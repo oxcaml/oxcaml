@@ -773,8 +773,7 @@ static void adopt_orphaned_work (int expected_status)
 /* Default speed setting for the major GC */
 atomic_uintnat caml_percent_free = Percent_free_def;
 
-/* Idle-phase floor, in sweep-work words: after sweeping, marking waits
-   until this much has been allocated this cycle. */
+/* Idle-phase duration in sweep-work words */
 uintnat caml_small_heap_limit = Small_heap_limit_def;
 atomic_uintnat caml_max_percent_free = Max_percent_free_def;
 
@@ -831,14 +830,15 @@ static atomic_uintnat total_work_completed;
 static uintnat total_work_incurred_at_mark_start;
 
 /* Value of total_work_completed at the latest color rotation (start of sweep)
-   and number of allocations done during the latest sweep phase.
+   and amount of work done during the latest sweep phase.
    Not atomic because these are only accessed in stw. */
-static uintnat work_counter_at_sweep_start;
-static uintnat latest_sweep_allocs;
+static uintnat work_completed_at_sweep_start;
+static uintnat latest_sweep_work;
 
-/* Sweeping will not give way to Phase_sweep_and_mark_main until
-   total_work_completed reaches this. */
-static atomic_uintnat work_counter_min_before_mark;
+/* Small-memory mode: at the end of sweeping, we will not switch to
+   Phase_mark_and_sweep_main (and thus will stay in idle mode) until
+   total_work_completed has reached this value. */
+static atomic_uintnat work_completed_min_before_mark;
 
 static inline intnat max2 (intnat a, intnat b)
 {
@@ -885,8 +885,8 @@ void caml_init_major_pacing (void)
 {
   total_work_incurred = 0;
   total_work_completed = 0;
-  CAML_GC_MESSAGE (POLICY, "work_counter: initialize to 0\n");
-  work_counter_min_before_mark = caml_small_heap_limit;
+  CAML_GC_MESSAGE (POLICY, "work counters: initialize to 0\n");
+  work_completed_min_before_mark = caml_small_heap_limit;
 }
 
 /* add_overhead is true if the latest collection was synchronous (with
@@ -907,12 +907,12 @@ void caml_reset_major_pacing(bool add_overhead)
            atomic_compare_exchange_strong(&total_work_completed, &completed, target));
   } while (!res);
   {
-    uintnat virtual_sweep_work = latest_sweep_allocs;
+    uintnat virtual_sweep_work = latest_sweep_work;
     if (add_overhead){
       virtual_sweep_work =
         virtual_sweep_work / 100 * (100 + atomic_load (&caml_percent_free));
     }
-    work_counter_min_before_mark =
+    work_completed_min_before_mark =
       target + max2 (virtual_sweep_work, caml_small_heap_limit);
   }
 }
@@ -1724,8 +1724,8 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
 
   Caml_global_barrier_if_final(participant_count) {
     caml_gc_phase = Phase_sweep_and_mark_main;
-    latest_sweep_allocs =
-      diffmod (atomic_load (&total_work_completed), work_counter_at_sweep_start);
+    latest_sweep_work =
+      diffmod (atomic_load (&total_work_completed), work_completed_at_sweep_start);
     atomic_store_relaxed(&global_roots_scanned, WORK_UNSTARTED);
 
     /* Adopt orphaned work from domains that were spawned and
@@ -1970,14 +1970,12 @@ static void cycle_major_heap_from_stw_single(
   caml_atomic_counter_init(&num_domains_to_mark, num_domains_in_stw);
 
   caml_gc_phase = Phase_sweep_main;
-  work_counter_at_sweep_start = atomic_load (&total_work_completed);
-  work_counter_min_before_mark =
-    work_counter_at_sweep_start + caml_small_heap_limit;
+  work_completed_at_sweep_start = atomic_load (&total_work_completed);
+  work_completed_min_before_mark =
+    work_completed_at_sweep_start + caml_small_heap_limit;
   CAML_GC_MESSAGE (MAJOR,
-                   "Sweep start: work counter "F_U
-                   ", idle floor armed at "F_U"\n",
-                   work_counter_at_sweep_start,
-                   work_counter_min_before_mark);
+                   "work completed: "F_U" at start of sweep",
+                   work_completed_at_sweep_start);
   atomic_store(&caml_gc_mark_phase_requested, 0);
   caml_atomic_counter_init(&ephe_round_info.num_domains_todo,
                            num_domains_in_stw);
@@ -2260,10 +2258,8 @@ static void major_collection_slice(intnat howmuch,
   }
 
   if (domain_state->sweeping_done && !caml_marking_started()) {
-    /* Idle phase: defer marking until the work counter passes the floor
-       armed at the start of this sweep phase. */
     uintnat wkcnt = atomic_load (&total_work_completed);
-    intnat idle = diffmod (work_counter_min_before_mark, wkcnt);
+    intnat idle = diffmod (work_completed_min_before_mark, wkcnt);
     bool want_mark;
     if (idle <= 0){
       want_mark = true;
@@ -2277,18 +2273,20 @@ static void major_collection_slice(intnat howmuch,
       CAML_GC_MESSAGE (SLICE, "Idle phase: "F_D"%s\n",
                        todo, want_mark ? " [finished]" : "");
     }
+    /* We do not immediately trigger a minor GC, but instead wait for
+     * the next one to happen normally. This gives some chance that
+     * other domains will finish sweeping as well.
+     * TODO: consider sharing sweep work between domains. */
+    /* TODO: this code doesn't play well with the overlap between
+       sweeping and marking (when a domain finishes its sweeping work
+       long before another). We need to do load-balancing on the
+       sweep work to have all domains switch to Idle (and then Mark)
+       at the same time. (Needed for performance, not for safety.)
+     */
     if (want_mark){
       bool mark_was_requested =
         atomic_load_relaxed (&caml_gc_mark_phase_requested) != 0;
-      /* We do not immediately trigger a minor GC, but instead wait for
-         the next one to happen normally, when marking will start. This
-         gives some chance that other domains will finish sweeping as
-         well. */
       request_mark_phase();
-      /* If there was no sweeping to do, but marking hasn't started,
-         then minor GC has not occurred naturally between major slices -
-         so we should force one now. (Gated on want_mark so the idle
-         phase cannot spin forced minor collections.) */
       if (mark_was_requested && sweep_work == 0 && !caml_marking_started()) {
         caml_request_minor_gc();
       }
