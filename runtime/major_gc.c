@@ -1104,15 +1104,19 @@ static intnat get_major_slice_sweepwork(collection_slice_mode mode){
 /* Register the work done by a chunk of slice.
    Clear requested_global_major_slice if the work counter has caught up with
    the slice's target counter. */
-static void commit_major_slice_sweepwork(intnat words_done) {
+static void account_work_completed(intnat words_done) {
   caml_domain_state *dom_st = Caml_state;
   dom_st->slice_budget -= words_done;
-  atomic_fetch_add (&total_work_completed, words_done);
   if (diffmod (dom_st->slice_target, atomic_load (&total_work_completed)) <= 0){
     /* We've done enough work by ourselves, no need to interrupt the other
        domains. */
     dom_st->requested_global_major_slice = 0;
   }
+}
+
+static void commit_major_slice_sweepwork(intnat words_done) {
+  atomic_fetch_add(&total_work_completed, words_done);
+  account_work_completed(words_done);
 }
 
 static intnat get_major_slice_markwork(collection_slice_mode mode)
@@ -2269,6 +2273,7 @@ static void major_collection_slice(intnat howmuch,
        at the same time. (Needed for performance, not for safety.)
      */
     uintnat wkcnt = atomic_load (&total_work_completed);
+  retry_idle:
     intnat idle = diffmod (work_completed_min_before_mark, wkcnt);
     if (idle <= 0){
       /* Idle phase is finished (or never existed), we should start marking */
@@ -2284,6 +2289,10 @@ static void major_collection_slice(intnat howmuch,
       todo = min2 (todo, idle);
       CAML_GC_MESSAGE (SLICE, "Idle phase: "F_D"%s\n",
                        todo, todo == idle ? " [finished]" : "");
+      if (!atomic_compare_exchange_strong(&total_work_completed,
+                                          &wkcnt, wkcnt + todo))
+        goto retry_idle;
+      account_work_completed(todo);
       commit_major_slice_sweepwork (todo);
       if (todo == idle) request_mark_phase ();
     }
