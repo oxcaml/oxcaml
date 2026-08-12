@@ -556,7 +556,5 @@ end;;
 (Id.id 42, Id.id #3.14 |> to_float)
 [%%expect {|
 module Id : sig val poly_ id : 'a -> 'a end
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+- : int * float = (42, 3.14)
 |}];;
