@@ -27,6 +27,8 @@ type subjkind_error =
   | Jkind_error of Jkind.Violation.t
   | Mode_crossing_error of mode_crossing_error
 
+val subjkind_error_printing_env : subjkind_error -> Env.t option
+
 val report_subjkind_error_with_offender :
   offender:(Format_doc.formatter -> unit) ->
   Env.t ->

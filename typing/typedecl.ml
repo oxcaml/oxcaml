@@ -5774,14 +5774,24 @@ let report_error ~loc = function
       fprintf ppf "type %a" Style.inline_code path_end
     in
     Location.errorf ~loc "%t" (fun ppf ->
-      Ikind.report_subjkind_error_with_offender ~offender
-        env ppf v)
+      let report () =
+        Ikind.report_subjkind_error_with_offender ~offender env ppf v
+      in
+      match Ikind.subjkind_error_printing_env v with
+      | None -> report ()
+      | Some printing_env ->
+        Printtyp.wrap_printing_env ~error:true printing_env report)
   | Jkind_mismatch_of_type (env, ty, v) ->
     let offender ppf = fprintf ppf "type %a"
         (Style.as_inline_code Printtyp.type_expr) ty in
     Location.errorf ~loc "%t" (fun ppf ->
-      Ikind.report_subjkind_error_with_offender ~offender
-        env ppf v)
+      let report () =
+        Ikind.report_subjkind_error_with_offender ~offender env ppf v
+      in
+      match Ikind.subjkind_error_printing_env v with
+      | None -> report ()
+      | Some printing_env ->
+        Printtyp.wrap_printing_env ~error:true printing_env report)
   | Jkind_sort {env; kloc; typ; err} ->
     let s =
       match kloc with

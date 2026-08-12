@@ -662,31 +662,9 @@ let pp_axis_list_prose ppf (axes : Jkind_axis.Axis.packed list) =
          pp_axis_name)
       init pp_axis_name last
 
-let remove_numeric_path_stamps s =
-  let b = Buffer.create (String.length s) in
-  let is_digit = function '0' .. '9' -> true | _ -> false in
-  let rec loop i =
-    if i >= String.length s
-    then ()
-    else
-      match s.[i] with
-      | '/' when i + 1 < String.length s && is_digit s.[i + 1] ->
-        let rec skip_digits j =
-          if j < String.length s && is_digit s.[j]
-          then skip_digits (j + 1)
-          else j
-        in
-        loop (skip_digits (i + 1))
-      | c ->
-        Buffer.add_char b c;
-        loop (i + 1)
-  in
-  loop 0;
-  Buffer.contents b
-
 let format_jkind_single_line env jkind =
   Format_doc.asprintf "%a" (Jkind.format env) jkind
-  |> collapse_whitespace |> remove_numeric_path_stamps
+  |> collapse_whitespace
 
 let pp_breakable_words ppf s =
   s |> String.split_on_char ' '
@@ -730,7 +708,8 @@ let axes_in_violation_order ~violating_axes axes =
     violating_axes
 
 type mode_crossing_error =
-  { super_jkind : Types.jkind_l;
+  { printing_env : Env.t;
+    super_jkind : Types.jkind_l;
     sub_poly : Ldd.node;
     super_poly : Ldd.node;
     provenance_names : Ldd.Name.t list;
@@ -740,6 +719,10 @@ type mode_crossing_error =
 type subjkind_error =
   | Jkind_error of Jkind.Violation.t
   | Mode_crossing_error of mode_crossing_error
+
+let subjkind_error_printing_env = function
+  | Jkind_error _ -> None
+  | Mode_crossing_error { printing_env; _ } -> Some printing_env
 
 let map_jkind_error result =
   Result.map_error (fun error -> Jkind_error error) result
@@ -915,8 +898,8 @@ let report_provenance_mode_crossing_error env ppf
          (pp_type_definition_kind_annotation env)
          super_jkind pp_provenance_residual_bullets entries)
 
-let report_mode_crossing_error ~offender env ppf err =
-  match report_provenance_mode_crossing_error env ppf err with
+let report_mode_crossing_error ~offender ppf err =
+  match report_provenance_mode_crossing_error err.printing_env ppf err with
   | Some () -> ()
   | None ->
     Format_doc.fprintf ppf
@@ -927,7 +910,7 @@ let report_mode_crossing_error ~offender env ppf err =
 let report_subjkind_error_with_offender ~offender env ppf = function
   | Jkind_error err ->
     Jkind.Violation.report_with_offender ~offender env ppf err
-  | Mode_crossing_error err -> report_mode_crossing_error ~offender env ppf err
+  | Mode_crossing_error err -> report_mode_crossing_error ~offender ppf err
 
 let report_subjkind_error_with_name ~name env ppf err =
   report_subjkind_error_with_offender
@@ -1404,7 +1387,7 @@ let compute_provenance_bound_polys env ~(lhs : Solver.ctx -> Ldd.node)
       let ctx = Solver.reset_for_provenance ctx ~add_provenance:true in
       lhs ctx)
 
-let check_mode_crossing_polys ~origin:_ ~sub_jkind:_ ~super_jkind
+let check_mode_crossing_polys ~origin:_ ~sub_jkind:_ ~super_jkind ~printing_env
     { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path = _ } =
   let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
   match violating_axes with
@@ -1412,7 +1395,8 @@ let check_mode_crossing_polys ~origin:_ ~sub_jkind:_ ~super_jkind
   | _ ->
     Error
       (Mode_crossing_error
-         { super_jkind;
+         { printing_env;
+           super_jkind;
            sub_poly;
            super_poly;
            provenance_names = Provenance.all_names ();
@@ -1447,7 +1431,7 @@ let subjkind_errors_have_same_violating_axes error1 error2 =
   | Jkind_error _, _ | _, Jkind_error _ -> false
 
 let best_effort_provenance_error ~fallback_error ~origin ~sub_jkind ~super_jkind
-    actual_error make_polys =
+    ~printing_env actual_error make_polys =
   let fallback error =
     match fallback_error () with
     | None -> Error error
@@ -1456,7 +1440,8 @@ let best_effort_provenance_error ~fallback_error ~origin ~sub_jkind ~super_jkind
   let provenance_check =
     match make_polys () with
     | provenance_polys ->
-      check_mode_crossing_polys ~origin ~sub_jkind ~super_jkind provenance_polys
+      check_mode_crossing_polys ~origin ~sub_jkind ~super_jkind ~printing_env
+        provenance_polys
     | exception
         ((Misc.Fatal_error | Stack_overflow | Out_of_memory | Sys.Break) as exn)
       ->
@@ -1498,7 +1483,7 @@ let sub_jkind_l ?(allow_any_crossing = false) ?origin
       let subcheck_polys = compute_subcheck_polys ~context env sub super in
       match
         check_mode_crossing_polys ~origin ~sub_jkind:sub ~super_jkind:super
-          subcheck_polys
+          ~printing_env:env subcheck_polys
       with
       | Ok () -> Ok ()
       | Error ikind_error -> (
@@ -1529,7 +1514,7 @@ let check_bound ?(allow_any_crossing = false) ?origin ~type_equal ~context env
       let actual_polys = compute_subcheck_polys ~context env actual bound in
       match
         check_mode_crossing_polys ~origin ~sub_jkind:actual ~super_jkind:bound
-          actual_polys
+          ~printing_env:env actual_polys
       with
       | Ok () -> Ok ()
       | Error actual_error ->
@@ -1552,7 +1537,7 @@ let check_bound ?(allow_any_crossing = false) ?origin ~type_equal ~context env
           | Error jkind_error -> Some (Jkind_error jkind_error)
         in
         best_effort_provenance_error ~fallback_error ~origin ~sub_jkind:actual
-          ~super_jkind:bound actual_error (fun () ->
+          ~super_jkind:bound ~printing_env:env actual_error (fun () ->
             compute_provenance_bound_polys env ~lhs:provenance_lhs bound)
 
 let check_type_expr_bound ?origin ~type_equal ~context env ~ty ~actual ~bound =

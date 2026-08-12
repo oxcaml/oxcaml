@@ -858,8 +858,13 @@ let report_type_mismatch first second decl env ppf err =
          (choose ord first second) decl
          "has a fixed representation while the other varies"
   | Jkind v ->
-      Ikind.report_subjkind_error_with_name ~name:first
-        env ppf v
+      let report () =
+        Ikind.report_subjkind_error_with_name ~name:first env ppf v
+      in
+      (match Ikind.subjkind_error_printing_env v with
+       | None -> report ()
+       | Some printing_env ->
+         Printtyp.wrap_printing_env ~error:true printing_env report)
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->
