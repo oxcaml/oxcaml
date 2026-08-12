@@ -34,8 +34,8 @@
    -open
    Int_replace_polymorphic_compare))
  (libraries
-  ocamlcommon
-  oxcaml_utils
+  ocamlfrontend
+  oxcaml_common
   flambda2_algorithms
   flambda2_bound_identifiers
   flambda2_identifiers

@@ -36,7 +36,7 @@ let test_meet_chains_two_vars () =
   let env = TE.add_equation env (Name.var var2) first_type_for_var2 in
   let symbol =
     Symbol.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       (Linkage_name.of_string "my_symbol")
   in
   let env = TE.add_definition env (Bound_name.create_symbol symbol) K.value in
@@ -83,7 +83,7 @@ let test_meet_chains_three_vars () =
   let env = TE.add_equation env (Name.var var3) first_type_for_var3 in
   let symbol =
     Symbol.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       (Linkage_name.of_string "my_symbol")
   in
   let env = TE.add_definition env (Bound_name.create_symbol symbol) K.value in
@@ -470,7 +470,10 @@ let test_meet_bottom_after_alias () =
 let test_meet_array_element_kinds () =
   let env = create_env () in
   let define ?(kind = K.value) env v =
-    let v' = Bound_var.create v Flambda_debug_uid.none Name_mode.normal in
+    let v' =
+      Bound_var.create v Flambda_debug_uid.none Name_mode.normal
+        ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+    in
     TE.add_definition env (Bound_name.create_var v') kind
   in
   let join ty1 ty2 =

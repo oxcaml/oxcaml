@@ -526,8 +526,8 @@ let phantom cmm_expr free_vars = Phantom { cmm_expr; free_vars }
 let rec is_cmm_simple cmm =
   match (cmm : Cmm.expression) with
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ ->
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ ->
     true
   | Cname_for_debugger (_, body) ->
     (* [Cname_for_debugger] is transparent for the purposes of deciding

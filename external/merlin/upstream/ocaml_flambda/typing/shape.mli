@@ -189,6 +189,7 @@ module Predef : sig
     | Unboxed_int32
     | Unboxed_int16
     | Unboxed_int8
+    | Unboxed_mask
     | Unboxed_simd of simd_vec_split
 
   type t =
@@ -205,6 +206,7 @@ module Predef : sig
     | Int32
     | Int64
     | Lazy_t
+    | Mask
     | Nativeint
     | String
     | Simd of simd_vec_split
@@ -253,7 +255,9 @@ and desc =
   | Rec_var of DeBruijn_index.t
 
   (* constructors for type declarations *)
-  | Variant of (t * Layout.t) complex_constructors
+  | Variant of (t * Layout.t option) complex_constructors
+      (* An [any] field will have a layout of [None]. Each particular value of
+         that variant may have a different layout for that field. *)
       (* CR sspies: Rename this just to constructor now that simple constructors
          are no longer a thing. *)
   | Variant_unboxed of
@@ -327,8 +331,9 @@ and 'a complex_constructor_argument =
   }
 
 (* Unlike in [types.ml], we use [Layout.t] entries here, because we can
-    represent flattened floats simply as float64 in the debugger. *)
-and constructor_representation = mixed_product_shape
+    represent flattened floats simply as float64 in the debugger. [None] means
+    the field is an [any] field and thus has no fixed layout. *)
+and constructor_representation = Layout.t option array
 
 and mixed_product_shape = Layout.t array
 
@@ -374,7 +379,7 @@ val rec_var : ?uid:Uid.t -> DeBruijn_index.t -> t
 
 (* constructors for type declarations *)
 val variant :
-  ?uid:Uid.t -> (t * Layout.t) complex_constructors -> t
+  ?uid:Uid.t -> (t * Layout.t option) complex_constructors -> t
 val variant_unboxed :
   ?uid:Uid.t -> variant_uid:Uid.t option -> arg_uid:Uid.t option ->
   string -> string option -> t -> Layout.t -> t

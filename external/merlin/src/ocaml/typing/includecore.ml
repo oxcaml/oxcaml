@@ -279,6 +279,9 @@ let value_descriptions ~loc env name
           {pc_desc = p1; pc_type = vd2.Types.val_type;
            pc_poly_mode = Option.map Mode.Locality.disallow_right mode_l1;
            pc_poly_sort = sort1;
+           pc_yielding =
+             Ctype.prim_params_yielding env vd2.Types.val_type
+               ~arity:p1.prim_arity;
            pc_env = env; pc_loc = vd1.Types.val_loc; } in
         Tcoerce_primitive pc
      end

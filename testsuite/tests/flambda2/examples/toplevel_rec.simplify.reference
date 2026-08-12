@@ -1,17 +1,17 @@
 let code g_1 deleted and code f_0 deleted in
 let z = %opaque (42) in
 let $camlToplevel_rec__f_2 =
-  closure f_0_1 @f
+  closure f_0_1 @f &toplevel.alloc_region
 and $camlToplevel_rec__g_3 =
-  closure g_1_1 @g
+  closure g_1_1 @g &toplevel.alloc_region
 and code rec loopify(never) size(10) newer_version_of(g_1)
       g_1_1 (y : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let z_1 = %project_value_slot.[g].[z] ($camlToplevel_rec__g_3) in
   (let int_sub = %int_barith.sub (y, 1) in
-   apply direct(f_0_1)
+   apply direct(f_0_1 &my_alloc_region)
      ($camlToplevel_rec__f_2 ~ depth my_depth -> succ my_depth
       : _ -> imm tagged)
        (int_sub)
@@ -21,12 +21,12 @@ and code rec loopify(never) size(10) newer_version_of(g_1)
       cont k (int_add)
 and code rec loopify(never) size(10) newer_version_of(f_0)
       f_0_1 (x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let z_1 = %project_value_slot.[f].[z] ($camlToplevel_rec__f_2) in
   (let int_add = %int_barith.add (x, 1) in
-   apply direct(g_1_1)
+   apply direct(g_1_1 &my_alloc_region)
      ($camlToplevel_rec__g_3 ~ depth my_depth -> succ my_depth
       : _ -> imm tagged)
        (int_add)

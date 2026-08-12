@@ -54,11 +54,13 @@ type t =
     typing_env : TE.t;
     inlined_debuginfo : Inlined_debuginfo.t;
     disable_inlining : Disable_inlining.t;
+    disable_partial_application_stub_generation : bool;
     inlining_state : Inlining_state.t;
     propagating_float_consts : bool;
     at_unit_toplevel : bool;
     unit_toplevel_return_continuation : Continuation.t;
     unit_toplevel_exn_continuation : Continuation.t;
+    unit_toplevel_alloc_region : Variable.t;
     variables_defined_at_toplevel : Variable.Set.t;
     cse : CSE.t;
     comparison_results : Comparison_result.t Variable.Map.t;
@@ -104,11 +106,12 @@ type t =
 
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 inlined_debuginfo; disable_inlining;
+                disable_partial_application_stub_generation;
                 inlining_state; propagating_float_consts;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
                 variables_defined_at_toplevel; cse; comparison_results;
                 are_rebuilding_terms; closure_info;
-                unit_toplevel_return_continuation; all_code;
+                unit_toplevel_return_continuation; unit_toplevel_alloc_region; all_code;
                 get_imported_code = _; inlining_history_tracker = _;
                 loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
                 lifted = _; cost_of_lifting_continuations_out_of_current_one;
@@ -120,11 +123,13 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
       @[<hov 1>(typing_env@ %a)@]@ \
       @[<hov 1>(inlined_debuginfo@ %a)@]@ \
       @[<hov 1>(disable_inlining@ %a)@]@ \
+      @[<hov 1>(disable_partial_application_stub_generation@ %b)@]@ \
       @[<hov 1>(inlining_state@ %a)@]@ \
       @[<hov 1>(propagating_float_consts@ %b)@]@ \
       @[<hov 1>(at_unit_toplevel@ %b)@]@ \
       @[<hov 1>(unit_toplevel_return_continuation@ %a)@]@ \
       @[<hov 1>(unit_toplevel_exn_continuation@ %a)@]@ \
+      @[<hov 1>(unit_toplevel_alloc_region@ %a)@]@ \
       @[<hov 1>(variables_defined_at_toplevel@ %a)@]@ \
       @[<hov 1>(cse@ @[<hov 1>%a@])@]@ \
       @[<hov 1>(comparison_results@ @[<hov 1>%a@])@]@ \
@@ -144,11 +149,13 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     TE.print typing_env
     Inlined_debuginfo.print inlined_debuginfo
     Disable_inlining.print disable_inlining
+    disable_partial_application_stub_generation
     Inlining_state.print inlining_state
     propagating_float_consts
     at_unit_toplevel
     Continuation.print unit_toplevel_return_continuation
     Continuation.print unit_toplevel_exn_continuation
+    Variable.print unit_toplevel_alloc_region
     Variable.Set.print variables_defined_at_toplevel
     CSE.print cse
     (Variable.Map.print Comparison_result.print) comparison_results
@@ -217,7 +224,7 @@ let define_extra_variable t var kind =
 let create ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
-    ~toplevel_my_region ~toplevel_my_ghost_region =
+    ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region =
   let typing_env = TE.create ~machine_width ~resolver in
   let t =
     { round;
@@ -225,11 +232,13 @@ let create ~round ~machine_width ~(resolver : resolver)
       typing_env;
       inlined_debuginfo = Inlined_debuginfo.none;
       disable_inlining = Do_not_disable_inlining;
+      disable_partial_application_stub_generation = false;
       inlining_state = Inlining_state.default ~round;
       propagating_float_consts;
       at_unit_toplevel = true;
       unit_toplevel_return_continuation;
       unit_toplevel_exn_continuation;
+      unit_toplevel_alloc_region = toplevel_my_alloc_region;
       variables_defined_at_toplevel = Variable.Set.empty;
       cse = CSE.empty;
       comparison_results = Variable.Map.empty;
@@ -238,7 +247,7 @@ let create ~round ~machine_width ~(resolver : resolver)
       all_code = Code_id.Map.empty;
       get_imported_code;
       inlining_history_tracker =
-        Inlining_history.Tracker.empty (Compilation_unit.get_current_exn ());
+        Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
       loopify_state = Loopify_state.do_not_loopify;
       replay_history = Replay_history.first_pass;
       specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
@@ -276,11 +285,16 @@ let get_continuation_scope t = TE.current_scope t.typing_env
 
 let disable_inlining t = t.disable_inlining
 
+let disable_partial_application_stub_generation t =
+  t.disable_partial_application_stub_generation
+
 let propagating_float_consts t = t.propagating_float_consts
 
 let unit_toplevel_exn_continuation t = t.unit_toplevel_exn_continuation
 
 let unit_toplevel_return_continuation t = t.unit_toplevel_return_continuation
+
+let unit_toplevel_alloc_region t = t.unit_toplevel_alloc_region
 
 let at_unit_toplevel t = t.at_unit_toplevel
 
@@ -309,17 +323,27 @@ let increment_continuation_scope t =
 let bump_current_level_scope t =
   { t with typing_env = TE.bump_current_level_scope t.typing_env }
 
+let enter_stub_function t =
+  { t with
+    disable_inlining = Disable_inlining Stub;
+    disable_partial_application_stub_generation =
+      Flambda_features.simplify_stubs ()
+      || t.disable_partial_application_stub_generation
+  }
+
 let enter_set_of_closures
     { machine_width;
       round;
       typing_env;
       inlined_debuginfo = _;
       disable_inlining;
+      disable_partial_application_stub_generation;
       inlining_state;
       propagating_float_consts;
       at_unit_toplevel = _;
       unit_toplevel_return_continuation;
       unit_toplevel_exn_continuation;
+      unit_toplevel_alloc_region;
       variables_defined_at_toplevel;
       cse = _;
       comparison_results = _;
@@ -336,20 +360,19 @@ let enter_set_of_closures
       cost_of_lifting_continuations_out_of_current_one = _;
       has_seen_a_non_liftable_continuation = _;
       join_analysis = _
-    } ~in_stub =
-  let disable_inlining : Disable_inlining.t =
-    if in_stub then Disable_inlining Stub else disable_inlining
-  in
+    } =
   { machine_width;
     round;
     typing_env = TE.closure_env typing_env;
     inlined_debuginfo = Inlined_debuginfo.none;
     disable_inlining;
+    disable_partial_application_stub_generation;
     inlining_state;
     propagating_float_consts;
     at_unit_toplevel = false;
     unit_toplevel_return_continuation;
     unit_toplevel_exn_continuation;
+    unit_toplevel_alloc_region;
     variables_defined_at_toplevel;
     cse = CSE.empty;
     comparison_results = Variable.Map.empty;
@@ -532,6 +555,23 @@ let check_simple_is_bound t (simple : Simple.t) =
 let mem_code t id =
   Code_id.Map.mem id t.all_code || Exported_code.mem id (t.get_imported_code ())
 
+let find_code_metadata_exn t id =
+  match Code_id.Map.find id t.all_code with
+  | code -> Code.code_metadata code
+  | exception Not_found -> (
+    (* We don't care which unit the metadata is coming from, so if we have
+       already loaded the metadata in imported code, return it. *)
+    match Exported_code.find_exn (t.get_imported_code ()) id with
+    | code_or_metadata -> Code_or_metadata.code_metadata code_or_metadata
+    | exception Not_found ->
+      (* Sometimes the metadata is not properly reexported; try to force loading
+         it. *)
+      let (_ : TE.Serializable.t option) =
+        TE.resolver t.typing_env (Code_id.get_compilation_unit id)
+      in
+      Code_or_metadata.code_metadata
+        (Exported_code.find_exn (t.get_imported_code ()) id))
+
 let find_code_exn t id =
   match Code_id.Map.find_or_null id t.all_code with
   | This code -> Code_or_metadata.create code
@@ -546,10 +586,7 @@ let find_code_exn t id =
     Exported_code.find_exn (t.get_imported_code ()) id
 
 let define_code t ~code_id ~code =
-  if
-    not
-      (Code_id.in_compilation_unit code_id
-         (Compilation_unit.get_current_exn ()))
+  if not (Code_id.in_compilation_unit code_id (Current_unit.get_cu_exn ()))
   then
     Misc.fatal_errorf "Cannot define code ID %a as it is from another unit:@ %a"
       Code_id.print code_id Code.print code;
@@ -607,11 +644,12 @@ let set_rebuild_terms t =
 
 let are_rebuilding_terms t = t.are_rebuilding_terms
 
-let enter_closure code_id ~return_continuation ~exn_continuation ~my_closure t =
+let enter_closure code_id ~return_continuation ~exn_continuation ~my_closure
+    ~my_alloc_region t =
   { t with
     closure_info =
       Closure_info.in_a_closure code_id ~return_continuation ~exn_continuation
-        ~my_closure
+        ~my_closure ~my_alloc_region
   }
 
 let closure_info t = t.closure_info
@@ -643,9 +681,15 @@ let add_inlined_debuginfo t dbg =
 
 let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
   let arguments =
-    Inlining_state.arguments t.inlining_state
-    |> Inlining_arguments.meet (Code.inlining_arguments called_code)
-    |> Inlining_arguments.meet (Apply.inlining_arguments apply)
+    let arguments = Inlining_state.arguments t.inlining_state in
+    (* CR ncourant: why do we combine with [called_code]'s inlining arguments,
+       when we don't do that for regular apply_exprs? *)
+    let arguments =
+      Inlining_arguments.combine ~from_env:arguments
+        ~from_metadata:(Code.inlining_arguments called_code)
+    in
+    Inlining_arguments.combine ~from_env:arguments
+      ~from_metadata:(Apply.inlining_arguments apply)
   in
   let inlining_state =
     (* The depth limit for [@inline always] and [@inlined always] is really to
@@ -654,16 +698,16 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
        the user's requests for these attributes basically all the time. As such
        inlining when these attributes are in effect affects the depth limit much
        less than in other scenarios. *)
+    let is_stub = Code.stub called_code in
+    let increment =
+      if is_stub
+      then 0
+      else if was_inline_always
+      then 1
+      else Flambda_features.Inlining.depth_scaling_factor
+    in
     Inlining_state.with_arguments arguments
-      (if Code.stub called_code
-       then t.inlining_state
-       else
-         let by =
-           if was_inline_always
-           then 1
-           else Flambda_features.Inlining.depth_scaling_factor
-         in
-         Inlining_state.increment_depth t.inlining_state ~by)
+      (Inlining_state.increment_depth t.inlining_state ~is_stub ~by:increment)
   in
   let inlined_debuginfo =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)
@@ -785,6 +829,8 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     machine_width = denv.machine_width;
     inlined_debuginfo = denv.inlined_debuginfo;
     disable_inlining = denv.disable_inlining;
+    disable_partial_application_stub_generation =
+      denv.disable_partial_application_stub_generation;
     inlining_state = denv.inlining_state;
     inlining_history_tracker = denv.inlining_history_tracker;
     (* denv_for_join *)
@@ -809,6 +855,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     propagating_float_consts = denv.propagating_float_consts;
     unit_toplevel_return_continuation = denv.unit_toplevel_return_continuation;
     unit_toplevel_exn_continuation = denv.unit_toplevel_exn_continuation;
+    unit_toplevel_alloc_region = denv.unit_toplevel_alloc_region;
     are_rebuilding_terms = denv.are_rebuilding_terms;
     closure_info = denv.closure_info;
     get_imported_code = denv.get_imported_code;

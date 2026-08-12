@@ -50,6 +50,11 @@ val of_float : float -> t
 (** Convert to a 64-bit float; exact. *)
 val to_float : t -> float
 
+(** Convert from a 64-bit integer; rounds once to the nearest 32-bit float
+    (matching the backend's [cvtsi2ss], unlike going via a 64-bit float which
+    would double-round). *)
+val of_int64 : int64 -> t
+
 (** Bit-cast to 32-bit integer. *)
 val to_bits : t -> int32
 
