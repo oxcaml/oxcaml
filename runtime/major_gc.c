@@ -2258,21 +2258,6 @@ static void major_collection_slice(intnat howmuch,
   }
 
   if (domain_state->sweeping_done && !caml_marking_started()) {
-    uintnat wkcnt = atomic_load (&total_work_completed);
-    intnat idle = diffmod (work_completed_min_before_mark, wkcnt);
-    bool want_mark;
-    if (idle <= 0){
-      want_mark = true;
-    }else{
-      intnat todo = diffmod (atomic_load (&total_work_incurred), wkcnt);
-      todo = min2 (todo, idle);
-      /* Commit even when todo == 0: this also clears
-         [requested_global_major_slice]. */
-      commit_major_slice_sweepwork (todo);
-      want_mark = (todo == idle);
-      CAML_GC_MESSAGE (SLICE, "Idle phase: "F_D"%s\n",
-                       todo, want_mark ? " [finished]" : "");
-    }
     /* We do not immediately trigger a minor GC, but instead wait for
      * the next one to happen normally. This gives some chance that
      * other domains will finish sweeping as well.
@@ -2283,13 +2268,24 @@ static void major_collection_slice(intnat howmuch,
        sweep work to have all domains switch to Idle (and then Mark)
        at the same time. (Needed for performance, not for safety.)
      */
-    if (want_mark){
-      bool mark_was_requested =
-        atomic_load_relaxed (&caml_gc_mark_phase_requested) != 0;
+    uintnat wkcnt = atomic_load (&total_work_completed);
+    intnat idle = diffmod (work_completed_min_before_mark, wkcnt);
+    if (idle <= 0){
+      /* Idle phase is finished (or never existed), we should start marking */
       request_mark_phase();
-      if (mark_was_requested && sweep_work == 0 && !caml_marking_started()) {
+      /* If there was neither sweeping nor idle work to do, but marking
+         hasn't started, then minor GC has not occurred naturally between
+         major slices - so we should force one now. */
+      if (sweep_work == 0) {
         caml_request_minor_gc();
       }
+    } else {
+      intnat todo = diffmod (atomic_load (&total_work_incurred), wkcnt);
+      todo = min2 (todo, idle);
+      CAML_GC_MESSAGE (SLICE, "Idle phase: "F_D"%s\n",
+                       todo, todo == idle ? " [finished]" : "");
+      commit_major_slice_sweepwork (todo);
+      if (todo == idle) request_mark_phase ();
     }
   }
 
