@@ -57,7 +57,7 @@ type header = {
     header_name : Compilation_unit.Name.t;
     header_kind : kind;
     header_globals : Global_module.With_precision.t array;
-    header_sign : Serialized.persistent_signature;
+    header_sign : Serialized.signature * Mode.Staticity.Const.t;
     header_params : Global_module.Parameter_name.t list;
 }
 
@@ -65,14 +65,14 @@ type 'sg cmi_infos_generic = {
     cmi_name : Compilation_unit.Name.t;
     cmi_kind : kind;
     cmi_globals : Global_module.With_precision.t array;
-    cmi_sign : 'sg;
+    cmi_sign : 'sg * Mode.Staticity.Const.t;
     cmi_params : Global_module.Parameter_name.t list;
     cmi_crcs : crcs;
     cmi_flags : flags;
 }
 
-type cmi_infos_lazy = Subst.Lazy.persistent_signature cmi_infos_generic
-type cmi_infos = Types.persistent_signature cmi_infos_generic
+type cmi_infos_lazy = Subst.Lazy.signature cmi_infos_generic
+type cmi_infos = Types.signature cmi_infos_generic
 
 let force_cmi_infos cmi =
   let sign, staticity = cmi.cmi_sign in

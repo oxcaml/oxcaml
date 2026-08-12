@@ -189,6 +189,15 @@ and type_desc =
   (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
       The last parameter keep tracks of known expansions, see [abbrev_memo]. *)
 
+  | Tmod of type_expr * mod_bounds
+  (** [Tmod (t, bounds)] ==> [t @@ bounds]
+      The type [t] with its mode crossing bounded by [bounds]. This is a
+      transparent wrapper: it constrains mode crossing only, and erases at
+      runtime. The unboxing and kind-computation paths look through it to [t],
+      as they do for [Tpoly]; generic structural traversals rebuild it; the
+      leaf consumers that classify a type's runtime representation raise,
+      since a [Tmod] is not expected to reach them. *)
+
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]
       f1, fn are represented as a linked list of types using Tfield and Tnil
@@ -917,6 +926,7 @@ and mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
@@ -1214,7 +1224,9 @@ module type Wrapped = sig
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Staticity.Const.t
+  (** A left mode instead of a constant mode, in order to encode mode hints.
+      Note that cmi record constant modes anyway. *)
+  and persistent_signature = signature * Mode.Value.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility

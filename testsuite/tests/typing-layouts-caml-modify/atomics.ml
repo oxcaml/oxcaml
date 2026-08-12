@@ -1,4 +1,5 @@
 (* TEST
+ include stdlib_stable;
  modules = "replace_caml_atomic.c";
  {
    not-macos;
@@ -7,12 +8,15 @@
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_load_field \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_exchange \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_exchange_field \
+            -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_exchange_field_local \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_set \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_set_field \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_compare_exchange \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_compare_exchange_field \
+            -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_compare_exchange_field_local \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_cas \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_cas_field \
+            -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_cas_field_local \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_fetch_add \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_fetch_add_field \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_atomic_add \
@@ -29,10 +33,98 @@
  }
 *)
 
+open Stdlib_stable
+
 (* CR-someday mslater: this should also work on arm once atomics are builtins *)
 
 (* This test verifies that immediate atomics do not call runtime wrapper functions
    in native amd64 builds. *)
+
+external total_atomic_calls : unit -> int = "total_atomic_calls"
+external total_atomic_reset : unit -> unit = "total_atomic_reset"
+
+external atomic_load_calls : unit -> int = "atomic_load_calls"
+external atomic_load_field_calls : unit -> int = "atomic_load_field_calls"
+external atomic_exchange_calls : unit -> int = "atomic_exchange_calls"
+external atomic_exchange_field_local_calls : unit -> int = "atomic_exchange_field_local_calls"
+external atomic_exchange_field_calls : unit -> int = "atomic_exchange_field_calls"
+external atomic_set_calls : unit -> int = "atomic_set_calls"
+external atomic_set_field_calls : unit -> int = "atomic_set_field_calls"
+external atomic_compare_exchange_calls : unit -> int = "atomic_compare_exchange_calls"
+external atomic_compare_exchange_field_calls : unit -> int = "atomic_compare_exchange_field_calls"
+external atomic_compare_exchange_field_local_calls : unit -> int = "atomic_compare_exchange_field_local_calls"
+external atomic_cas_calls : unit -> int = "atomic_cas_calls"
+external atomic_cas_field_calls : unit -> int = "atomic_cas_field_calls"
+external atomic_cas_field_local_calls : unit -> int = "atomic_cas_field_local_calls"
+external atomic_fetch_add_calls : unit -> int = "atomic_fetch_add_calls"
+external atomic_fetch_add_field_calls : unit -> int = "atomic_fetch_add_field_calls"
+external atomic_add_calls : unit -> int = "atomic_add_calls"
+external atomic_add_field_calls : unit -> int = "atomic_add_field_calls"
+external atomic_sub_calls : unit -> int = "atomic_sub_calls"
+external atomic_sub_field_calls : unit -> int = "atomic_sub_field_calls"
+external atomic_land_calls : unit -> int = "atomic_land_calls"
+external atomic_land_field_calls : unit -> int = "atomic_land_field_calls"
+external atomic_lor_calls : unit -> int = "atomic_lor_calls"
+external atomic_lor_field_calls : unit -> int = "atomic_lor_field_calls"
+external atomic_lxor_calls : unit -> int = "atomic_lxor_calls"
+external atomic_lxor_field_calls : unit -> int = "atomic_lxor_field_calls"
+
+external atomic_load_reset : unit -> unit = "atomic_load_reset"
+external atomic_load_field_reset : unit -> unit = "atomic_load_field_reset"
+external atomic_exchange_reset : unit -> unit = "atomic_exchange_reset"
+external atomic_exchange_field_reset : unit -> unit = "atomic_exchange_field_reset"
+external atomic_exchange_field_local_reset : unit -> unit = "atomic_exchange_field_local_reset"
+external atomic_set_reset : unit -> unit = "atomic_set_reset"
+external atomic_set_field_reset : unit -> unit = "atomic_set_field_reset"
+external atomic_compare_exchange_reset : unit -> unit = "atomic_compare_exchange_reset"
+external atomic_compare_exchange_field_reset : unit -> unit = "atomic_compare_exchange_field_reset"
+external atomic_compare_exchange_field_local_reset : unit -> unit = "atomic_compare_exchange_field_local_reset"
+external atomic_cas_reset : unit -> unit = "atomic_cas_reset"
+external atomic_cas_field_reset : unit -> unit = "atomic_cas_field_reset"
+external atomic_cas_field_local_reset : unit -> unit = "atomic_cas_field_local_reset"
+external atomic_fetch_add_reset : unit -> unit = "atomic_fetch_add_reset"
+external atomic_fetch_add_field_reset : unit -> unit = "atomic_fetch_add_field_reset"
+external atomic_add_reset : unit -> unit = "atomic_add_reset"
+external atomic_add_field_reset : unit -> unit = "atomic_add_field_reset"
+external atomic_sub_reset : unit -> unit = "atomic_sub_reset"
+external atomic_sub_field_reset : unit -> unit = "atomic_sub_field_reset"
+external atomic_land_reset : unit -> unit = "atomic_land_reset"
+external atomic_land_field_reset : unit -> unit = "atomic_land_field_reset"
+external atomic_lor_reset : unit -> unit = "atomic_lor_reset"
+external atomic_lor_field_reset : unit -> unit = "atomic_lor_field_reset"
+external atomic_lxor_reset : unit -> unit = "atomic_lxor_reset"
+external atomic_lxor_field_reset : unit -> unit = "atomic_lxor_field_reset"
+
+(* Reset all atomic counters. Initializing stdlib modules (like Format) can
+   invoke atomic operations. *)
+
+let () =
+  total_atomic_reset ();
+  atomic_load_reset ();
+  atomic_load_field_reset ();
+  atomic_exchange_reset ();
+  atomic_exchange_field_reset ();
+  atomic_exchange_field_local_reset ();
+  atomic_set_reset ();
+  atomic_set_field_reset ();
+  atomic_compare_exchange_reset ();
+  atomic_compare_exchange_field_reset ();
+  atomic_compare_exchange_field_local_reset ();
+  atomic_cas_reset ();
+  atomic_cas_field_reset ();
+  atomic_cas_field_local_reset ();
+  atomic_fetch_add_reset ();
+  atomic_fetch_add_field_reset ();
+  atomic_add_reset ();
+  atomic_add_field_reset ();
+  atomic_sub_reset ();
+  atomic_sub_field_reset ();
+  atomic_land_reset ();
+  atomic_land_field_reset ();
+  atomic_lor_reset ();
+  atomic_lor_field_reset ();
+  atomic_lxor_reset ();
+  atomic_lxor_field_reset ()
 
 let a = Atomic.make 0
 let _ = Atomic.get a
@@ -67,10 +159,10 @@ let _ = Atomic.Loc.logor [%atomic.loc a.x] 1
 let _ = Atomic.Loc.logxor [%atomic.loc a.x] 1
 
 external atomic_get_field : 'a atomic -> int -> 'a = "%atomic_load_field"
-external atomic_set_field : 'a atomic -> int -> 'a -> unit = "%atomic_set_field"
-external atomic_exchange_field : 'a atomic -> int -> 'a -> 'a = "%atomic_exchange_field"
-external atomic_compare_exchange_field : 'a atomic -> int -> 'a -> 'a -> 'a = "%atomic_compare_exchange_field"
-external atomic_compare_and_set_field : 'a atomic -> int -> 'a -> 'a -> bool = "%atomic_cas_field"
+external atomic_set_field : ('a atomic [@local_opt]) -> int -> 'a -> unit = "%atomic_set_field"
+external atomic_exchange_field : ('a atomic [@local_opt]) -> int -> 'a -> 'a = "%atomic_exchange_field"
+external atomic_compare_exchange_field : ('a atomic [@local_opt]) -> int -> 'a -> 'a -> 'a = "%atomic_compare_exchange_field"
+external atomic_compare_and_set_field : ('a atomic [@local_opt]) -> int -> 'a -> 'a -> bool = "%atomic_cas_field"
 external atomic_fetch_and_add_field : int atomic -> int -> int -> int = "%atomic_fetch_add_field"
 external atomic_add_field : int atomic -> int -> int -> unit = "%atomic_add_field"
 external atomic_sub_field : int atomic -> int -> int -> unit = "%atomic_sub_field"
@@ -91,39 +183,19 @@ let _ = atomic_logand_field a 0 1
 let _ = atomic_logor_field a 0 1
 let _ = atomic_logxor_field a 0 1
 
-external atomic_load_calls : unit -> int = "atomic_load_calls"
-external atomic_load_field_calls : unit -> int = "atomic_load_field_calls"
-external atomic_exchange_calls : unit -> int = "atomic_exchange_calls"
-external atomic_exchange_field_calls : unit -> int = "atomic_exchange_field_calls"
-external atomic_set_calls : unit -> int = "atomic_set_calls"
-external atomic_set_field_calls : unit -> int = "atomic_set_field_calls"
-external atomic_compare_exchange_calls : unit -> int = "atomic_compare_exchange_calls"
-external atomic_compare_exchange_field_calls : unit -> int = "atomic_compare_exchange_field_calls"
-external atomic_cas_calls : unit -> int = "atomic_cas_calls"
-external atomic_cas_field_calls : unit -> int = "atomic_cas_field_calls"
-external atomic_fetch_add_calls : unit -> int = "atomic_fetch_add_calls"
-external atomic_fetch_add_field_calls : unit -> int = "atomic_fetch_add_field_calls"
-external atomic_add_calls : unit -> int = "atomic_add_calls"
-external atomic_add_field_calls : unit -> int = "atomic_add_field_calls"
-external atomic_sub_calls : unit -> int = "atomic_sub_calls"
-external atomic_sub_field_calls : unit -> int = "atomic_sub_field_calls"
-external atomic_land_calls : unit -> int = "atomic_land_calls"
-external atomic_land_field_calls : unit -> int = "atomic_land_field_calls"
-external atomic_lor_calls : unit -> int = "atomic_lor_calls"
-external atomic_lor_field_calls : unit -> int = "atomic_lor_field_calls"
-external atomic_lxor_calls : unit -> int = "atomic_lxor_calls"
-external atomic_lxor_field_calls : unit -> int = "atomic_lxor_field_calls"
-
 let () = assert (atomic_load_calls () = 0)
 let () = assert (atomic_load_field_calls () = 0)
 let () = assert (atomic_exchange_calls () = 0)
 let () = assert (atomic_exchange_field_calls () = 0)
+let () = assert (atomic_exchange_field_local_calls () = 0)
 let () = assert (atomic_set_calls () = 0)
 let () = assert (atomic_set_field_calls () = 0)
 let () = assert (atomic_compare_exchange_calls () = 0)
 let () = assert (atomic_compare_exchange_field_calls () = 0)
+let () = assert (atomic_compare_exchange_field_local_calls () = 0)
 let () = assert (atomic_cas_calls () = 0)
 let () = assert (atomic_cas_field_calls () = 0)
+let () = assert (atomic_cas_field_local_calls () = 0)
 let () = assert (atomic_fetch_add_calls () = 0)
 let () = assert (atomic_fetch_add_field_calls () = 0)
 let () = assert (atomic_add_calls () = 0)
@@ -136,3 +208,249 @@ let () = assert (atomic_lor_calls () = 0)
 let () = assert (atomic_lor_field_calls () = 0)
 let () = assert (atomic_lxor_calls () = 0)
 let () = assert (atomic_lxor_field_calls () = 0)
+
+(* Test individual atomic operations. *)
+
+(* build a test function for a particular atomic call *)
+let gen_test ~fn ~fn_calls ~reset_fn_calls =
+  let test ~(call_pos : [%call_pos]) ~expected f =
+    total_atomic_reset ();
+    reset_fn_calls ();
+    f ();
+    let actual_fn = fn_calls () in
+    let actual_total = total_atomic_calls () in
+    if not (expected = actual_fn) then
+      failwith @@
+        Format.sprintf
+          "On line %d, expected %d calls to %s, but saw %d"
+          call_pos.pos_lnum expected fn actual_fn;
+    if not (expected = actual_total) then
+      failwith @@
+        Format.sprintf
+          "On line %d, expected %d total atomic calls, but saw %d"
+          call_pos.pos_lnum expected actual_total;
+  in
+  test
+
+let test_atomic_exchange_field = gen_test ~fn:"atomic_exchange_field"
+                              ~fn_calls:atomic_exchange_field_calls
+                              ~reset_fn_calls:atomic_exchange_field_reset
+
+let test_atomic_exchange_field_local =
+  gen_test ~fn:"atomic_exchange_field_local"
+    ~fn_calls:atomic_exchange_field_local_calls
+    ~reset_fn_calls:atomic_exchange_field_local_reset
+
+let test_atomic_compare_exchange_field =
+  gen_test ~fn:"atomic_compare_exchange_field"
+    ~fn_calls:atomic_compare_exchange_field_calls
+    ~reset_fn_calls:atomic_compare_exchange_field_reset
+
+let test_atomic_compare_exchange_field_local =
+  gen_test ~fn:"atomic_compare_exchange_field_local"
+    ~fn_calls:atomic_compare_exchange_field_local_calls
+    ~reset_fn_calls:atomic_compare_exchange_field_local_reset
+
+let test_atomic_cas_field =
+  gen_test ~fn:"atomic_cas_field"
+    ~fn_calls:atomic_cas_field_calls
+    ~reset_fn_calls:atomic_cas_field_reset
+
+let test_atomic_cas_field_local =
+  gen_test ~fn:"atomic_cas_field_local"
+    ~fn_calls:atomic_cas_field_local_calls
+    ~reset_fn_calls:atomic_cas_field_local_reset
+
+(* Patomic_set_field skips runtime call for immediates. *)
+module Set_field = struct
+  type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let () =
+    let t = { imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      t.imm <- 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      t.ptr <- "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
+
+(* Patomic_set_mixed_field skips runtime call for immediates. *)
+module Set_field_mixed = struct
+  type t = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let () =
+    let t = { f = #42L; imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      t.imm <- 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      t.ptr <- "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
+
+(* Idx_atomic.set skips runtime call for immediates. *)
+module Set_idx_atomic = struct
+  type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let () =
+    let t = { imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      let idx = (.imm) in
+      Idx_atomic.set t idx 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      let idx = (.ptr) in
+      Idx_atomic.set t idx "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
+
+(* Idx_atomic.set on mixed field skips runtime call for immediates. *)
+module Set_idx_atomic_mixed = struct
+  type t = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let () =
+    let t = { f = #42L; imm = 1; ptr = "two"} in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      let idx = (.imm) in
+      Idx_atomic.set t idx 3;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      let idx = (.ptr) in
+      Idx_atomic.set t idx "four";
+      ignore (Sys.opaque_identity t)
+    )
+end
+
+module Atomic_locality = struct
+  (* atomic in global record *)
+  let () =
+    let (t @ global) = Atomic.make "foo" in
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      Atomic.set t "bar"
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      ignore (Atomic.exchange t "bar")
+    );
+    test_atomic_compare_exchange_field ~expected:1 (fun () ->
+      Atomic.compare_exchange t "foo" "bar"
+    );
+    test_atomic_cas_field ~expected:1 (fun () ->
+      Atomic.compare_and_set t "foo" "bar"
+    )
+
+  (* atomic in local record *)
+  let () =
+    let (t @ local) = Atomic.make "foo" in
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      Atomic.set t "bar"
+    );
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      ignore (Atomic.exchange t "bar")
+    );
+    test_atomic_compare_exchange_field_local ~expected:1 (fun () ->
+      Atomic.compare_exchange t "foo" "bar"
+    );
+    test_atomic_cas_field_local ~expected:1 (fun () ->
+      Atomic.compare_and_set t "foo" "bar"
+    )
+end
+
+module Atomic_loc_locality = struct
+  type 'a t = { mutable contents: 'a [@atomic] }
+
+  (* atomic in global record *)
+  let () =
+    let (t @ global) = { contents = "foo" } in
+    let (loc @ global) = [%atomic.loc t.contents] in
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      Atomic.Loc.set loc "bar"
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      ignore (Atomic.Loc.exchange loc "bar")
+    );
+    test_atomic_compare_exchange_field ~expected:1 (fun () ->
+      Atomic.Loc.compare_exchange loc "foo" "bar"
+    );
+    test_atomic_cas_field ~expected:1 (fun () ->
+      Atomic.Loc.compare_and_set loc "foo" "bar"
+    )
+
+  (* atomic in local record *)
+  let () =
+    let (t @ local) = { contents = "foo" } in
+    let (loc @ local) = [%atomic.loc t.contents] in
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      Atomic.Loc.set loc "bar"
+    );
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      ignore (Atomic.Loc.exchange loc "bar")
+    );
+    test_atomic_compare_exchange_field_local ~expected:1 (fun () ->
+      Atomic.Loc.compare_exchange loc "foo" "bar"
+    );
+    test_atomic_cas_field_local ~expected:1 (fun () ->
+      Atomic.Loc.compare_and_set loc "foo" "bar"
+    )
+end
+
+module Atomic_idx_locality = struct
+  type 'a t = { mutable contents : 'a [@atomic] }
+
+  (* atomic in global record *)
+  let () =
+    let (t @ global) = { contents = "foo" } in
+    let idx = (.contents) in
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      Idx_atomic.set t idx "bar"
+    )
+
+  (* atomic in local record *)
+  let () =
+    let (t @ local) = { contents = "foo" } in
+    let idx = (.contents) in
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      Idx_atomic.set t idx "bar"
+    )
+end
+
+module Atomic_field_locality = struct
+  (* atomic in global record *)
+  let () =
+    let (t @ global) = { x = "foo" } in
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      atomic_set_field t 0 "bar"
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      ignore (atomic_exchange_field t 0 "bar")
+    );
+    test_atomic_compare_exchange_field ~expected:1 (fun () ->
+      atomic_compare_exchange_field t 0 "foo" "bar"
+    );
+    test_atomic_cas_field ~expected:1 (fun () ->
+      atomic_compare_and_set_field t 0 "foo" "bar"
+    )
+
+  (* atomic in local record *)
+  let () =
+    let (t @ local) = { x = "foo" } in
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      atomic_set_field t 0 "bar"
+    );
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      ignore (atomic_exchange_field t 0 "bar")
+    );
+    test_atomic_compare_exchange_field_local ~expected:1 (fun () ->
+      atomic_compare_exchange_field t 0 "foo" "bar"
+    );
+    test_atomic_cas_field_local ~expected:1 (fun () ->
+      atomic_compare_and_set_field t 0 "foo" "bar"
+    )
+end

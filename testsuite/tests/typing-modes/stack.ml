@@ -290,7 +290,8 @@ let f () = stack_ [i for i = 0 to 9]
 Line 1, characters 18-36:
 1 | let f () = stack_ [i for i = 0 to 9]
                       ^^^^^^^^^^^^^^^^^^
-Error: Stack allocating list comprehensions is unsupported yet.
+Error: Stack allocating list comprehensions is not yet supported;
+       they are currently always heap allocated.
 |}]
 
 let f () = stack_ [|i for i = 0 to 9|]
@@ -298,7 +299,8 @@ let f () = stack_ [|i for i = 0 to 9|]
 Line 1, characters 18-38:
 1 | let f () = stack_ [|i for i = 0 to 9|]
                       ^^^^^^^^^^^^^^^^^^^^
-Error: Stack allocating array comprehensions is unsupported yet.
+Error: Stack allocating array comprehensions is not yet supported;
+       they are currently always heap allocated.
 |}]
 
 class foo cla = object end
@@ -317,7 +319,8 @@ class foo cla = object method bar = stack_ {< >} end
 Line 1, characters 43-48:
 1 | class foo cla = object method bar = stack_ {< >} end
                                                ^^^^^
-Error: Stack allocating objects is unsupported yet.
+Error: Stack allocating objects is not yet supported;
+       they are currently always heap allocated.
 |}]
 
 let f() = stack_ (object end)
@@ -325,7 +328,8 @@ let f() = stack_ (object end)
 Line 1, characters 17-29:
 1 | let f() = stack_ (object end)
                      ^^^^^^^^^^^^
-Error: Stack allocating objects is unsupported yet.
+Error: Stack allocating objects is not yet supported;
+       they are currently always heap allocated.
 |}]
 
 let f() = stack_ (lazy "hello")
@@ -333,7 +337,8 @@ let f() = stack_ (lazy "hello")
 Line 1, characters 17-31:
 1 | let f() = stack_ (lazy "hello")
                      ^^^^^^^^^^^^^^
-Error: Stack allocating lazy expressions is unsupported yet.
+Error: Stack allocating lazy expressions is not yet supported;
+       they are currently always heap allocated.
 |}]
 
 module M = struct end
@@ -346,7 +351,53 @@ module type S = sig end
 Line 4, characters 17-31:
 4 | let f() = stack_ (module M : S)
                      ^^^^^^^^^^^^^^
-Error: Stack allocating modules is unsupported yet.
+Error: Stack allocating modules is not yet supported;
+       they are currently always heap allocated.
+|}]
+
+let f() = stack_ 42
+[%%expect{|
+Line 1, characters 17-19:
+1 | let f() = stack_ 42
+                     ^^
+Error: Stack allocating literals is not supported;
+       they are not allocated at runtime.
+|}]
+
+let f() = stack_ "hello"
+[%%expect{|
+Line 1, characters 17-24:
+1 | let f() = stack_ "hello"
+                     ^^^^^^^
+Error: Stack allocating literals is not supported;
+       they are not allocated at runtime.
+|}]
+
+let f() = stack_ [%src_pos]
+[%%expect{|
+Line 1, characters 17-27:
+1 | let f() = stack_ [%src_pos]
+                     ^^^^^^^^^^
+Error: Stack allocating source position literals is not supported;
+       they are not allocated at runtime.
+|}]
+
+let f() = stack_ #()
+[%%expect{|
+Line 1, characters 17-20:
+1 | let f() = stack_ #()
+                     ^^^
+Error: Stack allocating unboxed unit literals is not supported;
+       they are not allocated at runtime.
+|}]
+
+let f() = stack_ #true
+[%%expect{|
+Line 1, characters 17-22:
+1 | let f() = stack_ #true
+                     ^^^^^
+Error: Stack allocating unboxed boolean literals is not supported;
+       they are not allocated at runtime.
 |}]
 
 (* stack_ works shallowly *)

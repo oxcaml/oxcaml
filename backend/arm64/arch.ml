@@ -145,6 +145,10 @@ let num_args_addressing = function
   | Iindexed _ -> 1
   | Ibased _ -> 0
 
+(* No arm64-specific operation can currently absorb a constant addition to one
+   of its source registers. *)
+let fold_delta_into_specific_operation _op ~arg_is_folded_reg:_ ~delta:_ = None
+
 let addressing_displacement_for_llvmize addr =
   if not !Clflags.llvm_backend
   then
@@ -298,6 +302,7 @@ let equal_arith_operation left right =
 
 let equal_specific_operation left right =
   match left, right with
+  | Ifar_poll, Ifar_poll -> true
   | Ifar_alloc { bytes = left_bytes; dbginfo = _; mode = left_mode },
     Ifar_alloc { bytes = right_bytes; dbginfo = _; mode = right_mode } ->
     Int.equal left_bytes right_bytes

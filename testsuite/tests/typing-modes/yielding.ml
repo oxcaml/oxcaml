@@ -1,6 +1,12 @@
 (* TEST
+ flags = "-w -220";
  expect;
 *)
+
+(* Some tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
 
 (* CR dkalinichenko: allow [yielding] at toplevel? *)
 let my_effect : (unit -> unit) @ yielding = print_endline "Hello, world!"

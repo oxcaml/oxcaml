@@ -14,7 +14,7 @@ let is_null (x : int or_null) =
   match x with Null -> true | This _ -> false
 [%%expect_asm X86_64{|
 is_null:
-  cmpq  $0, %rax
+  testq %rax, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -25,7 +25,7 @@ let is_this (x : int or_null) =
   match x with Null -> false | This _ -> true
 [%%expect_asm X86_64{|
 is_this:
-  cmpq  $0, %rax
+  testq %rax, %rax
   setne %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -59,7 +59,7 @@ equal_int:
   testq %rax, %rax
   jne   .L0
   xorl  %eax, %eax
-  cmpq  $0, %rbx
+  testq %rbx, %rbx
   sete  %al
   leaq  1(%rax,%rax), %rax
   ret

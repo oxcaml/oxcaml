@@ -38,6 +38,7 @@ val create :
   unit_toplevel_return_continuation:Continuation.t ->
   toplevel_my_region:Variable.t ->
   toplevel_my_ghost_region:Variable.t ->
+  toplevel_my_alloc_region:Variable.t ->
   t
 
 val all_code : t -> Code.t Code_id.Map.t
@@ -62,6 +63,8 @@ val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
 val unit_toplevel_return_continuation : t -> Continuation.t
 
 val unit_toplevel_exn_continuation : t -> Continuation.t
+
+val unit_toplevel_alloc_region : t -> Variable.t
 
 val increment_continuation_scope : t -> t
 
@@ -138,6 +141,9 @@ val mem_code : t -> Code_id.t -> bool
 (** This function raises if the code ID is unbound. *)
 val find_code_exn : t -> Code_id.t -> Code_or_metadata.t
 
+(** This function raises if the code ID is unbound. *)
+val find_code_metadata_exn : t -> Code_id.t -> Code_metadata.t
+
 val set_inlined_debuginfo : t -> from:t -> t
 
 val merge_inlined_debuginfo : t -> from_apply_expr:Inlined_debuginfo.t -> t
@@ -188,7 +194,11 @@ end
 
 val disable_inlining : t -> Disable_inlining.t
 
-val enter_set_of_closures : t -> in_stub:bool -> t
+val disable_partial_application_stub_generation : t -> bool
+
+val enter_set_of_closures : t -> t
+
+val enter_stub_function : t -> t
 
 val set_rebuild_terms : t -> t
 
@@ -199,6 +209,7 @@ val enter_closure :
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   my_closure:Variable.t ->
+  my_alloc_region:Variable.t ->
   t ->
   t
 

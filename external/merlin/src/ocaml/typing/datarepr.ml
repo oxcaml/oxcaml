@@ -220,8 +220,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     in
     let cstr_shape =
       match cstr_layouts.(src_index) with
-      | Cstr_layout_known { shape; _ } -> Some shape
-      | Cstr_layout_variable -> None
+      | Cstr_layout_known { shape; _ } -> shape
+      | Cstr_layout_variable -> Constructor_variable
     in
     let cstr_constant = cstr_constant.(src_index) in
     let runtime_tag, const_tag, nonconst_tag =
@@ -241,11 +241,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | _ -> Ordinary {src_index; runtime_tag}
     in
     let cstr_existentials, cstr_args, cstr_inlined =
-      let record_repr =
-        match cstr_shape with
-        | None -> Record_variable
-        | Some shape -> Record_inlined (cstr_tag, shape, rep)
-      in
+      let record_repr = Record_inlined (cstr_tag, cstr_shape, rep) in
       constructor_args ~current_unit decl.type_private cd_args cd_res
         Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) record_repr
     in
@@ -292,7 +288,7 @@ let extension_descr ~current_unit path_ext ext =
       cstr_arity = List.length cstr_args;
       cstr_tag;
       cstr_repr = Variant_extensible;
-      cstr_shape = Some ext.ext_shape;
+      cstr_shape = ext.ext_shape;
       cstr_constant = ext.ext_constant;
       cstr_consts = -1;
       cstr_nonconsts = -1;
