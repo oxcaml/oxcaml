@@ -1,6 +1,12 @@
 (* TEST
+ flags = "-w -220";
  expect;
 *)
+
+(* Some tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
 
 let my_unforkable : (unit -> unit) @ unforkable = print_endline "Hello, world!"
 [%%expect{|

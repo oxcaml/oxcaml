@@ -41,7 +41,8 @@ type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
         prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
-        prepare_modality : Mode.Modality.t -> Mode.Modality.t
+        prepare_modality : Mode.Modality.t -> Mode.Modality.t;
+        prepare_ident : Ident.t -> Ident.t
       }
     (* The [prepare_jkind] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
@@ -49,7 +50,10 @@ type additional_action =
 
        The [prepare_mode]/[prepare_modality] functions should be applied to all
        modes/modalities when saving; this ensures the saved file doesn't contain
-       mode variables. *)
+       mode variables.
+
+       The [prepare_ident] function is applied to bound identifiers when saving,
+       giving them deterministic stamps so the saved [.cmi] is reproducible. *)
   | Duplicate_variables
   | No_action
 
@@ -268,9 +272,6 @@ let with_additional_action =
      attempt to do this based on filename caused spurious "inconsistent
      assumption" errors that couldn't immediately be solved. Revisit
      with a better approach.
-
-     We'll need to revisit the Note [Preparing_for_saving always the same]
-     once we do this tailoring.
   *)
   let (additional_action, sort_var_mapping) : additional_action * sort_map =
     match config with
@@ -307,7 +308,13 @@ let with_additional_action =
         let prepare_modality modality =
           Mode.Modality.(modality |> to_const_exn|> of_const)
         in
-        Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality },
+        let bound_ident_stamp = ref 0 in
+        let prepare_ident id =
+          incr bound_ident_stamp;
+          Ident.rename_with_stamp !bound_ident_stamp id
+        in
+        Prepare_for_saving
+          { prepare_jkind; prepare_mode; prepare_modality; prepare_ident },
         Saving (Hashtbl.create 17)
   in
   { s with
@@ -482,7 +489,7 @@ let apply_type_function params args body =
                     Tsubst (ty, None) -> ty
                     (* TODO: is this case possible?
                        possibly an interaction with (copy more) below? *)
-                  | Tconstr _ | Tnil ->
+                  | Tconstr _ | Tnil | Tof_kind _ ->
                       copy more
                   | Tvar _ | Tunivar _ ->
                       newgenty mored
@@ -655,10 +662,11 @@ let rec typexp copy_scope s ty =
     let has_fixed_row =
       not (is_Tconstr ty) && is_constr_row ~allow_ident:false tm in
     (* Make a stub *)
-    let jkind = Jkind.Builtin.any ~why:Dummy_jkind in
+    let stub_jkind = Jkind.Builtin.any ~why:Dummy_jkind in
     let ty' =
-      if should_duplicate_vars then newpersty (Tvar {name = None; jkind})
-      else newgenstub ~scope:(get_scope ty) jkind
+      if should_duplicate_vars
+      then newpersty (Tvar {name = None; jkind = stub_jkind})
+      else newgenstub ~scope:(get_scope ty) stub_jkind
     in
     For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
     let desc =
@@ -751,6 +759,9 @@ let rec typexp copy_scope s ty =
           let ret = typexp copy_scope s ret in
           let comm = copy_commu comm in
           Tarrow ((label, marg, mret), arg, ret, comm)
+      | Tof_kind jk -> Tof_kind (jkind copy_scope s jk)
+      | Tmod (ty, mod_bounds) ->
+          Tmod (typexp copy_scope s ty, mod_bounds)
       | _ -> copy_type_desc (typexp copy_scope s) desc
     in
     Transient_expr.set_stub_desc ty' desc;
@@ -792,9 +803,23 @@ let type_expr s ty =
   let loc = Option.value s.loc ~default:Location.none in
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)
 
+(* For idents that are guaranteed to be local/scoped, such as bound
+   signature items and functor parameters. *)
+let rename_ident s id =
+  match s.additional_action with
+  | Prepare_for_saving { prepare_ident; _ } -> prepare_ident id
+  | Duplicate_variables | No_action -> Ident.rename id
+
+(* For constructor/label idents, which may be predef (e.g. the constructors
+   of [bool] or [or_null], whose declarations can appear in a substituted
+   signature). Predef and global idents are kept: they cannot be renamed,
+   and they carry no volatile stamp. *)
+let rename_decl_ident s id =
+  if Ident.is_global_or_predef id then id else rename_ident s id
+
 let label_declaration copy_scope s l =
   {
-    ld_id = l.ld_id;
+    ld_id = rename_decl_ident s l.ld_id;
     ld_mutable = l.ld_mutable;
     ld_modalities = l.ld_modalities;
     ld_sort = l.ld_sort;
@@ -820,7 +845,7 @@ let constructor_arguments copy_scope s = function
 
 let constructor_declaration copy_scope s c =
   {
-    cd_id = c.cd_id;
+    cd_id = rename_decl_ident s c.cd_id;
     cd_args = constructor_arguments copy_scope s c.cd_args;
     cd_res = Option.map (typexp copy_scope s c.cd_loc) c.cd_res;
     cd_loc = loc s c.cd_loc;
@@ -1094,7 +1119,7 @@ let rename_bound_idents scoping s sg =
     let open Ident in
     match scoping with
     | Keep -> (fun id -> create_scoped ~scope:(scope id) (name id))
-    | Make_local -> Ident.rename
+    | Make_local -> rename_ident s
     | Rescope scope -> (fun id -> create_scoped ~scope (name id))
   in
   let rec rename_bound_idents s sg = function
@@ -1133,7 +1158,7 @@ let rename_bound_idents scoping s sg =
           rest
     | Sig_value(id, vd, vis) :: rest ->
         (* scope doesn't matter for value identifiers. *)
-        let id' = Ident.rename id in
+        let id' = rename_ident s id in
         rename_bound_idents s (Sig_value(id', vd, vis) :: sg) rest
     | Sig_typext(id, ec, es, vis) :: rest ->
         let id' = rename id in
@@ -1249,7 +1274,7 @@ and subst_lazy_modtype scoping s = function
       Mty_functor(Named (None, (subst_lazy_modtype scoping s) arg, marg),
                    subst_lazy_modtype scoping s res, mres)
   | Mty_functor(Named (Some id, arg, marg), res, mres) ->
-      let id' = Ident.rename id in
+      let id' = rename_ident s id in
       Mty_functor(Named (Some id', (subst_lazy_modtype scoping s) arg, marg),
                   subst_lazy_modtype scoping (add_module id (Pident id') s)
                     res,
@@ -1329,13 +1354,9 @@ and compose s1 s2 =
             | Duplicate_variables, (Prepare_for_saving _ as prepare)
                 -> prepare
 
-            (* Note [Preparing_for_saving always the same]
-               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-               The function we put in [Prepare_for_saving] is always the same,
-               so we can take either.
-            *)
-            | (Prepare_for_saving _ as prepare1), Prepare_for_saving _
-                -> prepare1
+            | Prepare_for_saving _, Prepare_for_saving _ ->
+              fatal_error
+                "compose: composing Prepare_for_saving and Prepare_for_saving"
           end;
           sort_var_mapping = begin
             match s1.sort_var_mapping, s2.sort_var_mapping with

@@ -234,7 +234,7 @@ let iter_on_occurrences
       | Texp_idx (ba, uas) ->
           iter_block_access exp_env ba;
           List.iter (iter_unboxed_access exp_env) uas
-      | Texp_atomic_loc (_, _, lid, label_desc, _) ->
+      | Texp_atomic_loc { lid; label = label_desc; _ } ->
           add_label ~namespace:Label exp_env lid label_desc
       | Texp_new (path, lid, _, _) ->
           f ~namespace:Class exp_env path lid
@@ -268,7 +268,7 @@ let iter_on_occurrences
       (* CR-someday let_mutable: maybe iterate on mutvar? *)
       | Texp_mutvar _ | Texp_setmutvar _
       | Texp_open _ | Texp_src_pos | Texp_overwrite _
-      | Texp_hole _  | Texp_quotation _ | Texp_antiquotation _ -> ());
+      | Texp_hole _  | Texp_quote _ | Texp_splice _ -> ());
       default_iterator.expr sub e);
 
   (* Remark: some types get iterated over twice due to how constraints are

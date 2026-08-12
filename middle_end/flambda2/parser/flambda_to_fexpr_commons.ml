@@ -20,12 +20,16 @@ module type Convertible_id = sig
 
   val name : t -> string
 
+  val stamp : t -> int option
+
   val add_tag : string -> int -> string
 
   val mk_fexpr_id : string -> fexpr_id
 end
 
 let default_add_tag name tag = Printf.sprintf "%s_%d" name tag
+
+let add_stamp name stamp = Printf.sprintf "%s/%d" name stamp
 
 module Name_map (I : Convertible_id) : sig
   type t
@@ -49,6 +53,7 @@ end = struct
 
   let bind { id_map; names } id =
     let name = I.name id in
+    let stamp = I.stamp id in
     let rec try_name name names =
       match String_map.find_opt name names with
       | None ->
@@ -62,7 +67,13 @@ end = struct
          * case we'll end up with x_1_1 *)
         try_name name names
     in
-    let fexpr_id, names = try_name name names in
+    let fexpr_id, names =
+      if !Clflags.canonical_ids || Option.is_none stamp
+      then try_name name names
+      else
+        let name = add_stamp name (Option.get stamp) in
+        I.mk_fexpr_id name, names
+    in
     let id_map = I.Map.add id fexpr_id id_map in
     fexpr_id, { id_map; names }
 
@@ -145,7 +156,11 @@ module Env : sig
   val bind_special_continuation :
     t -> Continuation.t -> to_:Fexpr.special_continuation -> t
 
+  val bind_toplevel_alloc_region : t -> Variable.t -> t
+
   val bind_toplevel_region : t -> Variable.t -> t
+
+  val bind_toplevel_ghost_region : t -> Variable.t -> t
 
   val find_var_exn : t -> Variable.t -> Fexpr.variable
 
@@ -170,6 +185,8 @@ end = struct
 
     let name v = raw_name v
 
+    let stamp v = Some (name_stamp v)
+
     let add_tag = default_add_tag
 
     let mk_fexpr_id name = name |> nowhere
@@ -186,6 +203,8 @@ end = struct
 
     let name v = linkage_name v |> Linkage_name.to_string
 
+    let stamp _ = None
+
     let add_tag = default_add_tag
 
     let mk_fexpr_id name = name
@@ -199,6 +218,8 @@ end = struct
     let desc = "code id"
 
     let name v = Code_id.name v
+
+    let stamp _ = None
 
     let add_tag = default_add_tag
 
@@ -214,6 +235,8 @@ end = struct
 
     let name v = Function_slot.name v
 
+    let stamp _ = None
+
     let add_tag = default_add_tag
 
     let mk_fexpr_id name = name |> nowhere
@@ -228,6 +251,8 @@ end = struct
 
     let name v = Value_slot.name v
 
+    let stamp _ = None
+
     let add_tag = default_add_tag
 
     let mk_fexpr_id name = name |> nowhere
@@ -241,6 +266,8 @@ end = struct
     let desc = "continuation"
 
     let name c = Continuation.name c
+
+    let stamp c = Some (Continuation.name_stamp c)
 
     let add_tag name tag =
       match name with
@@ -257,7 +284,9 @@ end = struct
       function_slots : Function_slot_name_map.t;
       vars_within_closures : Value_slot_name_map.t;
       continuations : Continuation_name_map.t;
-      toplevel_region : Variable.t option
+      toplevel_alloc_region : Variable.t option;
+      toplevel_region : Variable.t option;
+      toplevel_ghost_region : Variable.t option
     }
 
   let create () =
@@ -267,7 +296,9 @@ end = struct
       function_slots = Function_slot_name_map.create ();
       vars_within_closures = Value_slot_name_map.create ();
       continuations = Continuation_name_map.empty;
-      toplevel_region = None
+      toplevel_alloc_region = None;
+      toplevel_region = None;
+      toplevel_ghost_region = None
     }
 
   let bind_var t v =
@@ -280,14 +311,14 @@ end = struct
     let is_local =
       Compilation_unit.equal
         (Symbol.compilation_unit s)
-        (Compilation_unit.get_current_exn ())
+        (Current_unit.get_cu_exn ())
     in
     if not is_local
     then
       Misc.fatal_errorf "Cannot bind non-local symbol %a@ Current unit is %a"
         Symbol.print s
         (Format_doc.compat Compilation_unit.print)
-        (Compilation_unit.get_current_exn ());
+        (Current_unit.get_cu_exn ());
     let s = Symbol_name_map.translate t.symbols s in
     (None, s) |> nowhere, t
 
@@ -306,15 +337,17 @@ end = struct
     in
     { t with continuations }
 
+  let bind_toplevel_alloc_region t v = { t with toplevel_alloc_region = Some v }
+
   let bind_toplevel_region t v = { t with toplevel_region = Some v }
+
+  let bind_toplevel_ghost_region t v = { t with toplevel_ghost_region = Some v }
 
   let find_var_exn t v = Variable_name_map.find_exn t.variables v
 
   let find_symbol_exn t s =
     let cunit = Symbol.compilation_unit s in
-    let is_local =
-      Compilation_unit.equal cunit (Compilation_unit.get_current_exn ())
-    in
+    let is_local = Compilation_unit.equal cunit (Current_unit.get_cu_exn ()) in
     if is_local
     then (None, Symbol_name_map.translate t.symbols s) |> nowhere
     else
@@ -337,9 +370,18 @@ end = struct
     Continuation_name_map.find_exn t.continuations c
 
   let find_region_exn t r : Fexpr.region =
-    match t.toplevel_region with
-    | Some toplevel_region when Variable.equal toplevel_region r -> Toplevel
-    | _ -> Named (find_var_exn t r)
+    match
+      List.find_map
+        (function
+          | Some region, result ->
+            if Variable.equal region r then Some result else None
+          | None, _ -> None)
+        [ t.toplevel_alloc_region, Fexpr.Toplevel_alloc_region;
+          t.toplevel_region, Fexpr.Toplevel_region;
+          t.toplevel_ghost_region, Fexpr.Toplevel_ghost_region ]
+    with
+    | Some result -> result
+    | None -> Named (find_var_exn t r)
 
   let translate_function_slot t c =
     Function_slot_name_map.translate t.function_slots c

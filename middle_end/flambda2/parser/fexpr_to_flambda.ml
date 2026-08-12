@@ -20,6 +20,9 @@ let vec256 bits : Vector_types.Vec256.Bit_pattern.t =
 let vec512 bits : Vector_types.Vec512.Bit_pattern.t =
   Vector_types.Vec512.Bit_pattern.of_bits bits
 
+let mask bits : Vector_types.Mask.Bit_pattern.t =
+  Vector_types.Mask.Bit_pattern.of_bits bits
+
 let tag_scannable (tag : Fexpr.tag_scannable) : Tag.Scannable.t =
   Tag.Scannable.create_exn tag
 
@@ -46,6 +49,7 @@ let rec subkind :
   | Boxed_vec128 -> Boxed_vec128
   | Boxed_vec256 -> Boxed_vec256
   | Boxed_vec512 -> Boxed_vec512
+  | Boxed_mask -> Boxed_mask
   | Tagged_immediate -> Tagged_immediate
   | Variant { consts; non_consts } ->
     let consts =
@@ -65,6 +69,18 @@ let rec subkind :
   | Immediate_array -> Immediate_array
   | Value_array -> Value_array
   | Generic_array -> Generic_array
+  | Unboxed_float32_array -> Unboxed_float32_array
+  | Untagged_int_array -> Untagged_int_array
+  | Untagged_int8_array -> Untagged_int8_array
+  | Untagged_int16_array -> Untagged_int16_array
+  | Unboxed_int32_array -> Unboxed_int32_array
+  | Unboxed_int64_array -> Unboxed_int64_array
+  | Unboxed_nativeint_array -> Unboxed_nativeint_array
+  | Unboxed_vec128_array -> Unboxed_vec128_array
+  | Unboxed_vec256_array -> Unboxed_vec256_array
+  | Unboxed_vec512_array -> Unboxed_vec512_array
+  | Unboxed_mask_array -> Unboxed_mask_array
+  | Unboxed_product_array -> Unboxed_product_array
 
 and value_kind_with_subkind :
     Fexpr.kind_with_subkind -> Flambda_kind.With_subkind.t = function
@@ -97,6 +113,7 @@ let const (c : Fexpr.const) : Reg_width_const.t =
   | Naked_vec128 bits -> Reg_width_const.naked_vec128 (bits |> vec128)
   | Naked_vec256 bits -> Reg_width_const.naked_vec256 (bits |> vec256)
   | Naked_vec512 bits -> Reg_width_const.naked_vec512 (bits |> vec512)
+  | Naked_mask bits -> Reg_width_const.naked_mask (bits |> mask)
   | Null -> Reg_width_const.const_null
   | Poison (kind, name) ->
     let kind = Flambda_kind.With_subkind.kind (value_kind_with_subkind kind) in
@@ -153,19 +170,26 @@ let or_variable f env (ov : _ Fexpr.or_variable) : _ Or_variable.t =
 
 let alloc_mode_for_allocations env (alloc : Fexpr.alloc_mode_for_allocations) =
   match alloc with
-  | Heap -> Alloc_mode.For_allocations.heap
-  | Local { region = r } ->
-    let r = find_region env r in
-    Alloc_mode.For_allocations.local ~region:r
+  | Heap { alloc_region } ->
+    let alloc_region = find_region env alloc_region in
+    Alloc_mode.For_allocations.heap ~alloc_region
+  | Local { alloc_region; region } ->
+    let alloc_region = find_region env alloc_region in
+    let region = find_region env region in
+    Alloc_mode.For_allocations.local ~alloc_region ~region
 
-let alloc_mode_for_applications env (alloc : Fexpr.alloc_mode_for_applications)
-    =
+let alloc_mode_for_applications env
+    (alloc : Fexpr.region Fexpr.alloc_mode_for_applications) =
   match alloc with
-  | Heap -> Alloc_mode.For_applications.heap
-  | Local { region = r; ghost_region = r' } ->
-    let r = find_region env r in
-    let r' = find_region env r' in
-    Alloc_mode.For_applications.local ~region:r ~ghost_region:r'
+  | Not_alloc_stack { alloc_region } ->
+    let alloc_region = find_region env alloc_region in
+    Alloc_mode.For_applications.not_alloc_stack ~alloc_region
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
+    let alloc_region = find_region env alloc_region in
+    let region = find_region env region in
+    let ghost_region = find_region env ghost_region in
+    Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region ~region
+      ~ghost_region
 
 let prim env ((p, args) : Fexpr.prim) : Flambda_primitive.t =
   let args = List.map (simple env) args in
@@ -259,9 +283,24 @@ let set_of_closures env fun_decls value_slots =
   in
   let value_slots = Option.value value_slots ~default:[] in
   let value_slots : Simple.t Value_slot.Map.t =
-    let convert ({ var; value } : Fexpr.one_value_slot) =
-      (* CR mshinwell: support non-value kinds *)
-      fresh_or_existing_value_slot env var Flambda_kind.value, simple env value
+    let convert ({ var; value; kind } : Fexpr.one_value_slot) =
+      let kind =
+        match kind with
+        | None -> Flambda_kind.value
+        | Some naked_number_kind -> Flambda_kind.naked_number naked_number_kind
+      in
+      let value_slot = fresh_or_existing_value_slot env var kind in
+      if not (Flambda_kind.equal (Value_slot.kind value_slot) kind)
+      then
+        (* This can happen if an occurrence of the value slot, such as a
+           projection (which assumes kind [Value], see [Fexpr_prim]), was
+           encountered before this definition. *)
+        Misc.fatal_errorf
+          "Value slot %s: kind %a does not match kind %a of a previous \
+           occurrence of this slot"
+          var.txt Flambda_kind.print kind Flambda_kind.print
+          (Value_slot.kind value_slot);
+      value_slot, simple env value
     in
     List.map convert value_slots |> Value_slot.Map.of_list
   in
@@ -567,6 +606,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           static_const (SC.boxed_vec256 (or_variable vec256 env i))
         | Boxed_vec512 i ->
           static_const (SC.boxed_vec512 (or_variable vec512 env i))
+        | Boxed_mask i -> static_const (SC.boxed_mask (or_variable mask env i))
         | Immutable_float_block elements ->
           static_const
             (SC.immutable_float_block
@@ -618,9 +658,10 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           static_const
             (SC.immutable_vec512_array
                (List.map (or_variable vec512 env) elements))
+        | Immutable_mask_array elements ->
+          static_const
+            (SC.immutable_mask_array (List.map (or_variable mask env) elements))
         | Empty_array array_kind -> static_const (SC.empty_array array_kind)
-        | Mutable_string { initial_value = s } ->
-          static_const (SC.mutable_string ~initial_value:s)
         | Immutable_string s -> static_const (SC.immutable_string s))
       | Set_of_closures { bindings; elements } ->
         let fun_decls =
@@ -672,8 +713,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               acc ) =
           let { Fexpr.params;
                 closure_var;
-                region_var;
-                ghost_region_var;
+                region_vars;
                 depth_var;
                 ret_cont;
                 exn_cont;
@@ -697,11 +737,26 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           let my_closure, _my_closure_duid, env =
             fresh_var env closure_var Flambda_kind.value
           in
-          let my_region, _my_region_duid, env =
-            fresh_var env region_var Flambda_kind.region
-          in
-          let my_ghost_region, _my_ghost_region, env =
-            fresh_var env ghost_region_var Flambda_kind.region
+          let my_alloc_mode, env =
+            match region_vars with
+            | Not_alloc_stack { alloc_region } ->
+              let alloc_region, _duid, env =
+                fresh_var env alloc_region Flambda_kind.region
+              in
+              Alloc_mode.For_applications.not_alloc_stack ~alloc_region, env
+            | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
+              let alloc_region, _duid, env =
+                fresh_var env alloc_region Flambda_kind.region
+              in
+              let region, _duid, env =
+                fresh_var env region Flambda_kind.region
+              in
+              let ghost_region, _duid, env =
+                fresh_var env ghost_region Flambda_kind.region
+              in
+              ( Alloc_mode.For_applications.maybe_alloc_stack ~alloc_region
+                  ~region ~ghost_region,
+                env )
           in
           let my_depth, _my_depth, env =
             fresh_var env depth_var Flambda_kind.rec_info
@@ -719,11 +774,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             Flambda.Function_params_and_body.create ~return_continuation
               ~exn_continuation
               (Bound_parameters.create params)
-              ~body ~my_closure
-              ~my_alloc_mode:
-                (Alloc_mode.For_applications.local ~region:my_region
-                   ~ghost_region:my_ghost_region)
-              ~my_depth ~free_names_of_body:Unknown
+              ~body ~my_closure ~my_alloc_mode ~my_depth
+              ~free_names_of_body:Unknown
           in
           let free_names =
             (* CR mshinwell: This needs fixing XXX *)
@@ -734,6 +786,11 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             free_names,
             Flambda.Function_params_and_body.is_my_closure_used params_and_body,
             acc )
+        in
+        let result_mode =
+          match result_mode with
+          | Not_alloc_stack -> Lambda.not_alloc_stack
+          | Maybe_alloc_stack -> Lambda.maybe_alloc_stack
         in
         let recursive = convert_recursive_flag recursive in
         let inline =
@@ -753,16 +810,13 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             (fun _ -> Alloc_mode.For_types.heap)
             (Flambda_arity.unarize params_arity)
         in
-        let result_mode =
-          match result_mode with
-          | Heap -> Lambda.alloc_heap
-          | Local -> Lambda.alloc_local
-        in
         let code =
           (* CR mshinwell: [inlining_decision] should maybe be set properly *)
           Code.create code_id ~params_and_body ~free_names_of_params_and_body
             ~newer_version_of ~params_arity ~param_modes
-            ~first_complex_local_param:(Flambda_arity.num_params params_arity)
+            ~first_complex_local_param:
+              (First_complex_local_param.Index
+                 (Flambda_arity.num_params params_arity))
             ~result_arity ~result_types:Unknown ~result_mode ~stub ~inline
             ~zero_alloc_attribute:Default_zero_alloc
               (* CR gyorsh: should [check] be set properly? *)
@@ -774,8 +828,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             ~dbg:Debuginfo.none ~is_tupled ~is_my_closure_used
             ~inlining_decision:Never_inline_attribute
             ~absolute_history:
-              (Inlining_history.Absolute.empty
-                 (Compilation_unit.get_current_exn ()))
+              (Inlining_history.Absolute.empty (Current_unit.get_cu_exn ()))
             ~relative_history:Inlining_history.Relative.empty ~loopify
         in
         acc, Flambda.Static_const_or_code.create_code code
@@ -805,7 +858,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         arities
       } ->
     let continuation = find_result_cont env continuation in
-    let alloc_mode = alloc_mode_for_applications env alloc_mode in
+    let return_mode = alloc_mode_for_applications env alloc_mode in
     let call_kind, args_arity, return_arity =
       match call_kind with
       | Function (Direct { code_id; function_slot = _ }) ->
@@ -887,7 +940,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         (* TODO inlining arguments *)
         Inlining_state.create
           ~arguments:(Inlining_arguments.create ~round:0)
-          ~depth
+          ~depth ~stub_depth:0
       | None -> Inlining_state.default ~round:0
     in
     let exn_continuation =
@@ -902,8 +955,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
         ~callee:(Option.map (simple env) func)
         ~continuation exn_continuation
         ~args:((List.map (simple env)) args)
-        ~args_arity ~return_arity ~call_kind ~alloc_mode Debuginfo.none ~inlined
-        ~inlining_state ~probe:None ~position:Normal
+        ~args_arity ~return_arity ~call_kind ~return_mode Debuginfo.none
+        ~inlined ~inlining_state ~probe:None ~position:Normal
         ~relative_history:Inlining_history.Relative.empty
     in
     acc, Flambda.Expr.create_apply apply
@@ -967,7 +1020,9 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
   let env = init_env () in
   let { done_continuation = return_continuation;
         error_continuation;
+        toplevel_alloc_region;
         toplevel_region;
+        toplevel_ghost_region;
         _
       } =
     env
@@ -978,9 +1033,8 @@ let conv comp_unit (fexpr : Fexpr.flambda_unit) : conv_result =
   let code_slot_offsets = acc.Acc.code_slot_offsets in
   let unit =
     Flambda_unit.create ~return_continuation ~exn_continuation
+      ~toplevel_my_alloc_region:toplevel_alloc_region
       ~toplevel_my_region:toplevel_region
-      ~toplevel_my_ghost_region:
-        (Variable.create "my_ghost_region" Flambda_kind.region)
-      ~body ~module_symbol ~used_value_slots:Unknown
+      ~toplevel_my_ghost_region:toplevel_ghost_region ~body ~module_symbol
   in
   { unit; code_slot_offsets }

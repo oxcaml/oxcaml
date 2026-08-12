@@ -267,7 +267,7 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
 
 let iterate_over_variable_like_things state ~available_ranges_vars ~f =
   ARV.iter available_ranges_vars ~f:(fun var range ->
-      let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
+      let ident_for_type = Some (Current_unit.get_cu_exn (), var) in
       f var ~ident_for_type ~range)
 
 let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die

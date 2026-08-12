@@ -15,43 +15,6 @@
    return the root value again; if the cache is not flushed it wrongly returns
    the now-out-of-scope child value. *)
 
-(* Dynamic.t isn't yet implemented in the OxCaml stdlib, only the runtime
-   support for it, so testing requires faking the infrastructure here. *)
-
-module Dynamic : sig
-  type 'a t
-
-  val make : unit -> 'a t
-  val get : 'a t -> 'a or_null
-
-  val with_temporarily : 'a t -> 'a -> f: (unit -> 'b) -> 'b
-
-end = struct
-  type last_fiber : immediate
-  type (-'a, +'b) cont
-  type 'a t
-
-  external reperform :
-    'a Effect.t -> ('a, 'b) cont -> last_fiber -> 'b = "%reperform"
-
-  external with_stack_bind :
-    ('a -> 'b) ->
-    (exn -> 'b) ->
-    ('c Effect.t -> ('c, 'b) cont -> last_fiber -> 'b) ->
-    'd t ->
-    'd ->
-    ('e -> 'a) ->
-    'e ->
-    'b = "%with_stack_bind"
-
-  external make : unit -> 'a t = "caml_dynamic_make"
-  external get : 'a t -> 'a or_null = "caml_dynamic_get"
-
-  let with_temporarily d v ~f =
-    let effc eff k last_fiber = reperform eff k last_fiber in
-    with_stack_bind (fun x -> x) (fun e -> raise e) effc d v f ()
-end
-
 let () = Sys.catch_break true
 
 let[@inline never] allocate_bytes finished =
@@ -63,31 +26,33 @@ let[@inline never] allocate_bytes finished =
   ref (Some b)
 
 let print_null = function
-  | This x -> Int.to_string x
+  | This x -> x
   | Null -> "null"
 
 let print_dyn d = print_null (Dynamic.get d)
 
-let child = 100
-
 let () =
   let d = Dynamic.make () in
-  let finished = ref false in
-  let r = allocate_bytes finished in
-  (try
-    Sys.with_async_exns (fun () ->
-      r := None;
-      (* Bind [d] to [child] in a fiber and read it so the cache holds
-         [d -> child], then allocate until the finaliser raises [Sys.Break]
-         asynchronously, unwinding out of this fiber. *)
-      Dynamic.with_temporarily d child ~f:(fun () ->
-        Printf.printf "in fiber [expect %d]: %s\n%!" child (print_dyn d);
-        while true do
-          let _ @ global = Sys.opaque_identity (42, Random.int 42) in
-          ()
-        done))
-  with
-  | Sys.Break -> assert !finished
-  | _ -> assert false);
-  (* The bound fiber is gone; [d] must read as [root] again. *)
-  Printf.printf "after async unwind [expect null]: %s\n%!" (print_dyn d)
+  let parent = (Bytes.unsafe_to_string (Bytes.make 4 'x')) in
+  Dynamic.with_temporarily d parent ~f:(fun () -> exclave_
+    let finished = ref false in
+    let r = allocate_bytes finished in
+    (try
+      Sys.with_async_exns (fun () ->
+        r := None;
+        (* Bind [d] to [child] and read it so the cache holds
+          [d -> child], then allocate until the finaliser raises [Sys.Break]
+          asynchronously, unwinding out of this async exn handler. *)
+        let child = (Bytes.unsafe_to_string (Bytes.make 4 'y')) in
+        Dynamic.with_temporarily d child ~f:(fun () -> exclave_
+          Printf.printf "in fiber [expect %s]: %s\n%!" child (print_dyn d);
+          while true do
+            let _ @ global = Sys.opaque_identity (42, Random.int 42) in
+            ()
+          done;
+          ()) [@nontail])
+    with
+    | Sys.Break -> assert !finished
+    | _ -> assert false);
+    (* The bound fiber is gone; [d] must read as [parent] again. *)
+    Printf.printf "after async unwind [expect %s]: %s\n%!" parent (print_dyn d))

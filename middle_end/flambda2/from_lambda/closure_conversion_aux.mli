@@ -56,7 +56,8 @@ module IR : sig
           loc : Lambda.scoped_location;
           exn_continuation : exn_continuation option;
           region : Ident.t option;
-          ghost_region : Ident.t option
+          ghost_region : Ident.t option;
+          alloc_region : Ident.t
         }
 
   type apply_kind =
@@ -76,9 +77,10 @@ module IR : sig
       region_close : Lambda.region_close;
       inlined : Lambda.inlined_attribute;
       probe : Lambda.probe;
-      mode : Lambda.locality_mode;
+      mode : Lambda.return_mode;
       region : Ident.t option;
       ghost_region : Ident.t option;
+      alloc_region : Ident.t;
       args_arity : [`Complex] Flambda_arity.t;
       return_arity : [`Unarized] Flambda_arity.t
     }
@@ -346,10 +348,14 @@ module Function_decls : sig
       | Unboxed_number of Flambda_kind.Boxable_number.t
       | Unboxed_float_record of int
 
+    type unboxing_return_kind = unboxing_kind * Lambda.locality_mode
+
     type calling_convention =
       | Normal_calling_convention
       | Unboxed_calling_convention of
-          unboxing_kind option list * unboxing_kind option * Function_slot.t
+          unboxing_kind option list
+          * unboxing_return_kind option
+          * Function_slot.t
 
     type t
 
@@ -373,6 +379,7 @@ module Function_decls : sig
       calling_convention:calling_convention ->
       return_continuation:Continuation.t ->
       exn_continuation:IR.exn_continuation ->
+      my_alloc_region:Ident.t ->
       my_region:Ident.t option ->
       my_ghost_region:Ident.t option ->
       body:(Acc.t -> Env.t -> Acc.t * Flambda.Import.Expr.t) ->
@@ -382,7 +389,7 @@ module Function_decls : sig
       Recursive.t ->
       closure_alloc_mode:Lambda.locality_mode ->
       first_complex_local_param:int ->
-      result_mode:Lambda.locality_mode ->
+      result_mode:Lambda.return_mode ->
       t
 
     val let_rec_ident : t -> Ident.t
@@ -408,6 +415,8 @@ module Function_decls : sig
     val my_region : t -> Ident.t option
 
     val my_ghost_region : t -> Ident.t option
+
+    val my_alloc_region : t -> Ident.t
 
     val body : t -> Acc.t -> Env.t -> Acc.t * Flambda.Import.Expr.t
 
@@ -441,7 +450,7 @@ module Function_decls : sig
 
     val first_complex_local_param : t -> int
 
-    val result_mode : t -> Lambda.locality_mode
+    val result_mode : t -> Lambda.return_mode
 
     (* Like [all_free_idents], but for just one function. *)
     val free_idents : t -> Ident.Set.t
