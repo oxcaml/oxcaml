@@ -1,5 +1,7 @@
 The OxCaml repo contains both the OxCaml compiler and Merlin. Merlin vendors the frontend code of the compiler, but makes some modifications to it. As a result, when we make a change to the compiler’s frontend, we must update Merlin accordingly (a GitHub CI check asserts that we do so). This file describes how to update Merlin when making a frontend compiler change.
 
+"Frontend" here means the `parsing/` and `typing/` directories, as well as any files in `file_formats/` or `utils/` that are used in `parsing/` and `typing`.
+
 # Basics
 
 Here are the commands to know:
