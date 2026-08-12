@@ -510,4 +510,53 @@ let x =
   M.id #1s |> to_int8
 [%%expect {|
 val x : int8 = 1s
-|}]
+|}];;
+
+(** Layout-polymorphic bindings in the top-level **)
+
+(* Static binding in expression *)
+
+let poly_ id x = x in
+(id 42, id #3.14 |> to_float)
+[%%expect {|
+- : int * float = (42, 3.14)
+|}];;
+
+(* Static module binding in expression *)
+
+let module Id = struct
+  let poly_ id x = x
+end in
+(Id.id 42, Id.id #3.14 |> to_float)
+[%%expect {|
+- : int * float = (42, 3.14)
+|}];;
+
+(* Value binding *)
+
+(* For now, we always force value bindings in the top-level to be at [legacy].
+   However, we could change this for staticity. *)
+let poly_ id x = x;;
+(id 42, id #3.14 |> to_float)
+[%%expect {|
+val poly_ id : 'a -> 'a = <lpoly>
+Line 2, characters 1-3:
+2 | (id 42, id #3.14 |> to_float)
+     ^^
+Error: The value "id" is "dynamic"
+       but is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
+|}];;
+
+(* Module binding *)
+
+module Id = struct
+  let poly_ id x = x
+end;;
+(Id.id 42, Id.id #3.14 |> to_float)
+[%%expect {|
+module Id : sig val poly_ id : 'a -> 'a end
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
+|}];;
