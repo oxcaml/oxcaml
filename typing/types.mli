@@ -113,15 +113,15 @@ module Rigid_name : sig
             [Types.get_id] of the type variable representing the parameter. *)
     | Provenance of
         { id : int;
+          (** Identifies this provenance occurrence. *)
+
           ty : string;
+          (** The printed type expression or descriptive noun phrase. *)
+
           phrase : bool
+          (** Whether [ty] is a plural noun phrase rather than a type. *)
         }
-        (** A provenance variable introduced while translating a type expression
-            for error reporting. The integer identifies the occurrence, and
-            [ty] describes the corresponding type expression — or, when
-            [phrase] is true, a plural noun phrase describing a class of
-            contributions (e.g. "mutable fields") rather than a printed type
-            expression. These variables are diagnostic-only and must not
+        (** A diagnostic-only provenance variable. These variables must not
             appear in stored [type_ikind]s. *)
     | Unknown of unknown_id
         (** An unknown quantity with a given id. Used to model not-best in
