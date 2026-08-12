@@ -118,7 +118,7 @@ module Rigid_name : sig
           ty : string;
           (** The printed type expression or descriptive noun phrase. *)
 
-          phrase : bool
+          plural : bool
           (** Whether [ty] is a plural noun phrase rather than a type. *)
         }
         (** A diagnostic-only provenance variable. These variables must not
@@ -140,7 +140,7 @@ module Rigid_name : sig
 
   val param : int -> t
 
-  val provenance : id:int -> ty:string -> phrase:bool -> t
+  val provenance : id:int -> ty:string -> plural:bool -> t
 
   val unknown : Shape.Uid.t -> t
 

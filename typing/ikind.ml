@@ -59,10 +59,10 @@ module Provenance = struct
 
   let names : Ldd.Name.t list ref = ref []
 
-  let register_text ~phrase ty : Ldd.Name.t =
+  let register_text ~plural ty : Ldd.Name.t =
     let id = !next_id in
     next_id := id + 1;
-    let name = Ldd.Name.provenance ~id ~ty ~phrase in
+    let name = Ldd.Name.provenance ~id ~ty ~plural in
     names := name :: !names;
     name
 
@@ -75,15 +75,15 @@ module Provenance = struct
     let register_type ty =
       Format_doc.asprintf "%a" Jkind.format_type_expr ty
       |> collapse_whitespace
-      |> register_text ~phrase:false
+      |> register_text ~plural:false
     in
     match Types.get_desc ty with
-    | Types.Tarrow _ -> register_text ~phrase:true "functions"
-    | Types.Ttuple _ -> register_text ~phrase:true "tuples"
-    | Types.Tunboxed_tuple _ -> register_text ~phrase:true "unboxed tuples"
-    | Types.Tobject _ -> register_text ~phrase:true "objects"
-    | Types.Tvariant _ -> register_text ~phrase:true "polymorphic variants"
-    | Types.Tpackage _ -> register_text ~phrase:true "first-class modules"
+    | Types.Tarrow _ -> register_text ~plural:true "functions"
+    | Types.Ttuple _ -> register_text ~plural:true "tuples"
+    | Types.Tunboxed_tuple _ -> register_text ~plural:true "unboxed tuples"
+    | Types.Tobject _ -> register_text ~plural:true "objects"
+    | Types.Tvariant _ -> register_text ~plural:true "polymorphic variants"
+    | Types.Tpackage _ -> register_text ~plural:true "first-class modules"
     | Types.Tconstr (path, _ :: _, _) ->
       register_type (Btype.newgenty (Types.Tconstr (path, [], ref Types.Mnil)))
     | _ -> register_type ty
@@ -183,7 +183,7 @@ module Solver = struct
     rigid_name ctx (Provenance.register ty)
 
   let provenance_text (ctx : ctx) (text : string) : Ldd.node =
-    rigid_name ctx (Provenance.register_text ~phrase:true text)
+    rigid_name ctx (Provenance.register_text ~plural:true text)
 
   let with_provenance_text (ctx : ctx) (text : unit -> string) (poly : Ldd.node)
       : Ldd.node =
@@ -750,12 +750,12 @@ type subjkind_error =
 
 type provenance_residual =
   { ty : string;
-    phrase : bool;
+    plural : bool;
     mode_bounds : Axis_lattice.t;
     axes : Jkind_axis.Axis.packed list
   }
 
-let add_provenance_residual entries ({ ty; phrase; mode_bounds; axes } as entry)
+let add_provenance_residual entries ({ ty; plural; mode_bounds; axes } as entry)
     =
   (* Deduplicate identical entries (e.g. two fields of type [int ref] under
      the same bound), keeping first-occurrence order. Entries that merely
@@ -763,7 +763,7 @@ let add_provenance_residual entries ({ ty; phrase; mode_bounds; axes } as entry)
      rendered ['a]) can have different requirements and must stay separate. *)
   let duplicate other =
     String.equal other.ty ty
-    && Bool.equal other.phrase phrase
+    && Bool.equal other.plural plural
     && Axis_lattice.equal other.mode_bounds mode_bounds
     && List.length other.axes = List.length axes
     && List.for_all (fun axis -> List.exists (same_axis axis) other.axes) axes
@@ -809,7 +809,7 @@ let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
     |> List.filter_map (fun (name, coeff) ->
         match (name : Ldd.Name.t) with
         | Atom _ | KAtom _ | Param _ | Unknown _ -> None
-        | Provenance { ty; phrase; _ } ->
+        | Provenance { ty; plural; _ } ->
           if is_bot_poly coeff
           then None
           else
@@ -830,7 +830,7 @@ let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
                  axes left to report. *)
               match axes with
               | [] -> None
-              | _ :: _ -> Some { ty; phrase; mode_bounds; axes })
+              | _ :: _ -> Some { ty; plural; mode_bounds; axes })
     |> List.fold_left add_provenance_residual []
     |> Option.some
 
@@ -853,10 +853,10 @@ let residual_mode_strings { mode_bounds; axes; _ } =
   |> Typemode.untransl_mod_bounds ~verbose:false
   |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
 
-let pp_provenance_residual ppf ({ ty; phrase; _ } as residual) =
+let pp_provenance_residual ppf ({ ty; plural; _ } as residual) =
   (* Phrase subjects ("mutable fields", "boxed records") are plural noun
      phrases; type-expression subjects read as singular. *)
-  let verb = if phrase then "are" else "is" in
+  let verb = if plural then "are" else "is" in
   let modes = residual_mode_strings residual in
   Format_doc.fprintf ppf "@[<hov 2>%s %s not mod %a@]" ty verb
     (Format_doc.pp_print_list
