@@ -19,11 +19,9 @@ type t =
       { params : Bound_parameters.t;
             (** To avoid re-opening name abstractions, we store the opened
                 parameters and handler here. *)
-        handler : Rebuilt_expr.t;
+        handler : Rebuilt_expr.t
             (** [free_names_of_handler] includes entries for any occurrences of
                 the [params] in the [handler]. *)
-        free_names_of_handler : Name_occurrences.t;
-        cost_metrics_of_handler : Cost_metrics.t
       }
   | Non_inlinable_zero_arity of
       { handler : Rebuilt_expr.t Or_unknown.t
