@@ -47,6 +47,12 @@
 extern char caml_system__code_begin, caml_system__code_end;
 /* The two symbols above are defined in runtime/$ARCH.S. */
 
+/* Nothing in the runtime or in statically-linked OCaml code necessarily
+   refers to threads.c, so the linker may omit it from libasmrun; force it
+   into every native program so that dynamically-loaded code can use it. */
+extern int caml_c_thread_register(void);
+int (*caml_force_link_systhreads)(void) = &caml_c_thread_register;
+
 extern uintnat caml_prelinking_in_use;
 
 /* Initialize the static data and code area limits. */

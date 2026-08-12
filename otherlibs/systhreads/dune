@@ -15,7 +15,7 @@
 ; For some reason the C header files aren't being found if this library
 ; is given a public name, so we do the installation manually.
 
-(copy_files# caml/*.h)
+(copy_files# ../../runtime/caml/threads.h)
 
 (install
  (files
