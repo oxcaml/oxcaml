@@ -46,7 +46,9 @@ and instruction_desc =
   | Lreturn
   | Llabel of
       { label : label;
-        section_name : string option
+        section_name : string option;
+        is_loop_header : bool
+            (* target of a backward branch in the linearized order *)
       }
   | Lbranch of label
   | Lcondbranch of Operation.test * label
