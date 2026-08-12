@@ -164,13 +164,9 @@ module Solver = struct
     { ctx with add_provenance; ty_to_kind = TyTbl.create 1 }
 
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
-    match ctx.mode with
-    | Normal -> Ldd.node_of_var (Ldd.rigid name)
-    | Round_up when match name with Provenance _ -> true | _ -> false ->
-      Ldd.node_of_var (Ldd.rigid name)
     match ctx.mode, name with
     | Normal, _
-    | Round_up, Provenance ->
+    | Round_up, Provenance _ ->
       Ldd.node_of_var (Ldd.rigid name)
     | Round_up, _ -> Ldd.const Axis_lattice.top
 
@@ -732,13 +728,9 @@ let axes_in_violation_order ~violating_axes axes =
     violating_axes
 
 type mode_crossing_error =
-  { origin : string option;
-    sub_jkind : Types.jkind_l;
-    super_jkind : Types.jkind_l;
+  { super_jkind : Types.jkind_l;
     sub_poly : Ldd.node;
     super_poly : Ldd.node;
-    failing_poly : Ldd.node;
-    fast_path : string;
     provenance_names : Ldd.Name.t list;
     violating_axes : Jkind_axis.Axis.packed list
   }
@@ -926,7 +918,7 @@ let report_mode_crossing_error ~offender env ppf err =
     Format_doc.fprintf ppf
       "@[<v>The mode crossing of %t is not allowed here.@;\
        @[<hov 2>The inferred kind is not below the required kind along %a.@]@]"
-      offender pp_axis_list_prose violating_axes
+      offender pp_axis_list_prose err.violating_axes
 
 let report_subjkind_error_with_offender ~offender env ppf = function
   | Jkind_error err ->
@@ -1330,11 +1322,6 @@ type subcheck_fast_path =
   | Rhs_top_fast_path
   | Lhs_mod_bounds_floor_fast_path
 
-let string_of_subcheck_fast_path = function
-  | No_fast_path -> "none"
-  | Rhs_top_fast_path -> "rhs_top"
-  | Lhs_mod_bounds_floor_fast_path -> "lhs_mod_bounds_floor"
-
 type subcheck_polys =
   { lhs_for_leq : Ldd.node;
     rhs_for_leq : Ldd.node;
@@ -1413,22 +1400,17 @@ let compute_provenance_bound_polys env ~(lhs : Solver.ctx -> Ldd.node)
       let ctx = Solver.reset_for_provenance ctx ~add_provenance:true in
       lhs ctx)
 
-let check_mode_crossing_polys ~origin ~sub_jkind ~super_jkind
-    { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path } =
+let check_mode_crossing_polys ~origin:_ ~sub_jkind:_ ~super_jkind
+    { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path = _ } =
   let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
   match violating_axes with
   | [] -> Ok ()
   | _ ->
-    let failing_poly = Ldd.sub_subsets sub_poly super_poly in
     Error
       (Mode_crossing_error
-         { origin;
-           sub_jkind;
-           super_jkind;
+         { super_jkind;
            sub_poly;
            super_poly;
-           failing_poly;
-           fast_path = string_of_subcheck_fast_path fast_path;
            provenance_names = Provenance.all_names ();
            violating_axes
          })
