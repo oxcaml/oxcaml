@@ -382,6 +382,7 @@ module History = struct
     | V1_safety_check
     | Probe
     | Captured_in_object
+    | Alloc_and_raise
     | Let_rec_variable of Ident.t
     | Type_argument of
         { parent_path : Path.t;

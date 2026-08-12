@@ -815,10 +815,13 @@ Error: This expression is not an allocation site.
 <[fun x -> alloc_and_raise_ Stdlib.raise (Stdlib.Failure x)]>
 |}];;
 
-<[ fun x -> alloc_and_raise_ ignore (x, x); 42 ]>;;
+<[ fun x -> alloc_and_raise_ ignore (x, x); raise (Failure "error") ]>;;
 [%%expect {|
-- : <[$('a) -> int]> expr =
-<[fun x -> alloc_and_raise_ Stdlib.ignore (x, x); 42]>
+- : <[$('a) -> $('b)]> expr =
+<[
+  fun x -> alloc_and_raise_ Stdlib.ignore (x, x);
+    Stdlib.raise (Stdlib.Failure "error")
+]>
 |}];;
 
 module type S = sig
