@@ -158,12 +158,12 @@ module Unique_continuation_handlers : sig
     'a t ->
     'a t
 
-  val find :
+  val find_opt :
     Are_rebuilding_terms.t ->
     Bound_parameters.t ->
     rebuilt_expr ->
     is_exn_handler:bool ->
     free_names_without_params:Name_occurrences.t ->
     'a t ->
-    'a
+    ('a * Simple.t list) option
 end
