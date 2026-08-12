@@ -21,16 +21,23 @@ type contents_hash =
   }
 
 type t =
-  { expr : Expr.t;
-    contents_hash : contents_hash Or_null.t
-        (* If not null, this is a structural hash of the contents of this
-           rebuilt expression (always null when not rebuilding terms).
+  | Expr_not_rebuilt of
+      { cost_metrics : Cost_metrics.t;
+        free_names : Name_occurrences.t
+      }
+  | Expr of
+      { cost_metrics : Cost_metrics.t;
+        free_names : Name_occurrences.t;
+        expr : Expr.t;
+        contents_hash : contents_hash Or_null.t
+            (* If not null, this is a structural hash of the contents of this
+               rebuilt expression (always null when not rebuilding terms).
 
-           The hash should not depend on the name of variables within the
-           expression, because we use it to de-duplicate continuation handlers
-           that might bind variables with different names (see
-           [Unique_continuation_map]). *)
-  }
+               The hash should not depend on the name of variables within the
+               expression, because we use it to de-duplicate continuation
+               handlers that might bind variables with different names (see
+               [Unique_continuation_map]). *)
+      }
 
 (* Rebuilt terms with no [contents_hash] cannot be deduplicated (e.g. because
    they contain not-shareable subterms such as sets of closures). We also want
@@ -49,7 +56,7 @@ type t =
    switch branches. *)
 let max_hash_depth = 32
 
-let create ?contents_hash expr =
+let create ?contents_hash ~cost_metrics ~free_names expr =
   (* Since we are building terms from the bottom-up, we don't know initially at
      which depth they will end up. Instead, we eagerly compute hashes as we
      rebuild expressions (so that computing the hash does not need another
@@ -59,7 +66,35 @@ let create ?contents_hash expr =
     | Some { depth; _ } when depth >= max_hash_depth -> Or_null.null
     | _ -> Or_null.of_option contents_hash
   in
-  { expr; contents_hash }
+  Expr { expr; contents_hash; cost_metrics; free_names }
+
+let notify_removed ~operation t =
+  match t with
+  | Expr_not_rebuilt ({ cost_metrics; _ } as not_rebuilt) ->
+    Expr_not_rebuilt
+      { not_rebuilt with
+        cost_metrics = Cost_metrics.notify_removed ~operation cost_metrics
+      }
+  | Expr ({ cost_metrics; _ } as expr) ->
+    Expr
+      { expr with
+        cost_metrics = Cost_metrics.notify_removed ~operation cost_metrics
+      }
+
+let to_expr0 = function
+  | Expr_not_rebuilt _ -> Expr.create_invalid Code_not_rebuilt
+  | Expr { expr; _ } -> expr
+
+let contents_hash = function
+  | Expr_not_rebuilt _ -> Or_null.null
+  | Expr { contents_hash; _ } -> contents_hash
+
+let cost_metrics = function
+  | Expr_not_rebuilt { cost_metrics; _ } | Expr { cost_metrics; _ } ->
+    cost_metrics
+
+let free_names = function
+  | Expr_not_rebuilt { free_names; _ } | Expr { free_names; _ } -> free_names
 
 type rebuilt_expr = t
 
@@ -69,9 +104,9 @@ let to_expr t are_rebuilding =
     Misc.fatal_error
       "Cannot ask [Rebuilt_expr] for the built expression when \
        [UA.do_not_rebuild_terms] is set"
-  else t.expr
+  else to_expr0 t
 
-let descr t = Expr.descr t.expr
+let descr t = Expr.descr (to_expr0 t)
 
 let to_apply_cont t =
   match descr t with
@@ -91,9 +126,10 @@ let [@ocamlformat "disable"] print are_rebuilding ppf t =
   if ART.do_not_rebuild_terms are_rebuilding then
     Format.fprintf ppf "<unavailable, terms not being rebuilt>"
   else
-    Expr.print ppf t.expr
+    Expr.print ppf (to_expr0 t)
 
-let term_not_rebuilt = create (Expr.create_invalid Code_not_rebuilt)
+let term_not_rebuilt ~cost_metrics ~free_names =
+  Expr_not_rebuilt { cost_metrics; free_names }
 
 let contents_hash_simple simple =
   (* We want a "structural" hash that doesn't depend on names bound by
@@ -108,13 +144,40 @@ let contents_hash_simple simple =
       let has_coercion = not (Coercion.is_id coercion) in
       Hashtbl.hash (2, has_coercion))
 
-let create_let are_rebuilding bound_vars defining_expr ~body ~free_names_of_body
-    =
+let create_let are_rebuilding bound_vars defining_expr ~body
+    ~free_names_of_defining_expr ~cost_metrics_of_defining_expr =
+  let free_names_of_body = free_names body in
+  let name_mode = Bound_pattern.name_mode bound_vars in
+  let is_phantom = Name_mode.is_phantom name_mode in
+  let cost_metrics =
+    Cost_metrics.( + ) (cost_metrics body)
+      (Cost_metrics.increase_due_to_let_expr ~is_phantom
+         ~cost_metrics_of_defining_expr)
+  in
+  let free_names_of_defining_expr =
+    if not is_phantom
+    then free_names_of_defining_expr
+    else
+      Name_occurrences.downgrade_occurrences_at_strictly_greater_name_mode
+        free_names_of_defining_expr name_mode
+  in
+  let free_names =
+    match (bound_vars : Bound_pattern.t) with
+    | Singleton _ | Set_of_closures _ ->
+      Name_occurrences.diff free_names_of_body
+        ~without:(Bound_pattern.free_names bound_vars)
+      |> Name_occurrences.union free_names_of_defining_expr
+    | Static bound_static ->
+      (* Care: these bindings can be recursive (e.g. via a set of closures). *)
+      Name_occurrences.diff
+        (Name_occurrences.union free_names_of_body free_names_of_defining_expr)
+        ~without:(Bound_static.free_names bound_static)
+  in
   if ART.do_not_rebuild_terms are_rebuilding
-  then term_not_rebuilt
+  then term_not_rebuilt ~cost_metrics ~free_names
   else
     let contents_hash =
-      match body.contents_hash with
+      match contents_hash body with
       | Null -> None
       | This { depth; structural_hash = body_hash } -> (
         let[@local] simple_expr named_hash =
@@ -139,16 +202,21 @@ let create_let are_rebuilding bound_vars defining_expr ~body ~free_names_of_body
           simple_expr (Hashtbl.hash (1, prim, args_hash))
         | Set_of_closures _ | Static_consts _ | Rec_info _ -> None)
     in
-    Let.create bound_vars defining_expr ~body:body.expr
+    Let.create bound_vars defining_expr ~body:(to_expr0 body)
       ~free_names_of_body:(Known free_names_of_body)
-    |> Expr.create_let |> create ?contents_hash
+    |> Expr.create_let
+    |> create ?contents_hash ~cost_metrics ~free_names
 
 let create_apply are_rebuilding apply =
+  let free_names = Apply.free_names apply in
+  let cost_metrics = Cost_metrics.from_size (Code_size.apply apply) in
   if ART.do_not_rebuild_terms are_rebuilding
-  then term_not_rebuilt
-  else Expr.create_apply apply |> create
+  then term_not_rebuilt ~cost_metrics ~free_names
+  else Expr.create_apply apply |> create ~cost_metrics ~free_names
 
 let create_apply_cont apply_cont =
+  let free_names = Apply_cont.free_names apply_cont in
+  let cost_metrics = Cost_metrics.from_size (Code_size.apply_cont apply_cont) in
   let contents_hash =
     match Apply_cont.trap_action apply_cont with
     | Some _ -> None
@@ -162,118 +230,210 @@ let create_apply_cont apply_cont =
                 List.map contents_hash_simple (Apply_cont.args apply_cont) )
         }
   in
-  Expr.create_apply_cont apply_cont |> create ?contents_hash
+  Expr.create_apply_cont apply_cont
+  |> create ?contents_hash ~cost_metrics ~free_names
 
 module Function_params_and_body = struct
-  type t = Function_params_and_body.t
+  type t =
+    { cost_metrics : Cost_metrics.t;
+      free_names : Name_occurrences.t;
+      recursive : Recursive.t;
+      params_and_body : Function_params_and_body.t
+    }
 
-  let create ~return_continuation ~exn_continuation params ~body
-      ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth =
-    Function_params_and_body.create ~return_continuation ~exn_continuation
-      params ~body:body.expr ~free_names_of_body:(Known free_names_of_body)
-      ~my_closure ~my_alloc_mode ~my_depth
+  let create ~return_continuation ~exn_continuation params ~body ~my_closure
+      ~my_alloc_mode ~my_depth =
+    let free_names_of_body = free_names body in
+    let recursive : Recursive.t =
+      if Name_occurrences.mem_var free_names_of_body my_depth
+      then Recursive
+      else Non_recursive
+    in
+    let params_and_body =
+      Function_params_and_body.create ~return_continuation ~exn_continuation
+        params ~body:(to_expr0 body)
+        ~free_names_of_body:(Known free_names_of_body) ~my_closure
+        ~my_alloc_mode ~my_depth
+    in
+    let free_names =
+      let module NO = Name_occurrences in
+      free_names_of_body
+      |> NO.remove_continuation ~continuation:return_continuation
+      |> NO.remove_continuation ~continuation:exn_continuation
+      |> NO.remove_var ~var:my_closure
+      |> NO.diff ~without:(Alloc_mode.For_applications.free_names my_alloc_mode)
+      |> NO.remove_var ~var:my_depth
+      |> NO.diff ~without:(Bound_parameters.free_names params)
+    in
+    { params_and_body; recursive; cost_metrics = cost_metrics body; free_names }
 
   let to_function_params_and_body t are_rebuilding =
     if ART.do_not_rebuild_terms are_rebuilding
     then
       Misc.fatal_error
         "Cannot ask for function params and body when not rebuilding terms"
-    else t
+    else t.params_and_body
 
-  let is_my_closure_used t = Function_params_and_body.is_my_closure_used t
+  let cost_metrics { cost_metrics; _ } = cost_metrics
+
+  let free_names { free_names; _ } = free_names
+
+  let recursive { recursive; _ } = recursive
+
+  let is_my_closure_used t =
+    Function_params_and_body.is_my_closure_used t.params_and_body
 end
 
 module Continuation_handler = struct
-  type t = Continuation_handler.t
+  type t =
+    { free_names_without_params : Name_occurrences.t;
+      params : Bound_parameters.t;
+      handler : rebuilt_expr;
+      is_exn_handler : bool;
+      is_cold : bool
+    }
 
-  let print ~cont ~recursive ppf ch =
-    Continuation_handler.print ~cont ~recursive ppf ch
+  let is_zero_arity_handler { handler; params; _ } =
+    if Bound_parameters.is_empty params then Some handler else None
 
-  let dummy =
-    Continuation_handler.create Bound_parameters.empty
-      ~handler:term_not_rebuilt.expr ~free_names_of_handler:Unknown
-      ~is_exn_handler:false ~is_cold:false
+  let arity { params; _ } = Bound_parameters.arity params
 
-  let create are_rebuilding params ~handler ~free_names_of_handler
-      ~is_exn_handler ~is_cold =
+  let to_continuation_handler { params; handler; is_exn_handler; is_cold; _ } =
+    Continuation_handler.create params ~handler:(to_expr0 handler)
+      ~free_names_of_handler:(Known (free_names handler))
+      ~is_exn_handler ~is_cold
+
+  let print are_rebuilding ~cont ~recursive ppf ch =
     if ART.do_not_rebuild_terms are_rebuilding
-    then dummy
+    then Format.fprintf ppf "<unavailable, terms not being rebuilt>"
     else
-      Continuation_handler.create params ~handler:handler.expr
-        ~free_names_of_handler:(Known free_names_of_handler) ~is_exn_handler
-        ~is_cold
+      Continuation_handler.print ~cont ~recursive ppf
+        (to_continuation_handler ch)
+
+  let create params ~handler ~is_exn_handler ~is_cold =
+    let free_names_of_handler = free_names handler in
+    let free_names_without_params =
+      List.fold_left
+        (fun free_names param ->
+          Name_occurrences.remove_var free_names
+            ~var:(Bound_parameter.var param))
+        free_names_of_handler
+        (Bound_parameters.to_list params)
+    in
+    { params; handler; is_exn_handler; is_cold; free_names_without_params }
+
+  let cost_metrics_of_handler { handler; _ } = cost_metrics handler
+
+  let free_names_of_handler { handler; _ } = free_names handler
+
+  let free_names { free_names_without_params; _ } = free_names_without_params
 end
 
-let create_non_recursive_let_cont are_rebuilding cont handler ~body
-    ~free_names_of_body =
+let create_non_recursive_let_cont are_rebuilding cont handler ~body =
+  let free_names_of_body = free_names body in
+  let free_names =
+    Name_occurrences.remove_continuation ~continuation:cont
+      (Name_occurrences.union free_names_of_body
+         (Continuation_handler.free_names handler))
+  in
+  let cost_metrics =
+    Cost_metrics.( + ) (cost_metrics body)
+      (Cost_metrics.increase_due_to_let_cont_non_recursive
+         ~cost_metrics_of_handler:
+           (Continuation_handler.cost_metrics_of_handler handler))
+  in
   if ART.do_not_rebuild_terms are_rebuilding
-  then term_not_rebuilt
+  then term_not_rebuilt ~cost_metrics ~free_names
   else
-    Let_cont.create_non_recursive cont handler ~body:body.expr
-      ~free_names_of_body:(Known free_names_of_body)
-    |> create
+    Let_cont.create_non_recursive cont
+      (Continuation_handler.to_continuation_handler handler)
+      ~body:(to_expr0 body) ~free_names_of_body:(Known free_names_of_body)
+    |> create ~cost_metrics ~free_names
 
 let create_non_recursive_let_cont' are_rebuilding cont handler ~body
     ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps =
+  let free_names =
+    Name_occurrences.remove_continuation ~continuation:cont
+      (Name_occurrences.union (free_names body)
+         (Continuation_handler.free_names handler))
+  in
+  let cost_metrics =
+    Cost_metrics.( + ) (cost_metrics body)
+      (Cost_metrics.increase_due_to_let_cont_non_recursive
+         ~cost_metrics_of_handler:
+           (Continuation_handler.cost_metrics_of_handler handler))
+  in
   if ART.do_not_rebuild_terms are_rebuilding
-  then term_not_rebuilt
+  then term_not_rebuilt ~cost_metrics ~free_names
   else
-    Let_cont.create_non_recursive' ~cont handler ~body:body.expr
+    Let_cont.create_non_recursive' ~cont
+      (Continuation_handler.to_continuation_handler handler)
+      ~body:(to_expr0 body)
       ~num_free_occurrences_of_cont_in_body:
         (Known num_free_occurrences_of_cont_in_body) ~is_applied_with_traps
-    |> create
-
-let create_non_recursive_let_cont_without_free_names are_rebuilding cont handler
-    ~body =
-  if ART.do_not_rebuild_terms are_rebuilding
-  then term_not_rebuilt
-  else
-    Let_cont.create_non_recursive cont handler ~body:body.expr
-      ~free_names_of_body:Unknown
-    |> create
+    |> create ~cost_metrics ~free_names
 
 let create_recursive_let_cont are_rebuilding ~invariant_params handlers ~body =
+  let (cost_metrics_of_handlers, free_names), handlers =
+    Continuation.Lmap.fold_left_map
+      (fun (cost_metrics, free_names) _ handler ->
+        let cost_metrics =
+          Cost_metrics.( + ) cost_metrics
+            (Continuation_handler.cost_metrics_of_handler handler)
+        in
+        let free_names_of_handler =
+          List.fold_left
+            (fun free_names param ->
+              Name_occurrences.remove_var free_names
+                ~var:(Bound_parameter.var param))
+            (Continuation_handler.free_names handler)
+            (Bound_parameters.to_list invariant_params)
+        in
+        let free_names =
+          Name_occurrences.union free_names
+            (Name_occurrences.increase_counts free_names_of_handler)
+        in
+        ( (cost_metrics, free_names),
+          Continuation_handler.to_continuation_handler handler ))
+      (Cost_metrics.zero, free_names body)
+      handlers
+  in
+  let free_names =
+    Continuation.Lmap.fold
+      (fun continuation _ free_names ->
+        Name_occurrences.remove_continuation free_names ~continuation)
+      handlers free_names
+  in
+  let cost_metrics =
+    Cost_metrics.( + ) (cost_metrics body)
+      (Cost_metrics.increase_due_to_let_cont_recursive ~cost_metrics_of_handlers)
+  in
   if ART.do_not_rebuild_terms are_rebuilding
-  then term_not_rebuilt
+  then term_not_rebuilt ~cost_metrics ~free_names
   else
-    Let_cont.create_recursive ~invariant_params handlers ~body:body.expr
-    |> create
+    Let_cont.create_recursive ~invariant_params handlers ~body:(to_expr0 body)
+    |> create ~cost_metrics ~free_names
 
 let create_switch are_rebuilding switch =
+  let free_names = Switch.free_names switch in
+  let cost_metrics = Cost_metrics.from_size (Code_size.switch switch) in
   if ART.do_not_rebuild_terms are_rebuilding
-  then term_not_rebuilt
-  else Expr.create_switch switch |> create
+  then term_not_rebuilt ~cost_metrics ~free_names
+  else Expr.create_switch switch |> create ~cost_metrics ~free_names
 
-let create_invalid reason = Expr.create_invalid reason |> create
+let create_invalid reason =
+  Expr.create_invalid reason
+  |> create ~cost_metrics:Cost_metrics.zero ~free_names:Name_occurrences.empty
 
-let bind_no_simplification are_rebuilding ~bindings ~body ~cost_metrics_of_body
-    ~free_names_of_body =
-  ListLabels.fold_left (List.rev bindings)
-    ~init:(body, cost_metrics_of_body, free_names_of_body)
-    ~f:(fun
-        (expr, cost_metrics, free_names)
-        (var, size_of_defining_expr, defining_expr)
-      ->
-      let expr =
-        create_let are_rebuilding
-          (Bound_pattern.singleton var)
-          defining_expr ~body:expr ~free_names_of_body:free_names
-      in
-      let free_names =
-        Name_occurrences.union
-          (Named.free_names defining_expr)
-          (Name_occurrences.remove_var free_names ~var:(Bound_var.var var))
-      in
-      let is_phantom = Name_mode.is_phantom (Bound_var.name_mode var) in
-      let cost_metrics_of_defining_expr =
-        Cost_metrics.from_size size_of_defining_expr
-      in
-      let cost_metrics =
-        Cost_metrics.( + ) cost_metrics
-          (Cost_metrics.increase_due_to_let_expr ~is_phantom
-             ~cost_metrics_of_defining_expr)
-      in
-      expr, cost_metrics, free_names)
+let bind_no_simplification are_rebuilding ~bindings ~body =
+  ListLabels.fold_left (List.rev bindings) ~init:body
+    ~f:(fun expr (var, size_of_defining_expr, defining_expr) ->
+      create_let are_rebuilding
+        (Bound_pattern.singleton var)
+        defining_expr ~body:expr
+        ~free_names_of_defining_expr:(Named.free_names defining_expr)
+        ~cost_metrics_of_defining_expr:
+          (Cost_metrics.from_size size_of_defining_expr))
 
 module Matching_for_unique_handler = struct
   (* Computes an approximate equality between terms. Terms that are equal in
@@ -625,7 +785,7 @@ module Unique_continuation_handlers = struct
     if ART.do_not_rebuild_terms are_rebuilding
     then Or_null.null
     else
-      match handler.contents_hash with
+      match contents_hash handler with
       | Null -> Or_null.null
       | This { depth; structural_hash } ->
         (* The [contents_hash] does not include variable names (it is not clear
@@ -657,7 +817,7 @@ module Unique_continuation_handlers = struct
         | This entries -> entries
       in
       let entry =
-        { params; handler = handler.expr; is_exn_handler; payload = value }
+        { params; handler = to_expr0 handler; is_exn_handler; payload = value }
       in
       { hash_map = Numeric_types.Int.Map.add hash (entry :: entries) t.hash_map
       }
@@ -682,8 +842,8 @@ module Unique_continuation_handlers = struct
           then
             Option.map
               (fun args -> value, args)
-              (match_continuation_handler ~is_exn_handler params handler.expr
-                 other_params other_handler)
+              (match_continuation_handler ~is_exn_handler params
+                 (to_expr0 handler) other_params other_handler)
           else None)
       |> Option.bind (Numeric_types.Int.Map.find_opt hash t.hash_map)
 end
