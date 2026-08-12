@@ -674,6 +674,10 @@ module Without_args : sig
 
   val print : Format.formatter -> t -> unit
 
+  val equal : t -> t -> bool
+
+  val free_names : t -> Name_occurrences.t
+
   (** Describe the effects and coeffects that the application of the given
       primitive may have. *)
   val effects_and_coeffects : t -> Effects_and_coeffects.t

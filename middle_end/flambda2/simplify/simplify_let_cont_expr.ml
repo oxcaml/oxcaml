@@ -772,8 +772,7 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
                       uenv ~params ~handler ~is_exn_handler
                       ~free_names_without_params:free_names
                   with
-                  | Some cont ->
-                    Shortcut_to (cont, Bound_parameters.simples params)
+                  | Some (cont, args) -> Shortcut_to (cont, args)
                   | None -> Unknown)
           in
           match behaviour with

@@ -82,12 +82,8 @@ let find_continuation_shortcut t cont =
 
 let find_unique_continuation_handler are_rebuilding_terms t ~params ~handler
     ~is_exn_handler ~free_names_without_params =
-  match
-    Rebuilt_expr.Unique_continuation_handlers.find are_rebuilding_terms params
-      handler t.unique_handlers_map ~is_exn_handler ~free_names_without_params
-  with
-  | exception Not_found -> None
-  | cont -> Some cont
+  Rebuilt_expr.Unique_continuation_handlers.find_opt are_rebuilding_terms params
+    handler t.unique_handlers_map ~is_exn_handler ~free_names_without_params
 
 let add_continuation0 t cont cont_in_env =
   let continuations = Continuation.Map.add cont cont_in_env t.continuations in
