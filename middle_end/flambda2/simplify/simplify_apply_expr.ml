@@ -184,13 +184,6 @@ let simplify_direct_tuple_application ~simplify_expr dacc apply
 let rebuild_non_inlined_direct_full_application apply ~use_id ~exn_cont_use_id
     ~result_arity ~coming_from_indirect ~callee's_code_metadata:_ uacc
     ~after_rebuild =
-  let uacc =
-    if coming_from_indirect
-    then
-      UA.notify_removed ~operation:Removed_operations.direct_call_of_indirect
-        uacc
-    else uacc
-  in
   let apply =
     Simplify_common.update_exn_continuation_extra_args uacc ~exn_cont_use_id
       apply
@@ -206,14 +199,32 @@ let rebuild_non_inlined_direct_full_application apply ~use_id ~exn_cont_use_id
    *     && not (Code_metadata.is_my_closure_used callee's_code_metadata)
    * in *)
   let apply = if erase_callee then Apply.erase_callee apply else apply in
-  let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id result_arity apply
+  let expr = EB.rewrite_fixed_arity_apply uacc ~use_id result_arity apply in
+  let expr =
+    if coming_from_indirect
+    then
+      RE.notify_removed ~operation:Removed_operations.direct_call_of_indirect
+        expr
+    else expr
   in
   after_rebuild expr uacc
 
 type inlining_decision =
   | Do_not_inline of { erase_attribute : bool }
   | Inline of DA.t * Expr.t
+
+let removed_operations_due_to_inlining ~coming_from_indirect =
+  Removed_operations.( + ) Removed_operations.call
+    (if coming_from_indirect
+     then Removed_operations.direct_call_of_indirect
+     else Removed_operations.zero)
+
+let notify_removed ~operation ~simplify_expr dacc expr ~down_to_up =
+  simplify_expr dacc expr ~down_to_up:(fun dacc ~rebuild ->
+      down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
+          rebuild uacc ~after_rebuild:(fun expr uacc ->
+              let expr = RE.notify_removed ~operation expr in
+              after_rebuild expr uacc)))
 
 (* CR vlaviron: fetch [params_arity], [result_arity] and [result_types] from
    [callee's_code_metadata] to prevent using the wrong one by mistake *)
@@ -260,21 +271,8 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
   in
   match inlined with
   | Inline (dacc, inlined) ->
-    let down_to_up dacc ~rebuild =
-      let rebuild uacc ~after_rebuild =
-        let uacc =
-          if coming_from_indirect
-          then
-            UA.notify_removed
-              ~operation:Removed_operations.direct_call_of_indirect uacc
-          else uacc
-        in
-        let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
-        rebuild uacc ~after_rebuild
-      in
-      down_to_up dacc ~rebuild
-    in
-    simplify_expr dacc inlined ~down_to_up
+    let operation = removed_operations_due_to_inlining ~coming_from_indirect in
+    notify_removed ~operation ~simplify_expr dacc inlined ~down_to_up
   | Do_not_inline { erase_attribute } -> (
     let apply =
       let inlined : Inlined_attribute.t =
@@ -804,21 +802,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       in
       expr, dacc
   in
-  let down_to_up dacc ~rebuild =
-    down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-        let uacc =
-          if coming_from_indirect
-          then
-            UA.notify_removed
-              ~operation:Removed_operations.direct_call_of_indirect uacc
-          else uacc
-        in
-        (* Increase the counter of calls as the apply has been replaced by an
-           allocation of the partial set of closures. *)
-        let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
-        rebuild uacc ~after_rebuild)
-  in
-  simplify_expr dacc expr ~down_to_up
+  let operation = removed_operations_due_to_inlining ~coming_from_indirect in
+  notify_removed ~operation ~simplify_expr dacc expr ~down_to_up
 
 let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
     ~coming_from_indirect ~callee's_code_id ~callee's_code_metadata =
@@ -827,20 +812,12 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
     Simplify_common.split_direct_over_application apply ~callee's_code_id
       ~callee's_code_metadata
   in
-  let down_to_up dacc ~rebuild =
-    let rebuild uacc ~after_rebuild =
-      let uacc =
-        if coming_from_indirect
-        then
-          UA.notify_removed
-            ~operation:Removed_operations.direct_call_of_indirect uacc
-        else uacc
-      in
-      rebuild uacc ~after_rebuild
-    in
-    down_to_up dacc ~rebuild
-  in
-  simplify_expr dacc expr ~down_to_up
+  notify_removed
+    ~operation:
+      (if coming_from_indirect
+       then Removed_operations.direct_call_of_indirect
+       else Removed_operations.zero)
+    ~simplify_expr dacc expr ~down_to_up
 
 let replace_apply_by_invalid dacc ~down_to_up reason =
   down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
@@ -879,7 +856,7 @@ let rebuild_function_call_where_callee's_type_unavailable apply ~use_id
       (Inlined_attribute.with_use_info (Apply.inlined apply)
          Unused_because_function_unknown)
   in
-  let uacc, expr =
+  let expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
   in
   after_rebuild expr uacc
@@ -1327,7 +1304,7 @@ let rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id uacc
     Simplify_common.update_exn_continuation_extra_args uacc ~exn_cont_use_id
       apply
   in
-  let uacc, expr =
+  let expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
   in
   after_rebuild expr uacc
@@ -1390,14 +1367,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
   in
   match simplified with
   | Specialised (dacc, expr, operation) ->
-    let down_to_up dacc ~rebuild =
-      let rebuild uacc ~after_rebuild =
-        let uacc = UA.notify_removed uacc ~operation in
-        rebuild uacc ~after_rebuild
-      in
-      down_to_up dacc ~rebuild
-    in
-    simplify_expr dacc expr ~down_to_up
+    notify_removed ~operation ~simplify_expr dacc expr ~down_to_up
   | Unchanged { return_types } ->
     let dacc, use_id =
       match Apply.continuation apply with
