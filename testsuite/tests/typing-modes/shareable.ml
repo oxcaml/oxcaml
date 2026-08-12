@@ -129,8 +129,8 @@ type t
 Line 4, characters 0-65:
 4 | type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "s" is value
-         because of the definition of t at line 1, characters 0-6.
+Error: The kind of type "s" is value mod everything mod dynamic with t
+         because it's an @@unboxed record type.
        But the kind of type "s" must be a subkind of value mod shareable
          because of the annotation on the declaration of the type s.
 |}]
