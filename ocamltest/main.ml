@@ -191,12 +191,26 @@ let run_test_tree log add_msg behavior env summ ast =
         ~must_do_something
     | Split alternatives :: rest ->
       let count = List.length alternatives in
+      (* Scope the [set]s within each branch to that branch only. Once all
+         branches have run, restore the union of their registrations, so that
+         adding a [split] doesn't change which variables count as registered
+         afterwards *)
+      let snapshot = Variables.snapshot () in
+      let arm_snapshots = ref [] in
       let run_alternative i alternative =
         Printf.fprintf log "Running split branch %d of %d\n%!" (i + 1) count;
-        run_statements behavior env summ alternative (rest :: segments)
-          subs ~branches:(i + 1 :: branches) ~must_do_something
+        Fun.protect
+          (fun () ->
+             run_statements behavior env summ alternative (rest :: segments)
+               subs ~branches:(i + 1 :: branches) ~must_do_something)
+          ~finally:(fun () ->
+             arm_snapshots := Variables.snapshot () :: !arm_snapshots;
+             Variables.restore snapshot)
       in
-      join_list_parallel (List.mapi run_alternative alternatives)
+      let summ = join_list_parallel (List.mapi run_alternative alternatives) in
+      let combined_snapshot = Variables.union (snapshot :: !arm_snapshots) in
+      Variables.restore combined_snapshot;
+      summ
     | [] ->
       run_segments behavior env summ segments subs ~branches ~must_do_something
   and run_segments behavior env summ segments subs ~branches
