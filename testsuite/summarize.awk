@@ -99,32 +99,32 @@ function record_unexp() {
     errored = 1;
 }
 
+/^ ... testing '[^']*' with / {
+    if (in_test && !in_skipped_test) record_unexp();
+    match($0, /... testing '[^']*'/);
+    thiskey = sprintf ("%s/%s", curdir, substr($0, RSTART+13, RLENGTH-14));
+    if (!in_skipped_test && thiskey == key && key in RESULTS) {
+        # Failed test displaying full true - the => failed line comes first
+        # Skip all the remaining lines under this test key, therefore.
+        next;
+    } else {
+        in_skipped_test = 1;
+    }
+}
+
 /^ ... testing '[^']*'/ {
     if (in_test) record_unexp();
     match($0, /... testing '[^']*'/);
     curfile = substr($0, RSTART+13, RLENGTH-14);
-    if (match($0, /... testing '[^']*' with [^:=]*/)){
-        curfile = substr($0, RSTART+12, RLENGTH-12);
+    if (match($0, /\(wall clock: .*s\)/)){
+        duration = substr($0, RSTART+13, RLENGTH-15);
+        if (duration + 0.0 > 10.0)
+          slow[slowcount++] = sprintf("%s: %s", curfile, duration);
     }
     key = sprintf ("%s/%s", curdir, curfile);
     DIRS[key] = curdir;
     in_test = 1;
-}
-
-/^ ... testing (with|[^'])/ {
-    if (in_test) record_unexp();
-    key = curdir;
-    DIRS[key] = curdir;
-    in_test = 1;
-}
-
-/^Wall clock:/ {
-  match($0, /: .* took /);
-  curfile = substr($0, RSTART+2, RLENGTH-8);
-  match($0, / took .*s/);
-  duration = substr($0, RSTART+6, RLENGTH-7);
-  if (duration + 0.0 > 10.0)
-    slow[slowcount++] = sprintf("%s: %s", curfile, duration);
+    if (!match($0, /^ ... testing '[^']*' with /)) in_skipped_test = 0;
 }
 
 /=> passed/ {
@@ -139,9 +139,7 @@ function record_unexp() {
     record_skip();
 }
 
-/=> predicate.*is satisfied/ {
-    record_pass();
-}
+# A predicate being satisfied is NOT a pass! (because nothing was done)
 
 /=> n\/a/ {
     record_na();

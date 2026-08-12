@@ -49,7 +49,7 @@ let get_global glob =
     raise(Error(Unbound_global glob))
 
 let rec address path event = function
-  | Env.Aunit cu -> get_global (Glob_compunit cu)
+  | Env.Aunit (cu, _) -> get_global (Glob_compunit cu)
   | Env.Alocal id ->
     begin
       match Symtable.Global.of_ident id with
@@ -111,8 +111,7 @@ let rec expression event env = function
           in
           if not @@ Lpoly.is_empty_exn valdesc.val_lpoly then
             raise (Error Layout_polymorphic_value);
-          let typ = Ctype.correct_levels valdesc.val_type in
-          v, typ
+          v, valdesc.val_type
       | exception Not_found ->
           raise(Error(Unbound_long_identifier lid))
     end
@@ -196,6 +195,7 @@ and find_label lbl env ty path tydesc pos = function
 
 open Format
 module Style = Misc.Style
+module Printtyp = Printtyp.Doc
 
 let as_inline_code pr = Format_doc.compat @@ Style.as_inline_code pr
 let inline_code = Format_doc.compat Style.inline_code

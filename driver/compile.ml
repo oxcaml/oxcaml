@@ -22,9 +22,11 @@ let with_info =
   Compile_common.with_info ~backend:Byte ~tool_name
 
 let interface ~source_file ~output_prefix =
-  with_info ~source_file ~output_prefix ~dump_ext:"cmi"
-    ~compilation_unit:Inferred_from_output_prefix ~kind:Intf
-  @@ fun info ->
+  let unit_info =
+    unit_info_from_cu_or_output_prefix ~source_file Intf ~output_prefix
+      ~compilation_unit:Inferred_from_output_prefix
+  in
+  with_info ~dump_ext:"cmi" unit_info @@ fun info ->
   Compile_common.interface
     ~hook_parse_tree:(fun _ -> ())
     ~hook_typed_tree:(fun _ -> ())
@@ -49,11 +51,14 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
        tlambda
        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
        |> Slambda.eval
+            ~cu_static_data:(fun _ ->
+              Misc.fatal_errorf
+                "Cross-module static evaluation not implemented in bytecode")
             (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-       |> fun { Slambda.slv_comptime = _; slv_runtime } ->
+       |> fun (_static_data, lambda) ->
           (* CR layout poly: Drop the comptime part until top-level modules can
              be static. *)
-          slv_runtime
+          lambda
        |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
           (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
@@ -113,9 +118,11 @@ let starting_point_of_compiler_pass start_from =
 let implementation_aux ~start_from ~source_file ~output_prefix
     ~keep_symbol_tables:_
     ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
-  with_info ~source_file ~output_prefix ~dump_ext:"cmo" ~compilation_unit
-    ~kind:Impl
-  @@ fun info ->
+  let unit_info =
+    unit_info_from_cu_or_output_prefix
+      ~source_file Impl ~output_prefix ~compilation_unit
+  in
+  with_info ~dump_ext:"cmo" unit_info @@ fun info ->
   match start_from with
   | Parsing ->
     let backend info typed =

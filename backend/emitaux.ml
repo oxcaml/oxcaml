@@ -51,6 +51,21 @@ type frame_descr =
 
 let frame_descriptors = ref ([] : frame_descr list)
 
+(* The epoch bumps at each text-section change. It prepares for a compact
+   frame-descriptor format in which a return address is a delta from the
+   previous descriptor's -- an assembly-time constant only when both lie in the
+   same section -- so descriptors will record the epoch to decide where delta
+   chains must break. *)
+let frame_section_epoch = ref 0
+
+let current_code_section = ref ""
+
+let enter_code_section name =
+  if not (String.equal name !current_code_section)
+  then (
+    current_code_section := name;
+    incr frame_section_epoch)
+
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
 
 let get_flags debuginfo =
@@ -70,10 +85,7 @@ let is_long n =
   if n > 0x3FFF_FFFF then raise (Error (Stack_frame_way_too_large n));
   n >= !Oxcaml_flags.long_frames_threshold
 
-let is_long_stack_index n =
-  let is_reg n = n land 1 = 1 in
-  (* allows negative reg offsets in runtime4 *)
-  if is_reg n && not Config.runtime5 then false else is_long n
+let is_long_stack_index n = is_long n
 
 let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
   assert (frame_size land 3 = 0);
@@ -124,7 +136,8 @@ let emit_frames a =
     let n = Numbers.Int8.of_int_exn n in
     a.efa_i8 n
   in
-  let emit_i16 n =
+  let[@warning "-26"] emit_i16 n =
+    (* unused, but here for completeness *)
     let n = Numbers.Int16.of_int_exn n in
     a.efa_i16 n
   in
@@ -190,16 +203,9 @@ let emit_frames a =
     then (
       emit_u16 Oxcaml_flags.max_long_frames_threshold;
       a.efa_align 4);
-    let emit_signed_16_or_32 = if fd.fd_long then emit_i32 else emit_i16 in
     let emit_unsigned_16_or_32 = if fd.fd_long then emit_u32 else emit_u16 in
-    let emit_live_offset n =
-      (* On runtime 4, the live offsets can be negative. As such, we emit them
-         as signed integers (and truncate the upper bound to 0x7f...ff); on
-         runtime 5 they are always unsigned. *)
-      if Config.runtime5
-      then emit_unsigned_16_or_32 n
-      else emit_signed_16_or_32 n
-    in
+    (* The live offsets are always unsigned. *)
+    let emit_live_offset n = emit_unsigned_16_or_32 n in
     emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
     emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
     List.iter emit_live_offset fd.fd_live_offset;
@@ -383,10 +389,14 @@ let with_snapshot ~f =
   let saved_file_pos_nums = !file_pos_nums in
   let saved_file_pos_num_cnt = !file_pos_num_cnt in
   let saved_frame_descriptors = !frame_descriptors in
+  let saved_frame_section_epoch = !frame_section_epoch in
+  let saved_current_code_section = !current_code_section in
   let result = f () in
   file_pos_nums := saved_file_pos_nums;
   file_pos_num_cnt := saved_file_pos_num_cnt;
   frame_descriptors := saved_frame_descriptors;
+  frame_section_epoch := saved_frame_section_epoch;
+  current_code_section := saved_current_code_section;
   result
 
 let get_file_num ~file_emitter file_name =
@@ -461,8 +471,8 @@ module Dwarf_helpers = struct
       Asm_targets.Asm_directives.debug_header ~get_file_num;
       let unit_name =
         (* CR lmaurer: This doesn't actually need to be an [Ident.t] *)
-        Symbol.for_current_unit () |> Symbol.linkage_name
-        |> Linkage_name.to_string |> Ident.create_persistent
+        Current_unit.symbol () |> Symbol.linkage_name |> Linkage_name.to_string
+        |> Ident.create_persistent
       in
       let code_begin = Asm_targets.Asm_symbol.create_global code_begin in
       let code_end = Asm_targets.Asm_symbol.create_global code_end in
@@ -530,6 +540,11 @@ let report_error_doc ppf = function
 
 let report_error = Format_doc.compat report_error_doc
 
+let () =
+  Location.register_error_of_exn (function
+    | Error err -> Some (Location.error_of_printer_file report_error_doc err)
+    | _ -> None)
+
 type preproc_stack_check_result =
   { max_frame_size : int;
     contains_nontail_calls : bool
@@ -555,7 +570,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
         | Tls_get | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
         | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Load _
+        | Const_vec512 _ | Const_mask _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -569,7 +584,8 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
       loop i.next fs max_fs nontail_flag
     | Lstackcheck _ ->
       (* should not be already present *)
-      assert false
+      Misc.fatal_error
+        "Emitaux.preproc_stack_check: Lstackcheck already present"
   in
   loop fun_body frame_size frame_size false
 

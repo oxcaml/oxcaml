@@ -29,7 +29,7 @@ let box_array x = [| Float_u.to_float a for a in x |]
 Line 1, characters 38-39:
 1 | let box_array x = [| Float_u.to_float a for a in x |]
                                           ^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "a" has type "('a : value_or_null)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
@@ -59,7 +59,7 @@ let box_list x = [ Float_u.to_float a for a in x ]
 Line 1, characters 36-37:
 1 | let box_list x = [ Float_u.to_float a for a in x ]
                                         ^
-Error: This expression has type "('a : value)"
+Error: The value "a" has type "('a : value)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.

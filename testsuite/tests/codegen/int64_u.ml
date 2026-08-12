@@ -7,11 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  expect.opt;
 *)
 
@@ -19,13 +15,10 @@ open Intrinsics
 
 (* Codegen tests for Int64_u operations *)
 
-(* CR ttebbi: This should use the neg instruction. *)
 let neg x = Int64_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  neg   %rax
   ret
 |}]
 
@@ -50,7 +43,6 @@ mul:
   ret
 |}]
 
-(* CR ttebbi: imul could be replaced with lea (x*2+x) *)
 let mul_3 x = Int64_u.mul x #3L
 [%%expect_asm X86_64{|
 mul_3:
@@ -61,21 +53,18 @@ mul_3:
 let div x y = Int64_u.div x y
 [%%expect_asm X86_64{|
 div:
-  movq  %rax, %rdi
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L118
+  je    .L1
   cmpq  $-1, %rcx
-  je    .L111
-  movq  %rdi, %rax
+  je    .L0
   cqto
   idivq %rcx
   ret
-.L111:
-  xorl  %eax, %eax
-  subq  %rdi, %rax
+.L0:
+  neg   %rax
   ret
-.L118:
+.L1:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -95,56 +84,16 @@ div_by_constant:
   ret
 |}]
 
-(* CR ttebbi: These are way too many instructions. *)
 let unsigned_div x y = Int64_u.unsigned_div x y
 [%%expect_asm X86_64{|
 unsigned_div:
-  movq  %rax, %rdi
   movq  %rbx, %rcx
-  cmpq  $0, %rcx
-  jge   .L115
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rcx
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rdi
-  cmpq  %rcx, %rdi
-  jge   .L109
-  xorl  %eax, %eax
-  ret
-.L109:
-  movl  $1, %eax
-  ret
-.L115:
   testq %rcx, %rcx
-  je    .L141
-  movq  %rdi, %rbx
-  shrq  $1, %rbx
-  cmpq  $-1, %rcx
-  je    .L123
-  movq  %rbx, %rax
-  cqto
-  idivq %rcx
-  jmp   .L126
-.L123:
-  xorl  %eax, %eax
-  subq  %rbx, %rax
-.L126:
-  salq  $1, %rax
-  movabsq $-9223372036854775808, %rsi
-  movq  %rcx, %rbx
-  subq  %rsi, %rbx
-  movabsq $-9223372036854775808, %rdx
-  movq  %rax, %rsi
-  imulq %rcx, %rsi
-  subq  %rsi, %rdi
-  subq  %rdx, %rdi
-  cmpq  %rbx, %rdi
-  jge   .L134
+  je    .L0
+  xorl  %edx, %edx
+  divq  %rcx
   ret
-.L134:
-  incq  %rax
-  ret
-.L141:
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -157,17 +106,17 @@ let rem x y = Int64_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L117
+  je    .L1
   cmpq  $-1, %rcx
-  je    .L111
+  je    .L0
   cqto
   idivq %rcx
   movq  %rdx, %rax
   ret
-.L111:
+.L0:
   xorl  %eax, %eax
   ret
-.L117:
+.L1:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -175,93 +124,138 @@ rem:
   jmp   *%r11
 |}]
 
-(* CR ttebbi: These are way too many instructions. *)
 let unsigned_rem x y = Int64_u.unsigned_rem x y
 [%%expect_asm X86_64{|
 unsigned_rem:
-  movq  %rax, %rdi
   movq  %rbx, %rcx
-  cmpq  $0, %rcx
-  jge   .L118
-  movabsq $-9223372036854775808, %rbx
-  movq  %rcx, %rax
-  subq  %rbx, %rax
-  movabsq $-9223372036854775808, %rsi
-  movq  %rdi, %rbx
-  subq  %rsi, %rbx
-  cmpq  %rax, %rbx
-  jge   .L112
-  xorl  %ebx, %ebx
-  jmp   .L148
-.L112:
-  movl  $1, %ebx
-  jmp   .L148
-.L118:
   testq %rcx, %rcx
-  je    .L144
-  movq  %rdi, %rax
-  shrq  $1, %rax
-  cmpq  $-1, %rcx
-  je    .L126
-  cqto
-  idivq %rcx
-  movq  %rax, %rbx
-  jmp   .L129
-.L126:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-.L129:
-  salq  $1, %rbx
-  movabsq $-9223372036854775808, %rsi
-  movq  %rcx, %rax
-  subq  %rsi, %rax
-  movabsq $-9223372036854775808, %r8
-  movq  %rbx, %rsi
-  imulq %rcx, %rsi
-  movq  %rdi, %rdx
-  subq  %rsi, %rdx
-  subq  %r8, %rdx
-  cmpq  %rax, %rdx
-  jl    .L148
-  incq  %rbx
-  jmp   .L148
-.L144:
+  je    .L0
+  xorl  %edx, %edx
+  divq  %rcx
+  movq  %rdx, %rax
+  ret
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L148:
-  imulq %rcx, %rbx
-  movq  %rdi, %rax
-  subq  %rbx, %rax
+|}]
+
+let unsafe_unsigned_div x y = Int64_u.unsafe_unsigned_div x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_div:
+  movq  %rbx, %rcx
+  xorl  %edx, %edx
+  divq  %rcx
   ret
 |}]
 
-(* CR ttebbi: This could be just a bitwise and. *)
+let unsafe_unsigned_rem x y = Int64_u.unsafe_unsigned_rem x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_rem:
+  movq  %rbx, %rcx
+  xorl  %edx, %edx
+  divq  %rcx
+  movq  %rdx, %rax
+  ret
+|}]
+
+let unsigned_div_1 x = Int64_u.unsigned_div x #1L
+[%%expect_asm X86_64{|
+unsigned_div_1:
+  ret
+|}]
+
+let unsigned_rem_1 x = Int64_u.unsigned_rem x #1L
+[%%expect_asm X86_64{|
+unsigned_rem_1:
+  xorl  %eax, %eax
+  ret
+|}]
+
+let unsigned_div_2 x = Int64_u.unsigned_div x #2L
+[%%expect_asm X86_64{|
+unsigned_div_2:
+  shrq  $1, %rax
+  ret
+|}]
+
 let unsigned_rem_2 x = Int64_u.unsigned_rem x #2L
 [%%expect_asm X86_64{|
 unsigned_rem_2:
+  andl  $1, %eax
+  ret
+|}]
+
+let unsigned_div_128 x = Int64_u.unsigned_div x #128L
+[%%expect_asm X86_64{|
+unsigned_div_128:
+  shrq  $7, %rax
+  ret
+|}]
+
+let unsigned_rem_128 x = Int64_u.unsigned_rem x #128L
+[%%expect_asm X86_64{|
+unsigned_rem_128:
+  andl  $127, %eax
+  ret
+|}]
+
+let unsigned_div_7 x = Int64_u.unsigned_div x #7L
+[%%expect_asm X86_64{|
+unsigned_div_7:
   movq  %rax, %rbx
+  movabsq $2635249153387078803, %rdi
+  movq  %rbx, %rax
+  mulq  %rdi
+  movq  %rdx, %rax
+  subq  %rax, %rbx
   shrq  $1, %rbx
-  movq  %rbx, %rdi
-  shrq  $63, %rdi
-  addq  %rdi, %rbx
-  sarq  $1, %rbx
-  salq  $1, %rbx
-  movabsq $-9223372036854775806, %rdx
-  movabsq $-9223372036854775808, %rcx
-  movq  %rbx, %rdi
-  salq  $1, %rdi
-  movq  %rax, %rsi
-  subq  %rdi, %rsi
-  subq  %rcx, %rsi
-  cmpq  %rdx, %rsi
-  jl    .L120
-  incq  %rbx
-.L120:
-  salq  $1, %rbx
-  subq  %rbx, %rax
+  leaq  (%rbx,%rdx), %rax
+  shrq  $2, %rax
+  ret
+|}]
+
+let unsigned_rem_7 x = Int64_u.unsigned_rem x #7L
+[%%expect_asm X86_64{|
+unsigned_rem_7:
+  movq  %rax, %rbx
+  movabsq $2635249153387078803, %rdi
+  movq  %rbx, %rax
+  mulq  %rdi
+  movq  %rdx, %rdi
+  movq  %rbx, %rax
+  subq  %rdi, %rax
+  shrq  $1, %rax
+  leaq  (%rax,%rdx), %rdi
+  shrq  $2, %rdi
+  imulq $7, %rdi
+  movq  %rbx, %rax
+  subq  %rdi, %rax
+  ret
+|}]
+
+let unsigned_div_umaxint x = Int64_u.unsigned_div x (-#1L)
+[%%expect_asm X86_64{|
+unsigned_div_umaxint:
+  cmpq  $-1, %rax
+  jne   .L0
+  movl  $1, %eax
+  ret
+.L0:
+  xorl  %eax, %eax
+  ret
+|}]
+
+let unsigned_rem_umaxint x = Int64_u.unsigned_rem x (-#1L)
+[%%expect_asm X86_64{|
+unsigned_rem_umaxint:
+  cmpq  $-1, %rax
+  jne   .L0
+  xorl  %eax, %eax
+  ret
+.L0:
   ret
 |}]
 
@@ -283,14 +277,11 @@ pred:
 let abs x = Int64_u.abs x
 [%%expect_asm X86_64{|
 abs:
-  movq  %rax, %rbx
-  cmpq  $0, %rbx
-  jl    .L105
-  movq  %rbx, %rax
+  cmpq  $0, %rax
+  jl    .L0
   ret
-.L105:
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+.L0:
+  neg   %rax
   ret
 |}]
 
@@ -374,22 +365,22 @@ let unsigned_to_int x = Int64_u.unsigned_to_int x
 unsigned_to_int:
   movq  %rax, %rbx
   cmpq  $0, %rbx
-  jl    .L112
+  jl    .L1
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
-  jg    .L112
+  jg    .L1
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L115
-.L117:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
   leaq  1(%rbx,%rbx), %rbx
   movq  %rbx, (%rax)
   addq  $8, %rsp
   ret
-.L112:
+.L1:
   movl  $1, %eax
   ret
 |}]
@@ -409,8 +400,8 @@ to_float:
   vcvtsi2sdq %rax, %xmm0, %xmm0
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd %xmm0, (%rax)
@@ -432,8 +423,8 @@ to_int32:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L106
-.L108:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
@@ -458,8 +449,8 @@ to_nativeint:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
@@ -475,6 +466,7 @@ of_int32_u:
   ret
 |}]
 
+(* CR ttebbi: could be [cltq] *)
 let to_int32_u x = Int64_u.to_int32_u x
 [%%expect_asm X86_64{|
 to_int32_u:
@@ -509,8 +501,8 @@ float_of_bits:
   movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovq %rbx, %xmm0
@@ -523,24 +515,24 @@ float_of_bits:
 let compare x y = Int64_u.compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 |}]
 
 let unsigned_compare x y = Int64_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
+  movabsq $-9223372036854775808, %rdi
+  subq  %rdi, %rbx
+  movabsq $-9223372036854775808, %rsi
   movq  %rax, %rdi
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rbx
-  movabsq $-9223372036854775808, %rax
-  subq  %rax, %rdi
+  subq  %rsi, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
@@ -560,18 +552,10 @@ equal:
   ret
 |}]
 
-(* CR ttebbi: This is very inefficient, should be like `equal`. *)
 let equal_using_compare x y = Int64_u.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
-  xorl  %eax, %eax
-  cmpq  %rbx, %rdi
-  setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
-  cmpq  $1, %rax
+  cmpq  %rbx, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
@@ -582,13 +566,11 @@ equal_using_compare:
 let min x y = Int64_u.min x y
 [%%expect_asm X86_64{|
 min:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
-  jg    .L105
-  movq  %rdi, %rax
+  cmpq  %rbx, %rax
+  jg    .L0
   ret
-.L105:
+.L0:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -596,13 +578,11 @@ min:
 let max x y = Int64_u.max x y
 [%%expect_asm X86_64{|
 max:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
-  jl    .L105
-  movq  %rdi, %rax
+  cmpq  %rbx, %rax
+  jl    .L0
   ret
-.L105:
+.L0:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -613,8 +593,8 @@ to_int64:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi

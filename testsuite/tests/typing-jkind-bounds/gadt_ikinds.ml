@@ -1,5 +1,4 @@
 (* TEST
-   flags = "-ikinds";
    expect;
 *)
 
@@ -29,6 +28,40 @@ type ('a : value mod portable) require_portable
 type ('a : value mod many) require_many
 type 'a require_nonnull
 type ('a : value mod external_) require_external
+|}]
+
+module Recursive_boxed_variant_with_bounded_parameter = struct
+  module Variable = struct
+    type ('v : value mod contended portable) t
+      : value mod contended portable with 'v
+  end
+
+  module Record_t = struct
+    type ('v : value mod contended portable) t
+      : value mod contended portable =
+      | Variable of 'v Variable.t
+      | Linear_combination of ('v t * int)
+      | Abs of 'v t * (int * (int * int))
+      | Max of { ts : ('v t * int) * ('v t * int) list }
+  end
+end
+[%%expect{|
+module Recursive_boxed_variant_with_bounded_parameter :
+  sig
+    module Variable :
+      sig
+        type ('v : value mod portable contended) t
+          : value mod portable contended with 'v
+      end
+    module Record_t :
+      sig
+        type ('v : value mod portable contended) t =
+            Variable of 'v Variable.t
+          | Linear_combination of ('v t * int)
+          | Abs of 'v t * (int * (int * int))
+          | Max of { ts : ('v t * int) * ('v t * int) list; }
+      end
+  end
 |}]
 
 (***********************************************************************)
@@ -71,7 +104,7 @@ let bar (x : q) =
 Line 2, characters 23-24:
 2 |   takes_only_immutable x
                            ^
-Error: This expression has type "q" but an expression was expected of type
+Error: The value "x" has type "q" but an expression was expected of type
          "('a : immutable_data)"
        The kind of q is immutable_data with M.t
          because of the definition of q at line 1, characters 0-32.
@@ -153,7 +186,7 @@ Lines 1-3, characters 0-61:
 1 | type 'a t : value mod contended portable =
 2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
 3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
-Error: The kind of type "t" is value non_float mod portable immutable with 'a
+Error: The kind of type "t" is value non_float mod immutable portable with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of
            value mod portable contended

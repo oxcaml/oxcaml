@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-no-ikinds";
  readonly_files = "a1.ml a2.ml b.ml";
  setup-ocamlc.byte-build-env;
  commandline = "-depend b.ml -o b.deps";

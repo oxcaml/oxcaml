@@ -7,11 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  expect.opt;
 *)
 
@@ -59,17 +55,15 @@ f:
   ret
 |}]
 
-(* CR ttebbi: We could merge the and and test instructions *)
 let do_intersect t1 t2 =
   Int64_u.(if equal (logand t1 t2) #0L then #100L else #200L)
 [%%expect_asm X86_64{|
 do_intersect:
   andq  %rbx, %rax
-  testq %rax, %rax
-  jne   .L106
+  jne   .L0
   movl  $100, %eax
   ret
-.L106:
+.L0:
   movl  $200, %eax
   ret
 |}]
@@ -82,11 +76,11 @@ logand_branch:
   movq  %rdi, %rbx
   andl  $33, %eax
   cmpq  $1, %rax
-  je    .L108
+  je    .L0
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L108:
+.L0:
   movl  $1, %eax
   ret
 |}]
@@ -102,23 +96,23 @@ let combine_comparisons r f =
 ;;
 [%%expect_asm X86_64{|
 combine_comparisons:
-  movq  (%rax), %rbx
-  xorl  %eax, %eax
-  cmpq  $41, %rbx
-  setl  %al
-  cmpq  $11, %rbx
-  jle   .L114
-  testq %rax, %rax
-  je    .L114
-  movq  %rbx, %rax
+  movq  (%rax), %rdi
+  xorl  %ebx, %ebx
+  cmpq  $41, %rdi
+  setl  %bl
+  movq  %rdi, %rax
+  cmpq  $11, %rax
+  jle   .L0
+  testq %rbx, %rbx
+  je    .L0
   ret
-.L114:
+.L0:
   movl  $1, %eax
   ret
 |}]
 
-(* CR ttebbi: We branch twice on the same comparison, even though we realise
-   it is the same one. *)
+(* CR ttebbi: We branch twice on the same comparison, materializing a boolean
+   for the second branch. *)
 let repeat_comparisons r _f =
   let a = !r > 5 in
   let b = !r > 5 in
@@ -129,17 +123,68 @@ repeat_comparisons:
   xorl  %eax, %eax
   cmpq  $11, %rbx
   setg  %al
-  cmpq  $11, %rbx
-  jle   .L113
+  jle   .L0
   testq %rax, %rax
-  je    .L113
+  je    .L0
   movl  $3, %eax
   ret
-.L113:
+.L0:
   movl  $5, %eax
   ret
 |}]
 
+(* CR ttebbi: We first compute the boolean result of the || predicate, instead
+   of jumping directly. *)
+let bad_max a b =
+  let i = ref 0 in
+  while !i < a || !i < b do incr i done;
+  !i
+[%%expect_asm X86_64{|
+bad_max:
+  movq  %rax, %rsi
+  movl  $1, %edi
+  cmpq  %rsi, %rdi
+  jge   .L1
+.L0:
+  movl  $1, %eax
+  jmp   .L2
+.L1:
+  xorl  %eax, %eax
+  cmpq  %rbx, %rdi
+  setl  %al
+  testq %rax, %rax
+  je    .L3
+.L2:
+  addq  $2, %rdi
+  cmpq  %rsi, %rdi
+  jge   .L1
+  jmp   .L0
+.L3:
+  movq  %rdi, %rax
+  ret
+|}]
+
+let int_compare x y =
+  let[@inline never] opaque _ = 0 in
+  match Stdlib.Int.compare x y with
+  | 0 -> opaque x
+  | r -> r
+[%%expect_asm X86_64{|
+int_compare:
+  movq  %rax, %rsi
+  cmpq  %rbx, %rsi
+  je    .L0
+  movq  $-1, %rdi
+  xorl  %eax, %eax
+  cmpq  %rbx, %rsi
+  setg  %al
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
+  ret
+.L0:
+  movl  $1, %eax
+  ret
+|}]
 
 (* CR ttebbi: We materialize the boolean needlessly. *)
 let branch_and_return o =
@@ -154,10 +199,10 @@ branch_and_return:
   setne %al
   leaq  1(%rax,%rax), %rax
   cmpq  $3, %rax
-  jne   .L107
+  jne   .L0
   movq  %rbx, %rax
   ret
-.L107:
+.L0:
   movl  $15, %eax
   ret
 |}]
@@ -169,20 +214,20 @@ let two_element_list x = [x; x]
 [%%expect_asm X86_64{|
 two_element_list:
   subq  $8, %rsp
-  movq  %rax, %rbx
+  movq  %rax, %rdi
   subq  $48, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
-  leaq  8(%r15), %rdi
-  addq  $24, %rdi
-  movq  $2048, -8(%rdi)
-  movq  %rbx, (%rdi)
-  movq  $1, 8(%rdi)
-  leaq  -24(%rdi), %rax
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rbx
+  addq  $24, %rbx
+  movq  $2048, -8(%rbx)
+  movq  %rdi, (%rbx)
+  movq  $1, 8(%rbx)
+  leaq  -24(%rbx), %rax
   movq  $2048, -8(%rax)
-  movq  %rbx, (%rax)
-  movq  %rdi, 8(%rax)
+  movq  %rdi, (%rax)
+  movq  %rbx, 8(%rax)
   addq  $8, %rsp
   ret
 |}]
@@ -196,15 +241,15 @@ let constant_folding (x : int) =
 [%%expect_asm X86_64{|
 constant_folding:
   cmpq  %rax, %rax
-  jl    .L109
+  jl    .L0
   subq  %rax, %rax
   incq  %rax
   cmpq  $1, %rax
-  jne   .L111
-.L109:
+  jne   .L1
+.L0:
   movl  $7, %eax
   ret
-.L111:
+.L1:
   movl  $9, %eax
   ret
 |}]
@@ -218,7 +263,6 @@ external memcmp :
   = "caml_no_bytecode_impl" "memcmp"
 [@@noalloc]
 
-(* CR ttebbi: Double sign extension instructions. *)
 let int32_box_unbox_after_call (a : ptr) (b : ptr) =
   Int32_u.of_int (Int32_u.to_int (memcmp a b ~len:#5n))
 [%%expect_asm X86_64{|
@@ -228,7 +272,6 @@ int32_box_unbox_after_call:
   movq  %rbx, %rsi
   movl  $5, %edx
   call  memcmp@PLT
-  movslq %eax, %rax
   movslq %eax, %rax
   addq  $8, %rsp
   ret
@@ -267,8 +310,8 @@ pause:
   subq  $8, %rsp
   pause
   cmpq  (%r14), %r15
-  jbe   .L105
-.L106:
+  jbe   <hidden GC jump pad>
+.L0:
   movl  $1, %eax
   addq  $8, %rsp
   ret
@@ -329,7 +372,7 @@ let is_int_constant () : bool =
    Obj.repr (Some 3) |> Obj.is_int
 [%%expect_asm X86_64{|
 is_int_constant:
-  movq  camlTOP25__const_block785@GOTPCREL(%rip), %rax
+  movq  <hidden PC-relative offset>(%rip), %rax
   andl  $1, %eax
   leaq  1(%rax,%rax), %rax
   ret
@@ -339,11 +382,11 @@ let is_int_branch (x : 'a) f = if Obj.is_int(Obj.repr x) then f()
 [%%expect_asm X86_64{|
 is_int_branch:
   testb $1, %al
-  je    .L107
+  je    .L0
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
-.L107:
+.L0:
   movl  $1, %eax
   ret
 |}]
@@ -354,10 +397,10 @@ let is_block_branch (x : 'a) f = if not(Obj.is_int(Obj.repr x)) then f()
 [%%expect_asm X86_64{|
 is_block_branch:
   testb $1, %al
-  je    .L105
+  je    .L0
   movl  $1, %eax
   ret
-.L105:
+.L0:
   movl  $1, %eax
   movq  (%rbx), %rdi
   jmp   *%rdi
@@ -375,14 +418,14 @@ let branch_or_tailcall x =
 [%%expect_asm X86_64{|
 branch_or_tailcall:
   cmpq  $5, %rax
-  jbe   .L105
-  movq  camlTOP28__Pmakeblock918@GOTPCREL(%rip), %rax
+  jbe   .L0
+  movq  <hidden PC-relative offset>(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-.L105:
-  movq  camlTOP28__switch_block919@GOTPCREL(%rip), %rbx
+.L0:
+  movq  <hidden PC-relative offset>(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
 |}]
@@ -396,9 +439,9 @@ let shift_of_logand (a : int64#) =
 ;;
 [%%expect_asm X86_64{|
 shift_of_logand:
+  movl  $1, %ebx
   movq  %rax, %rcx
-  movl  $1, %eax
-  andq  %rax, %rcx
+  andq  %rbx, %rcx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax

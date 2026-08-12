@@ -3,10 +3,8 @@
 A performance-focused version of OCaml.
 This is also the home of the Flambda 2 optimiser and the Cfg backend.
 
-OxCaml is currently based on OCaml 5.2.0 (plus some patches from later
-upstream revisions, mainly in the runtime).  It supports both the OCaml 4 and OCaml 5
-runtime systems, although support for the OCaml 4 runtime is expected to be removed
-in autumn 2025.
+OxCaml is currently based on OCaml 5.4 (plus some patches from later
+upstream revisions, mainly in the runtime).
 
 The following gives basic instructions for getting set up.  Please see
 [`HACKING.md`](HACKING.md) for more detailed instructions if you want to develop in this repo.

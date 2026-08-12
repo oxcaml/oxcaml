@@ -249,21 +249,55 @@ let create_typedef_die ~reference ~parent_proto_die ?name child_die =
       |> attribute_list_with_optional_name name)
     ()
 
-let create_array_die ~reference ~parent_proto_die ~child_die ?name () =
+(** {1 Layout of OCaml array elements}
+
+    The OCaml runtime lays out array elements differently depending on the
+    element kind. The stride between consecutive elements is:
+
+    {v
+    | Element                          | Stride        | Notes                 |
+    |----------------------------------|---------------|-----------------------|
+    | [value] kind                     | [size_addr]   | regular OCaml value   |
+    | [int8#]                          | 1 byte        | densely packed 8/word |
+    | [int16#]                         | 2 bytes       | densely packed 4/word |
+    | [int32#], [float32#]             | 4 bytes       | densely packed 2/word |
+    | [int64#], [float#], [nativeint#] | 8 bytes       | exactly one word      |
+    | unboxed product                  | sum of word-  | e.g. #{int8#; int8#}  |
+    |                                  | extended      | takes 16 bytes per    |
+    |                                  | fields        | element               |
+    v}
+
+    So primitive sub-word arrays are densely packed (multiple values per word),
+    but the moment a sub-word value lives inside an unboxed product field its
+    slot grows to one full word.
+
+    The in-array layout is independent of how the same type is laid out
+    elsewhere (e.g. as a field of a mixed block, or in a register), so the
+    stride is not derivable from the element die alone - it must be computed by
+    the caller. [create_array_die] and [create_packed_struct] below produce
+    DWARF that follows the table above.
+
+    Caveat for densely packed primitive sub-word arrays: the OCaml block tag
+    encodes how many of the final word's slots are valid, but OxCaml LLDB
+    ignores the [DW_AT_count = 0] we emit below and infers the element count
+    from [block_size / element_stride], which overshoots by up to
+    [elements_per_word - 1]. Once the language plugin supports DWARF expressions
+    we can replace the [0] with a tag-aware count expression and the displayed
+    length will match the logical length. *)
+let create_array_die ~reference ~parent_proto_die ~child_die ~element_stride
+    ?name () =
   let array_die =
     Proto_die.create ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Array_type
       ~attribute_values:
         [ DAH.create_type_from_reference ~proto_die_reference:child_die;
           (* We can't use DW_AT_byte_size or DW_AT_bit_size since we don't know
              how large the array might be. *)
-          (* DW_AT_byte_stride probably isn't required strictly speaking, but
-             let's add it for the avoidance of doubt. *)
-          DAH.create_byte_stride ~bytes:(Int8.of_int_exn Arch.size_addr) ]
+          DAH.create_byte_stride ~bytes:(Int64.of_int element_stride) ]
       ()
   in
   Proto_die.create_ignore ~parent:(Some array_die) ~tag:Dwarf_tag.Subrange_type
     ~attribute_values:
-      [ (* Thankfully, all that lldb cares about is DW_AT_count. *)
+      [ (* Ignored by OxCaml LLDB; see the commentary above. *)
         DAH.create_count_const 0L ]
     ();
   (* OxCaml LLDB currently uses custom printing for arrays instead of respecting
@@ -827,7 +861,7 @@ let create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
       ~tag:Dwarf_tag.Variant_part ()
   in
   Proto_die.create_ignore ~reference:constructor_discriminant_ref
-    ~parent:(Some complex_constructors_struct) ~tag:Dwarf_tag.Member
+    ~parent:(Some variant_part_constructor) ~tag:Dwarf_tag.Member
     ~attribute_values:
       [ DAH.create_type ~proto_die:complex_constructor_enum_die;
         DAH.create_byte_size_exn ~byte_size:Arch.size_addr;
@@ -1038,7 +1072,7 @@ let unboxed_base_type_to_simd_vec_split (x : RS.unboxed) =
   match x with
   | Unboxed_simd s -> Some s
   | Unboxed_float | Unboxed_float32 | Unboxed_nativeint | Unboxed_int64
-  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 ->
+  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 | Unboxed_mask ->
     None
 
 type vec_split_properties =
@@ -1120,7 +1154,7 @@ let create_runtime_layout_type ?(simd_vec_split = None) ~reference (sort : RL.t)
   | Float32 | Float64 ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
       Encoding_attribute.float
-  | Bits8 | Bits16 | Bits32 | Bits64 | Word | Untagged_immediate ->
+  | Bits8 | Bits16 | Bits32 | Bits64 | Mask | Word | Untagged_immediate ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
       Encoding_attribute.signed
   | Vec128 | Vec256 | Vec512 ->
@@ -1128,6 +1162,10 @@ let create_runtime_layout_type ?(simd_vec_split = None) ~reference (sort : RL.t)
       ~byte_size ~split:simd_vec_split ()
 
 let create_packed_struct ~parent_proto_die dies_and_layouts =
+  (* Describes one element of an unboxed product array (see the array-layout
+     commentary above [create_array_die]). Field offsets and the total struct
+     size use [size_in_memory] (the word-extended slot), while each member's
+     [byte_size] is [RL.size] (the bytes the value actually occupies). *)
   let packed_byte_size =
     List.fold_left
       (fun acc (_, layout) -> acc + RL.size_in_memory layout)
@@ -1200,21 +1238,21 @@ end
 
 module Dwarf_die_cache : sig
   val find_in_cache :
-    RS.t -> rec_env:'a S.DeBruijn_env.t -> Proto_die.reference option
+    RS.t -> rec_env:'a RS.DeBruijn_env.t -> Proto_die.reference option
 
   val add_to_cache :
-    RS.t -> Proto_die.reference -> rec_env:'a S.DeBruijn_env.t -> unit
+    RS.t -> Proto_die.reference -> rec_env:'a RS.DeBruijn_env.t -> unit
 end = struct
   let cache = RS.Cache.create 100
 
   let find_in_cache (runtime_shape : RS.t) ~rec_env =
-    if S.DeBruijn_env.is_empty rec_env
+    if RS.DeBruijn_env.is_empty rec_env
     then RS.Cache.find_opt cache runtime_shape
     else None
 
   let add_to_cache (runtime_shape : RS.t) reference ~rec_env =
     (* [rec_env] being empty means that the shape is closed. *)
-    if S.DeBruijn_env.is_empty rec_env
+    if RS.DeBruijn_env.is_empty rec_env
     then RS.Cache.add cache runtime_shape reference
 end
 
@@ -1267,7 +1305,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
   in
   let die_with_extended_env sh new_ref =
     runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-      ~rec_env:(S.DeBruijn_env.push rec_env new_ref)
+      ~rec_env:(RS.DeBruijn_env.push rec_env new_ref)
       sh
   in
   match t.desc with
@@ -1368,7 +1406,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
              Format.pp_print_string)
           constructor_names)
   | Rec_var (de_bruijn_index, layout) -> (
-    match S.DeBruijn_env.get_opt rec_env ~de_bruijn_index with
+    match RS.DeBruijn_env.get_opt rec_env ~de_bruijn_index with
     | Some reference' ->
       create_typedef_die ~reference ~parent_proto_die ?name reference'
     | None ->
@@ -1376,7 +1414,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
           f
             "Recursive variable environment lookup failed: rec_env returned \
              None for de Bruijn index %a"
-            S.DeBruijn_index.print de_bruijn_index))
+            RS.DeBruijn_index.print de_bruijn_index))
   | Mu sh ->
     (* CR sspies: We are creating two typedefs for recursive types. One should
        be enough. *)
@@ -1391,11 +1429,17 @@ and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
   match t with
   | Array (Regular s) ->
     let child_die = die s in
-    create_array_die ~reference ~parent_proto_die ~child_die ?name ()
+    let element_stride = RL.size (RS.runtime_layout s) in
+    create_array_die ~reference ~parent_proto_die ~child_die ~element_stride
+      ?name ()
   | Array (Packed fields) ->
     let dies = List.map (fun t -> die t, RS.runtime_layout t) fields in
     let packed_die = create_packed_struct ~parent_proto_die dies in
-    create_array_die ~reference ~parent_proto_die ~child_die:packed_die ?name ()
+    let element_stride =
+      List.fold_left (fun acc (_, ly) -> acc + RL.size_in_memory ly) 0 dies
+    in
+    create_array_die ~reference ~parent_proto_die ~child_die:packed_die
+      ~element_stride ?name ()
   | Char -> create_char_die ~reference ~parent_proto_die ?name ()
   | Unboxed b ->
     let type_layout = RS.runtime_layout_of_unboxed b in
@@ -1407,7 +1451,7 @@ and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
     create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
       ()
   | Bytes | Extension_constructor | Float | Float32 | Floatarray | Int | Int8
-  | Int16 | Int32 | Int64 | Lazy_t _ | Nativeint | String ->
+  | Int16 | Int32 | Int64 | Lazy_t _ | Mask | Nativeint | String ->
     create_runtime_layout_type ~reference Value ?name ~parent_proto_die
       ~fallback_value_die ()
 (* CR sspies: Create a separate block for lazy values. We now have type
@@ -1535,7 +1579,7 @@ let runtime_shape_to_dwarf_die_with_aliased_name (type_name : string)
     let unnamed_die =
       runtime_shape_to_dwarf_die runtime_shape ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:S.DeBruijn_env.empty
+        ~rec_env:RS.DeBruijn_env.empty
     in
     let reference = Proto_die.create_reference () in
     let runtime_layout = RS.runtime_layout runtime_shape in

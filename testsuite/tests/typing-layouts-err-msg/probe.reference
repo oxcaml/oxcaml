@@ -1,5 +1,5 @@
 File "probe.ml", line 13, characters 2-6:
 13 |   f ()
        ^^^^
-Error: This expression has type "float#" but an expression was expected of type
-         "unit"
+Error: This expression has type float# but an expression was expected of type
+         unit

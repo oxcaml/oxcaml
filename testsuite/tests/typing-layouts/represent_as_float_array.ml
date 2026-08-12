@@ -23,6 +23,26 @@ Lines 1-2, characters 0-28:
 Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
 |}]
 
+type ('a : float64) t = { i : 'a }
+[@@unboxed]
+[@@represent_as_float_array]
+[%%expect{|
+Lines 1-3, characters 0-28:
+1 | type ('a : float64) t = { i : 'a }
+2 | [@@unboxed]
+3 | [@@represent_as_float_array]
+Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
+|}]
+
+type ('a : any) t = { a : 'a }
+[@@represent_as_float_array]
+[%%expect{|
+Lines 1-2, characters 0-28:
+1 | type ('a : any) t = { a : 'a }
+2 | [@@represent_as_float_array]
+Error: "[@@represent_as_float_array]" can only be used on records whose fields are all float64.
+|}]
+
 type t [@@represent_as_float_array]
 [%%expect{|
 Line 1, characters 0-35:
@@ -112,4 +132,14 @@ Error: Signature mismatch:
          type r = { f : float#; }
        Their internal representations differ:
        the first declaration uses float# representation.
+|}]
+
+(* Regression test: [type_unboxed_default] must be [false] when
+   [@@represent_as_float_array] is used, so that this declaration does not
+   trigger the [unboxable-type-in-prim-decl] warning. *)
+type r = { f : float# } [@@represent_as_float_array]
+external id : r -> r = "%identity"
+[%%expect{|
+type r = { f : float#; }
+external id : r -> r = "%identity"
 |}]

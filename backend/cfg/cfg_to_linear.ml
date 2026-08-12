@@ -28,7 +28,7 @@
 open! Int_replace_polymorphic_compare
 module CL = Cfg_with_layout
 module L = Linear
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
     L.instruction =
@@ -333,7 +333,7 @@ let linearize_terminator cfg_with_layout (func : string) start
                   Misc.fatal_errorf
                     "Cannot linearize terminator: meaningless specification of \
                      comparison, always has result %b:@ %a"
-                    result Cfg.print_terminator terminator
+                    result Printcfg.terminator terminator
                 | Ok comp ->
                   let test =
                     match imm with
@@ -392,7 +392,10 @@ let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
         false
       | Return | Raise _ | Tailcall_func _ | Tailcall_self _ | Call_no_return _
         ->
-        assert false)
+        Misc.fatal_errorf
+          "Cfg_to_linear.need_starting_label: block follows non-returning \
+           terminator %a"
+          Printcfg.terminator prev_block.terminator)
 
 let adjust_stack_offset body (block : Cfg.basic_block)
     ~(prev_block : Cfg.basic_block) =

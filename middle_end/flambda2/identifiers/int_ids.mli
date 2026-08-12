@@ -47,6 +47,8 @@ module Const : sig
 
   val const_null : t
 
+  val const_poison : Flambda_kind.t -> string -> t
+
   (** [naked_immediate] is similar to [naked_nativeint], but represents integers
       of width [n - 1] bits, where [n] is the native machine width. (By
       contrast, [naked_nativeint] represents integers of width [n] bits.) *)
@@ -74,6 +76,8 @@ module Const : sig
 
   val naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
 
+  val naked_mask : Vector_types.Mask.Bit_pattern.t -> t
+
   module Descr : sig
     type t = private
       | Naked_immediate of Target_ocaml_int.t
@@ -88,7 +92,9 @@ module Const : sig
       | Naked_vec128 of Vector_types.Vec128.Bit_pattern.t
       | Naked_vec256 of Vector_types.Vec256.Bit_pattern.t
       | Naked_vec512 of Vector_types.Vec512.Bit_pattern.t
+      | Naked_mask of Vector_types.Mask.Bit_pattern.t
       | Null
+      | Poison of Flambda_kind.t * string
 
     include Container_types.S with type t := t
   end

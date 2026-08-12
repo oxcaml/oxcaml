@@ -3,7 +3,6 @@
  compare_programs = "false";
  poll-insertion;
  arch64;
- runtime5;
  {
    flags = "-Oclassic";
    native;

@@ -28,19 +28,21 @@
 
 enum { CAML_MEMPROF_SRC_NORMAL = 0,
        CAML_MEMPROF_SRC_MARSHAL = 1, /* interning */
-       CAML_MEMPROF_SRC_CUSTOM = 2 /* custom memory */ };
+       CAML_MEMPROF_SRC_CUSTOM = 2, /* custom memory */
+       CAML_MEMPROF_SRC_MAP_FILE = 3, /* mmapped file */
+       CAML_MEMPROF_NUM_SOURCE_KINDS};
 
 /* Respond to the allocation of any block. Does not call callbacks.
  * `block` is the allocated block, to be tracked by memprof if
  * sampled. `allocated_words` is the number of words allocated, to be
  * passed to the allocation callback. `sampled_words` is the number of
  * words to use when computing the number of samples (this will
- * normally be one more than `allocated words` due to the header word,
+ * normally be one more than `allocated_words` due to the header word,
  * but may not be for out-of-heap memory). `source` is one of the
  * `CAML_MEMPROF_SRC_* constants above. */
 
-void caml_memprof_sample_block(value block, size_t allocated_words,
-                               size_t sampled_words, int source);
+CAMLextern void caml_memprof_sample_block(value block, size_t allocated_words,
+                                          size_t sampled_words, int source);
 
 /* Sample a minor heap "Comballoc" (combined allocation). Called when
  * the memprof trigger is hit (before the allocation is actually
@@ -81,7 +83,7 @@ extern void caml_memprof_scan_roots(scanning_action f,
 extern void caml_memprof_after_minor_gc(caml_domain_state *state);
 
 /* Update memprof data structures for the domain `state`, to reflect
- * survival, after a minor GC is completed. */
+ * survival, after a major GC is completed. */
 
 extern void caml_memprof_after_major_gc(caml_domain_state *state);
 
@@ -95,7 +97,7 @@ extern void caml_memprof_set_trigger(caml_domain_state *state);
 /* Run any pending callbacks or other memprof actions for the current
  * domain (or adopted from a terminated domain). */
 
-extern value caml_memprof_do_pending_exn(void);
+extern caml_result caml_memprof_do_pending_res(void);
 
 
 /*** Multi-domain support. ***/
@@ -140,6 +142,6 @@ CAMLextern void caml_memprof_enter_thread(memprof_thread_t);
 
 CAMLextern void caml_memprof_delete_thread(memprof_thread_t);
 
-#endif
+#endif /* CAML_INTERNALS */
 
 #endif /* CAML_MEMPROF_H */

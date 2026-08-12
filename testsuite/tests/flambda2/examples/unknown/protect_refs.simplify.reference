@@ -5,11 +5,11 @@ let code set_mode_pattern_4 deleted in
 let code `fn[protect_refs.ml:41,26--40]_5` deleted in
 let code loopify(done) size(22) newer_version_of(iter_0)
       iter_0_1 (f : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  cont self (param)
-    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+  cont `self` (param)
+    where rec `self` (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
       let f_1 = f in
       let prim = %is_int (param_1) in
       (switch prim
@@ -17,17 +17,18 @@ let code loopify(done) size(22) newer_version_of(iter_0)
          | 1 -> k (0)
          where k2 =
            ((let Pfield = %block_load.[`0`] (param_1) in
-             apply f_1 (Pfield) -> k3 * k1
+             apply &my_alloc_region f_1 (Pfield) -> k3 * k1
                where k3 (param_2) =
                  cont k2)
               where k2 =
                 let Pfield = %block_load.[`1`] (param_1) in
-                cont self (Pfield)))
+                cont `self` (Pfield)))
 in
-let $camlProtect_refs__iter_6 = closure iter_0_1 @iter in
+let $camlProtect_refs__iter_6 = closure iter_0_1 @iter &toplevel.alloc_region
+in
 let code loopify(never) size(7) newer_version_of(`fn[protect_refs.ml:28,24--50]_2`)
       `fn[protect_refs.ml:28,24--50]_2_1` (param : [ 0 of val * val ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let Pfield = %block_load.[`1`] (param) in
@@ -37,55 +38,56 @@ let code loopify(never) size(7) newer_version_of(`fn[protect_refs.ml:28,24--50]_
 in
 let $`camlProtect_refs__fn[protect_refs.ml:28,24--50]_8` =
   closure `fn[protect_refs.ml:28,24--50]_2_1`
-    @`fn[protect_refs.ml:28,24--50]`
+    @`fn[protect_refs.ml:28,24--50]` &toplevel.alloc_region
 in
 let code loopify(never) size(11) newer_version_of(`fn[protect_refs.ml:29,2--43]_3`)
       `fn[protect_refs.ml:29,2--43]_3_1`
         (refs : [ 0 | 0 of val * [ 0 | 0 of val * val ] ], f : val)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1 =
-  apply direct(iter_0_1) inlining_state(depth(10))
+  apply direct(iter_0_1 &my_alloc_region) inlining_state(depth(10))
     ($camlProtect_refs__iter_6 : _ -> imm tagged)
       ($`camlProtect_refs__fn[protect_refs.ml:28,24--50]_8`, refs)
       -> k3 * k1
     where k3 (param : imm tagged) =
       cont k2
     where k2 =
-      apply f (0) -> k * k1
+      apply &my_alloc_region f (0) -> k * k1
 in
 let $`camlProtect_refs__fn[protect_refs.ml:29,2--43]_9` =
   closure `fn[protect_refs.ml:29,2--43]_3_1` @`fn[protect_refs.ml:29,2--43]`
+    &toplevel.alloc_region
 in
-let umode = %block.mut.[`0`] (0) in
+let umode = %block.mut.[`0`].`toplevel` (0) in
 let umode_1 = umode in
 let $camlProtect_refs__set_mode_pattern_10 =
-  closure set_mode_pattern_4_1 @set_mode_pattern
+  closure set_mode_pattern_4_1 @set_mode_pattern &toplevel.alloc_region
 and code inline(never) loopify(never) size(4) newer_version_of(set_mode_pattern_4)
       set_mode_pattern_4_1 (f : val)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1 =
-  apply direct(`fn[protect_refs.ml:29,2--43]_3_1`)
+  apply direct(`fn[protect_refs.ml:29,2--43]_3_1` &my_alloc_region)
     $`camlProtect_refs__fn[protect_refs.ml:29,2--43]_9`
-      ($camlProtect_refs__Pmakeblock121, f)
+      ($camlProtect_refs__Pmakeblock134, f)
       -> k * k1
-and $camlProtect_refs__Pmakeblock120 =
+and $camlProtect_refs__Pmakeblock133 =
   Block 0 (umode_1, 1)
-and $camlProtect_refs__Pmakeblock121 =
-  Block 0 ($camlProtect_refs__Pmakeblock120, 0)
+and $camlProtect_refs__Pmakeblock134 =
+  Block 0 ($camlProtect_refs__Pmakeblock133, 0)
   with { umode = umode }
 in
 (let code loopify(never) size(1) newer_version_of(`fn[protect_refs.ml:41,26--40]_5`)
        `fn[protect_refs.ml:41,26--40]_5_1` (param : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    cont k1 (0)
  in
  let $`camlProtect_refs__fn[protect_refs.ml:41,26--40]_11` =
    closure `fn[protect_refs.ml:41,26--40]_5_1`
-     @`fn[protect_refs.ml:41,26--40]`
+     @`fn[protect_refs.ml:41,26--40]` &toplevel.alloc_region
  in
- apply direct(set_mode_pattern_4_1)
+ apply direct(set_mode_pattern_4_1 &toplevel.alloc_region)
    ($camlProtect_refs__set_mode_pattern_10 : _ -> imm tagged)
      ($`camlProtect_refs__fn[protect_refs.ml:41,26--40]_11`)
      -> k1 * error

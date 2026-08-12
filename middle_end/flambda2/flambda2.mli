@@ -52,3 +52,6 @@ val reset_symbol_tables : unit -> unit
 
 val get_module_info :
   Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
+
+(** Used in toplevel expect test tool *)
+val register_compilation_unit_callback : (Compilation_unit.t -> unit) -> unit

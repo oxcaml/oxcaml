@@ -7,11 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  expect.opt;
 *)
 
@@ -92,8 +88,8 @@ header:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
@@ -138,8 +134,8 @@ make_ref:
   movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1024, -8(%rax)
   movq  %rbx, (%rax)
@@ -230,6 +226,26 @@ get_mut_unboxed:
 let set_mut_unboxed (r : mutable_unboxed) (v : int64#) = r.p <- v
 [%%expect_asm X86_64{|
 set_mut_unboxed:
+  movq  %rbx, 8(%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+(* The immediate of a store is never negated, so the full signed 32-bit range
+   applies: -0x8000_0000 is stored directly, while -0x8000_0001 must be
+   materialized in a register first. *)
+let set_mut_unboxed_min_int32 (r : mutable_unboxed) = r.p <- -#0x80000000L
+[%%expect_asm X86_64{|
+set_mut_unboxed_min_int32:
+  movq  $-2147483648, 8(%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+let set_mut_unboxed_below_min_int32 (r : mutable_unboxed) = r.p <- -#0x80000001L
+[%%expect_asm X86_64{|
+set_mut_unboxed_below_min_int32:
+  movabsq $-2147483649, %rbx
   movq  %rbx, 8(%rax)
   movl  $1, %eax
   ret

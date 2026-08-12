@@ -207,7 +207,7 @@ let c'' = new color_circle p;;
 Line 1, characters 27-28:
 1 | let c'' = new color_circle p;;
                                ^
-Error: This expression has type "point" but an expression was expected of type
+Error: The value "p" has type "point" but an expression was expected of type
          "#color_point"
        The first object type has no method "color"
 |}];;
@@ -270,8 +270,9 @@ let p = new printable_point 7;;
 [%%expect{|
 val p : printable_point = <obj>
 |}];;
-p#print;;
+p#print; Format.print_newline ();;
 [%%expect{|
+7
 - : unit = ()
 |}];;
 
@@ -289,8 +290,8 @@ end;;
 Line 3, characters 2-36:
 3 |   inherit printable_point y as super
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 13 [instance-variable-override]: the following instance variables are overridden by the class printable_point :
-  x
+Warning 13 [instance-variable-override]: the following instance variables
+  are overridden by the class "printable_point": "x"
 
 class printable_color_point :
   int ->
@@ -309,8 +310,9 @@ let p' = new printable_color_point 7 "red";;
 [%%expect{|
 val p' : printable_color_point = <obj>
 |}];;
-p'#print;;
+p'#print; Format.print_newline ();;
 [%%expect{|
+(7, red)
 - : unit = ()
 |}];;
 
@@ -424,8 +426,9 @@ let l1 = new cons 3 (new cons 10 (new nil ()));;
 val l1 : int lst = <obj>
 |}];;
 
-l1#print Format.print_int;;
+l1#print Format.print_int; Format.print_newline ();;
 [%%expect{|
+(3::10::[])
 - : unit = ()
 |}];;
 
@@ -433,8 +436,9 @@ let l2 = l1#map (fun x -> x + 1);;
 [%%expect{|
 val l2 : int lst = <obj>
 |}];;
-l2#print Format.print_int;;
+l2#print Format.print_int; Format.print_newline ();;
 [%%expect{|
+(4::11::[])
 - : unit = ()
 |}];;
 
@@ -449,8 +453,9 @@ let p1 = (map_list (fun x -> new printable_color_point x "red") l1);;
 [%%expect{|
 val p1 : printable_color_point lst = <obj>
 |}];;
-p1#print (fun x -> x#print);;
+p1#print (fun x -> x#print); Format.print_newline () ;;
 [%%expect{|
+((3, red)::(10, red)::[])
 - : unit = ()
 |}];;
 
@@ -580,7 +585,7 @@ l#add (c3 :> int_comparable);;
 Line 1, characters 25-27:
 1 | (new sorted_list ())#add c3;;
                              ^^
-Error: This expression has type
+Error: The value "c3" has type
          "int_comparable3" =
            "< cmp : int_comparable -> int; setx : int -> unit; x : int >"
        but an expression was expected of type
@@ -613,7 +618,7 @@ val l : int_comparable list = [<obj>; <obj>; <obj>]
 |}];;
 pr l;;
 [%%expect{|
-7(7, red)(3::10::[])(4::11::[])((3, red)::(10, red)::[])5 2 4
+5 2 4
 - : unit = ()
 |}];;
 pr (sort l);;

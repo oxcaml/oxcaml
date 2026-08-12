@@ -31,11 +31,11 @@ val f : t @ contended -> t = <fun>
 |}]
 
 (* If we set the attribute but *don't* get a kind mismatch, we ought to be fine *)
-type t : value mod many portable uncontended = string
+type t : value mod many portable = string
 [@@unsafe_allow_any_mode_crossing]
 [%%expect{|
 Lines 1-2, characters 0-34:
-1 | type t : value mod many portable uncontended = string
+1 | type t : value mod many portable = string
 2 | [@@unsafe_allow_any_mode_crossing]
 Error: [@@unsafe_allow_any_mode_crossing] is not allowed on this kind of type declaration.
        Only records, unboxed products, and variants are supported.
@@ -54,6 +54,21 @@ Error: The layout of type "t" is value non_float
          because of the annotation on the declaration of the type t.
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
+|}]
+
+(* Can't change the layout for mutually recursive types. This *should*
+   typecheck; i.e. allow_any_mode_crossing shouldn't replace [t]'s layout with
+   [any]. *)
+type ('a : float64) require_f64
+
+type t : any = #{ f : float# }
+[@@unsafe_allow_any_mode_crossing]
+
+and s : value = t require_f64
+[%%expect{|
+type ('a : float64) require_f64
+type t : float64 = #{ f : float#; } [@@unsafe_allow_any_mode_crossing]
+and s = t require_f64
 |}]
 
 (* Annotations with with-bounds are allowed *)
@@ -321,7 +336,7 @@ Error: Signature mismatch:
 |}]
 
 module A : sig
-  type t : value mod external_ global portable many uncontended unyielding
+  type t : value mod external_ global portable many
 end = struct
   type t = int
 end
@@ -404,10 +419,10 @@ Lines 1-2, characters 0-34:
 Error: This variant or record definition does not match that of type "'a t"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
-         immutable contended with 'a
-         but this has: mod forkable unyielding many stateless portable
-         immutable contended
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended
 |}]
 
 type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a }
@@ -425,10 +440,10 @@ Error: This variant or record definition does not match that of type
          "('a, 'b) arity_2"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
-         immutable contended with 'b
-         but this has: mod forkable unyielding many stateless portable
-         immutable contended with 'a
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'b
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
 |}]
 
 (* mcomp *)
@@ -569,7 +584,7 @@ let f (type a b) (eq : ((a, b) M7.t, (a, b) M9.t) eq) = match eq with Refl -> ()
 val f : (('a, 'b) M7.t, ('a, 'b) M9.t) eq -> unit = <fun>
 |}]
 
-module M : sig 
+module M : sig
   type t : immutable_data
 end = struct
   type q : immutable_data = { bar : int ref }
@@ -580,7 +595,7 @@ end
 module M : sig type t : immutable_data end
 |}]
 
-module M : sig 
+module M : sig
   type t : immutable_data
 end = struct
   type q : immutable_data = { bar : int ref }
@@ -589,4 +604,15 @@ end = struct
 end
 [%%expect{|
 module M : sig type t : immutable_data end
+|}]
+
+(* A type in the same mutually recursive group sees the crossed jkind of an
+   [@@unsafe_allow_any_mode_crossing] type, not its structural one. *)
+type t : value mod contended = { mutable i : int }
+[@@unsafe_allow_any_mode_crossing]
+and s : value mod contended = { t : t } [@@unboxed]
+[%%expect{|
+type t : value non_float mod contended = { mutable i : int; }
+[@@unsafe_allow_any_mode_crossing]
+and s = { t : t; } [@@unboxed]
 |}]

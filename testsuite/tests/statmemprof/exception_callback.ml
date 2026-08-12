@@ -33,4 +33,8 @@ try
  )
 with
   Sys.Break -> (MP.stop();
-                Printf.printf "Exception from memprof.\n")
+                Printf.printf "Exception from major allocation callback.\n")
+
+(* The upstream test uses a user-defined exception which carries a string "major
+   allocation callback" to the printf call. We can't do that here as we only allow the
+   async callbacks, so we fake the string to keep the reference output files identical. *)

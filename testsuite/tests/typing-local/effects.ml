@@ -1,6 +1,6 @@
 (* TEST
-   runtime5;
    stack-allocation;
+   flags += "-keywords 5.3";
    { native; }
 *)
 
@@ -205,10 +205,60 @@ let g1 () = assert (g1' () = 123)
 
 (* ------------------------------------------------------------------------ *)
 
+type _ Effect.t += Eff_syntax : int t
+exception Exn_syntax
+
+let[@inline never] effect_syntax_value_case () =
+  let result =
+    match perform Eff_syntax with
+    | x ->
+      let r = opaque (local_ ref x) in
+      !r
+    | effect Eff_syntax, k -> continue k 42
+  in
+  assert (result = 42)
+
+let[@inline never] effect_syntax_exception_case () =
+  let result =
+    try raise Exn_syntax with
+    | Exn_syntax ->
+      let r = opaque (local_ ref 42) in
+      !r
+    | effect Eff_syntax, _ -> 0
+  in
+  assert (result = 42)
+
+let[@inline never] effect_syntax_effect_case () =
+  let result =
+    match perform Eff_syntax with
+    | x -> x
+    | effect Eff_syntax, k ->
+      let r = opaque (local_ ref 41) in
+      continue k (!r + 1)
+  in
+  assert (result = 42)
+
+let[@inline never] effect_syntax_body () =
+  let result =
+    match
+      let r = opaque (local_ ref 1) in
+      perform Eff_syntax + !r
+    with
+    | x -> x
+    | effect Eff_syntax, _ -> 42
+  in
+  assert (result = 42)
+
+(* ------------------------------------------------------------------------ *)
+
 let () =
   print_endline "f1"; f1 ();
   print_endline "f2"; f2 ();
   print_endline "f3"; f3 ();
   print_endline "f4"; f4 ();
   print_endline "f5"; f5 ();
-  print_endline "g1"; g1 ()
+  print_endline "g1"; g1 ();
+  effect_syntax_value_case ();
+  effect_syntax_exception_case ();
+  effect_syntax_effect_case ();
+  effect_syntax_body ()

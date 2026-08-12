@@ -1,6 +1,5 @@
 (* TEST
  modules = "test7_.c";
- runtime5;
  libunix;
  {
    bytecode;

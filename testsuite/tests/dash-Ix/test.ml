@@ -62,35 +62,24 @@ ocamlc.byte;
    ordering of -I flags.  B was compiled against liba, so using liba_alt for A
    causes inconsistent assumptions. *)
 {
-  (* Test: -Ix liba before -I liba_alt: liba wins, compiles fine. *)
-  flags = "-Ix liba -I liba_alt -I libb -nocwd";
+  split [
+  | (* Test: -Ix liba before -I liba_alt: liba wins, compiles fine. *)
+    flags = "-Ix liba -I liba_alt -I libb -nocwd";
+  | (* Test: -I liba before -Ix liba_alt: liba wins, compiles fine. *)
+    flags = "-I liba -Ix liba_alt -I libb -nocwd";
+  ]
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
 }
 {
-  (* Test: -I liba before -Ix liba_alt: liba wins, compiles fine. *)
-  flags = "-I liba -Ix liba_alt -I libb -nocwd";
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
-}
-{
-  (* Test: -Ix liba_alt before -I liba: liba_alt wins, inconsistent. *)
   not-windows;
-  flags = "-Ix liba_alt -I liba -I libb -nocwd";
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
-}
-{
-  (* Test: -I liba_alt before -Ix liba: liba_alt wins, inconsistent. *)
-  not-windows;
-  flags = "-I liba_alt -Ix liba -I libb -nocwd";
+  split [
+  | (* Test: -Ix liba_alt before -I liba: liba_alt wins, inconsistent. *)
+    flags = "-Ix liba_alt -I liba -I libb -nocwd";
+  | (* Test: -I liba_alt before -Ix liba: liba_alt wins, inconsistent. *)
+    flags = "-I liba_alt -Ix liba -I libb -nocwd";
+  ]
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "2";

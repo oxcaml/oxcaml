@@ -478,24 +478,22 @@ val work :
 Line 85, characters 16-71:
 85 |                 balance_right (Node { t with right = ins k v t.right }) [@nontail]
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 72 [tmc-breaks-tailcall]: This call
-is in tail-modulo-cons position in a TMC function,
-but the function called is not itself specialized for TMC,
-so the call will not be transformed into a tail call.
-Please either mark the called function with the [@tail_mod_cons]
-attribute, or mark this call with the [@tailcall false] attribute
-to make its non-tailness explicit.
+Warning 72 [tmc-breaks-tailcall]: This call is in tail-modulo-cons position
+  in a TMC function, but the function called is not itself specialized for
+  TMC, so the call will not be transformed into a tail call.
+  Please either mark the called function with the "[@tail_mod_cons]" attribute,
+  or mark this call with the "[@tailcall false]" attribute to make its
+  non-tailness explicit.
 
 Line 80, characters 16-68:
 80 |                 balance_left (Node { t with left = ins k v t.left }) [@nontail]
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 72 [tmc-breaks-tailcall]: This call
-is in tail-modulo-cons position in a TMC function,
-but the function called is not itself specialized for TMC,
-so the call will not be transformed into a tail call.
-Please either mark the called function with the [@tail_mod_cons]
-attribute, or mark this call with the [@tailcall false] attribute
-to make its non-tailness explicit.
+Warning 72 [tmc-breaks-tailcall]: This call is in tail-modulo-cons position
+  in a TMC function, but the function called is not itself specialized for
+  TMC, so the call will not be transformed into a tail call.
+  Please either mark the called function with the "[@tail_mod_cons]" attribute,
+  or mark this call with the "[@tailcall false]" attribute to make its
+  non-tailness explicit.
 
 module Make_Okasaki :
   functor (Ord : Map.OrderedType) ->

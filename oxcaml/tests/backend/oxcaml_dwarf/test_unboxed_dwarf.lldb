@@ -1,97 +1,147 @@
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_start
+(lldb) b Test_unboxed_dwarf.f_start
 (lldb) run
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_unboxed_float
+(lldb) b Test_unboxed_dwarf.f_unboxed_float
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_unboxed_float32
+(lldb) b Test_unboxed_dwarf.f_unboxed_float32
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_unboxed_nativeint
+(lldb) b Test_unboxed_dwarf.f_unboxed_nativeint
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_unboxed_int32
+(lldb) b Test_unboxed_dwarf.f_unboxed_int32
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_unboxed_int64
+(lldb) b Test_unboxed_dwarf.f_unboxed_int64
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_unboxed_int8
+(lldb) b Test_unboxed_dwarf.f_unboxed_int8
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_unboxed_int16
+(lldb) b Test_unboxed_dwarf.f_unboxed_int16
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_poly_float64
+(lldb) b Test_unboxed_dwarf.f_poly_float64
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_poly_float32
+(lldb) b Test_unboxed_dwarf.f_poly_float32
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_poly_bits64
+(lldb) b Test_unboxed_dwarf.f_poly_bits64
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_poly_bits32
+(lldb) b Test_unboxed_dwarf.f_poly_bits32
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_poly_word
+(lldb) b Test_unboxed_dwarf.f_poly_word
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_poly_bits8
+(lldb) b Test_unboxed_dwarf.f_poly_bits8
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_poly_bits16
+(lldb) b Test_unboxed_dwarf.f_poly_bits16
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_simple_product
+(lldb) b Test_unboxed_dwarf.f_simple_product
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_mixed_product
+(lldb) b Test_unboxed_dwarf.f_mixed_product
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_nested_product
+(lldb) b Test_unboxed_dwarf.f_nested_product
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_small_int_product
+(lldb) b Test_unboxed_dwarf.f_small_int_product
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_mixed_small_product
+(lldb) b Test_unboxed_dwarf.f_mixed_small_product
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_simple_record
+(lldb) b Test_unboxed_dwarf.f_simple_record
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_mixed_record
+(lldb) b Test_unboxed_dwarf.f_mixed_record
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_nested_record
+(lldb) b Test_unboxed_dwarf.f_nested_record
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_small_int_record
+(lldb) b Test_unboxed_dwarf.f_small_int_record
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_mixed_small_record
+(lldb) b Test_unboxed_dwarf.f_mixed_small_record
 (lldb) c
 (lldb) c
 (lldb) c
-(lldb) breakpoint set -b Test_unboxed_dwarf.f_poly_product
+(lldb) b Test_unboxed_dwarf.f_poly_product
 (lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int64_array
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int32_array
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_array_record_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_float_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_mixed_tuple_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_nativeint_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int64_pair_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_float32_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_empty_int64_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_large_int64_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int8_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int16_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int32_array_packed_corner
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_float32_array_packed_corner
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_2xint8_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_one_int64_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_4xint16_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_72bit_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_16xint64_array
 (lldb) c
 (lldb) quit

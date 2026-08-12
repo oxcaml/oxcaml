@@ -263,31 +263,31 @@ module Int32 = struct
 end
 
 module Int16 = struct
-  external count_leading_zeros : (int16[@untagged]) -> (int[@untagged])
+  external count_leading_zeros : (int16[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int16_clz_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external count_trailing_zeros : (int16[@untagged]) -> (int[@untagged])
+  external count_trailing_zeros : (int16[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int16_ctz_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   (** [count_set_bits n] returns the number of bits that are 1 in [n]. *)
-  external count_set_bits : (int16[@untagged]) -> (int[@untagged])
+  external count_set_bits : (int16[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int16_popcnt_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external shift_left :
-    (int16[@untagged]) -> (int16[@untagged]) -> (int16[@untagged])
+    (int16[@unboxed]) -> (int16[@unboxed]) -> (int16[@unboxed])
     = "caml_vec128_unreachable" "caml_int16_shift_left_by_int16_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external shift_right :
-    (int16[@untagged]) -> (int16[@untagged]) -> (int16[@untagged])
+    (int16[@unboxed]) -> (int16[@unboxed]) -> (int16[@unboxed])
     = "caml_vec128_unreachable" "caml_int16_shift_right_by_int16_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external shift_right_logical :
-    (int16[@untagged]) -> (int16[@untagged]) -> (int16[@untagged])
+    (int16[@unboxed]) -> (int16[@unboxed]) -> (int16[@unboxed])
     = "caml_vec128_unreachable"
       "caml_int16_shift_right_logical_by_int16_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
@@ -346,31 +346,30 @@ module Int16 = struct
 end
 
 module Int8 = struct
-  external count_leading_zeros : (int8[@untagged]) -> (int[@untagged])
+  external count_leading_zeros : (int8[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int8_clz_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external count_trailing_zeros : (int8[@untagged]) -> (int[@untagged])
+  external count_trailing_zeros : (int8[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int8_ctz_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   (** [count_set_bits n] returns the number of bits that are 1 in [n]. *)
-  external count_set_bits : (int8[@untagged]) -> (int[@untagged])
+  external count_set_bits : (int8[@unboxed]) -> (int[@untagged])
     = "caml_vec128_unreachable" "caml_int8_popcnt_untagged_to_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
-  external shift_left :
-    (int8[@untagged]) -> (int8[@untagged]) -> (int8[@untagged])
+  external shift_left : (int8[@unboxed]) -> (int8[@unboxed]) -> (int8[@unboxed])
     = "caml_vec128_unreachable" "caml_int8_shift_left_by_int8_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external shift_right :
-    (int8[@untagged]) -> (int8[@untagged]) -> (int8[@untagged])
+    (int8[@unboxed]) -> (int8[@unboxed]) -> (int8[@unboxed])
     = "caml_vec128_unreachable" "caml_int8_shift_right_by_int8_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 
   external shift_right_logical :
-    (int8[@untagged]) -> (int8[@untagged]) -> (int8[@untagged])
+    (int8[@unboxed]) -> (int8[@unboxed]) -> (int8[@unboxed])
     = "caml_vec128_unreachable" "caml_int8_shift_right_logical_by_int8_untagged"
   [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
 

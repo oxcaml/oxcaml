@@ -297,7 +297,7 @@ Error: This application of the functor "F" is ill-typed.
        These arguments:
          M N
        do not match these parameters:
-         functor (X : Empty) (Y : Empty) -> ...
+         (X : Empty) (Y : Empty) -> ...
        1. Module M matches the expected module type Empty
        2. Modules do not match:
             N : sig end @ local

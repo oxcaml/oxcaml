@@ -153,6 +153,7 @@ void caml_shared_add_pool_stats(struct caml_heap_state *heap,
   s->pool_live_words += pool_live_words;
   s->pool_frag_words += pool_frag_words;
 }
+static void adopt_all_pool_stats_with_lock(struct caml_heap_state *adopter);
 
 
 struct caml_heap_state* caml_init_shared_heap (void) {
@@ -189,13 +190,14 @@ static int move_all_pools(pool** src, _Atomic(pool*)* dst,
   return count;
 }
 
-void caml_teardown_shared_heap(struct caml_heap_state* heap) {
-  int released = 0, released_large = 0;
+void caml_orphan_shared_heap(struct caml_heap_state* heap) {
+  size_t released = 0, released_large = 0;
   caml_plat_lock_blocking(&pool_freelist.lock);
   for (sizeclass_t i = 0; i < NUM_SIZECLASSES; i++) {
     released +=
       move_all_pools(&heap->avail_pools[i],
                      &pool_freelist.global_avail_pools[i], NULL);
+    heap->free.lists[i] = NULL;
 
     released +=
       move_all_pools(&heap->full_pools[i],
@@ -215,22 +217,72 @@ void caml_teardown_shared_heap(struct caml_heap_state* heap) {
   }
   orphan_heap_stats_with_lock(heap);
   caml_plat_unlock(&pool_freelist.lock);
-  caml_stat_free(heap);
   CAML_GC_MESSAGE(MAJOR_HEAP,
-                  "Shutdown shared heap. Released %d active pools, %d large\n",
+                  "Orphaned shared heap. Released %zu active pools, %zu large.\n",
                   released, released_large);
 }
 
-uintnat caml_major_heap_increment; /* percent or words */
+
+void caml_adopt_all_orphan_heaps(struct caml_heap_state* local) {
+  int adopted_pools = 0, adopted_large = 0;
+  caml_plat_lock_blocking(&pool_freelist.lock);
+  for (sizeclass_t i = 0; i < NUM_SIZECLASSES; i++) {
+    adopted_pools += move_all_pools(
+        (pool**)&pool_freelist.global_avail_pools[i],
+        (_Atomic(pool*)*)&local->unswept_avail_pools[i],
+        local->owner);
+    adopted_pools += move_all_pools(
+        (pool**)&pool_freelist.global_full_pools[i],
+        (_Atomic(pool*)*)&local->unswept_full_pools[i],
+        local->owner);
+  }
+  while (pool_freelist.global_large) {
+    large_alloc* a = pool_freelist.global_large;
+    pool_freelist.global_large = a->next;
+    a->owner = local->owner;
+    a->next = local->unswept_large;
+    local->unswept_large = a;
+    adopted_large++;
+  }
+  if (adopted_pools || adopted_large) {
+    adopt_all_pool_stats_with_lock(local);
+  }
+  caml_plat_unlock(&pool_freelist.lock);
+  if (adopted_pools || adopted_large)
+    CAML_GC_MESSAGE(MAJOR_HEAP,
+                    "Adopted %d pools, %d large blocks",
+                    adopted_pools, adopted_large);
+  local->next_to_sweep = 0;
+}
+
+
+void caml_assert_shared_heap_is_empty(struct caml_heap_state* heap) {
+  for (int i = 0; i < NUM_SIZECLASSES; i++) {
+    CAMLassert(!heap->avail_pools[i]);
+    CAMLassert(!heap->full_pools[i]);
+    CAMLassert(!heap->unswept_avail_pools[i]);
+    CAMLassert(!heap->unswept_full_pools[i]);
+  }
+  CAMLassert(!heap->unswept_large);
+  CAMLassert(!heap->swept_large);
+}
+
+void caml_free_shared_heap(struct caml_heap_state* heap) {
+  caml_assert_shared_heap_is_empty(heap);
+  caml_stat_free(heap);
+}
+
+atomic_uintnat caml_major_heap_increment; /* percent or words */
 
 static uintnat new_chunk_bsize(void)
 {
   uintnat new_pools;
-  if (caml_major_heap_increment > 1000) {
+  uintnat increment = atomic_load_relaxed(&caml_major_heap_increment);
+  if (increment > 1000) {
     new_pools =
-      (caml_major_heap_increment + (POOL_WSIZE-1)) / POOL_WSIZE;
+      (increment + (POOL_WSIZE-1)) / POOL_WSIZE;
   } else {
-    new_pools = pool_freelist.active_pools * caml_major_heap_increment / 100;
+    new_pools = pool_freelist.active_pools * increment / 100;
   }
   uintnat bsize = Bsize_wsize(new_pools * POOL_WSIZE);
   if (bsize < caml_pool_min_chunk_bsz) {
@@ -395,6 +447,7 @@ static intnat pool_sweep(struct caml_heap_state* local,
                          pool**,
                          sizeclass_t sz ,
                          int release_to_global_pool);
+static void pool_finalise(struct caml_heap_state* local, pool**, sizeclass_t sz);
 
 /* Adopt pool from the pool_freelist avail and full pools
    to satisfy an allocation */
@@ -458,6 +511,7 @@ static pool* pool_global_adopt(struct caml_heap_state* local, sizeclass_t sz)
       pool_sweep(local, &local->full_pools[sz], sz, 0);
     r = local->avail_pools[sz];
   }
+
   CAMLassert(r == NULL || r->owner == local->owner);
   return r;
 }
@@ -601,8 +655,7 @@ value* caml_shared_try_alloc(struct caml_heap_state* local, mlsize_t wosize,
   CAML_TSAN_ANNOTATE_HAPPENS_BEFORE(p);
 #ifdef DEBUG
   {
-    int i;
-    for (i = 0; i < wosize; i++) {
+    for (int i = 0; i < wosize; i++) {
       Field(Val_hp(p), i) = Debug_free_major;
     }
   }
@@ -774,6 +827,69 @@ void caml_get_global_heap_stats(struct global_heap_stats *stats)
   stats->max_chunk_words = pool_freelist.max_chunk_words;
   stats->chunks = pool_freelist.chunks;
   caml_plat_unlock(&pool_freelist.lock);
+}
+
+/* Purging */
+
+static void large_alloc_finalise(struct caml_heap_state* local) {
+  value* p;
+  header_t hd;
+  large_alloc* a;
+
+  while ((a = local->unswept_large) != 0) {
+    local->unswept_large = a->next;
+
+    p = (value*)((char*)a + LARGE_ALLOC_HEADER_SZ);
+    hd = Hd_hp(p);
+    if (Tag_hd (hd) == Custom_tag) {
+      void (*final_fun)(value) = Custom_ops_val(Val_hp(p))->finalize;
+      if (final_fun != NULL) final_fun(Val_hp(p));
+    }
+    free(a);
+  }
+}
+
+static void pool_finalise(struct caml_heap_state* local, pool** plist,
+                         sizeclass_t sz) {
+  pool *a;
+  while ((a = *plist) != 0) {
+    *plist = a->next;
+
+    header_t* p = POOL_FIRST_BLOCK(a, sz);
+    header_t* end = POOL_END(a);
+    mlsize_t wh = whsize_sizeclass[sz];
+
+    while (p + wh <= end) {
+      header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
+      if (hd != 0) {
+        CAMLassert(Whsize_hd(hd) <= wh);
+        if (Tag_hd (hd) == Custom_tag) {
+          void (*final_fun)(value) = Custom_ops_val(Val_hp(p))->finalize;
+          if (final_fun != NULL) final_fun(Val_hp(p));
+        }
+        atomic_store_relaxed((atomic_uintnat*)p, 0);
+        p[1] = (value)0;
+      }
+      p += wh;
+    }
+
+    pool_release(local, a, sz);
+  }
+}
+
+void caml_finalise_heap(void) {
+  struct caml_heap_state *local = Caml_state->shared_heap;
+  sizeclass_t sz;
+
+  /* Finalise and release unswept local pools. */
+  for (sz = 0; sz < NUM_SIZECLASSES; sz++) {
+    pool_finalise(local, &local->unswept_avail_pools[sz], sz);
+    pool_finalise(local, &local->unswept_full_pools[sz], sz);
+  }
+
+  /* Finalise and free large unswept objects. */
+  if (local->unswept_large)
+    large_alloc_finalise(local);
 }
 
 uintnat caml_heap_size(struct caml_heap_state* local) {
@@ -963,8 +1079,9 @@ static void verify_object(struct heap_verify_state* st, value v) {
 
   if (Tag_val(v) == Cont_tag) {
     struct stack_info* stk = Ptr_val(Field(v, 0));
+    value *gc_regs = caml_continuation_gc_regs(v);
     if (stk != NULL)
-      caml_scan_stack(verify_push, verify_scanning_flags, st, stk, 0);
+      caml_scan_stack(verify_push, verify_scanning_flags, st, stk, gc_regs);
   } else if (Scannable_val(v)) {
     int i = 0;
     if (Tag_val(v) == Closure_tag) {
@@ -1147,9 +1264,11 @@ static void compact_update_block(header_t* p)
   CAMLassert(tag != Infix_tag);
 
   if (tag == Cont_tag) {
-    value stk = Field(Val_hp(p), 0);
+    value v = Val_hp(p);
+    value stk = Field(v, 0);
     if (Ptr_val(stk)) {
-      caml_scan_stack(&compact_update_value, 0, NULL, Ptr_val(stk), 0);
+      value *gc_regs = caml_continuation_gc_regs(v);
+      caml_scan_stack(&compact_update_value, 0, NULL, Ptr_val(stk), gc_regs);
     }
   } else {
     uintnat offset = 0;
@@ -2286,8 +2405,7 @@ struct mem_stats {
 };
 
 static void verify_pool(pool* a, sizeclass_t sz, struct mem_stats* s) {
-  value* v;
-  for (v = a->next_obj; v; v = (value*)v[1]) {
+  for (value *v = a->next_obj; v; v = (value *)v[1]) {
     CAMLassert(*v == 0);
   }
 
@@ -2334,12 +2452,11 @@ static void verify_swept (struct caml_heap_state* local) {
   /* sweeping should be done by this point */
   CAMLassert(local->next_to_sweep == NUM_SIZECLASSES);
   for (sizeclass_t i = 0; i < NUM_SIZECLASSES; i++) {
-    pool* p;
-    CAMLassert(local->unswept_avail_pools[i] == NULL &&
-               local->unswept_full_pools[i] == NULL);
-    for (p = local->avail_pools[i]; p; p = p->next)
+    CAMLassert(local->unswept_avail_pools[i] == NULL);
+    CAMLassert(local->unswept_full_pools[i] == NULL);
+    for (pool *p = local->avail_pools[i]; p; p = p->next)
       verify_pool(p, i, &pool_stats);
-    for (p = local->full_pools[i]; p; p = p->next) {
+    for (pool *p = local->full_pools[i]; p; p = p->next) {
       CAMLassert(p->next_obj == NULL);
       verify_pool(p, i, &pool_stats);
     }
@@ -2383,10 +2500,6 @@ void caml_cycle_heap_from_stw_single (void) {
 }
 
 void caml_cycle_heap(struct caml_heap_state* local) {
-  int received_p = 0, received_l = 0;
-
-  CAML_GC_MESSAGE(MAJOR_HEAP,
-                  "Moving pools and large objects to unswept lists.\n");
   for (sizeclass_t i = 0; i < NUM_SIZECLASSES; i++) {
     CAMLassert(local->unswept_avail_pools[i] == NULL);
     local->unswept_avail_pools[i] = local->avail_pools[i];
@@ -2400,34 +2513,20 @@ void caml_cycle_heap(struct caml_heap_state* local) {
   local->unswept_large = local->swept_large;
   local->swept_large = NULL;
 
-  /* Adopt orphaned pools and large blocks into unswept lists. */
+  caml_adopt_all_orphan_heaps(local);
+}
+
+void caml_finalise_freelist(void) {
+  int freed_large = 0;
+
   caml_plat_lock_blocking(&pool_freelist.lock);
-  for (sizeclass_t i = 0; i < NUM_SIZECLASSES; i++) {
-    received_p += move_all_pools(
-        (pool**)&pool_freelist.global_avail_pools[i],
-        (_Atomic(pool*)*)&local->unswept_avail_pools[i],
-        local->owner);
-    received_p += move_all_pools(
-        (pool**)&pool_freelist.global_full_pools[i],
-        (_Atomic(pool*)*)&local->unswept_full_pools[i],
-        local->owner);
-  }
   while (pool_freelist.global_large) {
     large_alloc* a = pool_freelist.global_large;
     pool_freelist.global_large = a->next;
-    a->owner = local->owner;
-    a->next = local->unswept_large;
-    local->unswept_large = a;
-    received_l++;
-  }
-  if (received_p || received_l) {
-    adopt_all_pool_stats_with_lock(local);
+    free(a);
+    freed_large++;
   }
   caml_plat_unlock(&pool_freelist.lock);
-  if (received_p || received_l)
-    CAML_GC_MESSAGE(MAJOR_HEAP,
-                    "Adopted %d pools, %d large allocs\n",
-                    received_p, received_l);
-
-  local->next_to_sweep = 0;
+  CAML_GC_MESSAGE(MAJOR_HEAP,
+                  "Finalise freelist. Freed %d large blocks.\n", freed_large);
 }

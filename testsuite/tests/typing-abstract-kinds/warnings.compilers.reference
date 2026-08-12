@@ -1,3 +1,9 @@
+File "warnings.ml", line 25, characters 2-8:
+25 |   open M
+       ^^^^^^
+Warning 44 [open-shadow-identifier]: this open statement shadows the
+  kind identifier k_shadowed (which is later used)
+
 File "warnings.ml", line 7, characters 2-9:
 7 |   kind_ k
       ^^^^^^^

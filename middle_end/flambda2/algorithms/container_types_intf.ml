@@ -228,6 +228,8 @@ module type Map = sig
 
   val find_opt : key -> 'a t -> 'a option
 
+  val find_or_null : key -> 'a t -> 'a Or_null.t
+
   val map : ('a -> 'b) -> 'a t -> 'b t
 
   val mapi : (key -> 'a -> 'b) -> 'a t -> 'b t
@@ -256,6 +258,8 @@ module type Map = sig
 
   val print :
     (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+
+  val subset_domain : 'a t -> 'b t -> bool
 
   val diff_domains : 'a t -> 'b t -> 'a t
 

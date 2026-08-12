@@ -20,4 +20,7 @@
 val generate_asm : out_channel -> X86_ast.asm_program -> unit
 
 val format_asm_for_expect_asm :
-  name:string -> body:X86_ast.asm_line list -> string
+  name:string ->
+  body:X86_ast.asm_line list ->
+  hidden_gc_jump_pads:X86_ast.asm_line list ->
+  string

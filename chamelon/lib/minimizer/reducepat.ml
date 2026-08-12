@@ -74,7 +74,7 @@ let reduce_pat_mapper should_remove =
                 (* if e1 then e2 else e3 -> __ignore__ e1; e3 *)
                 E.list [E.ignore e_if; e_else]
             else e
-          | O (Texp_try (e_try, vc_l)) ->
+          | O (Texp_try (e_try, vc_l, _)) ->
             E.try_ e_try
               (List.filter_map
                  (fun case -> reduce_case ~should_remove case)

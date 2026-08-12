@@ -1,2 +1,2 @@
 Run without exception.
-Exception from memprof.
+Exception from major allocation callback.

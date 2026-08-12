@@ -1,14 +1,16 @@
 (* TEST
- reason = "Thread.exit from a Memprof callback is a fatal error under oxcaml";
- skip;
  include systhreads;
  hassysthreads;
+ exit_status = "2";
+ ocamlrunparam += ",b=0";
  {
    bytecode;
  }{
    native;
  }
 *)
+
+(* Thread.exit from a Memprof callback is a fatal error in OxCaml *)
 
 (* Tests statmemprof behaviour when a callback terminates its thread.
    The expected behaviour is that the thread exits, but sampling

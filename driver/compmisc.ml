@@ -43,7 +43,9 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
        List.map
          (fun path : Clflags.visible_include ->
             { path; cmx_guaranteed = false })
-         Config.flexdll_dirs;
+         (* Config.flexdll_dirs is either [] or ["+flexdll"]: don't include a
+            reference to the Standard Library when -nostdlib was specified. *)
+         (if !Clflags.no_std_include then [] else Config.flexdll_dirs);
        !Compenv.first_include_dirs]
   in
   let visible =
@@ -86,6 +88,7 @@ let init_parameters () =
 let initial_env () =
   Ident.reinit();
   Types.Uid.reinit();
+  Shape.Rec_var_ident.reinit();
   let initially_opened_module =
     if !Clflags.nopervasives then
       None
@@ -95,31 +98,7 @@ let initial_env () =
   Typemod.initial_env
     ~loc:(Location.in_file "command line")
     ~initially_opened_module
-    ~open_implicit_modules:(List.rev !Clflags.open_modules)
-
-let set_from_env flag Clflags.{ parse; usage; env_var } =
-  try
-    match parse (Sys.getenv env_var) with
-    | None ->
-        Location.prerr_warning Location.none
-          (Warnings.Bad_env_variable (env_var, usage))
-    | Some x -> match !flag with
-      | None -> flag := Some x
-      | Some _ -> ()
-  with
-    Not_found -> ()
-
-let read_clflags_from_env () =
-  set_from_env Clflags.color Clflags.color_reader;
-  let no_color () = (* See https://no-color.org/ *)
-    match Sys.getenv_opt "NO_COLOR" with
-    | None | Some "" -> false
-    | _ -> true
-  in
-  if Option.is_none !Clflags.color && no_color () then
-    Clflags.color := Some Misc.Color.Never;
-  set_from_env Clflags.error_style Clflags.error_style_reader;
-  ()
+    ~open_implicit_args:(List.rev !Clflags.open_args)
 
 let directory_exists dir =
   Sys.file_exists dir && Sys.is_directory dir

@@ -101,44 +101,52 @@ module Uid = struct
 
   let internal_not_actually_unique = Internal
 
-  let unboxed_version t =
-    match t with
-    | Unboxed_version _ ->
-      Misc.fatal_error "Shape.unboxed_version"
-    | _ -> Unboxed_version t
+  let unboxed_version t = Unboxed_version t
 
   let for_actual_declaration = function
     | Item _ -> true
     | _ -> false
 end
 
-module DeBruijn_index = struct
-  type t = int
+module Rec_var_ident = struct
+  (* Identifiers are qualified by the current compilation unit, because
+     shapes are marshalled into .cms files and mixed with locally created
+     shapes when imported. The compilation unit avoids identifier collisions. *)
+  type t =
+    { comp_unit : string;
+      id : int
+    }
 
-  let create n =
-    if n < 0
-    then Misc.fatal_errorf "De_bruijn_index.create: negative index %d" n
-    else n
+  let counter = ref 0
 
-  let move_under_binder n = n + 1
+  let reinit () = counter := 0
 
-  let equal n1 n2 = Int.equal n1 n2
+  let mk_fresh () =
+    let comp_unit =
+      match Current_unit.get_cu () with
+      | None -> ""
+      | Some cu -> Compilation_unit.full_path_as_string cu
+    in
+    let n = !counter in
+    incr counter;
+    { comp_unit; id = n }
 
-  let print fmt n = Format.fprintf fmt "%d" n
+  let equal t1 t2 =
+    Int.equal t1.id t2.id && String.equal t1.comp_unit t2.comp_unit
+
+  let compare t1 t2 =
+    let c = Int.compare t1.id t2.id in
+    if c <> 0 then c else String.compare t1.comp_unit t2.comp_unit
+
+  let hash { comp_unit; id } = Hashtbl.hash (comp_unit, id)
+
+  let print fmt { comp_unit; id } =
+    match comp_unit with
+    | "" -> Format.fprintf fmt "rv%d" id
+    | comp_unit -> Format.fprintf fmt "rv%s.%d" comp_unit id
 end
 
-
-module DeBruijn_env = struct
-  type 'a t = 'a list
-
-  let empty = []
-
-  let get_opt t ~de_bruijn_index = List.nth_opt t de_bruijn_index
-
-  let push t x = x :: t
-
-  let is_empty = function [] -> true | _ -> false
-end
+module Rec_var_env = Map.Make (Rec_var_ident)
 
 module Sig_component_kind = struct
   type t =
@@ -291,6 +299,7 @@ module Predef = struct
       | Unboxed_int32
       | Unboxed_int16
       | Unboxed_int8
+      | Unboxed_mask
       | Unboxed_simd of simd_vec_split
 
     type t =
@@ -307,6 +316,7 @@ module Predef = struct
       | Int32
       | Int64
       | Lazy_t
+      | Mask
       | Nativeint
       | String
       | Simd of simd_vec_split
@@ -369,6 +379,7 @@ module Predef = struct
       | Unboxed_int32 -> "int32"
       | Unboxed_int16 -> "int16"
       | Unboxed_int8 -> "int8"
+      | Unboxed_mask -> "mask"
       | Unboxed_simd s -> simd_vec_split_to_string s
 
     let to_string : t -> string = function
@@ -385,6 +396,7 @@ module Predef = struct
       | Int32 -> "int32"
       | Int64 -> "int64"
       | Lazy_t -> "lazy_t"
+      | Mask -> "mask"
       | Nativeint -> "nativeint"
       | String -> "string"
       | Simd s -> simd_vec_split_to_string s
@@ -427,13 +439,14 @@ module Predef = struct
       | Unboxed_int32 -> Bits32
       | Unboxed_int16 -> Bits16
       | Unboxed_int8 -> Bits8
+      | Unboxed_mask -> Mask
       | Unboxed_simd s -> simd_vec_split_to_layout s
 
     let to_base_layout : t -> base_layout =
       function
       | Array | Bytes | Char | Extension_constructor | Float | Float32
-      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
-      | String | Simd _ | Exception ->
+      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Mask
+      | Nativeint | String | Simd _ | Exception ->
         Scannable
       | Unboxed u -> unboxed_type_to_base_layout u
 
@@ -476,11 +489,12 @@ module Predef = struct
       | Unboxed_int64, Unboxed_int64
       | Unboxed_int32, Unboxed_int32
       | Unboxed_int16, Unboxed_int16
-      | Unboxed_int8, Unboxed_int8 -> true
+      | Unboxed_int8, Unboxed_int8
+      | Unboxed_mask, Unboxed_mask -> true
       | Unboxed_simd s1, Unboxed_simd s2 -> equal_simd_vec_split s1 s2
       | (Unboxed_float | Unboxed_float32 | Unboxed_nativeint
         | Unboxed_int64 | Unboxed_int32 | Unboxed_int16 | Unboxed_int8
-        | Unboxed_simd _), _ -> false
+        | Unboxed_mask | Unboxed_simd _), _ -> false
 
     let equal p1 p2 =
       match p1, p2 with
@@ -497,14 +511,15 @@ module Predef = struct
       | Int32, Int32
       | Int64, Int64
       | Lazy_t, Lazy_t
+      | Mask, Mask
       | Nativeint, Nativeint
       | String, String -> true
       | Simd s1, Simd s2 -> equal_simd_vec_split s1 s2
       | Exception, Exception -> true
       | Unboxed u1, Unboxed u2 -> equal_unboxed u1 u2
       | (Array | Bytes | Char | Extension_constructor | Float | Float32
-        | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Nativeint
-        | String | Simd _ | Exception | Unboxed _), _ -> false
+        | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t | Mask
+        | Nativeint | String | Simd _ | Exception | Unboxed _), _ -> false
 end
 
 type var = Ident.t
@@ -527,11 +542,11 @@ and desc =
   | Predef of Predef.t * t list
   | Arrow
   | Poly_variant of t poly_variant_constructors
-  | Mu of t
-  | Rec_var of int
+  | Mu of Rec_var_ident.t * t
+  | Rec_var of Rec_var_ident.t
 
   (* constructors for type declarations *)
-  | Variant of (t * Layout.t) complex_constructors
+  | Variant of (t * Layout.t option) complex_constructors
   | Variant_unboxed of
     { name : string;
       variant_uid : Uid.t option;
@@ -578,7 +593,7 @@ and 'a complex_constructor_argument =
     field_value : 'a
   }
 
-and constructor_representation = mixed_product_shape
+and constructor_representation = Layout.t option array
 
 and mixed_product_shape = Layout.t array
 
@@ -608,7 +623,7 @@ let equal_complex_constructor eq
     { name = name1; kind = kind1; args = args1 }
     { name = name2; kind = kind2; args = args2 } =
   String.equal name1 name2 &&
-  Misc.Stdlib.Array.equal Layout.equal kind1 kind2 &&
+  Misc.Stdlib.Array.equal (Option.equal Layout.equal) kind1 kind2 &&
   List.equal (equal_complex_constructor_arguments eq) args1 args2
 
 let rec equal_desc0 d1 d2 =
@@ -623,9 +638,9 @@ let rec equal_desc0 d1 d2 =
     if not (equal t1 t2) then false
     else equal v1 v2
   | Leaf, Leaf -> true
-  | Mu (t1_body), Mu (t2_body) ->
-    equal t1_body t2_body
-  | Rec_var i1, Rec_var i2 -> Int.equal i1 i2
+  | Mu (rv1, t1_body), Mu (rv2, t2_body) ->
+    Rec_var_ident.equal rv1 rv2 && equal t1_body t2_body
+  | Rec_var rv1, Rec_var rv2 -> Rec_var_ident.equal rv1 rv2
   | Struct t1, Struct t2 ->
     Item.Map.equal equal t1 t2
   | Proj (t1, i1), Proj (t2, i2) ->
@@ -652,7 +667,7 @@ let rec equal_desc0 d1 d2 =
   | Variant c1, Variant c2 ->
     List.equal
          (equal_complex_constructor (fun (t1, l1) (t2, l2) ->
-           equal t1 t2 && Layout.equal l1 l2))
+           equal t1 t2 && Option.equal Layout.equal l1 l2))
          c1 c2
   | Variant_unboxed c1, Variant_unboxed c2 ->
     String.equal c1.name c2.name
@@ -739,14 +754,15 @@ let rec print fmt t =
         Format.fprintf fmt "@[%a(@,%a)%a@]" aux t1 aux t2 print_uid_opt uid
     | Leaf ->
         Format.fprintf fmt "<%a>" (Format.pp_print_option Uid.print) uid
-    | Mu (t_body) ->
-      Format.fprintf fmt "Rec@[%a %a@]"
+    | Mu (rv, t_body) ->
+      Format.fprintf fmt "Mu@[%a %a.%a@]"
         print_uid_opt uid
+        Rec_var_ident.print rv
         print_nested t_body
-    | Rec_var id ->
-      Format.fprintf fmt "#%d%a"
-      id
-      print_uid_opt uid
+    | Rec_var rv ->
+      Format.fprintf fmt "#%a%a"
+        Rec_var_ident.print rv
+        print_uid_opt uid
     | Proj (t, item) ->
         begin match uid with
         | None ->
@@ -854,7 +870,6 @@ let rec print fmt t =
   | At_layout (shape, layout) ->
     Format.fprintf fmt "(%a : %a)" print_nested shape
       (Format_doc.compat Layout.format) layout
-
   in
   if t.approximated then
     Format.fprintf fmt "@[(approx)@ %a@]@;" aux t
@@ -1009,14 +1024,14 @@ let comp_unit ?uid s =
     hash = Hashtbl.hash (hash_comp_unit, uid, s);
     approximated = false }
 
-let mu ?uid t_body =
-  { uid; desc = Mu (t_body);
-    hash = Hashtbl.hash (hash_mu, uid, t_body.hash);
+let mu ?uid rv t_body =
+  { uid; desc = Mu (rv, t_body);
+    hash = Hashtbl.hash (hash_mu, uid, Rec_var_ident.hash rv, t_body.hash);
     approximated = false }
 
-let rec_var ?uid n =
-  { uid; desc = Rec_var n;
-    hash = Hashtbl.hash (hash_rec_var, uid, n);
+let rec_var ?uid rv =
+  { uid; desc = Rec_var rv;
+    hash = Hashtbl.hash (hash_rec_var, uid, Rec_var_ident.hash rv);
     approximated = false }
 
 let app_list (base_shape : t) (args : t list) : t =
@@ -1104,7 +1119,6 @@ let at_layout ?uid shape layout =
     hash = Hashtbl.hash (hash_at_layout, uid, shape.hash, layout);
     approximated = false }
 
-
 let decompose_abs t =
   match t.desc with
   | Abs (x, t) -> Some (x, t)
@@ -1115,36 +1129,29 @@ let dummy_mod = str Item.Map.empty
 let of_path ~find_shape ~namespace path =
   (* We need to handle the following cases:
     Path of constructor:
-      M.t.C
+      M.t.C [Pextra_ty("M.t", "C")]
     Path of label:
-      M.t.lbl
+      M.t.lbl [Pextra_ty("M.t", "lbl")]
     Path of label of inline record:
-      M.t.C.lbl
+      M.t.C.lbl [Pextra_ty(Pextra_ty("M.t", "C"), "lbl")]
     Path of label of implicit unboxed record:
-      M.t#.lbl
-  *)
+      M.t#.lbl [Pextra_ty(Pextra_ty("M.t", Punboxed_ty), "lbl")] *)
   let rec aux : Sig_component_kind.t -> Path.t -> t = fun ns -> function
     | Pident id -> find_shape ns id
-    | Pdot (Pextra_ty (path, Punboxed_ty), name) ->
-      (match ns with
-       Unboxed_label -> ()
-       | _ -> Misc.fatal_error "Shape.of_path");
-      proj (aux Type path) (name, Label)
-    | Pdot (path, name) ->
-      let namespace :  Sig_component_kind.t =
-        match (ns : Sig_component_kind.t) with
-        | Constructor -> Type
-        | Label -> Type
-        | Unboxed_label -> Type
-        | _ -> Module
-      in
-      proj (aux namespace path) (name, ns)
+    | Pdot (path, name) -> proj (aux Module path) (name, ns)
     | Papply (p1, p2) -> app (aux Module p1) ~arg:(aux Module p2)
     | Pextra_ty (path, extra) -> begin
-        match extra with
-          Pcstr_ty name -> proj (aux Type path) (name, Constructor)
-        | Pext_ty -> aux Extension_constructor path
-        | Punboxed_ty -> aux ns path
+        match extra, ns, path with
+        | Pcstr_ty name, Label, Pextra_ty _ ->
+            (* Handle the M.t.C.lbl case *)
+            proj (aux Constructor path) (name, ns)
+        | Pcstr_ty name, Unboxed_label, Pextra_ty (path', Punboxed_ty) ->
+            (* Implicit-unboxed view of a boxed record: labels are stored in
+               the underlying boxed type's shape under the Label namespace. *)
+            proj (aux Type path') (name, Label)
+        | Pcstr_ty name, _, _ -> proj (aux Type path) (name, ns)
+        | Pext_ty, _, _ -> aux Extension_constructor path
+        | Punboxed_ty, _, _ -> aux ns path
       end
   in
   aux namespace path
@@ -1170,8 +1177,8 @@ let set_uid_if_none t uid =
   | Proj (t, i) -> proj ~uid t i
   | Comp_unit c -> comp_unit ~uid c
   | Error s -> error ~uid s
-  | Mu t -> mu ~uid t
-  | Rec_var i -> rec_var ~uid i
+  | Mu (rv, t) -> mu ~uid rv t
+  | Rec_var rv -> rec_var ~uid rv
   | Constr (c, ts) -> constr ~uid c ts
   | Tuple ts -> tuple ~uid ts
   | Unboxed_tuple ts -> unboxed_tuple ~uid ts

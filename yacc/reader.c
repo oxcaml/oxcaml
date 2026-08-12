@@ -347,6 +347,7 @@ static void process_open_curly_bracket(FILE *f) {
                         unterminated_string(s_lineno, s_line, s_cptr);
                 }
             }
+            FREE(s_line);
             FREE(buf);
             return;
         }
@@ -523,7 +524,7 @@ nextc(void)
                 s = cptr;
                 break;
             }
-            /* fall through */
+            fallthrough;
 
         default:
             cptr = s;
@@ -645,7 +646,7 @@ loop:
             FREE(t_line);
             return;
         }
-        /* fall through */
+        fallthrough;
 
     case '{':
         putc(c, f);
@@ -741,8 +742,10 @@ get_tag(void)
 
     for (i = 0; i < ntags; ++i)
     {
-        if (strcmp(cache, tag_table[i]) == 0)
+        if (strcmp(cache, tag_table[i]) == 0) {
+            FREE(t_line);
             return (tag_table[i]);
+        }
     }
 
     if (ntags >= tagmax)

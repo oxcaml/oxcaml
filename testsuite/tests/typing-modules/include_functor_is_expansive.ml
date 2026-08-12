@@ -46,7 +46,7 @@ val r : '_a option ref = {contents = None}
 Line 14, characters 12-13:
 14 |   r := Some a;
                  ^
-Error: This expression has type "a" but an expression was expected of type "'a"
+Error: The value "a" has type "a" but an expression was expected of type "'a"
        The type constructor "a" would escape its scope
 |}]
 
@@ -72,6 +72,6 @@ val r : '_a option ref = {contents = None}
 Line 12, characters 12-13:
 12 |   r := Some a;
                  ^
-Error: This expression has type "a" but an expression was expected of type "'a"
+Error: The value "a" has type "a" but an expression was expected of type "'a"
        The type constructor "a" would escape its scope
 |}]

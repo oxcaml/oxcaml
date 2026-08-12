@@ -291,5 +291,5 @@ Line 2, characters 15-20:
 2 | class type c = float
                    ^^^^^
 Error: Unbound class type "float"
-Hint: Did you mean "floot"?
+Hint:        Did you mean "floot"?
 |}]

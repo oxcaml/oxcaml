@@ -7,10 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -experimental-optimizations";
  expect.opt;
 *)
 
@@ -134,9 +131,7 @@ bswap:
 let neg x = Int8_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  neg   %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
@@ -165,13 +160,13 @@ let div x y = Int8_u.div x y
 div:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L114
+  je    .L0
   cqto
   idivq %rcx
   salq  $56, %rax
   sarq  $56, %rax
   ret
-.L114:
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -184,14 +179,14 @@ let rem x y = Int8_u.rem x y
 rem:
   movq  %rbx, %rcx
   testq %rcx, %rcx
-  je    .L114
+  je    .L0
   cqto
   idivq %rcx
   movq  %rdx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret
-.L114:
+.L0:
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -225,13 +220,13 @@ unsafe_rem:
 let compare x y = Int8_u.compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 |}]
 
@@ -278,13 +273,13 @@ lessthan:
 let unsigned_compare x y = Int8_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   seta  %al
-  cmovae %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovae %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 |}]
 
@@ -464,8 +459,8 @@ to_float:
   movq  %rax, %rbx
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vcvtsi2sdq %rbx, %xmm0, %xmm0
@@ -488,8 +483,8 @@ to_float32:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_float32_ops@GOTPCREL(%rip), %rdi
@@ -540,8 +535,8 @@ to_int32:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L105
-.L107:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_int32_ops@GOTPCREL(%rip), %rdi
@@ -565,8 +560,8 @@ to_int64:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_int64_ops@GOTPCREL(%rip), %rdi
@@ -596,8 +591,8 @@ to_nativeint:
   movq  %rax, %rbx
   subq  $24, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $2303, -8(%rax)
   movq  caml_nativeint_ops@GOTPCREL(%rip), %rdi
@@ -626,8 +621,7 @@ popcount:
 let ctz x = Int8_u.ctz x
 [%%expect_asm X86_64{|
 ctz:
-  movl  $256, %ebx
-  orq   %rbx, %rax
+  orq   $256, %rax
   tzcnt %rax, %rax
   salq  $56, %rax
   sarq  $56, %rax
@@ -680,10 +674,9 @@ shr:
 let select x y z = Int8_u.select x y z
 [%%expect_asm X86_64{|
 select:
-  movq  %rax, %rsi
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
   movq  %rdi, %rax
-  cmpq  $1, %rsi
-  cmovne %rbx, %rax
   salq  $56, %rax
   sarq  $56, %rax
   ret

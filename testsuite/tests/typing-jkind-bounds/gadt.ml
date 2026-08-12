@@ -1,4 +1,5 @@
 (* TEST
+    flags = "-no-ikinds";
     expect;
 *)
 
@@ -70,7 +71,7 @@ let bar (x : q) =
 Line 2, characters 23-24:
 2 |   takes_only_immutable x
                            ^
-Error: This expression has type "q" but an expression was expected of type
+Error: The value "x" has type "q" but an expression was expected of type
          "('a : immutable_data)"
        The kind of q is immutable_data with M.t
          because of the definition of q at line 1, characters 0-32.
@@ -152,7 +153,7 @@ Lines 1-3, characters 0-61:
 1 | type 'a t : value mod contended portable =
 2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
 3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
-Error: The kind of type "t" is value non_float mod portable immutable with 'a
+Error: The kind of type "t" is value non_float mod immutable portable with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of
            value mod portable contended

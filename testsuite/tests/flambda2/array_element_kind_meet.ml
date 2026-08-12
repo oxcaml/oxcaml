@@ -4,7 +4,14 @@
  flambda2;
  setup-ocamlopt.byte-build-env;
  ocamlopt.byte with dump-simplify;
- check-fexpr-dump;
+ {
+   flat-float-array;
+   check-fexpr-dump;
+ }{
+   no-flat-float-array;
+   fexpr_reference_suffix = "no-flat-float-array.reference";
+   check-fexpr-dump;
+ }
 *)
 
 (* When a record field is known to be a value array, Is_flat_float_array

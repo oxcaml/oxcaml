@@ -40,7 +40,7 @@ val branching : 'a @ unique -> 'a = <fun>
    Therefore, in the rest we will only constrain uniqueness *)
 let branching (x @ once) = (if true then x else x : @ unique)
 [%%expect{|
-val branching : 'a @ unique once -> 'a @ once = <fun>
+val branching : 'a @ once unique -> 'a @ once = <fun>
 |}]
 
 let branching b =
@@ -732,7 +732,7 @@ Line 5, characters 9-56:
 5 |   ignore ({r with x = "hello again"; y = "world again"})
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 23 [useless-record-with]: all the fields are explicitly listed in this record:
-the 'with' clause is useless.
+  the "with" clause is useless.
 
 Line 5, characters 11-12:
 5 |   ignore ({r with x = "hello again"; y = "world again"})

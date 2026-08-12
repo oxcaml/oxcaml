@@ -43,6 +43,6 @@ let f (x : <[int]> eval) : int = x
 Line 1, characters 33-34:
 1 | let f (x : <[int]> eval) : int = x
                                      ^
-Error: This expression has type "<[int]> eval"
+Error: The value "x" has type "<[int]> eval"
        but an expression was expected of type "int"
 |}]

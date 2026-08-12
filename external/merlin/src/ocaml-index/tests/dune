@@ -1,0 +1,21 @@
+(env (_
+ (binaries ocamlc-wrapper ocamlobjinfo-wrapper)
+ (env-vars
+  (OCAMLC ocamlc-wrapper)
+  (OCAMLOBJINFO ocamlobjinfo-wrapper))))
+
+(alias
+ (name ocaml-index-test-deps)
+ (deps
+  (package ocaml-index)
+  %{bin:ocaml-index}
+  %{bin:ocamlc-wrapper}
+  %{bin:ocamlobjinfo-wrapper}
+  (env_var MERLIN_TEST_OCAML_VERSION)))
+
+(cram
+ (package ocaml-index)
+ (applies_to :whole_subtree)
+ (deps
+  (env_var MERLIN_TEST_OCAML_PATH)
+  (alias ocaml-index-test-deps)))

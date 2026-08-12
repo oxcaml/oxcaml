@@ -72,13 +72,16 @@ let name = function
   | Predef { name; _ } -> name
   | Global_with_args g -> global_name g
 
-let rename = function
+let rename_with_stamp stamp = function
   | Local { name; stamp = _ }
   | Scoped { name; stamp = _; scope = _ } ->
-      incr currentstamp;
-      Local { name; stamp = !currentstamp }
+      Local { name; stamp }
   | id ->
       Misc.fatal_errorf "Ident.rename %s" (name id)
+
+let rename id =
+  incr currentstamp;
+  rename_with_stamp !currentstamp id
 
 let unique_name = function
   | Local { name; stamp }
@@ -93,6 +96,8 @@ let unique_name = function
          "_<some number>", and that their name is unique. *)
       name
   | Global_with_args g -> global_name g
+
+let canonical_name i = if !Clflags.canonical_ids then name i else unique_name i
 
 let unique_toplevel_name = function
   | Local { name; stamp }
@@ -131,6 +136,9 @@ let stamp = function
   | Scoped { stamp; _ } -> stamp
   | _ -> 0
 
+let compare_stamp id1 id2 =
+  compare (stamp id1) (stamp id2)
+
 let scope = function
   | Scoped { scope; _ } -> scope
   | Local _ -> highest_scope
@@ -168,19 +176,48 @@ let to_global = function
   | Global_with_args g -> Some g
   | _ -> None
 
+let canonical_stamps = s_table Hashtbl.create 0
+let next_canonical_stamp = s_table Hashtbl.create 0
+
+let canonicalize name stamp =
+  try Hashtbl.find !canonical_stamps (name, stamp)
+  with Not_found ->
+    let canonical_stamp =
+      try Hashtbl.find !next_canonical_stamp name
+      with Not_found -> 0
+    in
+    Hashtbl.replace !next_canonical_stamp name
+      (canonical_stamp + 1);
+    Hashtbl.add !canonical_stamps (name, stamp)
+      canonical_stamp;
+    canonical_stamp
+
+let pp_stamped ppf (name, stamp) =
+  let open Format_doc in
+  if not !Clflags.unique_ids then
+    fprintf ppf "%s" name
+  else begin
+    let stamp =
+      if not !Clflags.canonical_ids then stamp
+      else canonicalize name stamp
+    in
+    fprintf ppf "%s/%i" name stamp
+  end
+
 let print ~with_scope ppf =
   let open Format_doc in
   function
-  | Global name -> fprintf ppf "%s!" name
-  | Predef { name; stamp = n } ->
-      fprintf ppf "%s%s!" name
-        (if !Clflags.unique_ids then asprintf "/%i" n else "")
-  | Local { name; stamp = n } ->
-      fprintf ppf "%s%s" name
-        (if !Clflags.unique_ids then asprintf "/%i" n else "")
-  | Scoped { name; stamp = n; scope } ->
-      fprintf ppf "%s%s%s" name
-        (if !Clflags.unique_ids then asprintf "/%i" n else "")
+  | Global name ->
+      fprintf ppf "%s!" name
+  | Predef { name; stamp } ->
+      fprintf ppf "%a!"
+        pp_stamped (name, stamp)
+  | Local { name; stamp } ->
+      fprintf ppf "%a"
+        pp_stamped (name, stamp)
+  | Scoped { name; stamp; scope } ->
+      fprintf ppf "%a%s"
+        pp_stamped (name, stamp)
         (if with_scope then asprintf "[%i]" scope else "")
   | Global_with_args g ->
       fprintf ppf "%a!" Global_module.Name.print g
@@ -298,23 +335,29 @@ let rec remove id = function
       else
         let rr = remove id r in if r == rr then m else balance l k rr
 
-let rec find_previous id = function
+let rec find_previous_or_null id = function
     None ->
-      raise Not_found
+      Misc.Or_null.Null
   | Some k ->
-      if same id k.ident then k.data else find_previous id k.previous
+      if same id k.ident then Misc.Or_null.This k.data
+      else find_previous_or_null id k.previous
 
-let rec find_same id = function
+let rec find_same_or_null id = function
     Empty ->
-      raise Not_found
+      Misc.Or_null.Null
   | Node(l, k, r, _) ->
       let c = String.compare (name id) (name k.ident) in
       if c = 0 then
         if same id k.ident
-        then k.data
-        else find_previous id k.previous
+        then Misc.Or_null.This k.data
+        else find_previous_or_null id k.previous
       else
-        find_same id (if c < 0 then l else r)
+        find_same_or_null id (if c < 0 then l else r)
+
+let find_same id tbl =
+  match find_same_or_null id tbl with
+  | This data -> data
+  | Null -> raise Not_found
 
 let rec find_name n = function
     Empty ->

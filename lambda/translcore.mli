@@ -24,13 +24,14 @@ open Debuginfo.Scoped_location
 val pure_module : module_expr -> let_kind
 
 (* Used for translating Alloc_heap values in classes and modules. *)
-val transl_exp: scopes:scopes -> Jkind.Sort.Const.t -> expression -> lambda
+val transl_exp: scopes:scopes -> Lambda.layout -> expression -> lambda
 val transl_apply: scopes:scopes
                   -> ?tailcall:tailcall_attribute
                   -> ?inlined:inlined_attribute
                   -> ?specialised:specialise_attribute
                   -> ?position:region_close
-                  -> ?mode:locality_mode
+                  -> ?mode:return_mode
+                  -> ?yielding:yielding_kind
                   -> result_layout:Lambda.layout
                   -> lambda
                   -> (arg_label * apply_arg) list
@@ -42,7 +43,7 @@ val transl_extension_constructor: scopes:scopes ->
   Env.t -> Longident.t option ->
   extension_constructor -> lambda
 
-val transl_scoped_exp : scopes:scopes -> Jkind.Sort.Const.t -> expression -> lambda
+val transl_scoped_exp : scopes:scopes -> Lambda.layout -> expression -> lambda
 
 type error =
     Free_super_var
@@ -52,7 +53,7 @@ type error =
   | Illegal_void_record_field
   | Illegal_product_record_field of Jkind.Sort.Const.t
   | Void_sort of Types.type_expr
-  | Unboxed_vector_in_array_comprehension
+  | Unboxed_vector_or_mask_in_array_comprehension
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible

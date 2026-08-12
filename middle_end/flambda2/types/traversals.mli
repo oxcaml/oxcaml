@@ -73,6 +73,10 @@ module Pattern : sig
   val function_slot : Function_slot.t -> 'a t -> 'a closure_field
 
   val closure : 'a closure_field list -> 'a t
+
+  (** [boxed_number bn t] matches a boxed number of the given kind, with [t]
+      matching the type of its (unboxed) contents. *)
+  val boxed_number : Flambda_kind.Boxable_number.t -> 'a t -> 'a t
 end
 
 type 'a expr
@@ -89,8 +93,6 @@ module Expr : sig
   val var : 'a -> 'a t
 
   val unknown : Flambda_kind.t -> 'a t
-
-  val bottom : Flambda_kind.t -> 'a t
 
   val unknown_with_subkind : Flambda_kind.With_subkind.t -> 'a t
 

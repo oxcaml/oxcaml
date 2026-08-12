@@ -20,6 +20,8 @@
 module Expanded_type : sig
   type t
 
+  val of_non_alias_type : ?coercion:Coercion.t -> Type_grammar.t -> t
+
   val create_const : Reg_width_const.t -> t
 
   val create_value : Type_grammar.head_of_kind_value -> t
@@ -46,6 +48,8 @@ module Expanded_type : sig
 
   val create_naked_vec512 : Type_grammar.head_of_kind_naked_vec512 -> t
 
+  val create_naked_mask : Type_grammar.head_of_kind_naked_mask -> t
+
   val create_rec_info : Type_grammar.head_of_kind_rec_info -> t
 
   val create_region : Type_grammar.head_of_kind_region -> t
@@ -66,6 +70,8 @@ module Expanded_type : sig
 
   val to_type : t -> Type_grammar.t
 
+  val kind : t -> Flambda_kind.t
+
   type descr = private
     | Value of Type_grammar.head_of_kind_value
     | Naked_immediate of Type_grammar.head_of_kind_naked_immediate
@@ -79,6 +85,7 @@ module Expanded_type : sig
     | Naked_vec128 of Type_grammar.head_of_kind_naked_vec128
     | Naked_vec256 of Type_grammar.head_of_kind_naked_vec256
     | Naked_vec512 of Type_grammar.head_of_kind_naked_vec512
+    | Naked_mask of Type_grammar.head_of_kind_naked_mask
     | Rec_info of Type_grammar.head_of_kind_rec_info
     | Region of Type_grammar.head_of_kind_region
 
@@ -107,6 +114,7 @@ module Expanded_type : sig
         Type_grammar.head_of_kind_naked_vec256 Or_unknown_or_bottom.t
     | Naked_vec512 of
         Type_grammar.head_of_kind_naked_vec512 Or_unknown_or_bottom.t
+    | Naked_mask of Type_grammar.head_of_kind_naked_mask Or_unknown_or_bottom.t
     | Rec_info of Type_grammar.head_of_kind_rec_info Or_unknown_or_bottom.t
     | Region of Type_grammar.head_of_kind_region Or_unknown_or_bottom.t
 

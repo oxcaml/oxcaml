@@ -125,7 +125,7 @@ and let_expr_normal ~env ~res e ~(bound_pattern : Bound_pattern.t)
       let fvar = Bound_var.var v in
       To_jsir_result.with_debuginfo_exn res dbg ~f:(fun res ->
           create_let_prim ~env ~res fvar p)
-    | Set_of_closures bound_vars, Set_of_closures soc ->
+    | Set_of_closures bound_vars, Set_of_closures (soc, _alloc_mode) ->
       To_jsir_set_of_closures.dynamic_set_of_closures ~env ~res ~bound_vars soc
     | Static bound_static, Static_consts consts ->
       (* Definitions within this group can reference each others' symbols
@@ -386,23 +386,30 @@ and apply_expr ~env ~res e =
           let arg, res = To_jsir_shared.simple ~env ~res arg in
           let unit = Pc (Int Targetint.zero) in
           "%with_stack", [Pv valuec; Pv exnc; Pv effc; Pv f; Pv arg; unit], res
-        | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+        | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
           let valuec, res = To_jsir_shared.simple ~env ~res valuec in
           let exnc, res = To_jsir_shared.simple ~env ~res exnc in
           let effc, res = To_jsir_shared.simple ~env ~res effc in
-          let dyn, res = To_jsir_shared.simple ~env ~res dyn in
-          let bind, res = To_jsir_shared.simple ~env ~res bind in
+          let handle_tick, res = To_jsir_shared.simple ~env ~res handle_tick in
           let f, res = To_jsir_shared.simple ~env ~res f in
           let arg, res = To_jsir_shared.simple ~env ~res arg in
           let unit = Pc (Int Targetint.zero) in
-          ( "%with_stack_bind",
-            [Pv valuec; Pv exnc; Pv effc; Pv dyn; Pv bind; Pv f; Pv arg; unit],
+          ( "%with_stack_preemptible",
+            [Pv valuec; Pv exnc; Pv effc; Pv handle_tick; Pv f; Pv arg; unit],
             res )
-        | Resume { cont; f; arg } ->
+        | Continue { cont; value } ->
           let cont, res = To_jsir_shared.simple ~env ~res cont in
-          let f, res = To_jsir_shared.simple ~env ~res f in
-          let arg, res = To_jsir_shared.simple ~env ~res arg in
-          "%resume", [Pv cont; Pv f; Pv arg], res
+          let value, res = To_jsir_shared.simple ~env ~res value in
+          "%continue", [Pv cont; Pv value], res
+        | Discontinue { cont; exn } ->
+          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let exn, res = To_jsir_shared.simple ~env ~res exn in
+          "%discontinue", [Pv cont; Pv exn], res
+        | Discontinue_with_backtrace { cont; exn; bt } ->
+          let cont, res = To_jsir_shared.simple ~env ~res cont in
+          let exn, res = To_jsir_shared.simple ~env ~res exn in
+          let bt, res = To_jsir_shared.simple ~env ~res bt in
+          "%discontinue_with_backtrace", [Pv cont; Pv exn; Pv bt], res
       in
       let prim : Jsir.expr = Prim (Extern prim_name, args) in
       let var = Jsir.Var.fresh () in

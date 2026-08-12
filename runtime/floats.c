@@ -29,6 +29,7 @@
 #include <string.h>
 #include <float.h>
 #include <limits.h>
+#include <assert.h>
 
 #include "caml/alloc.h"
 #include "caml/fail.h"
@@ -81,11 +82,12 @@
 
 #ifdef ARCH_ALIGN_DOUBLE
 
+static_assert(sizeof(double) == 2 * sizeof(value), "");
+
 CAMLexport double caml_Double_val(value val)
 {
   union { value v[2]; double d; } buffer;
 
-  CAMLassert(sizeof(double) == 2 * sizeof(value));
   buffer.v[0] = Field(val, 0);
   buffer.v[1] = Field(val, 1);
   return buffer.d;
@@ -95,7 +97,6 @@ CAMLexport void caml_Store_double_val(value val, double dbl)
 {
   union { value v[2]; double d; } buffer;
 
-  CAMLassert(sizeof(double) == 2 * sizeof(value));
   buffer.d = dbl;
   Field(val, 0) = buffer.v[0];
   Field(val, 1) = buffer.v[1];
@@ -229,7 +230,7 @@ CAMLprim value caml_hexstring_of_float(value arg, value vprec, value vstyle)
   }
   /* Treat special cases */
   if (exp == 0x7FF) {
-    char * txt;
+    const char * txt;
     if (m == 0) txt = "infinity"; else txt = "nan";
     memcpy(p, txt, strlen(txt));
     p[strlen(txt)] = 0;

@@ -754,15 +754,6 @@ end
 
 module Float_arrays (Primitives : sig
 
-  val float_array_get_float64x2 : float array -> int -> float64x2
-  val float_array_get_float64x2_unsafe : float array -> int -> float64x2
-
-  val float_iarray_get_float64x2 : float iarray -> int -> float64x2
-  val float_iarray_get_float64x2_unsafe : float iarray -> int -> float64x2
-
-  val float_array_set_float64x2 : float array -> int -> float64x2 -> unit
-  val float_array_set_float64x2_unsafe : float array -> int -> float64x2 -> unit
-
   val floatarray_get_float64x2 : floatarray -> int -> float64x2
   val floatarray_get_float64x2_unsafe : floatarray -> int -> float64x2
 
@@ -813,8 +804,6 @@ end)= struct
     let zw = interleave_low_32 z w in
     interleave_low_64s xy zw
 
-  let float_array () = [| 0.0; 1.0; 2.0; 3.0 |]
-  let float_iarray () = [: 0.0; 1.0; 2.0; 3.0 :]
   let floatarray () =
     let a = Array.Floatarray.create 4 in
     Array.Floatarray.set a 0 0.0;
@@ -825,94 +814,6 @@ end)= struct
   ;;
   let unboxed_float_array () = [| #0.0; #1.0; #2.0; #3.0 |]
   let unboxed_float32_array () = [| #0.0s; #1.0s; #2.0s; #3.0s; #4.0s; #5.0s; #6.0s; #7.0s |]
-
-  let () =
-    let float_array = float_array () in
-    let f_01 = f64x2 0.0 1.0 in
-    let f_12 = f64x2 1.0 2.0 in
-    let get = float_array_get_float64x2 float_array 0 in
-    eq (float64x2_low_int64 f_01) (float64x2_high_int64 f_01)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-    let get = float_array_get_float64x2 float_array 1 in
-    eq (float64x2_low_int64 f_12) (float64x2_high_int64 f_12)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-
-    let f_45 = f64x2 4.0 5.0 in
-    let f_67 = f64x2 6.0 7.0 in
-    float_array_set_float64x2 float_array 0 f_45;
-    let get = float_array_get_float64x2 float_array 0 in
-    eq (float64x2_low_int64 f_45) (float64x2_high_int64 f_45)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-    float_array_set_float64x2 float_array 1 f_67;
-    let get = float_array_get_float64x2 float_array 1 in
-    eq (float64x2_low_int64 f_67) (float64x2_high_int64 f_67)
-       (float64x2_low_int64 get) (float64x2_high_int64 get)
-  ;;
-
-  let () =
-    let float_array = float_array () in
-    let f_01 = f64x2 0.0 1.0 in
-    let f_12 = f64x2 1.0 2.0 in
-    let get = float_array_get_float64x2_unsafe float_array 0 in
-    eq (float64x2_low_int64 f_01) (float64x2_high_int64 f_01)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-    let get = float_array_get_float64x2_unsafe float_array 1 in
-    eq (float64x2_low_int64 f_12) (float64x2_high_int64 f_12)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-
-    let f_45 = f64x2 4.0 5.0 in
-    let f_67 = f64x2 6.0 7.0 in
-    float_array_set_float64x2_unsafe float_array 0 f_45;
-    let get = float_array_get_float64x2_unsafe float_array 0 in
-    eq (float64x2_low_int64 f_45) (float64x2_high_int64 f_45)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-    float_array_set_float64x2_unsafe float_array 1 f_67;
-    let get = float_array_get_float64x2_unsafe float_array 1 in
-    eq (float64x2_low_int64 f_67) (float64x2_high_int64 f_67)
-       (float64x2_low_int64 get) (float64x2_high_int64 get)
-  ;;
-
-  let () =
-    let a = float_array () in
-    let f_0 = f64x2 0.0 0.0 in
-    let fail a i =
-      try
-        let _ = float_array_get_float64x2 a i in
-        let _ = float_array_set_float64x2 a i f_0 in
-        Printf.printf "Did not fail on index %d\n" i
-      with | Invalid_argument s when s = "index out of bounds" -> ()
-    in
-    fail a (-1);
-    fail a 3;
-    fail a 4;
-    fail [||] 0;
-    fail [|0.0|] 0;
-    fail [|0.0|] 1;
-    fail [|0.0|] (-1)
-  ;;
-
-  let () =
-    let float_array = float_array () in
-    let f_01 = f64x2 0.0 1.0 in
-    let f_12 = f64x2 1.0 2.0 in
-    let get = float_array_get_float64x2 float_array 0 in
-    eq (float64x2_low_int64 f_01) (float64x2_high_int64 f_01)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-    let get = float_array_get_float64x2 float_array 1 in
-    eq (float64x2_low_int64 f_12) (float64x2_high_int64 f_12)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-
-    let f_45 = f64x2 4.0 5.0 in
-    let f_67 = f64x2 6.0 7.0 in
-    float_array_set_float64x2 float_array 0 f_45;
-    let get = float_array_get_float64x2 float_array 0 in
-    eq (float64x2_low_int64 f_45) (float64x2_high_int64 f_45)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-    float_array_set_float64x2 float_array 1 f_67;
-    let get = float_array_get_float64x2 float_array 1 in
-    eq (float64x2_low_int64 f_67) (float64x2_high_int64 f_67)
-       (float64x2_low_int64 get) (float64x2_high_int64 get)
-  ;;
 
   let () =
     let floatarray = floatarray () in
@@ -956,36 +857,6 @@ end)= struct
     fail (Array.Floatarray.create 0) 0;
     let a = Array.Floatarray.create 1 in
     Array.Floatarray.set a 0 0.0;
-    fail a 0;
-    fail a 1;
-    fail a (-1)
-  ;;
-
-  let () =
-    let float_iarray = float_iarray () in
-    let f_01 = f64x2 0.0 1.0 in
-    let f_12 = f64x2 1.0 2.0 in
-    let get = float_iarray_get_float64x2_unsafe float_iarray 0 in
-    eq (float64x2_low_int64 f_01) (float64x2_high_int64 f_01)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-    let get = float_iarray_get_float64x2_unsafe float_iarray 1 in
-    eq (float64x2_low_int64 f_12) (float64x2_high_int64 f_12)
-       (float64x2_low_int64 get) (float64x2_high_int64 get);
-  ;;
-
-  let () =
-    let a = float_iarray () in
-    let fail a i =
-      try
-        let _ = float_iarray_get_float64x2 a i in
-        Printf.printf "Did not fail on index %d\n" i
-      with | Invalid_argument s when s = "index out of bounds" -> ();
-    in
-    fail a (-1);
-    fail a 3;
-    fail a 4;
-    fail [::] 0;
-    let a = [: 0.0 :] in
     fail a 0;
     fail a 1;
     fail a (-1)
@@ -1126,15 +997,6 @@ end
 
 module _ = Float_arrays(struct
 
-  external float_array_get_float64x2 : float array -> int -> float64x2 = "%caml_float_array_get128"
-  external float_array_get_float64x2_unsafe : float array -> int -> float64x2 = "%caml_float_array_get128u"
-
-  external float_iarray_get_float64x2 : float iarray -> int -> float64x2 = "%caml_float_array_get128"
-  external float_iarray_get_float64x2_unsafe : float iarray -> int -> float64x2 = "%caml_float_array_get128u"
-
-  external float_array_set_float64x2 : float array -> int -> float64x2 -> unit = "%caml_float_array_set128"
-  external float_array_set_float64x2_unsafe : float array -> int -> float64x2 -> unit = "%caml_float_array_set128u"
-
   external floatarray_get_float64x2 : floatarray -> int -> float64x2 = "%caml_floatarray_get128"
   external floatarray_get_float64x2_unsafe : floatarray -> int -> float64x2 = "%caml_floatarray_get128u"
 
@@ -1156,21 +1018,6 @@ module _ = Float_arrays(struct
 end)
 
 module _ = Float_arrays(struct
-
-  external float_array_get_float64x2 : float array -> int8# -> float64x2 = "%caml_float_array_get128_indexed_by_int8#"
-  let float_array_get_float64x2 arr i = float_array_get_float64x2 arr (Stdlib_stable.Int8_u.of_int i)
-  external float_array_get_float64x2_unsafe : float array -> int8# -> float64x2 = "%caml_float_array_get128u_indexed_by_int8#"
-  let float_array_get_float64x2_unsafe arr i = float_array_get_float64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i)
-
-  external float_iarray_get_float64x2 : float iarray -> int8# -> float64x2 = "%caml_float_array_get128_indexed_by_int8#"
-  let float_iarray_get_float64x2 arr i = float_iarray_get_float64x2 arr (Stdlib_stable.Int8_u.of_int i)
-  external float_iarray_get_float64x2_unsafe : float iarray -> int8# -> float64x2 = "%caml_float_array_get128u_indexed_by_int8#"
-  let float_iarray_get_float64x2_unsafe arr i = float_iarray_get_float64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i)
-
-  external float_array_set_float64x2 : float array -> int8# -> float64x2 -> unit = "%caml_float_array_set128_indexed_by_int8#"
-  let float_array_set_float64x2 arr i v = float_array_set_float64x2 arr (Stdlib_stable.Int8_u.of_int i) v
-  external float_array_set_float64x2_unsafe : float array -> int8# -> float64x2 -> unit = "%caml_float_array_set128u_indexed_by_int8#"
-  let float_array_set_float64x2_unsafe arr i v = float_array_set_float64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
 
   external floatarray_get_float64x2 : floatarray -> int8# -> float64x2 = "%caml_floatarray_get128_indexed_by_int8#"
   let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_stable.Int8_u.of_int i)
@@ -1206,21 +1053,6 @@ end)
 
 module _ = Float_arrays(struct
 
-  external float_array_get_float64x2 : float array -> int16# -> float64x2 = "%caml_float_array_get128_indexed_by_int16#"
-  let float_array_get_float64x2 arr i = float_array_get_float64x2 arr (Stdlib_stable.Int16_u.of_int i)
-  external float_array_get_float64x2_unsafe : float array -> int16# -> float64x2 = "%caml_float_array_get128u_indexed_by_int16#"
-  let float_array_get_float64x2_unsafe arr i = float_array_get_float64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i)
-
-  external float_iarray_get_float64x2 : float iarray -> int16# -> float64x2 = "%caml_float_array_get128_indexed_by_int16#"
-  let float_iarray_get_float64x2 arr i = float_iarray_get_float64x2 arr (Stdlib_stable.Int16_u.of_int i)
-  external float_iarray_get_float64x2_unsafe : float iarray -> int16# -> float64x2 = "%caml_float_array_get128u_indexed_by_int16#"
-  let float_iarray_get_float64x2_unsafe arr i = float_iarray_get_float64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i)
-
-  external float_array_set_float64x2 : float array -> int16# -> float64x2 -> unit = "%caml_float_array_set128_indexed_by_int16#"
-  let float_array_set_float64x2 arr i v = float_array_set_float64x2 arr (Stdlib_stable.Int16_u.of_int i) v
-  external float_array_set_float64x2_unsafe : float array -> int16# -> float64x2 -> unit = "%caml_float_array_set128u_indexed_by_int16#"
-  let float_array_set_float64x2_unsafe arr i v = float_array_set_float64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
-
   external floatarray_get_float64x2 : floatarray -> int16# -> float64x2 = "%caml_floatarray_get128_indexed_by_int16#"
   let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_stable.Int16_u.of_int i)
   external floatarray_get_float64x2_unsafe : floatarray -> int16# -> float64x2 = "%caml_floatarray_get128u_indexed_by_int16#"
@@ -1254,21 +1086,6 @@ module _ = Float_arrays(struct
 end)
 
 module _ = Float_arrays(struct
-
-  external float_array_get_float64x2 : float array -> int32# -> float64x2 = "%caml_float_array_get128_indexed_by_int32#"
-  let float_array_get_float64x2 arr i = float_array_get_float64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
-  external float_array_get_float64x2_unsafe : float array -> int32# -> float64x2 = "%caml_float_array_get128u_indexed_by_int32#"
-  let float_array_get_float64x2_unsafe arr i = float_array_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
-
-  external float_iarray_get_float64x2 : float iarray -> int32# -> float64x2 = "%caml_float_array_get128_indexed_by_int32#"
-  let float_iarray_get_float64x2 arr i = float_iarray_get_float64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
-  external float_iarray_get_float64x2_unsafe : float iarray -> int32# -> float64x2 = "%caml_float_array_get128u_indexed_by_int32#"
-  let float_iarray_get_float64x2_unsafe arr i = float_iarray_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
-
-  external float_array_set_float64x2 : float array -> int32# -> float64x2 -> unit = "%caml_float_array_set128_indexed_by_int32#"
-  let float_array_set_float64x2 arr i v = float_array_set_float64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
-  external float_array_set_float64x2_unsafe : float array -> int32# -> float64x2 -> unit = "%caml_float_array_set128u_indexed_by_int32#"
-  let float_array_set_float64x2_unsafe arr i v = float_array_set_float64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
 
   external floatarray_get_float64x2 : floatarray -> int32# -> float64x2 = "%caml_floatarray_get128_indexed_by_int32#"
   let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
@@ -1304,21 +1121,6 @@ end)
 
 module _ = Float_arrays(struct
 
-  external float_array_get_float64x2 : float array -> int64# -> float64x2 = "%caml_float_array_get128_indexed_by_int64#"
-  let float_array_get_float64x2 arr i = float_array_get_float64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
-  external float_array_get_float64x2_unsafe : float array -> int64# -> float64x2 = "%caml_float_array_get128u_indexed_by_int64#"
-  let float_array_get_float64x2_unsafe arr i = float_array_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
-
-  external float_iarray_get_float64x2 : float iarray -> int64# -> float64x2 = "%caml_float_array_get128_indexed_by_int64#"
-  let float_iarray_get_float64x2 arr i = float_iarray_get_float64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
-  external float_iarray_get_float64x2_unsafe : float iarray -> int64# -> float64x2 = "%caml_float_array_get128u_indexed_by_int64#"
-  let float_iarray_get_float64x2_unsafe arr i = float_iarray_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
-
-  external float_array_set_float64x2 : float array -> int64# -> float64x2 -> unit = "%caml_float_array_set128_indexed_by_int64#"
-  let float_array_set_float64x2 arr i v = float_array_set_float64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
-  external float_array_set_float64x2_unsafe : float array -> int64# -> float64x2 -> unit = "%caml_float_array_set128u_indexed_by_int64#"
-  let float_array_set_float64x2_unsafe arr i v = float_array_set_float64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
-
   external floatarray_get_float64x2 : floatarray -> int64# -> float64x2 = "%caml_floatarray_get128_indexed_by_int64#"
   let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
   external floatarray_get_float64x2_unsafe : floatarray -> int64# -> float64x2 = "%caml_floatarray_get128u_indexed_by_int64#"
@@ -1352,21 +1154,6 @@ module _ = Float_arrays(struct
 end)
 
 module _ = Float_arrays(struct
-
-  external float_array_get_float64x2 : float array -> nativeint# -> float64x2 = "%caml_float_array_get128_indexed_by_nativeint#"
-  let float_array_get_float64x2 arr i = float_array_get_float64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
-  external float_array_get_float64x2_unsafe : float array -> nativeint# -> float64x2 = "%caml_float_array_get128u_indexed_by_nativeint#"
-  let float_array_get_float64x2_unsafe arr i = float_array_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
-
-  external float_iarray_get_float64x2 : float iarray -> nativeint# -> float64x2 = "%caml_float_array_get128_indexed_by_nativeint#"
-  let float_iarray_get_float64x2 arr i = float_iarray_get_float64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
-  external float_iarray_get_float64x2_unsafe : float iarray -> nativeint# -> float64x2 = "%caml_float_array_get128u_indexed_by_nativeint#"
-  let float_iarray_get_float64x2_unsafe arr i = float_iarray_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
-
-  external float_array_set_float64x2 : float array -> nativeint# -> float64x2 -> unit = "%caml_float_array_set128_indexed_by_nativeint#"
-  let float_array_set_float64x2 arr i v = float_array_set_float64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
-  external float_array_set_float64x2_unsafe : float array -> nativeint# -> float64x2 -> unit = "%caml_float_array_set128u_indexed_by_nativeint#"
-  let float_array_set_float64x2_unsafe arr i v = float_array_set_float64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
 
   external floatarray_get_float64x2 : floatarray -> nativeint# -> float64x2 = "%caml_floatarray_get128_indexed_by_nativeint#"
   let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
@@ -2318,3 +2105,47 @@ module _ = Int_arrays(struct
   let untagged_int8_array_set_int8x16_unsafe arr i v = untagged_int8_array_set_int8x16_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
 
 end)
+
+(* Regression test for a bug in the arm64 backend's unaligned 128-bit
+   load/store address computation (backend/arm64/emit.ml, [Onetwentyeight_unaligned]).
+
+   The effective address [base + offset] was materialised with a raw
+   ADD-immediate ([O.imm n]).  An ARM64 ADD/SUB immediate can only encode an
+   unsigned 12-bit value (optionally shifted left by 12), so a statically-known
+   negative offset (e.g. from [set128u a (-2) v], offset -16) or a large,
+   non-12-bit-encodable offset could not be encoded.  This surfaced as a fatal
+   "imm: value -16 not encodable ..." at emit time once the AST constructor
+   started validating its argument (oxcaml/oxcaml#6313).  The fix computes the
+   address with [emit_addimm], which emits SUB / split-ADD as needed.
+
+   These accesses are deliberately guarded by [Sys.opaque_identity false]: the
+   bug is purely at instruction *emission*, so we only need the compiler to
+   emit the load/store at a negative / large constant offset.  We must NOT
+   actually execute an out-of-bounds unsafe access, and the opaque guard both
+   defeats dead-code elimination (so the instructions are still emitted) and
+   ensures they never run. *)
+module _ = struct
+  external get128u : int64# array -> int -> int64x2
+    = "%caml_unboxed_int64_array_get128u"
+  external set128u : int64# array -> int -> int64x2 -> unit
+    = "%caml_unboxed_int64_array_set128u"
+
+  let () =
+    if Sys.opaque_identity false
+    then begin
+      let a = [| #0L; #1L; #2L; #3L |] in
+      let v = int64x2_of_int64s 0xAAAAAAAAAAAAAAAAL 0xBBBBBBBBBBBBBBBBL in
+      (* Negative constant offsets: -8 and -16 (the value from the original
+         failure).  These are encoded via SUB after the fix. *)
+      set128u a (-1) v;
+      set128u a (-2) v;
+      ignore (Sys.opaque_identity (get128u a (-1)));
+      ignore (Sys.opaque_identity (get128u a (-2)));
+      (* Large positive offset with nonzero low 12 bits: index 514 is byte
+         offset 514*8 = 0x1010, which is not a single 12-bit immediate and must
+         be materialised with a split ADD. *)
+      set128u a 514 v;
+      ignore (Sys.opaque_identity (get128u a 514))
+    end
+  ;;
+end

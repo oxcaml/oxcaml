@@ -31,7 +31,7 @@ let f (t : int list list list t) = require_portable t
 Line 1, characters 52-53:
 1 | let f (t : int list list list t) = require_portable t
                                                         ^
-Error: This expression has type "int list list list t"
+Error: The value "t" has type "int list list list t"
        but an expression was expected of type "('a : value mod portable)"
        The kind of int list list list t is
            immutable_data
@@ -46,8 +46,6 @@ Error: This expression has type "int list list list t"
 
        The first mode-crosses less than the second along:
          portability: mod portable with int list list list ≰ mod portable
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
 |}]
 
 (* Test the same scenario, except it requires remembering that we ran out of
@@ -67,7 +65,7 @@ let f (t : int list list list Foo.t) = require_portable t
 Line 1, characters 56-57:
 1 | let f (t : int list list list Foo.t) = require_portable t
                                                             ^
-Error: This expression has type "int list list list Foo.t"
+Error: The value "t" has type "int list list list Foo.t"
        but an expression was expected of type "('a : value mod portable)"
        The kind of int list list list Foo.t is
            immutable_data
@@ -81,6 +79,4 @@ Error: This expression has type "int list list list Foo.t"
 
        The first mode-crosses less than the second along:
          portability: mod portable with int list list list ≰ mod portable
-       Note: I gave up trying to find the simplest kind for the first,
-       as it is very large or deeply recursive.
 |}]

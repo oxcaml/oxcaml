@@ -27,7 +27,7 @@ fi
 opam_exec=${opam_exec:-}
 
 # needed for the root dune file to parse
-touch dune.runtime_selection duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
+touch duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
 
 exit_code=0
 $opam_exec dune build @fmt || exit_code=1

@@ -17,7 +17,6 @@
 (* To print values *)
 
 open Format
-module Printtyp=Printtyp.Compat
 open Parser_aux
 open Types
 
@@ -62,7 +61,8 @@ module EvalPath =
         | None -> raise Error
 
     let rec eval_address = function
-    | Env.Aunit cu -> eval_id (cu |> Compilation_unit.to_global_ident_for_bytecode)
+    | Env.Aunit (cu, _) ->
+      eval_id (cu |> Compilation_unit.to_global_ident_for_bytecode)
     | Env.Alocal id -> eval_id id
     | Env.Adot(root, _field_sorts, pos) ->
         (* We can ignore [_field_sorts] since the debugger runs only bytecode *)
@@ -75,14 +75,7 @@ module EvalPath =
 
 module Printer = Genprintval.Make(Debugcom.Remote_value)(EvalPath)
 
-let install_printer path ty _ppf fn =
-  Printer.install_printer path ty
-    (fun ppf remote_val ->
-       try
-         fn ppf (Obj.repr (Debugcom.Remote_value.obj remote_val))
-       with
-         Debugcom.Marshalling_error ->
-           fprintf ppf "<cannot fetch remote object>")
+let install_printer = Printer.install_printer
 
 let remove_printer = Printer.remove_printer
 

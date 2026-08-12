@@ -1,0 +1,8 @@
+(cram
+ (applies_to path-expansion hidden-deps exclude-query-dir)
+ (enabled_if
+  (<> %{os_type} Win32)))
+
+(cram
+ (applies_to symlinks workdir)
+ (enabled_if false))

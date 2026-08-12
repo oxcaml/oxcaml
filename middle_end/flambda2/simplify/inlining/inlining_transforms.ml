@@ -111,15 +111,20 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
         "Trying to call [Inlining_transforms.inline] on something other than \
          an OCaml function call."
   in
-  let region_inlined_into = Apply.alloc_mode apply in
+  let region_inlined_into = Apply.return_mode apply in
   let args = Apply.args apply in
   let apply_return_continuation = Apply.continuation apply in
   let apply_exn_continuation = Apply.exn_continuation apply in
   (* CR-someday mshinwell: Add meet constraint to the return continuation *)
   let denv = DA.denv dacc in
-  let code =
-    Code_or_metadata.get_code (DE.find_code_exn denv (FT.code_id function_decl))
+  let code_or_metadata =
+    try DE.find_code_exn denv (FT.code_id function_decl)
+    with Not_found ->
+      Misc.fatal_errorf
+        "Trying to inline %a but could not find its code or metadata"
+        Code_id.print (FT.code_id function_decl)
   in
+  let code = Code_or_metadata.get_code code_or_metadata in
   let rec_info =
     match T.meet_rec_info (DE.typing_env denv) (FT.rec_info function_decl) with
     | Known_result rec_info -> rec_info
@@ -127,7 +132,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
     | Invalid -> (* CR vlaviron: ? *) Rec_info_expr.do_not_inline
   in
   match region_inlined_into, Code.result_mode code with
-  | Heap, Alloc_local ->
+  | Not_alloc_stack _, Maybe_alloc_stack ->
     (* The alloc_mode of the application and of the code are incompatible. This
        should have been prevented by the typer; therefore we are in GADT-caused
        unreachable code; we replace the inlined body by [Invalid]. *)
@@ -135,9 +140,9 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
       Expr.create_invalid
         (Flambda.Invalid.Calling_local_returning_closure_with_normal_apply apply)
     )
-  | Local _, Alloc_heap (* This is allowed by subtyping *)
-  | Local _, Alloc_local
-  | Heap, Alloc_heap ->
+  | Maybe_alloc_stack _, Not_alloc_stack (* This is allowed by subtyping *)
+  | Maybe_alloc_stack _, Maybe_alloc_stack
+  | Not_alloc_stack _, Not_alloc_stack ->
     let denv =
       DE.enter_inlined_apply ~called_code:code ~apply ~was_inline_always denv
     in

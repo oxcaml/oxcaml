@@ -83,7 +83,7 @@ float and non-float elements. However, all types in vanilla OCaml are
 
 ### Using scannable axes
 
-Scannable axes can be written after a layout to lower the axis. For example, `value non_pointer` lowers `value` to have separability `non_pointer`, but `value maybe_separable` is equivalent to `value` (because `value` is already `separable`, which is lower than `maybe_separable`). Scannable axes written after non-value layouts have no effect, e.g. `float64 = float64 non_null`. Scannable axes can also be written on `any`, in which case they take effect *only in the case* that it is lowered to a value layout.
+Scannable axes can be written after a layout to lower the axis. For example, `value non_pointer` lowers `value` to have separability `non_pointer`, but `value maybe_separable` is equivalent to `value` (because `value` is already `separable`, which is lower than `maybe_separable`). Scannable axes written after non-value layouts have no effect, e.g. `float64 = float64 non_null`. Scannable axes can also be written on `any` and abstract kinds.
 
 The `mod` syntax may also be written with scannable axes, and has the same effect, but should be considered deprecated: we will remove this syntax so that `mod` is reserved for modal axes.
 
@@ -291,8 +291,9 @@ let box : t# -> t = fun #{ i ; s } -> { i ; s }
 type u : immediate & value = t# = #{ i : int ; s : string }
 ```
 
-Records who store boxed floats flatly (all-float and float-and-float# records)
-and `[@@unboxed]` records do not get unboxed versions.
+Records who store boxed floats flatly (all-float and float-and-float# records),
+`[@@unboxed]` records, and records with `[@atomic]` fields do not get unboxed
+versions.
 
 *Limitations and future plans*:
 * Unboxed products may only be stored in blocks via records (i.e. they are not
@@ -316,7 +317,7 @@ For example, it's fine to write this function type:
 ```ocaml
 val f : ('a : any). 'a -> 'a (* valid as a type signature *)
 ```
-> (See the [previous section](#layout-annotation) to learn more about the layout annotation used here)
+> (See the [previous section](#layout-annotations) to learn more about the layout annotation used here)
 
 But it's not possible to implement a function of that type:
 
@@ -370,10 +371,18 @@ Here by defining module type `S` with layout `any` and using `with` constraints,
 reason about modules with similar shapes but that operate on different layouts. This removes code
 duplication and can aid ppxs in supporting unboxed types.
 
-<!-- This heading is referred to by name in a link to an HTML anchor below.
-     If you rename it, please also update that link.
--->
-# `[@layout_poly]` attribute
+There is one limitation: All fields in a module type must have a representable
+layout. For example, the following is not allowed, regardless of how `S` is used:
+```ocaml
+module type S = sig
+  type t : any
+
+  val one : t
+end
+```
+We plan on lifting this restriction in the future.
+
+# `[@layout_poly]` attribute {#layout_poly-attribute}
 
 The attribute enables support for **limited layout polymorphism on external
 `%`-primitives**. This is possible because these primitives are always inlined at every
@@ -477,22 +486,27 @@ A limited set of primitives may be bound as `[@layout_poly]`;
 
 ## Runtime representation
 
-| Array                                          | Tag                | Layout of data                                               |
-|----------------------------------              |--------------------|--------------------------------------------------------------|
-| `('a : float64) array`                         | `Double_array_tag` | 64 bits per element                                          |
-| `('a : bits64) array`                          | `Custom_tag`       | reserved custom block word, followed by 64 bits per element  |
-| `('a : float32) array`, `('a : bits32) array`  | `Custom_tag`       | reserved custom block word, followed by 32 bits per element  |
-| `('a : vec128) array`                          | `Custom_tag`       | reserved custom block word, followed by 128 bits per element |
+| Array                   | Tag                             | Layout of data       |
+|-------------------------|---------------------------------|----------------------|
+| `('a : float64) array`  | `Double_array_tag`              | 64 bits per element  |
+| `('a : bits64) array`   | `Unboxed_int64_array_tag`       | 64 bits per element  |
+| `('a : float32) array`  | `Unboxed_float32_array_R_tag`   | 32 bits per element  |
+| `('a : bits32) array`   | `Unboxed_int32_array_R_tag`     | 32 bits per element  |
+| `('a : bits16) array`   | `Untagged_int16_array_R_tag`    | 16 bits per element  |
+| `('a : bits8) array`    | `Untagged_int8_array_R_tag`     | 8 bits per element   |
+| `('a : vec128) array`   | `Unboxed_vec128_array_tag`      | 128 bits per element |
+| `('a : vec256) array`   | `Unboxed_vec256_array_tag`      | 256 bits per element |
+| `('a : vec512) array`   | `Unboxed_vec512_array_tag`      | 512 bits per element |
 
-The reserved custom block word is the standard custom block field that stores a
-pointer to the record of custom operations, like polymorphic equality and
-comparison. For unboxed 32-bit element types, like `int32#` and `float32#`, the
-custom operations pointer is different for odd-length arrays and even-length
-arrays.
+Here, `R` is one of `zero`, `one`, &hellip, or `seven`, equal to the remainder
+of the array's length divided by the number of elements per word. For example,
+`[| #1S; #2S; #3S; #4S; #5S |] : int16 array` has tag
+`Untagged_int16_array_one_tag`.
 
-Odd-length arrays of 32-bit element type have 32 bits of padding at the end.
-The contents of this padding is unspecified, and it is not guaranteed that
-the padding value will be preserved by the generated code or the runtime.
+Arrays where `R` is not `zero` have padding at the end to make the total size of
+the array a multiple of 64 bits. The contents of this padding is unspecified,
+and it is not guaranteed that the padding value will be preserved by the
+generated code or the runtime.
 
 # Using unboxed types in structures
 
@@ -502,10 +516,10 @@ These structures may contain unboxed types:
 
   * Records
   * Constructors
+  * Modules
 
 Unboxed numbers can't be put in these structures:
 
-  * Constructors with inline record fields
   * Exceptions
   * Extensible variant constructors
   * Tuples
@@ -667,3 +681,7 @@ Version history:
 - `v1`: initial implementation;
 - `v2`: automatic reordering by the front- and middle-ends;
 - `v3`: automatic flattening of nested unboxed records.
+- `v4`: unboxed arrays are now normal blocks, not custom blocks.
+- `v5`: block indices to mixed products now use 52-bit offsets and 12-bit gaps.
+- `v6`: all value/void records are now uniform blocks, and (by default)
+  represent all-`float64` records as mixed blocks instead of float array blocks.

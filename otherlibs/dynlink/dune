@@ -114,6 +114,7 @@
   ident
   path
   unit_info
+  current_unit
   shape
   shape_reduce
   allowance
@@ -144,6 +145,7 @@
   predef
   subst
   signature_with_global_bindings
+  data_types
   datarepr
   cmi_format
   persistent_env
@@ -153,7 +155,9 @@
   errortrace
   ctype
   signature_group
+  out_type
   printtyp
+  errortrace_report
   includecore
   typedecl_properties
   typedecl_separability
@@ -283,8 +287,6 @@
 
 (copy_files ../../parsing/parser_types.ml)
 
-(copy_files ../../parsing/parser.ml)
-
 (copy_files ../../parsing/printast.ml)
 
 (copy_files ../../parsing/pprintast.ml)
@@ -343,7 +345,11 @@
 
 (copy_files ../../typing/errortrace.ml)
 
+(copy_files ../../typing/errortrace_report.ml)
+
 (copy_files ../../typing/ctype.ml)
+
+(copy_files ../../typing/out_type.ml)
 
 (copy_files ../../typing/printtyp.ml)
 
@@ -374,6 +380,8 @@
 
 (copy_files ../../typing/signature_with_global_bindings.ml)
 
+(copy_files ../../typing/data_types.ml)
+
 (copy_files ../../typing/datarepr.ml)
 
 (copy_files ../../typing/typedtree.ml)
@@ -381,6 +389,8 @@
 (copy_files ../../file_formats/cmi_format.ml)
 
 (copy_files ../../typing/persistent_env.ml)
+
+(copy_files ../../typing/current_unit.ml)
 
 (copy_files ../../typing/env.ml)
 
@@ -506,8 +516,6 @@
 
 (copy_files ../../typing/jkind.mli)
 
-(copy_files ../../typing/jkind_intf.mli)
-
 (copy_files ../../typing/jkind_types.mli)
 
 (copy_files ../../typing/jkind_axis.mli)
@@ -538,9 +546,13 @@
 
 (copy_files ../../typing/errortrace.mli)
 
+(copy_files ../../typing/errortrace_report.mli)
+
 (copy_files ../../typing/ctype.mli)
 
 (copy_files ../../typing/signature_group.mli)
+
+(copy_files ../../typing/out_type.mli)
 
 (copy_files ../../typing/printtyp.mli)
 
@@ -566,9 +578,11 @@
 
 (copy_files ../../typing/signature_with_global_bindings.mli)
 
+(copy_files ../../typing/data_types.mli)
+
 (copy_files ../../typing/datarepr.mli)
 
-(copy_files ../../typing/unit_info.mli)
+(copy_files ../../parsing/unit_info.mli)
 
 (copy_files ../../typing/typedtree.mli)
 
@@ -577,6 +591,8 @@
 (copy_files ../../file_formats/cmi_format.mli)
 
 (copy_files ../../typing/persistent_env.mli)
+
+(copy_files ../../typing/current_unit.mli)
 
 (copy_files ../../typing/env.mli)
 
@@ -729,6 +745,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Current_unit.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
@@ -744,6 +761,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Cmi_format.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Debuginfo.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Consistbl.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Data_types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Datarepr.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__CamlinternalMenhirLib.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Parser_types.cmo
@@ -756,7 +774,9 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ctype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_group.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Out_type.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Printtyp.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace_report.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Includecore.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typedtree.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Static_label.cmo
@@ -793,8 +813,16 @@
    %{read:../../natdynlinkops}
    -o
    dynlink.cmxa
-   %{deps}))
+   %{cmx}))
  (deps
+  ; The .o files are read by [ocamlopt -a] when building dynlink.a but are not
+  ; passed on the command line; they must be present alongside the .cmx files.
+  (glob_files .dynlink_compilerlibs.objs/native/*.o)
+  (glob_files .dynlink_internal_common.objs/native/*.o)
+  (glob_files .dynlink_internal_byte.objs/native/*.o)
+  (glob_files .dynlink_internal_native.objs/native/*.o)
+  (glob_files .dynlink_internal.objs/native/*.o)
+  (:cmx
   ; NOTE: Be sure to keep these arguments in dependency order!
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Runtimetags.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Int_replace_polymorphic_compare.cmx
@@ -851,6 +879,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Current_unit.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
@@ -866,6 +895,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Cmi_format.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Debuginfo.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Consistbl.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Data_types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Datarepr.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__CamlinternalMenhirLib.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Parser_types.cmx
@@ -878,7 +908,9 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ctype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_group.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Out_type.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Printtyp.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace_report.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Includecore.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typedtree.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Static_label.cmx
@@ -902,7 +934,7 @@
   .dynlink_internal_common.objs/native/dynlink_common.cmx
   .dynlink_internal_byte.objs/native/dynlink_internal_byte.cmx
   .dynlink_internal_native.objs/native/dynlink_internal_native.cmx
-  .dynlink_internal.objs/native/dynlink.cmx))
+  .dynlink_internal.objs/native/dynlink.cmx)))
 
 (install
  (files

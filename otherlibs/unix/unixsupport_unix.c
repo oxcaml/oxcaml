@@ -20,13 +20,11 @@
 #include <caml/callback.h>
 #include <caml/memory.h>
 #include <caml/fail.h>
-#ifdef CAML_RUNTIME_5
 #include <caml/platform.h>
-#endif
 #include "caml/unixsupport.h"
 #include "cst2constr.h"
 #include <errno.h>
-#ifdef HAS_UNISTD
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <fcntl.h>
@@ -291,8 +289,6 @@ int caml_unix_code_of_unix_error (value error)
 
 static const value * _Atomic caml_unix_error_exn = NULL;
 
-#ifdef CAML_RUNTIME_5
-
 void caml_unix_error(int errcode, const char *cmdname, value cmdarg)
 {
   CAMLparam0();
@@ -319,45 +315,6 @@ void caml_unix_error(int errcode, const char *cmdname, value cmdarg)
   caml_raise(res);
   CAMLnoreturn;
 }
-
-#else
-
-void caml_unix_error(int errcode, const char *cmdname, value cmdarg)
-{
-  CAMLparam0();
-  CAMLlocal3(name, err, arg);
-  value res;
-  const value * exn;
-
-/* BACKPORT BEGIN
-  exn = atomic_load_acquire(&caml_unix_error_exn);
-*/
-  exn = caml_unix_error_exn;
-/* BACKPORT END */
-  if (exn == NULL) {
-    exn = caml_named_value("Unix.Unix_error");
-    if (exn == NULL)
-      caml_invalid_argument("Exception Unix.Unix_error not initialized,"
-                            " please link unix.cma");
-/* BACKPORT BEGIN
-    atomic_store(&caml_unix_error_exn, exn);
-*/
-    caml_unix_error_exn = exn;
-/* BACKPORT END */
-  }
-  arg = cmdarg == Nothing ? caml_copy_string("") : cmdarg;
-  name = caml_copy_string(cmdname);
-  err = caml_unix_error_of_code (errcode);
-  res = caml_alloc_small(4, 0);
-  Field(res, 0) = *exn;
-  Field(res, 1) = err;
-  Field(res, 2) = name;
-  Field(res, 3) = arg;
-  caml_raise(res);
-  CAMLnoreturn;
-}
-
-#endif
 
 void caml_uerror(const char *cmdname, value cmdarg)
 {
@@ -379,7 +336,7 @@ int caml_unix_cloexec_p(value cloexec)
     return caml_unix_cloexec_default;
 }
 
-void caml_unix_set_cloexec(int fd, char *cmdname, value cmdarg)
+void caml_unix_set_cloexec(int fd, const char *cmdname, value cmdarg)
 {
   int flags = fcntl(fd, F_GETFD, 0);
   if (flags == -1 ||
@@ -387,7 +344,7 @@ void caml_unix_set_cloexec(int fd, char *cmdname, value cmdarg)
     caml_uerror(cmdname, cmdarg);
 }
 
-void caml_unix_clear_cloexec(int fd, char *cmdname, value cmdarg)
+void caml_unix_clear_cloexec(int fd, const char *cmdname, value cmdarg)
 {
   int flags = fcntl(fd, F_GETFD, 0);
   if (flags == -1 ||

@@ -47,90 +47,21 @@ module Recursive_binder : sig
 
   val mark_as_used : t -> Shape.t
 
-  val close_term_if_binder_is_used :
-    ?preserve_uid:bool -> t -> Shape.t -> Shape.t
+  val close_term_if_binder_is_used : t -> Shape.t -> Shape.t
 end = struct
-  (* CR sspies: To improve performance, consider replacing this pass with
-     a single pass over the resulting definition that simultaneously turns
-     all binders into DeBruijn indices. *)
-  let rec shape_subst_uid_with_rec_var ~preserve_uid uid rv outer =
-    let open Shape in
-    let subst = shape_subst_uid_with_rec_var ~preserve_uid uid rv in
-    let subst_list = List.map subst in
-    match outer.desc with
-    | Leaf when Option.equal Uid.equal outer.uid (Some uid) ->
-      let uid = if preserve_uid then Some uid else None in
-      Shape.rec_var ?uid rv
-    | Leaf | Error _ | Rec_var _ | Comp_unit _ | Var _ -> outer (* base cases *)
-    | Alias sh -> Shape.alias ?uid:outer.uid (subst sh)
-    | App (sh, arg) -> Shape.app ?uid:outer.uid (subst sh) ~arg:(subst arg)
-    | Proj (sh, item) -> Shape.proj ?uid:outer.uid (subst sh) item
-    | Struct map -> Shape.str ?uid:outer.uid (Item.Map.map subst map)
-    | Abs (var, sh) -> Shape.abs ?uid:outer.uid var (subst sh)
-    | Mu sh ->
-      Shape.mu ?uid:outer.uid
-        (shape_subst_uid_with_rec_var ~preserve_uid uid
-           (Shape.DeBruijn_index.move_under_binder rv)
-           sh)
-    | Mutrec map -> Shape.mutrec ?uid:outer.uid (Ident.Map.map subst map)
-    | Proj_decl (sh, id) -> Shape.proj_decl ?uid:outer.uid (subst sh) id
-    | Constr (id, args) -> Shape.constr ?uid:outer.uid id (subst_list args)
-    | Tuple shapes -> Shape.tuple ?uid:outer.uid (subst_list shapes)
-    | Unboxed_tuple shapes ->
-      Shape.unboxed_tuple ?uid:outer.uid (subst_list shapes)
-    | Predef (predef, args) ->
-      Shape.predef predef ?uid:outer.uid (subst_list args)
-    | Arrow -> Shape.arrow ?uid:outer.uid ()
-    | Poly_variant fields ->
-      Shape.poly_variant ?uid:outer.uid
-        (poly_variant_constructors_map subst fields)
-    | Record { fields; kind } ->
-      Shape.record ?uid:outer.uid kind
-        (List.map
-           (fun (name, uid_opt, sh, layout) -> name, uid_opt, subst sh, layout)
-           fields)
-    | Variant constructors ->
-      Shape.variant ?uid:outer.uid
-        (Shape.complex_constructors_map
-           (fun (sh, layout) -> subst sh, layout)
-           constructors)
-    | Variant_unboxed
-        { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
-      Shape.variant_unboxed ?uid:outer.uid ~variant_uid ~arg_uid name arg_name
-        (subst arg_shape) arg_layout
-    | Unknown_type -> Shape.unknown_type ?uid:outer.uid ()
-    | At_layout (shape, layout) -> Shape.at_layout ?uid:outer.uid shape layout
-
   type t =
-    { uid : Uid.t;
+    { rv : Shape.Rec_var_ident.t;
       mutable used : bool
     }
 
-  let create () = { uid = Uid.mk ~current_unit:None; used = false }
+  let create () = { rv = Shape.Rec_var_ident.mk_fresh (); used = false }
 
-  (* CR sspies: Looking at this again after some evaluation of the shape
-     mechanism, I think there is a question here of whether we want to use de
-     Bruijn indices or just new identifiers for our recursive variables. The
-     latter would allow us to avoid [shape_subst_uid_with_rec_var] in
-     [close_term_if_binder_is_used], which saves us a (potentially costly) shape
-     traversal. The benefit of the de Bruijn indices is that they increase
-     sharing between types that have the exact same recursive structure. I'm not
-     sure how much this happens in practice.
-  *)
   let mark_as_used db =
     db.used <- true;
-    Shape.leaf db.uid
+    Shape.rec_var db.rv
 
-  let close_term_if_binder_is_used ?(preserve_uid = true) db sh =
-    if not db.used
-    then sh
-    else
-      let sh =
-        shape_subst_uid_with_rec_var ~preserve_uid db.uid
-          (Shape.DeBruijn_index.create 0)
-          sh
-      in
-      Shape.mu ?uid:(if preserve_uid then Some db.uid else None) sh
+  let close_term_if_binder_is_used db sh =
+    if not db.used then sh else Shape.mu db.rv sh
 end
 
 module Type_shape = struct
@@ -194,6 +125,7 @@ module Type_shape = struct
       | p when Path.same p Predef.path_unboxed_int32 -> Some Unboxed_int32
       | p when Path.same p Predef.path_unboxed_int8 -> Some Unboxed_int8
       | p when Path.same p Predef.path_unboxed_int16 -> Some Unboxed_int16
+      | p when Path.same p Predef.path_unboxed_mask -> Some Unboxed_mask
       | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
 
     let of_path : Path.t -> t option = function
@@ -211,6 +143,7 @@ module Type_shape = struct
       | p when Path.same p Predef.path_int32 -> Some Int32
       | p when Path.same p Predef.path_int64 -> Some Int64
       | p when Path.same p Predef.path_lazy_t -> Some Lazy_t
+      | p when Path.same p Predef.path_mask -> Some Mask
       | p when Path.same p Predef.path_nativeint -> Some Nativeint
       | p when Path.same p Predef.path_string -> Some String
       | p when Path.same p Predef.path_exn -> Some Exception
@@ -291,6 +224,8 @@ module Type_shape = struct
             Option.value shape ~default:unknown_shape_any
             (* CR sspies: We could ask the environment here for extra layout
                information about the type. *)
+          | Tmod _ ->
+            Misc.fatal_error "Type_shape.of_type_expr: unexpected Tmod"
           | Ttuple exprs -> Shape.tuple (of_expr_list (List.map snd exprs))
           | Tvar { name = _; jkind } -> unknown_shape_from_jkind jkind
           | Tpoly (type_expr, _type_vars) ->
@@ -319,20 +254,21 @@ module Type_shape = struct
                 | Tarrow (_, _, _, _)
                 | Ttuple _ | Tunboxed_tuple _
                 | Tconstr (_, _, _)
+                | Tmod (_, _)
                 | Tobject (_, _)
                 | Tfield (_, _, _, _)
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
                 | Trepr (_, _)
-                | Tpackage (_, _)
-                | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ ->
+                | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
+                | Tbox _ ->
                   assert false
               in
               Misc.fatal_errorf
                 "Linking and substitution should not reach this stage. Found \
                  %s type in file %s."
                 str
-                (match Compilation_unit.get_current () with
+                (match Current_unit.get_cu () with
                 | None -> "<unknown>"
                 | Some cu -> Compilation_unit.full_path_as_string cu)
               (* We cannot access the type printer here, so this
@@ -366,11 +302,11 @@ module Type_shape = struct
           | Tquote_eval _ -> unknown_shape_any
           | Tunivar _ -> unknown_shape_any
           | Tof_kind _ -> unknown_shape_any
+          | Tbox _ -> unknown_shape_value
           | Tpackage _ -> unknown_shape_value
           (* CR sspies: Support first-class modules. *)
         in
-        Recursive_binder.close_term_if_binder_is_used ~preserve_uid:false
-          rec_binder type_shape
+        Recursive_binder.close_term_if_binder_is_used rec_binder type_shape
 
   let of_type_expr (expr : Types.type_expr) shape_for_constr =
     of_type_expr_go ~visited:Numbers.Int.Map.empty ~depth:0 expr []
@@ -402,6 +338,7 @@ module Type_decl_shape = struct
     | Types.Vec128 -> Layout.Base Vec128
     | Types.Vec256 -> Layout.Base Vec256
     | Types.Vec512 -> Layout.Base Vec512
+    | Types.Mask -> Layout.Base Mask
     | Types.Word -> Layout.Base Word
     | Types.Void -> Layout.Base Void
     | Types.Product args ->
@@ -409,9 +346,7 @@ module Type_decl_shape = struct
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
 
   let of_complex_constructor type_subst name
-      (cstr_args : Types.constructor_declaration)
-      ((constructor_repr, _) : Types.constructor_representation * _)
-      shape_for_constr =
+      (cstr_args : Types.constructor_declaration) arg_layout shape_for_constr =
     let args =
       match cstr_args.cd_args with
       | Cstr_tuple list ->
@@ -439,42 +374,56 @@ module Type_decl_shape = struct
           list
     in
     let constructor_repr =
-      match constructor_repr with
-      | Constructor_mixed shapes ->
-        List.iter2
-          (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
-            let ly2 = mixed_block_shape_to_layout mix_shape in
-            if not (Layout.equal ly ly2)
-            then
-              if !Clflags.dwarf_pedantic
-              then
-                Misc.fatal_errorf_doc
-                  "Type_shape: variant constructor with mismatched layout, has \
-                   %a but expected %a"
-                  Layout.format ly Layout.format ly2
-              else ())
-          (Array.to_list shapes) args;
-        Array.map mixed_block_shape_to_layout shapes
-      | Constructor_uniform_value ->
-        let lys =
-          List.map
-            (fun { Shape.field_name = _; field_value = _, ly } ->
-              if
-                not
-                  (Layout.equal ly (Layout.Base Scannable)
-                  || Layout.equal ly (Layout.Base Void))
-              then
+      match (arg_layout : Types.cstr_layout) with
+      | Cstr_layout_known { shape = constructor_repr; _ } -> (
+        match (constructor_repr : Types.constructor_representation) with
+        | Constructor_mixed shapes ->
+          List.iter2
+            (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
+              let ly2 = mixed_block_shape_to_layout mix_shape in
+              match ly with
+              | Some ly when not (Layout.equal ly ly2) ->
                 if !Clflags.dwarf_pedantic
                 then
                   Misc.fatal_errorf_doc
                     "Type_shape: variant constructor with mismatched layout, \
-                     has %a but expected value or void."
-                    Layout.format ly
-                else Layout.Base Scannable
-              else ly)
-            args
-        in
-        Array.of_list lys
+                     has %a but expected %a"
+                    Layout.format ly Layout.format ly2
+                else ()
+              | _ -> ())
+            (Array.to_list shapes) args;
+          Array.map
+            (fun mix_shape ->
+              Layout.some (mixed_block_shape_to_layout mix_shape))
+            shapes
+        | Constructor_uniform_value ->
+          let lys =
+            List.map
+              (fun { Shape.field_name = _; field_value = _, ly } ->
+                match ly with
+                | Some ly
+                  when not
+                         (Layout.equal ly (Base Scannable)
+                         || Layout.equal ly (Base Void)) ->
+                  if !Clflags.dwarf_pedantic
+                  then
+                    Misc.fatal_errorf_doc
+                      "Type_shape: variant constructor with mismatched layout, \
+                       has %a but expected value or void."
+                      Layout.format ly
+                  else Layout.some (Base Scannable)
+                | _ -> ly)
+              args
+          in
+          Array.of_list lys
+        | Constructor_variable ->
+          Misc.fatal_error
+            "Type_shape: unexpected variable constructor representation")
+      | Cstr_layout_variable ->
+        Misc.Stdlib.Array.of_list_map
+          (fun { Shape.field_name = _; field_uid = _; field_value = _, ly } ->
+            ly)
+          args
     in
     { Shape.name;
       constr_uid = Some cstr_args.cd_uid;
@@ -491,15 +440,22 @@ module Type_decl_shape = struct
       false
 
   let record_of_labels ~shape_for_constr ~type_subst kind labels =
-    Shape.record kind
-      (List.map
-         (fun (lbl : Types.label_declaration) ->
-           ( Ident.name lbl.ld_id,
-             Some lbl.ld_uid,
-             Type_shape.of_type_expr_with_type_subst lbl.ld_type
-               shape_for_constr type_subst,
-             lbl.ld_sort ))
-         labels)
+    let label_shapes =
+      Misc.Stdlib.List.map_option
+        (fun (lbl : Types.label_declaration) ->
+          Option.map
+            (fun sort ->
+              ( Ident.name lbl.ld_id,
+                Some lbl.ld_uid,
+                Type_shape.of_type_expr_with_type_subst lbl.ld_type
+                  shape_for_constr type_subst,
+                sort ))
+            lbl.ld_sort)
+        labels
+    in
+    match label_shapes with
+    | Some shapes -> Shape.record kind shapes
+    | None -> Shape.unknown_type ()
 
   let type_var_count = ref 0
 
@@ -547,11 +503,15 @@ module Type_decl_shape = struct
             | Cstr_tuple _ | Cstr_record _ ->
               Misc.fatal_error "Unboxed variant must have exactly one argument."
           in
-          Shape.variant_unboxed ~variant_uid:(Some cstr_uid) ~arg_uid:field_uid
-            name field_name
-            (Type_shape.of_type_expr_with_type_subst type_expr shape_for_constr
-               type_subst)
-            layout
+          begin match layout with
+          | Some layout ->
+            Shape.variant_unboxed ~variant_uid:(Some cstr_uid)
+              ~arg_uid:field_uid name field_name
+              (Type_shape.of_type_expr_with_type_subst type_expr
+                 shape_for_constr type_subst)
+              layout
+          | None -> Shape.unknown_type ()
+          end
         | Type_variant ([_], Variant_unboxed, _unsafe_mode_crossing) ->
           Misc.fatal_error "Unboxed variant must have constructor arguments."
         | Type_variant (([] | _ :: _ :: _), Variant_unboxed, _) ->
@@ -563,7 +523,7 @@ module Type_decl_shape = struct
           (* CR sspies: These variants are not yet supported. *)
         | Type_record (lbl_list, record_repr, _unsafe_mode_crossing) -> (
           match record_repr with
-          | Record_boxed _ ->
+          | Record_boxed ->
             record_of_labels ~shape_for_constr ~type_subst Record_boxed lbl_list
           | Record_mixed fields ->
             record_of_labels ~shape_for_constr ~type_subst
@@ -577,7 +537,7 @@ module Type_decl_shape = struct
               List.map
                 (fun (lbl : Types.label_declaration) ->
                   { lbl with
-                    ld_sort = Base Float64;
+                    ld_sort = Jkind_types.Sort.Const.(some float64);
                     ld_type = Types_predef.type_unboxed_float
                   })
                   (* CR sspies: We are changing the type and the layout here.
@@ -596,7 +556,9 @@ module Type_decl_shape = struct
                  inside of a match. For example, if [Foo] is the constructor \
                  [Foo { a : int; b : int }], then [r] is an inline record in \
                  [match e with Foo r -> ...]."
-            else unknown_shape ())
+            else unknown_shape ()
+          | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
+          | Record_variable -> unknown_shape ())
         | Type_abstract _ -> unknown_shape ()
         | Type_open -> unknown_shape ()
         | Type_record_unboxed_product (lbl_list, _, _) ->
@@ -946,8 +908,7 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
         let ts = Ident.Map.find id ts in
         unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
           subst_constr (Shape.app_list ts args)
-        |> Recursive_binder.close_term_if_binder_is_used ~preserve_uid:false
-             rec_binder
+        |> Recursive_binder.close_term_if_binder_is_used rec_binder
         |> Option.some
       | Unknown_type | At_layout _ | Error _ -> None
       | Var _
@@ -1061,8 +1022,8 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
       | Tuple args -> Shape.tuple (unfold_and_eval_list args)
       | Unboxed_tuple args -> Shape.unboxed_tuple (unfold_and_eval_list args)
       | Predef (p, args) -> Shape.predef p (unfold_and_eval_list args)
-      | Mu body ->
-        Shape.mu
+      | Mu (rv, body) ->
+        Shape.mu rv
           (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
              subst_constr body)
       | Alias t ->

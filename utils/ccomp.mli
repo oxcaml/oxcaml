@@ -22,6 +22,15 @@
 
 val command: string -> int
 val run_command: string -> unit
+
+(** [echo_if_verbose cmdline] prints [cmdline] to stderr (prefixed with ["+ "])
+    when [-verbose] is set, matching how [command] logs the commands it runs.
+
+    Exposed so that commands which cannot go through [command] can still produce
+    the same [-verbose] output. In particular this covers platform-specific
+    commands run such as the dissector's partial linking, which spawns the
+    linker directly via [Unix] to obtain a pid to wait on. *)
+val echo_if_verbose: string -> unit
 val compile_file:
   ?output:string -> ?opt:string -> ?stable_name:string -> string -> int
 val create_archive: string -> string list -> int
@@ -43,5 +52,3 @@ type link_mode =
    `link_mode` is `Dll`, but that didn't seem to work.  Understand why. *)
 val call_linker:
   ?native_toplevel:bool -> link_mode -> string -> string list -> string -> int
-
-val linker_is_flexlink : bool

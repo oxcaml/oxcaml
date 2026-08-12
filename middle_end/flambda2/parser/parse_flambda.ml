@@ -89,8 +89,8 @@ let parse filename =
   |> Result.map (fun fexpr ->
       let unit_info = make_unit_info ~filename in
       let comp_unit = Unit_info.modname unit_info in
-      let old_unit_info = Env.get_unit_name () in
-      Env.set_unit_name (Some unit_info);
+      let old_unit_info = Env.get_current_unit () in
+      Env.set_current_unit unit_info;
       let flambda = Fexpr_to_flambda.conv comp_unit fexpr in
-      Env.set_unit_name old_unit_info;
+      Option.iter Env.set_current_unit old_unit_info;
       flambda.unit)

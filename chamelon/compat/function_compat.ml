@@ -26,7 +26,6 @@
  ******************************************************************************)
 
 open Typedtree
-open Types
 open Compat
 
 type cases_view_identifier =
@@ -42,7 +41,7 @@ type cases_view =
     cases_view_identifier : cases_view_identifier
   }
 
-let dummy_type_expr = newty2 ~level:0 (mkTvar (Some "a"))
+let dummy_type_expr = Btype.newty2 ~level:0 (mkTvar (Some "a"))
 
 let mk_exp ed =
   { exp_desc = ed;
@@ -100,7 +99,7 @@ let function_to_cases_view { params; body } =
     in
     { arg_label;
       param;
-      cases = [{ c_lhs = pattern; c_guard = None; c_rhs }];
+      cases = [{ c_lhs = pattern; c_cont = None; c_guard = None; c_rhs }];
       partial;
       optional_default;
       cases_view_identifier = Param param_identifier

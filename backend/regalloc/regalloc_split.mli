@@ -1,5 +1,15 @@
 [@@@ocaml.warning "+a-30-40-41-42"]
 
+type phi_move =
+  { src : Reg.t;
+    dst : Reg.t
+  }
+
+type split_result =
+  { stack_slots : Regalloc_stack_slots.t;
+    phi_moves : phi_move list
+  }
+
 (** Splits the live ranges of registers by introducing new registers at
     destruction points. Destructions points are locations where all hardware
     registers are clobbered. This means that all registers live at such points
@@ -13,5 +23,4 @@
     The algorithm is an adaptation of the one rewriting a CFG to put it in SSA
     form: we simply consider that new names are introduced at destruction
     points. *)
-val split_live_ranges :
-  Cfg_with_infos.t -> Regalloc_stack_slots.t * (Reg.t * Reg.t) list
+val split_live_ranges : Cfg_with_infos.t -> split_result

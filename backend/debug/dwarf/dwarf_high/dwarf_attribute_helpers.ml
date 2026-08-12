@@ -386,8 +386,8 @@ let create_declaration () =
     (V.flag_true ~comment:"incomplete / non-defining declaration" ())
 
 let create_byte_stride ~bytes =
-  let spec = AS.create Byte_stride Data1 in
-  AV.create spec (V.int8 bytes)
+  let spec = AS.create Byte_stride Data8 in
+  AV.create spec (V.int64 bytes)
 
 let create_count loc_desc =
   let spec = AS.create Count Exprloc in

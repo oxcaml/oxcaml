@@ -1,5 +1,4 @@
 (* TEST
- runtime5;
  no-stack-checks;
  no-address-sanitizer;
  exit_status = "2";

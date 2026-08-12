@@ -57,7 +57,7 @@ module Transfer :
     match instr.desc with
     | Op _ | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
-      if Cfg.is_pure_basic instr.desc && Reg.disjoint_set_array before instr.res
+      if Cfg.is_dead_basic instr ~live_after:before
       then
         (* If the operation is without side-effects and the result is unused
            then don't mark the arguments as used because this instruction could
@@ -75,7 +75,8 @@ module Transfer :
     Result.ok
     @@
     match instr.desc with
-    | Never -> assert false
+    | Never ->
+      Misc.fatal_error "Cfg_liveness.terminator: unexpected Never terminator"
     | Tailcall_self _ ->
       (* CR-someday azewierzejew: If the stamps for the tail call DomainState
          argument and parameter were the same and Tailcall (Self _) had

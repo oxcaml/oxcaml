@@ -1,5 +1,9 @@
 (* TEST *)
 
+(* CR gbury: enabling match-in-match can change the output of this test
+   (though the generated code is still correct), because more equalities
+   are kept. *)
+
 let check ~stub txt f =
   let run mode f =
     match f mode with

@@ -252,7 +252,7 @@ let update eq =
 Line 2, characters 42-43:
 2 |   overwrite_ eq with { eq0 = "foo"; eq1 = 1 }
                                               ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "1" has type "int" but an expression was expected of type
          "string"
 |}]
 
@@ -311,7 +311,7 @@ let update : _ pair @ unique -> _ pair = function eq ->
 Line 2, characters 29-30:
 2 |   overwrite_ eq with ("foo", 1)
                                  ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "1" has type "int" but an expression was expected of type
          "string"
 |}]
 
@@ -1131,6 +1131,7 @@ Line 2, characters 28-41:
 Error: This expression has type "x:string * 'a"
        but an expression was expected of type
          "tuple_labeled" = "x:string * y:string"
+       A label "y" was expected
 |}]
 
 (* CR uniqueness: Would be good to support [~y:_], without the parentheses, if possible *)

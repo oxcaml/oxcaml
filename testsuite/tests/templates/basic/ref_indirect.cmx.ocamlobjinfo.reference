@@ -10,7 +10,8 @@ Interfaces imported:
 	00000000000000000000000000000000	Monoid
 	00000000000000000000000000000000	CamlinternalFormatBasics
 Implementations imported:
-Globals used in quotations:
+Interfaces used in quotations:
+Implementations used in quotations:
 Runtime parameters:
 	Monoid
 	Monoid_utils
@@ -19,6 +20,7 @@ Currying functions: 2L0
 Apply functions:
 Send functions:
 Force link: no
+Static data: [ (missing); ]
 File ref_indirect.cmi
 Unit name: Ref_indirect
 Is parameter: no

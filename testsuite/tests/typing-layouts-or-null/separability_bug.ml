@@ -105,9 +105,9 @@ Line 1, characters 17-27:
                      ^^^^^^^^^^
 Error: This type "'a or_null" should be an instance of type
          "('b : value_maybe_separable)"
-       The layout of 'a or_null is value maybe_separable maybe_null
+       The layout of 'a or_null is value_or_null
          because it is the primitive type or_null.
        But the layout of 'a or_null must be a sublayout of
-           value maybe_separable
+           value_maybe_separable
          because the type argument of or_null has layout value.
 |}]

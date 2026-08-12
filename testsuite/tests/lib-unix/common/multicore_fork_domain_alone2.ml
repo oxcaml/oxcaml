@@ -1,9 +1,8 @@
 (* TEST
- runtime5;
- multidomain;
+ multicore;
  include unix;
  hasunix;
- not-windows;
+ not-target-windows;
  {
    bytecode;
  }{

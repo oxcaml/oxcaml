@@ -1,11 +1,11 @@
 let $camlUnroll3__first_const = Block 0 () in
 (let code rec size(23)
        even_0 (n : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let odd = %project_function_slot.[`even`].[`odd`] (my_closure) in
+   let odd = %project_function_slot.[even].[odd] (my_closure) in
    (let prim = %phys_eq (n, 0) in
     let eq = %tag_imm (prim) in
     (let untagged = %untag_imm (eq) in
@@ -16,17 +16,17 @@ let $camlUnroll3__first_const = Block 0 () in
         cont k3)
      where k3 =
        let int_sub = %int_barith.sub (n, 1) in
-       apply direct(odd_1)
+       apply direct(odd_1 &my_alloc_region)
          (odd ~ depth my_depth -> next_depth : _ -> imm tagged)
            (int_sub)
            -> k1 * k2
  and code rec size(23)
        odd_1 (n : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let even = %project_function_slot.[`odd`].[`even`] (my_closure) in
+   let even = %project_function_slot.[odd].[even] (my_closure) in
    (let prim = %phys_eq (n, 0) in
     let eq = %tag_imm (prim) in
     (let untagged = %untag_imm (eq) in
@@ -37,18 +37,22 @@ let $camlUnroll3__first_const = Block 0 () in
         cont k3)
      where k3 =
        let int_sub = %int_barith.sub (n, 1) in
-       apply direct(even_0)
+       apply direct(even_0 &my_alloc_region)
          (even ~ depth my_depth -> next_depth : _ -> imm tagged)
            (int_sub)
            -> k1 * k2
  in
- let even = closure even_0 @even and odd = closure odd_1 @odd in
- apply direct(even_0) unroll(4) (even : _ -> imm tagged) (3) -> k1 * error
+ let even = closure even_0 @even &toplevel.alloc_region
+ and odd = closure odd_1 @odd &toplevel.alloc_region
+ in
+ apply direct(even_0 &toplevel.alloc_region) unroll(4)
+   (even : _ -> imm tagged) (3) -> k1 * error
    where k1 (three_is_even : imm tagged) =
-     (apply direct(odd_1) unroll(2) (odd : _ -> imm tagged) (4) -> k1 * error
+     (apply direct(odd_1 &toplevel.alloc_region) unroll(2)
+        (odd : _ -> imm tagged) (4) -> k1 * error
         where k1 (four_is_odd : imm tagged) =
           let Pmakeblock =
-            %block.[`0`] (even, odd, three_is_even, four_is_odd)
+            %block.[`0`].`toplevel` (even, odd, three_is_even, four_is_odd)
           in
           cont k (Pmakeblock)))
   where k define_root_symbol (module_block) =

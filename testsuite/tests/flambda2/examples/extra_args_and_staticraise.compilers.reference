@@ -1,11 +1,9 @@
 (let
-  (f/282 =
-     (function {nlocal = 0} x/284[value<int>] init/285[value<int>] : int
-       (let (m/286 =mut[value<int>] init/285)
+  (f/0 =
+     (function {nlocal = 0} x/0[value<int>] init/0[value<int>] : int
+       (let (m/0 =mut[value<int>] init/0)
          (catch
-           (try
-             (exit 1
-               (for i/287 0 to x/284 (assign m/286 (%int_add *m/286 i/287))))
-            with exn/296 0)
-          with (1 val/295[value<int>]) *m/286))))
-  (makeblock 0 f/282))
+           (try (exit 2 (for i/0 0 to x/0 (assign m/0 (%int_add *m/0 i/0))))
+            with exn/0 0)
+          with (2 val/0[value<int>]) *m/0))))
+  (makeblock 0 f/0))

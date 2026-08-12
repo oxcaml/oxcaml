@@ -7,11 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  expect.opt;
 *)
 
@@ -60,12 +56,10 @@ abs:
   ret
 |}]
 
-(* CR ttebbi: This should be vsqrtsd %xmm0, %xmm0, %xmm0 *)
 let sqrt x = Float_u.sqrt x
 [%%expect_asm X86_64{|
 sqrt:
-  vxorpd %xmm1, %xmm1, %xmm1
-  vsqrtsd %xmm0, %xmm1, %xmm0
+  vsqrtsd %xmm0, %xmm0, %xmm0
   ret
 |}]
 
@@ -110,8 +104,8 @@ to_float:
   subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
-  jb    .L104
-.L106:
+  jb    <hidden GC jump pad>
+.L0:
   leaq  8(%r15), %rax
   movq  $1277, -8(%rax)
   vmovsd %xmm0, (%rax)
@@ -147,29 +141,29 @@ min:
   vmovsd 8(%rsp), %xmm0
   vmovsd (%rsp), %xmm1
   vcomisd %xmm1, %xmm0
-  ja    .L134
+  ja    .L1
   vmovsd 8(%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
-  jne   .L126
+  jne   .L0
   vmovsd (%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
-  jne   .L134
-.L126:
+  jne   .L1
+.L0:
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jp    .L138
-  jmp   .L136
-.L134:
+  jp    .L3
+  jmp   .L2
+.L1:
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jnp   .L138
-.L136:
+  jnp   .L3
+.L2:
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
-.L138:
+.L3:
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -186,29 +180,29 @@ max:
   vmovsd 8(%rsp), %xmm0
   vmovsd (%rsp), %xmm1
   vcomisd %xmm1, %xmm0
-  ja    .L134
+  ja    .L1
   vmovsd 8(%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
-  jne   .L126
+  jne   .L0
   vmovsd (%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
-  jne   .L134
-.L126:
+  jne   .L1
+.L0:
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jp    .L138
-  jmp   .L136
-.L134:
+  jp    .L3
+  jmp   .L2
+.L1:
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jnp   .L138
-.L136:
+  jnp   .L3
+.L2:
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret
-.L138:
+.L3:
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -225,29 +219,29 @@ min_num:
   vmovsd 8(%rsp), %xmm0
   vmovsd (%rsp), %xmm1
   vcomisd %xmm1, %xmm0
-  ja    .L134
+  ja    .L1
   vmovsd 8(%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
-  jne   .L126
+  jne   .L0
   vmovsd (%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
-  jne   .L134
-.L126:
+  jne   .L1
+.L0:
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jp    .L138
-  jmp   .L136
-.L134:
+  jp    .L3
+  jmp   .L2
+.L1:
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jnp   .L138
-.L136:
+  jnp   .L3
+.L2:
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
-.L138:
+.L3:
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -264,29 +258,29 @@ max_num:
   vmovsd 8(%rsp), %xmm0
   vmovsd (%rsp), %xmm1
   vcomisd %xmm1, %xmm0
-  ja    .L134
+  ja    .L1
   vmovsd 8(%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
-  jne   .L126
+  jne   .L0
   vmovsd (%rsp), %xmm0
   call  caml_signbit@PLT
   cmpq  $1, %rax
-  jne   .L134
-.L126:
+  jne   .L1
+.L0:
   vmovsd (%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jp    .L138
-  jmp   .L136
-.L134:
+  jp    .L3
+  jmp   .L2
+.L1:
   vmovsd 8(%rsp), %xmm0
   vucomisd %xmm0, %xmm0
-  jnp   .L138
-.L136:
+  jnp   .L3
+.L2:
   vmovsd (%rsp), %xmm0
   addq  $24, %rsp
   ret
-.L138:
+.L3:
   vmovsd 8(%rsp), %xmm0
   addq  $24, %rsp
   ret
@@ -299,20 +293,15 @@ let min_unchecked (a : Float_u.t) (b : Float_u.t) =
 ;;
 [%%expect_asm X86_64{|
 min_unchecked:
-  vmovapd %xmm0, %xmm2
-  vmovapd %xmm1, %xmm0
-  vcomisd %xmm2, %xmm0
-  jbe   .L105
-  vmovapd %xmm2, %xmm0
+  vcomisd %xmm0, %xmm1
+  jbe   .L0
   ret
-.L105:
+.L0:
+  vmovapd %xmm1, %xmm0
   ret
 |}]
 
-(* CR ttebbi: Bad codegen:
-      - useless spill and hence no need for a frame
-      - could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3
-*)
+(* CR ttebbi: could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3 *)
 let is_nan (x : Float_u.t) = Float.is_nan (Float_u.to_float x)
 [%%expect_asm X86_64{|
 is_nan:
@@ -324,10 +313,7 @@ is_nan:
 |}]
 
 
-(* CR ttebbi: Bad codegen:
-      - useless spill and hence no need for a frame
-      - could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3
-*)
+(* CR ttebbi: could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3 *)
 let is_finite (x : Float_u.t) =
   let equal x y = float_equal (Float_u.to_float x) (Float_u.to_float y) in
   let zero_or_nan = Float_u.sub x x in

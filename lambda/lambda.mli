@@ -39,24 +39,46 @@ type compile_time_constant =
 
 type immediate_or_pointer =
   | Immediate
+  (* The value must be immediate. *)
   | Pointer
+  (* The value may be a pointer or an immediate. *)
 
 type locality_mode = private
   | Alloc_heap
   | Alloc_local
 
+type return_mode = private
+  | Maybe_alloc_stack
+  | Not_alloc_stack
+
 type modify_mode = private
   | Modify_heap
   | Modify_maybe_stack
 
+type atomic_flag = Asttypes.atomic_flag
+
+type access_flag = Asttypes.access_flag
+
+val access_atomicity : access_flag -> atomic_flag
+
 val alloc_heap : locality_mode
 
-(* Actually [Alloc_heap] if [Config.stack_allocation] is [false] *)
 val alloc_local : locality_mode
+
+val not_alloc_stack : return_mode
+
+val maybe_alloc_stack : return_mode
 
 val modify_heap : modify_mode
 
 val modify_maybe_stack : modify_mode
+
+val return_mode_to_locality_mode : return_mode -> locality_mode
+(** [return_mode_to_locality_mode] takes a return_mode and returns a
+    locality_mode.
+    WARNING: a return_mode is in general not sufficient to determine whether
+    an allocation can be done on the stack. Use this transformation with
+    caution. *)
 
 type staticity =
   | Static
@@ -107,6 +129,18 @@ type region_close =
     but it does not mean that it's a tail call of that function. (It's not a
     tail call because the outer region needs to end there.)
 *)
+
+(** Whether an application might perform a free effect (i.e. an effect
+    handled in the parent stack). [Unyielding] means the applied
+    function and all of its arguments were at mode [unyielding], so the
+    call can never perform a free effect. Only meaningful for bytecode
+    (it is recorded in debug events for consumers such as js_of_ocaml);
+    native backends ignore it. *)
+type yielding_kind =
+  | May_yield
+  | Unyielding
+
+val join_yielding_kind : yielding_kind -> yielding_kind -> yielding_kind
 
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
@@ -167,9 +201,11 @@ type primitive =
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
   | Pwith_stack
-  | Pwith_stack_bind
+  | Pwith_stack_preemptible
   | Pperform
-  | Presume
+  | Pcontinue
+  | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform
   (* External call *)
   | Pccall of external_call_description
@@ -236,6 +272,8 @@ type primitive =
   | Pstring_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                           mode : locality_mode; boxed : bool }
   | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind;
                         tagged : bool }
   | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind;
@@ -250,6 +288,8 @@ type primitive =
   | Pbytes_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pbytes_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                          mode : locality_mode; boxed : bool }
   | Pbytes_set_8 of { unsafe : bool; index_kind : array_index_kind;
                       tagged : bool }
   | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -262,6 +302,8 @@ type primitive =
       boxed : bool }
   | Pbytes_set_vec of { size : boxed_vector; unsafe : bool;
                         index_kind : array_index_kind; boxed : bool }
+  | Pbytes_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                         boxed : bool }
   (* load/set 8,16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
   (* load_i8/i16 is sign-extended *)
@@ -284,6 +326,8 @@ type primitive =
       mode : locality_mode;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                              mode : locality_mode; boxed : bool }
   | Pbigstring_set_8 of { unsafe : bool; index_kind : array_index_kind;
                           tagged : bool }
   | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -301,13 +345,12 @@ type primitive =
       index_kind : array_index_kind;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                             boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
                               mode : locality_mode; boxed : bool }
-  | Pfloat_array_load_vec of { size : boxed_vector; unsafe : bool;
-                               index_kind : array_index_kind;
-                               mode : locality_mode; boxed : bool }
   | Pint_array_load_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind;
                              mode : locality_mode; boxed : bool }
@@ -334,8 +377,6 @@ type primitive =
                                            mode : locality_mode; boxed : bool }
   | Pfloatarray_set_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind; boxed : bool }
-  | Pfloat_array_set_vec of { size : boxed_vector; unsafe : bool;
-                              index_kind : array_index_kind; boxed : bool }
   | Pint_array_set_vec of { size : boxed_vector; unsafe : bool;
                             index_kind : array_index_kind; boxed : bool }
   | Punboxed_float_array_set_vec of { size : boxed_vector; unsafe : bool;
@@ -366,11 +407,25 @@ type primitive =
   (* Atomic operations. Note that these operations must not be used on fields of
      all-float blocks. *)
   | Patomic_load_field of { immediate_or_pointer : immediate_or_pointer }
-  | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }
-  | Patomic_exchange_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_load_mixed_field of {
+    index : int;
+    (** The field being accessed. Like [Pmixedfield]'s path, this is an index
+        into [shape] -- not a field index. *)
+    shape : mixed_block_shape;
+  }
+  | Patomic_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
+  | Patomic_set_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+    mode : modify_mode;
+  }
+  | Patomic_exchange_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_compare_exchange_field of
-    { immediate_or_pointer : immediate_or_pointer }
-  | Patomic_compare_set_field of { immediate_or_pointer : immediate_or_pointer }
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
+  | Patomic_compare_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_fetch_add_field
   | Patomic_add_field
   | Patomic_sub_field
@@ -387,6 +442,8 @@ type primitive =
   | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
+  | Punbox_mask
+  | Pbox_mask of locality_mode
   | Pjoin_vec256
   | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple of boxed_vector
@@ -424,10 +481,14 @@ type primitive =
   | Ppoll
   (* Arch-specific pause. Without poll insertion, also acts as a [Ppoll]. *)
   | Pcpu_relax
-  | Pget_idx of layout * Asttypes.mutable_flag
-  | Pset_idx of layout * modify_mode
+  | Pget_idx of layout * access_flag
+  | Pset_idx of layout * modify_mode * atomic_flag
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
+  (* External pointer primitives: like [Pget_ptr]/[Pset_ptr] but take only the
+     offset and behave as if the base were null. *)
+  | Pget_ext_ptr of layout * Asttypes.mutable_flag
+  | Pset_ext_ptr of layout * modify_mode
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
@@ -435,6 +496,7 @@ and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
+  | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
 and external_call_description = extern_repr Primitive.description_gen
@@ -444,9 +506,23 @@ and array_kind =
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
+  | Punboxedmaskarray
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Punspecializedarray
+  (* Used only in the definition of primitives, to represent primitives that
+     have not yet been specialized. Note that [Punspecializedarray] and
+     [Pgenarray] are not the same thing:
+
+     - [Pgenarray] represent arrays that can be either [Paddrarray] or
+       [Pfloatarray]
+     - [Punspecializedarray] is for arrays that can be of any kind, including
+       [Pgenarray].
+
+     When [Config.flat_float_array] is [false], then [Pgenarray] must not be
+     used, but [Punspecializedarray] always is. After specialization, no value
+     of this kind should remain. *)
 
 (** When accessing a flat float array, we need to know the mode which we should
     box the resulting float at. *)
@@ -459,9 +535,12 @@ and array_ref_kind =
   | Punboxedfloatarray_ref of unboxed_float
   | Punboxedoruntaggedintarray_ref of unboxed_or_untagged_integer
   | Punboxedvectorarray_ref of unboxed_vector
+  | Punboxedmaskarray_ref
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Punspecializedarray_ref of locality_mode
+    (* See [Punspecializedarray]. *)
 
 (** When updating an array that might contain pointers, we need to know what
     mode they're at; otherwise, access is uniform. *)
@@ -474,10 +553,13 @@ and array_set_kind =
   | Punboxedfloatarray_set of unboxed_float
   | Punboxedoruntaggedintarray_set of unboxed_or_untagged_integer
   | Punboxedvectorarray_set of unboxed_vector
+  | Punboxedmaskarray_set
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
   (* Invariant: the product element kind lists have length >= 2 *)
+  | Punspecializedarray_set of modify_mode
+    (* See [Punspecializedarray]. *)
 
 and ignorable_product_element_kind =
   | Pint_ignorable
@@ -523,6 +605,7 @@ and value_kind_non_null =
     }
   | Parrayval of array_kind
   | Pboxedvectorval of boxed_vector
+  | Pboxedmaskval
 
 (* Because we check for and error on void in the translation to lambda, we don't
    need a constructor for it here. *)
@@ -532,9 +615,10 @@ and layout =
   | Punboxed_float of unboxed_float
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
+  | Punboxed_mask
   | Punboxed_product of layout list
   | Pbottom
-  | Psplicevar of Ident.t
+  | Psplicevar of Slambdaident.t
 
 and block_shape =
   | All_value
@@ -555,10 +639,11 @@ and 'a mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
-  | Splice_variable of Ident.t
+  | Splice_variable of Slambdaident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -636,6 +721,11 @@ val equal_raise_kind : raise_kind -> raise_kind -> bool
 
 val equal_value_kind : value_kind -> value_kind -> bool
 
+val join_value_kind : value_kind -> value_kind -> value_kind
+
+(** Join of two layouts, must be of the same kind. *)
+val join_layout : layout -> layout -> layout
+
 val equal_layout : layout -> layout -> bool
 
 val print_boxed_vector : Format.formatter -> boxed_vector -> unit
@@ -658,6 +748,9 @@ val layout_of_extern_repr : extern_repr -> layout
 val element_layout_of_array_kind : array_kind -> layout
 
 val extern_repr_involves_unboxed_products : extern_repr -> bool
+
+val strip_locality_mode :
+  mixed_block_shape_with_locality_mode -> mixed_block_shape
 
 type structured_constant =
     Const_base of constant
@@ -804,6 +897,8 @@ type shared_code = (int * int) list     (* stack size -> code label *)
 
 type static_label = Static_label.t
 
+type unbox_return_attribute = locality_mode option
+
 type function_attribute = {
   inline : inline_attribute;
   specialise : specialise_attribute;
@@ -823,7 +918,7 @@ type function_attribute = {
      [fun x y -> e]. This fusion is allowed only when the [may_fuse_arity] field
      on *both* functions involved is [true]. *)
   may_fuse_arity: bool;
-  unbox_return: bool;
+  unbox_return: unbox_return_attribute;
 }
 
 type parameter_attribute = {
@@ -917,7 +1012,8 @@ type lambda =
   | Lfor of lambda_for
   | Lassign of Ident.t * lambda
   | Lsend of meth_kind * lambda * lambda * lambda list
-             * region_close * locality_mode * scoped_location * layout
+             * region_close * return_mode * scoped_location * layout
+             * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
@@ -926,6 +1022,10 @@ type lambda =
   | Lexclave of lambda
   (* [Lsplice] should only exist in the slambda stage. *)
   | Lsplice of scoped_location * slambda
+  (* [Lkindtemplate] should only exist in the tlambda stage. *)
+  | Lkindtemplate of lkindtemplate
+  (* [Lkindinstantiate] should only exist in the tlambda stage. *)
+  | Lkindinstantiate of lkindinstantiate
 
 and slambda =
   | SLlayout of layout
@@ -953,7 +1053,7 @@ and slambda_function =
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda array
   }
 
 and slambda_let =
@@ -979,9 +1079,32 @@ and lfunction = private
     attr: function_attribute; (* specified with [@inline] attribute *)
     loc : scoped_location;
     mode : locality_mode;     (* locality of the closure itself *)
-    ret_mode: locality_mode;
+    ret_mode: return_mode;
     (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
+    yielding: yielding_kind;
+    (** [Unyielding] if fully applying the closure can never perform a free
+        effect (it neither closes over nor is passed any yielding value).
+        Only set precisely by [Translcore]; other construction sites
+        conservatively default to [May_yield]. *)
+  }
+
+and lkindtemplate =
+  { ktmpl_params: Slambdaident.t list;
+    ktmpl_return: layout;
+    ktmpl_body: lambda;
+    ktmpl_ret_mode: return_mode;
+    ktmpl_env: (lambda * layout) Ident.Map.t;
+    ktmpl_env_mode: locality_mode;
+    ktmpl_loc: scoped_location;
+  }
+
+and lkindinstantiate =
+  { kinst_func: lambda;
+    kinst_args: layout list;
+    kinst_result_layout: layout;
+    kinst_mode: return_mode;
+    kinst_loc: scoped_location;
   }
 
 and lambda_while =
@@ -1004,7 +1127,8 @@ and lambda_apply =
     ap_args : lambda list;
     ap_result_layout : layout;
     ap_region_close : region_close;
-    ap_mode : locality_mode;
+    ap_mode : return_mode;
+    ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute; (* [@inlined] attribute in code *)
@@ -1157,6 +1281,7 @@ val of_bool : bool -> lambda
 val split_vectors : bool
 
 val layout_unit : layout
+val layout_bool : layout
 val layout_unboxed_unit : layout
 val layout_int : layout
 val layout_array : array_kind -> layout
@@ -1165,15 +1290,19 @@ val layout_list : layout
 val layout_exception : layout
 val layout_function : layout
 val layout_object : layout
+val layout_poly_variant : layout
 val layout_class : layout
 val layout_module : layout
 val layout_functor : layout
+val layout_template_env : layout
 val layout_string : layout
 val layout_boxed_float : boxed_float -> layout
 val layout_unboxed_float : unboxed_float -> layout
 val layout_boxed_int : boxed_integer -> layout
 val layout_boxed_vector : boxed_vector -> layout
+val layout_boxed_mask : layout
 val layout_tupled_vector : boxed_vector -> layout
+val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
 (* A layout that is Pgenval because it is the field of a tuple *)
@@ -1194,8 +1323,14 @@ val layout_lazy_contents : layout
 val layout_any_value : layout
 (* A layout that is Pgenval because it is bound by a letrec *)
 val layout_letrec : layout
+val layout_instance_var : layout
+val layout_method : layout
+val layout_initializer : layout
+val layout_array_comprehension_element : layout
+val layout_list_element : layout
 (* The probe hack: Free vars in probes must have layout value. *)
 val layout_probe_arg : layout
+val layout_block_idx : layout
 
 val layout_unboxed_product : layout list -> layout
 
@@ -1221,7 +1356,7 @@ val lfunction :
   attr:function_attribute -> (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
-  ret_mode:locality_mode ->
+  ret_mode:return_mode ->
   lambda
 
 val lfunction' :
@@ -1232,8 +1367,12 @@ val lfunction' :
   attr:function_attribute -> (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
-  ret_mode:locality_mode ->
+  ret_mode:return_mode ->
   lfunction
+
+(* Set the yielding mode of a closure (defaults to [May_yield] from the
+   smart constructors). [Translcore] uses this to record the precise mode. *)
+val lfunction_with_yielding : yielding_kind -> lfunction -> lfunction
 
 
 val iter_head_constructor: (lambda -> unit) -> lambda -> unit
@@ -1262,9 +1401,13 @@ val transl_prim: string -> string -> lambda
 (** Translate a value from a persistent module. For instance:
 
     {[
-      transl_internal_value "CamlinternalLazy" "force"
+      transl_prim "CamlinternalLazy" "force"
     ]}
 *)
+
+val is_evaluated : lambda -> bool
+(** [is_evaluated lam] returns [true] if [lam] is either a constant, a variable
+    or a function abstract. *)
 
 val free_variables: lambda -> Ident.Set.t
 
@@ -1356,11 +1499,18 @@ val max_arity : unit -> int
       This is unlimited ([max_int]) for bytecode, but limited
       (currently to 126) for native code. *)
 
+val tag_of_lazy_tag : lazy_block_tag -> int
+
 val join_locality_mode : locality_mode -> locality_mode -> locality_mode
 val sub_locality_mode : locality_mode -> locality_mode -> bool
 val eq_locality_mode : locality_mode -> locality_mode -> bool
 val is_local_mode : locality_mode -> bool
 val is_heap_mode : locality_mode -> bool
+
+val is_maybe_alloc_stack : return_mode -> bool
+val is_not_alloc_stack : return_mode -> bool
+val eq_return_mode : return_mode -> return_mode -> bool
+val locality_return_compat : locality_mode -> return_mode -> bool
 
 val primitive_may_allocate : primitive -> locality_mode option
   (** Whether and where a primitive may allocate.
@@ -1378,6 +1528,11 @@ val primitive_may_allocate : primitive -> locality_mode option
 val locality_mode_of_primitive_description :
   external_call_description -> locality_mode option
   (** Like [primitive_may_allocate], for [external] calls. *)
+
+val return_mode_of_primitive_description :
+  external_call_description -> return_mode option
+  (** Like [locality_mode_of_primitive_description], but computes
+      a [return_mode] *)
 
 (***********************)
 (* For static failures *)
@@ -1436,7 +1591,8 @@ val will_be_reordered : _ mixed_block_element -> bool
 
 val primitive_result_layout : primitive -> layout
 
-val array_ref_kind_result_layout: array_ref_kind -> layout
+val array_kind_of_array_ref_kind : array_ref_kind -> array_kind
+val array_kind_of_array_set_kind : array_set_kind -> array_kind
 
 (** The mode will be discarded if unnecessary for the given [array_kind] *)
 val array_ref_kind : locality_mode -> array_kind -> array_ref_kind
@@ -1512,10 +1668,5 @@ val static_cast
   -> loc:scoped_location
   -> lambda
 
-type error =
-  | Slambda_unsupported of string
-
-val error : ?loc:Location.t -> error -> 'a
-
-val fatal_error_unevaluated_splice_var : Ident.t -> 'a
+val fatal_error_unevaluated_splice_var : Slambdaident.t -> 'a
 val fatal_error_invalid_constructor : lambda -> 'a

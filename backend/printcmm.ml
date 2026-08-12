@@ -40,6 +40,7 @@ let machtype_component ppf (ty : machtype_component) =
   | Vec128 -> fprintf ppf "vec128"
   | Vec256 -> fprintf ppf "vec256"
   | Vec512 -> fprintf ppf "vec512"
+  | Mask -> fprintf ppf "mask"
   | Float32 -> fprintf ppf "float32"
   | Valx2 -> fprintf ppf "valx2"
 
@@ -150,6 +151,7 @@ let chunk = function
   | Fivetwelve_unaligned -> "unaligned vec512"
   | Fivetwelve_aligned -> "aligned vec512"
   | Word_int -> "int"
+  | Word_mask -> "mask"
   | Word_val -> "val"
   | Single { reg = Float64 } -> "float32_as_float64"
   | Single { reg = Float32 } -> "float32"
@@ -180,14 +182,14 @@ let atomic_op = function
 let phantom_defining_expr ppf defining_expr =
   match defining_expr with
   | Cphantom_const_int i -> Targetint.print ppf i
-  | Cphantom_const_symbol sym -> Format.pp_print_string ppf sym
+  | Cphantom_const_symbol sym -> Format.pp_print_string ppf sym.sym_name
   | Cphantom_var var -> V.print ppf var
   | Cphantom_offset_var { var; offset_in_words } ->
     Format.fprintf ppf "%a+(%d)" V.print var offset_in_words
   | Cphantom_read_field { var; field } ->
     Format.fprintf ppf "%a[%d]" V.print var field
   | Cphantom_read_symbol_field { sym; field } ->
-    Format.fprintf ppf "%s[%d]" sym field
+    Format.fprintf ppf "%s[%d]" sym.sym_name field
   | Cphantom_block { tag; fields } ->
     Format.fprintf ppf "[%d: " tag;
     List.iter (fun field -> Format.fprintf ppf "%a; " V.print field) fields;
@@ -238,6 +240,8 @@ let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | Int64_of_float -> "float as int64"
   | Float32_of_int32 -> "int32 as float32"
   | Int32_of_float32 -> "float32 as int32"
+  | Mask_of_int64 -> "int64 as mask"
+  | Int64_of_mask -> "mask as int64"
 
 let static_cast : Cmm.static_cast -> string = function
   | Int_of_float Float64 -> "float->int"
@@ -275,8 +279,8 @@ let operation d = function
   | Csubi -> "-"
   | Cmuli -> "*"
   | Cmulhi { signed } -> "*h" ^ if signed then "" else "u"
-  | Cdivi -> "/"
-  | Cmodi -> "mod"
+  | Cdivi { signed } -> "/" ^ if signed then "" else "u"
+  | Cmodi { signed } -> "mod" ^ if signed then "" else "u"
   | Caddi128 -> "+128"
   | Csubi128 -> "-128"
   | Cmuli64 { signed } -> "*128" ^ if signed then "" else "u"
@@ -348,6 +352,7 @@ let rec expr ppf = function
       ({ word0; word1; word2; word3; word4; word5; word6; word7 }, _dbg) ->
     fprintf ppf "%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx" word7
       word6 word5 word4 word3 word2 word1 word0
+  | Cconst_mask (n, _dbg) -> fprintf ppf "mask:%016Lx" n
   | Cconst_float32 (n, _dbg) -> fprintf ppf "%Fs" n
   | Cconst_float (n, _dbg) -> fprintf ppf "%F" n
   | Cconst_symbol (s, _dbg) ->

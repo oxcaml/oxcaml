@@ -30,7 +30,7 @@ Line 3, characters 19-34:
                        ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_value_or_null is value maybe_separable maybe_null
+       The layout of t_value_or_null is value_or_null
          because of the definition of t_value_or_null at line 1, characters 0-36.
        But the layout of t_value_or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -76,7 +76,7 @@ Line 1, characters 19-32:
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is value maybe_separable maybe_null
+       The layout of float or_null is value_or_null
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -90,7 +90,7 @@ let should_fail = [| Null; This 3.4 |]
 Line 1, characters 32-35:
 1 | let should_fail = [| Null; This 3.4 |]
                                     ^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "3.4" has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
          because it is the primitive type float.
@@ -127,7 +127,7 @@ Line 3, characters 19-34:
                        ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_value_or_null is value maybe_separable maybe_null
+       The layout of t_value_or_null is value_or_null
          because of the definition of t_value_or_null at line 1, characters 0-36.
        But the layout of t_value_or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -173,7 +173,7 @@ Line 1, characters 19-32:
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is value maybe_separable maybe_null
+       The layout of float or_null is value_or_null
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -186,7 +186,7 @@ let should_fail_iarray = [: Null; This 3.4 :]
 Line 1, characters 39-42:
 1 | let should_fail_iarray = [: Null; This 3.4 :]
                                            ^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The constant "3.4" has type "float" but an expression was expected of type
          "('a : value non_float)"
        The layout of float is value
          because it is the primitive type float.

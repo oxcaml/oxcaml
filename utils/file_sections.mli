@@ -18,18 +18,28 @@
 
 type t
 
+module Idx : sig
+  type t
+end
+
 val create : int array -> string -> in_channel -> first_section_offset:int -> t
 
 val empty : t
 
 val length : t -> int
 
-val get : t -> int -> Obj.t
-
-val to_array : t -> Obj.t array
+val get : t -> Idx.t -> Obj.t
 
 val serialize : t -> string array * int array * int
 
 val from_array : Obj.t array -> t
 
-val concat : t -> t -> t
+module Builder : sig
+  type file_sections := t
+  type t
+
+  val create : int -> t
+  val add : t -> Obj.t -> Idx.t
+  val build : t -> file_sections
+  val clear : t -> unit
+end

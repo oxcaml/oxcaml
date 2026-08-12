@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-no-ikinds";
  readonly_files = "gen_types.sh types.ml";
  setup-ocamlc.byte-build-env;
 

@@ -1,7 +1,6 @@
 (* TEST
  flags += " -w a ";
  modules = "globrootsprim.c globroots.ml";
- runtime5;
  { bytecode; }
  { native; }
 *)

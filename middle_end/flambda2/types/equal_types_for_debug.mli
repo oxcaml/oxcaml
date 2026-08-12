@@ -30,7 +30,7 @@ val create_config : ?ignore_alloc_mode:bool -> unit -> config
 
 val equal_type :
   ?config:config ->
-  meet_type:Meet_env.meet_type ->
+  meet_expanded_head:Meet_env.meet_expanded_head ->
   Typing_env.t ->
   Type_grammar.t ->
   Type_grammar.t ->
@@ -38,7 +38,7 @@ val equal_type :
 
 val equal_env_extension :
   ?config:config ->
-  meet_type:Meet_env.meet_type ->
+  meet_expanded_head:Meet_env.meet_expanded_head ->
   Typing_env.t ->
   Typing_env_extension.t ->
   Typing_env_extension.t ->
@@ -46,7 +46,7 @@ val equal_env_extension :
 
 val names_with_non_equal_types_env_extension :
   ?config:config ->
-  meet_type:Meet_env.meet_type ->
+  meet_expanded_head:Meet_env.meet_expanded_head ->
   Typing_env.t ->
   Typing_env_extension.t ->
   Typing_env_extension.t ->
@@ -54,7 +54,7 @@ val names_with_non_equal_types_env_extension :
 
 val equal_level_ignoring_name_mode :
   ?config:config ->
-  meet_type:Meet_env.meet_type ->
+  meet_expanded_head:Meet_env.meet_expanded_head ->
   Typing_env.t ->
   Typing_env_level.t ->
   Typing_env_level.t ->
@@ -62,7 +62,7 @@ val equal_level_ignoring_name_mode :
 
 val names_with_non_equal_types_level_ignoring_name_mode :
   ?config:config ->
-  meet_type:Meet_env.meet_type ->
+  meet_expanded_head:Meet_env.meet_expanded_head ->
   Typing_env.t ->
   Typing_env_level.t ->
   Typing_env_level.t ->

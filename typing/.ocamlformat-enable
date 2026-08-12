@@ -26,4 +26,17 @@ type_shape.mli
 type_shape.ml
 scalar.ml
 scalar.mli
+axis_lattice.ml
+axis_lattice.mli
+global_module.ml
+global_module.mli
+ikind.ml
+ikind.mli
+ldd.ml
+ldd.mli
+ldd_intf.ml
+signature_with_global_bindings.ml
+signature_with_global_bindings.mli
+zero_alloc.ml
+zero_alloc.mli
 ikinds/*

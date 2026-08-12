@@ -105,11 +105,11 @@ val id : 'a -> 'a = <fun>
 Line 5, characters 19-30:
 5 |   require_portable (id (a, b))
                        ^^^^^^^^^^^
-Error: This expression has type "'a t_no_bound * 'b t_with_bound"
-       but an expression was expected of type "('c : value mod portable)"
-       The kind of 'a t_no_bound * 'b t_with_bound is immutable_data with 'a
+Error: This expression has type "unit * 'a t_with_bound"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of unit * 'a t_with_bound is immutable_data with 'a
          because it's a tuple type.
-       But the kind of 'a t_no_bound * 'b t_with_bound must be a subkind of
+       But the kind of unit * 'a t_with_bound must be a subkind of
            value mod portable
          because of the definition of require_portable at line 1, characters 21-56.
 |}, Principal{|

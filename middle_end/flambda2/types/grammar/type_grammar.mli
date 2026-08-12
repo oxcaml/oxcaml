@@ -33,6 +33,31 @@ type is_null =
   | Not_null
   | Maybe_null of { is_null : Variable.t option }
 
+module Relation : sig
+  type t
+
+  include Container_types.S with type t := t
+
+  val is_null : t
+
+  val is_int : t
+
+  val get_tag : t
+
+  val of_const :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Reg_width_const.t ->
+    Target_ocaml_int.t Or_bottom.t
+
+  type descr =
+    | Is_null
+    | Is_int
+    | Get_tag
+
+  val descr : t -> descr
+end
+
 type t = private
   | Value of head_of_kind_value Type_descr.t
   | Naked_immediate of head_of_kind_naked_immediate Type_descr.t
@@ -46,6 +71,7 @@ type t = private
   | Naked_vec128 of head_of_kind_naked_vec128 Type_descr.t
   | Naked_vec256 of head_of_kind_naked_vec256 Type_descr.t
   | Naked_vec512 of head_of_kind_naked_vec512 Type_descr.t
+  | Naked_mask of head_of_kind_naked_mask Type_descr.t
   | Rec_info of head_of_kind_rec_info Type_descr.t
   | Region of head_of_kind_region Type_descr.t
 
@@ -73,6 +99,7 @@ and head_of_kind_value_non_null = private
   | Boxed_vec128 of t * Alloc_mode.For_types.t
   | Boxed_vec256 of t * Alloc_mode.For_types.t
   | Boxed_vec512 of t * Alloc_mode.For_types.t
+  | Boxed_mask of t * Alloc_mode.For_types.t
   | Closures of
       { by_function_slot : row_like_for_closures;
         alloc_mode : Alloc_mode.For_types.t
@@ -86,11 +113,7 @@ and head_of_kind_value_non_null = private
         alloc_mode : Alloc_mode.For_types.t
       }
 
-and head_of_kind_naked_immediate = private
-  | Naked_immediates of Target_ocaml_int.Set.t
-  | Is_int of t  (** For variants only *)
-  | Get_tag of t  (** For variants only *)
-  | Is_null of t
+and head_of_kind_naked_immediate
 
 (** Invariant: the float/integer sets for naked float, int<N>, and nativeint
     heads are non-empty. (Empty sets are represented as an overall bottom type.)
@@ -117,6 +140,8 @@ and head_of_kind_naked_vec128 = private Vector_types.Vec128.Bit_pattern.Set.t
 and head_of_kind_naked_vec256 = private Vector_types.Vec256.Bit_pattern.Set.t
 
 and head_of_kind_naked_vec512 = private Vector_types.Vec512.Bit_pattern.Set.t
+
+and head_of_kind_naked_mask = private Vector_types.Mask.Bit_pattern.Set.t
 
 and head_of_kind_rec_info = Rec_info_expr.t
 
@@ -244,6 +269,8 @@ val bottom_naked_vec256 : t
 
 val bottom_naked_vec512 : t
 
+val bottom_naked_mask : t
+
 val bottom_rec_info : t
 
 val bottom_region : t
@@ -271,6 +298,8 @@ val any_naked_vec128 : t
 val any_naked_vec256 : t
 
 val any_naked_vec512 : t
+
+val any_naked_mask : t
 
 val any_region : t
 
@@ -306,6 +335,8 @@ val this_naked_vec256 : Vector_types.Vec256.Bit_pattern.t -> t
 
 val this_naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
 
+val this_naked_mask : Vector_types.Mask.Bit_pattern.t -> t
+
 val these_naked_immediates : Target_ocaml_int.Set.t -> t
 
 val these_naked_float32s : Numeric_types.Float32_by_bit_pattern.Set.t -> t
@@ -327,6 +358,8 @@ val these_naked_vec128s : Vector_types.Vec128.Bit_pattern.Set.t -> t
 val these_naked_vec256s : Vector_types.Vec256.Bit_pattern.Set.t -> t
 
 val these_naked_vec512s : Vector_types.Vec512.Bit_pattern.Set.t -> t
+
+val these_naked_masks : Vector_types.Mask.Bit_pattern.Set.t -> t
 
 val boxed_float32_alias_to :
   naked_float32:Variable.t -> Alloc_mode.For_types.t -> t
@@ -354,6 +387,8 @@ val boxed_vec256_alias_to :
 
 val boxed_vec512_alias_to :
   naked_vec512:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_mask_alias_to : naked_mask:Variable.t -> Alloc_mode.For_types.t -> t
 
 (** This function checks the kind of its argument. *)
 val box_float32 : t -> Alloc_mode.For_types.t -> t
@@ -385,16 +420,21 @@ val box_vec256 : t -> Alloc_mode.For_types.t -> t
 (** This function checks the kind of its argument. *)
 val box_vec512 : t -> Alloc_mode.For_types.t -> t
 
+(** This function checks the kind of its argument. *)
+val box_mask : t -> Alloc_mode.For_types.t -> t
+
 val tagged_immediate_alias_to : naked_immediate:Variable.t -> t
 
 (** This function checks the kind of its argument. *)
 val tag_immediate : t -> t
 
-val is_int_for_scrutinee : scrutinee:Simple.t -> t
+val is_int_for_scrutinee :
+  machine_width:Target_system.Machine_width.t -> scrutinee:Simple.t -> t
 
 val get_tag_for_block : block:Simple.t -> t
 
-val is_null : scrutinee:Simple.t -> t
+val is_null :
+  machine_width:Target_system.Machine_width.t -> scrutinee:Simple.t -> t
 
 val create_variant :
   is_unique:bool ->
@@ -408,11 +448,7 @@ val mutable_block : Alloc_mode.For_types.t -> t
 val create_closures : Alloc_mode.For_types.t -> row_like_for_closures -> t
 
 (** Note this assumes the allocation mode is [Heap] *)
-val this_immutable_string :
-  string -> machine_width:Target_system.Machine_width.t -> t
-
-val mutable_string :
-  size:int -> machine_width:Target_system.Machine_width.t -> t
+val this_immutable_string : string -> t
 
 val array_of_length :
   element_kind:Flambda_kind.With_subkind.t Or_unknown_or_bottom.t ->
@@ -690,6 +726,8 @@ module Descr : sig
         head_of_kind_naked_vec256 Type_descr.Descr.t Or_unknown_or_bottom.t
     | Naked_vec512 of
         head_of_kind_naked_vec512 Type_descr.Descr.t Or_unknown_or_bottom.t
+    | Naked_mask of
+        head_of_kind_naked_mask Type_descr.Descr.t Or_unknown_or_bottom.t
     | Rec_info of
         head_of_kind_rec_info Type_descr.Descr.t Or_unknown_or_bottom.t
     | Region of head_of_kind_region Type_descr.Descr.t Or_unknown_or_bottom.t
@@ -720,6 +758,8 @@ val create_from_head_naked_vec128 : head_of_kind_naked_vec128 -> t
 val create_from_head_naked_vec256 : head_of_kind_naked_vec256 -> t
 
 val create_from_head_naked_vec512 : head_of_kind_naked_vec512 -> t
+
+val create_from_head_naked_mask : head_of_kind_naked_mask -> t
 
 val create_from_head_rec_info : head_of_kind_rec_info -> t
 
@@ -773,6 +813,9 @@ val apply_coercion_head_of_kind_naked_vec512 :
   Coercion.t ->
   head_of_kind_naked_vec512 Or_bottom.t
 
+val apply_coercion_head_of_kind_naked_mask :
+  head_of_kind_naked_mask -> Coercion.t -> head_of_kind_naked_mask Or_bottom.t
+
 val apply_coercion_head_of_kind_rec_info :
   head_of_kind_rec_info -> Coercion.t -> head_of_kind_rec_info Or_bottom.t
 
@@ -808,6 +851,8 @@ module Head_of_kind_value : sig
   val create_boxed_vec256 : flambda_type -> Alloc_mode.For_types.t -> t
 
   val create_boxed_vec512 : flambda_type -> Alloc_mode.For_types.t -> t
+
+  val create_boxed_mask : flambda_type -> Alloc_mode.For_types.t -> t
 
   val create_tagged_immediate : Target_ocaml_int.t -> t
 
@@ -857,6 +902,8 @@ module Head_of_kind_value_non_null : sig
 
   val create_boxed_vec512 : flambda_type -> Alloc_mode.For_types.t -> t
 
+  val create_boxed_mask : flambda_type -> Alloc_mode.For_types.t -> t
+
   val create_tagged_immediate : Target_ocaml_int.t -> t
 
   val create_closures : Row_like_for_closures.t -> Alloc_mode.For_types.t -> t
@@ -874,17 +921,24 @@ end
 module Head_of_kind_naked_immediate : sig
   type t = head_of_kind_naked_immediate
 
+  type descr =
+    { naked_immediates : Target_ocaml_int.Set.t Or_unknown.t;
+      inverse_relations : Name.Set.t Relation.Map.t
+    }
+
+  val descr : t -> descr
+
+  val from_descr : descr -> t Or_bottom.t
+
+  val from_descr_non_empty : descr -> t
+
   val create_naked_immediate : Target_ocaml_int.t -> t
 
   val create_naked_immediates : Target_ocaml_int.Set.t -> t Or_bottom.t
 
   val create_naked_immediates_non_empty : Target_ocaml_int.Set.t -> t
 
-  val create_is_int : flambda_type -> t
-
-  val create_get_tag : flambda_type -> t
-
-  val create_is_null : flambda_type -> t
+  val create_inverse_relations : Name.Set.t Relation.Map.t -> t
 end
 
 module type Head_of_kind_naked_number_intf = sig
@@ -965,5 +1019,10 @@ module Head_of_kind_naked_vec512 :
     with type n = Vector_types.Vec512.Bit_pattern.t
     with type n_set = Vector_types.Vec512.Bit_pattern.Set.t
 
-val must_be_singleton :
-  t -> machine_width:Target_system.Machine_width.t -> Reg_width_const.t option
+module Head_of_kind_naked_mask :
+  Head_of_kind_naked_number_intf
+    with type t = head_of_kind_naked_mask
+    with type n = Vector_types.Mask.Bit_pattern.t
+    with type n_set = Vector_types.Mask.Bit_pattern.Set.t
+
+val must_be_singleton : t -> Reg_width_const.t option

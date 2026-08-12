@@ -31,11 +31,14 @@ type pinpoint_desc =
   | Function  (** A function definition *)
   | Module  (** A module definition *)
   | Functor  (** A functor definition *)
+  | Functor_parameter  (** A functor parameter *)
   | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Quote  (** A quoted expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
+  | Effect_match  (** A pattern match with effect cases *)
+  | Effect_try  (** A try-with expression with effect cases *)
   | Class  (** A class declaration *)
   | Object  (** An object declaration *)
   | Loop  (** A loop *)
@@ -56,6 +59,7 @@ type mutable_part =
 type always_dynamic =
   | Application
   | Try_with
+  | Generative_functor
 
 type legacy =
   | Compilation_unit
@@ -73,43 +77,6 @@ type ('d0, 'd1) polarity =
   | Comonadic : ('l * 'r, 'l * 'r) polarity
   constraint 'd0 = _ * _ constraint 'd1 = _ * _
 [@@warning "-62"]
-
-(* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
-the RHS". They are similiar to the [Skip] morph hint and should raise when being
-printed. *)
-
-(** Hint for a constant bound. See [Mode.Report.print_const] for what each
-    non-trivial constructor means. *)
-type 'd const =
-  | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
-  | Lazy_allocated_on_heap : (disallowed * 'r) pos const
-  | Legacy : legacy -> ('l * 'r) const
-  | Toplevel_expression : (disallowed * 'r) pos const
-  | Tailcall_function : (disallowed * 'r) pos const
-  | Tailcall_argument : (disallowed * 'r) pos const
-  | Mutable_read : mutable_part -> (disallowed * 'r) neg const
-  | Mutable_write : mutable_part -> (disallowed * 'r) neg const
-  | Lazy_forced : (disallowed * 'r) neg const
-  | Function_return : (disallowed * 'r) pos const
-  | Stack_expression : ('l * disallowed) pos const
-  | Module_allocated_on_heap : (disallowed * 'r) pos const
-  | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
-  | Branching : ('l * disallowed) neg const
-  | Lpoly_inst : (disallowed * 'r) neg const
-  | Is_used_in : pinpoint -> (disallowed * 'r) const
-      (** A variant of [Is_closed_by] where the closure mode is constant.
-          INVARIANT: The [pinpoint] cannot be [Unknown]. *)
-  | Borrowed : Location.t * ('l * 'r, 'd) polarity -> 'd const
-  | Escape_region : region -> (disallowed * 'r) const
-  | Quoted_computation : ('l * disallowed) pos const
-  | Spliced : ('l * 'r, 'd) polarity -> 'd const
-  constraint 'd = _ * _
-[@@ocaml.warning "-62"]
-
-type closure_details =
-  { closure : pinpoint;
-    closed : pinpoint
-  }
 
 (* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
    resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
@@ -135,12 +102,54 @@ type is_contained_by =
     container : pinpoint
   }
 
+(* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
+the RHS". They are similiar to the [Skip] morph hint and should raise when being
+printed. *)
+
+(** Hint for a constant bound. See [Mode.Report.print_const] for what each
+    non-trivial constructor means. *)
+type 'd const =
+  | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
+  | Lazy_allocated_on_heap : (disallowed * 'r) pos const
+  | Legacy : legacy -> ('l * 'r) const
+  | Toplevel_expression : (disallowed * 'r) pos const
+  | Tailcall_function : (disallowed * 'r) pos const
+  | Tailcall_argument : (disallowed * 'r) pos const
+  | Mutable_read : mutable_part -> (disallowed * 'r) neg const
+  | Mutable_write : mutable_part -> (disallowed * 'r) neg const
+  | Lazy_forced : (disallowed * 'r) neg const
+  | Function_return : (disallowed * 'r) pos const
+  | Stack_expression : ('l * disallowed) pos const
+  | Module_allocated_on_heap : (disallowed * 'r) pos const
+  | Always_dynamic : always_dynamic -> ('l * disallowed) neg const
+  | Cmx_not_guaranteed :
+      Compilation_unit.t option
+      -> ('l * disallowed) neg const
+  | Branching : ('l * disallowed) neg const
+  | Lpoly_inst : (disallowed * 'r) neg const
+  | Is_used_in : pinpoint -> (disallowed * 'r) const
+      (** A variant of [Is_closed_by] where the closure mode is constant.
+          INVARIANT: The [pinpoint] cannot be [Unknown]. *)
+  | Borrowed : Location.t * ('l * 'r, 'd) polarity -> 'd const
+  | Escape_region : region -> (disallowed * 'r) const
+  | Quoted_computation : ('l * disallowed) pos const
+  | Spliced : ('l * 'r, 'd) polarity -> 'd const
+  | Contained_by : is_contained_by -> ('l * 'r) const
+  constraint 'd = _ * _
+[@@ocaml.warning "-62"]
+
+type closure_details =
+  { closure : pinpoint;
+    closed : pinpoint
+  }
+
 type allocation_desc =
   | Unknown
   | Optional_argument
   | Function_coercion
   | Float_projection
   | Lpoly_captured_environment
+  | Captured_by_partial_application
 
 type allocation = allocation_desc Location.loc
 
@@ -162,11 +171,23 @@ type 'd morph =
      the source and destination pinpoints. Once we make [pinpoint] mandatory for
      submode calls, each constructor only needs to store the info of its source
      pinpoint. *)
-  | Captured_by_partial_application : (disallowed * 'r) morph
-  | Adj_captured_by_partial_application : ('l * disallowed) morph
   | Crossing : ('l * 'r) morph
+  | Functor_to_parameter : Location.t -> ('l * 'r) morph
+      (** The identity morphism connecting a functor's staticity to its
+          parameter's. Carries the functor's location. *)
+  | Parameter_to_functor : Location.t -> ('l * 'r) morph
+      (** The identity morphism connecting a parameter's staticity to the
+          functor's. Carries the parameter's location. *)
+  | Functor_to_application : Location.t -> ('l * disallowed) neg morph
+      (** The identity morphism from a functor's staticity to its application
+          result's staticity (a monadic axis, hence [neg]). Carries the
+          functor's location. *)
+  | Application_to_functor : Location.t -> (disallowed * 'r) neg morph
+      (** The dual of [Functor_to_application]: from the result's staticity back
+          to the functor's. Carries the application's location. *)
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
+  | Allocation : allocation -> ('l * 'r) morph
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph

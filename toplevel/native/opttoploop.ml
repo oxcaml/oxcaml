@@ -26,6 +26,26 @@ open Ast_helper
 
 module Genprintval = Genprintval_native
 
+(* Eta-expansion gives [create_process] and [waitpid] the unannotated types
+   required by [Compiler_owee.Unix_intf.S]. *)
+module Unix_for_owee = struct
+  include Unix
+
+  let create_process prog args stdin stdout stderr =
+    Unix.create_process prog args stdin stdout stderr
+
+  let waitpid flags pid = Unix.waitpid flags pid
+end
+
+type input =
+  | Stdin
+  | File of string
+  | String of string
+
+let filename_of_input = function
+  | File name -> name
+  | Stdin | String _ -> ""
+
 type res = Ok of Obj.t | Err of string
 type evaluation_outcome = Result of Obj.t | Exception of exn
 
@@ -152,7 +172,7 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
         else None (* [pos] points to an unboxed singleton *))
 
 let rec eval_address = function
-  | Env.Aunit cu ->
+  | Env.Aunit (cu, _) ->
       global_symbol cu
   | Env.Alocal id ->
       let glob, pos, repr = toplevel_value id in
@@ -307,7 +327,7 @@ let default_load ppf (program : Lambda.program) =
       (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
   Asmgen.compile_implementation
-    (module Unix : Compiler_owee.Unix_intf.S)
+    (module Unix_for_owee : Compiler_owee.Unix_intf.S)
     ~toplevel:need_symbol
     ~sourcefile:(Some filename) ~prefixname:filename
     ~pipeline ~ppf_dump:ppf
@@ -332,11 +352,12 @@ let default_load ppf (program : Lambda.program) =
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let { Slambda.slv_comptime = _; slv_runtime = rawlam } =
+  let (_static_data, rawlam) =
     (* CR layout poly: If this toplevel value is static we should keep the
        comptime part in a separate table so we can use it in later expressions.
     *)
-    Slambda.eval (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
+    Slambda.eval ~cu_static_data:Compilenv.get_static_data
+      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam =
@@ -368,7 +389,7 @@ let outval_of_id env id val_lpoly val_type =
 (* Print the outcome of an evaluation *)
 
 let pr_item =
-  Printtyp.print_items
+  Out_type.print_items
     (fun env -> function
       | Sig_value(id, {val_kind = Val_reg _; val_type; val_lpoly}, _) ->
          Some (outval_of_id env id val_lpoly val_type)
@@ -537,7 +558,7 @@ let execute_phrase print_outcome ppf phr =
                           in
                           (* CR-someday zqian: should pass val_lpoly to
                              printer *)
-                          let ty = Printtyp.tree_of_type_scheme vd.val_type in
+                          let ty = Out_type.tree_of_type_scheme vd.val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false
                     else
@@ -578,7 +599,8 @@ let execute_phrase print_outcome ppf phr =
       | Some d ->
           match d, pdir_arg with
           | Directive_none f, None -> f (); true
-          | Directive_string f, Some {pdira_desc = Pdir_string s; _} -> f s; true
+          | Directive_string f, Some {pdira_desc = Pdir_string s; _} ->
+              f s; true
           | Directive_int f, Some {pdira_desc = Pdir_int (n,None); _} ->
              begin match Int_literal_converter.int n with
              | n -> f n; true
@@ -592,8 +614,10 @@ let execute_phrase print_outcome ppf phr =
               fprintf ppf "Wrong integer literal for directive `%s'.@."
                 dir_name;
               false
-          | Directive_ident f, Some {pdira_desc = Pdir_ident lid; _} -> f lid; true
-          | Directive_bool f, Some {pdira_desc = Pdir_bool b; _} -> f b; true
+          | Directive_ident f, Some {pdira_desc = Pdir_ident lid; _} ->
+              f lid; true
+          | Directive_bool f, Some {pdira_desc = Pdir_bool b; _} ->
+              f b; true
           | _ ->
               fprintf ppf "Wrong type of argument for directive `%s'.@."
                 dir_name;
@@ -629,7 +653,8 @@ let use_channel ppf ~wrap_in_module ic name filename =
         List.iter
           (fun ph ->
             let ph = preprocess_phrase ppf ph in
-            if not (execute_phrase !use_print_results ppf ph) then raise Exit)
+            let success = execute_phrase !use_print_results ppf ph in
+            if not success then raise Exit)
           (if wrap_in_module then
              parse_mod_use_file name lb
            else
@@ -833,8 +858,6 @@ let loop ppf =
       let phr = try !parse_toplevel_phrase lb with Exit -> raise PPerror in
       let phr = preprocess_phrase ppf phr  in
       Env.reset_cache_toplevel ();
-      if !Clflags.dump_parsetree then Printast.top_phrase ppf phr;
-      if !Clflags.dump_source then Pprintast.top_phrase ppf phr;
       ignore(execute_phrase true ppf phr)
     with
     | End_of_file -> raise (Compenv.Exit_with_status 0)
@@ -866,3 +889,71 @@ let run_script ppf name args =
     else name
   in
   use_silently ppf explicit_name
+
+
+module Compiler = (val Optcompile.native
+                   (module Unix_for_owee : Compiler_owee.Unix_intf.S)
+                   ~flambda2:Flambda2.lambda_to_cmm)
+
+(* Load in-core a .cmxs file *)
+
+let linkenv = Linkenv.create ()
+
+let load_file ppf name0 =
+  let name =
+    try Some (Load_path.find name0)
+    with Not_found -> None
+  in
+  match name with
+  | None -> fprintf ppf "File not found: %s@." name0; false
+  | Some name ->
+    let fn,tmp =
+      if Filename.check_suffix name Compiler.ext_flambda_obj
+         || Filename.check_suffix name Compiler.ext_flambda_lib
+      then
+        let cmxs = Filename.temp_file "caml" ".cmxs" in
+        Compiler.link_shared ~ppf_dump:ppf linkenv [name] cmxs;
+        cmxs,true
+      else
+        name,false
+    in
+    let success =
+      (* The Dynlink interface does not allow us to distinguish between
+          a Dynlink.Error exceptions raised in the loaded modules
+          or a genuine error during dynlink... *)
+      try Dynlink.loadfile fn; true
+      with
+      | Dynlink.Error err ->
+        fprintf ppf "Error while loading %s: %s.@."
+          name (Dynlink.error_message err);
+        false
+      | exn ->
+        print_exception_outcome ppf exn;
+        false
+    in
+    if tmp then (try Sys.remove fn with Sys_error _ -> ());
+    success
+
+let preload_objects = ref []
+
+let prepare ppf ?input:_ () =
+  set_paths ();
+  begin try
+    initialize_toplevel_env ()
+  with Env.Error _ | Typetexp.Error _ as exn ->
+    Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
+  end;
+  try
+    let res =
+      let objects =
+        List.rev (!preload_objects @ !Compenv.first_objfiles)
+      in
+      List.for_all (load_file ppf) objects
+    in
+    run_hooks Startup;
+    res
+  with x ->
+    try Location.report_exception ppf x; false
+    with x ->
+      Format.fprintf ppf "Uncaught exception: %s\n" (Printexc.to_string x);
+      false

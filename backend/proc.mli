@@ -17,9 +17,6 @@
 
 (* Processor descriptions *)
 
-(* Instruction selection *)
-val word_addressed : bool
-
 val phys_reg : Cmm.machtype_component -> Regs.Phys_reg.t -> Reg.t
 
 val precolored_regs : unit -> Reg.Set.t
@@ -61,7 +58,7 @@ val loc_exn_bucket : Reg.t
 val max_arguments_for_tailcalls : int
 
 (* Registers destroyed by operations *)
-val destroyed_at_raise : Reg.t array
+val destroyed_at_raise : unit -> Reg.t array
 
 val destroyed_at_reloadretaddr : Reg.t array
 

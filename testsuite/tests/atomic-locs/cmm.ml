@@ -28,6 +28,9 @@ let get_imm (r : int atomic) : int =
 let set_imm (r : int atomic) v =
   r.x <- v
 
+let cas (r : 'a atomic) oldv newv =
+  Atomic.Loc.compare_and_set [%atomic.loc r.x] oldv newv
+
 (* TEST
    arch_amd64;
    flambda;

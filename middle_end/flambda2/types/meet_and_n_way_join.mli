@@ -29,8 +29,4 @@ val n_way_join :
 
 (* This function has a slightly different interface; it is meant to be used only
    by functions in Typing_env *)
-val meet_type :
-  Meet_env.t ->
-  Type_grammar.t ->
-  Type_grammar.t ->
-  (Type_grammar.t Meet_env.meet_return_value * Meet_env.t) Or_bottom.t
+val meet_expanded_head : Meet_env.meet_expanded_head

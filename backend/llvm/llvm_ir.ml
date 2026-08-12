@@ -80,12 +80,12 @@ module Format = struct
     in
     pp_dbg_comment ppf instr_str ins.dbg
 
-  let pp_dbg_instr_basic = pp_dbg_instr_aux Cfg.print_basic
+  let pp_dbg_instr_basic = pp_dbg_instr_aux Printcfg.basic
 
   let dbg_instr_basic_string i =
     string_of_pp (fun ppf -> pp_dbg_instr_basic ppf i)
 
-  let pp_dbg_instr_terminator = pp_dbg_instr_aux Cfg.print_terminator
+  let pp_dbg_instr_terminator = pp_dbg_instr_aux Printcfg.terminator
 
   let dbg_instr_terminator_string i =
     string_of_pp (fun ppf -> pp_dbg_instr_terminator ppf i)
@@ -164,7 +164,7 @@ module Type = struct
          handle derived pointers for us. *)
     | Float -> double
     | Float32 -> float
-    | Vec128 | Vec256 | Vec512 | Valx2 ->
+    | Vec128 | Vec256 | Vec512 | Mask | Valx2 ->
       fail_msg ~name:"Type.of_machtype_component" "not_implemented"
 
   let of_reg (reg : Reg.t) = of_machtype_component reg.typ

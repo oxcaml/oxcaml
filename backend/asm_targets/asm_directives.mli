@@ -286,6 +286,10 @@ val between_labels_32_bit :
 val between_labels_64_bit :
   ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> unit
 
+(** Emit the difference [upper - lower] of two same-section labels as a ULEB128
+    value. Supported only on the GAS text backend. *)
+val delta_uleb128 : upper:Asm_label.t -> lower:Asm_label.t -> unit
+
 (** Like [between_symbols], but for two labels with additional offsets, emitting
     a 64-bit-wide reference. The labels must be in the same section. *)
 val between_labels_64_bit_with_offsets :
@@ -477,6 +481,8 @@ module Directive : sig
           target_symbol : Asm_symbol.t;
           addend : int64
         }
+    | Delta_uleb128 of { delta : Constant.t }
+        (** Variable-width return-address delta for a short frame descriptor *)
 
   (** Translate the given directive to textual form. This produces output
       suitable for either gas or MASM as appropriate. *)
@@ -491,6 +497,10 @@ module Directive : sig
       unchanged. *)
   val increment_offset_in_bytes : t -> offset_in_bytes:int -> int
 
+  (** The number of bytes in the ULEB128 encoding of a value (which must be
+      non-negative). *)
+  val uleb128_size : int64 -> int
+
   (** Emit an unsigned LEB128 encoded value to a buffer. *)
   val emit_uleb128 : Buffer.t -> int64 -> unit
 
@@ -499,6 +509,10 @@ module Directive : sig
 
   (** Emit a little-endian integer value of the given width to a buffer. *)
   val emit_int_le : Buffer.t -> width_bytes:int -> int64 -> unit
+
+  (** Replace the [Asm_label.t] inside a [New_label (Label _, _)] directive
+      using the given function. Other directives are returned unchanged. *)
+  val map_new_label : (Asm_label.t -> Asm_label.t) -> t -> t
 end
 
 (** To be called by the emitter at the very start of code generation.

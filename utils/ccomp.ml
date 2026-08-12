@@ -15,12 +15,15 @@
 
 (* Compiling C files and building C libraries *)
 
-let command cmdline =
+let echo_if_verbose cmdline =
   if !Clflags.verbose then begin
     prerr_string "+ ";
     prerr_string cmdline;
     prerr_newline()
-  end;
+  end
+
+let command cmdline =
+  echo_if_verbose cmdline;
   let res = Sys.command cmdline in
   if res = 127 then raise (Sys_error cmdline);
   res
@@ -112,12 +115,11 @@ let compile_file ?output ?(opt="") ?stable_name name =
          (match !Clflags.c_compiler with
           | Some cc -> cc
           | None ->
-              (* #7678: ocamlopt only calls the C compiler to process .c files
-                 from the command line, and the behaviour between
-                 ocamlc/ocamlopt should be identical. *)
-              (String.concat " " [Config.c_compiler;
-                                  Config.ocamlc_cflags;
-                                  Config.ocamlc_cppflags]))
+              let (cflags, cppflags) =
+                  if !Clflags.native_code
+                  then (Config.native_cflags, Config.native_cppflags)
+                  else (Config.bytecode_cflags, Config.bytecode_cppflags) in
+              (String.concat " " [Config.c_compiler; cflags; cppflags]))
          debug_prefix_map
          (match output with
           | None -> ""
@@ -225,9 +227,3 @@ let call_linker ?(native_toplevel = false) mode output_name files extra =
     in
     command cmd
   )
-
-let linker_is_flexlink =
-  (* Config.mkexe, Config.mkdll and Config.mkmaindll are all flexlink
-     invocations for the native Windows ports and for Cygwin, if shared library
-     support is enabled. *)
-  Sys.win32 || Config.supports_shared_libraries && Sys.cygwin

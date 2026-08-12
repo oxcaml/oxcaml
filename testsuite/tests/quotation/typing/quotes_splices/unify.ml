@@ -56,7 +56,7 @@ module NonInst1 : sig type 'a t type 'a t' end
 module Inst2 : sig type t end
 module NonInst2 : sig type 'a t end
 |}]
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 
 
 (** [unify]ing a variable under quotes/splices -- flexibility checks **)
@@ -65,7 +65,7 @@ module NonInst2 : sig type 'a t end
 (* Note that [generalize] type schemes have their quantified variables
    normalised to stage 0 (i.e. all of these would become ['a -> 'a]).
    This means in all tests with directly quoted variables we will eventually
-   remove the quotes, as we cannot have top-level splices.
+   remove the quotes, as we cannot have initial-stage splices.
    However, unification should happen before this. *)
 
 (* <['a]> ~ unit *)
@@ -91,19 +91,19 @@ let _ : <[<[<['a]>]>]> -> <[<[<['a]>]>]> = fun (() as x) -> x
 let _ : <[ $('a) -> $('a) ]> expr  =
   <[fun (() as x) -> x]>
 [%%expect {|
-- : <[unit -> unit]> expr = <[fun () as x -> x]>
+- : <[unit -> unit]> expr = <[fun (() as x) -> x]>
 |}]
 (* $($('a)) ~ unit *)
 let _ : <[ <[ $($('a)) -> $($('a)) ]> expr ]> expr =
   <[<[fun (() as x) -> x]>]>
 [%%expect {|
-- : <[<[unit -> unit]> expr]> expr = <[<[fun () as x -> x]>]>
+- : <[<[unit -> unit]> expr]> expr = <[<[fun (() as x) -> x]>]>
 |}]
 (* $($($('a))) ~ unit *)
 let _ : <[ <[ <[ $($($('a))) -> $($($('a))) ]> expr ]> expr ]> expr =
   <[<[<[fun (() as x) -> x]>]>]>
 [%%expect {|
-- : <[<[<[unit -> unit]> expr]> expr]> expr = <[<[<[fun () as x -> x]>]>]>
+- : <[<[<[unit -> unit]> expr]> expr]> expr = <[<[<[fun (() as x) -> x]>]>]>
 |}]
 
 
@@ -119,7 +119,7 @@ let _ = <[ fun (Equal : ($Inst1.t, int NonInst0.t) Type.eq)
 Line 8, characters 38-39:
 8 |                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
                                           ^
-Error: This expression has type "Inst1.t expr"
+Error: The value "x" has type "Inst1.t expr"
        but an expression was expected of type "<[int NonInst0.t]> expr"
        Type "Inst1.t" is not compatible with type "<[int NonInst0.t]>"
 |}]
@@ -130,7 +130,7 @@ let _ = <[ fun (Equal : (int NonInst0.t, $Inst1.t) Type.eq)
 Line 2, characters 38-39:
 2 |                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
                                           ^
-Error: This expression has type "Inst1.t expr"
+Error: The value "x" has type "Inst1.t expr"
        but an expression was expected of type "<[int NonInst0.t]> expr"
        Type "Inst1.t" is not compatible with type "<[int NonInst0.t]>"
 |}]
@@ -233,7 +233,7 @@ let _ = <[ fun (Equal : ($Inst1.t, $Inst1.t') Type.eq) ->
 Line 2, characters 39-40:
 2 |         $( (fun (x : Inst1.t expr) -> (x : Inst1.t' expr))
                                            ^
-Error: This expression has type "Inst1.t expr"
+Error: The value "x" has type "Inst1.t expr"
        but an expression was expected of type "Inst1.t' expr"
        Type "Inst1.t" is not compatible with type "Inst1.t'"
 |}]

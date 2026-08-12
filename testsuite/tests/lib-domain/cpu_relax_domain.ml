@@ -1,7 +1,7 @@
 (* TEST
    include systhreads;
    hassysthreads;
-   multidomain;
+   multicore;
    { bytecode; }
    { native; }
 *)

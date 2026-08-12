@@ -81,7 +81,7 @@ and let_expr =
 and named =
   | Simple of Simple.t
   | Prim of Flambda_primitive.t * Debuginfo.t
-  | Set_of_closures of Set_of_closures.t
+  | Set_of_closures of Set_of_closures.t * Alloc_mode.For_allocations.t
   | Static_consts of static_const_group
   | Rec_info of Rec_info_expr.t
 
@@ -175,9 +175,14 @@ and apply_renaming_named (named : named) renaming : named =
   | Prim (prim, dbg) ->
     let prim' = Flambda_primitive.apply_renaming prim renaming in
     if prim == prim' then named else Prim (prim', dbg)
-  | Set_of_closures set ->
+  | Set_of_closures (set, alloc_mode) ->
     let set' = Set_of_closures.apply_renaming set renaming in
-    if set == set' then named else Set_of_closures set'
+    let alloc_mode' =
+      Alloc_mode.For_allocations.apply_renaming alloc_mode renaming
+    in
+    if set == set' && alloc_mode == alloc_mode'
+    then named
+    else Set_of_closures (set', alloc_mode')
   | Static_consts consts ->
     let consts' = apply_renaming_static_const_group consts renaming in
     if consts == consts' then named else Static_consts consts'
@@ -391,7 +396,10 @@ and ids_for_export_named t =
   match t with
   | Simple simple -> Ids_for_export.from_simple simple
   | Prim (prim, _dbg) -> Flambda_primitive.ids_for_export prim
-  | Set_of_closures set -> Set_of_closures.ids_for_export set
+  | Set_of_closures (set, alloc_mode) ->
+    Ids_for_export.union
+      (Set_of_closures.ids_for_export set)
+      (Alloc_mode.For_allocations.ids_for_export alloc_mode)
   | Static_consts consts -> ids_for_export_static_const_group consts
   | Rec_info rec_info_expr -> Rec_info_expr.ids_for_export rec_info_expr
 
@@ -589,8 +597,8 @@ and print_continuation_handler (recursive : Recursive.t) invariant_params ppf k
 
 and print_function_params_and_body ppf t =
   let print ~return_continuation ~exn_continuation params ~body ~my_closure
-      ~is_my_closure_used:_ ~my_region ~my_ghost_region ~my_depth
-      ~free_names_of_body:_ =
+      ~is_my_closure_used:_ ~my_alloc_region ~my_region ~my_ghost_region
+      ~my_depth ~free_names_of_body:_ =
     let my_closure =
       Bound_parameter.create my_closure
         (K.With_subkind.create K.value Anything Non_nullable)
@@ -599,10 +607,12 @@ and print_function_params_and_body ppf t =
     fprintf ppf
       "@[<hov 1>(%t@<1>\u{03bb}%t@[<hov \
        1>@<1>\u{3008}%a@<1>\u{3009}@<1>\u{300a}%a@<1>\u{300b}\u{27c5}%t%a%t\u{27c6}@ \
-       \u{27c5}%t%a%t\u{27c6}@ %a %a %t%a%t %t.%t@]@ %a))@]"
+       \u{27c5}%t%a%t\u{27c6}@ \u{27c5}%t%a%t\u{27c6}@ %a %a %t%a%t %t.%t@]@ \
+       %a))@]"
       Flambda_colours.lambda Flambda_colours.pop Continuation.print
       return_continuation Continuation.print exn_continuation
-      Flambda_colours.parameter
+      Flambda_colours.parameter Variable.print my_alloc_region
+      Flambda_colours.pop Flambda_colours.parameter
       (Format.pp_print_option Variable.print)
       my_region Flambda_colours.pop Flambda_colours.parameter
       (Format.pp_print_option Variable.print)
@@ -620,7 +630,9 @@ and print_function_params_and_body ppf t =
         ~return_continuation:(BFF.return_continuation bff)
         ~exn_continuation:(BFF.exn_continuation bff) (BFF.params bff) ~body:expr
         ~my_closure:(BFF.my_closure bff)
-        ~is_my_closure_used:t.is_my_closure_used ~my_region:(BFF.my_region bff)
+        ~is_my_closure_used:t.is_my_closure_used
+        ~my_alloc_region:(BFF.my_alloc_region bff)
+        ~my_region:(BFF.my_region bff)
         ~my_ghost_region:(BFF.my_ghost_region bff) ~my_depth:(BFF.my_depth bff)
         ~free_names_of_body:free_names)
 
@@ -887,7 +899,12 @@ and print_named ppf (t : named) =
   | Prim (prim, dbg) ->
     fprintf ppf "@[<hov 1>(%a%t%a%t)@]" Flambda_primitive.print prim
       Flambda_colours.debuginfo print_or_elide_debuginfo dbg Flambda_colours.pop
-  | Set_of_closures set_of_closures -> Set_of_closures.print ppf set_of_closures
+  | Set_of_closures (set_of_closures, alloc_mode) ->
+    Set_of_closures.print_with_extra_fields
+      (fun ppf ->
+        Format.fprintf ppf "@[<hov 1>(alloc_mode@ %a)@]@ "
+          Alloc_mode.For_allocations.print alloc_mode)
+      ppf set_of_closures
   | Static_consts consts -> print_static_const_group ppf consts
   | Rec_info rec_info_expr -> Rec_info_expr.print ppf rec_info_expr
 
@@ -1378,7 +1395,8 @@ module Named = struct
 
   let create_prim prim dbg = Prim (prim, dbg)
 
-  let create_set_of_closures set_of_closures = Set_of_closures set_of_closures
+  let create_set_of_closures ~alloc_mode set_of_closures =
+    Set_of_closures (set_of_closures, alloc_mode)
 
   let create_static_consts consts = Static_consts consts
 
@@ -1388,7 +1406,10 @@ module Named = struct
     match t with
     | Simple simple -> Simple.free_names simple
     | Prim (prim, _dbg) -> Flambda_primitive.free_names prim
-    | Set_of_closures set -> Set_of_closures.free_names set
+    | Set_of_closures (set, alloc_mode) ->
+      Name_occurrences.union
+        (Set_of_closures.free_names set)
+        (Alloc_mode.For_allocations.free_names alloc_mode)
     | Static_consts consts -> Static_const_group.free_names consts
     | Rec_info rec_info_expr -> Rec_info_expr.free_names rec_info_expr
 
@@ -1439,6 +1460,9 @@ module Named = struct
       | Naked_number Naked_vec512 ->
         Simple.const
           (Reg_width_const.naked_vec512 Vector_types.Vec512.Bit_pattern.zero)
+      | Naked_number Naked_mask ->
+        Simple.const
+          (Reg_width_const.naked_mask Vector_types.Mask.Bit_pattern.zero)
       | Region -> Misc.fatal_error "[Region] kind not expected here"
       | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
     in
@@ -1466,7 +1490,7 @@ module Named = struct
 
   let fold_code_and_sets_of_closures t ~init ~f_code ~f_set =
     match t with
-    | Set_of_closures s -> f_set init s
+    | Set_of_closures (s, _alloc_mode) -> f_set init s
     | Rec_info _ | Simple _ | Prim _ -> init
     | Static_consts group ->
       Static_const_group.to_list group
@@ -1479,14 +1503,15 @@ module Named = struct
              | Static_const
                  ( Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
                  | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _
-                 | Boxed_vec512 _ | Boxed_nativeint _ | Immutable_float_block _
-                 | Immutable_float_array _ | Immutable_float32_array _
-                 | Mutable_string _ | Immutable_string _ | Empty_array _
-                 | Immutable_value_array _ | Immutable_int_array _
-                 | Immutable_int8_array _ | Immutable_int16_array _
-                 | Immutable_int32_array _ | Immutable_int64_array _
-                 | Immutable_nativeint_array _ | Immutable_vec128_array _
-                 | Immutable_vec256_array _ | Immutable_vec512_array _ ) ->
+                 | Boxed_vec512 _ | Boxed_mask _ | Boxed_nativeint _
+                 | Immutable_float_block _ | Immutable_float_array _
+                 | Immutable_float32_array _ | Immutable_string _
+                 | Empty_array _ | Immutable_value_array _
+                 | Immutable_int_array _ | Immutable_int8_array _
+                 | Immutable_int16_array _ | Immutable_int32_array _
+                 | Immutable_int64_array _ | Immutable_nativeint_array _
+                 | Immutable_vec128_array _ | Immutable_vec256_array _
+                 | Immutable_vec512_array _ | Immutable_mask_array _ ) ->
                acc)
            init
 end

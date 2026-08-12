@@ -21,13 +21,14 @@ open Format
 val link :
   (module Compiler_owee.Unix_intf.S) ->
   Linkenv.t ->
-  string list ->
+  Linkenv.objfile_to_link list ->
   string ->
   cached_genfns_imports:Generic_fns.Partition.Set.t ->
   genfns:Generic_fns.Tbl.t ->
   units_tolink:Linkenv.unit_link_info list ->
   uses_eval:bool ->
-  quoted_globals:Compilation_unit.Name.Set.t ->
+  quoted_cmi:Compilation_unit.Name.Set.t ->
+  quoted_cmx:Compilation_unit.Set.t ->
   ppf_dump:Format.formatter ->
   unit
 

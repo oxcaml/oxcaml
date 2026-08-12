@@ -30,7 +30,7 @@
    architecture-specific emitters (X86_binary_emitter, Arm64_binary_emitter). *)
 
 module String_map = Map.Make (String)
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 (* Packed sections with their Binary_emitter.S module, hiding the
    architecture-specific types using an existential. *)
@@ -58,13 +58,22 @@ let register callback =
     (* Save old x86 internal assembler and register our hook *)
     saved_x86_internal_assembler := !X86_proc.internal_assembler;
     X86_proc.register_internal_assembler (fun ~delayed:_ sections _filename ->
+        X86_binary_emitter.clear_cross_section_labels ();
+        (* Assemble text-like sections first: data sections may contain
+           [Delta_uleb128] directives referencing text labels. *)
+        let text, others =
+          List.partition
+            (fun (name, _) -> X86_proc.Section_name.is_text_like name)
+            sections
+        in
+        let sections = text @ others in
         (* Assemble each section *)
         let sections_map =
           List.fold_left
             (fun map (name, instrs) ->
               let name_str = X86_proc.Section_name.to_string name in
               let section =
-                { X86_binary_emitter.sec_name = name_str;
+                { X86_binary_emitter.sec_name = name;
                   sec_instrs = DLL.to_array instrs
                 }
               in

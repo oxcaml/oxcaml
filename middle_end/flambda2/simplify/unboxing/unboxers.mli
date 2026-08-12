@@ -45,8 +45,7 @@ end
 module Closure_field : sig
   val unboxing_prim : Function_slot.t -> closure:Simple.t -> Value_slot.t -> P.t
 
-  val unboxer :
-    Target_system.Machine_width.t -> Function_slot.t -> Value_slot.t -> unboxer
+  val unboxer : Function_slot.t -> Value_slot.t -> unboxer
 end
 
 (* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -59,7 +58,7 @@ module type Number_S = sig
 
   val unboxing_prim : Simple.t -> P.t
 
-  val unboxer : Target_system.Machine_width.t -> unboxer
+  val unboxer : unboxer
 end
 
 module Immediate : Number_S
@@ -79,3 +78,5 @@ module Vec128 : Number_S
 module Vec256 : Number_S
 
 module Vec512 : Number_S
+
+module Mask : Number_S

@@ -65,7 +65,11 @@ val reaper_max_unbox_size : unit -> int
 
 val reaper_change_calling_conventions : unit -> bool
 
+val simplify_stubs : unit -> bool
+
 val kind_checks : unit -> bool
+
+val match_in_match : unit -> bool
 
 val flat_float_array : unit -> bool
 
@@ -122,6 +126,8 @@ val dump_simplify : unit -> bool
 val dump_reaper : unit -> bool
 
 val freshen_when_printing : unit -> bool
+
+val erase_in_types_depth_variables : unit -> bool
 
 module Inlining : sig
   type round_or_default =
@@ -190,7 +196,7 @@ module Expert : sig
 
   val cont_lifting_budget : unit -> int
 
-  val cont_spec_budget : unit -> int
+  val cont_spec_threshold : unit -> float
 end
 
 val stack_allocation_enabled : unit -> bool

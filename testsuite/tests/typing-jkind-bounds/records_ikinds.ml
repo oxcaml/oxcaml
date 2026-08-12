@@ -1,5 +1,4 @@
 (* TEST
-   flags = "-ikinds";
    expect;
 *)
 
@@ -547,16 +546,12 @@ let foo (t : _ t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
 |}, Principal{|
 type ('a : immutable_data) t = { x : 'a; }
-Line 3, characters 15-16:
-3 |   use_portable t;
-                   ^
-Error: This value is "once" but is expected to be "many".
+val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -609,7 +604,7 @@ let () = cross_global t
 Line 1, characters 22-23:
 1 | let () = cross_global t
                           ^
-Error: This expression has type "t" but an expression was expected of type
+Error: The value "t" has type "t" but an expression was expected of type
          "('a : value mod global)"
        The kind of t is immutable_data
          because of the definition of t at line 1, characters 0-32.
@@ -641,7 +636,7 @@ let () =
 Line 2, characters 13-16:
 2 |   cross_many int;
                  ^^^
-Error: This expression has type "int t" but an expression was expected of type
+Error: The value "int" has type "int t" but an expression was expected of type
          "('a : value mod many)"
        The kind of int t is immutable_data with int
          because of the definition of t at line 1, characters 0-22.
@@ -654,7 +649,7 @@ let () = cross_aliased int
 Line 1, characters 23-26:
 1 | let () = cross_aliased int
                            ^^^
-Error: This expression has type "int t" but an expression was expected of type
+Error: The value "int" has type "int t" but an expression was expected of type
          "('a : value mod aliased)"
        The kind of int t is immutable_data
          because of the definition of t at line 1, characters 0-22.
@@ -664,7 +659,7 @@ Error: This expression has type "int t" but an expression was expected of type
 Line 1, characters 23-26:
 1 | let () = cross_aliased int
                            ^^^
-Error: This expression has type "int t" but an expression was expected of type
+Error: The value "int" has type "int t" but an expression was expected of type
          "('a : value mod aliased)"
        The kind of int t is immutable_data with int
          because of the definition of t at line 1, characters 0-22.
@@ -677,7 +672,7 @@ let () = cross_portable func
 Line 1, characters 24-28:
 1 | let () = cross_portable func
                             ^^^^
-Error: This expression has type "(unit -> unit) t"
+Error: The value "func" has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod portable)"
        The kind of (unit -> unit) t is value non_float mod immutable
          because of the definition of t at line 1, characters 0-22.
@@ -688,7 +683,7 @@ Error: This expression has type "(unit -> unit) t"
 Line 1, characters 24-28:
 1 | let () = cross_portable func
                             ^^^^
-Error: This expression has type "(unit -> unit) t"
+Error: The value "func" has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod portable)"
        The kind of (unit -> unit) t is immutable_data with unit -> unit
          because of the definition of t at line 1, characters 0-22.
@@ -702,7 +697,7 @@ let () = cross_external func
 Line 1, characters 24-28:
 1 | let () = cross_external func
                             ^^^^
-Error: This expression has type "(unit -> unit) t"
+Error: The value "func" has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod external_)"
        The kind of (unit -> unit) t is value non_float mod immutable
          because of the definition of t at line 1, characters 0-22.
@@ -713,7 +708,7 @@ Error: This expression has type "(unit -> unit) t"
 Line 1, characters 24-28:
 1 | let () = cross_external func
                             ^^^^
-Error: This expression has type "(unit -> unit) t"
+Error: The value "func" has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod external_)"
        The kind of (unit -> unit) t is immutable_data with unit -> unit
          because of the definition of t at line 1, characters 0-22.

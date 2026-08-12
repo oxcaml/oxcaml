@@ -7,11 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
- flags += " -cfg-prologue-shrink-wrap";
- flags += " -x86-peephole-optimize";
- flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc irc";
- flags += " -cfg-merge-blocks";
+ flags += " -experimental-optimizations";
  expect.opt;
 *)
 
@@ -43,29 +39,26 @@ select_cmp:
   ret
 |}]
 
-(* CR ttebbi: We shouldn't materialize the bit, and ideally even share the
-   cmp instructions. *)
+(* CR ttebbi: We shouldn't materialize the bit. *)
 let select_cmp_twice (x : int) (y: int) =
   (Builtins.select (x < y) x y) + (Builtins.select (x < y) 10 20)
 [%%expect_asm X86_64{|
 select_cmp_twice:
-  movq  %rax, %rdi
+  movq  %rax, %rsi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setl  %al
   leaq  1(%rax,%rax), %rax
-  movl  $41, %esi
+  movl  $41, %edi
   movl  $21, %edx
   cmpq  $1, %rax
-  cmovne %rdx, %rsi
-  cmpq  $1, %rax
-  cmovne %rdi, %rbx
-  leaq  -1(%rbx,%rsi), %rax
+  cmovne %rdx, %rdi
+  cmovne %rsi, %rbx
+  leaq  -1(%rbx,%rdi), %rax
   ret
 |}]
 
 
-(* CR ttebbi: We could constant-fold this. *)
 let select_constant (x : int) = Builtins.select true x 55
 [%%expect_asm X86_64{|
 select_constant:
@@ -119,21 +112,19 @@ let repeated_select_shared x y z w  a b =
   #(q,r)
 [%%expect_asm X86_64{|
 repeated_select_shared:
-  movq  %rbx, %r8
-  movq  %rcx, %rbx
-  cmpq  %r8, %rax
+  cmpq  %rbx, %rax
   setl  %al
   movzbq %al, %rax
-  leaq  1(%rax,%rax), %rcx
+  leaq  1(%rax,%rax), %r8
   movq  %rsi, %rax
-  cmpq  $1, %rcx
+  cmpq  $1, %r8
   cmovne %rdi, %rax
-  cmpq  $1, %rcx
+  movq  %rcx, %rbx
   cmovne %rdx, %rbx
   ret
 |}]
 
-(* CR ttebbi: We should not materialize the boolean, ideally even share the cmpq. *)
+(* CR ttebbi: We should not materialize the boolean. *)
 let repeated_select_repeated x y z w  a b =
   let q =
     Builtins.select_int64 ((Int64_u.to_int64 x) < (Int64_u.to_int64 y)) z w
@@ -144,16 +135,72 @@ let repeated_select_repeated x y z w  a b =
   #(q,r)
 [%%expect_asm X86_64{|
 repeated_select_repeated:
-  movq  %rbx, %r8
-  movq  %rcx, %rbx
-  cmpq  %r8, %rax
+  cmpq  %rbx, %rax
   setl  %al
   movzbq %al, %rax
-  leaq  1(%rax,%rax), %rcx
+  leaq  1(%rax,%rax), %r8
   movq  %rsi, %rax
-  cmpq  $1, %rcx
+  cmpq  $1, %r8
   cmovne %rdi, %rax
-  cmpq  $1, %rcx
+  movq  %rcx, %rbx
   cmovne %rdx, %rbx
+  ret
+|}]
+
+
+(* CR ttebbi: select blocks automatic unboxing. *)
+let unboxing_through_select b x y =
+  Builtins.select b (Int64_u.to_int64 x) (Int64_u.to_int64 y) |> Int64_u.of_int64
+[%%expect_asm X86_64{|
+unboxing_through_select:
+  subq  $8, %rsp
+  movq  64(%r14), %rsi
+  movq  64(%r14), %rdx
+  subq  $48, %rdx
+  movq  %rdx, 64(%r14)
+  cmpq  80(%r14), %rdx
+  jl    <hidden GC jump pad>
+.L0:
+  addq  72(%r14), %rdx
+  addq  $8, %rdx
+  addq  $24, %rdx
+  movq  $3071, -8(%rdx)
+  movq  caml_int64_ops@GOTPCREL(%rip), %rcx
+  movq  %rcx, (%rdx)
+  movq  %rdi, 8(%rdx)
+  leaq  -24(%rdx), %rdi
+  movq  $3071, -8(%rdi)
+  movq  %rcx, (%rdi)
+  movq  %rbx, 8(%rdi)
+  cmpq  $1, %rax
+  cmovne %rdi, %rdx
+  movq  8(%rdx), %rax
+  movq  %rsi, 64(%r14)
+  addq  $8, %rsp
+  ret
+|}]
+
+(* Both arms are the same constant, so no csel is needed. *)
+let select_same_constant x = Builtins.select x 0 0
+[%%expect_asm X86_64{|
+select_same_constant:
+  movl  $1, %eax
+  ret
+|}]
+
+(* Both arms are the same value, so no csel is needed. *)
+let select_same_arg x y = Builtins.select x y y
+[%%expect_asm X86_64{|
+select_same_arg:
+  movq  %rbx, %rax
+  ret
+|}]
+
+(* When the condition holds the two arms are equal, so this is the identity
+   on [y]. *)
+let select_equal (x : int) (y : int) = Builtins.select (x = y) x y
+[%%expect_asm X86_64{|
+select_equal:
+  movq  %rbx, %rax
   ret
 |}]

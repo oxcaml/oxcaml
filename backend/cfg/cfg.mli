@@ -31,8 +31,7 @@ include module type of struct
   include Cfg_intf.S
 end
 
-type basic_instruction_list =
-  basic instruction Oxcaml_utils.Doubly_linked_list.t
+type basic_instruction_list = basic instruction Doubly_linked_list.t
 
 type basic_block =
   { mutable start : Label.t;
@@ -183,23 +182,6 @@ val fold_body_instructions :
    sets before registration . *)
 val register_predecessors_for_all_blocks : t -> unit
 
-(** Printing *)
-
-val print_terminator : Format.formatter -> terminator instruction -> unit
-
-val print_basic : Format.formatter -> basic instruction -> unit
-
-val print_instruction' :
-  ?print_reg:(Format.formatter -> Reg.t -> unit) ->
-  Format.formatter ->
-  [`Basic of basic instruction | `Terminator of terminator instruction] ->
-  unit
-
-val print_instruction :
-  Format.formatter ->
-  [`Basic of basic instruction | `Terminator of terminator instruction] ->
-  unit
-
 (* CR-someday gyorsh: Current version of cfg is a half-way house in terms of its
    exception handling. It has a lot of redundancy and the result of the
    computation is not used.
@@ -222,9 +204,17 @@ val is_return_terminator : terminator -> bool
 
 val is_pure_basic : basic -> bool
 
+(** [is_dead_basic instr ~live_after] holds when [instr] is pure and all its
+    results are unused (disjoint from [live_after], the registers live
+    immediately after [instr]). Shared by [Cfg_liveness] (optimistic dead-code
+    case) and [Cfg_deadcode] (actual removal) so the two tests stay in sync. *)
+val is_dead_basic : basic instruction -> live_after:Reg.Set.t -> bool
+
 val is_noop_move : basic instruction -> bool
 
 val is_alloc : basic instruction -> bool
+
+val is_heap_alloc : basic instruction -> bool
 
 val is_poll : basic instruction -> bool
 
@@ -233,10 +223,6 @@ val is_end_region : basic -> bool
 val set_stack_offset : 'a instruction -> int -> unit
 
 val set_live : 'a instruction -> Reg.Set.t -> unit
-
-val dump_basic : Format.formatter -> basic -> unit
-
-val dump_terminator : ?sep:string -> Format.formatter -> terminator -> unit
 
 val make_instruction :
   desc:'a ->

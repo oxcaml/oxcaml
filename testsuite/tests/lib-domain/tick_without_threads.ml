@@ -1,7 +1,5 @@
 (* TEST
    modules = "tick_stubs.c";
-   runtime5;
-   flags = "-alert -unsafe_multidomain";
    { native; }
 *)
 

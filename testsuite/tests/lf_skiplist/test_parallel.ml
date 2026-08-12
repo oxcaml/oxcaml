@@ -1,8 +1,7 @@
 (* TEST
  modules = "stubs.c";
  no-tsan;
- runtime5;
- multidomain;
+ multicore;
  { bytecode; }
  { native; }
 *)

@@ -1,0 +1,4 @@
+42 % 1 = 0; counter=1
+42 % min_int = 42; counter=2
+42 %u 1 = 0; counter=3
+42 %u max_int = 42; counter=4

@@ -110,8 +110,8 @@ val b' : baz =
 (* Test 2: evaluation order of variants with voids *)
 type void_variant =
     A of t_void * void_rec * int * void_rec * int * void_rec * t_void
-  | B of t_void
-  | C of void_rec * t_void
+  | B of t_void [@immediate_all_void_constructor]
+  | C of void_rec * t_void [@immediate_all_void_constructor]
   | D of { a1 : t_void;
            a2 : void_rec;
            x : int;
@@ -152,8 +152,8 @@ let _ = assert (List.for_all2 (=) !r [10;9;8;7;6;5;4;3;2;1]);;
 [%%expect{|
 type void_variant =
     A of t_void * void_rec * int * void_rec * int * void_rec * t_void
-  | B of t_void
-  | C of void_rec * t_void
+  | B of t_void [@immediate_all_void_constructor]
+  | C of void_rec * t_void [@immediate_all_void_constructor]
   | D of { a1 : t_void; a2 : void_rec; x : int; v : void_rec; z : int;
       b1 : void_rec; b2 : t_void;
     }
@@ -267,7 +267,7 @@ module M3_4 : sig end
 (* Test 4: Void to left of semicolon *)
 let () = r := []
 
-type void_holder = V of t_void
+type void_holder = V of t_void [@immediate_all_void_constructor]
 let vh : void_holder = V (t_void ())
 
 let [@warning "-10"] f4 (V v) =
@@ -282,7 +282,7 @@ let _ = f4 vh
 
 let _ = assert (List.for_all2 (=) !r [6;5;4;3;2;1]);;
 [%%expect{|
-type void_holder = V of t_void
+type void_holder = V of t_void [@immediate_all_void_constructor]
 val vh : void_holder = V <void>
 val f4 : void_holder -> unit = <fun>
 - : unit = ()
@@ -492,7 +492,7 @@ Line 6, characters 21-24:
                          ^^^
 Error: This variant expression is expected to have type "exn"
        There is no constructor "Ex4" within type "exn"
-Hint: Did you mean "Ex1", "Ex2" or "Ex3"?
+Hint:             Did you mean "Ex1", "Ex2" or "Ex3"?
 |}]
 (* CR layouts v5: This was the expected behavior before removing the handling of
    void for lambda, and we expected it to be the expected behavior again after
@@ -599,7 +599,7 @@ let () = assert (List.for_all2 (=) !r [2;1]);;
 Line 9, characters 22-23:
 9 |   and v' = (cons_r 2; v)
                           ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "v" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-33.
@@ -636,7 +636,7 @@ let () = assert (List.for_all2 (=) !r [3;2;1]);;
 Line 8, characters 25-26:
 8 |   let rec v1 = cons_r 1; v
                              ^
-Error: This expression has type "t_void" but an expression was expected of type
+Error: The value "v" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-33.

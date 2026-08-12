@@ -13,7 +13,7 @@ let parse_flambda filename =
   | Ok unit ->
     let unit_info = Parse_flambda.make_unit_info ~filename in
     let comp_unit = Unit_info.modname unit_info in
-    Env.set_unit_name (Some unit_info);
+    Env.set_current_unit unit_info;
     let fl2 = Fexpr_to_flambda.conv comp_unit unit in
     check_invariants fl2.unit;
     Flambda2.flambda_to_flambda ~ppf_dump:Format.std_formatter
@@ -43,5 +43,5 @@ let _ =
   Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Compenv.parse_arguments (ref Sys.argv) defer_file "fexprc";
-  Compmisc.read_clflags_from_env ();
+  Location.read_clflags_from_env ();
   !file_action ()

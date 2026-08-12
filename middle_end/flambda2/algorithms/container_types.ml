@@ -87,6 +87,8 @@ module Make_map (T : Thing) (Set : Set_plus_stdlib with type elt = T.t) = struct
           | Some _datum1, Some _datum2 -> None)
         t1 t2
 
+  let subset_domain t1 t2 = for_all (fun key _ -> mem key t2) t1
+
   let inter f t1 t2 =
     merge
       (fun key datum1_opt datum2_opt ->
@@ -257,6 +259,9 @@ module Make_map (T : Thing) (Set : Set_plus_stdlib with type elt = T.t) = struct
         t
     in
     if not !changed then t else t'
+
+  let find_or_null k t =
+    match find_opt k t with None -> Or_null.null | Some v -> Or_null.this v
 end
 [@@inline always]
 

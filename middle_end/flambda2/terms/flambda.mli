@@ -73,7 +73,7 @@ and named = private
           do not have to be [Let]-bound but are allowed here for convenience. *)
   | Prim of Flambda_primitive.t * Debuginfo.t
       (** Primitive operations (arithmetic, memory access, allocation, etc). *)
-  | Set_of_closures of Set_of_closures.t
+  | Set_of_closures of Set_of_closures.t * Alloc_mode.For_allocations.t
       (** Definition of a set of (dynamically allocated) possibly
           mutually-recursive closures. *)
   | Static_consts of static_const_group
@@ -176,7 +176,8 @@ module Named : sig
   val create_prim : Flambda_primitive.t -> Debuginfo.t -> t
 
   (** Convert a set of closures into the defining expression of a [Let]. *)
-  val create_set_of_closures : Set_of_closures.t -> t
+  val create_set_of_closures :
+    alloc_mode:Alloc_mode.For_allocations.t -> Set_of_closures.t -> t
 
   (** Convert one or more statically-allocated constants into the defining
       expression of a [Let]. *)

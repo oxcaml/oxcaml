@@ -44,7 +44,7 @@ val rebuild :
   continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
   fixed_arity_continuations:Continuation.Set.t ->
   final_typing_env:Typing_env.t option ->
-  Flambda_kind.t Name.Map.t ->
+  types_rewrite_context:Types_rewriter.rewrite_context ->
   Unboxing_analysis.result ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->
