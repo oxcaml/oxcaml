@@ -170,7 +170,7 @@ type t17b : value & value
 |}]
 
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
-  ('a : value mod immutable global aliased)
+  ('a : value mod immutable global)
 [%%expect{|
 type ('a : value mod everything non_float) t18 = 'a
 |}]
@@ -512,7 +512,7 @@ type ('a, 'b) labeled_fn =
     a:'a @ local unique portable contended ->
     ?b:'b @ local once portable contended ->
     'a @ local portable contended ->
-    (int -> 'b @ local unique once) @ portable
+    (int -> 'b @ local once unique) @ portable
 type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
 |}]
 
@@ -891,7 +891,8 @@ let unary_minus_plus () =
 Line 4, characters 17-22:
 4 |   let b = stack_ (-42) in
                      ^^^^^
-Error: This expression is not an allocation site.
+Error: Stack allocating literals is not supported;
+       they are not allocated at runtime.
 |}]
 
 (**********)
@@ -1299,6 +1300,28 @@ val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
 val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
 |}]
 
+(* Block index as block access (index deepening) *)
+type 'a s = { a : 'a; mutable b: 'a; mutable c: 'a [@atomic] }
+
+let idx_a = (.a)
+let idx_b = (.b)
+let idx_c = (.c)
+[%%expect{|
+type 'a s = { a : 'a; mutable b : 'a; mutable c : 'a [@atomic]; }
+val idx_a : ('a s, 'a) idx_imm = <abstr>
+val idx_b : ('a s, 'a) idx_mut = <abstr>
+val idx_c : ('a s, 'a) idx_atomic = <abstr>
+|}]
+
+let idx_a' = (.idx_imm(idx_a).#foo)
+let idx_b' = (.idx_mut(idx_b).#foo)
+let idx_c' = (.idx_atomic(idx_c).#foo)
+[%%expect{|
+val idx_a' : ('a r# s, 'a) idx_imm = <abstr>
+val idx_b' : ('a r# s, 'a) idx_mut = <abstr>
+val idx_c' : ('a r# s, 'a) idx_atomic = <abstr>
+|}]
+
 module Borrow = struct
   let f () =
     let x = "hello" in
@@ -1347,15 +1370,15 @@ type existential_abstract =
 |}]
 
 module M : sig
-  kind_ immediate = value mod global many uncontended
-  kind_ immutable_data = value mod uncontended many
-  kind_ immutable = value mod uncontended
+  kind_ immediate = value mod global many
+  kind_ immutable_data = value mod many
+  kind_ immutable = value
   kind_ data = value mod many
   kind_ abstract
 end = struct
-  kind_ immediate = value mod global many uncontended
-  kind_ immutable_data = value mod uncontended many
-  kind_ immutable = value mod uncontended
+  kind_ immediate = value mod global many
+  kind_ immutable_data = value mod many
+  kind_ immutable = value
   kind_ data = value mod many
   kind_ abstract
 end
@@ -1663,6 +1686,28 @@ type ('a, _[@foo] : any)  t
 type ('a, _ : any) t
 |}]
 
+(**********************************************)
+(* attributes on module aliases in signatures *)
+module Foo = struct end
+module type S = sig
+  module Foo = Foo [@foo] @@ nonportable
+end
+[%%expect{|
+module Foo : sig end @@ stateless
+module type S = sig module Foo = Foo end
+|}]
+
+(* make sure loc is set correctly *)
+module type S = sig
+  module Bar = Bar [@foo] @@ nonportable
+end
+[%%expect{|
+Line 2, characters 15-18:
+2 |   module Bar = Bar [@foo] @@ nonportable
+                   ^^^
+Error: Unbound module "Bar"
+|}]
+
 (*********************)
 (* quotations syntax *)
 
@@ -1708,9 +1753,7 @@ Error: This binding has no layout variables, so "poly_" has no effect.
 
 let poly_ id = fun x -> x
 [%%expect{|
->> Fatal error: layout: unexpected genvar
-Uncaught exception: Misc.Fatal_error
-
+val poly_ id : 'a -> 'a = <lpoly>
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
@@ -1737,8 +1780,8 @@ Warning 219: This value description has no layout-polymorphic type variables,
 module type S_poly =
   sig
     val f : 'a -> 'a
-    val g : layout_ l. 'a 'b ('c : l). 'a -> 'b -> 'c -> 'a
-    val h : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+    val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+    val poly_ h : 'a -> 'b -> 'a
   end
 |}]
 
@@ -1785,5 +1828,5 @@ module type S = sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
 end
 [%%expect{|
-module type S = sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
+module type S = sig val poly_ f : 'a -> 'b end
 |}]

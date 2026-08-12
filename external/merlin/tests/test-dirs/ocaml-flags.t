@@ -115,6 +115,7 @@ logic.
   -dcmm-invariants
   -dcounters
   -dcse
+  -ddebug-avail-sets
   -ddebug-available-regs
   -ddebug-invariants
   -ddebug-uid-tables
@@ -154,6 +155,7 @@ logic.
   -disable-zero-alloc-checker
   -dissector
   -dissector-assume-lld-without-64-bit-eh-frames
+  -dissector-max-linker-parallelism
   -dissector-partition-size
   -dlambda
   -dletreclambda
@@ -248,9 +250,11 @@ logic.
   -flambda2-join-points
   -flambda2-kind-checks
   -flambda2-match-in-match
+  -flambda2-no-simplify-stubs
   -flambda2-reaper
   -flambda2-result-types-all-functions
   -flambda2-result-types-functors-only
+  -flambda2-simplify-stubs
   -flambda2-speculative-inlining-only-if-arguments-useful
   -flambda2-speculative-inlining-track-lifted-constants
   -flambda2-unbox-along-intra-function-control-flow

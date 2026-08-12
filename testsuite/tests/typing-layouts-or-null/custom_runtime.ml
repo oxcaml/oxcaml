@@ -33,6 +33,23 @@ type float_payload =
   | Float_payload of float
 [@@or_null]
 
+type void : void mod everything
+external void : unit -> void = "%unbox_unit"
+
+let[@inline never] use_void (v : void) =
+  let _ : void = v in
+  1
+
+type void_null =
+  | Null_void of void
+  | This_void of int
+[@@or_null]
+
+type void_product_null =
+  | This_void_product of int
+  | Null_void_product of #(void * void)
+[@@or_null]
+
 type 'a unused_param =
   | Unused_null
   | Unused_payload of int
@@ -88,6 +105,41 @@ let () =
 let () =
   match Float_payload 3.5 with
   | Float_payload x when x = 3.5 -> ()
+  | _ -> assert false
+;;
+
+let () =
+  match Null_void (void ()) with
+  | Null_void v when use_void v = 1 -> ()
+  | _ -> assert false
+;;
+
+let () =
+  let effects = ref 0 in
+  let void_effect () =
+    incr effects;
+    void ()
+  in
+  match Null_void (void_effect ()) with
+  | Null_void _ -> assert (!effects = 1)
+  | _ -> assert false
+;;
+
+let () =
+  match This_void 17 with
+  | This_void 17 -> ()
+  | _ -> assert false
+;;
+
+let () =
+  match Null_void_product #(void (), void ()) with
+  | Null_void_product #(v1, v2) when use_void v1 = 1 && use_void v2 = 1 -> ()
+  | _ -> assert false
+;;
+
+let () =
+  match This_void_product 19 with
+  | This_void_product 19 -> ()
   | _ -> assert false
 ;;
 

@@ -32,13 +32,21 @@ let class_of_operation (op : Operation.t)
   match op with
   | Specific spec ->
     begin match spec with
-    | Ilea _ | Isextend32 | Izextend32 -> Class Op_pure
+    | Ilea _ | Isextend32 | Izextend32 | Ineg -> Class Op_pure
     | Istore_int(_, _, is_asg) -> Class (Op_store is_asg)
     | Ioffset_loc(_, _) -> Class (Op_store true)
     | Ifloatarithmem _ -> Class (Op_load Mutable)
     | Ibswap _ -> Use_default
-    | Irdtsc | Irdpmc
-    | Ilfence | Isfence | Imfence -> Class Op_other
+    | Irdtsc | Irdpmc -> Class Op_other
+    | Ilfence | Imfence ->
+      (* A load that follows a load fence must not be satisfied by an equation
+         over a load that precedes the fence: that would effectively hoist the
+         load above the fence. *)
+      Class (Op_store true)
+    | Isfence ->
+      (* [sfence] only orders stores, and CSE neither eliminates nor moves
+         stores, so it does not need to be a load barrier. *)
+      Class Op_other
     | Ipackf32 -> Class Op_pure
     | Isimd op ->
       Class (of_simd_class (Simd.class_of_operation op))
@@ -57,6 +65,7 @@ let class_of_operation (op : Operation.t)
   | Reinterpret_cast _ | Static_cast _
   | Const_int _ | Const_float32 _ | Const_float _
   | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+  | Const_mask _
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause

@@ -28,7 +28,7 @@
 open! Int_replace_polymorphic_compare
 module C = Cfg
 module CL = Cfg_with_layout
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 module Eliminate_dead_code : sig
   val run : Cfg_with_layout.t -> Label.Set.t

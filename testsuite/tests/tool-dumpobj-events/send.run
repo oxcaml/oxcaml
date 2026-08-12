@@ -1,0 +1,7 @@
+if [ "${os_type}" = 'Win32' ]; then
+  ocamlrun=$(cygpath "${ocamlrun}")
+fi
+# Unlike test.ml, this program links the stdlib (objects need
+# CamlinternalOO), so filter the dump down to send.ml's own events.
+"${ocamlrun}" "${ocamlsrcdir}/tools/dumpobj" -nobanners "${program}" \
+  | awk '/^File "send.ml"/ { print; if (getline > 0) print }' > "${output}"

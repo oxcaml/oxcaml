@@ -1,6 +1,6 @@
 [@@@ocaml.warning "+a-30-40-41-42"]
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 (* CR-soon xclerc for xclerc: some work may be needed on the hash functions, as
    the performance of some passes (e.g. `Cfg_merg_blocks`) seems to be quite

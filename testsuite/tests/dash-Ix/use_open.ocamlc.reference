@@ -1,0 +1,4 @@
+File "use_open.ml", line 11, characters 20-21:
+11 | let () = use_static x
+                         ^
+Error: This value is dynamic but is expected to be static.

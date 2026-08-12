@@ -21,7 +21,7 @@ define dune_boot_context
   (name default)
   (profile dev)
   (env (_
-    (flags (:standard -warn-error +A -alert -unsafe_multidomain))
+    (flags (:standard -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
     (env-vars
       ("OCAMLPARAM" "")
 
@@ -57,7 +57,7 @@ define dune_runtime_stdlib_context
     (OCAMLLIB ("$(CURDIR)/_build/_bootinstall/lib/ocaml")))
   (env (_
     (bin_annot_cms true)
-    (flags (:standard -directory stdlib -warn-error +A -alert -unsafe_multidomain))
+    (flags (:standard -directory stdlib -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
     $(ENV_VARS)))))
 endef
 
@@ -73,7 +73,7 @@ define dune_main_context
     (OCAMLLIB ("$(CURDIR)/_build/runtime_stdlib_install/lib/ocaml_runtime_stdlib")))
   (env (_
     (bin_annot_cms true)
-    (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain))
+    (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
     $(ENV_VARS)))))
@@ -93,10 +93,10 @@ boot_targets = \
   ocamltest/ocamltest.native
 
 boot-compiler: _build/_bootinstall
-	$(dune) build $(ws_boot) $(coverage_dune_flags) $(boot_targets)
+	$(dune) build $(ws_boot) $(coverage_dune_flags) @merlin-support $(boot_targets)
 
 boot-runtest: boot-compiler
-	$(dune) runtest $(ws_boot) $(coverage_dune_flags) --force
+	$(dune) build $(ws_boot) $(coverage_dune_flags) --force $(runtest_targets)
 
 runtime-stdlib: boot-compiler
 	$(dune) build $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
@@ -152,12 +152,20 @@ minimize-stdlib: boot-minimizer boot-compiler
           $(ws_runstd) \
           --only-packages=ocaml_runtime_stdlib @install
 
+# We want to be able to build the @runtest dune alias, but exclude
+# external/merlin from that (since Merlin only builds in the boot workspace).
+# Dune doesn't offer a native way to do this, so instead we list all directories
+# and build @runtest in each directory, excluding external/merlin and any
+# directories not in the dune workspace. (We can exclude external/ as a whole
+# since all the non-merlin directories in that folder are vendored anyways.)
+runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out autom4te.cache/ build-aux/ external/ _%, $(dir $(wildcard */.))))))
+
 # CR dkalinichenko: [runtest] is built using the main profile,
 # which uses the boot compiler. Use the final compiler for [runtest],
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
 runtest: compiler
-	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) runtest $(ws_main)
+	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) OXCAML_POLL_INSERTION=$(POLL_INSERTION) $(dune) build $(ws_main) $(runtest_targets)
 
 runtest-llvmize: compiler
 	OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
@@ -358,6 +366,7 @@ install_for_test: install
 	# various things.
 	mkdir _runtest/utils
 	cp _install/lib/ocaml/compiler-libs/*.{cmi,cmx} _runtest/utils
+	cp $(main_build)/$(ocamldir)/.ocamlfrontend.objs/byte/*.cmo _runtest/utils
 	cp $(main_build)/$(ocamldir)/.ocamlcommon.objs/byte/*.cmo _runtest/utils
 	rm -f _runtest/utils/{topdirs,opttopdirs}.cmi
 	cp _install/lib/ocaml/*.{cmi,cma,a,cmxa} _runtest/utils
@@ -471,7 +480,7 @@ promote-one-no-rebuild:
 # This target is like a polling version of upstream "make ocamlopt"
 .PHONY: hacking
 hacking: _build/_bootinstall
-	$(dune) build $(ws_boot) -w $(boot_targets)
+	$(dune) build $(ws_boot) -w @merlin-support $(boot_targets)
 
 # The `hacking-emacs-poller` and `hacking-emacs-builder` targets make it
 # possible to run the polling build with Emacs's `M-x compile`.  You should run
@@ -485,7 +494,7 @@ hacking-emacs-poller: _build/_bootinstall
 
 .PHONY: hacking-emacs-builder
 hacking-emacs-builder: _build/_bootinstall
-	$(dune) rpc build $(ws_boot) -w $(boot_targets)
+	$(dune) rpc build $(ws_boot) -w @merlin-support $(boot_targets)
 	$(dune) diagnostics
 
 .PHONY: debug-printers

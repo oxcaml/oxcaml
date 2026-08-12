@@ -88,8 +88,10 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
     true
   | Vec512, Vec512 ->
     true
+  | Mask, Mask ->
+    true
   | (Int | Val | Addr | Float | Float32 |
-     Vec128 | Vec256 | Vec512 | Valx2), _ -> false
+     Vec128 | Vec256 | Vec512 | Mask | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
 
@@ -112,6 +114,11 @@ let hard_vec512_reg =
 let hard_float32_reg =
   Array.map (Reg.create_alias ~typ:Float32) hard_float_reg
 
+let hard_mask_reg =
+  Regs.phys_mask_regs
+  |> Array.map (fun phys_mask_reg ->
+     Reg.create_at_location Mask (Reg phys_mask_reg))
+
 let add_hard_vec256_regs list ~f =
   if Arch.Extension.enabled_vec256 ()
   then f hard_vec256_reg :: list else list
@@ -120,11 +127,16 @@ let add_hard_vec512_regs list ~f =
   if Arch.Extension.enabled_vec512 ()
   then f hard_vec512_reg :: list else list
 
-let all_phys_regs =
+let add_hard_mask_regs list ~f =
+  if Arch.Extension.enabled_vec512 ()
+  then f hard_mask_reg :: list else list
+
+let all_phys_regs = lazy ((* To be forced after flags are parsed. *)
   [hard_int_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> add_hard_mask_regs ~f:(fun regs -> regs)
+  |> Array.concat)
 
 let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   let index_in_class = Regs.index_in_class phys_reg in
@@ -143,6 +155,7 @@ let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
   | Vec128 | Valx2 -> hard_vec128_reg.(index_in_class)
   | Vec256 -> hard_vec256_reg.(index_in_class)
   | Vec512 -> hard_vec512_reg.(index_in_class)
+  | Mask -> hard_mask_reg.(index_in_class)
 
 let rax = phys_reg Int (P RAX)
 let rdi = phys_reg Int (P RDI)
@@ -177,12 +190,14 @@ let size_domainstate_args = 64 * size_int
 let calling_conventions
       ~int_registers
       ~float_registers
+      ~mask_registers
       ~make_stack
       ~first_stack
       arg =
   let loc = Array.make (Array.length arg) Reg.dummy in
   let int_registers = ref int_registers in
   let float_registers = ref float_registers in
+  let mask_registers = Option.map ref mask_registers in
   let ofs = ref first_stack in
   let max_size = ref 0 in
   (* A negative offset indicates a domainstate slot, which will
@@ -194,13 +209,20 @@ let calling_conventions
   in
   for i = 0 to Array.length arg - 1 do
     let ty : machtype_component = arg.(i) in
-    let registers, size =
+    let registers, size, ty =
       match ty with
-      | Val | Int | Addr -> int_registers, size_int
-      | Float | Float32 -> float_registers, size_float
-      | Vec128 -> float_registers, size_vec128
-      | Vec256 -> float_registers, size_vec256
-      | Vec512 -> float_registers, size_vec512
+      | Val | Int | Addr -> int_registers, size_int, ty
+      | Float | Float32 -> float_registers, size_float, ty
+      | Vec128 -> float_registers, size_vec128, ty
+      | Vec256 -> float_registers, size_vec256, ty
+      | Vec512 -> float_registers, size_vec512, ty
+      | Mask -> (
+        match mask_registers with
+        | Some mask_registers -> mask_registers, size_int, ty
+        | None ->
+          (* The C ABI passes masks in GPRs. The location is typed [Int] so
+             that instruction selection inserts the mask<->GPR conversions. *)
+          int_registers, size_int, Int)
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
     in
     match !registers with
@@ -236,11 +258,15 @@ let ocaml_int_registers = Regs.[RAX; RBX; RDI; RSI; RDX; RCX; R8; R9; R12; R13]
 let ocaml_float_registers =
   Regs.[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7; MM8; MM9]
 
+let ocaml_mask_registers =
+  Regs.[K1; K2; K3; K4; K5; K6; K7]
+
 let loc_arguments arg =
   let (loc, ofs, _align) =
     calling_conventions
         ~int_registers:ocaml_int_registers
         ~float_registers:ocaml_float_registers
+        ~mask_registers:(Some ocaml_mask_registers)
         ~make_stack:outgoing
         ~first_stack:(- size_domainstate_args)
         arg
@@ -252,6 +278,7 @@ let loc_parameters arg =
     calling_conventions
       ~int_registers:ocaml_int_registers
       ~float_registers:ocaml_float_registers
+      ~mask_registers:(Some ocaml_mask_registers)
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       arg
@@ -263,6 +290,7 @@ let loc_results_call res =
     calling_conventions
       ~int_registers:ocaml_int_registers
       ~float_registers:ocaml_float_registers
+      ~mask_registers:(Some ocaml_mask_registers)
       ~make_stack:outgoing
       ~first_stack:(- size_domainstate_args)
       res
@@ -274,6 +302,7 @@ let loc_results_return res =
     calling_conventions
       ~int_registers:ocaml_int_registers
       ~float_registers:ocaml_float_registers
+      ~mask_registers:(Some ocaml_mask_registers)
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       res
@@ -301,6 +330,7 @@ let loc_external_results res =
     calling_conventions
       ~int_registers:[RAX; RDX]
       ~float_registers:[MM0; MM1]
+      ~mask_registers:None
       ~make_stack:not_supported
       ~first_stack:0
       res
@@ -310,6 +340,7 @@ let unix_loc_external_arguments arg =
   calling_conventions
     ~int_registers:[RDI; RSI; RDX; RCX; R8; R9]
     ~float_registers:[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7]
+    ~mask_registers:None
     ~make_stack:outgoing
     ~first_stack:0
     arg
@@ -327,7 +358,7 @@ let win64_loc_external_arguments arg =
       match ty with
       | Val | Int | Addr -> win64_int_external_arguments, size_int
       | Float | Float32 -> win64_float_external_arguments, size_float
-      | Vec128 | Vec256 | Vec512 ->
+      | Vec128 | Vec256 | Vec512 | Mask ->
         (* CR mslater: (SIMD) win64 calling convention requires pass by reference *)
         Misc.fatal_error "SIMD external arguments are not supported on Win64"
       | Valx2 ->
@@ -368,7 +399,7 @@ let int_regs_destroyed_at_c_call =
        Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
   else Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
 
-let destroyed_at_c_call_win64 =
+let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
   [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call_win64;
     Array.sub hard_float_reg 0 6;
@@ -376,9 +407,10 @@ let destroyed_at_c_call_win64 =
     Array.sub hard_vec128_reg 0 6 ]
   |> add_hard_vec256_regs ~f:(fun regs -> Array.sub regs 0 6)
   |> add_hard_vec512_regs ~f:(fun regs -> Array.sub regs 0 6)
-  |> Array.concat
+  |> add_hard_mask_regs ~f:(fun regs -> regs)
+  |> Array.concat)
 
-let destroyed_at_c_call_unix =
+let destroyed_at_c_call_unix = lazy ((* To be forced after flags are parsed. *)
   (* Unix: rbx, rbp, r12-r15 preserved *)
   [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call;
     hard_float_reg;
@@ -386,7 +418,8 @@ let destroyed_at_c_call_unix =
     hard_vec128_reg ]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> add_hard_mask_regs ~f:(fun regs -> regs)
+  |> Array.concat)
 
 let destroyed_at_c_call =
   (* C calling conventions preserve rbx, but it is clobbered
@@ -480,7 +513,7 @@ let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
   | Load op | Store op -> destroyed_by_simd_op op
 
-let destroyed_at_raise = all_phys_regs
+let destroyed_at_raise () = Lazy.force all_phys_regs
 
 let destroyed_at_reloadretaddr = [| |]
 
@@ -495,7 +528,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_at_reloadretaddr
   | Pushtrap _ ->
     destroyed_at_pushtrap
-  | Op (Intop (Idiv | Imod)) | Op (Intop_imm ((Idiv | Imod), _)) ->
+  | Op (Intop (Idiv _ | Imod _)) | Op (Intop_imm ((Idiv _ | Imod _), _)) ->
     destroyed_rax_rdx
   | Op(Store(Single { reg = Float64 }, _, _)) ->
     destroyed_at_single_float64_store
@@ -509,15 +542,15 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op(Specific (Ifloatarithmem (Float32, _, _)))
   | Op(Intop_atomic _) ->
     destroyed_at_small_memory_op
-  | Op(Store( (Word_int | Word_val | Double | Onetwentyeight_aligned |
-               Onetwentyeight_unaligned | Twofiftysix_aligned |
-               Twofiftysix_unaligned | Fivetwelve_aligned |
-               Fivetwelve_unaligned), _, _))
+  | Op(Store( (Word_int | Word_mask | Word_val | Double |
+               Onetwentyeight_aligned | Onetwentyeight_unaligned |
+               Twofiftysix_aligned | Twofiftysix_unaligned |
+               Fivetwelve_aligned | Fivetwelve_unaligned), _, _))
   | Op(Load { memory_chunk =
-                (Word_int | Word_val | Double | Onetwentyeight_aligned |
-                 Onetwentyeight_unaligned | Twofiftysix_aligned |
-                 Twofiftysix_unaligned | Fivetwelve_aligned |
-                 Fivetwelve_unaligned); _})
+                (Word_int | Word_mask | Word_val | Double |
+                 Onetwentyeight_aligned | Onetwentyeight_unaligned |
+                 Twofiftysix_aligned | Twofiftysix_unaligned |
+                 Fivetwelve_aligned | Fivetwelve_unaligned); _})
   | Op(Specific (Istore_int _))
   | Op(Specific (Ifloatarithmem (Float64, _, _)))
   | Op(Specific (Iprefetch _ | Icldemote _)) ->
@@ -540,7 +573,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
         intr
   | Op (Move | Spill | Reload | Const_int _
        | Const_float _ | Const_float32 _ | Const_symbol _
-       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
                | Iasr | Ipopcnt | Iclz | Ictz
@@ -557,7 +590,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Begin_region
        | End_region
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
-                  | Isextend32 | Izextend32
+                  | Isextend32 | Izextend32 | Ineg
                   | Ilfence | Isfence | Imfence)
        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
   | Poptrap _ | Prologue | Epilogue ->
@@ -586,11 +619,15 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
-    if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
+    if alloc || stack_ofs > 0
+    then Lazy.force all_phys_regs
+    else Lazy.force destroyed_at_c_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
-    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
-  | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
+    if stack_ofs > 0
+    then Lazy.force all_phys_regs
+    else Lazy.force destroyed_at_c_call
+  | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -628,7 +665,8 @@ let initial_stack_offset ~num_stack_slots:_ ~contains_calls:_ = 0
 let trap_frame_size_in_bytes = 16
 
 let frame_required ~fun_contains_calls ~fun_num_stack_slots =
-  fp || fun_contains_calls ||
+  (fp && not !Oxcaml_flags.omit_leaf_frame_pointers)
+  || fun_contains_calls ||
   Stack_class.Tbl.exists
     fun_num_stack_slots
     ~f:(fun _stack_class num -> num > 0)
@@ -690,7 +728,7 @@ let clear_pending_jit_run () = ()
 (* Precolored_regs is not always the same as [all_phys_regs], as some physical registers
    may not be allocatable (e.g. rbp when frame pointers are enabled). *)
 let precolored_regs () =
-  let phys_regs = Reg.set_of_array all_phys_regs in
+  let phys_regs = Reg.set_of_array (Lazy.force all_phys_regs) in
   if fp then Reg.Set.remove rbp phys_regs else phys_regs
 
 let has_three_operand_float_ops () = Arch.Extension.enabled AVX
@@ -703,9 +741,11 @@ let operation_supported = function
   | Creinterpret_cast (V512_of_vec _ | V128_of_vec Vec512 | V256_of_vec Vec512)
   | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
     Arch.Extension.enabled_vec512 ()
+  | Creinterpret_cast (Mask_of_int64 | Int64_of_mask) ->
+    Arch.Extension.enabled AVX512BW
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Caddi128 | Csubi128 | Cmuli64 _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _
@@ -740,6 +780,7 @@ let expression_supported = function
   | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
   | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
+  | Cconst_mask _ -> Arch.Extension.enabled_vec512 ()
 
 let trap_size_in_bytes () =
   if !Clflags.llvm_backend then 32 else 16

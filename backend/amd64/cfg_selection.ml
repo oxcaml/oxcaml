@@ -161,6 +161,7 @@ let pseudoregs_for_operation op arg res =
   | Intop_imm ((Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
   | Floatop ((Float64 | Float32), (Iabsf | Inegf))
   | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })
+  | Specific Ineg
   | Opaque ->
     res, res
   (* For xchg, args must be a register allowing access to high 8 bit register
@@ -174,8 +175,8 @@ let pseudoregs_for_operation op arg res =
   (* For div and mod, first arg must be in rax, rdx is clobbered, and result is
      in rax or rdx respectively. Keep it simple, just force second argument in
      rcx. *)
-  | Intop Idiv -> [| rax; rcx |], [| rax |]
-  | Intop Imod -> [| rax; rcx |], [| rdx |]
+  | Intop (Idiv _) -> [| rax; rcx |], [| rax |]
+  | Intop (Imod _) -> [| rax; rcx |], [| rdx |]
   | Int128op (Iadd128 | Isub128) ->
     [| res.(0); res.(1); arg.(2); arg.(3) |], res
   | Int128op (Imul64 _) -> [| rax; arg.(1) |], [| rax; rdx |]
@@ -219,7 +220,8 @@ let pseudoregs_for_operation op arg res =
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
   | Intop (Ipopcnt | Iclz | Ictz | Icomp _ | Iadd)
   | Intop_imm
-      ( (Iadd | Isub | Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz | Ictz),
+      ( ( Iadd | Isub | Imulh _ | Idiv _ | Imod _ | Icomp _ | Ipopcnt | Iclz
+        | Ictz ),
         _ )
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
@@ -229,7 +231,7 @@ let pseudoregs_for_operation op arg res =
       | Irdtsc | Icldemote _ | Iprefetch _ )
   | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
   | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
-  | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
+  | Const_vec512 _ | Const_mask _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Pause | Begin_region
   | End_region | Poll | Dls_get | Tls_get | Domain_index ->
@@ -289,12 +291,16 @@ let select_addressing chunk exp : addressing_mode * Cmm.expression =
 let select_store' ~is_assign addr (exp : Cmm.expression) :
     Cfg_selectgen_target_intf.select_store_result =
   match exp with
-  | Cconst_int (n, _dbg) when int_is_immediate n ->
+  (* The immediate of a store is never negated, so the full signed 32-bit range
+     applies (hence [is_immediate_natint] rather than [int_is_immediate], whose
+     range is symmetric). *)
+  | Cconst_int (n, _dbg) when is_immediate_natint (Nativeint.of_int n) ->
     Rewritten
       (Specific (Istore_int (Nativeint.of_int n, addr, is_assign)), Ctuple [])
   | Cconst_natint (n, _dbg) when is_immediate_natint n ->
     Rewritten (Specific (Istore_int (n, addr, is_assign)), Ctuple [])
   | Cconst_int _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+  | Cconst_mask _
   | Cconst_natint (_, _)
   | Cconst_float32 (_, _)
   | Cconst_float (_, _)
@@ -329,9 +335,15 @@ let is_offset_out_of_range _byte_offset :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
   Within_range
 
-let insert_move_extcall_arg _exttype _src _dst :
+let insert_move_extcall_arg _exttype (src : Reg.t array) (dst : Reg.t array) :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  Use_default
+  match src, dst with
+  | [| s |], [| d |]
+    when Cmm.equal_machtype_component s.typ Mask
+         && Cmm.equal_machtype_component d.typ Int ->
+    (* The C ABI passes masks in GPRs. *)
+    Rewritten (Op (Reinterpret_cast Cmm.Int64_of_mask), src, dst)
+  | _ -> Use_default
 
 (* Recognize float arithmetic with mem *)
 
@@ -373,12 +385,17 @@ let select_operation'
     (args : Cmm.expression list) dbg ~label_after:_ :
     Cfg_selectgen_target_intf.select_operation_result =
   match op with
-  (* Recognize the LEA instruction *)
+  (* Recognize the NEG and LEA instructions *)
   | Caddi | Caddv | Cadda | Csubi | Cor | Cmuli -> (
-    match select_addressing Word_int (Cop (op, args, dbg)) with
-    | Iindexed _, _ | Iindexed2 0, _ -> Use_default
-    | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg ->
-      Rewritten (specific (Ilea addr), [arg]))
+    match op, args with
+    | Csubi, ([Cconst_int (0, _); arg] | [Cconst_natint (0n, _); arg]) ->
+      Rewritten (specific Ineg, [arg])
+    | _, _ -> (
+      match select_addressing Word_int (Cop (op, args, dbg)) with
+      | Iindexed _, _ | Iindexed2 0, _ -> Use_default
+      | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg
+        ->
+        Rewritten (specific (Ilea addr), [arg])))
   (* Recognize float arithmetic with memory. *)
   | Caddf width -> select_floatarith true width Iaddf Ifloatadd args
   | Csubf width -> select_floatarith false width Isubf Ifloatsub args

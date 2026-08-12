@@ -24,19 +24,19 @@
  addr G:"camlInvalid__check_0_3_code")
 (data
  int 2816
- "camlInvalid__Pmakeblock69":
+ "camlInvalid__Pmakeblock75":
  addr G:"caml_exn_Failure"
- addr L:"camlInvalid__immstring17")
-(data int 2045 "camlInvalid__float43": double 1.)
-(data int 768 "camlInvalid__empty_array40":)
-(data int 2044 "camlInvalid__immstring17": string "lengths" skip 0 byte 0)
+ addr L:"camlInvalid__immstring19")
+(data int 2045 "camlInvalid__float47": double 1.)
+(data int 768 "camlInvalid__empty_array44":)
+(data int 2044 "camlInvalid__immstring19": string "lengths" skip 0 byte 0)
 (function{invalid.ml:24,25-96} camlInvalid__check_0_3_code
      (t1/0: val t2/0: val) : int
  (if
    (!= (or (>>u (<< (load_mut int (+a t1/0 -8)) 8) 17) 1)
      (or (>>u (<< (load_mut int (+a t2/0 -8)) 8) 17) 1))
    (raise_notrace{invalid.ml:25,45-63;stdlib.ml:39,17-33}
-     L:"camlInvalid__Pmakeblock69")
+     L:"camlInvalid__Pmakeblock75")
    1) )
 
 (function{invalid.ml:27,17-68} camlInvalid__bar_1_4_code
@@ -48,14 +48,14 @@
 
 (function{invalid.ml:31,8-30} camlInvalid__foo_2_5_code (param/1: int) : int
  (let
-   (Pmakearray/0 (alloc{invalid.ml:31,17-25} 1024 L:"camlInvalid__float43")
+   (Pmakearray/0 (alloc{invalid.ml:31,17-25} 1024 L:"camlInvalid__float47")
     param/2
       (app{invalid.ml:31,13-30;invalid.ml:28,2-13}
         G:"camlInvalid__check_0_3_code" Pmakearray/0
-        L:"camlInvalid__empty_array40" int))
+        L:"camlInvalid__empty_array44" int))
    (+
      (<<
-       (==f (load float64 (load_mut val L:"camlInvalid__empty_array40")) 0.)
+       (==f (load float64 (load_mut val L:"camlInvalid__empty_array44")) 0.)
        1)
      1)) )
 

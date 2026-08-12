@@ -1004,6 +1004,17 @@ let create_hashtable size init =
   List.iter (fun (key, data) -> Hashtbl.add tbl key data) init;
   tbl
 
+(* This would be better in Obj, but we'd need upstream to do the same *)
+let hash_variant s =
+  let accu = ref 0 in
+  for i = 0 to String.length s - 1 do
+    accu := 223 * !accu + Char.code s.[i]
+  done;
+  (* reduce to 31 bits *)
+  accu := !accu land (1 lsl 31 - 1);
+  (* make it signed for 64 bits architectures *)
+  if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
+
 (* File copy *)
 
 let copy_file ic oc =
@@ -2438,4 +2449,26 @@ module Colours = struct
     if debug_push_and_pop then output ppf "\u{2191}"
 
   let none ppf = push ppf
+end
+
+module Or_null = struct
+  type 'a t = Null | This of 'a [@@or_null]
+
+  let return x = This x
+
+  let bind t f = match t with Null -> Null | This x -> f x
+
+  let ( >>= ) t f = bind t f
+
+  let map f t = match t with Null -> Null | This x -> This (f x)
+
+  let both t1 t2 =
+    match t1 with Null -> Null | This x -> map (fun y -> x, y) t2
+
+  module Syntax = struct
+    let ( let+ ) t f = map f t
+    let ( and+ ) t1 t2 = both t1 t2
+    let ( let* ) t f = bind t f
+    let ( and* ) t1 t2 = both t1 t2
+  end
 end

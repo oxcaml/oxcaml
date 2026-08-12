@@ -389,8 +389,10 @@ binaryop:
   | ADDI                        { Caddi }
   | SUBI                        { Csubi }
   | STAR                        { Cmuli }
-  | DIVI                        { Cdivi }
-  | MODI                        { Cmodi }
+  | DIVI                        { (Cdivi {signed = true}) }
+  | DIVI UNSIGNED               { (Cdivi {signed = false}) }
+  | MODI                        { (Cmodi {signed = true}) }
+  | MODI UNSIGNED               { (Cmodi {signed = false}) }
   | AND                         { Cand }
   | OR                          { Cor }
   | XOR                         { Cxor }

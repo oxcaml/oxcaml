@@ -594,6 +594,7 @@ let ocaml_ignored_flags =
     "-no-x86-peephole-optimize";
     "-no-x86-peephole-remove-mov-to-dead-register";
     "-no-x86-peephole-remove-redundant-cmp";
+    "-no-x86-peephole-remove-redundant-extension";
     "-no-x86-peephole-combine-add-rsp";
     "-verbose-types";
     "-no-verbose-types";
@@ -735,6 +736,7 @@ let ocaml_ignored_flags =
     "-dcfg";
     "-dcfg-invariants";
     "-dcmm-invariants";
+    "-ddebug-avail-sets";
     "-ddebug-available-regs";
     "-dfexpr";
     "-dflambda-invariants";
@@ -766,7 +768,9 @@ let ocaml_ignored_flags =
     "-flambda2-match-in-match";
     "-no-flambda2-match-in-match";
     "-frametables-in-rodata";
-    "-no-frametables-in-rodata"
+    "-no-frametables-in-rodata";
+    "-flambda2-no-simplify-stubs";
+    "-flambda2-simplify-stubs"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -877,7 +881,8 @@ let ocaml_ignored_parametrized_flags =
     "-llvm-flags";
     "-reaper-preserve-direct-calls";
     "-save-ir-after";
-    "-X"
+    "-X";
+    "-dissector-max-linker-parallelism"
   ]
 
 let ocaml_warnings_spec ~error =

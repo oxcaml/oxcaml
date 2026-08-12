@@ -245,7 +245,7 @@ end = struct
       ~params:[param_from_name id]
       ~return:(Pvalue { raw_kind = Pgenval; nullable = Non_nullable })
       ~attr:default_function_attribute ~body ~loc ~mode:alloc_heap
-      ~ret_mode:alloc_heap
+      ~ret_mode:not_alloc_stack
 
   let func ~loc arg_sort body_lam id body =
     func_ ~loc arg_sort id (body_lam body)
@@ -361,11 +361,14 @@ let apply modname field loc args =
        { ap_func = Lazy.force comb;
          ap_args = args;
          ap_probe = None;
+         (* These combinators build quotation AST; they never run the quoted
+            code, so they can't yield *)
+         ap_yielding = Unyielding;
          ap_loc = loc;
          ap_result_layout =
            Pvalue { raw_kind = Pgenval; nullable = Non_nullable };
          ap_region_close = Rc_normal;
-         ap_mode = alloc_heap;
+         ap_mode = not_alloc_stack;
          ap_tailcall = Default_tailcall;
          ap_inlined = Default_inlined;
          ap_specialised = Default_specialise
@@ -461,6 +464,10 @@ module Constant : sig
 
   val float32 : Debuginfo.Scoped_location.t -> string -> t'
 
+  val int8 : Debuginfo.Scoped_location.t -> int -> t'
+
+  val int16 : Debuginfo.Scoped_location.t -> int -> t'
+
   val int32 : Debuginfo.Scoped_location.t -> int32 -> t'
 
   val int64 : Debuginfo.Scoped_location.t -> int64 -> t'
@@ -476,6 +483,14 @@ module Constant : sig
   val unboxed_int64 : Debuginfo.Scoped_location.t -> int64 -> t'
 
   val unboxed_nativeint : Debuginfo.Scoped_location.t -> nativeint -> t'
+
+  val untagged_char : Debuginfo.Scoped_location.t -> int -> t'
+
+  val untagged_int : Debuginfo.Scoped_location.t -> int -> t'
+
+  val untagged_int8 : Debuginfo.Scoped_location.t -> int -> t'
+
+  val untagged_int16 : Debuginfo.Scoped_location.t -> int -> t'
 end = struct
   type s = lambda
 
@@ -504,6 +519,12 @@ end = struct
     apply1 "Constant" "float32" loc
       (Lconst (Const_base (Const_string (x, to_location loc, None))))
 
+  let int8 loc x =
+    apply1 "Constant" "int8" loc (Lconst (Const_base (Const_int x)))
+
+  let int16 loc x =
+    apply1 "Constant" "int16" loc (Lconst (Const_base (Const_int x)))
+
   let int32 loc x =
     apply1 "Constant" "int32" loc (Lconst (Const_base (Const_int32 x)))
 
@@ -522,16 +543,26 @@ end = struct
       (Lconst (Const_base (Const_string (x, to_location loc, None))))
 
   let unboxed_int32 loc x =
-    apply1 "Constant" "unboxed_int32" loc
-      (Lconst (Const_base (Const_unboxed_int32 x)))
+    apply1 "Constant" "unboxed_int32" loc (Lconst (Const_base (Const_int32 x)))
 
   let unboxed_int64 loc x =
-    apply1 "Constant" "unboxed_int64" loc
-      (Lconst (Const_base (Const_unboxed_int64 x)))
+    apply1 "Constant" "unboxed_int64" loc (Lconst (Const_base (Const_int64 x)))
 
   let unboxed_nativeint loc x =
     apply1 "Constant" "unboxed_nativeint" loc
-      (Lconst (Const_base (Const_unboxed_nativeint x)))
+      (Lconst (Const_base (Const_nativeint x)))
+
+  let untagged_char loc x =
+    apply1 "Constant" "untagged_char" loc (Lconst (Const_base (Const_int x)))
+
+  let untagged_int loc x =
+    apply1 "Constant" "untagged_int" loc (Lconst (Const_base (Const_int x)))
+
+  let untagged_int8 loc x =
+    apply1 "Constant" "untagged_int8" loc (Lconst (Const_base (Const_int x)))
+
+  let untagged_int16 loc x =
+    apply1 "Constant" "untagged_int16" loc (Lconst (Const_base (Const_int x)))
 end
 
 module Modes : sig
@@ -693,69 +724,7 @@ module Identifier : sig
 
     val var : Debuginfo.Scoped_location.t -> Var.Type_constr.t -> Loc.t -> t'
 
-    val int : t'
-
-    val char : t'
-
-    val string : t'
-
-    val bytes : t'
-
-    val float : t'
-
-    val float32 : t'
-
-    val bool : t'
-
-    val unit : t'
-
-    val exn : t'
-
-    val array : t'
-
-    val iarray : t'
-
-    val list : t'
-
-    val option : t'
-
-    val nativeint : t'
-
-    val int32 : t'
-
-    val int64 : t'
-
-    val lazy_t : t'
-
-    val extension_constructor : t'
-
-    val floatarray : t'
-
-    val lexing_position : t'
-
-    val expr : t'
-
-    val eval : t'
-
-    val unboxed_float : t'
-
-    val unboxed_nativeint : t'
-
-    val unboxed_int32 : t'
-
-    val unboxed_int64 : t'
-
-    val int8x16 : t'
-
-    val int16x8 : t'
-
-    val int32x4 : t'
-
-    val int64x2 : t'
-
-    val float32x4 : t'
-
-    val float64x2 : t'
+    val builtin : Debuginfo.Scoped_location.t -> string -> t'
   end
 
   module Module_type : sig
@@ -781,45 +750,7 @@ module Identifier : sig
 
     val dot : Debuginfo.Scoped_location.t -> Module.t -> string -> t'
 
-    val false_ : t'
-
-    val true_ : t'
-
-    val void : t'
-
-    val nil : t'
-
-    val cons : t'
-
-    val none : t'
-
-    val some : t'
-
-    val match_failure : t'
-
-    val out_of_memory : t'
-
-    val out_of_fibers : t'
-
-    val invalid_argument : t'
-
-    val failure : t'
-
-    val not_found : t'
-
-    val sys_error : t'
-
-    val end_of_file : t'
-
-    val division_by_zero : t'
-
-    val stack_overflow : t'
-
-    val sys_blocked_io : t'
-
-    val assert_failure : t'
-
-    val undefined_recursive_module : t'
+    val builtin : Debuginfo.Scoped_location.t -> string -> t'
   end
 
   module Field : sig
@@ -888,69 +819,7 @@ end = struct
     let var loc a1 a2 =
       apply2 "Identifier.Type" "var" loc (extract a1) (extract a2)
 
-    let int = use "Identifier.Type" "int"
-
-    let char = use "Identifier.Type" "char"
-
-    let string = use "Identifier.Type" "string"
-
-    let bytes = use "Identifier.Type" "bytes"
-
-    let float = use "Identifier.Type" "float"
-
-    let float32 = use "Identifier.Type" "float32"
-
-    let bool = use "Identifier.Type" "bool"
-
-    let unit = use "Identifier.Type" "unit"
-
-    let exn = use "Identifier.Type" "exn"
-
-    let array = use "Identifier.Type" "array"
-
-    let iarray = use "Identifier.Type" "iarray"
-
-    let list = use "Identifier.Type" "list"
-
-    let option = use "Identifier.Type" "option"
-
-    let nativeint = use "Identifier.Type" "nativeint"
-
-    let int32 = use "Identifier.Type" "int32"
-
-    let int64 = use "Identifier.Type" "int64"
-
-    let lazy_t = use "Identifier.Type" "lazy_t"
-
-    let extension_constructor = use "Identifier.Type" "extension_constructor"
-
-    let floatarray = use "Identifier.Type" "floatarray"
-
-    let lexing_position = use "Identifier.Type" "lexing_position"
-
-    let expr = use "Identifier.Type" "expr"
-
-    let eval = use "Identifier.Type" "eval"
-
-    let unboxed_float = use "Identifier.Type" "unboxed_float"
-
-    let unboxed_nativeint = use "Identifier.Type" "unboxed_nativeint"
-
-    let unboxed_int32 = use "Identifier.Type" "unboxed_int32"
-
-    let unboxed_int64 = use "Identifier.Type" "unboxed_int64"
-
-    let int8x16 = use "Identifier.Type" "int8x16"
-
-    let int16x8 = use "Identifier.Type" "int16x8"
-
-    let int32x4 = use "Identifier.Type" "int32x4"
-
-    let int64x2 = use "Identifier.Type" "int64x2"
-
-    let float32x4 = use "Identifier.Type" "float32x4"
-
-    let float64x2 = use "Identifier.Type" "float64x2"
+    let builtin loc a1 = apply1 "Identifier.Type" "builtin" loc (string ~loc a1)
   end
 
   module Module_type = struct
@@ -978,46 +847,8 @@ end = struct
     let dot loc a1 a2 =
       apply2 "Identifier.Constructor" "dot" loc (extract a1) (string ~loc a2)
 
-    let false_ = use "Identifier.Constructor" "false_"
-
-    let true_ = use "Identifier.Constructor" "true_"
-
-    let void = use "Identifier.Constructor" "void"
-
-    let nil = use "Identifier.Constructor" "nil"
-
-    let cons = use "Identifier.Constructor" "cons"
-
-    let none = use "Identifier.Constructor" "none"
-
-    let some = use "Identifier.Constructor" "some"
-
-    let match_failure = use "Identifier.Constructor" "match_failure"
-
-    let out_of_memory = use "Identifier.Constructor" "out_of_memory"
-
-    let out_of_fibers = use "Identifier.Constructor" "out_of_fibers"
-
-    let invalid_argument = use "Identifier.Constructor" "invalid_argument"
-
-    let failure = use "Identifier.Constructor" "failure"
-
-    let not_found = use "Identifier.Constructor" "not_found"
-
-    let sys_error = use "Identifier.Constructor" "sys_error"
-
-    let end_of_file = use "Identifier.Constructor" "end_of_file"
-
-    let division_by_zero = use "Identifier.Constructor" "division_by_zero"
-
-    let stack_overflow = use "Identifier.Constructor" "stack_overflow"
-
-    let sys_blocked_io = use "Identifier.Constructor" "sys_blocked_io"
-
-    let assert_failure = use "Identifier.Constructor" "assert_failure"
-
-    let undefined_recursive_module =
-      use "Identifier.Constructor" "undefined_recursive_module"
+    let builtin loc a1 =
+      apply1 "Identifier.Constructor" "builtin" loc (string ~loc a1)
   end
 
   module Field = struct
@@ -2063,9 +1894,9 @@ and Exp_desc : sig
 
   val quote : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
-  val antiquote : Debuginfo.Scoped_location.t -> Exp.t -> t'
+  val splice : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
-  val splice : Debuginfo.Scoped_location.t -> Code.t -> t'
+  val unquote : Debuginfo.Scoped_location.t -> Code.t -> t'
 end = struct
   type s = lambda
 
@@ -2231,9 +2062,9 @@ end = struct
 
   let quote loc a1 = apply1 "Exp_desc" "quote" loc (extract a1)
 
-  let antiquote loc a1 = apply1 "Exp_desc" "antiquote" loc (extract a1)
-
   let splice loc a1 = apply1 "Exp_desc" "splice" loc (extract a1)
+
+  let unquote loc a1 = apply1 "Exp_desc" "unquote" loc (extract a1)
 end
 
 and Exp : sig
@@ -2374,6 +2205,8 @@ let quote_constant loc (const : Typedtree.constant) =
     | Const_string (x, _, lopt) -> Constant.string loc x lopt
     | Const_float x -> Constant.float loc x
     | Const_float32 x -> Constant.float32 loc x
+    | Const_int8 x -> Constant.int8 loc x
+    | Const_int16 x -> Constant.int16 loc x
     | Const_int32 x -> Constant.int32 loc x
     | Const_int64 x -> Constant.int64 loc x
     | Const_nativeint x -> Constant.nativeint loc x
@@ -2382,12 +2215,10 @@ let quote_constant loc (const : Typedtree.constant) =
     | Const_unboxed_int32 x -> Constant.unboxed_int32 loc x
     | Const_unboxed_int64 x -> Constant.unboxed_int64 loc x
     | Const_unboxed_nativeint x -> Constant.unboxed_nativeint loc x
-    (* CR metaprogramming aivaskovic:
-      consider implementing in CamlinternalQuote *)
-    | Const_untagged_char _ | Const_int8 _ | Const_int16 _
-    | Const_untagged_int _ | Const_untagged_int8 _ | Const_untagged_int16 _ ->
-      fatal_errorf "Translquote: cannot quote constant %s"
-        (Printpat.pretty_const const))
+    | Const_untagged_char x -> Constant.untagged_char loc x
+    | Const_untagged_int x -> Constant.untagged_int loc x
+    | Const_untagged_int8 x -> Constant.untagged_int8 loc x
+    | Const_untagged_int16 x -> Constant.untagged_int16 loc x)
   |> Constant.wrap
 
 let quote_loc loc =
@@ -2420,9 +2251,9 @@ let quote_arg_label loc = function
        Labelled, Nolabel and Optional"
       Location.print_loc (to_location loc)
 
-let module_for_path loc env path =
+let module_for_path_opt loc env path =
   Env.add_required_global_for_quote path env;
-  let rec module_for_path path =
+  let rec go path =
     match path with
     | Path.Pident id ->
       (match Hashtbl.find_opt vars_env.env_mod id with
@@ -2434,85 +2265,70 @@ let module_for_path loc env path =
             (* We must be in a [Toplevel_lock_for_directive] if we are quoting
              a non-global module. *)
             Ident.name id |> Identifier.Module.toplevel_module loc))
-      |> Identifier.Module.wrap
+      |> Identifier.Module.wrap |> Option.some
     | Path.Pdot (p, s) ->
-      Identifier.Module.dot loc (module_for_path p) s |> Identifier.Module.wrap
-    | _ -> raise Exit
+      go p
+      |> Option.map (fun m ->
+          Identifier.Module.dot loc m s |> Identifier.Module.wrap)
+    | _ -> None
   in
-  module_for_path path
+  go path
 
-let module_type_for_path loc env = function
+let module_type_for_path_opt loc env = function
   | Path.Pident id ->
-    Module_type.of_string loc (Ident.name id) |> Module_type.wrap
+    Module_type.of_string loc (Ident.name id) |> Module_type.wrap |> Option.some
   | Path.Pdot (p, s) ->
-    Module_type.ident loc
-      (Identifier.Module_type.dot loc (module_for_path loc env p) s
-      |> Identifier.Module_type.wrap)
-    |> Module_type.wrap
-  | _ -> raise Exit
+    module_for_path_opt loc env p
+    |> Option.map (fun m ->
+        Module_type.ident loc
+          (Identifier.Module_type.dot loc m s |> Identifier.Module_type.wrap)
+        |> Module_type.wrap)
+  | _ -> None
 
-let type_for_path loc env = function
+let type_for_path_opt loc env = function
   | Path.Pident id ->
     (match Hashtbl.find_opt vars_env.env_tys id with
-      | Some t -> Identifier.Type.var loc t (quote_loc loc)
-      | None -> (
-        match Ident.name id with
-        | "int" -> Identifier.Type.int
-        | "char" -> Identifier.Type.char
-        | "string" -> Identifier.Type.string
-        | "bytes" -> Identifier.Type.bytes
-        | "float" -> Identifier.Type.float
-        | "float32" -> Identifier.Type.float32
-        | "bool" -> Identifier.Type.bool
-        | "unit" -> Identifier.Type.unit
-        | "exn" -> Identifier.Type.exn
-        | "array" -> Identifier.Type.array
-        | "iarray" -> Identifier.Type.iarray
-        | "list" -> Identifier.Type.list
-        | "option" -> Identifier.Type.option
-        | "nativeint" -> Identifier.Type.nativeint
-        | "int32" -> Identifier.Type.int32
-        | "int64" -> Identifier.Type.int64
-        | "lazy_t" -> Identifier.Type.lazy_t
-        | "extension_constructor" -> Identifier.Type.extension_constructor
-        | "floatarray" -> Identifier.Type.floatarray
-        | "lexing_position" -> Identifier.Type.lexing_position
-        | "expr" -> Identifier.Type.expr
-        | "eval" -> Identifier.Type.eval
-        | "float#" -> Identifier.Type.unboxed_float
-        | "nativeint#" -> Identifier.Type.unboxed_nativeint
-        | "int32#" -> Identifier.Type.unboxed_int32
-        | "int64#" -> Identifier.Type.unboxed_int64
-        | "nativeint_u" -> Identifier.Type.unboxed_nativeint
-        | "int32_u" -> Identifier.Type.unboxed_int32
-        | "int64_u" -> Identifier.Type.unboxed_int64
-        | "int8x16" -> Identifier.Type.int8x16
-        | "int16x8" -> Identifier.Type.int16x8
-        | "int32x4" -> Identifier.Type.int32x4
-        | "int64x2" -> Identifier.Type.int64x2
-        | "float32x4" -> Identifier.Type.float32x4
-        | "float64x2" -> Identifier.Type.float64x2
-        | _ -> raise Exit))
-    |> Identifier.Type.wrap
+      | Some t -> Identifier.Type.var loc t (quote_loc loc) |> Option.some
+      | None ->
+        (* CR-someday jbachurski: I am fairly sure we can retire this check as
+           it is redundant with what the environment already does. However,
+           we can keep it if it does not get in the way. *)
+        let name = Ident.name id in
+        if
+          List.exists
+            (fun (name', _) -> String.equal name name')
+            Predef.builtin_type_constrs
+        then Some (Identifier.Type.builtin loc name)
+        else None)
+    |> Option.map Identifier.Type.wrap
   | Path.Pdot (p, s) ->
-    Identifier.Type.dot loc (module_for_path loc env p) s
-    |> Identifier.Type.wrap
-  | _ -> raise Exit
+    module_for_path_opt loc env p
+    |> Option.map (fun m -> Identifier.Type.dot loc m s |> Identifier.Type.wrap)
+  | _ -> None
 
-let type_constr_for_path loc env path arity =
-  Type.constr loc
-    (type_for_path loc env path)
-    (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
-  |> Type.wrap
-
-let value_for_path loc env = function
+let value_for_path_opt loc env = function
   | Path.Pdot (p, s) ->
-    Identifier.Value.dot loc (module_for_path loc env p) s
-    |> Identifier.Value.wrap
-  | _ -> raise Exit
+    module_for_path_opt loc env p
+    |> Option.map (fun m ->
+        Identifier.Value.dot loc m s |> Identifier.Value.wrap)
+  | _ -> None
 
-let value_for_path_opt loc env p =
-  match value_for_path loc env p with res -> Some res | exception Exit -> None
+let try_path kind path_for_kind_opt loc env path =
+  match path_for_kind_opt loc env path with
+  | Some x -> x
+  | None ->
+    fatal_errorf
+      "Translquote [at %a]: cannot quote %s %s - this is either unsupported or \
+       a bug"
+      Location.print_loc (to_location loc) kind (Path.name path)
+
+let module_for_path loc env path =
+  try_path "module" module_for_path_opt loc env path
+
+let module_type_for_path loc env path =
+  try_path "module" module_type_for_path_opt loc env path
+
+let type_for_path loc env path = try_path "type" type_for_path_opt loc env path
 
 let quote_value_ident_path loc env path =
   match value_for_path_opt loc env path with
@@ -2540,6 +2356,12 @@ let type_path env ty =
   let desc = Types.get_desc (Ctype.expand_head_opt env ty) in
   match desc with Tconstr (p, _, _) -> Some p | _ -> None
 
+let type_constr_for_path loc env path arity =
+  Type.constr loc
+    (type_for_path loc env path)
+    (List.init arity (fun _ -> Type.var loc None |> Type.wrap))
+  |> Type.wrap
+
 let quote_record_field loc env (lbl_desc : _ Data_types.gen_label_description) =
   match type_path env lbl_desc.lbl_res with
   | None ->
@@ -2556,55 +2378,51 @@ let quote_record_field loc env (lbl_desc : _ Data_types.gen_label_description) =
       Location.print_loc (to_location loc)
 
 let quote_constructor loc env (constr : Data_types.constructor_description) =
-  let exception Non_builtin of string in
-  (try
-     Identifier.Constructor.wrap
-       (match constr.cstr_tag with
-       | Extension (Path.Pdot (p, name)) ->
-         Identifier.Constructor.dot loc (module_for_path loc env p) name
-       | Extension (Path.Pident name) -> raise (Non_builtin (Ident.name name))
-       | Extension _ ->
-         fatal_errorf "Translquote [at %a]: Papply in extension constructor."
-           Location.print_loc (to_location loc)
-       | Ordinary _ | Null -> (
-         match type_path env constr.cstr_res with
-         | None ->
-           fatal_errorf "Translquote [at %a]: no global path for constructor"
-             Location.print_loc (to_location loc)
-         | Some (Path.Pident _) -> (
-           match constr.cstr_name with
-           | "false" -> Identifier.Constructor.false_
-           | "true" -> Identifier.Constructor.true_
-           | "()" -> Identifier.Constructor.void
-           | "[]" -> Identifier.Constructor.nil
-           | "::" -> Identifier.Constructor.cons
-           | "None" -> Identifier.Constructor.none
-           | "Some" -> Identifier.Constructor.some
-           | "Match_failure" -> Identifier.Constructor.match_failure
-           | "Out_of_memory" -> Identifier.Constructor.out_of_memory
-           | "Out_of_fibers" -> Identifier.Constructor.out_of_fibers
-           | "Invalid_argument" -> Identifier.Constructor.invalid_argument
-           | "Failure" -> Identifier.Constructor.failure
-           | "Not_found" -> Identifier.Constructor.not_found
-           | "Sys_error" -> Identifier.Constructor.sys_error
-           | "End_of_file" -> Identifier.Constructor.end_of_file
-           | "Division_by_zero" -> Identifier.Constructor.division_by_zero
-           | "Stack_overflow" -> Identifier.Constructor.stack_overflow
-           | "Sys_blocked_io" -> Identifier.Constructor.sys_blocked_io
-           | "Assert_failure" -> Identifier.Constructor.assert_failure
-           | "Undefined_recursive_module" ->
-             Identifier.Constructor.undefined_recursive_module
-           | name -> raise (Non_builtin name))
-         | Some (Path.Pdot (p, _)) ->
-           Identifier.Constructor.dot loc
-             (module_for_path loc env p)
-             constr.cstr_name
-         | _ ->
-           fatal_errorf
-             "Translquote [at %a]: unsupported constructor type detected."
-             Location.print_loc (to_location loc)))
-     |> Constructor.ident loc
-   with Non_builtin name -> Constructor.of_string loc name)
+  let local id = Constructor.of_string loc id in
+  let persistent id =
+    id |> Identifier.Constructor.wrap |> Constructor.ident loc
+  in
+  (* CR-someday jbachurski: Similarly to [type_for_path], I'm fairly sure
+     checking for builtin names is redundant. Secondly, I'm not sure
+     why these code paths are split between [Extension] and the rest,
+     nor certain that the [type_path] check is helpful. *)
+  (match constr.cstr_tag with
+    | Extension (Path.Pdot (p, name)) ->
+      Identifier.Constructor.dot loc (module_for_path loc env p) name
+      |> persistent
+    | Extension (Path.Pident id) ->
+      let name = Ident.name id in
+      if
+        List.exists
+          (fun (name', _) -> String.equal name name')
+          Predef.builtin_exns
+      then Identifier.Constructor.builtin loc name |> persistent
+      else local name
+    | Extension _ ->
+      fatal_errorf "Translquote [at %a]: Papply in extension constructor."
+        Location.print_loc (to_location loc)
+    | Ordinary _ | Null -> (
+      match type_path env constr.cstr_res with
+      | None ->
+        fatal_errorf "Translquote [at %a]: no global path for constructor"
+          Location.print_loc (to_location loc)
+      | Some (Path.Pident _) ->
+        let name = constr.cstr_name in
+        if
+          List.exists
+            (fun (name', _) -> String.equal name name')
+            Predef.builtin_constrs
+        then Identifier.Constructor.builtin loc name |> persistent
+        else local name
+      | Some (Path.Pdot (p, _)) ->
+        Identifier.Constructor.dot loc
+          (module_for_path loc env p)
+          constr.cstr_name
+        |> persistent
+      | _ ->
+        fatal_errorf
+          "Translquote [at %a]: unsupported constructor type detected."
+          Location.print_loc (to_location loc)))
   |> Constructor.wrap
 
 let rec quote_modtype_path_of_lid loc = function
@@ -2738,8 +2556,6 @@ let constrain_pat_with_type loc typ pat =
 let maybe_constrain_pat_with_type loc typ exp =
   match typ with Some typ -> constrain_pat_with_type loc typ exp | None -> exp
 
-let any_modes modes = not (List.is_empty modes.mode_desc)
-
 let assert_no_modes modes =
   List.iter
     (fun mode ->
@@ -2761,6 +2577,17 @@ let assert_no_jkinds jkind =
            position."
           Location.print_loc pjka_loc)
     jkind
+
+(* wildcard annotations *)
+let newvar () = Ctype.newvar (Jkind.Builtin.any ~why:Dummy_jkind)
+
+let newcorevar env loc =
+  { ctyp_desc = Ttyp_var (None, None);
+    ctyp_type = newvar ();
+    ctyp_env = env;
+    ctyp_loc = to_location loc;
+    ctyp_attributes = []
+  }
 
 (* Approximate the [core_type] for type annotation from a given [type_expr].
    Used for annotating the results of type inspections in quotes. *)
@@ -2817,6 +2644,7 @@ let type_for_annotation ~env ~loc typ =
         | Tconstr (p, tyl, _) ->
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
+        | Tmod _ -> fatal_errorf "Translquote: unexpected Tmod"
         | Tobject (fields, _) ->
           let Out_type.{ fields; open_row } =
             Out_type.tree_of_typobject_repr fields
@@ -2901,6 +2729,7 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
   let extra, _, _ = extra in
   match extra with
   | Tpat_constraint (ty, ms) ->
+    let ty = Option.value ~default:(newcorevar env loc) ty in
     Pat.constraint_ loc pat_lam
       (quote_core_type ~scopes ty)
       (quote_modes loc ms)
@@ -3331,15 +3160,6 @@ and fun_param_binding ~scopes ~transl stage loc param frest =
   in
   let idents = pat_bound_idents pat in
   let pat_quoted = quote_value_pattern ~scopes pat in
-  let pat_quoted =
-    if any_modes param.fp_mode
-    then
-      Pat.constraint_ loc pat_quoted
-        (Type.var loc None |> Type.wrap)
-        (quote_modes loc param.fp_mode)
-      |> Pat.wrap
-    else pat_quoted
-  in
   let fun_ =
     if is_module pat
     then
@@ -3385,19 +3205,6 @@ and quote_function ~scopes ~transl stage loc fn extras =
       match fn.body with
       | Tfunction_body exp ->
         let exp_quoted = quote_expression ~scopes ~transl stage exp in
-        let exp_quoted =
-          if any_modes fn.ret_mode
-          then
-            Exp.mk loc
-              (quote_modes loc fn.ret_mode
-              |> Type_constraint.constraint_ loc (Type.var loc None |> Type.wrap)
-              |> Type_constraint.wrap
-              |> Exp_desc.constraint_ loc exp_quoted
-              |> Exp_desc.wrap)
-              []
-            |> Exp.wrap
-          else exp_quoted
-        in
         Function.body loc exp_quoted None
       | Tfunction_cases cases ->
         (* This case should be impossible, since there is no syntax for
@@ -3440,11 +3247,11 @@ and quote_module_exp ~transl stage loc env mod_exp =
   | Tmod_ident (path, _) ->
     let m = module_for_path loc env path in
     Module.ident loc m |> Module.wrap
-  | Tmod_apply (funct, arg, _) ->
+  | Tmod_apply (funct, arg, _, _, _) ->
     let transl_funct = quote_module_exp ~transl stage loc env funct in
     let transl_arg = quote_module_exp ~transl stage loc env arg in
     Module.apply loc transl_funct transl_arg |> Module.wrap
-  | Tmod_apply_unit funct ->
+  | Tmod_apply_unit (funct, _) ->
     let transl_funct = quote_module_exp ~transl stage loc env funct in
     Module.apply_unit loc transl_funct |> Module.wrap
   | Tmod_constraint (mod_exp, _, _, _) ->
@@ -3579,16 +3386,6 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
          (type_constraint_of_ambiguity loc env ambiguity)
   | Texp_inspected_type (Polymorphic_parameter poly_param) ->
     (* unused dummy for [core_type.ctyp_type] *)
-    let newvar () = Ctype.newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
-    (* wildcard annotation *)
-    let newcorevar () =
-      { ctyp_desc = Ttyp_var (None, None);
-        ctyp_type = newvar ();
-        ctyp_env = env;
-        ctyp_loc = to_location loc;
-        ctyp_attributes = []
-      }
-    in
     let cty =
       match poly_param with
       | Method (met, ty) ->
@@ -3614,7 +3411,7 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
                     (match sch with
                     | Some sch ->
                       type_for_annotation ~env ~loc:(to_location loc) sch
-                    | None -> newcorevar ()),
+                    | None -> newcorevar env loc),
                     Typemode.transl_alloc_mode [],
                     spine,
                     Typemode.transl_alloc_mode [] );
@@ -3623,7 +3420,7 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
               ctyp_loc = to_location loc;
               ctyp_attributes = []
             })
-          params (newcorevar ())
+          params (newcorevar env loc)
     in
     Exp_desc.constraint_ loc (mk_exp_noattr loc lambda)
       (Type_constraint.constraint_ loc
@@ -3696,7 +3493,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
                   (* CR-soon metaprogramming jbachurski: Support modes on
                      recursive let bindings after refactoring this mess. *)
                   assert_no_modes ms;
-                  Some ct
+                  ct
                 | [] -> None
                 | _ ->
                   fatal_errorf
@@ -3776,7 +3573,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
           e.exp_extra
       in
       Exp_desc.function_ loc fn
-    | Texp_apply (fn, args, _, _, _) ->
+    | Texp_apply (fn, args, _, _, _, _) ->
       let fn = quote_expression ~scopes ~transl stage fn in
       let args =
         List.filter
@@ -3935,14 +3732,14 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
     | Texp_lazy exp ->
       let exp = quote_expression ~scopes ~transl stage exp in
       Exp_desc.lazy_ loc exp
-    | Texp_quotation exp ->
+    | Texp_quote exp ->
       let exp = quote_expression ~scopes ~transl (stage + 1) exp in
       Exp_desc.quote loc exp
-    | Texp_antiquotation exp ->
+    | Texp_splice exp ->
       if stage > 0
       then
         let exp = quote_expression ~scopes ~transl (stage - 1) exp in
-        Exp_desc.antiquote loc exp
+        Exp_desc.splice loc exp
       else
         let exp =
           (* Local allocations are not expected to escape from this expression.
@@ -3950,7 +3747,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
              need to indicate local mode. *)
           Lregion (transl exp, layout_any_value)
         in
-        Exp_desc.splice loc (Code.inject exp)
+        Exp_desc.unquote loc (Code.inject exp)
     | Texp_new (path, _, _, _) ->
       Exp_desc.new_ loc (quote_value_ident_path loc env path)
     | Texp_pack m ->

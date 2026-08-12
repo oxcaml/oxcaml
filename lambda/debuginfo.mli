@@ -137,7 +137,8 @@ val to_structured_mangling_path :
 module Dbg : sig
   type t
 
-  (** [compare] and [hash] ignore [dinfo_scopes] field of item *)
+  (** [compare] and [hash] ignore the [dinfo_scopes] field of item;
+      [compare] additionally ignores [dinfo_function_symbol]. *)
 
   val is_none : t -> bool
 

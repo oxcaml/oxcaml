@@ -35,7 +35,10 @@
 (** Errors that can occur when measuring object files. *)
 type error =
   | File_not_found of string
-  | Duplicate_file of string
+  | Unrecognized_input of
+      { filename : string;
+        magic : string
+      }  (** The file is neither an ELF relocatable object nor an ar archive. *)
 
 (** Exception wrapper for measurement errors. *)
 exception Error of error
@@ -48,7 +51,10 @@ val report_error : Format_doc.formatter -> error -> unit
     Note: Passthrough files (C stubs from -cclib, runtime libraries) are
     separated before measuring and don't use this type. *)
 type file_origin =
-  | OCaml  (** OCaml-compiled code (.o from .cmx, .a from .cmxa) *)
+  | OCaml of { required_symbols : Asm_targets.Asm_symbol.t list }
+      (** OCaml-compiled code (.o from .cmx, .a from .cmxa), with the entry
+          symbols of the required compilation units it provides (see
+          {!Partial_link.link_one_partition}). *)
   | Startup  (** Startup object file *)
   | Cached_genfns  (** Cached generic functions *)
 
@@ -67,6 +73,10 @@ module File_size : sig
 
   (** Returns the origin of the file. *)
   val origin : t -> file_origin
+
+  (** Returns the required entry symbols of the file's origin; empty for
+      non-OCaml origins. *)
+  val required_symbols : t -> Asm_targets.Asm_symbol.t list
 end
 
 (** [measure_files unix ~files] computes the allocated section size for each

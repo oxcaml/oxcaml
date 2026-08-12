@@ -1,7 +1,7 @@
 let code f_0 deleted in
 let code loopify(never) size(31) newer_version_of(f_0)
       f_0_1 (x : imm tagged, init : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let prim = %int_comp.le (0, x) in
@@ -25,7 +25,9 @@ let code loopify(never) size(31) newer_version_of(f_0)
              | 0 -> k (int_add)
              | 1 -> k2 (for_next_naked, int_add))
 in
-let $camlExtra_args_and_staticraise__f_1 = closure f_0_1 @f in
+let $camlExtra_args_and_staticraise__f_1 =
+  closure f_0_1 @f &toplevel.alloc_region
+in
 let $camlExtra_args_and_staticraise =
   Block 0 ($camlExtra_args_and_staticraise__f_1)
 in
