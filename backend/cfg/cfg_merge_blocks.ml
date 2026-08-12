@@ -1,7 +1,7 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Int = Numbers.Int
 module List = ListLabels
 
@@ -48,7 +48,11 @@ end = struct
       && Misc.Stdlib.Array.equal equal_reg left_res right_res
       && equal_desc left_desc right_desc
       (* CR-someday xclerc for xclerc: consider definin equal in `Debuginfo` *)
-      && Debuginfo.compare left_dbg right_dbg = 0
+      (* Debug info is allowed to differ (the merged-away paths inherit the
+         representative block's locations), unless the user has asked for
+         debugging to take precedence over code generation. *)
+      && ((not !Dwarf_flags.gdwarf_may_alter_codegen)
+         || Debuginfo.compare left_dbg right_dbg = 0)
 
   let basic_block :
       equal_reg:(Reg.t -> Reg.t -> bool) ->

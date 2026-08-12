@@ -170,7 +170,11 @@ module type Common = sig
   val submode_err :
     Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
-  val equate : lr -> lr -> (unit, equate_error) result
+  (** Similar to [submode_err], but checks the two modes are equal by submoding
+      in both directions. *)
+  val equate_err : Mode_hint.pinpoint -> lr -> lr -> unit
+
+  val equate : ?pp:Mode_hint.pinpoint -> lr -> lr -> (unit, equate_error) result
 
   (** Similiar to [submode], but crashes the compiler if errors. Use this
       function if the submode is guaranteed to succeed. *)
@@ -205,6 +209,10 @@ module type Common_axis = sig
   type 'd hint_const constraint 'd = 'l * 'r
 
   val of_const : ?hint:'d hint_const -> Const.t -> 'd t
+
+  type 'd hint_morph constraint 'd = 'l * 'r
+
+  val apply_hint : 'd hint_morph -> 'd t -> 'd t
 end
 
 module type Axis = sig
@@ -212,7 +220,7 @@ module type Axis = sig
   type 'a t
 
   (** Compare two axes in implication order. If A implies B, then A is before B.
-  *)
+      This is also observed by [printtyp]. *)
   val compare : 'a t -> 'b t -> int
 
   type packed = P : 'a t -> packed
@@ -360,6 +368,7 @@ module type S = sig
         with module Const := Const
          and type 'd t = (Const.t, 'd pos) mode
          and type 'd hint_const := 'd pos_hint_const
+         and type 'd hint_morph := 'd pos_hint_morph
   end
 
   module type Common_axis_neg = sig
@@ -370,6 +379,7 @@ module type S = sig
         with module Const := Const
          and type 'd t = (Const.t, 'd neg) mode
          and type 'd hint_const := 'd neg_hint_const
+         and type 'd hint_morph := 'd neg_hint_morph
   end
 
   module Locality : sig
@@ -898,6 +908,8 @@ module type S = sig
       val of_value : Value.Axis.packed -> packed
 
       val to_value : packed -> Value.Axis.packed
+
+      val compare : packed -> packed -> int
     end
 
     type atom = Atom : 'a Axis.t * 'a -> atom
@@ -909,6 +921,8 @@ module type S = sig
 
       (** Test if the given modality is a constant modality. *)
       val is_constant : 'a Axis.t -> 'a -> bool
+
+      val le : 'a Axis.t -> 'a -> 'a -> bool
 
       val print : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end

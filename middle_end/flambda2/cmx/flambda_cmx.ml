@@ -28,23 +28,23 @@ type loader =
 let load_cmx_file_contents loader comp_unit =
   let accessible_comp_unit =
     Compilation_unit.which_cmx_file comp_unit
-      ~accessed_by:(Compilation_unit.get_current_exn ())
+      ~accessed_by:(Current_unit.get_cu_exn ())
   in
   let cmx_file =
     Compilation_unit.to_global_name_without_prefix accessible_comp_unit
   in
   match Imported_unit_map.find cmx_file loader.imported_units with
   | typing_env_or_none -> typing_env_or_none
-  | exception Not_found -> (
-    match loader.get_module_info accessible_comp_unit with
-    | None ->
-      (* To make things easier to think about, we never retry after a .cmx load
-         fails. *)
-      loader.imported_units
-        <- Imported_unit_map.add cmx_file None loader.imported_units;
-      None
-    | Some cmx ->
-      Profile.record_call ~accumulate:true "load_cmx" (fun () ->
+  | exception Not_found ->
+    Profile.record_call ~accumulate:true "load_cmx" (fun () ->
+        match loader.get_module_info accessible_comp_unit with
+        | None ->
+          (* To make things easier to think about, we never retry after a .cmx
+             load fails. *)
+          loader.imported_units
+            <- Imported_unit_map.add cmx_file None loader.imported_units;
+          None
+        | Some cmx ->
           let typing_env, all_code =
             Flambda_cmx_format.import_typing_env_and_code cmx
           in
@@ -54,7 +54,7 @@ let load_cmx_file_contents loader comp_unit =
           loader.imported_units
             <- Imported_unit_map.add cmx_file (Some typing_env)
                  loader.imported_units;
-          Some typing_env))
+          Some typing_env)
 
 let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
@@ -117,9 +117,7 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
       in
       let fold_code_id names_to_add code_id =
         if
-          not
-            (Code_id.in_compilation_unit code_id
-               (Compilation_unit.get_current_exn ()))
+          not (Code_id.in_compilation_unit code_id (Current_unit.get_cu_exn ()))
         then
           (* Code in units upon which the current unit depends cannot reference
              this unit. *)
@@ -145,7 +143,7 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
           not
             (Compilation_unit.equal
                (Name.compilation_unit name)
-               (Compilation_unit.get_current_exn ()))
+               (Current_unit.get_cu_exn ()))
         then
           (* Names in units upon which the current unit depends cannot reference
              this unit. *)

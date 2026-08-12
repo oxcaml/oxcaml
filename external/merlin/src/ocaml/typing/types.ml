@@ -150,6 +150,7 @@ and type_desc =
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
+  | Tmod of type_expr * mod_bounds
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   | Tfield of string * field_kind * type_expr * type_expr
   | Tquote of type_expr
@@ -164,6 +165,7 @@ and type_desc =
   | Trepr of type_expr * Jkind_types.Sort.univar list
   | Tpackage of package
   | Tof_kind of jkind_lr
+  | Tbox of type_expr
 
 and arg_label =
   | Nolabel
@@ -242,7 +244,7 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t
+  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -505,6 +507,7 @@ and mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Product of mixed_product_shape
   | Void
@@ -543,6 +546,7 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   | Constructor_mixed of mixed_product_shape
+  | Constructor_variable
 
 and label_declaration =
   {
@@ -714,7 +718,7 @@ module type Wrapped = sig
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Staticity.Const.t
+  and persistent_signature = signature * Mode.Value.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -872,13 +876,14 @@ let rec equal_mixed_block_element_up_to_scannable_axes e1 e2 =
   | Bits8, Bits8 | Bits16, Bits16
   | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Mask, Mask
   | Void, Void
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal
          equal_mixed_block_element_up_to_scannable_axes es1 es2
   | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
-    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
+    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
     | Product _ | Void ), _
     -> false
 
@@ -894,6 +899,7 @@ let rec compare_mixed_block_element e1 e2 =
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Mask, Mask
   | Void, Void
     -> 0
   | Product es1, Product es2
@@ -924,6 +930,8 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Vec256 -> 1
   | Vec512, _ -> -1
   | _, Vec512 -> 1
+  | Mask, _ -> -1
+  | _, Mask -> 1
   | Void, _ -> -1
   | _, Void -> 1
 
@@ -935,7 +943,9 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | (Constructor_mixed _ | Constructor_uniform_value), _ -> false
+  | Constructor_variable, Constructor_variable -> true
+  | (Constructor_mixed _ | Constructor_uniform_value | Constructor_variable), _
+    -> false
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   match r1, r2 with
@@ -1008,6 +1018,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Base Vec128 -> Vec128
   | Base Vec256 -> Vec256
   | Base Vec512 -> Vec512
+  | Base Mask -> Mask
   | Base Word -> Word
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
@@ -1090,6 +1101,7 @@ let rec mixed_block_element_to_string = function
   | Vec128 -> "Vec128"
   | Vec256 -> "Vec256"
   | Vec512 -> "Vec512"
+  | Mask -> "Mask"
   | Word -> "Word"
   | Untagged_immediate -> "Untagged_immediate"
   | Product es ->
@@ -1111,6 +1123,7 @@ let mixed_block_element_to_lowercase_string = function
   | Vec128 -> "vec128"
   | Vec256 -> "vec256"
   | Vec512 -> "vec512"
+  | Mask -> "mask"
   | Word -> "word"
   | Untagged_immediate -> "untagged_immediate"
   | Product es ->
@@ -1352,6 +1365,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tquote _
         | Tsplice _
         | Tquote_eval _
+        | Tbox _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in
@@ -1364,9 +1378,10 @@ let best_effort_compare_type_expr te1 te2 =
         | Ttuple _ -> 2
         | Tunboxed_tuple _ -> 3
         | Tconstr (_, _, _) -> 5
-        | Tpoly (_, _) -> 6
-        | Tof_kind _ -> 7
-        | Trepr (_, _) -> 8
+        | Tmod (_, _) -> 6
+        | Tpoly (_, _) -> 7
+        | Tof_kind _ -> 8
+        | Trepr (_, _) -> 9
         (* Types we should never see *)
         | Tlink _ -> Misc.fatal_error "Tlink encountered in With_bounds_types"
       in
@@ -1385,6 +1400,9 @@ let best_effort_compare_type_expr te1 te2 =
         if p = 0
         then List.compare (aux (depth + 1)) args1 args2
         else p
+      | Tmod (t1, mod_bounds1), Tmod (t2, mod_bounds2) ->
+        let c = aux (depth + 1) t1 t2 in
+        if c = 0 then Stdlib.compare mod_bounds1 mod_bounds2 else c
       | Tpoly (t1, ts1), Tpoly (t2, ts2) ->
         (* NOTE: this is mostly broken according to the semantics of type_expr, but probably
            fine for the particular "best-effort" comparison we want. *)

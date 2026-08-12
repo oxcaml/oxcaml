@@ -289,6 +289,7 @@ module Cmm_comparator = struct
     | Cconst_vec128 (v1, _), Cconst_vec128 (v2, _) -> equal_vec128_bits v1 v2
     | Cconst_vec256 (v1, _), Cconst_vec256 (v2, _) -> equal_vec256_bits v1 v2
     | Cconst_vec512 (v1, _), Cconst_vec512 (v2, _) -> equal_vec512_bits v1 v2
+    | Cconst_mask (n1, _), Cconst_mask (n2, _) -> Int64.equal n1 n2
     | Cconst_symbol (s1, _), Cconst_symbol (s2, _) -> equal_symbol s1 s2
     | Cvar v1, Cvar v2 -> V.equal v1 v2
     | Clet (v1, def1, body1), Clet (v2, def2, body2) ->
@@ -359,6 +360,7 @@ module Cmm_comparator = struct
         | Cconst_vec128 (_, _)
         | Cconst_vec256 (_, _)
         | Cconst_vec512 (_, _)
+        | Cconst_mask (_, _)
         | Cconst_symbol (_, _)
         | Cvar _
         | Clet (_, _, _)

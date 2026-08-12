@@ -1,7 +1,7 @@
 let $camlTests14__first_const = Block 0 () in
 (let code size(5)
        set_0 (t : val)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -10,7 +10,7 @@ let $camlTests14__first_const = Block 0 () in
  in
  let code size(7)
        nth_char_1 (s : val, n : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -21,7 +21,7 @@ let $camlTests14__first_const = Block 0 () in
  in
  let code size(32)
        needs_try_region_2 (param : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
@@ -52,7 +52,7 @@ let $camlTests14__first_const = Block 0 () in
  in
  let code size(12)
        gadt_match_3 (x : [ 0 |1 | 0 of imm tagged ], n : val)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : val =
    let next_depth = rec_info (succ my_depth) in
@@ -64,11 +64,14 @@ let $camlTests14__first_const = Block 0 () in
        let Popaque = %opaque (n) in
        cont k1 (Popaque)
  in
- let set = closure set_0 @set in
- let nth_char = closure nth_char_1 @nth_char in
- let needs_try_region = closure needs_try_region_2 @needs_try_region in
- let gadt_match = closure gadt_match_3 @gadt_match in
- let Pmakeblock = %block.[`0`] (set, nth_char, needs_try_region, gadt_match)
+ let set = closure set_0 @set &toplevel.alloc_region in
+ let nth_char = closure nth_char_1 @nth_char &toplevel.alloc_region in
+ let needs_try_region =
+   closure needs_try_region_2 @needs_try_region &toplevel.alloc_region
+ in
+ let gadt_match = closure gadt_match_3 @gadt_match &toplevel.alloc_region in
+ let Pmakeblock =
+   %block.[`0`].`toplevel` (set, nth_char, needs_try_region, gadt_match)
  in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =

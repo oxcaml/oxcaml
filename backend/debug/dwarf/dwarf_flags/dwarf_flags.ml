@@ -183,18 +183,23 @@ let gdwarf_may_alter_codegen_experimental = ref false
 
 let dwarf_inlined_frames = ref false
 
+let debug_avail_sets = ref false
+
 let default_gdwarf_compression = "zlib"
 
-let gdwarf_compression = ref default_gdwarf_compression
+let gdwarf_compression : string option ref = ref None
 
 let ddwarf_metrics = ref false
 
 let ddwarf_metrics_output_file : string option ref = ref None
 
 let get_dwarf_compression_flag () =
-  if !dwarf_inlined_frames || not !restrict_to_upstream_dwarf
-  then Some !gdwarf_compression
-  else None
+  match !gdwarf_compression with
+  | Some _ as compression -> compression
+  | None ->
+    if !dwarf_inlined_frames || not !restrict_to_upstream_dwarf
+    then Some default_gdwarf_compression
+    else None
 
 let get_dwarf_compression_format () =
   match get_dwarf_compression_flag () with
