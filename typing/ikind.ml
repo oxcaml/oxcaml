@@ -805,9 +805,9 @@ let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
   let base, coeffs =
     Ldd.decompose_into_linear_terms ~universe:provenance_vars sub_poly
   in
-  if Ldd.leq_with_reason base super_poly <> []
-  then None
-  else
+  match Ldd.leq_with_reason base super_poly with
+  | _ :: _ -> None
+  | [] ->
     List.combine provenance_names coeffs
     |> List.filter_map (fun (name, coeff) ->
         match (name : Ldd.Name.t) with
