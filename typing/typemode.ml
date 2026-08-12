@@ -690,10 +690,10 @@ let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
      [untransl_mod_bounds] relies on those implications being present in order
      to omit the implied modes when printing, so close the bounds first. *)
   let crossing = Jkind.Mod_bounds.crossing bounds in
-  let annotated =
-    Modality.Const.diff Modality.Const.id (Crossing.to_modality crossing)
-  in
   let modality = Crossing.to_modality crossing in
+  let annotated =
+    Modality.Const.diff Modality.Const.id modality
+  in
   let implied = List.concat_map implied_modalities annotated in
   let crossing =
     List.fold_left
