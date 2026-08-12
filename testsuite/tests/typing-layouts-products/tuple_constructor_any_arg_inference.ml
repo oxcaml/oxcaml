@@ -1,43 +1,49 @@
 (* TEST
- flags = "-extension layouts_beta";
+ reference =
+   "${test_source_directory}/tuple_constructor_any_arg_inference.reference";
  flambda2;
- compile_only = "true";
- ocamlopt_opt_exit_status = "2";
- setup-ocamlopt.opt-build-env;
- ocamlopt.opt;
+ {
+   flags = "-extension layouts_beta";
+   native;
+ }{
+   flags = "-extension layouts_beta -Oclassic";
+   native;
+ }{
+   flags = "-extension layouts_beta -O3";
+   native;
+ }{
+   flags = "-extension layouts_beta";
+   bytecode;
+ }
 *)
 
-(* A variable-representation variant used in functions that don't constrain the
-   sort variable *)
+(* Specializing [any]-arguments in variants *)
 
 external box_float : float# -> float = "%box_float"
 
 type ('a : any) t = A of 'a
 
-let f x =
-  let t = A x in
-  t
+(* [x] later gets specialized to [float64] *)
+let mk_t x = A x
 
-let _ = f #3.14
+let _ = mk_t #3.14
 
-let g (A x : _ t) : float# = x
+(* This function determines the representation via its annotations *)
+let get_float (A x : _ t) : float# = x
 
 type ('a : any) pair = P of 'a * int
 
-let mk x =
-  let p = P (x, 1) in
-  p
-
-let mk_up () = mk #(21, "twenty-one")
-
-let mk_float x =
-  let p = P (x, 2) in
-  p
+(* In each of these, [x] later gets specialized to a different sort *)
+let mk_up x = P (x, 1)
+let mk_float x = P (x, 2)
+let mk_string x = P (x, 3)
 
 let () =
-  let t = f #2.5 in
-  Printf.printf "g (f #2.5): %.2f\n" (box_float (g t));
-  let (P (#(i, s), n)) = mk_up () in
+  let t = mk_t #2.5 in
+  Printf.printf "get_float (mk_t #2.5): %.2f\n" (box_float (get_float t));
+  let (P (#(i, s), n)) = mk_up #(21, "twenty-one") in
   Printf.printf "mk_up: %d %s %d\n" i s n;
   let (P (x, n)) = mk_float #6.25 in
-  Printf.printf "mk_float #6.25: %.2f %d\n" (box_float x) n
+  Printf.printf "mk_float #6.25: %.2f %d\n" (box_float x) n;
+  let (P (s, n)) = mk_string "hi" in
+  Printf.printf "mk_string: %s %d\n" s n
