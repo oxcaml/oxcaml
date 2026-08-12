@@ -1,0 +1,4 @@
+Before Thread.create: Null
+Inside thread body: This 50000
+After normal thread join: Null
+After Thread.exit join: Null

@@ -51,7 +51,10 @@ module type S = sig
     num_bytes:int ->
     dbginfo:Cmm.alloc_dbginfo ->
     res:Reg.t ->
+    mode:Cmm.Alloc_mode.t ->
     relaxed_instruction
+
+  val relax_stackcheck : max_frame_size_bytes:int -> relaxed_instruction
 
   val relax_condbranch :
     Operation.test -> Cmm.label -> arg:Reg.t array -> relaxed_instruction

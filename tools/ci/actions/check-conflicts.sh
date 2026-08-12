@@ -27,10 +27,21 @@ start_marker="<<<<<<<"
 middle_marker="|||||||"
 end_marker=">>>>>>>"
 
+# Files that intentionally contain conflict markers.
+exempt=(
+  "external/merlin/HACKING.jst.md"
+)
+
+exclusions=()
+for path in "${exempt[@]}"; do
+  exclusions+=(":(exclude)${path}")
+done
+
 matches=$(git grep --no-color -n \
   -e "^${start_marker}" \
   -e "^${middle_marker}" \
-  -e "^${end_marker}") || true
+  -e "^${end_marker}" \
+  -- . "${exclusions[@]}") || true
 
 if [ -n "$matches" ]; then
   {

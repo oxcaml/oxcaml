@@ -9,7 +9,7 @@ title: Syntax
 [overview]: ../intro
 [manual]: https://ocaml.org/manual/language.html
 [unboxed types]: ../../unboxed-types/intro
-[nullability]: ../non-modal#nullability
+[nullability]: ../../unboxed-types/intro#nullability
 [externality]: ../non-modal#externality
 
 This page describes user-facing concerns about kind annotations. You may
@@ -118,8 +118,6 @@ The abbreviations defined in the language are as follows:
       confuse update-in-place of the pointed-to memory, if there was any)
     Using `mod everything` is appropriate for data represented directly,
     like `int` or `float32#`.
-
-* `any_non_null = any non_null separable`
 
 * `value = value_or_null non_null separable`
 
@@ -497,12 +495,17 @@ atomic-kind ::= layout
 
 layout ::= `any`
        |   `value_or_null`
+       |   `void`
        |   `float64`
        |   `float32`
        |   `word`
-       |   `bits64`
+       |   `bits8`
+       |   `bits16`
        |   `bits32`
+       |   `bits64`
        |   `vec128`
+       |   `vec256`
+       |   `vec512`
        |   layout scannable_axis
 
 scannable_axis ::= `non_null`
@@ -513,13 +516,17 @@ scannable_axis ::= `non_null`
               |    `separable`
               |    `maybe_separable`
 
-kind_abbreviation ::= `any_non_null`
-                  |   `value`
+kind_abbreviation ::= `value`
                   |   `immediate`
+                  |   `immediate_or_null`
                   |   `immediate64`
+                  |   `immediate64_or_null`
                   |   `immutable_data`
+                  |   `immutable_data_or_null`
                   |   `sync_data`
+                  |   `sync_data_or_null`
                   |   `mutable_data`
+                  |   `mutable_data_or_null`
 
 mod-bounds ::= `everything`
            |   { mod-bound }+

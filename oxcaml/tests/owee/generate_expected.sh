@@ -23,7 +23,8 @@ echo "Archive: $ARCHIVE"
 
 # Count members by parsing headers
 OFFSET=8
-FILESIZE=$(stat -c%s "$ARCHIVE")
+# Follow symlinks (-L) to deal with Dune sandboxing
+FILESIZE=$(stat -L -c%s "$ARCHIVE")
 MEMBER_COUNT=0
 declare -a MEMBER_NAMES
 declare -a MEMBER_SIZES

@@ -1,5 +1,6 @@
 (* TEST
    include stdlib_stable;
+   flags = "-w -220";
    expect;
 *)
 

@@ -610,9 +610,9 @@ type s4 = string t4
 and ('a : any) t4
 |}];;
 
-type ('a : void) void4 = Void4  of 'a;;
+type ('a : void) void4 = Void4  of 'a [@immediate_all_void_constructor];;
 [%%expect{|
-type ('a : void) void4 = Void4 of 'a
+type ('a : void) void4 = Void4 of 'a [@immediate_all_void_constructor]
 |}];;
 
 type ('a : any) any4 = Any4 of 'a
@@ -2914,7 +2914,7 @@ Error: This function application uses an expression with type "'a"
 |}]
 
 let f (x : ('a : value)) = x ()
-let f (x : ('a : value mod uncontended)) = x ()
+let f (x : ('a : value mod aliased)) = x ()
 
 [%%expect{|
 val f : (unit -> 'a) -> 'a = <fun>

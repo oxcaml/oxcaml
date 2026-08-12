@@ -47,7 +47,7 @@ let main argv ppf =
     Compenv.readenv ppf Before_args;
     Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous program;
-    Compmisc.read_clflags_from_env ();
+    Location.read_clflags_from_env ();
     if !Clflags.plugin then
       Compenv.fatal "-plugin is only supported up to OCaml 4.08.0";
     try

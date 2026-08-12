@@ -37,8 +37,9 @@ val prepare_cmx_file_contents :
   module_symbol:Symbol.t ->
   used_value_slots:Value_slot.Set.t ->
   exported_offsets:Exported_offsets.t ->
+  sections:File_sections.Builder.t ->
   Exported_code.t ->
-  Name_occurrences.t * Flambda_cmx_format.t option
+  Name_occurrences.t * Flambda_cmx_format.raw option
 
 val prepare_cmx_from_approx :
   machine_width:Target_system.Machine_width.t ->
@@ -46,5 +47,6 @@ val prepare_cmx_from_approx :
   module_symbol:Symbol.t ->
   exported_offsets:Exported_offsets.t ->
   used_value_slots:Value_slot.Set.t ->
+  sections:File_sections.Builder.t ->
   Exported_code.t ->
-  Name_occurrences.t * Flambda_cmx_format.t option
+  Name_occurrences.t * Flambda_cmx_format.raw option

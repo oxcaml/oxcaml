@@ -40,6 +40,7 @@ type native_repr =
   | Same_as_ocaml_repr of Jkind_types.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
+  | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Unpacked_product of Jkind_types.Sort.Const.t
 
@@ -101,6 +102,7 @@ let check_ocaml_value = function
   | _, Repr_poly -> Bad_layout
   | _, Unboxed_float _
   | _, Unboxed_vector _
+  | _, Unboxed_mask
   | _, Unboxed_or_untagged_integer _
   | _, Unpacked_product _ -> Bad_attribute
 
@@ -283,6 +285,7 @@ let print p osig_val_decl =
                                     | Untagged_int16) -> false
     | _, Unboxed_float _
     | _, Unboxed_vector _
+    | _, Unboxed_mask
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint) ->
       true
@@ -303,6 +306,7 @@ let print p osig_val_decl =
     | _, Same_as_ocaml_repr _
     | _, Unboxed_float _
     | _, Unboxed_vector _
+    | _, Unboxed_mask
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint)
     | _, Unpacked_product _
@@ -345,6 +349,7 @@ let print p osig_val_decl =
      | Repr_poly -> []
      | Unboxed_float _
      | Unboxed_vector _
+     | Unboxed_mask
      | Unboxed_or_untagged_integer (Unboxed_int32 | Unboxed_int64
                                    | Unboxed_nativeint) ->
        if all_unboxed then [] else [oattr_unboxed]
@@ -430,36 +435,41 @@ let equal_native_repr nr1 nr2 =
   match nr1, nr2 with
   | Repr_poly, Repr_poly -> true
   | Repr_poly, (Unboxed_float _ | Unboxed_or_untagged_integer _
-               | Unboxed_vector _ | Same_as_ocaml_repr _
+               | Unboxed_vector _ | Unboxed_mask | Same_as_ocaml_repr _
                | Unpacked_product _)
   | (Unboxed_float _ | Unboxed_or_untagged_integer _
-    | Unboxed_vector _ | Same_as_ocaml_repr _
+    | Unboxed_vector _ | Unboxed_mask | Same_as_ocaml_repr _
     | Unpacked_product _), Repr_poly
     -> false
   | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Same_as_ocaml_repr _,
     (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
   | Unboxed_float f1, Unboxed_float f2 -> equal_boxed_float f1 f2
   | Unboxed_float _,
     (Same_as_ocaml_repr _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
   | Unboxed_vector vi1, Unboxed_vector vi2 ->
     equal_unboxed_vector_size (unboxed_vector vi1) (unboxed_vector vi2)
   | Unboxed_vector _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_or_untagged_integer _ | Unboxed_mask | Unpacked_product _) ->
+    false
+  | Unboxed_mask, Unboxed_mask -> true
+  | Unboxed_mask,
+    (Same_as_ocaml_repr _ | Unboxed_float _ | Unboxed_vector _ |
      Unboxed_or_untagged_integer _ | Unpacked_product _) -> false
   | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 ->
     equal_unboxed_or_untagged_integer bi1 bi2
   | Unboxed_or_untagged_integer _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
   | Unpacked_product s1, Unpacked_product s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Unpacked_product _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unboxed_or_untagged_integer _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _) -> false
 
 let equal_effects ef1 ef2 =
   match ef1, ef2 with
@@ -501,7 +511,8 @@ module Repr_check = struct
 
   let value_or_unboxed_or_untagged = function
     | Same_as_ocaml_repr (Base Scannable)
-    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _ -> true
+    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
+    | Unboxed_mask -> true
     | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ -> false
 
   let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
@@ -514,12 +525,12 @@ module Repr_check = struct
     | Same_as_ocaml_repr s ->
       if sort_is_product s then [Product_arg] else []
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Unpacked_product _ | Repr_poly -> []
+    | Unboxed_mask | Unpacked_product _ | Repr_poly -> []
 
   let c_stub_return_errors = function
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Repr_poly -> []
+    | Unboxed_mask | Repr_poly -> []
     | Unpacked_product _ -> [Unpacked_product_return]
     | Same_as_ocaml_repr (Product [s1; s2]) ->
       if (sort_is_product s1) ||
@@ -587,99 +598,105 @@ end
    with [@layout_poly] (see [make_native_repr] and the note above
    [error_if_containing_unexpected_jkind]).  Here we have more speicific checks
    for individual primitives. *)
-let prim_has_valid_reprs ~loc prim =
-  let open Repr_check in
+module Primitive_reprs = struct
+  module C = Jkind_types.Sort.Const
 
-  let module C = Jkind_types.Sort.Const in
-
-  let check =
-    (* Corresponds to [indexing_primitives] in [translprim.ml]. *)
-    let stringlike_indexing_primitives =
-      let widths : (_ * _ * Jkind_types.Sort.Const.t) list =
-        [
-          ("8", "", C.scannable);
-          ("i8", "", C.scannable);
-          ("16", "", C.scannable);
-          ("i16", "", C.scannable);
-          ("32", "", C.scannable);
-          ("f32", "", C.scannable);
-          ("64", "", C.scannable);
-          ("a128", "", C.scannable);
-          ("u128", "", C.scannable);
-          ("a256", "", C.scannable);
-          ("u256", "", C.scannable);
-          ("a512", "", C.scannable);
-          ("u512", "", C.scannable);
-          ("8", "#", C.bits8);
-          ("i8", "#", C.bits8);
-          ("16", "#", C.bits16);
-          ("i16", "#", C.bits16);
-          ("32", "#", C.bits32);
-          ("f32", "#", C.float32);
-          ("64", "#", C.bits64);
-          ("a128", "#", C.vec128);
-          ("u128", "#", C.vec128);
-          ("a256", "#", C.vec256);
-          ("u256", "#", C.vec256);
-          ("a512", "#", C.vec512);
-          ("u512", "#", C.vec512);
-        ]
-      in
-      let indices : (_ * Jkind_types.Sort.Const.t) list =
-        [
-          ("", C.scannable);
-          ("_indexed_by_nativeint#", C.word);
-          ("_indexed_by_int8#", C.bits8);
-          ("_indexed_by_int16#", C.bits16);
-          ("_indexed_by_int32#", C.bits32);
-          ("_indexed_by_int64#", C.bits64);
-        ]
-      in
-      let combiners =
-        [
-          ( Printf.sprintf "%%caml_%s_get%s%s%s%s",
-            fun index_kind width_kind ->
-              [
-                Same_as_ocaml_repr C.scannable;
-                Same_as_ocaml_repr index_kind;
-                Same_as_ocaml_repr width_kind;
-              ] );
-          ( Printf.sprintf "%%caml_%s_set%s%s%s%s",
-            fun index_kind width_kind ->
-              [
-                Same_as_ocaml_repr C.scannable;
-                Same_as_ocaml_repr index_kind;
-                Same_as_ocaml_repr width_kind;
-                Same_as_ocaml_repr C.scannable;
-              ] );
-        ]
-      in
-      (let ( let* ) x f = List.concat_map f x in
-       let* container = [ "bigstring"; "bytes"; "string" ] in
-       let* safe_sigil = [ ""; "u" ] in
-       let* index_sigil, index_kind = indices in
-       let* width_sigil, unboxed_sigil, width_kind = widths in
-       let* combine_string, combine_repr = combiners in
-       let string =
-         combine_string container width_sigil safe_sigil unboxed_sigil
-           index_sigil
-       in
-       let reprs = combine_repr index_kind width_kind in
-       [ (string, reprs) ])
-      |> List.to_seq
-      |> fun seq -> String.Map.add_seq seq String.Map.empty
+  (* Corresponds to [indexing_primitives] in [translprim.ml]. *)
+  let stringlike_indexing_primitives =
+    lazy
+      (
+    let widths : (_ * _ * Jkind_types.Sort.Const.t) list =
+      [
+        ("8", "", C.scannable);
+        ("i8", "", C.scannable);
+        ("16", "", C.scannable);
+        ("i16", "", C.scannable);
+        ("32", "", C.scannable);
+        ("f32", "", C.scannable);
+        ("64", "", C.scannable);
+        ("a128", "", C.scannable);
+        ("u128", "", C.scannable);
+        ("a256", "", C.scannable);
+        ("u256", "", C.scannable);
+        ("a512", "", C.scannable);
+        ("u512", "", C.scannable);
+        ("mask", "", C.scannable);
+        ("8", "#", C.bits8);
+        ("i8", "#", C.bits8);
+        ("16", "#", C.bits16);
+        ("i16", "#", C.bits16);
+        ("32", "#", C.bits32);
+        ("f32", "#", C.float32);
+        ("64", "#", C.bits64);
+        ("a128", "#", C.vec128);
+        ("u128", "#", C.vec128);
+        ("a256", "#", C.vec256);
+        ("u256", "#", C.vec256);
+        ("a512", "#", C.vec512);
+        ("u512", "#", C.vec512);
+        ("mask", "#", C.mask);
+      ]
     in
-    (* Corresponds to [array_vec_primitives] in [translprim.ml]. *)
-    let vector_array_indexing_primitives =
-      let vector_sizes = [
+    let indices : (_ * Jkind_types.Sort.Const.t) list =
+      [
+        ("", C.scannable);
+        ("_indexed_by_nativeint#", C.word);
+        ("_indexed_by_int8#", C.bits8);
+        ("_indexed_by_int16#", C.bits16);
+        ("_indexed_by_int32#", C.bits32);
+        ("_indexed_by_int64#", C.bits64);
+      ]
+    in
+    let combiners =
+      [
+        ( Printf.sprintf "%%caml_%s_get%s%s%s%s",
+          fun index_kind width_kind ->
+            [
+              Same_as_ocaml_repr C.scannable;
+              Same_as_ocaml_repr index_kind;
+              Same_as_ocaml_repr width_kind;
+            ] );
+        ( Printf.sprintf "%%caml_%s_set%s%s%s%s",
+          fun index_kind width_kind ->
+            [
+              Same_as_ocaml_repr C.scannable;
+              Same_as_ocaml_repr index_kind;
+              Same_as_ocaml_repr width_kind;
+              Same_as_ocaml_repr C.scannable;
+            ] );
+      ]
+    in
+    (let ( let* ) x f = List.concat_map f x in
+     let* container = [ "bigstring"; "bytes"; "string" ] in
+     let* safe_sigil = [ ""; "u" ] in
+     let* index_sigil, index_kind = indices in
+     let* width_sigil, unboxed_sigil, width_kind = widths in
+     let* combine_string, combine_repr = combiners in
+     let string =
+       combine_string container width_sigil safe_sigil unboxed_sigil
+         index_sigil
+     in
+     let reprs = combine_repr index_kind width_kind in
+     [ string, reprs ])
+    |> List.to_seq
+    |> fun seq -> String.Map.add_seq seq String.Map.empty)
+
+  (* Corresponds to [array_vec_primitives] in [translprim.ml]. *)
+  let vector_array_indexing_primitives =
+    lazy
+      (
+    let vector_sizes =
+      [
         ("128", "", C.scannable);
         ("128", "#", C.vec128);
         ("256", "", C.scannable);
         ("256", "#", C.vec256);
         ("512", "", C.scannable);
         ("512", "#", C.vec512);
-      ] in
-      let array_types = [
+      ]
+    in
+    let array_types =
+      [
         "floatarray";
         "unboxed_float_array";
         "unboxed_float32_array";
@@ -689,49 +706,65 @@ let prim_has_valid_reprs ~loc prim =
         "untagged_int16_array";
         "untagged_int8_array";
         "unboxed_nativeint_array";
-      ] in
-      let safe_sigils = [""; "u"] in
-      let indices = [
+      ]
+    in
+    let safe_sigils = [ ""; "u" ] in
+    let indices =
+      [
         ("", C.scannable);
         ("_indexed_by_nativeint#", C.word);
         ("_indexed_by_int8#", C.bits8);
         ("_indexed_by_int16#", C.bits16);
         ("_indexed_by_int32#", C.bits32);
         ("_indexed_by_int64#", C.bits64);
-      ] in
-      let combiners =
-        [
-          ( Printf.sprintf "%%caml_%s_get%s%s%s%s",
-            fun index_kind vector_kind ->
-              [
-                Same_as_ocaml_repr C.scannable;
-                Same_as_ocaml_repr index_kind;
-                Same_as_ocaml_repr vector_kind;
-              ] );
-          ( Printf.sprintf "%%caml_%s_set%s%s%s%s",
-            fun index_kind vector_kind ->
-              [
-                Same_as_ocaml_repr C.scannable;
-                Same_as_ocaml_repr index_kind;
-                Same_as_ocaml_repr vector_kind;
-                Same_as_ocaml_repr C.scannable;
-              ] );
-        ]
-      in
-      (let ( let* ) x f = List.concat_map f x in
-       let* array_type = array_types in
-       let* safe_sigil = safe_sigils in
-       let* size_str, unboxed_sigil, vector_kind = vector_sizes in
-       let* index_suffix, index_kind = indices in
-       let* combine_string, combine_repr = combiners in
-       let string =
-         combine_string array_type size_str safe_sigil unboxed_sigil
-           index_suffix
-       in
-       let reprs = combine_repr index_kind vector_kind in
-       [ (string, reprs) ])
-      |> List.to_seq
-      |> fun seq -> String.Map.add_seq seq String.Map.empty
+      ]
+    in
+    let combiners =
+      [
+        ( Printf.sprintf "%%caml_%s_get%s%s%s%s",
+          fun index_kind vector_kind ->
+            [
+              Same_as_ocaml_repr C.scannable;
+              Same_as_ocaml_repr index_kind;
+              Same_as_ocaml_repr vector_kind;
+            ] );
+        ( Printf.sprintf "%%caml_%s_set%s%s%s%s",
+          fun index_kind vector_kind ->
+            [
+              Same_as_ocaml_repr C.scannable;
+              Same_as_ocaml_repr index_kind;
+              Same_as_ocaml_repr vector_kind;
+              Same_as_ocaml_repr C.scannable;
+            ] );
+      ]
+    in
+    (let ( let* ) x f = List.concat_map f x in
+     let* array_type = array_types in
+     let* safe_sigil = safe_sigils in
+     let* size_str, unboxed_sigil, vector_kind = vector_sizes in
+     let* index_suffix, index_kind = indices in
+     let* combine_string, combine_repr = combiners in
+     let string =
+       combine_string array_type size_str safe_sigil unboxed_sigil
+         index_suffix
+     in
+     let reprs = combine_repr index_kind vector_kind in
+     [ string, reprs ])
+    |> List.to_seq
+    |> fun seq -> String.Map.add_seq seq String.Map.empty)
+end
+
+let prim_has_valid_reprs ~loc prim =
+  let open Repr_check in
+
+  let module C = Jkind_types.Sort.Const in
+
+  let check =
+    let stringlike_indexing_primitives =
+      Lazy.force Primitive_reprs.stringlike_indexing_primitives
+    in
+    let vector_array_indexing_primitives =
+      Lazy.force Primitive_reprs.vector_array_indexing_primitives
     in
     match prim.prim_name with
     | "%identity"
@@ -925,11 +958,24 @@ let prim_has_valid_reprs ~loc prim =
         is (Same_as_ocaml_repr C.bits64);
         any
       ]
+    | "%get_idx_atomic" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable)
+      ]
     | "%set_idx" ->
       check [
         is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.bits64);
         any;
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%set_idx_atomic" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.scannable);
       ]
     | "%unsafe_array_idx" ->
@@ -975,6 +1021,22 @@ let prim_has_valid_reprs ~loc prim =
     | "%unsafe_set_ptr" ->
       check [
         is (Same_as_ocaml_repr (C.Product [C.scannable; C.bits64]));
+        any;
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_get_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        any
+      ]
+    | "%unsafe_get_ext_ptr_imm" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        any
+      ]
+    | "%unsafe_set_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
         any;
         is (Same_as_ocaml_repr C.scannable);
       ]
@@ -1038,6 +1100,10 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.vec512; Same_as_ocaml_repr C.scannable]
     | "%unbox_vec512" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.vec512]
+    | "%box_mask" ->
+      exactly [Same_as_ocaml_repr C.mask; Same_as_ocaml_repr C.scannable]
+    | "%unbox_mask" ->
+      exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.mask]
 
     | "%reinterpret_tagged_int63_as_unboxed_int64" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.bits64]

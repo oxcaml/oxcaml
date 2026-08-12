@@ -175,6 +175,7 @@ let newgenstub ~scope jkind =
 let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
 let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
 let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
+let new_box_ty t = newty2 ~level:(get_level t) (Tbox t)
 
 (**** Check some types ****)
 
@@ -242,15 +243,7 @@ let tvariant_not_immediate row =
       | _ -> false)
     (row_fields row)
 
-let hash_variant s =
-  let accu = ref 0 in
-  for i = 0 to String.length s - 1 do
-    accu := 223 * !accu + Char.code s.[i]
-  done;
-  (* reduce to 31 bits *)
-  accu := !accu land (1 lsl 31 - 1);
-  (* make it signed for 64 bits architectures *)
-  if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
+let hash_variant = Misc.hash_variant
 
 let proxy ty =
   match get_desc ty with
@@ -351,6 +344,7 @@ let fold_type_expr f init ty =
   | Ttuple l            -> List.fold_left (fun acc (_, t) -> f acc t) init l
   | Tunboxed_tuple l    -> List.fold_left (fun acc (_, t) -> f acc t) init l
   | Tconstr (_, l, _)   -> List.fold_left f init l
+  | Tmod (ty, _)        -> f init ty
   | Tobject(ty, {contents = Some (_, p)}) ->
       let result = f init ty in
       List.fold_left f result p
@@ -376,6 +370,7 @@ let fold_type_expr f init ty =
   | Tpackage pack ->
     List.fold_left (fun result (_n, ty) -> f result ty) init pack.pack_cstrs
   | Tof_kind _ -> init
+  | Tbox ty -> f init ty
 
 let iter_type_expr f ty =
   fold_type_expr (fun () v -> f v) () ty
@@ -488,7 +483,8 @@ let type_iterators_without_type_expr =
   and it_jkind_declaration it jkd =
     match jkd.jkind_manifest with
     | None -> ()
-    | Some { base = Kconstr p; mod_bounds = _; with_bounds = No_with_bounds } ->
+    | Some { base = Kconstr (p, _); mod_bounds = _;
+             with_bounds = No_with_bounds } ->
       it.it_path p
     | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds } ->
       ()
@@ -595,6 +591,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tunboxed_tuple l    ->
     Tunboxed_tuple (List.map (fun (label, t) -> label, f t) l)
   | Tconstr (p, l, _)   -> Tconstr (p, List.map f l, ref Mnil)
+  | Tmod (ty, mod_bounds) -> Tmod (f ty, mod_bounds)
   | Tobject(ty, {contents = Some (p, tl)})
                         -> Tobject (f ty, ref (Some(p, List.map f tl)))
   | Tobject (ty, _)     -> Tobject (f ty, ref None)
@@ -618,6 +615,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
       Tpackage {pack with
         pack_cstrs = List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
   | Tof_kind jk -> Tof_kind jk
+  | Tbox ty -> Tbox (f ty)
 
 (* TODO: rename to [module Copy_scope] *)
 module For_copy : sig
@@ -893,6 +891,16 @@ let tpoly_get_mono ty =
   match get_desc ty with
   | Tpoly(ty, []) -> ty
   | _ -> assert false
+
+                  (*******************************)
+                  (*  Utilities for box types    *)
+                  (*******************************)
+
+let simple_unbox_ty ty =
+  match get_desc ty with
+  | Ttuple tys -> Some (newty2 ~level:(get_level ty) (Tunboxed_tuple tys))
+  | Tbox ty -> Some ty
+  | _ -> None
 
                   (************)
                   (*  Jkinds  *)
@@ -1257,6 +1265,13 @@ module Jkind0 = struct
       | Layout l -> (
         match f l with None -> None | Some l -> Some { t with base = Layout l })
 
+    let meet_scannable_axes (base : Jkind_types.Layout.Const.t jkind_base) sa :
+        Jkind_types.Layout.Const.t jkind_base =
+      match base with
+      | Kconstr (p, sa') -> Kconstr (p, Jkind_types.Scannable_axes.meet sa sa')
+      | Layout l ->
+        Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
+
     let map_type_expr f t =
       { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
 
@@ -1287,7 +1302,7 @@ module Jkind0 = struct
     end)
 
     let of_path path =
-      { base = Kconstr path;
+      { base = Kconstr (path, Jkind_types.Scannable_axes.max);
         mod_bounds = Mod_bounds.max;
         with_bounds = No_with_bounds
       }
@@ -1316,8 +1331,9 @@ module Jkind0 = struct
       | None -> false
       | Some (t1, t2) -> (
         match t1.base, t2.base with
-        | Kconstr p1, Kconstr p2 ->
+        | Kconstr (p1, sa1), Kconstr (p2, sa2) ->
           Path.same p1 p2 &&
+          Jkind_types.Scannable_axes.equal sa1 sa2 &&
           Mod_bounds.equal t1.mod_bounds t2.mod_bounds
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
@@ -1814,6 +1830,14 @@ module Jkind0 = struct
           name = "vec512"
         }
 
+      let mask =
+        { jkind =
+            mk_jkind (Base (Mask, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.min;
+          name = "mask"
+        }
+
       let kind_of_unboxed_128bit_vectors =
         { jkind =
             mk_jkind (Base (Vec128, Scannable_axes.max))
@@ -1836,6 +1860,14 @@ module Jkind0 = struct
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "vec512 mod everything"
+        }
+
+      let kind_of_unboxed_mask =
+        { jkind =
+            mk_jkind (Base (Mask, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
+              ~externality:Mod_bounds.Externality.min;
+          name = "mask mod everything"
         }
 
       let builtins =
@@ -1867,7 +1899,8 @@ module Jkind0 = struct
           bits64;
           vec128;
           vec256;
-          vec512 ]
+          vec512;
+          mask ]
 
       let additional_common_jkinds =
         [ any_mod_everything;
@@ -1884,7 +1917,8 @@ module Jkind0 = struct
           kind_of_unboxed_int64;
           kind_of_unboxed_128bit_vectors;
           kind_of_unboxed_256bit_vectors;
-          kind_of_unboxed_512bit_vectors ]
+          kind_of_unboxed_512bit_vectors;
+          kind_of_unboxed_mask ]
 
       let common_jkinds = builtins @ additional_common_jkinds
 
@@ -2058,8 +2092,8 @@ module Jkind0 = struct
       Some
         Parsetree.{
           pjka_loc = Location.none;
-          pjka_desc = Pjk_abbreviation ({ loc = Location.none;
-                                          txt = (Lident name) }, [])
+          pjka_desc = Pjk_abbreviation { loc = Location.none;
+                                         txt = (Lident name) }
         }
 
     let mark_best (type l r) (t : (l * r) jkind) =
@@ -2085,6 +2119,28 @@ module Jkind0 = struct
         | _ ->
           fresh_jkind Jkind_desc.Builtin.any
             ~annotation:(mk_annot "any") ~why:(Any_creation why)
+
+      let any_with_nullability nullability
+          ~(why : Jkind_intf.History.any_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Any
+                   { Jkind_types.Scannable_axes.max with nullability })
+          }
+          ~annotation:None ~why:(Any_creation why)
+
+      let any_with_separability separability
+          ~(why : Jkind_intf.History.any_creation_reason) =
+        fresh_jkind
+          { Jkind_desc.Builtin.any with
+            base =
+              Layout
+                (Jkind_types.Layout.Any
+                   { Jkind_types.Scannable_axes.max with separability })
+          }
+          ~annotation:None ~why:(Any_creation why)
 
       let value_v1_safety_check =
         { jkind = Jkind_desc.Builtin.value_or_null;
@@ -2560,11 +2616,7 @@ module Jkind0 = struct
         }
         ~annotation:None ~why:(Any_creation Array_type_argument)
 
-    let for_or_null_argument ident =
-      let why : Jkind_intf.History.value_creation_reason =
-        Type_argument
-          { parent_path = Path.Pident ident; position = 1; arity = 1 }
-      in
+    let for_or_null_payload_with_history why =
       let mod_bounds =
         Mod_bounds.create Mode.Crossing.max
           ~externality:Mod_bounds.Externality.max
@@ -2581,6 +2633,16 @@ module Jkind0 = struct
         }
         ~annotation:None ~why:(Value_creation why)
 
+    let for_or_null_argument ident =
+      let why : Jkind_intf.History.value_creation_reason =
+        Type_argument
+          { parent_path = Path.Pident ident; position = 1; arity = 1 }
+      in
+      for_or_null_payload_with_history why
+
+    let for_or_null_payload path =
+      for_or_null_payload_with_history (Or_null_payload path)
+
     let for_effect_arg ident =
       let why : Jkind_intf.History.value_creation_reason =
         Type_argument
@@ -2588,13 +2650,12 @@ module Jkind0 = struct
       in
       Builtin.value ~why
 
-    let for_variant_with_null_result path param =
+    let for_variant_with_null_result path ~modality payload_ty =
       let why : Jkind_intf.History.value_or_null_creation_reason =
-        Type_argument
-          { parent_path = path; position = 1; arity = 1 }
+        Or_null_payload path
       in
       Builtin.value_or_null ~why
-      |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param
+      |> add_with_bounds ~modality ~type_expr:payload_ty
       |> mark_best
   end
 

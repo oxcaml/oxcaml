@@ -28,11 +28,20 @@ type unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
+type objfile_to_link =
+  { path : string;
+    units : Compilation_unit.t list
+  }
+
 module Cmi_consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
 module Cmx_consistbl = Consistbl.Make (CU) (Unit)
 
 type error =
   | File_not_found of filepath
+  | Companion_object_file_not_found_via_manifest of
+      { object_filename : filepath;
+        requested_filename : filepath
+      }
   | Not_an_object_file of filepath
   | Missing_implementations of (Compilation_unit.t * string list) list
   | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
@@ -49,8 +58,8 @@ exception Error of error
 type t =
   { crc_interfaces : Cmi_consistbl.t;
     crc_implementations : Cmx_consistbl.t;
-    mutable implementations : CU.t list;
-    mutable cmx_required : CU.t list;
+    mutable implementations : CU.Set.t;
+    mutable cmx_required : CU.Set.t;
     interfaces : unit CU.Name.Tbl.t;
     implementations_defined : string CU.Tbl.t;
     mutable quoted_cmi : CU.Name.Set.t;
@@ -70,8 +79,8 @@ let create () =
   in
   { crc_interfaces = Cmi_consistbl.create ();
     crc_implementations = Cmx_consistbl.create ();
-    implementations = [];
-    cmx_required = [];
+    implementations = CU.Set.empty;
+    cmx_required = CU.Set.empty;
     interfaces = CU.Name.Tbl.create 100;
     implementations_defined = CU.Tbl.create 100;
     quoted_cmi;
@@ -121,10 +130,10 @@ let check_cmx_consistency t file_name cmxs =
       (fun import ->
         let name = Import_info.cu import in
         let crco = Import_info.crc import in
-        t.implementations <- name :: t.implementations;
+        t.implementations <- CU.Set.add name t.implementations;
         match crco with
         | None ->
-          if List.mem name t.cmx_required
+          if CU.Set.mem name t.cmx_required
           then raise (Error (Missing_cmx (file_name, name)))
         | Some crc ->
           Cmx_consistbl.check t.crc_implementations name () crc file_name)
@@ -143,10 +152,11 @@ let check_consistency t ~unit cmis cmxs =
      let source = CU.Tbl.find t.implementations_defined unit.name in
      raise (Error (Multiple_definition (ui_unit, unit.file_name, source)))
    with Not_found -> ());
-  t.implementations <- unit.name :: t.implementations;
+  t.implementations <- CU.Set.add unit.name t.implementations;
   Cmx_consistbl.check t.crc_implementations unit.name () unit.crc unit.file_name;
   CU.Tbl.replace t.implementations_defined unit.name unit.file_name;
-  if CU.is_packed unit.name then t.cmx_required <- unit.name :: t.cmx_required
+  if CU.is_packed unit.name
+  then t.cmx_required <- CU.Set.add unit.name t.cmx_required
 
 let extract_crc_interfaces t =
   CU.Name.Tbl.fold
@@ -156,10 +166,11 @@ let extract_crc_interfaces t =
     t.interfaces []
 
 let extract_crc_implementations t =
-  Cmx_consistbl.extract t.implementations t.crc_implementations
-  |> List.map (fun (cu, crc) ->
+  Cmx_consistbl.fold_map t.implementations ~init:[]
+    ~f:(fun acc cu crc ->
       let crc = Option.map (fun ((), crc) -> crc) crc in
-      Import_info.create_normal cu ~crc)
+      Import_info.create_normal cu ~crc :: acc)
+    t.crc_implementations
 
 (* Add C objects and options and "custom" info from a library descriptor. See
    bytecomp/bytelink.ml for comments on the order of C objects. *)
@@ -239,6 +250,14 @@ open Format_doc
 let report_error ppf = function
   | File_not_found name ->
     fprintf ppf "Cannot find file %a" Location.Doc.quoted_filename name
+  | Companion_object_file_not_found_via_manifest
+      { object_filename; requested_filename } ->
+    fprintf ppf
+      "@[<hov>Cannot find file %a,@ the object file accompanying %a:@ the \
+       latter was resolved through a manifest entry (see -I-manifest),@ so its \
+       object file must be listed as a separate manifest entry@]"
+      Location.Doc.quoted_filename object_filename Location.Doc.quoted_filename
+      requested_filename
   | Not_an_object_file name ->
     fprintf ppf "The file %a is not a compilation unit description"
       Location.Doc.quoted_filename name

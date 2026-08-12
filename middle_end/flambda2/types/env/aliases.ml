@@ -50,22 +50,6 @@ module Map_to_canonical = struct
           fatal_inconsistent ~func_name:"Aliases.Map_to_canonical.union" elt
             coercion1 coercion2)
       map1 map2
-
-  let ids_for_export t =
-    Name.Map.fold
-      (fun name coercion ids ->
-        Ids_for_export.union ids
-          (Ids_for_export.add_name (Coercion.ids_for_export coercion) name))
-      t Ids_for_export.empty
-
-  let apply_renaming t renaming =
-    Name.Map.fold
-      (fun name coercion t ->
-        Name.Map.add
-          (Renaming.apply_name renaming name)
-          (Coercion.apply_renaming coercion renaming)
-          t)
-      t Name.Map.empty
 end
 
 module Aliases_of_canonical_element : sig
@@ -101,10 +85,6 @@ module Aliases_of_canonical_element : sig
   val inter : t -> t -> t
 
   val compose : t -> then_:Coercion.t -> t
-
-  include Contains_ids.S with type t := t
-
-  val apply_renaming : t -> Renaming.t -> t
 end = struct
   type t =
     { aliases : Map_to_canonical.t Name_mode.Map.t;
@@ -214,27 +194,6 @@ end = struct
     let f m = Name.Map.map_sharing (Coercion.compose_exn ~then_) m in
     let aliases = Name_mode.Map.map_sharing f aliases in
     let all = f all in
-    { aliases; all }
-
-  let ids_for_export { aliases; all } =
-    let aliases =
-      Name_mode.Map.fold
-        (fun _mode map_to_canonical ids ->
-          Ids_for_export.union ids
-            (Map_to_canonical.ids_for_export map_to_canonical))
-        aliases Ids_for_export.empty
-    in
-    let all = Map_to_canonical.ids_for_export all in
-    Ids_for_export.union aliases all
-
-  let apply_renaming { aliases; all } renaming =
-    let aliases =
-      Name_mode.Map.map_sharing
-        (fun map_to_canonical ->
-          Map_to_canonical.apply_renaming map_to_canonical renaming)
-        aliases
-    in
-    let all = Map_to_canonical.apply_renaming all renaming in
     { aliases; all }
 end
 
@@ -421,15 +380,15 @@ let name_defined_earlier ~binding_time_resolver ~binding_times_and_modes alias
        However if this situation occurs they should have binding time
        [Binding_time.imported_variables] (see [Typing_env.add_equation0]). *)
     let alias_binding_time =
-      match Name.Map.find alias binding_times_and_modes with
-      | exception Not_found -> Binding_time.imported_variables
-      | _, binding_time_and_mode ->
+      match Name.Map.find_or_null alias binding_times_and_modes with
+      | Null -> Binding_time.imported_variables
+      | This (_, binding_time_and_mode) ->
         Binding_time.With_name_mode.binding_time binding_time_and_mode
     in
     let than_binding_time =
-      match Name.Map.find than binding_times_and_modes with
-      | exception Not_found -> Binding_time.imported_variables
-      | _, binding_time_and_mode ->
+      match Name.Map.find_or_null than binding_times_and_modes with
+      | Null -> Binding_time.imported_variables
+      | This (_, binding_time_and_mode) ->
         Binding_time.With_name_mode.binding_time binding_time_and_mode
     in
     if Binding_time.strictly_earlier alias_binding_time ~than:than_binding_time
@@ -471,9 +430,9 @@ let binding_time_and_name_mode ~binding_times_and_modes elt =
     ~const:(fun _ -> Binding_time.With_name_mode.consts)
     ~var:(fun var ~coercion:_ ->
       let name = Name.var var in
-      match Name.Map.find name binding_times_and_modes with
-      | _, binding_time_and_mode -> binding_time_and_mode
-      | exception Not_found ->
+      match Name.Map.find_or_null name binding_times_and_modes with
+      | This (_, binding_time_and_mode) -> binding_time_and_mode
+      | Null ->
         (* This variable must be in another compilation unit. *)
         Binding_time.With_name_mode.imported_variables)
     ~symbol:(fun _ ~coercion:_ -> Binding_time.With_name_mode.symbols)
@@ -554,9 +513,9 @@ let canonical t element : canonical =
   Simple.pattern_match element
     ~const:(fun _ -> Is_canonical)
     ~name:(fun name ~coercion:coercion_from_bare_element_to_element ->
-      match Name.Map.find name t.canonical_elements with
-      | exception Not_found -> Is_canonical
-      | canonical_element, coercion_from_bare_element_to_canonical ->
+      match Name.Map.find_or_null name t.canonical_elements with
+      | Null -> Is_canonical
+      | This (canonical_element, coercion_from_bare_element_to_canonical) ->
         let coercion_from_element_to_bare_element =
           Coercion.inverse coercion_from_bare_element_to_element
         in
@@ -996,37 +955,6 @@ let get_aliases t element =
            alias_names_with_coercions_to_canonical));
     Alias_set.create_aliases_of_element ~element ~canonical_element
       ~coercion_from_canonical_to_element ~alias_names_with_coercions_to_element
-
-let apply_renaming
-    { canonical_elements; aliases_of_canonical_names; aliases_of_consts }
-    renaming =
-  let rename_name = Renaming.apply_name renaming in
-  let rename_simple = Renaming.apply_simple renaming in
-  let canonical_elements =
-    Name.Map.fold
-      (fun elt (canonical, coercion) acc ->
-        Name.Map.add (rename_name elt)
-          (rename_simple canonical, Coercion.apply_renaming coercion renaming)
-          acc)
-      canonical_elements Name.Map.empty
-  in
-  let aliases_of_canonical_names =
-    Name.Map.fold
-      (fun canonical aliases acc ->
-        Name.Map.add (rename_name canonical)
-          (Aliases_of_canonical_element.apply_renaming aliases renaming)
-          acc)
-      aliases_of_canonical_names Name.Map.empty
-  in
-  let aliases_of_consts =
-    Reg_width_const.Map.fold
-      (fun const aliases ->
-        Reg_width_const.Map.add
-          (Renaming.apply_const renaming const)
-          (Aliases_of_canonical_element.apply_renaming aliases renaming))
-      aliases_of_consts Reg_width_const.Map.empty
-  in
-  { canonical_elements; aliases_of_canonical_names; aliases_of_consts }
 
 let get_canonical_ignoring_name_mode t name =
   let elt = Simple.name name in

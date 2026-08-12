@@ -307,8 +307,22 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
   let required_extra_args =
     Continuation.Map.find cont continuation_parameters
   in
-  Variable.Set.fold
-    (fun var epa ->
+  (* We don't want to add the extra params and args according to the order of
+     the Int_ids hash, because that is unstable and produces noise in fexpr
+     dumps.
+
+     Ideally, we'd want to create the parameters according to the binding times
+     of the original variables, but currently binding times are not comparable
+     across scopes, so we instead sort the extra args according to their name
+     stamp, which should be a good enough approximation for now. *)
+  let extra_args_for_aliases_sorted_by_stamp =
+    Variable.Set.fold
+      (fun var acc -> (Variable.name_stamp var, var) :: acc)
+      required_extra_args.extra_args_for_aliases []
+    |> List.sort (fun (stamp1, _) (stamp2, _) -> Int.compare stamp2 stamp1)
+  in
+  List.fold_left
+    (fun epa (_stamp, var) ->
       let extra_args =
         Apply_cont_rewrite_id.Map.of_set
           (fun _id -> EPA.Extra_arg.Already_in_scope (Simple.var var))
@@ -326,15 +340,15 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
       EPA.add
         ~extra_param:(Bound_parameter.create var var_kind var_duid)
         ~extra_args epa ~invalids:Apply_cont_rewrite_id.Set.empty)
-    required_extra_args.extra_args_for_aliases EPA.empty
+    EPA.empty extra_args_for_aliases_sorted_by_stamp
 
 let add_extra_params_for_mutable_unboxing cont uacc extra_params_and_args =
   let Flow_types.Mutable_unboxing_result.{ additional_epa; _ } =
     UA.mutable_unboxing_result uacc
   in
-  match Continuation.Map.find cont additional_epa with
-  | exception Not_found -> extra_params_and_args
-  | additional_epa ->
+  match Continuation.Map.find_or_null cont additional_epa with
+  | Null -> extra_params_and_args
+  | This additional_epa ->
     EPA.concat ~inner:extra_params_and_args ~outer:additional_epa
 
 type behaviour =
@@ -961,11 +975,11 @@ let create_handler_to_rebuild
     Apply_cont_rewrite_id.Map.of_set
       (fun rewrite_id ->
         match
-          Apply_cont_rewrite_id.Map.find rewrite_id
+          Apply_cont_rewrite_id.Map.find_or_null rewrite_id
             (EPA.extra_args data.invariant_extra_params_and_args)
         with
-        | extra_args -> extra_args
-        | exception Not_found ->
+        | This extra_args -> extra_args
+        | Null ->
           Or_invalid.Ok
             (List.map
                (fun param ->
@@ -1536,12 +1550,12 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
      outside of its context. So the remaining thing to do is setup the dacc, and
      later decide whether to lift the continuations defined inside the
      continuation being currently let-bound. *)
-  let dacc_after_body = dacc in
-  let body_continuation_uses_env = DA.continuation_uses_env dacc in
-  let denv = data.denv_for_join in
   let dacc, consts_lifted_during_body =
     DA.get_and_clear_lifted_constants dacc
   in
+  let dacc_after_body = dacc in
+  let body_continuation_uses_env = DA.continuation_uses_env dacc in
+  let denv = data.denv_for_join in
   let previous_are_lifting_conts = DA.are_lifting_conts dacc in
   match data.handlers with
   | Non_recursive

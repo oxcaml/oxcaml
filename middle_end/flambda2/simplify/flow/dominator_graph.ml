@@ -170,7 +170,9 @@ let find_dom simple doms =
 
          - we are in the first iteration of a loop fixpoint, in which case we
          also want to initialize the dominator to the variable itself. *)
-      try Variable.Map.find var doms with Not_found -> simple)
+      match Variable.Map.find_or_null var doms with
+      | Null -> simple
+      | This dom -> dom)
 
 let update_doms_for_one_var { dominator_roots; graph; _ } doms var =
   let simple = Simple.var var in
@@ -178,9 +180,9 @@ let update_doms_for_one_var { dominator_roots; graph; _ } doms var =
     if Simple.Set.mem simple dominator_roots
     then simple
     else
-      match Simple.Map.find simple graph with
-      | exception Not_found -> simple
-      | predecessors -> (
+      match Simple.Map.find_or_null simple graph with
+      | Null -> simple
+      | This predecessors -> (
         let s =
           Simple.Set.map
             (fun predecessor -> find_dom predecessor doms)
@@ -297,9 +299,9 @@ let aliases_kind { params_kind; required_names; _ } (aliases : alias_map) =
           ~symbol:(fun _ ~coercion:_ -> acc)
           ~const:(fun _ -> acc)
           ~var:(fun v ~coercion:_ ->
-            (match Variable.Map.find v acc with
-            | exception Not_found -> ()
-            | alias_kind ->
+            (match Variable.Map.find_or_null v acc with
+            | Null -> ()
+            | This alias_kind ->
               if not (Flambda_kind.equal kind alias_kind)
               then Misc.fatal_errorf "Incoherent kinds for aliases !");
             Variable.Map.add v kind acc))

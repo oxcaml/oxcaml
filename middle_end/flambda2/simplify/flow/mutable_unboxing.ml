@@ -62,9 +62,9 @@ let find_alias ~(dom : Dominator_graph.alias_map) simple =
     ~const:(fun _ -> simple)
     ~symbol:(fun _ ~coercion:_ -> simple)
     ~var:(fun var ~coercion:_ ->
-      match Variable.Map.find var dom with
-      | exception Not_found -> simple
-      | res -> res)
+      match Variable.Map.find_or_null var dom with
+      | Null -> simple
+      | This res -> res)
 
 let escaping_by_alias ~(dom : Dominator_graph.alias_map)
     ~(dom_graph : Dominator_graph.t) =
@@ -113,9 +113,9 @@ let escaping_by_use_for_one_continuation ~required_names
   let add_name_occurrences occurrences init =
     Name_occurrences.fold_variables occurrences ~init ~f:(fun escaping var ->
         let escaping =
-          match Variable.Map.find var dom with
-          | exception Not_found -> escaping
-          | simple -> Simple.Set.add simple escaping
+          match Variable.Map.find_or_null var dom with
+          | Null -> escaping
+          | This simple -> Simple.Set.add simple escaping
         in
         Simple.Set.add (Simple.var var) escaping)
   in
@@ -135,9 +135,9 @@ let escaping_by_use_for_one_continuation ~required_names
        See [flambda2/tests/ref_to_var/unboxing_cse.ml] *)
     Variable.Set.fold
       (fun var escaping ->
-        match Variable.Map.find var dom with
-        | exception Not_found -> escaping
-        | simple -> Simple.Set.add simple escaping)
+        match Variable.Map.find_or_null var dom with
+        | Null -> escaping
+        | This simple -> Simple.Set.add simple escaping)
       (names_used_in_new_let_binding elt)
       escaping
   in
@@ -177,15 +177,15 @@ let escaping_by_return ~(dom : Dominator_graph.alias_map)
   Continuation.Map.fold
     (fun _cont (elt : T.Continuation_info.t) escaping ->
       let add_escaping cont escaping =
-        match Continuation.Map.find cont elt.apply_cont_args with
-        | exception Not_found -> escaping
-        | apply_cont_args ->
+        match Continuation.Map.find_or_null cont elt.apply_cont_args with
+        | Null -> escaping
+        | This apply_cont_args ->
           Variable.Set.fold
             (fun var escaping ->
               let escaping =
-                match Variable.Map.find var dom with
-                | exception Not_found -> escaping
-                | simple -> Simple.Set.add simple escaping
+                match Variable.Map.find_or_null var dom with
+                | Null -> escaping
+                | This simple -> Simple.Set.add simple escaping
               in
               Simple.Set.add (Simple.var var) escaping)
             (free_names_of_apply_cont_args apply_cont_args)
@@ -259,9 +259,9 @@ let prims_using_block ~blocks_to_unbox ~dom prim =
   | Block_set { block; _ }
   | Block_load { block; _ } ->
     let block =
-      match Variable.Map.find block dom with
-      | exception Not_found -> Simple.var block
-      | block -> block
+      match Variable.Map.find_or_null block dom with
+      | Null -> Simple.var block
+      | This block -> block
     in
     if Simple.Map.mem block blocks_to_unbox
     then Simple.Set.singleton block
@@ -361,23 +361,23 @@ module Fold_prims = struct
 
   let with_unboxed_block ~block ~dom ~env ~blocks_to_unbox ~f =
     let block =
-      match Variable.Map.find block dom with
-      | exception Not_found -> Simple.var block
-      | block -> block
+      match Variable.Map.find_or_null block dom with
+      | Null -> Simple.var block
+      | This block -> block
     in
-    match Simple.Map.find block blocks_to_unbox with
-    | exception Not_found -> env
-    | { tag; fields_kinds; mut = _ } -> f ~block ~tag ~fields_kinds
+    match Simple.Map.find_or_null block blocks_to_unbox with
+    | Null -> env
+    | This { tag; fields_kinds; mut = _ } -> f ~block ~tag ~fields_kinds
 
   let with_unboxed_fields ~block ~dom ~env ~f =
     let block =
-      match Variable.Map.find block dom with
-      | exception Not_found -> Simple.var block
-      | block -> block
+      match Variable.Map.find_or_null block dom with
+      | Null -> Simple.var block
+      | This block -> block
     in
-    match Simple.Map.find block env.bindings with
-    | exception Not_found -> env
-    | fields -> f ~block fields
+    match Simple.Map.find_or_null block env.bindings with
+    | Null -> env
+    | This fields -> f ~block fields
 
   let apply_prim ~machine_width ~dom ~blocks_to_unbox env rewrite_id var
       (prim : T.Mutable_prim.t) =
@@ -476,7 +476,7 @@ module Fold_prims = struct
               (fun i kind ->
                 let name =
                   Simple.pattern_match' block_needed
-                    ~var:(fun var ~coercion:_ -> Variable.unique_name var)
+                    ~var:(fun var ~coercion:_ -> Variable.canonical_name var)
                     ~symbol:(fun _ ~coercion:_ ->
                       Misc.fatal_errorf
                         "[Mutable Unboxing] Cannot unbox mutable symbols")
@@ -547,10 +547,11 @@ module Fold_prims = struct
             Apply_cont_rewrite_id.Map.map
               (fun _args ->
                 match
-                  Continuation.Map.find cont continuations_with_live_block
+                  Continuation.Map.find_or_null cont
+                    continuations_with_live_block
                 with
-                | exception Not_found -> Numeric_types.Int.Map.empty
-                | blocks_needed ->
+                | Null -> Numeric_types.Int.Map.empty
+                | This blocks_needed ->
                   let extra_args =
                     Simple.Set.fold
                       (fun block_needed extra_args ->
@@ -614,9 +615,9 @@ let create ~(dom : Dominator_graph.alias_map) ~(dom_graph : Dominator_graph.t)
   }
 
 let pp_node { blocks_to_unbox = _; continuations_with_live_block; _ } ppf cont =
-  match Continuation.Map.find cont continuations_with_live_block with
-  | exception Not_found -> ()
-  | live_blocks -> Format.fprintf ppf " %a" Simple.Set.print live_blocks
+  match Continuation.Map.find_or_null cont continuations_with_live_block with
+  | Null -> ()
+  | This live_blocks -> Format.fprintf ppf " %a" Simple.Set.print live_blocks
 
 let add_to_extra_params_and_args result =
   let epa = Continuation.Map.empty in
@@ -640,11 +641,11 @@ let add_to_extra_params_and_args result =
                   match previous_extra_args with
                   | None -> (
                     match
-                      Continuation.Map.find callee_cont
+                      Continuation.Map.find_or_null callee_cont
                         result.extra_params_and_args
                     with
-                    | exception Not_found -> []
-                    | extra_params, _ ->
+                    | Null -> []
+                    | This (extra_params, _) ->
                       List.map
                         (fun _ -> Apply_cont_rewrite_id.Map.empty)
                         extra_params)
@@ -673,9 +674,11 @@ let add_to_extra_params_and_args result =
     Continuation.Map.fold
       (fun cont extra_args epa ->
         let extra_params =
-          match Continuation.Map.find cont result.extra_params_and_args with
-          | exception Not_found -> []
-          | extra_params, _ -> extra_params
+          match
+            Continuation.Map.find_or_null cont result.extra_params_and_args
+          with
+          | Null -> []
+          | This (extra_params, _) -> extra_params
         in
         Continuation.Map.update cont
           (fun epa_for_cont ->

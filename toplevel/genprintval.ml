@@ -332,8 +332,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     let print_sort : Jkind.Sort.Const.t -> _ = function
       | Base Scannable -> Print_as_value
       | Base Void -> Print_as "<void>"
-      | Base (Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 |
-              Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
+      | Base
+          ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
+          | Vec256 | Vec512 | Mask | Word | Untagged_immediate ) ->
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
       | Univar _ -> Print_as "<univar>"
@@ -429,8 +430,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 tree_of_lazy depth obj ty_arg
 
               | Tconstr (path, [_], _)
-                when Path.same path Predef.path_code ->
-                Oval_code (O.obj obj : CamlinternalQuote.Code.t)
+                when Path.same path Predef.path_expr ->
+                Oval_quote (O.obj obj : CamlinternalQuote.Code.t)
 
               | _ ->
                 match Env.find_type path env with
@@ -490,7 +491,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 Oval_stuff "<box>"
               | ty -> tree_of_val depth obj ty
               end
-          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _ ->
+          | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _
+          | Tmod _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
@@ -535,9 +537,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   if !printer_steps < 0 || depth < 0 then
                     Oval_ellipsis :: tree_list
                   else if i < length then
-                    let tree = nest tree_of_val (depth - 1)
-                                    (O.field obj i) ty_arg
+                    let elt =
+                      let is_double_array = O.tag obj = O.double_array_tag in
+                      if is_double_array then O.repr (O.double_field obj i)
+                      else O.field obj i
                     in
+                    let tree = nest tree_of_val (depth - 1) elt ty_arg in
                     tree_of_items (tree :: tree_list) (i + 1)
                   else tree_list
                 in
@@ -714,19 +719,21 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         | None ->
             let rep =
               match rep with
-              | Record_variable ->
+              | (Record_variable | Record_inlined (_, Constructor_variable, _))
+                as old_repres ->
                   let label_params_and_types, record_params =
                     Ctype.instance_label_declarations ~fixed:false
                       (lbl_list |> Array.of_list) ~params:type_params
                   in
-                  List.iter2 (Ctype.unify env) record_params ty_list;
+                  List.iter2 (Ctype.unify env) record_params
+                    (Ctype.instance_list ty_list);
                   let lds_and_types =
                     List.map2 (fun lbl (_params, ty) -> lbl, ty)
                       lbl_list (label_params_and_types |> Array.to_list)
                   in
                   (match
                      Typedecl.update_record_representation env Location.none
-                       Legacy lds_and_types ~why:Field_projection
+                       Legacy ~old_repres lds_and_types ~why:Field_projection
                    with
                    | Ok (_sorts, rep) -> rep
                    | Error _ -> Misc.fatal_error "unrepresentable record")
@@ -760,7 +767,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     else Outval_record_boxed
               | Record_dummy _ ->
                   Misc.fatal_error "dummy record representation"
-              | Record_variable ->
+              | Record_variable | Record_inlined (_, Constructor_variable, _) ->
                   Misc.fatal_error "variable record representation"
             in
             tree_of_record_fields depth
@@ -803,8 +810,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
                         | Float32 | Bits8 | Bits16 | Untagged_immediate
-                        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
-                        | Product _ ->
+                        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
+                        | Word | Product _ ->
                             `Stop (Oval_stuff "<abstr>")
                         | Void ->
                             `Stop (Oval_stuff "<void>")

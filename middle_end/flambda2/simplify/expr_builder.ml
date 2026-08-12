@@ -133,7 +133,7 @@ let create_coerced_singleton_let uacc var defining_expr
         ~cost_metrics_of_defining_expr
     | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _ ->
       let uncoerced_var =
-        let name = "uncoerced_" ^ Variable.unique_name (VB.var var) in
+        let name = "uncoerced_" ^ Variable.canonical_name (VB.var var) in
         Variable.create name (Variable.kind (VB.var var))
       in
       let uncoerced_var_duid = Flambda_debug_uid.none in
@@ -379,9 +379,9 @@ let create_let_symbols uacc lifted_constant ~body =
               (* We're not dropping the coercion: it gets used in [stop_here] *)
               stop_here ())
             ~var:(fun var' ~coercion:coercion_from_var'_to_simple ->
-              match Variable.Map.find var' symbol_projections with
-              | exception Not_found -> stop_here ()
-              | proj' ->
+              match Variable.Map.find_or_null var' symbol_projections with
+              | Null -> stop_here ()
+              | This proj' ->
                 let coercion_from_var'_to_proj =
                   (* Since [simple] is just an evaluated form of [proj] *)
                   coercion_from_var'_to_simple

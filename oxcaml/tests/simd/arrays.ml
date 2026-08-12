@@ -2105,3 +2105,47 @@ module _ = Int_arrays(struct
   let untagged_int8_array_set_int8x16_unsafe arr i v = untagged_int8_array_set_int8x16_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
 
 end)
+
+(* Regression test for a bug in the arm64 backend's unaligned 128-bit
+   load/store address computation (backend/arm64/emit.ml, [Onetwentyeight_unaligned]).
+
+   The effective address [base + offset] was materialised with a raw
+   ADD-immediate ([O.imm n]).  An ARM64 ADD/SUB immediate can only encode an
+   unsigned 12-bit value (optionally shifted left by 12), so a statically-known
+   negative offset (e.g. from [set128u a (-2) v], offset -16) or a large,
+   non-12-bit-encodable offset could not be encoded.  This surfaced as a fatal
+   "imm: value -16 not encodable ..." at emit time once the AST constructor
+   started validating its argument (oxcaml/oxcaml#6313).  The fix computes the
+   address with [emit_addimm], which emits SUB / split-ADD as needed.
+
+   These accesses are deliberately guarded by [Sys.opaque_identity false]: the
+   bug is purely at instruction *emission*, so we only need the compiler to
+   emit the load/store at a negative / large constant offset.  We must NOT
+   actually execute an out-of-bounds unsafe access, and the opaque guard both
+   defeats dead-code elimination (so the instructions are still emitted) and
+   ensures they never run. *)
+module _ = struct
+  external get128u : int64# array -> int -> int64x2
+    = "%caml_unboxed_int64_array_get128u"
+  external set128u : int64# array -> int -> int64x2 -> unit
+    = "%caml_unboxed_int64_array_set128u"
+
+  let () =
+    if Sys.opaque_identity false
+    then begin
+      let a = [| #0L; #1L; #2L; #3L |] in
+      let v = int64x2_of_int64s 0xAAAAAAAAAAAAAAAAL 0xBBBBBBBBBBBBBBBBL in
+      (* Negative constant offsets: -8 and -16 (the value from the original
+         failure).  These are encoded via SUB after the fix. *)
+      set128u a (-1) v;
+      set128u a (-2) v;
+      ignore (Sys.opaque_identity (get128u a (-1)));
+      ignore (Sys.opaque_identity (get128u a (-2)));
+      (* Large positive offset with nonzero low 12 bits: index 514 is byte
+         offset 514*8 = 0x1010, which is not a single 12-bit immediate and must
+         be materialised with a split ADD. *)
+      set128u a 514 v;
+      ignore (Sys.opaque_identity (get128u a 514))
+    end
+  ;;
+end

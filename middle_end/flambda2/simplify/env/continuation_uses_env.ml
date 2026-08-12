@@ -46,19 +46,18 @@ let record_continuation_use t cont kind ~env_at_use ~arg_types =
   t, id
 
 let get_typing_env_no_more_than_one_use t k =
-  match Continuation.Map.find k t.continuation_uses with
-  | exception Not_found -> None
-  | cont_uses -> Continuation_uses.get_typing_env_no_more_than_one_use cont_uses
+  match Continuation.Map.find_or_null k t.continuation_uses with
+  | Null -> None
+  | This cont_uses ->
+    Continuation_uses.get_typing_env_no_more_than_one_use cont_uses
 
 let get_continuation_uses t cont =
-  match Continuation.Map.find cont t.continuation_uses with
-  | exception Not_found -> None
-  | uses -> Some uses
+  Continuation.Map.find_opt cont t.continuation_uses
 
 let num_continuation_uses t cont =
-  match Continuation.Map.find cont t.continuation_uses with
-  | exception Not_found -> 0
-  | uses -> Continuation_uses.number_of_uses uses
+  match Continuation.Map.find_or_null cont t.continuation_uses with
+  | Null -> 0
+  | This uses -> Continuation_uses.number_of_uses uses
 
 let all_continuations_used t = Continuation.Map.keys t.continuation_uses
 

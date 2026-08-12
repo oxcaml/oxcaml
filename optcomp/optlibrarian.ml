@@ -38,15 +38,8 @@ end) : S = struct
       try Load_path.find name
       with Not_found -> raise (Error (File_not_found name))
     in
-    let info, crc = Compilenv.read_unit_info filename in
-    info.ui_force_link <- info.ui_force_link || !Clflags.link_everything;
-    (* There is no need to keep the approximation in the flambda library file,
-       since the compiler will go looking directly for flambda object files. The
-       linker, which is the only one that reads library files, does not need the
-       approximation. *)
-    info.ui_export_info <- None;
     ( Filename.chop_suffix filename Backend.ext_flambda_obj ^ Backend.ext_obj,
-      (info, crc) )
+      Compilenv.read_unit_info filename )
 
   let create_archive file_list lib_name =
     let archive_name = Filename.remove_extension lib_name ^ Backend.ext_lib in
@@ -128,7 +121,7 @@ end) : S = struct
               { li_name = unit.ui_unit;
                 li_crc = crc;
                 li_defines = unit.ui_defines;
-                li_force_link = unit.ui_force_link;
+                li_force_link = unit.ui_force_link || !Clflags.link_everything;
                 li_imports_cmi =
                   mk_bitmap cmis cmi_index unit.ui_imports_cmi
                     ~find:Compilation_unit.Name.Tbl.find
