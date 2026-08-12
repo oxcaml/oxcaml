@@ -356,7 +356,7 @@ module Solver = struct
         base_poly, coeffs_poly)
 
   (* Apply a constructor polynomial to argument types. *)
-  and constr ?self_ty (ctx : ctx) (path : Path.t) (args : Types.type_expr list)
+  and constr ~self_ty (ctx : ctx) (path : Path.t) (args : Types.type_expr list)
       : Ldd.node =
     let constr_ctx =
       if ctx.add_provenance
@@ -367,9 +367,9 @@ module Solver = struct
       constr_kind constr_ctx ~min_arity:(List.length args) path
     in
     let base =
-      match self_ty with
-      | Some ty when ctx.add_provenance -> Ldd.meet base (provenance ctx ty)
-      | Some _ | None -> base
+      if ctx.add_provenance
+      then Ldd.meet base (provenance ctx self_ty)
+      else base
     in
     let rec loop acc remaining i =
       if i = Array.length coeffs
