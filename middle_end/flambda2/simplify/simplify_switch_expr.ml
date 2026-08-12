@@ -826,41 +826,43 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
   let uacc, expr = EB.bind_let_conts uacc ~body new_let_conts in
   after_rebuild expr uacc
 
-let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
+let filter_arm ~typing_env_at_use ~scrutinee_ty arm action arms =
   let shape = T.this_naked_immediate arm in
   match T.meet typing_env_at_use scrutinee_ty shape with
-  | Bottom -> arms, dacc
-  | Ok (_meet_ty, env_at_use) ->
-    let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
-    let args = AC.args action in
-    let use_kind =
-      Simplify_common.apply_cont_use_kind ~context:Switch_branch action
-    in
-    let { S.simples = args; simple_tys = arg_types } =
-      S.simplify_simples (DA.with_denv dacc denv_at_use) args
-    in
-    let dacc, rewrite_id =
-      DA.record_continuation_use dacc (AC.continuation action) use_kind
-        ~env_at_use:denv_at_use ~arg_types
-    in
-    let arity =
-      arg_types
-      |> List.map (fun ty -> K.With_subkind.anything (T.kind ty))
-      |> Flambda_arity.create_singletons
-    in
-    let action = Apply_cont.update_args action ~args in
-    let dbg = AC.debuginfo action in
-    let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
-    let action = AC.with_debuginfo action ~dbg in
-    let dacc =
-      DA.map_flow_acc dacc
-        ~f:
-          (Flow.Acc.add_apply_cont_args ~rewrite_id
-             (Apply_cont.continuation action)
-             args)
-    in
-    let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
-    arms, dacc
+  | Bottom -> arms
+  | Ok (_meet_ty, env_at_use) -> TI.Map.add arm (action, env_at_use) arms
+
+let simplify_arm arm (action, env_at_use) (arms, dacc) =
+  let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
+  let args = AC.args action in
+  let use_kind =
+    Simplify_common.apply_cont_use_kind ~context:Switch_branch action
+  in
+  let { S.simples = args; simple_tys = arg_types } =
+    S.simplify_simples (DA.with_denv dacc denv_at_use) args
+  in
+  let dacc, rewrite_id =
+    DA.record_continuation_use dacc (AC.continuation action) use_kind
+      ~env_at_use:denv_at_use ~arg_types
+  in
+  let arity =
+    arg_types
+    |> List.map (fun ty -> K.With_subkind.anything (T.kind ty))
+    |> Flambda_arity.create_singletons
+  in
+  let action = Apply_cont.update_args action ~args in
+  let dbg = AC.debuginfo action in
+  let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
+  let action = AC.with_debuginfo action ~dbg in
+  let dacc =
+    DA.map_flow_acc dacc
+      ~f:
+        (Flow.Acc.add_apply_cont_args ~rewrite_id
+           (Apply_cont.continuation action)
+           args)
+  in
+  let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
+  arms, dacc
 
 let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
   match DA.are_lifting_conts dacc with
@@ -1020,34 +1022,49 @@ let simplify_switch dacc switch ~down_to_up =
   in
   let dacc_before_switch = dacc in
   let typing_env_at_use = DA.typing_env dacc in
-  let arms, dacc =
+  let arms =
     TI.Map.fold
-      (simplify_arm ~typing_env_at_use ~scrutinee_ty)
-      (Switch.arms switch) (TI.Map.empty, dacc)
+      (filter_arm ~typing_env_at_use ~scrutinee_ty)
+      (Switch.arms switch) TI.Map.empty
   in
-  let dacc =
-    if TI.Map.cardinal arms <= 1
-    then dacc
-    else
-      DA.map_flow_acc dacc
-        ~f:(Flow.Acc.add_used_in_current_handler (Simple.free_names scrutinee))
-  in
-  let condition_dbg =
-    DE.add_inlined_debuginfo (DA.denv dacc) (Switch.condition_dbg switch)
-  in
-  let dacc =
-    match decide_continuation_specialization ~dacc ~switch ~scrutinee with
-    | `Specialized (continuation, lifting_cost) ->
-      let dacc = DA.decrease_continuation_lifting_budget dacc lifting_cost in
-      let dacc =
-        DA.with_are_lifting_conts dacc
-          (Are_lifting_conts.lift_continuations_out_of continuation)
-      in
-      let dacc = DA.add_continuation_to_specialize dacc continuation in
-      dacc
-    | _ -> dacc
-  in
-  down_to_up dacc
-    ~rebuild:
-      (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-         ~dacc_before_switch)
+  match TI.Map.get_singleton arms with
+  | Some (_, (apply_cont, env_at_use)) ->
+    (* Rewrite to a regular apply_cont so that it is an inlinable use. *)
+    let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
+    let dacc = DA.with_denv dacc denv_at_use in
+    Simplify_apply_cont_expr.simplify_apply_cont dacc apply_cont
+      ~down_to_up:(fun dacc ~rebuild ->
+        down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
+            let uacc =
+              UA.notify_removed ~operation:Removed_operations.branch uacc
+            in
+            rebuild uacc ~after_rebuild))
+  | None ->
+    let arms, dacc = TI.Map.fold simplify_arm arms (TI.Map.empty, dacc) in
+    let dacc =
+      if TI.Map.cardinal arms <= 1
+      then dacc
+      else
+        DA.map_flow_acc dacc
+          ~f:
+            (Flow.Acc.add_used_in_current_handler (Simple.free_names scrutinee))
+    in
+    let condition_dbg =
+      DE.add_inlined_debuginfo (DA.denv dacc) (Switch.condition_dbg switch)
+    in
+    let dacc =
+      match decide_continuation_specialization ~dacc ~switch ~scrutinee with
+      | `Specialized (continuation, lifting_cost) ->
+        let dacc = DA.decrease_continuation_lifting_budget dacc lifting_cost in
+        let dacc =
+          DA.with_are_lifting_conts dacc
+            (Are_lifting_conts.lift_continuations_out_of continuation)
+        in
+        let dacc = DA.add_continuation_to_specialize dacc continuation in
+        dacc
+      | _ -> dacc
+    in
+    down_to_up dacc
+      ~rebuild:
+        (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
+           ~dacc_before_switch)
