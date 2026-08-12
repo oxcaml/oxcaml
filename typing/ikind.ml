@@ -1510,12 +1510,10 @@ let sub_jkind_l ?(allow_any_crossing = false) ?origin
          Format.eprintf "[ikind-subjkind] call%s allow_any=true@." origin_suffix);
       Ok ())
     else
-      let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path } =
-        compute_subcheck_polys ~context env sub super
-      in
+      let subcheck_polys = compute_subcheck_polys ~context env sub super in
       match
         check_mode_crossing_polys ~origin ~sub_jkind:sub ~super_jkind:super
-          { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path }
+          subcheck_polys
       with
       | Ok () -> Ok ()
       | Error ikind_error -> (
