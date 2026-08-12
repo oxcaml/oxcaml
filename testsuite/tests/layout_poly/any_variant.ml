@@ -44,3 +44,34 @@ Error: Signature mismatch:
        The type "('a -> 'b) -> 'b -> 'a t -> 'b"
        is not compatible with the type "int"
 |}]
+
+type ('a : any) r = { x : 'a }
+[%%expect{|
+type ('a : any) r = { x : 'a; }
+|}]
+
+(* A layout-polymorphic field is maybe-void, so this record is not known to
+   contain a runtime value. *)
+let poly_ mk v = { x = v }
+[%%expect{|
+Line 1, characters 17-26:
+1 | let poly_ mk v = { x = v }
+                     ^^^^^^^^^
+Error: Records must contain at least one runtime value.
+|}]
+
+type ('a : any) r2 = { x : 'a; y : int }
+[%%expect{|
+type ('a : any) r2 = { x : 'a; y : int; }
+|}]
+
+(* With a field that is certainly a runtime value, it is instead the
+   representation error that is reported. *)
+let poly_ mk2 v = { x = v; y = 1 }
+[%%expect{|
+Line 1, characters 18-34:
+1 | let poly_ mk2 v = { x = v; y = 1 }
+                      ^^^^^^^^^^^^^^^^
+Error: The representation of this record or variant depends on a
+       layout-polymorphic type, which is not yet supported.
+|}]
