@@ -1463,15 +1463,12 @@ let subjkind_errors_have_same_violating_axes error1 error2 =
     same_axis_set axes1 axes2
   | Jkind_error _, _ | _, Jkind_error _ -> false
 
-let best_effort_provenance_error ?fallback_error ~origin ~sub_jkind ~super_jkind
+let best_effort_provenance_error ~fallback_error ~origin ~sub_jkind ~super_jkind
     actual_error make_polys =
   let fallback error =
-    match fallback_error with
+    match fallback_error () with
     | None -> Error error
-    | Some fallback_error -> (
-      match fallback_error () with
-      | None -> Error error
-      | Some fallback_error -> Error fallback_error)
+    | Some fallback_error -> Error fallback_error
   in
   let provenance_check =
     match make_polys () with
