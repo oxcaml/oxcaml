@@ -169,7 +169,8 @@ type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
 Line 1, characters 0-66:
 1 | type ('a, 'b) t : immutable_data with 'a = [< `X | `Y of 'a] as 'b
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with 'a,
        because polymorphic variants are not mod forkable unyielding many
                  stateless immutable.
 |}]
@@ -178,7 +179,8 @@ type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
 Line 1, characters 0-66:
 1 | type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with 'a,
        because polymorphic variants are not mod forkable unyielding many
                  stateless immutable.
 |}]
@@ -205,7 +207,8 @@ end
 Line 2, characters 2-83:
 2 |   type 'a t : immutable_data with 'a = private [< `A of 'a | `B of ('a * 'a) | `C ]
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with 'a,
        because polymorphic variants are not mod forkable unyielding many
                  stateless immutable.
 |}]
@@ -357,7 +360,9 @@ Line 1, characters 0-96:
 1 | type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
-         value mod everything non_float with [ `A of string | `B of int | `C ] t1,
+         value mod everything
+           non_float
+           with [ `A of string | `B of int | `C ] t1,
        because
        - boxed variants are not mod global external_
        - string is not mod global external_

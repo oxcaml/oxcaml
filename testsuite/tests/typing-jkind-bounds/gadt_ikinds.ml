@@ -287,7 +287,8 @@ type 'a u : immutable_data =
 Lines 1-2, characters 0-25:
 1 | type 'a u : immutable_data =
 2 | | P1 : ('b, 'a) t -> 'a u
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because 'b is not mod forkable unyielding many stateless immutable.
 |}]
 

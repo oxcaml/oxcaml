@@ -125,7 +125,8 @@ type ('a, 'b) u : immutable_data with 'a with 'b
 Line 2, characters 0-53:
 2 | type ('a, 'b) t : immutable_data with 'a = ('a, 'b) u
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with 'a,
        because 'b is not mod forkable unyielding many stateless immutable.
 |}]
 
@@ -583,7 +584,8 @@ type r
 Line 3, characters 0-62:
 3 | type should_fail_too : immutable_data with r = [`A of int ref]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with r,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with r,
        because ref is not mod immutable.
 |}]
 
@@ -598,7 +600,8 @@ end
 Line 3, characters 2-42:
 3 |   type t : immutable_data with r = int ref
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with r,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with r,
        because ref is not mod immutable.
 |}]
 

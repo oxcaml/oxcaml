@@ -38,22 +38,6 @@ let fresh_unknown_uid () : Types.Uid.t =
   in
   Types.Uid.mk ~current_unit
 
-let collapse_whitespace s =
-  let b = Buffer.create (String.length s) in
-  let pending_space = ref false in
-  String.iter
-    (function
-      | ' ' | '\n' | '\r' | '\t' ->
-        if Buffer.length b > 0 then pending_space := true
-      | c ->
-        if !pending_space
-        then (
-          Buffer.add_char b ' ';
-          pending_space := false);
-        Buffer.add_char b c)
-    s;
-  Buffer.contents b
-
 module Provenance = struct
   let next_id = ref 0
 
@@ -662,38 +646,6 @@ let pp_axis_list_prose ppf (axes : Jkind_axis.Axis.packed list) =
          pp_axis_name)
       init pp_axis_name last
 
-let format_jkind_single_line env jkind =
-  Format_doc.asprintf "%a" (Jkind.format env) jkind
-  |> collapse_whitespace
-
-let pp_breakable_words ppf s =
-  s |> String.split_on_char ' '
-  |> List.filter (fun s -> not (String.equal s ""))
-  |> Format_doc.pp_print_list
-       ~pp_sep:(fun ppf () -> Format_doc.fprintf ppf "@ ")
-       Format_doc.pp_print_string ppf
-
-let split_on_first_substring ~sub s =
-  let len = String.length s in
-  let sub_len = String.length sub in
-  let rec loop i =
-    if i + sub_len > len
-    then None
-    else if String.equal (String.sub s i sub_len) sub
-    then
-      let before = String.sub s 0 i in
-      let after = String.sub s (i + sub_len) (len - i - sub_len) in
-      Some (before, after)
-    else loop (i + 1)
-  in
-  loop 0
-
-let pp_breakable_jkind_annotation ppf s =
-  match split_on_first_substring ~sub:" with " s with
-  | None -> pp_breakable_words ppf s
-  | Some (before, after) ->
-    Format_doc.fprintf ppf "@[<v 2>%s@;with %s@]" before after
-
 let is_bot_poly poly = Axis_lattice.equal (Ldd.round_up poly) Axis_lattice.bot
 
 let axes_in_violation_order ~violating_axes axes =
@@ -855,31 +807,9 @@ let pp_provenance_residual_bullets ppf entries =
     entries
 
 let pp_type_definition_kind_annotation env ppf super_jkind =
-  let super_jkind_single_line = format_jkind_single_line env super_jkind in
-  let single_line_prefix =
-    "Error: This type definition does not satisfy its kind annotation "
-  in
-  let error_prefix_width = String.length "Error: " in
-  let continuation_indent = 2 in
-  let continuation_prefix_width = error_prefix_width + continuation_indent in
-  if
-    String.length single_line_prefix + String.length super_jkind_single_line + 1
-    <= 88
-  then
-    Format_doc.fprintf ppf
-      "This type definition does not satisfy its kind annotation %s,"
-      super_jkind_single_line
-  else if
-    continuation_prefix_width + String.length super_jkind_single_line + 1 <= 88
-  then
-    Format_doc.fprintf ppf
-      "@[<v 2>This type definition does not satisfy its kind annotation@;%s,@]"
-      super_jkind_single_line
-  else
-    Format_doc.fprintf ppf
-      "@[<v 2>This type definition does not satisfy its kind annotation@;\
-       @[<hov>%a,@]@]"
-      pp_breakable_jkind_annotation super_jkind_single_line
+  Format_doc.fprintf ppf
+    "@[<hov 2>This type definition does not satisfy its kind annotation@ %a,@]"
+    (Jkind.format env) super_jkind
 
 let report_provenance_mode_crossing_error env ppf
     { super_jkind; sub_poly; super_poly; provenance_names; violating_axes; _ } =

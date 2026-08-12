@@ -574,7 +574,8 @@ type t : immutable_data = { mutable x : int}
 Line 1, characters 0-44:
 1 | type t : immutable_data = { mutable x : int}
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because mutable fields are not mod immutable.
 |}]
 
@@ -583,7 +584,8 @@ type ('a : mutable_data) t : immutable_data = { x : 'a }
 Line 1, characters 0-56:
 1 | type ('a : mutable_data) t : immutable_data = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because 'a is not mod immutable.
 |}]
 
@@ -598,7 +600,8 @@ Lines 2-4, characters 0-1:
 2 | type t : value mod contended = {
 3 |   a : u;
 4 | }
-Error: This type definition does not satisfy its kind annotation value mod contended,
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
        because u is not mod contended.
 |}]
 
@@ -613,7 +616,8 @@ Lines 1-4, characters 0-1:
 2 |   a : int ref;
 3 |   b : int ref;
 4 | }
-Error: This type definition does not satisfy its kind annotation value mod contended,
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
        because ref is not mod contended.
 |}]
 
@@ -625,7 +629,8 @@ type 'a u : immutable_data with 'a
 Line 2, characters 0-40:
 2 | type 'a t : immutable_data = Foo of 'a u
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
@@ -655,7 +660,8 @@ Lines 1-3, characters 0-27:
 1 | type _ t : value mod contended =
 2 |   | I : int -> int t
 3 |   | R : int ref -> string t
-Error: This type definition does not satisfy its kind annotation value mod contended,
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
        because ref is not mod contended.
 |}]
 
@@ -665,7 +671,8 @@ type t : value mod portable = Pack : ('a -> 'a) -> t
 Line 1, characters 0-52:
 1 | type t : value mod portable = Pack : ('a -> 'a) -> t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod portable,
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
        because functions are not mod portable.
 |}]
 
@@ -676,7 +683,8 @@ type 'a t : value mod contended =
 Lines 1-2, characters 0-22:
 1 | type 'a t : value mod contended =
 2 |   | A : 'b ref -> 'b t
-Error: This type definition does not satisfy its kind annotation value mod contended,
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
        because ref is not mod contended.
 |}]
 
@@ -685,7 +693,8 @@ type t : value mod portable = Pack : 'a -> t
 Line 1, characters 0-44:
 1 | type t : value mod portable = Pack : 'a -> t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod portable,
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
        because 'a is not mod portable.
 |}]
 
@@ -694,7 +703,8 @@ type 'a t : value mod portable = A : 'b -> 'b t
 Line 1, characters 0-47:
 1 | type 'a t : value mod portable = A : 'b -> 'b t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod portable,
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
        because 'b is not mod portable.
 |}]
 
@@ -1118,7 +1128,8 @@ type 'a u = Foo of { x : 'a; }
 Line 2, characters 0-53:
 2 | type 'a t : immutable_data = 'a u = Foo of { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 

@@ -17,7 +17,8 @@ type t : immutable_data = { mutable x : int [@atomic] }
 Line 1, characters 0-55:
 1 | type t : immutable_data = { mutable x : int [@atomic] }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because atomic mutable fields are not mod immutable.
 |}]
 
@@ -48,7 +49,8 @@ type t : immutable_data =
 Lines 1-2, characters 0-58:
 1 | type t : immutable_data =
 2 |   { mutable x : int [@atomic]; mutable y : int [@atomic] }
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because atomic mutable fields are not mod immutable.
 |}]
 
@@ -57,7 +59,8 @@ type t : immutable_data = { mutable x : int [@atomic]; mutable y : int }
 Line 1, characters 0-72:
 1 | type t : immutable_data = { mutable x : int [@atomic]; mutable y : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because
        - atomic mutable fields are not mod immutable
        - mutable fields are not mod immutable
@@ -68,7 +71,8 @@ type t : immutable_data = { mutable x : int; mutable y : int }
 Line 1, characters 0-62:
 1 | type t : immutable_data = { mutable x : int; mutable y : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because mutable fields are not mod immutable.
 |}]
 

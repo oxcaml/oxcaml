@@ -725,7 +725,8 @@ type t : any mod global = { x : string }
 Line 1, characters 0-40:
 1 | type t : any mod global = { x : string }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod global,
+Error: This type definition does not satisfy its kind annotation
+         any mod global,
        because
        - boxed records are not mod global
        - string is not mod global
@@ -736,7 +737,8 @@ type t : any mod aliased = { x : string }
 Line 1, characters 0-41:
 1 | type t : any mod aliased = { x : string }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod aliased,
+Error: This type definition does not satisfy its kind annotation
+         any mod aliased,
        because
        - boxed records are not mod aliased
        - string is not mod aliased
@@ -747,7 +749,8 @@ type t : any mod external_ = { x : string }
 Line 1, characters 0-43:
 1 | type t : any mod external_ = { x : string }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod external_,
+Error: This type definition does not satisfy its kind annotation
+         any mod external_,
        because
        - boxed records are not mod external_
        - string is not mod external_
@@ -767,7 +770,8 @@ type t : any mod many = { x : t_value }
 Line 1, characters 0-39:
 1 | type t : any mod many = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod many,
+Error: This type definition does not satisfy its kind annotation
+         any mod many,
        because t_value is not mod many.
 |}]
 
@@ -776,7 +780,8 @@ type t : any mod contended = { x : t_value }
 Line 1, characters 0-44:
 1 | type t : any mod contended = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod contended,
+Error: This type definition does not satisfy its kind annotation
+         any mod contended,
        because t_value is not mod contended.
 |}]
 
@@ -785,7 +790,8 @@ type t : any mod portable = { x : t_value }
 Line 1, characters 0-43:
 1 | type t : any mod portable = { x : t_value }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod portable,
+Error: This type definition does not satisfy its kind annotation
+         any mod portable,
        because t_value is not mod portable.
 |}]
 
@@ -837,7 +843,8 @@ type t : any mod global = { x : int }
 Line 1, characters 0-37:
 1 | type t : any mod global = { x : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod global,
+Error: This type definition does not satisfy its kind annotation
+         any mod global,
        because boxed records are not mod global.
 |}]
 
@@ -848,7 +855,8 @@ type t : immutable_data = { mutable a : int; f : int -> int }
 Line 1, characters 0-61:
 1 | type t : immutable_data = { mutable a : int; f : int -> int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because
        - mutable fields are not mod immutable
        - functions are not mod forkable unyielding many stateless
@@ -859,7 +867,8 @@ type t : any mod external_ = { x : int }
 Line 1, characters 0-40:
 1 | type t : any mod external_ = { x : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod external_,
+Error: This type definition does not satisfy its kind annotation
+         any mod external_,
        because boxed records are not mod external_.
 |}]
 
@@ -868,7 +877,8 @@ type t : any mod aliased = { x : int }
 Line 1, characters 0-38:
 1 | type t : any mod aliased = { x : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod aliased,
+Error: This type definition does not satisfy its kind annotation
+         any mod aliased,
        because boxed records are not mod aliased.
 |}]
 
@@ -916,7 +926,8 @@ type t : any mod global = { x : u } [@@unboxed]
 Line 1, characters 0-47:
 1 | type t : any mod global = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod global,
+Error: This type definition does not satisfy its kind annotation
+         any mod global,
        because u is not mod global.
 |}]
 
@@ -925,7 +936,8 @@ type t : any mod portable = { x : u } [@@unboxed]
 Line 1, characters 0-49:
 1 | type t : any mod portable = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod portable,
+Error: This type definition does not satisfy its kind annotation
+         any mod portable,
        because u is not mod portable.
 |}]
 
@@ -934,7 +946,8 @@ type t : any mod contended = { x : u } [@@unboxed]
 Line 1, characters 0-50:
 1 | type t : any mod contended = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod contended,
+Error: This type definition does not satisfy its kind annotation
+         any mod contended,
        because u is not mod contended.
 |}]
 
@@ -943,7 +956,8 @@ type t : any mod external_ = { x : u } [@@unboxed]
 Line 1, characters 0-50:
 1 | type t : any mod external_ = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod external_,
+Error: This type definition does not satisfy its kind annotation
+         any mod external_,
        because u is not mod external_.
 |}]
 
@@ -952,7 +966,8 @@ type t : any mod many = { x : u } [@@unboxed]
 Line 1, characters 0-45:
 1 | type t : any mod many = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod many,
+Error: This type definition does not satisfy its kind annotation
+         any mod many,
        because u is not mod many.
 |}]
 
@@ -961,7 +976,8 @@ type t : any mod aliased = { x : u } [@@unboxed]
 Line 1, characters 0-48:
 1 | type t : any mod aliased = { x : u } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod aliased,
+Error: This type definition does not satisfy its kind annotation
+         any mod aliased,
        because u is not mod aliased.
 |}]
 
@@ -984,7 +1000,8 @@ type ('a : immediate) t : value mod global = { mutable x : 'a }
 Line 1, characters 0-63:
 1 | type ('a : immediate) t : value mod global = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod global,
+Error: This type definition does not satisfy its kind annotation
+         value mod global,
        because
        - boxed records are not mod global
        - mutable fields are not mod global
@@ -995,7 +1012,8 @@ type ('a : immediate) t : value mod aliased = { mutable x : 'a }
 Line 1, characters 0-64:
 1 | type ('a : immediate) t : value mod aliased = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod aliased,
+Error: This type definition does not satisfy its kind annotation
+         value mod aliased,
        because
        - boxed records are not mod aliased
        - mutable fields are not mod aliased
@@ -1006,7 +1024,8 @@ type ('a : immediate) t : value mod contended = { mutable x : 'a }
 Line 1, characters 0-66:
 1 | type ('a : immediate) t : value mod contended = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod contended,
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
        because mutable fields are not mod contended.
 |}]
 
@@ -1015,7 +1034,8 @@ type ('a : immediate) t : value mod external_ = { mutable x : 'a }
 Line 1, characters 0-66:
 1 | type ('a : immediate) t : value mod external_ = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod external_,
+Error: This type definition does not satisfy its kind annotation
+         value mod external_,
        because
        - boxed records are not mod external_
        - mutable fields are not mod external_
@@ -1026,7 +1046,8 @@ type ('a : immediate) t : value mod external64 = { mutable x : 'a }
 Line 1, characters 0-67:
 1 | type ('a : immediate) t : value mod external64 = { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod external64,
+Error: This type definition does not satisfy its kind annotation
+         value mod external64,
        because
        - boxed records are not mod external64
        - mutable fields are not mod external64
@@ -1064,7 +1085,8 @@ type t : any mod aliased = Foo of int | Bar
 Line 1, characters 0-43:
 1 | type t : any mod aliased = Foo of int | Bar
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod aliased,
+Error: This type definition does not satisfy its kind annotation
+         any mod aliased,
        because boxed variants are not mod aliased.
 |}]
 
@@ -1073,7 +1095,8 @@ type t : any mod global = Foo of int | Bar
 Line 1, characters 0-42:
 1 | type t : any mod global = Foo of int | Bar
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod global,
+Error: This type definition does not satisfy its kind annotation
+         any mod global,
        because boxed variants are not mod global.
 |}]
 
@@ -1083,7 +1106,8 @@ type t : any mod external_ = Foo of int | Bar
 Line 1, characters 0-45:
 1 | type t : any mod external_ = Foo of int | Bar
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod external_,
+Error: This type definition does not satisfy its kind annotation
+         any mod external_,
        because boxed variants are not mod external_.
 |}]
 
@@ -1114,7 +1138,8 @@ type t : any mod portable = Foo of t_value [@@unboxed]
 Line 1, characters 0-54:
 1 | type t : any mod portable = Foo of t_value [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation any mod portable,
+Error: This type definition does not satisfy its kind annotation
+         any mod portable,
        because t_value is not mod portable.
 |}]
 
@@ -1214,7 +1239,8 @@ type 'a t : value mod aliased = { x : 'a @@ aliased }
 Line 1, characters 0-53:
 1 | type 'a t : value mod aliased = { x : 'a @@ aliased }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod aliased,
+Error: This type definition does not satisfy its kind annotation
+         value mod aliased,
        because boxed records are not mod aliased.
 |}]
 
@@ -1223,7 +1249,8 @@ type 'a t : value mod global = { x : 'a @@ global }
 Line 1, characters 0-51:
 1 | type 'a t : value mod global = { x : 'a @@ global }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod global,
+Error: This type definition does not satisfy its kind annotation
+         value mod global,
        because boxed records are not mod global.
 |}]
 
@@ -1502,7 +1529,8 @@ type 'a t : value mod global = Foo of 'a [@@unboxed]
 Line 1, characters 0-52:
 1 | type 'a t : value mod global = Foo of 'a [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod global,
+Error: This type definition does not satisfy its kind annotation
+         value mod global,
        because 'a is not mod global.
 |}]
 (* CR layouts v2.8: this should be accepted; 'a should be inferred to have kind
@@ -1513,7 +1541,8 @@ type 'a t : value mod global = { x : 'a }
 Line 1, characters 0-41:
 1 | type 'a t : value mod global = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod global,
+Error: This type definition does not satisfy its kind annotation
+         value mod global,
        because
        - boxed records are not mod global
        - 'a is not mod global
@@ -1524,7 +1553,8 @@ type 'a t : value mod many = { x : 'a }
 Line 1, characters 0-39:
 1 | type 'a t : value mod many = { x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod many,
+Error: This type definition does not satisfy its kind annotation
+         value mod many,
        because 'a is not mod many.
 |}]
 

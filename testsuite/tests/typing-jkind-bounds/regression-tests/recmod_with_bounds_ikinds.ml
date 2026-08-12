@@ -53,6 +53,7 @@ end =
 Line 7, characters 2-48:
 7 |   type t : value mod portable = { x : int T1.t }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod portable,
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
        because T1.t is not mod portable.
 |}]

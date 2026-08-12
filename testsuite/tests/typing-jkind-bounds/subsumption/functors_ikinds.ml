@@ -58,7 +58,8 @@ module Ref : sig type 'a t = 'a ref end
 Line 4, characters 0-48:
 4 | type 'a t : immutable_data with 'a = 'a F(Ref).t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with 'a,
        because F(Ref).t is not mod immutable.
 |}]
 

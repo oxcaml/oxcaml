@@ -172,7 +172,8 @@ type 'a t : immutable_data = Foo of 'a
 Line 1, characters 0-38:
 1 | type 'a t : immutable_data = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
@@ -181,7 +182,8 @@ type 'a t : immutable_data = Foo of { mutable x : 'a }
 Line 1, characters 0-54:
 1 | type 'a t : immutable_data = Foo of { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because
        - 'a is not mod stateless immutable
        - mutable fields are not mod immutable
@@ -192,7 +194,8 @@ type t : immutable_data = Foo | Bar of int ref
 Line 1, characters 0-46:
 1 | type t : immutable_data = Foo | Bar of int ref
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because ref is not mod immutable.
 |}]
 
@@ -201,7 +204,8 @@ type t : immutable_data = Foo of (unit -> unit)
 Line 1, characters 0-47:
 1 | type t : immutable_data = Foo of (unit -> unit)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because functions are not mod forkable unyielding many stateless.
 |}]
 
@@ -210,7 +214,8 @@ type 'a t : immutable_data = Foo of 'a option
 Line 1, characters 0-45:
 1 | type 'a t : immutable_data = Foo of 'a option
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
@@ -219,7 +224,8 @@ type t : immutable_data = Foo of int * int | Bar of { mutable z : int }
 Line 1, characters 0-71:
 1 | type t : immutable_data = Foo of int * int | Bar of { mutable z : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because mutable fields are not mod immutable.
 |}]
 
@@ -228,7 +234,8 @@ type t : mutable_data = Foo of { x : unit -> unit }
 Line 1, characters 0-51:
 1 | type t : mutable_data = Foo of { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation mutable_data,
+Error: This type definition does not satisfy its kind annotation
+         mutable_data,
        because functions are not mod forkable unyielding many stateless.
 |}]
 
@@ -237,7 +244,8 @@ type ('a : value mod portable) t : value mod many = Foo of 'a
 Line 1, characters 0-61:
 1 | type ('a : value mod portable) t : value mod many = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod many,
+Error: This type definition does not satisfy its kind annotation
+         value mod many,
        because 'a is not mod many.
 |}]
 
@@ -246,7 +254,8 @@ type ('a : value mod global) t : value mod global = Foo of 'a
 Line 1, characters 0-61:
 1 | type ('a : value mod global) t : value mod global = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod global,
+Error: This type definition does not satisfy its kind annotation
+         value mod global,
        because boxed variants are not mod global.
 |}]
 
@@ -255,7 +264,8 @@ type ('a : value mod aliased) t : value mod aliased = Foo of 'a
 Line 1, characters 0-63:
 1 | type ('a : value mod aliased) t : value mod aliased = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod aliased,
+Error: This type definition does not satisfy its kind annotation
+         value mod aliased,
        because boxed variants are not mod aliased.
 |}]
 
@@ -264,7 +274,8 @@ type ('a : value mod external_) t : value mod external_ = Foo of 'a
 Line 1, characters 0-67:
 1 | type ('a : value mod external_) t : value mod external_ = Foo of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod external_,
+Error: This type definition does not satisfy its kind annotation
+         value mod external_,
        because boxed variants are not mod external_.
 |}]
 
@@ -317,7 +328,8 @@ type 'a t : immutable_data with 'a = Foo of { mutable x : 'a }
 Line 1, characters 0-62:
 1 | type 'a t : immutable_data with 'a = Foo of { mutable x : 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with 'a,
        because mutable fields are not mod immutable.
 |}]
 
@@ -326,7 +338,8 @@ type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
 Line 1, characters 0-60:
 1 | type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with 'a,
        because functions are not mod forkable unyielding many stateless.
 |}]
 

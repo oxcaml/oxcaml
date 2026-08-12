@@ -24,7 +24,8 @@ type 'a t : immutable_data = A of 'a
 Line 1, characters 0-36:
 1 | type 'a t : immutable_data = A of 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
@@ -33,7 +34,8 @@ type ('a, 'b) t : immutable_data with 'a = { a : 'a; b : 'b }
 Line 1, characters 0-61:
 1 | type ('a, 'b) t : immutable_data with 'a = { a : 'a; b : 'b }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data with 'a,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with 'a,
        because 'b is not mod forkable unyielding many stateless immutable.
 |}]
 
@@ -42,7 +44,8 @@ type 'a t : immutable_data = Foo of 'a @@ portable
 Line 1, characters 0-50:
 1 | type 'a t : immutable_data = Foo of 'a @@ portable
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation immutable_data,
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
        because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
