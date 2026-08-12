@@ -2273,8 +2273,9 @@ static void major_collection_slice(intnat howmuch,
        at the same time. (Needed for performance, not for safety.)
      */
     uintnat wkcnt = atomic_load (&total_work_completed);
+    intnat idle;
   retry_idle:
-    intnat idle = diffmod (work_completed_min_before_mark, wkcnt);
+    idle = diffmod (work_completed_min_before_mark, wkcnt);
     if (idle <= 0){
       /* Idle phase is finished (or never existed), we should start marking */
       request_mark_phase();
