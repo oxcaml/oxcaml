@@ -99,6 +99,15 @@ let g_opt : type (a : any). ?x:(a opt) -> a -> unit -> (int -> int) =
   fun ?x:(YesO = assert false) y () -> y
 [%%expect{|
 type ('a : any) opt = YesO : (int -> int) opt
+Line 4, characters 31-32:
+4 |   fun ?x:(YesO = assert false) y () -> y
+                                   ^
+Error: This function's argument has type a,
+       whose layout is known only from the GADT pattern match at line 4, characters 10-14.
+       That pattern matches an optional argument that a caller could omit, so a caller could reach this argument at a different layout.
+       Function arguments and results must be representable independently of the patterns of optional arguments.
+|}, Principal{|
+type ('a : any) opt = YesO : (int -> int) opt
 Line 4, characters 10-14:
 4 |   fun ?x:(YesO = assert false) y () -> y
               ^^^^
@@ -122,6 +131,9 @@ type _ w = AW : int w
 let opt_value : type a. ?x:(a w) -> a -> unit =
   fun ?x:(AW = assert false) _y -> ()
 [%%expect{|
+type _ w = AW : int w
+val opt_value : ?x:'a w -> 'a -> unit = <fun>
+|}, Principal{|
 type _ w = AW : int w
 Line 4, characters 10-12:
 4 |   fun ?x:(AW = assert false) _y -> ()
