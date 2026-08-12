@@ -168,7 +168,11 @@ module Solver = struct
     | Normal -> Ldd.node_of_var (Ldd.rigid name)
     | Round_up when match name with Provenance _ -> true | _ -> false ->
       Ldd.node_of_var (Ldd.rigid name)
-    | Round_up -> Ldd.const Axis_lattice.top
+    match ctx.mode, name with
+    | Normal, _
+    | Round_up, Provenance ->
+      Ldd.node_of_var (Ldd.rigid name)
+    | Round_up, _ -> Ldd.const Axis_lattice.top
 
   (** A rigid variable corresponding to a type parameter [t]. *)
   let rigid (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
