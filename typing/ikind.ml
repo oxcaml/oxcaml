@@ -748,6 +748,9 @@ type subjkind_error =
   | Jkind_error of Jkind.Violation.t
   | Mode_crossing_error of mode_crossing_error
 
+let map_jkind_error result =
+  Result.map_error (fun error -> Jkind_error error) result
+
 type provenance_residual =
   { ty : string;
     plural : bool;
@@ -1492,14 +1495,12 @@ let sub_jkind_l ?allow_any_crossing ?origin
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then
     Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env sub super
-    |> Result.map_error (fun err -> Jkind_error err)
+    |> map_jkind_error
   else
     (* Check layouts first; if that fails, print both sides with full
        info and return the error. *)
     let* () =
-      match Jkind.sub_layout_or_error ~context env sub super with
-      | Ok () -> Ok ()
-      | Error v -> Error (Jkind_error v)
+      Jkind.sub_layout_or_error ~context env sub super |> map_jkind_error
     in
     let allow_any =
       match allow_any_crossing with Some true -> true | _ -> false
@@ -1540,9 +1541,7 @@ let check_bound ?allow_any_crossing ?origin ~type_equal ~context env ~actual
   else
     let open Misc.Stdlib.Monad.Result.Syntax in
     let* () =
-      match Jkind.sub_layout_or_error ~context env actual bound with
-      | Ok () -> Ok ()
-      | Error v -> Error (Jkind_error v)
+      Jkind.sub_layout_or_error ~context env actual bound |> map_jkind_error
     in
     let allow_any =
       match allow_any_crossing with Some true -> true | _ -> false
