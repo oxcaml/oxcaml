@@ -6,7 +6,7 @@ module L = Ldd.Make (struct
   let to_string x = x
 end)
 
-let leq a b = L.leq_with_reason a b = []
+let leq a b = List.is_empty (L.leq_with_reason a b)
 
 let assert_equiv label a b =
   if not (leq a b && leq b a)
