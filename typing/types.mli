@@ -115,8 +115,10 @@ module Rigid_name : sig
         { id : int;
           (** Identifies this provenance occurrence. *)
 
-          ty : string;
-          (** The printed type expression or descriptive noun phrase. *)
+          ty : Format_doc.doc;
+          (** The type expression or descriptive noun phrase, retained as a
+              formatting document so its line-breaking instructions survive
+              until the diagnostic is printed. *)
 
           plural : bool
           (** Whether [ty] is a plural noun phrase rather than a type. *)
@@ -140,7 +142,7 @@ module Rigid_name : sig
 
   val param : int -> t
 
-  val provenance : id:int -> ty:string -> plural:bool -> t
+  val provenance : id:int -> ty:Format_doc.doc -> plural:bool -> t
 
   val unknown : Shape.Uid.t -> t
 

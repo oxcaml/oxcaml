@@ -59,12 +59,15 @@ module Provenance = struct
 
   let names : Ldd.Name.t list ref = ref []
 
-  let register_text ~plural ty : Ldd.Name.t =
+  let register_doc ~plural ty : Ldd.Name.t =
     let id = !next_id in
     next_id := id + 1;
     let name = Ldd.Name.provenance ~id ~ty ~plural in
     names := name :: !names;
     name
+
+  let register_text ~plural text =
+    register_doc ~plural (Format_doc.doc_printf "%s" text)
 
   let register (ty : Types.type_expr) : Ldd.Name.t =
     (* A surviving residual for an occurrence reflects only the head
@@ -73,9 +76,8 @@ module Provenance = struct
        name the head rather than the full type expression: the constructor
        for [Tconstr], a class-of-types phrase for the built-in shapes. *)
     let register_type ty =
-      Format_doc.asprintf "%a" Jkind.format_type_expr ty
-      |> collapse_whitespace
-      |> register_text ~plural:false
+      Format_doc.doc_printf "@[<hov>%a@]" Jkind.format_type_expr ty
+      |> register_doc ~plural:false
     in
     match Types.get_desc ty with
     | Types.Tarrow _ -> register_text ~plural:true "functions"
@@ -743,7 +745,7 @@ let map_jkind_error result =
   Result.map_error (fun error -> Jkind_error error) result
 
 type provenance_residual =
-  { ty : string;
+  { ty : Format_doc.doc;
     plural : bool;
     mode_bounds : Axis_lattice.t;
     axes : Jkind_axis.Axis.packed list
@@ -756,7 +758,9 @@ let add_provenance_residual entries ({ ty; plural; mode_bounds; axes } as entry)
      share a printed name (e.g. two constructor-local existentials both
      rendered ['a]) can have different requirements and must stay separate. *)
   let duplicate other =
-    String.equal other.ty ty
+    String.equal
+      (Format_doc.asprintf "%a" Format_doc.pp_doc other.ty)
+      (Format_doc.asprintf "%a" Format_doc.pp_doc ty)
     && Bool.equal other.plural plural
     && Axis_lattice.equal other.mode_bounds mode_bounds
     && List.length other.axes = List.length axes
@@ -854,7 +858,7 @@ let pp_provenance_residual ppf ({ ty; plural; _ } as residual) =
      phrases; type-expression subjects read as singular. *)
   let verb = if plural then "are" else "is" in
   let modes = residual_mode_strings residual in
-  Format_doc.fprintf ppf "@[<hov 2>%s %s not mod %a@]" ty verb
+  Format_doc.fprintf ppf "@[<hov 2>%a %s not mod %a@]" Format_doc.pp_doc ty verb
     (Format_doc.pp_print_list
        ~pp_sep:(fun ppf () -> Format_doc.fprintf ppf "@ ")
        Format_doc.pp_print_string)

@@ -30,7 +30,7 @@ module Rigid_name = struct
     | Param of int
     | Provenance of
         { id : int;
-          ty : string;
+          ty : Format_doc.doc;
           plural : bool
         }
     | Unknown of unknown_id
@@ -65,7 +65,7 @@ module Rigid_name = struct
       Printf.sprintf "katom[%s]" path_s
     | Param i -> Printf.sprintf "param[%d]" i
     | Provenance { id; ty; plural = _ } ->
-      Printf.sprintf "provenance[%d:%s]" id ty
+      Format_doc.asprintf "provenance[%d:%a]" id Format_doc.pp_doc ty
     | Unknown id ->
       Format.asprintf "unknown[%a]" Shape.Uid.print id
 
