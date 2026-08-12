@@ -157,11 +157,10 @@ let prim env res _dbg p =
         in
         expr, env, res, fv
       | _ -> None, env, res, FV.empty))
-  | Nullary (Optimised_out _) ->
-    (* The variable is bound to a phantom let with no defining expression. This
-       still materialises a backend variable for it, so that any subsequent
-       phantom lets reading from it -- for example a [Project_value_slot] or
-       [Project_function_slot] from an optimised-out [my_closure] -- can refer
-       to it rather than being dropped. *)
+  | _ ->
+    (* Includes [Optimised_out]: the variable is bound to a phantom let with no
+       defining expression. This still materialises a backend variable for it,
+       so that any subsequent phantom lets reading from it -- for example a
+       [Project_value_slot] or [Project_function_slot] from an optimised-out
+       [my_closure] -- can refer to it rather than being dropped. *)
     None, env, res, FV.empty
-  | _ -> None, env, res, FV.empty
