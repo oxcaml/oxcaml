@@ -1,0 +1,36 @@
+let $camlPartial_app_kind_check_simplify__first_const = Block 0 () in
+(let code inline(always) size(1)
+       cast_1 (param : imm tagged, x : val)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : val =
+   let next_depth = rec_info (succ my_depth) in
+   cont k1 (x)
+ in
+ let code inline(never) size(1)
+       f_2 (param, param_1)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   cont k1 (0)
+ in
+ let code size(28)
+       test_0 (u : imm tagged, a, b)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : int64 =
+   let next_depth = rec_info (succ my_depth) in
+   let cast = closure cast_1 @cast &my_alloc_region in
+   let f = closure f_2 @f &my_alloc_region in
+   apply direct(cast_1 &my_alloc_region) (cast : _ -> val) (u, f) -> k3 * k2
+     where k3 (apply_result : val) =
+       apply &my_alloc_region apply_result (0) -> k1 * k2
+ in
+ let test = closure test_0 @test &toplevel.alloc_region in
+ let Pmakeblock = %block.[`0`].`toplevel` (test) in
+ cont k (Pmakeblock))
+  where k define_root_symbol (module_block) =
+    let field_0 = %block_load.tag[`0`].`size`[`1`].[`0`] (module_block) in
+    let $camlPartial_app_kind_check_simplify = Block 0 (field_0) in
+    cont done ($camlPartial_app_kind_check_simplify)
