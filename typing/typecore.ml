@@ -1424,15 +1424,6 @@ let unify_exp_types loc env ty expected_ty =
   | Tags(l1,l2) ->
       raise(Typetexp.Error(loc, env, Typetexp.Variant_tags (l1, l2)))
 
-let unify_exp_types_delaying_quote_evals loc env ty expected_ty =
-  try
-    unify_delaying_quote_evals env ty expected_ty
-  with
-    Unify err ->
-      raise(Error(loc, env, Expr_type_clash(err, None, None)))
-  | Tags(l1,l2) ->
-      raise(Typetexp.Error(loc, env, Typetexp.Variant_tags (l1, l2)))
-
 (* Getting proper location of already typed expressions.
 
    Used to avoid confusing locations on type error messages in presence of
@@ -10541,30 +10532,26 @@ and type_application env app_loc expected_mode position_and_mode
                       (Nolabel, Arg (Known_arg n))]] *)
           (* Upstream does not yet use result types to inform constructor
              disambiguation. It's also unprincipal. *)
-          let delayed_quote_evals =
-            if not (Language_extension.erasable_extensions_only ())
-               && not !Clflags.principal
-            then begin
-              let ty_res =
-                List.fold_left
-                  (fun ty_ret (lbl, arg) ->
-                     match arg with
-                     | Omitted { ty_arg; mode_arg; level; _ } ->
-                         let arrow_desc = (lbl, mode_arg, Alloc.newvar ()) in
-                         newty2 ~level
-                           (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
-                     | Arg _ -> ty_ret)
-                  ty_ret (List.rev untyped_args)
-              in
-              let ty_expected = instance ty_expected in
-              if not (is_Tvar (expand_head env ty_expected))
-              then
-                unify_exp_types_delaying_quote_evals app_loc env
-                  ty_res ty_expected
-              else []
-            end
-            else []
-          in
+          if not (Language_extension.erasable_extensions_only ())
+             && not !Clflags.principal
+          then begin
+            let ty_res =
+              List.fold_left
+                (fun ty_ret (lbl, arg) ->
+                   match arg with
+                   | Omitted { ty_arg; mode_arg; level; _ } ->
+                       let arrow_desc = (lbl, mode_arg, Alloc.newvar ()) in
+                       newty2 ~level
+                         (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
+                   | Arg _ -> ty_ret)
+                ty_ret (List.rev untyped_args)
+            in
+            let ty_expected = expand_head env (instance ty_expected) in
+            if not (is_Tvar ty_expected) then
+              let snap = snapshot () in
+              try Ctype.unify env ty_res ty_expected
+              with Unify _ -> backtrack snap
+          end;
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
             if partial_app then position_and_mode_default else position_and_mode
@@ -10575,9 +10562,6 @@ and type_application env app_loc expected_mode position_and_mode
                   ~position_and_mode ~partial_app arg)
               untyped_args
           in
-          List.iter
-            (fun (ty, ty') -> unify_exp_types app_loc env ty ty')
-            delayed_quote_evals;
           (* The application can never perform a free effect if the function and
              all of its arguments are unyielding. *)
           let ap_yielding =

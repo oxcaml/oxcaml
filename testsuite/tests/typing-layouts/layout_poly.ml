@@ -74,18 +74,6 @@ module M = struct
 end
 
 [%%expect{|
-Line 4, characters 58-69:
-4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
-                                                              ^^^^^^^^^^^
-Error: This expression has type "('a : float64)"
-       but an expression was expected of type "string"
-       The layout of string is value non_float
-         because it is the primitive type string.
-       But the layout of string must be a sublayout of float64
-         because of the definition of id' at line 2, characters 10-18.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
-|}, Principal{|
 Line 4, characters 63-68:
 4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
                                                                    ^^^^^
@@ -312,18 +300,6 @@ module S : sig val id : ('a : float64). 'a -> 'a end
 let () = Format.printf "%s\n" (S.id "abc")
 
 [%%expect{|
-Line 1, characters 30-42:
-1 | let () = Format.printf "%s\n" (S.id "abc")
-                                  ^^^^^^^^^^^^
-Error: This expression has type "('a : float64)"
-       but an expression was expected of type "string"
-       The layout of string is value non_float
-         because it is the primitive type string.
-       But the layout of string must be a sublayout of float64
-         because of the definition of id at line 2, characters 2-35.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
-|}, Principal{|
 Line 1, characters 36-41:
 1 | let () = Format.printf "%s\n" (S.id "abc")
                                         ^^^^^

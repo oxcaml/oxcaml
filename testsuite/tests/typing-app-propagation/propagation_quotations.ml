@@ -15,26 +15,6 @@ end)
 val eval : 'a expr @ once -> 'a eval = <fun>
 |}]
 
-let f () : int = eval <[ 42 ]>
-[%%expect {|
-val f : unit -> int = <fun>
-|}]
-
-let g () : string = eval <[ 42 ]> (* type error: int ~/~ string *)
-[%%expect {|
-Line 1, characters 20-33:
-1 | let g () : string = eval <[ 42 ]> (* type error: int ~/~ string *)
-                        ^^^^^^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
-         "int"
-|}, Principal{|
-Line 1, characters 20-33:
-1 | let g () : string = eval <[ 42 ]> (* type error: int ~/~ string *)
-                        ^^^^^^^^^^^^^
-Error: This expression has type "<[int]> eval" = "int"
-       but an expression was expected of type "string"
-|}]
-
 type t = A | B
 type s = A | B
 
@@ -45,10 +25,9 @@ type s = A | B
 val pair : 'a expr -> 'b -> 'a eval * 'b = <fun>
 |}]
 
+(* Inference with ['a eval] is incomplete, and we do not propagate through it *)
 let p () : int * t = pair <[ 1 ]> A
 [%%expect {|
-val p : unit -> int * t = <fun>
-|}, Principal{|
 Line 1, characters 21-35:
 1 | let p () : int * t = pair <[ 1 ]> A
                          ^^^^^^^^^^^^^^

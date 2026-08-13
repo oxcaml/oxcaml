@@ -423,6 +423,8 @@ and ['a] cons :
 
 let l1 = new cons 3 (new cons 10 (new nil ()));;
 [%%expect{|
+val l1 : int nil = <obj>
+|}, Principal{|
 val l1 : int lst = <obj>
 |}];;
 
@@ -446,11 +448,15 @@ let rec map_list f (x:'a lst) =
   if x#null then new nil()
   else new cons (f x#hd) (map_list f x#tl);;
 [%%expect{|
+val map_list : ('a -> 'b) -> 'a lst -> 'b nil = <fun>
+|}, Principal{|
 val map_list : ('a -> 'b) -> 'a lst -> 'b lst = <fun>
 |}];;
 
 let p1 = (map_list (fun x -> new printable_color_point x "red") l1);;
 [%%expect{|
+val p1 : printable_color_point nil = <obj>
+|}, Principal{|
 val p1 : printable_color_point lst = <obj>
 |}];;
 p1#print (fun x -> x#print); Format.print_newline () ;;
@@ -826,6 +832,40 @@ end and calculator_sub arg acc = object
   method equals = acc -. arg
 end;;
 [%%expect{|
+class calculator :
+  float ->
+  float ->
+  object
+    val acc : float
+    val arg : float
+    method add : calculator_add
+    method enter : float -> calculator
+    method equals : float
+    method sub : calculator_sub
+  end
+and calculator_add :
+  float ->
+  float ->
+  object
+    val acc : float
+    val arg : float
+    method add : calculator_add
+    method enter : float -> calculator
+    method equals : float
+    method sub : calculator_sub
+  end
+and calculator_sub :
+  float ->
+  float ->
+  object
+    val acc : float
+    val arg : float
+    method add : calculator_add
+    method enter : float -> calculator
+    method equals : float
+    method sub : calculator_sub
+  end
+|}, Principal{|
 class calculator :
   float ->
   float ->
