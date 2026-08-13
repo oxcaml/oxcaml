@@ -534,6 +534,71 @@ let contains_initial_stage_splice stage ty =
   in
   loop stage ty
 
+(* Returns [true] iff [t] is valid at any stage. Equivalently:
+   [<[t]> expr = t] up to beta-reductions in [try_reduce_quote_eval]. *)
+let rec type_is_persistent_in_quotations env t =
+  let types_are_persistent_in_quotations env tl =
+    List.fold_left
+      (fun acc t -> acc && type_is_persistent_in_quotations env t)
+      true tl
+  in
+  match get_desc t with
+  | Tvar _ | Tunivar _ ->
+    false
+  | Tarrow (_, t1, t2, _) ->
+    type_is_persistent_in_quotations env t1 &&
+    type_is_persistent_in_quotations env t2
+  | Ttuple tl ->
+    List.map (fun (_, t) -> t) tl
+    |> types_are_persistent_in_quotations env
+  | Tbox t ->
+    type_is_persistent_in_quotations env t
+  | Tunboxed_tuple tl ->
+    List.map (fun (_, t) -> t) tl
+    |> types_are_persistent_in_quotations env
+  | Tconstr (path, tl, _) ->
+    Env.path_is_persistent_in_quotations env path &&
+    types_are_persistent_in_quotations env tl
+  | Tmod (t, _) ->
+    type_is_persistent_in_quotations env t
+  | Tobject (t, ct) ->
+    type_is_persistent_in_quotations env t &&
+    Option.map
+      (fun (p, tl) ->
+        Env.path_is_persistent_in_quotations env p &&
+        types_are_persistent_in_quotations env tl) !ct
+    |> Option.value ~default:true
+  | Tfield (_, _, t_method, t_rest) ->
+    type_is_persistent_in_quotations env t_method &&
+    type_is_persistent_in_quotations env t_rest
+  | Tnil ->
+    true
+  | Tquote _ | Tsplice _ | Tquote_eval _ ->
+    (* [eval] does not reduce on these *)
+    false
+  | Tvariant row ->
+    row_more row |> type_is_persistent_in_quotations env
+  | Tpoly (_, []) ->
+    true
+  | Tpoly (_, _::_) ->
+    false
+  | Trepr (t, _) ->
+    type_is_persistent_in_quotations env t
+  | Tpackage { pack_path; pack_cstrs } ->
+    Env.path_is_persistent_in_quotations env pack_path &&
+    types_are_persistent_in_quotations env
+      (List.map (fun (_, t) -> t) pack_cstrs)
+  | Tof_kind _ ->
+    true
+  | Tlink _ | Tsubst _ -> assert false
+
+(* Should only be used when [type_is_persistent_in_quotations] is [true],
+   in which case the type contains no variables. *)
+let copy_type_desc_of_persistent_in_quotations = function
+  | Tvariant row ->
+    Tvariant (copy_row Fun.id true row false (row_more row))
+  | t -> copy_type_desc Fun.id t
+
 (* Update unification environment stage *)
 let unify_with_incr_stage uenv f =
   match uenv with
@@ -5106,6 +5171,21 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tquote_eval t1, Tquote_eval t2) ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
+  (* We copy [type_desc] to prevent infinite types like [<[t]> eval ~ t]. *)
+  | (Tquote_eval t1, t2)
+    when type_is_persistent_in_quotations (get_env uenv) t2' ->
+      let t2 =
+        copy_type_desc_of_persistent_in_quotations t2
+        |> newty2 ~level:(get_level t2')
+      in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
+  | (t1, Tquote_eval t2)
+    when type_is_persistent_in_quotations (get_env uenv) t1' ->
+      let t1 =
+        copy_type_desc_of_persistent_in_quotations t1
+        |> newty2 ~level:(get_level t1')
+      in
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tsplice s1, _) when is_flexible_ty s1 ->
       unify_with_decr_stage uenv (fun uenv -> unify uenv s1 (new_quote_ty t2'))
   | (Tquote s1, _) when is_flexible_ty s1 ->
@@ -6493,6 +6573,9 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tquote_eval t1, _) when type_is_persistent_in_quotations env t2' ->
+              moregen inst_nongen variance type_pairs
+                (incr_stage env) t1 t2'
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
