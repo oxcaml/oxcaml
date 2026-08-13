@@ -181,6 +181,13 @@ because its continuation was promoted (value: bytes copied).
 An idle stack was woken: copied onto a fresh guarded stack for
 resumption (value: bytes copied).
 @since 5.4 *)
+| EV_C_MAJOR_DIRECT_ALLOCATED_WORDS
+(**
+Direct allocations to the major heap of this Domain in {b words}, since the
+last major slice. This excludes words promoted from the minor heap, which are
+counted in EV_C_MAJOR_ALLOCATED_WORDS. Words include block headers.
+@since 5.6
+*)
 
 (** The type for span events emitted by the runtime. *)
 type runtime_phase =

@@ -44,6 +44,7 @@ type runtime_counter =
 | EV_C_STACK_FREED
 | EV_C_STACK_IDLED
 | EV_C_STACK_WOKEN
+| EV_C_MAJOR_DIRECT_ALLOCATED_WORDS
 
 type runtime_phase =
 | EV_EXPLICIT_GC_SET
@@ -157,6 +158,8 @@ let runtime_counter_name counter =
     "stack_idled"
   | EV_C_STACK_WOKEN ->
     "stack_woken"
+  | EV_C_MAJOR_DIRECT_ALLOCATED_WORDS ->
+    "major_direct_allocated_words"
 
 let runtime_phase_name phase =
   match phase with
