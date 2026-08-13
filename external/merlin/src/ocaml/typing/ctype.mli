@@ -89,7 +89,7 @@ val set_levels: levels -> unit
 
 val create_scope : unit -> int
 
-val mark_toplevel_in_quotations : Env.t -> Env.t
+val mark_persistent_in_quotations : Env.t -> Env.t
 
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
@@ -153,7 +153,7 @@ val merge_row_fields:
 val filter_row_fields:
         bool -> (label * row_field) list -> (label * row_field) list
 
-val contains_toplevel_splice: int -> type_expr -> bool
+val contains_initial_stage_splice: int -> type_expr -> bool
 val iter_type_expr_with_stages:
         (Env.t -> type_expr -> unit) -> Env.t -> type_expr -> unit
 
@@ -278,6 +278,11 @@ val instance_prim:
         Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
         Jkind.Sort.t option
 
+(** The join of the yielding modes of the first [arity] parameters of a
+    primitive of type [ty]; [Yielding.max] if [ty] has fewer arrows. *)
+val prim_params_yielding:
+        Env.t -> type_expr -> arity:int -> Mode.Yielding.l
+
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
     to have. *)
@@ -293,10 +298,11 @@ val apply:
            set to true.
            Exception [Cannot_apply] is raised in case of failure. *)
 
-val reduce_head: expand_eval:bool -> Env.t -> type_expr -> type_expr
-(** Exhaustively beta-reduce head-position quotes, splices and quote-evals.
-    If [expand_eval] is true, expands [Predef]'s [eval]s into [Tquote_eval]
-    enabling further reductions. *)
+val reduce_head:
+  expand_reducible_abbrevs:bool -> Env.t -> type_expr -> type_expr
+(** Exhaustively beta-reduce head-position quotes, splices, quote-evals, and
+    boxes. If [expand_reducible_abbrevs] is true, expands [Predef]'s [eval]s and
+    [box]es into [Tquote_eval] and [Tbox], enabling further reductions. *)
 
 val try_expand_once_opt: Env.t -> type_expr -> type_expr
 val try_expand_safe_opt: Env.t -> type_expr -> type_expr
@@ -649,10 +655,10 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
-  ; or_null : (type_declaration * unwrapped_type_expr) option;
-    (* We store the declaration rather than a bool to avoid re-writing the
-       with-bounds of [or_null], and to be more robust for the future where we
-       have user-defined [or_null]-like types
+  ; or_null : unwrapped_or_null option;
+    (* We store the declaration and arguments rather than a bool to avoid
+       re-writing the with-bounds of [or_null], and to be more robust for the
+       future where we have user-defined [or_null]-like types
 
        Note [unwrapped_type_expr backtracking for or_null]:
 
@@ -673,6 +679,8 @@ type unwrapped_type_expr =
        [estimate_type_jkind] to fix another bug.
     *)
   }
+
+and unwrapped_or_null
 
 val get_unboxed_type_representation :
   Env.t ->
@@ -765,8 +773,8 @@ val check_type_externality :
 val is_always_gc_ignorable : Env.t -> type_expr -> bool
 
 (* Check whether a type's nullability is less than some target.
-   Uses get_nullability which is potentially cheaper than calling type_jkind
-   if all with-bounds are irrelevant. *)
+   Potentially cheaper than just calling [type_jkind], because this can stop
+   expansion once it succeeds. *)
 val check_type_nullability :
   Env.t -> type_expr -> Jkind_axis.Nullability.t -> bool
 

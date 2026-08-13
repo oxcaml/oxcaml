@@ -20,6 +20,8 @@ open Mode
 
 type jkind_initialization_choice = Sort | Any
 
+type valdecl_lpoly_flag = Lpoly | Lmono
+
 module TyVarEnv : sig
   (* this is just the subset of [TyVarEnv] that is needed outside
      of [Typetexp]. See the ml file for more. *)
@@ -130,13 +132,17 @@ val transl_simple_type_delayed
            Returns the type, an instance of the corresponding type_expr, and a
            function that binds the type variable. *)
 val transl_type_scheme:
-        Env.t -> Parsetree.core_type ->
+        Env.t -> Parsetree.core_type -> valdecl_lpoly_flag ->
         Jkind_types.Sort.var list * Typedtree.core_type
 val transl_type_param:
-  Env.t -> Path.t -> jkind_lr -> Parsetree.core_type -> Typedtree.core_type
+  Env.t -> Path.t -> jkind_lr -> Parsetree.core_type ->
+  Typedtree.core_type * jkind_lr option
 (* the Path.t above is of the type/class whose param we are processing;
    the level defaults to the current level. The jkind_lr is the jkind to
-   use if no annotation is provided. *)
+   use if no annotation is provided. Also returns the translation of the
+   parameter's jkind annotation, if there was one, so that callers can
+   compare against it without re-translating (which would re-trigger
+   alerts and other side effects of translation). *)
 
 val get_type_param_jkind: Env.t -> Path.t -> Parsetree.core_type -> jkind_lr
 (* [get_type_param_jkind] is only used in contexts where the jkind will be
@@ -196,6 +202,7 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+  | Val_poly_and_layout
 
 exception Error of Location.t * Env.t * error
 

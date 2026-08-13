@@ -114,6 +114,7 @@
   ident
   path
   unit_info
+  current_unit
   shape
   shape_reduce
   allowance
@@ -137,6 +138,7 @@
   value_rec_types
   btype
   lazy_backtrack
+  hash_consed
   type_shape
   zero_alloc_utils
   diffing
@@ -268,6 +270,8 @@
 
 (copy_files ../../utils/lazy_backtrack.ml)
 
+(copy_files ../../utils/hash_consed.ml)
+
 (copy_files ../../utils/zero_alloc_utils.ml)
 
 (copy_files ../../utils/diffing.ml)
@@ -285,8 +289,6 @@
 (copy_files ../../parsing/lexer.ml)
 
 (copy_files ../../parsing/parser_types.ml)
-
-(copy_files ../../parsing/parser.ml)
 
 (copy_files ../../parsing/printast.ml)
 
@@ -391,6 +393,8 @@
 
 (copy_files ../../typing/persistent_env.ml)
 
+(copy_files ../../typing/current_unit.ml)
+
 (copy_files ../../typing/env.ml)
 
 (copy_files ../../lambda/debuginfo.ml)
@@ -473,6 +477,8 @@
 
 (copy_files ../../utils/lazy_backtrack.mli)
 
+(copy_files ../../utils/hash_consed.mli)
+
 (copy_files ../../utils/zero_alloc_utils.mli)
 
 (copy_files ../../utils/diffing.mli)
@@ -514,8 +520,6 @@
 (copy_files ../../typing/path.mli)
 
 (copy_files ../../typing/jkind.mli)
-
-(copy_files ../../typing/jkind_intf.mli)
 
 (copy_files ../../typing/jkind_types.mli)
 
@@ -583,7 +587,7 @@
 
 (copy_files ../../typing/datarepr.mli)
 
-(copy_files ../../typing/unit_info.mli)
+(copy_files ../../parsing/unit_info.mli)
 
 (copy_files ../../typing/typedtree.mli)
 
@@ -592,6 +596,8 @@
 (copy_files ../../file_formats/cmi_format.mli)
 
 (copy_files ../../typing/persistent_env.mli)
+
+(copy_files ../../typing/current_unit.mli)
 
 (copy_files ../../typing/env.mli)
 
@@ -724,6 +730,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Printast.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Syntaxerr.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Lazy_backtrack.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Hash_consed.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Zero_alloc_utils.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Diffing.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Diffing_with_keys.cmo
@@ -744,6 +751,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ldd.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Current_unit.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Types.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Attr_helper.cmo
@@ -811,8 +819,16 @@
    %{read:../../natdynlinkops}
    -o
    dynlink.cmxa
-   %{deps}))
+   %{cmx}))
  (deps
+  ; The .o files are read by [ocamlopt -a] when building dynlink.a but are not
+  ; passed on the command line; they must be present alongside the .cmx files.
+  (glob_files .dynlink_compilerlibs.objs/native/*.o)
+  (glob_files .dynlink_internal_common.objs/native/*.o)
+  (glob_files .dynlink_internal_byte.objs/native/*.o)
+  (glob_files .dynlink_internal_native.objs/native/*.o)
+  (glob_files .dynlink_internal.objs/native/*.o)
+  (:cmx
   ; NOTE: Be sure to keep these arguments in dependency order!
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Runtimetags.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Int_replace_polymorphic_compare.cmx
@@ -847,6 +863,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lexer.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Path.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Lazy_backtrack.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Hash_consed.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Zero_alloc_utils.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Diffing.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Diffing_with_keys.cmx
@@ -869,6 +886,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ldd.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Current_unit.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Types.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Attr_helper.cmx
@@ -923,7 +941,7 @@
   .dynlink_internal_common.objs/native/dynlink_common.cmx
   .dynlink_internal_byte.objs/native/dynlink_internal_byte.cmx
   .dynlink_internal_native.objs/native/dynlink_internal_native.cmx
-  .dynlink_internal.objs/native/dynlink.cmx))
+  .dynlink_internal.objs/native/dynlink.cmx)))
 
 (install
  (files

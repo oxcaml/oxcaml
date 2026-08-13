@@ -394,8 +394,12 @@ let op_shapes = [
   (* CR ocaml 5 effects:
   BACKPORT
   opPERFORM, Nothing;
-  opRESUME, Nothing;
-  opRESUMETERM, Uint;
+  opCONTINUE, Nothing;
+  opCONTINUETERM, Uint;
+  opDISCONTINUE, Nothing;
+  opDISCONTINUETERM, Uint;
+  opDISCONTINUE_WITH_BACKTRACE, Nothing;
+  opDISCONTINUE_WITH_BACKTRACETERM, Uint;
   opREPERFORMTERM, Uint;
   *)
   opSTOP, Nothing;
@@ -406,12 +410,27 @@ let op_shapes = [
 ]
 
 let print_event ev =
-  if !print_locations then
+  if !print_locations then begin
     let ls = ev.ev_loc.loc_start in
     let le = ev.ev_loc.loc_end in
     printf "File \"%s\", line %d, characters %d-%d:\n" ls.Lexing.pos_fname
       ls.Lexing.pos_lnum (ls.Lexing.pos_cnum - ls.Lexing.pos_bol)
-      (le.Lexing.pos_cnum - ls.Lexing.pos_bol)
+      (le.Lexing.pos_cnum - ls.Lexing.pos_bol);
+    let kind =
+      match ev.ev_kind with
+      | Event_before -> "before"
+      | Event_after _ -> "after"
+      | Event_pseudo -> "pseudo"
+    in
+    let info =
+      match ev.ev_info with
+      | Event_function -> "/fun"
+      | Event_return n -> sprintf "/ret(%d)" n
+      | Event_unyielding_call n -> sprintf "/unyielding-call(%d)" n
+      | Event_other -> ""
+    in
+    printf "Event %s%s\n" kind info
+  end
 
 let print_instr ic =
   let pos = currpos ic in

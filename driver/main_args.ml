@@ -210,7 +210,12 @@ let mk_I_manifest f =
   \    by the compiler, <actual_path> is where this file is in the\n\
   \    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file\n\
   \    passed to the [-I-manifest] flag should itself be relative to\n\
-  \    [$MANIFEST_FILES_ROOT]."
+  \    [$MANIFEST_FILES_ROOT]. When linking, files given on the command\n\
+  \    line by their bare names (e.g. 'foo.cmx' or 'lib.cmxa') are also\n\
+  \    resolved through manifest entries; if the entry's <actual_path> does\n\
+  \    not retain the extension, the companion object files ('foo.o',\n\
+  \    'lib.a') are resolved the same way and must therefore be listed as\n\
+  \    separate manifest entries."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
@@ -2059,6 +2064,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_color F._color;
     mk_error_style F._error_style;
 
+    mk_dcanonical_ids F._dcanonical_ids;
+    mk_dno_canonical_ids F._dno_canonical_ids;
     mk_dno_unique_ids F._dno_unique_ids;
     mk_dunique_ids F._dunique_ids;
     mk_dno_locations F._dno_locations;
@@ -2382,7 +2389,7 @@ module Default = struct
   module Common = struct
     let _absname = set Clflags.absname
     let _locs = set Clflags.locs
-    let _alert = Warnings.parse_alert_option
+    let _alert s = Warnings.parse_alert_option s
     let _no_ikinds = clear Clflags.ikinds
     let _ikinds_debug = set Clflags.ikinds_debug
     let _alias_deps = clear no_alias_deps

@@ -57,7 +57,7 @@ module T = struct
     | Vector512 -> 64
 
   let of_machtype : Cmm.machtype_component -> t = function
-    | Val | Int | Addr -> Int64
+    | Val | Int | Addr | Mask -> Int64
     | Float | Float32 -> Float64
     | Vec128 | Valx2 -> Vector128
     | Vec256 -> Vector256

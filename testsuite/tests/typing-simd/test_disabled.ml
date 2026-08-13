@@ -45,7 +45,7 @@ Line 1, characters 9-18:
 1 | type t = float32x4;;
              ^^^^^^^^^
 Error: Unbound type constructor "float32x4"
-Hint:              Did you mean "float32"?
+Hint:              Did you mean "float32" or "float32_u"?
 |}];;
 
 type t = float64x2;;
@@ -55,4 +55,12 @@ Line 1, characters 9-18:
              ^^^^^^^^^
 Error: Unbound type constructor "float64x2"
 Hint:              Did you mean "float32"?
+|}];;
+
+type t = mask;;
+[%%expect{|
+Line 1, characters 9-13:
+1 | type t = mask;;
+             ^^^^
+Error: Unbound type constructor "mask"
 |}];;

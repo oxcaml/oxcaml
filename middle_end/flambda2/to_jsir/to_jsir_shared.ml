@@ -89,7 +89,7 @@ let rec reg_width_const const : Jsir.constant =
       (Reg_width_const.of_int_of_kind Thirty_two_no_gc_tag_bit kind
          (String.hash name))
   | Naked_int8 _ | Naked_int16 _ | Naked_vec128 _ | Naked_vec256 _
-  | Naked_vec512 _ ->
+  | Naked_vec512 _ | Naked_mask _ ->
     (* CR selee: smallints and SIMD *)
     Misc.fatal_errorf "Unsupported constant %a" Int_ids.Const.print const
 

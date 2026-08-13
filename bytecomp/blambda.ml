@@ -56,10 +56,10 @@ type context_switch =
   | Perform
   | Reperform
   | With_stack
-  | With_stack_bind
   | With_stack_preemptible
-  | With_stack_bind_preemptible
-  | Resume
+  | Continue
+  | Discontinue
+  | Discontinue_with_backtrace
 
 type comparison = Instruct.comparison =
   | Eq
@@ -137,7 +137,8 @@ and blambda =
   | Apply of
       { func : blambda;
         args : blambda list;
-        nontail : bool
+        nontail : bool;
+        yielding : Lambda.yielding_kind
       }
   | Function of bfunction
   | Let of
@@ -180,7 +181,8 @@ and blambda =
         met : blambda;
         obj : blambda;
         args : blambda list;
-        nontail : bool
+        nontail : bool;
+        yielding : Lambda.yielding_kind
       }
   | Context_switch of context_switch * blambda list
   | Ifthenelse of

@@ -351,7 +351,7 @@ let acknowledge_import penv ~check modname pers_sig =
         | Alerts _ -> ()
         | Opaque -> register_import_as_opaque penv modname)
     flags;
-  begin match kind, CU.get_current () with
+  begin match kind, Current_unit.get_cu () with
   | Normal { cmi_impl = imported_unit }, Some current_unit ->
       let access_allowed =
         CU.can_access_by_name imported_unit ~accessed_by:current_unit
@@ -498,7 +498,7 @@ let rec approximate_global_by_name penv global_name =
   global
 
 let current_unit_is_aux name ~allow_args =
-  match CU.get_current () with
+  match Current_unit.get_cu () with
   | None -> false
   | Some current ->
       match CU.to_global_name current with
@@ -546,6 +546,12 @@ let check_for_unset_parameters penv global =
            }))
     global.Global_module.hidden_args
 
+let mode_pers_mod staticity =
+  let hint : _ Mode.Hint.const = Legacy Compilation_unit in
+  Mode.Value.of_const
+    { Mode.Value.Const.legacy with staticity }
+    ~hint_monadic:hint ~hint_comonadic:hint
+
 let rec global_of_global_name penv ~check name ~allow_excess_args =
   let load () =
     let pn =
@@ -559,6 +565,16 @@ let rec global_of_global_name penv ~check name ~allow_excess_args =
   | exception Not_found -> load ()
 
 and compute_global penv modname ~params ~check ~allow_excess_args =
+  let args =
+    if allow_excess_args then
+      (* Drop anything we already know is an excess argument, since otherwise
+         we'll resolve it now only to throw it away in Global.subst. *)
+      List.filter
+        (fun ({ param; _ } : Global_module.Name.argument) ->
+           List.exists (Global_module.Parameter_name.equal param) params)
+        modname.Global_module.Name.args
+    else modname.Global_module.Name.args
+  in
   let arg_global_by_param_name =
     List.map
       (fun ({ param = name; value } : Global_module.Name.argument) ->
@@ -567,12 +583,12 @@ and compute_global penv modname ~params ~check ~allow_excess_args =
          | exception Not_found ->
              error
                (Unbound_module_as_argument_value { instance = modname; value }))
-      modname.Global_module.Name.args
+      args
   in
   let subst : Global_module.subst =
     Global_module.Parameter_name.Map.of_list arg_global_by_param_name
   in
-  if check && modname.Global_module.Name.args <> [] then begin
+  if check && args <> [] then begin
     let compare_by_param param1 (param2, _) =
       Global_module.Parameter_name.compare param1 param2
     in
@@ -686,9 +702,29 @@ and acknowledge_new_pers_name penv check global_name global import =
        remember_global penv bound_global ~precision
          ~mentioned_by:(Other global_name))
     sign.bound_globals;
+  let pn_sign =
+    let signature, staticity = sign.sign in
+    let mode = Mode.Value.disallow_right (mode_pers_mod staticity) in
+    let mode =
+      match import.imp_visibility with
+      | Visible { cmx_guaranteed = true } ->
+        mode
+      | Visible { cmx_guaranteed = false } | Hidden ->
+        (* Without a guaranteed [.cmx], the unit is not available for
+           compile-time evaluation, so its staticity is forced to [Dynamic]
+           regardless of what the [.cmi] claims. *)
+        Mode.Value.join
+          [ mode;
+            Mode.Value.min_with_monadic Staticity
+              (Mode.Staticity.of_const
+                 ~hint:(Cmx_not_guaranteed import.imp_impl)
+                 Mode.Staticity.Dynamic) ]
+    in
+    signature, mode
+  in
   let pn = { pn_import = import;
              pn_global = global;
-             pn_sign = sign.sign;
+             pn_sign;
            } in
   if check then check_consistency penv import;
   Hashtbl.add persistent_names global_name pn;
@@ -784,7 +820,7 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
     Constant unit
 
 type address =
-  | Aunit of Compilation_unit.t
+  | Aunit of Compilation_unit.t * Mode.Value.l
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 
@@ -804,7 +840,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
   let {persistent_structures; locals_bound_to_runtime_parameters; _} = penv in
   let import = pers_name.pn_import in
   let global = pers_name.pn_global in
-  let sign = pers_name.pn_sign in
+  let (_, mode) as sign = pers_name.pn_sign in
   let is_param = import.imp_is_param in
   let impl = import.imp_impl in
   let filename = import.imp_filename in
@@ -822,7 +858,7 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
   let address : address =
     match binding with
     | Runtime_parameter id -> Alocal id
-    | Constant unit -> Aunit unit
+    | Constant unit -> Aunit (unit, mode)
   in
   let shape =
     match import.imp_impl, import.imp_params with

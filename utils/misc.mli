@@ -114,6 +114,10 @@ val create_hashtable: int -> ('a * 'b) list -> ('a, 'b) Hashtbl.t
        (** Create a hashtable with the given initial size and fills it
            with the given bindings. *)
 
+(* TODO Move this to Obj when the system compiler includes ocaml/ocaml/#14939 *)
+val hash_variant: string -> int
+        (** Hash function for variant tags *)
+
 (** {1 Extensions to the standard library} *)
 
 module Stdlib : sig
@@ -285,6 +289,10 @@ module Stdlib : sig
         @raise Invalid_argument if the two arrays are determined
         to have different lengths.
     *)
+
+    val fold_lefti : (int -> 'acc -> 'a -> 'acc) -> 'acc -> 'a array -> 'acc
+    (** [fold_lefti f init a] is like [Array.fold_left] but [f] also takes
+        as parameter the zero-based index of the element *)
 
     val for_alli : (int -> 'a -> bool) -> 'a array -> bool
     (** Same as [Array.for_all] from the standard library, but the
@@ -569,9 +577,7 @@ val letter_of_int : int -> string
 
 module Int_literal_converter : sig
   val int : string -> int
-    (** Convert a string to an integer.  Unlike {!Stdlib.int_of_string},
-        this function accepts the string representation of [max_int + 1]
-        and returns [min_int] in this case. *)
+    (** Convert a string to an integer. *)
 
   val int8 : string -> int
     (** Likewise, at type [int8] *)
@@ -1356,4 +1362,23 @@ module Colours : sig
   (** Run [f] with colour output globally disabled, restoring the previous
       setting when [f] returns (or raises). *)
   val without_colours : f:(unit -> 'a) -> 'a
+end
+
+(** Nullable values, unboxed via [@@or_null]. Not a full [Stdlib.Monad.S]: a
+    flat or_null cannot nest, so there is no [join]. *)
+module Or_null : sig
+  type 'a t = Null | This of 'a [@@or_null]
+
+  val return : 'a -> 'a t
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+  val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+  val map : ('a -> 'b) -> 'a t -> 'b t
+  val both : 'a t -> 'b t -> ('a * 'b) t
+
+  module Syntax : sig
+    val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
+    val ( and+ ) : 'a t -> 'b t -> ('a * 'b) t
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+    val ( and* ) : 'a t -> 'b t -> ('a * 'b) t
+  end
 end
