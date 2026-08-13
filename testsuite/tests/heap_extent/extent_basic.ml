@@ -181,3 +181,56 @@ let () =
   check_chain ();
   roots := [||];
   expect_freed "chained extent freed" 5
+
+(* Partial sweeping: the sweeper works on a bounded budget, so a
+   single extent containing tens of thousands of blocks is swept a
+   piece at a time, stopping partway through and resuming later,
+   possibly in another major slice. Drive the GC with many small
+   explicit slices, reading the surviving blocks while their dead
+   neighbours are swept out from around them. The custom blocks count
+   their finalisations, catching blocks finalised twice or skipped at
+   the stopping points. *)
+
+let n_plain = 50_000
+let n_customs = 20_000
+let keep_every = 1_000
+
+let create_partial () =
+  let plain = make_extent (Array.make n_plain 1) in
+  Array.iteri (fun i blk -> Obj.set_field blk 0 (Obj.repr (i * 3))) plain;
+  let customs = make_custom_extent n_customs in
+  let keep b =
+    Array.init (Array.length b / keep_every) (fun i -> b.(i * keep_every))
+  in
+  roots := Array.append (keep plain) (keep customs)
+
+let plain_survivors_ok () =
+  let ok = ref true in
+  for i = 0 to (n_plain / keep_every) - 1 do
+    if (Obj.obj (Obj.field !roots.(i) 0) : int) <> i * keep_every * 3
+    then ok := false
+  done;
+  !ok
+
+let () =
+  let freed_before = freed_count () in
+  let finalised_before = finalised_count () in
+  create_partial ();
+  let dead_customs = n_customs - n_customs / keep_every in
+  let survivors_ok = ref true in
+  let rec slices n =
+    survivors_ok := !survivors_ok && plain_survivors_ok ();
+    if finalised_count () <> finalised_before + dead_customs && n > 0
+    then (ignore (Gc.major_slice 5000 : int); slices (n - 1))
+  in
+  slices 5_000;
+  check "survivors intact during partial sweeping" !survivors_ok;
+  check "dead custom blocks finalised exactly once"
+    (finalised_count () = finalised_before + dead_customs);
+  check "partly-swept extents with survivors not freed"
+    (freed_count () = freed_before);
+  roots := [||];
+  gc_until (fun () -> finalised_count () = finalised_before + n_customs);
+  check "all custom blocks finalised after survivors dropped"
+    (finalised_count () = finalised_before + n_customs);
+  expect_freed "big extents freed" (freed_before + 2)

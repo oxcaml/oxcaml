@@ -19,3 +19,8 @@ chained extent not freed: ok
 intra-extent chain survives: ok
 long heap list via extent survives: ok
 chained extent freed: ok
+survivors intact during partial sweeping: ok
+dead custom blocks finalised exactly once: ok
+partly-swept extents with survivors not freed: ok
+all custom blocks finalised after survivors dropped: ok
+big extents freed: ok

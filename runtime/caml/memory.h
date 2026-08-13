@@ -49,6 +49,13 @@ CAMLextern void caml_initialize (volatile value *, value);
 CAMLextern value caml_atomic_cas_field (value, value, value, value);
 CAMLextern value caml_check_urgent_gc (value);
 
+/* Donate [size] bytes at [base] to the major heap, as an "extent"
+   already filled with well-formed blocks. Each block must have wosize
+   >= 1. Once all the extent's blocks are dead, the memory is returned
+   to the caller via [free_callback](base, size). */
+CAMLextern void caml_add_blocks_to_heap(void *base, size_t size,
+                                        void (*free_callback)(void *, size_t));
+
 /* [caml_stat_*] functions below provide an interface to the static memory
    manager built into the runtime, which can be used for managing static
    (that is, non-moving) blocks of heap memory.

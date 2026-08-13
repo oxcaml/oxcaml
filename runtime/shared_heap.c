@@ -87,31 +87,26 @@ typedef struct heap_extent {
 #define Extent_limit(e) ((e)->base + (e)->size / sizeof(value))
 
 /* An individual block in an extent which is freed by sweeping gets a
- * distinguishable header word (Infix_tag, NOT_MARKABLE), with
- * unchanged wosize, allowing the block to be skipped when sweeping
- * the extent. Adjacent free blocks are combined during sweeping.
- *
- * These distinguished headers can't simply be NOT_MARKABLE, as
- * continuations have that colour during their stack scan.
- *
- * TODO: Consider defining a new tag ("Bad_tag"?), never used in real
- * objects but available for uses like this; hanging new functionality
- * off Infix_tag is pretty fragile.
+ * zero header word, with Val_long(whsize) in field 0, allowing the
+ * block to be skipped when sweeping the extent. Adjacent free blocks
+ * are combined during sweeping. Extents forbid zero-sized blocks.
  */
 
-#define Is_extent_free_hd(hd) (Has_status_hd(hd, NOT_MARKABLE) \
-                               && (Tag_hd(hd) == Infix_tag))
-#define Extent_free_whsize(p, hd) Whsize_hd(hd)
-#define Extent_free_hd(wosize) Make_header(wosize, Infix_tag, NOT_MARKABLE)
-#define Extent_free_block(p, whsize) \
-  atomic_store_relaxed((atomic_uintnat*)(p), \
-                       Extent_free_hd(Wosize_whsize(whsize)))
+#define Is_extent_free_hd(hd)        ((hd) == 0)
+#define Extent_free_whsize(hp, hd)    Long_val(hp[1])
+#define Extent_free_hd(wosize)       0
+#define Extent_free_block(hp, whsize)                      \
+    ((hp[1] = Val_long(whsize)),                           \
+     atomic_store_relaxed((atomic_uintnat*)(hp), 0))
 
-static inline void extent_free_consolidate(value *p1, value *p2)
+static inline void extent_free_consolidate(value *hp1, value *hp2)
 {
-  mlsize_t total_size = Whsize_hp(p1) + Whsize_hp(p2);
-  CAMLassert(total_size <= Whsize_wosize(Max_wosize));
-  Extent_free_block(p1, total_size);
+  CAMLassert(Is_extent_free_hd(Hd_hp(hp1)));
+  CAMLassert(Is_extent_free_hd(Hd_hp(hp2)));
+  mlsize_t total_whsize = (Extent_free_whsize(hp1, Hd_hp(hp1)) +
+                           Extent_free_whsize(hp2, Hd_hp(hp2)));
+  CAMLassert(total_whsize <= Whsize_wosize(Max_wosize));
+  Extent_free_block(hp1, total_whsize);
 }
 
 static struct {
@@ -691,13 +686,13 @@ static void* large_allocate(struct caml_heap_state* local, mlsize_t sz) {
   return (char*)a + LARGE_ALLOC_HEADER_SZ;
 }
 
-static void add_extent(struct caml_heap_state *local,
-                       void *base, size_t size,
-                       void (*free_callback)(void *, size_t))
+void caml_add_extent(struct caml_heap_state *local,
+                     void *base, size_t size,
+                     void (*free_callback)(void *, size_t))
 {
-  value *p = base;
+  value *hp = base;
   size_t wsize = Wsize_bsize(size);
-  value *limit = p + wsize;
+  value *limit = hp + wsize;
   status color = caml_allocation_status();
   size_t blocks = 0;
   size_t remaining = wsize; /* for validation */
@@ -707,18 +702,18 @@ static void add_extent(struct caml_heap_state *local,
     caml_fatal_error("caml_add_extent: extent too large (%zu words)", wsize);
   }
 
-  while (p < limit) {
-    header_t hd = Hd_hp(p);
+  while (hp < limit) {
+    header_t hd = Hd_hp(hp);
     CAMLassert(!Is_extent_free_hd(hd));
     CAMLassert(Wosize_hd(hd) > 0);
     mlsize_t whsize = Whsize_hd(hd);
     CAMLassert(whsize <= remaining);
-    Hd_hp(p) = With_status_hd(hd, color); /* force to allocation colour */
+    Hd_hp(hp) = With_status_hd(hd, color); /* force to allocation colour */
     ++ blocks;
-    p += whsize;
+    hp += whsize;
     remaining -= whsize;
   }
-  CAMLassert(p == limit);
+  CAMLassert(hp == limit);
 
   heap_extent *e = caml_stat_alloc(sizeof(heap_extent));
   e->base = base;
@@ -736,13 +731,6 @@ static void add_extent(struct caml_heap_state *local,
     local->stats.extent_max_words = local->stats.extent_words;
   }
   local->stats.extent_blocks += blocks;
-}
-
-void caml_add_blocks_to_heap(void *base, size_t size,
-                             void (*free_callback)(void *, size_t))
-{
-  struct caml_heap_state *local = Caml_state->shared_heap;
-  add_extent(local, base, size, free_callback);
 }
 
 value* caml_shared_try_alloc(struct caml_heap_state* local, mlsize_t wosize,
@@ -928,65 +916,66 @@ static intnat extent_sweep(struct caml_heap_state* local, intnat budget) {
   intnat work = 0;
   status garbage = caml_global_heap_state.GARBAGE;
 
-  value *p = e->base;
+  value *hp = e->base;
   value *limit = Extent_limit(e);
 
   if (e->sweep_next) { /* Continue sweeping a partly swept extent */
-    p = e->sweep_next;
+    hp = e->sweep_next;
     has_live = e->has_live;
   }
-  value *last_free_p = NULL;
+  value *last_free_hp = NULL;
 
-  while (work < budget && p < limit) {
+  while (work < budget && hp < limit) {
     bool free = false; /* Was this block free? */
     value *next; /* next value of p */
     /* The header being read here may be concurrently written by a thread doing
        marking. This is fine because marking can only make UNMARKED objects
        MARKED (or NOT_MARKABLE with Cont_tag). */
-    header_t hd = Hd_hp(p);
+    header_t hd = Hd_hp(hp);
     if (Is_extent_free_hd(hd)) {
       free = true;
-      next = p + Extent_free_whsize(p, hd);
+      next = hp + Extent_free_whsize(hp, hd);
     } else {
+      mlsize_t whsize = Whsize_hd(hd);
       if (Has_status_hd(hd, garbage)) {
         free = true;
-        maybe_finalise(p, hd);
+        maybe_finalise(hp, hd);
         -- local->stats.extent_blocks;
-        mlsize_t whsize = Whsize_hd(hd);
         local->stats.extent_live_words -= whsize;
         local->owner->swept_words += whsize;
-        Extent_free_block(p, whsize);
-        /* In the DEBUG runtime, we overwrite the fields of swept blocks. */
+        /* In the DEBUG runtime, we overwrite the fields of swept blocks
+         * (before Extent_free_block stores the size in field 0). */
 #ifdef DEBUG
         mlsize_t wo = Wosize_whsize(whsize);
         for (size_t w = 0 ; w < wo ; w++) {
-          Field(Val_hp(p), w) = Debug_free_major;
+          Field(Val_hp(hp), w) = Debug_free_major;
         }
 #endif
+        Extent_free_block(hp, whsize);
       } else { /* block is live; do nothing */
         has_live = true;
       }
-      work += Whsize_hd(hd);
-      next = p + Whsize_hd(hd);
+      work += whsize;
+      next = hp + whsize;
     }
     if (free) {
-      if (last_free_p) { /* consolidate with previous block */
-        extent_free_consolidate(last_free_p, p);
+      if (last_free_hp) { /* consolidate with previous block */
+        extent_free_consolidate(last_free_hp, hp);
 #ifdef DEBUG
-        *p = Debug_free_major;
+        *hp = Debug_free_major;
 #endif
       } else {
-        last_free_p = p;
+        last_free_hp = hp;
       }
     } else {
-      last_free_p = NULL;
+      last_free_hp = NULL;
     }
-    p = next;
+    hp = next;
   }
 
-  if (p < limit) { /* Ran out of budget; leave on unswept list */
+  if (hp < limit) { /* Ran out of budget; leave on unswept list */
     e->has_live = has_live;
-    e->sweep_next = p;
+    e->sweep_next = hp;
   } else { /* Finished sweep */
     local->unswept_extent = e->next; /* Remove from unswept list */
     if (has_live) {
@@ -1069,17 +1058,17 @@ static void extent_finalise(struct caml_heap_state* local)
   heap_extent *e;
   while ((e = local->unswept_extent) != NULL) {
     local->unswept_extent = e->next;
-    value* p = e->base;
+    value* hp = e->base;
     value* limit = Extent_limit(e);
-    while (p < limit) {
-      header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
+    while (hp < limit) {
+      header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)hp);
       if (Is_extent_free_hd(hd)) {
-        p += Extent_free_whsize(p, hd);
+        hp += Extent_free_whsize(hp, hd);
       } else {
-        maybe_finalise(p, hd);
+        maybe_finalise(hp, hd);
         local->stats.extent_live_words -= Whsize_hd(hd);
         -- local->stats.extent_blocks;
-        p += Whsize_hd(hd);
+        hp += Whsize_hd(hd);
       }
     }
     -- local->stats.extents;
@@ -1556,9 +1545,8 @@ static void compact_update_pools(pool *cur_pool)
 
 /* Update all the live blocks in a heap extent.
 
-   Compaction does not move blocks within extents. We could compact
-   within each extent, for some gain in locality, but it would have no
-   effect on RSS, which is the main point of compaction, so we don't. */
+   Blocks within extents are guaranteed not to move, so compaction only
+   updates their contents. */
 
 static void compact_update_extent(heap_extent *e)
 {
