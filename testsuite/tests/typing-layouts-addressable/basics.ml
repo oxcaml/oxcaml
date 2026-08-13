@@ -637,7 +637,7 @@ Error: This pattern matches values of type "a"
          "('a : '_representable_layout_1 addressable)"
        The layout of a is any addressable
          because of the annotation on the abstract type declaration for a.
-       But the layout of a must be representable
+       But the layout of a must be addressable
          because we must know concretely how to pass a function argument.
 |}]
 
