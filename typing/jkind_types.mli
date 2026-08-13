@@ -243,4 +243,6 @@ module Layout : sig
   val get_flat_const : Sort.Flat.t t -> Const.t option
 
   val product : 'a t list -> 'a t
+
+  val apply_operator : 'a t -> Kind_operator.t -> 'a t
 end
