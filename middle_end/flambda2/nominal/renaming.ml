@@ -45,9 +45,8 @@ module Import_map : sig
   val simple :
     t ->
     Simple.t ->
-    name:(Name.t -> coercion:Coercion.t -> 'a) ->
-    const:(Const.t -> 'a) ->
-    'a
+    import_name:(Name.t -> coercion:Coercion.t -> Simple.t) ->
+    Simple.t
 
   val code_id : t -> Code_id.t -> Code_id.t
 
@@ -105,10 +104,11 @@ end = struct
 
   let continuation t orig = Continuation.import t.continuations orig
 
-  let simple t simple ~name ~const =
-    (* [t.simples] only holds those [Simple]s with [Coercion] (analogously to
-       the grand table of [Simple]s, see int_ids.ml). *)
-    Simple.import t.simples simple ~name ~const
+  let simple t simple ~import_name =
+    (* Constants are never permuted, only freshened upon import. *)
+    Simple.pattern_match_imported t.simples simple
+      ~name_not_imported:import_name ~const_not_imported:(fun cst ->
+        Simple.const (const t cst))
 
   let value_slot_is_used t var =
     if Value_slot.in_compilation_unit var t.original_compilation_unit
@@ -304,10 +304,10 @@ let apply_const t cst =
   | Some import_map -> Import_map.const import_map cst
 
 let apply_simple t simple =
-  (* Constants are never permuted, only freshened upon import. *)
-  let[@inline always] const cst = Simple.const (apply_const t cst) in
   match t.import_map with
   | None ->
+    (* Constants are never permuted, only freshened upon import. *)
+    let[@inline always] const cst = Simple.const (apply_const t cst) in
     let[@inline always] name old_name ~coercion:old_coercion =
       let new_name = apply_name t old_name in
       let new_coercion =
@@ -320,7 +320,10 @@ let apply_simple t simple =
     in
     Simple.pattern_match simple ~name ~const
   | Some import_map ->
-    let[@inline always] name old_name ~coercion:old_coercion =
+    (* This is a bit tricky -- we want to be able to use [apply_name] and
+       [apply_variable] here, so the names and coercions returned by
+       [Import_map.simple] cannot have been imported yet. *)
+    let[@inline always] import_name old_name ~coercion:old_coercion =
       let new_name = apply_name t old_name in
       let new_coercion =
         Coercion.map_depth_variables old_coercion ~f:(fun dv ->
@@ -328,7 +331,7 @@ let apply_simple t simple =
       in
       Simple.with_coercion (Simple.name new_name) new_coercion
     in
-    Import_map.simple import_map simple ~name ~const
+    Import_map.simple import_map simple ~import_name
 
 let value_slot_is_used t value_slot =
   match t.import_map with

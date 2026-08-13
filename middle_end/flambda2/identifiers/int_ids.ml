@@ -835,7 +835,8 @@ module Simple = struct
   let export simples =
     Table.export !grand_table_of_simples ~iter:(fun f -> Set.iter f simples)
 
-  let import importer t ~name ~const =
+  let pattern_match_imported importer t ~name_not_imported:name
+      ~const_not_imported:const =
     let flags = Id.flags t in
     if flags = var_flags
     then (name [@inlined hint]) (Name.var t) ~coercion:Coercion.id

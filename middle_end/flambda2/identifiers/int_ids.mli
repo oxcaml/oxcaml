@@ -225,11 +225,12 @@ module Simple : sig
 
   val export : Set.t -> importer
 
-  val import :
+  (* The imported only holds those [Simple]s with [Coercion]. *)
+  val pattern_match_imported :
     importer ->
     t ->
-    name:(Name.t -> coercion:Coercion.t -> 'a) ->
-    const:(Const.t -> 'a) ->
+    name_not_imported:(Name.t -> coercion:Coercion.t -> 'a) ->
+    const_not_imported:(Const.t -> 'a) ->
     'a
 end
 
