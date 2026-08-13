@@ -1838,13 +1838,10 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
             in
             (match v_opt with
             | Some v ->
-              let layout : Jkind_types.Sort.t Jkind_types.Layout.t =
-                let layout =
-                  Jkind_types.Layout.Sort (Jkind_types.Sort.Var v, sa)
-                in
-                match op with
-                | Id -> layout
-                | Addressable -> Addressable layout
+              let layout =
+                Jkind_types.Layout.apply_operator
+                  (Jkind_types.Layout.Sort (Jkind_types.Sort.Var v, sa))
+                  op
               in
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
                 = Layout layout in

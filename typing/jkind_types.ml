@@ -1471,6 +1471,10 @@ module Layout = struct
     | [lay] -> lay
     | lays -> Product lays
 
+  let apply_operator t : Kind_operator.t -> _ t = function
+    | Id -> t
+    | Addressable -> Addressable t
+
   let rec get_const of_sort : _ t -> Const.t option = function
     | Any sa -> Some (Any sa)
     | Sort (s, sa) -> of_sort s sa
