@@ -25,17 +25,14 @@ type b8 : bits8
 
 module type Check = module type of struct
   module F (M : S @ static) = struct
-    (* x := bits64; [bits64 addressable = bits64] *)
+    (* Check that [x addressable = x] when [x] is addressable, for different
+       instantiations of the layout variable [x] *)
     let g1 (a : int64#) (b : int64#) = M.f a b
 
-    (* x := value *)
     let g2 (a : string) (b : string) = M.f a b
 
-    (* x := bits8 addressable; [(bits8 addressable) addressable] absorbs *)
     let g3 (a : b8a) (b : b8a) = M.f a b
 
-    (* x and x addressable at the same argument: constrains x to be
-       addressable *)
     let g4 (a : int64#) = M.f a a
   end
 end
@@ -54,46 +51,49 @@ module type Check =
   end
 |}]
 
-(* [x addressable = bits8 addressable] admits both [x = bits8] and
-   [x = bits8 addressable], and no sort represents both; when the wrapped use
-   is checked first, unification commits to the cancelling solution
-   [x = bits8]. *)
-module type S_swapped = sig
-  val f : layout_ x. ('a : x) ('b : x addressable). 'b -> 'a -> unit
-end
-[%%expect{|
-module type S_swapped =
-  sig val f : layout_ l. ('b : l addressable) ('a : l). 'b -> 'a -> unit end
-|}]
+(* CR layouts: Inference for addressable is incomplete! These tests show that.
+   See [Jkind.Sort.equate_sort_addressable].
 
-(* The committed solution: the bare use at the cancelled kind works... *)
-module type Check_cancelled = module type of struct
+   We should make these complete through "fixing the kind system." *)
+
+(* [S_swapped] is [S] with the [x addressable] argument first. Checking that
+   argument at [b8a] commits to [x = bits8]: the bare [x] argument then
+   accepts [b8]... *)
+module type S_swapped = sig
+  val f : layout_ x. ('a : x addressable) ('b : x). 'a -> 'b -> unit
+end
+
+(* Unifies [bits8 addressable = x addressable] (which incompletely chooses to
+   make [x = bits8]), then [bits8 = x] *)
+module type Check_swapped = module type of struct
   module F (M : S_swapped @ static) = struct
-    let g (a : b8) (b : b8a) = M.f b a
+    let g (a : b8a) (b : b8) = M.f a b
   end
 end
 [%%expect{|
-module type Check_cancelled =
+module type S_swapped =
+  sig val f : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b -> unit end
+module type Check_swapped =
   sig
     module F :
-      functor (M : S_swapped @ static) -> sig val g : b8 -> b8a -> unit end
+      functor (M : S_swapped @ static) -> sig val g : b8a -> b8 -> unit end
       @@ stateless
   end
 |}]
 
-(* ...but a later bare use at the addressable kind is rejected, even though
-   [x = bits8 addressable] was also a solution (checking the bare use first,
-   as in [g3] above, accepts). *)
-module type Check_bad_cancelled = module type of struct
+
+(* Unifies [bits8 addressable = x addressable] (which incompletely chooses to
+   make [x = bits8]), then attempts [bits8 addressable = x] *)
+module type Check_bad_swapped = module type of struct
   module F (M : S_swapped @ static) = struct
-    let bad (a : b8a) (b : b8a) = M.f b a
+    let bad (a : b8a) (b : b8a) = M.f a b
   end
 end
 [%%expect{|
 Line 3, characters 40-41:
-3 |     let bad (a : b8a) (b : b8a) = M.f b a
+3 |     let bad (a : b8a) (b : b8a) = M.f a b
                                             ^
-Error: The value "a" has type "b8a" but an expression was expected of type
+Error: The value "b" has type "b8a" but an expression was expected of type
          "('a : bits8)"
        The layout of b8a is bits8 addressable
          because of the definition of b8a at line 1, characters 0-28.
@@ -101,7 +101,21 @@ Error: The value "a" has type "b8a" but an expression was expected of type
          because of the definition of f at line 2, characters 2-68.
 |}]
 
-(* x := bits8, but the second argument must then be [bits8 addressable] *)
+(* Unifies [bits8 addressable = x], then [bits8 addressable = x] *)
+module type Check_unswapped = module type of struct
+  module F (M : S @ static) = struct
+    let g (a : b8a) (b : b8a) = M.f a b
+  end
+end
+[%%expect{|
+module type Check_unswapped =
+  sig
+    module F : functor (M : S @ static) -> sig val g : b8a -> b8a -> unit end
+      @@ stateless
+  end
+|}]
+
+(* Unifies [bits8 = x], then [bits8 = x addressable] *)
 module type Check_bad = module type of struct
   module F (M : S @ static) = struct
     let bad (a : b8) (b : b8) = M.f a b

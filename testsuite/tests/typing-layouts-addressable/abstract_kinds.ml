@@ -339,3 +339,79 @@ kind_ k8 = bits8
 type t8 : bits8 addressable
 val f : t8 -> t8 = <fun>
 |}]
+
+(* Functor application *)
+
+module type Sk = sig
+  type t : k
+end
+
+module type Ska = sig
+  type t : k addressable
+end
+
+module F (_ : Sk) : Ska = struct
+  type t : k addressable
+end
+
+module M0 = struct
+  type t : k
+end
+
+module M1 = F (M0)
+[%%expect{|
+module type Sk = sig type t : k end
+module type Ska = sig type t : k addressable end
+module F : Sk -> Ska
+module M0 : sig type t : k end
+module M1 : sig type t = F(M0).t end
+|}]
+
+(* F cannot be applied twice: its result's kind [k addressable] is not a
+   subkind of the argument's [k]... *)
+module Bad = F (M1)
+[%%expect{|
+Line 1, characters 13-19:
+1 | module Bad = F (M1)
+                 ^^^^^^
+Error: Modules do not match: sig type t = F(M0).t end is not included in
+       Sk
+     Type declarations do not match:
+       type t = F(M0).t
+     is not included in
+       type t : k
+     The kind of the first is k addressable
+       because of the definition of t at line 6, characters 2-24.
+     But the kind of the first must be a subkind of k
+       because of the definition of t at line 2, characters 2-12.
+|}]
+
+(* A functor that wraps its argument's kind in [addressable] can be
+   iterated *)
+module Wrap (M : sig
+    kind_ k
+
+    type t : k
+  end) =
+struct
+  kind_ k = M.k addressable
+
+  type t : k
+end
+
+module M0 = struct
+  kind_ k
+
+  type t : k
+end
+
+module M1 = Wrap (M0)
+module M2 = Wrap (M1)
+[%%expect{|
+module Wrap :
+  functor (M : sig kind_ k type t : k end) ->
+    sig kind_ k = M.k addressable type t : M.k addressable end
+module M0 : sig kind_ k type t : k end
+module M1 : sig kind_ k = M0.k addressable type t = Wrap(M0).t end
+module M2 : sig kind_ k = M1.k addressable type t = Wrap(M1).t end
+|}]

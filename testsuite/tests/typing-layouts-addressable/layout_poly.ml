@@ -153,6 +153,23 @@ Error: This expression has type "('a : bits8 addressable)"
          representable at call sites).
 |}]
 
+(* The sort really is shared between ['a] and ['b]: the argument sets it to
+   [bits64], which does not unify with [b8a]'s [bits8 addressable] *)
+let bad (x : int64#) : b8a = magic_to_addressable x
+[%%expect{|
+Line 1, characters 29-51:
+1 | let bad (x : int64#) : b8a = magic_to_addressable x
+                                 ^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a : bits64)"
+       but an expression was expected of type "b8a"
+       The layout of b8a is bits8 addressable
+         because of the definition of b8a at line 1, characters 0-28.
+       But the layout of b8a must be a sublayout of bits64
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
 (* [@layout_poly] still requires a variable at layout [any] (possibly made
    addressable) *)
 external bad_ext : ('a : value addressable). 'a -> 'a = "%identity"
@@ -172,42 +189,43 @@ Error: "[@layout_poly]" on this external declaration has no
        variable for it to operate on.
 |}]
 
-(* Regression test: Intersecting [value & value] with [any addressable] wraps
-   the internal representation of the kind redundantly (a product of values is
-   already addressable); [f] must print and behave like [f_plain]. *)
-type ('a : any, 'b : any) r = #{ a : 'a; b : 'b }
+(* Regression test for an intermediary version of [addressable]: Intersecting
+   [value & value] with [any addressable] wraps the internal representation of
+   the kind redundantly (a product of values is already addressable); [f] must
+   print and behave like [f_plain]. *)
+type r = #{ a : string; b : string }
 
 let f_plain (x : ('a : value & value)) = x
 
-let g_plain (y : (string, string) r) = f_plain y
+let g_plain (y : r) = f_plain y
 [%%expect{|
-type ('a : any, 'b : any) r = #{ a : 'a; b : 'b; }
+type r = #{ a : string; b : string; }
 val f_plain : ('a : value & value). 'a -> 'a = <fun>
-val g_plain : (string, string) r -> (string, string) r = <fun>
+val g_plain : r -> r = <fun>
 |}]
 
 let f (x : ('a : value & value)) = id_addressable x
 
-let g (y : (string, string) r) = f y
+let g (y : r) = f y
 [%%expect{|
 val f : ('a : value & value). 'a -> 'a = <fun>
-val g : (string, string) r -> (string, string) r = <fun>
+val g : r -> r = <fun>
 |}]
 
 (* [any & any] also meets [any addressable], even though [any] itself is not
    addressable. *)
 let f_any (x : ('a : any & any)) = id_addressable x
 
-let g_any (y : (string, string) r) = f_any y
+let g_any (y : r) = f_any y
 [%%expect{|
 val f_any : ('a : value_or_null & value_or_null). 'a -> 'a = <fun>
-val g_any : (string, string) r -> (string, string) r = <fun>
+val g_any : r -> r = <fun>
 |}]
 
 (* Applying [id_addressable] to the record directly: the component sorts are
    not yet known addressable when the product is decomposed, and are
    constrained only when the fields are checked. *)
-let d (y : (string, string) r) = id_addressable y
+let d (y : r) = id_addressable y
 [%%expect{|
-val d : (string, string) r -> (string, string) r = <fun>
+val d : r -> r = <fun>
 |}]

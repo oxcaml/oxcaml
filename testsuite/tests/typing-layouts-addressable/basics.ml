@@ -2,7 +2,7 @@
  expect;
 *)
 
-(**** Acceptance and printing ****)
+(**** Basic addressable kinds and printing ****)
 
 type t8 : bits8 addressable
 [%%expect{|
@@ -78,6 +78,17 @@ Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable".
 
 type t : bits8 addressable
+|}]
+
+type t : (bits8 addressable & bits16 addressable) addressable
+[%%expect{|
+Line 1, characters 50-61:
+1 | type t : (bits8 addressable & bits16 addressable) addressable
+                                                      ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 addressable & bits16 addressable".
+
+type t : bits8 addressable & bits16 addressable
 |}]
 
 (**** Equalities: [k addressable = k] for addressable [k] ****)
@@ -761,15 +772,7 @@ Error: Don't know how to unpack this type.
        Only types with product layouts can be marked "unpacked".
 |}]
 
-(**** Errors ****)
-
-type t : bits8 addressabl
-[%%expect{|
-Line 1, characters 15-25:
-1 | type t : bits8 addressabl
-                   ^^^^^^^^^^
-Error: Unknown kind modifier addressabl
-|}]
+(**** Abstract kinds ****)
 
 (* [addressable] on an abstract kind is recorded and applied when the kind is
    expanded; see [abstract_kinds.ml] for more tests. *)
