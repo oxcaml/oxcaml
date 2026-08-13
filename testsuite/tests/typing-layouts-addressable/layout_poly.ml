@@ -47,7 +47,7 @@ Error: The value "x" has type "b8" but an expression was expected of type
          "('a : '_representable_layout_1 addressable)"
        The layout of b8 is bits8
          because of the definition of b8 at line 3, characters 0-15.
-       But the layout of b8 must be representable
+       But the layout of b8 must be addressable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -62,7 +62,7 @@ Error: The value "x" has type "float#" but an expression was expected of type
          "('a : '_representable_layout_2 addressable)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be representable
+       But the layout of float# must be addressable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -79,7 +79,7 @@ Error: The value "x" has type "#(float# * string)"
          "('a : '_representable_layout_3 addressable)"
        The layout of #(float# * string) is float64 & value non_float
          because it is an unboxed tuple.
-       But the layout of #(float# * string) must be representable
+       But the layout of #(float# * string) must be addressable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -106,7 +106,7 @@ Error: The value "x" has type "('a : '_representable_layout_4 addressable)"
        but an expression was expected of type "float#"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be representable
+       But the layout of float# must be addressable
          because it's the type of a variable bound by a `let`.
 |}]
 
