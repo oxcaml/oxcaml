@@ -3813,9 +3813,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           let comonadic0 =
             Mode.Value.Comonadic.of_const ~hint:(Is_used_in closure) comonadic
           in
-          ((closure, comonadic0) :: acc_unknown,
-          acc_no_raise,
-          acc_raise),
+          (comonadic0 :: acc_unknown, acc_no_raise, acc_raise),
           const_closure_mode pp vmode closure comonadic
       | Closure_lock (closure, comonadic) ->
           let hinted =
@@ -3823,9 +3821,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
               (Is_closed_by (Comonadic, {closure; closed = pp}))
               comonadic
           in
-          ((closure, hinted) :: acc_unknown,
-          acc_no_raise,
-          acc_raise),
+          (hinted :: acc_unknown, acc_no_raise, acc_raise),
           closure_mode pp vmode closure comonadic
       | Exclave_lock ->
           (acc_unknown, acc_no_raise, acc_raise),
@@ -3841,7 +3837,7 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
     in
     let constrain_closures alloc_mode closures =
       List.iter
-        (fun (_, closure_comonadic) ->
+        (fun closure_comonadic ->
           Mode.Value.Comonadic.submode_err pp
             (Mode.Value.Comonadic.min_with Allocation alloc_mode)
             closure_comonadic)
@@ -3885,8 +3881,6 @@ let walk_locks_for_zero_alloc_return ~env ~loc mode =
          (Mode.Value.proj_comonadic Allocation mode))
 
 (** Registers a use of an allocation at the given pinpoint. *)
-(* CR shsong: currently it only considers noalloc_strict and alloc,
-    need to customize this to support noalloc later *)
 let walk_locks_for_allocation ~env pp =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
