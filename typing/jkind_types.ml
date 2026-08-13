@@ -976,16 +976,6 @@ module Sort = struct
     | Product ts -> List.exists (var_occurs v) ts
     | Addressable s -> var_occurs v s
 
-  let rec equals_var_mod_addressability v = function
-    | Var v' -> (
-      v == v'
-      ||
-      match v'.contents with
-      | None -> false
-      | Some s -> equals_var_mod_addressability v s)
-    | Addressable s -> equals_var_mod_addressability v s
-    | Base _ | Product _ | Univar _ -> false
-
   let[@inline] sorts_of_product s =
     (* In the equate functions, it's useful to pass around lists of sorts inside
        the product constructor they came from to avoid re-allocating it if we
@@ -1003,8 +993,7 @@ module Sort = struct
     | Var v1 -> equate_var_sort v1 s2
     | Product _ -> swap_equate_result (equate_sort_product s2 s1)
     | Univar uv1 -> swap_equate_result (equate_sort_univar s2 uv1)
-    | Addressable arg1 ->
-      swap_equate_result (equate_sort_addressable s2 s1 arg1)
+    | Addressable arg1 -> swap_equate_result (equate_sort_addressable s2 arg1)
 
   and equate_sort_base s1 b2 =
     match s1 with
@@ -1042,7 +1031,7 @@ module Sort = struct
     | Var v2 -> equate_var_var v1 v2
     | Product _ -> equate_var_product v1 s2
     | Univar uv2 -> equate_var_univar v1 uv2
-    | Addressable arg2 -> equate_var_addressable v1 s2 arg2
+    | Addressable arg2 -> equate_sort_addressable (of_var v1) arg2
 
   and equate_var_var v1 v2 =
     if v1.id = v2.id (* equal id means physical equality *)
@@ -1079,49 +1068,23 @@ module Sort = struct
     | Var v1 -> equate_var_product v1 s2
     | Addressable _ -> equate_sort_sort s1 s2
 
-  and equate_sort_addressable s1 s2 arg2 =
-    (* [s2] is [Addressable arg2]. As in [sorts_of_product], we pass both to
-       avoid re-allocating the wrapper if we end up storing it in a
-       variable. *)
-    match s1 with
-    | Addressable arg1 ->
-      (* We currently solve [arg1 addressable = arg2 addressable] by
-         (incompletely) reducing it to solving [arg1 = arg2].
+  and equate_sort_addressable s1 arg2 =
+    (* We currently solve [s1 = arg2 addressable] by (incompletely) reducing it
+       to solving [s1 = s1 addressable] and [s1 = arg2].
 
-         There is no complete solution as long as sort variables only support
-         unification. For example, if [arg1 = bits8] and [arg2 = 'var], we could
-         unify ['var = bits8] or ['var = bits8 addressable], and neither is
-         strictly better. *)
-      equate_sort_sort
-        (strip_head_addressable arg1)
-        (strip_head_addressable arg2)
-    | Var v1 -> equate_var_addressable v1 s2 arg2
-    | (Base _ | Product _ | Univar _) as s1 -> (
-      (* After constraining, [s1 = s1 addressable]. *)
-      match constrain_addressable ~allow_mutation:true s1 with
-      | Not_known_addressable -> Unequal
-      | Addressable_no_mutation ->
-        equate_sort_addressable (Addressable s1) s2 arg2
-      | Addressable_mutated ->
-        combine_equate_results Equal_mutated_first
-          (equate_sort_addressable (Addressable s1) s2 arg2))
-
-  and equate_var_addressable v1 s2 arg2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_addressable s1 s2 arg2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
-      if equals_var_mod_addressability v1 arg2
-      then
-        match constrain_addressable ~allow_mutation:true (of_var v1) with
-        | Not_known_addressable -> Unequal
-        | Addressable_no_mutation -> Equal_no_mutation
-        | Addressable_mutated -> Equal_mutated_both
-      else if var_occurs v1 arg2
-      then Unequal (* [v1 = A (... v1 ...)] has no finite solution *)
-      else (
-        set v1 (Some s2);
-        Equal_mutated_first)
+       There is no complete solution as long as sort variables only support
+       unification. For example, if [s1 = 'var addressable] and [arg2 = bits8],
+       we could unify ['var = bits8] or ['var = bits8 addressable], and neither
+       is strictly better. *)
+    match constrain_addressable ~allow_mutation:true s1 with
+    | Not_known_addressable -> Unequal
+    | Addressable_no_mutation ->
+      equate_sort_sort (strip_head_addressable s1) (strip_head_addressable arg2)
+    | Addressable_mutated ->
+      combine_equate_results Equal_mutated_first
+        (equate_sort_sort
+           (strip_head_addressable s1)
+           (strip_head_addressable arg2))
 
   and equate_sorts sorts1 sorts2 =
     let rec go sorts1 sorts2 acc =
