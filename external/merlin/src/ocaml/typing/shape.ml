@@ -811,24 +811,26 @@ let rec print fmt t =
     | Error s ->
         Format.fprintf fmt "Error %s" s
     | Constr (id, args) ->
-        Format.fprintf fmt "@[%a@ %a@]"
+        Format.fprintf fmt "@[%a%a@ %a@]"
           Ident.print id
+          print_uid_opt uid
           (Format.pp_print_list print_nested) args
     | Tuple shapes ->
-      Format.fprintf fmt "@[%a@]"
+      Format.fprintf fmt "@[%a%a@]" print_uid_opt uid
         (Format.pp_print_list
             ~pp_sep:(fun fmt () -> Format.pp_print_string fmt " * ")
             print_nested)
         shapes
     | Unboxed_tuple shapes ->
-      Format.fprintf fmt "Unboxed_tuple (%a)"
+      Format.fprintf fmt "Unboxed_tuple%a (%a)" print_uid_opt uid
         (Format.pp_print_list
             ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
             print)
         shapes
     | Predef (predef, args) ->
-      Format.fprintf fmt "%a%a"
+      Format.fprintf fmt "%a%a%a"
         Predef.print predef
+        print_uid_opt uid
         (fun fmt -> function
           | [] -> ()
           | args -> Format.fprintf fmt "(@[%a@])"
@@ -836,9 +838,9 @@ let rec print fmt t =
                 ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",@ ")
                 print) args) args
     | Arrow ->
-      Format.fprintf fmt "Arrow"
+      Format.fprintf fmt "Arrow%a" print_uid_opt uid
     | Poly_variant fields ->
-      Format.fprintf fmt "Poly_variant (%a)"
+      Format.fprintf fmt "Poly_variant%a (%a)" print_uid_opt uid
         (Format.pp_print_list
             ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
             (fun fmt { pv_constr_name; pv_constr_args } ->
@@ -853,7 +855,8 @@ let rec print fmt t =
         print_constructor (fun fmt (t, _) -> print_nested fmt t)
       in
       Format.fprintf fmt
-        "Variant %a"
+        "Variant%a %a"
+        print_uid_opt uid
         (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ | ")
             print_constructor)
         constructors
@@ -868,7 +871,8 @@ let rec print fmt t =
             print_uid_opt arg_uid
         | None -> print fmt arg_shape) arg_name
   | Record { fields; kind } ->
-    Format.fprintf fmt "Record%s { %a }" (print_record_type kind)
+    Format.fprintf fmt "Record%s%a { %a }" (print_record_type kind)
+      print_uid_opt uid
       (Format.pp_print_list ~pp_sep:(print_sep_string "; ") print_field)
       fields
   | Mutrec m ->
@@ -879,15 +883,24 @@ let rec print fmt t =
               aux t
           )
       in
-    Format.fprintf fmt "Mutrec @[%a@]" print_decls m
+    Format.fprintf fmt "Mutrec%a @[%a@]" print_uid_opt uid print_decls m
   | Proj_decl (t, id) ->
-    Format.fprintf fmt "%a.%a"
-      print_nested t
-      Ident.print id
-  | Unknown_type -> Format.fprintf fmt "?"
+    begin match uid with
+    | None ->
+      Format.fprintf fmt "%a.%a"
+        print_nested t
+        Ident.print id
+    | Some uid ->
+      Format.fprintf fmt "(%a.%a)<%a>"
+        print_nested t
+        Ident.print id
+        Uid.print uid
+    end
+  | Unknown_type -> Format.fprintf fmt "?%a" print_uid_opt uid
   | At_layout (shape, layout) ->
-    Format.fprintf fmt "(%a : %a)" print_nested shape
+    Format.fprintf fmt "(%a : %a)%a" print_nested shape
       (Format_doc.compat Layout.format) layout
+      print_uid_opt uid
   in
   if t.approximated then
     Format.fprintf fmt "@[(approx)@ %a@]@;" aux t
