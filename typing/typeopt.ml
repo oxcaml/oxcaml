@@ -996,7 +996,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       num_nodes_visited, Lambda.Constructor_uniform shape
     in
     let for_one_constructor (constructor : Types.constructor_declaration)
-          ~depth ~num_nodes_visited
+          ~depth ~num_nodes_visited ~instantiate
           ~(cstr_shape : Types.constructor_representation) =
       let num_nodes_visited = num_nodes_visited + 1 in
       match constructor.cd_args with
@@ -1061,25 +1061,29 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
               Some (num_nodes_visited,
                     next_const + 1, next_const :: consts, next_tag, non_consts)
             else
-              let cstr_shape_opt, constructor =
+              let cstr_shape_opt, constructor, ~instantiate =
                 match cstr_layouts.(idx) with
-                | Cstr_layout_known { shape; _ } -> Some shape, constructor
+                | Cstr_layout_known { shape; _ } ->
+                  Some shape, constructor, ~instantiate
                 | Cstr_layout_undetermined ->
                   (match substitute_cd_args constructor.cd_args with
-                   | exception Ctype.Cannot_apply -> None, constructor
+                   | exception Ctype.Cannot_apply ->
+                     None, constructor, ~instantiate
                    | cd_args ->
                      let cd_args, ~constant:_, repr, _arg_sorts =
                        Typedecl.update_constructor_representation
                          env loc cd_args ~is_extension_constructor:false
                      in
-                     Result.to_option repr, { constructor with cd_args })
+                     (* [substitute_cd_args] already instantiated the fields *)
+                     Result.to_option repr, { constructor with cd_args },
+                     ~instantiate:Fun.id)
               in
               match cstr_shape_opt with
               | None -> None
               | Some cstr_shape ->
                   let (is_mutable, num_nodes_visited), fields =
                     for_one_constructor constructor ~depth ~num_nodes_visited
-                      ~cstr_shape
+                      ~instantiate ~cstr_shape
                   in
                   if is_mutable then None
                   else
