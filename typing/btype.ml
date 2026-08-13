@@ -1277,13 +1277,9 @@ module Jkind0 = struct
         (op : Jkind_types.Kind_operator.t) :
         Jkind_types.Layout.Const.t jkind_base =
       match base with
-      | Layout l ->
-        let l' = Jkind_types.Layout.Const.apply_operator l op in
-        if l' == l then base else Layout l'
+      | Layout l -> Layout (Jkind_types.Layout.Const.apply_operator l op)
       | Kconstr (p, sa, op') ->
-        let op'' = Jkind_types.Kind_operator.compose op op' in
-        if Jkind_types.Kind_operator.equal op'' op' then base
-        else Kconstr (p, sa, op'')
+        Kconstr (p, sa, Jkind_types.Kind_operator.compose op op')
 
     let map_type_expr f t =
       { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
