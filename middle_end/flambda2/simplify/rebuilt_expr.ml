@@ -15,9 +15,14 @@
 open! Flambda.Import
 module ART = Are_rebuilding_terms
 
+type contents_hash =
+  { depth : int;
+    structural_hash : int
+  }
+
 type t =
   { expr : Expr.t;
-    contents_hash : int Or_null.t
+    contents_hash : contents_hash Or_null.t
         (* If not null, this is a structural hash of the contents of this
            rebuilt expression (always null when not rebuilding terms).
 
@@ -27,8 +32,15 @@ type t =
            [Unique_continuation_map]). *)
   }
 
+(* Matches [max_raw] in [lambda.ml]. *)
+let max_hash_depth = 32
+
 let create ?contents_hash expr =
-  let contents_hash = Or_null.of_option contents_hash in
+  let contents_hash =
+    match contents_hash with
+    | Some { depth; _ } when depth >= max_hash_depth -> Or_null.null
+    | _ -> Or_null.of_option contents_hash
+  in
   { expr; contents_hash }
 
 type rebuilt_expr = t
@@ -86,9 +98,12 @@ let create_let are_rebuilding bound_vars defining_expr ~body ~free_names_of_body
     let contents_hash =
       match body.contents_hash with
       | Null -> None
-      | This body_hash -> (
+      | This { depth; structural_hash = body_hash } -> (
         let[@local] simple_expr named_hash =
-          Some (Hashtbl.hash (1, named_hash, body_hash))
+          Some
+            { depth = depth + 1;
+              structural_hash = Hashtbl.hash (1, named_hash, body_hash)
+            }
         in
         match (defining_expr : Named.t) with
         | Simple simple ->
@@ -121,10 +136,13 @@ let create_apply_cont apply_cont =
     | Some _ -> None
     | None ->
       Some
-        (Hashtbl.hash
-           ( 0,
-             Continuation.hash (Apply_cont.continuation apply_cont),
-             List.map contents_hash_simple (Apply_cont.args apply_cont) ))
+        { depth = 0;
+          structural_hash =
+            Hashtbl.hash
+              ( 0,
+                Continuation.hash (Apply_cont.continuation apply_cont),
+                List.map contents_hash_simple (Apply_cont.args apply_cont) )
+        }
   in
   Expr.create_apply_cont apply_cont |> create ?contents_hash
 
@@ -505,14 +523,15 @@ module Unique_continuation_handlers = struct
     else
       match handler.contents_hash with
       | Null -> Or_null.null
-      | This hash ->
+      | This { depth; structural_hash } ->
         (* The [contents_hash] does not include variable names, so we include
            the free names of variables in the hash.
 
            This is an approximation, since we can't distinguish e.g. [x + y]
            from [y + x] in this way, but should be discriminating enough. *)
         Name_occurrences.fold_variables free_names_without_params
-          ~init:(Hashtbl.hash (hash, Bool.hash is_exn_handler))
+          ~init:
+            (Hashtbl.hash (depth, structural_hash, Bool.hash is_exn_handler))
           ~f:(fun hash var -> Hashtbl.hash (hash, Variable.hash var))
         |> Or_null.this
 
