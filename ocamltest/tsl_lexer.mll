@@ -70,17 +70,21 @@ and token = parse
   | "*" (num+ as n) { TEST_DEPTH (int_of_string n)}
   | "+=" { PLUSEQUAL }
   | "=" { EQUAL }
-  | identchar *
+  | identchar * ("${" identchar * "}" identchar *) *
     { let s = Lexing.lexeme lexbuf in
       match s with
         | "include" -> INCLUDE
         | "set" -> SET
+        | "split" -> SPLIT
         | "unset" -> UNSET
         | "with" -> WITH
         | _ -> IDENTIFIER s
     }
   | "{" { LEFT_BRACE }
   | "}" { RIGHT_BRACE }
+  | "[" { LEFT_BRACKET }
+  | "]" { RIGHT_BRACKET }
+  | "|" { BAR }
   | ";" { SEMI }
   | "(*"
     {

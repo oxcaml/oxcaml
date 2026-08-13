@@ -1,24 +1,25 @@
 (let code inline(never) size(1)
-       f_1 (param)
-         my_closure _region _ghost_region my_depth
-         -> k1 * k2
-         : int64 =
+       f_1 (param) my_closure &my_alloc_region my_depth -> k1 * k2 : int64 =
    cont k1 (0L)
  in
  let code inline(never) size(10)
        test_0 (u : imm tagged, a, b)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
-   apply direct(f_1)  (0) -> k3 * k2
+   apply direct(f_1 &my_alloc_region)  (0) -> k3 * k2
      where k3 (func) =
-       apply func (0) -> k1 * k2
+       apply &my_alloc_region func (0) -> k1 * k2
  in
- let $camlOver_app_kind_check_classic__s0 = closure test_0 @test in
+ let $camlOver_app_kind_check_classic__s0 =
+   closure test_0 @test &toplevel.alloc_region
+ in
  let $camlOver_app_kind_check_classic__s2 =
    Block 0 ($camlOver_app_kind_check_classic__s0)
  in
- let $camlOver_app_kind_check_classic__s1 = closure f_1 @f in
+ let $camlOver_app_kind_check_classic__s1 =
+   closure f_1 @f &toplevel.alloc_region
+ in
  cont k ($camlOver_app_kind_check_classic__s2))
   where k define_root_symbol (module_block) =
     let field_0 = $camlOver_app_kind_check_classic__s0 in

@@ -337,7 +337,10 @@ let return_arity_identifier t =
 
 let print_generic_fns gfns =
   let pr_afuns _ fns =
-    let mode = function Cmx_format.Alloc_heap -> "" | Cmx_format.Alloc_local -> "L" in
+    let mode = function
+      | Cmx_format.Not_alloc_stack -> ""
+      | Cmx_format.Maybe_alloc_stack -> "L"
+    in
     List.iter (fun (arity,result,m) ->
         printf " %s%s%s"
           (unique_arity_identifier arity)
@@ -382,6 +385,9 @@ let print_cmx_infos (uir, sections, crc) =
   end;
   print_generic_fns uir.uir_generic_fns;
   printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");
+  Format.printf "@[<hv 2>Static data:@ %a@]@\n%!"
+    (Format_doc.compat Slambdaeval.CU_data.print)
+    (Slambdaeval.CU_data.read uir.uir_static_data ~sections);
   if not (!no_code || !no_approx) then begin
     Zero_alloc_info.Raw.print uir.uir_zero_alloc_info
   end
@@ -530,7 +536,7 @@ let dump_obj_by_kind filename ic obj_kind =
        seek_in ic (first_section_offset + uir.uir_sections_length);
        let crc = Digest.input ic in
        (* This consumes ic *)
-       let sections = Oxcaml_utils.File_sections.create
+       let sections = File_sections.create
              uir.uir_section_toc filename ic ~first_section_offset in
        print_cmx_infos (uir, sections, crc)
     | Cmxa ->

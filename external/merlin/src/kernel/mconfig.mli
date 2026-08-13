@@ -16,7 +16,7 @@ type ocaml =
     applicative_functors : bool;
     nopervasives : bool;
     strict_formats : bool;
-    open_modules : string list;
+    open_args : Clflags.open_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
     warnings : Warnings.state;

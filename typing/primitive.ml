@@ -40,6 +40,7 @@ type native_repr =
   | Same_as_ocaml_repr of Jkind_types.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
+  | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Unpacked_product of Jkind_types.Sort.Const.t
 
@@ -101,6 +102,7 @@ let check_ocaml_value = function
   | _, Repr_poly -> Bad_layout
   | _, Unboxed_float _
   | _, Unboxed_vector _
+  | _, Unboxed_mask
   | _, Unboxed_or_untagged_integer _
   | _, Unpacked_product _ -> Bad_attribute
 
@@ -283,6 +285,7 @@ let print p osig_val_decl =
                                     | Untagged_int16) -> false
     | _, Unboxed_float _
     | _, Unboxed_vector _
+    | _, Unboxed_mask
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint) ->
       true
@@ -303,6 +306,7 @@ let print p osig_val_decl =
     | _, Same_as_ocaml_repr _
     | _, Unboxed_float _
     | _, Unboxed_vector _
+    | _, Unboxed_mask
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint)
     | _, Unpacked_product _
@@ -345,6 +349,7 @@ let print p osig_val_decl =
      | Repr_poly -> []
      | Unboxed_float _
      | Unboxed_vector _
+     | Unboxed_mask
      | Unboxed_or_untagged_integer (Unboxed_int32 | Unboxed_int64
                                    | Unboxed_nativeint) ->
        if all_unboxed then [] else [oattr_unboxed]
@@ -430,36 +435,41 @@ let equal_native_repr nr1 nr2 =
   match nr1, nr2 with
   | Repr_poly, Repr_poly -> true
   | Repr_poly, (Unboxed_float _ | Unboxed_or_untagged_integer _
-               | Unboxed_vector _ | Same_as_ocaml_repr _
+               | Unboxed_vector _ | Unboxed_mask | Same_as_ocaml_repr _
                | Unpacked_product _)
   | (Unboxed_float _ | Unboxed_or_untagged_integer _
-    | Unboxed_vector _ | Same_as_ocaml_repr _
+    | Unboxed_vector _ | Unboxed_mask | Same_as_ocaml_repr _
     | Unpacked_product _), Repr_poly
     -> false
   | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Same_as_ocaml_repr _,
     (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
   | Unboxed_float f1, Unboxed_float f2 -> equal_boxed_float f1 f2
   | Unboxed_float _,
     (Same_as_ocaml_repr _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
   | Unboxed_vector vi1, Unboxed_vector vi2 ->
     equal_unboxed_vector_size (unboxed_vector vi1) (unboxed_vector vi2)
   | Unboxed_vector _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_or_untagged_integer _ | Unboxed_mask | Unpacked_product _) ->
+    false
+  | Unboxed_mask, Unboxed_mask -> true
+  | Unboxed_mask,
+    (Same_as_ocaml_repr _ | Unboxed_float _ | Unboxed_vector _ |
      Unboxed_or_untagged_integer _ | Unpacked_product _) -> false
   | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 ->
     equal_unboxed_or_untagged_integer bi1 bi2
   | Unboxed_or_untagged_integer _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unpacked_product _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unpacked_product _) -> false
   | Unpacked_product s1, Unpacked_product s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Unpacked_product _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _ | Unboxed_or_untagged_integer _) -> false
+     Unboxed_vector _ | Unboxed_mask | Unboxed_or_untagged_integer _) -> false
 
 let equal_effects ef1 ef2 =
   match ef1, ef2 with
@@ -501,7 +511,8 @@ module Repr_check = struct
 
   let value_or_unboxed_or_untagged = function
     | Same_as_ocaml_repr (Base Scannable)
-    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _ -> true
+    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
+    | Unboxed_mask -> true
     | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ -> false
 
   let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
@@ -514,12 +525,12 @@ module Repr_check = struct
     | Same_as_ocaml_repr s ->
       if sort_is_product s then [Product_arg] else []
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Unpacked_product _ | Repr_poly -> []
+    | Unboxed_mask | Unpacked_product _ | Repr_poly -> []
 
   let c_stub_return_errors = function
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Repr_poly -> []
+    | Unboxed_mask | Repr_poly -> []
     | Unpacked_product _ -> [Unpacked_product_return]
     | Same_as_ocaml_repr (Product [s1; s2]) ->
       if (sort_is_product s1) ||
@@ -609,6 +620,7 @@ module Primitive_reprs = struct
         ("u256", "", C.scannable);
         ("a512", "", C.scannable);
         ("u512", "", C.scannable);
+        ("mask", "", C.scannable);
         ("8", "#", C.bits8);
         ("i8", "#", C.bits8);
         ("16", "#", C.bits16);
@@ -622,6 +634,7 @@ module Primitive_reprs = struct
         ("u256", "#", C.vec256);
         ("a512", "#", C.vec512);
         ("u512", "#", C.vec512);
+        ("mask", "#", C.mask);
       ]
     in
     let indices : (_ * Jkind_types.Sort.Const.t) list =
@@ -945,11 +958,24 @@ let prim_has_valid_reprs ~loc prim =
         is (Same_as_ocaml_repr C.bits64);
         any
       ]
+    | "%get_idx_atomic" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable)
+      ]
     | "%set_idx" ->
       check [
         is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.bits64);
         any;
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%set_idx_atomic" ->
+      check [
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.scannable);
       ]
     | "%unsafe_array_idx" ->
@@ -1074,6 +1100,10 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.vec512; Same_as_ocaml_repr C.scannable]
     | "%unbox_vec512" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.vec512]
+    | "%box_mask" ->
+      exactly [Same_as_ocaml_repr C.mask; Same_as_ocaml_repr C.scannable]
+    | "%unbox_mask" ->
+      exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.mask]
 
     | "%reinterpret_tagged_int63_as_unboxed_int64" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.bits64]

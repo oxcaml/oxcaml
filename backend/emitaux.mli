@@ -52,6 +52,13 @@ val record_frame_descr :
   (* Location, if any *)
   unit
 
+(** The backends call this whenever they switch text section, with the section's
+    name; it maintains a section epoch, in preparation for a compact
+    frame-descriptor format whose return addresses are deltas from the previous
+    descriptor -- an assembly-time constant only when both lie in the same
+    section. Re-entering the current section does not bump the epoch. *)
+val enter_code_section : string -> unit
+
 (** [with_snapshot f] runs [f] and returns its result, but also ensures that the
     state of this [Emitaux] module is unchanged after [f] returns. *)
 val with_snapshot : f:(unit -> 'a) -> 'a

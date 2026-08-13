@@ -128,7 +128,15 @@ module F = struct
             output ^ ".output" ))
         run
     in
-    let deps = List.filter_map dependency_of_task tasks in
+    let deps =
+      List.filter_map dependency_of_task tasks
+      @
+      if List.exists (function C _ -> true | _ -> false) tasks
+      then
+        [ "(glob_files %{project_root}/runtime/caml/*.h)";
+          "%{project_root}/runtime/caml/domain_state.tbl" ]
+      else []
+    in
     let targets =
       List.filter_map target_of_task tasks
       @ match run_args with None -> [] | Some (_, output) -> [output ^ ".exe"]
@@ -191,9 +199,11 @@ let print_rule ~extra_subst ~buf rule_template =
         "-llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir \
          -dno-asm-comments -disable-poll-insertion"
       | "common_flags" ->
-        "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear"
+        "-g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm \
+         -dcfg -dlinear"
       | "stop_after_llvm_flags" ->
-        "-g -O3 -opaque -dump-into-file -dcmm -dcfg -stop-after llvmize"
+        "-g -O3 -flambda2-no-simplify-stubs -opaque -dump-into-file -dcmm \
+         -dcfg -stop-after llvmize"
       | "c_flags" -> "-c -g -O3 -I %{project_root}/runtime"
       | _ -> assert false)
   in

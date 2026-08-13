@@ -1,7 +1,7 @@
 let $camlUnroll4__first_const = Block 0 () in
 (let code rec size(31)
        even_1 (n : imm tagged)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
    let k = %project_value_slot.[even].[k] (my_closure) in
@@ -18,14 +18,12 @@ let $camlUnroll4__first_const = Block 0 () in
         cont k4)
      where k4 =
        let int_sub = %int_barith.sub (n, 1) in
-       apply direct(odd_2)
+       apply direct(odd_2 &my_alloc_region)
          odd ~ depth my_depth -> next_depth (int_sub) -> k1 * k2
      where k3 =
-       apply inlined(hint) k (1) -> k1 * k2
+       apply &my_alloc_region inlined(hint) k (1) -> k1 * k2
  and code rec size(31)
-       odd_2 (n : imm tagged)
-         my_closure _region _ghost_region my_depth
-         -> k1 * k2 =
+       odd_2 (n : imm tagged) my_closure &my_alloc_region my_depth -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
    let k = %project_value_slot.[odd].[k] (my_closure) in
    let even = %project_function_slot.[odd].[even] (my_closure) in
@@ -41,18 +39,18 @@ let $camlUnroll4__first_const = Block 0 () in
         cont k4)
      where k4 =
        let int_sub = %int_barith.sub (n, 1) in
-       apply direct(even_1)
+       apply direct(even_1 &my_alloc_region)
          even ~ depth my_depth -> next_depth (int_sub) -> k1 * k2
      where k3 =
-       apply inlined(hint) k (0) -> k1 * k2
+       apply &my_alloc_region inlined(hint) k (0) -> k1 * k2
  in
  let code inline(always) size(93)
        parity_is_0 (p : imm tagged, n : imm tagged, k : val)
-         my_closure _region _ghost_region my_depth
+         my_closure &my_alloc_region my_depth
          -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
-   let even = closure even_1 @even
-   and odd = closure odd_2 @odd
+   let even = closure even_1 @even &my_alloc_region
+   and odd = closure odd_2 @odd &my_alloc_region
    with { k = k }
    in
    (let untagged = %untag_imm (p) in
@@ -64,25 +62,25 @@ let $camlUnroll4__first_const = Block 0 () in
      where k5 =
        cont k4
      where k4 =
-       apply direct(even_1) unroll(3) even (n) -> k1 * k2
+       apply direct(even_1 &my_alloc_region) unroll(3) even (n) -> k1 * k2
      where k3 =
-       apply direct(odd_2) unroll(4) odd (n) -> k1 * k2
+       apply direct(odd_2 &my_alloc_region) unroll(4) odd (n) -> k1 * k2
  in
  let code inline(always) size(1)
-       k_3 (b) my_closure _region _ghost_region my_depth -> k1 * k2 =
+       k_3 (b) my_closure &my_alloc_region my_depth -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
    cont k1 (b)
  in
- let parity_is = closure parity_is_0 @parity_is in
- let k = closure k_3 @k in
- apply direct(parity_is_0)
+ let parity_is = closure parity_is_0 @parity_is &toplevel.alloc_region in
+ let k = closure k_3 @k &toplevel.alloc_region in
+ apply direct(parity_is_0 &toplevel.alloc_region)
    (parity_is : _ -> imm tagged) (0, 1, k) -> k1 * error
    where k1 (one_is_even : imm tagged) =
-     (apply direct(parity_is_0)
+     (apply direct(parity_is_0 &toplevel.alloc_region)
         (parity_is : _ -> imm tagged) (1, 4, k) -> k1 * error
         where k1 (four_is_odd : imm tagged) =
           let Pmakeblock =
-            %block.[`0`] (parity_is, k, one_is_even, four_is_odd)
+            %block.[`0`].`toplevel` (parity_is, k, one_is_even, four_is_odd)
           in
           cont k (Pmakeblock)))
   where k define_root_symbol (module_block) =
