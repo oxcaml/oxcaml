@@ -424,6 +424,7 @@ logic.
   -no-regalloc-validate
   -no-strict-formats
   -no-strict-sequence
+  -no-stubs-forward-inlining
   -no-symbol-visibility-protected
   -no-unbox-free-vars-of-closures
   -no-unbox-specialised-args
@@ -490,6 +491,7 @@ logic.
   -stop-after
   -strict-formats
   -strict-sequence
+  -stubs-forward-inlining
   -symbol-visibility-protected
   -thread
   -thunkify-compilation-unit-initialization
