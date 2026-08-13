@@ -145,7 +145,7 @@ Test 10, float# records in recursive groups.
   c: -7.30
   d: -8.40
 Test 11, heterogeneous polymorphic equality.
-  equal: true
+  equal: false
   unequal: false
 Test 12, If-then-else with assert and float64.
   result (1.00): 1.00

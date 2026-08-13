@@ -1,3 +1,32 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ *                       Basile Clément, OCamlPro                             *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2025 OCamlPro                                                *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
 module Var : sig
   type t
 
@@ -44,6 +73,10 @@ module Pattern : sig
   val function_slot : Function_slot.t -> 'a t -> 'a closure_field
 
   val closure : 'a closure_field list -> 'a t
+
+  (** [boxed_number bn t] matches a boxed number of the given kind, with [t]
+      matching the type of its (unboxed) contents. *)
+  val boxed_number : Flambda_kind.Boxable_number.t -> 'a t -> 'a t
 end
 
 type 'a expr
@@ -60,8 +93,6 @@ module Expr : sig
   val var : 'a -> 'a t
 
   val unknown : Flambda_kind.t -> 'a t
-
-  val bottom : Flambda_kind.t -> 'a t
 
   val unknown_with_subkind : Flambda_kind.With_subkind.t -> 'a t
 

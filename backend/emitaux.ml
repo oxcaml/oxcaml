@@ -51,6 +51,21 @@ type frame_descr =
 
 let frame_descriptors = ref ([] : frame_descr list)
 
+(* The epoch bumps at each text-section change. It prepares for a compact
+   frame-descriptor format in which a return address is a delta from the
+   previous descriptor's -- an assembly-time constant only when both lie in the
+   same section -- so descriptors will record the epoch to decide where delta
+   chains must break. *)
+let frame_section_epoch = ref 0
+
+let current_code_section = ref ""
+
+let enter_code_section name =
+  if not (String.equal name !current_code_section)
+  then (
+    current_code_section := name;
+    incr frame_section_epoch)
+
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
 
 let get_flags debuginfo =
@@ -70,10 +85,7 @@ let is_long n =
   if n > 0x3FFF_FFFF then raise (Error (Stack_frame_way_too_large n));
   n >= !Oxcaml_flags.long_frames_threshold
 
-let is_long_stack_index n =
-  let is_reg n = n land 1 = 1 in
-  (* allows negative reg offsets in runtime4 *)
-  if is_reg n && not Config.runtime5 then false else is_long n
+let is_long_stack_index n = is_long n
 
 let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
   assert (frame_size land 3 = 0);
@@ -124,7 +136,8 @@ let emit_frames a =
     let n = Numbers.Int8.of_int_exn n in
     a.efa_i8 n
   in
-  let emit_i16 n =
+  let[@warning "-26"] emit_i16 n =
+    (* unused, but here for completeness *)
     let n = Numbers.Int16.of_int_exn n in
     a.efa_i16 n
   in
@@ -190,16 +203,9 @@ let emit_frames a =
     then (
       emit_u16 Oxcaml_flags.max_long_frames_threshold;
       a.efa_align 4);
-    let emit_signed_16_or_32 = if fd.fd_long then emit_i32 else emit_i16 in
     let emit_unsigned_16_or_32 = if fd.fd_long then emit_u32 else emit_u16 in
-    let emit_live_offset n =
-      (* On runtime 4, the live offsets can be negative. As such, we emit them
-         as signed integers (and truncate the upper bound to 0x7f...ff); on
-         runtime 5 they are always unsigned. *)
-      if Config.runtime5
-      then emit_unsigned_16_or_32 n
-      else emit_signed_16_or_32 n
-    in
+    (* The live offsets are always unsigned. *)
+    let emit_live_offset n = emit_unsigned_16_or_32 n in
     emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
     emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
     List.iter emit_live_offset fd.fd_live_offset;
@@ -379,6 +385,20 @@ let reset_debug_info () =
   file_pos_nums := [];
   file_pos_num_cnt := 1
 
+let with_snapshot ~f =
+  let saved_file_pos_nums = !file_pos_nums in
+  let saved_file_pos_num_cnt = !file_pos_num_cnt in
+  let saved_frame_descriptors = !frame_descriptors in
+  let saved_frame_section_epoch = !frame_section_epoch in
+  let saved_current_code_section = !current_code_section in
+  let result = f () in
+  file_pos_nums := saved_file_pos_nums;
+  file_pos_num_cnt := saved_file_pos_num_cnt;
+  frame_descriptors := saved_frame_descriptors;
+  frame_section_epoch := saved_frame_section_epoch;
+  current_code_section := saved_current_code_section;
+  result
+
 let get_file_num ~file_emitter file_name =
   try List.assoc file_name !file_pos_nums
   with Not_found ->
@@ -432,6 +452,14 @@ module Dwarf_helpers = struct
 
   let ppf_dump = ref Format.err_formatter
 
+  let record_function_range ~function_symbol ~start_label ~end_label
+      ~offset_past_end_label =
+    Option.iter
+      (fun d ->
+        Dwarf.record_function_range d ~function_symbol ~start_label ~end_label
+          ~offset_past_end_label)
+      !dwarf
+
   let begin_dwarf ~code_begin ~code_end ~file_emitter =
     match !sourcefile_for_dwarf with
     | None -> ()
@@ -443,15 +471,26 @@ module Dwarf_helpers = struct
       Asm_targets.Asm_directives.debug_header ~get_file_num;
       let unit_name =
         (* CR lmaurer: This doesn't actually need to be an [Ident.t] *)
-        Symbol.for_current_unit () |> Symbol.linkage_name
-        |> Linkage_name.to_string |> Ident.create_persistent
+        Current_unit.symbol () |> Symbol.linkage_name |> Linkage_name.to_string
+        |> Ident.create_persistent
       in
       let code_begin = Asm_targets.Asm_symbol.create_global code_begin in
       let code_end = Asm_targets.Asm_symbol.create_global code_end in
+      let code_layout : Dwarf_state.code_layout =
+        if
+          !Clflags.function_sections
+          || !Oxcaml_flags.basic_block_sections
+          || !Oxcaml_flags.module_entry_functions_section
+        then
+          (* Use Function_sections mode - ranges will be recorded via
+             [record_function_range] as functions are emitted *)
+          Dwarf_state.Function_sections
+        else Dwarf_state.Continuous_code_section { code_begin; code_end }
+      in
       dwarf
         := Some
              (Dwarf.create ~sourcefile ~unit_name ~asm_directives
-                ~get_file_id:get_file_num ~code_begin ~code_end)
+                ~get_file_id:get_file_num ~code_layout)
 
   let reset_dwarf ppf =
     dwarf := None;
@@ -460,12 +499,7 @@ module Dwarf_helpers = struct
 
   let init ~ppf_dump ~disable_dwarf ~sourcefile =
     reset_dwarf ppf_dump;
-    let can_emit_dwarf =
-      !Clflags.debug
-      && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
-         || !Dwarf_flags.dwarf_inlined_frames)
-      && not disable_dwarf
-    in
+    let can_emit_dwarf = !Clflags.debug && not disable_dwarf in
     match
       ( can_emit_dwarf,
         Target_system.architecture (),
@@ -476,16 +510,12 @@ module Dwarf_helpers = struct
 
   let emit_dwarf () =
     Option.iter
-      (Dwarf.emit
-         ~basic_block_sections:!Oxcaml_flags.basic_block_sections
-         ~binary_backend_available:!binary_backend_available)
+      (Dwarf.emit ~binary_backend_available:!binary_backend_available)
       !dwarf
 
   let emit_delayed_dwarf () =
     Option.iter
-      (Dwarf.emit_delayed
-         ~basic_block_sections:!Oxcaml_flags.basic_block_sections
-         ~binary_backend_available:!binary_backend_available)
+      (Dwarf.emit_delayed ~binary_backend_available:!binary_backend_available)
       !dwarf
 
   let record_dwarf_for_fundecl fundecl =
@@ -497,7 +527,7 @@ module Dwarf_helpers = struct
       Some (Dwarf.dwarf_for_fundecl dwarf fundecl ~fun_end_label ~ppf_dump)
 end
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Stack_frame_too_large n ->
     Format_doc.fprintf ppf
       "stack frame too large (%d bytes). \nUse -long-frames compiler flag." n
@@ -507,6 +537,13 @@ let report_error ppf = function
     Format_doc.fprintf ppf
       "Inconsistent use of ~enabled_at_init in [%%probe %s ..] at %a" name
       Debuginfo.doc_print_compact dbg
+
+let report_error = Format_doc.compat report_error_doc
+
+let () =
+  Location.register_error_of_exn (function
+    | Error err -> Some (Location.error_of_printer_file report_error_doc err)
+    | _ -> None)
 
 type preproc_stack_check_result =
   { max_frame_size : int;
@@ -533,7 +570,7 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
         | Tls_get | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
         | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Load _
+        | Const_vec512 _ | Const_mask _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -547,7 +584,8 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
       loop i.next fs max_fs nontail_flag
     | Lstackcheck _ ->
       (* should not be already present *)
-      assert false
+      Misc.fatal_error
+        "Emitaux.preproc_stack_check: Lstackcheck already present"
   in
   loop fun_body frame_size frame_size false
 
@@ -621,6 +659,74 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   emit_desc ();
   D.define_label d;
   D.align ~fill:Zero ~bytes
+
+type emit_data_item_actions =
+  { global_maybe_protected : Asm_targets.Asm_symbol.t -> unit;
+    symbol_defined : string -> unit;
+    symbol_used : string -> unit
+  }
+
+let symbol_of_cmm_symbol (s : Cmm.symbol) : Asm_targets.Asm_symbol.t =
+  let visibility : Asm_targets.Asm_symbol.visibility =
+    match s.sym_global with Cmm.Global -> Global | Cmm.Local -> Local
+  in
+  Asm_targets.Asm_symbol.create ~visibility s.sym_name
+
+let emit_data_item actions (d : Cmm.data_item) =
+  let module D = Asm_targets.Asm_directives in
+  let module L = Asm_targets.Asm_label in
+  match d with
+  | Cdefine_symbol s -> (
+    let sym = symbol_of_cmm_symbol s in
+    match s.sym_global with
+    | Local -> D.define_label (L.create_label_for_local_symbol Data sym)
+    | Global ->
+      actions.global_maybe_protected sym;
+      actions.symbol_defined s.sym_name;
+      D.define_joint_label_and_symbol ~section:Data sym)
+  | Cint8 n -> D.int8 (Numbers.Int8.of_int_exn n)
+  | Cint16 n -> D.int16 (Numbers.Int16.of_int_exn n)
+  | Cint32 n -> D.int32 (Numbers.Int64.to_int32_exn (Int64.of_nativeint n))
+  (* CR mshinwell: Add [Targetint.of_nativeint] *)
+  | Cint n -> D.targetint (Targetint.of_int64 (Int64.of_nativeint n))
+  | Csingle f -> D.float32 f
+  | Cdouble f -> D.float64 f
+  (* SIMD vectors respect little-endian byte order *)
+  | Cvec128 { word0; word1 } ->
+    D.float64_from_bits word0;
+    D.float64_from_bits word1
+  | Cvec256 { word0; word1; word2; word3 } ->
+    D.float64_from_bits word0;
+    D.float64_from_bits word1;
+    D.float64_from_bits word2;
+    D.float64_from_bits word3
+  | Cvec512 { word0; word1; word2; word3; word4; word5; word6; word7 } ->
+    D.float64_from_bits word0;
+    D.float64_from_bits word1;
+    D.float64_from_bits word2;
+    D.float64_from_bits word3;
+    D.float64_from_bits word4;
+    D.float64_from_bits word5;
+    D.float64_from_bits word6;
+    D.float64_from_bits word7
+  | Csymbol_address s -> (
+    actions.symbol_used s.sym_name;
+    let sym = symbol_of_cmm_symbol s in
+    match s.sym_global with
+    | Global -> D.symbol sym
+    | Local -> D.label (L.create_label_for_local_symbol Data sym))
+  | Csymbol_offset (s, o) -> (
+    actions.symbol_used s.sym_name;
+    let sym = symbol_of_cmm_symbol s in
+    match s.sym_global with
+    | Global ->
+      D.symbol_plus_offset ~offset_in_bytes:(Targetint.of_int_exn o) sym
+    | Local ->
+      D.label_plus_offset ~offset_in_bytes:(Targetint.of_int_exn o)
+        (L.create_label_for_local_symbol Data sym))
+  | Cstring s -> D.string s
+  | Cskip n -> D.space ~bytes:n
+  | Calign n -> D.align ~fill:Zero ~bytes:n
 
 let reset () =
   reset_debug_info ();

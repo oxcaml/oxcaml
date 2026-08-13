@@ -17,52 +17,8 @@
 
 open! Int_replace_polymorphic_compare
 open X86_ast
-module DLL = Oxcaml_utils.Doubly_linked_list
-
-module Section_name = struct
-  module S = struct
-    type t =
-      { name : string list;
-        name_str : string;
-        flags : string option;
-        args : string list
-      }
-
-    let equal t1 t2 = List.equal String.equal t1.name t2.name
-
-    let hash t = Hashtbl.hash t.name
-
-    let compare t1 t2 = List.compare String.compare t1.name t2.name
-
-    let make name flags args =
-      { name; name_str = String.concat "," name; flags; args }
-
-    let of_string name =
-      { name = [name]; name_str = name; flags = None; args = [] }
-
-    let to_string t = t.name_str
-
-    let flags t = t.flags
-
-    let alignment t =
-      let rec align = function
-        | [] -> 0L
-        | [hd] -> Option.value ~default:0L (Int64.of_string_opt hd)
-        | _hd :: tl -> align tl
-      in
-      align t.args
-
-    let is_text_like t = String.starts_with ~prefix:".text" t.name_str
-
-    let is_data_like t = String.starts_with ~prefix:".data" t.name_str
-
-    let is_note_like t = String.starts_with ~prefix:".note" t.name_str
-  end
-
-  include S
-  module Map = Map.Make (S)
-  module Tbl = Hashtbl.Make (S)
-end
+module DLL = Doubly_linked_list
+module Section_name = X86_section.Section_name
 
 type system =
   (* 32 bits and 64 bits *)
@@ -327,8 +283,8 @@ let float_condition_of_imm = function
   | Imm 5L -> NLTf
   | Imm 6L -> NLEf
   | Imm 7L -> ORDf
-  | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Mem _
-  | Mem64_RIP _ | Imm _ ->
+  | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Regmask _
+  | Mem _ | Mem64_RIP _ | Imm _ ->
     Misc.fatal_errorf "Invalid float condition immediate arg"
 
 let string_of_float_condition_imm imm =
@@ -401,40 +357,66 @@ let assemble_file infile outfile =
 
 let asm_code = DLL.make_empty ()
 
-let asm_code_current_section = ref (DLL.make_empty ())
-
-let asm_code_by_section = Section_name.Tbl.create 100
-
-let delayed_sections = Section_name.Tbl.create 100
-
 (* Cannot use Emitaux directly here or there would be a circular dep *)
 let create_asm_file = ref true
 
-let directive dir =
-  if !create_asm_file then DLL.add_end asm_code dir;
-  match[@warning "-4"] dir with
-  | Directive
-      (Asm_targets.Asm_directives.Directive.Section (section, first_occurrence))
-    -> (
-    let details = Asm_targets.Asm_section.details section first_occurrence in
-    let name = Section_name.make details.names details.flags details.args in
-    let where =
-      if details.is_delayed then delayed_sections else asm_code_by_section
-    in
-    match Section_name.Tbl.find_opt where name with
-    | Some x -> asm_code_current_section := x
-    | None ->
-      let new_section = DLL.make_empty () in
-      asm_code_current_section := new_section;
-      Section_name.Tbl.add where name new_section)
-  | dir -> DLL.add_end !asm_code_current_section dir
+let directive dir = DLL.add_end asm_code dir
 
 let emit ins = directive (Ins ins)
 
-let reset_asm_code () =
-  DLL.clear asm_code;
-  asm_code_current_section := DLL.make_empty ();
-  Section_name.Tbl.clear asm_code_by_section
+let reset_asm_code () = DLL.clear asm_code
+
+(* The instructions are emitted as a single flat stream, [asm_code]; the
+   internal assembler consumes them grouped by section. [collect_sections] walks
+   the stream and groups the lines according to the [Section] directives, which
+   act as separators and do not appear in the result. *)
+let collect_sections ~is_delayed =
+  let sections = Section_name.Tbl.create 16 in
+  let current = ref None in
+  DLL.iter asm_code ~f:(fun line ->
+      match[@warning "-4"] line with
+      | Directive
+          (Asm_targets.Asm_directives.Directive.Section
+             (section, first_occurrence)) -> (
+        let details =
+          Asm_targets.Asm_section.details section first_occurrence
+        in
+        if not (Bool.equal details.is_delayed is_delayed)
+        then current := None
+        else
+          let name =
+            Section_name.make details.names details.flags details.args
+          in
+          match Section_name.Tbl.find_opt sections name with
+          | Some instrs -> current := Some instrs
+          | None ->
+            let instrs = DLL.make_empty () in
+            Section_name.Tbl.add sections name instrs;
+            current := Some instrs)
+      | dir -> !current |> Option.iter (fun instrs -> DLL.add_end instrs dir));
+  Section_name.Tbl.fold
+    (fun name instrs acc -> (name, instrs) :: acc)
+    sections []
+
+type output_pos = asm_line DLL.cell option (* None means the beginning *)
+
+let current_output_pos () = DLL.last_cell asm_code
+
+let next_pos pos =
+  match pos with None -> DLL.hd_cell asm_code | Some cell -> DLL.next cell
+
+let output_range ~from_pos ~to_pos =
+  DLL.range_to_list ~left_incl:(next_pos from_pos) ~right_excl:(next_pos to_pos)
+
+let peephole_optimize_from pos =
+  if !Oxcaml_flags.x86_peephole_optimize
+  then
+    let start =
+      match pos with
+      | None -> DLL.hd_cell asm_code
+      | Some start_excl -> DLL.next start_excl
+    in
+    X86_peephole_optimize.optimize_from_cell start
 
 let generate_code asm =
   (match asm with
@@ -442,12 +424,10 @@ let generate_code asm =
   | None -> ());
   match !internal_assembler with
   | Some f ->
-    let get sections =
-      Section_name.Tbl.fold
-        (fun name instrs acc -> (name, instrs) :: acc)
-        sections []
-    in
-    let instrs = get asm_code_by_section in
-    let delayed () = get delayed_sections in
+    let instrs = collect_sections ~is_delayed:false in
+    (* The delayed sections (DWARF .debug_line and .debug_frames) are emitted
+       while [f] runs, after the main sections have been assembled, so they can
+       only be extracted from [asm_code] once [f] forces the thunk. *)
+    let delayed () = collect_sections ~is_delayed:true in
     binary_content := Some (f ~delayed instrs)
   | None -> binary_content := None

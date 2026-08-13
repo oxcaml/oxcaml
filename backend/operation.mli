@@ -48,16 +48,16 @@ type integer_operation =
   | Isub
   | Imul
   | Imulh of { signed : bool }
-  | Idiv
-  | Imod
+  | Idiv of { signed : bool }
+  | Imod of { signed : bool }
   | Iand
   | Ior
   | Ixor
   | Ilsl
   | Ilsr
   | Iasr
-  | Iclz of { arg_is_non_zero : bool }
-  | Ictz of { arg_is_non_zero : bool }
+  | Iclz
+  | Ictz
   | Ipopcnt
   | Icomp of integer_comparison
 
@@ -138,6 +138,7 @@ type t =
   | Const_vec128 of Cmm.vec128_bits
   | Const_vec256 of Cmm.vec256_bits
   | Const_vec512 of Cmm.vec512_bits
+  | Const_mask of int64
   | Stackoffset of int
   | Load of
       { memory_chunk : Cmm.memory_chunk;
@@ -186,3 +187,5 @@ type t =
 val is_pure : t -> bool
 
 val dump : Format.formatter -> t -> unit
+
+val equal : t -> t -> bool

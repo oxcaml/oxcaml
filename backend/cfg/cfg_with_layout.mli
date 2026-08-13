@@ -27,7 +27,7 @@
 
 type t
 
-type layout = Label.t Oxcaml_utils.Doubly_linked_list.t
+type layout = Label.t Doubly_linked_list.t
 
 val create : Cfg.t -> layout:layout -> t
 
@@ -82,8 +82,6 @@ val print_dot :
   t ->
   unit
 
-val dump : Format.formatter -> t -> msg:string -> unit
-
 (** Change layout: randomly reorder the blocks, keeping the entry block first.
     This function is intended for testing and enabled by compiler flag
     "-reorder-blocks-random".
@@ -117,5 +115,4 @@ val insert_block :
   Cfg.basic_instruction_list ->
   after:Cfg.basic_block ->
   before:Cfg.basic_block option ->
-  next_instruction_id:(unit -> InstructionId.t) ->
   Cfg.basic_block list

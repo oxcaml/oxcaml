@@ -1,3 +1,6 @@
+ROOTDIR = ../../..
+include $(ROOTDIR)/Makefile.config_if_required
+
 DUNE_CMD := $(if $(wildcard dune/dune.exe),dune/dune.exe,dune)
 DUNE ?= $(DUNE_CMD)
 
@@ -8,9 +11,11 @@ else
     DBG=quiet
 endif
 
+VERSION := $(OCAML_VERSION_MAJOR).$(OCAML_VERSION_MINOR)
+
 WEBDIR = ../webman
-WEBDIRMAN = $(WEBDIR)/manual
-WEBDIRAPI = $(WEBDIR)/api
+WEBDIRMAN = $(WEBDIR)/$(VERSION)
+WEBDIRAPI = $(WEBDIRMAN)/api
 WEBDIRCOMP = $(WEBDIRAPI)/compilerlibref
 
 # The "all" target generates the Web Manual in the directories
@@ -52,9 +57,6 @@ js: $(JS_FILES)
 
 CURL = curl -s
 # download images for local use
-SEARCH := search_icon.svg
-$(WEBDIRAPI)/search_icon.svg: | $(WEBDIRAPI)
-	$(CURL) "https://ocaml.org/img/search.svg" > $(WEBDIRAPI)/$(SEARCH)
 
 $(WEBDIRCOMP)/%: $(WEBDIRAPI)/% | $(WEBDIRCOMP)
 	cp $< $@
@@ -71,9 +73,9 @@ $(WEBDIRAPI)/favicon.ico: | $(WEBDIRAPI) $(WEBDIRMAN) $(WEBDIRCOMP)
 	$(CURL) "https://raw.githubusercontent.com/ocaml/ocaml-logo/master/Colour/Favicon/32x32.ico" > $(WEBDIRAPI)/$(ICON)
 
 IMG_FILES0 := colour-logo.svg
-IMG_FILES := $(addprefix $(WEBDIRAPI)/, $(IMG_FILES0)) $(addprefix $(WEBDIRCOMP)/, $(IMG_FILES0)) $(addprefix $(WEBDIRMAN)/, $(IMG_FILES0)) 
+IMG_FILES := $(addprefix $(WEBDIRAPI)/, $(IMG_FILES0)) $(addprefix $(WEBDIRCOMP)/, $(IMG_FILES0)) $(addprefix $(WEBDIRMAN)/, $(IMG_FILES0))
 
-img: $(WEBDIRAPI)/search_icon.svg $(WEBDIRAPI)/favicon.ico $(WEBDIRCOMP)/search_icon.svg $(WEBDIRCOMP)/favicon.ico $(IMG_FILES)
+img: $(WEBDIRAPI)/favicon.ico $(WEBDIRCOMP)/favicon.ico $(IMG_FILES)
 
 clean:
 	rm -rf $(WEBDIR) src/.merlin _build

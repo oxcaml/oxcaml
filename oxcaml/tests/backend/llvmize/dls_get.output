@@ -23,7 +23,7 @@ L101:
   %14 = load i64, ptr %4
   store i64 %14, ptr %5
   %15 = load i64, ptr %ds
-  %16 = add i64 %15, 376
+  %16 = add i64 %15, 416
   %17 = inttoptr i64 %16 to ptr
   %18 = load i64, ptr %17
   %19 = inttoptr i64 %18 to ptr addrspace(1)
@@ -111,4 +111,5 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 
 !0 = !{ i32 1, !"oxcaml_module", !"Dls_get" }
-!llvm.module.flags = !{ !0 }
+!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }
+!llvm.module.flags = !{ !0, !1 }

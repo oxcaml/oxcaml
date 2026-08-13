@@ -17,6 +17,8 @@ val debug : bool
 val bool_of_param :
   ?guard:bool * string -> ?default:bool -> string -> bool Lazy.t
 
+val int_of_param : ?default:int -> string -> int Lazy.t
+
 val invariants : bool Lazy.t
 
 val verbose : bool Lazy.t
@@ -101,7 +103,7 @@ module Move : sig
   val to_string : t -> string
 end
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 module Insert_skipping_name_for_debugger : sig
   val insert_after :

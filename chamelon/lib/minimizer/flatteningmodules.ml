@@ -56,7 +56,7 @@ let remove_module id =
                         txt =
                           Lident
                             (String.lowercase_ascii (Ident.name id1)
-                            ^ "_" ^ lid2)
+                            ^ "_" ^ lid2.txt)
                       },
                       vd )
               }
@@ -81,7 +81,7 @@ let remove_module id =
                         txt =
                           Lident
                             (String.lowercase_ascii (Ident.name id1)
-                            ^ "_" ^ lid2)
+                            ^ "_" ^ lid2.txt)
                       },
                       tl )
               }
@@ -115,14 +115,18 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
              fields)
       | Tpat_array (vl, id) ->
         mkTpat_array ~id (List.map (replace_in_pat mod_name) vl)
-      | O (Tpat_construct (a1, a2, vl, a3)) ->
-        Tpat_construct (a1, a2, List.map (replace_in_pat mod_name) vl, a3)
-      | O (Tpat_record (r, a1)) ->
-        Tpat_record
+      | Tpat_construct (a1, a2, vl, a3, id) ->
+        mkTpat_construct ~id
+          ( a1,
+            a2,
+            List.map (fun (id, pat) -> id, replace_in_pat mod_name pat) vl,
+            a3 )
+      | Tpat_record (r, a1, id) ->
+        mkTpat_record ~id
           ( List.map (fun (e1, e2, pat) -> e1, e2, replace_in_pat mod_name pat) r,
             a1 )
-      | O (Tpat_record_unboxed_product (r, a1)) ->
-        Tpat_record_unboxed_product
+      | Tpat_record_unboxed_product (r, a1, id) ->
+        mkTpat_record_unboxed_product ~id
           ( List.map (fun (e1, e2, pat) -> e1, e2, replace_in_pat mod_name pat) r,
             a1 )
       | O (Tpat_or (p1, p2, a1)) ->
@@ -130,13 +134,26 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
       | O (Tpat_lazy pat) -> Tpat_lazy (replace_in_pat mod_name pat)
       | O (Tpat_variant (lab, Some p, t)) ->
         Tpat_variant (lab, Some (replace_in_pat mod_name p), t)
+      | O (Tpat_fun_layout { id; name; uid; sort; mode; lpoly; env_alloc_mode })
+        ->
+        Tpat_fun_layout
+          { id = create_local (mod_name ^ "_" ^ Ident.name id);
+            name = { name with txt = mod_name ^ "_" ^ name.txt };
+            uid;
+            sort;
+            mode;
+            lpoly;
+            env_alloc_mode
+          }
       | O (Tpat_value _)
       (* p) -> as_computation_pattern (replace_in_pat mod_name p) *)
       | O
           ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
           | Tpat_variant _ | Tpat_exception _ ) ->
         pat.pat_desc
-      | O (Tpat_var _ | Tpat_alias _ | Tpat_array _ | Tpat_tuple _) ->
+      | O
+          ( Tpat_var _ | Tpat_alias _ | Tpat_array _ | Tpat_construct _
+          | Tpat_record _ | Tpat_record_unboxed_product _ | Tpat_tuple _ ) ->
         assert false)
   }
 
@@ -265,12 +282,7 @@ let minimize should_remove map cur_name =
     let correcter nstr =
       List.fold_left
         (fun nstr id ->
-          let origin_file =
-            Pident
-              (create_local
-                 (String.capitalize_ascii
-                    (String.sub cur_name 0 (String.length cur_name - 3))))
-          in
+          let origin_file = Pident (create_local cur_name) in
           let to_find =
             Pdot
               ( Pdot (origin_file, String.capitalize_ascii mod_name),
@@ -291,5 +303,4 @@ let minimize should_remove map cur_name =
     let nmap = Smap.add cur_name nstr map in
     nmap
 
-let minimizer =
-  { minimizer_name = "flatten-modules"; minimizer_func = minimize }
+let minimizer = multifile_minimizer "flatten-modules" minimize

@@ -266,7 +266,7 @@ Error: Signature mismatch:
          external f : int -> int = "f" "f_nat" [@@noalloc]
        is not included in
          external f : int -> int = "f" "f_nat"
-       The left-hand side primitive is "[@@noalloc]" but the right-hand side is not
+       The first primitive is "[@@noalloc]" but the second is not
 |}]
 
 (* Bad: attributes in the interface but not in the implementation *)
@@ -429,7 +429,7 @@ Error: Signature mismatch:
          external f : int -> int = "f" "f_nat"
        is not included in
          external f : int -> int = "f" "f_nat" [@@noalloc]
-       The right-hand side primitive is "[@@noalloc]" but the left-hand side is not
+       The second primitive is "[@@noalloc]" but the first is not
 |}]
 
 (* Bad: claiming something is a primitive when it isn't *)
@@ -636,7 +636,7 @@ external g : (float [@untagged]) -> float = "g" "g_nat";;
 Line 1, characters 14-19:
 1 | external g : (float [@untagged]) -> float = "g" "g_nat";;
                   ^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 external h : (int [@unboxed]) -> float = "h" "h_nat";;
@@ -645,7 +645,7 @@ Line 1, characters 14-17:
 1 | external h : (int [@unboxed]) -> float = "h" "h_nat";;
                   ^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -656,7 +656,7 @@ Line 1, characters 13-25:
 1 | external i : int -> float [@unboxed] = "i" "i_nat";;
                  ^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -772,14 +772,13 @@ type i = I of int
 Line 2, characters 0-34:
 2 | external id : i -> i = "%identity";;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 61 [unboxable-type-in-prim-decl]: This primitive declaration uses type i, whose representation
-may be either boxed or unboxed. Without an annotation to indicate
-which representation is intended, the boxed representation has been
-selected by default. This default choice may change in future
-versions of the compiler, breaking the primitive implementation.
-You should explicitly annotate the declaration of i
-with [@@boxed] or [@@unboxed], so that its external interface
-remains stable in the future.
+Warning 61 [unboxable-type-in-prim-decl]: This primitive declaration uses type "i",
+  whose representation may be either boxed or unboxed. Without an annotation
+  to indicate which representation is intended, the boxed representation has
+  been selected by default. This default choice may change in future versions
+  of the compiler, breaking the primitive implementation. You should
+  explicitly annotate the declaration of "i" with "[@@boxed]" or "[@@unboxed]", so
+  that its external interface remains stable in the future.
 
 external id : i -> i = "%identity"
 |}];;
@@ -793,26 +792,24 @@ type j = J of int
 Line 3, characters 0-34:
 3 | external id : i -> j = "%identity";;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 61 [unboxable-type-in-prim-decl]: This primitive declaration uses type i, whose representation
-may be either boxed or unboxed. Without an annotation to indicate
-which representation is intended, the boxed representation has been
-selected by default. This default choice may change in future
-versions of the compiler, breaking the primitive implementation.
-You should explicitly annotate the declaration of i
-with [@@boxed] or [@@unboxed], so that its external interface
-remains stable in the future.
+Warning 61 [unboxable-type-in-prim-decl]: This primitive declaration uses type "i",
+  whose representation may be either boxed or unboxed. Without an annotation
+  to indicate which representation is intended, the boxed representation has
+  been selected by default. This default choice may change in future versions
+  of the compiler, breaking the primitive implementation. You should
+  explicitly annotate the declaration of "i" with "[@@boxed]" or "[@@unboxed]", so
+  that its external interface remains stable in the future.
 
 Line 3, characters 0-34:
 3 | external id : i -> j = "%identity";;
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 61 [unboxable-type-in-prim-decl]: This primitive declaration uses type j, whose representation
-may be either boxed or unboxed. Without an annotation to indicate
-which representation is intended, the boxed representation has been
-selected by default. This default choice may change in future
-versions of the compiler, breaking the primitive implementation.
-You should explicitly annotate the declaration of j
-with [@@boxed] or [@@unboxed], so that its external interface
-remains stable in the future.
+Warning 61 [unboxable-type-in-prim-decl]: This primitive declaration uses type "j",
+  whose representation may be either boxed or unboxed. Without an annotation
+  to indicate which representation is intended, the boxed representation has
+  been selected by default. This default choice may change in future versions
+  of the compiler, breaking the primitive implementation. You should
+  explicitly annotate the declaration of "j" with "[@@boxed]" or "[@@unboxed]", so
+  that its external interface remains stable in the future.
 
 external id : i -> j = "%identity"
 |}];;

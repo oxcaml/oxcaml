@@ -95,8 +95,8 @@ let f () =
 Line 3, characters 16-17:
 3 |   print_endline r
                     ^
-Error: This expression has type "int ref"
-       but an expression was expected of type "string"
+Error: The value "r" has type "int ref" but an expression was expected of type
+         "string"
 |}]
 
 (*
@@ -251,7 +251,7 @@ let foo (bar : int -> local_ (int -> int)) =
 Line 2, characters 11-14:
 2 |   let _ = (bar : int -> int -> int) in
                ^^^
-Error: This expression has type "int -> (int -> int) @ local"
+Error: The value "bar" has type "int -> (int -> int) @ local"
        but an expression was expected of type "int -> int -> int"
 |}]
 
@@ -282,8 +282,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 2 more arguments will make the value non-local
+Hint: This is a partial application
+      Adding 2 more arguments will make the value non-local
 |}]
 let apply3 x = f4 x x x
 [%%expect{|
@@ -294,8 +294,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 let apply4 x =
   f4 x x x x
@@ -363,8 +363,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 
 (* Optional argument elimination eta-expands and therefore allocates *)
@@ -503,7 +503,11 @@ module type T = sig val x : int option end
 Line 4, characters 50-51:
 4 |   let _m : (module T) = local_ (module struct let x = thing end) in
                                                       ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 4, characters 46-59
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 let local_module () =
   let thing = local_ Some 1 in
@@ -515,7 +519,11 @@ let local_module () =
 Line 4, characters 30-31:
 4 |     let module M = struct let x = thing end in
                                   ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 4, characters 26-39
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 let obj () =
   let thing = local_ Some 1 in
@@ -1200,6 +1208,16 @@ Error: This function takes a parameter which is "local",
        but was expected to take a parameter which is "global".
 |}]
 
+let rec f1 () = f2 ()
+and f2 () : string @ local = exclave_ "hi"
+[%%expect{|
+Line 2, characters 7-42:
+2 | and f2 () : string @ local = exclave_ "hi"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This function has a return value which is "local",
+       but was expected to have a return value which is "global".
+|}]
+
 (* Return mode must be greater than the type *)
 
 let foo : unit -> local_ string = fun () -> "hello"
@@ -1446,8 +1464,6 @@ let foo y =
   mut
 [%%expect{|
 val foo : 'a -> 'a = <fun>
-|}, Principal{|
-val foo : '_weak1 -> '_weak1 = <fun>
 |}]
 let foo (local_ #{ gbl }) = gbl
 [%%expect{|
@@ -1458,8 +1474,6 @@ let foo y =
   gbl
 [%%expect{|
 val foo : 'a -> 'a = <fun>
-|}, Principal{|
-val foo : '_weak2 -> '_weak2 = <fun>
 |}]
 
 let foo (local_ imm) =
@@ -1546,11 +1560,8 @@ val foo : 'a gbl @ local -> 'a = <fun>
 let foo y =
   let #{ gbl } = local_ #{ gbl = y } in
   gbl
-(* CR layouts v2.8: Fix principal case, or convince ourselves that it's expected. Internal ticket 5111 *)
 [%%expect{|
 val foo : 'a -> 'a = <fun>
-|}, Principal{|
-val foo : '_weak3 -> '_weak3 = <fun>
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
@@ -2010,7 +2021,7 @@ val zz : int ref @ local -> int -> unit = <fun>
 Line 3, characters 45-49:
 3 | let zy : local_ (int ref) -> (int -> unit) = (:=)
                                                  ^^^^
-Error: This expression has type "'a ref @ local -> 'a -> unit"
+Error: The value "(:=)" has type "'a ref @ local -> 'a -> unit"
        but an expression was expected of type
          "int ref @ local -> (int -> unit)"
 |}]
@@ -2138,7 +2149,13 @@ end
 Line 2, characters 12-13:
 2 |   let (Some z, _, _) | (None, Some z, _)
                 ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+         because it is contained (via constructor "Some") in the value at line 2, characters 30-36
+         which is "local".
+       However, the expression highlighted is expected to be "global"
+         because it is the value "z" in the structure at lines 2-3, characters 2-74
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 module M = struct
@@ -2149,7 +2166,13 @@ end
 Line 2, characters 12-13:
 2 |   let (Some z, _, _) | (None, Some z, _)
                 ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+         because it is contained (via constructor "Some") in the value at line 2, characters 7-13
+         which is "local".
+       However, the expression highlighted is expected to be "global"
+         because it is the value "z" in the structure at lines 2-3, characters 2-74
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 (* Example of backtracking after mode error *)
@@ -2163,7 +2186,7 @@ val f : (int list @ local -> unit) -> int -> unit = <fun>
 Line 5, characters 44-45:
 5 | let z : (int list -> unit) -> int -> unit = f
                                                 ^
-Error: This expression has type "(int list @ local -> unit) -> int -> unit"
+Error: The value "f" has type "(int list @ local -> unit) -> int -> unit"
        but an expression was expected of type
          "(int list -> unit) -> int -> unit"
        Type "int list @ local -> unit" is not compatible with type
@@ -2181,7 +2204,7 @@ end
 Line 6, characters 46-47:
 6 |   let z : (int list -> unit) -> int -> unit = f
                                                   ^
-Error: This expression has type "(int list @ local -> unit) -> int -> unit"
+Error: The value "f" has type "(int list @ local -> unit) -> int -> unit"
        but an expression was expected of type
          "(int list -> unit) -> int -> unit"
        Type "int list @ local -> unit" is not compatible with type
@@ -2243,7 +2266,8 @@ val local_to_global_to_global : (float @ local -> string) -> string = <fun>
 Line 5, characters 6-31:
 5 |   [f; local_to_global_to_global]
           ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "(float @ local -> string) -> string"
+Error: The value "local_to_global_to_global" has type
+         "(float @ local -> string) -> string"
        but an expression was expected of type "(float -> string) -> string"
        Type "float @ local -> string" is not compatible with type
          "float -> string"
@@ -2565,11 +2589,7 @@ Line 2, characters 8-9:
             ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is contained (via constructor "GFoo") in the value at line 2, characters 2-17
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+         because it is contained (via constructor "GFoo") (with some modality) in the value at line 2, characters 2-17.
 |}]
 
 let f =
@@ -2769,8 +2789,8 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
-  Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+Hint: This is a partial application
+      Adding 1 more argument will make the value non-local
 |}]
 
 (* Regression test for printing of [local_] *)

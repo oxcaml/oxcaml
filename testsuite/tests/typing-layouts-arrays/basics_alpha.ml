@@ -29,7 +29,7 @@ type ('a : any mod separable) t5' = 'a array
 type ('a : float32) t6' = 'a array
 
 [%%expect{|
-type t_any_mod_separable : any mod separable
+type t_any_mod_separable : any separable
 type t1 = float# array
 type t2 = int32# array
 type t3 = int64# array
@@ -40,7 +40,7 @@ type ('a : float64) t1' = 'a array
 type ('a : bits32) t2' = 'a array
 type ('a : bits64) t3' = 'a array
 type ('a : word) t4' = 'a array
-type ('a : any mod separable) t5' = 'a array
+type ('a : any separable) t5' = 'a array
 type ('a : float32) t6' = 'a array
 |}];;
 
@@ -83,11 +83,11 @@ let f (x : float# array) = x.(0)
 Line 1, characters 27-28:
 1 | let f (x : float# array) = x.(0)
                                ^
-Error: This expression has type "float# array"
+Error: The value "x" has type "float# array"
        but an expression was expected of type "'a array"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value.
+       But the layout of float# must be a value layout.
 |}];;
 
 let f (x : float# array) = Array.length x
@@ -95,11 +95,11 @@ let f (x : float# array) = Array.length x
 Line 1, characters 40-41:
 1 | let f (x : float# array) = Array.length x
                                             ^
-Error: This expression has type "float# array"
+Error: The value "x" has type "float# array"
        but an expression was expected of type "'a array"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value.
+       But the layout of float# must be a value layout.
 |}];;
 
 (*****************************************************************)
@@ -131,9 +131,9 @@ external get : ('a : any mod separable). 'a array -> int -> float = "%floatarray
 let d (x : 'a array) = get x 0
 
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> int -> float
+external get : ('a : any separable). 'a array -> int -> float
   = "%floatarray_safe_get"
-val d : ('a : value_or_null mod separable). 'a array -> float = <fun>
+val d : ('a : value_maybe_null). 'a array -> float = <fun>
 |}];;
 
 external get : int32# array -> int -> float = "%floatarray_safe_get"
@@ -195,7 +195,7 @@ let f4 (x : nativeint# array) = get x 0
 let f5 (x : float32# array) = get x 0
 
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> int -> 'a
+external get : ('a : any separable). 'a array -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 val f1 : float# array -> float# = <fun>
 val f2 : int32# array -> int32# = <fun>
@@ -212,7 +212,7 @@ let f4 (x : nativeint# array) v = set x 0 v
 let f5 (x : float32# array) v = set x 0 v
 
 [%%expect{|
-external set : ('a : any mod separable). 'a array -> int -> 'a -> unit
+external set : ('a : any separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
 val f1 : float# array -> float# -> unit = <fun>
 val f2 : int32# array -> int32# -> unit = <fun>
@@ -241,8 +241,8 @@ end
 Line 11, characters 79-82:
 11 |   let _ =  assert (Stdlib_upstream_compatible.Int64_u.equal #42L (get_third [| #0L; #1L; #42L |]))
                                                                                     ^^^
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : bits32 mod separable)"
+Error: This constant has type "int64#" but an expression was expected of type
+         "('a : bits32)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
        But the layout of int64# must be a sublayout of bits32
@@ -264,7 +264,7 @@ end
 Line 9, characters 24-35:
 9 |   let f2 idx : int32# = get arr idx
                             ^^^^^^^^^^^
-Error: This expression has type "('a : float64 mod separable)"
+Error: This expression has type "('a : float64)"
        but an expression was expected of type "int32#"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
@@ -284,11 +284,11 @@ let _ =
 Line 2, characters 39-44:
 2 |   let[@warning "-10"] rec x = [| x |]; #42.0 in
                                            ^^^^^
-Error: This expression has type "float#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
+Error: This constant has type "float#" but an expression was expected of type
+         "('a : value_maybe_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -300,11 +300,11 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42l in
                                            ^^^^
-Error: This expression has type "int32#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
+Error: This constant has type "int32#" but an expression was expected of type
+         "('a : value_maybe_null)"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
-       But the layout of int32# must be a sublayout of value
+       But the layout of int32# must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -316,11 +316,11 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42L in
                                            ^^^^
-Error: This expression has type "int64#" but an expression was expected of type
-         "('a : value_or_null mod separable)"
+Error: This constant has type "int64#" but an expression was expected of type
+         "('a : value_maybe_null)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -332,12 +332,11 @@ let _ =
 Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [| x |]; #42n in
                                            ^^^^
-Error: This expression has type "nativeint#"
-       but an expression was expected of type
-         "('a : value_or_null mod separable)"
+Error: This constant has type "nativeint#"
+       but an expression was expected of type "('a : value_maybe_null)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
-       But the layout of nativeint# must be a sublayout of value
+       But the layout of nativeint# must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -349,12 +348,11 @@ let _ =
 Line 2, characters 39-45:
 2 |   let[@warning "-10"] rec x = [| x |]; #42.0s in
                                            ^^^^^^
-Error: This expression has type "float32#"
-       but an expression was expected of type
-         "('a : value_or_null mod separable)"
+Error: This constant has type "float32#" but an expression was expected of type
+         "('a : value_maybe_null)"
        The layout of float32# is float32
          because it is the unboxed version of the primitive type float32.
-       But the layout of float32# must be a sublayout of value
+       But the layout of float32# must be a value layout
          because it's the type of an array element.
 |}]
 
@@ -367,13 +365,13 @@ external[@layout_poly] makearray_dynamic_uninit
   : ('a : any mod separable) . int -> 'a array = "%makearray_dynamic_uninit"
 [%%expect{|
 external makearray_dynamic_uninit_local :
-  ('a : any mod separable). int -> 'a array @ local
-  = "%makearray_dynamic_uninit" [@@layout_poly]
-external makearray_dynamic_uninit : ('a : any mod separable). int -> 'a array
+  ('a : any separable). int -> 'a array @ local = "%makearray_dynamic_uninit"
+  [@@layout_poly]
+external makearray_dynamic_uninit : ('a : any separable). int -> 'a array
   = "%makearray_dynamic_uninit" [@@layout_poly]
 |}]
 
-type ('a : any) with_i64s = #( int64# * 'a * int64# )
+type ('a : any mod separable) with_i64s = #( int64# * 'a * int64# )
 
 type ok_1 = #(int64# * int32#)
 type ok_2 = float# with_i64s
@@ -386,7 +384,19 @@ type bad_5 = bad_3 with_i64s
 type bad_6 = #(float * #(float * float) * #(float * #(float * float * float)))
 type bad_7 = #{ i : int64# ; bad_4 : bad_4 ; j : int64# }
 [%%expect{|
-type ('a : any) with_i64s = #(int64# * 'a * int64#)
+type ('a : any separable) with_i64s = #(int64# * 'a * int64#)
+type ok_1 = #(int64# * int32#)
+type ok_2 = float# with_i64s
+type bad_1 = #(int * int32#)
+type bad_2 = int
+type bad_3 = A | B | C
+type bad_4 = #{ a : int64#; enum : bad_3; }
+type bad_5 = bad_3 with_i64s
+type bad_6 =
+    #(float * #(float * float) * #(float * #(float * float * float)))
+type bad_7 = #{ i : int64#; bad_4 : bad_4; j : int64#; }
+|}, Principal{|
+type ('a : any separable) with_i64s = #(int64# * 'a * int64#)
 type ok_1 = #(int64# * int32#)
 type ok_2 = float# with_i64s
 type bad_1 = #(int * int32#)

@@ -103,10 +103,5 @@ let seq_function_mapper should_remove =
           | _ -> e))
   }
 
-let minimize should_remove map cur_name =
-  let mapper = seq_function_mapper should_remove in
-  let nstr = mapper.structure mapper (Smap.find cur_name map) in
-  Smap.add cur_name nstr map
-
 let minimizer =
-  { minimizer_name = "sequentialize-functions"; minimizer_func = minimize }
+  tast_mapper_minimizer "sequentialize-functions" seq_function_mapper

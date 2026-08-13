@@ -17,25 +17,32 @@ type t =
   | Recursive of
       { invariant_params : Bound_parameters.t;
         lifted_params : Lifted_cont_params.t;
-        continuation_handlers : One_recursive_handler.t Continuation.Lmap.t
+        continuation_handlers : One_recursive_handler.t Continuation.Lmap.t;
+        can_be_lifted : bool
       }
   | Non_recursive of Non_recursive_handler.t
 
-let print ppf t =
+let[@ocamlformat "disable"] print ppf t =
   match t with
   | Non_recursive non_rec_handler ->
     Non_recursive_handler.print ppf non_rec_handler
-  | Recursive { invariant_params; lifted_params; continuation_handlers } ->
-    Format.fprintf ppf
-      "@[<hov 1>(@[<hv 1>(invariant params@ %a)@]@ @[<hv 1>(lifted_params@ \
-       %a)@]@ @[<hv 1>(continuation handlers@ %a)@])@]"
+  | Recursive { invariant_params; lifted_params; continuation_handlers; can_be_lifted; } ->
+    Format.fprintf ppf "@[<hov 1>(
+        @[<hv 1>(can_be_lifted@ %b)@]@ \
+        @[<hv 1>(invariant params@ %a)@]@ \
+        @[<hv 1>(lifted_params@ %a)@]@ \
+        @[<hv 1>(continuation handlers@ %a)@]\
+      )@]"
+      can_be_lifted
       Bound_parameters.print invariant_params Lifted_cont_params.print
       lifted_params
       (Continuation.Lmap.print One_recursive_handler.print)
       continuation_handlers
 
-let create_recursive ~invariant_params ~lifted_params ~continuation_handlers =
-  Recursive { invariant_params; lifted_params; continuation_handlers }
+let create_recursive ~invariant_params ~lifted_params ~continuation_handlers
+    ~can_be_lifted =
+  Recursive
+    { invariant_params; lifted_params; continuation_handlers; can_be_lifted }
 
 let create_non_recursive non_rec_handler = Non_recursive non_rec_handler
 
@@ -46,7 +53,7 @@ let bound_continuations = function
 
 let can_be_lifted = function
   | Non_recursive { can_be_lifted; _ } -> can_be_lifted
-  | Recursive _ -> true
+  | Recursive { can_be_lifted; _ } -> can_be_lifted
 
 let add_params_to_lift t params_to_lift =
   let lifted_params, renaming = Lifted_cont_params.rename params_to_lift in

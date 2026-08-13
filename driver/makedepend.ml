@@ -28,6 +28,7 @@ let shared = ref false
 let native_only = ref false
 let bytecode_only = ref false
 let raw_dependencies = ref false
+let modules_only = ref false
 let sort_files = ref false
 let all_dependencies = ref false
 let nocwd = ref false
@@ -250,7 +251,10 @@ let print_dependencies oc target_files deps =
   output_string oc "\n"
 
 let print_raw_dependencies oc source_file deps =
-  print_filename oc source_file; output_string oc depends_on;
+  if not !modules_only then begin
+    print_filename oc source_file; output_string oc depends_on
+  end;
+  let sep = ref (if !modules_only then "" else " ") in
   String.Set.iter
     (fun dep ->
        (* filter out "*predef*" *)
@@ -259,11 +263,12 @@ let print_raw_dependencies oc source_file deps =
               | 'A'..'Z' | '\128'..'\255' -> true
               | _ -> false) then
         begin
-          output_char oc ' ';
+          output_string oc !sep;
+          sep := " ";
           output_string oc dep
         end)
     deps;
-  print_char '\n'
+  output_char oc '\n'
 
 
 (* Process one file *)
@@ -332,14 +337,22 @@ let read_parse_and_extract parse_function extract_function def ast_kind
       let ast = Pparse.file ~tool_name input_file parse_function ast_kind in
       let bound_vars =
         List.fold_left
-          (fun bv modname ->
-             let lid =
-               let lexbuf = Lexing.from_string modname in
-               Location.init lexbuf
-                 (Printf.sprintf "command line argument: -open %S" modname);
-               Parse.simple_module_path lexbuf in
-             Depend.open_module bv lid)
-          !module_map ((* PR#7248 *) List.rev !Clflags.open_modules)
+          (fun bv (arg : Clflags.open_arg) ->
+             match arg with
+             | Open modname ->
+                 let lid =
+                   let lexbuf = Lexing.from_string modname in
+                   Location.init lexbuf
+                     (Printf.sprintf "command line argument: -open %S" modname);
+                   Parse.simple_module_path lexbuf in
+                 Depend.open_module bv lid
+             | Open_cmi _ ->
+                 (* ocamldep does not accept the [-open-cmi] flag and does
+                    not load cmis, so there is nothing to do.  An
+                    [Open_cmi] could still reach this list via [OCAMLPARAM],
+                    in which case we just skip it. *)
+                 bv)
+          !module_map ((* PR#7248 *) List.rev !Clflags.open_args)
       in
       let r = extract_function bound_vars ast in
       (!Depend.free_structure_names, r)
@@ -425,13 +438,13 @@ let process_file_as process_fun def source_file =
   Compenv.readenv stderr (Before_compile source_file);
   load_path := [];
   let cwd = if !nocwd then [] else [Filename.current_dir_name] in
-  List.iter add_to_load_path (
-      (!Clflags.hidden_include_dirs @
-       !Compenv.last_include_dirs @
-       !Clflags.include_dirs @
-       !Compenv.first_include_dirs @
-       cwd
-      ));
+  List.iter add_to_load_path !Clflags.hidden_include_dirs;
+  List.iter
+    (fun (dir : Clflags.visible_include) -> add_to_load_path dir.path)
+    (!Compenv.last_include_dirs @
+     !Clflags.include_dirs @
+     !Compenv.first_include_dirs);
+  List.iter add_to_load_path cwd;
   Location.input_name := source_file;
   try
     if !strict || Sys.file_exists source_file
@@ -462,7 +475,7 @@ let sort_files_by_dependencies oc files =
 
 (* Init Hashtbl with all defined modules *)
   let files = List.map (fun (file, file_kind, deps, pp_deps) ->
-    let modname = Unit_info.modname_from_source file in
+    let modname = Unit_info.lax_modname_from_source file in
     let key = (modname, file_kind) in
     let new_deps = ref [] in
     Hashtbl.add h key (file, new_deps);
@@ -553,15 +566,15 @@ let process_mli_map =
                          String.Map.empty Pparse.Signature
 
 let parse_map fname =
-  let old_transp = !Clflags.transparent_modules in
-  Clflags.transparent_modules := true;
+  let old_no_alias_deps = !Clflags.no_alias_deps in
+  Clflags.no_alias_deps := true;
   let (deps, m) =
     process_file fname ~def:(String.Set.empty, String.Map.empty)
       ~ml_file:process_ml_map
       ~mli_file:process_mli_map
   in
-  Clflags.transparent_modules := old_transp;
-  let modname = Unit_info.modname_from_source fname in
+  Clflags.no_alias_deps := old_no_alias_deps;
+  let modname = Unit_info.lax_modname_from_source fname in
   if String.Map.is_empty m then
     report_err (Failure (fname ^ " : empty map file or parse error"));
   let mm = Depend.make_node m in
@@ -613,13 +626,20 @@ let run_main argv =
         " Generate dependencies on all files";
       "-allow-approx", Arg.Set allow_approximation,
         " Fallback to a lexer-based approximation on unparsable files";
-      "-as-map", Arg.Set Clflags.transparent_modules,
+      "-as-map", Arg.Set Clflags.no_alias_deps,
         " Omit delayed dependencies for module aliases (-no-alias-deps -w -49)";
         (* "compiler uses -no-alias-deps, and no module is coerced"; *)
       "-debug-map", Arg.Set debug,
         " Dump the delayed dependency map for each map file";
-      "-I", Arg.String (prepend_to_list Clflags.include_dirs),
+      "-I", Arg.String (fun path ->
+        prepend_to_list Clflags.include_dirs
+          { Clflags.path; cmx_guaranteed = false }),
         "<dir>  Add <dir> to the list of include directories";
+      "-Ix", Arg.String (fun path ->
+        prepend_to_list Clflags.include_dirs
+          { Clflags.path; cmx_guaranteed = true }),
+        "<dir>  Add <dir> to the list of include directories \
+         (cmx guaranteed)";
       "-H", Arg.String (prepend_to_list Clflags.hidden_include_dirs),
         "<dir>  Add <dir> to the list of hidden include directories";
       "-nocwd", Arg.Set nocwd,
@@ -629,6 +649,9 @@ let run_main argv =
         "<f>  Process <f> as a .ml file";
       "-intf", Arg.String (add_dep_arg (fun f -> Src (f, Some MLI))),
         "<f>  Process <f> as a .mli file";
+      "-keywords", Arg.String (fun s -> Clflags.keyword_edition := Some s ),
+      "<version+list>  set keywords following the <version+list> spec \
+       (see ocamlc)";
       "-map", Arg.String (add_dep_arg (fun f -> Map f)),
         "<f>  Read <f> and propagate delayed dependencies to following files";
       "-ml-synonym", Arg.String(add_to_synonym_list ml_synonyms),
@@ -637,6 +660,10 @@ let run_main argv =
         "<e>  Consider <e> as a synonym of the .mli extension";
       "-modules", Arg.Set raw_dependencies,
         " Print module dependencies in raw form (not suitable for make)";
+      "-modules-only", Arg.Unit (fun () ->
+          raw_dependencies := true;
+          modules_only := true),
+        " Like -modules, but omit source file names";
       "-native", Arg.Set native_only,
         " Generate dependencies for native-code only (no .cmo files)";
       "-bytecode", Arg.Set bytecode_only,
@@ -645,7 +672,9 @@ let run_main argv =
         "<file> Output to <file> rather than stdout";
       "-one-line", Arg.Set one_line,
         " Output one line per file, regardless of the length";
-      "-open", Arg.String (prepend_to_list Clflags.open_modules),
+      "-open", Arg.String
+        (fun s ->
+           Clflags.open_args := Clflags.Open s :: !Clflags.open_args),
         "<module>  Opens the module <module> before typing";
       "-plugin", Arg.String(fun _p -> Clflags.plugin := true),
         "<plugin>  (no longer supported)";

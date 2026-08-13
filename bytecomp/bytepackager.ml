@@ -358,7 +358,7 @@ let package_files ~ppf_dump initial_env files targetfile =
        file *)
     Unit_info.of_artifact Impl target ~dummy_source_file:targetfile
   in
-  Env.set_unit_name (Some unit_info);
+  Env.set_current_unit unit_info;
   Misc.try_finally (fun () ->
       let coercion =
         Typemod.package_units initial_env files (Unit_info.companion_cmi target)
@@ -373,7 +373,7 @@ let package_files ~ppf_dump initial_env files targetfile =
 open Format_doc
 module Style = Misc.Style
 
-let report_error ppf = function
+let report_error_doc ppf = function
     Forward_reference(file, compunit) ->
       fprintf ppf "Forward reference to %a in file %a"
         CU.print_as_inline_code compunit
@@ -398,6 +398,8 @@ let report_error ppf = function
 let () =
   Location.register_error_of_exn
     (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
+
+let report_error = Format_doc.compat report_error_doc

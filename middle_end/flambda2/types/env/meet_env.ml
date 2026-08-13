@@ -18,10 +18,22 @@ module MTC = More_type_creators
 module TG = Type_grammar
 module TE = Typing_env
 module TEL = Typing_env_level
+module K = Flambda_kind
+module ET = Expand_head.Expanded_type
+
+type meet_strategy =
+  | Dfs
+  | Bfs
+  | Hybrid
+
+let meet_strategy =
+  Oxcaml_args.Extra_options.symbol __LOC__ "flambda2-meet-strategy" Dfs
+    ["dfs", Dfs; "bfs", Bfs; "hybrid", Hybrid]
 
 type t =
   { typing_env : TE.t;
-    adding_equations_for_names : Name.Set.t
+    adding_equations_for_names : Name.Set.t;
+    delayed_equations : (Simple.t * ET.t) list
   }
 
 type 'a meet_return_value =
@@ -30,54 +42,41 @@ type 'a meet_return_value =
   | Both_inputs
   | New_result of 'a
 
-type meet_type =
-  t ->
-  Type_grammar.t ->
-  Type_grammar.t ->
-  (Type_grammar.t meet_return_value * t) Or_bottom.t
+type 'a meet_result =
+  | Bottom of unit meet_return_value
+  | Ok of 'a meet_return_value * t
+
+type meet_expanded_head = t -> ET.t -> ET.t -> ET.t meet_result
+
+let map_result ~f = function
+  | Bottom r -> Bottom r
+  | Ok (Left_input, env) -> Ok (Left_input, env)
+  | Ok (Right_input, env) -> Ok (Right_input, env)
+  | Ok (Both_inputs, env) -> Ok (Both_inputs, env)
+  | Ok (New_result x, env) -> Ok (New_result (f x), env)
 
 let create typing_env =
-  { typing_env; adding_equations_for_names = Name.Set.empty }
+  { typing_env;
+    adding_equations_for_names = Name.Set.empty;
+    delayed_equations = []
+  }
 
-let typing_env { typing_env; _ } = typing_env
+let code_age_relation env = TE.code_age_relation env.typing_env
+
+let code_age_relation_resolver env =
+  TE.code_age_relation_resolver env.typing_env
+
+let machine_width env = TE.machine_width env.typing_env
 
 let with_typing_env t typing_env = { t with typing_env }
 
-let use_meet_env t ~f = typing_env (f (create t))
+let map_typing_env t ~f = { t with typing_env = f t.typing_env }
 
-let use_meet_env_strict t ~f : _ Or_bottom.t =
-  if TE.is_bottom t
-  then Bottom
-  else
-    let t = f (create t) in
-    let tenv = typing_env t in
-    if TE.is_bottom tenv then Bottom else Ok tenv
-
-let map_typing_env t ~f = with_typing_env t (f (typing_env t))
-
-let adding_equation_for_name t name ~f =
-  (* If we were to add an equation on [x] while already adding an equation on
-     [x], either the inner equation would get overriden by the outer equation
-     and would not be visible, or it would get captured in an env extension.
-
-     That env extension would then likely end up stored on [x] itself, which
-     currently would cause an infinite loop next time we try to add an equation
-     on [x].
-
-     Instead, we simply ignore such recursive equations. *)
-  (* CR bclement: Implement support for recursive extensions (i.e. extensions
-     stored on [x] that can contain equations on [x]), then get rid of this. *)
-  if Name.Set.mem name t.adding_equations_for_names
-  then t
-  else
-    let adding_equations_for_names =
-      Name.Set.add name t.adding_equations_for_names
-    in
-    let t' = f { t with adding_equations_for_names } in
-    { t' with adding_equations_for_names = t.adding_equations_for_names }
+let delay_equation_on_simple t simple ty =
+  { t with delayed_equations = (simple, ty) :: t.delayed_equations }
 
 let replace_concrete_equation t name ty =
-  match TG.must_be_singleton ty ~machine_width:(TE.machine_width t) with
+  match TG.must_be_singleton ty with
   | None ->
     (* [ty] must be a concrete type. *)
     (match TG.get_alias_opt ty with
@@ -109,8 +108,85 @@ let replace_concrete_equation t name ty =
 
 exception Bottom_equation
 
-let add_concrete_equation_on_canonical ~raise_on_bottom t simple ty
-    ~(meet_type : meet_type) =
+let add_concrete_equation_on_canonical_name ~raise_on_bottom t name ~coercion ty
+    ~(meet_expanded_head : meet_expanded_head) =
+  let ty =
+    (* [ty] applies to [(coerce name coercion)], so the type of [name] is
+       [(coerce ty (inverse coercion))] *)
+    if Coercion.is_id coercion
+    then ty
+    else
+      ET.of_non_alias_type (ET.to_type ty) ~coercion:(Coercion.inverse coercion)
+  in
+  let kind = ET.kind ty in
+  (* Note: this will check that the [existing_ty] has the expected kind. *)
+  let existing_ty_of_name = TE.find t.typing_env name (Some kind) in
+  (* Since [name] is known to be canonical, it must have a concrete type. *)
+  let existing_ty = ET.of_non_alias_type existing_ty_of_name in
+  match meet_expanded_head t ty existing_ty with
+  | Bottom _ ->
+    if raise_on_bottom
+    then raise Bottom_equation
+    else
+      map_typing_env t ~f:(fun t ->
+          TE.replace_equation t name (MTC.bottom kind))
+  | Ok ((Right_input | Both_inputs), env) -> env
+  | Ok (Left_input, env) ->
+    map_typing_env env ~f:(fun env ->
+        replace_concrete_equation env name (ET.to_type ty))
+  | Ok (New_result ty', env) ->
+    map_typing_env env ~f:(fun env ->
+        replace_concrete_equation env name (ET.to_type ty'))
+
+let adding_equation_for_name t name ~f =
+  let adding_equations_for_names = t.adding_equations_for_names in
+  let t =
+    { t with
+      adding_equations_for_names = Name.Set.add name adding_equations_for_names
+    }
+  in
+  { (f t) with adding_equations_for_names }
+
+let add_or_delay_concrete_equation_on_canonical_name ~raise_on_bottom t name
+    ~coercion ty ~meet_expanded_head =
+  (* If we were to add an equation on [x] while already adding an equation on
+     [x], either the inner equation would get overriden by the outer equation
+     and would not be visible, or it would get captured in an env extension.
+
+     That env extension would then likely end up stored on [x] itself, which
+     currently would cause an infinite loop next time we try to add an equation
+     on [x].
+
+     Instead, we simply ignore such recursive equations. *)
+  (* CR bclement: Implement support for recursive extensions (i.e. extensions
+     stored on [x] that can contain equations on [x]), then get rid of this. *)
+  if Name.Set.mem name t.adding_equations_for_names
+  then
+    match meet_strategy () with
+    | Dfs -> t
+    | Bfs | Hybrid ->
+      delay_equation_on_simple t
+        (Simple.with_coercion (Simple.name name) coercion)
+        ty
+  else
+    match meet_strategy () with
+    | Bfs ->
+      delay_equation_on_simple t
+        (Simple.with_coercion (Simple.name name) coercion)
+        ty
+    | Dfs | Hybrid ->
+      adding_equation_for_name t name ~f:(fun t ->
+          add_concrete_equation_on_canonical_name ~raise_on_bottom t name
+            ~coercion ty ~meet_expanded_head)
+
+let add_concrete_equation_on_const ~raise_on_bottom t const ty
+    ~(meet_expanded_head : meet_expanded_head) =
+  match meet_expanded_head t ty (ET.create_const const) with
+  | Ok (_, env) -> env
+  | Bottom _ -> if raise_on_bottom then raise Bottom_equation else t
+
+let add_or_delay_concrete_equation_on_canonical ~raise_on_bottom t simple ty
+    ~meet_expanded_head =
   (* When adding a type to a canonical name, we need to call [meet] with the
      existing type for that name in order to ensure we record the most precise
      type available.
@@ -130,40 +206,32 @@ let add_concrete_equation_on_canonical ~raise_on_bottom t simple ty
      Note also that [p] and [x] may have different name modes! *)
   Simple.pattern_match simple
     ~const:(fun const ->
-      match meet_type t ty (MTC.type_for_const const) with
-      | Ok (_, env) -> env
-      | Bottom -> if raise_on_bottom then raise Bottom_equation else t)
+      add_concrete_equation_on_const ~raise_on_bottom t const ty
+        ~meet_expanded_head)
     ~name:(fun name ~coercion ->
-      adding_equation_for_name t name ~f:(fun t ->
-          (* If [(coerce name coercion)] has type [ty], then [name] has type
-             [(coerce ty coercion^-1)]. *)
-          let ty = TG.apply_coercion ty (Coercion.inverse coercion) in
-          (* Note: this will check that the [existing_ty] has the expected
-             kind. *)
-          let existing_ty = TE.find (typing_env t) name (Some (TG.kind ty)) in
-          match meet_type t ty existing_ty with
-          | Bottom ->
-            if raise_on_bottom
-            then raise Bottom_equation
-            else
-              map_typing_env t ~f:(fun t ->
-                  TE.replace_equation t name (MTC.bottom (TG.kind ty)))
-          | Ok ((Right_input | Both_inputs), env) -> env
-          | Ok (Left_input, env) ->
-            map_typing_env env ~f:(fun env ->
-                replace_concrete_equation env name ty)
-          | Ok (New_result ty', env) ->
-            map_typing_env env ~f:(fun env ->
-                replace_concrete_equation env name ty')))
+      add_or_delay_concrete_equation_on_canonical_name ~raise_on_bottom t name
+        ~coercion ty ~meet_expanded_head)
 
-let record_demotion ~raise_on_bottom t kind demoted canonical ~meet_type =
+let add_concrete_equation_on_simple ~raise_on_bottom t simple ty
+    ~meet_expanded_head =
+  match meet_strategy () with
+  | Dfs | Hybrid ->
+    let canonical =
+      TE.get_canonical_simple_ignoring_name_mode t.typing_env simple
+    in
+    add_or_delay_concrete_equation_on_canonical ~raise_on_bottom t canonical ty
+      ~meet_expanded_head
+  | Bfs -> delay_equation_on_simple t simple ty
+
+let record_demotion ~raise_on_bottom t kind demoted canonical
+    ~meet_expanded_head =
   (* We have demoted [demoted], which used to be canonical, to [canonical] in
      the aliases structure.
 
      We now need to record that information in the types structure, and add the
      previous type of [demoted] to [canonical] to ensure we do not lose
      information that was only stored on the type of [demoted]. *)
-  let ty_of_demoted = TE.find (typing_env t) demoted (Some kind) in
+  let ty_of_demoted = TE.find t.typing_env demoted (Some kind) in
   (if Flambda_features.check_light_invariants ()
    then
      match TG.get_alias_opt ty_of_demoted with
@@ -176,11 +244,15 @@ let record_demotion ~raise_on_bottom t kind demoted canonical ~meet_type =
     map_typing_env t ~f:(fun t ->
         TE.replace_equation t demoted (TG.alias_type_of kind canonical))
   in
-  add_concrete_equation_on_canonical ~raise_on_bottom t canonical ty_of_demoted
-    ~meet_type
+  let ty_of_demoted =
+    Expand_head.expand_head0 t.typing_env ty_of_demoted
+      ~known_canonical_simple_at_in_types_mode:(Some (Simple.name demoted))
+  in
+  add_or_delay_concrete_equation_on_canonical ~raise_on_bottom t canonical
+    ty_of_demoted ~meet_expanded_head
 
 let add_alias_between_canonicals ~raise_on_bottom t kind canonical_element1
-    canonical_element2 ~meet_type =
+    canonical_element2 ~meet_expanded_head =
   (* We are adding an equality between two canonical simples [canonical1] and
      [canonical2].
 
@@ -192,9 +264,7 @@ let add_alias_between_canonicals ~raise_on_bottom t kind canonical_element1
   if Simple.equal canonical_element1 canonical_element2
   then t
   else
-    match
-      TE.add_alias (typing_env t) ~canonical_element1 ~canonical_element2
-    with
+    match TE.add_alias t.typing_env ~canonical_element1 ~canonical_element2 with
     | Bottom -> if raise_on_bottom then raise Bottom_equation else t
     | Unknown ->
       (* Addition of aliases between names that are both in external compilation
@@ -204,11 +274,11 @@ let add_alias_between_canonicals ~raise_on_bottom t kind canonical_element1
     | Ok { demoted_name; canonical_element; t = typing_env } ->
       let t = with_typing_env t typing_env in
       record_demotion ~raise_on_bottom t kind demoted_name canonical_element
-        ~meet_type
+        ~meet_expanded_head
 
-let add_equation_on_canonical ~raise_on_bottom t simple ty ~meet_type =
-  (* We are adding a type [ty] to [simple], which must be canonical. There are
-     two general cases to consider:
+let add_equation_on_simple ~raise_on_bottom t simple ty ~meet_expanded_head =
+  (* We are adding a type [ty] to [simple]. There are two general cases to
+     consider:
 
      - Either [ty] is a concrete (non-alias) type, to be recorded in the types
      structure on the [canonical_simple];
@@ -217,42 +287,43 @@ let add_equation_on_canonical ~raise_on_bottom t simple ty ~meet_type =
      aliases structure. *)
   match TG.get_alias_opt ty with
   | None ->
-    add_concrete_equation_on_canonical ~raise_on_bottom t simple ty ~meet_type
+    let ty = ET.of_non_alias_type ty in
+    add_concrete_equation_on_simple ~raise_on_bottom t simple ty
+      ~meet_expanded_head
   | Some alias ->
-    let alias =
-      TE.get_canonical_simple_ignoring_name_mode (typing_env t) alias
+    let canonical_element1 =
+      TE.get_canonical_simple_ignoring_name_mode t.typing_env simple
     in
-    add_alias_between_canonicals ~raise_on_bottom t (TG.kind ty) simple alias
-      ~meet_type
+    let canonical_element2 =
+      TE.get_canonical_simple_ignoring_name_mode t.typing_env alias
+    in
+    add_alias_between_canonicals ~raise_on_bottom t (TG.kind ty)
+      canonical_element1 canonical_element2 ~meet_expanded_head
 
-let add_equation_on_simple ~raise_on_bottom t simple ty ~meet_type =
-  let canonical =
-    TE.get_canonical_simple_ignoring_name_mode (typing_env t) simple
-  in
-  add_equation_on_canonical ~raise_on_bottom t canonical ty ~meet_type
-
-let add_equation ~raise_on_bottom t name ty ~meet_type =
-  add_equation_on_simple ~raise_on_bottom t (Simple.name name) ty ~meet_type
+let add_equation ~raise_on_bottom t name ty ~meet_expanded_head =
+  add_equation_on_simple ~raise_on_bottom t (Simple.name name) ty
+    ~meet_expanded_head
 
 let add_env_extension ~raise_on_bottom t
-    (env_extension : Typing_env_extension.t) ~meet_type =
+    (env_extension : Typing_env_extension.t) ~meet_expanded_head =
   Typing_env_extension.fold
     ~equation:(fun name ty t ->
-      add_equation ~raise_on_bottom t name ty ~meet_type)
+      add_equation ~raise_on_bottom t name ty ~meet_expanded_head)
     env_extension t
 
 let add_env_extension_with_extra_variables t
-    (env_extension : Typing_env_extension.With_extra_variables.t) ~meet_type =
+    (env_extension : Typing_env_extension.With_extra_variables.t)
+    ~meet_expanded_head =
   Typing_env_extension.With_extra_variables.fold
     ~variable:(fun var kind t ->
       map_typing_env t ~f:(fun t ->
           TE.add_variable_definition t var kind Name_mode.in_types))
     ~equation:(fun name ty t ->
-      try add_equation ~raise_on_bottom:true t name ty ~meet_type
+      try add_equation ~raise_on_bottom:true t name ty ~meet_expanded_head
       with Bottom_equation -> map_typing_env ~f:TE.make_bottom t)
     env_extension t
 
-let add_env_extension_from_level t level ~meet_type =
+let add_env_extension_from_level t level ~meet_expanded_head =
   let t =
     map_typing_env t ~f:(fun t ->
         TEL.fold_on_defined_vars
@@ -263,7 +334,7 @@ let add_env_extension_from_level t level ~meet_type =
   let t =
     Name.Map.fold
       (fun name ty t ->
-        try add_equation ~raise_on_bottom:true t name ty ~meet_type
+        try add_equation ~raise_on_bottom:true t name ty ~meet_expanded_head
         with Bottom_equation -> map_typing_env ~f:TE.make_bottom t)
       (TEL.equations level) t
   in
@@ -273,33 +344,39 @@ let add_env_extension_from_level t level ~meet_type =
         (TEL.symbol_projections level)
         t)
 
-let add_equation_strict t name ty ~meet_type : _ Or_bottom.t =
-  if TE.is_bottom (typing_env t)
+let add_equation_strict t name ty ~meet_expanded_head : _ Or_bottom.t =
+  if TE.is_bottom t.typing_env
   then Bottom
   else
-    try Ok (add_equation ~raise_on_bottom:true t name ty ~meet_type)
+    try Ok (add_equation ~raise_on_bottom:true t name ty ~meet_expanded_head)
     with Bottom_equation -> Bottom
 
-let add_env_extension_strict t env_extension ~meet_type : _ Or_bottom.t =
-  if TE.is_bottom (typing_env t)
+let add_env_extension_strict t env_extension ~meet_expanded_head : _ Or_bottom.t
+    =
+  if TE.is_bottom t.typing_env
   then Bottom
   else
-    try Ok (add_env_extension ~raise_on_bottom:true t env_extension ~meet_type)
+    try
+      Ok
+        (add_env_extension ~raise_on_bottom:true t env_extension
+           ~meet_expanded_head)
     with Bottom_equation -> Bottom
 
-let add_env_extension_maybe_bottom t env_extension ~meet_type =
-  add_env_extension ~raise_on_bottom:false t env_extension ~meet_type
+let add_env_extension_maybe_bottom t env_extension ~meet_expanded_head =
+  add_env_extension ~raise_on_bottom:false t env_extension ~meet_expanded_head
 
-let add_equation t name ty ~meet_type =
-  try add_equation ~raise_on_bottom:true t name ty ~meet_type
+let add_equation t name ty ~meet_expanded_head =
+  try add_equation ~raise_on_bottom:true t name ty ~meet_expanded_head
   with Bottom_equation -> map_typing_env ~f:TE.make_bottom t
 
-let add_equation_on_simple t simple ty ~meet_type =
-  try add_equation_on_simple ~raise_on_bottom:true t simple ty ~meet_type
+let add_equation_on_simple t simple ty ~meet_expanded_head =
+  try
+    add_equation_on_simple ~raise_on_bottom:true t simple ty ~meet_expanded_head
   with Bottom_equation -> map_typing_env ~f:TE.make_bottom t
 
-let add_env_extension t env_extension ~meet_type =
-  try add_env_extension ~raise_on_bottom:true t env_extension ~meet_type
+let add_env_extension t env_extension ~meet_expanded_head =
+  try
+    add_env_extension ~raise_on_bottom:true t env_extension ~meet_expanded_head
   with Bottom_equation -> map_typing_env ~f:TE.make_bottom t
 
 let check_params_and_types ~params ~param_types =
@@ -313,18 +390,25 @@ let check_params_and_types ~params ~param_types =
       (Format.pp_print_list ~pp_sep:Format.pp_print_space TG.print)
       param_types
 
-let add_equations_on_params t ~params ~param_types ~meet_type =
+let add_equations_on_params t ~params ~param_types ~meet_expanded_head =
   check_params_and_types ~params ~param_types;
   List.fold_left2
     (fun t param param_type ->
-      add_equation t (Bound_parameter.name param) param_type ~meet_type)
+      add_equation t (Bound_parameter.name param) param_type ~meet_expanded_head)
     t
     (Bound_parameters.to_list params)
     param_types
 
-let current_scope env = TE.current_scope (typing_env env)
-
-let increment_scope env = map_typing_env env ~f:TE.increment_scope
+let[@inline] enter_scope env =
+  let tenv = env.typing_env in
+  let current_scope = TE.current_scope tenv in
+  let env =
+    { typing_env = TE.increment_scope tenv;
+      adding_equations_for_names = env.adding_equations_for_names;
+      delayed_equations = []
+    }
+  in
+  current_scope, tenv, env
 
 let add_definition env bound_name kind =
   map_typing_env env ~f:(fun env -> TE.add_definition env bound_name kind)
@@ -333,11 +417,174 @@ let add_symbol_projection env var symbol_projection =
   map_typing_env env ~f:(fun env ->
       TE.add_symbol_projection env var symbol_projection)
 
-let cut env ~cut_after = TE.cut (typing_env env) ~cut_after
-
-let cut_as_extension env ~cut_after =
-  TE.cut_as_extension (typing_env env) ~cut_after
-
 let add_variable_definition env var kind name_mode =
   map_typing_env env ~f:(fun env ->
       TE.add_variable_definition env var kind name_mode)
+
+let add_alias ~raise_on_bottom env simple1 simple2 ~meet_expanded_head =
+  let canonical1 =
+    TE.get_canonical_simple_ignoring_name_mode env.typing_env simple1
+  in
+  let canonical2 =
+    TE.get_canonical_simple_ignoring_name_mode env.typing_env simple2
+  in
+  add_alias_between_canonicals ~raise_on_bottom env (Simple.kind canonical1)
+    canonical1 canonical2 ~meet_expanded_head
+
+let add_alias env simple1 simple2 ~meet_expanded_head : _ Or_bottom.t =
+  match
+    add_alias ~raise_on_bottom:true env simple1 simple2 ~meet_expanded_head
+  with
+  | exception Bottom_equation -> Bottom
+  | env -> Ok env
+
+let meet env (t1 : TG.t) (t2 : TG.t) ~(meet_expanded_head : meet_expanded_head)
+    : ET.t meet_result =
+  (* Kind mismatches should have been caught (either turned into Invalid or a
+     fatal error) before we get here. *)
+  if not (K.equal (TG.kind t1) (TG.kind t2))
+  then
+    Misc.fatal_errorf "Kind mismatch upon meet:@ %a@ versus@ %a" TG.print t1
+      TG.print t2;
+  let kind = TG.kind t1 in
+  let tenv = env.typing_env in
+  let simple1 =
+    match
+      TE.get_alias_then_canonical_simple_exn tenv t1
+        ~min_name_mode:Name_mode.in_types
+    with
+    | exception Not_found -> None
+    | canonical_simple -> Some canonical_simple
+  in
+  let simple2 =
+    match
+      TE.get_alias_then_canonical_simple_exn tenv t2
+        ~min_name_mode:Name_mode.in_types
+    with
+    | exception Not_found -> None
+    | canonical_simple -> Some canonical_simple
+  in
+  match simple1 with
+  | None -> (
+    let expanded1 =
+      Expand_head.expand_head0 tenv t1
+        ~known_canonical_simple_at_in_types_mode:simple1
+    in
+    match simple2 with
+    | None ->
+      let expanded2 =
+        Expand_head.expand_head0 tenv t2
+          ~known_canonical_simple_at_in_types_mode:simple2
+      in
+      meet_expanded_head env expanded1 expanded2
+    | Some simple2 -> (
+      (* Here we are meeting a non-alias type on the left with an alias on the
+         right. In all cases, the return type is the alias, so we will always
+         return [Right_input]; the interesting part will be the environment.
+
+         [add_equation] will meet [expanded1] with the existing type of
+         [simple2]. *)
+      match
+        add_or_delay_concrete_equation_on_canonical ~raise_on_bottom:true env
+          simple2 expanded1 ~meet_expanded_head
+      with
+      | exception Bottom_equation -> Bottom (New_result ())
+      | env -> Ok (Right_input, env)))
+  | Some simple1 -> (
+    match simple2 with
+    | None -> (
+      let expanded2 =
+        Expand_head.expand_head0 tenv t2
+          ~known_canonical_simple_at_in_types_mode:simple2
+      in
+      (* We always return [Left_input] (see comment above) *)
+      match
+        add_or_delay_concrete_equation_on_canonical ~raise_on_bottom:true env
+          simple1 expanded2 ~meet_expanded_head
+      with
+      | exception Bottom_equation -> Bottom (New_result ())
+      | env -> Ok (Left_input, env))
+    | Some simple2 -> (
+      (* We are doing a meet between two alias types. Whatever happens, the
+         resulting environment will contain an alias equation between the two
+         inputs, so both the left-hand alias and the right-hand alias are
+         correct results for the meet, allowing us to return [Both_inputs] in
+         all cases.
+
+         [add_alias_between_canonicals] will have called [meet] on the
+         underlying types, so [env] now contains all extra equations arising
+         from meeting the expanded heads.
+
+         Note that [add_alias_between_canonicals] does nothing if [simple1] and
+         [simple2] are equal. *)
+      match
+        add_alias_between_canonicals ~raise_on_bottom:true env kind simple1
+          simple2 ~meet_expanded_head
+      with
+      | exception Bottom_equation -> Bottom (New_result ())
+      | env -> Ok (Both_inputs, env)))
+
+(* CR bclement: is this wrapper really necessary? *)
+let[@inline always] meet_type env t1 t2 ~meet_expanded_head : TG.t meet_result =
+  map_result ~f:ET.to_type
+    ((meet [@inlined never]) env t1 t2 ~meet_expanded_head)
+
+let current_typing_env t = t.typing_env
+
+let rec final_typing_env_exn ~meet_expanded_head ({ delayed_equations; _ } as t)
+    =
+  match delayed_equations with
+  | [] -> t.typing_env
+  | _ :: _ ->
+    (* For a nested scope, this is the set of names that we were adding when
+       entering the scope.
+
+       We currently have no way of preventing an equation added on these names
+       within the scope from looping (it would require being able to extract the
+       [meet] of env extensions outside of the [meet] of the type that contain
+       them), so we always forbid them. See also the comment in
+       [add_or_delay_concrete_equation_on_canonical_name] for non-delayed
+       equations. *)
+    let adding_equations_for_names = t.adding_equations_for_names in
+    let t = { t with delayed_equations = [] } in
+    let t =
+      List.fold_left
+        (fun t (simple, ty) ->
+          let canonical =
+            TE.get_canonical_simple_ignoring_name_mode t.typing_env simple
+          in
+          Simple.pattern_match canonical
+            ~const:(fun const ->
+              add_concrete_equation_on_const ~raise_on_bottom:true t const ty
+                ~meet_expanded_head)
+            ~name:(fun name ~coercion ->
+              if Name.Set.mem name adding_equations_for_names
+              then t
+              else
+                adding_equation_for_name t name ~f:(fun t ->
+                    add_concrete_equation_on_canonical_name
+                      ~raise_on_bottom:true t name ~coercion ty
+                      ~meet_expanded_head)))
+        t delayed_equations
+    in
+    final_typing_env_exn ~meet_expanded_head t
+
+let final_typing_env_strict ~meet_expanded_head t : _ Or_bottom.t =
+  match final_typing_env_exn ~meet_expanded_head t with
+  | exception Bottom_equation -> Bottom
+  | t -> Ok t
+
+let final_typing_env ~meet_expanded_head t =
+  try final_typing_env_exn ~meet_expanded_head t
+  with Bottom_equation -> TE.make_bottom t.typing_env
+
+let use_meet_env ~meet_expanded_head t ~f =
+  final_typing_env ~meet_expanded_head (f (create t))
+
+let use_meet_env_strict ~meet_expanded_head t ~f : _ Or_bottom.t =
+  if TE.is_bottom t
+  then Bottom
+  else
+    let t = f (create t) in
+    let tenv = final_typing_env ~meet_expanded_head t in
+    if TE.is_bottom tenv then Bottom else Ok tenv

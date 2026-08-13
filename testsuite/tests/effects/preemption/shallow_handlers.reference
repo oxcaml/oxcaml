@@ -1,0 +1,6 @@
+# Resume preemptible cont as non-preemptible
+OK
+# Resume non-preemptible cont as preemptible
+OK
+# Resume preemptible cont with different on_tick
+OK

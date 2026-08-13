@@ -41,9 +41,9 @@ let fmt_location f loc =
 let rec fmt_longident_aux f x =
   match x with
   | Longident.Lident (s) -> fprintf f "%s" s;
-  | Longident.Ldot (y, s) -> fprintf f "%a.%s" fmt_longident_aux y s;
+  | Longident.Ldot (y, s) -> fprintf f "%a.%s" fmt_longident_aux y.txt s.txt;
   | Longident.Lapply (y, z) ->
-      fprintf f "%a(%a)" fmt_longident_aux y fmt_longident_aux z;
+      fprintf f "%a(%a)" fmt_longident_aux y.txt fmt_longident_aux z.txt;
 ;;
 
 let fmt_longident f x = fprintf f "\"%a\"" fmt_longident_aux x;;
@@ -93,6 +93,13 @@ let fmt_mutable_flag f x =
   | Mutable -> fprintf f "Mutable";
 ;;
 
+let fmt_access_flag f x =
+  match x with
+  | Immutable_access -> fprintf f "Immutable";
+  | Mutable_access -> fprintf f "Mutable";
+  | Atomic_access -> fprintf f "Atomic";
+;;
+
 let fmt_virtual_flag f x =
   match x with
   | Virtual -> fprintf f "Virtual";
@@ -126,15 +133,6 @@ let fmt_private_flag f x =
   match x with
   | Public -> fprintf f "Public";
   | Private -> fprintf f "Private";
-;;
-
-let fmt_index_kind f = function
-  | Index_int -> fprintf f "Index_int"
-  | Index_unboxed_int64 -> fprintf f "Index_unboxed_int64"
-  | Index_unboxed_int32 -> fprintf f "Index_unboxed_int32"
-  | Index_unboxed_int16 -> fprintf f "Index_unboxed_int16"
-  | Index_unboxed_int8 -> fprintf f "Index_unboxed_int8"
-  | Index_unboxed_nativeint -> fprintf f "Index_unboxed_nativeint"
 ;;
 
 let line i f s (*...*) =
@@ -251,9 +249,9 @@ let rec core_type i ppf x =
       line i ppf "Ptyp_poly\n";
       list i typevar ppf sl;
       core_type i ppf ct;
-  | Ptyp_package (s, l) ->
-      line i ppf "Ptyp_package %a\n" fmt_longident_loc s;
-      list i package_with ppf l;
+  | Ptyp_package { ppt_path; ppt_cstrs } ->
+      line i ppf "Ptyp_package %a\n" fmt_longident_loc ppt_path;
+      list i package_with ppf ppt_cstrs;
   | Ptyp_open (mod_ident, t) ->
       line i ppf "Ptyp_open \"%a\"\n" fmt_longident_loc mod_ident;
       core_type i ppf t
@@ -266,6 +264,10 @@ let rec core_type i ppf x =
   | Ptyp_repr (lv, ct) ->
       line i ppf "Ptyp_repr\n";
       list i reprvar ppf lv;
+      core_type i ppf ct;
+  | Ptyp_newlayout (lv, ct) ->
+      line i ppf "Ptyp_newlayout\n";
+      list i string_loc ppf lv;
       core_type i ppf ct;
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i+1)) jkind
@@ -285,6 +287,10 @@ and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident_loc s;
   core_type i ppf t
 
+and package_type i ppf ptyp =
+  line (i + 1) ppf "package_type %a\n" fmt_longident_loc ptyp.ppt_path;
+  list (i + 1) package_with ppf ptyp.ppt_cstrs
+
 and pattern i ppf x =
   with_location_mapping ~loc:x.ppat_loc ppf (fun () ->
   line i ppf "pattern %a\n" fmt_location x.ppat_loc;
@@ -296,9 +302,10 @@ and pattern i ppf x =
   | Ppat_alias (p, s) ->
       line i ppf "Ppat_alias %a\n" fmt_string_loc s;
       pattern i ppf p;
-  | Ppat_constant (c) -> line i ppf "Ppat_constant %a\n" fmt_constant c;
-  | Ppat_interval (c1, c2) ->
-      line i ppf "Ppat_interval %a..%a\n" fmt_constant c1 fmt_constant c2;
+  | Ppat_constant { pconst_desc; _ } ->
+      line i ppf "Ppat_constant %a\n" fmt_constant pconst_desc;
+  | Ppat_interval ({ pconst_desc = d1; _ }, { pconst_desc = d2; _ }) ->
+      line i ppf "Ppat_interval %a..%a\n" fmt_constant d1 fmt_constant d2;
   | Ppat_unboxed_unit -> line i ppf "Ppat_unboxed_unit\n";
   | Ppat_unboxed_bool b -> line i ppf "Ppat_unboxed_bool %a\n" fmt_bool b;
   | Ppat_tuple (l, c) ->
@@ -353,6 +360,10 @@ and pattern i ppf x =
   | Ppat_open (m,p) ->
       line i ppf "Ppat_open \"%a\"\n" fmt_longident_loc m;
       pattern i ppf p
+  | Ppat_effect (p1, p2) ->
+      line i ppf "Ppat_effect\n";
+      pattern i ppf p1;
+      pattern i ppf p2
   | Ppat_extension (s, arg) ->
       line i ppf "Ppat_extension \"%s\"\n" s.txt;
       payload i ppf arg
@@ -365,7 +376,8 @@ and expression i ppf x =
   let i = i+1 in
   match x.pexp_desc with
   | Pexp_ident (li) -> line i ppf "Pexp_ident %a\n" fmt_longident_loc li;
-  | Pexp_constant (c) -> line i ppf "Pexp_constant %a\n" fmt_constant c;
+  | Pexp_constant { pconst_desc; _ } ->
+      line i ppf "Pexp_constant %a\n" fmt_constant pconst_desc;
   | Pexp_let (mf, rf, l, e) ->
       line i ppf "Pexp_let %a %a\n" fmt_mutable_flag mf fmt_rec_flag rf;
       list i value_binding ppf l;
@@ -493,9 +505,10 @@ and expression i ppf x =
       line i ppf "Pexp_newtype \"%s\"\n" s.txt;
       jkind_annotation_opt i ppf jkind;
       expression i ppf e
-  | Pexp_pack me ->
+  | Pexp_pack (me, optyp) ->
       line i ppf "Pexp_pack\n";
-      module_expr i ppf me
+      module_expr i ppf me;
+      option i package_type ppf optyp
   | Pexp_open (o, e) ->
       line i ppf "Pexp_open %a\n" fmt_override_flag o.popen_override;
       module_expr i ppf o.popen_expr;
@@ -536,13 +549,9 @@ and expression i ppf x =
 and block_access i ppf = function
   | Baccess_field lid ->
       line i ppf "Baccess_field %a\n" fmt_longident_loc lid
-  | Baccess_array (mut, index_kind, index) ->
-      line i ppf "Baccess_array %a %a\n"
-        fmt_mutable_flag mut fmt_index_kind index_kind;
-      expression i ppf index
   | Baccess_block (mut, idx) ->
     line i ppf "Baccess_block %a\n"
-      fmt_mutable_flag mut;
+      fmt_access_flag mut;
       expression i ppf idx
 
 and unboxed_access i ppf = function
@@ -592,11 +601,16 @@ and jkind_annotation_opt i ppf jkind =
   | Some jkind -> jkind_annotation (i+1) ppf jkind
 
 and jkind_annotation i ppf (jkind : jkind_annotation) =
-  line i ppf "jkind %a\n" fmt_location jkind.pjkind_loc;
-  match jkind.pjkind_desc with
+  line i ppf "jkind %a\n" fmt_location jkind.pjka_loc;
+  match jkind.pjka_desc with
   | Pjk_default -> line i ppf "Pjk_default\n"
-  | Pjk_abbreviation jkind ->
-      line i ppf "Pjk_abbreviation \"%s\"\n" jkind
+  | Pjk_abbreviation abbrev ->
+      line i ppf "Pjk_abbreviation %a\n" fmt_longident_loc abbrev
+  | Pjk_operator (jkind, sa) ->
+      line i ppf "Pjk_operator\n";
+      jkind_annotation (i+1) ppf jkind;
+      List.iter
+        (fun a -> line (i+1) ppf "scannable_axis %a\n" fmt_string_loc a) sa
   | Pjk_mod (jkind, m) ->
       line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;
@@ -677,6 +691,15 @@ and type_declaration i ppf x =
   line i ppf "ptype_manifest =\n";
   option (i+1) core_type ppf x.ptype_manifest
   )
+
+and jkind_declaration i ppf
+      { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc } =
+  line i ppf "jkind_declaration %a %a\n" fmt_string_loc pjkind_name
+       fmt_location pjkind_loc;
+  attributes i ppf pjkind_attributes;
+  let i = i+1 in
+  line i ppf "pjkind_manifest =\n";
+  option (i+1) jkind_annotation ppf pjkind_manifest
 
 and attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.attr_name.txt;
@@ -1040,9 +1063,9 @@ and signature_item i ppf x =
       payload i ppf arg
   | Psig_attribute a ->
       attribute i ppf "Psig_attribute" a
-  | Psig_kind_abbrev (name, jkind) ->
-      line i ppf "Psig_kind_abbrev \"%s\"\n" name.txt;
-      jkind_annotation i ppf jkind
+  | Psig_jkind jd ->
+      line i ppf "Psig_jkind";
+      jkind_declaration i ppf jd
   )
 
 and modtype_declaration i ppf = function
@@ -1061,6 +1084,9 @@ and with_constraint i ppf x =
       line i ppf "Pwith_module %a = %a\n"
         fmt_longident_loc lid1
         fmt_longident_loc lid2;
+  | Pwith_jkind (lid, jd) ->
+      line i ppf "Pwith_jkind %a\n" fmt_longident_loc lid;
+      jkind_declaration (i+1) ppf jd;
   | Pwith_modsubst (lid1, lid2) ->
       line i ppf "Pwith_modsubst %a = %a\n"
         fmt_longident_loc lid1
@@ -1073,6 +1099,9 @@ and with_constraint i ppf x =
      line i ppf "Pwith_modtypesubst %a\n"
         fmt_longident_loc lid1;
       module_type (i+1) ppf mty
+  | Pwith_jkindsubst (lid, jd) ->
+      line i ppf "Pwith_jkindsubst %a\n" fmt_longident_loc lid;
+      jkind_declaration (i+1) ppf jd;
 
 and module_expr i ppf x =
   with_location_mapping ~loc:x.pmod_loc ppf (fun () ->
@@ -1180,9 +1209,9 @@ and structure_item i ppf x =
       payload i ppf arg
   | Pstr_attribute a ->
       attribute i ppf "Pstr_attribute" a
-  | Pstr_kind_abbrev (name, jkind) ->
-      line i ppf "Pstr_kind_abbrev \"%s\"\n" name.txt;
-      jkind_annotation i ppf jkind
+  | Pstr_jkind jd ->
+      line i ppf "Pstr_kind";
+      jkind_declaration i ppf jd
   )
 
 and module_declaration i ppf pmd =

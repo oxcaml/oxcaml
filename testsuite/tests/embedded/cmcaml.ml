@@ -1,6 +1,5 @@
 (* TEST
  modules = "cmstub.c cmmain.c";
- flags = "-alert -unsafe_multidomain";
 *)
 
 (* OCaml part of the code *)

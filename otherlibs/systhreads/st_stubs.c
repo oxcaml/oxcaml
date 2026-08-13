@@ -15,10 +15,29 @@
 
 #define CAML_INTERNALS
 
+/* These macros must be defined before any winpthreads headers are included for
+   any reason. In mingw-w64 13.0.0, a subtle change meant that time.h causes
+   pthread_compat.h to be read. For this reason, this next block must appear
+   before anything headers are included. */
+#if defined(_WIN32) && !defined(NATIVE_CODE) && !defined(_MSC_VER)
+/* Ensure that pthread.h marks symbols __declspec(dllimport) so that they can be
+   picked up from the runtime (which will have linked winpthreads statically).
+   mingw-w64 11.0.0 introduced WINPTHREADS_USE_DLLIMPORT to do this explicitly;
+   prior versions co-opted this on the internal DLL_EXPORT, but this is ignored
+   in 11.0 and later unless IN_WINPTHREAD is also defined, so we can safely
+   define both to support both versions.
+   When compiling with MSVC, we currently link directly the winpthreads objects
+   into our runtime, so we do not want to mark its symbols with
+   __declspec(dllimport). */
+#define WINPTHREADS_USE_DLLIMPORT
+#define DLL_EXPORT
+#endif
+
 #define _GNU_SOURCE /* helps to find pthread_setname_np() */
 #include "caml/config.h"
 
 #if defined(_WIN32)
+#  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #  include <processthreadsapi.h>
 #  include "caml/osdeps.h"
@@ -52,6 +71,7 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #define DLL_EXPORT
 #endif
 
+#include <math.h>
 #include <stdbool.h>
 
 #include "caml/alloc.h"
@@ -80,8 +100,8 @@ SetThreadDescription(HANDLE hThread, PCWSTR lpThreadDescription);
 #define CAMLextern_libthreads
 #include "threads.h"
 
-/* Max computation time before rescheduling, in milliseconds */
-#define Thread_timeout 50
+/* Max computation time before rescheduling, in microseconds */
+#define Thread_timeout_usec 50000
 
 /* OS-specific code */
 #ifdef _WIN32
@@ -139,7 +159,7 @@ struct caml_thread_struct {
   void * signal_stack;       /* this thread's signal stack */
   size_t signal_stack_size;  /* size of this thread's signal stack in bytes */
   int is_main;               /* whether this is the main thread of its domain */
-  dynamic_thread_t dynamic;  /* dynamic value bindings */
+  dynamic_cache_t dynamic;   /* cached dynamic value bindings */
 
 #ifndef NATIVE_CODE
   intnat trap_sp_off;      /* saved value of Caml_state->trap_sp_off */
@@ -161,14 +181,18 @@ struct caml_thread_table {
   struct caml_locking_scheme * _Atomic locking_scheme;
   st_masterlock default_lock;
   struct caml_locking_scheme default_locking_scheme;
-  int tick_thread_running;
-  int tick_thread_disabled;
-  st_thread_id tick_thread_id;
-  atomic_uintnat tick_thread_stop;
+  int ticks_elapsed;
 };
 
 /* thread_table instance, up to caml_params->max_domains */
 static struct caml_thread_table* thread_table;
+
+/* How many ticks have we received since the last yield?
+
+   Note this is per-domain to preserve historical behavior, but arguably this
+   should be per-thread so that it's actually a timeout for fairness.
+ */
+#define Ticks_elapsed thread_table[Caml_state->id].ticks_elapsed
 
 #define Locking_scheme(dom_id) (thread_table[dom_id].locking_scheme)
 #define Default_lock(dom_id) (&thread_table[dom_id].default_lock)
@@ -203,9 +227,6 @@ static void thread_lock_release(void)
   s->unlock(s->context);
 }
 
-/* Used to signal that the "tick" thread for this domain should be stopped. */
-#define Tick_thread_stop thread_table[Caml_state->id].tick_thread_stop
-
 /* The remaining fields are accessed while holding the domain lock */
 
 /* The descriptor for the currently executing thread for this domain;
@@ -213,15 +234,6 @@ static void thread_lock_release(void)
    domain. Invariant: at every safe point, either Active_thread is
    NULL, or Caml_state is setup for Active_thread. */
 #define Active_thread thread_table[Caml_state->id].active_thread
-
-/* Whether the "tick" thread is already running for this domain */
-#define Tick_thread_running thread_table[Caml_state->id].tick_thread_running
-
-/* Whether the "tick" thread is disabled for this domain */
-#define Tick_thread_disabled thread_table[Caml_state->id].tick_thread_disabled
-
-/* The thread identifier of the "tick" thread for this domain */
-#define Tick_thread_id thread_table[Caml_state->id].tick_thread_id
 
 /* Identifier for next thread creation */
 static atomic_uintnat thread_next_id = 0;
@@ -255,9 +267,8 @@ static void caml_thread_scan_roots(
   scanning_action action, scanning_action_flags fflags, void *fdata,
   caml_domain_state *domain_state)
 {
-  caml_thread_t active, th;
-
-  active = th = thread_table[domain_state->id].active_thread;
+  const caml_thread_t active = thread_table[domain_state->id].active_thread;
+  caml_thread_t th = active;
 
   /* The GC could be triggered before [active_thread] is initialized,
      or after [caml_thread_domain_stop_hook] has been called; in this
@@ -272,7 +283,7 @@ static void caml_thread_scan_roots(
         if (th->current_stack != NULL)
           caml_do_local_roots(action, fflags, fdata,
                               th->local_roots, th->current_stack, th->gc_regs,
-                              th->dynamic);
+                              th->dynamic, th->c_stack);
       }
       th = th->next;
     } while (th != active);
@@ -344,7 +355,7 @@ static void restore_runtime_state(caml_thread_t th)
   Caml_state->external_raise_async = th->external_raise_async;
 #endif
   caml_memprof_enter_thread(th->memprof);
-  caml_dynamic_enter_thread(th->dynamic);
+  caml_dynamic_cache_enter_thread(th->dynamic);
 }
 
 CAMLexport void caml_thread_restore_runtime_state(void)
@@ -372,14 +383,9 @@ CAMLexport struct caml_locking_scheme* caml_get_default_locking_scheme(void)
   return Default_locking_scheme(Caml_state->id);
 }
 
-CAMLprim value caml_thread_cleanup(value unit);
-
 static void reset_active(void)
 {
   Active_thread = NULL;
-  /* If no other OCaml thread remains, ask the tick thread to stop
-     so that it does not prevent the whole process from exiting (#9971) */
-  caml_thread_cleanup(Val_unit);
 }
 
 /* Hooks for caml_enter_blocking_section and
@@ -429,7 +435,7 @@ static caml_thread_t caml_thread_new_info(caml_thread_t parent)
 
   th->memprof = caml_memprof_new_thread(domain_state);
   if (th->memprof == NULL) goto fail_memprof;
-  th->dynamic = caml_dynamic_new_thread(parent->dynamic);
+  th->dynamic = caml_dynamic_cache_new();
   if (th->dynamic == NULL) goto fail_dynamic;
 
   th->c_stack = NULL;
@@ -481,7 +487,7 @@ void caml_thread_free_info(caml_thread_t th)
      init_mask: stack-allocated
   */
   caml_memprof_delete_thread(th->memprof);
-  caml_dynamic_delete_thread(th->dynamic);
+  caml_dynamic_cache_delete(th->dynamic);
   caml_free_stack(th->current_stack);
   caml_free_backtrace_buffer(th->backtrace_buffer);
 
@@ -586,11 +592,11 @@ static void caml_thread_reinitialize(void)
   /* Reinitialize IO mutexes, in case the fork happened while another thread
      had locked the channel. If so, we're likely in an inconsistent state,
      but we may be able to proceed anyway. */
-  caml_plat_mutex_init(&caml_all_opened_channels_mutex);
+  caml_plat_mutex_reinit(&caml_all_opened_channels_mutex);
   for (chan = caml_all_opened_channels;
        chan != NULL;
        chan = chan->next) {
-    caml_plat_mutex_init(&chan->mutex);
+    caml_plat_mutex_reinit(&chan->mutex);
   }
 }
 
@@ -621,15 +627,12 @@ static void caml_thread_domain_stop_hook(void) {
 
     /* another domain thread may be joining on this domain's descriptor */
     caml_threadstatus_terminate(Terminated(Active_thread->descr));
-    /* Shut down the tick thread */
     reset_active();
     /* We free the thread info but not its resources: they are owned
        by Caml_state at this point, and will be cleaned-up later. */
     caml_stat_free(This_thread);
   };
 }
-
-static atomic_bool threads_initialized = false;
 
 CAMLprim value caml_thread_use_domains(value unit)
 {
@@ -642,10 +645,6 @@ CAMLprim value caml_thread_use_domains(value unit)
 static void caml_thread_domain_initialize_hook(void)
 {
   caml_thread_t new_thread;
-
-  atomic_store_release(&Tick_thread_stop, 0);
-  /* OS-specific initialization */
-  st_initialize();
 
   new_thread =
     (caml_thread_t) caml_stat_alloc(sizeof(struct caml_thread_struct));
@@ -667,26 +666,37 @@ static void caml_thread_domain_initialize_hook(void)
   This_thread = new_thread;
   Active_thread = new_thread;
   caml_memprof_enter_thread(new_thread->memprof);
-  caml_dynamic_enter_thread(new_thread->dynamic);
+  caml_dynamic_cache_enter_thread(new_thread->dynamic);
 }
 
 static void thread_yield(void);
 
-void caml_thread_interrupt_hook(void)
+void caml_thread_tick_hook(void)
 {
   /* Do not attempt to yield from the backup thread */
   if (caml_bt_is_self()) return;
 
-  uintnat mask = ~ST_INTERRUPT_FLAG;
-  atomic_uintnat* req_external_interrupt =
-    &Caml_state->requested_external_interrupt;
+  /* How many ticks we should wait for per preemption depends on how frequent
+     ticks are. There can be a slight imprecision here if the tick interval is
+     changed while we are waiting to preempt, but that's fine; we'll stabilize
+     on the next go around. */
+  uintnat interval = caml_effective_tick_interval_usec();
+  /* A stale tick can be processed after the effective interval has dropped to
+     0 (tick thread disabled, or the last tick request released). Nobody wants
+     preemption in that case, and dividing by 0 would be undefined behaviour. */
+  if (interval == 0) return;
+  uintnat ticks_per_preemption =
+      ceil((double)Thread_timeout_usec / (double)interval);
 
-  if (atomic_fetch_and(req_external_interrupt, mask) & ST_INTERRUPT_FLAG) {
+  if (++Ticks_elapsed >= ticks_per_preemption) {
+    Ticks_elapsed = 0;
     thread_yield();
   }
 
   return;
 }
+
+static atomic_bool threads_initialized = false;
 
 /* [caml_thread_initialize] initialises the systhreads infrastructure. This
    function first sets up the chain for systhreads on this domain, then setup
@@ -735,7 +745,7 @@ CAMLprim value caml_thread_initialize(value unit)
                                          caml_thread_scan_roots);
   caml_enter_blocking_section_hook = caml_thread_enter_blocking_section;
   caml_leave_blocking_section_hook = caml_thread_leave_blocking_section;
-  caml_domain_external_interrupt_hook = caml_thread_interrupt_hook;
+  caml_domain_tick_hook = caml_thread_tick_hook;
   caml_domain_initialize_hook = caml_thread_domain_initialize_hook;
   caml_domain_lock_hook = thread_lock_acquire;
   caml_domain_unlock_hook = thread_lock_release;
@@ -748,23 +758,8 @@ CAMLprim value caml_thread_initialize(value unit)
   return Val_unit;
 }
 
-static void stop_tick_thread(void)
-{
-  if (Tick_thread_running){
-    atomic_store_release(&Tick_thread_stop, 1);
-    st_thread_join(Tick_thread_id);
-    atomic_store_release(&Tick_thread_stop, 0);
-    Tick_thread_running = 0;
-  }
-}
-
-/* Cleanup the thread machinery when the runtime is shut down. Joining the tick
-   thread take 25ms on average / 50ms in the worst case, so we don't do it on
-   program exit. (FIXME: not implemented in OCaml 5 yet) */
-
 CAMLprim value caml_thread_cleanup(value unit)
 {
-  stop_tick_thread();
   return Val_unit;
 }
 
@@ -837,81 +832,32 @@ static void * caml_thread_start(void * v)
   return 0;
 }
 
-static st_retcode start_tick_thread(void)
-{
-  if (Tick_thread_running || Tick_thread_disabled) return 0;
-
-#ifdef POSIX_SIGNALS
-  sigset_t mask, old_mask;
-
-  /* Block all signals, so that we do not try to execute a C signal
-     handler in the new tick thread. */
-  sigfillset(&mask);
-  pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
-#endif
-
-  struct caml_thread_tick_args* tick_thread_args =
-    caml_stat_alloc_noexc(sizeof(struct caml_thread_tick_args));
-  if (tick_thread_args == NULL)
-    caml_fatal_error("start_tick_thread: failed to allocate thread args");
-
-  tick_thread_args->domain_id = Caml_state->id;
-  tick_thread_args->stop = &Tick_thread_stop;
-
-  st_retcode err = st_thread_create(&Tick_thread_id, caml_thread_tick,
-                                    (void *)tick_thread_args);
-
-#ifdef POSIX_SIGNALS
-  pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
-#endif
-
-  if (err != 0) return err;
-
-  Tick_thread_running = 1;
-  return 0;
-}
-
-CAMLprim value caml_enable_tick_thread(value v_enable)
-{
-  int enable = Long_val(v_enable) ? 1 : 0;
-  Tick_thread_disabled = !enable;
-
-  if (enable) {
-    st_retcode err = start_tick_thread();
-    sync_check_error(err, "caml_enable_tick_thread");
-  } else {
-    stop_tick_thread();
-  }
-
-  return Val_unit;
-}
-
 CAMLprim value caml_thread_new(value clos)
 {
   CAMLparam1(clos);
+  CAMLlocal1(descr);
 
 #ifndef NATIVE_CODE
   if (caml_debugger_in_use)
     caml_fatal_error("ocamldebug does not support multithreaded programs");
 #endif
 
-  /* Create the tick thread if not already done.
-     Because of PR#4666, we start the tick thread late, only when we create
-     the first additional thread in the current process */
-  st_retcode err = start_tick_thread();
-  sync_check_error(err, "Thread.create");
+  /* Allocate the descriptor before adding to the ring; if
+   * [caml_thread_new_descriptor] raises then we don't want to add a
+   * zombie entry. */
+  descr = caml_thread_new_descriptor(clos);
 
   /* Create a thread info block */
   caml_thread_t th = thread_alloc_and_add();
   if (th == NULL) caml_raise_out_of_memory();
-  th->descr = caml_thread_new_descriptor(clos);
+  th->descr = descr;
 
-  err = st_thread_create(NULL, caml_thread_start, (void *) th);
+  st_retcode err = st_thread_create(NULL, caml_thread_start, (void *) th);
 
   if (err != 0) {
     /* Creation failed, remove thread info block from list of threads */
     caml_thread_remove_and_free(th);
-    sync_check_error(err, "Thread.create");
+    caml_check_error(err, "Thread.create");
   }
 
   CAMLreturn(th->descr);
@@ -920,6 +866,10 @@ CAMLprim value caml_thread_new(value clos)
 /* Register a thread already created from C */
 
 #define Dom_c_threads 0
+
+/* [Domain.Tick.t] for the current C thread registered via
+   [caml_c_thread_register], if any. 0 if unset. */
+static CAMLthread_local long c_thread_tick = 0;
 
 /* the thread lock is not held when entering */
 CAMLexport int caml_c_thread_register(void)
@@ -940,10 +890,6 @@ CAMLexport int caml_c_thread_register(void)
   caml_init_domain_self(Dom_c_threads);
   caml_acquire_domain_lock();
 
-  /* Create tick thread if not already done */
-  st_retcode err = start_tick_thread();
-  if (err != 0) goto out_err;
-
   /* Set a thread info block */
   caml_thread_t th = thread_alloc_and_add();
   /* If it fails, we release the lock and return an error. */
@@ -951,6 +897,22 @@ CAMLexport int caml_c_thread_register(void)
   thread_init_current(th);
   /* We can now allocate the thread descriptor on the major heap */
   th->descr = caml_thread_new_descriptor(Val_unit);  /* no closure */
+
+  /* Acquire a tick, in case this is the only non-initial thread.
+     This must happen after the thread is fully set up, since the tick
+     acquire may start the tick thread which sends interrupts to all
+     domains. */
+  const value* acquire_tick = caml_named_value("Domain.Tick.acquire");
+  if (!acquire_tick) {
+    caml_fatal_error("named value Domain.Tick.acquire not found");
+  }
+  value tick =
+    caml_callback_exn(*acquire_tick, Val_long(Thread_timeout_usec));
+  if (Is_exception_result(tick)) {
+    caml_thread_remove_and_free(th);
+    goto out_err;
+  }
+  c_thread_tick = Long_val(tick);
 
   /* Release the domain lock the regular way. Note: we cannot receive
      an exception here. */
@@ -964,22 +926,39 @@ out_err:
 }
 
 /* Unregister a thread that was created from C and registered with
-   the function above */
+   the function above.
 
-/* the thread lock is not held when entering */
+   The thread lock is not held when entering */
 CAMLexport int caml_c_thread_unregister(void)
 {
+  value result = Val_unit;
   /* If [This_thread] is not set, then the thread was not registered */
   if (This_thread == NULL) return 0;
   /* Acquire the domain lock the regular way */
   caml_leave_blocking_section();
+
+  /* Release the tick */
+  if (c_thread_tick != 0) {
+    const value* release_tick = caml_named_value("Domain.Tick.release");
+    if (!release_tick) {
+      caml_fatal_error("Named value Domain.Tick.release not found");
+    }
+    result = caml_callback_exn(*release_tick, Val_long(c_thread_tick));
+  }
+
   /* Detach thread from the OCaml runtime; note that this resets
      [Caml_state_opt] and [This_thread]. */
   thread_detach_from_runtime();
   struct caml_locking_scheme *s = atomic_load(&Locking_scheme(Dom_c_threads));
-  if (s->thread_stop != NULL)
+  if (s->thread_stop != NULL) {
     s->thread_stop(s->context, Thread_type_c_registered);
-  return 1;
+  }
+
+  if (Is_exception_result(result)) {
+    return 0;
+  } else {
+    return 1;
+  }
 }
 
 /* Return the current thread */
@@ -1052,7 +1031,7 @@ CAMLprim value caml_thread_yield(value unit)
 CAMLprim value caml_thread_join(value th)
 {
   st_retcode rc = caml_threadstatus_wait(Terminated(th));
-  sync_check_error(rc, "Thread.join");
+  caml_check_error(rc, "Thread.join");
   return Val_unit;
 }
 
@@ -1087,7 +1066,7 @@ static value caml_threadstatus_new (void)
 {
   st_event ts = NULL;           /* suppress warning */
   value wrapper;
-  sync_check_error(st_event_create(&ts), "Thread.create");
+  caml_check_error(st_event_create(&ts), "Thread.create");
   wrapper = caml_alloc_custom(&caml_threadstatus_ops,
                               sizeof(st_event *),
                               0, 1);
@@ -1113,41 +1092,71 @@ static st_retcode caml_threadstatus_wait (value wrapper)
   CAMLreturnT(st_retcode, retcode);
 }
 
+#define caml_set_current_thread_name_warning(w)                                \
+  do {                                                                         \
+    if (caml_runtime_warnings_active()) {                                      \
+      fprintf(stderr, "[ocaml] error while setting thread name: %s\n", w);     \
+      fflush(stderr);                                                          \
+    }                                                                          \
+  } while (0)
+
 /* Set the current thread's name. */
 CAMLprim value caml_set_current_thread_name(value name)
 {
 #if defined(_WIN32)
-
 #  if defined(HAS_SETTHREADDESCRIPTION)
   wchar_t *thread_name = caml_stat_strdup_to_utf16(String_val(name));
-  SetThreadDescription(GetCurrentThread(), thread_name);
+  HRESULT hr = SetThreadDescription(GetCurrentThread(), thread_name);
   caml_stat_free(thread_name);
+  if (FAILED(hr))
+    caml_set_current_thread_name_warning("SetThreadDescription failed!");
 #  endif
 
 #  if defined(HAS_PTHREAD_SETNAME_NP)
   // We are using both methods.
   // See: https://github.com/ocaml/ocaml/pull/13504#discussion_r1786358928
-  pthread_setname_np(pthread_self(), String_val(name));
+  char buf[1024];
+  int ret = pthread_setname_np(pthread_self(), String_val(name));
+  if (ret != 0)
+    caml_set_current_thread_name_warning(caml_strerror(ret, buf, sizeof(buf)));
 #  endif
 
 #elif defined(HAS_PRCTL)
-  prctl(PR_SET_NAME, String_val(name));
+  char buf[1024];
+  int ret = prctl(PR_SET_NAME, String_val(name));
+  if (ret == -1)
+    caml_set_current_thread_name_warning(
+      caml_strerror(errno, buf, sizeof(buf)));
 #elif defined(HAS_PTHREAD_SETNAME_NP)
 #  if defined(__APPLE__)
+  // Darwin implementation does not return any error code.
   pthread_setname_np(String_val(name));
 #  elif defined(__NetBSD__)
-  pthread_setname_np(pthread_self(), "%s", String_val(name));
+  char buf[1024];
+  int ret = pthread_setname_np(pthread_self(), "%s", (void *)String_val(name));
+  if (ret != 0)
+    caml_set_current_thread_name_warning(caml_strerror(ret, buf, sizeof(buf)));
 #  else
-  pthread_setname_np(pthread_self(), String_val(name));
+  char buf[1024];
+  // Both linux and freebsd document return value as 0 or error
+  // code.
+  int ret = pthread_setname_np(pthread_self(), String_val(name));
+  if (ret != 0)
+    caml_set_current_thread_name_warning(caml_strerror(ret, buf, sizeof(buf)));
 #  endif
 #elif defined(HAS_PTHREAD_SET_NAME_NP)
+  // pthread_set_name_np seems to be the no-error alternative.
   pthread_set_name_np(pthread_self(), String_val(name));
 #else
-  if (caml_runtime_warnings_active()) {
-    fprintf(stderr, "set thread name not implemented\n");
-    fflush(stderr);
-  }
+  caml_set_current_thread_name_warning("set thread name not implemented");
 #endif
 
   return Val_unit;
+}
+
+CAMLprim value caml_thread_fatal_spawn_outside_multicore(value unit) {
+  CAMLparam1 (unit);
+  /* CR-someday vkarvonen: Change [caml_fatal_error] to take [const char*] */
+  caml_fatal_error("Multicore: domains have been spawned outside of Multicore");
+  CAMLreturn(Val_unit);
 }

@@ -40,7 +40,18 @@ val lambda_to_flambda :
   Lambda.program ->
   flambda_result
 
+val flambda_to_flambda :
+  ppf_dump:Format.formatter ->
+  prefixname:string ->
+  machine_width:Target_system.Machine_width.t ->
+  code_slot_offsets:Slot_offsets.t Flambda2_identifiers.Code_id.Map.t ->
+  Flambda_unit.t ->
+  flambda_result
+
 val reset_symbol_tables : unit -> unit
 
 val get_module_info :
   Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
+
+(** Used in toplevel expect test tool *)
+val register_compilation_unit_callback : (Compilation_unit.t -> unit) -> unit

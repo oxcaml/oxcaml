@@ -39,6 +39,8 @@ module Extra_param_and_args : sig
     name:string -> debug_uid:Flambda_debug_uid.t -> Flambda_kind.t -> t
 
   val update_param_args : t -> Apply_cont_rewrite_id.t -> EPA.Extra_arg.t -> t
+
+  val print : Format.formatter -> t -> unit
 end
 
 type unboxing_decision =

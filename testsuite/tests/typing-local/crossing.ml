@@ -161,8 +161,7 @@ Line 2, characters 13-14:
                  ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is an element of the array at line 2, characters 11-19
-         which is expected to be "global".
+         because it is an element (with some modality) of the array at line 2, characters 11-19.
 |}]
 
 (* after discussion with sdolan, we agree that
@@ -408,7 +407,7 @@ let _ = bar foo
 Line 1, characters 12-15:
 1 | let _ = bar foo
                 ^^^
-Error: This expression has type "int -> int"
+Error: The value "foo" has type "int -> int"
        but an expression was expected of type "int @ local -> int"
 |}]
 
@@ -503,4 +502,17 @@ let foo (local_ x : int) =
   ref bar
 [%%expect{|
 val foo : int @ local -> (int -> int) ref = <fun>
+|}]
+
+(* Functional record update allows mode-crossing on kept fields *)
+type r = { foo: int ref; bar: int; mutable baz: int; qux : int ref @@ global }
+let f (orig @ local) = { orig with foo = ref 42; baz = 42 }
+[%%expect{|
+type r = {
+  foo : int ref;
+  bar : int;
+  mutable baz : int;
+  qux : int ref @@ global;
+}
+val f : r @ local -> r = <fun>
 |}]

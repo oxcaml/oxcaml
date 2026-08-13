@@ -110,7 +110,7 @@ module Module = Odoc_module
 
 let analyse_files
     ?(merge_options=([] : Odoc_types.merge_option list))
-    ?(include_dirs=([] : string list))
+    ?(include_dirs=([] : Clflags.visible_include list))
     ?(hidden_include_dirs=([] : string list))
     ?(labels=false)
     ?(sort_modules=false)
@@ -129,7 +129,7 @@ let dump_modules = Odoc_analyse.dump_modules
 
 let load_modules = Odoc_analyse.load_modules
 
-let reset_type_names = Printtyp.reset
+let reset_type_names = Out_type.reset
 
 let string_of_variance t v = Odoc_str.string_of_variance t v
 

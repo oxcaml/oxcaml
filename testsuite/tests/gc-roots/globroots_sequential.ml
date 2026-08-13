@@ -1,5 +1,5 @@
 (* TEST
- flags += " -w a -alert -unsafe_multidomain ";
+ flags += " -w a ";
  modules = "globrootsprim.c globroots.ml";
 *)
 open Globroots

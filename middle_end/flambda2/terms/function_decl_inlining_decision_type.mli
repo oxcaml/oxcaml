@@ -18,18 +18,29 @@ type t =
   | Not_yet_decided
   | Never_inline_attribute
   | Function_body_too_large of Code_size.t
+  | Functor_body_too_large of Code_size.t
   | Stub
   | Attribute_inline
+  (* CR mshinwell/bclement: we could consider combining Small_function and
+     Small_functor in the future, with a flag for functors *)
   | Small_function of
       { size : Code_size.t;
         small_function_size : Code_size.t
+      }
+  | Small_functor of
+      { size : Code_size.t;
+        small_functor_size : Code_size.t
       }
   | Speculatively_inlinable of
       { size : Code_size.t;
         small_function_size : Code_size.t;
         large_function_size : Code_size.t
       }
-  | Functor of { size : Code_size.t }
+  | Speculatively_inlinable_functor of
+      { size : Code_size.t;
+        small_functor_size : Code_size.t;
+        large_functor_size : Code_size.t
+      }
   | Recursive
   | Jsir_inlining_disabled
 

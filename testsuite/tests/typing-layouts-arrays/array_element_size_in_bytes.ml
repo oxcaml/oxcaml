@@ -78,7 +78,8 @@ let check_floatu ~init ~element_size =
   let check_one n =
     let x = makearray_dynamic n init in
     assert ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
-    (* float# arrays use Double_array_tag (254) when non-empty, tag 0 when empty *)
+    (* float# arrays are flat [Double_array_tag] blocks when non-empty,
+       in all backends and configurations. *)
     let tag = Obj.tag (Obj.repr x) in
     let expected_tag = if n = 0 then 0 else 254 in
     assert (tag = expected_tag)

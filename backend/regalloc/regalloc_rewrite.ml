@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Substitution = Regalloc_substitution
 
 module type State = sig
@@ -91,7 +91,7 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
         ( Move | Opaque | Begin_region | End_region | Dls_get | Tls_get
         | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
         | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Stackoffset _ | Load _
+        | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -303,14 +303,11 @@ let rewrite_gen : type s.
           then
             (* insert block *)
             (* CR-soon xclerc for xclerc: now that we preprocess critical nodes,
-               no insertion should occur here. *)
+               no block insertion should occur here. *)
             let (_ : Cfg.basic_block list) =
               Cfg_with_layout.insert_block
                 (Cfg_with_infos.cfg_with_layout cfg_with_infos)
                 new_instrs ~after:block ~before:None
-                ~next_instruction_id:(fun () ->
-                  InstructionId.get_and_incr
-                    (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id)
             in
             block_insertion := true);
       if !block_rewritten && should_coalesce_temp_spills_and_reloads
@@ -427,17 +424,12 @@ let prelude :
   in
   if not (Cfg_edge.Set.is_empty critical_edges)
   then (
-    let next_instruction_id () =
-      InstructionId.get_and_incr
-        (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id
-    in
     Cfg_edge.Set.iter
       (fun { Cfg_edge.src; dst } ->
         let (_inserted_blocks : Cfg.basic_block list) =
           Cfg_with_layout.insert_block cfg_with_layout (DLL.make_empty ())
             ~after:(Cfg.get_block_exn cfg src)
             ~before:(Some (Cfg.get_block_exn cfg dst))
-            ~next_instruction_id
         in
         ())
       critical_edges;
@@ -451,22 +443,22 @@ let prelude :
     Reg.Set.cardinal cfg_infos.arg
   in
   if debug then Utils.log "#temporaries(before):%d" num_temporaries;
-  let cfg_infos, stack_slots =
+  let cfg_infos, stack_slots, phi_moves =
     if
       num_temporaries >= threshold_split_live_ranges
       || Flambda2_ui.Flambda_features.classic_mode ()
-    then cfg_infos, Regalloc_stack_slots.make ()
+    then cfg_infos, Regalloc_stack_slots.make (), []
     else if Lazy.force Regalloc_split_utils.split_live_ranges
     then
-      let stack_slots =
+      let { Regalloc_split.stack_slots; phi_moves } =
         Profile.record ~accumulate:true "split"
           (fun () -> Regalloc_split.split_live_ranges cfg_with_infos)
           ()
       in
-      collect_cfg_infos cfg_with_layout, stack_slots
-    else cfg_infos, Regalloc_stack_slots.make ()
+      collect_cfg_infos cfg_with_layout, stack_slots, phi_moves
+    else cfg_infos, Regalloc_stack_slots.make (), []
   in
-  cfg_infos, stack_slots, Regalloc_affinity.compute cfg_with_infos
+  cfg_infos, stack_slots, Regalloc_affinity.compute cfg_with_infos phi_moves
 
 let postlude : type s.
     (module State with type t = s) ->

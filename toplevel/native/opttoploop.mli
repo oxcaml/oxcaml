@@ -15,6 +15,14 @@
 
 open Format
 
+(* type of toplevel inputs *)
+type input =
+  | Stdin
+  | File of string
+  | String of string
+
+val filename_of_input: input -> string
+
 (* Set the load paths, before running anything *)
 
 val set_paths : unit -> unit
@@ -58,9 +66,10 @@ val print_exception_outcome : formatter -> exn -> unit
         (* Print an exception resulting from the evaluation of user code. *)
 val execute_phrase : bool -> formatter -> Parsetree.toplevel_phrase -> bool
         (* Execute the given toplevel phrase. Return [true] if the
-           phrase executed with no errors and [false] otherwise.
-           First bool says whether the values and types of the results
-           should be printed. Uncaught exceptions are always printed. *)
+           phrase executed with no errors and [false] otherwise. First
+           bool says whether the values and types of the results
+           should be printed. Uncaught exceptions are always
+           printed. *)
 val preprocess_phrase :
       formatter -> Parsetree.toplevel_phrase ->  Parsetree.toplevel_phrase
         (* Preprocess the given toplevel phrase using regular and ppx
@@ -81,7 +90,9 @@ val eval_class_path: Env.t -> Path.t -> Obj.t
 
 (* Printing of values *)
 
-val print_value: Env.t -> Obj.t -> formatter -> Types.type_expr -> unit
+(** The type_expr must not be layout-polymorphic. *)
+val print_value:
+  Env.t -> Obj.t -> formatter -> Types.type_expr -> unit
 val print_untyped_exception: formatter -> Obj.t -> unit
 
 type ('a, 'b) gen_printer =
@@ -170,7 +181,8 @@ type evaluation_outcome = Result of Obj.t | Exception of exn
 module Jit : sig
   type t =
     {
-      load : Format.formatter -> Lambda.program -> evaluation_outcome;
+      load : phrase_name:string -> Format.formatter -> Lambda.program
+        -> evaluation_outcome;
       lookup_symbol : string -> Obj.t option;
     }
 end
@@ -184,3 +196,25 @@ val default_lookup : string -> Obj.t option
 val need_symbol : string -> bool
 
 val phrase_name : string ref
+
+(** Disallow the reading of bundles from the current executable. Instead, fetch
+    them via the normal mechanisms used by compilerlibs. This should only be
+    used if the compilerlibs state in the process is already set up with the
+    correct [Load_path] information for .cmi and .cmx resolution (as is the case
+    in mdx, for example). *)
+val use_existing_compilerlibs_state_for_artifacts : unit -> unit
+
+(** Returns [true] iff [use_existing_compilerlibs_state_for_artifacts] has been
+    called. *)
+val using_existing_compilerlibs_state_for_artifacts : unit -> bool
+
+val load_file : formatter -> string -> bool
+(** Load a .cmxs, .cmx, or .cmxa file in-core and execute it. *)
+
+val preload_objects : string list ref
+(** List of compilation units to be loaded before entering the interactive
+    loop. *)
+
+val prepare : Format.formatter -> ?input:input -> unit -> bool
+(** Setup the load paths and initial toplevel environment and load compilation
+    units in {!preload_objects}. *)

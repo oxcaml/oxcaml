@@ -33,7 +33,7 @@ let verbose = ref false
 
 let output_file = ref None
 
-let include_dirs = ref []
+let include_dirs : Clflags.visible_include list ref = ref []
 
 let include_manifests = ref []
 
@@ -55,8 +55,20 @@ let spec_list =
       Arg.String
         (fun s ->
           include_dirs
-            := List.rev_append (String.split_on_char ',' s) !include_dirs),
+            := Misc.rev_map_end
+                 (fun path -> { Clflags.path; cmx_guaranteed = false })
+                 (String.split_on_char ',' s)
+                 !include_dirs),
       "A directory with .cmi files to include for lookups" );
+    ( "-Ix",
+      Arg.String
+        (fun s ->
+          include_dirs
+            := Misc.rev_map_end
+                 (fun path -> { Clflags.path; cmx_guaranteed = true })
+                 (String.split_on_char ',' s)
+                 !include_dirs),
+      "Same as -I (the cmx_guaranteed distinction is not used by this tool)" );
     ( "-H",
       Arg.String
         (fun s ->
@@ -143,7 +155,8 @@ let extract_shapes_from_file ~verbose file =
 
 let extract_shapes_from_files ~verbose files =
   Clflags.include_dirs := !include_dirs @ !Clflags.include_dirs;
-  Clflags.open_modules := !open_modules @ !Clflags.open_modules;
+  Clflags.open_args
+    := List.map (fun s -> Clflags.Open s) !open_modules @ !Clflags.open_args;
   Clflags.hidden_include_dirs
     := !hidden_include_dirs @ !Clflags.hidden_include_dirs;
   Clflags.include_manifests := !include_manifests @ !Clflags.include_manifests;

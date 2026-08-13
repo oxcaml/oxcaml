@@ -102,6 +102,11 @@ let runtime_events =
   make_library_modifier
     "runtime_events" [compiler_subdir ["otherlibs"; "runtime_events"]]
 
+let eval =
+  append Ocaml_variables.ocamlopt_flags ["-uses-metaprogramming"]
+  :: make_library_modifier "eval" [compiler_subdir ["otherlibs"; "eval"]]
+
+
 let compilerlibs_subdirs =
 [
   "asmcomp";
@@ -120,16 +125,24 @@ let compilerlibs_subdirs =
 let add_compiler_subdir subdir =
   append Ocaml_variables.directories [compiler_subdir [subdir]]
 
-let compilerlibs_archive archive =
-  append Ocaml_variables.libraries [archive] ::
+let compilerlibs_archives archives =
+  append Ocaml_variables.libraries archives ::
   List.map add_compiler_subdir compilerlibs_subdirs
 
-let runtime_suffix = if Config.runtime5 then "" else "4"
-
-let debugger = [add_compiler_subdir ("debugger" ^ runtime_suffix)]
+let debugger = [add_compiler_subdir "debugger"]
 
 let extension_universe_lib name =
   make_library_modifier name [compiler_subdir ["otherlibs"; name]]
+
+let make_fexpr_dump pass = [
+  append Ocaml_variables.fexpr_dump_files [pass ^ ".fl"];
+  append Ocaml_variables.ocamlopt_flags ["-dcanonical-ids"];
+  append Ocaml_variables.ocamlopt_flags ["-dfexpr-annot-after="^pass];
+]
+
+let fexpr_dump_raw = make_fexpr_dump "raw"
+let fexpr_dump_simplify = make_fexpr_dump "simplify"
+let fexpr_dump_reaper = make_fexpr_dump "reaper"
 
 let init () =
   register_modifiers "principal" principal;
@@ -138,6 +151,7 @@ let init () =
   register_modifiers "unix" unix;
   register_modifiers "dynlink" dynlink;
   register_modifiers "str" str;
+  register_modifiers "eval" eval;
   List.iter
     (fun name -> register_modifiers name (extension_universe_lib name))
     [
@@ -147,13 +161,20 @@ let init () =
       "stdlib_alpha";
     ];
   List.iter
-    (fun archive -> register_modifiers archive (compilerlibs_archive archive))
+    (fun (name, archives) ->
+      register_modifiers name (compilerlibs_archives archives))
     [
-      "ocamlcommon";
-      "ocamlbytecomp";
-      "ocamlmiddleend";
-      "ocamloptcomp";
-      "ocamltoplevel";
+      (* The compilerlibs split of ocamlcommon into ocamlcommon and
+         ocamlfrontend is specific to this repo.  To avoid updating every
+         test, the "ocamlcommon" modifier links both archives (there is
+         deliberately no "ocamlfrontend" modifier).  If the split is ever
+         upstreamed, this hack should go, with the tests then updated to
+         use the appropriate archives. *)
+      "ocamlcommon", ["ocamlcommon"; "ocamlfrontend"];
+      "ocamlbytecomp", ["ocamlbytecomp"];
+      "ocamlmiddleend", ["ocamlmiddleend"];
+      "ocamloptcomp", ["ocamloptcomp"];
+      "ocamltoplevel", ["ocamltoplevel"];
     ];
   register_modifiers "runtime_events" runtime_events;
   register_modifiers "systhreads" systhreads;
@@ -162,4 +183,7 @@ let init () =
   register_modifiers "man" man;
   register_modifiers "tool-ocaml-lib" tool_ocaml_lib;
   register_modifiers "debugger" debugger;
+  register_modifiers "dump-raw" fexpr_dump_raw;
+  register_modifiers "dump-simplify" fexpr_dump_simplify;
+  register_modifiers "dump-reaper" fexpr_dump_reaper;
   ()

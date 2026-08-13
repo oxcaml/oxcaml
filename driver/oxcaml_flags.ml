@@ -30,26 +30,41 @@ let vectorize_max_block_size =
 
 let cfg_peephole_optimize = ref true    (* -[no-]cfg-peephole-optimize *)
 
+let x86_peephole_optimize = ref false   (* -[no-]x86-peephole-optimize *)
+let x86_peephole_remove_mov_to_dead_register = ref true
+let x86_peephole_remove_redundant_cmp = ref true
+let x86_peephole_remove_redundant_extension = ref true
+let x86_peephole_combine_add_rsp = ref true
+let x86_peephole_remove_redundant_test = ref true
+
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
 
-let cfg_eliminate_dead_trap_handlers = ref false  (* -cfg-eliminate-dead-trap-handlers *)
+let cfg_eliminate_dead_trap_handlers = ref true
+                                       (* -cfg-eliminate-dead-trap-handlers *)
 
-let cfg_prologue_validate = ref false    (* -[no-]cfg-prologue-validate *)
-let cfg_prologue_shrink_wrap = ref false    (* -[no-]cfg-prologue-shrink-wrap *)
+let cfg_prologue_validate = ref true     (* -[no-]cfg-prologue-validate *)
+let cfg_prologue_shrink_wrap = ref true     (* -[no-]cfg-prologue-shrink-wrap *)
 let cfg_prologue_shrink_wrap_threshold = ref 16384
                                        (* -cfg-prologue-shrink-wrap-threshold *)
+
+let omit_leaf_frame_pointers = ref false (* -[no-]omit-leaf-frame-pointers *)
+
+let cfg_merge_blocks = ref false        (* -[no]-cfg-merge-blocks *)
 
 let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)
 let cfg_value_propagation_float = ref false
                                         (* -[no]-cfg-value-propagation-float *)
-
+let cfg_value_propagation_flow = ref false
+                                        (* -[no]-cfg-value-propagation-flow *)
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
 let basic_block_sections = ref false    (* -basic-block-sections *)
 (* -module-entry-functions-section *)
 let module_entry_functions_section = ref false
 
 let dasm_comments = ref false (* -dasm-comments *)
+
+let frametables_in_rodata = ref true (* -frametables-in-rodata *)
 
 let default_heap_reduction_threshold = 500_000_000 / (Sys.word_size / 8)
 let heap_reduction_threshold = ref default_heap_reduction_threshold (* -heap-reduction-threshold *)
@@ -108,12 +123,25 @@ let allow_long_frames = ref true        (* -no-long-frames *)
 let max_long_frames_threshold = 0x7FFF
 let long_frames_threshold = ref max_long_frames_threshold (* -debug-long-frames-threshold n *)
 
+(* Test-only override that lowers the maximum branch displacement used by the
+   branch relaxation pass, so that small functions exercise the relaxation
+   logic.  [max_int] means "use the real per-instruction displacements".
+
+   The value must stay well above the slack [Branch_relaxation] allows per
+   instruction: relaxing an over-long conditional branch emits an inverted
+   conditional branch that jumps over an unconditional branch, and that
+   inverted branch has a small, fixed displacement.  Too small a value would
+   treat even that displacement as overflowing, so the pass would relax the
+   same branch forever and never reach a fixpoint (non-termination). *)
+let branch_relaxation_max_displacement =
+  ref max_int (* -dbranch-relaxation-max-displacement n *)
+
 let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
-type opt_level = Oclassic | O2 | O3
+type opt_level = Oclassic | O2 | O3 | O4
 type 'a or_default = Set of 'a | Default
 
 
@@ -131,12 +159,13 @@ let gc_timings = ref false
 
 let symbol_visibility_protected = ref false (* -symbol-visibility-protected*)
 
-let flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 =
+let flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 ~o4 =
   match opt_level with
   | Default -> default
   | Set Oclassic -> oclassic
   | Set O2 -> o2
   | Set O3 -> o3
+  | Set O4 -> o4
 
   (* -llvm-backend is at [Clflags.llvm_backend] *)
 
@@ -165,9 +194,14 @@ module Flambda2 = struct
     let reaper_preserve_direct_calls : reaper_preserve_direct_calls = Auto
     let reaper_local_fields = false
     let reaper_unbox = true
+    let reaper_max_unbox_size = 10
     let reaper_change_calling_conventions = true
+    let simplify_stubs =
+      (* CR pchambart: should be changed to true after proper testing *)
+      false
     let unicode = true
     let kind_checks = false
+    let match_in_match = false
   end
 
   type flags = {
@@ -183,9 +217,12 @@ module Flambda2 = struct
     reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     reaper_local_fields : bool;
     reaper_unbox : bool;
+    reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
+    match_in_match : bool;
   }
 
   let default = {
@@ -201,10 +238,13 @@ module Flambda2 = struct
     reaper_preserve_direct_calls = Default.reaper_preserve_direct_calls;
     reaper_local_fields = Default.reaper_local_fields;
     reaper_unbox = Default.reaper_unbox;
+    reaper_max_unbox_size = Default.reaper_max_unbox_size;
     reaper_change_calling_conventions =
       Default.reaper_change_calling_conventions;
+    simplify_stubs = Default.simplify_stubs;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
+    match_in_match = Default.match_in_match;
   }
 
   let oclassic = {
@@ -226,7 +266,14 @@ module Flambda2 = struct
     function_result_types = Functors_only
   }
 
-  let default_for_opt_level opt_level = flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3
+  let o4 = {
+    o3 with
+    enable_reaper = true;
+    reaper_local_fields = true;
+  }
+
+  let default_for_opt_level opt_level =
+    flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 ~o4
 
   let classic_mode = ref Default
   let join_points = ref Default
@@ -242,7 +289,10 @@ module Flambda2 = struct
   let reaper_preserve_direct_calls = ref Default
   let reaper_local_fields = ref Default
   let reaper_unbox = ref Default
+  let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
+  let match_in_match = ref Default
+  let simplify_stubs = ref Default
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
@@ -251,7 +301,8 @@ module Flambda2 = struct
     let rawfexpr = ref Nowhere
     let fexpr = ref Nowhere
     let fexpr_after = ref Last_pass
-    let flexpect = ref Nowhere
+    let fexpr_annot = ref false
+    let fexpr_annot_after = ref []
     let slot_offsets = ref false
     let freshen = ref false
     let flow = ref false
@@ -270,8 +321,8 @@ module Flambda2 = struct
       let can_inline_recursive_functions = false
       let max_function_simplify_run = 2
       let shorten_symbol_names = false
-      let cont_lifting_budget = 0 (* possible future value: 200 *)
-      let cont_spec_budget = 0 (* possible future value: 20 *)
+      let cont_lifting_budget = 0
+      let cont_spec_threshold = -1.
     end
 
     type flags = {
@@ -285,7 +336,7 @@ module Flambda2 = struct
       max_function_simplify_run : int;
       shorten_symbol_names : bool;
       cont_lifting_budget : int;
-      cont_spec_budget : int;
+      cont_spec_threshold : float;
     }
 
     let default = {
@@ -299,23 +350,37 @@ module Flambda2 = struct
       max_function_simplify_run = Default.max_function_simplify_run;
       shorten_symbol_names = Default.shorten_symbol_names;
       cont_lifting_budget = Default.cont_lifting_budget;
-      cont_spec_budget = Default.cont_spec_budget;
+      cont_spec_threshold = Default.cont_spec_threshold;
     }
 
     let oclassic = {
       default with
+      fallback_inlining_heuristic = true;
       shorten_symbol_names = true;
     }
 
     let o2 = {
       default with
       fallback_inlining_heuristic = false;
+      cont_lifting_budget = 100;
+      cont_spec_threshold = 0.;
     }
 
-    let o3 = default
+    let o3 = {
+      default with
+      cont_lifting_budget = 1_000;
+      (* in the worst case : 1_000 budget -> ~+18% compilation time *)
+      cont_spec_threshold = 0.;
+    }
+
+    let o4 = {
+      o3 with
+      cont_lifting_budget = 3_000;
+      cont_spec_threshold = 0.;
+    }
 
     let default_for_opt_level opt_level =
-      flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3
+      flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 ~o4
 
     let fallback_inlining_heuristic = ref Default
     let inline_effects_in_cmm = ref Default
@@ -327,7 +392,7 @@ module Flambda2 = struct
     let max_function_simplify_run = ref Default
     let shorten_symbol_names = ref Default
     let cont_lifting_budget = ref Default
-    let cont_spec_budget = ref Default
+    let cont_spec_threshold = ref Default
   end
 
   module Debug = struct
@@ -356,6 +421,8 @@ module Flambda2 = struct
       poly_compare_cost : float;
       small_function_size : int;
       large_function_size : int;
+      small_functor_size : int;
+      large_functor_size : int;
       threshold : float;
     }
 
@@ -373,10 +440,16 @@ module Flambda2 = struct
         poly_compare_cost = 10. /. cost_divisor;
         small_function_size = 10;
         large_function_size = 10;
+        small_functor_size = 10;
+        (* CR mshinwell: lower to: large_functor_size = 20, once we're happy
+           inlining behaviour is ok *)
+        large_functor_size = 2000000;
         threshold = 10.;
       }
 
       let speculative_inlining_only_if_arguments_useful = true
+
+      let speculative_inlining_track_lifted_constants = false
     end
 
     let max_depth = ref (I.default Default.default_arguments.max_depth)
@@ -396,10 +469,18 @@ module Flambda2 = struct
     let large_function_size =
       ref (I.default Default.default_arguments.large_function_size)
 
+    let small_functor_size =
+      ref (I.default Default.default_arguments.small_functor_size)
+    let large_functor_size =
+      ref (I.default Default.default_arguments.large_functor_size)
+
     let threshold = ref (F.default Default.default_arguments.threshold)
 
     let speculative_inlining_only_if_arguments_useful =
       ref Default.speculative_inlining_only_if_arguments_useful
+
+    let speculative_inlining_track_lifted_constants =
+      ref Default.speculative_inlining_track_lifted_constants
 
     let report_bin = ref false
 
@@ -430,6 +511,12 @@ module Flambda2 = struct
       set_int large_function_size
         Default.default_arguments.large_function_size
         (Some arg.large_function_size);
+      set_int small_functor_size
+        Default.default_arguments.small_functor_size
+        (Some arg.small_functor_size);
+      set_int large_functor_size
+        Default.default_arguments.large_functor_size
+        (Some arg.large_functor_size);
       set_float threshold Default.default_arguments.threshold
         (Some arg.threshold)
 
@@ -438,6 +525,7 @@ module Flambda2 = struct
       (* We set the small and large function sizes to the same value here to
          recover "classic mode" semantics (no speculative inlining). *)
       large_function_size = Default.default_arguments.small_function_size;
+      large_functor_size = Default.default_arguments.small_functor_size;
       (* [threshold] matches the current compiler's default.  (The factor of
          8 in that default is accounted for by [cost_divisor], above.) *)
       threshold = 10.;
@@ -454,6 +542,12 @@ module Flambda2 = struct
       poly_compare_cost = 3.0 *. Default.default_arguments.poly_compare_cost;
       small_function_size = 10 * Default.default_arguments.small_function_size;
       large_function_size = 50 * Default.default_arguments.large_function_size;
+      small_functor_size = 10 * Default.default_arguments.small_functor_size;
+      (* This allows functors 50% larger than those in [Stdlib.Map] and
+         [Stdlib.Set] to be eligible for speculative inlining. *)
+      large_functor_size =
+        (* 7.5 * 50 * ... *)
+        15 * 25 * Default.default_arguments.large_functor_size;
       threshold = 100.;
     }
 
@@ -486,8 +580,16 @@ let set_o3 () =
     Clflags.Opt_flag_handler.default.set_o3 ();
   end
 
+let set_o4 () =
+  if Clflags.is_flambda2 () then begin
+    Flambda2.Inlining.use_inlining_arguments_set Flambda2.Inlining.o3_arguments;
+    opt_level := Set O4
+  end else begin
+    Clflags.Opt_flag_handler.default.set_o3 ();
+  end
+
 let opt_flag_handler : Clflags.Opt_flag_handler.t =
-  { set_oclassic; set_o2; set_o3 }
+  { set_oclassic; set_o2; set_o3; set_o4 }
 
 let use_cached_generic_functions = ref false
 let cached_generic_functions_path =
@@ -495,6 +597,12 @@ let cached_generic_functions_path =
 
 let dissector_assume_lld_without_64_bit_eh_frames = ref true
   (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)
+
+let dissector_max_linker_parallelism = ref Misc.Maybe_bounded.Unbounded
+  (* -dissector-max-linker-parallelism *)
+
+let manual_module_init = ref false
+  (* -[no-]manual-module-init *)
 
 let () =
   if Clflags.is_flambda2 () then set_o2 ()

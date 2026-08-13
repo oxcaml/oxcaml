@@ -488,9 +488,9 @@ arguments:
 
 The flag can be passed to `dune` build as usual for the entire project or on a
 per-library basis. For example, to disable regular and `opt` checks:
-`(ocamlopt_flags (:standard -zero-alloc-check none)`
+`(ocamlopt_flags (:standard -zero-alloc-check none))`
 
-The check can also be controled on a per-file basis using the top-level attribute
+The check can also be controlled on a per-file basis using the top-level attribute
 `[@@@zero_alloc check]`, `[@@@zero_alloc check_none]`, `[@@@zero_alloc check_all]`,
 `[@@@zero_alloc check_opt]`.
 

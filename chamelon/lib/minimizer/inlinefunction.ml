@@ -79,27 +79,24 @@ let find_function id1 str =
   let _ = mapper.structure mapper str in
   !fun_body.exp_desc, !non_rec
 
-let minimize should_remove map cur_name =
-  let str = Smap.find cur_name map in
-  let inline_mapper =
-    { Tast_mapper.default with
-      expr =
-        (fun mapper e ->
-          Tast_mapper.default.expr mapper
-            (match view_texp e.exp_desc with
-            | Texp_ident (Pident id, _, vd, _) ->
-              if is_function vd.val_type
-              then
-                let body, non_rec = find_function id str in
-                if non_rec && should_remove ()
-                then { e with exp_desc = body }
-                else e
+let inline_mapper str should_remove =
+  { Tast_mapper.default with
+    expr =
+      (fun mapper e ->
+        Tast_mapper.default.expr mapper
+          (match view_texp e.exp_desc with
+          | Texp_ident (Pident id, _, vd, _) ->
+            if is_function vd.val_type
+            then
+              let body, non_rec = find_function id str in
+              if non_rec && should_remove ()
+              then { e with exp_desc = body }
               else e
-            | _ -> e))
-    }
-  in
-  let nstr = inline_mapper.structure inline_mapper str in
-  Smap.add cur_name nstr map
+            else e
+          | _ -> e))
+  }
 
 let minimizer =
-  { minimizer_name = "inline-function"; minimizer_func = minimize }
+  structure_minimizer "inline-function" (fun should_remove str ->
+      let mapper = inline_mapper str should_remove in
+      mapper.structure mapper str)

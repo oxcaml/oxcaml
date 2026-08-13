@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare
 module Array = ArrayLabels
 module List = ListLabels
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Substitution = Regalloc_substitution
 
 let fatal_callback = ref (fun () -> ())
@@ -53,6 +53,16 @@ let bool_of_param ?guard ?(default = false) param_name =
           if not guard_value
           then fatal "%s is set but %s is not" param_name guard_name);
      res)
+
+let int_of_param ?(default = 0) param_name =
+  lazy
+    (match find_param_value param_name with
+    | None -> default
+    | Some value -> (
+      try int_of_string value
+      with Failure _ ->
+        Misc.fatal_errorf "the %s variable is %S but should be an integer"
+          param_name value))
 
 let debug = false
 
@@ -197,13 +207,14 @@ let make_log_body_and_terminator :
      ~instr_prefix ~term_prefix body term liveness ->
   DLL.iter body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
       log ~no_eol:() "%s " (instr_prefix instr);
-      if enabled then Cfg.dump_basic Format.err_formatter instr.Cfg.desc;
+      if enabled then Printcfg.basic_desc Format.err_formatter instr.Cfg.desc;
       if enabled then log_instruction_suffix instr liveness);
   log ~no_eol:() "%s " (term_prefix term);
   if enabled
-  then Cfg.dump_terminator ~sep:", " Format.err_formatter term.Cfg.desc;
+  then Printcfg.terminator_desc ~sep:", " Format.err_formatter term.Cfg.desc;
   if enabled then log_instruction_suffix term liveness
 
+(* CR-soon xclerc for xclerc: factor out with `Printcfg`. *)
 let make_log_cfg_with_infos :
     log_function ->
     instr_prefix:(Cfg.basic Cfg.instruction -> string) ->
@@ -319,9 +330,9 @@ end
 
 let same_reg_class : Reg.t -> Reg.t -> bool =
  fun reg1 reg2 ->
-  Reg_class.equal
-    (Reg_class.of_machtype reg1.typ)
-    (Reg_class.of_machtype reg2.typ)
+  Regs.Reg_class.equal
+    (Regs.Reg_class.of_machtype reg1.typ)
+    (Regs.Reg_class.of_machtype reg2.typ)
 
 let same_stack_class : Reg.t -> Reg.t -> bool =
  fun reg1 reg2 ->
@@ -339,6 +350,7 @@ let simplify_cfg : Cfg_with_layout.t -> Cfg_with_layout.t =
 let save_cfg : string -> Cfg_with_layout.t -> unit =
  fun str cfg_with_layout ->
   Cfg_with_layout.save_as_dot cfg_with_layout ~show_instr:true ~show_exn:true
+    ~annotate_instr:[Printcfg.instruction]
     ~annotate_block:(fun label ->
       let block =
         Cfg.get_block_exn (Cfg_with_layout.cfg cfg_with_layout) label

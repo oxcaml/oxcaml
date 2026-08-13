@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-w -220";
  expect;
 *)
 
@@ -186,7 +187,7 @@ let foo = ("hello" @ local)
 Line 1, characters 11-18:
 1 | let foo = ("hello" @ local)
                ^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "'a list"
 |}]
 
@@ -261,21 +262,21 @@ Error: Found a aliased value where a unique value was expected
 *)
 
 (* arrow types *)
-type r = local_ string @ unique once -> unique_ string @ local once
+type r = local_ string @ unique once -> string @ local unique once
 [%%expect{|
-type r = string @ local unique once -> string @ local unique once
+type r = string @ local once unique -> string @ local once unique
 |}]
 
 type r = local_ string * y:string @ unique once -> local_ string * w:string @ once
 [%%expect{|
 type r =
-    string * y:string @ local unique once -> string * w:string @ local once
+    string * y:string @ local once unique -> string * w:string @ local once
 |}]
 
 type r = x:local_ string * y:string @ unique once -> local_ string * w:string @ once
 [%%expect{|
 type r =
-    x:string * y:string @ local unique once -> string * w:string @ local once
+    x:string * y:string @ local once unique -> string * w:string @ local once
 |}]
 
 
@@ -296,24 +297,24 @@ Error: The locality axis has already been specified.
 |}]
 
 (* Mixing legacy and new modes *)
-type r = local_ unique_ once_ string -> string
+type r = local_ string @ unique once -> string
 [%%expect{|
-type r = string @ local unique once -> string
+type r = string @ local once unique -> string
 |}]
 
-type r = local_ unique_ once_ string @ portable contended -> string
+type r = local_ string @ unique once portable contended -> string
 [%%expect{|
-type r = string @ local unique once portable contended -> string
+type r = string @ local once unique portable contended -> string
 |}]
 
 type r = string @ local unique once portable contended -> string
 [%%expect{|
-type r = string @ local unique once portable contended -> string
+type r = string @ local once unique portable contended -> string
 |}]
 
 type r = string @ local unique once nonportable uncontended -> string
 [%%expect{|
-type r = string @ local unique once -> string
+type r = string @ local once unique -> string
 |}]
 
 
@@ -334,11 +335,6 @@ Error: Unrecognized modality foo.
 
 type t = Foo of global_ string @@ global
 [%%expect{|
-Line 1, characters 16-23:
-1 | type t = Foo of global_ string @@ global
-                    ^^^^^^^
-Warning 213: This locality is overriden by global later.
-
 type t = Foo of string @@ global
 |}]
 
@@ -363,11 +359,6 @@ type r = {
   global_ x : string @@ global
 }
 [%%expect{|
-Line 2, characters 2-9:
-2 |   global_ x : string @@ global
-      ^^^^^^^
-Warning 213: This locality is overriden by global later.
-
 type r = { x : string @@ global; }
 |}]
 
@@ -390,11 +381,6 @@ type r = {
   x : string @@ aliased global many aliased
 }
 [%%expect{|
-Line 2, characters 16-23:
-2 |   x : string @@ aliased global many aliased
-                    ^^^^^^^
-Warning 213: This uniqueness is overriden by aliased later.
-
 type r = { x : string @@ global many; }
 |}]
 
@@ -417,12 +403,12 @@ type r = { mutable x : string; }
 
 let foo ?(local_ x @ unique once = 42) () = ()
 [%%expect{|
-val foo : ?x:int @ local unique once -> unit -> unit = <fun>
+val foo : ?x:int @ local once unique -> unit -> unit = <fun>
 |}]
 
 let foo ?(local_ x : _ @ unique once = 42) () = ()
 [%%expect{|
-val foo : ?x:int @ local unique once -> unit -> unit = <fun>
+val foo : ?x:int @ local once unique -> unit -> unit = <fun>
 |}]
 
 let foo ?(local_ x : 'a. ('a -> 'a) @ unique once) = ()
@@ -435,12 +421,12 @@ Error: Optional parameters cannot be polymorphic
 
 let foo ?x:(local_ (x,y) @ unique once = (42, 42)) () = ()
 [%%expect{|
-val foo : ?x:int * int @ local unique once -> unit -> unit = <fun>
+val foo : ?x:int * int @ local once unique -> unit -> unit = <fun>
 |}]
 
 let foo ?x:(local_ (x,y) : _ @ unique once = (42, 42)) () = ()
 [%%expect{|
-val foo : ?x:int * int @ local unique once -> unit -> unit = <fun>
+val foo : ?x:int * int @ local once unique -> unit -> unit = <fun>
 |}]
 
 let foo ?x:(local_ (x,y) : 'a.('a->'a) @ unique once) () = ()
@@ -509,7 +495,7 @@ val local_ret : 'a -> 'a option @ local = <fun>
 Line 3, characters 29-38:
 3 | let bad_use = use_global_ret local_ret "hello"
                                  ^^^^^^^^^
-Error: This expression has type "'a -> 'a option @ local"
+Error: The value "local_ret" has type "'a -> 'a option @ local"
        but an expression was expected of type "'b -> 'c"
 |}]
 
@@ -536,7 +522,7 @@ val nonportable_ret : string -> string -> string = <fun>
 Line 5, characters 31-46:
 5 | let bad_use = use_portable_ret nonportable_ret "hello" " world"
                                    ^^^^^^^^^^^^^^^
-Error: This expression has type "string -> string -> string"
+Error: The value "nonportable_ret" has type "string -> string -> string"
        but an expression was expected of type "'a -> ('b -> 'c) @ portable"
 |}]
 
@@ -562,7 +548,7 @@ val contended_ret : string -> string @ contended = <fun>
 Line 5, characters 34-47:
 5 | let bad_use = use_uncontended_ret contended_ret "hello"
                                       ^^^^^^^^^^^^^
-Error: This expression has type "string -> string @ contended"
+Error: The value "contended_ret" has type "string -> string @ contended"
        but an expression was expected of type "'a -> 'b"
 |}]
 
@@ -601,7 +587,7 @@ let result = use_global bar 1. 2.
 Line 1, characters 24-27:
 1 | let result = use_global bar 1. 2.
                             ^^^
-Error: This expression has type "float @ local -> float @ local -> unit"
+Error: The value "bar" has type "float @ local -> float @ local -> unit"
        but an expression was expected of type "'a @ local -> ('b -> 'c)"
 |}]
 
@@ -627,7 +613,7 @@ val portable_arg : (unit -> 'a) @ portable -> 'a = <fun>
 Line 3, characters 34-46:
 3 | let bad_use = use_nonportable_arg portable_arg (fun () -> ())
                                       ^^^^^^^^^^^^
-Error: This expression has type "(unit -> 'a) @ portable -> 'a"
+Error: The value "portable_arg" has type "(unit -> 'a) @ portable -> 'a"
        but an expression was expected of type "('b -> 'c) -> 'd"
 |}]
 
@@ -649,7 +635,7 @@ val uncontended_arg : 'a -> unit = <fun>
 Line 3, characters 32-47:
 3 | let bad_use = use_contended_arg uncontended_arg ()
                                     ^^^^^^^^^^^^^^^
-Error: This expression has type "'a -> unit"
+Error: The value "uncontended_arg" has type "'a -> unit"
        but an expression was expected of type "'b @ contended -> 'c"
 |}]
 
@@ -667,6 +653,5 @@ Line 1, characters 26-30:
 Error: This expression has type "unit -> string"
        but an expression was expected of type "string"
        Hint: Did you forget to provide "()" as argument?
-  Hint: This function application is partial,
-  maybe some arguments are missing.
+Hint: This function application is partial, maybe some arguments are missing.
 |}]

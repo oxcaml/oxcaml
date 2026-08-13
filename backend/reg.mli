@@ -44,6 +44,10 @@ module Stamp : sig
   val to_string : t -> string
 
   val format : Format.formatter -> t -> unit
+
+  val to_int : t -> int
+
+  val of_int_unsafe : int -> t
 end
 
 type t = private
@@ -57,7 +61,7 @@ type t = private
 
 and location =
   | Unknown
-  | Reg of int
+  | Reg of Regs.Phys_reg.t
   | Stack of stack_location
 
 and stack_location =
@@ -87,6 +91,10 @@ and stack_location =
    first thing the callee does is copy them to registers or [Local]
    stack locations.  Neither GC nor thread context switches can occur
    between these two times. *)
+
+val format_stack_location : Format.formatter -> stack_location -> unit
+
+val format_location : Format.formatter -> location -> unit
 
 val equal_location : location -> location -> bool
 
@@ -189,7 +197,7 @@ module For_testing : sig
 end
 
 module For_printing : sig
-  (** The result of [create] will not be aded to the internal lists of
+  (** The result of [create] will not be added to the internal lists of
       registers, and therefore should not be kept around after printing. *)
   val create :
     name:Name.t ->

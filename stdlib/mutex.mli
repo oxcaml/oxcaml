@@ -28,7 +28,7 @@
    ]}
 *)
 
-type t : value mod portable contended
+type t : sync_data
 (** The type of mutexes. *)
 
 val create : unit -> t
@@ -61,7 +61,7 @@ val unlock : t @ local -> unit
    @before 4.12 {!Sys_error} was not raised when unlocking an unlocked mutex
    or when unlocking a mutex from a different thread. *)
 
-val protect : t @ local -> (unit -> 'a) @ local once -> 'a
+val protect : ('a : value_or_null). t @ local -> (unit -> 'a) @ local once -> 'a
 (** [protect mutex f] runs [f()] in a critical section where [mutex]
     is locked (using {!lock}); it then takes care of releasing [mutex],
     whether [f()] returned a value or raised an exception.

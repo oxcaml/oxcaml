@@ -41,6 +41,7 @@ module Singleton_mixed_block_element = struct
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 
@@ -59,6 +60,7 @@ module Singleton_mixed_block_element = struct
     | Vec128 -> Format.fprintf ppf "Vec128"
     | Vec256 -> Format.fprintf ppf "Vec256"
     | Vec512 -> Format.fprintf ppf "Vec512"
+    | Mask -> Format.fprintf ppf "Mask"
     | Word -> Format.fprintf ppf "Word"
     | Untagged_immediate -> Format.fprintf ppf "Untagged_immediate"
 end
@@ -180,15 +182,16 @@ let singleton_or_product_of_mixed_block_element
   | Bits32 -> Singleton Bits32
   | Bits64 -> Singleton Bits64
   | Vec128 -> Singleton Vec128
-  | Vec256 -> Singleton Vec256
+  | Vec256 ->
+    if Lambda.split_vectors
+    then Product Lambda.[| Vec128; Vec128 |]
+    else Singleton Vec256
   | Vec512 -> Singleton Vec512
+  | Mask -> Singleton Mask
   | Word -> Singleton Word
   | Untagged_immediate -> Singleton Untagged_immediate
   | Product sub_elements -> Product sub_elements
   | Splice_variable _ ->
-    (* CR layout poly: This is mostly unreachable, however Value_rec_compiler
-       calls it before slambda eval. Other checks should have caught this first
-       though. *)
     Misc.fatal_error
       "singleton_or_product_of_mixed_block_element: Splice_variable"
 
@@ -250,7 +253,7 @@ let of_mixed_block_elements ~print_locality
       match elem with
       | Value _ -> true
       | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+      | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
         false
     in
     if is_value

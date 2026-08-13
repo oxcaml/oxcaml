@@ -52,4 +52,6 @@ val ocamlobjinfo : string
 val ocamlmklib : string
 val codegen : string
 
+val fexprc : string
+
 val asmgen_archmod : string

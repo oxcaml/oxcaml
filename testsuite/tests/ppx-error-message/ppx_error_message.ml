@@ -14,7 +14,7 @@ let () =
            PStr
              [ { pstr_desc =
                    Pstr_eval
-                     ( { pexp_desc = Pexp_constant (Pconst_string (str, loc, _)) }
+                     ( { pexp_desc = Pexp_constant { pconst_desc = Pconst_string (str, loc, _); _ } }
                      , _ ) } ] )
          ->
         (* Use a ghost location, as is typical for ppxes *)

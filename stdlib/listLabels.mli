@@ -76,6 +76,11 @@ val cons : ('a : value_or_null). 'a -> 'a list -> 'a list
     @since 4.03 (4.05 in ListLabels)
  *)
 
+val singleton : ('a : value_or_null). 'a -> 'a list
+(** [singleton x] returns the one-element list [[x]].
+
+    @since 5.4 *)
+
 val hd : ('a : value_or_null). 'a list -> 'a
 (** Return the first element of the given list.
    @raise Failure if the list is empty.
@@ -386,6 +391,45 @@ val filteri : ('a : value_or_null). f:(int -> 'a -> bool) -> 'a list -> 'a list
    @since 4.11
 *)
 
+
+(** {1 List manipulation} *)
+
+
+val take : ('a : value_or_null). int -> 'a list -> 'a list
+(** [take n l] returns the prefix of [l] of length [n],
+    or a copy of [l] if [n > length l]. This is the empty
+    list if [n] is negative.
+
+    {b Warning.} In version 5.3 only, this function raises
+    [Invalid_argument] for negative [n] values.
+
+    @since 5.3
+*)
+
+val drop : ('a : value_or_null). int -> 'a list -> 'a list
+(** [drop n l] returns the suffix of [l] after [n] elements,
+    or [[]] if [n > length l]. This is [l] if [n] is negative.
+
+    {b Warning.} In version 5.3 only, this function raises
+    [Invalid_argument] for negative [n] values.
+
+    @since 5.3
+*)
+
+val take_while : ('a : value_or_null). f:('a -> bool) -> 'a list -> 'a list
+(** [take_while p l] is the longest (possibly empty) prefix of [l]
+    containing only elements that satisfy [p].
+
+    @since 5.3
+*)
+
+val drop_while : ('a : value_or_null). f:('a -> bool) -> 'a list -> 'a list
+(** [drop_while p l] is the longest (possibly empty) suffix of [l]
+    starting at the first element that does not satisfy [p].
+
+    @since 5.3
+*)
+
 val partition : ('a : value_or_null).
   f:('a -> bool) -> 'a list -> 'a list * 'a list
 (** [partition ~f l] returns a pair of lists [(l1, l2)], where
@@ -532,8 +576,12 @@ val fast_sort : ('a : value_or_null).
 
 val sort_uniq : ('a : value_or_null).
   cmp:('a -> 'a -> int) -> 'a list -> 'a list
-(** Same as {!sort}, but also remove duplicates.
+(** Same as {!sort}, but also remove duplicates: if multiple elements
+    compare equal, keep only the first.
+
     @since 4.02 (4.03 in ListLabels)
+
+    @before 5.4 the element kept was not necessarily the first one.
  *)
 
 val merge : ('a : value_or_null).

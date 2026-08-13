@@ -1,12 +1,19 @@
 (* TEST
  include stdlib_upstream_compatible;
  {
+   flags = "-no-ikinds -w -181";
    expect;
  }{
-   flags = " -extension layouts_beta";
+   flags = "-extension layouts_beta -no-ikinds -w -181";
    expect;
  }
 *)
+
+(* These tests enumerate modifiers, including redundant ones, so silence the
+   redundant-modifier warning throughout. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
 
 type t_value : value
 type t_imm : immediate
@@ -31,7 +38,7 @@ type t_void : void
 type t_any_mod_separable : any mod separable;;
 
 [%%expect{|
-type t_any_mod_separable : any mod separable
+type t_any_mod_separable : any separable
 |}]
 
 type t_value_or_null : value_or_null;;
@@ -152,12 +159,11 @@ Line 1, characters 32-41:
 Error: The externality axis has already been specified.
 |}]
 
+(* CR layouts-scannable: This test temporarily passes while the overridden
+   kind modifier error is disabled. *)
 type t13 : value mod maybe_null non_null
 [%%expect {|
-Line 1, characters 32-40:
-1 | type t13 : value mod maybe_null non_null
-                                    ^^^^^^^^
-Error: The nullability axis has already been specified.
+type t13
 |}]
 
 type t14 : value mod unique aliased
@@ -206,7 +212,7 @@ Error: Unrecognized modifier fizzbuzz.
 let x : int as ('a: value) = 5
 let x : int as ('a : immediate) = 5
 let x : int as ('a : any) = 5;;
-let x : int as ('a: value mod global aliased many contended portable external_) = 5
+let x : int as ('a: value mod global many contended portable external_) = 5
 
 [%%expect{|
 val x : int = 5
@@ -222,10 +228,11 @@ Line 1, characters 16-18:
                     ^^
 Error: This alias is bound to type "int" but is used as an instance of type
          "('a : float64)"
-       The layout of int is value
+       The layout of int is value non_pointer
          because it is the primitive type int.
        But the layout of int must be a sublayout of float64
          because of the annotation on the type variable 'a.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let x : (int as ('a : immediate)) list as ('b : value) = [3;4;5]
@@ -242,20 +249,26 @@ Line 1, characters 21-23:
                          ^^
 Error: This alias is bound to type "int list"
        but is used as an instance of type "('a : immediate)"
-       The kind of int list is immutable_data
+       The layout of int list is value non_float
          because it's a boxed variant type.
-       But the kind of int list must be a subkind of immediate
+       But the layout of int list must be a sublayout of value non_pointer
          because of the annotation on the type variable 'a.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}, Principal{|
 Line 1, characters 21-23:
 1 | let x : int list as ('a : immediate) = [3;4;5]
                          ^^
 Error: This alias is bound to type "int list"
        but is used as an instance of type "('a : immediate)"
-       The kind of int list is immutable_data with int
+       The layout of int list is value non_float
          because it's a boxed variant type.
-       But the kind of int list must be a subkind of immediate
+       But the layout of int list must be a sublayout of value non_pointer
          because of the annotation on the type variable 'a.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 (* CR layouts: error message could be phrased better *)
 
@@ -405,10 +418,13 @@ Line 1, characters 9-15:
 1 | type t = string t2_imm
              ^^^^^^
 Error: This type "string" should be an instance of type "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of t2_imm at line 1, characters 0-28.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 type t = string t2_global
@@ -644,12 +660,15 @@ let f { field } = field "hello"
 Line 1, characters 24-31:
 1 | let f { field } = field "hello"
                             ^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the definition of r at line 1, characters 0-47.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 let f { fieldg } = fieldg "hello"
@@ -658,7 +677,7 @@ let f { fieldg } = fieldg "hello"
 Line 1, characters 26-33:
 1 | let f { fieldg } = fieldg "hello"
                               ^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : value mod global)"
        The kind of string is immutable_data
          because it is the primitive type string.
@@ -672,12 +691,14 @@ let f { fieldc } = fieldc "hello"
 Line 1, characters 26-33:
 1 | let f { fieldc } = fieldc "hello"
                               ^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : word mod many aliased)"
-       The layout of string is value
+       The layout of string is value non_float
          because it is the primitive type string.
        But the layout of string must be a sublayout of word
          because of the definition of rc at line 1, characters 0-71.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 let r = { field = fun x -> x }
@@ -712,10 +733,11 @@ Line 2, characters 18-55:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This field value has type "'b -> 'b" which is less general than
          "'a. 'a -> 'a"
-       The kind of 'a is value
+       The layout of 'a is value
          because of the definition of r_value at line 1, characters 0-39.
-       But the kind of 'a must be a subkind of immediate
+       But the layout of 'a must be a sublayout of value non_pointer
          because of the annotation on the abstract type declaration for a.
+       Note: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts v1.5: that's a pretty awful error message *)
 
@@ -748,10 +770,11 @@ Error: Layout mismatch in final type declaration consistency check.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The kind of 'a is value
+         The layout of 'a is value
            because of the annotation on the universal variable 'a.
-         But the kind of 'a must be a subkind of immediate
+         But the layout of 'a must be a sublayout of value non_pointer
            because of the definition of t_imm at line 1, characters 0-27.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]
@@ -1054,12 +1077,15 @@ let f (x : ('a : immediate). 'a -> 'a) = x "string"
 Line 1, characters 43-51:
 1 | let f (x : ('a : immediate). 'a -> 'a) = x "string"
                                                ^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : immediate)"
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the annotation on the universal variable 'a.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 let f (x : ('a : value mod global). 'a -> 'a) = x "string"
@@ -1068,7 +1094,7 @@ let f (x : ('a : value mod global). 'a -> 'a) = x "string"
 Line 1, characters 50-58:
 1 | let f (x : ('a : value mod global). 'a -> 'a) = x "string"
                                                       ^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : value mod global)"
        The kind of string is immutable_data
          because it is the primitive type string.
@@ -1367,7 +1393,7 @@ type t : bits64 mod portable aliased
 type u = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1376,7 +1402,7 @@ type t : bits64 mod portable aliased
 type u : bits64 = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1386,7 +1412,7 @@ type t : bits64 mod portable aliased
 type u : bits64 mod portable aliased = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1676,10 +1702,11 @@ Line 1, characters 37-53:
                                          ^^^^^^^^^^^^^^^^
 Error: This definition has type "'b -> 'b" which is less general than
          "'a. 'a -> 'a"
-       The kind of 'a is value
+       The layout of 'a is value
          because of the annotation on the universal variable 'a.
-       But the kind of 'a must be a subkind of immediate
+       But the layout of 'a must be a sublayout of value non_pointer
          because of the definition of f_imm at line 1, characters 4-9.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type (_ : value) g =
@@ -1730,10 +1757,10 @@ let bad p =
 Line 3, characters 43-44:
 3 |   | T (type (a : float64)) (x : a) -> Some x
                                                ^
-Error: This expression has type "a" but an expression was expected of type
+Error: The value "x" has type "a" but an expression was expected of type
          "('a : value_or_null)"
        The layout of a is float64
          because of the annotation on the existential variable a.
-       But the layout of a must be a sublayout of value
+       But the layout of a must be a value layout
          because the type argument of option has layout value_or_null.
 |}]

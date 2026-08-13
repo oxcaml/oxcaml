@@ -8,7 +8,7 @@ type record_update = { x : string; y : string }
 type record_update = { x : string; y : string; }
 |}]
 
-let update (unique_ r : record_update) =
+let update (r : record_update @ unique) =
   let x = overwrite_ r with { x = "foo" } in
   x.x
 [%%expect{|
@@ -16,11 +16,12 @@ Line 2, characters 10-41:
 2 |   let x = overwrite_ r with { x = "foo" } in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : record_update) =
+let update (r : record_update @ unique) =
   let x = overwrite_ r with ({ x = "foo" } : record_update) in
   x.x
 [%%expect{|
@@ -28,7 +29,8 @@ Line 2, characters 10-59:
 2 |   let x = overwrite_ r with ({ x = "foo" } : record_update) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -75,7 +77,7 @@ Line 2, characters 21-22:
    - the resulting value can be local/global
    - the value written in the record can be local/global *)
 
-let gc_soundness_bug (local_ unique_ r) (local_ x) =
+let gc_soundness_bug (r @ local unique) (local_ x) =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 31-32:
@@ -87,7 +89,7 @@ Error: This value is "local"
          which is expected to be "global".
 |}]
 
-let disallowed_by_locality (local_ unique_ r) (local_ x) =
+let disallowed_by_locality (r @ local unique) (local_ x) =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 22-23:
@@ -99,7 +101,7 @@ Error: This value is "local" to the parent region
          which is expected to be "global".
 |}]
 
-let gc_soundness_bug (unique_ r) (local_ x) =
+let gc_soundness_bug (r @ unique) (local_ x) =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 31-32:
@@ -111,7 +113,7 @@ Error: This value is "local"
          which is expected to be "global".
 |}]
 
-let disallowed_by_locality (unique_ r) (local_ x) =
+let disallowed_by_locality (r @ unique) (local_ x) =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 22-23:
@@ -123,28 +125,30 @@ Error: This value is "local" to the parent region
          which is expected to be "global".
 |}]
 
-let gc_soundness_no_bug (local_ unique_ r) x =
+let gc_soundness_no_bug (r @ local unique) x =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 11-34:
 2 |   exclave_ overwrite_ r with { x }
                ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
 (* This code should fail if we used a real allocation { r with x } here.
    But we don't: the overwritten record may be regional in this case since
    no allocation takes place. We check four related cases below. *)
-let returning_regional (local_ unique_ r) x =
+let returning_regional (r @ local unique) x =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 2-25:
 2 |   overwrite_ r with { x }
       ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -170,7 +174,8 @@ Line 4, characters 4-27:
 4 |     overwrite_ r with { x }
         ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -184,7 +189,7 @@ Line 3, characters 22-23:
 Error: The value "r" is local, so it cannot be used inside an exclave_
 |}]
 
-let disallowed_by_regionality (local_ unique_ r) x =
+let disallowed_by_regionality (r @ local unique) x =
   let r = overwrite_ r with { x } in
   let ref = ref r in
   ref
@@ -195,25 +200,27 @@ Line 3, characters 16-17:
 Error: This value is "local" to the parent region but is expected to be "global".
 |}]
 
-let gc_soundness_no_bug (unique_ r) x =
+let gc_soundness_no_bug (r @ unique) x =
   exclave_ overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 11-34:
 2 |   exclave_ overwrite_ r with { x }
                ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let gc_soundness_no_bug (unique_ r) x =
+let gc_soundness_no_bug (r @ unique) x =
   overwrite_ r with { x }
 [%%expect{|
 Line 2, characters 2-25:
 2 |   overwrite_ r with { x }
       ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -234,7 +241,8 @@ Line 2, characters 2-36:
 2 |   overwrite_ eq with { eq0 = "foo" }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -244,7 +252,7 @@ let update eq =
 Line 2, characters 42-43:
 2 |   overwrite_ eq with { eq0 = "foo"; eq1 = 1 }
                                               ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "1" has type "int" but an expression was expected of type
          "string"
 |}]
 
@@ -280,7 +288,8 @@ Line 3, characters 2-41:
 3 |   overwrite_ eq with { eq0 = 1; eq1 = 2 }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -291,7 +300,8 @@ Line 2, characters 2-31:
 2 |   overwrite_ eq with ("foo", _)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -301,7 +311,7 @@ let update : _ pair @ unique -> _ pair = function eq ->
 Line 2, characters 29-30:
 2 |   overwrite_ eq with ("foo", 1)
                                  ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "1" has type "int" but an expression was expected of type
          "string"
 |}]
 
@@ -324,7 +334,8 @@ Line 3, characters 2-27:
 3 |   overwrite_ eq with (1, 2)
       ^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -345,7 +356,8 @@ Line 4, characters 4-49:
 4 |     overwrite_ mr with { a = None; b = many_fun }
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -403,7 +415,8 @@ Line 4, characters 4-53:
 4 |     overwrite_ mr with { a = None; b = portable_fun }
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -447,7 +460,8 @@ Line 3, characters 4-42:
 3 |     overwrite_ mr with { a = None; b = _ }
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -460,7 +474,8 @@ Line 3, characters 4-35:
 3 |     overwrite_ mr with { a = None }
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -538,7 +553,8 @@ Line 5, characters 17-53:
 5 |   | Constr1 _ -> overwrite_ c with Constr1 { x = "" }
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -601,7 +617,8 @@ Line 2, characters 22-49:
 2 |   | OptionA s as v -> overwrite_ v with OptionA s
                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -614,7 +631,8 @@ Line 3, characters 17-44:
 3 |   | OptionA s -> overwrite_ v with OptionA s
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -630,7 +648,8 @@ Line 5, characters 20-47:
 5 |      | OptionA s -> overwrite_ v with OptionA s
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -646,7 +665,8 @@ Line 5, characters 20-47:
 5 |      | OptionA _ -> overwrite_ v with OptionA s
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -696,7 +716,8 @@ Line 2, characters 44-75:
 2 |   | (OptionA "foo" | OptionA "bar") as v -> overwrite_ v with OptionA "baz"
                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -708,7 +729,8 @@ Line 2, characters 53-84:
 2 |   | ((OptionA "foo" as v) | (OptionA "bar" as v)) -> overwrite_ v with OptionA "baz"
                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -769,7 +791,8 @@ Line 8, characters 30-59:
 8 |     | Some s when is_option_a (overwrite_ v with OptionA s) -> true
                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -796,7 +819,8 @@ Line 3, characters 25-54:
 3 |   | { x = OptionA s } -> overwrite_ r.x with OptionA s
                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -840,7 +864,7 @@ type 'a mutable_record = { mutable m : 'a }
 let mutable_field_aliased r =
   let y = OptionA "foo" in
   r.m <- y;
-  (unique_ r), y
+  (r : @ unique), y
 [%%expect{|
 type 'a mutable_record = { mutable m : 'a; }
 val mutable_field_aliased :
@@ -848,13 +872,13 @@ val mutable_field_aliased :
 |}]
 
 let mutable_field_aliased r =
-  unique_ r.m
+  (r.m : @ unique)
 [%%expect{|
-Line 2, characters 10-13:
-2 |   unique_ r.m
-              ^^^
+Line 2, characters 3-6:
+2 |   (r.m : @ unique)
+       ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 2, characters 10-11.
+         because it is the field "m" (with some modality) of the record at line 2, characters 3-4.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1041,7 +1065,7 @@ type tuple_unlabeled = string * string
 type tuple_unlabeled = string * string
 |}]
 
-let update (unique_ r : tuple_unlabeled) : tuple_unlabeled =
+let update (r : tuple_unlabeled @ unique) : tuple_unlabeled =
   let x = overwrite_ r with (_, _) in
   x
 [%%expect{|
@@ -1049,11 +1073,12 @@ Line 2, characters 10-34:
 2 |   let x = overwrite_ r with (_, _) in
               ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_unlabeled) : tuple_unlabeled =
+let update (r : tuple_unlabeled @ unique) : tuple_unlabeled =
   let x = overwrite_ r with ("foo", _) in
   x
 [%%expect{|
@@ -1061,11 +1086,12 @@ Line 2, characters 10-38:
 2 |   let x = overwrite_ r with ("foo", _) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_unlabeled) : tuple_unlabeled =
+let update (r : tuple_unlabeled @ unique) : tuple_unlabeled =
   let x = overwrite_ r with ("foo", "bar") in
   x
 [%%expect{|
@@ -1073,11 +1099,12 @@ Line 2, characters 10-42:
 2 |   let x = overwrite_ r with ("foo", "bar") in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_unlabeled) : tuple_unlabeled =
+let update (r : tuple_unlabeled @ unique) : tuple_unlabeled =
   let x = overwrite_ r with ("foo", "bar", "baz") in
 x
 [%%expect{|
@@ -1094,7 +1121,7 @@ type tuple_labeled = x:string * y:string
 type tuple_labeled = x:string * y:string
 |}]
 
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo", _) in
   x
 [%%expect{|
@@ -1104,10 +1131,11 @@ Line 2, characters 28-41:
 Error: This expression has type "x:string * 'a"
        but an expression was expected of type
          "tuple_labeled" = "x:string * y:string"
+       A label "y" was expected
 |}]
 
 (* CR uniqueness: Would be good to support [~y:_], without the parentheses, if possible *)
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:(_), ~y:(_)) in
   x
 [%%expect{|
@@ -1115,11 +1143,12 @@ Line 2, characters 10-44:
 2 |   let x = overwrite_ r with (~x:(_), ~y:(_)) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo", ~y:(_)) in
   x
 [%%expect{|
@@ -1127,11 +1156,12 @@ Line 2, characters 10-46:
 2 |   let x = overwrite_ r with (~x:"foo", ~y:(_)) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo", ~y:"bar") in
   x
 [%%expect{|
@@ -1139,7 +1169,8 @@ Line 2, characters 10-48:
 2 |   let x = overwrite_ r with (~x:"foo", ~y:"bar") in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -1150,13 +1181,13 @@ Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Asser
    Currently these are syntax errors. *)
 
 (*
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo", ..) in
   x
 [%%expect{|
 |}]
 
-let update (unique_ r : tuple_labeled) : tuple_labeled =
+let update (r : tuple_labeled @ unique) : tuple_labeled =
   let x = overwrite_ r with (~x:"foo") in
   x
 [%%expect{|
@@ -1183,7 +1214,8 @@ Line 3, characters 12-47:
 3 |     let x = overwrite_ c with Con { x = "foo" } in
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -1196,7 +1228,8 @@ Line 3, characters 12-55:
 3 |     let x = overwrite_ c with Con { c1 with x = "foo" } in
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -1231,7 +1264,8 @@ Line 3, characters 16-49:
 3 |     let x = Con (overwrite_ c with { x = "foo" }) in
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -1244,6 +1278,7 @@ Line 3, characters 16-56:
 3 |     let x = Con (overwrite_ c with { c with x = "foo" }) in
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]

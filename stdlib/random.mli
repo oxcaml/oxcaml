@@ -43,11 +43,11 @@ val full_init : int array -> unit
 (** Same as {!Random.init} but takes more data as seed. *)
 
 val self_init : unit -> unit
-(** Initialize the domain-local generator with a random seed chosen
-    in a system-dependent way.  If [/dev/urandom] is available on the host
-    machine, it is used to provide a highly random initial seed.  Otherwise, a
-    less random seed is computed from system parameters (current time, process
-    IDs, domain-local state). *)
+(** Initialize the domain-local generator with a random seed chosen in a
+    system-dependent way.  If a cryptographically secure pseudorandom number
+    generator is available on the host machine, it is used to provide a highly
+    random initial seed.  Otherwise, a less random seed is computed from system
+    parameters (current time, process IDs, domain-local state). *)
 
 val bits : unit -> int
 (** Return 30 random bits in a nonnegative integer.
@@ -193,29 +193,30 @@ module State : sig
       in a system-dependent way.
       The seed is obtained as described in {!Random.self_init}. *)
 
-  val copy : t -> t
+  val copy : t @ local -> t
   (** Return a copy of the given state. *)
 
-  val bits : t -> int
-  val int : t -> int -> int
-  val full_int : t -> int -> int
-  val int_in_range : t -> min:int -> max:int -> int
-  val int32 : t -> Int32.t -> Int32.t
-  val int32_in_range : t -> min:int32 -> max:int32 -> int32
-  val nativeint : t -> Nativeint.t -> Nativeint.t
-  val nativeint_in_range : t -> min:nativeint -> max:nativeint -> nativeint
-  val int64 : t -> Int64.t -> Int64.t
-  val int64_in_range : t -> min:int64 -> max:int64 -> int64
-  val float : t -> float -> float
-  val bool : t -> bool
-  val bits32 : t -> Int32.t
-  val bits64 : t -> Int64.t
-  val nativebits : t -> Nativeint.t
+  val bits : t @ local -> int
+  val int : t @ local -> int -> int
+  val full_int : t @ local -> int -> int
+  val int_in_range : t @ local -> min:int -> max:int -> int
+  val int32 : t @ local -> Int32.t -> Int32.t
+  val int32_in_range : t @ local -> min:int32 -> max:int32 -> int32
+  val nativeint : t @ local -> Nativeint.t -> Nativeint.t
+  val nativeint_in_range :
+    t @ local -> min:nativeint -> max:nativeint -> nativeint
+  val int64 : t @ local -> Int64.t -> Int64.t
+  val int64_in_range : t @ local -> min:int64 -> max:int64 -> int64
+  val float : t @ local -> float -> float
+  val bool : t @ local -> bool
+  val bits32 : t @ local -> Int32.t
+  val bits64 : t @ local -> Int64.t
+  val nativebits : t @ local -> Nativeint.t
   (** These functions are the same as the basic functions, except that they
       use (and update) the given PRNG state instead of the default one.
   *)
 
-  val split : t -> t
+  val split : t @ local -> t
   (** Draw a fresh PRNG state from the given PRNG state.
       (The given PRNG state is modified.)
       The new PRNG is statistically independent from the given PRNG.

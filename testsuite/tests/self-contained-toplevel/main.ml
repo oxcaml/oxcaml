@@ -30,7 +30,7 @@ let () =
         { Cmi_format.cmi_name;
           cmi_kind;
           cmi_params;
-          cmi_sign;
+          cmi_sign = (cmi_sign, cmi_staticity);
           cmi_globals;
           cmi_crcs;
           cmi_flags
@@ -41,7 +41,7 @@ let () =
         { Cmi_format.cmi_name;
           cmi_kind;
           cmi_params;
-          cmi_sign = Subst.Lazy.of_signature cmi_sign;
+          cmi_sign = (Subst.Lazy.of_signature cmi_sign, cmi_staticity);
           cmi_globals;
           cmi_crcs;
           cmi_flags
@@ -50,7 +50,7 @@ let () =
       Some { Persistent_signature.
              filename   = Sys.executable_name
            ; cmi        = cmi
-           ; visibility = Visible
+           ; visibility = Visible { cmx_guaranteed = false }
            }
     | _ -> old_loader ~allow_hidden ~unit_name);
   Toploop.add_hook (function

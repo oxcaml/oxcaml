@@ -54,13 +54,6 @@ module Code_age_relation : sig
 
   val union : t -> t -> t
 
-  val meet :
-    t ->
-    resolver:(Compilation_unit.t -> t option) ->
-    Code_id.t ->
-    Code_id.t ->
-    Code_id.t Or_bottom.t
-
   val meet_set :
     t ->
     resolver:(Compilation_unit.t -> t option) ->
@@ -84,9 +77,19 @@ module Typing_env_extension : sig
 
   val add_or_replace_equation : t -> Name.t -> flambda_type -> t
 
-  val add_is_null_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_null_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
-  val add_is_int_relation : t -> Name.t -> scrutinee:Simple.t -> t
+  val add_is_int_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
 
   val add_get_tag_relation : t -> Name.t -> scrutinee:Simple.t -> t
 
@@ -130,7 +133,7 @@ module Typing_env : sig
       used_value_slots:Value_slot.Set.t ->
       t * (Simple.t -> Simple.t)
 
-    val find_or_missing : t -> Name.t -> flambda_type option
+    val find : t -> Name.t -> flambda_type
   end
 
   module Serializable : sig
@@ -149,8 +152,6 @@ module Typing_env : sig
 
     val print : Format.formatter -> t -> unit
 
-    val name_domain : t -> Name.Set.t
-
     val ids_for_export : t -> Ids_for_export.t
 
     val apply_renaming : t -> Renaming.t -> t
@@ -166,7 +167,6 @@ module Typing_env : sig
   val create :
     machine_width:Target_system.Machine_width.t ->
     resolver:(Compilation_unit.t -> Serializable.t option) ->
-    get_imported_names:(unit -> Name.Set.t) ->
     t
 
   val machine_width : t -> Target_system.Machine_width.t
@@ -210,8 +210,6 @@ module Typing_env : sig
   val mem_simple : ?min_name_mode:Name_mode.t -> t -> Simple.t -> bool
 
   val find : t -> Name.t -> Flambda_kind.t option -> flambda_type
-
-  val find_or_missing : t -> Name.t -> flambda_type option
 
   val find_params : t -> Bound_parameters.t -> flambda_type list
 
@@ -298,6 +296,26 @@ module Join_analysis : sig
 
   val simple_refined_at_join :
     'a t -> Typing_env.t -> Simple.t -> 'a simple_refined_at_join
+
+  module Simples_at_join : sig
+    type 'a t
+
+    type definition_at_use = At_normal_mode of Simple.t [@@unboxed]
+
+    val fold_definitions_at_uses :
+      ('a -> definition_at_use -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  end
+
+  (* Fold over the variables created during the join with information about
+     their value at each use.
+
+     Note that the variable may not have a value at all uses; for uses with no
+     value, the variable does not exist and can be poisoned. *)
+  val fold_variables_created_at_join :
+    f:(Name.t -> 'a Simples_at_join.t -> Flambda_kind.t -> 'b -> 'b) ->
+    'a t ->
+    init:'b ->
+    'b
 end
 
 val cut_and_n_way_join :
@@ -430,6 +448,9 @@ val this_boxed_vec256 :
 val this_boxed_vec512 :
   Vector_types.Vec512.Bit_pattern.t -> Alloc_mode.For_types.t -> t
 
+val this_boxed_mask :
+  Vector_types.Mask.Bit_pattern.t -> Alloc_mode.For_types.t -> t
+
 val these_tagged_immediates : Target_ocaml_int.Set.t -> t
 
 val these_boxed_float32s :
@@ -470,6 +491,8 @@ val this_naked_vec128 : Vector_types.Vec128.Bit_pattern.t -> t
 val this_naked_vec256 : Vector_types.Vec256.Bit_pattern.t -> t
 
 val this_naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
+
+val this_naked_mask : Vector_types.Mask.Bit_pattern.t -> t
 
 val this_rec_info : Rec_info_expr.t -> t
 
@@ -516,6 +539,8 @@ val boxed_vec256_alias_to :
 val boxed_vec512_alias_to :
   naked_vec512:Variable.t -> Alloc_mode.For_types.t -> t
 
+val boxed_mask_alias_to : naked_mask:Variable.t -> Alloc_mode.For_types.t -> t
+
 val box_float32 : t -> Alloc_mode.For_types.t -> t
 
 val box_float : t -> Alloc_mode.For_types.t -> t
@@ -531,6 +556,8 @@ val box_vec128 : t -> Alloc_mode.For_types.t -> t
 val box_vec256 : t -> Alloc_mode.For_types.t -> t
 
 val box_vec512 : t -> Alloc_mode.For_types.t -> t
+
+val box_mask : t -> Alloc_mode.For_types.t -> t
 
 val tagged_immediate_alias_to : naked_immediate:Variable.t -> t
 
@@ -568,11 +595,7 @@ val variant :
   Alloc_mode.For_types.t ->
   t
 
-val this_immutable_string :
-  string -> machine_width:Target_system.Machine_width.t -> t
-
-val mutable_string :
-  size:int -> machine_width:Target_system.Machine_width.t -> t
+val this_immutable_string : string -> t
 
 val exactly_this_closure :
   Function_slot.t ->
@@ -627,6 +650,7 @@ val kind : t -> Flambda_kind.t
 
 (** For each of the kinds in an arity, create an "unknown" type. *)
 val unknown_types_from_arity :
+  ?alloc_mode:Alloc_mode.For_types.t ->
   machine_width:Target_system.Machine_width.t ->
   [`Unarized] Flambda_arity.t ->
   t list
@@ -738,6 +762,8 @@ val prove_is_a_boxed_vec256 : Typing_env.t -> t -> unit proof_of_property
 
 val prove_is_a_boxed_vec512 : Typing_env.t -> t -> unit proof_of_property
 
+val prove_is_a_boxed_mask : Typing_env.t -> t -> unit proof_of_property
+
 val prove_is_or_is_not_a_boxed_float :
   Typing_env.t -> t -> bool proof_of_property
 
@@ -844,6 +870,9 @@ val meet_boxed_vec256_containing_simple :
 val meet_boxed_vec512_containing_simple :
   Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
 
+val meet_boxed_mask_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
 val meet_block_field_simple :
   Typing_env.t ->
   min_name_mode:Name_mode.t ->
@@ -888,6 +917,7 @@ type to_lift = private
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.t
   | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.t
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.t
+  | Boxed_mask of Vector_types.Mask.Bit_pattern.t
   | Immutable_float32_array of
       { fields : Numeric_types.Float32_by_bit_pattern.t list }
   | Immutable_float_array of
@@ -904,6 +934,7 @@ type to_lift = private
       { fields : Vector_types.Vec256.Bit_pattern.t list }
   | Immutable_vec512_array of
       { fields : Vector_types.Vec512.Bit_pattern.t list }
+  | Immutable_mask_array of { fields : Vector_types.Mask.Bit_pattern.t list }
   | Immutable_value_array of { fields : Simple.t list }
   | Empty_array of Empty_array_kind.t
 
@@ -980,6 +1011,10 @@ module Rewriter : sig
     val function_slot : Function_slot.t -> 'a t -> 'a closure_field
 
     val closure : 'a closure_field list -> 'a t
+
+    (** [boxed_number bn t] matches a boxed number of the given kind, with [t]
+        matching the type of its (unboxed) contents. *)
+    val boxed_number : Flambda_kind.Boxable_number.t -> 'a t -> 'a t
   end
 
   type 'a expr
@@ -996,8 +1031,6 @@ module Rewriter : sig
     val var : 'a -> 'a t
 
     val unknown : Flambda_kind.t -> 'a t
-
-    val bottom : Flambda_kind.t -> 'a t
 
     val tag_immediate : 'a t -> 'a t
 

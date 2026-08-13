@@ -88,6 +88,12 @@ external unsafe_set_mutable :
 external make_mutable_local :
   ('a : value_or_null mod separable). int -> local_ 'a -> local_ 'a array
   @@ portable = "caml_array_make_local"
+
+(* Make sure this function is marked zero-alloc because we can't annotate
+   externals as zero-alloc. It's not [noalloc] because it can raise. *)
+let[@inline][@zero_alloc assume] make_mutable_local i x =
+  exclave_ make_mutable_local i x
+
 external unsafe_of_local_array :
   ('a : any mod separable). local_ 'a array -> local_ 'a iarray @@ portable
   = "%array_to_iarray"
@@ -432,9 +438,9 @@ let fold_left_map_local f acc input_array = exclave_
   let len = length input_array in
   if len = 0 then (acc, unsafe_of_local_array [||]) else begin
     let rec go acc i = exclave_
-      let acc', elt = f acc (unsafe_get input_array i) in
+      let acc, elt = f acc (unsafe_get input_array i) in
       if i = len - 1 then
-        acc', make_mutable_local len elt
+        acc, make_mutable_local len elt
       else begin
         let (_, output_array) as res = go acc (i+1) in
         unsafe_set_local output_array i elt;
@@ -463,9 +469,9 @@ let fold_left_map_local_output f acc input_array = exclave_
   let len = length input_array in
   if len = 0 then (acc, unsafe_of_local_array [||]) else begin
     let rec go acc i = exclave_
-      let acc', elt = f acc (unsafe_get input_array i) in
+      let acc, elt = f acc (unsafe_get input_array i) in
       if i = len - 1 then
-        acc', make_mutable_local len elt
+        acc, make_mutable_local len elt
       else begin
         let (_, output_array) as res = go acc (i+1) in
         unsafe_set_local output_array i elt;

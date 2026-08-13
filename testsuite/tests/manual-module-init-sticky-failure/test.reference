@@ -1,0 +1,6 @@
+Fail_c: initializing
+Fail_a raised Invalid_config (Broken "deliberate failure")
+Fail_d raised Invalid_config (Broken "deliberate failure")
+Fail_b raised Invalid_config (Broken "deliberate failure")
+Fail_c raised Invalid_config (Broken "deliberate failure")
+OK: same reason object

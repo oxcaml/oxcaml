@@ -29,7 +29,7 @@ open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 let debug = false
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 type layout = Label.t DLL.t
 
@@ -113,54 +113,6 @@ let is_trap_handler t label =
 
 (* Printing utilities for debug *)
 
-let dump ppf t ~msg =
-  let open Format in
-  fprintf ppf "\ncfg for %s\n" msg;
-  fprintf ppf "%s\n" t.cfg.fun_name;
-  let regalloc =
-    List.find_map
-      (function[@ocaml.warning "-4"]
-        | Cfg.Use_regalloc regalloc -> Some regalloc | _ -> None)
-      t.cfg.fun_codegen_options
-  in
-  (match regalloc with
-  | None -> ()
-  | Some regalloc ->
-    fprintf ppf "use_regalloc=%a\n" Clflags.Register_allocator.format regalloc);
-  let regalloc_params =
-    List.find_map
-      (function[@ocaml.warning "-4"]
-        | Cfg.Use_regalloc_param params -> Some params | _ -> None)
-      t.cfg.fun_codegen_options
-  in
-  (match regalloc_params with
-  | None -> ()
-  | Some regalloc_params ->
-    fprintf ppf "regalloc_params=%s\n" (String.concat ", " regalloc_params));
-  fprintf ppf "layout.length=%d\n" (DLL.length t.layout);
-  fprintf ppf "blocks.length=%d\n" (Label.Tbl.length t.cfg.blocks);
-  let print_block label =
-    let block = Label.Tbl.find t.cfg.blocks label in
-    fprintf ppf "\n%a:\n" Label.format label;
-    let pp_with_id ppf ~pp (instr : _ Cfg.instruction) =
-      fprintf ppf "(id:%a) %a\n" InstructionId.format instr.id pp instr
-    in
-    DLL.iter ~f:(pp_with_id ppf ~pp:Cfg.print_basic) block.body;
-    pp_with_id ppf ~pp:Cfg.print_terminator block.terminator;
-    fprintf ppf "\npredecessors:";
-    Label.Set.iter (fprintf ppf " %a" Label.format) block.predecessors;
-    fprintf ppf "\nsuccessors:";
-    Label.Set.iter
-      (fprintf ppf " %a" Label.format)
-      (Cfg.successor_labels ~normal:true ~exn:false block);
-    fprintf ppf "\nexn-successors:";
-    Label.Set.iter
-      (fprintf ppf " %a" Label.format)
-      (Cfg.successor_labels ~normal:false ~exn:true block);
-    fprintf ppf "\n"
-  in
-  DLL.iter ~f:print_block t.layout
-
 let print_row r ppf = Format.dprintf "@,@[<v 1><tr>%t@]@,</tr>" r ppf
 
 type align =
@@ -211,10 +163,9 @@ let with_escape_ppf f ppf =
   Buffer.to_bytes buffer |> Bytes.to_string |> print_escaped ppf;
   ()
 
-let print_dot ?(show_instr = true) ?(show_exn = true)
-    ?(annotate_instr = [Cfg.print_instruction]) ?annotate_block
-    ?annotate_block_end ?(annotate_succ : (Label.t -> Label.t -> string) option)
-    ppf t =
+let print_dot ?(show_instr = true) ?(show_exn = true) ?(annotate_instr = [])
+    ?annotate_block ?annotate_block_end
+    ?(annotate_succ : (Label.t -> Label.t -> string) option) ppf t =
   let ppf =
     (* Change space indent into tabs because spaces are rendered by [dot]
        command and tabs not. *)
@@ -448,10 +399,8 @@ let insert_block :
     Cfg.basic_instruction_list ->
     after:Cfg.basic_block ->
     before:Cfg.basic_block option ->
-    next_instruction_id:(unit -> InstructionId.t) ->
     Cfg.basic_block list =
- fun cfg_with_layout body ~after:predecessor_block ~before:only_successor
-     ~next_instruction_id ->
+ fun cfg_with_layout body ~after:predecessor_block ~before:only_successor ->
   let cfg = cfg_with_layout.cfg in
   let successors =
     match only_successor with
@@ -478,7 +427,7 @@ let insert_block :
       dbg, fdo, live, stack_offset, available_before, available_across
   in
   let copy (i : Cfg.basic Cfg.instruction) : Cfg.basic Cfg.instruction =
-    { i with id = next_instruction_id () }
+    { i with id = InstructionId.get_and_incr cfg.next_instruction_id }
   in
   (* copy body if there is more than one successor *)
   let first = ref true in
@@ -508,7 +457,7 @@ let insert_block :
               fdo;
               live;
               stack_offset;
-              id = next_instruction_id ();
+              id = InstructionId.get_and_incr cfg.next_instruction_id;
               available_before;
               available_across
             };

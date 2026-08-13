@@ -16,8 +16,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@ocaml.warning "+a-4-30-40-41-42"]
-
 module DT = Dynlink_types
 
 module B = Dynlink_internal_byte

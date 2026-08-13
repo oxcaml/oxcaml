@@ -1,6 +1,5 @@
 (* TEST
  modules = "test_c_thread_has_lock_cstubs.c";
- runtime5;
  include systhreads;
  hassysthreads;
  {

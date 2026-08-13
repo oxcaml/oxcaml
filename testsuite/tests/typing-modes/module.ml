@@ -297,7 +297,7 @@ Error: This application of the functor "F" is ill-typed.
        These arguments:
          M N
        do not match these parameters:
-         functor (X : Empty) (Y : Empty) -> ...
+         (X : Empty) (Y : Empty) -> ...
        1. Module M matches the expected module type Empty
        2. Modules do not match:
             N : sig end @ local
@@ -377,13 +377,14 @@ module (F @ portable) () = struct
 end
 [%%expect{|
 val foo : unit -> unit = <fun>
-Line 4, characters 14-17:
+Lines 3-5, characters 22-3:
+3 | ......................() = struct
 4 |     let bar = foo
-                  ^^^
-Error: The value "foo" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the functor at lines 3-5, characters 22-3
-         which is expected to be "portable".
+5 | end
+Error: The module is "nonportable"
+         because it closes over the value "foo" at line 4, characters 14-17
+         which is "nonportable".
+       However, the module highlighted is expected to be "portable".
 |}]
 
 module (F @ portable) (X : sig val x : int -> int end) = struct
@@ -491,9 +492,6 @@ module type S =
 |}]
 
 (* CR zqian: fix [make_aliases_absent]. *)
-(* CR lmaurer: Disabling this test until it is rewritten without a line number
-   in it. *)
-(*
 module type S = sig
     module type S = sig end
 
@@ -522,7 +520,7 @@ module type S = sig
     @@ portable
 end
 [%%expect{|
-Uncaught exception: File "typing/env.ml", line 2155, characters 13-19: Assertion failed
+>> Fatal error: Env.module_declaration_address
+Uncaught exception: Misc.Fatal_error
 
 |}]
-*)

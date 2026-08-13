@@ -20,6 +20,11 @@ let architecture () : architecture =
   | "riscv" -> Riscv
   | arch -> Misc.fatal_errorf "Unknown architecture `%s'" arch
 
+let is_arm () =
+  match architecture () with
+  | ARM | AArch64 -> true
+  | _ -> false
+
 let is_64_bit () =
   match architecture () with
   | X86_64

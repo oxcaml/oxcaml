@@ -30,6 +30,7 @@
 type probe = private
   { stack_offset : int;
     num_stack_slots : int Stack_class.Tbl.t;
+    contains_calls : bool;
     probe_name : string;
     probe_enabled_at_init : bool;
     probe_handler_code_sym : string;
@@ -50,6 +51,7 @@ val get_probes : unit -> probe list
 val add_probe :
   stack_offset:int ->
   num_stack_slots:int Stack_class.Tbl.t ->
+  contains_calls:bool ->
   probe_name:string ->
   probe_enabled_at_init:bool ->
   probe_handler_code_sym:string ->
@@ -71,7 +73,4 @@ val reset : unit -> unit
 val find_or_add_semaphore : string -> bool option -> Debuginfo.t -> string
 
 (** Emit probe notes and semaphores to the assembly output *)
-val emit_probe_notes :
-  slot_offset:(Reg.stack_location -> Stack_class.t -> int) ->
-  add_def_symbol:(string -> unit) ->
-  unit
+val emit_probe_notes : add_def_symbol:(string -> unit) -> unit

@@ -18,11 +18,9 @@
 
 #include "caml/config.h"
 #include "caml/mlvalues.h"
-#ifdef CAML_RUNTIME_5
 #include "caml/frame_descriptors.h"
 #define NATIVE_CODE
 #include "caml/globroots.h"
-#endif
 #include "caml/memory.h"
 #include "caml/stack.h"
 #include "caml/callback.h"
@@ -53,9 +51,11 @@
 #define JIT_FLUSH_ICACHE(addr, size) ((void)0)
 #endif
 
+#ifdef __linux__
 bool __attribute__((weak)) TCMalloc_MallocExtension_MallocIsTCMalloc(void) {
   return false;
 }
+#endif
 
 CAMLprim value jit_get_page_size(value unit) {
   CAMLparam1(unit);
@@ -82,6 +82,8 @@ CAMLprim value jit_dlsym(value symbol) {
   CAMLreturn (result);
 }
 
+#if !defined(__APPLE__)
+
 #define SBRK_FAILED ((void*)-1)
 
 static void* alloc_page_aligned_using_sbrk(size_t page_size, size_t size) {
@@ -99,6 +101,8 @@ static void* alloc_page_aligned_using_sbrk(size_t page_size, size_t size) {
   assert((uintptr_t)brk % page_size == 0);
   return next_page_start;
 }
+
+#endif
 
 #if defined(__has_feature)
   // For clang
@@ -154,12 +158,21 @@ CAMLprim value jit_memalign(value section_size) {
        to make the tests pass. For serious usage of this under [musl], we'll need to
        do better. */
     addr = alloc_page_aligned_statically(page_size, size);
-  } else if (ASAN_IS_ENABLED || TCMalloc_MallocExtension_MallocIsTCMalloc()) {
+  } else if (ASAN_IS_ENABLED
+#ifdef __linux__
+             || TCMalloc_MallocExtension_MallocIsTCMalloc()
+#endif
+  ) {
     /* AddressSanitizer and TCMalloc use [mmap], not [sbrk], which results in
        addresses which are too large to apply relocations to against other
        sections (e.g. [.rodata]), so we manually use [sbrk] when linked against
        either. */
+#if defined(__APPLE__)
+    /* sbrk is deprecated on macOS, so we'll have to make do */
+    addr = aligned_alloc(page_size, size);
+#else
     addr = alloc_page_aligned_using_sbrk(page_size, size);
+#endif
   } else {
     addr = aligned_alloc(page_size, size);
   }
@@ -250,28 +263,13 @@ CAMLprim value jit_run(value symbols_addresses) {
 
   sym = addr_from_caml_option(Field(symbols_addresses, 0));
   if (NULL != sym) {
-#ifdef CAML_RUNTIME_5
     caml_register_frametables(&sym, 1);
-#else
-    caml_register_frametable(sym);
-#endif
   }
 
   sym = addr_from_caml_option(Field(symbols_addresses, 1));
   if (NULL != sym) {
-#ifdef CAML_RUNTIME_5
     caml_register_dyn_globals(&sym, 1);
-#else
-    caml_register_dyn_global(sym);
-#endif
   }
-
-#ifndef CAML_RUNTIME_5
-  sym = addr_from_caml_option(Field(symbols_addresses, 2));
-  sym2 = addr_from_caml_option(Field(symbols_addresses, 3));
-  if (NULL != sym && NULL != sym2)
-    caml_page_table_add(In_static_data, sym, sym2);
-#endif
 
   sym = addr_from_caml_option(Field(symbols_addresses, 4));
   sym2 = addr_from_caml_option(Field(symbols_addresses, 5));
@@ -303,4 +301,9 @@ CAMLprim value jit_addr_to_obj(value address) {
   obj = (value) ((intnat*) Nativeint_val(address));
 
   CAMLreturn(obj);
+}
+
+CAMLprim value jit_obj_to_addr(value obj) {
+  CAMLparam1(obj);
+  CAMLreturn(caml_copy_nativeint((intnat) obj));
 }

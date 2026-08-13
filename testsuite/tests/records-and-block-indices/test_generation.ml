@@ -274,7 +274,7 @@ let test_array_idx_access ~local ty =
     (Type.value_code ty 0);
   line "(* Fill [a] with distinct values using block indices *)";
   for_i_below_size ~debug_exprs (fun ~debug_exprs ->
-      line "Idx_mut.unsafe_set a (.(i)) (mk_value i);"
+      line "Idx_mut.set a (Idx_mut.unsafe_create_into_array i) (mk_value i);"
   );
   line "Gc.compact ();";
   for_i_below_size ~debug_exprs (fun ~debug_exprs ->
@@ -282,7 +282,8 @@ let test_array_idx_access ~local ty =
   );
   line "(* Also read back those values with block indices *)";
   for_i_below_size ~debug_exprs (fun ~debug_exprs ->
-      seq_assert ~debug_exprs "eq (Idx_mut.unsafe_get a (.(i))) (mk_value i)"
+      seq_assert ~debug_exprs
+        "eq (Idx_mut.get a (Idx_mut.unsafe_create_into_array i)) (mk_value i)"
   );
   for_i_below_size ~debug_exprs (fun ~debug_exprs ->
       List.iter (Type.unboxed_paths_by_depth ty)
@@ -322,12 +323,13 @@ let test_array_idx_access ~local ty =
                 in
                 line "let el = %s in" reference_update;
                 line
-                  "Idx_mut.unsafe_set a ((.(i)%s) : (%s array, _) idx_mut) \
-                   next_el%s;"
+                  "Idx_mut.set a ((.idx_mut(Idx_mut.unsafe_create_into_array \
+                   i)%s) : (%s array, _) idx_mut) next_el%s;"
                   (Path.to_string unboxed_path)
                   (Type.code ty)
                   (Path.to_string unboxed_path);
-                seq_assert ~debug_exprs "eq (Idx_mut.unsafe_get a (.(i))) el"
+                seq_assert ~debug_exprs
+                  "eq (Idx_mut.get a (Idx_mut.unsafe_create_into_array i)) el"
             )
           )
       );
@@ -348,16 +350,23 @@ let test_array_idx_deepening ty =
   type_section ty;
   List.iter unboxed_paths_by_depth ~f:(fun (depth, unboxed_paths) ->
       List.iter unboxed_paths ~f:(fun unboxed_path ->
-          line "(* Deepening to (.(i)%s) *)" (Path.to_string unboxed_path);
+          line "(* Deepening to array idx with path %s *)"
+            (Path.to_string unboxed_path);
           line "iter indices_in_deepening_tests ~f:(fun i ->";
           with_indent (fun () ->
-              line "let unboxed_path : (%s, _) idx_mut = (.(i)%s) in" ty_array_s
-                (Path.to_string unboxed_path);
+              let base_idx = "Idx_mut.unsafe_create_into_array i" in
+              let mk_array_idx path_s =
+                if path_s = ""
+                then base_idx
+                else sprintf "(.idx_mut(%s)%s)" base_idx path_s
+              in
+              line "let unboxed_path : (%s, _) idx_mut = %s in" ty_array_s
+                (mk_array_idx (Path.to_string unboxed_path));
               for prefix_len = 0 to depth do
                 let prefix, suffix = take_n unboxed_path prefix_len in
-                line "(* from (.(i)%s) *)" (Path.to_string prefix);
-                line "let shallow : (%s, _) idx_mut = (.(i)%s) in" ty_array_s
-                  (Path.to_string prefix);
+                line "(* from array idx with path %s *)" (Path.to_string prefix);
+                line "let shallow : (%s, _) idx_mut = %s in" ty_array_s
+                  (mk_array_idx (Path.to_string prefix));
                 line "let deepened = (.idx_mut(shallow)%s) in"
                   (Path.to_string suffix);
                 seq_assert ~debug_exprs
@@ -370,16 +379,9 @@ let test_array_idx_deepening ty =
   );
   print_newline ()
 
-(* If it's represented as a flattened float, then we can only create an idx if
-   the type is [float] (rather than a singleton unboxed record containing a
-   float *)
-let path_is_valid_block_idx ty path =
-  let flattened_float =
-    Type_structure.is_flat_float_record (Type.structure ty)
-    && Type_structure.layout (Type.structure (Type.follow_path ty path))
-       = Value { ignorable = false; non_float = false }
-  in
-  (not flattened_float) || Type.follow_path ty path = Type.Float
+(* Block indices are not supported on records that flatten floats. *)
+let path_is_valid_block_idx ty _path =
+  not (Type_structure.flattens_floats (Type.structure ty))
 
 let test_record_idx_access ty ~local =
   type_section ty;
@@ -400,20 +402,7 @@ let test_record_idx_access ty ~local =
               line "(* .%s%s *)" lbl (Path.to_string unboxed_path);
               let full_path = Path.Field lbl :: unboxed_path in
               let test_deepening () =
-                let flattened_float =
-                  Type_structure.is_flat_float_record (Type.structure ty)
-                  && Type_structure.layout
-                       (Type.structure (Type.follow_path ty full_path))
-                     = Value { ignorable = false; non_float = false }
-                in
-                let sub_ty =
-                  if flattened_float
-                  then (
-                    line "(* ff *)";
-                    Type.Float_u
-                  )
-                  else Type.follow_path ty full_path
-                in
+                let sub_ty = Type.follow_path ty full_path in
                 line "let sub_eq = %s in" (Type.eq_code sub_ty);
                 let reference_update =
                   (* To perform our reference update (without block indices) to
@@ -444,38 +433,12 @@ let test_record_idx_access ty ~local =
                     (Type.code ty)
                 in
                 let next_r_sub_element_flat =
-                  if flattened_float
-                  then
-                    (* next_r at some path must be a float(#) or nested
-                       singleton unboxed records to one *)
-                    let ty' = ty in
-                    let rec path_to_float (ty : Type.t) =
-                      match ty with
-                      | Float | Float_u -> []
-                      | Record
-                          { fields = [(lbl, ty)]; boxing = Unboxed; name = _ }
-                        ->
-                        Path.Unboxed_field lbl :: path_to_float ty
-                      | Tuple (_, Unboxed) -> failwith "unimplemented"
-                      | _ ->
-                        failwith
-                          (sprintf "ty %s; %s; subty %s; stuck at %s"
-                             (Type.code ty') (Path.to_string full_path)
-                             (Type.code (Type.follow_path ty' full_path))
-                             (Type.code ty)
-                          )
-                    in
-                    sprintf "(Float_u.of_float next_r%s%s)"
-                      (Path.to_string full_path)
-                      (Path.to_string
-                         (path_to_float (Type.follow_path ty full_path))
-                      )
-                  else sprintf "next_r%s" (Path.to_string full_path)
+                  sprintf "next_r%s" (Path.to_string full_path)
                 in
-                line "Idx_mut.unsafe_set r %s %s;" idx next_r_sub_element_flat;
+                line "Idx_mut.set r %s %s;" idx next_r_sub_element_flat;
                 seq_assert ~debug_exprs "eq r expected";
                 seq_assert ~debug_exprs
-                  (sprintf "sub_eq (Idx_mut.unsafe_get r %s) %s" idx
+                  (sprintf "sub_eq (Idx_mut.get r %s) %s" idx
                      next_r_sub_element_flat
                   )
               in
@@ -485,6 +448,8 @@ let test_record_idx_access ty ~local =
                 line
                   "(* Note: skipping test as this is not a valid block index,";
                 line "   due to the float record optimization *)";
+                line "let _ = eq in";
+                line "let _ = r in";
                 line "let _ = next_r in"
               )
           )
@@ -513,44 +478,27 @@ let test_record_idx_deepening ty =
                     for prefix_len = 0 to depth do
                       let prefix, suffix = take_n unboxed_path prefix_len in
                       let prefix = Path.Field lbl :: prefix in
-                      let from_flattened_float =
-                        Type_structure.is_flat_float_record (Type.structure ty)
-                        && Type_structure.layout
-                             (Type.structure (Type.follow_path ty prefix))
-                           = Value { ignorable = false; non_float = false }
-                      in
                       let to_void =
                         Type_structure.layout
                           (Type.structure (Type.follow_path ty full_path))
                         = Void
                       in
-                      if (not from_flattened_float) || suffix = []
+                      line "(* from (%s) *)" (Path.to_string prefix);
+                      line "let shallow : (%s, _) idx_mut = (%s) in"
+                        (Type.code ty) (Path.to_string prefix);
+                      line "let deepened = (.idx_mut(shallow)%s) in"
+                        (Path.to_string suffix);
+                      if to_void
                       then (
-                        line "(* from (%s) *)" (Path.to_string prefix);
-                        line "let shallow : (%s, _) idx_mut = (%s) in"
-                          (Type.code ty) (Path.to_string prefix);
-                        line "let deepened = (.idx_mut(shallow)%s) in"
-                          (Path.to_string suffix);
-                        if to_void
-                        then (
-                          line
-                            "(* No guarantees on representation of idx to void \
-                             *)";
-                          line "let _ignore = #(idx, deepened) in";
-                          line "();"
-                        )
-                        else
-                          seq_assert ~debug_exprs
-                            "Idx_repr.equal (Idx_repr.of_idx_mut idx) \
-                             (Idx_repr.of_idx_mut deepened)"
-                      )
-                      else (
                         line
-                          "(* Note: can't deepen (%s) because it's a path to a \
-                           flattened"
-                          (Path.to_string prefix);
-                        line "   float, making its element type [float#] *)"
+                          "(* No guarantees on representation of idx to void *)";
+                        line "let _ignore = #(idx, deepened) in";
+                        line "();"
                       )
+                      else
+                        seq_assert ~debug_exprs
+                          "Idx_repr.equal (Idx_repr.of_idx_mut idx) \
+                           (Idx_repr.of_idx_mut deepened)"
                     done
                 );
                 line ");"

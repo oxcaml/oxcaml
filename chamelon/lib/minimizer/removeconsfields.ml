@@ -33,7 +33,6 @@ open Stdlib
 open Typedtree
 open Tast_mapper
 open List
-open Types
 open Path
 open Compat
 
@@ -65,15 +64,15 @@ let remove_cons_mapper (i, cons_to_rem, _) =
                          (let l =
                             List.fold_left
                               (fun l val_case ->
-                                match val_case.c_lhs.pat_desc with
-                                | Tpat_construct (li, cd, pat_list, typs) ->
+                                match view_tpat val_case.c_lhs.pat_desc with
+                                | Tpat_construct (li, cd, pat_list, typs, id) ->
                                   if cons_to_rem = cd.cstr_name
                                   then
                                     { val_case with
                                       c_lhs =
                                         { val_case.c_lhs with
                                           pat_desc =
-                                            Tpat_construct
+                                            mkTpat_construct ~id
                                               ( li,
                                                 cd,
                                                 List.filteri
@@ -100,8 +99,10 @@ let remove_cons_mapper (i, cons_to_rem, _) =
                          (fun l comp_case ->
                            match comp_case.c_lhs.pat_desc with
                            | Tpat_value tva -> (
-                             match (tva :> value general_pattern).pat_desc with
-                             | Tpat_construct (li, cd, pat_list, typs) ->
+                             match
+                               view_tpat (tva :> value general_pattern).pat_desc
+                             with
+                             | Tpat_construct (li, cd, pat_list, typs, id) ->
                                if cons_to_rem = cd.cstr_name
                                then
                                  { comp_case with
@@ -109,7 +110,7 @@ let remove_cons_mapper (i, cons_to_rem, _) =
                                      as_computation_pattern
                                        { comp_case.c_lhs with
                                          pat_desc =
-                                           Tpat_construct
+                                           mkTpat_construct ~id
                                              ( li,
                                                cd,
                                                List.filteri
@@ -194,12 +195,11 @@ let minimize should_remove map cur_name =
       nstr !fields_to_remove
   in
   (* Replacing in multifiles *)
-  let name_clr = String.sub cur_name 0 (String.length cur_name - 3) in
   let mapper str =
     List.fold_left
       (fun nstr (i, cons, typ) ->
         let typ_mf =
-          Path.Pdot (Pident (Ident.create_local name_clr), Path.name typ)
+          Path.Pdot (Pident (Ident.create_local cur_name), Path.name typ)
         in
         let mapper_mf = remove_cons_mapper (i, cons, typ_mf) in
         mapper_mf.structure mapper_mf nstr)
@@ -209,5 +209,4 @@ let minimize should_remove map cur_name =
   (* Final result*)
   nmap
 
-let minimizer =
-  { minimizer_name = "remove-cons-fields"; minimizer_func = minimize }
+let minimizer = multifile_minimizer "remove-cons-fields" minimize

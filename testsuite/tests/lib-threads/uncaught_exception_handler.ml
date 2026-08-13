@@ -46,8 +46,10 @@ let _ =
  include systhreads;
  hassysthreads;
  {
-   bytecode;
- }{
-   native;
+   {
+     bytecode;
+   }{
+     native;
+   }
  }
 *)

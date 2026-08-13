@@ -75,23 +75,17 @@ let simplify apply_dummy e =
     | _ -> apply_dummy)
   | _ -> apply_dummy
 
-let minimize apply_dummy should_remove map cur_name =
-  let reduce_def_mapper =
-    { Tast_mapper.default with
-      expr =
-        (fun mapper e ->
-          if (not (is_simplified e)) && should_remove ()
-          then simplify apply_dummy e
-          else Tast_mapper.default.expr mapper e)
-    }
-  in
-  let nstr =
-    reduce_def_mapper.structure reduce_def_mapper (Smap.find cur_name map)
-  in
-  Smap.add cur_name nstr map
+let reduce_def_mapper apply_dummy should_remove =
+  { Tast_mapper.default with
+    expr =
+      (fun mapper e ->
+        if (not (is_simplified e)) && should_remove ()
+        then simplify apply_dummy e
+        else Tast_mapper.default.expr mapper e)
+  }
 
 let minimizer =
-  { minimizer_name = "reduce-expr"; minimizer_func = minimize apply_dummy2 }
+  tast_mapper_minimizer "reduce-expr" (reduce_def_mapper apply_dummy2)
 
 let minimizer_dummy1 =
-  { minimizer_name = "reduce-expr-2"; minimizer_func = minimize apply_dummy1 }
+  tast_mapper_minimizer "reduce-expr-2" (reduce_def_mapper apply_dummy1)

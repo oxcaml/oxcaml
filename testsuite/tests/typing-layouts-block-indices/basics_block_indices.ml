@@ -1,5 +1,7 @@
 (* TEST
  include stdlib_stable;
+ (* CR-soon lmaurer: Remove this flag when [any] in blocks leaves beta *)
+ flags = "-extension layouts_beta";
  expect;
 *)
 
@@ -20,7 +22,8 @@ let f () = (.i)
 val f : unit -> (r, int) idx_imm = <fun>
 |}]
 
-let f () = (.(5).#i)
+let f () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 5).#i)
 [%%expect{|
 val f : unit -> (r# array, int) idx_mut = <fun>
 |}]
@@ -99,7 +102,8 @@ val f : unit -> ('a r, int) idx_imm = <fun>
 |}]
 
 (* Array type disambiguates the unboxed access *)
-let f () : (u array, _) idx_mut = (.(0).#x)
+let f () : (u array, _) idx_mut =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#x)
 [%%expect{|
 val f : unit -> (u array, int) idx_mut = <fun>
 |}]
@@ -132,12 +136,14 @@ Error: This unboxed access is expected to have base type "y#"
 (*****************)
 (* Float records *)
 
-(* Indicies to flattened float always have element type [float#] *)
 type t = { f : float }
 let f () = (.f)
 [%%expect{|
 type t = { f : float; }
-val f : unit -> (t, float#) idx_imm = <fun>
+Line 2, characters 13-14:
+2 | let f () = (.f)
+                 ^
+Error: Block indices do not support float records.
 |}]
 
 (* Unboxed float record *)
@@ -157,74 +163,98 @@ type t = { t_float64 : t_float64; }
 val t_float64 : unit -> (t, t_float64) idx_imm = <fun>
 |}]
 
-(* Singleton unboxed records containing floats can appear in float records *)
+(* We can't create an index to float records *)
 type fr = #{ f : float }
 type t = { f : float; fr : fr  }
 let fr_f () = (.fr.#f)
 [%%expect{|
 type fr = #{ f : float; }
 type t = { f : float; fr : fr; }
-val fr_f : unit -> (t, float#) idx_imm = <fun>
+Line 3, characters 16-18:
+3 | let fr_f () = (.fr.#f)
+                    ^^
+Error: Block indices do not support float records.
 |}]
 
-(* But we can't create a pointer to a flattened [fr], because it has no unboxed
-   version *)
 let bad () = (.fr)
 [%%expect{|
-Line 1, characters 13-18:
+Line 1, characters 15-17:
 1 | let bad () = (.fr)
-                 ^^^^^
-Error: This block index points to an element stored as a flattened float.
-       Such block indices require the element type to have an unboxed
-       version, but "fr" does not.
+                   ^^
+Error: Block indices do not support float records.
 |}]
 
 (* Mixed float record *)
 type t_float64 : float64
 type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr  }
-let f () = (.f)
-let fu () = (.fu)
-let t_float64 () = (.t_float64)
-let fr_f () = (.fr.#f)
+[@@flatten_floats]
+let bad_f () = (.f)
 [%%expect{|
 type t_float64 : float64
 type t = { f : float; t_float64 : t_float64; fu : float#; fr : fr; }
-val f : unit -> (t, float#) idx_imm = <fun>
-val fu : unit -> (t, float#) idx_imm = <fun>
-val t_float64 : unit -> (t, t_float64) idx_imm = <fun>
-val fr_f : unit -> (t, float#) idx_imm = <fun>
+Line 4, characters 17-18:
+4 | let bad_f () = (.f)
+                     ^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
-(* Can't take a block index to a flattened [fr] because it doesn't have an
-   unboxed version *)
-let bad () = (.fr)
+let bad_fu () = (.fu)
 [%%expect{|
-Line 1, characters 13-18:
-1 | let bad () = (.fr)
-                 ^^^^^
-Error: This block index points to an element stored as a flattened float.
-       Such block indices require the element type to have an unboxed
-       version, but "fr" does not.
+Line 1, characters 18-20:
+1 | let bad_fu () = (.fu)
+                      ^^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
-type pfa = private float
-type r = { mutable pfa : pfa }
-let f () : (r, pfa#) idx_mut = (.pfa)
+let bad_t_float64 () = (.t_float64)
 [%%expect{|
-type pfa = private float
-type r = { mutable pfa : pfa; }
-val f : unit -> (r, pfa#) idx_mut = <fun>
+Line 1, characters 25-34:
+1 | let bad_t_float64 () = (.t_float64)
+                             ^^^^^^^^^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
-(* Cannot bypass private float aliases *)
-let bad () : (r, float#) idx_mut = (.pfa)
+let bad_fr_f () = (.fr.#f)
 [%%expect{|
-Line 1, characters 35-41:
-1 | let bad () : (r, float#) idx_mut = (.pfa)
-                                       ^^^^^^
-Error: This expression has type "(r, pfa#) idx_mut"
-       but an expression was expected of type "(r, float#) idx_mut"
-       Type "pfa#" is not compatible with type "float#"
+Line 1, characters 20-22:
+1 | let bad_fr_f () = (.fr.#f)
+                        ^^
+Error: Block indices do not support [@@flatten_floats] records.
+|}]
+
+let bad_fr () = (.fr)
+[%%expect{|
+Line 1, characters 18-20:
+1 | let bad_fr () = (.fr)
+                      ^^
+Error: Block indices do not support [@@flatten_floats] records.
+|}]
+
+type t = { f : float# } [@@represent_as_float_array]
+let bad_f () = (.f)
+[%%expect{|
+type t = { f : float#; }
+Line 2, characters 17-18:
+2 | let bad_f () = (.f)
+                     ^
+Error: Block indices do not support [@@represent_as_float_array] records.
+|}]
+
+type t = { f : float; f' : float# } [@@flatten_floats]
+let bad_f () = (.f)
+[%%expect{|
+type t = { f : float; f' : float#; }
+Line 2, characters 17-18:
+2 | let bad_f () = (.f)
+                     ^
+Error: Block indices do not support [@@flatten_floats] records.
+|}]
+let bad_f' () = (.f')
+[%%expect{|
+Line 1, characters 18-20:
+1 | let bad_f' () = (.f')
+                      ^^
+Error: Block indices do not support [@@flatten_floats] records.
 |}]
 
 (***************)
@@ -322,7 +352,7 @@ let coerce_mut_bad (idx : (_, [ `A ]) idx_mut) =
 Line 2, characters 3-6:
 2 |   (idx :> (_, [ `A | `B ]) idx_mut)
        ^^^
-Error: This expression cannot be coerced to type ""('a, [ `A | `B ]) idx_mut"";
+Error: This expression cannot be coerced to type ""('b, [ `A | `B ]) idx_mut"";
        it has type "('a, [ `A ]) idx_mut" but is here used with type
          "('a, [ `A | `B ]) idx_mut"
        The first variant type does not allow tag(s) "`B"
@@ -349,86 +379,48 @@ Error: In this definition, expected parameter variances are not satisfied.
 (**********)
 (* Arrays *)
 
-let idx_array x = (.(x))
-let idx_array_L x = (.L(x))
-let idx_array_l x = (.l(x))
-let idx_array_S x = (.S(x))
-let idx_array_s x = (.s(x))
-let idx_array_n x = (.n(x))
-let idx_iarray x = (.:(x))
-let idx_iarray_L x = (.:L(x))
-let idx_iarray_l x = (.:l(x))
-let idx_iarray_S x = (.:S(x))
-let idx_iarray_s x = (.:s(x))
-let idx_iarray_n x = (.:n(x))
+let idx_array x = Idx_mut.unsafe_create_into_array x
+let idx_iarray x = Idx_imm.unsafe_create_into_iarray x
 let idx_imm x = (.idx_imm(x))
 let idx_mut x = (.idx_mut(x))
 [%%expect{|
-val idx_array :
-  ('a : value_or_null mod non_float). int -> ('a array, 'a) idx_mut = <fun>
-val idx_array_L :
-  ('a : value_or_null mod non_float). int64# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_l :
-  ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_S :
-  ('a : value_or_null mod non_float). int16# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_s :
-  ('a : value_or_null mod non_float). int8# -> ('a array, 'a) idx_mut = <fun>
-val idx_array_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
+val idx_array : ('a : value_or_null non_float). int -> ('a array, 'a) idx_mut =
   <fun>
 val idx_iarray :
-  ('a : value_or_null mod non_float). int -> ('a iarray, 'a) idx_imm = <fun>
-val idx_iarray_L :
-  ('a : value_or_null mod non_float). int64# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_l :
-  ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_S :
-  ('a : value_or_null mod non_float). int16# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_s :
-  ('a : value_or_null mod non_float). int8# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =
-  <fun>
+  ('a : value_or_null non_float). int -> ('a iarray, 'a) idx_imm = <fun>
 val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 |}]
 
 type r = { a : string }
-let a () = (.(5).#contents.#a)
+let a () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 5).#contents.#a)
 [%%expect{|
 type r = { a : string; }
 val a : unit -> (r# ref# array, string) idx_mut = <fun>
 |}]
 
+type ('a : any) any_ref = { any_contents : 'a }
+let a () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 5).#any_contents.#a)
+[%%expect{|
+type ('a : any) any_ref = { any_contents : 'a; }
+val a : unit -> (r# any_ref# array, string) idx_mut = <fun>
+|}]
+
 type t = { mutable a : string; b : int }
-let a () = (.(5).#a)
+let a () = (.idx_mut(Idx_mut.unsafe_create_into_array 5).#a)
 [%%expect{|
 type t = { mutable a : string; b : int; }
 val a : unit -> (t# array, string) idx_mut = <fun>
 |}]
 
 type t1 = { a : string }
-let b () = (.:(5).#a)
+let b () =
+  (.idx_imm(Idx_imm.unsafe_create_into_iarray 5).#a)
 [%%expect{|
 type t1 = { a : string; }
 val b : unit -> (t1# iarray, string) idx_imm = <fun>
-|}]
-
-let bad_index_type = (.("test"))
-[%%expect{|
-Line 1, characters 24-30:
-1 | let bad_index_type = (.("test"))
-                            ^^^^^^
-Error: This expression has type "string" but an expression was expected of type
-         "int"
 |}]
 
 (****************)
@@ -486,30 +478,33 @@ Error: This block index cannot be created because it refers to values
 (* CR layouts v8: these should be allowed once we reorder array elements *)
 
 type r = #{ a : int64#; b : int }
-let bad_idx () = (.(0).#a)
+let bad_idx () : (_, r) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
 [%%expect{|
 type r = #{ a : int64#; b : int; }
-Line 2, characters 17-26:
-2 | let bad_idx () = (.(0).#a)
-                     ^^^^^^^^^
-Error: Block indices into arrays whose element layout contains a
+Line 3, characters 2-36:
+3 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Block indices into arrays of unboxed products containing a
        non-value before a value are not yet supported.
 |}]
 
 type r = { ii : #( int * int64#) ; i : int }
-let bad_idx () = (.(0).#ii)
+let bad_idx () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
 [%%expect{|
 type r = { ii : #(int * int64#); i : int; }
-Line 2, characters 17-27:
-2 | let bad_idx () = (.(0).#ii)
-                     ^^^^^^^^^^
-Error: Block indices into arrays whose element layout contains a
+Line 3, characters 12-46:
+3 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Block indices into arrays of unboxed products containing a
        non-value before a value are not yet supported.
 |}]
 
 (* Note that this does work, though, as no reordering is needed *)
 type r = #{ a : int; b : int64# }
-let idx_into_r_array () = (.(0).#a)
+let idx_into_r_array () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#a)
 [%%expect{|
 type r = #{ a : int; b : int64#; }
 val idx_into_r_array : unit -> (r array, int) idx_mut = <fun>
@@ -520,21 +515,221 @@ val idx_into_r_array : unit -> (r array, int) idx_mut = <fun>
 
 let idx_imm x = (.idx_imm(x))
 let idx_mut x = (.idx_mut(x))
+let idx_atomic x = (.idx_atomic(x))
 [%%expect{|
 val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
+val idx_atomic : ('a, 'b) idx_atomic -> ('a, 'b) idx_atomic = <fun>
+|}]
+
+(* Invalid index deepening *)
+
+type t = { imm: int; mutable mut: int; mutable atomic: int [@atomic] }
+[%%expect{|
+type t = { imm : int; mutable mut : int; mutable atomic : int [@atomic]; }
+|}]
+
+let validImm = (.idx_imm((.imm)))
+[%%expect{|
+val validImm : (t, int) idx_imm = <abstr>
+|}]
+
+let invalidImm1 = (.idx_mut((.imm)))
+[%%expect{|
+Line 1, characters 28-34:
+1 | let invalidImm1 = (.idx_mut((.imm)))
+                                ^^^^^^
+Error: This expression has type "(t, int) idx_imm"
+       but an expression was expected of type "(t, 'a) idx_mut"
+|}]
+
+let invalidImm2 = (.idx_atomic((.imm)))
+[%%expect{|
+Line 1, characters 31-37:
+1 | let invalidImm2 = (.idx_atomic((.imm)))
+                                   ^^^^^^
+Error: This expression has type "(t, int) idx_imm"
+       but an expression was expected of type "('a, 'b) idx_atomic"
+|}]
+
+let invalidMut1 = (.idx_imm((.mut)))
+[%%expect{|
+Line 1, characters 28-34:
+1 | let invalidMut1 = (.idx_imm((.mut)))
+                                ^^^^^^
+Error: This expression has type "(t, int) idx_mut"
+       but an expression was expected of type "(t, 'a) idx_imm"
+|}]
+
+let validMut = (.idx_mut((.mut)))
+[%%expect{|
+val validMut : (t, int) idx_mut = <abstr>
+|}]
+
+let invalidMut2 = (.idx_atomic((.mut)))
+[%%expect{|
+Line 1, characters 31-37:
+1 | let invalidMut2 = (.idx_atomic((.mut)))
+                                   ^^^^^^
+Error: This expression has type "(t, int) idx_mut"
+       but an expression was expected of type "('a, 'b) idx_atomic"
+|}]
+
+let invalidAtomic1 = (.idx_imm((.atomic)))
+[%%expect{|
+Line 1, characters 31-40:
+1 | let invalidAtomic1 = (.idx_imm((.atomic)))
+                                   ^^^^^^^^^
+Error: This expression has type "(t, int) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_imm"
+|}]
+
+let invalidAtomic2 = (.idx_mut((.atomic)))
+[%%expect{|
+Line 1, characters 31-40:
+1 | let invalidAtomic2 = (.idx_mut((.atomic)))
+                                   ^^^^^^^^^
+Error: This expression has type "(t, int) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_mut"
+|}]
+
+let validAtomic = (.idx_atomic((.atomic)))
+[%%expect{|
+val validAtomic : (t, int) idx_atomic = <abstr>
 |}]
 
 (*****************************************)
 (* Block indices to atomic record fields *)
-type atomic = { mutable i : int [@atomic] }
-let bad () = (.i)
+type atomic = { mutable i : int [@atomic]; mutable j : int [@atomic] }
+
+let idx_atomic_i = (.i)
 [%%expect{|
-type atomic = { mutable i : int [@atomic]; }
-Line 2, characters 13-17:
-2 | let bad () = (.i)
-                 ^^^^
-Error: Block indices do not yet support [@atomic] record fields.
+type atomic = { mutable i : int [@atomic]; mutable j : int [@atomic]; }
+val idx_atomic_i : (atomic, int) idx_atomic = <abstr>
+|}]
+
+let idx_atomic_j = (.j)
+[%%expect{|
+val idx_atomic_j : (atomic, int) idx_atomic = <abstr>
+|}]
+
+(* Can get/set atomic indices *)
+let f t = Idx_atomic.get t idx_atomic_i
+[%%expect{|
+val f : atomic -> int = <fun>
+|}]
+
+let g t = Idx_atomic.set t idx_atomic_i 42
+[%%expect{|
+val g : atomic -> unit = <fun>
+|}]
+
+(* Cannot access an element whose layout is not value *)
+let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
+[%%expect{|
+Line 1, characters 27-33:
+1 | let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
+                               ^^^^^^
+Error: This type "float#" should be an instance of type "('a : value_or_null)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because the 2nd type argument of idx_atomic has layout value_or_null.
+|}]
+
+(* Cannot access an atomic field non-atomically *)
+let f t = Idx_mut.get t idx_atomic_i
+[%%expect{|
+Line 1, characters 24-36:
+1 | let f t = Idx_mut.get t idx_atomic_i
+                            ^^^^^^^^^^^^
+Error: The value "idx_atomic_i" has type "(atomic, int) idx_atomic"
+       but an expression was expected of type "('a, 'b) idx_mut"
+|}]
+
+let g t = Idx_mut.set t idx_atomic_i 42
+[%%expect{|
+Line 1, characters 24-36:
+1 | let g t = Idx_mut.set t idx_atomic_i 42
+                            ^^^^^^^^^^^^
+Error: The value "idx_atomic_i" has type "(atomic, int) idx_atomic"
+       but an expression was expected of type "('a, 'b) idx_mut"
+|}]
+
+(* Block indices to unboxed singleton record *)
+type inner = { y: int }
+type outer = { mutable x: inner# [@atomic] }
+
+let unbox_idx_atomic = (.x.#y)
+[%%expect{|
+type inner = { y : int; }
+type outer = { mutable x : inner# [@atomic]; }
+val unbox_idx_atomic : (outer, int) idx_atomic = <abstr>
+|}]
+
+let fst = (.x)
+let snd = (.idx_atomic(fst).#y)
+[%%expect{|
+val fst : (outer, inner#) idx_atomic = <abstr>
+val snd : (outer, int) idx_atomic = <abstr>
+|}]
+
+(* Block indices to mixed record *)
+type t = { x: int64#; mutable y: string [@atomic]; z: int64# }
+
+let mixed_idx_atomic = (.y)
+[%%expect{|
+type t = { x : int64#; mutable y : string [@atomic]; z : int64#; }
+val mixed_idx_atomic : (t, string) idx_atomic = <abstr>
+|}]
+
+(* Block indices to all-float record *)
+type floats = { x: float; mutable y: float [@atomic] } [@@warning "-214"]
+let float_idx_atomic = (.y)
+[%%expect{|
+type floats = { x : float; mutable y : float [@atomic]; }
+val float_idx_atomic : (floats, float) idx_atomic = <abstr>
+|}]
+
+(**********************************************)
+(* Block indices to polymorphic record fields *)
+
+type poly_imm = { p_imm : 'a. 'a option }
+type poly_mut = { mutable p_mut : 'a. 'a option }
+[%%expect{|
+type poly_imm = { p_imm : 'a. 'a option; }
+type poly_mut = { mutable p_mut : 'a. 'a option; }
+|}]
+
+(* Immutable indices only read, so instantiating the field is fine. *)
+let ok = (.p_imm)
+[%%expect{|
+val ok : (poly_imm, 'a option) idx_imm = <abstr>
+|}]
+
+let bad = (.p_mut)
+[%%expect{|
+Line 1, characters 12-17:
+1 | let bad = (.p_mut)
+                ^^^^^
+Error: Mutable block indices to polymorphic record fields
+       (here "p_mut") are forbidden.
+|}]
+
+type poly_unboxed = #{ p_u : 'a. 'a option }
+type holds_poly = { mutable h : poly_unboxed }
+[%%expect{|
+type poly_unboxed = #{ p_u : 'a. 'a option; }
+type holds_poly = { mutable h : poly_unboxed; }
+|}]
+
+let bad_unboxed = (.h.#p_u)
+[%%expect{|
+Line 1, characters 23-26:
+1 | let bad_unboxed = (.h.#p_u)
+                           ^^^
+Error: Mutable block indices to polymorphic record fields
+       (here "p_u") are forbidden.
 |}]
 
 (**************)
@@ -662,35 +857,39 @@ Error: Block indices do not yet support non-default modalities. In particular,
 |}]
 
 (* After arrays *)
-let bad () = (.(0).#portable)
+let bad () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#portable)
 [%%expect{|
-Line 1, characters 13-29:
-1 | let bad () = (.(0).#portable)
-                 ^^^^^^^^^^^^^^^^
+Line 2, characters 2-58:
+2 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#portable)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
        mutable elements must have the identity modality, but this is portable.
 |}]
-let bad () = (.(0).#mut_not_many)
+let bad () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#mut_not_many)
 [%%expect{|
 val bad :
-  ('a : value mod non_float). unit -> ('a mut_not_many# array, 'a) idx_mut =
+  ('a : value non_float). unit -> ('a mut_not_many# array, 'a) idx_mut =
   <fun>
 |}]
 
 (* After immutable arrays *)
-let bad () = (.:(0).#global)
+let bad () =
+  (.idx_imm(Idx_imm.unsafe_create_into_iarray 0).#global)
 [%%expect{|
-Line 1, characters 13-28:
-1 | let bad () = (.:(0).#global)
-                 ^^^^^^^^^^^^^^^
+Line 2, characters 2-57:
+2 |   (.idx_imm(Idx_imm.unsafe_create_into_iarray 0).#global)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
        immutable elements must have the identity modality, but this is aliased.
 |}]
-let bad () = (.:(0).#item.#global.#item)
+let bad () =
+  (.idx_imm(Idx_imm.unsafe_create_into_iarray 0).#item.#global.#item)
 [%%expect{|
-Line 1, characters 13-40:
-1 | let bad () = (.:(0).#item.#global.#item)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 2-69:
+2 |   (.idx_imm(Idx_imm.unsafe_create_into_iarray 0).#item.#global.#item)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Block indices do not yet support non-default modalities. In particular,
        immutable elements must have the identity modality, but this is aliased.
 |}]
@@ -701,10 +900,11 @@ let ok () = (.contents.#global.#many)
 [%%expect{|
 val ok : unit -> ('a many# global# ref, 'a) idx_mut = <fun>
 |}]
-let ok () = (.(0).#global.#many.#aliased.#unyielding)
+let ok () =
+  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#global.#many.#aliased.#unyielding)
 [%%expect{|
 val ok :
-  ('a : value mod non_float).
+  ('a : value non_float).
     unit -> ('a unyielding# aliased# many# global# array, 'a) idx_mut =
   <fun>
 |}]
@@ -718,99 +918,131 @@ val ok : unit -> ('a box# mut_not_global# box_mut, 'a) idx_mut = <fun>
 
 (* CR layouts v8: could this error message more clearly point out the problem,
    that the element type is not [mod non_float]? *)
-let bad () : (float array, _) idx_mut = (.(0))
+let bad () : (float array, _) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
 [%%expect{|
-Line 1, characters 40-46:
-1 | let bad () : (float array, _) idx_mut = (.(0))
-                                            ^^^^^^
+Line 2, characters 2-36:
+2 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
+       The layout of float is value
          because it is the primitive type float.
-       But the kind of float must be a subkind of value_or_null mod non_float
-         because it's the element type (the second type parameter) for a
-         block index (idx or mut_idx).
+       But the layout of float must be a sublayout of value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]
 
-type packed = P : 'a -> packed
-let bad () : (packed array, _) idx_mut = (.(0))
+type non_sep = float or_null
+let bad () : (_ array, non_sep) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
 [%%expect{|
-type packed = P : 'a -> packed
-val bad : unit -> (packed array, packed) idx_mut = <fun>
+type non_sep = float or_null
+Line 3, characters 2-36:
+3 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a array, 'a) idx_mut"
+       but an expression was expected of type "('a array, non_sep) idx_mut"
+       Type "'a" is not compatible with type "non_sep" = "float or_null"
+       The layout of non_sep is value_or_null
+         because it is the primitive type or_null.
+       But the layout of non_sep must be a sublayout of
+           value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]
 
 type abstract
-let bad () : (abstract array, _) idx_mut = (.(0))
+let bad () : (abstract array, _) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
 [%%expect{|
 type abstract
-Line 2, characters 43-49:
-2 | let bad () : (abstract array, _) idx_mut = (.(0))
-                                               ^^^^^^
+Line 3, characters 2-36:
+3 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(abstract array, 'b) idx_mut"
-       The kind of abstract is value
+       The layout of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
-       But the kind of abstract must be a subkind of
-           value_or_null mod non_float
-         because it's the element type (the second type parameter) for a
-         block index (idx or mut_idx).
+       But the layout of abstract must be a sublayout of
+           value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]
 
-let bad () : (float iarray, _) idx_imm = (.:(0))
+let bad () : (float iarray, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
 [%%expect{|
-Line 1, characters 41-48:
-1 | let bad () : (float iarray, _) idx_imm = (.:(0))
-                                             ^^^^^^^
+Line 1, characters 41-76:
+1 | let bad () : (float iarray, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(float iarray, 'b) idx_imm"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
+       The layout of float is value
          because it is the primitive type float.
-       But the kind of float must be a subkind of value_or_null mod non_float
-         because it's the element type (the second type parameter) for a
-         block index (idx or mut_idx).
+       But the layout of float must be a sublayout of value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]
 
 (* CR layouts v8: this is similarly sad *)
 let bad (x : float array) =
-  let y = (.(42)) in
-  Idx_mut.unsafe_get x y
+  let y = Idx_mut.unsafe_create_into_array 42 in
+  Idx_mut.get x y
 [%%expect{|
-Line 3, characters 23-24:
-3 |   Idx_mut.unsafe_get x y
-                           ^
-Error: This expression has type "('a array, 'a) idx_mut"
+Line 3, characters 16-17:
+3 |   Idx_mut.get x y
+                    ^
+Error: The value "y" has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
+       The layout of float is value
          because it is the primitive type float.
-       But the kind of float must be a subkind of value_or_null mod non_float
-         because of the definition of y at line 2, characters 10-17.
+       But the layout of float must be a sublayout of value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]
 
-type packed = P : 'a -> packed
-let bad () : (packed iarray, _) idx_imm = (.:(0))
+type non_sep = float or_null
+let bad () : (_ iarray, non_sep) idx_imm =
+  Idx_imm.unsafe_create_into_iarray 0
 [%%expect{|
-type packed = P : 'a -> packed
-val bad : unit -> (packed iarray, packed) idx_imm = <fun>
+type non_sep = float or_null
+Line 3, characters 2-37:
+3 |   Idx_imm.unsafe_create_into_iarray 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a iarray, 'a) idx_imm"
+       but an expression was expected of type "('a iarray, non_sep) idx_imm"
+       Type "'a" is not compatible with type "non_sep" = "float or_null"
+       The layout of non_sep is value_or_null
+         because it is the primitive type or_null.
+       But the layout of non_sep must be a sublayout of
+           value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]
 
 type abstract
-let bad () : (abstract iarray, _) idx_imm = (.:(0))
+let bad () : (abstract iarray, _) idx_imm =
+  Idx_imm.unsafe_create_into_iarray 0
 [%%expect{|
 type abstract
-Line 2, characters 44-51:
-2 | let bad () : (abstract iarray, _) idx_imm = (.:(0))
-                                                ^^^^^^^
+Line 3, characters 2-37:
+3 |   Idx_imm.unsafe_create_into_iarray 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "(abstract iarray, 'b) idx_imm"
-       The kind of abstract is value
+       The layout of abstract is value
          because of the definition of abstract at line 1, characters 0-13.
-       But the kind of abstract must be a subkind of
-           value_or_null mod non_float
-         because it's the element type (the second type parameter) for a
-         block index (idx or mut_idx).
+       But the layout of abstract must be a sublayout of
+           value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]
 
 (*******************)
@@ -855,7 +1087,8 @@ val f : bool -> ('a r, int) idx_imm = <fun>
 Line 5, characters 6-7:
 5 |     (.u.#x)
           ^
-Warning 18 [not-principal]: this type-based field disambiguation is not principal.
+Warning 18 [not-principal]: this type-based field disambiguation is not
+  principal.
 
 val f : bool -> ('a r, int) idx_imm = <fun>
 |}]
@@ -872,7 +1105,8 @@ val f : bool -> (u t, int) idx_imm = <fun>
 Line 5, characters 9-10:
 5 |     (.a.#x)
              ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u t, int) idx_imm = <fun>
 |}]
@@ -889,7 +1123,8 @@ val f : bool -> (u t# t, int) idx_imm = <fun>
 Line 5, characters 12-13:
 5 |     (.a.#a.#x)
                 ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u t# t, int) idx_imm = <fun>
 |}]
@@ -898,16 +1133,18 @@ val f : bool -> (u t# t, int) idx_imm = <fun>
    type *)
 let f c =
   if c then
-    ((.(0).#x) : (u array, _) idx_mut)
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#x)
+      : (u array, _) idx_mut)
   else
-    (.(1).#x)
+    (.idx_mut(Idx_mut.unsafe_create_into_array 1).#x)
 [%%expect{|
 val f : bool -> (u array, int) idx_mut = <fun>
 |}, Principal{|
-Line 5, characters 11-12:
-5 |     (.(1).#x)
-               ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
+Line 6, characters 51-52:
+6 |     (.idx_mut(Idx_mut.unsafe_create_into_array 1).#x)
+                                                       ^
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u array, int) idx_mut = <fun>
 |}]
@@ -916,16 +1153,153 @@ val f : bool -> (u array, int) idx_mut = <fun>
    type *)
 let f c =
   if c then
-    ((.(0).#a.#x) : (u t# array, _) idx_mut)
+    ((.idx_mut(Idx_mut.unsafe_create_into_array 0).#a.#x)
+      : (u t# array, _) idx_mut)
   else
-    (.(1).#a.#x)
+    (.idx_mut(Idx_mut.unsafe_create_into_array 1).#a.#x)
 [%%expect{|
 val f : bool -> (u t# array, int) idx_mut = <fun>
 |}, Principal{|
-Line 5, characters 14-15:
-5 |     (.(1).#a.#x)
-                  ^
-Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
+Line 6, characters 54-55:
+6 |     (.idx_mut(Idx_mut.unsafe_create_into_array 1).#a.#x)
+                                                          ^
+Warning 18 [not-principal]: this type-based unboxed record field disambiguation
+  is not principal.
 
 val f : bool -> (u t# array, int) idx_mut = <fun>
+|}]
+
+(************************)
+(* Unable to specialize *)
+
+type ('a, 'b : any) not_an_idx : bits64
+type ('a : any mod separable) not_an_array
+[%%expect{|
+type ('a, 'b : any) not_an_idx : bits64
+type ('a : any separable) not_an_array
+|}]
+
+external bad
+  : ('a : any mod separable). int -> ('a not_an_array, 'a) idx_mut
+  = "%unsafe_array_idx"
+[@@layout_poly]
+let use_bad () = bad 0
+[%%expect{|
+external bad : ('a : any separable). int -> ('a not_an_array, 'a) idx_mut
+  = "%unsafe_array_idx" [@@layout_poly]
+Line 5, characters 17-22:
+5 | let use_bad () = bad 0
+                     ^^^^^
+Error: Unable to determine the array kind for array index primitive: the
+       result type should be equal to a "(_, _) idx_mut" or "(_, _) idx_imm"
+       whose first parameter is equal to "_ array" or "_ iarray".
+|}]
+
+external bad
+  : ('a : any mod separable). int -> ('a array, 'a) not_an_idx
+  = "%unsafe_array_idx"
+[@@layout_poly]
+let use_bad () = bad 0
+[%%expect{|
+external bad : ('a : any separable). int -> ('a array, 'a) not_an_idx
+  = "%unsafe_array_idx" [@@layout_poly]
+Line 5, characters 17-22:
+5 | let use_bad () = bad 0
+                     ^^^^^
+Error: Unable to determine the array kind for array index primitive: the
+       result type should be equal to a "(_, _) idx_mut" or "(_, _) idx_imm"
+       whose first parameter is equal to "_ array" or "_ iarray".
+|}]
+
+external bad : int -> (_, _) idx_mut = "%unsafe_array_idx"
+let use_bad () = bad 0
+[%%expect{|
+external bad : int -> ('a, 'b) idx_mut = "%unsafe_array_idx"
+Line 2, characters 17-22:
+2 | let use_bad () = bad 0
+                     ^^^^^
+Error: Unable to determine the array kind for array index primitive: the
+       result type should be equal to a "(_, _) idx_mut" or "(_, _) idx_imm"
+       whose first parameter is equal to "_ array" or "_ iarray".
+|}]
+
+(*************************)
+(* Specialize to aliases *)
+
+type ('a, 'b : any) an_idx : bits64 = ('a, 'b) idx_imm
+type ('a : any mod separable) an_array = 'a iarray
+
+external ok
+  : ('a : any mod separable). int -> ('a an_array, 'a) an_idx
+  = "%unsafe_array_idx"
+[@@layout_poly]
+let use_ok () = ok 0
+[%%expect{|
+type ('a, 'b : any) an_idx = ('a, 'b) idx_imm
+type ('a : any separable) an_array = 'a iarray
+external ok : ('a : any separable). int -> ('a an_array, 'a) an_idx
+  = "%unsafe_array_idx" [@@layout_poly]
+val use_ok : ('a : value_maybe_null). unit -> ('a an_array, 'a) an_idx =
+  <fun>
+|}]
+
+(***************************)
+(* [value_or_null] indices *)
+
+type r = #{ x : int }
+
+module M : sig
+  type t : value_or_null
+  val t : t
+  val i : (t, int) idx_mut
+  val j : (t, int) idx_imm
+  val k : (t, r) idx_imm
+end = struct
+  type t = { mutable i : int; j : int; k : r }
+  let t = { i = 1; j = 2; k = #{ x = 3 } }
+  let i = (.i)
+  let j = (.j)
+  let k = (.k)
+end
+
+let ~i, ~j, ~i', ~k =
+  let i = Idx_mut.get M.t M.i in
+  let j = Idx_imm.get M.t M.j in
+  Idx_mut.set M.t M.i 3;
+  let i' = Idx_mut.get M.t M.i in
+  let k = Idx_imm.get M.t (.idx_imm(M.k).#x) in
+  ~i, ~j, ~i', ~k
+[%%expect{|
+type r = #{ x : int; }
+module M :
+  sig
+    type t : value_or_null
+    val t : t
+    val i : (t, int) idx_mut
+    val j : (t, int) idx_imm
+    val k : (t, r) idx_imm
+  end
+val i : int = 1
+val j : int = 2
+val i' : int = 3
+val k : int = 3
+|}]
+
+type ('a : bits64) a = { a : 'a }
+module M : sig
+  val idx_imm : ('a : value_or_null) ('b : bits64).
+    ('a, 'b a#) idx_imm -> ('a, 'b) idx_imm
+  val idx_mut : ('a : value_or_null) ('b : bits64).
+    ('a, 'b a#) idx_mut -> ('a, 'b) idx_mut
+end = struct
+  let idx_imm i = (.idx_imm(i).#a)
+  let idx_mut i = (.idx_mut(i).#a)
+end
+[%%expect{|
+type ('a : bits64) a = { a : 'a; }
+module M :
+  sig
+    val idx_imm : 'a ('b : bits64). ('a, 'b a#) idx_imm -> ('a, 'b) idx_imm
+    val idx_mut : 'a ('b : bits64). ('a, 'b a#) idx_mut -> ('a, 'b) idx_mut
+  end
 |}]

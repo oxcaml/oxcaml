@@ -40,9 +40,7 @@ external make : ('a : value_or_null). 'a -> ('a t[@local_opt]) = "%makemutable"
     modifying these disjoint memory regions simultaneously becomes impossible,
     which can create a bottleneck. Hence, as a general guideline, if an atomic
     reference is experiencing contention, assigning it its own cache line may
-    enhance performance.
-
-    CR ocaml 5 all-runtime5: does not support runtime4 *)
+    enhance performance. *)
 external make_contended
   : ('a : value_or_null).
   'a -> ('a t[@local_opt])
@@ -52,12 +50,15 @@ external make_contended
 external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load"
 
 (** Set a new value for the atomic reference. *)
-external set : ('a : value_or_null). 'a t @ local -> 'a -> unit = "%atomic_set"
+external set
+  : ('a : value_or_null).
+  ('a t [@local_opt]) -> 'a -> unit
+  = "%atomic_set"
 
 (** Set a new value for the atomic reference, and return the current value. *)
 external exchange
   : ('a : value_or_null).
-  'a t @ local -> 'a -> 'a
+  ('a t [@local_opt]) -> 'a -> 'a
   = "%atomic_exchange"
 
 (** [compare_and_set r seen v] sets the new value of [r] to [v] only if its
@@ -66,7 +67,7 @@ external exchange
     happened) and [false] otherwise. *)
 external compare_and_set
   : ('a : value_or_null).
-  'a t @ local -> 'a -> 'a -> bool
+  ('a t [@local_opt]) -> 'a -> 'a -> bool
   = "%atomic_cas"
 
 (** [compare_exchange r seen v] sets the new value of [r] to [v] only if its
@@ -74,7 +75,7 @@ external compare_and_set
     occur atomically. Returns the previous value. *)
 external compare_exchange
   : ('a : value_or_null).
-  'a t @ local -> 'a -> 'a -> 'a
+  ('a t [@local_opt]) -> 'a -> 'a -> 'a
   = "%atomic_compare_exchange"
 
 (** [fetch_and_add r n] atomically increments the value of [r] by [n], and
@@ -120,22 +121,28 @@ module Loc : sig
       see the documentation above for more information. *)
   type ('a : value_or_null) t : sync_data with 'a = 'a atomic_loc
 
+  (* exposing 'external' primitives directly helps reasoning about
+     performance: it guarantees that all versions of the compiler
+     (including bytecode) remove the pair construction on direct
+     calls:
+       Atomic.Loc.foo [%atomic.loc r.x] ...  *)
+
   external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load_loc"
 
   external get_contended : ('a : value_or_null).
     'a t @ contended local -> 'a @ contended = "%atomic_load_loc"
 
   external set : ('a : value_or_null).
-    'a t @ local -> 'a -> unit = "%atomic_set_loc"
+    ('a t [@local_opt]) -> 'a -> unit = "%atomic_set_loc"
 
   external exchange : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a = "%atomic_exchange_loc"
+    ('a t [@local_opt]) -> 'a -> 'a = "%atomic_exchange_loc"
 
   external compare_and_set : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> bool = "%atomic_cas_loc"
+    ('a t [@local_opt]) -> 'a -> 'a -> bool = "%atomic_cas_loc"
 
   external compare_exchange : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
+    ('a t [@local_opt]) -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
 
   external fetch_and_add
     : int t @ local -> int -> int = "%atomic_fetch_add_loc"

@@ -1,0 +1,31 @@
+(* TEST
+ compile_only = "true";
+ flambda2;
+ ocamlopt_flags = "-dcmm";
+ setup-ocamlopt.byte-build-env;
+ ocamlopt.byte with dump-simplify;
+ {
+   flat-float-array;
+   check-fexpr-dump;
+   check-ocamlopt.byte-output;
+ }{
+   no-flat-float-array;
+   fexpr_reference_suffix = "no-flat-float-array.reference";
+   compiler_reference = "${test_source_directory}/invalid.no-flat-float-array.compilers.reference";
+   check-fexpr-dump;
+   check-ocamlopt.byte-output;
+ }
+*)
+
+(* This example showed an isntance where [Simplify] produced an invalid, which
+   when translated by `to_cmm`, caused delayed let bindings to be lost because
+   there was a missing flush, see PR#1126 *)
+
+let[@inline never] check t1 t2 =
+  if Array.length t1 <> Array.length t2 then failwith "lengths"
+
+let[@inline] bar t1 t2 =
+  check t1 t2;
+  Array.unsafe_get t2 0 = 0.
+
+let foo () = bar [| 1. |] [||]

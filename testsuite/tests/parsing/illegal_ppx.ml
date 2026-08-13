@@ -6,8 +6,8 @@ let empty_record loc = H.Exp.record ~loc [] None
 let empty_apply loc f =
   H.Exp.apply ~loc f []
 
-let foo_exp = H.Exp.constant (Pconst_char 'a') (* irrelevant what this
-                                                   expression actually is *)
+let foo_exp = H.Exp.constant (H.Const.char 'a') (* irrelevant what this
+                                                    expression actually is *)
 let var ~loc name = H.Pat.var { txt = name; loc }
 
 let mutable_let_rec loc =
@@ -36,8 +36,9 @@ let missing_rhs loc =
 
 let empty_let loc = H.Str.value ~loc Asttypes.Nonrecursive []
 let empty_type loc = H.Str.type_ ~loc Asttypes.Nonrecursive []
-let functor_id loc = Location.mkloc
-    (Longident.( Lapply (Lident "F", Lident "X"))) loc
+let empty_poly_binder loc = H.Typ.(poly ~loc [] (any ~loc None))
+let functor_id loc = Location.mkloc (Longident.(
+  Lapply (Location.mknoloc (Lident "F"),  Location.mknoloc (Lident "X")))) loc
 let complex_record loc =
   H.Pat.record ~loc [functor_id loc, H.Pat.any ~loc () ] Asttypes.Closed
 
@@ -57,11 +58,11 @@ let nested_pat_constraint loc =
 
 (* Malformed labeled tuples *)
 
-let lt_empty_open_pat loc =
+let empty_open_tuple_pat loc =
   let pat = H.Pat.mk Ppat_any in
   H.Pat.tuple ~loc [] Open
 
-let lt_short_closed_pat loc =
+let short_closed_tuple_pat loc =
   let pat = H.Pat.mk Ppat_any in
   H.Pat.tuple ~loc [Some "baz", pat] Closed
 
@@ -80,23 +81,26 @@ let expr mapper e =
     mutable_let_ppat_any loc
   | _ -> super.M.expr mapper e
 
-let typ mapper t =
-  match t.ptyp_desc with
-  | Ptyp_extension ({txt="alias_with_too_many_nones";loc},_) ->
-      alias_with_too_many_nones loc
-  | _ -> super.M.typ mapper t
-
 let pat mapper p =
   match p.ppat_desc with
   | Ppat_extension ({txt="record_with_functor_fields";loc},_) ->
       complex_record loc
-  | Ppat_extension ({txt="lt_empty_open_pat";loc},_) ->
-      lt_empty_open_pat loc
-  | Ppat_extension ({txt="lt_short_closed_pat";loc},_) ->
-      lt_short_closed_pat loc
+  | Ppat_extension ({txt="empty_open_tuple_pat";loc},_) ->
+      empty_open_tuple_pat loc
+  | Ppat_extension ({txt="short_closed_tuple_pat";loc},_) ->
+      short_closed_tuple_pat loc
   | Ppat_extension ({txt="nested_pat_constraint";loc},_) ->
       nested_pat_constraint loc
   | _ -> super.M.pat mapper p
+
+let typ mapper ty =
+  match ty.ptyp_desc with
+  | Ptyp_extension ({txt="alias_with_too_many_nones";loc},_) ->
+      alias_with_too_many_nones loc
+  | Ptyp_extension ({txt="empty_poly_binder";loc},_) ->
+      empty_poly_binder loc
+  | _ -> super.M.typ mapper ty
+
 
 let structure_item mapper stri = match stri.pstr_desc with
   | Pstr_extension (({Location.txt="empty_let";loc},_),_) -> empty_let loc
@@ -109,5 +113,5 @@ let signature_item mapper stri = match stri.psig_desc with
 
 
 let () = M.register "illegal ppx" (fun _ ->
-    { super with typ; expr; pat; structure_item; signature_item }
+    { super with expr; pat; structure_item; signature_item; typ }
   )

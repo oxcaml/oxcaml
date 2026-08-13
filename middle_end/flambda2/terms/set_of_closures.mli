@@ -20,15 +20,15 @@ include Expr_std.S with type t := t
 
 include Contains_ids.S with type t := t
 
+val print_with_extra_fields :
+  (Format.formatter -> unit) -> Format.formatter -> t -> unit
+
 val is_empty : t -> bool
 
 (** Create a set of closures given the code for its functions and the closure
     variables. *)
 val create :
-  value_slots:Simple.t Value_slot.Map.t ->
-  Alloc_mode.For_allocations.t ->
-  Function_declarations.t ->
-  t
+  value_slots:Simple.t Value_slot.Map.t -> Function_declarations.t -> t
 
 (** The function declarations associated with the set of closures. *)
 val function_decls : t -> Function_declarations.t
@@ -38,8 +38,6 @@ val value_slots : t -> Simple.t Value_slot.Map.t
 
 (** Returns true iff the given set of closures has no value slots. *)
 val is_closed : t -> bool
-
-val alloc_mode : t -> Alloc_mode.For_allocations.t
 
 val filter_function_declarations :
   t ->

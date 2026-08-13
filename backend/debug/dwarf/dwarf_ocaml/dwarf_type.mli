@@ -19,4 +19,8 @@ open! Dwarf_high
 module Uid = Flambda2_identifiers.Flambda_debug_uid
 
 val variable_to_die :
-  Dwarf_state.t -> Uid.t -> parent_proto_die:Proto_die.t -> Proto_die.reference
+  Dwarf_state.t ->
+  value_type_proto_die:Proto_die.t ->
+  Uid.t ->
+  parent_proto_die:Proto_die.t ->
+  Proto_die.reference

@@ -366,8 +366,8 @@ let () =
       (Printf.sprintf
          ">> Fatal error: In function arguments: changed preassigned \
           register's location from %s to %s"
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 1))
+         (Regs.register_name Cmm.Int (P RAX))
+         (Regs.register_name Cmm.Int (P RBX)))
 
 let () =
   check "Location can't be unknown after allocation"
@@ -379,7 +379,7 @@ let () =
     ~exp_err:
       (if String.equal Config.architecture "amd64"
        then
-         ">> Fatal error: instruction 20 has a register (anon:V/37) with an \
+         ">> Fatal error: instruction 20 has a register (anon:V/44) with an \
           unknown location"
        else
          ">> Fatal error: instruction 20 has a register (anon:V/68) with an \
@@ -398,8 +398,8 @@ let () =
       (Printf.sprintf
          ">> Fatal error: In instruction's no 17 results: changed preassigned \
           register's location from %s to %s"
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 1))
+         (Regs.register_name Cmm.Int (P RDI))
+         (Regs.register_name Cmm.Int (P RBX)))
 
 let () =
   check "Duplicate instruction found when validating description"
@@ -531,7 +531,7 @@ let () =
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
       ">> Fatal error: Register allocation added a terminator no. 26 but \
-       that's not allowed for this type of terminator: Return"
+       that's not allowed for this type of terminator: return"
 
 let () =
   check "Regalloc reordered instructions between blocks"
@@ -619,7 +619,7 @@ let () =
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
       ">> Fatal error: The desc of terminator with id 3 changed, before: \
-       Return, after: Raise."
+       return, after: raise."
 
 let () =
   check "Deleted instruction"
@@ -858,22 +858,22 @@ let test_loop ~loop_loc_first n =
           Equations: R[%s]=%s R[%s]=%s R[%s]=%s\n\
           Function argument descriptions: R[%s], R[%s], R[%s]\n\
           Function argument locations: %s, %s, %s"
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 2)
-         (Reg_class.register_name Cmm.Int 0)
-         (Reg_class.register_name Cmm.Int 1)
-         (Reg_class.register_name Cmm.Int 2))
+         (Regs.register_name Cmm.Int (P RDI))
+         (Regs.register_name Cmm.Int (P RBX))
+         (Regs.register_name Cmm.Int (P RBX))
+         (Regs.register_name Cmm.Int (P RBX))
+         (Regs.register_name Cmm.Int (P RAX))
+         (Regs.register_name Cmm.Int (P RAX))
+         (Regs.register_name Cmm.Int (P RDI))
+         (Regs.register_name Cmm.Int (P RBX))
+         (Regs.register_name Cmm.Int (P RDI))
+         (Regs.register_name Cmm.Int (P RDI))
+         (Regs.register_name Cmm.Int (P RAX))
+         (Regs.register_name Cmm.Int (P RBX))
+         (Regs.register_name Cmm.Int (P RDI))
+         (Regs.register_name Cmm.Int (P RAX))
+         (Regs.register_name Cmm.Int (P RBX))
+         (Regs.register_name Cmm.Int (P RDI)))
     ~exp_err:"";
   let end_time = Sys.time () in
   Format.printf "  Time of loop test: %fs\n" (end_time -. start_time);

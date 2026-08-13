@@ -21,6 +21,8 @@ open! Int_replace_polymorphic_compare [@@warning "-66"]
 
 type label = Cmm.label
 
+(* N.B. [Branch_relaxation] relies on physical equality being precise on values
+   of this type. *)
 type instruction =
   { mutable desc : instruction_desc;
     mutable next : instruction;

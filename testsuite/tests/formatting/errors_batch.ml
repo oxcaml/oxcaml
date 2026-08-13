@@ -40,6 +40,7 @@ let () =
       msg "@[<v>This second sub-message does not have \
            a location;@,ghost locations of submessages are \
            not printed.@]";
-    ]
+    ];
+    footnote=None;
   } in
   print_report Format.std_formatter report

@@ -1,6 +1,7 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
+ flags = "-extension layouts_beta";
  {
    expect;
  }
@@ -44,10 +45,13 @@ Line 1, characters 23-39:
 1 | type t_nope = string * #(string * bool)
                            ^^^^^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "#(string * bool)" is value & value
+       The layout of "#(string * bool)" is value non_float & value non_pointer
          because it is an unboxed tuple.
-       But the layout of "#(string * bool)" must be a sublayout of value
+       But the layout of "#(string * bool)" must be a value layout
          because it's the type of a tuple element.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 type t_nope_inner = #{ s : string; b : bool }
@@ -58,10 +62,13 @@ Line 2, characters 23-35:
 2 | type t_nope = string * t_nope_inner
                            ^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "t_nope_inner" is value & value
+       The layout of "t_nope_inner" is value non_float & value non_pointer
          because of the definition of t_nope_inner at line 1, characters 0-45.
-       But the layout of "t_nope_inner" must be a sublayout of value
+       But the layout of "t_nope_inner" must be a value layout
          because it's the type of a tuple element.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (********************************************)
@@ -86,11 +93,15 @@ type t2_wrong : value & float64 & value = #(string option * t1)
 Line 1, characters 0-63:
 1 | type t2_wrong : value & float64 & value = #(string option * t1)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "#(string option * t1)" is value & (float64 & value)
+Error: The layout of type "#(string option * t1)" is
+           value non_float & (float64 & value non_pointer)
          because it is an unboxed tuple.
        But the layout of type "#(string option * t1)" must be a sublayout of
            value & float64 & value
          because of the definition of t2_wrong at line 1, characters 0-63.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
@@ -98,11 +109,15 @@ type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
 Line 1, characters 0-74:
 1 | type t2_wrong : value & float64 & value = #{ so : string option; t1 : t1 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "t2_wrong" is value & (float64 & value)
+Error: The layout of type "t2_wrong" is
+           value non_float & (float64 & value non_pointer)
          because it is an unboxed record.
        But the layout of type "t2_wrong" must be a sublayout of
            value & float64 & value
          because of the annotation on the declaration of the type t2_wrong.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 type ('a : value & bits64) t3 = 'a
@@ -132,10 +147,11 @@ Line 1, characters 16-28:
                     ^^^^^^^^^^^^
 Error: This type "#(int * int)" should be an instance of type
          "('a : value & bits64)"
-       The layout of #(int * int) is value & value
+       The layout of #(int * int) is value non_pointer & value non_pointer
          because it is an unboxed tuple.
        But the layout of #(int * int) must be a sublayout of value & bits64
          because of the definition of t3 at line 1, characters 0-34.
+       Note: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts v7.1: The above error should identify the component of the product
    that is problematic. *)
@@ -149,10 +165,11 @@ Line 2, characters 16-30:
                     ^^^^^^^^^^^^^^
 Error: This type "t4_wrong_inner" should be an instance of type
          "('a : value & bits64)"
-       The layout of t4_wrong_inner is value & value
+       The layout of t4_wrong_inner is value non_pointer & value non_pointer
          because of the definition of t4_wrong_inner at line 1, characters 0-45.
        But the layout of t4_wrong_inner must be a sublayout of value & bits64
          because of the definition of t3 at line 1, characters 0-34.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 
@@ -172,10 +189,11 @@ Line 2, characters 11-15:
 2 | type t10 = bool t6
                ^^^^
 Error: This type "bool" should be an instance of type "('a : value & bits64)"
-       The layout of bool is value
+       The layout of bool is value non_pointer
          because it is the primitive type bool.
        But the layout of bool must be a sublayout of value & bits64
          because of the definition of t6 at line 1, characters 0-37.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type ('a : value & bits64) t6 = 'a t7
@@ -195,10 +213,11 @@ Line 3, characters 11-15:
 3 | type t10 = bool t6
                ^^^^
 Error: This type "bool" should be an instance of type "('a : value & bits64)"
-       The layout of bool is value
+       The layout of bool is value non_pointer
          because it is the primitive type bool.
        But the layout of bool must be a sublayout of value & bits64
          because of the definition of t6 at line 1, characters 0-37.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type ('a : value & bits64) t6_wrong = 'a t7_wrong
@@ -209,11 +228,14 @@ Line 2, characters 24-38:
                             ^^^^^^^^^^^^^^
 Error: This type "#(int * int64)" should be an instance of type
          "('a : value & bits64)"
-       The layout of #(int * int64) is value & value
+       The layout of #(int * int64) is value non_pointer & value non_float
          because it is an unboxed tuple.
        But the layout of #(int * int64) must be a sublayout of value & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 (* CR layouts v7.1: The above error should identify the component of the product
    that is problematic. *)
@@ -226,14 +248,17 @@ Line 1, characters 0-54:
 1 | type t6_wrong_inner_record = #{ i : int; i64 : int64 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The kind of t6_wrong_inner_record is value_or_null & bits64
+       The layout of t6_wrong_inner_record is
+           value non_pointer & value non_float
          because it is an unboxed record.
-       But the kind of t6_wrong_inner_record must be a subkind of
+       But the layout of t6_wrong_inner_record must be a sublayout of
            value & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
-(* CR layouts v7.2: The above has a very bad error message. *)
 
 (* Just like t6/t7, but with the annotation on the other (the order doesn't
    matter) *)
@@ -284,7 +309,7 @@ type t4 = t2 -> (t3 -> t3) -> t2
 [%%expect{|
 type t1 = #(int * bool) -> #(int * float# * #(int64# * string option))
 type t2 : value & float64
-type t3 : value & (float64 & value) & float64
+type t3 : value & (float64 & value non_pointer) & float64
 type t4 = t2 -> (t3 -> t3) -> t2
 |}]
 
@@ -447,10 +472,11 @@ Line 1, characters 31-44:
 1 | type poly_var_type = [ `Foo of #(int * bool) ]
                                    ^^^^^^^^^^^^^
 Error: Polymorphic variant constructor argument types must have layout value.
-       The layout of "#(int * bool)" is value & value
+       The layout of "#(int * bool)" is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of "#(int * bool)" must be a sublayout of value
+       But the layout of "#(int * bool)" must be a value layout
          because it's the type of the field of a polymorphic variant.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let poly_var_term = `Foo #(1,2)
@@ -463,7 +489,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}]
 
@@ -473,10 +499,11 @@ Line 1, characters 25-41:
 1 | type tuple_type = (int * #(bool * float#))
                              ^^^^^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "#(bool * float#)" is value & float64
+       The layout of "#(bool * float#)" is value non_pointer & float64
          because it is an unboxed tuple.
-       But the layout of "#(bool * float#)" must be a sublayout of value
+       But the layout of "#(bool * float#)" must be a value layout
          because it's the type of a tuple element.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let tuple_term = ("hi", #(1, 2))
@@ -489,7 +516,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_3 & '_representable_layout_4
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -528,10 +555,11 @@ Line 1, characters 21-38:
 1 | type object_type = < x : #(int * bool) >
                          ^^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The layout of "#(int * bool)" is value & value
+       The layout of "#(int * bool)" is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of "#(int * bool)" must be a sublayout of value
+       But the layout of "#(int * bool)" must be a value layout
          because it's the type of an object field.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let object_term = object val x = #(1, 2) end
@@ -540,10 +568,11 @@ Line 1, characters 29-30:
 1 | let object_term = object val x = #(1, 2) end
                                  ^
 Error: Variables bound in a class must have layout value.
-       The layout of x is value & value
+       The layout of x is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a value layout
          because it's the type of a class field.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 class class_ =
@@ -559,7 +588,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_5 & '_representable_layout_6
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a value layout
          because it's the type of an object field.
 |}]
 
@@ -572,12 +601,12 @@ end;;
 Line 3, characters 17-21:
 3 |     let #(x,y) = utup in
                      ^^^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "utup" has type "('a : value_or_null)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
            '_representable_layout_7 & '_representable_layout_8
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -591,10 +620,11 @@ Line 2, characters 31-45:
 2 | type poly_var_type = [ `Foo of poly_var_inner ]
                                    ^^^^^^^^^^^^^^
 Error: Polymorphic variant constructor argument types must have layout value.
-       The layout of "poly_var_inner" is value & value
+       The layout of "poly_var_inner" is value non_pointer & value non_pointer
          because of the definition of poly_var_inner at line 1, characters 0-44.
-       But the layout of "poly_var_inner" must be a sublayout of value
+       But the layout of "poly_var_inner" must be a value layout
          because it's the type of the field of a polymorphic variant.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type poly_var_term_record = #{ i : int; i2 : int }
@@ -606,10 +636,12 @@ Line 2, characters 25-43:
                              ^^^^^^^^^^^^^^^^^^
 Error: This expression has type "poly_var_term_record"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of poly_var_term_record is value & value
+       The layout of poly_var_term_record is
+           value non_pointer & value non_pointer
          because of the definition of poly_var_term_record at line 1, characters 0-50.
-       But the layout of poly_var_term_record must be a sublayout of value
+       But the layout of poly_var_term_record must be a value layout
          because it's the type of the field of a polymorphic variant.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type record_inner = #{ b : bool; f : float# }
@@ -620,10 +652,11 @@ Line 2, characters 25-37:
 2 | type tuple_type = (int * record_inner)
                              ^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "record_inner" is value & float64
+       The layout of "record_inner" is value non_pointer & float64
          because of the definition of record_inner at line 1, characters 0-45.
-       But the layout of "record_inner" must be a sublayout of value
+       But the layout of "record_inner" must be a value layout
          because it's the type of a tuple element.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type record = #{ i : int; i2 : int }
@@ -635,10 +668,11 @@ Line 2, characters 24-42:
                             ^^^^^^^^^^^^^^^^^^
 Error: This expression has type "record" but an expression was expected of type
          "('a : value_or_null)"
-       The layout of record is value & value
+       The layout of record is value non_pointer & value non_pointer
          because of the definition of record at line 1, characters 0-36.
-       But the layout of record must be a sublayout of value
+       But the layout of record must be a value layout
          because it's the type of a tuple element.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type record_inner = #{ i : int; b : bool }
@@ -688,10 +722,11 @@ Line 2, characters 21-37:
 2 | type object_type = < x : object_inner >
                          ^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The layout of "object_inner" is value & value
+       The layout of "object_inner" is value non_pointer & value non_pointer
          because of the definition of object_inner at line 1, characters 0-42.
-       But the layout of "object_inner" must be a sublayout of value
+       But the layout of "object_inner" must be a value layout
          because it's the type of an object field.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type object_term_record = #{ i1 : int; i2 : int }
@@ -702,10 +737,11 @@ Line 2, characters 29-30:
 2 | let object_term = object val x = #{ i1 = 1; i2 = 2 } end
                                  ^
 Error: Variables bound in a class must have layout value.
-       The layout of x is value & value
+       The layout of x is value non_pointer & value non_pointer
          because of the definition of object_term_record at line 1, characters 0-49.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a value layout
          because it's the type of a class field.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type class_record = #{ i1 : int; i2 : int }
@@ -720,10 +756,11 @@ Line 4, characters 15-34:
                    ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "class_record"
        but an expression was expected of type "('a : value)"
-       The layout of class_record is value & value
+       The layout of class_record is value non_pointer & value non_pointer
          because of the definition of class_record at line 1, characters 0-43.
-       But the layout of class_record must be a sublayout of value
+       But the layout of class_record must be a value layout
          because it's the type of an object field.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type capture_record = #{ x : int; y : int }
@@ -737,12 +774,13 @@ type capture_record = #{ x : int; y : int; }
 Line 4, characters 20-24:
 4 |     let #{ x; y } = utup in
                         ^^^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "utup" has type "('a : value_or_null)"
        but an expression was expected of type "capture_record"
-       The layout of capture_record is value & value
+       The layout of capture_record is value non_pointer & value non_pointer
          because of the definition of capture_record at line 1, characters 0-43.
-       But the layout of capture_record must be a sublayout of value
+       But the layout of capture_record must be a value layout
          because it's the type of a variable captured in an object.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (****************************************************)
@@ -893,24 +931,13 @@ module F :
     sig type r = X.t4 t_constraint end
 |}]
 
-(* This typechecks for unboxed tuples, but fail for [@@unboxed], unboxed, and
-   boxed records, in the same way as below.
-
-   CR layouts v7.2: These should typecheck for all record forms.
-*)
 module type S_coherence_deep = sig
   type t1 : any
   type t2 = #{ i : int; t1 : t1 }
 end
 [%%expect{|
-Line 3, characters 24-31:
-3 |   type t2 = #{ i : int; t1 : t1 }
-                            ^^^^^^^
-Error: Unboxed record element types must have a representable layout.
-       The layout of t1 is any
-         because of the definition of t1 at line 2, characters 2-15.
-       But the layout of t1 must be representable
-         because it is the type of record field t1.
+module type S_coherence_deep =
+  sig type t1 : any type t2 = #{ i : int; t1 : t1; } end
 |}]
 
 module type S_coherence_deep = sig
@@ -918,14 +945,8 @@ module type S_coherence_deep = sig
   type t2 = { t1 : t1 } [@@unboxed]
 end
 [%%expect{|
-Line 3, characters 14-21:
-3 |   type t2 = { t1 : t1 } [@@unboxed]
-                  ^^^^^^^
-Error: [@@unboxed] record element types must have a representable layout.
-       The layout of t1/2 is any
-         because of the definition of t1 at line 2, characters 2-15.
-       But the layout of t1/2 must be representable
-         because it is the type of record field t1.
+module type S_coherence_deep =
+  sig type t1 : any type t2 = { t1 : t1; } [@@unboxed] end
 |}]
 
 (*************************************************)
@@ -1084,8 +1105,8 @@ let f_external_kind_annot_mode_crosses_local_2
   : local_ t -> t = fun x -> x
 [%%expect{|
 type t
-  : value mod global external_ non_float
-    & (float64 mod global & value mod global external_ non_float)
+  : value non_pointer mod global external_
+    & (float64 mod global & value non_pointer mod global external_)
 val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 |}]
 
@@ -1093,7 +1114,7 @@ type t : immediate & (value & float64)
 let f_internal_kind_annot_does_not_mode_cross_local_2
   : local_ t -> t = fun x -> x
 [%%expect{|
-type t : value & (value & float64)
+type t : value non_pointer & (value & float64)
 Line 3, characters 29-30:
 3 |   : local_ t -> t = fun x -> x
                                  ^
@@ -1124,6 +1145,8 @@ Line 4, characters 25-45:
                              ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external ext_tuple_arg_with_attr_u : (#(int * bool) [@unboxed]) -> int = "foo"
@@ -1132,7 +1155,7 @@ Line 1, characters 38-51:
 1 | external ext_tuple_arg_with_attr_u : (#(int * bool) [@unboxed]) -> int = "foo"
                                           ^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1141,7 +1164,7 @@ external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
 Line 1, characters 38-51:
 1 | external ext_tuple_arg_with_attr_t : (#(int * bool) [@untagged]) -> int = "foo"
                                           ^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1152,6 +1175,8 @@ Line 1, characters 27-43:
                                ^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external ext_product_arg_3 : t_product_3 -> int = "foo" "bar"
@@ -1161,6 +1186,8 @@ Line 1, characters 29-47:
                                  ^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external ext_product_arg_with_attr_u : (t_product [@unboxed]) -> int = "foo"
@@ -1169,7 +1196,7 @@ Line 1, characters 40-49:
 1 | external ext_product_arg_with_attr_u : (t_product [@unboxed]) -> int = "foo"
                                             ^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1178,7 +1205,7 @@ external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
 Line 1, characters 40-49:
 1 | external ext_product_arg_with_attr_t : (t_product [@untagged]) -> int = "foo"
                                             ^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1194,6 +1221,7 @@ Line 1, characters 29-58:
                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 external ext_nested_tuple_return : int -> #(int * #(int * bool)) = "foo" "bar"
@@ -1203,6 +1231,7 @@ Line 1, characters 35-64:
                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 external ext_tuple_return_with_attr_u :
@@ -1212,7 +1241,7 @@ Line 2, characters 10-23:
 2 |   int -> (#(int * bool) [@unboxed]) = "foo"
               ^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1222,7 +1251,7 @@ external ext_tuple_return_with_attr_t :
 Line 2, characters 10-23:
 2 |   int -> (#(int * bool) [@untagged]) = "foo"
               ^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1239,6 +1268,7 @@ Line 1, characters 32-50:
                                     ^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 external ext_product_return_with_attr_u : int -> (t_product [@unboxed]) = "foo"
@@ -1247,7 +1277,7 @@ Line 1, characters 50-59:
 1 | external ext_product_return_with_attr_u : int -> (t_product [@unboxed]) = "foo"
                                                       ^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1256,7 +1286,7 @@ external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
 Line 1, characters 50-59:
 1 | external ext_product_return_with_attr_t : int -> (t_product [@untagged]) = "foo"
                                                       ^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1288,6 +1318,8 @@ Line 2, characters 26-54:
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 type ext_record_arg_record_3 = #{ i : int; b : bool; s : string }
@@ -1299,6 +1331,8 @@ Line 2, characters 28-58:
                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 type ext_record_arg_attr_record = #{ i : int; b : bool }
@@ -1310,7 +1344,7 @@ Line 3, characters 3-29:
 3 |   (ext_record_arg_attr_record [@unboxed]) -> int = "foo"
        ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1320,7 +1354,7 @@ external ext_record_arg_with_attr_t :
 Line 2, characters 3-29:
 2 |   (ext_record_arg_attr_record [@untagged]) -> int = "foo"
        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1340,6 +1374,7 @@ Line 2, characters 31-41:
                                    ^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 type ext_record_nested = #{ x : int; y : ext_record_arg_record }
@@ -1351,6 +1386,21 @@ Line 2, characters 30-54:
                                   ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [foo] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
+|}]
+
+external error_with_multiple_hints
+  : #(int * int) -> #(int * int) -> #(int * int * int)
+  = "foo" "bar"
+[%%expect{|
+Line 2, characters 4-54:
+2 |   : #(int * int) -> #(int * int) -> #(int * int * int)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
+Hint: Unboxed products in C stub returns must be a pair of non-products.
 |}]
 
 type t = #{ i : int; b : bool }
@@ -1361,7 +1411,7 @@ Line 2, characters 49-50:
 2 | external ext_record_return_with_attr_u : int -> (t [@unboxed]) = "foo"
                                                      ^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -1370,7 +1420,7 @@ external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
 Line 1, characters 49-50:
 1 | external ext_record_return_with_attr_t : int -> (t [@untagged]) = "foo"
                                                      ^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -1403,10 +1453,13 @@ Line 1, characters 28-53:
 1 | external foo1 : ('a : any). #( string * 'a * float# ) -> int = "foo" "bar"
                                 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Types in an external must have a representable layout.
-       The layout of #(string * 'a * float#) is value & any & float64
+       The layout of #(string * 'a * float#) is
+           value non_float & any & float64
          because it is an unboxed tuple.
        But the layout of #(string * 'a * float#) must be representable
          because it's the type of an argument in an external declaration.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 external foo2 : ('a : any). int -> #( string * 'a * float# ) = "foo" "bar"
@@ -1415,10 +1468,88 @@ Line 1, characters 35-60:
 1 | external foo2 : ('a : any). int -> #( string * 'a * float# ) = "foo" "bar"
                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Types in an external must have a representable layout.
-       The layout of #(string * 'a * float#) is value & any & float64
+       The layout of #(string * 'a * float#) is
+           value non_float & any & float64
          because it is an unboxed tuple.
        But the layout of #(string * 'a * float#) must be representable
          because it's the type of the result of an external declaration.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}]
+
+(* Test 9b: @unpacked on product args *)
+
+(* Product arg without [@unpacked] gives a hint *)
+external ext_product_no_attr :
+  #(int * bool) -> int = "foo" "bar"
+[%%expect{|
+Line 2, characters 2-22:
+2 |   #(int * bool) -> int = "foo" "bar"
+      ^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
+|}]
+
+(* @unpacked allows product types as arguments to C stubs *)
+external ext_unpack_tuple :
+  (#(int * bool) [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+external ext_unpack_tuple : (#(int * bool) [@unpacked]) -> int = "foo" "bar"
+|}]
+
+external ext_unpack_product :
+  (t_product [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+external ext_unpack_product : (t_product [@unpacked]) -> int = "foo" "bar"
+|}]
+
+external ext_unpack_product_3 :
+  (t_product_3 [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+external ext_unpack_product_3 : (t_product_3 [@unpacked]) -> int = "foo"
+  "bar"
+|}]
+
+(* @unpacked with unboxed record *)
+external ext_unpack_record :
+  (ext_record_arg_record [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+external ext_unpack_record : (ext_record_arg_record [@unpacked]) -> int
+  = "foo" "bar"
+|}]
+
+(* @unpacked on a non-product type should error *)
+external ext_unpack_int : (int [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+Line 1, characters 27-30:
+1 | external ext_unpack_int : (int [@unpacked]) -> int = "foo" "bar"
+                               ^^^
+Error: Don't know how to unpack this type.
+       Only types with product layouts can be marked "unpacked".
+|}]
+
+(* @unpacked on return should error *)
+external ext_unpack_return :
+  int -> (#(int * bool) [@unpacked]) = "foo" "bar"
+[%%expect{|
+Line 2, characters 2-36:
+2 |   int -> (#(int * bool) [@unpacked]) = "foo" "bar"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+Hint: The "[@unpacked]" attribute is not allowed on C stub returns.
+|}]
+
+(* @unpacked combined with @unboxed should error *)
+external ext_unpack_unboxed :
+  (#(int * bool) [@unpacked] [@unboxed]) -> int = "foo" "bar"
+[%%expect{|
+Line 2, characters 31-38:
+2 |   (#(int * bool) [@unpacked] [@unboxed]) -> int = "foo" "bar"
+                                   ^^^^^^^
+Error: Too many "[@@unboxed]"/"[@@untagged]"/"[@@unpacked]" attributes
 |}]
 
 (***********************************)
@@ -1437,7 +1568,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_9 & '_representable_layout_10
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a value layout
          because it's the type of the recursive variable x.
 |}]
 
@@ -1453,10 +1584,11 @@ Line 4, characters 37-56:
                                          ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "letrec_record"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of letrec_record is value & value
+       The layout of letrec_record is value non_pointer & value non_pointer
          because of the definition of letrec_record at line 3, characters 0-44.
-       But the layout of letrec_record must be a sublayout of value
+       But the layout of letrec_record must be a value layout
          because it's the type of the recursive variable x.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Unboxed records of kind value are also disallowed: *)
@@ -1483,7 +1615,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_11 & '_representable_layout_12
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a value layout
          because it's the type of the recursive variable _x.
 |}]
 
@@ -1496,10 +1628,11 @@ Line 2, characters 21-41:
                          ^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "letrec_simple"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of letrec_simple is value & value
+       The layout of letrec_simple is value non_pointer & value non_pointer
          because of the definition of letrec_simple at line 1, characters 0-44.
-       But the layout of letrec_simple must be a sublayout of value
+       But the layout of letrec_simple must be a value layout
          because it's the type of the recursive variable _x.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (************************************************)
@@ -1585,12 +1718,11 @@ Line 1, characters 31-37:
 1 | let _ = Array.init 3 (fun _ -> #(1,2))
                                    ^^^^^^
 Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type
-         "('c : value_or_null mod separable)"
+       but an expression was expected of type "('c : value_maybe_null)"
        The layout of #('a * 'b) is
            '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value.
+       But the layout of #('a * 'b) must be a value layout.
 |}]
 
 external make : ('a : value & value) . int -> 'a -> 'a array =
@@ -1601,6 +1733,8 @@ Line 1, characters 16-60:
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [caml_array_make] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: Types with product layouts in C stub arguments require the
+      "[@unpacked]" attribute.
 |}]
 
 external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
@@ -1620,7 +1754,7 @@ external[@layout_poly] array_get : ('a : any mod separable) . 'a array -> int ->
   "%array_safe_get"
 let f x : #(int * int) = array_get x 3
 [%%expect{|
-external array_get : ('a : any mod separable). 'a array -> int -> 'a
+external array_get : ('a : any separable). 'a array -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 val f : #(int * int) array -> #(int * int) = <fun>
 |}]
@@ -1629,7 +1763,7 @@ external[@layout_poly] array_set : ('a : any mod separable) . 'a array -> int ->
   "%array_safe_set"
 let f x = array_set x 3 #(1,2)
 [%%expect{|
-external array_set : ('a : any mod separable). 'a array -> int -> 'a -> unit
+external array_set : ('a : any separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
 val f : #(int * int) array -> unit = <fun>
 |}]
@@ -1670,11 +1804,12 @@ Line 2, characters 31-50:
 2 | let _ = Array.init 3 (fun _ -> #{ i1 = 1; i2 = 2 })
                                    ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "array_init_record"
-       but an expression was expected of type
-         "('a : value_or_null mod separable)"
-       The layout of array_init_record is value & value
+       but an expression was expected of type "('a : value_maybe_null)"
+       The layout of array_init_record is
+           value non_pointer & value non_pointer
          because of the definition of array_init_record at line 1, characters 0-48.
-       But the layout of array_init_record must be a sublayout of value.
+       But the layout of array_init_record must be a value layout.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Arrays of unboxed records of kind value *are* allowed in all cases *)
@@ -1702,12 +1837,12 @@ class product_instance_variable x =
 Line 2, characters 25-26:
 2 |   let sum = let #(a,b) = x in a + b in
                              ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
            '_representable_layout_15 & '_representable_layout_16
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a value layout
          because it's the type of a term-level argument to a class constructor.
 |}]
 
@@ -1722,12 +1857,14 @@ type class_arg_record = #{ a : int; b : int; }
 Line 3, characters 28-29:
 3 |   let sum = let #{ a; b } = x in a + b in
                                 ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type "class_arg_record"
-       The layout of class_arg_record is value & value
+       The layout of class_arg_record is
+           value non_pointer & value non_pointer
          because of the definition of class_arg_record at line 1, characters 0-45.
-       But the layout of class_arg_record must be a sublayout of value
+       But the layout of class_arg_record must be a value layout
          because it's the type of a term-level argument to a class constructor.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* But unboxed records of kind value are: *)
@@ -1757,7 +1894,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_17 & '_representable_layout_18
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a value layout
          because it's the type of a lazy expression.
 |}]
 
@@ -1768,10 +1905,11 @@ Line 1, characters 9-21:
 1 | type t = #(int * int) lazy_t
              ^^^^^^^^^^^^
 Error: This type "#(int * int)" should be an instance of type "('a : value)"
-       The layout of #(int * int) is value & value
+       The layout of #(int * int) is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of #(int * int) must be a sublayout of value
+       But the layout of #(int * int) must be a value layout
          because the type argument of lazy_t has layout value.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type lazy_record = #{ i1 : int; i2 : int }
@@ -1783,10 +1921,11 @@ Line 2, characters 13-32:
                  ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "lazy_record"
        but an expression was expected of type "('a : value)"
-       The layout of lazy_record is value & value
+       The layout of lazy_record is value non_pointer & value non_pointer
          because of the definition of lazy_record at line 1, characters 0-42.
-       But the layout of lazy_record must be a sublayout of value
+       But the layout of lazy_record must be a value layout
          because it's the type of a lazy expression.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type lazy_t_record = #{ i1 : int; i2 : int }
@@ -1797,10 +1936,11 @@ Line 2, characters 9-22:
 2 | type t = lazy_t_record lazy_t
              ^^^^^^^^^^^^^
 Error: This type "lazy_t_record" should be an instance of type "('a : value)"
-       The layout of lazy_t_record is value & value
+       The layout of lazy_t_record is value non_pointer & value non_pointer
          because of the definition of lazy_t_record at line 1, characters 0-44.
-       But the layout of lazy_t_record must be a sublayout of value
+       But the layout of lazy_t_record must be a value layout
          because the type argument of lazy_t has layout value.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Again, unboxed records of kind value can be: *)
@@ -1870,7 +2010,7 @@ Error: This expression has type "#('a * 'b)"
        The layout of #('a * 'b) is
            '_representable_layout_19 & '_representable_layout_20
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a sublayout of value
+       But the layout of #('a * 'b) must be a value layout
          because the type argument of option has layout value_or_null.
 |}]
 
@@ -1883,10 +2023,11 @@ Line 2, characters 29-48:
                                  ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "optional_record"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of optional_record is value & value
+       The layout of optional_record is value non_pointer & value non_pointer
          because of the definition of optional_record at line 1, characters 0-46.
-       But the layout of optional_record must be a sublayout of value
+       But the layout of optional_record must be a value layout
          because the type argument of option has layout value_or_null.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (******************************)
@@ -1925,8 +2066,8 @@ Line 1, characters 19-27:
 Error: This type "string t" = "#(string u * string u)"
        should be an instance of type "('a : any mod global)"
        The kind of string t is
-           immediate mod dynamic with string u
-           & immediate mod dynamic with string u
+           value mod everything non_float mod dynamic with string u
+           & value mod everything non_float mod dynamic with string u
          because it is an unboxed tuple.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -1944,7 +2085,9 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-           immutable_data & immutable_data & immutable_data
+           immutable_data non_pointer
+           & immutable_data
+           & immutable_data non_pointer
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
            any mod external_
@@ -1958,7 +2101,7 @@ Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
            immediate mod dynamic with int with string
-           & immediate mod dynamic with int with string
+           & value mod everything non_float mod dynamic with int with string
            & immediate mod dynamic with int with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
@@ -1995,9 +2138,7 @@ Line 1, characters 19-27:
 1 | type should_fail = string t needs_any_mod_global
                        ^^^^^^^^
 Error: This type "string t" should be an instance of type "('a : any mod global)"
-       The kind of string t is
-           immediate mod dynamic with string u
-           & immediate mod dynamic with string u
+       The kind of string t is immutable_data & immutable_data
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
@@ -2016,7 +2157,9 @@ Line 4, characters 9-17:
 Error: This type "s_record" should be an instance of type
          "('a : any mod external_)"
        The kind of s_record is
-           immutable_data & immutable_data & immutable_data
+           immutable_data non_pointer
+           & immutable_data
+           & immutable_data non_pointer
          because of the definition of s_record at line 3, characters 0-51.
        But the kind of s_record must be a subkind of any mod external_
          because of the definition of t at line 1, characters 0-31.
@@ -2035,12 +2178,8 @@ let rec f : ('a : any mod separable & value). unit -> 'a -> 'a = fun () -> f ()
 let g (x : 'a) = f () x
 
 [%%expect{|
-val f :
-  ('a : any mod separable & value_or_null mod separable). unit -> 'a -> 'a =
-  <fun>
-val g :
-  ('a : value_or_null mod separable & value_or_null mod separable). 'a -> 'a =
-  <fun>
+val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
+val g : ('a : value_maybe_null & value). 'a -> 'a = <fun>
 |}]
 
 (* test subjkinding *)
@@ -2049,14 +2188,12 @@ let rec f : ('a : any mod separable & value). unit -> 'a -> 'a = fun () -> f ()
 let g (type a) (x : a) = f () x
 
 [%%expect{|
-val f :
-  ('a : any mod separable & value_or_null mod separable). unit -> 'a -> 'a =
-  <fun>
+val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
 Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
-Error: This expression has type "a" but an expression was expected of type
-         "('a : '_representable_layout_21 & value_or_null mod separable)"
+Error: The value "x" has type "a" but an expression was expected of type
+         "('a : '_representable_layout_21 separable & value)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable
@@ -2204,17 +2341,14 @@ Lines 1-6, characters 0-30:
 4 |     c : #(int64# * #(float# * (bool -> bool) * 'b ));
 5 |     d : char }
 6 |   constraint 'b = int * string
-Error: The kind of type "record" is value mod immutable non_float with 'a
+Error: The kind of type "record" is value non_float mod immutable with 'a
          because it's a boxed record type.
        But the kind of type "record" must be a subkind of value mod portable
          because of the annotation on the declaration of the type record.
 |}]
 
-(*******************************************************************************)
-(* Test 22: You can't defeat the value prefix size limit with nested products. *)
-
-(* And note that blocks with products are always mixed blocks, so we don't
-   need to add any unboxed types to hit the limit. *)
+(****************************************************************************)
+(* Test 22: Product components counted correctly for the value prefix limit *)
 
 type eight_values :
   value & value & value & value & value & value & value & value
@@ -2236,7 +2370,58 @@ type r_254 =
     f253 : string;
     f254 : string;
   }
-
+type r_254_f64 =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f64 : float#;
+  }
+type r_255 =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f255 : string;
+  }
+type r_255_void =
+  { a : thirty_two_values#;
+    b : thirty_two_values#;
+    c : thirty_two_values#;
+    d : thirty_two_values#;
+    e : thirty_two_values#;
+    f : thirty_two_values#;
+    g : thirty_two_values#;
+    h : #(eight_values * eight_values * eight_values);
+    f249 : string;
+    f250 : string;
+    f251 : string;
+    f252 : string;
+    f253 : string;
+    f254 : string;
+    f255 : #(string * unit#);
+    v : unit#;
+  }
 [%%expect{|
 type eight_values
   : value & value & value & value & value & value & value & value
@@ -2262,9 +2447,61 @@ type r_254 = {
   f253 : string;
   f254 : string;
 }
+type r_254_f64 = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f64 : float#;
+}
+type r_255 = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f255 : string;
+}
+type r_255_void = {
+  a : thirty_two_values#;
+  b : thirty_two_values#;
+  c : thirty_two_values#;
+  d : thirty_two_values#;
+  e : thirty_two_values#;
+  f : thirty_two_values#;
+  g : thirty_two_values#;
+  h : #(eight_values * eight_values * eight_values);
+  f249 : string;
+  f250 : string;
+  f251 : string;
+  f252 : string;
+  f253 : string;
+  f254 : string;
+  f255 : #(string * unit#);
+  v : unit#;
+}
 |}]
 
-type r_255 =
+type r_255_f64 =
   { a : thirty_two_values#;
     b : thirty_two_values#;
     c : thirty_two_values#;
@@ -2279,21 +2516,21 @@ type r_255 =
     f252 : string;
     f253 : string;
     f254 : string;
-    f255 : string;
+    f255 : #(string * unit#);
+    f64 : float#;
   }
-
 [%%expect{|
-Lines 1-17, characters 0-3:
- 1 | type r_255 =
+Lines 1-18, characters 0-3:
+ 1 | type r_255_f64 =
  2 |   { a : thirty_two_values#;
  3 |     b : thirty_two_values#;
  4 |     c : thirty_two_values#;
  5 |     d : thirty_two_values#;
 ...
-14 |     f253 : string;
 15 |     f254 : string;
-16 |     f255 : string;
-17 |   }
+16 |     f255 : #(string * unit#);
+17 |     f64 : float#;
+18 |   }
 Error: Mixed records may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
 |}]
 
@@ -2311,15 +2548,17 @@ type ('a : any mod non_null) s
 
 type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
 [%%expect{|
-type ('a : any mod non_null) s
+type ('a : any non_null) s
 Line 3, characters 0-66:
 3 | type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The kind of t is value_or_null & bits32
+Error: The layout of type "t" is value non_pointer & value & value non_float
+         because it is an unboxed record.
+       But the layout of type "t" must be a sublayout of value_or_null & bits32
          because of the annotation on the declaration of the type t.
-       But the kind of t must be a subkind of any mod non_null
-         because of the definition of s at line 1, characters 0-30.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* modal axes have the same problem *)
@@ -2344,14 +2583,17 @@ type ('a : any mod non_null) s
 type t : (value_or_null & bits32) mod non_null =
   #{ a : int; b : t s; c : int32 }
 [%%expect{|
-type ('a : any mod non_null) s
+type ('a : any non_null) s
 Lines 3-4, characters 0-34:
 3 | type t : (value_or_null & bits32) mod non_null =
 4 |   #{ a : int; b : t s; c : int32 }
-Error: The layout of type "t" is value & value & value
+Error: The layout of type "t" is value non_pointer & value & value non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of value & bits32
+       But the layout of type "t" must be a sublayout of value_or_null & bits32
          because of the annotation on the declaration of the type t.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* modal axes have the same problem *)
@@ -2364,8 +2606,11 @@ type ('a : any mod portable) s
 Lines 3-4, characters 0-34:
 3 | type t : (value_or_null & bits32) mod portable =
 4 |   #{ a : int; b : t s; c : int32 }
-Error: The layout of type "t" is value & value & value
+Error: The layout of type "t" is value non_pointer & value & value non_float
          because it is an unboxed record.
-       But the layout of type "t" must be a sublayout of value & bits32
+       But the layout of type "t" must be a sublayout of value_or_null & bits32
          because of the annotation on the declaration of the type t.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]

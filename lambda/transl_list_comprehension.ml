@@ -174,7 +174,7 @@ let iterator ~transl_exp ~scopes = function
        correct (i.e., left-to-right) order *)
     let transl_bound var debug_uid bound =
       Let_binding.make (Immutable Strict) layout_int var debug_uid
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_value bound)
+        (transl_exp ~scopes Lambda.layout_int bound)
     in
     let start = transl_bound "start" Lambda.debug_uid_none start in
     let stop = transl_bound "stop" Lambda.debug_uid_none stop in
@@ -190,9 +190,9 @@ let iterator ~transl_exp ~scopes = function
     }
   | Texp_comp_in { pattern; sequence } ->
     let iter_list =
-      Let_binding.make (Immutable Strict) layout_any_value "iter_list"
+      Let_binding.make (Immutable Strict) Lambda.layout_list "iter_list"
         Lambda.debug_uid_none
-        (transl_exp ~scopes Jkind.Sort.Const.for_predef_value sequence)
+        (transl_exp ~scopes Lambda.layout_list sequence)
     in
     (* Create a fresh variable to use as the function argument. The debug uid is
        [.debug_uid_none], because the variable is not visible to users. *)
@@ -272,10 +272,11 @@ let rec translate_bindings ~transl_exp ~scopes ~loc ~inner_body ~accumulator =
               mode = alloc_local
             } ]
         ~return:layout_any_value ~attr:default_function_attribute ~loc
-        ~mode:alloc_local ~ret_mode:alloc_local ~body:(add_bindings body)
+        ~mode:alloc_local ~ret_mode:maybe_alloc_stack ~body:(add_bindings body)
     in
     let result =
-      Lambda_utils.apply ~loc ~mode:alloc_local (Lazy.force builder)
+      Lambda_utils.apply ~loc ~return_mode:maybe_alloc_stack
+        (Lazy.force builder)
         (List.map (fun Let_binding.{ id; _ } -> Lvar id) arg_lets
         @ [body_func; accumulator])
         ~result_layout:layout_any_value
@@ -306,7 +307,7 @@ let rec translate_clauses ~transl_exp ~scopes ~loc ~comprehension_body
       Let_binding.let_all arg_lets bindings
     | Texp_comp_when cond ->
       Lifthenelse
-        ( transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
+        ( transl_exp ~scopes Lambda.layout_bool cond,
           body ~accumulator,
           accumulator,
           layout_any_value (* [list]s have the standard representation *) ))
@@ -317,9 +318,9 @@ let comprehension ~transl_exp ~scopes ~loc { comp_body; comp_clauses } =
     translate_clauses ~transl_exp ~scopes ~loc
       ~comprehension_body:(fun ~accumulator ->
         rev_list_snoc_local ~loc ~init:accumulator
-          ~last:(transl_exp ~scopes Jkind.Sort.Const.for_list_element comp_body))
+          ~last:(transl_exp ~scopes Lambda.layout_list_element comp_body))
       ~accumulator:rev_list_nil comp_clauses
   in
-  Lambda_utils.apply ~loc ~mode:alloc_heap
+  Lambda_utils.apply ~loc ~return_mode:not_alloc_stack
     (Lazy.force rev_list_to_list)
     [rev_comprehension] ~result_layout:layout_any_value

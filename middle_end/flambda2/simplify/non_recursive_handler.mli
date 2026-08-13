@@ -38,3 +38,5 @@ val print : Format.formatter -> t -> unit
 val with_handler : Flambda.Expr.t -> t -> t
 
 val rename_params : t -> t
+
+val with_can_be_lifted : bool -> t -> t

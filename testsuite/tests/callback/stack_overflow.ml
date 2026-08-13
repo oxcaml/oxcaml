@@ -1,6 +1,5 @@
 (* TEST
  modules = "stack_overflow_.c";
- runtime5;
  {
    bytecode;
  }{

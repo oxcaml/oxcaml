@@ -1,31 +1,31 @@
 Indexed shapes:
-Resolved: Index_unboxed_labels.13 :
+Resolved: Index_unboxed_labels.13:
   b (File "index_unboxed_labels.ml", line 41, characters 7-8)
-Resolved: Index_unboxed_labels.14 :
+Resolved: Index_unboxed_labels.14:
   x (File "index_unboxed_labels.ml", line 38, characters 9-10)
-Resolved: Index_unboxed_labels.13 :
+Resolved: Index_unboxed_labels.13:
   b (File "index_unboxed_labels.ml", line 38, characters 12-13)
-Resolved: Index_unboxed_labels.13 :
+Resolved: Index_unboxed_labels.13:
   b (File "index_unboxed_labels.ml", line 37, characters 11-12)
-Resolved: Index_unboxed_labels.4 :
+Resolved: Index_unboxed_labels.4:
   a (File "index_unboxed_labels.ml", line 32, characters 7-8)
-Resolved: Index_unboxed_labels.9 :
+Resolved: Index_unboxed_labels.9:
   x (File "index_unboxed_labels.ml", line 29, characters 9-10)
-Resolved: Index_unboxed_labels.4 :
+Resolved: Index_unboxed_labels.4:
   a (File "index_unboxed_labels.ml", line 29, characters 12-13)
-Resolved: Index_unboxed_labels.4 :
+Resolved: Index_unboxed_labels.4:
   a (File "index_unboxed_labels.ml", line 28, characters 11-12)
-Resolved: Index_unboxed_labels.2 :
+Resolved: Index_unboxed_labels.2:
   b (File "index_unboxed_labels.ml", line 25, characters 14-15)
-Resolved: Index_unboxed_labels.1 :
+Resolved: Index_unboxed_labels.1:
   a (File "index_unboxed_labels.ml", line 25, characters 6-7)
-Resolved: Index_unboxed_labels.5 :
+Resolved: Index_unboxed_labels.5:
   x (File "index_unboxed_labels.ml", line 22, characters 9-10)
-Resolved: Index_unboxed_labels.1 :
+Resolved: Index_unboxed_labels.1:
   a (File "index_unboxed_labels.ml", line 22, characters 11-12)
-Resolved: Index_unboxed_labels.2 :
+Resolved: Index_unboxed_labels.2:
   b (File "index_unboxed_labels.ml", line 21, characters 18-19)
-Resolved: Index_unboxed_labels.1 :
+Resolved: Index_unboxed_labels.1:
   a (File "index_unboxed_labels.ml", line 21, characters 10-11)
 
 Uid of decls:

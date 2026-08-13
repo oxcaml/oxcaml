@@ -95,11 +95,11 @@ let f4_1 (x : t_bits64) = x, false;;
 Line 1, characters 26-27:
 1 | let f4_1 (x : t_bits64) = x, false;;
                               ^
-Error: This expression has type "t_bits64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value
+       But the layout of t_bits64 must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -108,11 +108,11 @@ let f4_2 (x : 'a t_bits64_id) = x, false;;
 Line 1, characters 32-33:
 1 | let f4_2 (x : 'a t_bits64_id) = x, false;;
                                     ^
-Error: This expression has type "'a t_bits64_id" = "('a : bits64)"
+Error: The value "x" has type "'a t_bits64_id" = "('a : bits64)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits64_id is bits64
          because of the definition of t_bits64_id at line 2, characters 0-35.
-       But the layout of 'a t_bits64_id must be a sublayout of value
+       But the layout of 'a t_bits64_id must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -121,11 +121,11 @@ let f4_3 (x : int64#) = x, false;;
 Line 1, characters 24-25:
 1 | let f4_3 (x : int64#) = x, false;;
                             ^
-Error: This expression has type "int64#" but an expression was expected of type
+Error: The value "x" has type "int64#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -137,7 +137,7 @@ Line 1, characters 12-20:
 Error: Tuple element types must have layout value.
        The layout of "t_bits64" is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of "t_bits64" must be a sublayout of value
+       But the layout of "t_bits64" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -149,7 +149,7 @@ Line 1, characters 18-24:
 Error: Tuple element types must have layout value.
        The layout of "int64#" is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of "int64#" must be a sublayout of value
+       But the layout of "int64#" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -161,7 +161,7 @@ Line 1, characters 26-28:
 Error: Tuple element types must have layout value.
        The layout of "'a" is bits64
          because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -174,7 +174,7 @@ Line 1, characters 45-47:
 Error: Tuple element types must have layout value.
        The layout of "'a" is bits64
          because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -260,11 +260,11 @@ let f7_1 (x : t_bits64) = `A x;;
 Line 1, characters 29-30:
 1 | let f7_1 (x : t_bits64) = `A x;;
                                  ^
-Error: This expression has type "t_bits64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value
+       But the layout of t_bits64 must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -273,11 +273,11 @@ let f7_2 (x : 'a t_bits64_id) = `A x;;
 Line 1, characters 35-36:
 1 | let f7_2 (x : 'a t_bits64_id) = `A x;;
                                        ^
-Error: This expression has type "'a t_bits64_id" = "('a : bits64)"
+Error: The value "x" has type "'a t_bits64_id" = "('a : bits64)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits64_id is bits64
          because of the definition of t_bits64_id at line 2, characters 0-35.
-       But the layout of 'a t_bits64_id must be a sublayout of value
+       But the layout of 'a t_bits64_id must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -286,11 +286,11 @@ let f7_3 (x : int64#) = `A x;;
 Line 1, characters 27-28:
 1 | let f7_3 (x : int64#) = `A x;;
                                ^
-Error: This expression has type "int64#" but an expression was expected of type
+Error: The value "x" has type "int64#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -302,7 +302,7 @@ Line 1, characters 20-28:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_bits64" is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of "t_bits64" must be a sublayout of value
+       But the layout of "t_bits64" must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -314,7 +314,7 @@ Line 1, characters 34-36:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "'a" is bits64
          because of the annotation on 'a in the declaration of the type f7_5.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -342,7 +342,7 @@ Error: This expression has type "t_bits64"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value
+       But the layout of t_bits64 must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -355,7 +355,7 @@ Error: This expression has type "'a t_bits64_id" = "('a : bits64)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_bits64_id is bits64
          because of the definition of t_bits64_id at line 2, characters 0-35.
-       But the layout of 'a t_bits64_id must be a sublayout of value
+       But the layout of 'a t_bits64_id must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -368,7 +368,7 @@ Error: This expression has type "int64#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -439,7 +439,7 @@ external f10_9 : (int64#[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 18-24:
 1 | external f10_9 : (int64#[@untagged]) -> bool -> string  = "foo" "bar";;
                       ^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -448,7 +448,7 @@ external f10_10 : string -> (int64#[@untagged])  = "foo" "bar";;
 Line 1, characters 29-35:
 1 | external f10_10 : string -> (int64#[@untagged])  = "foo" "bar";;
                                  ^^^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -517,7 +517,7 @@ Line 1, characters 15-27:
 Error: Object field types must have layout value.
        The layout of "t_bits64" is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of "t_bits64" must be a sublayout of value
+       But the layout of "t_bits64" must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -529,7 +529,7 @@ Line 1, characters 29-35:
 Error: Object field types must have layout value.
        The layout of "'a" is bits64
          because of the annotation on 'a in the declaration of the type t12_2.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of an object field.
 |}]
 
@@ -542,7 +542,7 @@ Error: The method "x" has type "t_bits64" but is expected to have type
          "('a : value)"
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value
+       But the layout of t_bits64 must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -568,7 +568,7 @@ Line 1, characters 25-26:
 Error: Variables bound in a class must have layout value.
        The layout of x is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a value layout
          because it's the type of a class field.
 |}];;
 
@@ -580,7 +580,7 @@ Line 1, characters 26-43:
 Error: The method "x" has type "int64#" but is expected to have type "('a : value)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -592,7 +592,7 @@ Line 1, characters 26-40:
 Error: Variables bound in a class must have layout value.
        The layout of x is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a value layout
          because it's the type of an instance variable.
 |}];;
 
@@ -641,11 +641,11 @@ end;;
 Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
                      ^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "m1" has type "('a : value_or_null)"
        but an expression was expected of type "t_bits64"
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value
+       But the layout of t_bits64 must be a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -662,7 +662,7 @@ Line 3, characters 17-19:
 Error: "m1" must have a type of layout value because it is captured by an object.
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value
+       But the layout of t_bits64 must be a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -677,11 +677,11 @@ let f13_1 (x : t_bits64) = x = x;;
 Line 1, characters 27-28:
 1 | let f13_1 (x : t_bits64) = x = x;;
                                ^
-Error: This expression has type "t_bits64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value.
+       But the layout of t_bits64 must be a value layout.
 |}];;
 
 let f13_2 (x : t_bits64) = compare x x;;
@@ -689,11 +689,11 @@ let f13_2 (x : t_bits64) = compare x x;;
 Line 1, characters 35-36:
 1 | let f13_2 (x : t_bits64) = compare x x;;
                                        ^
-Error: This expression has type "t_bits64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value.
+       But the layout of t_bits64 must be a value layout.
 |}];;
 
 let f13_3 (x : t_bits64) = Marshal.to_bytes x;;
@@ -701,11 +701,11 @@ let f13_3 (x : t_bits64) = Marshal.to_bytes x;;
 Line 1, characters 44-45:
 1 | let f13_3 (x : t_bits64) = Marshal.to_bytes x;;
                                                 ^
-Error: This expression has type "t_bits64"
-       but an expression was expected of type "('a : value_or_null)"
+Error: The value "x" has type "t_bits64" but an expression was expected of type
+         "('a : value_or_null)"
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value.
+       But the layout of t_bits64 must be a value layout.
 |}];;
 
 let f13_4 (x : t_bits64) = Hashtbl.hash x;;
@@ -713,9 +713,9 @@ let f13_4 (x : t_bits64) = Hashtbl.hash x;;
 Line 1, characters 40-41:
 1 | let f13_4 (x : t_bits64) = Hashtbl.hash x;;
                                             ^
-Error: This expression has type "t_bits64"
-       but an expression was expected of type "('a : value)"
+Error: The value "x" has type "t_bits64" but an expression was expected of type
+         "('a : value)"
        The layout of t_bits64 is bits64
          because of the definition of t_bits64 at line 1, characters 0-22.
-       But the layout of t_bits64 must be a sublayout of value.
+       But the layout of t_bits64 must be a value layout.
 |}];;

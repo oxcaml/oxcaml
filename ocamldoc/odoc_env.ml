@@ -75,6 +75,7 @@ let rec add_signature env root ?rel signat =
         { env2 with env_module_types = (rel_name ident, qualify ident) :: env2.env_module_types }
     | Types.Sig_class (ident, _, _, _) -> { env with env_classes = (rel_name ident, qualify ident) :: env.env_classes }
     | Types.Sig_class_type (ident, _, _, _) -> { env with env_class_types = (rel_name ident, qualify ident) :: env.env_class_types }
+    | Types.Sig_jkind _ -> Misc.fatal_error "Unsupported: Sig_jkind"
   in
   List.fold_left f env signat
 
@@ -176,11 +177,11 @@ let subst_type env t =
           let new_p =
             Odoc_name.to_path (full_type_name env (Odoc_name.from_path p)) in
           set_type_desc t (Tconstr (new_p, l, a))
-      | Tpackage (p, fl) ->
+      | Tpackage {pack_path = p; pack_cstrs} ->
           let new_p =
             Odoc_name.to_path
               (full_module_type_name env (Odoc_name.from_path p)) in
-          set_type_desc t (Tpackage (new_p, fl))
+          set_type_desc t (Tpackage {pack_path = new_p; pack_cstrs})
       | Tobject (_, ({contents=Some(p,tyl)} as r)) ->
           let new_p =
             Odoc_name.to_path (full_type_name env (Odoc_name.from_path p)) in

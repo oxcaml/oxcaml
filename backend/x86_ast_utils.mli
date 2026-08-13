@@ -19,3 +19,7 @@ val equal_arg : X86_ast.arg -> X86_ast.arg -> bool
 val is_mem : X86_ast.arg -> bool
 
 val is_regf : X86_ast.arg -> bool
+
+val is_regmask : X86_ast.arg -> bool
+
+val equal_args : X86_ast.arg -> X86_ast.arg -> bool

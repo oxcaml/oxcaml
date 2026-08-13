@@ -1,10 +1,9 @@
 (* TEST
- flags = "-g -alert -do_not_spawn_domains";
+ flags = "-g";
  modules = "swapgil_stubs.c";
  include systhreads;
  hassysthreads;
- multidomain;
- runtime5;
+ multicore;
  hasunix;
  native;
 *)

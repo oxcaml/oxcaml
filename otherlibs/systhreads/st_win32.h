@@ -15,27 +15,19 @@
 
 /* Win32 implementation of the "st" interface */
 
-#undef _WIN32_WINNT
-#define _WIN32_WINNT 0x0400
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-Caml_inline void st_msleep(int msec)
+typedef DWORD st_timeout;
+
+Caml_inline st_timeout st_timeout_of_msec(int msec)
 {
-  Sleep(msec);
+  return msec;
+}
+
+Caml_inline void st_msleep(const st_timeout *timeout)
+{
+  Sleep(*timeout);
 }
 
 #include "st_pthreads.h"
-
-/* Signal handling -- none under Win32 */
-
-value caml_thread_sigmask(value cmd, value sigs)
-{
-  caml_invalid_argument("Thread.sigmask not implemented");
-  return Val_int(0);            /* not reached */
-}
-
-value caml_wait_signal(value sigs)
-{
-  caml_invalid_argument("Thread.wait_signal not implemented");
-  return Val_int(0);            /* not reached */
-}

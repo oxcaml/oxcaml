@@ -203,9 +203,6 @@ let ocamlsrcdir = make ("ocamlsrcdir",
 let ocamldebug_flags = make ("ocamldebug_flags",
   "Flags for ocamldebug")
 
-let ocamldebug_script = make ("ocamldebug_script",
-  "Where ocamldebug should read its commands")
-
 let os_type = make ("os_type",
   "The OS we are running on")
 
@@ -232,9 +229,6 @@ let ocaml_script_as_argument =
 let plugins =
   Variables.make ( "plugins", "plugins for ocamldoc" )
 
-let runtime_dir =
-  Variables.make ( "runtime_dir", "leafname of the runtime directory" )
-
 let shared_library_cflags =
   Variables.make ("shared_library_cflags",
     "Flags used to compile C files for inclusion in shared libraries")
@@ -246,6 +240,14 @@ let sharedobjext =
 let use_runtime =
   Variables.make ("use_runtime",
     "Whether the -use-runtime option should be used" )
+
+let fexpr_dump_files =
+  Variables.make ("fexpr_dump_file",
+    "Flambda passes dump files suffixes")
+
+let fexpr_reference_suffix =
+  Variables.make ("fexpr_reference_suffix",
+    "Suffix to add to the fexpr reference files")
 
 let init () =
   List.iter register_variable
@@ -305,12 +307,12 @@ let init () =
     ocamldoc_reference;
     ocamldoc_exit_status;
     ocamldebug_flags;
-    ocamldebug_script;
     ocaml_script_as_argument;
     os_type;
     plugins;
-    runtime_dir;
     shared_library_cflags;
     sharedobjext;
     use_runtime;
+    fexpr_dump_files;
+    fexpr_reference_suffix;
   ]

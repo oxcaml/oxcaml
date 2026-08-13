@@ -38,6 +38,11 @@ type ('t, 'k, 'v) id =
     repr : ('t, 'k, 'v) repr
   }
 
+let singleton : type t k v. (t, k, v) id -> k -> v -> t =
+ fun { repr; _ } key value ->
+  let Patricia_tree_repr = repr in
+  Trie.singleton Trie.patricia_tree_is_trie [key] value
+
 let equal_key { value_repr; _ } = Value.equal_repr value_repr
 
 let print_key { value_repr; _ } = Value.print_repr value_repr

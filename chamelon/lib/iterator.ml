@@ -46,25 +46,28 @@ let minimize_basic (state : 'a) (f : 'a -> pos:int -> 'a minimized_step_result)
   in
   aux state 0 false
 
+let rec minimize_ranged_increasing state f ~ever_changed ~pos ~len =
+  match f state ~pos ~len with
+  | New_state nstate ->
+    minimize_ranged_increasing nstate f ~ever_changed:true ~pos ~len:(2 * len)
+  | Change_removes_error ->
+    minimize_ranged_decreasing state f ~ever_changed ~pos ~len:(len / 2)
+  | No_more_changes -> state, ever_changed
+
+and minimize_ranged_decreasing state f ~ever_changed ~pos ~len =
+  if len = 0
+  then minimize_ranged_increasing state f ~ever_changed ~pos:(pos + 1) ~len:1
+  else
+    match f state ~pos ~len with
+    | New_state nstate ->
+      minimize_ranged_decreasing nstate f ~ever_changed:true ~pos ~len:(len / 2)
+    | Change_removes_error ->
+      minimize_ranged_decreasing state f ~ever_changed ~pos ~len:(len / 2)
+    | No_more_changes -> state, ever_changed
+
 let minimize_ranged (state : 'a)
     (f : 'a -> pos:int -> len:int -> 'a minimized_step_result) : 'a * bool =
-  let rec loop_increasing (state : 'a) (pos : int) (len : int)
-      (ever_changed : bool) =
-    match f state ~pos ~len with
-    | New_state nstate -> loop_increasing nstate pos (2 * len) true
-    | Change_removes_error -> loop_decreasing state pos (len / 2) ever_changed
-    | No_more_changes -> state, ever_changed
-  and loop_decreasing (state : 'a) (pos : int) (len : int) (ever_changed : bool)
-      =
-    if len = 0
-    then loop_increasing state (pos + 1) 1 ever_changed
-    else
-      match f state ~pos ~len with
-      | New_state nstate -> loop_decreasing nstate pos (len / 2) true
-      | Change_removes_error -> loop_decreasing state pos (len / 2) ever_changed
-      | No_more_changes -> state, ever_changed
-  in
-  loop_increasing state 0 1 false
+  minimize_ranged_increasing state f ~ever_changed:false ~pos:0 ~len:1
 
 let minimize_at minimize cur_file map ~pos ~len =
   let r = ref (-1) in
@@ -76,6 +79,17 @@ let minimize_at minimize cur_file map ~pos ~len =
       map cur_file
   in
   nmap, pos <= !r
+
+let minimize_eager minimize cur_file map =
+  let r = ref (-1) in
+  let nmap =
+    minimize.minimizer_func
+      (fun () ->
+        incr r;
+        true)
+      map cur_file
+  in
+  nmap, 0 <= !r, !r + 1
 
 let step_minimizer ~check minimize cur_file map ~pos ~len =
   Format.eprintf "Trying %s: pos=%d, len=%d... @?" minimize.minimizer_name pos
@@ -98,9 +112,21 @@ let test_minimizer ~check ~pos ~len map cur_file minimize =
   let result, has_changed = minimize_at minimize cur_file map ~pos ~len in
   if has_changed && check result then result, true else result, false
 
+let eager_minimizer ~check map cur_file minimizer =
+  let nmap, has_changed, len = minimize_eager minimizer cur_file map in
+  if not has_changed
+  then nmap, false
+  else if check nmap
+  then nmap, true
+  else
+    minimize_ranged_decreasing map
+      (step_minimizer ~check minimizer cur_file)
+      ~ever_changed:false ~pos:0 ~len
+
 type strategy =
   | Basic
   | Dichotomy
+  | Eager
   | Test of
       { pos : int;
         len : int
@@ -111,10 +137,13 @@ let run_strategy strategy ~check map cur_file minimize =
   | Dichotomy -> minimize_ranged map (step_minimizer ~check minimize cur_file)
   | Basic -> minimize_basic map (step_minimizer ~check minimize cur_file ~len:1)
   | Test { pos; len } -> test_minimizer ~check ~pos ~len map cur_file minimize
+  | Eager -> eager_minimizer ~check map cur_file minimize
 
 let basic = Basic
 
 let dichotomy = Dichotomy
+
+let eager = Eager
 
 let test ~pos ~len = Test { pos; len }
 

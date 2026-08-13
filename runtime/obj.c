@@ -17,6 +17,7 @@
 
 /* Operations on objects */
 
+#include <assert.h>
 #include <string.h>
 #include "caml/camlatomic.h"
 #include "caml/alloc.h"
@@ -411,4 +412,129 @@ CAMLprim value caml_succ_scannable_prefix_len (value v) {
 CAMLprim value caml_is_null(value v)
 {
   return Is_null(v) ? Val_true : Val_false;
+}
+
+/* For compiling let rec over values */
+
+/* [size] is a [value] representing number of words (fields) */
+CAMLprim value caml_alloc_dummy(value size)
+{
+  mlsize_t wosize = Long_val(size);
+  return caml_alloc (wosize, 0);
+}
+
+/* [size] is a [value] representing number of floats. */
+CAMLprim value caml_alloc_dummy_float (value size)
+{
+  mlsize_t wosize = Long_val(size) * Double_wosize;
+  return caml_alloc (wosize, 0);
+}
+
+/* [size] is a [value] representing the number of fields.
+   [scannable_size] is a [value] representing the length of the prefix of
+   fields that contains pointer values.
+*/
+CAMLprim value caml_alloc_dummy_mixed (value size, value scannable_size)
+{
+  mlsize_t wosize = Long_val(size);
+#ifdef NATIVE_CODE
+  mlsize_t scannable_wosize = Long_val(scannable_size);
+  /* The below code runs for bytecode and native code, and critically assumes
+     that a double record field can be stored in one word. That's true both for
+     32-bit and 64-bit bytecode (as a double record field in a mixed record is
+     always boxed), and for 64-bit native code (as the double record field is
+     stored flat, taking up 1 word).
+  */
+  static_assert(Double_wosize == 1, "");
+  reserved_t reserved =
+    Reserved_mixed_block_scannable_wosize_native(scannable_wosize);
+#else
+  /* [scannable_size] can't be used meaningfully in bytecode */
+  (void)scannable_size;
+  reserved_t reserved = Faux_mixed_block_sentinel;
+#endif // NATIVE_CODE
+  return caml_alloc_with_reserved (wosize, 0, reserved);
+}
+
+/* This is a specialized primitive despite being expressible in terms
+   of [caml_alloc_dummy], because lambda/Value_rec_compiler recognizes
+   calls to this function specifically -- the distinction lets us
+   reconstruct type information that is useful for compilation. */
+CAMLprim value caml_alloc_dummy_lazy (value unit)
+{
+  return caml_alloc(1, 0);
+}
+
+CAMLprim value caml_update_dummy(value dummy, value newval)
+{
+  mlsize_t size;
+  tag_t tag;
+
+  tag = Tag_val (newval);
+  CAMLassert (tag != Infix_tag);
+  CAMLassert(tag != Closure_tag);
+
+  if (Wosize_val(dummy) == 0) {
+      /* Size-0 blocks are statically-allocated atoms. We cannot
+         mutate them, but there is no need:
+         - All atoms used in the runtime to represent OCaml values
+           have tag 0 --- including empty flat float arrays, or other
+           types that use a non-0 tag for non-atom blocks.
+         - The dummy was already created with tag 0.
+         So doing nothing suffices. */
+      CAMLassert(Wosize_val(newval) == 0);
+      CAMLassert(Tag_val(dummy) == Tag_val(newval));
+  } else if (tag == Double_array_tag){
+    CAMLassert (Wosize_val(newval) == Wosize_val(dummy));
+    CAMLassert (Tag_val(dummy) != Infix_tag);
+    Unsafe_store_tag_val(dummy, Double_array_tag);
+    size = Wosize_val (newval) / Double_wosize;
+    for (mlsize_t i = 0; i < size; i++) {
+      Store_double_flat_field (dummy, i, Double_flat_field (newval, i));
+    }
+  } else {
+    CAMLassert (Scannable_tag(tag));
+    CAMLassert (Tag_val(dummy) != Infix_tag);
+    CAMLassert (Reserved_val(dummy) == Reserved_val(newval));
+    Unsafe_store_tag_val(dummy, tag);
+    size = Wosize_val(newval);
+    CAMLassert (size == Wosize_val(dummy));
+    mlsize_t scannable_size = Scannable_wosize_val(newval);
+    CAMLassert (scannable_size == Scannable_wosize_val(dummy));
+    /* See comment above why this is safe even if [tag == Closure_tag]
+       and some of the "values" being copied are actually code pointers.
+
+       This reasoning does not apply to arbitrary flat fields, which might have
+       the same shape as pointers into the minor heap, so we need to handle the
+       non-scannable suffix of mixed blocks specially.
+    */
+    for (mlsize_t i = 0; i < scannable_size; i++){
+      caml_modify (&Field(dummy, i), Field(newval, i));
+    }
+    for (mlsize_t i = scannable_size; i < size; i++) {
+      Field(dummy, i) = Field(newval, i);
+    }
+  }
+  return Val_unit;
+}
+
+CAMLprim value caml_update_dummy_lazy(value dummy, value newval)
+{
+  // Note: [obj_tag] works on immediates as well
+  int tag = obj_tag (newval);
+  switch (tag) {
+  case Lazy_tag:
+  case Forcing_tag:
+  case Forward_tag:
+    caml_update_dummy(dummy, newval);
+    break;
+  // If the tag of [newval] is not a lazy tag,
+  // it comes from a Forward block that was shortcut.
+  default:
+    CAMLassert (Wosize_val(dummy) == 1);
+    caml_modify(&Field(dummy, 0), newval);
+    Unsafe_store_tag_val(dummy, Forward_tag);
+    break;
+  }
+  return Val_unit;
 }

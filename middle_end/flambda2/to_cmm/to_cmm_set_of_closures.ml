@@ -64,8 +64,15 @@ let get_func_decl_params_arity t code_id =
     then Lambda.Tupled
     else
       let nlocal =
-        Flambda_arity.num_params (Code_metadata.params_arity info)
-        - Code_metadata.first_complex_local_param info
+        match
+          (Code_metadata.first_complex_local_param info
+            : First_complex_local_param.t)
+        with
+        | Index index ->
+          Flambda_arity.num_params (Code_metadata.params_arity info) - index
+        | Never_partially_applied ->
+          (* This value should never be observed. *)
+          0
       in
       Lambda.Curried { nlocal }
   in
@@ -196,6 +203,7 @@ end = struct
               | Naked_number Naked_vec128 -> UK.naked_vec128_fields
               | Naked_number Naked_vec256 -> UK.naked_vec256_fields
               | Naked_number Naked_vec512 -> UK.naked_vec512_fields
+              | Naked_number Naked_mask -> UK.naked_mask_fields
               (* The "fields" update kinds are used because we are writing into
                  a 64-bit slot, and wish to initialize the whole. *)
               | Naked_number Naked_int32 -> UK.naked_int32_fields
@@ -458,8 +466,8 @@ let transl_cold_attrib (cold : bool) : Cmm.codegen_option list =
 
 let params_and_body0 env res code_id ~result_arity ~fun_dbg
     ~zero_alloc_attribute ~return_continuation ~exn_continuation params ~body
-    ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_region
-    ~my_ghost_region ~(translate_expr : translate_expr) =
+    ~my_closure ~(is_my_closure_used : _ Or_unknown.t) ~my_alloc_mode
+    ~(translate_expr : translate_expr) =
   let params =
     let is_my_closure_used =
       match is_my_closure_used with
@@ -492,26 +500,22 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
      so we don't need any binder for it (this is why we can ignore
      [_bound_var]). If it does end up in generated code, Selection will complain
      and refuse to compile the code. *)
-  let env, my_region_var =
-    match my_region with
-    | None -> env, None
-    | Some my_region ->
+  let env, my_region_var, my_ghost_region_var =
+    (* CR alloc_regions: my_alloc_region should be propagated as well. *)
+    match (my_alloc_mode : Alloc_mode.For_applications.t) with
+    | Not_alloc_stack { alloc_region = _ } -> env, None, None
+    | Maybe_alloc_stack
+        { alloc_region = _; region = my_region; ghost_region = my_ghost_region }
+      ->
       let my_region_duid = Flambda_debug_uid.none in
       let env, region =
         Env.create_bound_parameter env (my_region, my_region_duid)
       in
-      env, Some region
-  in
-  (* Similarly for [my_ghost_region]. *)
-  let env, my_ghost_region_var =
-    match my_ghost_region with
-    | None -> env, None
-    | Some my_ghost_region ->
       let my_ghost_region_duid = Flambda_debug_uid.none in
-      let env, region =
+      let env, ghost_region =
         Env.create_bound_parameter env (my_ghost_region, my_ghost_region_duid)
       in
-      env, Some region
+      env, Some region, Some ghost_region
   in
   (* Translate the arg list and body *)
   let env, fun_params = C.function_bound_parameters env params in
@@ -583,16 +587,14 @@ let params_and_body env res code_id p ~result_arity ~fun_dbg
         ~body
         ~my_closure
         ~is_my_closure_used
-        ~my_region
-        ~my_ghost_region
+        ~my_alloc_mode
         ~my_depth:_
         ~free_names_of_body:_
       ->
       try
         params_and_body0 env res code_id ~result_arity ~fun_dbg
           ~zero_alloc_attribute ~return_continuation ~exn_continuation params
-          ~body ~my_closure ~is_my_closure_used ~my_region ~my_ghost_region
-          ~translate_expr
+          ~body ~my_closure ~is_my_closure_used ~my_alloc_mode ~translate_expr
       with Misc.Fatal_error as e ->
         let bt = Printexc.get_raw_backtrace () in
         Format.eprintf
@@ -708,7 +710,7 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
 let lift_set_of_closures env res ~body ~bound_vars layout set
     ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
-  let comp_unit = Compilation_unit.get_current_exn () in
+  let comp_unit = Current_unit.get_cu_exn () in
   let dbg = debuginfo_for_set_of_closures env set in
   let cids =
     Function_declarations.funs_in_order (Set_of_closures.function_decls set)
@@ -763,7 +765,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   let effs : Ece.t =
     ( Only_generative_effects Immutable,
       (match closure_alloc_mode with
-      | Heap -> No_coeffects
+      | Heap _ -> No_coeffects
       | Local _ -> Has_coeffects),
       Strict,
       Can_move_anywhere )
@@ -776,6 +778,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
       env res effs ~prev_updates:None layout.slots
   in
   assert (Option.is_none updates);
+  (* CR alloc_regions: propagate alloc_regions to CMM. *)
   let csoc =
     assert (List.compare_length_with l 0 > 0);
     let tag = Tag.(to_int closure_tag) in
@@ -836,8 +839,8 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   translate_expr env res body
 
 let let_dynamic_set_of_closures env res ~body ~bound_vars
-    ~num_normal_occurrences_of_bound_vars set ~(translate_expr : translate_expr)
-    =
+    ~num_normal_occurrences_of_bound_vars set closure_alloc_mode
+    ~(translate_expr : translate_expr) =
   let layout = layout_for_set_of_closures env set in
   if layout.empty_env
   then
@@ -845,6 +848,5 @@ let let_dynamic_set_of_closures env res ~body ~bound_vars
       ~num_normal_occurrences_of_bound_vars
   else
     let_dynamic_set_of_closures0 env res ~body ~bound_vars
-      ~num_normal_occurrences_of_bound_vars set layout
-      ~closure_alloc_mode:(Set_of_closures.alloc_mode set)
+      ~num_normal_occurrences_of_bound_vars set layout ~closure_alloc_mode
       ~translate_expr

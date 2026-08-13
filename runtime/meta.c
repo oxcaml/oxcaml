@@ -20,6 +20,7 @@
 #include <string.h>
 #include "caml/alloc.h"
 #include "caml/backtrace_prim.h"
+#include "caml/bigarray.h"
 #include "caml/codefrag.h"
 #include "caml/config.h"
 #include "caml/debugger.h"
@@ -57,28 +58,16 @@ CAMLprim value caml_reify_bytecode(value ls_prog,
   CAMLparam3(ls_prog, debuginfo, digest_opt);
   CAMLlocal3(clos, bytecode, retval);
   code_t prog;
-  asize_t len, off; /* in bytes */
+  asize_t len; /* in bytes */
   enum digest_status digest_kind;
   unsigned char * digest;
-  int fragnum, i;
+  int fragnum;
 
-  /* ls_prog is a bytes array (= LongString.t) */
-  len = 0;
-  for (i = 0; i < Wosize_val(ls_prog); i++) {
-    value s = Field(ls_prog, i);
-    len += caml_string_length(s);
-  }
+  len = caml_ba_byte_size(Caml_ba_array_val(ls_prog));
+
   prog = caml_stat_alloc(len + sizeof(opcode_t) * 2 /* for 'RETURN 1' */);
 
-  off = 0;
-  for (i = 0; i < Wosize_val(ls_prog); i++) {
-    size_t s_len;
-    value s = Field(ls_prog, i);
-    s_len = caml_string_length(s);
-    memcpy((char*)prog + off, Bytes_val(s), s_len);
-    off += s_len;
-  }
-
+  memcpy(prog, Caml_ba_data_val(ls_prog), len);
 #ifdef ARCH_BIG_ENDIAN
   caml_fixup_endianness(prog, len);
 #endif
@@ -142,7 +131,7 @@ CAMLprim value caml_static_release_bytecode(value bc)
 
 CAMLprim value caml_realloc_global(value size)
 {
-  mlsize_t requested_size, actual_size, i;
+  mlsize_t requested_size, actual_size;
   value new_global_data, old_global_data;
   old_global_data = caml_global_data;
 
@@ -154,9 +143,9 @@ CAMLprim value caml_realloc_global(value size)
                      ARCH_INTNAT_PRINTF_FORMAT "u entries\n",
                      requested_size);
     new_global_data = caml_alloc_shr(requested_size, 0);
-    for (i = 0; i < actual_size; i++)
+    for (mlsize_t i = 0; i < actual_size; i++)
       caml_initialize(&Field(new_global_data, i), Field(old_global_data, i));
-    for (i = actual_size; i < requested_size; i++){
+    for (mlsize_t i = actual_size; i < requested_size; i++){
       Field (new_global_data, i) = Val_long (0);
     }
     caml_modify_generational_global_root(&caml_global_data, new_global_data);
@@ -197,12 +186,11 @@ CAMLprim value caml_invoke_traced_function(value codeptr, value env, value arg)
        saved env */
 
   value * osp, * nsp;
-  int i;
 
   osp = Caml_state->current_stack->sp;
   Caml_state->current_stack->sp -= 4;
   nsp = Caml_state->current_stack->sp;
-  for (i = 0; i < 7; i++) nsp[i] = osp[i];
+  for (int i = 0; i < 7; i++) nsp[i] = osp[i];
   nsp[7] = (value) Nativeint_val(codeptr);
   nsp[8] = env;
   nsp[9] = Val_int(0);

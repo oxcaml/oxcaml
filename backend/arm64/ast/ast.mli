@@ -1453,6 +1453,12 @@ module Instruction_name : sig
           * [`Imm of [`Six]]
           * [`Imm of [`Six]] )
         t
+    | UDIV :
+        ( triple,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]] )
+        t
     | UMAX_vector :
         ( triple,
           [ `Reg of
@@ -1589,6 +1595,12 @@ module Instruction : sig
         -> t
 
   val print : Format.formatter -> t -> unit
+
+  (** If this instruction is a conditional branch (B.cond, CBZ, CBNZ, TBZ,
+      TBNZ), returns [Some n] where [n] is the maximum displacement in
+      instruction-sized units. Returns [None] for all other instructions
+      including unconditional branches. *)
+  val max_displacement : t -> int option
 end
 
 module DSL : sig
@@ -1848,9 +1860,15 @@ module DSL : sig
     val ins :
       ('num, 'operands) Instruction_name.t -> ('num, 'operands) many -> unit
 
+    type measurement = private
+      { count : int;
+        min_max_displacement : int option
+      }
+
     (** Execute [f] with emission disabled, counting how many instructions would
-        be emitted. Returns the instruction count. *)
-    val with_measuring : f:(unit -> unit) -> int
+        be emitted and tracking the minimum [max_displacement] across any
+        conditional branches. *)
+    val with_measuring : f:(unit -> unit) -> measurement
 
     val ins1 : (singleton, 'a) Instruction_name.t -> 'a Operand.t -> unit
 

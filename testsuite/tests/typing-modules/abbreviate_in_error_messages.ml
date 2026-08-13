@@ -50,11 +50,9 @@ Error: Modules do not match: functor () -> S1 is not included in
          module M6 : sig ... end
          module M7 : sig ... end
        end
-     Modules do not match:
-       functor () -> ...
-     is not included in
-       functor  -> ...
-       An extra argument is provided of module type ()
+     This module should not be a functor, a structure was expected.
+     Moreover, the type of the functor body is incompatible with the expected
+     module type.
 |}]
 
 module Depth = struct

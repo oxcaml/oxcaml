@@ -17,6 +17,15 @@
 
 open Cmo_format
 
+module Compunit : sig
+  type t = compunit
+  val name : t -> string
+  val is_packed : compunit -> bool
+  val to_ident : compunit -> Ident.t
+  module Set : Set.S with type elt = t
+  module Map : Map.S with type key = t
+end
+
 module Predef : sig
   type t = predef
   module Set : Set.S with type elt = t
@@ -38,7 +47,9 @@ end
 (* Functions for batch linking *)
 
 val init: unit -> unit
-val patch_object: Misc.LongString.t -> (reloc_info * int) list -> unit
+val patch_object:
+  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->
+  (reloc_info * int) list -> unit
 val require_primitive: string -> unit
 val initial_global_table: unit -> Obj.t array
 val output_global_map: out_channel -> unit
@@ -52,16 +63,7 @@ val transl_const: Lambda.structured_constant -> Obj.t
 
 type global_map
 
-(* See comment about [get_bytecode_sections] in the .ml file. *)
-type bytecode_sections = private
-  { symb: global_map;
-    crcs: Import_info.t array;
-    prim: string list;
-    dlpt: string list }
-
-val init_toplevel: get_bytecode_sections:(unit -> bytecode_sections)
-  -> Import_info.t array
-
+val init_toplevel: unit -> Import_info.t array
 val update_global_table: unit -> unit
 val get_global_value: Global.t -> Obj.t
 val is_global_defined: Global.t -> bool
@@ -89,6 +91,7 @@ type error =
 
 exception Error of error
 
-val report_error: error Format_doc.printer
+val report_error: error Format_doc.format_printer
+val report_error_doc: error Format_doc.printer
 
 val reset: unit -> unit

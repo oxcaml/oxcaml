@@ -1,5 +1,4 @@
 (* TEST
-   runtime5;
    exit_status = "2";
    { bytecode; }
    { native; }

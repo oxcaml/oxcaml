@@ -22,7 +22,7 @@ open Config
 open Clflags
 open Misc
 open Cmm
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module String = Misc.Stdlib.String
 
 type error =
@@ -48,7 +48,9 @@ let cmm_invariants ppf fd_cmm =
 let cfg_invariants ppf cfg =
   let print_fundecl ppf c =
     if !Oxcaml_flags.dump_cfg
-    then Cfg_with_layout.dump ppf c ~msg:"*** Cfg invariant check failed"
+    then
+      Format.fprintf ppf "*** Cfg invariant check failed\n%a"
+        Printcfg.cfg_with_layout c
     else Format.fprintf ppf "%s" (Cfg_with_layout.cfg c).fun_name
   in
   if !Oxcaml_flags.cfg_invariants && Cfg_invariants.run ppf cfg
@@ -62,8 +64,7 @@ let pass_dump_linear_if ppf flag message phrase =
   phrase
 
 let pass_dump_cfg_if ppf flag message c =
-  if !flag
-  then fprintf ppf "*** %s@.%a@." message (Cfg_with_layout.dump ~msg:"") c;
+  if !flag then fprintf ppf "*** %s@.%a@." message Printcfg.cfg_with_layout c;
   c
 
 let should_vectorize () =
@@ -103,19 +104,18 @@ let reset () =
     (fun pass (cfg_unit_info : Cfg_format.cfg_unit_info) ->
       if should_save_ir_after pass || should_save_ir_before pass
       then (
-        cfg_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+        cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
         cfg_unit_info.items <- [];
-        cfg_before_regalloc_unit_info.unit
-          <- Compilation_unit.get_current_or_dummy ();
+        cfg_before_regalloc_unit_info.unit <- Current_unit.get_cu_or_dummy ();
         cfg_before_regalloc_unit_info.items <- []))
     pass_to_cfg;
   if should_save_before_emit ()
   then (
-    linear_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+    linear_unit_info.unit <- Current_unit.get_cu_or_dummy ();
     linear_unit_info.items <- []);
   if should_save_cfg_before_emit ()
   then (
-    cfg_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+    cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
     cfg_unit_info.items <- [])
 
 let save_data dl =
@@ -355,7 +355,13 @@ let register_allocator_gi cfg_with_infos =
     cfg_with_infos
 
 let register_allocator_irc cfg_with_infos =
-  cfg_with_infos_profile ~accumulate:true "cfg_irc" Regalloc_irc.run
+  (* CR-soon xclerc for xclerc: we are mis-attributing the time to IRC even when
+     we switch to linscan *)
+  cfg_with_infos_profile ~accumulate:true "cfg_irc"
+    (fun cfg_with_infos ->
+      match Regalloc_irc.run cfg_with_infos with
+      | Some res -> res
+      | None -> Regalloc_ls.run cfg_with_infos)
     cfg_with_infos
 
 let register_allocator_ls cfg_with_infos =
@@ -440,6 +446,12 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Cfg_with_infos.cfg_with_layout
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_prologue"
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
+  ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
+  match !Oxcaml_flags.cfg_merge_blocks with
+  | false -> cfg_with_layout
+  | true ->
+    Profile.record ~accumulate:true "cfg_merge_blocks"
+      Cfg_merge_blocks.run_after_register_allocation cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_simplify"
        Regalloc_utils.simplify_cfg
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
@@ -554,7 +566,7 @@ let compile_genfuns ~ppf_dump f =
         compile_phrase ~ppf_dump ph
       | _ -> ())
     (Generic_fns.compile ~cache:false ~shared:true
-       (Generic_fns.Tbl.of_fns (Compilenv.current_unit_infos ()).ui_generic_fns))
+       (Generic_fns.Tbl.of_fns (Compilenv.current_generic_fns ())))
 
 let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
     ~may_reduce_heap ~ppf_dump gen =
@@ -646,11 +658,13 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
       raise (Error (Binary_emitter_mismatch obj_filename))
 
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
-  Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:false ~sourcefile;
+  (* CR spies: Debug information is disabled for the top-level, because the
+     binary emitter does not support all directives emitted by the DWARF
+     emitter. See [testsuite/tests/tool-toplevel/dwarf_binary_emitter.ml]. *)
+  Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:(Option.is_some toplevel)
+    ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
-  ++ (fun x ->
-  if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cmm
   ++ Profile.record "compile_phrases" (compile_phrases ~ppf_dump)
   ++ fun () -> () );
@@ -694,8 +708,11 @@ let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
       match pipeline with
       | Direct_to_cmm direct_to_cmm ->
         let cmm_phrases = direct_to_cmm ~ppf_dump ~prefixname program in
-        end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
-            cmm_phrases))
+        if Clflags.should_stop_after Compiler_pass.Middle_end
+        then ()
+        else
+          end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
+              cmm_phrases))
 
 let linear_gen_implementation ~ppf_dump unix filename =
   let open Linear_format in
@@ -723,10 +740,11 @@ let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
       linear_gen_implementation ~ppf_dump unix progname)
 
 (* Error report *)
+module Style = Misc.Style
 
-let fprintf = Format_doc.fprintf
+let fprintf, dprintf = Format_doc.fprintf, Format_doc.dprintf
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Assembler_error file ->
     fprintf ppf "Assembler error, input left in file %a"
       Location.Doc.quoted_filename file
@@ -736,17 +754,21 @@ let report_error ppf = function
   | Mismatched_for_pack saved ->
     let msg prefix =
       if Compilation_unit.Prefix.is_empty prefix
-      then "without -for-pack"
-      else "with -for-pack " ^ Compilation_unit.Prefix.to_string prefix
+      then dprintf "without %a" Style.inline_code "-for-pack"
+      else
+        dprintf "with %a" Style.inline_code
+          ("-for-pack " ^ Compilation_unit.Prefix.to_string prefix)
     in
-    fprintf ppf "This input file cannot be compiled %s: it was generated %s."
+    fprintf ppf "This input file cannot be compiled %t: it was generated %t."
       (msg (Compilation_unit.Prefix.from_clflags ()))
       (msg saved)
   | Asm_generation (fn, err) ->
-    fprintf ppf "Error producing assembly code for %s: %a" fn
-      Emitaux.report_error err
+    fprintf ppf "Error producing assembly code for function %a: %a"
+      Style.inline_code fn Emitaux.report_error_doc err
 
 let () =
   Location.register_error_of_exn (function
-    | Error err -> Some (Location.error_of_printer_file report_error err)
+    | Error err -> Some (Location.error_of_printer_file report_error_doc err)
     | _ -> None)
+
+let report_error = Format_doc.compat report_error_doc

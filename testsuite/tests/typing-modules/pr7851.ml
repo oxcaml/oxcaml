@@ -40,9 +40,9 @@ let bool_of_int x =
 
 bool_of_int 3;;
 [%%expect{|
-Line 2, characters 28-32:
+Line 2, characters 28-30:
 2 |   let (E y : M1.u) = (E x : M1.t) in
-                                ^^^^
+                                ^^
 Error: Unbound module "M1"
 |}]
 

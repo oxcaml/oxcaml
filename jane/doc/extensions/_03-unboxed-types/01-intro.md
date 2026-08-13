@@ -22,15 +22,6 @@ by a *type*. The type system knows about a collection of fixed *base* layouts:
   conceived of before reading this description is a `value`.
 * `value_or_null` is a superlayout of `value` including normal OCaml values
   and null pointers.
-* `immediate` is a sublayout of `value`, describing those values that are represented
-  without a pointer. That is, `int : immediate`, as well as `private` and `[@@unboxed]`
-  wrappers around `int`.  `immediate` is a sublayout of `value`, and so you can use an
-  `immediate` type wherever a `value` is expected, without any explicit conversion
-  necessary. Types declared with `[@@immediate]` have layout `immediate`.
-* `immediate64` is a variant of `immediate` that is like `immediate` on 64-bit platforms
-  and like `value` on all other platforms (like JavaScript). In the sublayout relation,
-  `immediate < immediate64 < value`. Types declared with `[@@immediate64]` have layout
-  `immediate64`.
 * `float64` is the layout of the `float#` unboxed float type.
 * `float32` is the layout of the `float32#` unboxed 32-bit float type.
 * `void` is the layout of the `unit#` unbox unit type. It has no runtime representation.
@@ -47,9 +38,69 @@ The type system also supports one *composite* layout: unboxed products:
 * `l1 & l2 & ... & lk` is the layout of unboxed products where the first element
   of the product has layout `l1`, the second has layout `l2`, and so on.
 
-Over time, we'll be adding more layouts here.
+## Value layouts
 
-## Layout annotation
+The `value` layout describes the representation of "vanilla" OCaml values. In OxCaml, we introduce finer distinctions within `value`, such as that some values are `non_pointer` and can thus get more efficient code generation; we also *broaden* the set of representations that the GC can handle, such as with `value maybe_null`, which contains all values in legacy OCaml plus the `NULL` pointer.
+
+The most general of the `value`-like layouts is `scannable`, whose only requirement of its elements is that they can be scanned by the GC.
+We call the sublayouts of `scannable` the "value layouts" (choosing to emphasize the more familiar layout, `value`, instead of the top of the lattice, `scannable`).
+
+For all abbreviations, see the [kinds documentation](../../kinds/syntax).
+
+Below, we describe the two axes that modify value layouts, also known as the "scannable axes": nullability and separability.
+
+### Nullability
+
+The nullability axis records whether `NULL` (the machine word 0) is a possible
+value of a type, and is used to support the non-allocating option `'a or_null`
+type. The axis has two possible values, with `non_null < maybe_null`. A type may
+be `non_null` only if none of its values are `NULL`.
+
+The kind of values with `NULL` added as a possibility is written
+`value_or_null`.
+
+Types that don't have `NULL` as a possible value are
+compatible with `or_null`, a non-allocating option type that is built into
+OxCaml.  Its definition is:
+```ocaml
+type ('a : value) or_null : value_or_null =
+  | Null
+  | This of 'a
+```
+
+### Separability
+
+The separability axis records whether a type can contain pointers, or can have float or non-float values, where a float value is a pointer to an allocated block tagged with `Double_tag` (which is what `float` values look like).
+This axis has five possible values, with `non_pointer < non_pointer64 < non_float < separable < maybe_separable`.
+- A type is `non_pointer` if none of its values are pointers (i.e., the bottom bit is tagged or the value is NULL).
+- A type is `non_pointer64` if none of its values are pointers, when compiled to native code for 64-bit systems.
+- A type is `non_float` if none of its values are floats.
+- A type is `separable` if either all or none of its values are floats. In order for the float array optimization to be sound, only `separable` types may be stored in `array`s.
+
+The `value_or_null` layout is `maybe_separable`, since `float or_null` has both
+float and non-float elements. However, all types in vanilla OCaml are
+`separable`.
+
+### Using scannable axes
+
+Scannable axes can be written after a layout to lower the axis. For example, `value non_pointer` lowers `value` to have separability `non_pointer`, but `value maybe_separable` is equivalent to `value` (because `value` is already `separable`, which is lower than `maybe_separable`). Scannable axes written after non-value layouts have no effect, e.g. `float64 = float64 non_null`. Scannable axes can also be written on `any` and abstract kinds.
+
+The `mod` syntax may also be written with scannable axes, and has the same effect, but should be considered deprecated: we will remove this syntax so that `mod` is reserved for modal axes.
+
+### Relationship between `immediate` and value layouts
+
+In a previous design of OxCaml, `immediate` was a sublayout of `value`. It is still a *subkind* of `value`, but now conveys more kind information than just the layout:
+`immediate` has layout `value non_pointer`, and additionally crosses all modal axes.
+
+Types with kind `immediate` include `int`, as well as `private` and `[@@unboxed]`
+  wrappers around `int`.  As `immediate` is a subkind of `value`, you can use an
+  `immediate` type wherever a `value` is expected, without any explicit conversion
+  necessary. Types declared with `[@@immediate]` have layout `immediate`.
+
+`immediate64` has layout `value non_pointer64`, which indicates that it is only guaranteed to not be a pointer on 64-bit platforms, but not on other platforms (like JavaScript). Types declared with `[@@immediate64]` have layout
+  `immediate64`.
+
+## Layout annotations
 
 You can annotate type variables of type declarations with a layout, like this:
 
@@ -179,7 +230,7 @@ Each numeric type has its own library for working with it: `float_u`,
 ## Unboxed options
 
 We now have `type 'a or_null : value_or_null`, the type of unboxed options.
-It has constructors `Null` and `This v`. See the [`or_null` document](../02-or-null)
+It has constructors `Null` and `This v`. See the [`or_null` document](../or-null)
 for more details.
 
 ## Unboxed unit and unboxed bool
@@ -240,8 +291,9 @@ let box : t# -> t = fun #{ i ; s } -> { i ; s }
 type u : immediate & value = t# = #{ i : int ; s : string }
 ```
 
-Records who store boxed floats flatly (all-float and float-and-float# records)
-and `[@@unboxed]` records do not get unboxed versions.
+Records who store boxed floats flatly (all-float and float-and-float# records),
+`[@@unboxed]` records, and records with `[@atomic]` fields do not get unboxed
+versions.
 
 *Limitations and future plans*:
 * Unboxed products may only be stored in blocks via records (i.e. they are not
@@ -265,7 +317,7 @@ For example, it's fine to write this function type:
 ```ocaml
 val f : ('a : any). 'a -> 'a (* valid as a type signature *)
 ```
-> (See the [previous section](#layout-annotation) to learn more about the layout annotation used here)
+> (See the [previous section](#layout-annotations) to learn more about the layout annotation used here)
 
 But it's not possible to implement a function of that type:
 
@@ -319,10 +371,18 @@ Here by defining module type `S` with layout `any` and using `with` constraints,
 reason about modules with similar shapes but that operate on different layouts. This removes code
 duplication and can aid ppxs in supporting unboxed types.
 
-<!-- This heading is referred to by name in a link to an HTML anchor below.
-     If you rename it, please also update that link.
--->
-# `[@layout_poly]` attribute
+There is one limitation: All fields in a module type must have a representable
+layout. For example, the following is not allowed, regardless of how `S` is used:
+```ocaml
+module type S = sig
+  type t : any
+
+  val one : t
+end
+```
+We plan on lifting this restriction in the future.
+
+# `[@layout_poly]` attribute {#layout_poly-attribute}
 
 The attribute enables support for **limited layout polymorphism on external
 `%`-primitives**. This is possible because these primitives are always inlined at every
@@ -426,22 +486,27 @@ A limited set of primitives may be bound as `[@layout_poly]`;
 
 ## Runtime representation
 
-| Array                                          | Tag                | Layout of data                                               |
-|----------------------------------              |--------------------|--------------------------------------------------------------|
-| `('a : float64) array`                         | `Double_array_tag` | 64 bits per element                                          |
-| `('a : bits64) array`                          | `Custom_tag`       | reserved custom block word, followed by 64 bits per element  |
-| `('a : float32) array`, `('a : bits32) array`  | `Custom_tag`       | reserved custom block word, followed by 32 bits per element  |
-| `('a : vec128) array`                          | `Custom_tag`       | reserved custom block word, followed by 128 bits per element |
+| Array                   | Tag                             | Layout of data       |
+|-------------------------|---------------------------------|----------------------|
+| `('a : float64) array`  | `Double_array_tag`              | 64 bits per element  |
+| `('a : bits64) array`   | `Unboxed_int64_array_tag`       | 64 bits per element  |
+| `('a : float32) array`  | `Unboxed_float32_array_R_tag`   | 32 bits per element  |
+| `('a : bits32) array`   | `Unboxed_int32_array_R_tag`     | 32 bits per element  |
+| `('a : bits16) array`   | `Untagged_int16_array_R_tag`    | 16 bits per element  |
+| `('a : bits8) array`    | `Untagged_int8_array_R_tag`     | 8 bits per element   |
+| `('a : vec128) array`   | `Unboxed_vec128_array_tag`      | 128 bits per element |
+| `('a : vec256) array`   | `Unboxed_vec256_array_tag`      | 256 bits per element |
+| `('a : vec512) array`   | `Unboxed_vec512_array_tag`      | 512 bits per element |
 
-The reserved custom block word is the standard custom block field that stores a
-pointer to the record of custom operations, like polymorphic equality and
-comparison. For unboxed 32-bit element types, like `int32#` and `float32#`, the
-custom operations pointer is different for odd-length arrays and even-length
-arrays.
+Here, `R` is one of `zero`, `one`, &hellip, or `seven`, equal to the remainder
+of the array's length divided by the number of elements per word. For example,
+`[| #1S; #2S; #3S; #4S; #5S |] : int16 array` has tag
+`Untagged_int16_array_one_tag`.
 
-Odd-length arrays of 32-bit element type have 32 bits of padding at the end.
-The contents of this padding is unspecified, and it is not guaranteed that
-the padding value will be preserved by the generated code or the runtime.
+Arrays where `R` is not `zero` have padding at the end to make the total size of
+the array a multiple of 64 bits. The contents of this padding is unspecified,
+and it is not guaranteed that the padding value will be preserved by the
+generated code or the runtime.
 
 # Using unboxed types in structures
 
@@ -451,10 +516,10 @@ These structures may contain unboxed types:
 
   * Records
   * Constructors
+  * Modules
 
 Unboxed numbers can't be put in these structures:
 
-  * Constructors with inline record fields
   * Exceptions
   * Extensible variant constructors
   * Tuples
@@ -551,11 +616,11 @@ OxCaml provides mechanisms to assert your code depends on the current
 representation. The mechanism depends on whether you are writing C bindings
 or (unsafe) OCaml code.
 
-Note also that, while unboxed types are generally considered an "upstream
-compatible" (because they can be erased while preserving behavior), depending on
-the exact representation of mixed blocks is not. Thus, use of these mechanisms is
-also a sign that your code may need a custom mechanism if it is intended to work
-both in OxCaml and upstream OCaml.
+Note also that, while unboxed types are generally considered compatible with
+stock OCaml (because they can be erased while preserving behavior), depending on
+the exact representation of mixed blocks is not. Thus, use of these mechanisms
+is also a sign that your code may need a custom mechanism if it is intended to
+work both with OxCaml and with stock OCaml.
 
 ### In C bindings
 
@@ -563,7 +628,7 @@ To ensure that your C code will need to be updated when the layout changes, use
 the `Assert_mixed_block_layout_v#` family of macros. For example,
 
 ```
-Assert_mixed_block_layout_v5;
+Assert_mixed_block_layout_v6;
 ```
 
 Write the above in statement context, i.e. either at the top-level of a file or
@@ -593,7 +658,7 @@ type t =
 Here is the recommend way to access fields:
 
 ```c
-Assert_mixed_block_layout_v5;
+Assert_mixed_block_layout_v6;
 #define Foo_t_x(foo) (*(int32_t*)&Field(foo, 0))
 #define Foo_t_y(foo) (*(int32_t*)&Field(foo, 1))
 ```
@@ -616,3 +681,7 @@ Version history:
 - `v1`: initial implementation;
 - `v2`: automatic reordering by the front- and middle-ends;
 - `v3`: automatic flattening of nested unboxed records.
+- `v4`: unboxed arrays are now normal blocks, not custom blocks.
+- `v5`: block indices to mixed products now use 52-bit offsets and 12-bit gaps.
+- `v6`: all value/void records are now uniform blocks, and (by default)
+  represent all-`float64` records as mixed blocks instead of float array blocks.

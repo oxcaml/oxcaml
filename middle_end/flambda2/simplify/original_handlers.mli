@@ -17,7 +17,8 @@ type t = private
   | Recursive of
       { invariant_params : Bound_parameters.t;
         lifted_params : Lifted_cont_params.t;
-        continuation_handlers : One_recursive_handler.t Continuation.Lmap.t
+        continuation_handlers : One_recursive_handler.t Continuation.Lmap.t;
+        can_be_lifted : bool
       }
   | Non_recursive of Non_recursive_handler.t
 
@@ -25,6 +26,7 @@ val create_recursive :
   invariant_params:Bound_parameters.t ->
   lifted_params:Lifted_cont_params.t ->
   continuation_handlers:One_recursive_handler.t Continuation.Lmap.t ->
+  can_be_lifted:bool ->
   t
 
 val create_non_recursive : Non_recursive_handler.t -> t

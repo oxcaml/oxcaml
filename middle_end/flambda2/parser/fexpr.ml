@@ -49,31 +49,78 @@ type continuation_sort =
 
 type region =
   | Named of variable
-  | Toplevel
+  | Toplevel_alloc_region
+  | Toplevel_region
+  | Toplevel_ghost_region
+
+type tag_scannable = int
+
+type subkind =
+  | Anything
+  | Boxed_float32
+  | Boxed_float
+  | Boxed_int32
+  | Boxed_int64
+  | Boxed_nativeint
+  | Boxed_vec128
+  | Boxed_vec256
+  | Boxed_vec512
+  | Boxed_mask
+  | Tagged_immediate
+  | Variant of
+      { consts : targetint list;
+        non_consts : (tag_scannable * kind_with_subkind list) list
+      }
+  | Float_block of { num_fields : int }
+  | Float_array
+  | Immediate_array
+  | Value_array
+  | Generic_array
+  | Unboxed_float32_array
+  | Untagged_int_array
+  | Untagged_int8_array
+  | Untagged_int16_array
+  | Unboxed_int32_array
+  | Unboxed_int64_array
+  | Unboxed_nativeint_array
+  | Unboxed_vec128_array
+  | Unboxed_vec256_array
+  | Unboxed_vec512_array
+  | Unboxed_mask_array
+  | Unboxed_product_array
+
+and kind_with_subkind =
+  | Value of subkind
+  | Naked_number of Flambda_kind.Naked_number_kind.t
+  | Region
+  | Rec_info
 
 type const =
   | Naked_immediate of immediate
   | Tagged_immediate of immediate
   | Naked_float32 of float
   | Naked_float of float
+  | Naked_int8 of Numeric_types.Int8.t
+  | Naked_int16 of Numeric_types.Int16.t
+    (* CR bclement/keryan: we could consider using Reg_width_const.t directly *)
   | Naked_int32 of int32
   | Naked_int64 of int64
   | Naked_vec128 of Vector_types.Vec128.Bit_pattern.bits
   | Naked_vec256 of Vector_types.Vec256.Bit_pattern.bits
   | Naked_vec512 of Vector_types.Vec512.Bit_pattern.bits
+  | Naked_mask of Vector_types.Mask.Bit_pattern.bits
   | Naked_nativeint of targetint
   | Null
+  | Poison of kind_with_subkind * string
 
 type field_of_block =
   | Symbol of symbol
-  | Tagged_immediate of immediate
+  | Const of const
   | Dynamically_computed of variable
 
 type is_recursive =
   | Nonrecursive
   | Recursive
-
-type tag_scannable = int
 
 type mutability = Mutability.t =
   | Mutable
@@ -100,39 +147,26 @@ type static_data =
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.bits or_variable
   | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.bits or_variable
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.bits or_variable
+  | Boxed_mask of Vector_types.Mask.Bit_pattern.bits or_variable
   | Immutable_float_block of float or_variable list
   | Immutable_float_array of float or_variable list
+  | Immutable_float32_array of float or_variable list
   | Immutable_value_array of field_of_block list
+  | Immutable_int_array of targetint or_variable list
+  | Immutable_int8_array of Numeric_types.Int8.t or_variable list
+  | Immutable_int16_array of Numeric_types.Int16.t or_variable list
+  | Immutable_int32_array of int32 or_variable list
+  | Immutable_int64_array of int64 or_variable list
+  | Immutable_nativeint_array of targetint or_variable list
+  | Immutable_vec128_array of
+      Vector_types.Vec128.Bit_pattern.bits or_variable list
+  | Immutable_vec256_array of
+      Vector_types.Vec256.Bit_pattern.bits or_variable list
+  | Immutable_vec512_array of
+      Vector_types.Vec512.Bit_pattern.bits or_variable list
+  | Immutable_mask_array of Vector_types.Mask.Bit_pattern.bits or_variable list
   | Empty_array of empty_array_kind
-  | Mutable_string of { initial_value : string }
   | Immutable_string of string
-
-type subkind =
-  | Anything
-  | Boxed_float32
-  | Boxed_float
-  | Boxed_int32
-  | Boxed_int64
-  | Boxed_nativeint
-  | Boxed_vec128
-  | Boxed_vec256
-  | Boxed_vec512
-  | Tagged_immediate
-  | Variant of
-      { consts : targetint list;
-        non_consts : (tag_scannable * kind_with_subkind list) list
-      }
-  | Float_block of { num_fields : int }
-  | Float_array
-  | Immediate_array
-  | Value_array
-  | Generic_array
-
-and kind_with_subkind =
-  | Value of subkind
-  | Naked_number of Flambda_kind.Naked_number_kind.t
-  | Region
-  | Rec_info
 
 type static_data_binding =
   { symbol : symbol;
@@ -184,27 +218,31 @@ type simple =
 type cont_extra_arg = simple * kind_with_subkind
 
 type alloc_mode_for_allocations =
-  | Heap
-  | Local of { region : region }
-
-type alloc_mode_for_applications =
-  | Heap
+  | Heap of { alloc_region : region }
   | Local of
-      { region : region;
-        ghost_region : region
+      { alloc_region : region;
+        region : region
       }
+
+type 'a alloc_mode_for_applications =
+  | Not_alloc_stack of { alloc_region : 'a }
+  | Maybe_alloc_stack of
+      { alloc_region : 'a;
+        region : 'a;
+        ghost_region : 'a
+      }
+
+type alloc_mode_for_return =
+  | Not_alloc_stack
+  | Maybe_alloc_stack
 
 type alloc_mode_for_assignments =
   | Heap
   | Local
 
 type prim_param =
-  | Labeled of
-      { label : string;
-        value : string located
-      }
-  | Positional of string located
-  | Flag of string
+  | Labeled of string located * prim_param list
+  | Anonymous of prim_param list
 
 type prim_op =
   { prim : string;
@@ -224,14 +262,12 @@ type function_call =
 (* Will translate to indirect_known_arity or indirect_unknown_arity depending on
    whether the apply record's arities field has a value *)
 
-type method_kind =
-  | Self
-  | Public
-  | Cached
-
 type call_kind =
   | Function of function_call
-  (* | Method of { kind : method_kind; obj : simple; } *)
+  | Method of
+      { kind : Call_kind.Method_kind.t;
+        obj : simple
+      }
   | C_call of { alloc : bool }
 
 type function_arities =
@@ -263,12 +299,12 @@ type loopify_attribute = Loopify_attribute.t =
   | Default_loopify_and_not_tailrec
 
 type apply =
-  { func : simple;
+  { func : simple option;
     continuation : result_continuation;
     exn_continuation : continuation * cont_extra_arg list;
     args : simple list;
     call_kind : call_kind;
-    alloc_mode : alloc_mode_for_applications;
+    alloc_mode : region alloc_mode_for_applications;
     arities : function_arities option;
     inlined : inlined_attribute option;
     inlining_state : inlining_state option
@@ -294,15 +330,21 @@ type expr =
   | Apply_cont of apply_cont
   | Switch of
       { scrutinee : simple;
-        cases : (int * apply_cont) list
+        cases : (int * apply_or_inlined_cont) list
       }
   | Invalid of { message : string }
+
+and apply_or_inlined_cont =
+  | Inlined_goto of expr
+  | Named_cont of apply_cont
 
 and value_slots = one_value_slot list
 
 and one_value_slot =
   { var : value_slot;
-    value : simple
+    value : simple;
+    kind : Flambda_kind.Naked_number_kind.t option
+        (* [None] means kind [Value]. *)
   }
 
 and let_ =
@@ -371,8 +413,9 @@ and code =
     params_and_body : params_and_body;
     code_size : code_size;
     is_tupled : bool;
+    stub : bool;
     loopify : loopify_attribute option;
-    result_mode : alloc_mode_for_assignments
+    result_mode : alloc_mode_for_return
   }
 
 and code_size = int
@@ -380,8 +423,7 @@ and code_size = int
 and params_and_body =
   { params : kinded_parameter list;
     closure_var : variable;
-    region_var : variable;
-    ghost_region_var : variable;
+    region_vars : variable alloc_mode_for_applications;
     depth_var : variable;
     ret_cont : continuation_id;
     exn_cont : continuation_id;
@@ -394,14 +436,3 @@ and static_closure_binding =
   }
 
 type flambda_unit = { body : expr }
-
-type expect_test_spec =
-  { before : flambda_unit;
-    after : flambda_unit
-  }
-
-type markdown_node =
-  | Text of string
-  | Expect of expect_test_spec
-
-type markdown_doc = markdown_node list

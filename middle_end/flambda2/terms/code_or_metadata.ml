@@ -13,13 +13,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module File_sections = Oxcaml_utils.File_sections
-
 type code_status =
   | Loaded of Code.t
   | Not_loaded of
       { sections : File_sections.t;
-        index : int;
+        index : File_sections.Idx.t;
         metadata : Code_metadata.t;
         delayed_renaming : Renaming.t
       }
@@ -29,7 +27,7 @@ type t =
   | Metadata_only of Code_metadata.t
 
 type code_present =
-  | Present of { index : int }
+  | Present of { index : File_sections.Idx.t }
   | Absent
 
 type raw =
@@ -140,7 +138,7 @@ let merge code_id t1 t2 =
   match t1, t2 with
   | Metadata_only cm1, Metadata_only cm2 ->
     if Code_metadata.approx_equal cm1 cm2
-    then Some t1
+    then t1
     else
       Misc.fatal_errorf
         "Code id %a is imported with different code metadata (%a and %a)"
@@ -152,7 +150,7 @@ let merge code_id t1 t2 =
   | (Code_present { code_status } as t), Metadata_only cm_imported ->
     let cm_present = code_status_metadata code_status in
     if Code_metadata.approx_equal cm_present cm_imported
-    then Some t
+    then t
     else
       Misc.fatal_errorf
         "Code_id %a is present with code metadata@ %abut imported with code \
@@ -217,9 +215,11 @@ let map_result_types t ~f =
      called before output *)
   match view t with
   | Code_present code ->
-    Code_present { code_status = Loaded (Code.map_result_types code ~f) }
+    let code' = Code.map_result_types code ~f in
+    if code == code' then t else Code_present { code_status = Loaded code' }
   | Metadata_only code_metadata ->
-    Metadata_only (Code_metadata.map_result_types code_metadata ~f)
+    let code_metadata' = Code_metadata.map_result_types code_metadata ~f in
+    if code_metadata == code_metadata' then t else Metadata_only code_metadata'
 
 let code_present t =
   match t with Code_present _ -> true | Metadata_only _ -> false

@@ -45,7 +45,12 @@ type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
 type specific_operation =
   | Ifar_poll
-  | Ifar_alloc of { bytes : int; dbginfo : Cmm.alloc_dbginfo }
+  | Ifar_alloc of
+      { bytes : int;
+        dbginfo : Cmm.alloc_dbginfo;
+        mode : Cmm.Alloc_mode.t
+      }
+  | Ifar_stackcheck of { max_frame_size_bytes : int }
   | Ishiftarith of arith_operation * int
   | Imuladd       (* multiply and add *)
   | Imulsub       (* multiply and subtract *)
@@ -85,6 +90,11 @@ val size_vec512 : int
 
 val allow_unaligned_access : bool
 
+(* Whether Ocaml provides shift operations where the shift amount is interpreted
+   modulo bitwidth. *)
+
+val ocaml_shifts_are_wrapping : bool
+
 (* Behavior of division *)
 
 val division_crashes_on_overflow : bool
@@ -98,6 +108,18 @@ val identity_addressing : addressing_mode
 val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
+
+(** [fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta] is used
+    by the peephole optimizer to delete an instruction [r := r + delta] that
+    immediately precedes the instruction carrying [op].
+    [arg_is_folded_reg.(i)] is true iff the [i]-th argument of that
+    instruction is [r]. Returns [Some op'] where [op'], reading the value [r]
+    had before the deleted addition, computes the same result as [op] reading
+    [r + delta]; returns [None] when [op] cannot absorb the delta. Never
+    returns [Some] when [op] does not read [r] (this preserves liveness). *)
+val fold_delta_into_specific_operation :
+  specific_operation -> arg_is_folded_reg:bool array -> delta:int ->
+  specific_operation option
 
 val addressing_displacement_for_llvmize : addressing_mode -> int
 

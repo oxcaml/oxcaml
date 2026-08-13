@@ -1,12 +1,10 @@
 (* TEST
-flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
 hassysthreads;
 include systhreads;
-not-windows;
+not-target-windows;
 poll-insertion;
 no-tsan;
-runtime5;
-multidomain;
+multicore;
 {
   bytecode;
 }{

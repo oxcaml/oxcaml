@@ -18,7 +18,7 @@ module Width_in_bits = struct
     | Byte_unsigned | Byte_signed -> W8
     | Sixteen_unsigned | Sixteen_signed -> W16
     | Thirtytwo_unsigned | Thirtytwo_signed | Single _ -> W32
-    | Word_int | Word_val | Double -> W64
+    | Word_int | Word_mask | Word_val | Double -> W64
     | Onetwentyeight_unaligned | Onetwentyeight_aligned -> W128
     | Twofiftysix_unaligned | Twofiftysix_aligned -> W256
     | Fivetwelve_unaligned | Fivetwelve_aligned -> W512
@@ -109,7 +109,8 @@ module Vectorized_instruction = struct
       results : register array
     }
 
-  let print ppf t = Format.fprintf ppf "%a " Cfg.dump_basic (Cfg.Op t.operation)
+  let print ppf t =
+    Format.fprintf ppf "%a " Printcfg.basic_desc (Cfg.Op t.operation)
 
   let make_default ~arg_count ~res_count operation : t =
     { operation;
@@ -128,6 +129,7 @@ let vectorizable_machtypes (r1 : Reg.t) (r2 : Reg.t) =
        [Addr], we could generalize [machtype], but for simplicity do not
        vectorize [Addr]. *)
     false
+  | Mask, _ | _, Mask -> false
   | ( (Vec128 | Vec256 | Vec512 | Valx2),
       (Val | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Valx2) )
   | (Val | Int | Float | Float32), (Vec128 | Vec256 | Vec512 | Valx2) ->
@@ -160,5 +162,5 @@ let vectorize_machtypes (pack : Reg.t list) : Cmm.machtype_component =
     | Val, 2 -> Valx2
     | (Val | Float | Float32), n ->
       Misc.fatal_errorf "Unexpected pack size %d for %a" n Printreg.reglist pack
-    | Vec128, _ | Vec256, _ | Vec512, _ | Valx2, _ ->
+    | Vec128, _ | Vec256, _ | Vec512, _ | Mask, _ | Valx2, _ ->
       Misc.fatal_errorf "Unexpected machtype for %a" Printreg.reg hd)

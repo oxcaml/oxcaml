@@ -67,7 +67,7 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
     let off = on + 1 in
     if trap_handler
     then
-      Array.iter Proc.destroyed_at_raise ~f:(fun reg ->
+      Array.iter (Proc.destroyed_at_raise ()) ~f:(fun reg ->
           update_range reg ~begin_:on ~end_:on);
     State.set_ls_order state ~instruction_id:instr.id ~ls_order:on;
     Array.iter instr.arg ~f:(fun reg -> update_range reg ~begin_:on ~end_:on);
@@ -122,18 +122,17 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
   let reg = interval.reg in
   match reg.loc with
   | Unknown -> (
-    let reg_class = Reg_class.of_machtype reg.typ in
+    let reg_class = Regs.Reg_class.of_machtype reg.typ in
     let intervals = State.active state ~reg_class in
-    let first_available = Reg_class.first_available_register reg_class in
-    match Reg_class.num_available_registers reg_class with
+    match Regs.num_available_registers reg_class with
     | 0 ->
-      fatal "register class %a has no available registers" Reg_class.print
+      fatal "register class %a has no available registers" Regs.Reg_class.print
         reg_class
     | num_available_registers ->
       let available = Array.make num_available_registers true in
       let num_still_available = ref num_available_registers in
-      let set_not_available (r : int) : unit =
-        let idx = r - first_available in
+      let set_not_available (r : Regs.Phys_reg.t) : unit =
+        let idx = Regs.index_in_class r in
         if available.(idx) then decr num_still_available;
         available.(idx) <- false;
         if !num_still_available = 0 then raise No_free_register
@@ -141,7 +140,7 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
       let set_not_available_if_valid_phys_reg (interval : Interval.t) : unit =
         match interval.reg.loc with
         | Reg r ->
-          if r - first_available < num_available_registers
+          if Regs.index_in_class r < num_available_registers
           then set_not_available r
         | Stack _ | Unknown -> ()
       in
@@ -149,9 +148,10 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
       let remove_bound_overlapping (itv : Interval.t) : unit =
         match itv.reg.loc with
         | Reg r ->
+          let reg_index_in_class = Regs.index_in_class r in
           if
-            r - first_available < num_available_registers
-            && available.(r - first_available)
+            reg_index_in_class < num_available_registers
+            && available.(reg_index_in_class)
             && Interval.overlap itv interval
           then set_not_available r
         | Stack _ | Unknown -> ()
@@ -165,7 +165,8 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         if debug
         then (
           indent ();
-          log "assigning %d to register %a" phys_reg Printreg.reg reg;
+          log "assigning %a to register %a" Regs.Phys_reg.print phys_reg
+            Printreg.reg reg;
           dedent ());
         Not_spilling
       in
@@ -174,17 +175,18 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
         if idx >= num_available_registers
         then Misc.fatal_error "No_free_register should have been raised earlier"
         else if available.(idx)
-        then do_assign ~phys_reg:(first_available + idx)
+        then do_assign ~phys_reg:(Regs.registers reg_class).(idx)
         else assign_first (succ idx)
       in
       (* assigns the available register with the highest affinity *)
-      let rec assign_affinity = function
-        | [] -> assign_first 0
-        | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
-          let idx = phys_reg - first_available in
+      let rec assign_affinity aff =
+        match Regalloc_affinity.next aff with
+        | None -> assign_first 0
+        | Some { Regalloc_affinity.priority = _; phys_reg } ->
+          let idx = Regs.index_in_class phys_reg in
           if idx >= 0 && idx < num_available_registers && available.(idx)
           then do_assign ~phys_reg
-          else assign_affinity tl
+          else assign_affinity aff
       in
       assign_affinity (Regalloc_affinity.get (State.affinity state) reg))
   | Reg _ | Stack _ -> Not_spilling
@@ -192,7 +194,7 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
 let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
  fun state interval ->
   let reg = interval.reg in
-  let reg_class = Reg_class.of_machtype reg.typ in
+  let reg_class = Regs.Reg_class.of_machtype reg.typ in
   let intervals = State.active state ~reg_class in
   match DLL.hd_cell intervals.active_dll with
   | Some hd_cell ->
@@ -207,7 +209,13 @@ let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
            (DLL.exists ~f:chk intervals.fixed_dll
            || DLL.exists ~f:chk intervals.inactive_dll)
     then (
-      (match hd.reg.loc with Reg _ -> () | Stack _ | Unknown -> assert false);
+      (match hd.reg.loc with
+      | Reg _ -> ()
+      | Stack _ | Unknown ->
+        fatal
+          "Regalloc_ls.allocate_blocked_register: active interval %a has no \
+           physical register"
+          Printreg.reg hd.reg);
       Reg.set_loc interval.reg hd.reg.loc;
       DLL.delete_curr hd_cell;
       Interval.DLL.insert_sorted intervals.active_dll interval;
@@ -282,7 +290,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  let cfg_infos, stack_slots, affinity =
+  let (_ : cfg_infos), stack_slots, affinity =
     Regalloc_rewrite.prelude
       (module Utils)
       ~on_fatal_callback:(fun () ->
@@ -290,8 +298,8 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
           (fun (intervals, active) ->
             Format.eprintf "Regalloc_ls.run (on_fatal):";
             Format.eprintf "\n\nactives:\n";
-            Reg_class.Tbl.iter active ~f:(fun reg_class a ->
-                Format.eprintf "class %a:\n %a\n" Reg_class.print reg_class
+            Regs.Reg_class_tbl.iter active ~f:(fun reg_class a ->
+                Format.eprintf "class %a:\n %a\n" Regs.Reg_class.print reg_class
                   ClassIntervals.print a);
             Format.eprintf "\n\nintervals:\n";
             DLL.iter intervals ~f:(fun i ->
@@ -301,13 +309,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
         save_cfg "ls" cfg_with_layout)
       cfg_with_infos
   in
-  let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
   let state = State.make ~stack_slots ~affinity in
-  (match Reg.Set.elements spilling_because_unused with
-  | [] -> ()
-  | _ :: _ as spilled_nodes ->
-    rewrite state cfg_with_infos ~spilled_nodes ~block_temporaries:false;
-    Cfg_with_infos.invalidate_liveness cfg_with_infos);
   main ~round:1 state cfg_with_infos;
   Regalloc_rewrite.postlude
     (module State)

@@ -35,8 +35,7 @@ Line 1, characters 6-23:
 1 | let f (#false | #false) = #true
           ^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#true
+  Here is an example of a case that is not matched: "#true"
 
 Line 1, characters 16-22:
 1 | let f (#false | #false) = #true
@@ -53,8 +52,7 @@ Line 1, characters 8-50:
 1 | let f = function #true -> #false | #true -> #false
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#false
+  Here is an example of a case that is not matched: "#false"
 
 Line 1, characters 35-40:
 1 | let f = function #true -> #false | #true -> #false
@@ -91,6 +89,6 @@ let f = function #true -> #false | #false -> true
 Line 1, characters 45-49:
 1 | let f = function #true -> #false | #false -> true
                                                  ^^^^
-Error: This expression has type "bool" but an expression was expected of type
-         "bool#"
+Error: The constructor "true" has type "bool"
+       but an expression was expected of type "bool#"
 |}]

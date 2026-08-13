@@ -53,16 +53,16 @@ type integer_operation =
   | Isub
   | Imul
   | Imulh of { signed : bool }
-  | Idiv
-  | Imod
+  | Idiv of { signed : bool }
+  | Imod of { signed : bool }
   | Iand
   | Ior
   | Ixor
   | Ilsl
   | Ilsr
   | Iasr
-  | Iclz of { arg_is_non_zero : bool }
-  | Ictz of { arg_is_non_zero : bool }
+  | Iclz
+  | Ictz
   | Ipopcnt
   | Icomp of integer_comparison
 
@@ -76,16 +76,16 @@ let string_of_integer_operation = function
   | Isub -> " - "
   | Imul -> " * "
   | Imulh { signed } -> " *h" ^ if signed then " " else "u "
-  | Idiv -> " div "
-  | Imod -> " mod "
+  | Idiv { signed } -> " div" ^ if signed then " " else "u "
+  | Imod { signed } -> " mod" ^ if signed then " " else "u "
   | Iand -> " & "
   | Ior -> " | "
   | Ixor -> " ^ "
   | Ilsl -> " << "
   | Ilsr -> " >>u "
   | Iasr -> " >>s "
-  | Iclz { arg_is_non_zero } -> Printf.sprintf "clz %B " arg_is_non_zero
-  | Ictz { arg_is_non_zero } -> Printf.sprintf "ctz %B " arg_is_non_zero
+  | Iclz -> "clz "
+  | Ictz -> "ctz "
   | Ipopcnt -> "popcnt "
   | Icomp cmp -> string_of_integer_comparison cmp
 
@@ -95,9 +95,9 @@ let string_of_int128_operation = function
   | Imul64 { signed } -> " *" ^ if signed then " " else "u "
 
 let is_unary_integer_operation = function
-  | Iclz _ | Ictz _ | Ipopcnt -> true
-  | Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-  | Iasr | Icomp _ ->
+  | Iclz | Ictz | Ipopcnt -> true
+  | Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl
+  | Ilsr | Iasr | Icomp _ ->
     false
 
 let equal_integer_operation left right =
@@ -106,70 +106,66 @@ let equal_integer_operation left right =
   | Isub, Isub -> true
   | Imul, Imul -> true
   | Imulh { signed = left }, Imulh { signed = right } -> Bool.equal left right
-  | Idiv, Idiv -> true
-  | Imod, Imod -> true
+  | Idiv { signed = left }, Idiv { signed = right } -> Bool.equal left right
+  | Imod { signed = left }, Imod { signed = right } -> Bool.equal left right
   | Iand, Iand -> true
   | Ior, Ior -> true
   | Ixor, Ixor -> true
   | Ilsl, Ilsl -> true
   | Ilsr, Ilsr -> true
   | Iasr, Iasr -> true
-  | ( Iclz { arg_is_non_zero = left_arg_is_non_zero },
-      Iclz { arg_is_non_zero = right_arg_is_non_zero } ) ->
-    Bool.equal left_arg_is_non_zero right_arg_is_non_zero
-  | ( Ictz { arg_is_non_zero = left_arg_is_non_zero },
-      Ictz { arg_is_non_zero = right_arg_is_non_zero } ) ->
-    Bool.equal left_arg_is_non_zero right_arg_is_non_zero
+  | Iclz, Iclz -> true
+  | Ictz, Ictz -> true
   | Ipopcnt, Ipopcnt -> true
   | Icomp left, Icomp right -> equal_integer_comparison left right
   | ( Iadd,
-      ( Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl
+      | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Isub,
-      ( Iadd | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl
+      | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Imul,
-      ( Iadd | Isub | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl
+      | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Imulh _,
-      ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
-  | ( Idiv,
-      ( Iadd | Isub | Imul | Imulh _ | Imod | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
-  | ( Imod,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl | Ilsr
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
+  | ( Idiv _,
+      ( Iadd | Isub | Imul | Imulh _ | Imod _ | Iand | Ior | Ixor | Ilsl | Ilsr
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
+  | ( Imod _,
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Iand | Ior | Ixor | Ilsl | Ilsr
+      | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Iand,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Ior | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Ior | Ixor | Ilsl
+      | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ior,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ixor | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ixor | Ilsl
+      | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ixor,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ilsl | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ilsl
+      | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ilsl,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsr
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Ilsr | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Ilsr,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Iasr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Ilsl | Iasr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
   | ( Iasr,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ) )
-  | ( Iclz _,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Ictz _ | Ipopcnt | Icomp _ ) )
-  | ( Ictz _,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ipopcnt | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iclz | Ictz | Ipopcnt | Icomp _ ) )
+  | ( Iclz,
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Ictz | Ipopcnt | Icomp _ ) )
+  | ( Ictz,
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz | Ipopcnt | Icomp _ ) )
   | ( Ipopcnt,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ictz _ | Icomp _ ) )
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz | Ictz | Icomp _ ) )
   | ( Icomp _,
-      ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-      | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ) ) ->
+      ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Ilsl | Ilsr | Iasr | Iclz | Ictz | Ipopcnt ) ) ->
     false
 
 let equal_int128_operation left right =
@@ -289,6 +285,7 @@ type t =
   | Const_vec128 of Cmm.vec128_bits
   | Const_vec256 of Cmm.vec256_bits
   | Const_vec512 of Cmm.vec512_bits
+  | Const_mask of int64
   | Stackoffset of int
   | Load of
       { memory_chunk : Cmm.memory_chunk;
@@ -345,6 +342,7 @@ let is_pure = function
   | Const_vec128 _ -> true
   | Const_vec256 _ -> true
   | Const_vec512 _ -> true
+  | Const_mask _ -> true
   | Stackoffset _ -> false
   | Load _ -> true
   | Store _ -> false
@@ -357,7 +355,7 @@ let is_pure = function
   | Reinterpret_cast
       ( V128_of_vec _ | V256_of_vec _ | V512_of_vec _ | Float32_of_float
       | Float32_of_int32 | Float_of_float32 | Float_of_int64 | Int64_of_float
-      | Int32_of_float32 ) ->
+      | Int32_of_float32 | Mask_of_int64 | Int64_of_mask ) ->
     true
   | Static_cast _ -> true
   (* Conservative to ensure valueofint/intofvalue are not eliminated before
@@ -392,8 +390,8 @@ let intop (op : integer_operation) =
   | Isub -> " - "
   | Imul -> " * "
   | Imulh { signed : bool } -> " *h" ^ if signed then " " else "u "
-  | Idiv -> " div "
-  | Imod -> " mod "
+  | Idiv { signed : bool } -> " div" ^ if signed then " " else "u "
+  | Imod { signed : bool } -> " mod" ^ if signed then " " else "u "
   | Iand -> " & "
   | Ior -> " | "
   | Ixor -> " ^ "
@@ -401,8 +399,8 @@ let intop (op : integer_operation) =
   | Ilsr -> " >>u "
   | Iasr -> " >>s "
   | Ipopcnt -> " pop "
-  | Iclz _ -> " clz "
-  | Ictz _ -> " ctz "
+  | Iclz -> " clz "
+  | Ictz -> " ctz "
   | Icomp cmp -> intcomp cmp
 
 let int128op = function
@@ -439,12 +437,13 @@ let dump ppf op =
     Format.fprintf ppf
       "const vec512 %016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx"
       word0 word1 word2 word3 word4 word5 word6 word7
+  | Const_mask n -> Format.fprintf ppf "const mask %016Lx" n
   | Stackoffset n -> Format.fprintf ppf "stackoffset %d" n
   | Load _ -> Format.fprintf ppf "load"
   | Store _ -> Format.fprintf ppf "store"
-  | Intop op -> Format.fprintf ppf "intop %s" (intop op)
-  | Int128op op -> Format.fprintf ppf "int128op %s" (int128op op)
-  | Intop_imm (op, n) -> Format.fprintf ppf "intop %s %d" (intop op) n
+  | Intop op -> Format.fprintf ppf "intop%s" (intop op)
+  | Int128op op -> Format.fprintf ppf "int128op%s" (int128op op)
+  | Intop_imm (op, n) -> Format.fprintf ppf "intop%s%d" (intop op) n
   | Intop_atomic { op; size = _; addr = _ } ->
     Format.fprintf ppf "intop atomic %s" (Printcmm.atomic_op op)
   | Floatop (Float64, op) -> Format.fprintf ppf "floatop %a" floatop op
@@ -473,3 +472,155 @@ let dump ppf op =
     Format.fprintf ppf "alloc %i" bytes
   | Alloc { bytes; dbginfo = _; mode = Local } ->
     Format.fprintf ppf "alloc_local %i" bytes
+
+let equal_test left right =
+  match left, right with
+  | Itruetest, Itruetest
+  | Ifalsetest, Ifalsetest
+  | Ioddtest, Ioddtest
+  | Ieventest, Ieventest ->
+    true
+  | Iinttest left_cmp, Iinttest right_cmp ->
+    equal_integer_comparison left_cmp right_cmp
+  | Iinttest_imm (left_cmp, left_n), Iinttest_imm (right_cmp, right_n) ->
+    equal_integer_comparison left_cmp right_cmp && Int.equal left_n right_n
+  | Ifloattest (left_w, left_cmp), Ifloattest (right_w, right_cmp) ->
+    equal_float_width left_w right_w
+    && equal_float_comparison left_cmp right_cmp
+  | ( ( Itruetest | Ifalsetest | Iinttest _ | Iinttest_imm _ | Ifloattest _
+      | Ioddtest | Ieventest ),
+      _ ) ->
+    false
+
+let equal left right =
+  match left, right with
+  | Move, Move | Spill, Spill | Reload, Reload -> true
+  | Const_int left_n, Const_int right_n -> Nativeint.equal left_n right_n
+  | Const_float32 left_f, Const_float32 right_f -> Int32.equal left_f right_f
+  | Const_float left_f, Const_float right_f -> Int64.equal left_f right_f
+  | Const_symbol left_s, Const_symbol right_s -> Cmm.equal_symbol left_s right_s
+  | ( Const_vec128 { Cmm.word0 = left_w0; word1 = left_w1 },
+      Const_vec128 { Cmm.word0 = right_w0; word1 = right_w1 } ) ->
+    Int64.equal left_w0 right_w0 && Int64.equal left_w1 right_w1
+  | ( Const_vec256
+        { Cmm.word0 = left_w0;
+          word1 = left_w1;
+          word2 = left_w2;
+          word3 = left_w3
+        },
+      Const_vec256
+        { Cmm.word0 = right_w0;
+          word1 = right_w1;
+          word2 = right_w2;
+          word3 = right_w3
+        } ) ->
+    Int64.equal left_w0 right_w0
+    && Int64.equal left_w1 right_w1
+    && Int64.equal left_w2 right_w2
+    && Int64.equal left_w3 right_w3
+  | ( Const_vec512
+        { Cmm.word0 = left_w0;
+          word1 = left_w1;
+          word2 = left_w2;
+          word3 = left_w3;
+          word4 = left_w4;
+          word5 = left_w5;
+          word6 = left_w6;
+          word7 = left_w7
+        },
+      Const_vec512
+        { Cmm.word0 = right_w0;
+          word1 = right_w1;
+          word2 = right_w2;
+          word3 = right_w3;
+          word4 = right_w4;
+          word5 = right_w5;
+          word6 = right_w6;
+          word7 = right_w7
+        } ) ->
+    Int64.equal left_w0 right_w0
+    && Int64.equal left_w1 right_w1
+    && Int64.equal left_w2 right_w2
+    && Int64.equal left_w3 right_w3
+    && Int64.equal left_w4 right_w4
+    && Int64.equal left_w5 right_w5
+    && Int64.equal left_w6 right_w6
+    && Int64.equal left_w7 right_w7
+  | Const_mask left_n, Const_mask right_n -> Int64.equal left_n right_n
+  | Stackoffset left_n, Stackoffset right_n -> Int.equal left_n right_n
+  | ( Load
+        { memory_chunk = left_chunk;
+          addressing_mode = left_addr;
+          mutability = left_mut;
+          is_atomic = left_atomic
+        },
+      Load
+        { memory_chunk = right_chunk;
+          addressing_mode = right_addr;
+          mutability = right_mut;
+          is_atomic = right_atomic
+        } ) ->
+    Cmm.equal_memory_chunk left_chunk right_chunk
+    && Arch.equal_addressing_mode left_addr right_addr
+    && equal_mutable_flag left_mut right_mut
+    && Bool.equal left_atomic right_atomic
+  | ( Store (left_chunk, left_addr, left_assign),
+      Store (right_chunk, right_addr, right_assign) ) ->
+    Cmm.equal_memory_chunk left_chunk right_chunk
+    && Arch.equal_addressing_mode left_addr right_addr
+    && Bool.equal left_assign right_assign
+  | Intop left_op, Intop right_op -> equal_integer_operation left_op right_op
+  | Intop_imm (left_op, left_n), Intop_imm (right_op, right_n) ->
+    equal_integer_operation left_op right_op && Int.equal left_n right_n
+  | ( Intop_atomic { op = left_op; size = left_size; addr = left_addr },
+      Intop_atomic { op = right_op; size = right_size; addr = right_addr } ) ->
+    Cmm.equal_atomic_op left_op right_op
+    && Cmm.equal_atomic_bitwidth left_size right_size
+    && Arch.equal_addressing_mode left_addr right_addr
+  | Floatop (left_w, left_op), Floatop (right_w, right_op) ->
+    equal_float_width left_w right_w && equal_float_operation left_op right_op
+  | Csel left_test, Csel right_test -> equal_test left_test right_test
+  | Reinterpret_cast left_c, Reinterpret_cast right_c ->
+    Cmm.equal_reinterpret_cast left_c right_c
+  | Static_cast left_c, Static_cast right_c ->
+    Cmm.equal_static_cast left_c right_c
+  | ( Probe_is_enabled { name = left_name; enabled_at_init = left_eai },
+      Probe_is_enabled { name = right_name; enabled_at_init = right_eai } ) ->
+    String.equal left_name right_name
+    && Option.equal Bool.equal left_eai right_eai
+  | Opaque, Opaque | Begin_region, Begin_region | End_region, End_region -> true
+  | Specific left_op, Specific right_op ->
+    Arch.equal_specific_operation left_op right_op
+  | ( Name_for_debugger
+        { ident = left_ident;
+          which_parameter = left_wp;
+          provenance = left_prov;
+          regs = _
+        },
+      Name_for_debugger
+        { ident = right_ident;
+          which_parameter = right_wp;
+          provenance = right_prov;
+          regs = _
+        } ) ->
+    Ident.same left_ident right_ident
+    && Option.equal Int.equal left_wp right_wp
+    && Option.equal Backend_var.Provenance.equal left_prov right_prov
+  | Dls_get, Dls_get | Tls_get, Tls_get | Poll, Poll | Pause, Pause -> true
+  | Domain_index, Domain_index -> true
+  | Int128op left_op, Int128op right_op ->
+    equal_int128_operation left_op right_op
+  | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
+      Alloc { bytes = right_bytes; dbginfo = right_dbg; mode = right_mode } ) ->
+    Int.equal left_bytes right_bytes
+    && Cmm.equal_alloc_dbginfo left_dbg right_dbg
+    && Cmm.Alloc_mode.equal left_mode right_mode
+  | ( ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+      | Const_mask _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
+      | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+      | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
+      | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
+      | Poll | Pause | Alloc _ ),
+      _ ) ->
+    false

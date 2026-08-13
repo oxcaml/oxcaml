@@ -21,3 +21,13 @@ val fundecl: Linear.fundecl -> unit
 val data: Cmm.data_item list -> unit
 val begin_assembly: (module Compiler_owee.Unix_intf.S) -> unit
 val end_assembly: unit -> unit
+
+(** Register a callback to receive filtered and formatted asm code, for expect
+    tests. The callback is automatically cleared after being invoked once. *)
+val register_expect_asm_callback : (string -> unit) -> unit
+
+(** When set, the captured assembly for [%%expect_asm] extends past each
+    function's hot body to the end of the function, including the trailing
+    out-of-line code (GC jump pads, safety-error calls, the stack-realloc
+    handler). *)
+val expect_asm_whole_function : bool ref

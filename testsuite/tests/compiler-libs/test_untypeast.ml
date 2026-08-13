@@ -15,6 +15,19 @@ let run s =
 val run : string -> unit = <fun>
 |}];;
 
+let run_structure s =
+  let structure = Parse.implementation (Lexing.from_string s) in
+  let typed_structure, _, _, _, _, _ =
+    Typemod.type_structure (Lazy.force Env.initial) structure
+  in
+  let structure = Untypeast.untype_structure typed_structure in
+  Format.printf "%a@." Pprintast.structure structure
+;;
+
+[%%expect{|
+val run_structure : string -> unit = <fun>
+|}];;
+
 run {| match None with Some (Some _) -> () | _ -> () |};;
 
 [%%expect{|
@@ -90,24 +103,22 @@ let foo : ('a : value) . 'a -> 'a = fun x -> x in foo
 run {| let foo : type a . a -> a = fun x -> x in foo |}
 
 [%%expect{|
-let foo : ('a : value) . 'a -> 'a = fun (type a) -> ( (fun x -> x : a -> a)) in
+let foo : ('a : value) . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in
 foo
 - : unit = ()
 |}];;
 
-(* CR: untypeast/pprintast are totally busted on programs with modes in value
-   bindings. Fix this. *)
 run {| let foo : ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|
-let (foo : 'a -> 'a) = ((fun x -> x : 'a -> 'a) : _ @ portable) in foo
+let (foo : 'a -> 'a) = ((fun x -> x : 'a -> 'a) : @ portable) in foo
 - : unit = ()
 |}];;
 
 run {| let foo : 'a . ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|
-let foo : ('a : value) . ('a -> 'a) @ portable = (fun x -> x : _ @ portable) in
+let foo : ('a : value) . ('a -> 'a) @ portable = (fun x -> x : @ portable) in
 foo
 - : unit = ()
 |}];;
@@ -127,6 +138,53 @@ let module M = struct type t = {
 run {| let foo : 'a -> 'a = fun x -> x in foo |}
 
 [%%expect{|
-let (foo : 'a -> 'a) = ( (fun x -> x : 'a -> 'a)) in foo
+let (foo : 'a -> 'a) = (fun x -> x : 'a -> 'a) in foo
 - : unit = ()
 |}];;
+
+let run s =
+  let pe = Parse.implementation (Lexing.from_string s) in
+  let te,_,_,_,_,_ = Typemod.type_structure (Lazy.force Env.initial) pe in
+  let ute = Untypeast.untype_structure te in
+  Format.printf "%a@." Pprintast.structure ute
+;;
+
+[%%expect{|
+val run : string -> unit = <fun>
+|}];;
+
+(* That test would hang before ocaml/ocaml#14105 *)
+run {|type t = (::);; let f (x : t) = match x with (::) -> 4|}
+
+[%%expect{|
+type t =
+  | (::)
+let f (x : t) = match x with | (::) -> 4
+- : unit = ()
+|}];;
+
+(***********************************)
+(* Untypeast/pprintast correctly handle declaration modalities. *)
+
+run_structure {|
+  module State = struct
+    type t = int
+    external next : t -> t @@ portable = "%identity"
+  end |};;
+
+[%%expect{|
+module State =
+  struct type t = int
+         external next : t -> t @@ portable = "%identity" end
+- : unit = ()
+|}];;
+
+run_structure {|
+  module type S = sig
+    val x : int -> int @@ portable
+  end |};;
+
+[%%expect{|
+module type S  = sig val x : int -> int @@ portable end
+- : unit = ()
+|}]

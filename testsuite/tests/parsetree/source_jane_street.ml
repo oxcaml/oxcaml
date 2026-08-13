@@ -1,5 +1,5 @@
 (* TEST
-   flags = "-extension-universe alpha";
+   flags = "-extension-universe alpha -w -181-220";
    include stdlib_upstream_compatible;
    include stdlib_stable;
    expect;
@@ -108,21 +108,6 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
-(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
-(*
-module M : sig
-  kind_abbrev_ k = immediate
-end = struct
-  kind_abbrev_ k = immediate
-end
-
-[%%expect{|
->> Fatal error: kind_abbrev not supported!
-Uncaught exception: Misc.Fatal_error
-
-|}]
-*)
-
 type t1 : any
 type t2 : any mod separable
 type t3 : value_or_null
@@ -138,7 +123,7 @@ type t12 : bits64
 
 [%%expect{|
 type t1 : any
-type t2 : any mod separable
+type t2 : any separable
 type t3 : value_or_null
 type t4
 type t5 : void
@@ -166,6 +151,30 @@ type ('a, 'b : float64, 'c : any, 'd, 'e, 'f, 'g, 'h, 'i, 'j : bits64, 'k,
      t14
 |}]
 
+(* non-trivial values: scannable axis annotations *)
+
+type t15 : any non_pointer
+type t16 : value non_pointer
+type t17 : value & value non_pointer
+type t17b : (value & value) non_pointer
+[%%expect{|
+type t15 : any non_pointer
+type t16 : value non_pointer
+type t17 : value & value non_pointer
+Line 4, characters 12-39:
+4 | type t17b : (value & value) non_pointer
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+
+type t17b : value & value
+|}]
+
+type ('a : value mod external_ stateless many unyielding non_float) t18 =
+  ('a : value mod immutable global)
+[%%expect{|
+type ('a : value mod everything non_float) t18 = 'a
+|}]
+
 type t = #(int * float#)
 
 let f xs = match xs with
@@ -186,6 +195,17 @@ module M :
   sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
   stateless
 val x : unit -> #('a M.t * string M.t) = <fun>
+|}]
+
+module Or_null_names = struct
+  type 'a t = Nope | Yep of 'a [@@or_null]
+end
+let y () = #( Or_null_names.Nope, Or_null_names.Yep "hi" )
+
+[%%expect{|
+module Or_null_names : sig type 'a t = Nope | Yep of 'a [@@or_null] end @@
+  stateless
+val y : unit -> #('a Or_null_names.t * string Or_null_names.t) = <fun>
 |}]
 
 external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
@@ -412,27 +432,20 @@ let g () =
 Line 5, characters 52-54:
 5 |   let local_ f a b : (int -> int) @ once portable = 42 in
                                                         ^^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "42" has type "int" but an expression was expected of type
          "int -> int"
 |}]
 
 (* expressions *)
 let g () = exclave_ local_
-  let f = (() : _ @ unique once) in
-  let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-  local_ (() : _ @ unique once);;
+  let _f = (() : _ @ unique once) in
+  let _f = (() : @ unique once) in
+  let _f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
+  let _f x y @ local unique = exclave_ local_ (x + y : @ once unique) in
+  local_ (() : _ @ unique once);
+  local_ (() : @ unique once);;
 
 [%%expect{|
-Line 2, characters 6-7:
-2 |   let f = (() : _ @ unique once) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
-Line 3, characters 6-7:
-3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
 val g : unit -> unit @ local once = <fun>
 |}]
 
@@ -486,9 +499,9 @@ type t =
 type fn = local_ int @ portable contended -> local_ int @ portable contended ;;
 type nested_fn = (local_ int @ portable once -> local_ int @ portable once) @ portable once -> local_ int @ portable once;;
 type ('a, 'b) labeled_fn =
-  a:local_ unique_ 'a @ portable contended -> ?b:local_ once_ 'b @ portable contended ->  local_ 'a @ contended portable-> (int -> local_ 'b @ unique once) @ portable;;
+  a:local_ 'a @ unique portable contended -> ?b:local_ 'b @ once portable contended ->  local_ 'a @ contended portable-> (int -> local_ 'b @ unique once) @ portable;;
 type typvar_fn =
-  a:local_ unique_ ('a 'b. 'a) @ portable contended -> unit
+  a:local_ ('a 'b. 'a) @ unique portable contended -> unit
 
 [%%expect{|
 type fn = int @ local portable contended -> int @ local portable contended
@@ -499,7 +512,7 @@ type ('a, 'b) labeled_fn =
     a:'a @ local unique portable contended ->
     ?b:'b @ local once portable contended ->
     'a @ local portable contended ->
-    (int -> 'b @ local unique once) @ portable
+    (int -> 'b @ local once unique) @ portable
 type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
 |}]
 
@@ -878,7 +891,8 @@ let unary_minus_plus () =
 Line 4, characters 17-22:
 4 |   let b = stack_ (-42) in
                      ^^^^^
-Error: This expression is not an allocation site.
+Error: Stack allocating literals is not supported;
+       they are not allocated at runtime.
 |}]
 
 (**********)
@@ -922,7 +936,7 @@ let f x =
   | _ -> assert false;;
 
 [%%expect{|
-val f : ('a : value_or_null mod separable). 'a iarray -> 'a iarray = <fun>
+val f : ('a : value_maybe_null). 'a iarray -> 'a iarray = <fun>
 |}]
 
 (******************)
@@ -1002,7 +1016,7 @@ val f : (x:int * int) -> int = <fun>
 type xy = (x:int * y:int)
 
 (* Reordering and partial matches *)
-let lt = (~x:1, ~y:2, ~x:3, 4)
+let lt = (~x:1, ~y:2, ~x2:3, 4)
 
 let matches =
   let (~x, .. ) = lt in
@@ -1014,7 +1028,7 @@ let matches =
 
 [%%expect{|
 type xy = x:int * y:int
-val lt : x:int * y:int * x:int * int = (~x:1, ~y:2, ~x:3, 4)
+val lt : x:int * y:int * x2:int * int = (~x:1, ~y:2, ~x2:3, 4)
 val matches : int = 1
 val matches : int * int = (1, 2)
 |}]
@@ -1280,59 +1294,32 @@ val inc : 'a with_idx -> 'a with_idx = <fun>
 type 'a r = { foo : 'a }
 let idx_r () = (.foo)
 let idx_r_r () = (.foo.#foo)
-let idx_array x = (.(x))
-let idx_array_L x = (.L(x))
-let idx_array_l x = (.l(x))
-let idx_array_S x = (.S(x))
-let idx_array_s x = (.s(x))
-let idx_array_n x = (.n(x))
-let idx_iarray x = (.:(x))
-let idx_iarray_L x = (.:L(x))
-let idx_iarray_l x = (.:l(x))
-let idx_iarray_S x = (.:S(x))
-let idx_iarray_s x = (.:s(x))
-let idx_iarray_n x = (.:n(x))
-let idx_imm x = (.idx_imm(x))
-let idx_mut x = (.idx_mut(x))
 [%%expect{|
 type 'a r = { foo : 'a; }
 val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
 val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
-val idx_array :
-  ('a : value_or_null mod non_float). int -> ('a array, 'a) idx_mut = <fun>
-val idx_array_L :
-  ('a : value_or_null mod non_float). int64# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_l :
-  ('a : value_or_null mod non_float). int32# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_S :
-  ('a : value_or_null mod non_float). int16# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_array_s :
-  ('a : value_or_null mod non_float). int8# -> ('a array, 'a) idx_mut = <fun>
-val idx_array_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a array, 'a) idx_mut =
-  <fun>
-val idx_iarray :
-  ('a : value_or_null mod non_float). int -> ('a iarray, 'a) idx_imm = <fun>
-val idx_iarray_L :
-  ('a : value_or_null mod non_float). int64# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_l :
-  ('a : value_or_null mod non_float). int32# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_S :
-  ('a : value_or_null mod non_float). int16# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_s :
-  ('a : value_or_null mod non_float). int8# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_iarray_n :
-  ('a : value_or_null mod non_float). nativeint# -> ('a iarray, 'a) idx_imm =
-  <fun>
-val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
-val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
+|}]
+
+(* Block index as block access (index deepening) *)
+type 'a s = { a : 'a; mutable b: 'a; mutable c: 'a [@atomic] }
+
+let idx_a = (.a)
+let idx_b = (.b)
+let idx_c = (.c)
+[%%expect{|
+type 'a s = { a : 'a; mutable b : 'a; mutable c : 'a [@atomic]; }
+val idx_a : ('a s, 'a) idx_imm = <abstr>
+val idx_b : ('a s, 'a) idx_mut = <abstr>
+val idx_c : ('a s, 'a) idx_atomic = <abstr>
+|}]
+
+let idx_a' = (.idx_imm(idx_a).#foo)
+let idx_b' = (.idx_mut(idx_b).#foo)
+let idx_c' = (.idx_atomic(idx_c).#foo)
+[%%expect{|
+val idx_a' : ('a r# s, 'a) idx_imm = <abstr>
+val idx_b' : ('a r# s, 'a) idx_mut = <abstr>
+val idx_c' : ('a r# s, 'a) idx_atomic = <abstr>
 |}]
 
 module Borrow = struct
@@ -1357,8 +1344,8 @@ Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
-(***************)
-(* Modal kinds *)
+(*************************************)
+(* Modal kinds and kind declarations *)
 
 (* supported *)
 type 'a list : immutable_data with 'a
@@ -1382,29 +1369,53 @@ type existential_abstract =
     Mk : ('a : value mod portable). 'a abstract -> existential_abstract
 |}]
 
+module M : sig
+  kind_ immediate = value mod global many
+  kind_ immutable_data = value mod many
+  kind_ immutable = value
+  kind_ data = value mod many
+  kind_ abstract
+end = struct
+  kind_ immediate = value mod global many
+  kind_ immutable_data = value mod many
+  kind_ immutable = value
+  kind_ data = value mod many
+  kind_ abstract
+end
+[%%expect{|
+module M :
+  sig
+    kind_ immediate = value mod global many
+    kind_ immutable_data = value mod many
+    kind_ immutable = value
+    kind_ data = value mod many
+    kind_ abstract
+  end @@ stateless
+|}]
+
+module type S = sig kind_ k end
+module type S1 = S with kind_ k = value mod portable
+module type S2 = S with kind_ k := value mod global
+[%%expect{|
+module type S = sig kind_ k end
+module type S1 = sig kind_ k = value mod portable end
+module type S2 = sig end
+|}]
+
 (* not yet supported *)
 module _ : sig
   type 'a gel : kind_of_ 'a mod global
   type 'a t : _
-  kind_abbrev_ immediate = value mod global unique many sync uncontended
-  kind_abbrev_ immutable_data = value mod sync uncontended many
-  kind_abbrev_ immutable = value mod uncontended
-  kind_abbrev_ data = value mod sync many
 end = struct
   type 'a gel : kind_of_ 'a mod global
   type 'a t : _
-  kind_abbrev_ immediate = value mod global unique many sync uncontended
-  kind_abbrev_ immutable_data = value mod sync uncontended many
-  kind_abbrev_ immutable = value mod uncontended
-  kind_abbrev_ data = value mod sync many
 end
 
-(* CR layouts v2.8: Expect this output to change once modal kinds are
-   supported. Internal ticket 5118. *)
-
+(* CR layouts: Expect this output to change once `kind_of_` is   supported.
+   Internal ticket 2912. *)
 [%%expect{|
-Line 9, characters 16-27:
-9 |   type 'a gel : kind_of_ 'a mod global
+Line 5, characters 16-27:
+5 |   type 'a gel : kind_of_ 'a mod global
                     ^^^^^^^^^^^
 Error: Unimplemented kind syntax
 |}]
@@ -1511,7 +1522,7 @@ let f (x : bool) = (x : int)[@error_message "custom message"]
 Line 1, characters 20-21:
 1 | let f (x : bool) = (x : int)[@error_message "custom message"]
                         ^
-Error: This expression has type "bool" but an expression was expected of type
+Error: The value "x" has type "bool" but an expression was expected of type
          "int"
        custom message
 |}]
@@ -1522,11 +1533,11 @@ let f (v : float#) : ((_ : value)[@error_message "need a value"]) = v
 Line 1, characters 68-69:
 1 | let f (v : float#) : ((_ : value)[@error_message "need a value"]) = v
                                                                         ^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "v" has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because of the annotation on the wildcard _ at line 1, characters 22-33.
          need a value
 |}]
@@ -1592,7 +1603,8 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -1674,6 +1686,28 @@ type ('a, _[@foo] : any)  t
 type ('a, _ : any) t
 |}]
 
+(**********************************************)
+(* attributes on module aliases in signatures *)
+module Foo = struct end
+module type S = sig
+  module Foo = Foo [@foo] @@ nonportable
+end
+[%%expect{|
+module Foo : sig end @@ stateless
+module type S = sig module Foo = Foo end
+|}]
+
+(* make sure loc is set correctly *)
+module type S = sig
+  module Bar = Bar [@foo] @@ nonportable
+end
+[%%expect{|
+Line 2, characters 15-18:
+2 |   module Bar = Bar [@foo] @@ nonportable
+                   ^^^
+Error: Unbound module "Bar"
+|}]
+
 (*********************)
 (* quotations syntax *)
 
@@ -1703,4 +1737,96 @@ val f : bool# -> bool# = <fun>
 let f (_ : (repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) = ()
 [%%expect{|
 val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
+|}]
+
+(*****************)
+(* let poly_ and val poly_ *)
+
+let poly_ id : 'a. 'a -> 'a = fun x -> x
+[%%expect{|
+Line 1, characters 10-12:
+1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
+              ^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+
+let poly_ id = fun x -> x
+[%%expect{|
+val poly_ id : 'a -> 'a = <lpoly>
+|}]
+
+let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+[%%expect{|
+Line 1, characters 10-15:
+1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^^^^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+
+module type S_poly = sig
+  val poly_ f : 'a. 'a -> 'a
+  val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+  val poly_ h : 'a -> 'b -> 'a
+end
+[%%expect{|
+Line 2, characters 16-28:
+2 |   val poly_ f : 'a. 'a -> 'a
+                    ^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables,
+  so "poly_" has no effect. Consider using a regular "val" instead.
+
+module type S_poly =
+  sig
+    val f : 'a -> 'a
+    val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+    val poly_ h : 'a -> 'b -> 'a
+  end
+|}]
+
+let poly_ f : 'a. 'a -> 'a = fun x -> x
+and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+[%%expect{|
+Line 2, characters 10-11:
+2 | and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+
+(* Mixed poly and non-poly in mutually recursive bindings *)
+let poly_ f : 'a. 'a -> 'a = fun x -> x
+and g = fun x -> x
+[%%expect{|
+Line 2, characters 0-18:
+2 | and g = fun x -> x
+    ^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+
+let h = fun x -> x
+and poly_ k : 'a. 'a -> 'a = fun x -> x
+[%%expect{|
+Line 2, characters 0-39:
+2 | and poly_ k : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+
+let m = fun x -> x
+and poly_ n : 'a. 'a -> 'a = fun x -> x
+and p = fun x -> x
+[%%expect{|
+Line 2, characters 0-39:
+2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+
+module type S = sig
+  val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
+end
+[%%expect{|
+module type S = sig val poly_ f : 'a -> 'b end
 |}]

@@ -1,7 +1,6 @@
 (* TEST
- flags += " -w a -alert -do_not_spawn_domains -alert -unsafe_multidomain ";
+ flags += " -w a ";
  modules = "globrootsprim.c globroots.ml";
- runtime5;
  { bytecode; }
  { native; }
 *)

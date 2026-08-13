@@ -41,6 +41,16 @@
  (action (run ./generate_large_modules.exe mylib_b)))
 
 (rule
+ (target mylib_unused.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe mylib_unused)))
+
+(rule
+ (target unusedlib.ml)
+ (deps generate_large_modules.exe)
+ (action (run ./generate_large_modules.exe unusedlib)))
+
+(rule
  (target cmxa_main.ml)
  (deps generate_large_modules.exe)
  (action (run ./generate_large_modules.exe cmxa_main)))
@@ -51,8 +61,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target simple.exe)
  (deps simple.ml)
  (action
@@ -63,8 +72,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target simple.output)
  (deps simple.exe)
  (action (with-outputs-to %{target} (run ./simple.exe))))
@@ -74,8 +82,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps simple.expected simple.output)
  (action (diff simple.expected simple.output)))
 
@@ -85,8 +92,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target simple_funcsect.exe)
  (deps simple_funcsect.ml)
  (action
@@ -97,8 +103,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target simple_funcsect.output)
  (deps simple_funcsect.exe)
  (action (with-outputs-to %{target} (run ./simple_funcsect.exe))))
@@ -108,8 +113,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps simple.expected simple_funcsect.output)
  (action (diff simple.expected simple_funcsect.output)))
 
@@ -122,8 +126,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets gen_module_a.cmi gen_module_a.cmx gen_module_a.o)
  (deps gen_module_a.ml)
  (action
@@ -133,8 +136,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets gen_module_b.cmi gen_module_b.cmx gen_module_b.o)
  (deps gen_module_b.ml gen_module_a.cmi gen_module_a.cmx)
  (action
@@ -144,8 +146,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets gen_module_c.cmi gen_module_c.cmx gen_module_c.o)
  (deps gen_module_c.ml gen_module_a.cmi gen_module_a.cmx
        gen_module_b.cmi gen_module_b.cmx)
@@ -157,8 +158,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets gen_main.cmi gen_main.cmx gen_main.o)
  (deps gen_main.ml gen_module_a.cmi gen_module_a.cmx
        gen_module_b.cmi gen_module_b.cmx
@@ -172,8 +172,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cross_partition.exe)
  (deps gen_module_a.cmx gen_module_a.o
        gen_module_b.cmx gen_module_b.o
@@ -188,8 +187,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cross_partition.output)
  (deps cross_partition.exe)
  (action (with-outputs-to %{target} (run ./cross_partition.exe))))
@@ -199,8 +197,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cross_partition.expected cross_partition.output)
  (action (diff cross_partition.expected cross_partition.output)))
 
@@ -210,8 +207,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cross_partition.exe)
  (action (progn
   (with-stdout-to cross_partition_sections.txt (run readelf -S cross_partition.exe))
@@ -222,8 +218,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cross_partition_fs.exe)
  (deps gen_module_a.cmx gen_module_a.o
        gen_module_b.cmx gen_module_b.o
@@ -238,8 +233,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cross_partition_fs.output)
  (deps cross_partition_fs.exe)
  (action (with-outputs-to %{target} (run ./cross_partition_fs.exe))))
@@ -249,8 +243,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cross_partition.expected cross_partition_fs.output)
  (action (diff cross_partition.expected cross_partition_fs.output)))
 
@@ -260,8 +253,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
        gen_module_c.cmx gen_module_c.o gen_main.cmx gen_main.o)
  (action
@@ -379,8 +371,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
        gen_module_c.cmx gen_module_c.o gen_main.cmx gen_main.o)
  (action
@@ -429,8 +420,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps gen_module_a.cmx gen_module_a.o gen_module_b.cmx gen_module_b.o
        gen_module_c.cmx gen_module_c.o gen_main.cmx gen_main.o)
  (action
@@ -525,8 +515,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets mylib_a.cmi mylib_a.cmx mylib_a.o)
  (deps mylib_a.ml)
  (action
@@ -536,44 +525,78 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets mylib_b.cmi mylib_b.cmx mylib_b.o)
  (deps mylib_b.ml mylib_a.cmi mylib_a.cmx)
  (action
   (run %{bin:ocamlopt.opt} -c mylib_b.ml)))
+
+; mylib_unused is part of the archive but never referenced, so the dissector
+; must not link it into the executable
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")))
+ (targets mylib_unused.cmi mylib_unused.cmx mylib_unused.o)
+ (deps mylib_unused.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -c %{deps})))
 
 ; Create the .cmxa archive
 (rule
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (targets mylib.cmxa mylib.a)
- (deps mylib_a.cmx mylib_a.o mylib_b.cmx mylib_b.o)
+ (deps mylib_a.cmx mylib_a.o mylib_b.cmx mylib_b.o mylib_unused.cmx
+       mylib_unused.o)
  (action
-  (run %{bin:ocamlopt.opt} -a mylib_a.cmx mylib_b.cmx -o mylib.cmxa)))
+  (run %{bin:ocamlopt.opt} -a mylib_a.cmx mylib_b.cmx mylib_unused.cmx
+       -o mylib.cmxa)))
 
-; Link with dissector using the .cmxa archive
+; unusedlib is an archive none of whose units are referenced, so the dissector
+; must not link any of its members into the executable
 (rule
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
+ (targets unusedlib.cmi unusedlib.cmx unusedlib.o)
+ (deps unusedlib.ml)
+ (action
+  (run %{bin:ocamlopt.opt} -c %{deps})))
+
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")))
+ (targets unusedlib.cmxa unusedlib.a)
+ (deps unusedlib.cmx unusedlib.o)
+ (action
+  (run %{bin:ocamlopt.opt} -a unusedlib.cmx -o unusedlib.cmxa)))
+
+; Link with dissector using the .cmxa archives
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")))
  (target cmxa_test.exe)
- (deps mylib.cmxa mylib.a mylib_a.cmi mylib_b.cmi cmxa_main.ml)
+ (deps mylib.cmxa mylib.a mylib_a.cmi mylib_a.cmx mylib_b.cmi mylib_b.cmx
+       mylib_unused.cmi mylib_unused.cmx unusedlib.cmxa unusedlib.a
+       unusedlib.cmi unusedlib.cmx cmxa_main.ml)
  (action
   (run %{bin:ocamlopt.opt} -dissector -dissector-partition-size 0.005
-       mylib.cmxa cmxa_main.ml -o %{target})))
+       mylib.cmxa unusedlib.cmxa cmxa_main.ml -o %{target})))
 
 (rule
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cmxa_test.output)
  (deps cmxa_test.exe)
  (action (with-outputs-to %{target} (run ./cmxa_test.exe))))
@@ -583,8 +606,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cmxa_test.expected cmxa_test.output)
  (action (diff cmxa_test.expected cmxa_test.output)))
 
@@ -594,20 +616,34 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cmxa_test.exe)
  (action (progn
   (with-stdout-to cmxa_sections.txt (run readelf -S cmxa_test.exe))
   (bash "grep -q 'caml.p1' cmxa_sections.txt || (echo 'ERROR: no multiple partitions'; exit 1)"))))
+
+; Verify the unused archive member and the unused archive were not linked into
+; cmxa_test.exe (the dissector links only the required compilation units, like
+; a normal link)
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "amd64")
+       (= %{system} "linux")))
+ (deps cmxa_test.exe)
+ (action (progn
+  (with-stdout-to cmxa_symbols.txt (run nm cmxa_test.exe))
+  (bash "grep -q 'Mylib_a' cmxa_symbols.txt || (echo 'ERROR: Mylib_a symbols missing'; exit 1)")
+  (bash "! grep -q 'Mylib_unused' cmxa_symbols.txt || (echo 'ERROR: unused unit Mylib_unused was linked'; exit 1)")
+  (bash "! grep -q 'Unusedlib' cmxa_symbols.txt || (echo 'ERROR: unused archive Unusedlib was linked'; exit 1)"))))
 
 ; Test 4: Linker flags (-cclib) should not be treated as files
 (rule
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cclib_test.exe)
  (deps cclib_test.ml)
  (action
@@ -619,8 +655,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cclib_test.output)
  (deps cclib_test.exe)
  (action
@@ -632,8 +667,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cclib_test.output)
  (action (bash "grep -q 'cclib test passed' cclib_test.output")))
 
@@ -644,8 +678,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cstub.o)
  (deps cstub.c)
  (action
@@ -656,8 +689,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target libcstub.a)
  (deps cstub.o)
  (action
@@ -668,8 +700,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cstub_passthrough.exe)
  (deps cstub_passthrough.ml libcstub.a)
  (action
@@ -682,8 +713,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (target cstub_passthrough.output)
  (deps cstub_passthrough.exe)
  (action
@@ -695,8 +725,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cstub_passthrough.output)
  (action (bash "grep -q 'C stub passthrough test passed' cstub_passthrough.output")))
 
@@ -706,8 +735,7 @@
  (enabled_if
   (and (= %{context_name} "main")
        (= %{architecture} "amd64")
-       (= %{system} "linux")
-       (<> %{env:RUNTIME_DIR=runtime} "runtime4")))
+       (= %{system} "linux")))
  (deps cstub_passthrough.ml libcstub.a)
  (action
   (bash "

@@ -53,19 +53,20 @@ type m2 = (module S with type t = t_value);;
 [%%expect{|
 module type S = sig type t : immediate end
 type m1 = (module S with type t = int)
-Line 6, characters 10-42:
+Line 6, characters 18-41:
 6 | type m2 = (module S with type t = t_value);;
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^^^^
 Error: In this "with" constraint, the new definition of "t"
        does not match its original definition in the constrained signature:
        Type declarations do not match:
          type t = t_value
        is not included in
          type t : immediate
-       The kind of the first is value
+       The layout of the first is value
          because of the definition of t_value at line 1, characters 0-12.
-       But the kind of the first must be a subkind of immediate
+       But the layout of the first must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-22.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* You may not constrain types with a manifest in a package *)
@@ -76,9 +77,9 @@ end
 type m = (module S with type t = t_value);;
 [%%expect{|
 module type S = sig type t = int end
-Line 5, characters 9-41:
+Line 5, characters 17-40:
 5 | type m = (module S with type t = t_value);;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     ^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "int".
        Package "with" constraints may only be used on abstract types.
 |}];;
@@ -92,9 +93,9 @@ end
 type m = (module S with type t = int);;
 [%%expect{|
 module type S = sig type t = int end
-Line 5, characters 9-37:
+Line 5, characters 17-36:
 5 | type m = (module S with type t = int);;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     ^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "int".
        Package "with" constraints may only be used on abstract types.
 |}];;
@@ -112,9 +113,9 @@ type m = (module S with type P.t = int);;
 [%%expect{|
 module M : sig type t end
 module type S = sig module P = M end
-Line 9, characters 9-39:
+Line 9, characters 17-38:
 9 | type m = (module S with type P.t = int);;
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     ^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "P.t" is defined to be "M.t".
        Package "with" constraints may only be used on abstract types.
 |}];;
@@ -146,10 +147,11 @@ Line 6, characters 0-16:
 6 | and t2 = t_value;;
     ^^^^^^^^^^^^^^^^
 Error:
-       The kind of t2 is value
+       The layout of t2 is value
          because of the definition of t_value at line 1, characters 0-12.
-       But the kind of t2 must be a subkind of immediate
+       But the layout of t2 must be a sublayout of value non_pointer
          because of the definition of t at line 2, characters 2-22.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (* Though this sometimes fails if the check would require particularly clever
@@ -172,11 +174,12 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The kind of 'a t2 is value
+         The layout of 'a t2 is value
            because it instantiates an unannotated type parameter of t2,
-           chosen to have kind value.
-         But the kind of 'a t2 must be a subkind of immediate
+           chosen to have layout value.
+         But the layout of 'a t2 must be a sublayout of value non_pointer
            because of the definition of t at line 2, characters 2-22.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}];;
@@ -198,11 +201,12 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The kind of 'a t2 is value
+         The layout of 'a t2 is value
            because it instantiates an unannotated type parameter of t2,
-           chosen to have kind value.
-         But the kind of 'a t2 must be a subkind of immediate
+           chosen to have layout value.
+         But the layout of 'a t2 must be a sublayout of value non_pointer
            because of the definition of t at line 2, characters 2-22.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}];;
@@ -264,9 +268,9 @@ module type Private_row =
   sig type a and t = private [< `A | `B ] and b and d = private [< `C ] end
 module type Test =
   sig type a and t = [ `A ] and b and d = private [< `C ] end
-Line 13, characters 12-54:
+Line 13, characters 20-52:
 13 | type fail = (module Private_row with type t = [ `A ] )
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A | `B ]".
        Package "with" constraints may only be used on abstract types.
 |}]
@@ -280,36 +284,36 @@ end
 type t1 = (module Private_row with type t = [ `A ])
 [%%expect{|
 module type Private_row = sig type t = private [< `A ] end
-Line 5, characters 10-51:
+Line 5, characters 18-50:
 5 | type t1 = (module Private_row with type t = [ `A ])
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
 type t2 = (module Private_row with type t = [< `A ])
 [%%expect{|
-Line 1, characters 10-52:
+Line 1, characters 18-51:
 1 | type t2 = (module Private_row with type t = [< `A ])
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
 type 'a t3 = (module Private_row with type t = [< `A ]) as 'a
 [%%expect{|
-Line 1, characters 13-55:
+Line 1, characters 21-54:
 1 | type 'a t3 = (module Private_row with type t = [< `A ]) as 'a
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
 
 type 'a t4 = (module Private_row with type t = [< `A ] as 'a)
 [%%expect{|
-Line 1, characters 13-61:
+Line 1, characters 21-60:
 1 | type 'a t4 = (module Private_row with type t = [< `A ] as 'a)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: In the constrained signature, type "t" is defined to be "[< `A ]".
        Package "with" constraints may only be used on abstract types.
 |}]
@@ -333,8 +337,20 @@ Line 8, characters 10-17:
 8 | type t2 = t_value t
               ^^^^^^^
 Error: This type "t_value" should be an instance of type "('a : immediate)"
-       The kind of t_value is value
+       The layout of t_value is value
          because of the definition of t_value at line 1, characters 0-12.
-       But the kind of t_value must be a subkind of immediate
+       But the layout of t_value must be a sublayout of value non_pointer
          because of the definition of t at line 5, characters 0-39.
+       Note: The layout of immediate is value non_pointer.
 |}];;
+
+(** Issue 13778: constraining a type should count as using it *)
+module X: sig
+  type t
+end = struct
+  module type S = sig type s end
+  type t = (module S with type s = int)
+end
+[%%expect {|
+module X : sig type t end
+|}]

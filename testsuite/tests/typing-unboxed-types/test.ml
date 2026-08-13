@@ -137,8 +137,7 @@ let rec x = A x;;
 Line 1, characters 14-15:
 1 | let rec x = A x;;
                   ^
-Error: This expression has type "t1" but an expression was expected of type
-         "string"
+Error: The value "x" has type "t1" but an expression was expected of type "string"
 |}];;
 
 (* Representation mismatch between module and signature must be rejected *)
@@ -348,6 +347,36 @@ Error: Signature mismatch:
        The first is a record, but the second is an unboxed record.
 |}]
 
+module M : sig
+  (* the error on r gets reported first, since r's definition occurs first,
+     but the real issue is that t is not bits64 in the struct. *)
+  type r = { r : #(t * s) }
+  and t : bits64
+  and s
+end = struct
+  type r = { r : #(t * s) }
+  and t
+  and s
+end
+[%%expect{|
+Lines 7-11, characters 6-3:
+ 7 | ......struct
+ 8 |   type r = { r : #(t * s) }
+ 9 |   and t
+10 |   and s
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type r = { r : #(t * s); } and t and s end
+       is not included in
+         sig type r = { r : #(t * s); } and t : bits64 and s end
+       Type declarations do not match:
+         type r = { r : #(t * s); }
+       is not included in
+         type r = { r : #(t * s); }
+       Their internal representations differ:
+       This is likely caused by a layout mismatch in a later definition.
+|}]
 
 (* Check interference with representation of float arrays. *)
 type t11 = L of float [@@ocaml.unboxed];;
@@ -389,7 +418,7 @@ Line 1, characters 15-18:
 1 | let f (a : int t12 array) = a.(0);;
                    ^^^
 Error: Unbound type constructor "t12"
-Hint: Did you mean "t1", "t11" or "t2"?
+Hint:              Did you mean "t1", "t11" or "t2"?
 |}];;
 
 type 'a t12 : value = #{ a : 'a t12 };;
@@ -406,7 +435,7 @@ Line 1, characters 15-18:
 1 | let f (a : int t12 array) = a.(0);;
                    ^^^
 Error: Unbound type constructor "t12"
-Hint: Did you mean "t1", "t11" or "t2"?
+Hint:              Did you mean "t1", "t11" or "t2"?
 |}];;
 
 (* Check for another possible loop *)
@@ -416,7 +445,7 @@ Line 1, characters 17-20:
 1 | type t13 = A : _ t12 -> t13 [@@ocaml.unboxed];;
                      ^^^
 Error: Unbound type constructor "t12"
-Hint: Did you mean "t1", "t11", "t13" or "t2"?
+Hint:              Did you mean "t1", "t11", "t13" or "t2"?
 |}];;
 
 
@@ -610,7 +639,7 @@ end
 [%%expect{|
 module Result_u :
   sig
-    type ('a, 'b) t : value & value
+    type ('a, 'b) t : value non_pointer & value
     val to_result : ('a, 'b) t -> ('a, 'b) Result.t
     val of_result : ('a, 'b) Result.t -> ('a, 'b) t
   end
@@ -648,7 +677,8 @@ end
 [%%expect{|
 module Result_u_VV :
   sig
-    type ('a : value & value, 'b : value & value) t : value & (value & value)
+    type ('a : value & value, 'b : value & value) t
+      : value non_pointer & (value & value)
     val ok_exn : ('a : value & value) ('b : value & value). ('a, 'b) t -> 'a
     val error_exn :
       ('a : value & value) ('b : value & value). ('a, 'b) t -> 'b

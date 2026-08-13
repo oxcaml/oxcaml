@@ -24,9 +24,27 @@ open Typedtree
 open Outcometree
 open Ast_helper
 
-module SL = Slambda
-
 module Genprintval = Genprintval_native
+
+(* Eta-expansion gives [create_process] and [waitpid] the unannotated types
+   required by [Compiler_owee.Unix_intf.S]. *)
+module Unix_for_owee = struct
+  include Unix
+
+  let create_process prog args stdin stdout stderr =
+    Unix.create_process prog args stdin stdout stderr
+
+  let waitpid flags pid = Unix.waitpid flags pid
+end
+
+type input =
+  | Stdin
+  | File of string
+  | String of string
+
+let filename_of_input = function
+  | File name -> name
+  | Stdin | String _ -> ""
 
 type res = Ok of Obj.t | Err of string
 type evaluation_outcome = Result of Obj.t | Exception of exn
@@ -36,7 +54,8 @@ let _dummy = (Ok (Obj.magic 0), Err "")
 module Jit = struct
   type t =
     {
-      load : Format.formatter -> Lambda.program -> evaluation_outcome;
+      load : phrase_name:string -> Format.formatter -> Lambda.program
+        -> evaluation_outcome;
       lookup_symbol : string -> Obj.t option;
     }
 end
@@ -119,15 +138,11 @@ let close_phrase lam =
     let layout = Lambda.layout_of_module_field repr pos in
     let glob =
       Lprim (mod_field pos repr,
-             [Lprim (Pgetglobal glb, [], Loc_unknown)],
+             [Lprim (Pgetglobal (glb, Dynamic), [], Loc_unknown)],
              Loc_unknown)
     in
     Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
   ) (free_variables lam) lam
-
-let close_slambda_phrase slam =
-  match slam with
-  | SL.Quote lam -> SL.Quote (close_phrase lam)
 
 (* Return the value referred to by a path *)
 
@@ -157,7 +172,7 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
         else None (* [pos] points to an unboxed singleton *))
 
 let rec eval_address = function
-  | Env.Aunit cu ->
+  | Env.Aunit (cu, _) ->
       global_symbol cu
   | Env.Alocal id ->
       let glob, pos, repr = toplevel_value id in
@@ -222,11 +237,11 @@ let print_out_phrase = Oprint.out_phrase
 
 let print_untyped_exception ppf obj =
   !print_out_value ppf (Printer.outval_of_untyped_exception obj)
-let outval_of_value env obj ty =
+let outval_of_value env obj lpoly ty =
   Printer.outval_of_value !max_printer_steps !max_printer_depth
-    (fun _ _ _ -> None) env obj ty
+    (fun _ _ _ -> None) env obj lpoly ty
 let print_value env obj ppf ty =
-  !print_out_value ppf (outval_of_value env obj ty)
+  !print_out_value ppf (outval_of_value env obj (Lpoly.determined []) ty)
 
 type ('a, 'b) gen_printer = ('a, 'b) Genprintval.gen_printer =
   | Zero of 'b
@@ -291,6 +306,14 @@ let run_hooks hook = List.iter (fun f -> f hook) !hooks
 let phrase_seqid = ref 0
 let phrase_name = ref "TOP"
 
+let use_existing_compilerlibs_state_for_artifacts_flag = ref false
+
+let use_existing_compilerlibs_state_for_artifacts () =
+  use_existing_compilerlibs_state_for_artifacts_flag := true
+
+let using_existing_compilerlibs_state_for_artifacts () =
+  !use_existing_compilerlibs_state_for_artifacts_flag
+
 let default_load ppf (program : Lambda.program) =
   let dll =
     if !Clflags.keep_asm_file then !phrase_name ^ ext_dll
@@ -304,7 +327,7 @@ let default_load ppf (program : Lambda.program) =
       (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
   Asmgen.compile_implementation
-    (module Unix : Compiler_owee.Unix_intf.S)
+    (module Unix_for_owee : Compiler_owee.Unix_intf.S)
     ~toplevel:need_symbol
     ~sourcefile:(Some filename) ~prefixname:filename
     ~pipeline ~ppf_dump:ppf
@@ -326,45 +349,50 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_slambda ppf ~compilation_unit program repr =
+let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
-  if !Clflags.dump_slambda then fprintf ppf "%a@." Printslambda.program program;
-  let program = Slambdaeval.eval program in
-  let lam = program.code in
-  if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
-  let slam =
-    Simplif.simplify_lambda lam
+  if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
+  let (_static_data, rawlam) =
+    (* CR layout poly: If this toplevel value is static we should keep the
+       comptime part in a separate table so we can use it in later expressions.
+    *)
+    Slambda.eval ~cu_static_data:Compilenv.get_static_data
+      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
+  in
+  if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
+  let lam =
+    Simplif.simplify_lambda rawlam
       ~restrict_to_upstream_dwarf:
         !Dwarf_flags.restrict_to_upstream_dwarf
       ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
   in
-  if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
+  if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let program =
     { Lambda.
-      code = slam;
+      code = lam;
       main_module_block_format = Mb_struct { mb_repr = repr };
       arg_block_idx = None;
       compilation_unit;
-      required_globals = program.required_globals;
+      required_globals;
     }
   in
   match !jit with
   | None -> default_load ppf program
-  | Some {Jit.load; _} -> load ppf program
+  | Some {Jit.load; _} -> load ~phrase_name:!phrase_name ppf program
 
-let outval_of_id env id val_type =
+let outval_of_id env id val_lpoly val_type =
   let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
   match mod_field (global_symbol glob) repr pos with
-  | Some obj_to_print -> outval_of_value env obj_to_print val_type
+  | Some obj_to_print -> outval_of_value env obj_to_print val_lpoly val_type
   | None -> Oval_stuff "<abstr>"
 
 (* Print the outcome of an evaluation *)
 
 let pr_item =
-  Printtyp.print_items
+  Out_type.print_items
     (fun env -> function
-      | Sig_value(id, {val_kind = Val_reg _; val_type; _}, _) ->
-         Some (outval_of_id env id val_type)
+      | Sig_value(id, {val_kind = Val_reg _; val_type; val_lpoly}, _) ->
+         Some (outval_of_id env id val_lpoly val_type)
       | _ -> None
     )
 
@@ -380,7 +408,10 @@ let print_out_exception ppf exn outv =
 
 let print_exception_outcome ppf exn =
   if exn = Out_of_memory then Gc.full_major ();
-  let outv = outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn in
+  let outv =
+    outval_of_value !toplevel_env (Obj.repr exn) (Lpoly.determined [])
+      Predef.type_exn
+  in
   print_out_exception ppf exn outv
 
 (* The table of toplevel directives.
@@ -407,13 +438,14 @@ let name_expression ~loc ~attrs sort exp =
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       val_modalities = Mode.Modality.(Const.id |> of_const);
-      val_uid = Uid.internal_not_actually_unique; }
+      val_uid = Uid.internal_not_actually_unique;
+      val_lpoly = Lpoly.determined []; }
   in
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =
     { pat_desc =
-        Tpat_var(id, mknoloc name, vd.val_uid, sort,
-          Mode.Value.disallow_right Mode.Value.legacy);
+        Tpat_var { id; name = mknoloc name; uid = vd.val_uid; sort;
+                   mode = Mode.Value.disallow_right Mode.Value.legacy };
       pat_loc = loc;
       pat_extra = [];
       pat_type = exp.exp_type;
@@ -486,9 +518,9 @@ let execute_phrase print_outcome ppf phr =
             str, sg', true
         | _ -> str, sg', false
       in
-      let compilation_unit, program, repr =
-        let { SL.compilation_unit; main_module_block_format;
-              code = res } as program =
+      let compilation_unit, res, required_globals, repr =
+        let { Lambda.compilation_unit; main_module_block_format;
+              required_globals; code = res } =
           Translmod.transl_implementation compilation_unit
             (str, coercion, None) ~loc:Location.none
         in
@@ -499,15 +531,14 @@ let execute_phrase print_outcome ppf phr =
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
         remember compilation_unit sg' repr;
-        let program = { program with code = close_slambda_phrase res } in
-        compilation_unit, program, repr
+        compilation_unit, close_phrase res, required_globals, repr
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_slambda ppf ~compilation_unit program repr
+          load_tlambda ppf ~required_globals ~compilation_unit res repr
         in
         let out_phr =
           match res with
@@ -522,8 +553,12 @@ let execute_phrase print_outcome ppf phr =
                     if rewritten then
                       match sg' with
                       | [ Sig_value (id, vd, _) ] ->
-                          let outv = outval_of_id newenv id vd.val_type in
-                          let ty = Printtyp.tree_of_type_scheme vd.val_type in
+                          let outv =
+                            outval_of_id newenv id vd.val_lpoly vd.val_type
+                          in
+                          (* CR-someday zqian: should pass val_lpoly to
+                             printer *)
+                          let ty = Out_type.tree_of_type_scheme vd.val_type in
                           Ophr_eval (outv, ty)
                       | _ -> assert false
                     else
@@ -534,7 +569,8 @@ let execute_phrase print_outcome ppf phr =
               toplevel_sig := oldsig;
               if exn = Out_of_memory then Gc.full_major();
               let outv =
-                outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn
+                outval_of_value !toplevel_env (Obj.repr exn)
+                  (Lpoly.determined []) Predef.type_exn
               in
               Ophr_exception (exn, outv)
         in
@@ -563,7 +599,8 @@ let execute_phrase print_outcome ppf phr =
       | Some d ->
           match d, pdir_arg with
           | Directive_none f, None -> f (); true
-          | Directive_string f, Some {pdira_desc = Pdir_string s; _} -> f s; true
+          | Directive_string f, Some {pdira_desc = Pdir_string s; _} ->
+              f s; true
           | Directive_int f, Some {pdira_desc = Pdir_int (n,None); _} ->
              begin match Int_literal_converter.int n with
              | n -> f n; true
@@ -577,8 +614,10 @@ let execute_phrase print_outcome ppf phr =
               fprintf ppf "Wrong integer literal for directive `%s'.@."
                 dir_name;
               false
-          | Directive_ident f, Some {pdira_desc = Pdir_ident lid; _} -> f lid; true
-          | Directive_bool f, Some {pdira_desc = Pdir_bool b; _} -> f b; true
+          | Directive_ident f, Some {pdira_desc = Pdir_ident lid; _} ->
+              f lid; true
+          | Directive_bool f, Some {pdira_desc = Pdir_bool b; _} ->
+              f b; true
           | _ ->
               fprintf ppf "Wrong type of argument for directive `%s'.@."
                 dir_name;
@@ -614,7 +653,8 @@ let use_channel ppf ~wrap_in_module ic name filename =
         List.iter
           (fun ph ->
             let ph = preprocess_phrase ppf ph in
-            if not (execute_phrase !use_print_results ppf ph) then raise Exit)
+            let success = execute_phrase !use_print_results ppf ph in
+            if not success then raise Exit)
           (if wrap_in_module then
              parse_mod_use_file name lb
            else
@@ -764,14 +804,18 @@ let set_paths () =
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
   let expand = Misc.expand_directory Config.standard_library in
+  let expand_entry (e : Clflags.visible_include) : Clflags.visible_include =
+    { path = expand e.path; cmx_guaranteed = e.cmx_guaranteed }
+  in
+  let include_no_cmx path = { Clflags.path ; cmx_guaranteed = false } in
   let Load_path.{ visible; hidden } = Load_path.get_paths () in
   let visible = List.concat [
-      [ "" ];
-      List.map expand (List.rev !Compenv.first_include_dirs);
-      List.map expand (List.rev !Clflags.include_dirs);
-      List.map expand (List.rev !Compenv.last_include_dirs);
+      [ include_no_cmx "" ];
+      List.map expand_entry (List.rev !Compenv.first_include_dirs);
+      List.map expand_entry (List.rev !Clflags.include_dirs);
+      List.map expand_entry (List.rev !Compenv.last_include_dirs);
       visible;
-      [expand "+camlp4"];
+      [ include_no_cmx (expand "+camlp4") ];
     ]
   in
   let hidden = List.concat [
@@ -814,8 +858,6 @@ let loop ppf =
       let phr = try !parse_toplevel_phrase lb with Exit -> raise PPerror in
       let phr = preprocess_phrase ppf phr  in
       Env.reset_cache_toplevel ();
-      if !Clflags.dump_parsetree then Printast.top_phrase ppf phr;
-      if !Clflags.dump_source then Pprintast.top_phrase ppf phr;
       ignore(execute_phrase true ppf phr)
     with
     | End_of_file -> raise (Compenv.Exit_with_status 0)
@@ -847,3 +889,71 @@ let run_script ppf name args =
     else name
   in
   use_silently ppf explicit_name
+
+
+module Compiler = (val Optcompile.native
+                   (module Unix_for_owee : Compiler_owee.Unix_intf.S)
+                   ~flambda2:Flambda2.lambda_to_cmm)
+
+(* Load in-core a .cmxs file *)
+
+let linkenv = Linkenv.create ()
+
+let load_file ppf name0 =
+  let name =
+    try Some (Load_path.find name0)
+    with Not_found -> None
+  in
+  match name with
+  | None -> fprintf ppf "File not found: %s@." name0; false
+  | Some name ->
+    let fn,tmp =
+      if Filename.check_suffix name Compiler.ext_flambda_obj
+         || Filename.check_suffix name Compiler.ext_flambda_lib
+      then
+        let cmxs = Filename.temp_file "caml" ".cmxs" in
+        Compiler.link_shared ~ppf_dump:ppf linkenv [name] cmxs;
+        cmxs,true
+      else
+        name,false
+    in
+    let success =
+      (* The Dynlink interface does not allow us to distinguish between
+          a Dynlink.Error exceptions raised in the loaded modules
+          or a genuine error during dynlink... *)
+      try Dynlink.loadfile fn; true
+      with
+      | Dynlink.Error err ->
+        fprintf ppf "Error while loading %s: %s.@."
+          name (Dynlink.error_message err);
+        false
+      | exn ->
+        print_exception_outcome ppf exn;
+        false
+    in
+    if tmp then (try Sys.remove fn with Sys_error _ -> ());
+    success
+
+let preload_objects = ref []
+
+let prepare ppf ?input:_ () =
+  set_paths ();
+  begin try
+    initialize_toplevel_env ()
+  with Env.Error _ | Typetexp.Error _ as exn ->
+    Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
+  end;
+  try
+    let res =
+      let objects =
+        List.rev (!preload_objects @ !Compenv.first_objfiles)
+      in
+      List.for_all (load_file ppf) objects
+    in
+    run_hooks Startup;
+    res
+  with x ->
+    try Location.report_exception ppf x; false
+    with x ->
+      Format.fprintf ppf "Uncaught exception: %s\n" (Printexc.to_string x);
+      false

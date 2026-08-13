@@ -17,8 +17,8 @@ let f : unit -> Hash_type_aliases.f64 = fun () -> ()
 Line 1, characters 50-52:
 1 | let f : unit -> Hash_type_aliases.f64 = fun () -> ()
                                                       ^^
-Error: This expression has type "unit" but an expression was expected of type
-         "float#"
+Error: The constructor "()" has type "unit"
+       but an expression was expected of type "float#"
 |}]
 
 (* [f64] beats [float#] *)
@@ -29,8 +29,8 @@ let f : unit -> f64 = fun () -> ()
 Line 2, characters 32-34:
 2 | let f : unit -> f64 = fun () -> ()
                                     ^^
-Error: This expression has type "unit" but an expression was expected of type
-         "f64"
+Error: The constructor "()" has type "unit"
+       but an expression was expected of type "f64"
 |}]
 
 (* [U.u] beats [R.r#] *)
@@ -40,8 +40,7 @@ let f : unit -> R.r# = fun x -> x
 Line 1, characters 32-33:
 1 | let f : unit -> R.r# = fun x -> x
                                     ^
-Error: This expression has type "unit" but an expression was expected of type
-         "U.u"
+Error: The value "x" has type "unit" but an expression was expected of type "U.u"
 |}]
 
 (* [r#] beats [U.u] *)
@@ -52,8 +51,7 @@ let f : unit -> U.u = fun x -> x
 Line 2, characters 31-32:
 2 | let f : unit -> U.u = fun x -> x
                                    ^
-Error: This expression has type "unit" but an expression was expected of type
-         "r#"
+Error: The value "x" has type "unit" but an expression was expected of type "r#"
 |}]
 
 (* [u] beats [r#] *)
@@ -64,5 +62,5 @@ let f : unit -> r# = fun x -> x
 Line 2, characters 30-31:
 2 | let f : unit -> r# = fun x -> x
                                   ^
-Error: This expression has type "unit" but an expression was expected of type "u"
+Error: The value "x" has type "unit" but an expression was expected of type "u"
 |}]

@@ -1,4 +1,3 @@
-#2 "otherlibs/dynlink/dynlink.ml"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -19,6 +18,7 @@
 (* Dynamic loading of .cmx files *)
 
 open! Dynlink_compilerlibs
+open Cmxs_format
 
 module DC = Dynlink_common
 module DT = Dynlink_types
@@ -56,7 +56,7 @@ module Native = struct
     [@@noalloc]
 
   module Unit_header = struct
-    type t = Cmxs_format.dynunit
+    type t = dynunit
 
     let name (t : t) = t.dynu_name |> Compilation_unit.full_path_as_string
     let crc (t : t) = Some t.dynu_crc

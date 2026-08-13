@@ -1,5 +1,5 @@
 (* TEST
- flags += " -extension mode_alpha ";
+ flags += " -extension mode_alpha -w -220 ";
  expect;
 *)
 
@@ -46,31 +46,6 @@ module type S = sig
       portable nonportable
 end
 [%%expect{|
-Line 2, characters 22-28:
-2 |     val x : string @@ global local unique aliased once many uncontended contended
-                          ^^^^^^
-Warning 213: This locality is overriden by local later.
-
-Line 2, characters 50-54:
-2 |     val x : string @@ global local unique aliased once many uncontended contended
-                                                      ^^^^
-Warning 213: This linearity is overriden by many later.
-
-Line 3, characters 6-14:
-3 |       portable nonportable
-          ^^^^^^^^
-Warning 213: This portability is overriden by nonportable later.
-
-Line 2, characters 35-41:
-2 |     val x : string @@ global local unique aliased once many uncontended contended
-                                       ^^^^^^
-Warning 213: This uniqueness is overriden by aliased later.
-
-Line 2, characters 60-71:
-2 |     val x : string @@ global local unique aliased once many uncontended contended
-                                                                ^^^^^^^^^^^
-Warning 213: This contention is overriden by contended later.
-
 module type S = sig val x : string @@ many aliased contended end
 |}]
 
@@ -82,17 +57,25 @@ end
 Line 2, characters 15-16:
 2 |     let local_ x = "hello"
                    ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 2, characters 4-26
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 module M @ many = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-Line 2, characters 9-12:
+Lines 1-3, characters 18-3:
+1 | ..................struct
 2 |     let (foo @ once) () = ()
-             ^^^
-Error: This is "once", but expected to be "many" because it is inside a "many" structure.
+3 | end
+Error: The module is "once"
+         because it contains the value "foo" defined as the expression at line 2, characters 9-12
+         which is "once".
+       However, the module highlighted is expected to be "many".
 |}]
 
 (* Monadic axes don't have such constraint *)
@@ -142,6 +125,7 @@ module Module_type_of_error = struct
     let x = fun x -> ignore !y; x
   end
 end
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 Lines 8-12, characters 33-5:
  8 | .................................struct
@@ -166,10 +150,10 @@ Error: Signature mismatch:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
-       The left-hand side is "stateful"
+       The first is "stateful"
          because it contains a usage (of the value "y" at line 11, characters 29-30)
          which is expected to be "read_write".
-       However, the right-hand side is "stateless".
+       However, the second is "stateless".
 |}, Principal{|
 Lines 8-12, characters 33-5:
  8 | .................................struct
@@ -190,10 +174,10 @@ Error: Signature mismatch:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
-       The left-hand side is "stateful"
+       The first is "stateful"
          because it contains a usage (of the value "y" at line 11, characters 29-30)
          which is expected to be "read_write".
-       However, the right-hand side is "stateless".
+       However, the second is "stateless".
 |}]
 
 module Module_type_of_monadic = struct
@@ -210,7 +194,7 @@ end
 Line 9, characters 17-18:
 9 |     module M' = (M @ uncontended)
                      ^
-Error: This is "contended", but expected to be "uncontended".
+Error: The module is "contended" but is expected to be "uncontended".
 |}]
 
 module Module_type_nested = struct
@@ -231,6 +215,7 @@ end
 issue. See
 https://github.com/oxcaml/oxcaml/pull/3922#discussion_r2059000469
 *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Module_type_nested :
   sig
@@ -257,7 +242,7 @@ module Module_type_nested :
       sig
         val x : 'a -> 'a @@ stateless
         module N : sig val y : string ref end
-      end @@ contended
+      end @@ stateless contended
   end
 |}]
 
@@ -300,12 +285,10 @@ module Inclusion_fail = struct
     end
 end
 (* For this to type check, M has to be at [contended] *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Inclusion_fail :
   sig module M : sig val x : string ref end @@ contended end @@ stateless
-|}, Principal{|
-module Inclusion_fail :
-  sig module M : sig val x : string ref end @@ contended end
 |}]
 
 module Inclusion_fail = struct
@@ -315,6 +298,7 @@ module Inclusion_fail = struct
       let x @ contended = ref "hello"
   end
 end
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 Lines 4-6, characters 22-5:
 4 | ......................struct
@@ -329,8 +313,8 @@ Error: Signature mismatch:
          val x : string ref @@ stateless contended (* in a structure at uncontended *)
        is not included in
          val x : string ref (* in a structure at uncontended *)
-       The left-hand side is "contended"
-       but the right-hand side is "uncontended".
+       The first is "contended"
+       but the second is "uncontended".
 |}, Principal{|
 Lines 4-6, characters 22-5:
 4 | ......................struct
@@ -345,8 +329,8 @@ Error: Signature mismatch:
          val x : string ref @@ contended (* in a structure at uncontended *)
        is not included in
          val x : string ref (* in a structure at uncontended *)
-       The left-hand side is "contended"
-       but the right-hand side is "uncontended".
+       The first is "contended"
+       but the second is "uncontended".
 |}]
 
 module Inclusion_weakens_monadic = struct
@@ -401,11 +385,10 @@ module Inclusion_match = struct
     end
     let () = uncontended_use M.x
 end
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Inclusion_match : sig module M : sig val x : int ref end end @@
   stateless
-|}, Principal{|
-module Inclusion_match : sig module M : sig val x : int ref end end
 |}]
 
 (* [foo] closes over [M.x] instead of [M]. This is better ergonomics. *)
@@ -500,8 +483,8 @@ Error: Signature mismatch:
          external length : string -> int = "%string_length" (* in a structure at nonportable *)
        is not included in
          external length : string -> int @@ portable = "%string_length" (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module M : sig
@@ -629,8 +612,8 @@ Error: Signature mismatch:
          val f : int -> int (* in a structure at nonportable *)
        is not included in
          val f : int -> int @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 
@@ -668,7 +651,7 @@ end = struct
   let foo @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig val foo : int @@ portable end @@ stateless nonportable
+module M : sig val foo : int @@ portable end @@ stateless
 |}]
 
 (* The RHS type (expected type) is used for mode crossing. The following still
@@ -681,7 +664,7 @@ end = struct
   let t @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig type t val t : t @@ portable end @@ stateless nonportable
+module M : sig type t val t : t @@ portable end @@ stateless
 |}]
 
 (* LHS type is a subtype of RHS type, which means more type-level information.
@@ -695,7 +678,6 @@ end = struct
 end
 [%%expect{|
 module M : sig val t : [ `Bar | `Foo ] @@ portable end @@ stateless
-  nonportable
 |}]
 
 module M : sig
@@ -720,8 +702,8 @@ Error: Signature mismatch:
          val t : [> `Foo ] @@ stateless nonportable (* in a structure at nonportable *)
        is not included in
          val t : [ `Bar of 'a -> 'a | `Baz of string ref | `Foo ] @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 (* module constraint inclusion check looks at the modes of modules *)
@@ -799,6 +781,9 @@ Line 1, characters 26-57:
 1 | let f (x : (module S')) = (x : (module S') :> (module S))
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "(module S')" is not a subtype of "(module S)"
+       Modules do not match: S' is not included in S
+       Modalities on foo do not match:
+       The second is global and the first is not.
 |}]
 
 (* module equality/substitution inclusion check doesn't look at modes of modules
@@ -1405,7 +1390,9 @@ Line 2, characters 18-19:
 2 |   let k = (module M : Class) in
                       ^
 Error: The class "M.cla" is "nonportable"
-       but is expected to be "portable"
+         because it contains the class "cla" defined as the class at line 38, characters 2-24
+         which is "nonportable" because classes are always at the legacy modes.
+       However, the class "M.cla" highlighted is expected to be "portable"
          because it is used inside the function at lines 1-3, characters 21-3
          which is expected to be "portable".
 |}]
@@ -1498,8 +1485,8 @@ Error: Signature mismatch:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module rec M0 : sig
@@ -1526,8 +1513,8 @@ Error: Signature mismatch:
          val f : 'a -> 'a (* in a structure at nonportable *)
        is not included in
          val f : 'a -> 'a (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 (* nested signature *)
@@ -1545,10 +1532,14 @@ module M @ portable = struct
   class foo = object end
 end
 [%%expect{|
-Line 2, characters 2-24:
+Lines 1-3, characters 22-3:
+1 | ......................struct
 2 |   class foo = object end
-      ^^^^^^^^^^^^^^^^^^^^^^
-Error: This is "nonportable", but expected to be "portable" because it is inside a "portable" structure.
+3 | end
+Error: The module is "nonportable"
+         because it contains the class "foo" defined as the class at line 2, characters 2-24
+         which is "nonportable" because classes are always at the legacy modes.
+       However, the module highlighted is expected to be "portable".
 |}]
 
 module M @ nonportable = struct class foo = object end end
@@ -1565,7 +1556,9 @@ Error: Signature mismatch:
          sig class foo : object  end end @ portable
        Class declarations foo do not match:
        First is "nonportable"
-       but second is "portable".
+         because it contains the class "foo" defined as the class at line 1, characters 32-54
+         which is "nonportable" because classes are always at the legacy modes.
+       However, second is "portable".
 |}]
 
 module M = struct

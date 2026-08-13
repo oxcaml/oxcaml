@@ -19,8 +19,6 @@ open! Flambda.Import
 type resolver =
   Compilation_unit.t -> Flambda2_types.Typing_env.Serializable.t option
 
-type get_imported_names = unit -> Name.Set.t
-
 type get_imported_code = unit -> Exported_code.t
 
 type t
@@ -34,13 +32,13 @@ val create :
   round:int ->
   machine_width:Target_system.Machine_width.t ->
   resolver:resolver ->
-  get_imported_names:get_imported_names ->
   get_imported_code:get_imported_code ->
   propagating_float_consts:bool ->
   unit_toplevel_exn_continuation:Continuation.t ->
   unit_toplevel_return_continuation:Continuation.t ->
   toplevel_my_region:Variable.t ->
   toplevel_my_ghost_region:Variable.t ->
+  toplevel_my_alloc_region:Variable.t ->
   t
 
 val all_code : t -> Code.t Code_id.Map.t
@@ -65,6 +63,8 @@ val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
 val unit_toplevel_return_continuation : t -> Continuation.t
 
 val unit_toplevel_exn_continuation : t -> Continuation.t
+
+val unit_toplevel_alloc_region : t -> Variable.t
 
 val increment_continuation_scope : t -> t
 
@@ -141,6 +141,9 @@ val mem_code : t -> Code_id.t -> bool
 (** This function raises if the code ID is unbound. *)
 val find_code_exn : t -> Code_id.t -> Code_or_metadata.t
 
+(** This function raises if the code ID is unbound. *)
+val find_code_metadata_exn : t -> Code_id.t -> Code_metadata.t
+
 val set_inlined_debuginfo : t -> from:t -> t
 
 val merge_inlined_debuginfo : t -> from_apply_expr:Inlined_debuginfo.t -> t
@@ -189,7 +192,11 @@ end
 
 val disable_inlining : t -> Disable_inlining.t
 
-val enter_set_of_closures : t -> in_stub:bool -> t
+val disable_partial_application_stub_generation : t -> bool
+
+val enter_set_of_closures : t -> t
+
+val enter_stub_function : t -> t
 
 val set_rebuild_terms : t -> t
 
@@ -200,6 +207,7 @@ val enter_closure :
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   my_closure:Variable.t ->
+  my_alloc_region:Variable.t ->
   t ->
   t
 
@@ -242,6 +250,9 @@ val replay_history : t -> Replay_history.t
 
 val with_replay_history : (Replay_history.t * bool) option -> t -> t
 
+val record_inlining_decision :
+  apply:Apply_expr.t -> Call_site_inlining_decision_type.t -> t -> t
+
 val with_join_analysis :
   Apply_cont_rewrite_id.t Join_analysis.t option -> t -> t
 
@@ -253,3 +264,7 @@ val map_specialization_cost :
 val specialization_cost : t -> Specialization_cost.t
 
 val denv_for_lifted_continuation : denv_for_join:t -> denv:t -> t
+
+val has_seen_a_non_liftable_continuation : t -> bool
+
+val set_has_seen_a_non_liftable_continuation : t -> t

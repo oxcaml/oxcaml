@@ -33,17 +33,20 @@ type result = private
   { body : Flambda.Expr.t;
     free_names : Name_occurrences.t;
     all_code : Code.t Code_id.Map.t;
+    code_ids_to_remember : Code_id.Set.t;
     slot_offsets : Slot_offsets.t
   }
 
 val rebuild :
   machine_width:Target_system.Machine_width.t ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
+  ordered_code_ids:Code_id.t array ->
   continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
   fixed_arity_continuations:Continuation.Set.t ->
   final_typing_env:Typing_env.t option ->
-  Flambda_kind.t Name.Map.t ->
-  Dep_solver.result ->
+  types_rewrite_context:Types_rewriter.rewrite_context ->
+  Unboxing_analysis.result ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->
+  Rev_expr.rev_code Code_id.Map.t ->
   result

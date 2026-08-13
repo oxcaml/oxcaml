@@ -59,6 +59,7 @@ archives_to_compare="\
   bigarray.a \
   compiler-libs/ocamlbytecomp.a \
   compiler-libs/ocamlcommon.a \
+  compiler-libs/ocamlfrontend.a \
   stdlib.a \
   str.a \
   threads/threads.a \
@@ -106,11 +107,6 @@ shared_objects_to_compare="\
   "
 
 sundry_text_files_to_compare="\
-  camlheader \
-  camlheaderd \
-  camlheaderi \
-  camlheader_ur \
-  eventlog_metadata \
   ld.conf
   "
 
@@ -119,6 +115,7 @@ cma_to_compare="\
   bigarray.cma \
   threads/threads.cma \
   compiler-libs/ocamlcommon.cma \
+  compiler-libs/ocamlfrontend.cma \
   compiler-libs/ocamlbytecomp.cma \
   compiler-libs/ocamltoplevel.cma \
   unix.cma \
@@ -132,6 +129,7 @@ cmxa_to_compare="\
   bigarray.cmxa \
   threads/threads.cmxa \
   compiler-libs/ocamlcommon.cmxa \
+  compiler-libs/ocamlfrontend.cmxa \
   compiler-libs/ocamlbytecomp.cmxa \
   unix.cmxa \
   str.cmxa
@@ -1133,13 +1131,11 @@ echo "** Sundry text files"
 
 for file in $sundry_text_files_to_compare; do
   echo $file
-  # The extra "echo"s are to suppress "No newline at end of file"
-  # messages for camlheader* files.
   $difftool \
-    <((cat $upstream_tree/lib/ocaml/$file \
-        | sed "s:$upstream_tree:INSTALL-DIR:"); echo) \
-    <((cat $oxcaml_tree/lib/ocaml/$file \
-        | sed "s:$oxcaml_tree:INSTALL-DIR:"); echo)
+    <(cat $upstream_tree/lib/ocaml/$file \
+        | sed "s:$upstream_tree:INSTALL-DIR:") \
+    <(cat $oxcaml_tree/lib/ocaml/$file \
+        | sed "s:$oxcaml_tree:INSTALL-DIR:")
 done
 
 # 20. Makefile.config comparison.

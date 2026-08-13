@@ -1,6 +1,7 @@
 (* TEST
  flambda2;
  include stdlib_upstream_compatible;
+ flags = "-extension layouts_beta";
  {
    expect;
  }
@@ -243,14 +244,16 @@ Line 2, characters 0-37:
 2 | and r_bad = #{ y : float#; z : s t2 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r_bad is
-           '_representable_layout_1 & '_representable_layout_2
+       The layout of r_bad is any & any
          because it is an unboxed record.
        But the layout of r_bad must be a sublayout of value & float64 & value
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 
-type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r
+(* CR layouts-scannable: The annotation on ['a] is temporarily necessary while
+   inference for mutual recursive types + scannable axes is broken. See tests
+   in [typing-layouts-scannable/mutual_recursion.ml] for more examples. *)
+type 'a t = #{ a : 'a ; a' : 'a } constraint ('a : immediate & float64) = r
 and r = #{ i : int ; f : float# }
 [%%expect{|
 type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r
@@ -332,10 +335,12 @@ Error: Signature mismatch:
          type t = #{ s : string; r : string; }
        is not included in
          type t
-       The layout of the first is value & value
+       The layout of the first is value non_float & value non_float
          because of the definition of t at line 4, characters 2-36.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a value layout
          because of the definition of t at line 2, characters 2-8.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 module M : sig
@@ -432,7 +437,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float64
            because of the definition of t_float64_id at line 1, characters 0-37.
-         But the layout of 'a must overlap with value
+         But the layout of 'a must be a value layout
            because it instantiates an unannotated type parameter of t,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to
@@ -617,16 +622,6 @@ Error: This expression has type "t",
        which is a boxed record rather than an unboxed one.
 |}]
 
-let _ = #{ b = #5.0 }
-[%%expect{|
-Line 1, characters 11-12:
-1 | let _ = #{ b = #5.0 }
-               ^
-Error: Unbound unboxed record field "b"
-Hint: There is a boxed record field with this name.
-      Note that float- and [@@unboxed]- records don't get unboxed versions.
-|}]
-
 let _ = { u = #5.0 }
 [%%expect{|
 Line 1, characters 10-11:
@@ -643,17 +638,7 @@ Line 1, characters 22-23:
                           ^
 Error: Unbound record field "u"
 Hint: There is an unboxed record field with this name.
-      To project an unboxed record field, use ".#u" instead of ".u".
-|}]
-
-let bad_get t = t.#b
-[%%expect{|
-Line 1, characters 19-20:
-1 | let bad_get t = t.#b
-                       ^
-Error: Unbound unboxed record field "b"
-Hint: There is a boxed record field with this name.
-      Note that float- and [@@unboxed]- records don't get unboxed versions.
+To project an unboxed record field, use ".#u" instead of ".u".
 |}]
 
 (*****************************************************************************)
@@ -694,35 +679,48 @@ val update_t : t -> unit = <fun>
 
 type ('a : any) t = #{ x : int; y : 'a }
 [%%expect{|
-type ('a : value_or_null) t = #{ x : int; y : 'a; }
+type ('a : any) t = #{ x : int; y : 'a; }
 |}]
 
 (* CR layouts v7.2: once we allow record declarations with unknown kind (right
    now, ['a] in the decl above is defaulted to value), then this should give an
-   error saying that records being projected from must be representable. *)
+   error saying that records being projected from must be representable.
+
+   Update: The record declaration is now allowed, but it's actually difficult to
+   get that exact error in this situation, since one variable or another needs
+   to be given an unrepresentable type. *)
 let f : ('a : any). 'a t -> 'a = fun t -> t.#y
 [%%expect{|
-Line 1, characters 8-30:
+Line 1, characters 33-46:
 1 | let f : ('a : any). 'a t -> 'a = fun t -> t.#y
-            ^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind any.
-       But it was inferred to have kind value_or_null
-         because of the definition of t at line 1, characters 0-40.
+                                     ^^^^^^^^^^^^^
+Error: This definition has type "'b t -> 'b" which is less general than
+         "('a : any). 'a t -> 'a"
+       The layout of 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 (* CR layouts v7.2: once we allow record declarations with unknown kind
    (right now, ['a] in the decl above is defaulted to value), then this should
    give an error saying that records used in functional updates must be
    representable.
+
+   Update: Similarly, the type is now allowed but the function argument is what
+   gets flagged as an error.
 *)
 let f : ('a : any). 'a -> 'a t = fun a -> #{ x = 1; y = a }
 [%%expect{|
-Line 1, characters 8-30:
+Line 1, characters 33-59:
 1 | let f : ('a : any). 'a -> 'a t = fun a -> #{ x = 1; y = a }
-            ^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind any.
-       But it was inferred to have kind value_or_null
-         because of the definition of t at line 1, characters 0-40.
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This definition has type "'b -> 'b t" which is less general than
+         "('a : any). 'a -> 'a t"
+       The layout of 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 
@@ -752,11 +750,11 @@ and b : any & any & any = #{ i : int ; j : int }
 Line 2, characters 0-48:
 2 | and b : any & any & any = #{ i : int ; j : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of b is any & any & any
+Error: The layout of type "b" is value non_pointer & value non_pointer
+         because it is an unboxed record.
+       But the layout of type "b" must be a sublayout of any & any & any
          because of the annotation on the declaration of the type b.
-       But the layout of b must be representable
-         because it's the type of a constructor field.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type q : any mod portable = #{ x : int -> int; y : int -> q }
@@ -766,11 +764,11 @@ Line 1, characters 0-61:
 1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "q" is
-           value mod aliased immutable non_float
-           & value mod aliased immutable non_float
+           value non_float mod aliased immutable
+           & value non_float mod aliased immutable
          because it is an unboxed record.
        But the kind of type "q" must be a subkind of
-           value_or_null mod portable & value_or_null mod portable
+           any mod portable & any mod portable
          because of the annotation on the declaration of the type q.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without

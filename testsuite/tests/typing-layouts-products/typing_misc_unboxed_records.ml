@@ -101,17 +101,17 @@ type foo = #{ x: int };;
 let r : foo = #{ ZZZ.x = 2 };;
 [%%expect{|
 type foo = #{ x : int; }
-Line 2, characters 17-22:
+Line 2, characters 17-20:
 2 | let r : foo = #{ ZZZ.x = 2 };;
-                     ^^^^^
+                     ^^^
 Error: Unbound module "ZZZ"
 |}];;
 
 (ZZZ.X : int option);;
 [%%expect{|
-Line 1, characters 1-6:
+Line 1, characters 1-4:
 1 | (ZZZ.X : int option);;
-     ^^^^^
+     ^^^
 Error: Unbound module "ZZZ"
 |}];;
 
@@ -165,7 +165,7 @@ Line 1, characters 8-45:
 1 | let r = #{ (assert false) with contents = 1 } ;;
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 23 [useless-record-with]: all the fields are explicitly listed in this unboxed record:
-the 'with' clause is useless.
+  the "with" clause is useless.
 
 Exception: Assert_failure ("", 1, 11).
 |}]
@@ -261,9 +261,9 @@ let f () = #{ f1 = 0
 
 [%%expect{|
 type t = #{ f1 : int; f2 : int; }
-Line 4, characters 10-20:
+Line 4, characters 10-17:
 4 |         ; Coq__10.f2 = 0 }
-              ^^^^^^^^^^
+              ^^^^^^^
 Error: Unbound module "Coq__10"
 |}]
 
@@ -277,11 +277,11 @@ let f () = #{ f1 = 0
 
 [%%expect{|
 module Coq__11 : sig type t = #{ f1 : int; f2 : int; f3 : int; } end
-Line 6, characters 13-23:
+Line 6, characters 13-20:
 6 |            ; Coq__10.f2 = 0
-                 ^^^^^^^^^^
+                 ^^^^^^^
 Error: Unbound module "Coq__10"
-Hint: Did you mean "Coq__11"?
+Hint:    Did you mean "Coq__11"?
 |}]
 
 type a = unit

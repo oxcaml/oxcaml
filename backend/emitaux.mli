@@ -52,6 +52,17 @@ val record_frame_descr :
   (* Location, if any *)
   unit
 
+(** The backends call this whenever they switch text section, with the section's
+    name; it maintains a section epoch, in preparation for a compact
+    frame-descriptor format whose return addresses are deltas from the previous
+    descriptor -- an assembly-time constant only when both lie in the same
+    section. Re-entering the current section does not bump the epoch. *)
+val enter_code_section : string -> unit
+
+(** [with_snapshot f] runs [f] and returns its result, but also ensures that the
+    state of this [Emitaux] module is unchanged after [f] returns. *)
+val with_snapshot : f:(unit -> 'a) -> 'a
+
 type emit_frame_actions =
   { efa_code_label : Label.t -> unit;
     efa_data_label : Label.t -> unit;
@@ -114,11 +125,20 @@ module Dwarf_helpers : sig
   val emit_delayed_dwarf : unit -> unit
 
   val record_dwarf_for_fundecl : Linear.fundecl -> Dwarf.fundecl option
+
+  val record_function_range :
+    function_symbol:Asm_targets.Asm_symbol.t ->
+    start_label:Asm_targets.Asm_label.t ->
+    end_label:Asm_targets.Asm_label.t ->
+    offset_past_end_label:int option ->
+    unit
 end
 
 exception Error of error
 
-val report_error : Format_doc.formatter -> error -> unit
+val report_error : error Format_doc.format_printer
+
+val report_error_doc : error Format_doc.printer
 
 type preproc_stack_check_result =
   { max_frame_size : int;
@@ -146,3 +166,11 @@ val emit_elf_note :
   typ:int32 ->
   emit_desc:(unit -> unit) ->
   unit
+
+type emit_data_item_actions =
+  { global_maybe_protected : Asm_targets.Asm_symbol.t -> unit;
+    symbol_defined : string -> unit;
+    symbol_used : string -> unit
+  }
+
+val emit_data_item : emit_data_item_actions -> Cmm.data_item -> unit

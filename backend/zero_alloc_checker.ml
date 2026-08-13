@@ -1117,7 +1117,9 @@ end = struct
     match t with
     | Top w -> w
     | Bot | Safe -> Witnesses.empty
-    | Var _ | Transform _ | Join _ -> assert false
+    | Var _ | Transform _ | Join _ ->
+      Misc.fatal_errorf "Zero_alloc_checker.get_witnesses: unresolved value %a"
+        (print ~witnesses:false) t
 
   (* structural *)
   let compare t1 t2 =
@@ -1291,7 +1293,10 @@ end = struct
     | Safe, Bot -> Witnesses.empty
     | Top w, (Bot | Safe) -> w
     | (Var _ | Join _ | Transform _), _ | _, (Var _ | Join _ | Transform _) ->
-      assert false
+      Misc.fatal_errorf
+        "Zero_alloc_checker.diff_witnesses: unresolved value (actual %a, \
+         expected %a)"
+        (print ~witnesses:false) actual (print ~witnesses:false) expected
 
   let meet t1 t2 =
     match t1, t2 with
@@ -1701,15 +1706,16 @@ end = struct
 
   let error_messages t : Location.error list =
     let pp_inlined_dbg ppf dbg =
-      (* Show inlined locations, if dbg has more than one item. The first item
-         will be shown at the start of the error message. *)
+      (* Show inlined locations, if dbg has more than one item. The last item,
+         containing the actual allocation or function call, will be shown at the
+         start of the error message. *)
       let items = Debuginfo.to_items dbg in
       if List.compare_length_with items 1 > 0
       then
         (* Print the inlined stack starting from the innermost frame, i.e., the
            location that directly contains the witness instruction before
-           inlining. *)
-        let items = List.rev items in
+           inlining. Drop the first item which has already been printed. *)
+        let items = List.tl (List.rev items) in
         if !Oxcaml_flags.zero_alloc_checker_details_extra
         then
           Fmt.fprintf ppf "\ninlined from\n%a"
@@ -1730,6 +1736,7 @@ end = struct
       | Alloc_block_kind_vec128 -> pp "vec128"
       | Alloc_block_kind_vec256 -> pp "vec256"
       | Alloc_block_kind_vec512 -> pp "vec512"
+      | Alloc_block_kind_mask -> pp "mask"
       | Alloc_block_kind_boxed_int bi ->
         pp
           (match bi with
@@ -1746,6 +1753,7 @@ end = struct
       | Alloc_block_kind_vec128_u_array -> pp "unboxed_vec128_array"
       | Alloc_block_kind_vec256_u_array -> pp "unboxed_vec256_array"
       | Alloc_block_kind_vec512_u_array -> pp "unboxed_vec512_array"
+      | Alloc_block_kind_mask_u_array -> pp "unboxed_mask_array"
     in
     let pp_alloc_dbginfo_item (item : Cmm.alloc_dbginfo_item) =
       let aloc = Debuginfo.to_location item.alloc_dbg in
@@ -2054,7 +2062,10 @@ end = struct
     V.match_with v
       ~top:(fun _ -> 0)
       ~safe:1 ~bot:2
-      ~unresolved:(fun () -> assert false)
+      ~unresolved:(fun () ->
+        Misc.fatal_errorf
+          "Zero_alloc_checker.encode: unexpected unresolved value %a"
+          (V.print ~witnesses:false) v)
 
   (* Witnesses are not used across functions and not stored in cmx. Witnesses
      that appear in a function's summary are only used for error messages about
@@ -2082,7 +2093,7 @@ end = struct
       Some { nor; exn; div }
 
   let set_value s (v : Value.t) =
-    let info = (Compilenv.current_unit_infos ()).ui_zero_alloc_info in
+    let info = Compilenv.current_zero_alloc_info () in
     match encode v with
     | None -> ()
     | Some i -> Zero_alloc_info.set_value info s i
@@ -2613,19 +2624,20 @@ end = struct
         match op with
         | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Floatop _
+        | Const_mask _ | Load _ | Floatop _
         | Intop_imm
-            ( ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
-              | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Icomp _ ),
+            ( ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior
+              | Ixor | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ ),
               _ )
         | Intop
-            ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
-            | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Icomp _ )
+            ( Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+            | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz | Ictz | Icomp _ )
         | Int128op (Iadd128 | Isub128 | Imul64 _)
         | Reinterpret_cast
             ( Float32_of_float | Float_of_float32 | Float_of_int64
             | Int64_of_float | Float32_of_int32 | Int32_of_float32
-            | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ )
+            | Mask_of_int64 | Int64_of_mask | V128_of_vec _ | V256_of_vec _
+            | V512_of_vec _ )
         | Static_cast _ | Csel _ ->
           if not (Operation.is_pure op)
           then
@@ -2666,7 +2678,9 @@ end = struct
       let terminator next ~exn (i : Cfg.terminator Cfg.instruction) t =
         let dbg = i.dbg in
         match i.desc with
-        | Never -> assert false
+        | Never ->
+          Misc.fatal_error
+            "Zero_alloc_checker.terminator: unexpected Never terminator"
         | Return -> Value.normal_return
         | Raise Raise_notrace ->
           (* [raise_notrace] is typically used for control flow, not for
@@ -2797,7 +2811,8 @@ let drop_invalid_successors cfg_with_layout =
           let successors = Cfg.successor_labels ~normal:true ~exn:true block in
           block.terminator
             <- { block.terminator with
-                 desc = Invalid { r with label_after = None }
+                 desc = Invalid { r with label_after = None };
+                 res = [||]
                };
           block.exn <- None;
           block.can_raise <- false;
@@ -2829,8 +2844,7 @@ let reset_unit_info () =
 
 let record_unit_info ppf_dump =
   Analysis.record_unit unit_info unresolved_deps ppf_dump;
-  Compilenv.cache_zero_alloc_info
-    (Compilenv.current_unit_infos ()).ui_zero_alloc_info
+  Compilenv.cache_zero_alloc_info (Compilenv.current_zero_alloc_info ())
 
 type iter_witnesses = (string -> Witnesses.components -> unit) -> unit
 

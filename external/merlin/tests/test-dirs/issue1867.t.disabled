@@ -1,0 +1,33 @@
+Disabled locally: this test depends on an external yojson package built for the
+same compiler as MERLIN_TEST_OCAML_PATH. The current harness can combine the
+OxCaml compiler from MERLIN_TEST_OCAML_PATH with yojson from the ambient opam
+switch, producing a wrong-CMI-magic failure unrelated to Merlin behavior.
+
+  $ cat >dune-project <<'EOF'
+  > (lang dune 3.0)
+  > EOF
+
+  $ cat >dune <<'EOF'
+  > (executable (name foo))
+  > (executable (name foobar) (libraries yojson))
+  > EOF
+
+  $ touch foo.ml 
+
+  $ cat >foobar.ml <<'EOF'
+  > let eq = Yojson.equal
+  > let () = Printf.printf "%b" @@ eq `Null `Null
+  > EOF
+
+  $ $DUNE build 
+  $ $DUNE exec ./foobar.exe
+  true
+
+FIXME: there appear to be an issue with configuration here
+  $ $MERLIN single locate -position 1:10 \
+  > -filename foobar.ml <foobar.ml 
+  {
+    "class": "return",
+    "value": "Not in environment 'Yojson'",
+    "notifications": []
+  }

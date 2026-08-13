@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 # This script is used to generate large polymorphic variants. This is used to
 # test how jkind inference handles them.

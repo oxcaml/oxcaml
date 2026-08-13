@@ -19,6 +19,7 @@ open Format
 
 val structured_constant: formatter -> structured_constant -> unit
 val lambda: formatter -> lambda -> unit
+val slambda: formatter -> slambda -> unit
 val lfunction : formatter -> lfunction -> unit
 val program: formatter -> program -> unit
 val primitive: formatter -> primitive -> unit
@@ -37,6 +38,7 @@ val zero_alloc_attribute : formatter -> zero_alloc_attribute -> unit
 val locality_mode : formatter -> locality_mode -> unit
 val array_kind : array_kind -> string
 val array_set_kind : formatter -> array_set_kind -> unit
+val array_ref_kind : formatter -> array_ref_kind -> unit
 
 val tag_and_constructor_shape :
   (formatter -> value_kind -> unit) ->

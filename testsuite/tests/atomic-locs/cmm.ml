@@ -1,5 +1,7 @@
 (* TEST_BELOW *)
 
+(* CR-someday mslater: this should also work on arm once atomics are builtins *)
+
 (* standard atomics *)
 
 let standard_atomic_get (r : 'a Atomic.t) =
@@ -25,6 +27,9 @@ let get_imm (r : int atomic) : int =
 
 let set_imm (r : int atomic) v =
   r.x <- v
+
+let cas (r : 'a atomic) oldv newv =
+  Atomic.Loc.compare_and_set [%atomic.loc r.x] oldv newv
 
 (* TEST
    arch_amd64;

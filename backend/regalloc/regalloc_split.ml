@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open! Regalloc_utils
 open! Regalloc_split_utils
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module State = Regalloc_split_state
 module Substitution = Regalloc_substitution
 
@@ -152,7 +152,7 @@ let make_spill : type a. a make_operation =
     | Some stack_reg -> stack_reg
     | None ->
       let slots = State.stack_slots state in
-      let slot : int = Regalloc_stack_slots.get_or_fatal slots old_reg in
+      let slot : int = Regalloc_stack_slots.get_or_create slots old_reg in
       let stack : Reg.t =
         Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg
       in
@@ -230,6 +230,11 @@ let rec insert_spills_or_reloads_in_block :
         ~occur_check ~insert ~copy_default ~add_default ~move_cell ~block_subst
         ~stack_subst block cell live_at_interesting_point)
 
+let occur_check : Instruction.t -> Reg.t -> bool =
+ fun instr reg ->
+  occurs_array instr.arg reg || occurs_array instr.res reg
+  || occurs_array (Proc.destroyed_at_basic instr.desc) reg
+
 (* Inserts the spills in a block, as early as possible (i.e. immediately after
    the register is last set), to reduce live ranges. *)
 let insert_spills_in_block :
@@ -244,12 +249,7 @@ let insert_spills_in_block :
  fun state ~instr_id ~block_subst ~stack_subst block cell
      live_at_destruction_point ->
   insert_spills_or_reloads_in_block state ~instr_id
-    ~make_spill_or_reload:make_spill
-    ~occur_check:(fun instr reg ->
-      (* We have reached the insertion point not only if the register is
-         explicitly set, but also if it is destroyed by the instruction. *)
-      occurs_array instr.res reg
-      || occurs_array (Proc.destroyed_at_basic instr.desc) reg)
+    ~make_spill_or_reload:make_spill ~occur_check
     ~insert:(fun cell instr reg ->
       (* See comment before Insert_skipping_name_for_debugger *)
       Insert_skipping_name_for_debugger.insert_after cell instr ~reg)
@@ -309,7 +309,7 @@ let make_reload : type a. a make_operation =
     ~id:(InstructionId.get_and_incr instr_id)
     ~copy ~from:stack_reg ~to_:new_reg
 
-(* Inserts the relaods in a block, as late as possible (i.e. immediately before
+(* Inserts the reloads in a block, as late as possible (i.e. immediately before
    the register is first read), to reduce live ranges. *)
 let insert_reloads_in_block :
     State.t ->
@@ -323,8 +323,7 @@ let insert_reloads_in_block :
  fun state ~instr_id ~block_subst ~stack_subst block cell
      live_at_definition_point ->
   insert_spills_or_reloads_in_block state ~instr_id
-    ~make_spill_or_reload:make_reload
-    ~occur_check:(fun instr reg -> occurs_array instr.arg reg)
+    ~make_spill_or_reload:make_reload ~occur_check
     ~insert:(fun cell instr _reg ->
       (* We don't need special handling here, because we wouldn't expect a new
          Name_for_debugger operation anyway (that should have occurred when the
@@ -359,7 +358,13 @@ let insert_reloads :
     (State.definitions_at_beginning state);
   if debug then dedent ()
 
+type phi_move =
+  { src : Reg.t;
+    dst : Reg.t
+  }
+
 let add_phi_moves_to_instr_list :
+    phi_moves:phi_move list ref ->
     instr_id:InstructionId.sequence ->
     before:Cfg.basic_block ->
     phi:Cfg.basic_block ->
@@ -367,7 +372,7 @@ let add_phi_moves_to_instr_list :
     Reg.Set.t ->
     Cfg.basic_instruction_list ->
     unit =
- fun ~instr_id ~before ~phi substs to_unify instrs ->
+ fun ~phi_moves ~instr_id ~before ~phi substs to_unify instrs ->
   let before_subst = Substitution.for_label substs before.start in
   let phi_subst = Substitution.for_label substs phi.start in
   Reg.Set.iter
@@ -382,6 +387,7 @@ let add_phi_moves_to_instr_list :
             Printreg.reg to_
       | false ->
         if debug then log "phi %a -> %a" Printreg.reg from Printreg.reg to_;
+        phi_moves := { src = from; dst = to_ } :: !phi_moves;
         let phi_move =
           Move.make_instr Move.Plain
             ~id:(InstructionId.get_and_incr instr_id)
@@ -390,11 +396,14 @@ let add_phi_moves_to_instr_list :
         DLL.add_end instrs phi_move)
     to_unify
 
-(* Insert phi moves: - to the predecessor block if the edge is an "always" one;
-   - to a newly-inserted block otherwise. Returns `true` iff at least one block
-   was inserted. *)
-let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
+(*= Insert phi moves:
+  - to the predecessor block if the edge is an "always" one;
+  - to a newly-inserted block otherwise.
+  Returns `true` iff at least one block was inserted. *)
+let insert_phi_moves :
+    State.t -> Cfg_with_infos.t -> Substitution.map -> bool * phi_move list =
  fun state cfg_with_infos substs ->
+  let phi_moves = ref [] in
   let block_inserted = ref false in
   Label.Map.iter
     (fun label to_unify ->
@@ -415,24 +424,26 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
           in
           match predecessor_block.terminator.desc with
           | Return | Raise _ | Tailcall_func _ | Call_no_return _ | Never ->
-            assert false
+            fatal
+              "Regalloc_split.insert_phi_moves: phi block %a has predecessor \
+               %a with unexpected terminator"
+              Label.format label Label.format predecessor_label
           | Tailcall_self _ -> ()
           | Always _ ->
-            add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
-              ~phi:block substs to_unify predecessor_block.body
+            add_phi_moves_to_instr_list ~phi_moves ~instr_id
+              ~before:predecessor_block ~phi:block substs to_unify
+              predecessor_block.body
           | Switch _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
           | Call _ | Prim _ | Invalid _ ->
             let instrs = DLL.make_empty () in
-            add_phi_moves_to_instr_list ~instr_id ~before:predecessor_block
-              ~phi:block substs to_unify instrs;
+            add_phi_moves_to_instr_list ~phi_moves ~instr_id
+              ~before:predecessor_block ~phi:block substs to_unify instrs;
             (* CR-soon xclerc for xclerc: now that we preprocess critical nodes,
                no insertion should occur here. *)
             let inserted_blocks =
               Cfg_with_layout.insert_block
                 (Cfg_with_infos.cfg_with_layout cfg_with_infos)
                 instrs ~after:predecessor_block ~before:(Some block)
-                ~next_instruction_id:(fun () ->
-                  InstructionId.get_and_incr instr_id)
             in
             block_inserted := true;
             if debug && Lazy.force invariants
@@ -457,10 +468,10 @@ let insert_phi_moves : State.t -> Cfg_with_infos.t -> Substitution.map -> bool =
               ()))
         block.predecessors)
     (State.phi_at_beginning state);
-  !block_inserted
+  !block_inserted, !phi_moves
 
 let split_at_destruction_points :
-    Cfg_with_infos.t -> (Regalloc_stack_slots.t * bool) option =
+    Cfg_with_infos.t -> (Regalloc_stack_slots.t * bool * phi_move list) option =
  fun cfg_with_infos ->
   if debug
   then (
@@ -501,7 +512,7 @@ let split_at_destruction_points :
     Profile.record ~accumulate:true "insert_reloads"
       (fun () -> insert_reloads state cfg_with_infos substs stack_subst)
       ();
-    let block_inserted =
+    let block_inserted, phi_moves =
       Profile.record ~accumulate:true "insert_phi_moves"
         (fun () -> insert_phi_moves state cfg_with_infos substs)
         ()
@@ -510,9 +521,14 @@ let split_at_destruction_points :
     then (
       Regalloc_irc_utils.log_cfg_with_infos cfg_with_infos;
       dedent ());
-    Some (State.stack_slots state, block_inserted)
+    Some (State.stack_slots state, block_inserted, phi_moves)
 
-let split_live_ranges : Cfg_with_infos.t -> Regalloc_stack_slots.t =
+type split_result =
+  { stack_slots : Regalloc_stack_slots.t;
+    phi_moves : phi_move list
+  }
+
+let split_live_ranges : Cfg_with_infos.t -> split_result =
  fun cfg_with_infos ->
   (* CR-soon xclerc for xclerc: support closure, flambda, and
      flambda2/classic *)
@@ -527,14 +543,17 @@ let split_live_ranges : Cfg_with_infos.t -> Regalloc_stack_slots.t =
        "Regalloc_split: classic mode is currently not supported" *)
     ()
   | true, true -> assert false);
-  match split_at_destruction_points cfg_with_infos with
-  | None -> Regalloc_stack_slots.make ()
-  | Some (stack_slots, block_inserted) ->
-    Cfg_with_infos.invalidate_liveness cfg_with_infos;
-    if block_inserted
-    then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
-    let (_ : Cfg_with_infos.t) =
-      Profile.record ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
-        cfg_with_infos
-    in
-    stack_slots
+  let stack_slots, phi_moves =
+    match split_at_destruction_points cfg_with_infos with
+    | None -> Regalloc_stack_slots.make (), []
+    | Some (stack_slots, block_inserted, phi_moves) ->
+      Cfg_with_infos.invalidate_liveness cfg_with_infos;
+      if block_inserted
+      then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos;
+      let (_ : Cfg_with_infos.t) =
+        Profile.record ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
+          cfg_with_infos
+      in
+      stack_slots, phi_moves
+  in
+  { stack_slots; phi_moves }

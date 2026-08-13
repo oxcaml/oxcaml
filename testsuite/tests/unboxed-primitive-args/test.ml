@@ -10,10 +10,19 @@
  arguments = "ml";
  compiler_output = "main.ml";
  ocaml;
- ocamlopt_flags = "-extension simd -cc '${cc} -msse4.2' -ccopt '${cflags}'";
- all_modules = "test_common.c stubs.c common.mli common.ml test0.ml test1.ml main.ml";
- ocamlopt.opt;
- run;
- check-program-output;
+ all_modules = "test_common.c stubs.c common.mli common.ml test0.ml test1.ml test2.ml test3.ml test4.ml main.ml";
+ {
+  arch_amd64;
+  ocamlopt_flags = "-cc '${cc} -msse4.2' -ccopt '${cflags}'";
+  ocamlopt.opt;
+  run;
+  check-program-output;
+ }
+ {
+  arch_arm64;
+  ocamlopt.opt;
+  run;
+  check-program-output;
+ }
 *)
 (* We use flambda2 above as a proxy to indicate SIMD is supported *)

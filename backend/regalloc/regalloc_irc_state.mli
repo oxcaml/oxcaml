@@ -32,6 +32,8 @@ val degree : t -> Reg.t -> int
 
 val set_degree : t -> Reg.t -> int -> unit
 
+val get_max_degree : t -> int
+
 val is_precolored : t -> Reg.t -> bool
 
 val is_precolored_or_colored : t -> Reg.t -> bool
@@ -110,13 +112,15 @@ val mem_adj_set : t -> Reg.t -> Reg.t -> bool
 
 val adj_list : t -> Reg.t -> Reg.t list
 
-val adj_set : t -> EdgeSet.t
-
 val add_edge : t -> Reg.t -> Reg.t -> unit
 
 val iter_adjacent : t -> Reg.t -> f:(Reg.t -> unit) -> unit
 
 val for_all_adjacent : t -> Reg.t -> f:(Reg.t -> bool) -> bool
+
+val cardinal_edges : t -> int
+
+val iter_edges : t -> f:(Edge.t -> unit) -> unit
 
 val is_empty_node_moves : t -> Reg.t -> bool
 

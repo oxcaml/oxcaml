@@ -8,7 +8,7 @@ title: Block indices
 
 This document describes the language feature and implementation for explicit
 _indices_ into a block. Before reading this document, you may wish to read up
-through the [layouts](../01-intro#layouts) section of the main document.
+through the [layouts](../intro#layouts) section of the main document.
 
 As a quick example:
 ```ocaml
@@ -22,16 +22,17 @@ let mk_idx () : (line, int) idx_imm = (.q.#y)
 
 let get_coord (line : line) (i : (line, int) idx_imm) : int =
   (* If [i] is [(.q.#y)], then the below is similar to to [line.q.#y] *)
-  Idx_imm.unsafe_get line i
+  Idx_imm.get line i
 
 (* Creating a block index into an array *)
-let first_x (): (pt# array, int) idx_mut = (.(0).#x)
+let first_int () : (int array, int) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
 
 let inc_coord (pts : 'a) (i : ('a, int) idx_mut) =
   (* Equivalent to [pts.(i) <- pts.(i) + 1] when [i] is in bounds and [pts] is
      an [int array]. But this function could also be used update a mutable
      record containing an [int]. *)
-  Idx_mut.unsafe_set pts i (Idx_mut.unsafe_get pts i + 1)
+  Idx_mut.set pts i (Idx_mut.get pts i + 1)
 ```
 
 # Overview
@@ -42,9 +43,10 @@ The language feature includes these predefined types:
 ```ocaml
 type ('a, 'b : any) idx_imm : bits64
 type ('a, 'b : any) idx_mut : bits64
+type ('a, 'b : any) idx_atomic : bits64
 ```
 
-Given `('a, 'b) idx_imm` or `('a, 'b) idx_mut`, we refer to `'a` as the "base
+Given an `('a, 'b) idx_imm` (or other index type), we refer to `'a` as the "base
 type" and `'b` as the "element type." A block index thus represents the position
 of an element type within the base type. For example,
 `(.q.#y) : (line, int) idx_imm` in the example above represents the position of
@@ -60,27 +62,28 @@ Specifically, it consists of one "block access" followed by zero or more
 
 Block accesses take the following forms:
 - Record field: `.foo`
-- Array index as an `int`, `int64#`, `int32#`, `int16#`, `int8#`,
-  or `nativeint#`: `.(i)`, `.L(i)`, `.l(i)`, `.S(i)`, `.s(i)`, or `.n(i)`
-- Immutable array index as an `int`, `int64#`, `int32#`, `int16#`, `int8#`,
-  or `nativeint#`: `.:(i)`, `.:L(i)`, `.:l(i)`, `.S(i)`, `.s(i)`, or `.:n(i)`
-- Mutable or immutable block index: `.idx_mut(idx)` or `.idx_imm(idx)`
+- Block index: `.idx_imm(idx)`, `.idx_mut(idx)`, or `.idx_atomic(idx)`.
 
 Unboxed accesses take the following forms:
 - Unboxed record field: `.#bar`
 
-**Index mutability.** If the block access is mutable (mutable record fields,
-arrays, and mutable block indices), then an `idx_mut` is created, and if the
-block access is immutable (immutable record fields, immutable arrays, and
-immutable block indices), then an `idx_imm` is created.
+To determine whether a use of the block index syntax should result in an
+`idx_imm`, `idx_mut`, or `idx_atomic`, we look at its block access component.
+If it is a reference to a record field, we use the corresponding index type.
+If we are deepening an existing index, the new index has the same variety as
+the original.
 
-**Using indices.** Naturally, block indices can be used to read and write
-within blocks. This can be done via the `Idx_imm.unsafe_get`,
-`Idx_mut.unsafe_get`, and `Idx_mut.unsafe_set` functions in [`Stdlib_stable`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_stable
-).
-(These functions are unsafe only for array indices, which may be out of range.
-Uses of block indices built without the use of an array-indexing operation are
-always safe.)
+**Array indices.** Array indices are created via functions in `Stdlib_stable`:
+- `Idx_mut.unsafe_create_into_array : int -> ('a array, 'a) idx_mut`
+- `Idx_imm.unsafe_create_into_iarray : int -> ('a iarray, 'a) idx_imm`
+- Atomic array indices are not currently supported.
+
+These functions are marked `unsafe` because they cannot check array bounds, so
+using the index later could perform an unchecked out-of-bounds access.
+
+**Using indices.** Block indices can be used to read and write values within blocks.
+[`Stdlib_stable`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_stable)
+exposes `get` and `set` functions for `idx_imm`, `idx_mut`, and `idx_atomic`.
 
 _A key advantage of block indices is that these accessor functions are
 polymorphic in both the base type and element type._ Index reading roughly
@@ -133,16 +136,16 @@ let drop_last_to_y_axis (s : line Stack.t) =
 
 1. For block indices to arrays, the array type parameter must be `mod
    non_float`.
-2. Indices to `[@@unboxed]` records cannot be taken.
-3. An index to a `float` in a flattened float record has an element type
-   `float#`.
-4. Indices to some records containing both values and non-values, and occupying
+2. Indices cannot be taken to `[@@unboxed]` records,
+   `[@@represent_as_float_array]` records, records that store `float`s flatly,
+   or `private` records.
+3. Indices to some records containing both values and non-values, and occupying
    over 2^12 bytes, cannot be created. See [Representation of block
    indices](#representation-of-block-indices) for details.
-5. Indices to structures with non-default modalities are not supported.
+4. Indices to structures with non-default modalities are not supported.
    Specifically, the composition of modalities of the accesses of an `idx_imm`
    must have the identity modality, while the composition of modalities of the
-   accesses of an `idx_mut` must the the modality
+   accesses of an `idx_mut` must have the modality
    `global many aliased unyielding`.
 
 # Representation of block indices
@@ -161,7 +164,7 @@ type c = { mutable b : b; s : string }
 The record `c` presents an interesting problem for block indices: the fields of
 its contained unboxed records `a` and `b` are not actually contiguous at runtime
 when using the native code compiler. This problem is caused by the
-[mixed block representation](../01-intro#the-mixed-block-representation),
+[mixed block representation](../intro#the-mixed-block-representation),
 which mandates that we reorder fields so that values come before unboxed types.
 
 While the layout of `c` has the shape
@@ -224,7 +227,7 @@ Below, we show the different cases to consider. Note that:
    orange), while `o2` and `g2` refer to the offset and gap of the index after
    deepening (blue).
 
-<img src="assets/all_values_or_flats.png" width="600" height="auto" />
-<img src="assets/mixed_to_mixed.png" width="600" height="auto" />
-<img src="assets/mixed_to_all_values.png" width="600" height="auto" />
-<img src="assets/mixed_to_all_flats.png" width="600" height="auto" />
+<img src="/documentation/all_values_or_flats.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_mixed.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_all_values.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_all_flats.png" width="600" height="auto" />

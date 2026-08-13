@@ -1,6 +1,5 @@
 (* TEST
  include systhreads;
- flags = "-alert -unsafe_multidomain";
  hassysthreads;
  {
    bytecode;
@@ -28,7 +27,7 @@ let set a =
 
 (* no-alloc printing to stdout *)
 let say msg =
-  Unix.write Unix.stdout (Bytes.unsafe_of_string msg) 0 (String.length msg)
+  Unix.write_substring Unix.stdout msg 0 (String.length msg)
   |> ignore
 
 (*

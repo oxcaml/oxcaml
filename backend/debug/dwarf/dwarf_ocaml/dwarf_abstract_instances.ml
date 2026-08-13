@@ -34,9 +34,6 @@ module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module L = Linear
 
-let attributes fun_name =
-  [DAH.create_name fun_name; DAH.create_external ~is_visible_externally:true]
-
 let abstract_instance_proto_die_symbol ~fun_symbol =
   Asm_symbol.create_global (Asm_symbol.to_raw_string fun_symbol ^ "_absinst")
 
@@ -45,8 +42,9 @@ let add_empty state ~compilation_unit_proto_die ~fun_symbol ~demangled_name =
     (* DWARF-5 specification section 3.3.8.1, page 82. *)
     Proto_die.create ~parent:(Some compilation_unit_proto_die) ~tag:Subprogram
       ~attribute_values:
-        [ DAH.create_name (Asm_symbol.encode fun_symbol);
-          DAH.create_linkage_name ~linkage_name:demangled_name;
+        [ DAH.create_name demangled_name;
+          DAH.create_linkage_name
+            ~linkage_name:(Asm_symbol.encode_without_prefix fun_symbol);
           DAH.create_external ~is_visible_externally:true ]
       ()
   in
@@ -62,11 +60,14 @@ let add_empty state ~compilation_unit_proto_die ~fun_symbol ~demangled_name =
   abstract_instance_proto_die, abstract_instance_proto_die_symbol
 
 let add_root state ~parent ~demangled_name fun_symbol ~location_attributes =
+  let name =
+    match demangled_name with Some name -> [DAH.create_name name] | None -> []
+  in
   let attributes =
-    [ DAH.create_name (Asm_symbol.encode fun_symbol);
-      DAH.create_linkage_name ~linkage_name:demangled_name;
+    [ DAH.create_linkage_name
+        ~linkage_name:(Asm_symbol.encode_without_prefix fun_symbol);
       DAH.create_external ~is_visible_externally:true ]
-    @ location_attributes
+    @ name @ location_attributes
   in
   let attribute_values =
     attributes
@@ -155,7 +156,7 @@ let find state ~compilation_unit_proto_die (dbg : Debuginfo.t) =
   DS.Debug.log "found comp unit %a\n%!"
     (Format_doc.compat Compilation_unit.print)
     dbg_comp_unit;
-  let this_comp_unit = Compilation_unit.get_current_exn () in
+  let this_comp_unit = Current_unit.get_cu_exn () in
   if Compilation_unit.equal dbg_comp_unit this_comp_unit
   then (
     DS.Debug.log "looking in function_abstract_instances for %a\n%!"

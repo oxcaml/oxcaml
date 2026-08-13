@@ -97,11 +97,11 @@ let f4_1 (x : t_untagged_immediate) = x, false;;
 Line 1, characters 38-39:
 1 | let f4_1 (x : t_untagged_immediate) = x, false;;
                                           ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -110,13 +110,12 @@ let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
 Line 1, characters 44-45:
 1 | let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
                                                 ^
-Error: This expression has type
+Error: The value "x" has type
          "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
          because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of 'a t_untagged_immediate_id must be a sublayout of
-           value
+       But the layout of 'a t_untagged_immediate_id must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -125,11 +124,11 @@ let f4_3 (x : int#) = x, false;;
 Line 1, characters 22-23:
 1 | let f4_3 (x : int#) = x, false;;
                           ^
-Error: This expression has type "int#" but an expression was expected of type
+Error: The value "x" has type "int#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a sublayout of value
+       But the layout of int# must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -141,7 +140,7 @@ Line 1, characters 12-32:
 Error: Tuple element types must have layout value.
        The layout of "t_untagged_immediate" is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of "t_untagged_immediate" must be a sublayout of value
+       But the layout of "t_untagged_immediate" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -153,7 +152,7 @@ Line 1, characters 18-22:
 Error: Tuple element types must have layout value.
        The layout of "int#" is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of "int#" must be a sublayout of value
+       But the layout of "int#" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -165,7 +164,7 @@ Line 1, characters 38-40:
 Error: Tuple element types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -178,7 +177,7 @@ Line 1, characters 57-59:
 Error: Tuple element types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of a tuple element.
 |}]
 
@@ -269,11 +268,11 @@ let f7_1 (x : t_untagged_immediate) = `A x;;
 Line 1, characters 41-42:
 1 | let f7_1 (x : t_untagged_immediate) = `A x;;
                                              ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -282,13 +281,12 @@ let f7_2 (x : 'a t_untagged_immediate_id) = `A x;;
 Line 1, characters 47-48:
 1 | let f7_2 (x : 'a t_untagged_immediate_id) = `A x;;
                                                    ^
-Error: This expression has type
+Error: The value "x" has type
          "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
          because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of 'a t_untagged_immediate_id must be a sublayout of
-           value
+       But the layout of 'a t_untagged_immediate_id must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -297,11 +295,11 @@ let f7_3 (x : int#) = `A x;;
 Line 1, characters 25-26:
 1 | let f7_3 (x : int#) = `A x;;
                              ^
-Error: This expression has type "int#" but an expression was expected of type
+Error: The value "x" has type "int#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a sublayout of value
+       But the layout of int# must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -313,7 +311,7 @@ Line 1, characters 20-40:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "t_untagged_immediate" is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of "t_untagged_immediate" must be a sublayout of value
+       But the layout of "t_untagged_immediate" must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -325,7 +323,7 @@ Line 1, characters 46-48:
 Error: Polymorphic variant constructor argument types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type f7_5.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -354,7 +352,7 @@ Error: This expression has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -368,8 +366,7 @@ Error: This expression has type
        but an expression was expected of type "('b : value_or_null)"
        The layout of 'a t_untagged_immediate_id is untagged_immediate
          because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of 'a t_untagged_immediate_id must be a sublayout of
-           value
+       But the layout of 'a t_untagged_immediate_id must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -382,7 +379,7 @@ Error: This expression has type "int#" but an expression was expected of type
          "('a : value_or_null)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a sublayout of value
+       But the layout of int# must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -451,7 +448,7 @@ Line 1, characters 17-20:
 1 | external f10_8 : int -> int#  = "foo" "bar" [@@unboxed];;
                      ^^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}];;
 
@@ -460,7 +457,7 @@ external f10_9 : (int#[@untagged]) -> bool -> string  = "foo" "bar";;
 Line 1, characters 18-22:
 1 | external f10_9 : (int#[@untagged]) -> bool -> string  = "foo" "bar";;
                       ^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -469,7 +466,7 @@ external f10_10 : string -> (int#[@untagged])  = "foo" "bar";;
 Line 1, characters 29-33:
 1 | external f10_10 : string -> (int#[@untagged])  = "foo" "bar";;
                                  ^^^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
@@ -538,7 +535,7 @@ Line 1, characters 15-39:
 Error: Object field types must have layout value.
        The layout of "t_untagged_immediate" is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of "t_untagged_immediate" must be a sublayout of value
+       But the layout of "t_untagged_immediate" must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -550,7 +547,7 @@ Line 1, characters 41-47:
 Error: Object field types must have layout value.
        The layout of "'a" is untagged_immediate
          because of the annotation on 'a in the declaration of the type t12_2.
-       But the layout of "'a" must overlap with value
+       But the layout of "'a" must be a value layout
          because it's the type of an object field.
 |}]
 
@@ -563,7 +560,7 @@ Error: The method "x" has type "t_untagged_immediate"
        but is expected to have type "('a : value)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -590,7 +587,7 @@ Line 1, characters 25-26:
 Error: Variables bound in a class must have layout value.
        The layout of x is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a value layout
          because it's the type of a class field.
 |}];;
 
@@ -602,7 +599,7 @@ Line 1, characters 26-41:
 Error: The method "x" has type "int#" but is expected to have type "('a : value)"
        The layout of int# is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a sublayout of value
+       But the layout of int# must be a value layout
          because it's the type of an object field.
 |}];;
 
@@ -614,7 +611,7 @@ Line 1, characters 26-38:
 Error: Variables bound in a class must have layout value.
        The layout of x is untagged_immediate
          because it is the unboxed version of the primitive type int.
-       But the layout of x must be a sublayout of value
+       But the layout of x must be a value layout
          because it's the type of an instance variable.
 |}];;
 
@@ -667,11 +664,11 @@ end;;
 Line 3, characters 17-19:
 3 |     let _ = f1_1 m1 in
                      ^^
-Error: This expression has type "('a : value_or_null)"
+Error: The value "m1" has type "('a : value_or_null)"
        but an expression was expected of type "t_untagged_immediate"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -688,7 +685,7 @@ Line 3, characters 17-19:
 Error: "m1" must have a type of layout value because it is captured by an object.
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value
+       But the layout of t_untagged_immediate must be a value layout
          because it's the type of a variable captured in an object.
 |}];;
 
@@ -703,11 +700,11 @@ let f13_1 (x : t_untagged_immediate) = x = x;;
 Line 1, characters 39-40:
 1 | let f13_1 (x : t_untagged_immediate) = x = x;;
                                            ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value.
+       But the layout of t_untagged_immediate must be a value layout.
 |}];;
 
 let f13_2 (x : t_untagged_immediate) = compare x x;;
@@ -715,11 +712,11 @@ let f13_2 (x : t_untagged_immediate) = compare x x;;
 Line 1, characters 47-48:
 1 | let f13_2 (x : t_untagged_immediate) = compare x x;;
                                                    ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value.
+       But the layout of t_untagged_immediate must be a value layout.
 |}];;
 
 let f13_3 (x : t_untagged_immediate) = Marshal.to_bytes x;;
@@ -727,11 +724,11 @@ let f13_3 (x : t_untagged_immediate) = Marshal.to_bytes x;;
 Line 1, characters 56-57:
 1 | let f13_3 (x : t_untagged_immediate) = Marshal.to_bytes x;;
                                                             ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value_or_null)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value.
+       But the layout of t_untagged_immediate must be a value layout.
 |}];;
 
 let f13_4 (x : t_untagged_immediate) = Hashtbl.hash x;;
@@ -739,9 +736,9 @@ let f13_4 (x : t_untagged_immediate) = Hashtbl.hash x;;
 Line 1, characters 52-53:
 1 | let f13_4 (x : t_untagged_immediate) = Hashtbl.hash x;;
                                                         ^
-Error: This expression has type "t_untagged_immediate"
+Error: The value "x" has type "t_untagged_immediate"
        but an expression was expected of type "('a : value)"
        The layout of t_untagged_immediate is untagged_immediate
          because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a sublayout of value.
+       But the layout of t_untagged_immediate must be a value layout.
 |}];;

@@ -25,17 +25,17 @@ type t : value mod contended = { mutable contents : string }
 [@@unsafe_allow_any_mode_crossing]
 let f (x : t @ contended) = use_uncontended x
 [%%expect{|
-type t : value mod contended = { mutable contents : string; }
+type t : value non_float mod contended = { mutable contents : string; }
 [@@unsafe_allow_any_mode_crossing]
 val f : t @ contended -> t = <fun>
 |}]
 
 (* If we set the attribute but *don't* get a kind mismatch, we ought to be fine *)
-type t : value mod many portable uncontended = string
+type t : value mod many portable = string
 [@@unsafe_allow_any_mode_crossing]
 [%%expect{|
 Lines 1-2, characters 0-34:
-1 | type t : value mod many portable uncontended = string
+1 | type t : value mod many portable = string
 2 | [@@unsafe_allow_any_mode_crossing]
 Error: [@@unsafe_allow_any_mode_crossing] is not allowed on this kind of type declaration.
        Only records, unboxed products, and variants are supported.
@@ -48,18 +48,37 @@ type t : float64 mod contended = { mutable contents : string }
 Lines 1-2, characters 0-34:
 1 | type t : float64 mod contended = { mutable contents : string }
 2 | [@@unsafe_allow_any_mode_crossing]
-Error: The layout of type "t" is value
+Error: The layout of type "t" is value non_float
          because it's a boxed record type.
        But the layout of type "t" must be a sublayout of float64
          because of the annotation on the declaration of the type t.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}]
+
+(* Can't change the layout for mutually recursive types. This *should*
+   typecheck; i.e. allow_any_mode_crossing shouldn't replace [t]'s layout with
+   [any]. *)
+type ('a : float64) require_f64
+
+type t : any = #{ f : float# }
+[@@unsafe_allow_any_mode_crossing]
+
+and s : value = t require_f64
+[%%expect{|
+type ('a : float64) require_f64
+type t : float64 = #{ f : float#; } [@@unsafe_allow_any_mode_crossing]
+and s = t require_f64
 |}]
 
 (* Annotations with with-bounds are allowed *)
 type 'a t : value mod contended with 'a = { mutable contents : 'a }
 [@@unsafe_allow_any_mode_crossing]
 [%%expect{|
-type 'a t : value mod contended with 'a = { mutable contents : 'a; }
-[@@unsafe_allow_any_mode_crossing]
+type 'a t
+  : value non_float mod contended with 'a = {
+  mutable contents : 'a;
+} [@@unsafe_allow_any_mode_crossing]
 |}]
 
 (* Abstract types in signatures should work with the unsafe kind *)
@@ -118,12 +137,16 @@ end
 [%%expect{|
 module M1 :
   sig
-    type t : value mod contended = { mutable contents : string; }
+    type t : value non_float mod contended = { mutable contents : string; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M2 :
   sig
-    type t : value mod contended = M1.t = { mutable contents : string; }
+    type t
+      : value non_float mod contended =
+      M1.t = {
+      mutable contents : string;
+    }
     [@@unsafe_allow_any_mode_crossing]
   end
 |}]
@@ -141,7 +164,10 @@ end
 [%%expect{|
 module Private :
   sig
-    type t : value mod contended = private { mutable contents : string; }
+    type t
+      : value non_float mod contended = private {
+      mutable contents : string;
+    }
     [@@unsafe_allow_any_mode_crossing]
   end
 |}]
@@ -177,12 +203,15 @@ end
 [%%expect{|
 module M :
   sig
-    type t1 : value mod contended = { mutable contents : string; }
+    type t1 : value non_float mod contended = { mutable contents : string; }
     [@@unsafe_allow_any_mode_crossing]
-    type t2 : value mod contended = private { mutable contents : string; }
+    type t2
+      : value non_float mod contended = private {
+      mutable contents : string;
+    }
     [@@unsafe_allow_any_mode_crossing]
     type t3
-      : value mod contended =
+      : value non_float mod contended =
         Immut of string
       | Mut of { mutable contents : string; }
     [@@unsafe_allow_any_mode_crossing]
@@ -206,13 +235,13 @@ Error: Signature mismatch:
          sig type t = { mutable x : int; } end
        is not included in
          sig
-           type t : value mod contended = { mutable x : int; }
+           type t : value non_float mod contended = { mutable x : int; }
            [@@unsafe_allow_any_mode_crossing]
          end
        Type declarations do not match:
          type t = { mutable x : int; }
        is not included in
-         type t : value mod contended = { mutable x : int; }
+         type t : value non_float mod contended = { mutable x : int; }
        [@@unsafe_allow_any_mode_crossing]
        They have different unsafe mode crossing behavior:
        the second has [@@unsafe_allow_any_mode_crossing], but the first does not
@@ -231,7 +260,7 @@ module _ = (M : S)
 [%%expect{|
 module type S =
   sig
-    type t : value mod contended = { mutable x : int; }
+    type t : value non_float mod contended = { mutable x : int; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M : sig type t = { mutable x : int; } end
@@ -246,7 +275,7 @@ Error: Signature mismatch:
        Type declarations do not match:
          type t = M.t = { mutable x : int; }
        is not included in
-         type t : value mod contended = { mutable x : int; }
+         type t : value non_float mod contended = { mutable x : int; }
        [@@unsafe_allow_any_mode_crossing]
        They have different unsafe mode crossing behavior:
        the second has [@@unsafe_allow_any_mode_crossing], but the first does not
@@ -280,19 +309,25 @@ Lines 4-7, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           type t : value mod portable contended = { mutable x : int; }
+           type t
+             : value non_float mod portable contended = {
+             mutable x : int;
+           }
            [@@unsafe_allow_any_mode_crossing]
          end
        is not included in
          sig
-           type t : value mod contended = { mutable x : int; }
+           type t : value non_float mod contended = { mutable x : int; }
            [@@unsafe_allow_any_mode_crossing]
          end
        Type declarations do not match:
-         type t : value mod portable contended = { mutable x : int; }
+         type t
+           : value non_float mod portable contended = {
+           mutable x : int;
+         }
        [@@unsafe_allow_any_mode_crossing]
        is not included in
-         type t : value mod contended = { mutable x : int; }
+         type t : value non_float mod contended = { mutable x : int; }
        [@@unsafe_allow_any_mode_crossing]
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
@@ -301,7 +336,7 @@ Error: Signature mismatch:
 |}]
 
 module A : sig
-  type t : value mod external_ global portable many uncontended unyielding
+  type t : value mod external_ global portable many
 end = struct
   type t = int
 end
@@ -316,7 +351,7 @@ end
 module A : sig type t : value mod global many portable external_ end
 module B :
   sig
-    type t : value mod portable contended = { a : A.t; }
+    type t : value non_float mod portable contended = { a : A.t; }
     [@@unsafe_allow_any_mode_crossing]
     val a : t -> A.t
   end
@@ -384,10 +419,10 @@ Lines 1-2, characters 0-34:
 Error: This variant or record definition does not match that of type "'a t"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
-         immutable contended with 'a
-         but this has: mod forkable unyielding many stateless portable
-         immutable contended
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended
 |}]
 
 type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a }
@@ -405,10 +440,10 @@ Error: This variant or record definition does not match that of type
          "('a, 'b) arity_2"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
-         immutable contended with 'b
-         but this has: mod forkable unyielding many stateless portable
-         immutable contended with 'a
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'b
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
 |}]
 
 (* mcomp *)
@@ -464,27 +499,27 @@ end
 type (_, _) eq = Refl : ('a, 'a) eq
 module M1 :
   sig
-    type 'a t : value mod contended = { x : 'a; }
+    type 'a t : value non_float mod contended = { x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M2 :
   sig
-    type 'a t : value mod contended = { x : 'a; }
+    type 'a t : value non_float mod contended = { x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M3 :
   sig
-    type 'a t : value mod portable = { x : 'a; }
+    type 'a t : value non_float mod portable = { x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M4 :
   sig
-    type 'a t : value mod contended with 'a = { mutable x : 'a; }
+    type 'a t : value non_float mod contended with 'a = { mutable x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M5 :
   sig
-    type 'a t : value mod contended with 'a = { mutable x : 'a; }
+    type 'a t : value non_float mod contended with 'a = { mutable x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M6 :
@@ -494,17 +529,26 @@ module M6 :
   end
 module M7 :
   sig
-    type ('a, 'b) t : value mod contended with 'a = { mutable x : 'b; }
+    type ('a, 'b) t
+      : value non_float mod contended with 'a = {
+      mutable x : 'b;
+    }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M8 :
   sig
-    type ('a, 'b) t : value mod contended with 'a = { mutable x : 'b; }
+    type ('a, 'b) t
+      : value non_float mod contended with 'a = {
+      mutable x : 'b;
+    }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M9 :
   sig
-    type ('a, 'b) t : value mod contended with 'b = { mutable x : 'b; }
+    type ('a, 'b) t
+      : value non_float mod contended with 'b = {
+      mutable x : 'b;
+    }
     [@@unsafe_allow_any_mode_crossing]
   end
 |}]
@@ -538,4 +582,37 @@ val f : (('a, 'b) M7.t, ('a, 'b) M8.t) eq -> unit = <fun>
 let f (type a b) (eq : ((a, b) M7.t, (a, b) M9.t) eq) = match eq with Refl -> ()
 [%%expect{|
 val f : (('a, 'b) M7.t, ('a, 'b) M9.t) eq -> unit = <fun>
+|}]
+
+module M : sig
+  type t : immutable_data
+end = struct
+  type q : immutable_data = { bar : int ref }
+  [@@unsafe_allow_any_mode_crossing]
+  type t : immutable_data = q
+end
+[%%expect{|
+module M : sig type t : immutable_data end
+|}]
+
+module M : sig
+  type t : immutable_data
+end = struct
+  type q : immutable_data = { bar : int ref }
+  [@@unsafe_allow_any_mode_crossing]
+  type t : immutable_data = q list
+end
+[%%expect{|
+module M : sig type t : immutable_data end
+|}]
+
+(* A type in the same mutually recursive group sees the crossed jkind of an
+   [@@unsafe_allow_any_mode_crossing] type, not its structural one. *)
+type t : value mod contended = { mutable i : int }
+[@@unsafe_allow_any_mode_crossing]
+and s : value mod contended = { t : t } [@@unboxed]
+[%%expect{|
+type t : value non_float mod contended = { mutable i : int; }
+[@@unsafe_allow_any_mode_crossing]
+and s = { t : t; } [@@unboxed]
 |}]

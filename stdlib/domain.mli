@@ -17,10 +17,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@alert unstable
-    "The Domain interface may change in incompatible ways in the future."
-]
-
 (** Domains.
 
     See 'Parallel programming' chapter in the manual.
@@ -31,12 +27,13 @@ type !'a t : value mod portable contended with 'a
 (** A domain of type ['a t] runs independently, eventually producing a
     result of type 'a, or an exception *)
 
-val spawn : (unit -> 'a) -> 'a t @@ nonportable
+val spawn : (unit -> 'a) -> 'a t
 [@@alert do_not_spawn_domains
    "User programs should never spawn domains. To execute a function on a \
     domain, use [Multicore] from the threading library. This is because \
     spawning more than [recommended_domain_count] domains (the CPU core count) \
-    will significantly degrade GC performance."]
+    will significantly degrade GC performance. Using both [Domain.spawn] and \
+    [Multicore] can cause [Multicore] to abort."]
 [@@alert unsafe_multidomain "Use [Domain.Safe.spawn]."]
 (** [spawn f] creates a new domain that runs in parallel with the
     current domain.
@@ -58,32 +55,7 @@ val get_id : 'a t -> id @@ portable
 val self : unit -> id @@ portable
 (** [self ()] is the identifier of the currently running domain *)
 
-external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
-(** If busy-waiting, calling cpu_relax () between iterations
-    will improve performance on some CPU architectures *)
-
-val is_main_domain : unit -> bool @@ portable
-(** [is_main_domain ()] returns true if called from the initial domain. *)
-
-val recommended_domain_count : unit -> int @@ portable
-(** The recommended maximum number of domains which should be running
-    simultaneously (including domains already running).
-
-    The value returned is at least [1]. *)
-
-val self_index : unit -> int @@ portable
-(** The index of the current domain. It is an integer unique among
-    currently-running domains, in the interval [0; N-1] where N is the
-    peak number of domains running simultaneously so far.
-
-    The index of a terminated domain may be reused for a new
-    domain. Use [(Domain.self () :> int)] instead for an identifier
-    unique among all domains ever created by the program.
-
-    @since 5.3
-*)
-
-val before_first_spawn : (unit -> unit) -> unit @@ nonportable
+val before_first_spawn : (unit -> unit) -> unit
 (** [before_first_spawn f] registers [f] to be called before the first domain
     is spawned by the program. The functions registered with
     [before_first_spawn] are called on the main (initial) domain. The functions
@@ -92,7 +64,7 @@ val before_first_spawn : (unit -> unit) -> unit @@ nonportable
 
     @raise Invalid_argument if the program has already spawned a domain. *)
 
-val at_exit : (unit -> unit) -> unit @@ nonportable
+val at_exit : (unit -> unit) -> unit
 (** [at_exit f] registers [f] to be called when the current domain exits. Note
     that [at_exit] callbacks are domain-local and only apply to the calling
     domain. The registered functions are called in 'last in, first out' order:
@@ -110,17 +82,45 @@ let temp_file_key = Domain.DLS.new_key (fun _ ->
     to close it, thus guaranteeing the descriptor is not leaked in
     case the current domain exits. *)
 
-(** Domain-local Storage *)
+external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
+(** If busy-waiting, calling cpu_relax () between iterations
+    will improve performance on some CPU architectures *)
+
+val is_main_domain : unit -> bool @@ portable
+(** [is_main_domain ()] returns true if called from the initial domain. *)
+
+val recommended_domain_count : unit -> int @@ portable
+(** The recommended maximum number of domains which should be running
+    simultaneously (including domains already running).
+
+    The value returned is at least [1]. *)
+
+val max_domain_count : int
+(** The maximum number of simultaneously running domains. *)
+
+val self_index : unit -> int @@ portable
+(** The index of the current domain. It is an integer unique among
+    currently-running domains, in the interval [0; N-1] where N is the
+    peak number of domains running simultaneously so far.
+    N is at most [max_domain_count].
+
+    The index of a terminated domain may be reused for a new
+    domain. Use [(Domain.self () :> int)] instead for an identifier
+    unique among all domains ever created by the program.
+
+    @since 5.3
+*)
+
 module DLS : sig
+(** Domain-local Storage *)
 
     type 'a key : value mod portable contended
     (** Type of a DLS key *)
 
     val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
-      @@ nonportable
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.new_key]."]
     (** [new_key f] returns a new key bound to initialiser [f] for accessing
-,        domain-local variables.
+        domain-local variables.
 
         If [split_from_parent] is not provided, the value for a new
         domain will be computed on-demand by the new domain: the first
@@ -161,13 +161,13 @@ module DLS : sig
         explicit synchronization to avoid data races.
     *)
 
-    val get : 'a key -> 'a @@ nonportable
+    val get : 'a key -> 'a
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.get]."]
     (** [get k] returns [v] if a value [v] is associated to the key [k] on
         the calling domain's domain-local state. Sets [k]'s value with its
         initialiser and returns it otherwise. *)
 
-    val set : 'a key -> 'a -> unit @@ nonportable
+    val set : 'a key -> 'a -> unit
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.set]."]
     (** [set k v] updates the calling domain's domain-local state to associate
         the key [k] with value [v]. It overwrites any previous values associated
@@ -183,15 +183,14 @@ module TLS : sig
     (** Type of a TLS key *)
 
     val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
-        @@ nonportable
     [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.new_key]."]
     (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
 
-    val get : 'a key -> 'a @@ nonportable
+    val get : 'a key -> 'a
     [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.get]."]
     (** Like {!DLS.get}, but reads the value for the current thread. *)
 
-    val set : 'a key -> 'a -> unit @@ nonportable
+    val set : 'a key -> 'a -> unit
     [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.set]."]
     (** Like {!DLS.set}, but sets the value for the current thread. *)
 
@@ -204,8 +203,41 @@ module TLS : sig
     end
 end
 
-(** Submodule containing non-backwards-compatible functions which enforce thread safety
-    via modes. *)
+module Tick : sig @@ portable
+  (** A handle to a request that the tick thread tick at a given interval
+
+      In between calling [acquire] and calling [release], the tick thread will
+      tick {i at least as frequently} as the provided [interval_usec]. *)
+  type t : mutable_data mod external_ global non_float
+
+  (** Request that the tick thread tick at least as frequently as
+      [interval_usec] until [release] is called on the returned handle. *)
+  val acquire : interval_usec:int -> t @ unique
+
+  (** Release a handle to a tick request.
+
+     It is unsound to call this on a domain other than the one that called
+     [acquire] (though it is fine to call it on a different thread on the same
+     domain).
+  *)
+  val release : t @ unique -> unit
+
+  (** [with_ ~interval_usec f] runs [f] with the tick thread ticking at least as
+      frequently as [interval_usec] *)
+  val with_
+    : ('r : value_or_null).
+       interval_usec:int
+    -> (t @ local -> 'r) @ local once
+    -> 'r
+
+  (** Returns the interval at which the tick thread will tick, or [Null]
+      if no domain has any active tick requests. This is the global minimum
+      across all domains of live tick requests. *)
+  val effective_interval_usec : unit -> int or_null
+end
+
+(** Submodule containing non-backwards-compatible functions which enforce thread
+    safety via modes. *)
 module Safe : sig @@ portable
 
   (** Like {!DLS}, but uses modes to enforce properties necessary for data-race
@@ -255,7 +287,8 @@ module Safe : sig @@ portable
      "User programs should never spawn domains. To execute a function on a \
       domain, use [Multicore] from the threading library. This is because \
       spawning more than [recommended_domain_count] domains (the CPU core \
-      count) will significantly degrade GC performance."]
+      count) will significantly degrade GC performance. Using both \
+      [Domain.spawn] and [Multicore] can cause [Multicore] to abort."]
   (** Like {!spawn}, but enforces thread-safety via modes. In particular, the provided
       computation must be [portable], and so cannot close over and interact with any
       unsynchronized mutable data in the current domain. *)

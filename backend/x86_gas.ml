@@ -19,7 +19,7 @@ open! Int_replace_polymorphic_compare
 open X86_ast
 open X86_proc
 open Amd64_simd_instrs
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let bprintf = Printf.bprintf
 
@@ -63,6 +63,7 @@ let arg b = function
   | Reg32 x -> print_reg b string_of_reg32 x
   | Reg64 x -> print_reg b string_of_reg64 x
   | Regf x -> print_reg b string_of_regf x
+  | Regmask k -> bprintf b "%%k%d" k
   | Mem addr -> arg_mem b addr
   | Mem64_RIP (_, s, displ) -> bprintf b "%s%a(%%rip)" s opt_displ displ
 
@@ -73,7 +74,7 @@ let typeof = function
   | Reg32 _ -> DWORD
   | Reg64 _ -> QWORD
   | Imm _ | Sym _ -> NONE
-  | Regf _ -> assert false
+  | Regf _ | Regmask _ -> assert false
 
 let suf arg =
   match typeof arg with
@@ -83,7 +84,8 @@ let suf arg =
   | QWORD -> "q"
   | REAL4 -> "s"
   | VEC128 | VEC256 | VEC512 | NONE -> ""
-  | NEAR | PROC -> assert false
+  | NEAR -> Misc.fatal_error "X86_gas.suf: unexpected datatype NEAR"
+  | PROC -> Misc.fatal_error "X86_gas.suf: unexpected datatype PROC"
 
 let i0 b s = bprintf b "\t%s" s
 
@@ -103,6 +105,63 @@ let i3 b s x y z = bprintf b "\t%s\t%a, %a, %a" s arg x arg y arg z
 
 let i4 b s x y z w = bprintf b "\t%s\t%a, %a, %a, %a" s arg x arg y arg z arg w
 
+let evex_rounding : Amd64_simd_defs.evex_rounding -> string = function
+  | Rnd_near -> "{rn-sae}, "
+  | Rnd_down -> "{rd-sae}, "
+  | Rnd_up -> "{ru-sae}, "
+  | Rnd_zero -> "{rz-sae}, "
+
+let evex_broadcast evex_w (len : Amd64_simd_defs.evex_length) =
+  let bits = match len with L128 -> 128 | L256 -> 256 | L512 -> 512 in
+  Printf.sprintf "{1to%d}" (bits / if evex_w then 64 else 32)
+
+let ievex b (instr : Amd64_simd_instrs.instr) args =
+  let has_mem = Array.exists X86_ast_utils.is_mem args in
+  let zeroing, rounding, broadcast =
+    match instr.enc.prefix with
+    | Evex { evex_z; evex_b; evex_ll; evex_w; _ } ->
+      let rounding, broadcast =
+        match evex_ll with
+        | Ll_round rnd -> evex_rounding rnd, ""
+        | Ll_len len ->
+          if not evex_b
+          then "", ""
+          else if has_mem
+          then "", evex_broadcast evex_w len
+          else "{sae}, ", ""
+      in
+      (if evex_z then "{z}" else ""), rounding, broadcast
+    | Legacy _ | Vex _ -> Misc.fatal_error "expected EVEX encoding"
+  in
+  let mask b = function None -> () | Some m -> bprintf b "{%a}" arg m in
+  (* [emit_simd_instr] passes the immediate first, then the writemask, then the
+     remaining operands in AT&T order. *)
+  let imm, args =
+    match instr.imm with
+    | Imm_spec | Imm_reg ->
+      Some args.(0), Array.sub args 1 (Array.length args - 1)
+    | Imm_none -> None, args
+  in
+  let writemask, args =
+    if Amd64_simd_defs.instr_expects_mask instr
+    then Some args.(0), Array.sub args 1 (Array.length args - 1)
+    else None, args
+  in
+  bprintf b "\t%s\t" instr.mnemonic;
+  (* The assembler requires the rounding mode to follow the immediate. *)
+  (match imm with
+  | Some imm -> bprintf b "%a, " arg imm
+  | None -> ());
+  Buffer.add_string b rounding;
+  let last = Array.length args - 1 in
+  Array.iteri
+    (fun i a ->
+      if i > 0 then Buffer.add_string b ", ";
+      arg b a;
+      if X86_ast_utils.is_mem a then Buffer.add_string b broadcast;
+      if i = last then bprintf b "%a%s" mask writemask zeroing)
+    args
+
 let i1_call_jmp b s = function
   (* this is the encoding of jump labels: don't use * *)
   | Mem { arch = X86; idx = _; scale = 0; base = None; sym = Some _; _ } as x ->
@@ -110,7 +169,11 @@ let i1_call_jmp b s = function
   | (Reg32 _ | Reg64 _ | Mem { arch = X64 | X86; _ } | Mem64_RIP _) as x ->
     bprintf b "\t%s\t*%a" s arg x
   | Sym x -> bprintf b "\t%s\t%s" s x
-  | Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ -> assert false
+  | (Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Regf _ | Regmask _) as x ->
+    let buf = Buffer.create 16 in
+    arg buf x;
+    Misc.fatal_errorf "X86_gas.i1_call_jmp: invalid operand %s"
+      (Buffer.contents buf)
 
 let print_instr b = function
   | ADD (arg1, arg2) -> i2_s b "add" arg1 arg2
@@ -128,6 +191,7 @@ let print_instr b = function
   | DEC arg -> i1_s b "dec" arg
   | HLT -> i0 b "hlt"
   | IDIV arg -> i1_s b "idiv" arg
+  | DIV arg -> i1_s b "div" arg
   | IMUL (arg, None) -> i1_s b "imul" arg
   | IMUL (arg1, Some arg2) -> i2_s b "imul" arg1 arg2
   | MUL arg -> i1_s b "mul" arg
@@ -152,10 +216,10 @@ let print_instr b = function
     i2 b "movabsq" arg1 arg2
   | MOV
       ( (( Reg8L _ | Imm _ | Sym _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
-         | Regf _ | Mem _
+         | Regf _ | Regmask _ | Mem _
          | Mem64_RIP (_, _, _) ) as arg1),
         (( Reg8L _ | Imm _ | Sym _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
-         | Regf _ | Mem _
+         | Regf _ | Regmask _ | Mem _
          | Mem64_RIP (_, _, _) ) as arg2) ) ->
     i2_s b "mov" arg1 arg2
   | MOVSX (arg1, arg2) -> i2_ss b "movs" arg1 arg2
@@ -186,8 +250,11 @@ let print_instr b = function
   | SUB (arg1, arg2) -> i2_s b "sub" arg1 arg2
   | SBB (arg1, arg2) -> i2_s b "sbb" arg1 arg2
   | TEST (arg1, arg2) -> i2_s b "test" arg1 arg2
+  | UD2 -> i0 b "ud2"
   | XCHG (arg1, arg2) -> i2 b "xchg" arg1 arg2
   | XOR (arg1, arg2) -> i2_s b "xor" arg1 arg2
+  | SIMD (instr, args) when Amd64_simd_defs.instr_is_evex instr ->
+    ievex b instr args
   | SIMD (instr, args) -> (
     match[@warning "-4"] instr.id, args with
     (* The assembler won't accept these mnemonics directly. *)
@@ -220,6 +287,67 @@ let print_line b i =
   | Ins i -> print_instr b i
   | Directive d -> Asm_targets.Asm_directives.Directive.print b d
 
+let map_arg (f : arg -> arg) (instr : instruction) : instruction =
+  match instr with
+  | ADD (a, b) -> ADD (f a, f b)
+  | ADC (a, b) -> ADC (f a, f b)
+  | AND (a, b) -> AND (f a, f b)
+  | BSF (a, b) -> BSF (f a, f b)
+  | BSR (a, b) -> BSR (f a, f b)
+  | BSWAP a -> BSWAP (f a)
+  | CALL a -> CALL (f a)
+  | CDQ -> CDQ
+  | CLDEMOTE a -> CLDEMOTE (f a)
+  | CMOV (c, a, b) -> CMOV (c, f a, f b)
+  | CMP (a, b) -> CMP (f a, f b)
+  | CQO -> CQO
+  | DEC a -> DEC (f a)
+  | HLT -> HLT
+  | IDIV a -> IDIV (f a)
+  | DIV a -> DIV (f a)
+  | IMUL (a, b) -> IMUL (f a, Option.map f b)
+  | MUL a -> MUL (f a)
+  | INC a -> INC (f a)
+  | J (c, a) -> J (c, f a)
+  | JMP a -> JMP (f a)
+  | LEA (a, b) -> LEA (f a, f b)
+  | LOCK_CMPXCHG (a, b) -> LOCK_CMPXCHG (f a, f b)
+  | LOCK_XADD (a, b) -> LOCK_XADD (f a, f b)
+  | LOCK_ADD (a, b) -> LOCK_ADD (f a, f b)
+  | LOCK_SUB (a, b) -> LOCK_SUB (f a, f b)
+  | LOCK_AND (a, b) -> LOCK_AND (f a, f b)
+  | LOCK_OR (a, b) -> LOCK_OR (f a, f b)
+  | LOCK_XOR (a, b) -> LOCK_XOR (f a, f b)
+  | LEAVE -> LEAVE
+  | MOV (a, b) -> MOV (f a, f b)
+  | MOVSX (a, b) -> MOVSX (f a, f b)
+  | MOVSXD (a, b) -> MOVSXD (f a, f b)
+  | MOVZX (a, b) -> MOVZX (f a, f b)
+  | NEG a -> NEG (f a)
+  | NOP -> NOP
+  | OR (a, b) -> OR (f a, f b)
+  | PAUSE -> PAUSE
+  | POP a -> POP (f a)
+  | PREFETCH (w, h, a) -> PREFETCH (w, h, f a)
+  | PUSH a -> PUSH (f a)
+  | RDTSC -> RDTSC
+  | RDPMC -> RDPMC
+  | LFENCE -> LFENCE
+  | SFENCE -> SFENCE
+  | MFENCE -> MFENCE
+  | RET -> RET
+  | SAL (a, b) -> SAL (f a, f b)
+  | SAR (a, b) -> SAR (f a, f b)
+  | SET (c, a) -> SET (c, f a)
+  | SHR (a, b) -> SHR (f a, f b)
+  | SUB (a, b) -> SUB (f a, f b)
+  | SBB (a, b) -> SBB (f a, f b)
+  | TEST (a, b) -> TEST (f a, f b)
+  | UD2 -> UD2
+  | XCHG (a, b) -> XCHG (f a, f b)
+  | XOR (a, b) -> XOR (f a, f b)
+  | SIMD (simd_instr, args) -> SIMD (simd_instr, Array.map f args)
+
 let generate_asm oc lines =
   let b = Buffer.create 10000 in
   output_string oc "\t.file \"\"\n";
@@ -229,3 +357,102 @@ let generate_asm oc lines =
       print_line b i;
       Buffer.add_char b '\n';
       Buffer.output_buffer oc b)
+
+let format_asm_for_expect_asm ~name ~body ~hidden_gc_jump_pads =
+  let module D = Asm_targets.Asm_directives.Directive in
+  let module L = Asm_targets.Asm_label in
+  let tab_stops = [| 2; 8 |] in
+  let tabs_to_spaces s =
+    let result = Buffer.create (String.length s) in
+    let col = ref 0 in
+    let tab_index = ref 0 in
+    String.iter
+      (fun c ->
+        if Char.equal c '\t' && !tab_index < Array.length tab_stops
+        then (
+          let target_col = tab_stops.(!tab_index) in
+          let spaces = max 1 (target_col - !col) in
+          for _ = 1 to spaces do
+            Buffer.add_char result ' '
+          done;
+          col := !col + spaces;
+          incr tab_index)
+        else (
+          Buffer.add_char result c;
+          incr col))
+      s;
+    Buffer.contents result
+  in
+  let label_map : (string, L.t) Hashtbl.t = Hashtbl.create 16 in
+  let next_id = ref 0 in
+  List.iter
+    (fun line ->
+      match[@warning "-4"] line with
+      | Directive (D.New_label (D.Label l, _)) ->
+        let old_str = L.encode l in
+        let new_label = L.create_int (L.section l) !next_id in
+        Hashtbl.add label_map old_str new_label;
+        incr next_id
+      | Ins _ | Directive _ -> ())
+    body;
+  let hidden_labels : (string, unit) Hashtbl.t = Hashtbl.create 16 in
+  List.iter
+    (fun line ->
+      match[@warning "-4"] line with
+      | Directive (D.New_label (D.Label l, _)) ->
+        Hashtbl.add hidden_labels (L.encode l) ()
+      | Ins _ | Directive _ -> ())
+    hidden_gc_jump_pads;
+  let rewrite_str s =
+    match Hashtbl.find_opt label_map s with
+    | None -> if Hashtbl.mem hidden_labels s then "<hidden GC jump pad>" else s
+    | Some new_label -> L.encode new_label
+  in
+  let rewrite_label l =
+    match Hashtbl.find_opt label_map (L.encode l) with
+    | None -> l
+    | Some new_label -> new_label
+  in
+  let rewrite_arg (a : arg) : arg =
+    match a with
+    | Sym s -> Sym (rewrite_str s)
+    | Mem ({ sym; _ } as addr) ->
+      Mem { addr with sym = Option.map rewrite_str sym }
+    | Mem64_RIP (typ, s, displ) ->
+      let s =
+        if
+          String.starts_with ~prefix:"camlTOP" s
+          || String.starts_with ~prefix:".L" s
+        then "<hidden PC-relative offset>"
+        else rewrite_str s
+      in
+      Mem64_RIP (typ, s, displ)
+    | ( Imm _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+      | Regmask _ ) as a ->
+      a
+  in
+  let body =
+    List.map
+      (fun line ->
+        match line with
+        | Ins instr -> Ins (map_arg rewrite_arg instr)
+        | Directive d -> Directive (D.map_new_label rewrite_label d))
+      body
+  in
+  let buf = Buffer.create 1024 in
+  bprintf buf "%s:\n" name;
+  List.iter
+    (fun line ->
+      let should_output =
+        match[@warning "-4"] line with
+        | Ins _ | Directive (New_label _) -> true
+        | Directive _ -> false
+      in
+      if should_output
+      then (
+        let line_buf = Buffer.create 128 in
+        print_line line_buf line;
+        Buffer.add_string buf (tabs_to_spaces (Buffer.contents line_buf));
+        Buffer.add_char buf '\n'))
+    body;
+  Buffer.contents buf

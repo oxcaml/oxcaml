@@ -17,17 +17,17 @@ let f (v: float#): ((_ : value)[@error_message]) = v
 Line 1, characters 31-47:
 1 | let f (v: float#): ((_ : value)[@error_message]) = v
                                    ^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'error_message'.
-error_message attribute expects a string argument
+Warning 47 [attribute-payload]: illegal payload for attribute "error_message".
+  error_message attribute expects a string argument
 
 Line 1, characters 51-52:
 1 | let f (v: float#): ((_ : value)[@error_message]) = v
                                                        ^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "v" has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because of the annotation on the wildcard _ at line 1, characters 20-31.
 |}]
 
@@ -36,17 +36,17 @@ let f (v: float#): ((_ : value)[@error_message 1]) = v
 Line 1, characters 31-49:
 1 | let f (v: float#): ((_ : value)[@error_message 1]) = v
                                    ^^^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'error_message'.
-error_message attribute expects a string argument
+Warning 47 [attribute-payload]: illegal payload for attribute "error_message".
+  error_message attribute expects a string argument
 
 Line 1, characters 53-54:
 1 | let f (v: float#): ((_ : value)[@error_message 1]) = v
                                                          ^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "v" has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because of the annotation on the wildcard _ at line 1, characters 20-31.
 |}]
 
@@ -56,11 +56,11 @@ let f (v: float#): ((_ : value)[@error_message "Custom message"]) = v
 Line 1, characters 68-69:
 1 | let f (v: float#): ((_ : value)[@error_message "Custom message"]) = v
                                                                         ^
-Error: This expression has type "float#" but an expression was expected of type
+Error: The value "v" has type "float#" but an expression was expected of type
          "('a : value)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a sublayout of value
+       But the layout of float# must be a value layout
          because of the annotation on the wildcard _ at line 1, characters 20-31.
          Custom message
 |}]
@@ -72,10 +72,10 @@ let f x =
 Line 3, characters 19-20:
 3 |   Float_u.to_float x
                        ^
-Error: This expression has type "('a : value)"
+Error: The value "x" has type "('a : value)"
        but an expression was expected of type "Float_u.t" = "float#"
        The layout of Float_u.t is float64.
-       But the layout of Float_u.t must be a sublayout of value
+       But the layout of Float_u.t must be a value layout
          because of the annotation on the wildcard _ at line 2, characters 15-26.
          Custom message
 |}]
@@ -113,7 +113,7 @@ Line 3, characters 33-38:
 Error: Bad layout annotation:
          The layout of "t" is float64
            because of the definition of t at line 2, characters 2-18.
-         But the layout of "t" must be a sublayout of value
+         But the layout of "t" must be a value layout
            because of the annotation on the type variable 'a.
            Custom message
 |}]
@@ -132,7 +132,7 @@ Error: This alias is bound to type "t" but is used as an instance of type
          "('a : value)"
        The layout of t is float64
          because of the definition of t at line 2, characters 2-18.
-       But the layout of t must be a sublayout of value
+       But the layout of t must be a value layout
          because of the annotation on the type variable 'a.
          Custom message
 |}]
@@ -150,7 +150,7 @@ Line 3, characters 26-31:
 Error: Bad layout annotation:
          The layout of "t/2" is float64
            because of the definition of t at line 2, characters 2-18.
-         But the layout of "t/2" must be a sublayout of value
+         But the layout of "t/2" must be a value layout
            because of the annotation on the wildcard _ at line 3, characters 26-31.
            Custom message
 |}]
@@ -167,14 +167,13 @@ let f (x : bool) = (x : int)[@error_message]
 Line 1, characters 28-44:
 1 | let f (x : bool) = (x : int)[@error_message]
                                 ^^^^^^^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'error_message'.
-error_message attribute expects a string argument
+Warning 47 [attribute-payload]: illegal payload for attribute "error_message".
+  error_message attribute expects a string argument
 
 Line 1, characters 20-21:
 1 | let f (x : bool) = (x : int)[@error_message]
                         ^
-Error: This expression has type "bool" but an expression was expected of type
-         "int"
+Error: The value "x" has type "bool" but an expression was expected of type "int"
 |}]
 
 (* Can only be applied once *)
@@ -183,8 +182,7 @@ let f (x : bool) = (x : int)[@error_message "A"][@error_message "B"]
 Line 1, characters 20-21:
 1 | let f (x : bool) = (x : int)[@error_message "A"][@error_message "B"]
                         ^
-Error: This expression has type "bool" but an expression was expected of type
-         "int"
+Error: The value "x" has type "bool" but an expression was expected of type "int"
        A
 |}]
 
@@ -194,7 +192,7 @@ let f (x : bool) = (x : int)[@error_message "custom message"]
 Line 1, characters 20-21:
 1 | let f (x : bool) = (x : int)[@error_message "custom message"]
                         ^
-Error: This expression has type "bool" but an expression was expected of type
+Error: The value "x" has type "bool" but an expression was expected of type
          "int"
        custom message
 |}]
@@ -218,8 +216,7 @@ val g : int -> int = <fun>
 Line 2, characters 39-40:
 2 | let f (x : bool) = (let y = false in g y : int)[@error_message "custom message"]
                                            ^
-Error: This expression has type "bool" but an expression was expected of type
-         "int"
+Error: The value "y" has type "bool" but an expression was expected of type "int"
 |}]
 
 (* Can be used to enforce layouts but not great *)
@@ -228,13 +225,16 @@ let f (x : string) = (x : (_ : immediate))[@error_message "custom message"]
 Line 1, characters 22-23:
 1 | let f (x : string) = (x : (_ : immediate))[@error_message "custom message"]
                           ^
-Error: This expression has type "string" but an expression was expected of type
+Error: The value "x" has type "string" but an expression was expected of type
          "('a : immediate)"
        custom message
-       The kind of string is immutable_data
+       The layout of string is value non_float
          because it is the primitive type string.
-       But the kind of string must be a subkind of immediate
+       But the layout of string must be a sublayout of value non_pointer
          because of the annotation on the wildcard _ at line 1, characters 26-41.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* Doesn't apply when the mismatch is deep *)
@@ -265,8 +265,8 @@ val g : int -> int = <fun>
 Line 2, characters 12-13:
 2 | let f () = (g : (string -> string))[@error_message "custom message"]
                 ^
-Error: This expression has type "int -> int"
-       but an expression was expected of type "string -> string"
+Error: The value "g" has type "int -> int" but an expression was expected of type
+         "string -> string"
        Type "int" is not compatible with type "string"
 |}]
 
@@ -277,7 +277,7 @@ val g : int -> int = <fun>
 Line 2, characters 12-13:
 2 | let f () = (g : string)[@error_message "custom message"]
                 ^
-Error: This expression has type "int -> int"
-       but an expression was expected of type "string"
+Error: The value "g" has type "int -> int" but an expression was expected of type
+         "string"
        custom message
 |}]

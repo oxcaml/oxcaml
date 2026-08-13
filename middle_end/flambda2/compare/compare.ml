@@ -278,8 +278,7 @@ let subst_set_of_closures env set =
         subst_value_slot env var, subst_simple env simple)
     |> Value_slot.Map.of_list
   in
-  let alloc = Set_of_closures.alloc_mode set in
-  Set_of_closures.create alloc ~value_slots decls
+  Set_of_closures.create ~value_slots decls
 
 let subst_rec_info_expr _env ri =
   (* Only depth variables can occur in [Rec_info_expr], and we only mess with
@@ -320,8 +319,8 @@ and subst_named env (n : Named.t) =
   match n with
   | Simple s -> Named.create_simple (subst_simple env s)
   | Prim (p, dbg) -> Named.create_prim (subst_primitive env p) dbg
-  | Set_of_closures set ->
-    Named.create_set_of_closures (subst_set_of_closures env set)
+  | Set_of_closures (set, alloc_mode) ->
+    Named.create_set_of_closures ~alloc_mode (subst_set_of_closures env set)
   | Static_consts sc -> Named.create_static_consts (subst_static_consts env sc)
   | Rec_info ri -> Named.create_rec_info (subst_rec_info_expr env ri)
 
@@ -393,15 +392,13 @@ and subst_params_and_body env params_and_body =
         ~body
         ~my_closure
         ~is_my_closure_used:_
-        ~my_region
-        ~my_ghost_region
+        ~my_alloc_mode
         ~my_depth
         ~free_names_of_body
       ->
       let body = subst_expr env body in
       Function_params_and_body.create ~return_continuation ~exn_continuation
-        params ~body ~my_closure ~my_region ~my_ghost_region ~free_names_of_body
-        ~my_depth)
+        params ~body ~my_closure ~my_alloc_mode ~free_names_of_body ~my_depth)
 
 and subst_let_cont env (let_cont_expr : Let_cont_expr.t) =
   match let_cont_expr with
@@ -442,7 +439,7 @@ and subst_apply env apply =
   let exn_continuation = Apply_expr.exn_continuation apply in
   let args = List.map (subst_simple env) (Apply_expr.args apply) in
   let call_kind = subst_call_kind env (Apply_expr.call_kind apply) in
-  let alloc_mode = Apply_expr.alloc_mode apply in
+  let return_mode = Apply_expr.return_mode apply in
   let dbg = Apply_expr.dbg apply in
   let inlined = Apply_expr.inlined apply in
   let inlining_state = Apply_expr.inlining_state apply in
@@ -451,7 +448,7 @@ and subst_apply env apply =
   let args_arity = Apply_expr.args_arity apply in
   let return_arity = Apply_expr.return_arity apply in
   Apply_expr.create ~callee ~continuation exn_continuation ~args ~call_kind
-    ~alloc_mode dbg ~inlined ~inlining_state ~probe:None ~position
+    ~return_mode dbg ~inlined ~inlining_state ~probe:None ~position
     ~relative_history ~args_arity ~return_arity
   |> Expr.create_apply
 
@@ -889,9 +886,13 @@ let named_exprs env named1 named2 : Named.t Comparison.t =
   | Prim (prim1, dbg1), Prim (prim2, _) ->
     primitives env prim1 prim2
     |> Comparison.map ~f:(fun prim -> Named.create_prim prim dbg1)
-  | Set_of_closures set1, Set_of_closures set2 ->
-    sets_of_closures env set1 set2
-    |> Comparison.map ~f:Named.create_set_of_closures
+  | Set_of_closures (set1, alloc_mode1), Set_of_closures (set2, alloc_mode2) ->
+    if Alloc_mode.For_allocations.compare alloc_mode1 alloc_mode2 = 0
+    then
+      sets_of_closures env set1 set2
+      |> Comparison.map
+           ~f:(Named.create_set_of_closures ~alloc_mode:alloc_mode1)
+    else Different { approximant = named1 }
   | Rec_info rec_info_expr1, Rec_info rec_info_expr2 ->
     rec_info_exprs env rec_info_expr1 rec_info_expr2
     |> Comparison.map ~f:Named.create_rec_info
@@ -1034,8 +1035,8 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
     && Flambda_arity.equal_exact
          (Apply.return_arity apply1)
          (Apply.return_arity apply2)
-    && Alloc_mode.For_applications.compare (Apply.alloc_mode apply1)
-         (Apply.alloc_mode apply2)
+    && Alloc_mode.For_applications.compare (Apply.return_mode apply1)
+         (Apply.return_mode apply2)
        = 0
   in
   let ok = ref atomic_things_equal in
@@ -1061,7 +1062,7 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
             ~continuation:(Apply.continuation apply1)
             (Apply.exn_continuation apply1)
             ~args:args1' ~call_kind:call_kind1'
-            ~alloc_mode:(Apply.alloc_mode apply1) (Apply.dbg apply1)
+            ~return_mode:(Apply.return_mode apply1) (Apply.dbg apply1)
             ~inlined:(Apply.inlined apply1)
             ~inlining_state:(Apply.inlining_state apply1)
             ~probe:None ~position:(Apply.position apply1)
@@ -1233,15 +1234,14 @@ and codes env (code1 : Code.t) (code2 : Code.t) =
           ~body1
           ~body2
           ~my_closure
-          ~my_region
-          ~my_ghost_region
+          ~my_alloc_mode
           ~my_depth
         ->
         exprs env body1 body2
         |> Comparison.map ~f:(fun body1' ->
             Function_params_and_body.create ~return_continuation
-              ~exn_continuation params ~body:body1' ~my_closure ~my_region
-              ~my_ghost_region ~my_depth ~free_names_of_body:Unknown))
+              ~exn_continuation params ~body:body1' ~my_closure ~my_alloc_mode
+              ~my_depth ~free_names_of_body:Unknown))
   in
   pairs ~f1:bodies
     ~f2:(options ~f:code_ids ~subst:subst_code_id)
@@ -1363,6 +1363,9 @@ and cont_handlers env handler1 handler2 =
 let flambda_units u1 u2 =
   let ret_cont = Continuation.create ~sort:Toplevel_return () in
   let exn_cont = Continuation.create () in
+  let toplevel_my_alloc_region =
+    Variable.create "toplevel_my_alloc_region" Flambda_kind.region
+  in
   let toplevel_my_region =
     Variable.create "toplevel_my_region" Flambda_kind.region
   in
@@ -1380,6 +1383,11 @@ let flambda_units u1 u2 =
       Renaming.add_fresh_continuation renaming
         (Flambda_unit.exn_continuation u)
         ~guaranteed_fresh:exn_cont
+    in
+    let renaming =
+      Renaming.add_fresh_variable renaming
+        (Flambda_unit.toplevel_my_alloc_region u)
+        ~guaranteed_fresh:toplevel_my_alloc_region
     in
     let renaming =
       Renaming.add_fresh_variable renaming
@@ -1401,4 +1409,4 @@ let flambda_units u1 u2 =
       let module_symbol = Flambda_unit.module_symbol u1 in
       Flambda_unit.create ~return_continuation:ret_cont
         ~exn_continuation:exn_cont ~body ~module_symbol
-        ~used_value_slots:Unknown ~toplevel_my_region ~toplevel_my_ghost_region)
+        ~toplevel_my_alloc_region ~toplevel_my_region ~toplevel_my_ghost_region)

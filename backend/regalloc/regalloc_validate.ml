@@ -14,7 +14,7 @@
 (* CR-soon xclerc for xclerc: try to enable warning 4. *)
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 include Cfg_intf.S
 
 module Location : sig
@@ -29,6 +29,8 @@ module Location : sig
   val to_loc_lossy : t -> Reg.location
 
   val print : Cmm.machtype_component -> Format.formatter -> t -> unit
+
+  val compare : t -> t -> int
 
   val equal : t -> t -> bool
 
@@ -93,7 +95,10 @@ end = struct
       | Reg.Incoming offset ->
         Incoming { index = byte_offset_to_word_index offset }
       | Reg.Outgoing offset ->
-        Outgoing { index = byte_offset_to_word_index offset }
+        (* macOS on arm requires unaligned stack locations for C calls. *)
+        if Target_system.is_macos () && Target_system.is_arm ()
+        then Outgoing { index = offset / word_size }
+        else Outgoing { index = byte_offset_to_word_index offset }
       | Reg.Domainstate offset ->
         Domainstate { index = byte_offset_to_word_index offset }
 
@@ -104,10 +109,29 @@ end = struct
       | Outgoing { index } -> Reg.Outgoing (word_index_to_byte_offset index)
       | Domainstate { index } ->
         Reg.Domainstate (word_index_to_byte_offset index)
+
+    let compare (t1 : t) (t2 : t) : int =
+      match t1, t2 with
+      | ( Local { index = i1; stack_class = c1 },
+          Local { index = i2; stack_class = c2 } ) ->
+        let c = Int.compare i1 i2 in
+        if c <> 0
+        then c
+        else Int.compare (Stack_class.hash c1) (Stack_class.hash c2)
+      | Incoming { index = i1 }, Incoming { index = i2 } -> Int.compare i1 i2
+      | Outgoing { index = i1 }, Outgoing { index = i2 } -> Int.compare i1 i2
+      | Domainstate { index = i1 }, Domainstate { index = i2 } ->
+        Int.compare i1 i2
+      | Local _, (Incoming _ | Outgoing _ | Domainstate _) -> -1
+      | (Incoming _ | Outgoing _ | Domainstate _), Local _ -> 1
+      | Incoming _, (Outgoing _ | Domainstate _) -> -1
+      | (Outgoing _ | Domainstate _), Incoming _ -> 1
+      | Outgoing _, Domainstate _ -> -1
+      | Domainstate _, Outgoing _ -> 1
   end
 
   type t =
-    | Reg of int
+    | Reg of Regs.Phys_reg.t
     | Stack of Stack.t
 
   let of_reg reg =
@@ -134,8 +158,11 @@ end = struct
     Printreg.loc ~unknown:(fun _ -> assert false) ppf (to_loc_lossy t) typ
 
   let compare (t1 : t) (t2 : t) : int =
-    (* CR-someday azewierzejew: Implement proper comparison. *)
-    Stdlib.compare t1 t2
+    match t1, t2 with
+    | Reg r1, Reg r2 -> Regs.Phys_reg.compare r1 r2
+    | Stack s1, Stack s2 -> Stack.compare s1 s2
+    | Reg _, Stack _ -> -1
+    | Stack _, Reg _ -> 1
 
   let equal (t1 : t) (t2 : t) : bool = compare t1 t2 = 0
 
@@ -182,8 +209,12 @@ end = struct
     | Named _ -> Reg.Unknown
 
   let compare (t1 : t) (t2 : t) =
-    (* CR-someday azewierzejew: Implement proper comparison. *)
-    Stdlib.compare t1 t2
+    match t1, t2 with
+    | Preassigned { location = l1 }, Preassigned { location = l2 } ->
+      Location.compare l1 l2
+    | Named { stamp = s1 }, Named { stamp = s2 } -> Reg.Stamp.compare s1 s2
+    | Preassigned _, Named _ -> -1
+    | Named _, Preassigned _ -> 1
 end
 
 module Register : sig
@@ -392,8 +423,8 @@ end = struct
          testing. Currently it's not a problem because we abort the build
          whenever register allocation fails but if there was a fallback mode
          then the interesting files would be instantly overwritten. *)
-      Cfg_with_layout.save_as_dot ~filename:"before.dot" cfg
-        "before_allocation_before_validation";
+      Cfg_with_layout.save_as_dot ~annotate_instr:[Printcfg.instruction]
+        ~filename:"before.dot" cfg "before_allocation_before_validation";
     let basic_count, terminator_count =
       Cfg_with_layout.fold_instructions cfg
         ~instruction:(fun (basic_count, terminator_count) _ ->
@@ -497,15 +528,13 @@ end = struct
            allocation): %a."
           InstructionId.format id InstructionId.format old_successor_id
           InstructionId.format successor_id;
-      (* CR-someday azewierzejew: Avoid using polymrphic compare. *)
       (match instr.desc, old_instr.desc with
       | Op (Name_for_debugger _), Op (Name_for_debugger _) ->
         (* IRC uses `Reg.interf` to represent the adjacency lists for the
            interference graph, which can lead to cycles. *)
         ()
       | _ ->
-        (* CR-soon xclerc for xclerc: avoid polymorphic equality. *)
-        if Stdlib.compare instr.desc old_instr.desc <> 0
+        if not (Cfg.equal_basic instr.desc old_instr.desc)
         then
           Regalloc_utils.fatal "The desc of instruction with id %a changed"
             InstructionId.format id);
@@ -576,29 +605,22 @@ end = struct
     | Switch labels1, Switch labels2 ->
       Array.iter2 (fun l1 l2 -> compare_label l1 l2) labels1 labels2
     | Return, Return -> ()
-    | Raise rk1, Raise rk2
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare rk1 rk2 = 0 ->
-      ()
+    | Raise rk1, Raise rk2 when Lambda.equal_raise_kind rk1 rk2 -> ()
     | Tailcall_self { destination = l1 }, Tailcall_self { destination = l2 } ->
       compare_label l1 l2
     | Tailcall_func call1, Tailcall_func call2
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Cfg.equal_func_call_operation call1 call2 ->
       ()
     | Call_no_return call1, Call_no_return call2
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Cfg.equal_external_call_operation call1 call2 ->
       ()
     | ( Call { op = call1; label_after = l1 },
         Call { op = call2; label_after = l2 } )
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Cfg.equal_func_call_operation call1 call2 ->
       compare_label l1 l2
     | ( Prim { op = prim1; label_after = l1 },
         Prim { op = prim2; label_after = l2 } )
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare prim1 prim2 = 0 ->
+      when Cfg.equal_prim_call_operation prim1 prim2 ->
       compare_label l1 l2
     | ( Invalid { message = m1; label_after = None; _ },
         Invalid { message = m2; label_after = None; _ } )
@@ -612,9 +634,9 @@ end = struct
       Regalloc_utils.fatal
         "The desc of terminator with id %a changed, before: %a, after: %a."
         InstructionId.format id
-        (Cfg.dump_terminator ~sep:", ")
+        (Printcfg.terminator_desc ~sep:", ")
         old_instr
-        (Cfg.dump_terminator ~sep:", ")
+        (Printcfg.terminator_desc ~sep:", ")
         instr
 
   let verify_terminator ~seen_ids ~(successor_ids : InstructionId.t Label.Tbl.t)
@@ -638,7 +660,7 @@ end = struct
         Regalloc_utils.fatal
           "Register allocation added a terminator no. %a but that's not \
            allowed for this type of terminator: %a"
-          InstructionId.format id Cfg.print_terminator instr)
+          InstructionId.format id Printcfg.terminator instr)
 
   let compute_successor_ids t (cfg : Cfg.t) =
     let visited_labels = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
@@ -682,7 +704,7 @@ end = struct
           Regalloc_utils.fatal
             "Register allocation added a terminator no. %a but that's not \
              allowed for this type of terminator: %a"
-            InstructionId.format block.terminator.id Cfg.print_terminator
+            InstructionId.format block.terminator.id Printcfg.terminator
             block.terminator)
     in
     Label.Tbl.iter
@@ -861,23 +883,23 @@ end = struct
       t1.for_loc
 
   let union t1 t2 =
-    { for_loc =
-        Location.Map.merge
-          (fun _loc regs1 regs2 ->
-            match regs1, regs2 with
-            | None, None -> None
-            | Some r, None | None, Some r -> Some r
-            | Some r1, Some r2 -> Some (Register.Set.union r1 r2))
-          t1.for_loc t2.for_loc;
-      for_reg =
-        Register.Map.merge
-          (fun _reg locs1 locs2 ->
-            match locs1, locs2 with
-            | None, None -> None
-            | Some l, None | None, Some l -> Some l
-            | Some l1, Some l2 -> Some (Location.Set.union l1 l2))
-          t1.for_reg t2.for_reg
-    }
+    (* [Map.union] shares the subtrees that occur in only one operand, so this
+       costs O(overlap) rather than O(size); the guard keeps the join with an
+       empty set allocation-free. *)
+    if is_empty t1
+    then t2
+    else if is_empty t2
+    then t1
+    else
+      { for_loc =
+          Location.Map.union
+            (fun _loc regs1 regs2 -> Some (Register.Set.union regs1 regs2))
+            t1.for_loc t2.for_loc;
+        for_reg =
+          Register.Map.union
+            (fun _reg locs1 locs2 -> Some (Location.Set.union locs1 locs2))
+            t1.for_reg t2.for_reg
+      }
 
   let array_fold2 f acc arr1 arr2 =
     let acc = ref acc in
@@ -1063,9 +1085,9 @@ end = struct
     Format.fprintf ppf "CFG REGALLOC Check failed in instr %a:\n"
       InstructionId.format t.loc_instr.id;
     Format.fprintf ppf "Instruction's description before allocation: %a\n"
-      Cfg.print_instruction reg_instr;
+      Printcfg.instruction reg_instr;
     Format.fprintf ppf "Instruction's description after allocation: %a\n"
-      (Cfg.print_instruction' ~print_reg:print_reg_as_loc)
+      (Printcfg.instruction_with_print_reg ~print_reg:print_reg_as_loc)
       loc_instr;
     Format.fprintf ppf "Message: %s\n" t.message;
     Format.fprintf ppf "Live equations for the normal successor: [%a]\n"
@@ -1118,7 +1140,10 @@ module Transfer (Desc_val : Description_value) :
     let loc =
       match reg.reg_id with
       | Preassigned { location } -> location
-      | Named _ -> assert false
+      | Named _ ->
+        Misc.fatal_error
+          "Regalloc_validate.remove_exn_bucket: exception bucket register must \
+           be preassigned"
     in
     Equation_set.remove_result equations ~reg_res:[| reg |] ~loc_res:[| loc |]
     |> Result.map_error (fun message ->
@@ -1154,7 +1179,8 @@ module Transfer (Desc_val : Description_value) :
               (* Verify the destroyed registers for exceptional path only. *)
               equations
               |> Equation_set.verify_destroyed_locations
-                   ~destroyed:(Location.of_regs_exn Proc.destroyed_at_raise)
+                   ~destroyed:
+                     (Location.of_regs_exn (Proc.destroyed_at_raise ()))
               |> Result.map_error (fun message ->
                   Printf.sprintf
                     "While verifying locations destroyed at raise: %s" message)
@@ -1186,11 +1212,15 @@ module Transfer (Desc_val : Description_value) :
 
   let basic t instr () : (domain, error) result =
     match Description.find_basic description instr with
-    | None ->
-      (match instr.desc with
-      | Op (Spill | Reload | Move) -> ()
-      | _ -> assert false);
-      Result.ok @@ rename_location t ~loc_instr:instr
+    | None -> (
+      match instr.desc with
+      | Op (Spill | Reload | Move) ->
+        Result.ok @@ rename_location t ~loc_instr:instr
+      | _ ->
+        Regalloc_utils.fatal
+          "Regalloc_validate.basic: added instruction no. %a must be Spill, \
+           Reload, or Move: %a"
+          InstructionId.format instr.id Printcfg.basic instr)
     | Some instr_before -> (
       match instr.desc with
       | Op Move
@@ -1233,7 +1263,7 @@ module Transfer (Desc_val : Description_value) :
         Regalloc_utils.fatal
           "Register allocation added a terminator no. %a but that's not \
            allowed for this type of terminator: %a"
-          InstructionId.format instr.id Cfg.print_terminator instr)
+          InstructionId.format instr.id Printcfg.terminator instr)
 
   (* This should remove the equations for the exception value, but we do that in
      [Domain.append_equations] because there we have more information to give if
@@ -1257,7 +1287,7 @@ let save_as_dot_with_equations ~desc ~res_instr ~res_block ?filename cfg msg =
           |> Format.pp_print_option
                ~none:(fun ppf () -> Format.fprintf ppf "Unknown")
                Equation_set.print ppf);
-        Cfg.print_instruction' ~print_reg:print_reg_as_loc;
+        Printcfg.instruction_with_print_reg ~print_reg:print_reg_as_loc;
         (fun ppf instr ->
           let print printer find instr =
             match find desc instr with
@@ -1267,9 +1297,9 @@ let save_as_dot_with_equations ~desc ~res_instr ~res_block ?filename cfg msg =
             | None -> ()
           in
           match instr with
-          | `Basic instr -> print Cfg.print_basic Description.find_basic instr
+          | `Basic instr -> print Printcfg.basic Description.find_basic instr
           | `Terminator ti ->
-            print Cfg.print_terminator Description.find_terminator ti) ]
+            print Printcfg.terminator Description.find_terminator ti) ]
     ~annotate_block_end:(fun ppf block ->
       Label.Tbl.find_opt res_block block.start
       |> Format.pp_print_option
@@ -1401,7 +1431,8 @@ let test (desc : Description.t) (cfg : Cfg_with_layout.t) :
        register allocation fails but if there was a fallback mode then the
        interesting files would be instantly overwritten. *)
     Cfg_with_layout.save_as_dot
-      ~annotate_instr:[Cfg.print_instruction' ~print_reg:print_reg_as_loc]
+      ~annotate_instr:
+        [Printcfg.instruction_with_print_reg ~print_reg:print_reg_as_loc]
       ~filename:"after.dot" cfg "after_allocation_before_validation";
   Description.verify desc cfg;
   let module Check_backwards = Check_backwards (struct

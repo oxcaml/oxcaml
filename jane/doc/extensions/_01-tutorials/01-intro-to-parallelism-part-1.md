@@ -237,7 +237,7 @@ fundamentals of data-race freedom. The [next tutorial] will build on
 the basics by
 covering more primitive operations that exercise more of the system.
 
-[next tutorial]: ../02-intro-to-parallelism-part-2
+[next tutorial]: ../intro-to-parallelism-part-2
 
 ## A trivial example
 
@@ -882,8 +882,8 @@ This value is contended but expected to be uncontended.
 ```
 
 because rule 2b insists that it treat `a` as `contended`. Fortunately, `loop`
-doesn't need to be `portable`: since it's defined inside `functorial`, it's
-safe for `functorial` to call `loop` even though `loop` isn't `portable`.
+doesn't need to be `portable`: since it's defined inside `factorial`, it's
+safe for `factorial` to call `loop` even though `loop` isn't `portable`.
 (Remember, rule 1 says we can't call `loop` from _outside the domain that
 created it._ Since `factorial` is `portable`, that could be any domain, but
 nonetheless its whole body executes in one consistent domain.)
@@ -1192,8 +1192,8 @@ access `mood` even if a `Thing.t` is `contended`, and in fact we can mark `t` as
 [`Atomic` module], as it has many useful operations,
 from `compare_exchange` to atomic logical bitwise XOR. Also, note that we're
 using Core's `Atomic` here rather than the `Atomic` from OxCaml's standard
-library, which hews closer to the upstream OCaml standard library and doesn't
-support mode crossing.
+library, which hews closer to the OCaml standard library and doesn't support
+mode crossing.
 
 [crosses contention]: #mode-crossing
 [`Atomic` module]: https://github.com/janestreet/portable/blob/master/kernel/src/atomic.mli
@@ -1253,7 +1253,7 @@ something more sophisticated like a lock over the whole tree, which grants a
 function `uncontended` access while the lock is held (which is safe because of
 course only one domain can hold the lock). See the [capsule API] for details.
 
-[capsule API]: ../../parallelism/02-capsules
+[capsule API]: ../../parallelism/capsules
 
 The good news is that data-race freedom guarantees that even buggy programs can
 be reasoned about intuitively. See [Why are data races bad?].

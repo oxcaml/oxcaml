@@ -510,6 +510,7 @@ external sigprocmask:
 external sigpending: unit -> int list @@ portable = "caml_unix_sigpending"
 external sigsuspend:
   int list @ local -> unit @@ portable = "caml_unix_sigsuspend"
+external sigwait: int list @ local -> int @@ portable = "caml_unix_sigwait"
 
 let pause() =
   let sigs = sigprocmask SIG_BLOCK [] in sigsuspend sigs
@@ -895,11 +896,10 @@ let thread_unsafe_getaddrinfo_emulation node service opts =
 
 let allow_thread_unsafe_emulation =
   let open struct
-    external runtime5 : unit -> bool @@ portable = "%runtime5"
     external domain_id :
       unit -> int @@ portable = "caml_ml_domain_id" [@@noalloc]
   end in
-  fun () -> not (runtime5 ()) || domain_id () = 0
+  fun () -> domain_id () = 0
 
 let getaddrinfo node service opts =
   try
@@ -1009,29 +1009,6 @@ type popen_process =
 (* This is protected by [popen_mutex] mutex below. *)
 let popen_processes @ portable contended =
   Obj.magic_portable (Hashtbl.create 7 : (popen_process, int) Hashtbl.t)
-
-(* CR ocaml 5 all-runtime5: go back to the normal [Mutex]. *)
-
-module Mutex : sig @@ portable
-  type t : value mod contended portable
-  val create : unit -> t
-  val protect : t -> (unit -> 'a) -> 'a
-end = struct
-  type t = Mutex.t option
-
-  external runtime5 : unit -> bool @@ portable = "%runtime5"
-
-  let create () =
-    (* On runtime4, systhreads must be linked to use [Mutex], which is
-       error-prone to ensure.  The use of [Mutex] here is new in 5.2.0, so
-       we just omit it for runtime4, which doesn't have parallelism. *)
-    if runtime5 () then Some (Mutex.create ()) else None
-
-  let protect t f =
-    match t with
-    | None -> f ()
-    | Some mutex -> Mutex.protect mutex f
-end
 
 let popen_mutex = Mutex.create ()
 

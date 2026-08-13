@@ -27,11 +27,13 @@ fi
 opam_exec=${opam_exec:-}
 
 # needed for the root dune file to parse
-touch dune.runtime_selection duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
+touch duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
 
 exit_code=0
 $opam_exec dune build @fmt --auto-promote || exit_code=1
 # Format owee files explicitly (external/ is vendored so dune skips it)
 $opam_exec ocamlformat -i external/owee/owee_archive.ml external/owee/owee_archive.mli || exit_code=1
-scripts/80ch.sh || exit_code=1
+if [[ -z "${SKIP_80CH+x}" ]]; then # don't use `-v` to accommodate macOS (old bash)
+  scripts/80ch.sh || exit_code=1
+fi
 exit $exit_code

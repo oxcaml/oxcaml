@@ -79,8 +79,8 @@ end
 
 ## Details and Limitations
 
-This extension is not available in the upstream compiler, so publicly
-released code should not use it.  We plan to upstream it in the
+This extension is not available in stock OCaml, so publicly
+released code should not use it. We plan to contribute it to OCaml in the
 future.
 
 To include a functor `F`, it must have a module type of the form:

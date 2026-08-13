@@ -1,4 +1,5 @@
 (* TEST
+  include eval;
   flags = "-extension runtime_metaprogramming";
   native;
 *)
@@ -10,6 +11,6 @@
 
 let () =
   Printf.printf "\nTest eval +\n";
-  let output = [%eval: int] <[ 1 + 2 ]> in
+  let output : int = Eval.eval <[ 1 + 2 ]> in
   Printf.printf "Output: %d\n" output;
 ;;

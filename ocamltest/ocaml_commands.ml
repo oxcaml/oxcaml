@@ -46,3 +46,6 @@ let ocamlrun_ocamlmklib =
 
 let codegen =
   Ocaml_files.codegen
+
+let fexprc =
+  Ocaml_files.fexprc

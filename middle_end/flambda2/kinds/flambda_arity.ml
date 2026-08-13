@@ -85,13 +85,14 @@ module Component_for_creation = struct
     | Punboxed_vector Unboxed_vec128 -> Singleton KS.naked_vec128
     | Punboxed_vector Unboxed_vec256 -> Singleton KS.naked_vec256
     | Punboxed_vector Unboxed_vec512 -> Singleton KS.naked_vec512
+    | Punboxed_mask -> Singleton KS.naked_mask
     | Punboxed_product layouts ->
       Unboxed_product (List.map (from_lambda ~machine_width) layouts)
     | Ptop | Pbottom ->
       Misc.fatal_errorf
         "Cannot convert %a to Flambda_arity.Component_for_creation"
         Printlambda.layout layout
-    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
 end
 
 let nullary = []
@@ -131,7 +132,7 @@ let fresh_idents_unarized t ~id =
     (fun n kind ->
       let ident =
         Ident.create_local
-          (Printf.sprintf "%s_unboxed%d" (Ident.unique_name id) n)
+          (Printf.sprintf "%s_unboxed%d" (Ident.canonical_name id) n)
       in
       ident, kind)
     (unarize t)

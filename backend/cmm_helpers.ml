@@ -49,7 +49,10 @@ module Unboxed_or_untagged_array_tags = struct
 
   let untagged_int_array_tag = 10
 
-  (* Tag 11 is currently unassigned to align the int16 and int8 tags *)
+  let unboxed_mask_array_tag = 11
+
+  (* int8 and int16 array tags are aligned such that the lowest bits contain the
+     padding size. *)
 
   let untagged_int16_array_zero_tag = 12
 
@@ -150,8 +153,7 @@ let bind_list name args fn =
 
 let caml_black = Nativeint.shift_left (Nativeint.of_int 3) 8
 
-let caml_local =
-  Nativeint.shift_left (Nativeint.of_int (if Config.runtime5 then 3 else 2)) 8
+let caml_local = Nativeint.shift_left (Nativeint.of_int 3) 8
 
 (* cf. runtime/caml/gc.h *)
 
@@ -296,20 +298,35 @@ let float_header = block_header Obj.double_tag (size_float / size_addr)
 let float_local_header =
   local_block_header Obj.double_tag (size_float / size_addr)
 
-let boxedvec128_header = block_header Obj.abstract_tag (size_vec128 / size_addr)
+let boxedvec128_header =
+  block_header 0 (size_vec128 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
-let boxedvec256_header = block_header Obj.abstract_tag (size_vec256 / size_addr)
+let boxedvec256_header =
+  block_header 0 (size_vec256 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
-let boxedvec512_header = block_header Obj.abstract_tag (size_vec512 / size_addr)
+let boxedvec512_header =
+  block_header 0 (size_vec512 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
+
+let boxedmask_header =
+  block_header 0 1 ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let boxedvec128_local_header =
-  local_block_header Obj.abstract_tag (size_vec128 / size_addr)
+  local_block_header 0 (size_vec128 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let boxedvec256_local_header =
-  local_block_header Obj.abstract_tag (size_vec256 / size_addr)
+  local_block_header 0 (size_vec256 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let boxedvec512_local_header =
-  local_block_header Obj.abstract_tag (size_vec512 / size_addr)
+  local_block_header 0 (size_vec512 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
+
+let boxedmask_local_header =
+  local_block_header 0 1 ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let floatarray_header len =
   (* Zero-sized float arrays have tag zero for consistency with
@@ -398,6 +415,11 @@ let alloc_boxedvec512_header (mode : Cmm.Alloc_mode.t) dbg =
   | Heap -> Cconst_natint (boxedvec512_header, dbg)
   | Local -> Cconst_natint (boxedvec512_local_header, dbg)
 
+let alloc_boxedmask_header (mode : Cmm.Alloc_mode.t) dbg =
+  match mode with
+  | Heap -> Cconst_natint (boxedmask_header, dbg)
+  | Local -> Cconst_natint (boxedmask_local_header, dbg)
+
 let alloc_floatarray_header len dbg = Cconst_natint (floatarray_header len, dbg)
 
 let alloc_closure_header ~(mode : Cmm.Alloc_mode.t) sz dbg =
@@ -475,9 +497,9 @@ let rec map_tail1 e ~f =
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, map_tail1 body ~f)
   | Csequence (e1, e2) -> Csequence (e1, map_tail1 e2 ~f)
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _ | Ccatch _ | Cswitch _
-  | Cinvalid _ ->
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _
+  | Ccatch _ | Cswitch _ | Cinvalid _ ->
     f e
 
 let map_tail2 x y ~f = map_tail1 y ~f:(fun y -> map_tail1 x ~f:(fun x -> f x y))
@@ -674,17 +696,21 @@ let max_signed_bit_length =
   check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
     max_signed_bit_length'
 
-let ignore_low_bit_int = function
+let rec ignore_low_bit_int = function
   | Cop
       ( Caddi,
         [(Cop (Clsl, [_; Cconst_int (n, _)], _) as c); Cconst_int (1, _)],
         _ )
     when n > 0 && is_defined_shift n ->
-    c
-  | Cop (Cor, [c; Cconst_int (1, _)], _) -> c
+    ignore_low_bit_int c
+  | Cop (Cor, [c; Cconst_int (1, _)], _) -> ignore_low_bit_int c
+  | Cop (Clsl, [Cop (Clsr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
+    ignore_low_bit_int c
+  | Cop (Clsl, [Cop (Casr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
+    ignore_low_bit_int c
   | c -> c
 
-let ignore_low_bit_int' arg =
+let rec ignore_low_bit_int' arg =
   let open P.Default_variables in
   P.run arg
     [ ( Guarded
@@ -695,8 +721,13 @@ let ignore_low_bit_int' arg =
                   Const_int_fixed 1 );
             guard = (fun env -> env#.n > 0 && is_defined_shift env#.n)
           }
-      => fun env -> env#.c );
-      (Binop (Or, Any c, Const_int_fixed 1) => fun env -> env#.c) ]
+      => fun env -> ignore_low_bit_int' env#.c );
+      ( Binop (Or, Any c, Const_int_fixed 1) => fun env ->
+        ignore_low_bit_int' env#.c );
+      ( Binop (Lsl, Binop (Lsr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      => fun env -> ignore_low_bit_int' env#.c );
+      ( Binop (Lsl, Binop (Asr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      => fun env -> ignore_low_bit_int' env#.c ) ]
 
 let ignore_low_bit_int =
   check_equal_1 "ignore_low_bit_int" ignore_low_bit_int ignore_low_bit_int'
@@ -743,6 +774,9 @@ let rec or_const e n dbg =
   | n ->
     map_tail1 e ~f:(fun e ->
         let[@local] default () =
+          let e =
+            if Nativeint.logand n 1n = 1n then ignore_low_bit_int e else e
+          in
           (* prefer putting constants on the right *)
           Cop (Cor, [e; natint_const_untagged dbg n], dbg)
         in
@@ -766,6 +800,9 @@ let rec and_const e n dbg =
         | Some e -> natint_const_untagged dbg (Nativeint.logand e n)
         | None -> (
           let[@local] default () =
+            let e =
+              if Nativeint.logand n 1n = 0n then ignore_low_bit_int e else e
+            in
             (* prefer putting constants on the right *)
             Cop (Cand, [e; natint_const_untagged dbg n], dbg)
           in
@@ -972,22 +1009,35 @@ let rec low_bits ~bits ~dbg x =
       let low_bits = Nativeint.pred (Nativeint.shift_left 1n bits) in
       Nativeint.equal low_bits (Nativeint.logand mask low_bits)
     in
-    (* Ignore sign and zero extensions which do not affect the low bits *)
     map_tail
       (function
         | Cop
             ( (Casr | Clsr),
               [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
               _ )
-          when 0 <= right && right <= left && left <= unused_bits ->
-          (* these sign-extensions can be replaced with a left shift since we
-             don't care about the high bits that it changed *)
-          low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
+          when 0 <= left && 0 <= right && max left right <= unused_bits ->
+          (* Replacing a first left then right shift pattern with a single shift
+             leaves the highest `max left right` bits in a different state. It
+             doesn't matter if we use a logical or arithmetic right shift in the
+             end because the topmost bits are wrong anyway. *)
+          if left >= right
+          then low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
+          else low_bits ~bits ~dbg (asr_const x (right - left) dbg)
         | x -> (
           match get_const_bitmask x with
           | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
             low_bits ~bits x ~dbg
-          | _ -> x))
+          | _ -> (
+            match x with
+            | Cop (((Cand | Cor | Cxor) as op), [x1; x2], dbg) -> (
+              let x1 = low_bits ~bits ~dbg x1 in
+              let x2 = low_bits ~bits ~dbg x2 in
+              match op with
+              | Cand -> and_int x1 x2 dbg
+              | Cor -> or_int x1 x2 dbg
+              | Cxor -> xor_int x1 x2 dbg
+              | _ -> Misc.fatal_error "impossible")
+            | _ -> x)))
       x
 
 let tag_int i dbg =
@@ -1005,6 +1055,8 @@ let untag_int i dbg =
     when n > 0 && is_defined_shift (n + 1) ->
     lsr_const c (n + 1) dbg
   | c -> asr_const c 1 dbg
+
+let unsigned_untag_int i dbg = lsr_const i 1 dbg
 
 let mk_not dbg cmm =
   match cmm with
@@ -1033,19 +1085,70 @@ let mk_not dbg cmm =
     (* 1 -> 3, 3 -> 1 *)
     Cop (Cxor, [Cconst_int (2, dbg); c], dbg)
 
+(** Whether two expressions are known to denote the same machine word. Only
+    variables and constants are recognised, so that evaluating one of the two
+    expressions instead of both is equivalent. *)
+let same_simple_value (e1 : expression) (e2 : expression) =
+  match e1, e2 with
+  | Cvar v1, Cvar v2 -> V.same v1 v2
+  | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
+  | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
+  | Cconst_symbol (s1, _), Cconst_symbol (s2, _) ->
+    String.equal s1.sym_name s2.sym_name
+  | _ -> false
+
+(** Whether [cond] is an equality test between the two arms of a [csel], so that
+    the arms hold the same word on the edge where the test succeeds. Float
+    comparisons are excluded, since equal floats need not have the same
+    representation. *)
+let condition_equates_arms cond ~ifso ~ifnot =
+  match cond with
+  | Cop (Ccmpi (Ceq | Cne), [c1; c2], _) ->
+    (same_simple_value c1 ifso && same_simple_value c2 ifnot)
+    || (same_simple_value c1 ifnot && same_simple_value c2 ifso)
+  | _ -> false
+
+let csel ~dbg ty ~cond ~ifso ~ifnot =
+  match cond with
+  | Cconst_int (0, _) -> ifnot
+  | Cconst_int (1, _) -> ifso
+  | Cop (Ccmpi Ceq, _, _) when condition_equates_arms cond ~ifso ~ifnot -> ifnot
+  | Cop (Ccmpi Cne, _, _) when condition_equates_arms cond ~ifso ~ifnot -> ifso
+  | _ ->
+    if same_simple_value ifso ifnot
+    then
+      (* [cond] is still evaluated for its effects; dead code elimination drops
+         it when it has none. *)
+      Csequence (cond, ifso)
+    else Cop (Ccsel ty, [cond; ifso; ifnot], dbg)
+
 let mk_compare_ints_untagged dbg a1 a2 =
   bind "int_cmp" a2 (fun a2 ->
       bind "int_cmp" a1 (fun a1 ->
-          let op1 = Cop (Ccmpi Cgt, [a1; a2], dbg) in
-          let op2 = Cop (Ccmpi Clt, [a1; a2], dbg) in
-          sub_int op1 op2 dbg))
+          (* Three-way compare via csel(a1>=a2, a1>a2, -1):
+
+             a1 < a2 => csel(0, _, -1) = -1
+
+             a1 = a2 => csel(1, 0, _) = 0
+
+             a1 > a2 => csel(1, 1, _) = 1
+
+             Compared to (a1 > a2) - (a1 < a2), this encoding uses one fewer
+             instruction and has good latency without resorting to tricks. *)
+          let cond = Cop (Ccmpi Cge, [a1; a2], dbg) in
+          let ifso = Cop (Ccmpi Cgt, [a1; a2], dbg) in
+          let ifnot = Cconst_int (-1, dbg) in
+          csel ~dbg typ_int ~cond ~ifso ~ifnot))
 
 let mk_unsigned_compare_ints_untagged dbg a1 a2 =
   bind "uint_cmp" a2 (fun a2 ->
       bind "uint_cmp" a1 (fun a1 ->
-          let op1 = Cop (Ccmpi Cugt, [a1; a2], dbg) in
-          let op2 = Cop (Ccmpi Cult, [a1; a2], dbg) in
-          sub_int op1 op2 dbg))
+          (* Same encoding as [mk_compare_ints_untagged] but with unsigned
+             comparisons. *)
+          let cond = Cop (Ccmpi Cuge, [a1; a2], dbg) in
+          let ifso = Cop (Ccmpi Cugt, [a1; a2], dbg) in
+          let ifnot = Cconst_int (-1, dbg) in
+          csel ~dbg typ_int ~cond ~ifso ~ifnot))
 
 let mk_compare_ints dbg a1 a2 =
   match a1, a2 with
@@ -1176,6 +1279,92 @@ let divimm_parameters d =
      && unsigned_compare2 md (add2 twoszp twop1) <= 0
 *)
 
+let udivimm_parameters d =
+  (* Unsigned division and modulus at type nativeint. Algorithm: Hacker's
+     Delight, 2nd ed, Figure 10-2. *)
+  let open Nativeint in
+  let udivmod n d =
+    let q = unsigned_div n d in
+    q, sub n (mul q d)
+  in
+  let nc = sub (-1n) (unsigned_rem (neg d) d) in
+  let rec loop ~p ~a (q1, r1) (q2, r2) =
+    let p = p + 1 in
+    let q1, r1 =
+      let q1', r1' = shift_left q1 1, shift_left r1 1 in
+      if unsigned_compare r1 (sub nc r1) >= 0
+      then succ q1', sub r1' nc
+      else q1', r1'
+    in
+    let a, q2, r2 =
+      let q2', r2' = shift_left q2 1, shift_left r2 1 in
+      if unsigned_compare (succ r2) (sub d r2) >= 0
+      then
+        let a = if unsigned_compare q2 max_int >= 0 then true else a in
+        a, succ q2', sub (succ r2') d
+      else
+        let a = if unsigned_compare q2 min_int >= 0 then true else a in
+        a, q2', succ r2'
+    in
+    let delta = sub (pred d) r2 in
+    if
+      p < 128
+      && (unsigned_compare q1 delta < 0 || (equal q1 delta && equal r1 0n))
+    then loop ~p ~a (q1, r1) (q2, r2)
+    else succ q2, a, p - 64
+  in
+  loop ~p:63 ~a:false (udivmod min_int nc) (udivmod max_int d)
+
+(*= The result [(m, a, p)] of [udivimm_parameters d] satisfies the following
+    inequality for all 0 <= n < 2^wordsize:
+
+    0 <= n * (M * d - 2^P) / 2^P < d - (n mod d) (i)
+
+    where M = m + a * 2^wordsize and P = wordsize + p. It follows that:
+
+    floor(n / d) = floor(n / d + n*(M*d-2^P) / (d*2^P)) = floor(n * M / 2^P)
+
+    If we stipulate that M * d - 2^P < d, then if the correctness condition (i)
+    is ever violated, it will be violated for the largest n < 2^wordsize where n
+    mod d = d-1. These conditions are checked by the code below (see the comment
+    below [divimm_parameters] for the helper functions). It was tested for d and
+    (3^d mod 2^wordsize) where d ranges from 1 to 10^9, in the wordsize = 64
+    case.
+
+    let sub2 (xh, xl) (yh, yl) =
+      let zl = sub xl yl and zh = sub xh yh in
+      (if unsigned_compare xl yl < 0 then pred zh else zh), zl
+
+    let validate d m a p =
+      let one2 = 0n, 1n in
+      let two_p () = shl2 one2 (size + p) in
+      let n =
+        let largest_multiple_of_d = mul (unsigned_div (-1n) d) d in
+        let cand1 = pred largest_multiple_of_d in
+        let cand2 = add d cand1 in
+        if unsigned_compare cand1 cand2 < 0 then cand2 else cand1
+      in
+      let r_hi, r = (* calculate M*d - 2^P *)
+        let md_minus_ad = mul2 m d in
+        if not a then sub2 md_minus_ad (two_p ())
+        else
+          let md = add2 md_minus_ad (d, 0n) in
+          if p = size
+          then (
+            (* 2^P can't fit in a 2wordsize-bit integer. We make sure M*d - 2^P
+               doesn't underflow *)
+            assert (unsigned_compare2 md md_minus_ad < 0);
+            md)
+          else (
+            assert (unsigned_compare2 md_minus_ad md < 0);
+            sub2 md (two_p ()))
+      in
+      unsigned_compare 0n r_hi = 0 && unsigned_compare r d < 0
+                                                        (* 0 <= M*d - 2^P < d *)
+      && (p = size || unsigned_compare2 (mul2 n r) (two_p ()) < 0)
+                                                     (* n * (M*d - 2^P) < 2^P *)
+ *)
+
 let raise_symbol dbg symb =
   Cop
     (Craise Lambda.Raise_regular, [Cconst_symbol (global_symbol symb, dbg)], dbg)
@@ -1285,7 +1474,60 @@ let div_int ?dividend_cannot_be_min_int c1 c2 dbg =
           add_int q sign_bit dbg)
   | _, _ ->
     make_safe_divmod ?dividend_cannot_be_min_int ~if_divisor_is_negative_one
-      Cdivi c1 c2 ~dbg
+      (Cdivi { signed = true })
+      c1 c2 ~dbg
+
+let unsigned_div_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> c1
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_div n1 n2)
+  | _, Some -1n ->
+    (* unsigned division by unsigned max_int always returns 0 unless the
+       dividend is also max_int, in which case it's 1. *)
+    Cifthenelse
+      ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
+        dbg,
+        Cconst_int (1, dbg),
+        dbg,
+        Cconst_int (0, dbg),
+        dbg )
+  | _, Some divisor ->
+    if is_power_of_2_or_zero divisor
+    then
+      if Nativeint.equal divisor Nativeint.min_int
+      then
+        (* special case for divisor = 1 << 63 since [log2_nativeint] assumes
+           argument is signed *)
+        lsr_const c1 63 dbg
+      else
+        let l = Misc.log2_nativeint divisor in
+        lsr_const c1 l dbg
+    else
+      bind "dividend" c1 (fun n ->
+          (* Algorithm:
+
+             q = umulhi n, M
+
+             if a then
+
+             q = ((n-q)/2 + q) u>> (s-1)
+
+             else
+
+             q u>>= s *)
+          let m, a, s = udivimm_parameters divisor in
+          let q =
+            Cop
+              (Cmulhi { signed = false }, [n; natint_const_untagged dbg m], dbg)
+          in
+          if a
+          then
+            lsr_const
+              (add_int (lsr_const (sub_int n q dbg) 1 dbg) q dbg)
+              (s - 1) dbg
+          else lsr_const q s dbg)
+  | _, _ -> Cop (Cdivi { signed = false }, [c1; c2], dbg)
 
 let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
   let if_divisor_is_positive_or_negative_one ~dividend ~dbg =
@@ -1339,8 +1581,33 @@ let mod_int ?dividend_cannot_be_min_int c1 c2 dbg =
           sub_int c1 (mul_int (div_int c1 c2 dbg) c2 dbg) dbg)
   | _, _ ->
     make_safe_divmod ?dividend_cannot_be_min_int
-      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one Cmodi
+      ~if_divisor_is_negative_one:if_divisor_is_positive_or_negative_one
+      (Cmodi { signed = true })
       c1 c2 ~dbg
+
+let unsigned_mod_int c1 c2 dbg =
+  match get_const c1, get_const c2 with
+  | _, Some 0n -> divide_by_zero c1 ~dbg
+  | _, Some 1n -> bind "dividend" c1 (fun _ -> Cconst_int (0, dbg))
+  | Some n1, Some n2 -> natint_const_untagged dbg (Nativeint.unsigned_rem n1 n2)
+  | _, Some -1n ->
+    (* similarly, mod unsigned max_int is identity unless the dividend is
+       max_int, in which case it is 0 *)
+    bind "dividend" c1 (fun c1 ->
+        Cifthenelse
+          ( Cop (Ccmpi Ceq, [c1; Cconst_natint (-1n, dbg)], dbg),
+            dbg,
+            Cconst_int (0, dbg),
+            dbg,
+            c1,
+            dbg ))
+  | _, Some divisor ->
+    if is_power_of_2_or_zero divisor
+    then and_const c1 (Nativeint.pred divisor) dbg
+    else
+      bind "dividend" c1 (fun c1 ->
+          sub_int c1 (mul_int (unsigned_div_int c1 c2 dbg) c2 dbg) dbg)
+  | _, _ -> Cop (Cmodi { signed = false }, [c1; c2], dbg)
 
 (* Bool *)
 
@@ -1460,6 +1727,16 @@ let unbox_vec512 =
              ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
       | _ -> None)
 
+let box_mask =
+  box_vector ~alloc_kind:Alloc_block_kind_mask ~header:alloc_boxedmask_header
+
+let unbox_mask =
+  unbox_vector ~header:boxedmask_header ~local_header:boxedmask_local_header
+    ~chunk:Word_mask ~structured_constant_of_sym:(fun symbol dbg ->
+      match Cmmgen_state.structured_constant_of_sym symbol with
+      | Some (Const_mask n) -> Some (Cconst_mask (n, dbg))
+      | _ -> None)
+
 (* Conversions for 16-bit floats *)
 
 let float_of_float16 dbg c =
@@ -1521,6 +1798,7 @@ let memory_chunk_width_in_bytes : memory_chunk -> int = function
   | Thirtytwo_unsigned | Thirtytwo_signed -> 4
   | Single { reg = Float64 | Float32 } -> 4
   | Word_int -> size_int
+  | Word_mask -> size_int
   | Word_val -> size_addr
   | Double -> size_float
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> size_vec128
@@ -1571,19 +1849,11 @@ let get_header_masked ptr dbg =
 let tag_offset = if big_endian then -1 else -size_int
 
 let get_tag ptr dbg =
-  if Proc.word_addressed
-  then
-    (* If byte loads are slow *)
-    Cop (Cand, [get_header ptr dbg; Cconst_int (255, dbg)], dbg)
-  else
-    (* If byte loads are efficient *)
-    (* Same comment as [get_header] above *)
-    Cop
-      ( (if Config.runtime5
-         then mk_load_immut Byte_unsigned
-         else mk_load_mut Byte_unsigned),
-        [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
-        dbg )
+  (* Same comment as [get_header] above *)
+  Cop
+    ( mk_load_immut Byte_unsigned,
+      [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
+      dbg )
 
 let get_size ptr dbg = lsr_const (get_header_masked ptr dbg) 10 dbg
 
@@ -1676,6 +1946,9 @@ let unboxed_float32_array_length =
 
 let unboxed_or_untagged_int_or_int64_or_nativeint_array_length arr dbg =
   bind "arr" arr (fun arr -> tag_int (get_size arr dbg) dbg)
+
+let unboxed_mask_array_length =
+  unboxed_or_untagged_int_or_int64_or_nativeint_array_length
 
 let unboxed_vector_array_length ~log2_ints_per_vec arr dbg =
   bind "arr" arr (fun arr ->
@@ -1964,6 +2237,14 @@ let unboxed_or_untagged_int_or_int64_or_nativeint_array_ref arr ~array_index dbg
   bind "arr" arr (fun arr ->
       bind "index" array_index (fun index -> int_array_ref arr index dbg))
 
+let unboxed_mask_array_ref arr ~array_index dbg =
+  bind "arr" arr (fun arr ->
+      bind "index" array_index (fun index ->
+          Cop
+            ( mk_load_mut Word_mask,
+              [array_indexing log2_size_addr arr index dbg],
+              dbg )))
+
 let unboxed_or_untagged_packed_array_set arr ~index ~new_value dbg
     ~log2_size_addr ~memory_chunk =
   bind "arr" arr (fun arr ->
@@ -1996,6 +2277,15 @@ let unboxed_or_untagged_int_or_int64_or_nativeint_array_set arr ~index
       bind "index" index (fun index ->
           bind "new_value" new_value (fun new_value ->
               int_array_set arr index new_value dbg)))
+
+let unboxed_mask_array_set arr ~index ~new_value dbg =
+  bind "arr" arr (fun arr ->
+      bind "index" index (fun index ->
+          bind "new_value" new_value (fun new_value ->
+              Cop
+                ( Cstore (Word_mask, Assignment),
+                  [array_indexing log2_size_addr arr index dbg; new_value],
+                  dbg ))))
 
 let get_field_unboxed ~dbg memory_chunk mutability block ~index_in_words =
   if Arch.big_endian && memory_chunk_width_in_bytes memory_chunk <> size_addr
@@ -2110,6 +2400,7 @@ module Extended_machtype_component = struct
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Float32
 
   let of_machtype_component (component : machtype_component) =
@@ -2121,6 +2412,7 @@ module Extended_machtype_component = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Float32 -> Float32
     | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
 
@@ -2133,6 +2425,7 @@ module Extended_machtype_component = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Float32 -> Float32
 
   let change_tagged_int_to_val t : machtype_component =
@@ -2145,6 +2438,7 @@ module Extended_machtype_component = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Float32 -> Float32
 end
 
@@ -2167,6 +2461,8 @@ module Extended_machtype = struct
 
   let typ_vec512 = [| Extended_machtype_component.Vec512 |]
 
+  let typ_mask = [| Extended_machtype_component.Mask |]
+
   let typ_void = [||]
 
   let of_machtype machtype =
@@ -2183,12 +2479,13 @@ module Extended_machtype = struct
     | Ptop -> Misc.fatal_error "No Extended_machtype for layout [Ptop]"
     | Pbottom ->
       Misc.fatal_error "No unique Extended_machtype for layout [Pbottom]"
-    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
     | Punboxed_float Unboxed_float64 -> typ_float
     | Punboxed_float Unboxed_float32 -> typ_float32
     | Punboxed_vector Unboxed_vec128 -> typ_vec128
     | Punboxed_vector Unboxed_vec256 -> typ_vec256
     | Punboxed_vector Unboxed_vec512 -> typ_vec512
+    | Punboxed_mask -> typ_mask
     | Punboxed_or_untagged_integer _ ->
       (* Only 64-bit architectures, so this is always [typ_int] *)
       typ_any_int
@@ -2213,6 +2510,7 @@ let machtype_identifier t =
     | Vec128 -> 'X'
     | Vec256 -> 'Y'
     | Vec512 -> 'Z'
+    | Mask -> 'K'
     | Float32 -> 'S'
     | Addr ->
       Misc.fatal_error "[Addr] is forbidden inside arity for generic functions"
@@ -2228,9 +2526,11 @@ let unique_arity_identifier (arity : Cmm.machtype list) =
 let result_layout_suffix result =
   match result with [| Val |] -> "" | _ -> "_R" ^ machtype_identifier result
 
-let send_function_name arity result (mode : Cmx_format.alloc_mode) =
+let send_function_name arity result (mode : Cmx_format.return_mode) =
   let res = result_layout_suffix result in
-  let suff = match mode with Alloc_heap -> "" | Alloc_local -> "L" in
+  let suff =
+    match mode with Not_alloc_stack -> "" | Maybe_alloc_stack -> "L"
+  in
   global_symbol ("caml_send" ^ unique_arity_identifier arity ^ res ^ suff)
 
 let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
@@ -2272,7 +2572,7 @@ let memory_chunk_size_in_words_for_mixed_block = function
         "Unable to compile mixed blocks on a platform where a float is not the \
          same width as a value.";
     1
-  | Word_int | Word_val -> 1
+  | Word_int | Word_mask | Word_val -> 1
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 2
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 4
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 8
@@ -2286,7 +2586,7 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
   | Word_val ->
     (* Values must go through "caml_initialize" *)
     addr_array_initialize block ofs newval dbg
-  | Word_int -> generic_case ()
+  | Word_int | Word_mask -> generic_case ()
   (* Generic cases that may differ under big endian archs *)
   | Single _ | Double | Thirtytwo_unsigned | Thirtytwo_signed
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
@@ -2406,13 +2706,13 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
-          | Fivetwelve_aligned ->
+          | Fivetwelve_aligned | Word_mask ->
             error "the value prefix of a mixed block"
         else
           (* flat suffix part of the block *)
           match memory_chunk with
-          | Word_int | Thirtytwo_unsigned | Thirtytwo_signed | Double
-          | Onetwentyeight_unaligned | Onetwentyeight_aligned
+          | Word_int | Word_mask | Thirtytwo_unsigned | Thirtytwo_signed
+          | Double | Onetwentyeight_unaligned | Onetwentyeight_aligned
           | Twofiftysix_unaligned | Twofiftysix_aligned | Fivetwelve_unaligned
           | Fivetwelve_aligned | Single _ | Byte_unsigned | Byte_signed
           | Sixteen_unsigned | Sixteen_signed ->
@@ -2427,12 +2727,12 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
 
 (* Record application and currying functions *)
 
-let apply_function_name arity result (mode : Cmx_format.alloc_mode) =
+let apply_function_name arity result (mode : Cmx_format.return_mode) =
   let res = result_layout_suffix result in
   let suff =
     match mode with
-    | Cmx_format.Alloc_heap -> ""
-    | Cmx_format.Alloc_local -> "L"
+    | Cmx_format.Not_alloc_stack -> ""
+    | Cmx_format.Maybe_alloc_stack -> "L"
   in
   "caml_apply" ^ unique_arity_identifier arity ^ res ^ suff
 
@@ -2597,8 +2897,17 @@ let unbox_int dbg bi =
       | _ -> default cmm)
     | cmm -> default cmm)
 
-let make_unsigned_int bi arg dbg =
-  if bi = Primitive.Unboxed_int32 then zero_extend ~bits:32 arg ~dbg else arg
+let bit_count (bi : Primitive.unboxed_or_untagged_integer) =
+  match bi with
+  | Untagged_int8 -> 8
+  | Untagged_int16 -> 16
+  | Unboxed_int32 -> 32
+  | Unboxed_int64 -> 64
+  | Unboxed_nativeint -> size_int * 8
+  | Untagged_int -> (size_int * 8) - 1
+
+let make_unsigned_int (bi : Primitive.unboxed_or_untagged_integer) arg dbg =
+  zero_extend ~bits:(bit_count bi) arg ~dbg
 
 let unaligned_load_16 ~ptr_out_of_heap ptr idx dbg =
   if Arch.allow_unaligned_access
@@ -3010,6 +3319,10 @@ let unaligned_load_512 = load_chunk Fivetwelve_unaligned
 
 let unaligned_set_512 = set_chunk Fivetwelve_unaligned
 
+let load_mask = load_chunk Word_mask
+
+let set_mask = set_chunk Word_mask
+
 let opaque e dbg = Cop (Copaque, [e], dbg)
 
 (* Build an actual switch (ie jump table) *)
@@ -3335,13 +3648,13 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
           (apply_or_call_caml_apply result arity mut clos args pos mode dbg)
         ~body_nontail:
           (apply_or_call_caml_apply result arity mut clos args Rc_normal
-             Cmx_format.Alloc_local dbg)
+             Cmx_format.Maybe_alloc_stack dbg)
         old_region)
   | (arity, args), Some (arity', args') -> (
     let body old_region =
       bind "result"
         (call_caml_apply [| Val |] arity mut clos args Rc_normal
-           Cmx_format.Alloc_local dbg) (fun clos ->
+           Cmx_format.Maybe_alloc_stack dbg) (fun clos ->
           might_split_call_caml_apply ?old_region result arity' mut clos args'
             pos mode dbg)
     in
@@ -3355,7 +3668,7 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
        so, we close the region ourselves afterwards, as is already done inside
        [caml_apply]. *)
     match old_region, mode with
-    | None, Cmx_format.Alloc_heap when Config.stack_allocation ->
+    | None, Cmx_format.Not_alloc_stack when Config.stack_allocation ->
       let dbg = placeholder_dbg in
       bind "region"
         (Cop (Cbeginregion, [], dbg ()))
@@ -3513,7 +3826,7 @@ let placeholder_fun_dbg ~human_name:_ = Debuginfo.none
  *        (app closN-1.code aN closN-1))))
  *)
 
-let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
+let apply_function_body arity result (mode : Cmx_format.return_mode) =
   let dbg = placeholder_dbg in
   let args = List.map (fun _ -> V.create_local "arg") arity in
   let clos = V.create_local "clos" in
@@ -3524,8 +3837,8 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
     then None
     else
       match mode with
-      | Cmx_format.Alloc_heap -> Some (V.create_local "region")
-      | Cmx_format.Alloc_local -> None
+      | Cmx_format.Not_alloc_stack -> Some (V.create_local "region")
+      | Cmx_format.Maybe_alloc_stack -> None
   in
   let rec app_fun clos args =
     match args with
@@ -3534,7 +3847,10 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
       let app =
         Cop
           ( Capply { result_type = result; region = Rc_normal; callees = None },
-            [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
+            (* The code pointer and closure info of a closure are write-once;
+               reading them immutably is correct and lets the debugger describe
+               the call target (and closure projections) for call sites. *)
+            [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
               Cvar arg;
               Cvar clos ],
             dbg () )
@@ -3554,7 +3870,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
           Cop
             ( Capply
                 { result_type = typ_val; region = Rc_normal; callees = None },
-              [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
+              [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
               dbg () ),
@@ -3577,7 +3893,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
             ( Ccmpi Ceq,
               [ Cop
                   ( Casr,
-                    [ get_field_gen Asttypes.Mutable (Cvar clos) 1 (dbg ());
+                    [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
                       Cconst_int (pos_arity_in_closinfo, dbg ()) ],
                     dbg () );
                 Cconst_int (List.length arity, dbg ()) ],
@@ -3585,7 +3901,7 @@ let apply_function_body arity result (mode : Cmx_format.alloc_mode) =
           dbg (),
           Cop
             ( Capply { result_type = result; region = Rc_normal; callees = None },
-              get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
+              get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
           dbg (),
@@ -3714,7 +4030,9 @@ let tuplify_function arity return =
       fun_body =
         Cop
           ( Capply { result_type = return; region = Rc_normal; callees = None },
-            get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
+            (* The closure code pointer is write-once; see
+               [apply_function_body]. *)
+            get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
             :: access_components 0
             @ [Cvar clos],
             dbg () );
@@ -3775,7 +4093,8 @@ let machtype_stored_size t =
         cur + 1
       | Vec128 -> cur + ints_per_vec128
       | Vec256 -> cur + ints_per_vec256
-      | Vec512 -> cur + ints_per_vec512)
+      | Vec512 -> cur + ints_per_vec512
+      | Mask -> cur + 1)
     0 t
 
 let machtype_non_scanned_size t =
@@ -3792,7 +4111,8 @@ let machtype_non_scanned_size t =
         cur + 1
       | Vec128 -> cur + ints_per_vec128
       | Vec256 -> cur + ints_per_vec256
-      | Vec512 -> cur + ints_per_vec512)
+      | Vec512 -> cur + ints_per_vec512
+      | Mask -> cur + 1)
     0 t
 
 let make_tuple l = match l with [e] -> e | _ -> Ctuple l
@@ -3805,7 +4125,7 @@ let value_slot_given_machtype vs =
     List.partition
       (fun (_, c) ->
         match (c : machtype_component) with
-        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 -> true
+        | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> assert false)
@@ -3815,7 +4135,11 @@ let value_slot_given_machtype vs =
 
 let read_from_closure_given_machtype t clos base_offset dbg =
   let load chunk offset =
-    Cop (mk_load_mut chunk, [field_address clos offset dbg], dbg)
+    (* Closure value slots are write-once (a partial-application closure is
+       never back-patched), so these reads are immutable. Besides being correct,
+       this lets the debugger describe the recovered arguments as projections of
+       the closure for call site information. *)
+    Cop (mk_load_immut chunk, [field_address clos offset dbg], dbg)
   in
   let _, l =
     List.fold_left_map
@@ -3840,6 +4164,8 @@ let read_from_closure_given_machtype t clos base_offset dbg =
         | Vec512 ->
           ( (non_scanned_pos + ints_per_vec512, scanned_pos),
             load Fivetwelve_unaligned non_scanned_pos )
+        | Mask ->
+          (non_scanned_pos + 1, scanned_pos), load Word_mask non_scanned_pos
         | Val -> (non_scanned_pos, scanned_pos + 1), load Word_val scanned_pos
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
         | Addr -> Misc.fatal_error "[Addr] cannot be read")
@@ -3857,7 +4183,10 @@ let rec make_curry_apply result narity args_type args clos n =
   | [] ->
     Cop
       ( Capply { result_type = result; region = Rc_normal; callees = None },
-        (get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ()) :: args)
+        (* Code pointer and chain links of a partial-application closure are
+           write-once; reading them immutably lets the debugger describe the
+           call target and the recovered arguments as closure projections. *)
+        (get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ()) :: args)
         @ [Cvar clos],
         dbg () )
   | arg_type :: args_type ->
@@ -3866,7 +4195,7 @@ let rec make_curry_apply result narity args_type args clos n =
     let clos_pos = arg_pos + machtype_stored_size arg_type in
     Clet
       ( VP.create newclos,
-        get_field_gen Asttypes.Mutable (Cvar clos) clos_pos (dbg ()),
+        get_field_gen Asttypes.Immutable (Cvar clos) clos_pos (dbg ()),
         make_curry_apply result narity args_type
           (read_from_closure_given_machtype arg_type (Cvar clos) arg_pos
              (dbg ())
@@ -4074,8 +4403,7 @@ let assignment_kind (ptr : Lambda.immediate_or_pointer)
     assert Config.stack_allocation;
     Caml_modify_local
   | Heap_initialization, Pointer -> Caml_initialize
-  | Root_initialization, Pointer ->
-    if Config.runtime5 then Caml_initialize else Simple Initialization
+  | Root_initialization, Pointer -> Caml_initialize
   | Assignment _, Immediate -> Simple Assignment
   | Heap_initialization, Immediate | Root_initialization, Immediate ->
     Simple Initialization
@@ -4136,6 +4464,18 @@ let div_int_caml arg1 arg2 dbg =
        (untag_int arg2 dbg) dbg)
     dbg
 
+(* CR-someday jrayman: Since Ocaml ints are 63 bits, there is always a valid set
+   of division parameters with [a = false]. [udivimm_parameters] finds
+   parameters for 64-bit division, so it sometimes generates worse code with the
+   [a = true] fixup. A divisor of 7 is such a case. *)
+let unsigned_div_int_caml arg1 arg2 dbg =
+  tag_int
+    (unsigned_div_int
+       (unsigned_untag_int arg1 dbg)
+       (unsigned_untag_int arg2 dbg)
+       dbg)
+    dbg
+
 let mod_int_caml arg1 arg2 dbg =
   let dividend_cannot_be_min_int =
     (* Since caml integers are tagged, we know that they when they're untagged,
@@ -4145,6 +4485,14 @@ let mod_int_caml arg1 arg2 dbg =
   tag_int
     (mod_int ~dividend_cannot_be_min_int (untag_int arg1 dbg)
        (untag_int arg2 dbg) dbg)
+    dbg
+
+let unsigned_mod_int_caml arg1 arg2 dbg =
+  tag_int
+    (unsigned_mod_int
+       (unsigned_untag_int arg1 dbg)
+       (unsigned_untag_int arg2 dbg)
+       dbg)
     dbg
 
 let and_int_caml arg1 arg2 dbg = and_int arg1 arg2 dbg
@@ -4232,6 +4580,9 @@ let emit_vec256_constant symb bits cont =
 let emit_vec512_constant symb bits cont =
   emit_block symb boxedvec512_header (Cvec512 bits :: cont)
 
+let emit_mask_constant symb bits cont =
+  emit_block symb boxedmask_header (Cint (Int64.to_nativeint bits) :: cont)
+
 let emit_float_array_constant symb fields cont =
   emit_block symb
     (floatarray_header (List.length fields))
@@ -4240,11 +4591,27 @@ let emit_float_array_constant symb fields cont =
 let make_symbol ?compilation_unit name =
   let compilation_unit =
     match compilation_unit with
-    | None -> Compilation_unit.get_current_exn ()
+    | None -> Current_unit.get_cu_exn ()
     | Some compilation_unit -> compilation_unit
   in
+  (* CR sspies: [make_symbol] always uses flat name mangling. Structured
+     mangling can currently only be enabled for functions with a code id. It
+     could, in principle, also be used for other symbols such as module entry
+     points, frame tables, etc. If desired, structured mangling for these can be
+     enabled here BUT this requires additional changes, since other parts of the
+     compiler currently hardcode the symbol names and some symbols should use C
+     linkage names to be referenced from the runtime (e.g., frame tables and GC
+     roots). [make_symbol] is called, for example, for [code_begin], [code_end],
+     [data_begin], [data_end], [entry], [frametable], [gc_roots], and
+     [jump_tables]. *)
   Symbol.for_name compilation_unit name
   |> Symbol.linkage_name |> Linkage_name.to_string
+
+(* The name of the module initialization ("entry") function of a compilation
+   unit. The definition site (To_cmm), the startup file's tables and the
+   dissector's -u linker flags must all agree on this name. *)
+let entry_symbol_name ?compilation_unit () =
+  make_symbol ?compilation_unit "entry"
 
 (* Failure function for closures that should never be called indirectly *)
 
@@ -4322,7 +4689,7 @@ let entry_point namelist =
     List.map
       (fun name ->
         Csymbol_address
-          (global_symbol (make_symbol ~compilation_unit:name "entry")))
+          (global_symbol (entry_symbol_name ~compilation_unit:name ())))
       namelist
   in
   let data = Cdefine_symbol table_symbol :: data in
@@ -4387,6 +4754,127 @@ let global_table namelist =
   Cdata
     ((Cdefine_symbol (global_symbol "caml_globals") :: List.map mksym namelist)
     @ [cint_zero])
+
+(* Generate the unit dependency table for shared objects / complete objects.
+ *
+ * Table layout (all words are native-sized):
+ *   num_units : intnat
+ *   entries[num_units] : array of {
+ *     unit_name : char*       -- pointer to null-terminated string
+ *     entry_fn : value        -- entry function (OCaml closure)
+ *     gc_roots : value *      -- pointer to gc_roots (module block)
+ *     frametable : intnat *   -- pointer to frametable
+ *     num_deps : intnat       -- number of dependencies
+ *     dep_indices : intnat *  -- pointer to array of indices into entries[]
+ *     init_state : value      -- Val_int 0 = not init, 1 = initializing,
+ *                                2 = done, 3 = failed
+ *     raised_exn : value      -- stored exception if failed, Val_unit otherwise
+ *   }
+ *
+ *  Entries are sorted by unit_name for binary search lookup.
+ *  Dependencies reference other entries by index, avoiding name lookups.
+ *)
+(* CR-someday xclerc: Consider merging the multiple traversals of
+   [sorted_units] (index_map, name_symbols, dep_arrays, table_entries) into
+   fewer passes, and avoiding the duplicate dep filtering between the
+   dep_arrays and table_entries passes. See #5395. *)
+let unit_deps_table units =
+  let module CU = Compilation_unit in
+  let module StringMap = Misc.Stdlib.String.Map in
+  let unit_name cu = CU.full_path_as_string cu in
+  (* Sort units by name for binary search *)
+  let sorted_units =
+    List.sort
+      (fun (cu1, _) (cu2, _) -> String.compare (unit_name cu1) (unit_name cu2))
+      units
+  in
+  (* Build map from unit name to sorted index *)
+  let index_map =
+    List.fold_left
+      (fun (acc, i) (cu, _) -> StringMap.add (unit_name cu) i acc, i + 1)
+      (StringMap.empty, 0) sorted_units
+    |> fst
+  in
+  (* Emit unit name strings *)
+  let name_symbols =
+    List.fold_left
+      (fun acc (cu, _) ->
+        let sym_name = Compilenv.new_const_symbol () in
+        StringMap.add (unit_name cu) { sym_name; sym_global = Local } acc)
+      StringMap.empty sorted_units
+  in
+  let string_data =
+    StringMap.fold
+      (fun name sym acc ->
+        Cdefine_symbol sym :: Cstring (name ^ "\000") :: Calign size_int :: acc)
+      name_symbols []
+  in
+  (* Emit dependency index arrays *)
+  let dep_arrays, dep_array_symbols =
+    List.fold_left
+      (fun (data_acc, sym_acc) (cu, deps) ->
+        if deps = []
+        then data_acc, StringMap.add (unit_name cu) None sym_acc
+        else
+          let arr_sym_name = Compilenv.new_const_symbol () in
+          let arr_sym = { sym_name = arr_sym_name; sym_global = Local } in
+          let arr_data =
+            Cdefine_symbol arr_sym
+            :: List.filter_map
+                 (fun import ->
+                   let dep_name = unit_name (Import_info.cu import) in
+                   match StringMap.find_opt dep_name index_map with
+                   | Some idx -> Some (Cint (Nativeint.of_int idx))
+                   | None -> None)
+                 deps
+          in
+          ( arr_data @ data_acc,
+            StringMap.add (unit_name cu) (Some arr_sym) sym_acc ))
+      ([], StringMap.empty) sorted_units
+  in
+  (* Emit main table *)
+  let table_sym = global_symbol "caml_unit_deps_table" in
+  let num_units = List.length sorted_units in
+  let table_header =
+    [Cdefine_symbol table_sym; Cint (Nativeint.of_int num_units)]
+  in
+  let table_entries =
+    List.concat_map
+      (fun (cu, deps) ->
+        let name = unit_name cu in
+        let name_sym = StringMap.find name name_symbols in
+        let entry_sym =
+          global_symbol (entry_symbol_name ~compilation_unit:cu ())
+        in
+        let gc_roots_sym =
+          global_symbol (make_symbol ~compilation_unit:cu "gc_roots")
+        in
+        let frametable_sym =
+          global_symbol (make_symbol ~compilation_unit:cu "frametable")
+        in
+        let num_deps =
+          List.length
+            (List.filter
+               (fun import ->
+                 StringMap.mem (unit_name (Import_info.cu import)) index_map)
+               deps)
+        in
+        let deps_sym_item =
+          match StringMap.find name dep_array_symbols with
+          | None -> cint_zero
+          | Some arr_sym -> Csymbol_address arr_sym
+        in
+        [ Csymbol_address name_sym;
+          Csymbol_address entry_sym;
+          Csymbol_address gc_roots_sym;
+          Csymbol_address frametable_sym;
+          Cint (Nativeint.of_int num_deps);
+          deps_sym_item;
+          Cint 1n (* init_state: INIT_STATE_NOT_INITIALIZED = Val_int(0) *);
+          Cint 1n (* raised_exn: Val_unit (no exception yet) *) ])
+      sorted_units
+  in
+  Cdata (string_data @ dep_arrays @ table_header @ table_entries)
 
 let reference_symbols namelist =
   let mksym name = Csymbol_address name in
@@ -4486,6 +4974,8 @@ let vec256 ~dbg bits = Cconst_vec256 (bits, dbg)
 
 let vec512 ~dbg bits = Cconst_vec512 (bits, dbg)
 
+let mask ~dbg bits = Cconst_mask (bits, dbg)
+
 let nativeint ~dbg i = natint_const_untagged dbg i
 
 let letin v ~defining_expr ~body =
@@ -4494,8 +4984,8 @@ let letin v ~defining_expr ~body =
     defining_expr
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-  | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Cconst_mask _ | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _
+  | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -4553,11 +5043,9 @@ let float_of_float32 = unary (Cstatic_cast Float_of_float32)
 let lsl_int_caml_raw ~dbg arg1 arg2 =
   incr_int (lsl_int (decr_int arg1 dbg) arg2 dbg) dbg
 
-let lsr_int_caml_raw ~dbg arg1 arg2 =
-  Cop (Cor, [lsr_int arg1 arg2 dbg; Cconst_int (1, dbg)], dbg)
+let lsr_int_caml_raw ~dbg arg1 arg2 = or_const (lsr_int arg1 arg2 dbg) 1n dbg
 
-let asr_int_caml_raw ~dbg arg1 arg2 =
-  Cop (Cor, [asr_int arg1 arg2 dbg; Cconst_int (1, dbg)], dbg)
+let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
 
 let eq ~dbg x y =
   match x, y with
@@ -4838,8 +5326,8 @@ let cmm_arith_size (e : Cmm.expression) =
   let rec cmm_arith_size0 (e : Cmm.expression) =
     match e with
     | Cop
-        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor
-          | Clsl | Clsr | Casr ),
+        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor
+          | Cxor | Clsl | Clsr | Casr ),
           l,
           _ ) ->
       List.fold_left ( + ) 1 (List.map cmm_arith_size0 l)
@@ -4848,7 +5336,7 @@ let cmm_arith_size (e : Cmm.expression) =
   match e with
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cvar _ | Cconst_vec128 _ | Cconst_vec256 _
-  | Cconst_vec512 _ ->
+  | Cconst_vec512 _ | Cconst_mask _ ->
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
   | Clet _ | Cphantom_let _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _
@@ -4865,10 +5353,15 @@ let atomic_load_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block
   Cop
     (mk_load_atomic memory_chunk, [field_address_computed block field dbg], dbg)
 
-let atomic_exchange_extcall ~dbg block ~field ~new_value =
+let atomic_extcall_name base_name (mode : Lambda.modify_mode) =
+  match mode with
+  | Modify_heap -> base_name
+  | Modify_maybe_stack -> base_name ^ "_local"
+
+let atomic_exchange_extcall ~dbg ~mode block ~field ~new_value =
   Cop
     ( Cextcall
-        { func = "caml_atomic_exchange_field";
+        { func = atomic_extcall_name "caml_atomic_exchange_field" mode;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -4880,15 +5373,15 @@ let atomic_exchange_extcall ~dbg block ~field ~new_value =
       [block; field; new_value],
       dbg )
 
-let atomic_exchange_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block
-    ~field ~new_value =
+let atomic_exchange_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode
+    block ~field ~new_value =
   match imm_or_ptr with
   | Immediate ->
     let op = Catomic { op = Exchange; size = Word } in
     if Proc.operation_supported op
     then Cop (op, [new_value; field_address_computed block field dbg], dbg)
-    else atomic_exchange_extcall ~dbg block ~field ~new_value
-  | Pointer -> atomic_exchange_extcall ~dbg block ~field ~new_value
+    else atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
+  | Pointer -> atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
 
 let atomic_arith ~dbg ~op ~untag ~ext_name block ~field i =
   let i = if untag then decr_int i dbg else i in
@@ -4941,10 +5434,11 @@ let atomic_lxor_field ~dbg atomic ~field i =
     atomic ~field i
   |> return_unit dbg
 
-let atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value =
+let atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
+    =
   Cop
     ( Cextcall
-        { func = "caml_atomic_cas_field";
+        { func = atomic_extcall_name "caml_atomic_cas_field" mode;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -4957,7 +5451,7 @@ let atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value =
       dbg )
 
 let atomic_compare_and_set_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
-    block ~field ~old_value ~new_value =
+    ~mode block ~field ~old_value ~new_value =
   match imm_or_ptr with
   | Immediate ->
     let op = Catomic { op = Compare_set; size = Word } in
@@ -4970,14 +5464,17 @@ let atomic_compare_and_set_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
              [old_value; new_value; field_address_computed block field dbg],
              dbg ))
         (fun a2 -> tag_int a2 dbg)
-    else atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value
+    else
+      atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value
+        ~new_value
   | Pointer ->
-    atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value
+    atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
 
-let atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value =
+let atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+    ~new_value =
   Cop
     ( Cextcall
-        { func = "caml_atomic_compare_exchange_field";
+        { func = atomic_extcall_name "caml_atomic_compare_exchange_field" mode;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -4990,7 +5487,7 @@ let atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value =
       dbg )
 
 let atomic_compare_exchange_field ~dbg
-    (imm_or_ptr : Lambda.immediate_or_pointer) block ~field ~old_value
+    (imm_or_ptr : Lambda.immediate_or_pointer) ~mode block ~field ~old_value
     ~new_value =
   match imm_or_ptr with
   | Immediate ->
@@ -4999,9 +5496,12 @@ let atomic_compare_exchange_field ~dbg
     then
       Cop
         (op, [old_value; new_value; field_address_computed block field dbg], dbg)
-    else atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value
+    else
+      atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+        ~new_value
   | Pointer ->
-    atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value
+    atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+      ~new_value
 
 let pack_small_ints_into_word ~bits int_list dbg =
   if bits * List.length int_list > arch_bits
@@ -5162,6 +5662,14 @@ let allocate_unboxed_nativeint_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
       Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag)
     ~elements mode dbg
 
+let allocate_unboxed_mask_array ~elements (mode : Cmm.Alloc_mode.t) dbg =
+  allocate_array
+    ~make_payload:(fun _ l -> l)
+    ~alloc_kind:Alloc_block_kind_mask_u_array
+    ~tag_of_length:(fun _ ->
+      Unboxed_or_untagged_array_tags.unboxed_mask_array_tag)
+    ~elements mode dbg
+
 let allocate_unboxed_vector_array ~ints_per_vec ~alloc_kind ~tag ~elements
     (mode : Cmm.Alloc_mode.t) dbg =
   let header =
@@ -5237,36 +5745,52 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
         arg ],
       dbg )
 
-let with_stack_bind ~dbg ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg =
+let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
   Cop
     ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
       [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
         Cop
           ( Cextcall
-              { func = "caml_alloc_stack_bind";
+              { func = "caml_alloc_stack_preemptible";
                 ty = typ_val;
                 alloc = true;
                 builtin = false;
                 returns = true;
                 effects = Arbitrary_effects;
                 coeffects = Has_coeffects;
-                ty_args = [XInt; XInt; XInt; XInt; XInt]
+                ty_args = [XInt; XInt; XInt; XInt]
               },
-            [valuec; exnc; effc; dyn; bind],
+            [valuec; exnc; effc; handle_tick],
             dbg );
         f;
         arg ],
       dbg )
 
-let resume ~dbg ~cont ~f ~arg =
-  (* Rc_normal is required here, because there are some uses of effects with
-     repeated resumes, and these should consume O(1) stack space by tail-calling
-     caml_resume. *)
-  let sym = Cmm.global_symbol "caml_resume" in
+(* Rc_normal is required for [continue], [discontinue], and
+   [discontinue_with_backtrace], because there are some uses of effects with
+   repeated resumes, and these should consume O(1) stack space by tail-calling
+   the runtime resume function. *)
+
+let continue ~dbg ~cont ~value =
+  let sym = Cmm.global_symbol "caml_continue" in
   Cop
     ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [Cconst_symbol (sym, dbg); cont; f; arg],
+      [Cconst_symbol (sym, dbg); cont; value],
+      dbg )
+
+let discontinue ~dbg ~cont ~exn =
+  let sym = Cmm.global_symbol "caml_discontinue" in
+  Cop
+    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+      [Cconst_symbol (sym, dbg); cont; exn],
+      dbg )
+
+let discontinue_with_backtrace ~dbg ~cont ~exn ~bt =
+  let sym = Cmm.global_symbol "caml_discontinue_with_backtrace" in
+  Cop
+    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+      [Cconst_symbol (sym, dbg); cont; exn; bt],
       dbg )
 
 let reperform ~dbg ~eff ~cont ~last_fiber =

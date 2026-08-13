@@ -87,11 +87,21 @@ module Constant : sig
 
   val char : char -> t
 
+  val untagged_char : int -> t
+
   val string : string -> string option -> t
 
   val float : string -> t
 
   val float32 : string -> t
+
+  val unboxed_float : string -> t
+
+  val unboxed_float32 : string -> t
+
+  val int8 : int -> t
+
+  val int16 : int -> t
 
   val int32 : int32 -> t
 
@@ -99,9 +109,11 @@ module Constant : sig
 
   val nativeint : nativeint -> t
 
-  val unboxed_float : string -> t
+  val untagged_int : int -> t
 
-  val unboxed_float32 : string -> t
+  val untagged_int8 : int -> t
+
+  val untagged_int16 : int -> t
 
   val unboxed_int32 : int32 -> t
 
@@ -136,67 +148,7 @@ module Identifier : sig
 
     val var : Var.Type_constr.t -> Loc.t -> t
 
-    val int : t
-
-    val char : t
-
-    val string : t
-
-    val bytes : t
-
-    val float : t
-
-    val float32 : t
-
-    val bool : t
-
-    val unit : t
-
-    val exn : t
-
-    val array : t
-
-    val iarray : t
-
-    val list : t
-
-    val option : t
-
-    val nativeint : t
-
-    val int32 : t
-
-    val int64 : t
-
-    val lazy_t : t
-
-    val extension_constructor : t
-
-    val floatarray : t
-
-    val lexing_position : t
-
-    val expr : t
-
-    val unboxed_float : t
-
-    val unboxed_nativeint : t
-
-    val unboxed_int32 : t
-
-    val unboxed_int64 : t
-
-    val int8x16 : t
-
-    val int16x8 : t
-
-    val int32x4 : t
-
-    val int64x2 : t
-
-    val float32x4 : t
-
-    val float64x2 : t
+    val builtin : string -> t
   end
 
   module Module_type : sig
@@ -210,45 +162,7 @@ module Identifier : sig
 
     val dot : Module.t -> string -> t
 
-    val false_ : t
-
-    val true_ : t
-
-    val void : t
-
-    val nil : t
-
-    val cons : t
-
-    val none : t
-
-    val some : t
-
-    val match_failure : t
-
-    val out_of_memory : t
-
-    val out_of_fibers : t
-
-    val invalid_argument : t
-
-    val failure : t
-
-    val not_found : t
-
-    val sys_error : t
-
-    val end_of_file : t
-
-    val division_by_zero : t
-
-    val stack_overflow : t
-
-    val sys_blocked_io : t
-
-    val assert_failure : t
-
-    val undefined_recursive_module : t
+    val builtin : string -> t
   end
 
   module Field : sig
@@ -330,6 +244,14 @@ module Module_type : sig
   val of_string : string -> t
 end
 
+module Modes : sig
+  type t
+
+  val legacy : t
+
+  val of_string_list : string list -> t
+end
+
 module rec Object_type : sig
   module Object_closed_flag : sig
     type t
@@ -381,7 +303,7 @@ and Type : sig
 
   val var : Var.Type_var.t option -> t
 
-  val arrow : Label.t -> t -> t -> t
+  val arrow : Label.t -> t -> Modes.t -> t -> Modes.t -> t
 
   val tuple : (Label.Nonoptional.t * t) list -> t
 
@@ -445,7 +367,7 @@ module Pat : sig
 
   val exception_ : t -> t
 
-  val constraint_ : t -> Type.t -> t
+  val constraint_ : t -> Type.t -> Modes.t -> t
 end
 
 module Exp_attribute : sig
@@ -470,6 +392,14 @@ module Exp_attribute : sig
   val loop : t
 
   val tail_mod_cons : t
+
+  val magic_staged_modes : t
+end
+
+module Vb_attribute : sig
+  type t
+
+  val mk : string -> string option -> t
 end
 
 module rec Case : sig
@@ -504,7 +434,7 @@ end
 and Type_constraint : sig
   type t
 
-  val constraint_ : Type.t -> t
+  val constraint_ : Type.t -> Modes.t -> t
 
   val coercion : Type.t option -> Type.t -> t
 end
@@ -560,7 +490,7 @@ and Exp_desc : sig
 
   val let_rec_simple :
     Loc.t ->
-    (Name.t * Type.t option) list ->
+    (Name.t * Type.t option * Vb_attribute.t list) list ->
     (Var.Value.t list -> Exp.t list * Exp.t) lam ->
     t
 
@@ -569,6 +499,7 @@ and Exp_desc : sig
     Name.t list ->
     Name.t list ->
     Exp.t list ->
+    Vb_attribute.t list list ->
     (Var.Value.t list -> Var.Module.t list -> Pat.t * Exp.t) lam ->
     t
 
@@ -636,6 +567,8 @@ and Exp_desc : sig
 
   val let_op : Identifier.Value.t list -> Exp.t list -> Case.t -> t
 
+  val let_open : Identifier.Module.t -> Exp.t -> t
+
   val exclave : Exp.t -> t
 
   val list_comprehension : Comprehension.t -> t
@@ -656,11 +589,9 @@ and Exp_desc : sig
 
   val quote : Exp.t -> t
 
-  val antiquote : Exp.t -> t
+  val splice : Exp.t -> t
 
-  val splice : Code.t -> t
-
-  val eval : Type.t -> t
+  val unquote : Code.t -> t
 end
 
 and Exp : sig

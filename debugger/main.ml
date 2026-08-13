@@ -154,7 +154,9 @@ let anonymous s =
   program_name := Unix_tools.make_absolute s; raise Found_program_name
 let add_include d =
   default_load_path :=
-    Misc.expand_directory Config.standard_library d :: !default_load_path
+    { Clflags.path = Misc.expand_directory Config.standard_library d;
+      cmx_guaranteed = false }
+    :: !default_load_path
 let set_socket s =
   socket_name := s
 let set_checkpoints n =
@@ -205,6 +207,8 @@ let report report_error error =
   eprintf "Debugger [version %s] environment error:@ @[@;%a@]@.;"
     Config.version report_error error
 
+let usage = "Usage: ocamldebug [options] <program> [arguments]\nOptions are:"
+
 let main () =
   Callback.Safe.register "Debugger.function_placeholder" function_placeholder;
   try
@@ -218,11 +222,8 @@ let main () =
                                 ("camldebug" ^ (Int.to_string (Unix.getpid ())))
       );
     begin try
-      Arg.parse speclist anonymous "";
-      Arg.usage speclist
-        "No program name specified\n\
-         Usage: ocamldebug [options] <program> [arguments]\n\
-         Options are:";
+      Arg.parse speclist anonymous usage;
+      Arg.usage speclist ("No program name specified\n" ^ usage);
       exit 2
     with Found_program_name ->
       for j = !Arg.current + 1 to Array.length Sys.argv - 1 do
@@ -242,8 +243,8 @@ let main () =
   | Toplevel ->
       exit 2
   | Persistent_env.Error e ->
-      report (Format_doc.compat Persistent_env.report_error) e;
+      report Persistent_env.report_error e;
       exit 2
   | Cmi_format.Error e ->
-      report (Format_doc.compat Cmi_format.report_error) e;
+      report Cmi_format.report_error e;
       exit 2

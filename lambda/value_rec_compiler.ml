@@ -43,12 +43,41 @@
 
 open Lambda
 
+(** Allocation and backpatching primitives *)
+
+let alloc_prim =
+  Lambda.simple_prim_on_values
+    ~name:"caml_alloc_dummy" ~arity:1 ~alloc:true
+
+let alloc_float_record_prim =
+  Lambda.simple_prim_on_values
+    ~name:"caml_alloc_dummy_float" ~arity:1 ~alloc:true
+
+let alloc_lazy_prim =
+  Lambda.simple_prim_on_values
+    ~name:"caml_alloc_dummy_lazy" ~arity:1 ~alloc:true
+
+let alloc_mixed_record_prim =
+  Lambda.simple_prim_on_values
+    ~name:"caml_alloc_dummy_mixed" ~arity:2 ~alloc:true
+
+let update_prim =
+  (* Note: [alloc] could be false, but it probably doesn't matter *)
+  Lambda.simple_prim_on_values
+    ~name:"caml_update_dummy" ~arity:2 ~alloc:true
+
+let update_lazy_prim =
+  Lambda.simple_prim_on_values
+    ~name:"caml_update_dummy_lazy" ~arity:2 ~alloc:true
+
+
 (** {1. Sizing} *)
 
 (* Simple blocks *)
 type block_size =
   | Regular_block of int
   | Float_record of int
+  | Lazy_block
   | Mixed_record of Lambda.mixed_block_shape
 
 type size =
@@ -110,6 +139,39 @@ let join_sizes lam size1 size2 =
   match size1, size2 with
   | Unreachable, size | size, Unreachable -> size
   | _, _ -> dynamic_size lam
+
+(* We need to recognize the Pmakeblock that we transformed into
+   primitive calls, to support size compilation in nested recursive
+   definitions. Consider this example from Vincent Laviron:
+   {[let f a =
+       let rec x =
+         let rec y = Some a in y
+       in x
+   ]}
+
+   [let rec y = Some a in y] gets compiled to
+   {[let y = caml_alloc_dummy 1 in
+     caml_update_dummy(y, ...);
+     y]}
+   and we need to recognize from this definition that this
+   value has known size [1].
+*)
+let find_size_of_alloc_prim prim args =
+  let same_as other_prim =
+    let open Primitive in
+    String.equal prim.prim_name other_prim.prim_name
+  in
+  let int_arg = match args with
+    | [Lconst (Const_base (Const_int n))] -> Some n
+    | _ ->  None
+  in
+  if same_as alloc_prim then
+    Option.map (fun n -> Regular_block n) int_arg
+  else if same_as alloc_float_record_prim then
+    Option.map (fun n -> Float_record n) int_arg
+  else if same_as alloc_lazy_prim then
+    Some Lazy_block
+  else None
 
 let compute_static_size lam =
   let rec compute_expression_size env lam =
@@ -183,8 +245,10 @@ let compute_static_size lam =
       *)
       assert false
     | Lsplice _ ->
-      (* CR layout poly: Fix this (and split_static_function below). *)
-      Misc.fatal_error "letrec: layout poly not supported"
+      fatal_error_invalid_constructor lam
+    | Lkindtemplate _ ->
+      Misc.fatal_error "letrec: poly_ not supported"
+    | Lkindinstantiate _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -197,6 +261,16 @@ let compute_static_size lam =
               join_sizes action size (compute_expression_size env action))
             size cases)
         Unreachable all_cases
+  (* In native code, void fields are erased, so the runtime block size is the
+     number of value fields only. In bytecode, void fields are kept, so the
+     block size includes all fields. *)
+  and all_value_mixed_block_size shape =
+    if !Clflags.native_code then
+      Mixed_product_bytes.value_prefix_len
+        (Mixed_product_bytes.count (Product shape))
+    else Array.length shape
+  and all_value_mixed_block_size_types shape =
+    all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
   and size_of_primitive env p args =
     match p with
     | Pignore
@@ -210,15 +284,19 @@ let compute_static_size lam =
     | Parraysetu _
     | Parraysets _
     | Pbigarrayset _
+    | Pbytes_set_8 _
     | Pbytes_set_16 _
     | Pbytes_set_32 _
     | Pbytes_set_f32 _
     | Pbytes_set_64 _
+    | Pbigstring_set_8 _
     | Pbigstring_set_16 _
     | Pbigstring_set_32 _
     | Pbigstring_set_f32 _
     | Pbigstring_set_64 _
     | Ppoll
+    | Patomic_set_field _
+    | Patomic_set_mixed_field _
     | Patomic_add_field
     | Patomic_sub_field
     | Patomic_land_field
@@ -232,7 +310,7 @@ let compute_static_size lam =
 
     | Pduprecord (repres, size) ->
         begin match repres with
-        | Record_boxed _
+        | Record_boxed
         | Record_inlined (_, Constructor_uniform_value,
                           (Variant_boxed _ | Variant_extensible)) ->
             Block (Regular_block size)
@@ -241,21 +319,40 @@ let compute_static_size lam =
         | Record_inlined (_, Constructor_mixed shape,
                           (Variant_boxed _ | Variant_extensible))
         | Record_mixed shape ->
-            Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
+            if Mixed_product_bytes.types_shape_is_all_value shape
+            then
+              Block (Regular_block
+                (all_value_mixed_block_size_types shape))
+            else
+              Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
+        | Record_dummy _ ->
+            Misc.fatal_error
+              "size_of_primitive: unexpected dummy representation"
+        | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+            Misc.fatal_error
+              "size_of_primitive: unexpected variable representation"
         end
     | Pmakeblock (_, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
+        (* CR layout poly: This is no longer known before slambda eval, we
+           should merge Regular_block and Mixed_record (and fix the error
+           produced by [mixed_block_of_block_shape]). *)
         (match Lambda.mixed_block_of_block_shape shape with
-         | None -> Block (Regular_block (List.length args))
+         | None ->
+           let size = match shape with
+             | All_value -> List.length args
+             | Shape shape -> all_value_mixed_block_size shape
+           in
+           Block (Regular_block size)
          | Some arr -> Block (Mixed_record arr))
     | Pmakelazyblock _ ->
-        Block (Regular_block (List.length args))
+        Block Lazy_block
     | Pmakearray (kind, _, _) ->
         let size = List.length args in
         begin match kind with
@@ -264,9 +361,12 @@ let compute_static_size lam =
         | Pfloatarray ->
             Block (Float_record size)
         | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-        | Punboxedvectorarray _ | Pgcscannableproductarray _
+        | Punboxedvectorarray _ | Punboxedmaskarray
+        | Pgcscannableproductarray _
         | Pgcignorableproductarray _ ->
             Misc.fatal_error "size_of_primitive"
+        | Punspecializedarray ->
+            Misc.fatal_error "size_of_primitive: Punspecializedarray"
         end
     | Pmakearray_dynamic _ -> Misc.fatal_error "size_of_primitive"
     | Parrayblit _ -> Constant
@@ -287,6 +387,12 @@ let compute_static_size lam =
            so we should never end up here; but these are constants anyway. *)
         Constant
 
+    | Pccall prim ->
+        begin match find_size_of_alloc_prim prim args with
+        | Some size -> Block size
+        | None -> dynamic_size lam
+        end
+
     | Pbytes_to_string
     | Pbytes_of_string
     | Pgetglobal _
@@ -295,11 +401,12 @@ let compute_static_size lam =
     | Pfloatfield _
     | Pmixedfield _
     | Pwith_stack
-    | Pwith_stack_bind
+    | Pwith_stack_preemptible
     | Pperform
-    | Presume
+    | Pcontinue
+    | Pdiscontinue
+    | Pdiscontinue_with_backtrace
     | Preperform
-    | Pccall _
     | Psequand | Psequor | Pnot
     | Pstringlength | Pstringrefu  | Pstringrefs
     | Pbyteslength | Pbytesrefu | Pbytesrefs
@@ -311,21 +418,27 @@ let compute_static_size lam =
     | Pisout
     | Pbigarrayref _
     | Pbigarraydim _
+    | Pstring_load_i8 _
+    | Pstring_load_i16 _
     | Pstring_load_16 _
     | Pstring_load_32 _
     | Pstring_load_f32 _
     | Pstring_load_64 _
+    | Pbytes_load_i8 _
+    | Pbytes_load_i16 _
     | Pbytes_load_16 _
     | Pbytes_load_32 _
     | Pbytes_load_f32 _
     | Pbytes_load_64 _
+    | Pbigstring_load_i8 _
+    | Pbigstring_load_i16 _
     | Pbigstring_load_16 _
     | Pbigstring_load_32 _
     | Pbigstring_load_f32 _
     | Pbigstring_load_64 _
     | Pint_as_pointer _
     | Patomic_load_field _
-    | Patomic_set_field _
+    | Patomic_load_mixed_field _
     | Patomic_exchange_field _
     | Patomic_compare_exchange_field _
     | Patomic_compare_set_field _
@@ -341,7 +454,9 @@ let compute_static_size lam =
     | Pget_idx _
     | Pset_idx _
     | Pget_ptr _
-    | Pset_ptr _ ->
+    | Pset_ptr _
+    | Pget_ext_ptr _
+    | Pset_ext_ptr _ ->
         dynamic_size lam
 
     (* Primitives specific to oxcaml *)
@@ -351,12 +466,15 @@ let compute_static_size lam =
 
     | Psetufloatfield (_, _)
     | Pbytes_set_vec _
+    | Pbytes_set_mask _
     | Pbigstring_set_vec _
+    | Pbigstring_set_mask _
     | Pfloatarray_set_vec _
-    | Pfloat_array_set_vec _
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
     | Punboxed_float32_array_set_vec _
+    | Puntagged_int8_array_set_vec _
+    | Puntagged_int16_array_set_vec _
     | Punboxed_int32_array_set_vec _
     | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _
@@ -377,13 +495,17 @@ let compute_static_size lam =
     | Pufloatfield (_, _)
     | Punboxed_product_field (_, _)
     | Pstring_load_vec _
+    | Pstring_load_mask _
     | Pbytes_load_vec _
+    | Pbytes_load_mask _
     | Pbigstring_load_vec _
+    | Pbigstring_load_mask _
     | Pfloatarray_load_vec _
-    | Pfloat_array_load_vec _
     | Pint_array_load_vec _
     | Punboxed_float_array_load_vec _
     | Punboxed_float32_array_load_vec _
+    | Puntagged_int8_array_load_vec _
+    | Puntagged_int16_array_load_vec _
     | Punboxed_int32_array_load_vec _
     | Punboxed_int64_array_load_vec _
     | Punboxed_nativeint_array_load_vec _
@@ -391,9 +513,15 @@ let compute_static_size lam =
     | Pobj_magic _
     | Punbox_vector _
     | Pbox_vector (_, _)
+    | Punbox_mask
+    | Pbox_mask _
+    | Pjoin_vec256
+    | Psplit_vec256
     | Pget_header _
     | Preinterpret_tagged_int63_as_unboxed_int64
-    | Preinterpret_unboxed_int64_as_tagged_int63 ->
+    | Preinterpret_unboxed_int64_as_tagged_int63
+    | Preinterpret_boxed_vector_as_tuple _
+    | Preinterpret_tuple_as_boxed_vector _ ->
         dynamic_size lam
   in
   compute_expression_size Ident.Map.empty lam
@@ -505,19 +633,21 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
         ap_mode = lfun.ret_mode;
+        ap_yielding = lfun.yielding;
         ap_probe = None;
       }
     in
     let wrapper =
-      lfunction'
-        ~kind:lfun.kind
-        ~params
-        ~return:lfun.return
-        ~body
-        ~attr:default_stub_attribute
-        ~loc:no_loc
-        ~mode:lfun.mode
-        ~ret_mode:lfun.ret_mode
+      lfunction_with_yielding lfun.yielding
+        (lfunction'
+           ~kind:lfun.kind
+           ~params
+           ~return:lfun.return
+           ~body
+           ~attr:default_stub_attribute
+           ~loc:no_loc
+           ~mode:lfun.mode
+           ~ret_mode:lfun.ret_mode)
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,
@@ -688,13 +818,15 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lassign _
   | Lsend _
   | Lifused _
-  | Lexclave _ ->
+  | Lexclave _
+  | Lkindtemplate _
+  | Lkindinstantiate _ ->
     Misc.fatal_errorf
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
   | Lsplice _ ->
-    Misc.fatal_error "letrec: layout poly not supported"
+    fatal_error_invalid_constructor lam
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =
@@ -813,20 +945,93 @@ let empty_bindings =
     dynamic = [];
   }
 
-(** Allocation and backpatching primitives *)
+(** Allocation and backpatching code *)
 
-let alloc_prim =
-  Lambda.simple_prim_on_values ~name:"caml_alloc_dummy" ~arity:1 ~alloc:true
+let compile_indirect newval =
+  let indirect = Lambda.transl_prim "CamlinternalLazy" "indirect" in
+  Lapply {
+    ap_func = indirect;
+    ap_args = [newval];
+    ap_loc = no_loc;
+    ap_tailcall = Default_tailcall;
+    ap_inlined = Default_inlined;
+    ap_specialised = Default_specialise;
+    ap_result_layout = Lambda.layout_lazy;
+    ap_region_close = Rc_normal;
+    ap_mode = Lambda.not_alloc_stack;
+    (* [indirect] just allocates a forwarding block; it never runs user code,
+       so it can't yield *)
+    ap_yielding = Unyielding;
+    ap_probe = None;
+  }
 
-let alloc_float_record_prim =
-  Lambda.simple_prim_on_values ~name:"caml_alloc_dummy_float" ~arity:1 ~alloc:true
+let compile_alloc size =
+  let alloc prim const_args =
+    Lprim (Pccall prim,
+           List.map Lambda.tagged_immediate const_args,
+           no_loc)
+  in
+  (* if you add new allocation primitives below,
+     you should update {!find_size_of_alloc_prim} as well. *)
+  match size with
+  | Regular_block size ->
+      alloc alloc_prim [size]
+  | Float_record size ->
+      alloc alloc_float_record_prim [size]
+  | Lazy_block ->
+      Lprim(Pccall alloc_lazy_prim,
+            [Lambda.lambda_unit],
+            no_loc)
+  | Mixed_record shape ->
+      if !Clflags.native_code then
+        let shape =
+          Mixed_block_shape.of_mixed_block_elements
+            ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+            shape
+        in
+        let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
+        let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
+        let size = value_prefix_len + flat_suffix_len in
+        alloc alloc_mixed_record_prim [size; value_prefix_len]
+      else
+        let size = Array.length shape in
+        alloc alloc_mixed_record_prim [size; size]
 
-let alloc_mixed_record_prim =
-  Lambda.simple_prim_on_values ~name:"caml_alloc_dummy_mixed" ~arity:2 ~alloc:true
+let compile_update size dummy newval =
+  let prim, newval =
+    match size with
+    | Regular_block _ | Float_record _ | Mixed_record _ ->
+      update_prim, newval
+    | Lazy_block ->
+      (* Consider the following example from Vincent Laviron:
+         {[let rec v =
+             let l = lazy (expensive computation) in
+             let () = maybe_force_in_another_domain l in
+             l
+         ]}
 
-let update_prim =
-  (* Note: [alloc] could be false, but it probably doesn't matter *)
-  Lambda.simple_prim_on_values ~name:"caml_update_dummy" ~arity:2 ~alloc:true
+         The naive/simple compilation scheme would do
+         a [caml_update_dummy_lazy(v, l)], and the dummy-update code
+         could run concurrently with another domain forcing [l].
+
+         To avoid this issue, lazy blocks get updated via
+         [caml_update_dummy_lazy(dummy, CamlinternalLazy.indirect newval)],
+         where [CamlinternalLazy.indirect] returns a fresh/local thunk
+         that is not getting forced concurrently (whereas [newval]
+         might be).
+      *)
+      update_lazy_prim,
+      begin match newval with
+        | Lprim(Pmakelazyblock _, _, _) ->
+          (* No need to wrap the thunk if was just constructed.
+             This removes indirections on terms defined as lazy thunks
+             at the toplevel: [let rec x = lazy ...] *)
+          newval
+        | _ -> compile_indirect newval
+      end
+  in
+  Lprim (Pccall prim, [dummy; newval],
+         no_loc)
 
 (** Compilation function *)
 
@@ -895,12 +1100,9 @@ let compile_letrec input_bindings body =
       empty_bindings input_bindings
   in
   let body_with_patches =
-    List.fold_left (fun body (id, _, _size, lam) ->
-        let update =
-          Lprim (Pccall update_prim, [Lvar id; lam], no_loc)
-        in
-        Lsequence (update, body))
-      body (all_bindings_rev.static)
+    List.fold_left (fun body (id, _, size, lam) ->
+        Lsequence(compile_update size (Lvar id) lam, body)
+    ) body (all_bindings_rev.static)
   in
   let body_with_functions =
     match all_bindings_rev.functions with
@@ -920,26 +1122,7 @@ let compile_letrec input_bindings body =
   in
   let body_with_pre_allocations =
     List.fold_left (fun body (id, duid, size, _lam) ->
-        let alloc_prim, const_args =
-          match size with
-          | Regular_block size -> alloc_prim, [size]
-          | Float_record size -> alloc_float_record_prim, [size]
-          | Mixed_record shape ->
-              let shape =
-                Mixed_block_shape.of_mixed_block_elements
-                  ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-                  shape
-              in
-              let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
-              let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
-              let size = value_prefix_len + flat_suffix_len in
-              alloc_mixed_record_prim, [size; value_prefix_len]
-        in
-        let alloc =
-          Lprim (Pccall alloc_prim,
-                 List.map Lambda.tagged_immediate const_args,
-                 no_loc)
-        in
+        let alloc = compile_alloc size in
         Llet(Strict, Lambda.layout_letrec, id, duid, alloc, body))
       body_with_dynamic_values all_bindings_rev.static
   in

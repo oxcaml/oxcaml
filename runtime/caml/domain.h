@@ -17,11 +17,9 @@
 #ifndef CAML_DOMAIN_H
 #define CAML_DOMAIN_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifdef CAML_INTERNALS
+
+#include <stdbool.h>
 
 #include "camlatomic.h"
 #include "config.h"
@@ -41,6 +39,10 @@ extern "C" {
 #define Max_domains_def 1
 #define Max_domains_max 1
 #endif
+
+/* Force tick thread to use usleep instead of epoll. Settable with
+   OCAMLRUNPARAM */
+extern uintnat caml_tick_use_usleep;   /* -Xtick_use_usleep= */
 
 /* is the minor heap full or an external interrupt has been triggered */
 Caml_inline int caml_check_gc_interrupt(caml_domain_state * dom_st)
@@ -68,14 +70,18 @@ int caml_incoming_interrupts_queued(void);
 
 void caml_poll_gc_work(void);
 void caml_handle_gc_interrupt(void);
-void caml_process_external_interrupt(void);
 void caml_handle_incoming_interrupts(void);
+#ifdef NATIVE_CODE
+void caml_domain_setup_preemption(void);
+#endif
+void caml_domain_reset_preemption(void);
+caml_result caml_process_tick_res(void);
 
 CAMLextern void caml_interrupt_self(void);
 void caml_interrupt_all_signal_safe(void);
-void caml_external_interrupt_all_signal_safe(uintnat flags);
 void caml_reset_young_limit(caml_domain_state *);
 void caml_update_young_limit_after_c_call(caml_domain_state *);
+struct stack_cache* caml_get_stack_caches(int domain_idx);
 
 CAMLextern void caml_reset_domain_lock(void);
 CAMLextern int caml_bt_is_in_blocking_section(void);
@@ -86,14 +92,22 @@ CAMLextern void caml_bt_exit_ocaml(void);
 CAMLextern void caml_acquire_domain_lock(void);
 CAMLextern void caml_release_domain_lock(void);
 
+/* Start the tick thread unless it is disabled. Returns nonzero in the case of
+   an error. */
+CAMLextern int caml_start_tick_thread(void);
+
+/* Stop the tick thread */
+CAMLextern void caml_stop_tick_thread(void);
+CAMLextern uintnat caml_effective_tick_interval_usec(void);
+
 /* These hooks are not modified after other domains are spawned. */
 CAMLextern void (*caml_atfork_hook)(void);
 CAMLextern void (*caml_domain_initialize_hook)(void);
 CAMLextern void (*caml_domain_lock_hook)(void);
 CAMLextern void (*caml_domain_unlock_hook)(void);
 CAMLextern void (*caml_domain_stop_hook)(void);
-CAMLextern void (*caml_domain_external_interrupt_hook)(void);
 CAMLextern void (*caml_domain_send_interrupt_hook)(caml_domain_state*);
+CAMLextern void (*caml_domain_tick_hook)(void);
 
 CAMLextern void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz);
 CAMLextern void caml_init_domain_self(int);
@@ -102,9 +116,35 @@ CAMLextern uintnat caml_minor_heap_max_wsz;
 
 CAMLextern atomic_uintnat caml_num_domains_running;
 
+/* When [caml_domain_alone()] is true, there is a single domain
+   running. In particular, if the test passes while holding the domain
+   lock, then we know that no other domain is running concurrently,
+   and we can use fast paths with fewer synchronization operations.
+
+      // if you hold the domain lock:
+      if (caml_domain_alone()) {
+        // sequential fast path
+        ...
+      } else {
+        // slower concurrent version
+        ...
+      }
+*/
 Caml_inline intnat caml_domain_alone(void)
 {
   return atomic_load_acquire(&caml_num_domains_running) == 1;
+}
+
+/* The index of the current domain. It is an integer unique among
+   currently-running domains, in the interval [0; N-1] where N is the
+   peak number of domains running simultaneously so far. The index of
+   a terminated domain may be reused for a new domain.
+
+   This function requires the domain lock to be held.
+*/
+Caml_inline int caml_domain_index(void)
+{
+  return Caml_state->id;
 }
 
 #ifdef DEBUG
@@ -113,6 +153,7 @@ int caml_domain_is_in_stw(void);
 
 int caml_domain_terminating(caml_domain_state *);
 int caml_domain_is_terminating(void);
+void caml_domain_terminate(bool last);
 
 int caml_try_run_on_all_domains_with_spin_work(
   int sync,
@@ -133,7 +174,7 @@ int caml_try_run_on_all_domains(
    [caml_try_run_on_all_domains*] runners, it will
    run on all participant domains in parallel.
 
-   The "STW critical section" is the runtime interval betweeen the
+   The "STW critical section" is the runtime interval between the
    start of the execution of the STW callback and the last barrier in
    the callback. During this interval, mutator code from registered
    participants cannot be running in parallel.
@@ -230,10 +271,17 @@ void caml_global_barrier_release_as_final(barrier_status status);
            caml_global_barrier_release_as_final(CAML_GENSYM(b))),       \
           CAML_GENSYM(continue) = 0))
 
-#endif /* CAML_INTERNALS */
+/*
+ * Termination helpers.
+ */
 
-#ifdef __cplusplus
-}
-#endif
+/* Force all other domains to stop their operation. */
+void caml_stop_all_domains(void);
+
+/* Try and release all synchronisation resources set up by
+   caml_init_domains(). Returns whether all resources could be released. */
+bool caml_free_domains(void);
+
+#endif /* CAML_INTERNALS */
 
 #endif /* CAML_DOMAIN_H */

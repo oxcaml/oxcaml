@@ -67,6 +67,9 @@ val reg_w : Reg.t -> gp_w
 
 val reg_x : Reg.t -> gp_x
 
+(** DWARF register number for a GP-X operand for use in CFI directives. *)
+val gp_x_dwarf_encoding : gp_x -> int
+
 (** {1 Scalar FP/SIMD register operands} *)
 
 val reg_d : Reg.t -> scalar_d

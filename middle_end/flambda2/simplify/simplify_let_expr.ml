@@ -72,238 +72,250 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
   let no_constants_to_place =
     no_constants_from_defining_expr && UA.no_lifted_constants uacc
   in
-  let uacc = UA.notify_removed ~operation:removed_operations uacc in
-  let bindings =
-    Simplify_named_result.bindings_to_place simplify_named_result
-  in
-  let bindings =
-    List.map
-      (fun (binding : Expr_builder.binding_to_place) :
-           Expr_builder.binding_to_place ->
-        match binding with
-        | Delete_binding _ -> binding
-        | Keep_binding
-            ({ let_bound; simplified_defining_expr; original_defining_expr = _ }
-             as kept_binding) -> (
-          match simplified_defining_expr.named with
-          | Prim (prim, _dbg) -> (
-            match Bound_pattern.must_be_singleton_opt let_bound with
-            | None -> binding
-            | Some bound_var -> (
-              let simple = Simple.var (Bound_var.var bound_var) in
-              match
-                DA.find_debuginfo_rewrite (UA.creation_dacc uacc)
-                  ~bound_to:simple
-              with
+  let put_bindings_around_body uacc ~body =
+    let uacc = UA.notify_removed ~operation:removed_operations uacc in
+    let bindings =
+      Simplify_named_result.bindings_to_place simplify_named_result
+    in
+    let bindings =
+      List.map
+        (fun (binding : Expr_builder.binding_to_place) :
+             Expr_builder.binding_to_place ->
+          match binding with
+          | Delete_binding _ -> binding
+          | Keep_binding
+              ({ let_bound;
+                 simplified_defining_expr;
+                 original_defining_expr = _
+               } as kept_binding) -> (
+            match simplified_defining_expr.named with
+            | Prim (prim, _dbg) -> (
+              match Bound_pattern.must_be_singleton_opt let_bound with
               | None -> binding
-              | Some dbg ->
-                let machine_width = UE.machine_width (UA.uenv uacc) in
-                Keep_binding
-                  { kept_binding with
-                    simplified_defining_expr =
-                      Simplified_named.create ~machine_width
-                        (Named.create_prim prim dbg)
-                  }))
-          | Simple _ | Set_of_closures _ | Rec_info _ -> binding))
-      bindings
-  in
-  (* Phantom let creation *)
-  let generate_phantom_lets = UA.generate_phantom_lets uacc in
-  let free_names_of_body = UA.name_occurrences uacc in
-  let compute_greatest_name_mode (bound_vars : Bound_pattern.t) =
-    match bound_vars with
-    | Singleton bound_var ->
-      (* We avoid the closure allocation (below) in this case. *)
-      Name_occurrences.greatest_name_mode_var free_names_of_body
-        (VB.var bound_var)
-    | Set_of_closures _ ->
-      Bound_pattern.fold_all_bound_vars bound_vars
-        ~init:Name_mode.Or_absent.absent ~f:(fun greatest_name_mode bound_var ->
-          Name_mode.Or_absent.join_in_terms greatest_name_mode
-            (Name_occurrences.greatest_name_mode_var free_names_of_body
-               (VB.var bound_var)))
-    | Static _ -> assert false
-    (* see below *)
-  in
-  let bindings =
-    List.map
-      (fun (binding_to_place : Expr_builder.binding_to_place) ->
-        match binding_to_place with
-        | Delete_binding _ -> binding_to_place
-        | Keep_binding
-            ({ let_bound = bound_vars;
-               simplified_defining_expr;
-               original_defining_expr
-             } as binding) ->
-          let greatest_name_mode = compute_greatest_name_mode bound_vars in
-          let declared_name_mode = Bound_pattern.name_mode bound_vars in
-          let mismatched_modes =
-            match
-              Name_mode.Or_absent.compare_partial_order greatest_name_mode
-                (Name_mode.Or_absent.present declared_name_mode)
-            with
-            | None -> true
-            | Some c -> c > 0
-          in
-          let defining_expr =
-            Simplified_named.to_named
-              simplified_defining_expr.Simplified_named.named
-          in
-          if mismatched_modes
-          then
-            Misc.fatal_errorf
-              "[Let]-binding declares variable(s) %a (mode %a) to be bound to@ \
-               %a,@ but there exist occurrences for such variable(s) at \
-               incompatible mode(s)@ (compared to %a)@ in the body (free names \
-               %a):@ %a"
-              Bound_pattern.print bound_vars Name_mode.print declared_name_mode
-              Named.print defining_expr Name_mode.Or_absent.print
-              greatest_name_mode Name_occurrences.print free_names_of_body
-              (RE.print (UA.are_rebuilding_terms uacc))
-              body;
-          let is_end_region =
-            match defining_expr with
-            | Prim (prim, _) -> P.is_end_region prim
-            | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ ->
-              None
-          in
-          let is_end_region_for_unused_region, is_end_region_for_used_region =
-            match is_end_region with
-            | None -> false, false
-            | Some region ->
-              let is_used =
-                Name.Set.mem (Name.var region) (UA.required_names uacc)
-              in
-              not is_used, is_used
-          in
-          let must_be_kept_for_its_effects =
-            is_end_region_for_used_region
-            || (not is_end_region_for_unused_region)
-               && not (Named.at_most_generative_effects defining_expr)
-          in
-          if must_be_kept_for_its_effects
-          then (
-            if not (Name_mode.is_normal declared_name_mode)
+              | Some bound_var -> (
+                let simple = Simple.var (Bound_var.var bound_var) in
+                match
+                  DA.find_debuginfo_rewrite (UA.creation_dacc uacc)
+                    ~bound_to:simple
+                with
+                | None -> binding
+                | Some dbg ->
+                  let machine_width = UE.machine_width (UA.uenv uacc) in
+                  Keep_binding
+                    { kept_binding with
+                      simplified_defining_expr =
+                        Simplified_named.create ~machine_width
+                          (Named.create_prim prim dbg)
+                    }))
+            | Simple _ | Set_of_closures _ | Rec_info _ -> binding))
+        bindings
+    in
+    (* Phantom let creation *)
+    let generate_phantom_lets = UA.generate_phantom_lets uacc in
+    let free_names_of_body = UA.name_occurrences uacc in
+    let compute_greatest_name_mode (bound_vars : Bound_pattern.t) =
+      match bound_vars with
+      | Singleton bound_var ->
+        (* We avoid the closure allocation (below) in this case. *)
+        Name_occurrences.greatest_name_mode_var free_names_of_body
+          (VB.var bound_var)
+      | Set_of_closures _ ->
+        Bound_pattern.fold_all_bound_vars bound_vars
+          ~init:Name_mode.Or_absent.absent
+          ~f:(fun greatest_name_mode bound_var ->
+            Name_mode.Or_absent.join_in_terms greatest_name_mode
+              (Name_occurrences.greatest_name_mode_var free_names_of_body
+                 (VB.var bound_var)))
+      | Static _ -> assert false
+      (* see below *)
+    in
+    let bindings =
+      List.map
+        (fun (binding_to_place : Expr_builder.binding_to_place) ->
+          match binding_to_place with
+          | Delete_binding _ -> binding_to_place
+          | Keep_binding
+              ({ let_bound = bound_vars;
+                 simplified_defining_expr;
+                 original_defining_expr
+               } as binding) ->
+            let greatest_name_mode = compute_greatest_name_mode bound_vars in
+            let declared_name_mode = Bound_pattern.name_mode bound_vars in
+            let mismatched_modes =
+              match
+                Name_mode.Or_absent.compare_partial_order greatest_name_mode
+                  (Name_mode.Or_absent.present declared_name_mode)
+              with
+              | None -> true
+              | Some c -> c > 0
+            in
+            let defining_expr =
+              Simplified_named.to_named
+                simplified_defining_expr.Simplified_named.named
+            in
+            if mismatched_modes
             then
               Misc.fatal_errorf
-                "Cannot [Let]-bind non-normal variable(s) to a [Named] that \
-                 has more than generative effects:@ %a@ =@ %a"
-                Bound_pattern.print bound_vars Named.print defining_expr;
-            binding_to_place)
-          else
-            let is_depth =
+                "[Let]-binding declares variable(s) %a (mode %a) to be bound \
+                 to@ %a,@ but there exist occurrences for such variable(s) at \
+                 incompatible mode(s)@ (compared to %a)@ in the body (free \
+                 names %a):@ %a"
+                Bound_pattern.print bound_vars Name_mode.print
+                declared_name_mode Named.print defining_expr
+                Name_mode.Or_absent.print greatest_name_mode
+                Name_occurrences.print free_names_of_body
+                (RE.print (UA.are_rebuilding_terms uacc))
+                body;
+            let is_end_region =
               match defining_expr with
-              | Rec_info _ -> true
-              | Simple _ | Prim _ | Set_of_closures _ | Static_consts _ -> false
+              | Prim (prim, _) -> P.is_end_region prim
+              | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ ->
+                None
             in
-            let has_uses = Name_mode.Or_absent.is_present greatest_name_mode in
-            let can_phantomise =
-              (not is_depth)
-              && Bound_pattern.exists_all_bound_vars bound_vars
-                   ~f:(fun bound_var ->
-                     Variable.user_visible (VB.var bound_var))
+            let is_end_region_for_unused_region, is_end_region_for_used_region =
+              match is_end_region with
+              | None -> false, false
+              | Some region ->
+                let is_used =
+                  Name.Set.mem (Name.var region) (UA.required_names uacc)
+                in
+                not is_used, is_used
             in
-            let will_delete_binding =
-              if is_end_region_for_unused_region
-              then true
-              else
-                (* CR-someday mshinwell: This should detect whether there is any
-                   provenance info associated with the variable. If there isn't,
-                   the [Let] can be deleted even if debugging information is
-                   being generated. *)
-                not (has_uses || (generate_phantom_lets && can_phantomise))
+            let must_be_kept_for_its_effects =
+              is_end_region_for_used_region
+              || (not is_end_region_for_unused_region)
+                 && not (Named.at_most_generative_effects defining_expr)
             in
-            if will_delete_binding
-            then Expr_builder.Delete_binding { original_defining_expr }
+            if must_be_kept_for_its_effects
+            then (
+              if not (Name_mode.is_normal declared_name_mode)
+              then
+                Misc.fatal_errorf
+                  "Cannot [Let]-bind non-normal variable(s) to a [Named] that \
+                   has more than generative effects:@ %a@ =@ %a"
+                  Bound_pattern.print bound_vars Named.print defining_expr;
+              binding_to_place)
             else
-              (* CR-someday mshinwell: When leaving behind phantom lets, maybe
-                 we should turn the defining expressions into simpler ones by
-                 using the type, if possible. For example an Unbox_naked_int64
-                 or something could potentially turn into a variable. This
-                 defining expression usually never exists as the types propagate
-                 the information forward. mshinwell: this might be done now in
-                 Simplify_named, check. *)
-              let name_mode =
-                match greatest_name_mode with
-                | Absent -> Name_mode.phantom
-                | Present name_mode -> name_mode
+              let is_depth =
+                match defining_expr with
+                | Rec_info _ -> true
+                | Simple _ | Prim _ | Set_of_closures _ | Static_consts _ ->
+                  false
               in
-              assert (Name_mode.can_be_in_terms name_mode);
-              let bound_vars =
-                Bound_pattern.with_name_mode bound_vars name_mode
+              let has_uses =
+                Name_mode.Or_absent.is_present greatest_name_mode
               in
-              Expr_builder.Keep_binding { binding with let_bound = bound_vars })
-      bindings
-  in
-  let uacc, bindings =
-    let Flow_types.Mutable_unboxing_result.{ let_rewrites; _ } =
-      UA.mutable_unboxing_result uacc
-    in
-    match Named_rewrite_id.Map.find rewrite_id let_rewrites with
-    | exception Not_found -> uacc, bindings
-    | rewrite -> (
-      match bindings with
-      | [] -> uacc, []
-      | _ :: _ :: _ -> assert false
-      | [(Delete_binding _ as binding)] -> uacc, [binding]
-      | [Keep_binding binding] -> (
-        match rewrite, binding.original_defining_expr with
-        | Prim_rewrite prim_rewrite, Some (Prim (original_prim, dbg)) ->
-          let uacc =
-            UA.notify_removed
-              ~operation:(Removed_operations.prim original_prim)
-              uacc
-          in
-          let machine_width = UE.machine_width (UA.uenv uacc) in
-          let new_bindings =
-            match prim_rewrite with
-            | Remove_prim -> (
-              let greatest_name_mode =
-                compute_greatest_name_mode binding.let_bound
+              let can_phantomise =
+                (not is_depth)
+                && Bound_pattern.exists_all_bound_vars bound_vars
+                     ~f:(fun bound_var ->
+                       Variable.user_visible (VB.var bound_var))
               in
-              match greatest_name_mode with
-              | Absent ->
-                [ Expr_builder.Delete_binding
-                    { original_defining_expr = binding.original_defining_expr }
-                ]
-              | Present name_mode ->
-                if Name_mode.is_phantom name_mode
-                then
-                  let let_bound =
-                    Bound_pattern.with_name_mode binding.let_bound name_mode
-                  in
-                  [Expr_builder.Keep_binding { binding with let_bound }]
+              let will_delete_binding =
+                if is_end_region_for_unused_region
+                then true
                 else
-                  Misc.fatal_errorf
-                    "Binding for %a was supposed to be removed but occurs in \
-                     free names:@ %a"
-                    Bound_pattern.print binding.let_bound Name_occurrences.print
-                    free_names_of_body)
-            | Invalid k ->
-              let prim : P.t = Nullary (Invalid k) in
-              let simplified_defining_expr =
-                Simplified_named.create ~machine_width
-                  (Named.create_prim prim dbg)
+                  (* CR-someday mshinwell: This should detect whether there is
+                     any provenance info associated with the variable. If there
+                     isn't, the [Let] can be deleted even if debugging
+                     information is being generated. *)
+                  not (has_uses || (generate_phantom_lets && can_phantomise))
               in
-              [ Expr_builder.Keep_binding
-                  { binding with simplified_defining_expr } ]
-            | Replace_by_binding { var; bound_to } ->
-              let bv = Bound_pattern.must_be_singleton binding.let_bound in
-              let var' = Bound_var.var bv in
-              assert (Variable.equal var var');
-              let simplified_defining_expr =
-                Simplified_named.create ~machine_width
-                  (Named.create_simple bound_to)
-              in
-              [ Expr_builder.Keep_binding
-                  { binding with simplified_defining_expr } ]
-          in
-          uacc, new_bindings
-        | ( Prim_rewrite _,
-            ( None
-            | Some (Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _)
-              ) ) ->
-          Misc.fatal_errorf "Prim_rewrite applied to a non-prim Named.t"))
+              if will_delete_binding
+              then Expr_builder.Delete_binding { original_defining_expr }
+              else
+                (* CR-someday mshinwell: When leaving behind phantom lets, maybe
+                   we should turn the defining expressions into simpler ones by
+                   using the type, if possible. For example an Unbox_naked_int64
+                   or something could potentially turn into a variable. This
+                   defining expression usually never exists as the types
+                   propagate the information forward. mshinwell: this might be
+                   done now in Simplify_named, check. *)
+                let name_mode =
+                  match greatest_name_mode with
+                  | Absent -> Name_mode.phantom
+                  | Present name_mode -> name_mode
+                in
+                assert (Name_mode.can_be_in_terms name_mode);
+                let bound_vars =
+                  Bound_pattern.with_name_mode bound_vars name_mode
+                in
+                Expr_builder.Keep_binding
+                  { binding with let_bound = bound_vars })
+        bindings
+    in
+    let uacc, bindings =
+      let Flow_types.Mutable_unboxing_result.{ let_rewrites; _ } =
+        UA.mutable_unboxing_result uacc
+      in
+      match Named_rewrite_id.Map.find rewrite_id let_rewrites with
+      | exception Not_found -> uacc, bindings
+      | rewrite -> (
+        match bindings with
+        | [] -> uacc, []
+        | _ :: _ :: _ -> assert false
+        | [(Delete_binding _ as binding)] -> uacc, [binding]
+        | [Keep_binding binding] -> (
+          match rewrite, binding.original_defining_expr with
+          | Prim_rewrite prim_rewrite, Some (Prim (original_prim, dbg)) ->
+            let uacc =
+              UA.notify_removed
+                ~operation:(Removed_operations.prim original_prim)
+                uacc
+            in
+            let machine_width = UE.machine_width (UA.uenv uacc) in
+            let new_bindings =
+              match prim_rewrite with
+              | Remove_prim -> (
+                let greatest_name_mode =
+                  compute_greatest_name_mode binding.let_bound
+                in
+                match greatest_name_mode with
+                | Absent ->
+                  [ Expr_builder.Delete_binding
+                      { original_defining_expr = binding.original_defining_expr
+                      } ]
+                | Present name_mode ->
+                  if Name_mode.is_phantom name_mode
+                  then
+                    let let_bound =
+                      Bound_pattern.with_name_mode binding.let_bound name_mode
+                    in
+                    [Expr_builder.Keep_binding { binding with let_bound }]
+                  else
+                    Misc.fatal_errorf
+                      "Binding for %a was supposed to be removed but occurs in \
+                       free names:@ %a"
+                      Bound_pattern.print binding.let_bound
+                      Name_occurrences.print free_names_of_body)
+              | Invalid k ->
+                let prim : P.t = Nullary (Invalid k) in
+                let simplified_defining_expr =
+                  Simplified_named.create ~machine_width
+                    (Named.create_prim prim dbg)
+                in
+                [ Expr_builder.Keep_binding
+                    { binding with simplified_defining_expr } ]
+              | Replace_by_binding { var; bound_to } ->
+                let bv = Bound_pattern.must_be_singleton binding.let_bound in
+                let var' = Bound_var.var bv in
+                assert (Variable.equal var var');
+                let simplified_defining_expr =
+                  Simplified_named.create ~machine_width
+                    (Named.create_simple bound_to)
+                in
+                [ Expr_builder.Keep_binding
+                    { binding with simplified_defining_expr } ]
+            in
+            uacc, new_bindings
+          | ( Prim_rewrite _,
+              ( None
+              | Some
+                  (Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _)
+                ) ) ->
+            Misc.fatal_errorf "Prim_rewrite applied to a non-prim Named.t"))
+    in
+    EB.make_new_let_bindings uacc ~bindings_outermost_first:bindings ~body
   in
   (* Return as quickly as possible if there is nothing to do. In this case, all
      constants get floated up to an outer binding. *)
@@ -318,9 +330,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
         LCS.union lifted_constants_from_body lifted_constants_from_defining_expr
         |> UA.with_lifted_constants uacc
     in
-    let body, uacc =
-      EB.make_new_let_bindings uacc ~bindings_outermost_first:bindings ~body
-    in
+    let body, uacc = put_bindings_around_body uacc ~body in
     after_rebuild body uacc
   else
     let uacc, lifted_constants_from_body =
@@ -328,83 +338,9 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
     in
     let body, uacc =
       EB.place_lifted_constants uacc ~lifted_constants_from_defining_expr
-        ~lifted_constants_from_body
-        ~put_bindings_around_body:(fun uacc ~body ->
-          EB.make_new_let_bindings uacc ~bindings_outermost_first:bindings ~body)
-        ~body
+        ~lifted_constants_from_body ~put_bindings_around_body ~body
     in
     after_rebuild body uacc
-
-let record_one_value_slot_for_data_flow symbol value_slot simple data_flow =
-  Flow.Acc.record_value_slot (Name.symbol symbol) value_slot
-    (Simple.free_names simple) data_flow
-
-let record_one_function_slot_for_data_flow ~free_names ~value_slots _
-    (symbol, _) data_flow =
-  let data_flow = Flow.Acc.record_symbol_binding symbol free_names data_flow in
-  Value_slot.Map.fold
-    (record_one_value_slot_for_data_flow symbol)
-    value_slots data_flow
-
-let record_lifted_constant_definition_for_data_flow ~being_defined data_flow
-    definition =
-  let module D = LC.Definition in
-  match D.descr definition with
-  | Code code_id ->
-    Flow.Acc.record_code_id_binding code_id
-      (NO.union being_defined (D.free_names definition))
-      data_flow
-  | Block_like { symbol; _ } ->
-    let free_names = NO.union being_defined (D.free_names definition) in
-    Flow.Acc.record_symbol_binding symbol free_names data_flow
-  | Set_of_closures { closure_symbols_with_types; _ } -> (
-    let expr = D.defining_expr definition in
-    match Rebuilt_static_const.to_const expr with
-    | Some (Static_const const) ->
-      let set_of_closures = Static_const.must_be_set_of_closures const in
-      let free_names =
-        NO.union being_defined
-          (Function_declarations.free_names
-             (Set_of_closures.function_decls set_of_closures))
-      in
-      let value_slots = Set_of_closures.value_slots set_of_closures in
-      Function_slot.Lmap.fold
-        (record_one_function_slot_for_data_flow ~free_names ~value_slots)
-        closure_symbols_with_types data_flow
-    | None | Some (Code _ | Deleted_code) ->
-      let free_names = NO.union being_defined (D.free_names definition) in
-      Function_slot.Lmap.fold
-        (fun _ (symbol, _) data_flow ->
-          Flow.Acc.record_symbol_binding symbol free_names data_flow)
-        closure_symbols_with_types data_flow)
-
-let record_lifted_constant_for_data_flow data_flow lifted_constant =
-  let data_flow =
-    (* Record all projections as potential dependencies. *)
-    Variable.Map.fold
-      (fun var proj data_flow ->
-        Flow.Acc.record_symbol_projection var
-          (Symbol_projection.free_names proj)
-          data_flow)
-      (LC.symbol_projections lifted_constant)
-      data_flow
-  in
-  let being_defined =
-    let bound_static = Lifted_constant.bound_static lifted_constant in
-    (* Note: We're not registering code IDs in the set, because we can actually
-       make the code bindings deleted individually. In particular, code IDs that
-       are only used in the newer_version_of field of another binding will be
-       deleted as expected. *)
-    let symbols = Bound_static.symbols_being_defined bound_static in
-    NO.empty
-    |> Symbol.Set.fold
-         (fun symbol acc -> NO.add_symbol acc symbol Name_mode.normal)
-         symbols
-  in
-  ListLabels.fold_left
-    (LC.definitions lifted_constant)
-    ~init:data_flow
-    ~f:(record_lifted_constant_definition_for_data_flow ~being_defined)
 
 let record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id
     data_flow (binding : Expr_builder.binding_to_place) : Flow.Acc.t =
@@ -427,8 +363,8 @@ let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
          to do anything here. *)
       data_flow
     | Not_in_a_closure ->
-      LCS.fold lifted_constants_from_defining_expr ~init:data_flow
-        ~f:record_lifted_constant_for_data_flow
+      Flow.Acc.record_lifted_constants lifted_constants_from_defining_expr
+        data_flow
   in
   ListLabels.fold_left
     (Simplify_named_result.bindings_to_place simplify_named_result)

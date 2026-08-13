@@ -63,6 +63,7 @@ and debug_event_kind = Debug_event.debug_event_kind =
 and debug_event_info = Debug_event.debug_event_info =
     Event_function
   | Event_return of int
+  | Event_unyielding_call of int
   | Event_other
 
 and debug_event_repr = Debug_event.debug_event_repr =
@@ -128,11 +129,15 @@ type instruction =
   | Kgetdynmet
   | Kevent of debug_event
   | Kperform
-  | Kresume
-  | Kresumeterm of int
+  | Kcontinue
+  | Kcontinueterm of int
+  | Kdiscontinue
+  | Kdiscontinueterm of int
+  | Kdiscontinue_with_backtrace
+  | Kdiscontinue_with_backtraceterm of int
   | Kreperformterm of int
   | Kwith_stack
-  | Kwith_stack_bind
+  | Kwith_stack_preemptible
   | Kstop
 
 let immed_min = -0x40000000

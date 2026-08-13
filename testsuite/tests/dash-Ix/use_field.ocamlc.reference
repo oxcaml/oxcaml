@@ -1,0 +1,4 @@
+File "use_field.ml", line 8, characters 20-23:
+8 | let () = use_static S.x
+                        ^^^
+Error: This value is dynamic but is expected to be static.

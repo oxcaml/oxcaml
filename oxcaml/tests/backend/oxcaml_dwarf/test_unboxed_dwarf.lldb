@@ -94,4 +94,54 @@
 (lldb) b Test_unboxed_dwarf.f_poly_product
 (lldb) c
 (lldb) c
+(lldb) b Test_unboxed_dwarf.f_int64_array
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int32_array
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_array_record_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_float_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_mixed_tuple_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_nativeint_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int64_pair_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_float32_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_empty_int64_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_large_int64_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int8_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int16_array
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_int32_array_packed_corner
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_float32_array_packed_corner
+(lldb) c
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_2xint8_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_one_int64_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_4xint16_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_72bit_array
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_record_16xint64_array
+(lldb) c
 (lldb) quit

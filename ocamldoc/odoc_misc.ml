@@ -83,9 +83,9 @@ let remove_duplicates (type a) compare (li : a list) =
 let rec string_of_longident li =
   match li with
   | Longident.Lident s -> s
-  | Longident.Ldot(li, s) -> string_of_longident li ^ "." ^ s
+  | Longident.Ldot(li, s) -> string_of_longident li.txt ^ "." ^ s.txt
   | Longident.Lapply(l1, l2) ->
-      string_of_longident l1 ^ "(" ^ string_of_longident l2 ^ ")"
+      string_of_longident l1.txt ^ "(" ^ string_of_longident l2.txt ^ ")"
 
 let rec string_of_text t =
   let rec iter t_ele =
@@ -495,6 +495,7 @@ let remove_option typ =
     match t with
     | Tconstr(path, [ty], _)
       when Path.same path Predef.path_option -> get_desc ty
+    | Tmod _ -> Misc.fatal_error "Odoc_misc: unexpected Tmod"
     | Tconstr _
     | Tvar _
     | Tunivar _
@@ -507,10 +508,12 @@ let remove_option typ =
     | Tfield _
     | Tquote _
     | Tsplice _
+    | Tquote_eval _
     | Tnil
     | Tvariant _
     | Tpackage _
-    | Tof_kind _ -> t
+    | Tof_kind _
+    | Tbox _ -> t
     | Tlink t2 -> trim (get_desc t2)
     | Tsubst _ -> assert false
   in

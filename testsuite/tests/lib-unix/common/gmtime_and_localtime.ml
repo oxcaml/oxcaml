@@ -9,7 +9,7 @@
 *)
 
 let () =
-  (Unix.putenv [@alert "-unsafe_multidomain"]) "TZ" "UTC";
+  Unix.putenv "TZ" "UTC";
   let tm = Unix.{
     tm_sec = 45;
     tm_min = 30;

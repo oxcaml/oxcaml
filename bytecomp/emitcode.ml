@@ -49,24 +49,30 @@ let () =
     )
 
 (* Buffering of bytecode *)
-let out_buffer = ref(LongString.create 0)
+let create_bigarray = Bigarray.Array1.create Bigarray.Char Bigarray.c_layout
+
+let copy_bigarray src dst size =
+  Bigarray.Array1.(blit (sub src 0 size) (sub dst 0 size))
+
+let out_buffer = ref(create_bigarray 0)
 and out_position = ref 0
 
 let extend_buffer needed =
-  let size = LongString.length !out_buffer in
+  let size = Bigarray.Array1.dim !out_buffer in
   let new_size = ref(max size 16) (* we need new_size > 0 *) in
   while needed >= !new_size do new_size := 2 * !new_size done;
-  let new_buffer = LongString.create !new_size in
-  LongString.blit !out_buffer 0 new_buffer 0 (LongString.length !out_buffer);
+  let new_buffer = create_bigarray !new_size in
+  copy_bigarray !out_buffer new_buffer size;
   out_buffer := new_buffer
 
 let out_word b1 b2 b3 b4 =
   let p = !out_position in
-  if p+3 >= LongString.length !out_buffer then extend_buffer (p+3);
-  LongString.set !out_buffer p (Char.unsafe_chr b1);
-  LongString.set !out_buffer (p+1) (Char.unsafe_chr b2);
-  LongString.set !out_buffer (p+2) (Char.unsafe_chr b3);
-  LongString.set !out_buffer (p+3) (Char.unsafe_chr b4);
+  let open Bigarray.Array1 in
+  if p+3 >= dim !out_buffer then extend_buffer (p+3);
+  set !out_buffer p (Char.unsafe_chr b1);
+  set !out_buffer (p+1) (Char.unsafe_chr b2);
+  set !out_buffer (p+2) (Char.unsafe_chr b3);
+  set !out_buffer (p+3) (Char.unsafe_chr b4);
   out_position := p + 4
 
 let out opcode =
@@ -116,10 +122,11 @@ let extend_label_table needed =
 
 let backpatch (pos, orig) =
   let displ = (!out_position - orig) asr 2 in
-  LongString.set !out_buffer pos (Char.unsafe_chr displ);
-  LongString.set !out_buffer (pos+1) (Char.unsafe_chr (displ asr 8));
-  LongString.set !out_buffer (pos+2) (Char.unsafe_chr (displ asr 16));
-  LongString.set !out_buffer (pos+3) (Char.unsafe_chr (displ asr 24))
+  let open Bigarray.Array1 in
+  set !out_buffer pos (Char.unsafe_chr displ);
+  set !out_buffer (pos+1) (Char.unsafe_chr (displ asr 8));
+  set !out_buffer (pos+2) (Char.unsafe_chr (displ asr 16));
+  set !out_buffer (pos+3) (Char.unsafe_chr (displ asr 24))
 
 let define_label lbl =
   if lbl >= Array.length !label_table then extend_label_table lbl;
@@ -150,7 +157,7 @@ let enter info =
   reloc_info := (info, !out_position) :: !reloc_info
 
 let slot_for_literal sc =
-  enter (Reloc_literal sc);
+  enter (Reloc_literal (Symtable.transl_const sc));
   out_int 0
 and slot_for_getglobal cu =
   let reloc_info = Reloc_getcompunit cu in
@@ -193,12 +200,12 @@ let clear() =
   reloc_info := [];
   debug_dirs := String.Set.empty;
   events := [];
-  out_buffer := LongString.create 0
+  out_buffer := create_bigarray 0
 
 let init () =
   clear ();
   label_table := Array.make 16 (Label_undefined []);
-  out_buffer := LongString.create 1024
+  out_buffer := create_bigarray 1024
 
 (* Emission of one instruction *)
 
@@ -223,10 +230,6 @@ let negate_integer_comparison = function
   | Geint -> Ltint
   | Ultint -> Ugeint
   | Ugeint -> Ultint
-
-let runtime5_only () =
-  if not Config.runtime5 then
-    Misc.fatal_error "Effect primitives are only supported on runtime5"
 
 let emit_instr = function
     Klabel lbl -> define_label lbl
@@ -334,12 +337,17 @@ let emit_instr = function
   | Kgetpubmet tag -> out opGETPUBMET; out_int tag; out_int 0
   | Kgetdynmet -> out opGETDYNMET
   | Kevent ev -> record_event ev
-  | Kperform -> runtime5_only (); out opPERFORM
-  | Kresume -> runtime5_only (); out opRESUME
-  | Kresumeterm n -> runtime5_only (); out opRESUMETERM; out_int n
-  | Kreperformterm n -> runtime5_only (); out opREPERFORMTERM; out_int n
-  | Kwith_stack -> runtime5_only (); out opWITH_STACK
-  | Kwith_stack_bind -> runtime5_only (); out opWITH_STACK_BIND
+  | Kperform -> out opPERFORM
+  | Kcontinue -> out opCONTINUE
+  | Kcontinueterm n -> out opCONTINUETERM; out_int n
+  | Kdiscontinue -> out opDISCONTINUE
+  | Kdiscontinueterm n -> out opDISCONTINUETERM; out_int n
+  | Kdiscontinue_with_backtrace -> out opDISCONTINUE_WITH_BACKTRACE
+  | Kdiscontinue_with_backtraceterm n ->
+    out opDISCONTINUE_WITH_BACKTRACETERM; out_int n
+  | Kreperformterm n -> out opREPERFORMTERM; out_int n
+  | Kwith_stack -> out opWITH_STACK
+  | Kwith_stack_preemptible -> out opWITH_STACK_PREEMPTIBLE
   | Kstop -> out opSTOP
 
 (* Emission of a list of instructions. Include some peephole optimization. *)
@@ -424,7 +432,7 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
   output_binary_int outchan 0;
   let pos_code = pos_out outchan in
   emit code;
-  LongString.output outchan !out_buffer 0 !out_position;
+  Out_channel.output_bigarray outchan !out_buffer 0 !out_position;
   let (pos_debug, size_debug) =
     if !Clflags.debug then begin
       let filename = Unit_info.Artifact.filename artifact_info in
@@ -478,8 +486,8 @@ let to_memory instrs =
   init();
   Fun.protect ~finally:clear (fun () ->
   emit instrs;
-  let code = LongString.create !out_position in
-  LongString.blit !out_buffer 0 code 0 !out_position;
+  let code = create_bigarray !out_position in
+  copy_bigarray !out_buffer code !out_position;
   let reloc = List.rev !reloc_info in
   let events = !events in
   (code, reloc, events))
@@ -490,7 +498,7 @@ let to_packed_file outchan code =
   init ();
   Fun.protect ~finally:clear (fun () ->
   emit code;
-  LongString.output outchan !out_buffer 0 !out_position;
+  Out_channel.output_bigarray outchan !out_buffer 0 !out_position;
   let reloc = List.rev !reloc_info in
   let events = !events in
   let debug_dirs = !debug_dirs in

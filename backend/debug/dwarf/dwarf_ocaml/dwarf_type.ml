@@ -249,21 +249,55 @@ let create_typedef_die ~reference ~parent_proto_die ?name child_die =
       |> attribute_list_with_optional_name name)
     ()
 
-let create_array_die ~reference ~parent_proto_die ~child_die ?name () =
+(** {1 Layout of OCaml array elements}
+
+    The OCaml runtime lays out array elements differently depending on the
+    element kind. The stride between consecutive elements is:
+
+    {v
+    | Element                          | Stride        | Notes                 |
+    |----------------------------------|---------------|-----------------------|
+    | [value] kind                     | [size_addr]   | regular OCaml value   |
+    | [int8#]                          | 1 byte        | densely packed 8/word |
+    | [int16#]                         | 2 bytes       | densely packed 4/word |
+    | [int32#], [float32#]             | 4 bytes       | densely packed 2/word |
+    | [int64#], [float#], [nativeint#] | 8 bytes       | exactly one word      |
+    | unboxed product                  | sum of word-  | e.g. #{int8#; int8#}  |
+    |                                  | extended      | takes 16 bytes per    |
+    |                                  | fields        | element               |
+    v}
+
+    So primitive sub-word arrays are densely packed (multiple values per word),
+    but the moment a sub-word value lives inside an unboxed product field its
+    slot grows to one full word.
+
+    The in-array layout is independent of how the same type is laid out
+    elsewhere (e.g. as a field of a mixed block, or in a register), so the
+    stride is not derivable from the element die alone - it must be computed by
+    the caller. [create_array_die] and [create_packed_struct] below produce
+    DWARF that follows the table above.
+
+    Caveat for densely packed primitive sub-word arrays: the OCaml block tag
+    encodes how many of the final word's slots are valid, but OxCaml LLDB
+    ignores the [DW_AT_count = 0] we emit below and infers the element count
+    from [block_size / element_stride], which overshoots by up to
+    [elements_per_word - 1]. Once the language plugin supports DWARF expressions
+    we can replace the [0] with a tag-aware count expression and the displayed
+    length will match the logical length. *)
+let create_array_die ~reference ~parent_proto_die ~child_die ~element_stride
+    ?name () =
   let array_die =
     Proto_die.create ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Array_type
       ~attribute_values:
         [ DAH.create_type_from_reference ~proto_die_reference:child_die;
           (* We can't use DW_AT_byte_size or DW_AT_bit_size since we don't know
              how large the array might be. *)
-          (* DW_AT_byte_stride probably isn't required strictly speaking, but
-             let's add it for the avoidance of doubt. *)
-          DAH.create_byte_stride ~bytes:(Int8.of_int_exn Arch.size_addr) ]
+          DAH.create_byte_stride ~bytes:(Int64.of_int element_stride) ]
       ()
   in
   Proto_die.create_ignore ~parent:(Some array_die) ~tag:Dwarf_tag.Subrange_type
     ~attribute_values:
-      [ (* Thankfully, all that lldb cares about is DW_AT_count. *)
+      [ (* Ignored by OxCaml LLDB; see the commentary above. *)
         DAH.create_count_const 0L ]
     ();
   (* OxCaml LLDB currently uses custom printing for arrays instead of respecting
@@ -827,7 +861,7 @@ let create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
       ~tag:Dwarf_tag.Variant_part ()
   in
   Proto_die.create_ignore ~reference:constructor_discriminant_ref
-    ~parent:(Some complex_constructors_struct) ~tag:Dwarf_tag.Member
+    ~parent:(Some variant_part_constructor) ~tag:Dwarf_tag.Member
     ~attribute_values:
       [ DAH.create_type ~proto_die:complex_constructor_enum_die;
         DAH.create_byte_size_exn ~byte_size:Arch.size_addr;
@@ -1038,7 +1072,7 @@ let unboxed_base_type_to_simd_vec_split (x : RS.unboxed) =
   match x with
   | Unboxed_simd s -> Some s
   | Unboxed_float | Unboxed_float32 | Unboxed_nativeint | Unboxed_int64
-  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 ->
+  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 | Unboxed_mask ->
     None
 
 type vec_split_properties =
@@ -1120,7 +1154,7 @@ let create_runtime_layout_type ?(simd_vec_split = None) ~reference (sort : RL.t)
   | Float32 | Float64 ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
       Encoding_attribute.float
-  | Bits8 | Bits16 | Bits32 | Bits64 | Word | Untagged_immediate ->
+  | Bits8 | Bits16 | Bits32 | Bits64 | Mask | Word | Untagged_immediate ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
       Encoding_attribute.signed
   | Vec128 | Vec256 | Vec512 ->
@@ -1128,6 +1162,10 @@ let create_runtime_layout_type ?(simd_vec_split = None) ~reference (sort : RL.t)
       ~byte_size ~split:simd_vec_split ()
 
 let create_packed_struct ~parent_proto_die dies_and_layouts =
+  (* Describes one element of an unboxed product array (see the array-layout
+     commentary above [create_array_die]). Field offsets and the total struct
+     size use [size_in_memory] (the word-extended slot), while each member's
+     [byte_size] is [RL.size] (the bytes the value actually occupies). *)
   let packed_byte_size =
     List.fold_left
       (fun acc (_, layout) -> acc + RL.size_in_memory layout)
@@ -1169,54 +1207,10 @@ let create_boxed_simd_type ?name ~reference ~parent_proto_die split =
            DAH.create_type_from_reference ~proto_die_reference:base_ref ])
     ()
 
-module Shape_with_layout = struct
-  type t =
-    { type_shape : Shape.t;
-      type_layout : Layout.t
-    }
-
-  include Identifiable.Make (struct
-    type nonrec t = t
-
-    let compare = Stdlib.compare
-    (* CR sspies: Fix compare and equals on this type. Move the module to type
-       shape once it is more cleaned up. *)
-
-    let print fmt { type_shape; type_layout } =
-      Format.fprintf fmt "%a @ %a" Shape.print type_shape
-        (Format_doc.compat Layout.format)
-        type_layout
-
-    let hash { type_shape; type_layout } =
-      Hashtbl.hash (type_shape.hash, type_layout)
-
-    let equal ({ type_shape = x1; type_layout = y1 } : t)
-        ({ type_shape = x2; type_layout = y2 } : t) =
-      Shape.equal x1 x2 && Layout.equal y1 y2
-
-    let output _oc _t = Misc.fatal_error "unimplemented"
-  end)
-end
-
-module Dwarf_die_cache : sig
-  val find_in_cache :
-    RS.t -> rec_env:'a S.DeBruijn_env.t -> Proto_die.reference option
-
-  val add_to_cache :
-    RS.t -> Proto_die.reference -> rec_env:'a S.DeBruijn_env.t -> unit
-end = struct
-  let cache = RS.Cache.create 100
-
-  let find_in_cache (runtime_shape : RS.t) ~rec_env =
-    if S.DeBruijn_env.is_empty rec_env
-    then RS.Cache.find_opt cache runtime_shape
-    else None
-
-  let add_to_cache (runtime_shape : RS.t) reference ~rec_env =
-    (* [rec_env] being empty means that the shape is closed. *)
-    if S.DeBruijn_env.is_empty rec_env
-    then RS.Cache.add cache runtime_shape reference
-end
+module Die_gen_ctx = DS.Die_gen_ctx
+module Rec_var_env = Die_gen_ctx.Rec_var_env
+module Cache = Die_gen_ctx.Cache
+module Name_cache = Die_gen_ctx.Name_cache
 
 let partition_constructors constructors ~f =
   List.partition_map
@@ -1238,22 +1232,22 @@ let partition_constructors constructors ~f =
    [runtime_shape_to_dwarf_die] only works for types without names, and types
    with names are handled in [runtime_shape_to_dwarf_die_with_aliased_name]
    below. *)
-let rec runtime_shape_to_dwarf_die (t : RS.t) ~parent_proto_die
+let rec runtime_shape_to_dwarf_die ~ctx (t : RS.t) ~parent_proto_die
     ~fallback_value_die ~rec_env =
-  match Dwarf_die_cache.find_in_cache t ~rec_env with
+  match Cache.find (Die_gen_ctx.cache ctx) ~inp:t ~rec_env with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    Dwarf_die_cache.add_to_cache t reference ~rec_env;
+    Cache.add (Die_gen_ctx.cache ctx) ~inp:t ~rec_env ~outp:reference;
     let name = None in
     (* Instead of omitting the name argument below, we fix it to be [None] here
        such that it is easier to change this code if in the future we want to
        change how the names of types are handled. *)
-    runtime_shape_to_dwarf_die_memo t ?name ~reference ~parent_proto_die
+    runtime_shape_to_dwarf_die_memo ~ctx t ?name ~reference ~parent_proto_die
       ~fallback_value_die ~rec_env;
     reference
 
-and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
+and runtime_shape_to_dwarf_die_memo ~ctx ~reference ?name (t : RS.t)
     ~parent_proto_die ~fallback_value_die ~rec_env : unit =
   let err ~fallback f =
     if !Clflags.dwarf_pedantic
@@ -1263,11 +1257,12 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
         ~fallback_value_die ()
   in
   let die sh =
-    runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die ~rec_env sh
+    runtime_shape_to_dwarf_die ~ctx ~parent_proto_die ~fallback_value_die
+      ~rec_env sh
   in
   let die_with_extended_env sh new_ref =
-    runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-      ~rec_env:(S.DeBruijn_env.push rec_env new_ref)
+    runtime_shape_to_dwarf_die ~ctx ~parent_proto_die ~fallback_value_die
+      ~rec_env:(Die_gen_ctx.push_rec_binder ctx rec_env new_ref)
       sh
   in
   match t.desc with
@@ -1275,8 +1270,8 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
     create_runtime_layout_type ~reference type_layout ?name ~parent_proto_die
       ~fallback_value_die ()
   | Predef p ->
-    predef_to_dwarf_die ~reference ?name p ~parent_proto_die ~fallback_value_die
-      ~rec_env
+    predef_to_dwarf_die ~ctx ~reference ?name p ~parent_proto_die
+      ~fallback_value_die ~rec_env
   | Tuple { args; kind = Tuple_boxed } ->
     (* CR sspies: In the future, tuples have to be handled like mixed
        records. *)
@@ -1368,7 +1363,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
              Format.pp_print_string)
           constructor_names)
   | Rec_var (de_bruijn_index, layout) -> (
-    match S.DeBruijn_env.get_opt rec_env ~de_bruijn_index with
+    match Rec_var_env.get_opt rec_env ~de_bruijn_index with
     | Some reference' ->
       create_typedef_die ~reference ~parent_proto_die ?name reference'
     | None ->
@@ -1376,26 +1371,33 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
           f
             "Recursive variable environment lookup failed: rec_env returned \
              None for de Bruijn index %a"
-            S.DeBruijn_index.print de_bruijn_index))
+            RS.DeBruijn_index.print de_bruijn_index))
   | Mu sh ->
     (* CR sspies: We are creating two typedefs for recursive types. One should
        be enough. *)
     let reference' = die_with_extended_env sh reference in
     create_typedef_die ~reference ~parent_proto_die ?name reference'
 
-and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
+and predef_to_dwarf_die ~ctx ~reference ?name (t : RS.predef) ~parent_proto_die
     ~fallback_value_die ~rec_env =
   let die sh =
-    runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die ~rec_env sh
+    runtime_shape_to_dwarf_die ~ctx ~parent_proto_die ~fallback_value_die
+      ~rec_env sh
   in
   match t with
   | Array (Regular s) ->
     let child_die = die s in
-    create_array_die ~reference ~parent_proto_die ~child_die ?name ()
+    let element_stride = RL.size (RS.runtime_layout s) in
+    create_array_die ~reference ~parent_proto_die ~child_die ~element_stride
+      ?name ()
   | Array (Packed fields) ->
     let dies = List.map (fun t -> die t, RS.runtime_layout t) fields in
     let packed_die = create_packed_struct ~parent_proto_die dies in
-    create_array_die ~reference ~parent_proto_die ~child_die:packed_die ?name ()
+    let element_stride =
+      List.fold_left (fun acc (_, ly) -> acc + RL.size_in_memory ly) 0 dies
+    in
+    create_array_die ~reference ~parent_proto_die ~child_die:packed_die
+      ~element_stride ?name ()
   | Char -> create_char_die ~reference ~parent_proto_die ?name ()
   | Unboxed b ->
     let type_layout = RS.runtime_layout_of_unboxed b in
@@ -1407,16 +1409,11 @@ and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
     create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
       ()
   | Bytes | Extension_constructor | Float | Float32 | Floatarray | Int | Int8
-  | Int16 | Int32 | Int64 | Lazy_t _ | Nativeint | String ->
+  | Int16 | Int32 | Int64 | Lazy_t _ | Mask | Nativeint | String ->
     create_runtime_layout_type ~reference Value ?name ~parent_proto_die
       ~fallback_value_die ()
 (* CR sspies: Create a separate block for lazy values. We now have type
    information for them. *)
-
-(** This second cache is for named type shapes. Every type name should be
-    associated with at most one DWARF die, so this cache maps type names to type
-    shapes and DWARF dies. *)
-let name_cache = String.Tbl.create 16
 
 module With_cms_reduce = Shape_reduce.Make (struct
   let fuel () = MB.of_option !Clflags.gdwarf_config_shape_reduce_fuel
@@ -1505,50 +1502,35 @@ end)
 
 module D = Shape_reduction_diagnostics
 
-(* Search for the first unused suffix-numbered version of [name] in the
-   [name_cache] cache. If we come along a type of the same name and runtime
-   shape, then we simply use that reference. *)
-let find_unused_type_name_or_cached (name : string) (runtime_shape : RS.t) :
-    (Proto_die.reference, string) Either.t =
-  let rec aux inc : _ Either.t =
-    let name_suffix = if inc = 0 then "" else "/" ^ string_of_int inc in
-    let name = name ^ name_suffix in
-    match String.Tbl.find_opt name_cache name with
-    | Some (runtime_shape', reference) ->
-      if RS.equal runtime_shape runtime_shape'
-      then Left reference
-      else aux (inc + 1)
-    | None -> Right name
-  in
-  aux 0
-
 (* We represent all types as DIE entries of the form [typedef ... type_name;]
    and use caching for types that have the same name and shape. For name
    conflicts, we search for the next available suffix-numbered version of the
    name, [type_name/n]. *)
-let runtime_shape_to_dwarf_die_with_aliased_name (type_name : string)
+let runtime_shape_to_dwarf_die_with_aliased_name ~ctx (type_name : string)
     (runtime_shape : RS.t) ~parent_proto_die ~fallback_value_die :
     Proto_die.reference =
-  match find_unused_type_name_or_cached type_name runtime_shape with
+  let name_cache = Die_gen_ctx.name_cache ctx in
+  match
+    Name_cache.find_unused_name_or_cached name_cache type_name runtime_shape
+  with
   | Left reference -> reference
   | Right name ->
     let unnamed_die =
-      runtime_shape_to_dwarf_die runtime_shape ~parent_proto_die
+      runtime_shape_to_dwarf_die ~ctx runtime_shape ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:S.DeBruijn_env.empty
+        ~rec_env:(Die_gen_ctx.empty_rec_env ctx)
     in
     let reference = Proto_die.create_reference () in
     let runtime_layout = RS.runtime_layout runtime_shape in
     let layout_name = RL.to_string runtime_layout in
     let full_name = name ^ " @ " ^ layout_name in
-    String.Tbl.add name_cache name (runtime_shape, reference);
+    Name_cache.add name_cache name runtime_shape reference;
     create_typedef_die ~reference ~name:full_name ~parent_proto_die unnamed_die;
     reference
 
-let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
-  let fallback_value_die =
-    Proto_die.reference (DS.value_type_proto_die state)
-  in
+let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
+    ~parent_proto_die =
+  let fallback_value_die = Proto_die.reference value_type_proto_die in
   (* Once we reach the backend, layouts such as Product [Product [Bits64;
      Bits64]; Float64] have de facto been flattened into a sequence of base
      layouts [Bits64; Bits64; Float64]. Below, we compute the index into the
@@ -1590,6 +1572,7 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
       Profile.record "unfold_and_evaluate"
         (fun () ->
           Type_shape.Evaluated_shape.unfold_and_evaluate
+            ~ctx:(DS.eval_context state)
             ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
             type_shape)
         ~accumulate:true ()
@@ -1656,8 +1639,9 @@ let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
         let reference =
           Profile.record "dwarf_produce_dies"
             (fun () ->
-              runtime_shape_to_dwarf_die_with_aliased_name type_name
-                runtime_shape ~parent_proto_die ~fallback_value_die)
+              runtime_shape_to_dwarf_die_with_aliased_name
+                ~ctx:(DS.die_gen_ctx state) type_name runtime_shape
+                ~parent_proto_die ~fallback_value_die)
             ~accumulate:true ()
         in
         if Debugging_the_compiler.enabled ()

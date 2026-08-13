@@ -22,7 +22,7 @@ open! Int_replace_polymorphic_compare
 
 [@@@ocaml.warning "+a-4-9-40-41-42"]
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Or_never_returns = Select_utils.Or_never_returns
 module SU = Select_utils
 module V = Backend_var
@@ -51,6 +51,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec128 _ -> true
     | Cconst_vec256 _ -> true
     | Cconst_vec512 _ -> true
+    | Cconst_mask _ -> true
     | Cvar _ -> true
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
@@ -70,10 +71,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         false
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
-      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Caddi128
-      | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Ccmpi _
-      | Caddv | Cadda | Cnegf _ | Cclz _ | Cctz _ | Cpopcnt | Cbswap _ | Ccsel _
-      | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
+      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+      | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _
+      | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
       | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
       | Cdls_get | Ctls_get | Cdomain_index ->
         List.for_all is_simple_expr args)
@@ -101,7 +102,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match exp with
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cvar _ ->
+    | Cconst_mask _ | Cvar _ ->
       EC.none
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
@@ -127,11 +128,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ->
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
-        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
         | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
-        | Ccsel _ | Cclz _ | Cctz _ | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _
-        | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
-        | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
+        | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv
+        | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+        | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
           EC.none
       in
       EC.join from_op (EC.join_list_map args effects_of)
@@ -159,17 +160,29 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Is_immediate result -> result
     | Use_default -> is_immediate (Icomp cmp) n
 
+  (* Turn integer constants that fit in an OCaml integer into [Cconst_int], so
+     that the [Cconst_int] patterns below suffice to recognize all constants
+     that may be used as immediate arguments. *)
+  let normalize_int_constant (expr : Cmm.expression) : Cmm.expression =
+    match expr with
+    | Cconst_natint (n, dbg)
+      when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
+      Cconst_int (Nativeint.to_int n, dbg)
+    | _ -> expr
+
   (* Instruction selection for conditionals *)
 
   let select_condition (arg : Cmm.expression) : Operation.test * Cmm.expression
       =
     match arg with
-    | Cop (Ccmpi cmp, [arg1; Cconst_int (n, _)], _) when is_immediate_test cmp n
-      ->
-      Iinttest_imm (cmp, n), arg1
-    | Cop (Ccmpi cmp, [Cconst_int (n, _); arg2], _)
-      when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
-      Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
+    | Cop (Ccmpi cmp, [arg1; arg2], _) -> (
+      match normalize_int_constant arg1, normalize_int_constant arg2 with
+      | arg1, Cconst_int (n, _) when is_immediate_test cmp n ->
+        Iinttest_imm (cmp, n), arg1
+      | Cconst_int (n, _), arg2
+        when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
+        Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
+      | arg1, arg2 -> Iinttest cmp, Ctuple [arg1; arg2])
     | Cop (Ccmpi cmp, args, _) -> Iinttest cmp, Ctuple args
     | Cop (Ccmpf (width, cmp), args, _) -> Ifloattest (width, cmp), Ctuple args
     | Cop (Cand, [arg1; Cconst_int (1, _)], _) -> Ioddtest, arg1
@@ -224,7 +237,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comm (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match List.map normalize_int_constant args with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | [Cconst_int (n, _); arg] when is_immediate op n ->
@@ -234,7 +247,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match List.map normalize_int_constant args with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | _ -> SU.basic_op (Intop op), args
@@ -242,7 +255,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comp (cmp : Operation.integer_comparison)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match List.map normalize_int_constant args with
     | [arg; Cconst_int (n, _)] when is_immediate (Operation.Icomp cmp) n ->
       SU.basic_op (Intop_imm (Icomp cmp, n)), [arg]
     | [Cconst_int (n, _); arg]
@@ -345,8 +358,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Csubi -> select_arith Isub args
     | Cmuli -> select_arith_comm Imul args
     | Cmulhi { signed } -> select_arith_comm (Imulh { signed }) args
-    | Cdivi -> SU.basic_op (Intop Idiv), args
-    | Cmodi -> SU.basic_op (Intop Imod), args
+    | Cdivi { signed } -> SU.basic_op (Intop (Idiv { signed })), args
+    | Cmodi { signed } -> SU.basic_op (Intop (Imod { signed })), args
     | Caddi128 -> SU.basic_op (Int128op Iadd128), args
     | Csubi128 -> SU.basic_op (Int128op Isub128), args
     | Cmuli64 { signed } -> SU.basic_op (Int128op (Imul64 { signed })), args
@@ -356,10 +369,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Clsl -> select_arith Ilsl args
     | Clsr -> select_arith Ilsr args
     | Casr -> select_arith Iasr args
-    | Cclz { arg_is_non_zero } ->
-      SU.basic_op (Intop (Iclz { arg_is_non_zero })), args
-    | Cctz { arg_is_non_zero } ->
-      SU.basic_op (Intop (Ictz { arg_is_non_zero })), args
+    | Cclz -> SU.basic_op (Intop Iclz), args
+    | Cctz -> SU.basic_op (Intop Ictz), args
     | Cpopcnt -> SU.basic_op (Intop Ipopcnt), args
     | Ccmpi comp -> select_arith_comp comp args
     | Caddv -> select_arith_comm Iadd args
@@ -622,6 +633,32 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       assert (Array.length regs_addr = 1);
       ref regs_addr
     in
+    let reset_addressing () =
+      (* Use a temporary to store the address [!base + !byte_offset]. *)
+      let tmp = Reg.createv Cmm.typ_int in
+      (* CR-someday xclerc: Now that this code in the "generic" part, it is
+         maybe a bit unexpected to assume there is no better sequence to emit x
+         += k. That being said, it is a corner case. *)
+      insert_debug env sub_cfg
+        (Op (SU.make_const_int (Nativeint.of_int !byte_offset)))
+        dbg [||] tmp;
+      (* The new base is a pointer into the middle of an ocaml value. *)
+      assert (!byte_offset > 0);
+      let new_base = Reg.createv Cmm.typ_addr in
+      insert_debug env sub_cfg (Op (Operation.Intop Iadd)) dbg
+        (Array.append !base tmp) new_base;
+      (* Use the temporary as the new base address. *)
+      base := new_base;
+      byte_offset := 0;
+      addressing_mode := Arch.identity_addressing
+    in
+    let advance bytes =
+      byte_offset := !byte_offset + bytes;
+      match Target.is_offset_out_of_range !byte_offset with
+      | Within_range ->
+        addressing_mode := Arch.offset_addressing !addressing_mode bytes
+      | Out_of_range -> reset_addressing ()
+    in
     let for_one_arg arg =
       let original_arg = arg in
       let select_store_result =
@@ -653,52 +690,20 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Vec128 -> Onetwentyeight_unaligned
               | Vec256 -> Twofiftysix_unaligned
               | Vec512 -> Fivetwelve_unaligned
+              | Mask -> Word_mask
               | Val | Addr | Int -> Word_val
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
-            let is_out_of_range :
-                Cfg_selectgen_target_intf.is_store_out_of_range_result =
-              match select_store_result with
-              | Rewritten _ | Use_default -> Within_range
-              | Maybe_out_of_range ->
-                Target.is_store_out_of_range chunk ~byte_offset:!byte_offset
-            in
-            let reset_addressing () =
-              (* Use a temporary to store the address [!base + !byte_offset]. *)
-              let tmp = Reg.createv Cmm.typ_int in
-              (* CR-someday xclerc: Now that this code in the "generic" part, it
-                 is maybe a bit unexpected to assume there is no better sequence
-                 to emit x += k. That being said, it is a corner case. *)
-              insert_debug env sub_cfg
-                (Op (SU.make_const_int (Nativeint.of_int !byte_offset)))
-                dbg [||] tmp;
-              (* The new base is a pointer into the middle of an ocaml value. *)
-              assert (!byte_offset > 0);
-              let new_base = Reg.createv Cmm.typ_addr in
-              insert_debug env sub_cfg (Op (Operation.Intop Iadd)) dbg
-                (Array.append !base tmp) new_base;
-              (* Use the temporary as the new base address. *)
-              base := new_base;
-              byte_offset := 0;
-              addressing_mode := Arch.identity_addressing
-            in
-            (match is_out_of_range with
-            | Within_range -> ()
-            | Out_of_range -> reset_addressing ());
             insert_debug env sub_cfg
               (Op (Store (chunk, !addressing_mode, false)))
               dbg
               (Array.append [| r |] !base)
               [||];
-            let size = SU.size_component r.Reg.typ in
-            addressing_mode := Arch.offset_addressing !addressing_mode size;
-            byte_offset := !byte_offset + size
+            advance (SU.size_component r.Reg.typ)
           done
         | Some op ->
           insert_debug env sub_cfg (Op op) dbg (Array.append regs regs_addr) [||];
-          let size = SU.size_expr env original_arg in
-          addressing_mode := Arch.offset_addressing !addressing_mode size;
-          byte_offset := !byte_offset + size)
+          advance (SU.size_expr env original_arg))
       | Never_returns ->
         Misc.fatal_error
           "emit_expr did not return any registers in [emit_stores]"
@@ -745,6 +750,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec512 (bits, _dbg) ->
       let r = Reg.createv Cmm.typ_vec512 in
       Ok (insert_op env sub_cfg (Operation.Const_vec512 bits) [||] r)
+    | Cconst_mask (bits, _dbg) ->
+      let r = Reg.createv Cmm.typ_mask in
+      Ok (insert_op env sub_cfg (Operation.Const_mask bits) [||] r)
     | Cconst_symbol (n, _dbg) ->
       (* Cconst_symbol _ evaluates to a statically-allocated address, so its
          value fits in a typ_int register and is never changed by the GC.
@@ -777,7 +785,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok (simple_args, env) ->
         let* rs = emit_tuple env sub_cfg simple_args in
-        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rs))
+        let rd = Reg.createv_with_typs rs in
+        Ok (insert_op_debug env sub_cfg (SU.make_opaque ()) dbg rs rd))
     | Cop (Ctuple_field (field, fields_layout), [arg], _dbg) -> (
       match emit_expr env sub_cfg arg ~bound_name:None with
       | Never_returns -> Never_returns
@@ -835,7 +844,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       insert_return env sub_cfg ok (SU.pop_all_traps env)
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cvar _ | Ctuple _ | Cexit _ ->
+    | Cconst_mask _ | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
 
   and emit_invalid env sub_cfg message symbol =
@@ -1014,10 +1023,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         add_naming_op_for_bound_name sub_cfg rd;
         Ok (insert_op_debug env sub_cfg op dbg r1 rd)
       | Basic basic ->
-        Misc.fatal_errorf "unexpected basic (%a)" Cfg.dump_basic basic
+        Misc.fatal_errorf "unexpected basic (%a)" Printcfg.basic_desc basic
       | Terminator term ->
         Misc.fatal_errorf "unexpected terminator (%a)"
-          (Cfg.dump_terminator ~sep:"")
+          (Printcfg.terminator_desc ~sep:"")
           term)
 
   and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg eif
@@ -1200,9 +1209,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Array.iter
           (fun reg ->
             match reg.Reg.typ with
-            | Addr -> assert false
+            | Addr ->
+              Misc.fatal_error
+                "Cfg_selectgen.emit_expr_exit: unexpected machtype_component \
+                 Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ())
+            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 ->
+              ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;
         SU.insert_moves env sub_cfg tmp_regs (Array.concat handler.regs);
@@ -1277,8 +1290,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             loc_res;
           Sub_cfg.add_never_block sub_cfg ~label:label_after;
           SU.set_traps_for_raise env;
-          SU.insert env sub_cfg (Op (Stackoffset (-stack_ofs))) [||] [||];
-          insert_return env sub_cfg (Ok loc_res) (SU.pop_all_traps env))
+          SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+          insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
       | Terminator (Call { op = Direct func; label_after } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
@@ -1306,8 +1319,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.insert_debug' env sub_cfg term dbg loc_arg loc_res;
           Sub_cfg.add_never_block sub_cfg ~label:label_after;
           SU.set_traps_for_raise env;
-          SU.insert env sub_cfg (Op (Stackoffset (-stack_ofs))) [||] [||];
-          insert_return env sub_cfg (Ok loc_res) (SU.pop_all_traps env))
+          SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
+          insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
       | _ -> Misc.fatal_error "Cfg_selectgen.emit_tail")
 
   and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) eif
@@ -1485,8 +1498,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               }
           in
           DLL.add_end block.Cfg.body
-            (Sub_cfg.make_instr (Cfg.Op naming_op) hard_regs_for_arg [||]
-               Debuginfo.none))
+            (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||] Debuginfo.none))
       fun_args
 
   (* Sequentialization of a function definition *)

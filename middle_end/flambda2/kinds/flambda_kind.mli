@@ -32,6 +32,7 @@ module Naked_number_kind : sig
     | Naked_vec128
     | Naked_vec256
     | Naked_vec512
+    | Naked_mask
 
   val print : Format.formatter -> t -> unit
 
@@ -79,6 +80,8 @@ val naked_vec256 : t
 
 val naked_vec512 : t
 
+val naked_mask : t
+
 val region : t
 
 val rec_info : t
@@ -89,7 +92,7 @@ val is_naked_float : t -> bool
 
 include Container_types.S with type t := t
 
-type flat_suffix_element = private
+type flat_suffix_element =
   | Naked_float
   | Naked_float32
   | Naked_int8
@@ -101,13 +104,12 @@ type flat_suffix_element = private
   | Naked_vec128
   | Naked_vec256
   | Naked_vec512
+  | Naked_mask
 
 module Mixed_block_lambda_shape = Mixed_block_shape
 
 module Mixed_block_shape : sig
   type t
-
-  val from_mixed_block_shape : _ Mixed_block_lambda_shape.t -> t
 
   val field_kinds : t -> kind array
 
@@ -124,6 +126,9 @@ module Mixed_block_shape : sig
   val compare : t -> t -> int
 
   val print : Format.formatter -> t -> unit
+
+  val from_prefix_size_and_suffix_elements :
+    int -> flat_suffix_element list -> t
 end
 
 module Scannable_block_shape : sig
@@ -141,6 +146,8 @@ module Scannable_block_shape : sig
   val print : Format.formatter -> t -> unit
 
   val element_kind : t -> int -> kind
+
+  val from_mixed_block_shape : _ Mixed_block_lambda_shape.t -> t
 end
 
 module Block_shape : sig
@@ -190,6 +197,7 @@ module Boxable_number : sig
     | Naked_vec128
     | Naked_vec256
     | Naked_vec512
+    | Naked_mask
 
   val unboxed_kind : t -> kind
 
@@ -223,6 +231,7 @@ module With_subkind : sig
       | Boxed_vec128
       | Boxed_vec256
       | Boxed_vec512
+      | Boxed_mask
       | Tagged_immediate
       | Variant of
           { consts : Target_ocaml_int.Set.t;
@@ -243,6 +252,7 @@ module With_subkind : sig
       | Unboxed_vec128_array
       | Unboxed_vec256_array
       | Unboxed_vec512_array
+      | Unboxed_mask_array
       | Unboxed_product_array
 
     include Container_types.S with type t := t
@@ -289,6 +299,8 @@ module With_subkind : sig
 
   val naked_vec512 : t
 
+  val naked_mask : t
+
   val region : t
 
   val boxed_float : t
@@ -300,6 +312,8 @@ module With_subkind : sig
   val boxed_nativeint : t
 
   val boxed_vec128 : t
+
+  val boxed_mask : t
 
   val tagged_immediate : t
 
@@ -318,6 +332,8 @@ module With_subkind : sig
   val unboxed_vec256_array : t
 
   val unboxed_vec512_array : t
+
+  val unboxed_mask_array : t
 
   val unboxed_product_array : t
 

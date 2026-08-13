@@ -1,6 +1,7 @@
 (* TEST
+ include eval;
  modules = "poly_types.ml util.ml";
- flags = "-extension runtime_metaprogramming";
+ flags = "-extension runtime_metaprogramming -uses-metaprogramming";
  native;
 *)
 
@@ -39,11 +40,13 @@ let () =
 ;;
 
 (* Method polymorphic in a jkind-annotated variable *)
-(* FIXME: Enable this test when TypePoly keeps track of jkind annotation *)
+(* CR metaprogramming jbachurski: Enable when we can quote jkind annotations. *)
+(*
 let () =
   let (f : <[to4]> expr) = <[fun obj -> (obj#f 42, obj#f true)]> in
   test ~eval:false <[ ignore (((fun x -> x) $f) : to4) ]>
 ;;
+*)
 
 (* Method with recursive type *)
 let () =
@@ -96,6 +99,13 @@ let () =
   test <[ ignore (((fun x -> x) $f) : t3''') ]>
 ;;
 
+(* eval types *)
+(* FIXME: For ~eval:true, we need to allow evaluating programs with quotes. *)
+let () =
+  let (f : <[t3'''']> expr) = <[fun f -> (f <[42]>, f <["abc"]>)]> in
+  test ~eval:false <[ ignore (((fun x -> x) $f) : t3'''') ]>
+;;
+
 (* funky object types *)
 let () =
   let (f : <[('a. < x : 'a; .. > -> 'a) -> int * string]> expr) =
@@ -119,11 +129,13 @@ let () =
 ;;
 
 (* Parameter polymorphic in a jkind-annotated variable *)
-(* FIXME: Enable this test when TypePoly keeps track of jkind annotation *)
+(* CR metaprogramming jbachurski: Enable when we can quote jkind annotations. *)
+(*
 let () =
   let (f : <[t4]> expr) = <[fun f -> (f 42, f true)]> in
   test ~eval:false <[ ignore (((fun x -> x) $f) : t4) ]>
 ;;
+*)
 
 
 (** Polymorphic parameters: higher-rank function elimination **)
@@ -149,8 +161,10 @@ let () =
 ;;
 
 (* Parameter polymorphic in a jkind-annotated variable *)
-(* FIXME: Enable this test when TypePoly keeps track of jkind annotation *)
+(* CR metaprogramming jbachurski: Enable when we can quote jkind annotations. *)
+(*
 let () =
   let (f : <[te4]> expr) = <[fun f -> f (fun x -> x)]> in
   test ~eval:false <[ ignore (((fun x -> x) $f) : te4) ]>
 ;;
+*)

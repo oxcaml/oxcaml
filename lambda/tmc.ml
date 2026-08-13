@@ -574,10 +574,10 @@ let find_candidate = function
   | Lfunction lfun when lfun.attr.tmc_candidate ->
      (* TMC does not make sense for local-returning functions *)
      begin match lfun.ret_mode with
-     | Alloc_local ->
+     | Maybe_alloc_stack ->
        raise (Error (Debuginfo.Scoped_location.to_location lfun.loc,
                      Tmc_local_returning))
-     | Alloc_heap -> Some lfun
+     | Not_alloc_stack -> Some lfun
      end
   | _ -> None
 
@@ -685,7 +685,8 @@ let rec choice ctx t =
     | Lexclave lam ->
         let+ lam = choice ctx ~tail lam in
         Lexclave lam
-    | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+    | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+      fatal_error_invalid_constructor t
 
   and choice_apply ctx ~tail apply =
     let exception No_tmc in
@@ -730,7 +731,7 @@ let rec choice ctx t =
           in
           (* This application is in tail position of a region=true function
              (or Tmc_local_returning would have occurred), so it must be Heap *)
-          assert (Lambda.is_heap_mode apply.ap_mode);
+          assert (Lambda.is_not_alloc_stack apply.ap_mode);
           {
             Choice.dps = Dps.make (fun ~tail ~dst ->
               Lapply { apply with
@@ -901,10 +902,14 @@ let rec choice ctx t =
     | Pignore
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
+    | Preinterpret_boxed_vector_as_tuple _
+    | Preinterpret_tuple_as_boxed_vector _
     | Punbox_unit
 
     (* we don't handle effect or DLS primitives *)
-    | Pwith_stack | Pwith_stack_bind | Pperform | Presume | Preperform
+    | Pwith_stack | Pwith_stack_preemptible
+    | Pperform | Pcontinue | Pdiscontinue
+    | Pdiscontinue_with_backtrace | Preperform
     | Pdls_get | Ptls_get | Pdomain_index
 
     (* we don't handle atomic primitives *)
@@ -912,12 +917,12 @@ let rec choice ctx t =
     | Patomic_compare_set_field _ | Patomic_fetch_add_field
     | Patomic_add_field | Patomic_sub_field | Patomic_land_field
     | Patomic_lor_field | Patomic_lxor_field
-    | Patomic_load_field _ | Patomic_set_field _
+    | Patomic_load_field _ | Patomic_load_mixed_field _
+    | Patomic_set_field _ | Patomic_set_mixed_field _
     | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
-
-    (* it doesn't seem worth it to support lazy blocks for tmc *)
-    | Pmakelazyblock _
+    | Punbox_mask | Pbox_mask _
+    | Pjoin_vec256 | Psplit_vec256
 
     (* we don't handle array indices as destinations yet *)
     | (Pmakearray _ | Pduparray _ | Pmakearray_dynamic _)
@@ -940,32 +945,51 @@ let rec choice ctx t =
     | Pobj_magic _
     | Pprobe_is_enabled _
 
+    (* Lazy blocks should never contain a recursive call directly:
+       either it's a closure (Lazy_tag), or a variable (Forward_tag).
+       The case 'let foo = recursive_call in lazy foo' could be translated to
+       use tmc in the cases where 'foo' might be of type lazy or float, but
+       given the fragility of such a transformation we choose not to. *)
+    | Pmakelazyblock _
+
     (* more common cases... *)
     | Pbigarrayref _ | Pbigarrayset _
     | Pbigarraydim _
+    | Pstring_load_i8 _ | Pstring_load_i16 _
     | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
     | Pstring_load_64 _ | Pstring_load_vec _
+    | Pstring_load_mask _
+    | Pbytes_load_i8 _ | Pbytes_load_i16 _
     | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
     | Pbytes_load_64 _ | Pbytes_load_vec _
+    | Pbytes_load_mask _
+    | Pbytes_set_8 _
     | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
     | Pbytes_set_64 _ | Pbytes_set_vec _
+    | Pbytes_set_mask _
+    | Pbigstring_load_i8 _ | Pbigstring_load_i16 _
     | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_f32 _
     | Pbigstring_load_64 _ | Pbigstring_load_vec _
+    | Pbigstring_load_mask _
+    | Pbigstring_set_8 _
     | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
     | Pbigstring_set_64 _ | Pbigstring_set_vec _
+    | Pbigstring_set_mask _
     | Pfloatarray_load_vec _
-    | Pfloat_array_load_vec _
     | Pint_array_load_vec _
+    | Puntagged_int8_array_load_vec _
+    | Puntagged_int16_array_load_vec _
     | Punboxed_float_array_load_vec _
     | Punboxed_float32_array_load_vec _
     | Punboxed_int32_array_load_vec _
     | Punboxed_int64_array_load_vec _
     | Punboxed_nativeint_array_load_vec _
     | Pfloatarray_set_vec _
-    | Pfloat_array_set_vec _
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
     | Punboxed_float32_array_set_vec _
+    | Puntagged_int8_array_set_vec _
+    | Puntagged_int16_array_set_vec _
     | Punboxed_int32_array_set_vec _
     | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _
@@ -977,7 +1001,8 @@ let rec choice ctx t =
     | Ppeek _ | Ppoke _
     | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
     | Pmake_idx_array _
-    | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _ ->
+    | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _
+    | Pget_ext_ptr _ | Pset_ext_ptr _ ->
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 
@@ -1082,8 +1107,7 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
   in
   let dps_var = special.dps_id in
   let dps_var_duid = Lambda.debug_uid_none in
-  [var, var_duid, direct;
-   dps_var, dps_var_duid, dps]
+  [var, var_duid, direct; dps_var, dps_var_duid, dps]
 
 and traverse_list ctx terms =
   List.map (traverse ctx) terms

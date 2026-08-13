@@ -1,5 +1,9 @@
 (copy_files# ../*.{c,h,ml,mli})
 
+(alias
+ (name C-only)
+ (deps libthreads_stubs.a dllthreads_stubs.so))
+
 (copy_files# ../../../runtime/sync_posix.h)
 
 (library

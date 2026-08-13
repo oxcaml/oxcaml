@@ -100,12 +100,12 @@ val build_intervals : Cfg_with_infos.t -> Interval.t Reg.Tbl.t
 
 module Hardware_register : sig
   type location = private
-    { reg_class : Reg_class.t;
+    { reg_class : Regs.Reg_class.t;
       reg_index_in_class : int
     }
 
   val make_location :
-    reg_class:Reg_class.t -> reg_index_in_class:int -> location
+    reg_class:Regs.Reg_class.t -> reg_index_in_class:int -> location
 
   val print_location : Format.formatter -> location -> unit
 

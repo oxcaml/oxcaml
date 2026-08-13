@@ -17,7 +17,7 @@ external[@layout_poly] make_vect : ('a : any mod separable) . int -> 'a -> 'a ia
 
 let make_scannable (x : #(int * string)) = make_vect 42 x
 [%%expect{|
-external make_vect : ('a : any mod separable). int -> 'a -> 'a iarray
+external make_vect : ('a : any separable). int -> 'a -> 'a iarray
   = "%makearray_dynamic" [@@layout_poly]
 val make_scannable : #(int * string) -> #(int * string) iarray = <fun>
 |}]
@@ -49,7 +49,7 @@ external[@layout_poly] len : ('a : any mod separable) . 'a iarray -> int =
 
 let length_scannable (x : #(int * string) iarray) = len x
 [%%expect{|
-external len : ('a : any mod separable). 'a iarray -> int = "%array_length"
+external len : ('a : any separable). 'a iarray -> int = "%array_length"
   [@@layout_poly]
 val length_scannable : #(int * string) iarray -> int = <fun>
 |}]
@@ -61,9 +61,9 @@ val length_ignorable : #(int * float#) iarray -> int = <fun>
 
 let length_bad (x : #(string * float#) iarray) = len x
 [%%expect{|
-Line 1, characters 49-54:
+Line 1, characters 53-54:
 1 | let length_bad (x : #(string * float#) iarray) = len x
-                                                     ^^^^^
+                                                         ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -80,7 +80,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int -> 'a =
 
 let get_scannable (x : #(int * string) iarray) = get x 42
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int -> 'a
+external get : ('a : any separable). 'a iarray -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -92,9 +92,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x 42
 [%%expect{|
-Line 1, characters 46-54:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x 42
-                                                  ^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -111,7 +111,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int -> 'a =
 
 let get_scannable (x : #(int * string) iarray) = get x 42
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int -> 'a
+external get : ('a : any separable). 'a iarray -> int -> 'a
   = "%array_unsafe_get" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -123,9 +123,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x 42
 [%%expect{|
-Line 1, characters 46-54:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x 42
-                                                  ^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -142,7 +142,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64# -> '
 
 let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int64# -> 'a
+external get : ('a : any separable). 'a iarray -> int64# -> 'a
   = "%array_safe_get_indexed_by_int64#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -154,9 +154,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42L
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42L
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -173,7 +173,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int64# -> '
 
 let get_scannable (x : #(int * string) iarray) = get x #42L
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int64# -> 'a
+external get : ('a : any separable). 'a iarray -> int64# -> 'a
   = "%array_unsafe_get_indexed_by_int64#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -185,9 +185,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42L
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42L
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -204,7 +204,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32# -> '
 
 let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int32# -> 'a
+external get : ('a : any separable). 'a iarray -> int32# -> 'a
   = "%array_safe_get_indexed_by_int32#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -216,9 +216,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42l
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42l
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -235,7 +235,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a iarray -> int32# -> '
 
 let get_scannable (x : #(int * string) iarray) = get x #42l
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> int32# -> 'a
+external get : ('a : any separable). 'a iarray -> int32# -> 'a
   = "%array_unsafe_get_indexed_by_int32#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -247,9 +247,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42l
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42l
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -267,7 +267,7 @@ external[@layout_poly] get :
 
 let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> nativeint# -> 'a
+external get : ('a : any separable). 'a iarray -> nativeint# -> 'a
   = "%array_safe_get_indexed_by_nativeint#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -279,9 +279,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42n
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42n
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
@@ -299,7 +299,7 @@ external[@layout_poly] get :
 
 let get_scannable (x : #(int * string) iarray) = get x #42n
 [%%expect{|
-external get : ('a : any mod separable). 'a iarray -> nativeint# -> 'a
+external get : ('a : any separable). 'a iarray -> nativeint# -> 'a
   = "%array_unsafe_get_indexed_by_nativeint#" [@@layout_poly]
 val get_scannable : #(int * string) iarray -> #(int * string) = <fun>
 |}]
@@ -311,9 +311,9 @@ val get_ignorable : #(int * float#) iarray -> #(int * float#) = <fun>
 
 let get_bad (x : #(string * float#) iarray) = get x #42n
 [%%expect{|
-Line 1, characters 46-56:
+Line 1, characters 50-51:
 1 | let get_bad (x : #(string * float#) iarray) = get x #42n
-                                                  ^^^^^^^^^^
+                                                      ^
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose

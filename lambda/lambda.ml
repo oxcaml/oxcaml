@@ -16,8 +16,6 @@
 open Misc
 open Asttypes
 
-module SL = Slambda0
-
 type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
@@ -47,11 +45,23 @@ type has_initializer =
   | With_initializer
   | Uninitialized
 
+type atomic_flag = Asttypes.atomic_flag
+
+type access_flag = Asttypes.access_flag
+
+let access_atomicity : access_flag -> atomic_flag = function
+  | Immutable_access | Mutable_access -> Nonatomic
+  | Atomic_access -> Atomic
+
 include (struct
 
   type locality_mode =
     | Alloc_heap
     | Alloc_local
+
+  type return_mode =
+    | Maybe_alloc_stack
+    | Not_alloc_stack
 
   type modify_mode =
     | Modify_heap
@@ -63,6 +73,12 @@ include (struct
     if Config.stack_allocation then Alloc_local
     else Alloc_heap
 
+  let not_alloc_stack = Not_alloc_stack
+
+  let maybe_alloc_stack : return_mode =
+    if Config.stack_allocation then Maybe_alloc_stack
+    else Not_alloc_stack
+
   let modify_heap = Modify_heap
 
   let modify_maybe_stack : modify_mode =
@@ -73,11 +89,20 @@ include (struct
     match a, b with
     | Alloc_local, _ | _, Alloc_local -> Alloc_local
     | Alloc_heap, Alloc_heap -> Alloc_heap
+
+  let return_mode_to_locality_mode a =
+    match a with
+    | Maybe_alloc_stack -> Alloc_local
+    | Not_alloc_stack -> Alloc_heap
 end : sig
 
   type locality_mode = private
     | Alloc_heap
     | Alloc_local
+
+  type return_mode = private
+    | Maybe_alloc_stack
+    | Not_alloc_stack
 
   type modify_mode = private
     | Modify_heap
@@ -86,11 +111,16 @@ end : sig
   val alloc_heap : locality_mode
   val alloc_local : locality_mode
 
+  val not_alloc_stack : return_mode
+  val maybe_alloc_stack : return_mode
+
   val modify_heap : modify_mode
 
   val modify_maybe_stack : modify_mode
 
   val join_locality_mode : locality_mode -> locality_mode -> locality_mode
+
+  val return_mode_to_locality_mode : return_mode -> locality_mode
 end)
 
 let is_local_mode = function
@@ -111,8 +141,31 @@ let eq_locality_mode a b =
   match a, b with
   | Alloc_heap, Alloc_heap -> true
   | Alloc_local, Alloc_local -> true
-  | Alloc_heap, Alloc_local -> false
-  | Alloc_local, Alloc_heap -> false
+  | (Alloc_heap | Alloc_local), _ -> false
+
+let is_maybe_alloc_stack = function
+  | Not_alloc_stack -> false
+  | Maybe_alloc_stack -> true
+
+let is_not_alloc_stack = function
+  | Not_alloc_stack -> true
+  | Maybe_alloc_stack -> false
+
+let eq_return_mode a b =
+  match a, b with
+  | Not_alloc_stack, Not_alloc_stack -> true
+  | Maybe_alloc_stack, Maybe_alloc_stack -> true
+  | (Not_alloc_stack | Maybe_alloc_stack), _ -> false
+
+let locality_return_compat a b =
+  match a, b with
+  | Alloc_heap, _ -> true
+  | _, Maybe_alloc_stack -> true
+  | Alloc_local, Not_alloc_stack -> false
+
+type staticity =
+  | Static
+  | Dynamic
 
 type initialization_or_assignment =
   | Assignment of modify_mode
@@ -123,6 +176,15 @@ type region_close =
   | Rc_normal
   | Rc_nontail
   | Rc_close_at_apply
+
+type yielding_kind =
+  | May_yield
+  | Unyielding
+
+let join_yielding_kind a b =
+  match a, b with
+  | May_yield, _ | _, May_yield -> May_yield
+  | Unyielding, Unyielding -> Unyielding
 
 type any_locality_mode = Scalar.any_locality_mode = Any_locality_mode
 
@@ -136,12 +198,16 @@ type lazy_block_tag =
   | Lazy_tag
   | Forward_tag
 
+let tag_of_lazy_tag = function
+  | Lazy_tag -> Config.lazy_tag
+  | Forward_tag -> Obj.forward_tag
+
 type primitive =
   | Pbytes_to_string
   | Pbytes_of_string
   | Pignore
     (* Globals *)
-  | Pgetglobal of Compilation_unit.t
+  | Pgetglobal of Compilation_unit.t * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -177,9 +243,11 @@ type primitive =
   | Pidx_deepen of unit mixed_block_element * int list
   (* Context switches *)
   | Pwith_stack
-  | Pwith_stack_bind
+  | Pwith_stack_preemptible
   | Pperform
-  | Presume
+  | Pcontinue
+  | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform
   (* External call *)
   | Pccall of external_call_description
@@ -218,7 +286,12 @@ type primitive =
   | Pbigarrayset of bool * int * bigarray_kind * bigarray_layout
   (* size of the nth dimension of a Bigarray *)
   | Pbigarraydim of int
-  (* load/set 16,32,64 bits from a string: (unsafe)*)
+  (* load/set 8,16,32,64 bits from a string: (unsafe)*)
+  (* load_i8/i16 is sign-extended *)
+  | Pstring_load_i8 of { unsafe : bool; index_kind : array_index_kind;
+                         tagged : bool }
+  | Pstring_load_i16 of { unsafe : bool; index_kind : array_index_kind;
+                          tagged : bool }
   | Pstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -229,6 +302,12 @@ type primitive =
   | Pstring_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                           mode : locality_mode; boxed : bool }
+  | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind;
+                        tagged : bool }
+  | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind;
+                         tagged : bool }
   | Pbytes_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbytes_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -239,7 +318,12 @@ type primitive =
   | Pbytes_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
-  | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbytes_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                          mode : locality_mode; boxed : bool }
+  | Pbytes_set_8 of { unsafe : bool; index_kind : array_index_kind;
+                      tagged : bool }
+  | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind;
+                       tagged : bool }
   | Pbytes_set_32 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
   | Pbytes_set_f32 of { unsafe : bool; index_kind : array_index_kind;
@@ -248,8 +332,15 @@ type primitive =
       boxed : bool }
   | Pbytes_set_vec of { size : boxed_vector; unsafe : bool;
                         index_kind : array_index_kind; boxed : bool }
-  (* load/set 16,32,64 bits from a
+  | Pbytes_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                         boxed : bool }
+  (* load/set 8,16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
+  (* load_i8/i16 is sign-extended *)
+  | Pbigstring_load_i8 of { unsafe : bool; index_kind : array_index_kind;
+                            tagged : bool }
+  | Pbigstring_load_i16 of { unsafe : bool; index_kind : array_index_kind;
+                             tagged : bool }
   | Pbigstring_load_16 of { unsafe : bool; index_kind : array_index_kind }
   | Pbigstring_load_32 of { unsafe : bool; index_kind : array_index_kind;
       mode : locality_mode; boxed : bool }
@@ -264,7 +355,12 @@ type primitive =
       mode : locality_mode;
       aligned : bool;
       boxed : bool }
-  | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind }
+  | Pbigstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                              mode : locality_mode; boxed : bool }
+  | Pbigstring_set_8 of { unsafe : bool; index_kind : array_index_kind;
+                          tagged : bool }
+  | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind;
+                           tagged : bool }
   | Pbigstring_set_32 of { unsafe : bool; index_kind : array_index_kind;
       boxed : bool }
   | Pbigstring_set_f32 of { unsafe : bool; index_kind : array_index_kind;
@@ -277,13 +373,12 @@ type primitive =
       index_kind : array_index_kind;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                             boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
                               mode : locality_mode; boxed : bool }
-  | Pfloat_array_load_vec of { size : boxed_vector; unsafe : bool;
-                               index_kind : array_index_kind;
-                               mode : locality_mode; boxed : bool }
   | Pint_array_load_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind;
                              mode : locality_mode; boxed : bool }
@@ -293,6 +388,12 @@ type primitive =
   | Punboxed_float32_array_load_vec of { size : boxed_vector; unsafe : bool;
                                          index_kind : array_index_kind;
                                          mode : locality_mode; boxed : bool }
+  | Puntagged_int8_array_load_vec of { size : boxed_vector; unsafe : bool;
+                                       index_kind : array_index_kind;
+                                       mode : locality_mode; boxed : bool }
+  | Puntagged_int16_array_load_vec of { size : boxed_vector; unsafe : bool;
+                                        index_kind : array_index_kind;
+                                        mode : locality_mode; boxed : bool }
   | Punboxed_int32_array_load_vec of { size : boxed_vector; unsafe : bool;
                                        index_kind : array_index_kind;
                                        mode : locality_mode; boxed : bool }
@@ -304,8 +405,6 @@ type primitive =
                                            mode : locality_mode; boxed : bool }
   | Pfloatarray_set_vec of { size : boxed_vector; unsafe : bool;
                              index_kind : array_index_kind; boxed : bool }
-  | Pfloat_array_set_vec of { size : boxed_vector; unsafe : bool;
-                              index_kind : array_index_kind; boxed : bool }
   | Pint_array_set_vec of { size : boxed_vector; unsafe : bool;
                             index_kind : array_index_kind; boxed : bool }
   | Punboxed_float_array_set_vec of { size : boxed_vector; unsafe : bool;
@@ -314,6 +413,12 @@ type primitive =
   | Punboxed_float32_array_set_vec of { size : boxed_vector; unsafe : bool;
                                         index_kind : array_index_kind;
                                         boxed : bool }
+  | Puntagged_int8_array_set_vec of { size : boxed_vector; unsafe : bool;
+                                      index_kind : array_index_kind;
+                                      boxed : bool }
+  | Puntagged_int16_array_set_vec of { size : boxed_vector; unsafe : bool;
+                                       index_kind : array_index_kind;
+                                       boxed : bool }
   | Punboxed_int32_array_set_vec of { size : boxed_vector; unsafe : bool;
                                       index_kind : array_index_kind;
                                       boxed : bool }
@@ -329,11 +434,23 @@ type primitive =
   | Pint_as_pointer of locality_mode
   (* Atomic operations *)
   | Patomic_load_field of {immediate_or_pointer : immediate_or_pointer}
-  | Patomic_set_field of {immediate_or_pointer : immediate_or_pointer}
-  | Patomic_exchange_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_load_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+  }
+  | Patomic_set_field of
+    {immediate_or_pointer : immediate_or_pointer; mode : modify_mode}
+  | Patomic_set_mixed_field of {
+    index : int;
+    shape : mixed_block_shape;
+    mode : modify_mode;
+  }
+  | Patomic_exchange_field of
+    {immediate_or_pointer : immediate_or_pointer; mode : modify_mode}
   | Patomic_compare_exchange_field of
-    {immediate_or_pointer : immediate_or_pointer}
-  | Patomic_compare_set_field of {immediate_or_pointer : immediate_or_pointer}
+    {immediate_or_pointer : immediate_or_pointer; mode : modify_mode}
+  | Patomic_compare_set_field of
+    {immediate_or_pointer : immediate_or_pointer; mode : modify_mode}
   | Patomic_fetch_add_field
   | Patomic_add_field
   | Patomic_sub_field
@@ -350,6 +467,12 @@ type primitive =
   | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
+  | Punbox_mask
+  | Pbox_mask of locality_mode
+  | Pjoin_vec256
+  | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple of boxed_vector
+  | Preinterpret_tuple_as_boxed_vector of boxed_vector
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64
   (* Jane Street extensions *)
@@ -365,15 +488,18 @@ type primitive =
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
-  | Pget_idx of layout * Asttypes.mutable_flag
-  | Pset_idx of layout * modify_mode
+  | Pget_idx of layout * access_flag
+  | Pset_idx of layout * modify_mode * atomic_flag
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
+  | Pget_ext_ptr of layout * Asttypes.mutable_flag
+  | Pset_ext_ptr of layout * modify_mode
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
+  | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
 
 and external_call_description = extern_repr Primitive.description_gen
@@ -399,6 +525,7 @@ and value_kind_non_null =
     }
   | Parrayval of array_kind
   | Pboxedvectorval of boxed_vector
+  | Pboxedmaskval
 
 and layout =
   | Ptop
@@ -406,9 +533,10 @@ and layout =
   | Punboxed_float of unboxed_float
   | Punboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Punboxed_vector of unboxed_vector
+  | Punboxed_mask
   | Punboxed_product of layout list
   | Pbottom
-  | Psplicevar of Ident.t
+  | Psplicevar of Slambdaident.t
 
 and block_shape =
   | All_value
@@ -426,10 +554,11 @@ and 'a mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Untagged_immediate
   | Product of 'a mixed_block_element array
-  | Splice_variable of Ident.t
+  | Splice_variable of Slambdaident.t
 
 and mixed_block_shape = unit mixed_block_element array
 
@@ -445,8 +574,10 @@ and array_kind =
   | Punboxedfloatarray of unboxed_float
   | Punboxedoruntaggedintarray of unboxed_or_untagged_integer
   | Punboxedvectorarray of unboxed_vector
+  | Punboxedmaskarray
   | Pgcscannableproductarray of scannable_product_element_kind list
   | Pgcignorableproductarray of ignorable_product_element_kind list
+  | Punspecializedarray
 
 and array_ref_kind =
   | Pgenarray_ref of locality_mode
@@ -457,8 +588,10 @@ and array_ref_kind =
   | Punboxedfloatarray_ref of unboxed_float
   | Punboxedoruntaggedintarray_ref of unboxed_or_untagged_integer
   | Punboxedvectorarray_ref of unboxed_vector
+  | Punboxedmaskarray_ref
   | Pgcscannableproductarray_ref of scannable_product_element_kind list
   | Pgcignorableproductarray_ref of ignorable_product_element_kind list
+  | Punspecializedarray_ref of locality_mode
 
 and array_set_kind =
   | Pgenarray_set of modify_mode
@@ -469,9 +602,11 @@ and array_set_kind =
   | Punboxedfloatarray_set of unboxed_float
   | Punboxedoruntaggedintarray_set of unboxed_or_untagged_integer
   | Punboxedvectorarray_set of unboxed_vector
+  | Punboxedmaskarray_set
   | Pgcscannableproductarray_set of
       modify_mode * scannable_product_element_kind list
   | Pgcignorableproductarray_set of ignorable_product_element_kind list
+  | Punspecializedarray_set of modify_mode
 
 and ignorable_product_element_kind =
   | Pint_ignorable
@@ -552,6 +687,18 @@ and raise_kind =
   | Raise_reraise
   | Raise_notrace
 
+let equal_raise_kind left right =
+  match left, right with
+  | Raise_regular, Raise_regular
+  | Raise_reraise, Raise_reraise
+  | Raise_notrace, Raise_notrace -> true
+  | (Raise_regular | Raise_reraise | Raise_notrace), _ -> false
+
+let fatal_error_unevaluated_splice_var ident =
+  Misc.fatal_errorf
+    "Splice variable %a should have been evaluated"
+    Slambdaident.print ident
+
 let generic_value =
   { raw_kind = Pgenval;
     nullable = Nullable;
@@ -576,6 +723,7 @@ let rec equal_value_kind_non_null x y =
   | Pboxedfloatval f1, Pboxedfloatval f2 -> Primitive.equal_boxed_float f1 f2
   | Pboxedintval bi1, Pboxedintval bi2 -> Primitive.equal_boxed_integer bi1 bi2
   | Pboxedvectorval v1, Pboxedvectorval v2 -> Primitive.equal_boxed_vector v1 v2
+  | Pboxedmaskval, Pboxedmaskval -> true
   | Pintval, Pintval -> true
   | Parrayval elt_kind1, Parrayval elt_kind2 -> elt_kind1 = elt_kind2
   | Pvariant { consts = consts1; non_consts = non_consts1; },
@@ -591,7 +739,7 @@ let rec equal_value_kind_non_null x y =
              && equal_constructor_shape cstr1 cstr2)
            non_consts1 non_consts2
   | (Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pintval | Pvariant _
-      | Parrayval _ | Pboxedvectorval _), _ -> false
+      | Parrayval _ | Pboxedvectorval _ | Pboxedmaskval), _ -> false
 
 and equal_value_kind x y =
   equal_value_kind_non_null x.raw_kind y.raw_kind
@@ -614,15 +762,16 @@ and equal_mixed_block_element :
   | Vec128, Vec128
   | Vec256, Vec256
   | Vec512, Vec512
+  | Mask, Mask
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> true
   | Product es1, Product es2 ->
     Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
       es1 es2
-  | Splice_variable id1, Splice_variable id2 -> Ident.equal id1 id2
+  | Splice_variable id1, Splice_variable id2 -> Slambdaident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-     | Vec256 | Vec512 | Word | Untagged_immediate | Product _
+     | Vec256 | Vec512 | Mask | Word | Untagged_immediate | Product _
      | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
@@ -637,25 +786,116 @@ and equal_constructor_shape x y =
       equal_mixed_block_shape shape1 shape2
   | (Constructor_uniform _ | Constructor_mixed _), _ -> false
 
+let join_nullable x y =
+  match x, y with
+  | Non_nullable, Non_nullable -> Non_nullable
+  | Nullable, _ | _, Nullable -> Nullable
+
+let rec join_value_kind_non_null x y =
+  if equal_value_kind_non_null x y then x
+  else
+    match x, y with
+    | Pvariant { consts = consts1; non_consts = non_consts1 },
+      Pvariant { consts = consts2; non_consts = non_consts2 } -> begin
+        match join_non_consts non_consts1 non_consts2 with
+        | Some non_consts ->
+            let consts = List.sort_uniq Int.compare (consts1 @ consts2) in
+            Pvariant { consts; non_consts }
+        | None -> Pgenval
+      end
+    | _, _ -> Pgenval
+
+and join_constructor_shape shape1 shape2 =
+  match shape1, shape2 with
+  | Constructor_uniform fields1, Constructor_uniform fields2
+    when List.length fields1 = List.length fields2 ->
+      Some (Constructor_uniform (List.map2 join_value_kind fields1 fields2))
+  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+      Option.map
+        (fun shape -> Constructor_mixed shape)
+        (join_mixed_block_shape shape1 shape2)
+  | (Constructor_uniform _ | Constructor_mixed _), _ -> None
+
+and join_mixed_block_shape shape1 shape2 =
+  if Array.length shape1 <> Array.length shape2 then None
+  else
+    Misc.Stdlib.Array.all_somes
+      (Array.map2 join_mixed_block_element shape1 shape2)
+
+and join_mixed_block_element (m1 : unit mixed_block_element)
+    (m2 : unit mixed_block_element) : unit mixed_block_element option =
+  match m1, m2 with
+  | Value v1, Value v2 -> Some (Value (join_value_kind v1 v2))
+  | Product es1, Product es2 when Array.length es1 = Array.length es2 ->
+      Option.map (fun es -> Product es) (join_mixed_block_shape es1 es2)
+  | Float_boxed (), Float_boxed () -> Some m1
+  | Float64, Float64
+  | Float32, Float32
+  | Bits8, Bits8
+  | Bits16, Bits16
+  | Bits32, Bits32
+  | Bits64, Bits64
+  | Vec128, Vec128
+  | Vec256, Vec256
+  | Vec512, Vec512
+  | Mask, Mask
+  | Word, Word
+  | Untagged_immediate, Untagged_immediate -> Some m1
+  | Splice_variable id1, Splice_variable id2 when Slambdaident.equal id1 id2 ->
+      Some m1
+  | ( ( Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+      | Untagged_immediate | Product _ | Splice_variable _ ),
+      _ ) ->
+      None
+
+and join_non_consts non_consts1 non_consts2 =
+  let sorted = List.sort (fun (tag1, _) (tag2, _) -> Int.compare tag1 tag2) in
+  let rec merge l1 l2 =
+    match l1, l2 with
+    | [], l | l, [] -> Some l
+    | (tag1, shape1) :: rest1, (tag2, shape2) :: rest2 ->
+        if tag1 < tag2 then
+          Option.map (fun l -> (tag1, shape1) :: l) (merge rest1 l2)
+        else if tag2 < tag1 then
+          Option.map (fun l -> (tag2, shape2) :: l) (merge l1 rest2)
+        else
+          match join_constructor_shape shape1 shape2 with
+          | Some shape ->
+              Option.map (fun l -> (tag1, shape) :: l) (merge rest1 rest2)
+          | None -> None
+  in
+  merge (sorted non_consts1) (sorted non_consts2)
+
+and join_value_kind x y =
+  { raw_kind = join_value_kind_non_null x.raw_kind y.raw_kind;
+    nullable = join_nullable x.nullable y.nullable;
+  }
+
 let block_shape_of_value_kinds (vks : value_kind list option) : block_shape =
   match vks with
   | None -> All_value
   | Some vks -> Shape (Array.of_list (List.map (fun vk -> Value vk) vks))
 
+(* CR rtjoa: This function is redundant with [Mixed_product_bytes], but it's
+   duplicated for now. We should fix the module dependency structure *)
+let rec is_value_or_void_element : _ mixed_block_element -> bool = function
+  | Value _ -> true
+  | Product elts -> Array.for_all is_value_or_void_element elts
+  | Splice_variable var -> fatal_error_unevaluated_splice_var var
+  | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+  | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+    false
+(* CR layout poly: This function probably shouldn't exist at all and we should
+   merge mixed_block_shape and block_shape. *)
 let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
     =
   match shape with
   | All_value -> None
   | Shape shape ->
-    let is_uniform =
-      Array.for_all
-        (function
-          | Value _ -> true
-          | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
-          | _ -> false)
-        shape
-    in
-    if is_uniform then None else Some shape
+    if Array.for_all is_value_or_void_element shape
+    then None
+    else Some shape
 
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)
@@ -666,6 +906,30 @@ let equal_layout x y =
   | Ptop, Ptop -> true
   | Pbottom, Pbottom -> true
   | _, _ -> false
+
+let rec join_layout x y =
+  match x, y with
+  | Pbottom, l | l, Pbottom -> l
+  | Ptop, _ | _, Ptop -> Ptop
+  | Pvalue kind1, Pvalue kind2 -> Pvalue (join_value_kind kind1 kind2)
+  | Punboxed_product layouts1, Punboxed_product layouts2
+    when List.length layouts1 = List.length layouts2 ->
+      Punboxed_product (List.map2 join_layout layouts1 layouts2)
+  | Punboxed_float f1, Punboxed_float f2
+    when Primitive.equal_unboxed_float f1 f2 ->
+      x
+  | Punboxed_or_untagged_integer i1, Punboxed_or_untagged_integer i2
+    when Primitive.equal_unboxed_or_untagged_integer i1 i2 ->
+      x
+  | Punboxed_vector v1, Punboxed_vector v2
+    when Primitive.equal_unboxed_vector v1 v2 ->
+      x
+  | Punboxed_mask, Punboxed_mask -> x
+  | Psplicevar id1, Psplicevar id2 when Slambdaident.equal id1 id2 -> x
+  | ( ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ),
+      _ ) ->
+      Misc.fatal_error "Lambda.join_layout: layouts of different sorts"
 
 let rec equal_ignorable_product_element_kind k1 k2 =
   match k1, k2 with
@@ -846,6 +1110,8 @@ type shared_code = (int * int) list
 
 type static_label = Static_label.t
 
+type unbox_return_attribute = locality_mode option
+
 type function_attribute = {
   inline : inline_attribute;
   specialise : specialise_attribute;
@@ -861,7 +1127,7 @@ type function_attribute = {
   stub: bool;
   tmc_candidate: bool;
   may_fuse_arity: bool;
-  unbox_return: bool;
+  unbox_return: unbox_return_attribute;
 }
 
 type scoped_location = Debuginfo.Scoped_location.t
@@ -910,14 +1176,49 @@ type lambda =
   | Lassign of Ident.t * lambda
   | Lsend of
       meth_kind * lambda * lambda * lambda list
-      * region_close * locality_mode * scoped_location * layout
+      * region_close * return_mode * scoped_location * layout
+      * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
-  | Lsplice of lambda_splice
+  | Lsplice of scoped_location * slambda
+  | Lkindtemplate of lkindtemplate
+  | Lkindinstantiate of lkindinstantiate
 
-and slambda = lambda SL.t0
+and slambda =
+  | SLlayout of layout
+  | SLglobal of Compilation_unit.t
+  | SLvar of Slambdaident.t
+  | SLmissing
+  | SLrecord of slambda list
+  | SLfield of slambda * int
+  | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
+
+and slambda_halves =
+  { sval_comptime: slambda;
+    sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_args: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
+  }
 
 and rec_binding = {
   id : Ident.t;
@@ -933,7 +1234,30 @@ and lfunction =
     attr: function_attribute; (* specified with [@inline] attribute *)
     loc: scoped_location;
     mode: locality_mode;
-    ret_mode: locality_mode;
+    ret_mode: return_mode;
+    yielding: yielding_kind;
+    (* [Unyielding] if fully applying the closure can never perform a free
+       effect (it neither closes over nor is passed any yielding value).
+       Only set precisely by [Translcore]; other construction sites
+       conservatively default to [May_yield]. *)
+  }
+
+and lkindtemplate =
+  { ktmpl_params: Slambdaident.t list;
+    ktmpl_return: layout;
+    ktmpl_body: lambda;
+    ktmpl_ret_mode: return_mode;
+    ktmpl_env: (lambda * layout) Ident.Map.t;
+    ktmpl_env_mode: locality_mode;
+    ktmpl_loc: scoped_location;
+  }
+
+and lkindinstantiate =
+  { kinst_func: lambda;
+    kinst_args: layout list;
+    kinst_result_layout: layout;
+    kinst_mode: return_mode;
+    kinst_loc: scoped_location;
   }
 
 and lambda_while =
@@ -956,7 +1280,8 @@ and lambda_apply =
     ap_args : lambda list;
     ap_result_layout : layout;
     ap_region_close : region_close;
-    ap_mode : locality_mode;
+    ap_mode : return_mode;
+    ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute;
@@ -983,7 +1308,78 @@ and lambda_event_kind =
   | Lev_function
   | Lev_pseudo
 
-and lambda_splice = { splice_loc : scoped_location; slambda : slambda }
+let rec try_to_find_location lam =
+  (* This is very much best-effort and may overshoot, but will still likely be
+     better than nothing. *)
+  match lam with
+  | Lprim (_, _, loc)
+  | Lfunction { loc; _ }
+  | Lkindtemplate { ktmpl_loc = loc; _ }
+  | Lletrec ({ def = { loc; _ }; _ } :: _, _)
+  | Lapply { ap_loc = loc; _ }
+  | Lkindinstantiate { kinst_loc = loc; _ }
+  | Lfor { for_loc = loc; _ }
+  | Lswitch (_, _, loc, _)
+  | Lstringswitch (_, _, _, loc, _)
+  | Lsend (_, _, _, _, _, _, loc, _, _)
+  | Levent (_, { lev_loc = loc; _ })
+  | Lsplice (loc, _) ->
+    loc
+  | Llet (_, _, _, _, lam, _)
+  | Lmutlet (_, _, _, lam, _)
+  | Lifthenelse (lam, _, _, _)
+  | Lstaticcatch (lam, _, _, _, _)
+  | Lstaticraise (_, lam :: _)
+  | Lwhile { wh_cond = lam; _ }
+  | Lsequence (lam, _)
+  | Lassign (_, lam)
+  | Lifused (_, lam)
+  | Lregion (lam, _)
+  | Lexclave lam
+  | Ltrywith (lam, _, _, _, _) ->
+    try_to_find_location lam
+  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
+    Debuginfo.Scoped_location.Loc_unknown
+
+let try_to_find_debuginfo lam =
+  Debuginfo.from_location (try_to_find_location lam)
+
+let fatal_error_invalid_constructor lambda =
+  let loc =
+    Debuginfo.Scoped_location.to_location (try_to_find_location lambda)
+  in
+  let name = match lambda with
+    | Lvar _ -> "Lvar"
+    | Lmutvar _ -> "Lmutvar"
+    | Lconst _ -> "Lconst"
+    | Lapply _ -> "Lapply"
+    | Lfunction _ -> "Lfunction"
+    | Llet _ -> "Llet"
+    | Lmutlet _ -> "Lmutlet"
+    | Lletrec _ -> "Lletrec"
+    | Lprim _ -> "Lprim"
+    | Lswitch _ -> "Lswitch"
+    | Lstringswitch _ -> "Lstringswitch"
+    | Lstaticraise _ -> "Lstaticraise"
+    | Lstaticcatch _ -> "Lstaticcatch"
+    | Ltrywith _ -> "Ltrywith"
+    | Lifthenelse _ -> "Lifthenelse"
+    | Lsequence _ -> "Lsequence"
+    | Lwhile _ -> "Lwhile"
+    | Lfor _ -> "Lfor"
+    | Lassign _ -> "Lassign"
+    | Lsend _ -> "Lsend"
+    | Levent _ -> "Levent"
+    | Lifused _ -> "Lifused"
+    | Lregion _ -> "Lregion"
+    | Lexclave _ -> "Lexclave"
+    | Lsplice _ -> "Lsplice"
+    | Lkindtemplate _ -> "Lkindtemplate"
+    | Lkindinstantiate _ -> "Lkindinstantiate"
+  in
+  Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
+    name Location.print_loc loc
+
 
 type runtime_param =
   | Rp_argument_block of Global_module.t
@@ -1023,13 +1419,96 @@ type arg_descr =
 
 let const_int n = Const_base (Const_int n)
 
+let const_int8 n = Const_base (Const_int8 n)
+
+let const_int16 n = Const_base (Const_int16 n)
+
+let const_int32 n = Const_base (Const_int32 n)
+
+let const_int64 n = Const_base (Const_int64 n)
+
+let const_nativeint n = Const_base (Const_nativeint n)
+
+let const_untagged_int n = Const_base (Const_untagged_int n)
+
+let const_untagged_int8 n = Const_base (Const_untagged_int8 n)
+
+let const_untagged_int16 n = Const_base (Const_untagged_int16 n)
+
+let const_unboxed_int32 n = Const_base (Const_unboxed_int32 n)
+
+let const_unboxed_int64 n = Const_base (Const_unboxed_int64 n)
+
+let const_unboxed_nativeint n = Const_base (Const_unboxed_nativeint n)
+
 let tagged_immediate n = Lconst (const_int n)
 
 let int = Scalar.Maybe_naked.Value (Scalar.Integral.Width.Taggable Int)
 
+let untagged_int = Scalar.Maybe_naked.Naked (Scalar.Integral.Width.Taggable Int)
+
+let untagged_int8 =
+  Scalar.Maybe_naked.Naked (Scalar.Integral.Width.Taggable Int8)
+
+let untagged_int16 =
+  Scalar.Maybe_naked.Naked (Scalar.Integral.Width.Taggable Int16)
+
+let unboxed_int32 =
+  Scalar.Maybe_naked.Naked
+    (Scalar.Integral.Width.Boxable (Int32 Any_locality_mode))
+
+let unboxed_int64 =
+  Scalar.Maybe_naked.Naked
+    (Scalar.Integral.Width.Boxable (Int64 Any_locality_mode))
+
+let unboxed_nativeint =
+  Scalar.Maybe_naked.Naked
+    (Scalar.Integral.Width.Boxable (Nativeint Any_locality_mode))
+
 let const_unit = const_int 0
 
 let dummy_constant = tagged_immediate (0xBBBB / 2)
+
+let array_index_to_layout = function
+  | Ptagged_int_index -> Pvalue { raw_kind = Pintval; nullable = Non_nullable }
+  | Punboxed_or_untagged_integer_index Untagged_int ->
+    Punboxed_or_untagged_integer Untagged_int
+  | Punboxed_or_untagged_integer_index Untagged_int8 ->
+    Punboxed_or_untagged_integer Untagged_int8
+  | Punboxed_or_untagged_integer_index Untagged_int16 ->
+    Punboxed_or_untagged_integer Untagged_int16
+  | Punboxed_or_untagged_integer_index Unboxed_int32 ->
+    Punboxed_or_untagged_integer Unboxed_int32
+  | Punboxed_or_untagged_integer_index Unboxed_int64 ->
+    Punboxed_or_untagged_integer Unboxed_int64
+  | Punboxed_or_untagged_integer_index Unboxed_nativeint ->
+    Punboxed_or_untagged_integer Unboxed_nativeint
+
+let array_index_to_scalar = function
+  | Ptagged_int_index -> int
+  | Punboxed_or_untagged_integer_index Untagged_int -> untagged_int
+  | Punboxed_or_untagged_integer_index Untagged_int8 -> untagged_int8
+  | Punboxed_or_untagged_integer_index Untagged_int16 -> untagged_int16
+  | Punboxed_or_untagged_integer_index Unboxed_int32 -> unboxed_int32
+  | Punboxed_or_untagged_integer_index Unboxed_int64 -> unboxed_int64
+  | Punboxed_or_untagged_integer_index Unboxed_nativeint -> unboxed_nativeint
+
+let const_scalar (kind : locality_mode Scalar.Integral.t) n =
+  Lconst
+    (match kind with
+    | Value (Taggable Int) -> const_int n
+    | Value (Taggable Int8) -> const_int8 n
+    | Value (Taggable Int16) -> const_int16 n
+    | Value (Boxable (Int32 _)) -> const_int32 (Int32.of_int n)
+    | Value (Boxable (Int64 _)) -> const_int64 (Int64.of_int n)
+    | Value (Boxable (Nativeint _)) -> const_nativeint (Nativeint.of_int n)
+    | Naked (Taggable Int) -> const_untagged_int n
+    | Naked (Taggable Int8) -> const_untagged_int8 n
+    | Naked (Taggable Int16) -> const_untagged_int16 n
+    | Naked (Boxable (Int32 _)) -> const_unboxed_int32 (Int32.of_int n)
+    | Naked (Boxable (Int64 _)) -> const_unboxed_int64 (Int64.of_int n)
+    | Naked (Boxable (Nativeint _)) ->
+      const_unboxed_nativeint (Nativeint.of_int n))
 
 let max_arity () =
   if !Clflags.native_code then 126 else max_int
@@ -1057,13 +1536,16 @@ let lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
      let nparams = List.length params in
      assert (0 <= nlocal);
      assert (nlocal <= nparams);
-     if is_local_mode ret_mode then assert (nlocal >= 1);
+     if is_maybe_alloc_stack ret_mode then assert (nlocal >= 1);
      if is_local_mode mode then assert (nlocal = nparams)
   end;
-  { kind; params; return; body; attr; loc; mode; ret_mode }
+  { kind; params; return; body; attr; loc; mode; ret_mode;
+    yielding = May_yield }
 
 let lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
   Lfunction (lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode)
+
+let lfunction_with_yielding yielding (lf : lfunction) = { lf with yielding }
 
 let lambda_unit = Lconst const_unit
 
@@ -1077,7 +1559,15 @@ let non_null_value raw_kind =
 let nullable_value raw_kind =
   Pvalue { raw_kind; nullable = Nullable }
 
+let split_vectors =
+  match Target_system.architecture () with
+  | X86_64 -> false
+  | AArch64 -> true
+  | IA32 | ARM | POWER | Z | Riscv ->
+    Misc.fatal_error "Only x86-64 and arm64 are supported"
+
 let layout_unit = non_null_value Pintval
+let layout_bool = non_null_value (Pvariant { consts = [0; 1]; non_consts = []})
 let layout_unboxed_unit = Punboxed_product []
 let layout_int = non_null_value Pintval
 let layout_int_or_null = nullable_value Pintval
@@ -1100,9 +1590,11 @@ let layout_variant_arg = nullable_value Pgenval
 let layout_exception = non_null_value Pgenval
 let layout_function = non_null_value Pgenval
 let layout_object = non_null_value Pgenval
+let layout_poly_variant = non_null_value Pgenval
 let layout_class = non_null_value Pgenval
 let layout_module = non_null_value Pgenval
 let layout_functor = non_null_value Pgenval
+let layout_template_env = non_null_value Pgenval
 let layout_boxed_float f = non_null_value (Pboxedfloatval f)
 let layout_unboxed_float f = Punboxed_float f
 let layout_unboxed_nativeint = Punboxed_or_untagged_integer Unboxed_nativeint
@@ -1113,15 +1605,63 @@ let layout_unboxed_int8 = Punboxed_or_untagged_integer Untagged_int8
 let layout_string = non_null_value Pgenval
 let layout_unboxed_int ubi = Punboxed_or_untagged_integer ubi
 let layout_boxed_int bi = non_null_value (Pboxedintval bi)
-let layout_unboxed_vector v = Punboxed_vector v
+let layout_unboxed_mask = Punboxed_mask
+
+let layout_unboxed_vector v =
+  match v with
+  | Unboxed_vec128 -> Punboxed_vector Unboxed_vec128
+  | Unboxed_vec256 ->
+    if split_vectors
+    then
+      Punboxed_product
+        [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
+    else Punboxed_vector Unboxed_vec256
+  | Unboxed_vec512 -> Punboxed_vector Unboxed_vec512
+
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
+let layout_boxed_mask = non_null_value Pboxedmaskval
+
+let layout_tupled_vector v =
+  let fields =
+    match v with
+    | Boxed_vec128 -> [| Vec128 |]
+    | Boxed_vec256 -> [| Vec128; Vec128 |]
+    | Boxed_vec512 -> [| Vec128; Vec128; Vec128; Vec128 |]
+  in
+  Pvalue
+    { raw_kind =
+        Pvariant { consts = []; non_consts = [0, Constructor_mixed fields] };
+      nullable = Non_nullable
+    }
+
+let layout_unboxed_tupled_vector v =
+  let fields =
+    match v with
+    | Unboxed_vec128 -> [Punboxed_vector Unboxed_vec128]
+    | Unboxed_vec256 ->
+      [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
+    | Unboxed_vec512 ->
+      [ Punboxed_vector Unboxed_vec128;
+        Punboxed_vector Unboxed_vec128;
+        Punboxed_vector Unboxed_vec128;
+        Punboxed_vector Unboxed_vec128 ]
+  in
+  Punboxed_product fields
+
 let layout_predef_value = nullable_value Pgenval
 
 let layout_lazy = nullable_value Pgenval
 let layout_lazy_contents = nullable_value Pgenval
 let layout_any_value = nullable_value Pgenval
 let layout_letrec = layout_any_value
+let layout_instance_var = nullable_value Pgenval
+let layout_method = nullable_value Pgenval
+let layout_initializer = nullable_value Pgenval
+let layout_array_comprehension_element = nullable_value Pgenval
+let layout_list_element = nullable_value Pgenval
 let layout_probe_arg = nullable_value Pgenval
+let layout_block_idx = layout_unboxed_nativeint
+
 let layout_unboxed_product layouts = Punboxed_product layouts
 
 let unboxed_vector_of_boxed_vector = function
@@ -1159,7 +1699,7 @@ let default_function_attribute = {
      them multi-argument. So, we keep arity fusion turned on by default for now.
   *)
   may_fuse_arity = true;
-  unbox_return = false;
+  unbox_return = None;
 }
 
 let default_stub_attribute =
@@ -1198,20 +1738,25 @@ let make_key e =
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
+    | Lkindinstantiate inst ->
+        Lkindinstantiate { inst with kinst_func = tr_rec env inst.kinst_func;
+                                     kinst_loc = Loc_unknown}
     | Llet (Alias,_k,x,_x_duid,ex,e) -> (* Ignore aliases -> substitute *)
         let ex = tr_rec env ex in
         tr_rec (Ident.add x ex env) e
     | Llet ((Strict | StrictOpt),_k,x,_x_duid,ex,Lvar v) when Ident.same v x ->
         tr_rec env ex
-    | Llet (str,k,x,x_duid,ex,e) ->
-     (* Because of side effects, keep other lets with normalized names *)
+    | Llet (str,k,x,_x_duid,ex,e) ->
+     (* Because of side effects, keep other lets with normalized names.
+        Debug uids are erased, like locations, so that they do not get in
+        the way of sharing. *)
         let ex = tr_rec env ex in
         let y = make_key x in
-        Llet (str,k,y,x_duid,ex,tr_rec (Ident.add x (Lvar y) env) e)
-    | Lmutlet (k,x,x_duid,ex,e) ->
+        Llet (str,k,y,debug_uid_none,ex,tr_rec (Ident.add x (Lvar y) env) e)
+    | Lmutlet (k,x,_x_duid,ex,e) ->
         let ex = tr_rec env ex in
         let y = make_key x in
-        Lmutlet (k,y,x_duid,ex,tr_rec (Ident.add x (Lmutvar y) env) e)
+        Lmutlet (k,y,debug_uid_none,ex,tr_rec (Ident.add x (Lmutvar y) env) e)
     | Lprim (p,es,_) ->
         Lprim (p,tr_recs env es, Loc_unknown)
     | Lswitch (e,sw,loc,kind) ->
@@ -1234,20 +1779,20 @@ let make_key e =
         Lsequence (tr_rec env e1,tr_rec env e2)
     | Lassign (x,e) ->
         Lassign (x,tr_rec env e)
-    | Lsend (m,e1,e2,es,pos,mo,_loc,layout) ->
-        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,layout)
+    | Lsend (m,e1,e2,es,pos,mo,_loc,layout,yielding) ->
+        Lsend (m,tr_rec env e1,tr_rec env e2,tr_recs env es,pos,mo,Loc_unknown,
+               layout,yielding)
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _
+    | Lletrec _|Lfunction _ | Lkindtemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
-    | Levent _
-    (* CR layout poly: Anything calling this should probably be moved to after
-       slambda eval, we could possibly also make slambda keys. *)
-    | Lsplice _ ->
+    | Levent _ ->
         raise Not_simple
+    | Lsplice _ ->
+        fatal_error_invalid_constructor e
 
   and tr_recs env es = List.map (tr_rec env) es
 
@@ -1339,7 +1884,7 @@ let shallow_iter ~tail ~non_tail:f = function
       f for_from; f for_to; f for_body
   | Lassign(_, e) ->
       f e
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       List.iter f (met::obj::args)
   | Levent (e, _evt) ->
       tail e
@@ -1349,9 +1894,17 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
+  | Lkindtemplate {ktmpl_body} ->
+      f ktmpl_body
+  | Lkindinstantiate {kinst_func} ->
+      f kinst_func
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
+
+let is_evaluated = function
+  | Lconst _ | Lvar _ | Lfunction _ -> true
+  | _ -> false
 
 let rec free_variables = function
   | Lvar id
@@ -1424,7 +1977,7 @@ let rec free_variables = function
            (Ident.Set.remove for_id (free_variables for_body)))
   | Lassign(id, e) ->
       Ident.Set.add id (free_variables e)
-  | Lsend (_k, met, obj, args, _, _, _, _) ->
+  | Lsend (_k, met, obj, args, _, _, _, _, _) ->
       free_variables_list
         (Ident.Set.union (free_variables met) (free_variables obj))
         args
@@ -1437,8 +1990,13 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice { slambda = (SL.Quote e); _ } ->
-      free_variables e
+  | Lsplice _ as l -> fatal_error_invalid_constructor l
+  | Lkindtemplate {ktmpl_env} ->
+      Ident.Map.fold
+        (fun _ (lam, _) acc -> Ident.Set.union (free_variables lam) acc)
+        ktmpl_env Ident.Set.empty
+  | Lkindinstantiate {kinst_func = fn} ->
+      free_variables fn
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -1468,9 +2026,21 @@ let rec patch_guarded patch = function
       Levent (patch_guarded patch lam, ev)
   | _ -> fatal_error "Lambda.patch_guarded"
 
+let value_kind_of_pointerness = function
+  | Immediate -> Pintval
+  | Pointer -> Pgenval
+
+let pointerness_of_separability sep =
+  if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
+  then Immediate else Pointer
+
 let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   match elt with
-  | Value -> Value generic_value
+  | Scannable { separability; _ } ->
+    let raw_kind =
+      value_kind_of_pointerness (pointerness_of_separability separability)
+    in
+    Value { generic_value with raw_kind }
   | Float_boxed -> Float_boxed ()
   | Float64 -> Float64
   | Float32 -> Float32
@@ -1479,8 +2049,12 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   | Bits32 -> Bits32
   | Bits64 -> Bits64
   | Vec128 -> Vec128
-  | Vec256 -> Vec256
+  | Vec256 ->
+    if split_vectors
+    then Product [|Vec128; Vec128|]
+    else Vec256
   | Vec512 -> Vec512
+  | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
@@ -1493,7 +2067,11 @@ and transl_mixed_product_shape shape =
 let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (fun i (elt : Types.mixed_block_element) ->
     match elt with
-    | Value -> Value (get_value_kind i)
+    | Scannable { separability; _ } ->
+      let raw_kind =
+        value_kind_of_pointerness (pointerness_of_separability separability)
+      in
+      Value { (get_value_kind i) with raw_kind }
     | Float_boxed -> Float_boxed (get_mode i)
     | Float64 -> Float64
     | Float32 -> Float32
@@ -1502,8 +2080,12 @@ let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
     | Bits32 -> Bits32
     | Bits64 -> Bits64
     | Vec128 -> Vec128
-    | Vec256 -> Vec256
+    | Vec256 ->
+      if split_vectors
+      then Product [|Vec128; Vec128|]
+      else Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
     | Product shapes ->
@@ -1520,6 +2102,9 @@ let mod_field ?(read_semantics=Reads_agree) pos = function
     Pmixedfield([pos], shape_for_read, read_semantics)
 
 let transl_module_representation repr =
+  (* The shape here is potentially an underapproximation, since the scannable
+     axes in [shape] will all be [max]. This should not matter, though, since it
+     is not possible to reassign / directly mutate a [val] in a module. *)
   let shape =
     Array.map
       (fun sort ->
@@ -1530,9 +2115,9 @@ let transl_module_representation repr =
   in
   let is_value (elt : Types.mixed_block_element) =
     match elt with
-    | Value -> true
+    | Scannable _ -> true
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Word
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
     | Product _ | Void -> false
   in
   if Array.for_all is_value shape
@@ -1549,7 +2134,14 @@ let transl_module_representation repr =
 (* Translate an access path *)
 
 let rec transl_address loc = function
-  | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
+  | Env.Aunit (cu, mode) ->
+    let staticity = Mode.Value.proj_monadic Staticity mode in
+    let staticity =
+      match Mode.Staticity.zap_to_floor staticity with
+      | Static -> Static
+      | Dynamic -> Dynamic
+    in
+    Lprim(Pgetglobal (cu, staticity), [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
@@ -1578,36 +2170,20 @@ let transl_extension_path loc env path =
 let transl_class_path loc env path =
   transl_path Env.find_class_address loc env path
 
-let transl_prim mod_name name =
-  let pers = Ident.create_persistent mod_name in
-  let env = Env.add_persistent_structure pers Env.empty in
-  let lid = Longident.Ldot (Longident.Lident mod_name, name) in
-  match Env.find_value_by_name_lazy lid env with
-  | path, _ -> transl_value_path Loc_unknown env path
+let transl_prim modname field =
+  let mod_ident = Ident.create_persistent modname in
+  let env = Env.add_persistent_structure mod_ident (Lazy.force Env.initial) in
+  match Env.open_pers_signature modname env with
   | exception Not_found ->
-      fatal_error ("Primitive " ^ name ^ " not found.")
-
-let block_of_module_representation ~loc = function
-  | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
-  | Module_mixed (shape, _) ->
-    let rec count_values shape =
-      Array.fold_left
-        (fun acc elt ->
-          match elt with
-          | Value _ -> acc + 1
-          | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-          | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate -> acc
-          | Product product_shape -> acc + count_values product_shape
-          (* CR layout poly: We need to support this for relatively simple
-             layout poly usecases, however it should be easy to move this assert
-             to after slambdaeval (or maybe during?). *)
-          | Splice_variable _ ->
-            Misc.fatal_error "Layout poly doesn't support mixed modules yet")
-        0 shape
-    in
-    Typedecl.assert_mixed_product_support loc Module
-      ~value_prefix_len:(count_values shape);
-    Pmakeblock(0, Immutable, Shape shape, alloc_heap)
+      fatal_errorf "Module %s unavailable." modname
+    | _path, env -> (
+      match Env.find_value_by_name_lazy (Longident.Lident field) env with
+      | exception Not_found ->
+          fatal_errorf "Primitive %s.%s not found." modname field
+        (* Loc_unknown is appropriate here: this references a compiler-internal
+            primitive with no corresponding user source location. *)
+      | path, _ -> transl_value_path Loc_unknown env path
+    )
 
 (* Compile a sequence of expressions *)
 
@@ -1679,8 +2255,18 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lapply ap ->
         Lapply{ap with ap_func = subst s l ap.ap_func;
                       ap_args = subst_list s l ap.ap_args}
+    | Lkindinstantiate inst ->
+        Lkindinstantiate { inst with kinst_func = subst s l inst.kinst_func }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
+    | Lkindtemplate ({ktmpl_env} as ktmpl) ->
+        Lkindtemplate
+          { ktmpl with
+            ktmpl_env =
+              Ident.Map.map
+                (fun (lam, layout) -> (subst s l lam, layout))
+                ktmpl_env;
+          }
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -1727,9 +2313,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         assert (not (Ident.Map.mem id s));
         let id = try Ident.Map.find id l with Not_found -> id in
         Lassign(id, subst s l e)
-    | Lsend (k, met, obj, args, pos, mode, loc, layout) ->
+    | Lsend (k, met, obj, args, pos, mode, loc, layout, yielding) ->
         Lsend (k, subst s l met, subst s l obj, subst_list s l args,
-               pos, mode, loc, layout)
+               pos, mode, loc, layout, yielding)
     | Levent (lam, evt) ->
         let old_env = evt.lev_env in
         let env_updates =
@@ -1773,8 +2359,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
-    | Lsplice { splice_loc; slambda = (SL.Quote e) } ->
-        Lsplice { splice_loc; slambda = (SL.Quote (subst s l e)) }
+    | Lsplice _ -> fatal_error_invalid_constructor lam
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -1807,91 +2392,229 @@ let duplicate_function =
      ~freshen_bound_variables:true
      Ident.Map.empty).subst_lfunction
 
-let map_lfunction f { kind; params; return; body; attr; loc;
-                      mode; ret_mode } =
-  let body = f body in
-  { kind; params; return; body; attr; loc; mode; ret_mode }
+let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
+                      mode; ret_mode; yielding } as lfunction) =
+  let new_body = f old_body in
+  if old_body == new_body
+  then lfunction
+  else { kind; params; return; body = new_body; attr; loc; mode; ret_mode;
+         yielding }
 
-let shallow_map ~tail ~non_tail:f = function
+let shallow_map ~tail ~non_tail:f lam =
+  match lam with
   | Lvar _
   | Lmutvar _
   | Lconst _
-  | Lsplice _ as lam -> lam
-  | Lapply { ap_func; ap_args; ap_result_layout; ap_region_close; ap_mode; ap_loc; ap_tailcall;
+  | Lsplice _ -> lam
+  | Lapply { ap_func = old_func; ap_args = old_args; ap_result_layout;
+             ap_region_close; ap_mode; ap_yielding; ap_loc; ap_tailcall;
              ap_inlined; ap_specialised; ap_probe } ->
-      Lapply {
-        ap_func = f ap_func;
-        ap_args = List.map f ap_args;
-        ap_result_layout;
-        ap_region_close;
-        ap_mode;
-        ap_loc;
-        ap_tailcall;
-        ap_inlined;
-        ap_specialised;
-        ap_probe;
-      }
-  | Lfunction lfun ->
-      Lfunction (map_lfunction f lfun)
-  | Llet (str, layout, v, v_duid, e1, e2) ->
-      Llet (str, layout, v, v_duid, f e1, tail e2)
-  | Lmutlet (layout, v, v_duid, e1, e2) ->
-      Lmutlet (layout, v, v_duid, f e1, tail e2)
-  | Lletrec (idel, e2) ->
-      Lletrec
-        (List.map (fun rb ->
-             { rb with def = map_lfunction f rb.def })
-            idel,
-         tail e2)
-  | Lprim (Psequand as p, [l1; l2], loc)
-  | Lprim (Psequor as p, [l1; l2], loc) ->
-      Lprim(p, [f l1; tail l2], loc)
-  | Lprim (p, el, loc) ->
-      Lprim (p, List.map f el, loc)
-  | Lswitch (e, sw, loc, layout) ->
-      Lswitch (f e,
-               { sw_numconsts = sw.sw_numconsts;
-                 sw_consts = List.map (fun (n, e) -> (n, tail e)) sw.sw_consts;
-                 sw_numblocks = sw.sw_numblocks;
-                 sw_blocks = List.map (fun (n, e) -> (n, tail e)) sw.sw_blocks;
-                 sw_failaction = Option.map tail sw.sw_failaction;
-               },
-               loc, layout)
-  | Lstringswitch (e, sw, default, loc, layout) ->
-      Lstringswitch (
-        f e,
-        List.map (fun (s, e) -> (s, tail e)) sw,
-        Option.map tail default,
-        loc, layout)
-  | Lstaticraise (i, args) ->
-      Lstaticraise (i, List.map f args)
-  | Lstaticcatch (body, id, handler, r, layout) ->
-      Lstaticcatch (tail body, id, tail handler, r, layout)
-  | Ltrywith (e1, v, duid, e2, layout) ->
-      Ltrywith (f e1, v, duid, tail e2, layout)
-  | Lifthenelse (e1, e2, e3, layout) ->
-      Lifthenelse (f e1, tail e2, tail e3, layout)
-  | Lsequence (e1, e2) ->
-      Lsequence (f e1, tail e2)
-  | Lwhile lw ->
-      Lwhile { wh_cond = f lw.wh_cond;
-               wh_body = f lw.wh_body }
-  | Lfor lf ->
-      Lfor { lf with for_from = f lf.for_from;
-                     for_to = f lf.for_to;
-                     for_body = f lf.for_body }
-  | Lassign (v, e) ->
-      Lassign (v, f e)
-  | Lsend (k, m, o, el, pos, mode, loc, layout) ->
-      Lsend (k, f m, f o, List.map f el, pos, mode, loc, layout)
-  | Levent (l, ev) ->
-      Levent (tail l, ev)
-  | Lifused (v, e) ->
-      Lifused (v, tail e)
-  | Lregion (e, layout) ->
-      Lregion (f e, layout)
-  | Lexclave e ->
-      Lexclave (tail e)
+      let new_func = f old_func in
+      let new_args = Misc.Stdlib.List.map_sharing f old_args in
+      if old_func == new_func && old_args == new_args
+      then lam
+      else
+        Lapply {
+          ap_func = new_func;
+          ap_args = new_args;
+          ap_result_layout;
+          ap_region_close;
+          ap_mode;
+          ap_yielding;
+          ap_loc;
+          ap_tailcall;
+          ap_inlined;
+          ap_specialised;
+          ap_probe;
+        }
+  | Lkindinstantiate { kinst_func = old_func; kinst_args; kinst_result_layout;
+                       kinst_mode; kinst_loc } ->
+      let new_func = f old_func in
+      if old_func == new_func
+      then lam
+      else
+        Lkindinstantiate {
+          kinst_func = new_func;
+          kinst_args;
+          kinst_result_layout;
+          kinst_mode;
+          kinst_loc;
+        }
+  | Lfunction old_lfun ->
+      let new_lfun = map_lfunction f old_lfun in
+      if old_lfun == new_lfun then lam else Lfunction new_lfun
+  | Lkindtemplate { ktmpl_params; ktmpl_return; ktmpl_body = old_body;
+                    ktmpl_ret_mode; ktmpl_env = old_env; ktmpl_env_mode;
+                    ktmpl_loc } ->
+      let new_body = f old_body in
+      let env_changed = ref false in
+      let new_env =
+        Ident.Map.map
+          (fun (old_lam, layout) ->
+            let new_lam = f old_lam in
+            env_changed := !env_changed || old_lam != new_lam;
+            (new_lam, layout))
+          old_env
+      in
+      if old_body == new_body && not !env_changed
+      then lam
+      else
+        Lkindtemplate {
+          ktmpl_params;
+          ktmpl_return;
+          ktmpl_body = new_body;
+          ktmpl_ret_mode;
+          ktmpl_env = new_env;
+          ktmpl_env_mode;
+          ktmpl_loc;
+        }
+  | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
+      let new_e1 = f old_e1 in
+      let new_e2 = tail old_e2 in
+      if old_e1 == new_e1 && old_e2 == new_e2
+      then lam
+      else Llet (str, layout, v, v_duid, new_e1, new_e2)
+  | Lmutlet (layout, v, v_duid, old_e1, old_e2) ->
+      let new_e1 = f old_e1 in
+      let new_e2 = tail old_e2 in
+      if old_e1 == new_e1 && old_e2 == new_e2
+      then lam
+      else Lmutlet (layout, v, v_duid, new_e1, new_e2)
+  | Lletrec (old_idel, old_e2) ->
+      let new_idel =
+        Misc.Stdlib.List.map_sharing
+          (fun rb ->
+            let new_def = map_lfunction f rb.def in
+            if rb.def == new_def then rb else { rb with def = new_def })
+          old_idel
+      in
+      let new_e2 = tail old_e2 in
+      if old_idel == new_idel && old_e2 == new_e2
+      then lam
+      else Lletrec (new_idel, new_e2)
+  | Lprim (Psequand as p, [old_l1; old_l2], loc)
+  | Lprim (Psequor as p, [old_l1; old_l2], loc) ->
+      let new_l1 = f old_l1 in
+      let new_l2 = tail old_l2 in
+      if old_l1 == new_l1 && old_l2 == new_l2
+      then lam
+      else Lprim (p, [new_l1; new_l2], loc)
+  | Lprim (p, old_el, loc) ->
+      let new_el = Misc.Stdlib.List.map_sharing f old_el in
+      if old_el == new_el then lam else Lprim (p, new_el, loc)
+  | Lswitch (old_e, old_sw, loc, layout) ->
+      let new_e = f old_e in
+      let map_cases cases =
+        Misc.Stdlib.List.map_sharing
+          (fun ((n, old_e) as case) ->
+            let new_e = tail old_e in
+            if old_e == new_e then case else (n, new_e))
+          cases
+      in
+      let new_consts = map_cases old_sw.sw_consts in
+      let new_blocks = map_cases old_sw.sw_blocks in
+      let new_failaction =
+        Misc.Stdlib.Option.map_sharing tail old_sw.sw_failaction
+      in
+      if old_e == new_e
+         && old_sw.sw_consts == new_consts
+         && old_sw.sw_blocks == new_blocks
+         && old_sw.sw_failaction == new_failaction
+      then lam
+      else
+        Lswitch (new_e,
+                 { sw_numconsts = old_sw.sw_numconsts;
+                   sw_consts = new_consts;
+                   sw_numblocks = old_sw.sw_numblocks;
+                   sw_blocks = new_blocks;
+                   sw_failaction = new_failaction;
+                 },
+                 loc, layout)
+  | Lstringswitch (old_e, old_sw, old_default, loc, layout) ->
+      let new_e = f old_e in
+      let new_sw =
+        Misc.Stdlib.List.map_sharing
+          (fun ((s, old_e) as case) ->
+            let new_e = tail old_e in
+            if old_e == new_e then case else (s, new_e))
+          old_sw
+      in
+      let new_default =
+        Misc.Stdlib.Option.map_sharing tail old_default
+      in
+      if old_e == new_e && old_sw == new_sw
+         && old_default == new_default
+      then lam
+      else Lstringswitch (new_e, new_sw, new_default, loc, layout)
+  | Lstaticraise (i, old_args) ->
+      let new_args = Misc.Stdlib.List.map_sharing f old_args in
+      if old_args == new_args then lam
+      else Lstaticraise (i, new_args)
+  | Lstaticcatch (old_body, id, old_handler, r, layout) ->
+      let new_body = tail old_body in
+      let new_handler = tail old_handler in
+      if old_body == new_body && old_handler == new_handler
+      then lam
+      else Lstaticcatch (new_body, id, new_handler, r, layout)
+  | Ltrywith (old_e1, v, duid, old_e2, layout) ->
+      let new_e1 = f old_e1 in
+      let new_e2 = tail old_e2 in
+      if old_e1 == new_e1 && old_e2 == new_e2
+      then lam
+      else Ltrywith (new_e1, v, duid, new_e2, layout)
+  | Lifthenelse (old_e1, old_e2, old_e3, layout) ->
+      let new_e1 = f old_e1 in
+      let new_e2 = tail old_e2 in
+      let new_e3 = tail old_e3 in
+      if old_e1 == new_e1 && old_e2 == new_e2 && old_e3 == new_e3
+      then lam
+      else Lifthenelse (new_e1, new_e2, new_e3, layout)
+  | Lsequence (old_e1, old_e2) ->
+      let new_e1 = f old_e1 in
+      let new_e2 = tail old_e2 in
+      if old_e1 == new_e1 && old_e2 == new_e2
+      then lam
+      else Lsequence (new_e1, new_e2)
+  | Lwhile old_lw ->
+      let new_cond = f old_lw.wh_cond in
+      let new_body = f old_lw.wh_body in
+      if old_lw.wh_cond == new_cond && old_lw.wh_body == new_body
+      then lam
+      else Lwhile { wh_cond = new_cond; wh_body = new_body }
+  | Lfor old_lf ->
+      let new_from = f old_lf.for_from in
+      let new_to = f old_lf.for_to in
+      let new_body = f old_lf.for_body in
+      if old_lf.for_from == new_from
+         && old_lf.for_to == new_to
+         && old_lf.for_body == new_body
+      then lam
+      else
+        Lfor { old_lf with for_from = new_from;
+                            for_to = new_to;
+                            for_body = new_body }
+  | Lassign (v, old_e) ->
+      let new_e = f old_e in
+      if old_e == new_e then lam else Lassign (v, new_e)
+  | Lsend (k, old_m, old_o, old_el, pos, mode, loc, layout, yielding) ->
+      let new_m = f old_m in
+      let new_o = f old_o in
+      let new_el = Misc.Stdlib.List.map_sharing f old_el in
+      if old_m == new_m && old_o == new_o && old_el == new_el
+      then lam
+      else Lsend (k, new_m, new_o, new_el, pos, mode, loc, layout, yielding)
+  | Levent (old_l, ev) ->
+      let new_l = tail old_l in
+      if old_l == new_l then lam else Levent (new_l, ev)
+  | Lifused (v, old_e) ->
+      let new_e = tail old_e in
+      if old_e == new_e then lam else Lifused (v, new_e)
+  | Lregion (old_e, layout) ->
+      let new_e = f old_e in
+      if old_e == new_e then lam else Lregion (new_e, layout)
+  | Lexclave old_e ->
+      let new_e = tail old_e in
+      if old_e == new_e then lam else Lexclave new_e
 
 let map f =
   let rec g lam = f (shallow_map ~tail:g ~non_tail:g lam) in
@@ -1944,9 +2667,13 @@ let find_exact_application kind ~arity args =
 let reset () =
   Static_label.reset static_label_sequence
 
-let locality_mode_of_primitive_description (p : external_call_description) =
+type alloc_mode =
+| Stack
+| Heap
+
+let alloc_mode_of_primitive_description (p : external_call_description) =
   if not Config.stack_allocation then
-    if p.prim_alloc then Some alloc_heap else None
+    if p.prim_alloc then Some Heap else None
   else
     match p.prim_native_repr_res with
     | Prim_local, _ ->
@@ -1954,7 +2681,7 @@ let locality_mode_of_primitive_description (p : external_call_description) =
          whether [caml_c_call] is required, without telling us anything
          about local allocation.  (However if [p.prim_alloc = false] we
          do actually know that the primitive does not allocate on the heap.) *)
-      Some alloc_local
+      Some Stack
     | (Prim_global | Prim_poly), _ ->
       (* For primitives that definitely do not allocate locally,
          [p.prim_alloc = false] actually tells us that the primitive does
@@ -1962,7 +2689,19 @@ let locality_mode_of_primitive_description (p : external_call_description) =
 
          No external call that is [Prim_poly] may allocate locally.
       *)
-      if p.prim_alloc then Some alloc_heap else None
+      if p.prim_alloc then Some Heap else None
+
+let locality_mode_of_primitive_description (p : external_call_description) =
+  match alloc_mode_of_primitive_description p with
+  | Some Stack -> Some alloc_local
+  | Some Heap -> Some alloc_heap
+  | None -> None
+
+let return_mode_of_primitive_description (p : external_call_description) =
+  match alloc_mode_of_primitive_description p with
+  | Some Stack -> Some maybe_alloc_stack
+  | Some Heap -> Some not_alloc_stack
+  | None -> None
 
 let project_from_mixed_block_shape
     : 'a. 'a mixed_block_element array -> path:int list
@@ -2002,7 +2741,8 @@ let project_from_mixed_block_shape
         | Value _
         | Float_boxed _
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-        | Untagged_immediate | Vec128 | Vec256 | Vec512 | Splice_variable _ ->
+        | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask
+        | Splice_variable _ ->
           Misc.fatal_error "project_from_mixed_block_element: path too long \
             for mixed block shape")
     in
@@ -2013,7 +2753,7 @@ let mixed_block_projection_may_allocate shape ~path =
     match element with
     | Float_boxed mode -> Some mode
     | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
-    | Untagged_immediate | Vec128 | Vec256 | Vec512 -> None
+    | Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask -> None
     | Product shape ->
       Array.fold_left (fun alloc_mode element ->
           let alloc_mode' = allocates element in
@@ -2072,22 +2812,26 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Parraysetu _ | Parraysets _
   | Parrayrefu ((Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
-      | Punboxedvectorarray_ref _
+      | Punboxedvectorarray_ref _ | Punboxedmaskarray_ref
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _)
   | Parrayrefs ((Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
       | Punboxedfloatarray_ref _ | Punboxedoruntaggedintarray_ref _
-      | Punboxedvectorarray_ref _
+      | Punboxedvectorarray_ref _ | Punboxedmaskarray_ref
       | Pgcscannableproductarray_ref _
       | Pgcignorableproductarray_ref _), _, _) -> None
   | Parrayrefu ((Pgenarray_ref m | Pfloatarray_ref m), _, _)
   | Parrayrefs ((Pgenarray_ref m | Pfloatarray_ref m), _, _) -> Some m
+  | Parrayrefu (Punspecializedarray_ref _, _, _)
+  | Parrayrefs (Punspecializedarray_ref _, _, _) ->
+    Misc.fatal_error "Lambda.primitive_may_allocate: Punspecializedarray_ref"
   | Pisint _ | Pisnull | Pisout -> None
   | Pbigarrayset _ | Pbigarraydim _ -> None
   | Pbigarrayref (_, _, _, _) ->
      (* Boxes arising from Bigarray access are always Alloc_heap *)
      Some alloc_heap
-  | Pstring_load_16 _ | Pbytes_load_16 _ -> None
+  | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+  | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _ -> None
   | Pstring_load_32 { mode = m; boxed = true; _ }
   | Pbytes_load_32 { mode = m; boxed = true; _ }
   | Pstring_load_f32 { mode = m; boxed = true; _ }
@@ -2096,11 +2840,14 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pbytes_load_64 { mode = m; boxed = true; _ }
   | Pstring_load_vec { mode = m; boxed = true; _ }
   | Pbytes_load_vec { mode = m; boxed = true; _ }
+  | Pstring_load_mask { mode = m; boxed = true; _ }
+  | Pbytes_load_mask { mode = m; boxed = true; _ }
   | Pfloatarray_load_vec { mode = m; boxed = true; _ }
-  | Pfloat_array_load_vec { mode = m; boxed = true; _ }
   | Pint_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_float_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_float32_array_load_vec { mode = m; boxed = true; _ }
+  | Puntagged_int8_array_load_vec { mode = m; boxed = true; _ }
+  | Puntagged_int16_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_int32_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_int64_array_load_vec { mode = m; boxed = true; _ }
   | Punboxed_nativeint_array_load_vec { mode = m; boxed = true; _ }
@@ -2109,33 +2856,40 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pstring_load_f32 { boxed = false; _ }
   | Pstring_load_64 { boxed = false; _ }
   | Pstring_load_vec { boxed = false; _ }
+  | Pstring_load_mask { boxed = false; _ }
   | Pbytes_load_32 { boxed = false; _ }
   | Pbytes_load_f32 { boxed = false; _ }
   | Pbytes_load_64 { boxed = false; _ }
   | Pbytes_load_vec { boxed = false; _ }
+  | Pbytes_load_mask { boxed = false; _ }
   | Pfloatarray_load_vec { boxed = false; _ }
-  | Pfloat_array_load_vec { boxed = false; _ }
   | Pint_array_load_vec { boxed = false; _ }
   | Punboxed_float_array_load_vec { boxed = false; _ }
   | Punboxed_float32_array_load_vec { boxed = false; _ }
+  | Puntagged_int8_array_load_vec { boxed = false; _ }
+  | Puntagged_int16_array_load_vec { boxed = false; _ }
   | Punboxed_int32_array_load_vec { boxed = false; _ }
   | Punboxed_int64_array_load_vec { boxed = false; _ }
   | Punboxed_nativeint_array_load_vec { boxed = false; _ } -> None
-  | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
-  | Pbytes_set_64 _ | Pbytes_set_vec _ -> None
-  | Pbigstring_load_16 _ -> None
+  | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
+  | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbytes_set_mask _ -> None
+  | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _ -> None
   | Pbigstring_load_32 { mode = m; boxed = true; _ }
   | Pbigstring_load_f32 { mode = m; boxed = true; _ }
   | Pbigstring_load_64 { mode = m; boxed = true; _ }
-  | Pbigstring_load_vec { mode = m; boxed = true; _ } -> Some m
+  | Pbigstring_load_vec { mode = m; boxed = true; _ }
+  | Pbigstring_load_mask { mode = m; boxed = true; _ } -> Some m
   | Pbigstring_load_32 { boxed = false; _ }
   | Pbigstring_load_f32 { boxed = false; _ }
   | Pbigstring_load_64 { boxed = false; _ }
-  | Pbigstring_load_vec { boxed = false; _ } -> None
-  | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
-  | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pbigstring_load_vec { boxed = false; _ }
+  | Pbigstring_load_mask { boxed = false; _ } -> None
+  | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pbigstring_set_mask _
+  | Pfloatarray_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _ -> None
   | Pctconst _ -> None
@@ -2146,14 +2900,23 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pobj_magic _ -> None
   | Punbox_vector _ -> None
   | Pbox_vector (_, m) -> Some m
+  | Punbox_mask -> None
+  | Pbox_mask m -> Some m
   | Punbox_unit -> None
-  | Pwith_stack | Pwith_stack_bind | Presume | Pperform | Preperform
+  | Pjoin_vec256 | Psplit_vec256 ->
+    (* Aborts in bytecode, unboxed in native code *)
+    None
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pperform | Preperform
     (* CR mshinwell: check *)
   | Ppoll ->
     Some alloc_heap
   | Pcpu_relax -> if Config.poll_insertion then None else Some alloc_heap
   | Patomic_load_field _
+  | Patomic_load_mixed_field _
   | Patomic_set_field _
+  | Patomic_set_mixed_field _
   | Patomic_exchange_field _
   | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _
@@ -2167,9 +2930,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Ptls_get
   | Pdomain_index
   | Preinterpret_unboxed_int64_as_tagged_int63
+  | Preinterpret_boxed_vector_as_tuple _
+  | Preinterpret_tuple_as_boxed_vector _
   | Parray_element_size_in_bytes _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
+  | Pget_ext_ptr _ | Pset_ext_ptr _
   | Ppeek _ | Ppoke _ ->
     None
   | Pmake_idx_field _
@@ -2191,44 +2957,59 @@ let primitive_can_raise prim =
   | Pphys_equal (Eq | Noteq) -> false
   | Pccall _ | Praise _ | Parrayrefs _ | Parraysets _
   | Pstringrefs | Pbytesrefs | Pbytessets
+  | Pstring_load_i8 { unsafe = false; _ }
+  | Pstring_load_i16 { unsafe = false; _ }
   | Pstring_load_16 { unsafe = false; _ }
   | Pstring_load_32 { unsafe = false; _ }
   | Pstring_load_f32 { unsafe = false; _ }
   | Pstring_load_64 { unsafe = false; _ }
   | Pstring_load_vec { unsafe = false; _ }
+  | Pstring_load_mask { unsafe = false; _ }
+  | Pbytes_load_i8 { unsafe = false; _ }
+  | Pbytes_load_i16 { unsafe = false; _ }
   | Pbytes_load_16 { unsafe = false; _ }
   | Pbytes_load_32 { unsafe = false; _ }
   | Pbytes_load_f32 { unsafe = false; _ }
   | Pbytes_load_64 { unsafe = false; _ }
   | Pbytes_load_vec { unsafe = false; _ }
+  | Pbytes_load_mask { unsafe = false; _ }
+  | Pbytes_set_8 { unsafe = false; index_kind = _ }
   | Pbytes_set_16 { unsafe = false; index_kind = _ }
   | Pbytes_set_32 { unsafe = false; index_kind = _; boxed = _ }
   | Pbytes_set_f32 { unsafe = false; index_kind = _; boxed = _ }
   | Pbytes_set_64 { unsafe = false; index_kind = _; boxed = _ }
   | Pbytes_set_vec { unsafe = false; _ }
+  | Pbytes_set_mask { unsafe = false; _ }
+  | Pbigstring_load_i8 { unsafe = false; index_kind = _ }
+  | Pbigstring_load_i16 { unsafe = false; index_kind = _ }
   | Pbigstring_load_16 { unsafe = false; index_kind = _ }
   | Pbigstring_load_32 { unsafe = false; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_f32 { unsafe = false; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_64 { unsafe = false; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_vec { checks = Some _; _ }
+  | Pbigstring_load_mask { unsafe = false; _ }
+  | Pbigstring_set_8 { unsafe = false; index_kind = _ }
   | Pbigstring_set_16 { unsafe = false; index_kind = _ }
   | Pbigstring_set_32 { unsafe = false; index_kind = _; boxed = _ }
   | Pbigstring_set_f32 { unsafe = false; index_kind = _; boxed = _ }
   | Pbigstring_set_64 { unsafe = false; index_kind = _; boxed = _ }
   | Pbigstring_set_vec { checks = Some _; _ }
+  | Pbigstring_set_mask { unsafe = false; _ }
   | Pfloatarray_load_vec { unsafe = false; _ }
-  | Pfloat_array_load_vec { unsafe = false; _ }
   | Pint_array_load_vec { unsafe = false; _ }
   | Punboxed_float_array_load_vec { unsafe = false; _ }
   | Punboxed_float32_array_load_vec { unsafe = false; _ }
+  | Puntagged_int8_array_load_vec { unsafe = false; _ }
+  | Puntagged_int16_array_load_vec { unsafe = false; _ }
   | Punboxed_int32_array_load_vec { unsafe = false; _ }
   | Punboxed_int64_array_load_vec { unsafe = false; _ }
   | Punboxed_nativeint_array_load_vec { unsafe = false; _ }
   | Pfloatarray_set_vec { unsafe = false; _ }
-  | Pfloat_array_set_vec { unsafe = false; _ }
   | Pint_array_set_vec { unsafe = false; _ }
   | Punboxed_float_array_set_vec { unsafe = false; _ }
   | Punboxed_float32_array_set_vec { unsafe = false; _ }
+  | Puntagged_int8_array_set_vec { unsafe = false; _ }
+  | Puntagged_int16_array_set_vec { unsafe = false; _ }
   | Punboxed_int32_array_set_vec { unsafe = false; _ }
   | Punboxed_int64_array_set_vec { unsafe = false; _ }
   | Punboxed_nativeint_array_set_vec { unsafe = false; _ }
@@ -2272,67 +3053,90 @@ let primitive_can_raise prim =
         | Pbigarray_int64 | Pbigarray_caml_int | Pbigarray_native_int
         | Pbigarray_complex32 | Pbigarray_complex64 ),
         (Pbigarray_c_layout | Pbigarray_fortran_layout) )
+  | Pstring_load_i8 { unsafe = true; _ }
+  | Pstring_load_i16 { unsafe = true; _ }
   | Pstring_load_16 { unsafe = true; _ }
   | Pstring_load_32 { unsafe = true; _ }
   | Pstring_load_f32 { unsafe = true; _ }
   | Pstring_load_64 { unsafe = true; _ }
   | Pstring_load_vec { unsafe = true; _ }
+  | Pstring_load_mask { unsafe = true; _ }
+  | Pbytes_load_i8 { unsafe = true; _ }
+  | Pbytes_load_i16 { unsafe = true; _ }
   | Pbytes_load_16 { unsafe = true; _ }
   | Pbytes_load_32 { unsafe = true; _ }
   | Pbytes_load_f32 { unsafe = true; _ }
   | Pbytes_load_64 { unsafe = true; _ }
   | Pbytes_load_vec { unsafe = true; _ }
+  | Pbytes_load_mask { unsafe = true; _ }
+  | Pbytes_set_8 { unsafe = true; index_kind = _ }
   | Pbytes_set_16 { unsafe = true; index_kind = _ }
   | Pbytes_set_32 { unsafe = true; index_kind = _; boxed = _ }
   | Pbytes_set_f32 { unsafe = true; index_kind = _; boxed = _ }
   | Pbytes_set_64 { unsafe = true; index_kind = _; boxed = _ }
   | Pbytes_set_vec { unsafe = true; _ }
+  | Pbytes_set_mask { unsafe = true; _ }
+  | Pbigstring_load_i8 { unsafe = true; index_kind = _ }
+  | Pbigstring_load_i16 { unsafe = true; index_kind = _ }
   | Pbigstring_load_16 { unsafe = true; index_kind = _ }
   | Pbigstring_load_32 { unsafe = true; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_f32 { unsafe = true; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_64 { unsafe = true; index_kind = _; mode = _; boxed = _ }
   | Pbigstring_load_vec { checks = None; _ }
+  | Pbigstring_load_mask { unsafe = true; _ }
+  | Pbigstring_set_8 { unsafe = true; _ }
   | Pbigstring_set_16 { unsafe = true; _ }
   | Pbigstring_set_32 { unsafe = true; index_kind = _; boxed = _ }
   | Pbigstring_set_f32 { unsafe = true; index_kind = _; boxed = _ }
   | Pbigstring_set_64 { unsafe = true; index_kind = _; boxed = _ }
   | Pbigstring_set_vec { checks = None; _ }
+  | Pbigstring_set_mask { unsafe = true; _ }
   | Pfloatarray_load_vec { unsafe = true; _ }
-  | Pfloat_array_load_vec { unsafe = true; _ }
   | Pint_array_load_vec { unsafe = true; _ }
   | Punboxed_float_array_load_vec { unsafe = true; _ }
   | Punboxed_float32_array_load_vec { unsafe = true; _ }
+  | Puntagged_int8_array_load_vec { unsafe = true; _ }
+  | Puntagged_int16_array_load_vec { unsafe = true; _ }
   | Punboxed_int32_array_load_vec { unsafe = true; _ }
   | Punboxed_int64_array_load_vec { unsafe = true; _ }
   | Punboxed_nativeint_array_load_vec { unsafe = true; _ }
   | Pfloatarray_set_vec { unsafe = true; _ }
-  | Pfloat_array_set_vec { unsafe = true; _ }
   | Pint_array_set_vec { unsafe = true; _ }
   | Punboxed_float_array_set_vec { unsafe = true; _ }
   | Punboxed_float32_array_set_vec { unsafe = true; _ }
+  | Puntagged_int8_array_set_vec { unsafe = true; _ }
+  | Puntagged_int16_array_set_vec { unsafe = true; _ }
   | Punboxed_int32_array_set_vec { unsafe = true; _ }
   | Punboxed_int64_array_set_vec { unsafe = true; _ }
   | Punboxed_nativeint_array_set_vec { unsafe = true; _ }
   | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
-  | Pbox_vector (_, _)
-  | Punbox_vector _ | Punbox_unit | Pmake_unboxed_product _
+  | Pbox_vector (_, _) | Punbox_vector _
+  | Pbox_mask _ | Punbox_mask
+  | Pjoin_vec256 | Psplit_vec256
+  | Punbox_unit | Pmake_unboxed_product _
   | Punboxed_product_field _ | Pget_header _ ->
     false
   | Patomic_exchange_field _ | Patomic_compare_exchange_field _
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
-  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_set_field _ -> false
-  | Pwith_stack | Pwith_stack_bind | Pperform | Presume
+  | Patomic_lxor_field  | Patomic_load_field _ | Patomic_load_mixed_field _
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> false
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pperform | Pcontinue | Pdiscontinue
+  | Pdiscontinue_with_backtrace
   | Preperform -> true (* XXX! *)
   | Pdls_get | Ptls_get | Pdomain_index | Ppoll | Pcpu_relax
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63
+  | Preinterpret_boxed_vector_as_tuple _
+  | Preinterpret_tuple_as_boxed_vector _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
   | Pidx_deepen _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
+  | Pget_ext_ptr _ | Pset_ext_ptr _
   | Ppeek _ | Ppoke _ ->
     false
 
@@ -2365,7 +3169,7 @@ let structured_constant_layout = function
 
 let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   match c with
-  | Base Value -> layout_any_value
+  | Base Scannable -> layout_any_value
   | Base Float64 -> layout_unboxed_float Unboxed_float64
   | Base Float32 -> layout_unboxed_float Unboxed_float32
   | Base Word -> layout_unboxed_nativeint
@@ -2377,14 +3181,18 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Base Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Base Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Base Mask -> layout_unboxed_mask
   | Base Void -> layout_unboxed_product []
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
+  | Genvar _ ->
+    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
+  | Unboxed_mask -> layout_boxed_mask
   | Unboxed_float bf -> layout_boxed_float bf
   | Unboxed_or_untagged_integer
       (Untagged_int | Untagged_int8 | Untagged_int16) ->
@@ -2399,19 +3207,43 @@ let layout_of_extern_repr : extern_repr -> _ = function
 
 let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
-  | Same_as_ocaml_repr (Product _) -> true
+  | Same_as_ocaml_repr (Product _)
   | Same_as_ocaml_repr (Base _)
-  | Unboxed_vector _ | Unboxed_float _
+  | Unboxed_vector _ | Unboxed_mask | Unboxed_float _
   | Unboxed_or_untagged_integer _ ->
     false
   | Same_as_ocaml_repr (Univar _) ->
     Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected univar"
+  | Same_as_ocaml_repr (Genvar _) ->
+    Misc.fatal_error "extern_repr_involves_unboxed_products: unexpected genvar"
+
+let strip_locality_mode shape =
+  let rec strip_elt elt =
+    match elt with
+    | Float_boxed _ -> Float_boxed ()
+    | Product elts -> Product (Array.map strip_elt elts)
+    | Value vk -> Value vk
+    | Float64 -> Float64
+    | Float32 -> Float32
+    | Bits8 -> Bits8
+    | Bits16 -> Bits16
+    | Bits32 -> Bits32
+    | Bits64 -> Bits64
+    | Vec128 -> Vec128
+    | Vec256 -> Vec256
+    | Vec512 -> Vec512
+    | Mask -> Mask
+    | Word -> Word
+    | Untagged_immediate -> Untagged_immediate
+    | Splice_variable id -> Splice_variable id
+  in
+  Array.map strip_elt shape
 
 let rec layout_of_scannable_kinds kinds =
   Punboxed_product (List.map layout_of_scannable_kind kinds)
 
 and layout_of_scannable_kind = function
-  | Pint_scannable -> layout_int
+  | Pint_scannable -> layout_int_or_null
   | Paddr_scannable -> layout_value_field
   | Pproduct_scannable kinds -> layout_of_scannable_kinds kinds
 
@@ -2419,22 +3251,53 @@ let rec layout_of_ignorable_kinds kinds =
   Punboxed_product (List.map layout_of_ignorable_kind kinds)
 
 and layout_of_ignorable_kind = function
-  | Pint_ignorable -> layout_int
+  | Pint_ignorable -> layout_int_or_null
   | Punboxedfloat_ignorable f -> layout_unboxed_float f
   | Punboxedvector_ignorable v -> layout_unboxed_vector v
   | Punboxedoruntaggedint_ignorable i -> layout_unboxed_int i
   | Pproduct_ignorable kinds -> layout_of_ignorable_kinds kinds
 
-let array_ref_kind_result_layout = function
-  | Pintarray_ref -> layout_int
-  | Pfloatarray_ref _ -> layout_boxed_float Boxed_float64
-  | Punboxedfloatarray_ref bf -> layout_unboxed_float bf
-  | Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref ->
-    layout_value_field
-  | Punboxedoruntaggedintarray_ref i -> layout_unboxed_int i
-  | Punboxedvectorarray_ref bv -> layout_unboxed_vector bv
-  | Pgcscannableproductarray_ref kinds -> layout_of_scannable_kinds kinds
-  | Pgcignorableproductarray_ref kinds -> layout_of_ignorable_kinds kinds
+let element_layout_of_array_kind = function
+  | Pintarray -> layout_int
+  | Pfloatarray -> layout_boxed_float Boxed_float64
+  | Punboxedfloatarray bf -> layout_unboxed_float bf
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray -> layout_value_field
+  | Punboxedoruntaggedintarray i -> layout_unboxed_int i
+  | Punboxedvectorarray bv -> layout_unboxed_vector bv
+  | Punboxedmaskarray -> layout_unboxed_mask
+  | Pgcscannableproductarray kinds -> layout_of_scannable_kinds kinds
+  | Pgcignorableproductarray kinds -> layout_of_ignorable_kinds kinds
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda.element_layout_of_array_kind: Punspecializedarray_ref"
+
+let array_kind_of_array_ref_kind : array_ref_kind -> array_kind = function
+  | Pgenarray_ref _ -> Pgenarray
+  | Paddrarray_ref -> Paddrarray
+  | Pgcignorableaddrarray_ref -> Pgcignorableaddrarray
+  | Pintarray_ref -> Pintarray
+  | Pfloatarray_ref _ -> Pfloatarray
+  | Punboxedfloatarray_ref bf -> Punboxedfloatarray bf
+  | Punboxedoruntaggedintarray_ref i -> Punboxedoruntaggedintarray i
+  | Punboxedvectorarray_ref bv -> Punboxedvectorarray bv
+  | Punboxedmaskarray_ref -> Punboxedmaskarray
+  | Pgcscannableproductarray_ref kinds -> Pgcscannableproductarray kinds
+  | Pgcignorableproductarray_ref kinds -> Pgcignorableproductarray kinds
+  | Punspecializedarray_ref _ -> Punspecializedarray
+
+let array_kind_of_array_set_kind : array_set_kind -> array_kind = function
+  | Pgenarray_set _ -> Pgenarray
+  | Paddrarray_set _ -> Paddrarray
+  | Pgcignorableaddrarray_set -> Pgcignorableaddrarray
+  | Pintarray_set -> Pintarray
+  | Pfloatarray_set -> Pfloatarray
+  | Punboxedfloatarray_set bf -> Punboxedfloatarray bf
+  | Punboxedoruntaggedintarray_set i -> Punboxedoruntaggedintarray i
+  | Punboxedvectorarray_set bv -> Punboxedvectorarray bv
+  | Punboxedmaskarray_set -> Punboxedmaskarray
+  | Pgcscannableproductarray_set (_, kinds) -> Pgcscannableproductarray kinds
+  | Pgcignorableproductarray_set kinds -> Pgcignorableproductarray kinds
+  | Punspecializedarray_set _ -> Punspecializedarray
 
 let rec layout_of_mixed_block_element element =
   match element with
@@ -2451,6 +3314,7 @@ let rec layout_of_mixed_block_element element =
   | Vec128 -> layout_unboxed_vector Unboxed_vec128
   | Vec256 -> layout_unboxed_vector Unboxed_vec256
   | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Mask -> layout_unboxed_mask
   | Product shape ->
     Punboxed_product
       (Array.to_list (Array.map layout_of_mixed_block_element shape))
@@ -2468,7 +3332,7 @@ let layout_of_module_field repr pos =
     layout_of_mixed_block_element shape.(pos)
 
 let rec mixed_block_element_of_layout (layout : layout) :
-    unit mixed_block_element =
+    _ mixed_block_element =
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
@@ -2482,14 +3346,17 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_or_untagged_integer Untagged_int8 -> Bits8
   | Punboxed_or_untagged_integer Unboxed_nativeint -> Word
   | Punboxed_vector Unboxed_vec128 -> Vec128
-  | Punboxed_vector Unboxed_vec256 -> Vec256
+  | Punboxed_vector Unboxed_vec256 ->
+    assert (not split_vectors);
+    Vec256
   | Punboxed_vector Unboxed_vec512 -> Vec512
+  | Punboxed_mask -> Mask
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
   | Psplicevar id -> Splice_variable id
 
-let value_kind_of_value_with_externality ext =
-  let open Jkind_axis.Externality in
-  if le ext (upper_bound_if_is_always_gc_ignorable ()) then Pintval else Pgenval
+let pointerness_of_scannable_with_externality ext =
+  if Jkind_axis.Externality.(le ext (upper_bound_if_is_always_gc_ignorable ()))
+  then Immediate else Pointer
 
 let rec layout_of_mixed_block_element_for_idx_set
   ext (mbe : _ mixed_block_element)
@@ -2501,7 +3368,9 @@ let rec layout_of_mixed_block_element_for_idx_set
       (Array.to_list
         (Array.map (layout_of_mixed_block_element_for_idx_set ext) mbes))
   | Value ({ raw_kind = Pgenval; _ } as value_kind) ->
-    let raw_kind = value_kind_of_value_with_externality ext in
+    let raw_kind =
+      value_kind_of_pointerness (pointerness_of_scannable_with_externality ext)
+    in
     Pvalue { value_kind with raw_kind }
   | Value value_kind -> Pvalue value_kind
   | Float64 | Float_boxed _ -> Punboxed_float Unboxed_float64
@@ -2511,9 +3380,10 @@ let rec layout_of_mixed_block_element_for_idx_set
   | Bits16 -> Punboxed_or_untagged_integer Untagged_int16
   | Bits8 -> Punboxed_or_untagged_integer Untagged_int8
   | Word -> Punboxed_or_untagged_integer Unboxed_nativeint
-  | Vec128 -> Punboxed_vector Unboxed_vec128
-  | Vec256 -> Punboxed_vector Unboxed_vec256
-  | Vec512 -> Punboxed_vector Unboxed_vec512
+  | Vec128 -> layout_unboxed_vector Unboxed_vec128
+  | Vec256 -> layout_unboxed_vector Unboxed_vec256
+  | Vec512 -> layout_unboxed_vector Unboxed_vec512
+  | Mask -> layout_unboxed_mask
   | Untagged_immediate -> Punboxed_or_untagged_integer Untagged_int
   | Splice_variable id -> Psplicevar id
 
@@ -2523,7 +3393,7 @@ let rec mixed_block_element_leaves (el : _ mixed_block_element)
   | Product els ->
     List.concat_map mixed_block_element_leaves (Array.to_list els)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate
+  | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate
   | Splice_variable _ ->
     [el]
 
@@ -2540,7 +3410,7 @@ let will_be_reordered (mbe : _ mixed_block_element) =
           { seen_flat = true; last_value_after_flat = acc.seen_flat }
         | Value _ -> { acc with last_value_after_flat = acc.seen_flat }
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Word | Vec128 |  Vec256 | Vec512 | Untagged_immediate ->
+        | Word | Vec128 |  Vec256 | Vec512 | Mask | Untagged_immediate ->
           { acc with seen_flat = true })
       { seen_flat = false; last_value_after_flat = false }
       (mixed_block_element_leaves mbe)
@@ -2583,11 +3453,14 @@ let primitive_result_layout (p : primitive) =
   | Pignore | Psetfield _ | Psetfield_computed _ | Psetfloatfield _ | Poffsetref _
   | Psetufloatfield _ | Psetmixedfield _
   | Pbytessetu | Pbytessets | Parraysetu _ | Parraysets _ | Pbigarrayset _
+  | Pbytes_set_8 _
   | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _
-  | Pbytes_set_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbytes_set_vec _ | Pbytes_set_mask _
+  | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+  | Pbigstring_set_mask _ | Pfloatarray_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
   | Parrayblit _
@@ -2609,6 +3482,12 @@ let primitive_result_layout (p : primitive) =
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
   | Pbox_vector (v, _) -> layout_boxed_vector v
   | Punbox_vector v -> layout_unboxed_vector (Primitive.unboxed_vector v)
+  | Pbox_mask _ -> layout_boxed_mask
+  | Punbox_mask -> layout_unboxed_mask
+  | Pjoin_vec256 -> layout_unboxed_vector Unboxed_vec256
+  | Psplit_vec256 ->
+    Punboxed_product
+      [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
   | Pmixedfield (path, shape, _) -> layout_of_mixed_block_shape shape ~path
   | Pccall { prim_native_repr_res = _, repr_res } -> layout_of_extern_repr repr_res
   | Praise _ -> layout_bottom
@@ -2616,11 +3495,22 @@ let primitive_result_layout (p : primitive) =
   | Pstringlength | Pstringrefu | Pstringrefs
   | Pbyteslength | Pbytesrefu | Pbytesrefs
   | Parraylength _ | Pisint _ | Pisnull | Pisout
+  | Pstring_load_i8 { tagged = true; _ } | Pbytes_load_i8 { tagged = true; _ }
+  | Pbigstring_load_i8 { tagged = true; _ }
+  | Pstring_load_i16 { tagged = true; _ } | Pbytes_load_i16 { tagged = true; _ }
+  | Pbigstring_load_i16 { tagged = true; _ }
   | Pstring_load_16 _ | Pbytes_load_16 _ | Pbigstring_load_16 _
   | Pprobe_is_enabled _
     -> layout_int
+  | Pstring_load_i8 { tagged = false; _ } | Pbytes_load_i8 { tagged = false; _ }
+  | Pbigstring_load_i8 { tagged = false; _ } ->
+    layout_unboxed_int8
+  | Pstring_load_i16 { tagged = false; _ }
+  | Pbytes_load_i16 { tagged = false; _ }
+  | Pbigstring_load_i16 { tagged = false; _ } ->
+    layout_unboxed_int16
   | Parrayrefu (array_ref_kind, _, _) | Parrayrefs (array_ref_kind, _, _) ->
-    array_ref_kind_result_layout array_ref_kind
+    element_layout_of_array_kind (array_kind_of_array_ref_kind array_ref_kind)
   | Punbox_unit -> layout_unboxed_unit
   | Pstring_load_32 { boxed = true; _ } | Pbytes_load_32 { boxed = true; _ }
   | Pbigstring_load_32 { boxed = true; _ } ->
@@ -2631,6 +3521,9 @@ let primitive_result_layout (p : primitive) =
   | Pstring_load_64 { boxed = true; _ } | Pbytes_load_64 { boxed = true; _ }
   | Pbigstring_load_64 { boxed = true; _ } ->
     layout_boxed_int Boxed_int64
+  | Pstring_load_mask { boxed = true; _ }
+  | Pbytes_load_mask { boxed = true; _ }
+  | Pbigstring_load_mask { boxed = true; _ } -> layout_boxed_mask
   | Pstring_load_vec { size = Boxed_vec128; boxed = true; _ }
   | Pbytes_load_vec { size = Boxed_vec128; boxed = true; _ }
   | Pbigstring_load_vec { size = Boxed_vec128; boxed = true; _ } ->
@@ -2644,6 +3537,9 @@ let primitive_result_layout (p : primitive) =
   | Pbigstring_load_64 { boxed = false; _ }
   | Pstring_load_64 { boxed = false; _ }
   | Pbytes_load_64 { boxed = false; _ } -> layout_unboxed_int Unboxed_int64
+  | Pstring_load_mask { boxed = false; _ }
+  | Pbytes_load_mask { boxed = false; _ }
+  | Pbigstring_load_mask { boxed = false; _ } -> layout_unboxed_mask
   | Pstring_load_vec { size = Boxed_vec128; boxed = false; _ }
   | Pbytes_load_vec { size = Boxed_vec128; boxed = false; _ }
   | Pbigstring_load_vec { size = Boxed_vec128; boxed = false; _ } ->
@@ -2652,10 +3548,11 @@ let primitive_result_layout (p : primitive) =
   | Pbytes_load_vec { size; boxed = false; _ }
   | Pbigstring_load_vec { size; boxed = false; _ }
   | Pfloatarray_load_vec { size; boxed = false; _ }
-  | Pfloat_array_load_vec { size; boxed = false; _ }
   | Punboxed_float_array_load_vec { size; boxed = false; _ }
   | Punboxed_float32_array_load_vec { size; boxed = false; _ }
   | Pint_array_load_vec { size; boxed = false; _ }
+  | Puntagged_int8_array_load_vec { size; boxed = false; _ }
+  | Puntagged_int16_array_load_vec { size; boxed = false; _ }
   | Punboxed_int64_array_load_vec { size; boxed = false; _ }
   | Punboxed_nativeint_array_load_vec { size; boxed = false; _ }
   | Punboxed_int32_array_load_vec { size; boxed = false; _ } ->
@@ -2664,10 +3561,11 @@ let primitive_result_layout (p : primitive) =
   | Pbytes_load_vec { size; boxed = true; _ }
   | Pbigstring_load_vec { size; boxed = true; _ }
   | Pfloatarray_load_vec { size; boxed = true; _ }
-  | Pfloat_array_load_vec { size; boxed = true; _ }
   | Punboxed_float_array_load_vec { size; boxed = true; _ }
   | Punboxed_float32_array_load_vec { size; boxed = true; _ }
   | Pint_array_load_vec { size; boxed = true; _ }
+  | Puntagged_int8_array_load_vec { size; boxed = true; _ }
+  | Puntagged_int16_array_load_vec { size; boxed = true; _ }
   | Punboxed_int64_array_load_vec { size; boxed = true; _ }
   | Punboxed_nativeint_array_load_vec { size; boxed = true; _ }
   | Punboxed_int32_array_load_vec { size; boxed = true; _ } ->
@@ -2703,20 +3601,24 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | (Parray_to_iarray | Parray_of_iarray) -> layout_any_value
   | Pget_header _ -> layout_boxed_int Boxed_nativeint
-  | Pwith_stack | Pwith_stack_bind | Presume | Pperform | Preperform ->
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Pperform | Preperform ->
     layout_any_value
   | Patomic_load_field { immediate_or_pointer = Immediate } ->
     layout_int_or_null
   | Patomic_load_field { immediate_or_pointer = Pointer } ->
     layout_any_value
-  | Patomic_set_field _ -> layout_unit
-  | Patomic_exchange_field { immediate_or_pointer = Immediate } ->
+  | Patomic_load_mixed_field { index ; shape } ->
+    layout_of_mixed_block_shape shape ~path:[index]
+  | Patomic_set_field _ | Patomic_set_mixed_field _ -> layout_unit
+  | Patomic_exchange_field { immediate_or_pointer = Immediate; _ } ->
     layout_int_or_null
-  | Patomic_exchange_field { immediate_or_pointer = Pointer } ->
+  | Patomic_exchange_field { immediate_or_pointer = Pointer; _ } ->
     layout_any_value
-  | Patomic_compare_exchange_field { immediate_or_pointer = Immediate } ->
+  | Patomic_compare_exchange_field { immediate_or_pointer = Immediate; _ } ->
     layout_int_or_null
-  | Patomic_compare_exchange_field { immediate_or_pointer = Pointer } ->
+  | Patomic_compare_exchange_field { immediate_or_pointer = Pointer; _ } ->
     layout_any_value
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
@@ -2731,6 +3633,8 @@ let primitive_result_layout (p : primitive) =
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
   | Preinterpret_unboxed_int64_as_tagged_int63 -> layout_int
+  | Preinterpret_boxed_vector_as_tuple v -> layout_tupled_vector v
+  | Preinterpret_tuple_as_boxed_vector v -> layout_boxed_vector v
   | Ppeek layout -> (
       match layout with
       | Ppp_tagged_immediate -> layout_int
@@ -2748,6 +3652,8 @@ let primitive_result_layout (p : primitive) =
   | Pset_idx _ -> layout_unit
   | Pget_ptr (layout, _) -> layout
   | Pset_ptr _ -> layout_unit
+  | Pget_ext_ptr (layout, _) -> layout
+  | Pset_ext_ptr _ -> layout_unit
 
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode
@@ -2759,8 +3665,10 @@ let array_ref_kind mode = function
     Punboxedoruntaggedintarray_ref int_kind
   | Punboxedfloatarray float_kind -> Punboxedfloatarray_ref float_kind
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_ref vec_kind
+  | Punboxedmaskarray -> Punboxedmaskarray_ref
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_ref kinds
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_ref kinds
+  | Punspecializedarray -> Punspecializedarray_ref mode
 
 let array_set_kind mode = function
   | Pgenarray -> Pgenarray_set mode
@@ -2772,8 +3680,10 @@ let array_set_kind mode = function
     Punboxedoruntaggedintarray_set int_kind
   | Punboxedfloatarray float_kind -> Punboxedfloatarray_set float_kind
   | Punboxedvectorarray vec_kind -> Punboxedvectorarray_set vec_kind
+  | Punboxedmaskarray -> Punboxedmaskarray_set
   | Pgcscannableproductarray kinds -> Pgcscannableproductarray_set (mode, kinds)
   | Pgcignorableproductarray kinds -> Pgcignorableproductarray_set kinds
+  | Punspecializedarray -> Punspecializedarray_set mode
 
 let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
       : array_ref_kind =
@@ -2782,6 +3692,7 @@ let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
   | Punboxedfloatarray_set uf -> Punboxedfloatarray_ref uf
   | Punboxedoruntaggedintarray_set ui -> Punboxedoruntaggedintarray_ref ui
   | Punboxedvectorarray_set uv -> Punboxedvectorarray_ref uv
+  | Punboxedmaskarray_set -> Punboxedmaskarray_ref
   | Pgcscannableproductarray_set (_, scannables) ->
     Pgcscannableproductarray_ref scannables
   | Pgcignorableproductarray_set ignorables ->
@@ -2790,6 +3701,7 @@ let array_ref_kind_of_array_set_kind (kind : array_set_kind) mode
   | Paddrarray_set _ -> Paddrarray_ref
   | Pgcignorableaddrarray_set -> Pgcignorableaddrarray_ref
   | Pfloatarray_set -> Pfloatarray_ref mode
+  | Punspecializedarray_set _ -> Punspecializedarray_ref mode
 
 let may_allocate_in_region lam =
   (* loop_region raises, if the lambda might allocate in parent region *)
@@ -2801,11 +3713,15 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} -> ()
-    | Lfunction {mode=Alloc_local} -> raise Exit
+    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_env_mode=Alloc_heap} ->
+      ()
+    | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_env_mode=Alloc_local}
+      ->
+      raise Exit
 
-    | Lapply {ap_mode=Alloc_local}
-    | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
+    | Lapply {ap_mode=Maybe_alloc_stack}
+    | Lkindinstantiate {kinst_mode=Maybe_alloc_stack}
+    | Lsend (_,_,_,_,_,Maybe_alloc_stack,_,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
        begin match primitive_may_allocate prim with
@@ -2822,14 +3738,11 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
-    (* CR layout poly: Pessimistically return true, this really should only get
-       called after slambda eval but translcore does some early simplification.
-       We should fix that at some point. *)
-    | Lsplice _ -> raise Exit
+    | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
-      | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
-      | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
+    | ( Lapply _  | Lkindinstantiate _ | Llet _ | Lmutlet _ | Lletrec _
+      | Lswitch _ | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _
+      | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
       | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
   in
@@ -2850,43 +3763,10 @@ let simple_prim_on_values ~name ~arity ~alloc =
     ~native_name:""
     ~native_repr_args:
       (Primitive.make_prim_repr_args arity
-        (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.value))
-    ~native_repr_res:(Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.value)
+        (Primitive.Prim_global,Same_as_ocaml_repr Jkind.Sort.Const.scannable))
+    ~native_repr_res:
+      (Prim_global, Same_as_ocaml_repr Jkind.Sort.Const.scannable)
     ~is_layout_poly:false
-
-let rec try_to_find_location lam =
-  (* This is very much best-effort and may overshoot, but will still likely be
-     better than nothing. *)
-  match lam with
-  | Lprim (_, _, loc)
-  | Lfunction { loc; _ }
-  | Lletrec ({ def = { loc; _ }; _ } :: _, _)
-  | Lapply { ap_loc = loc; _ }
-  | Lfor { for_loc = loc; _ }
-  | Lswitch (_, _, loc, _)
-  | Lstringswitch (_, _, _, loc, _)
-  | Lsend (_, _, _, _, _, _, loc, _)
-  | Levent (_, { lev_loc = loc; _ })
-  | Lsplice { splice_loc = loc; _ }->
-    loc
-  | Llet (_, _, _, _, lam, _)
-  | Lmutlet (_, _, _, lam, _)
-  | Lifthenelse (lam, _, _, _)
-  | Lstaticcatch (lam, _, _, _, _)
-  | Lstaticraise (_, lam :: _)
-  | Lwhile { wh_cond = lam; _ }
-  | Lsequence (lam, _)
-  | Lassign (_, lam)
-  | Lifused (_, lam)
-  | Lregion (lam, _)
-  | Lexclave lam
-  | Ltrywith (lam, _, _, _, _) ->
-    try_to_find_location lam
-  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
-    Debuginfo.Scoped_location.Loc_unknown
-
-let try_to_find_debuginfo lam =
-  Debuginfo.from_location (try_to_find_location lam)
 
 (* The "count_initializers_*" functions count the number of individual
    components in an initializer for the corresponding array kind _after_
@@ -2920,7 +3800,8 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
   match lambda_array_kind with
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
   | Punboxedfloatarray _
-  | Punboxedoruntaggedintarray _  -> 1
+  | Punboxedoruntaggedintarray _
+  | Punboxedmaskarray -> 1
   | Punboxedvectorarray Unboxed_vec128 -> 2
   | Punboxedvectorarray Unboxed_vec256 -> 4
   | Punboxedvectorarray Unboxed_vec512 -> 8
@@ -2932,6 +3813,9 @@ let count_initializers_array_kind (lambda_array_kind : array_kind) =
     List.fold_left
       (fun acc ignorable -> acc + count_initializers_ignorable ignorable)
       0 ignorables
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda.count_initializers_array_kind: Punspecializedarray"
 
 (* CR mshinwell: This function might need revisiting for JSIR and any
    Flambda 2 -> WASM backend *)
@@ -2958,9 +3842,14 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Punboxedvectorarray Unboxed_vec128 -> 16
   | Punboxedvectorarray Unboxed_vec256 -> 32
   | Punboxedvectorarray Unboxed_vec512 -> 64
+  | Punboxedmaskarray -> 8
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     (* All elements of unboxed product arrays are currently 8 bytes wide. *)
     count_initializers_array_kind array_kind * 8
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Lambda.array_element_size_in_bytes: Punspecializedarray"
+
 let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =
   match kind with

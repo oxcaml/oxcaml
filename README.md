@@ -3,10 +3,8 @@
 A performance-focused version of OCaml.
 This is also the home of the Flambda 2 optimiser and the Cfg backend.
 
-OxCaml is currently based on OCaml 5.2.0 (plus some patches from later
-upstream revisions, mainly in the runtime).  It supports both the OCaml 4 and OCaml 5
-runtime systems, although support for the OCaml 4 runtime is expected to be removed
-in autumn 2025.
+OxCaml is currently based on OCaml 5.4 (plus some patches from later
+upstream revisions, mainly in the runtime).
 
 The following gives basic instructions for getting set up.  Please see
 [`HACKING.md`](HACKING.md) for more detailed instructions if you want to develop in this repo.
@@ -19,10 +17,16 @@ The supported platforms are x86-64 and arm64 Linux; and arm64 macOS.  x86 macOS 
 
 One-time setup:
 ```
-$ opam switch 5.4.0  # or "opam switch create 5.4.0" if you haven't got that switch already
+$ opam switch create oxcaml-dev --empty
+$ opam pin add -ny git+https://github.com/oxcaml/oxcaml
+$ opam switch set-invariant -y --packages oxcaml-dev
 $ eval $(opam env)
-$ opam pin menhir 20231231
-$ opam install dune.3.20.2 ocamlformat.0.28.1
+```
+
+You can check that an existing opam switch is using the currently required versions of tools by
+running:
+```
+$ opam upgrade oxcaml-dev
 ```
 
 You probably then want to fork the `oxcaml/oxcaml` repo to your own Github org.
@@ -40,7 +44,7 @@ The OxCaml tree has to be configured before building.  The configure script is n
 in; you have to run `autoconf`.  For example:
 ```
 $ autoconf
-$ ./configure --prefix=/path/to/install/dir --enable-runtime5
+$ ./configure --prefix=/path/to/install/dir
 ```
 
 ## Building and installing

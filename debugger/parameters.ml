@@ -23,7 +23,9 @@ let socket_name = ref ""
 let arguments = ref ""
 
 let default_load_path =
-  ref [ Filename.current_dir_name; Config.standard_library ]
+  Clflags.(
+    ref [ { path = Filename.current_dir_name; cmx_guaranteed = false };
+          { path = Config.standard_library; cmx_guaranteed = false } ])
 
 let breakpoint = ref true
 let prompt = ref true
@@ -31,7 +33,7 @@ let time = ref true
 let version = ref true
 
 let add_path dir =
-  Load_path.add_dir ~hidden:false dir;
+  Load_path.add_dir (Visible { cmx_guaranteed = false }) dir;
   Envaux.reset_cache ~preserve_persistent_env:false
 
 let add_path_for mdl dir =

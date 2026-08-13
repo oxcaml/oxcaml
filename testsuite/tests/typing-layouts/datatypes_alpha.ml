@@ -14,7 +14,7 @@ type t_immediate : immediate;;
 
 (***************************************************)
 (* Test 1: constructor arguments may have any sort *)
-type t1_void = T1_void of t_void
+type t1_void = T1_void of t_void [@immediate_all_void_constructor]
 type t1_value = T1_value of t_value
 type t1_immediate = T1_immediate of t_immediate
 
@@ -26,7 +26,7 @@ type t_void : void
 type t_any : any
 type t_value
 type t_immediate : immediate
-type t1_void = T1_void of t_void
+type t1_void = T1_void of t_void [@immediate_all_void_constructor]
 type t1_value = T1_value of t_value
 type t1_immediate = T1_immediate of t_immediate
 type t1_mixed1 = T1_mixed1 of t_void * t_immediate
@@ -34,49 +34,30 @@ type t1_mixed2 = T1_mixed2 of t_immediate * t_value * t_void
 type t1_mixed3 = T1_mixed3 of t_value * t_immediate
 |}];;
 
-type 'a t1_constraint = T1_con of 'a constraint 'a = 'b t1_constraint'
+type 'a t1_constraint = T1_con of 'a [@immediate_all_void_constructor]
+  constraint 'a = 'b t1_constraint'
 and 'b t1_constraint' = t_void
 [%%expect {|
-type 'a t1_constraint = T1_con of 'a constraint 'a = 'b t1_constraint'
+type 'a t1_constraint = T1_con of 'a [@immediate_all_void_constructor]
+  constraint 'a = 'b t1_constraint'
 and 'b t1_constraint' = t_void
 |}]
 
-(************************************)
-(* Test 2: but not the "any" layout *)
+(**************************************)
+(* Test 2: including the "any" layout *)
 type t2_any1 = T2_any1 of t_any
 [%%expect {|
-Line 1, characters 15-31:
-1 | type t2_any1 = T2_any1 of t_any
-                   ^^^^^^^^^^^^^^^^
-Error: Constructor argument types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 2, characters 0-16.
-       But the layout of t_any must be representable
-         because it's the type of a constructor field.
+type t2_any1 = T2_any1 of t_any
 |}];;
 
 type t2_any2 = T2_any2 of t_immediate * t_any
 [%%expect {|
-Line 1, characters 15-45:
-1 | type t2_any2 = T2_any2 of t_immediate * t_any
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Constructor argument types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 2, characters 0-16.
-       But the layout of t_any must be representable
-         because it's the type of a constructor field.
+type t2_any2 = T2_any2 of t_immediate * t_any
 |}];;
 
 type t2_any3 = T2_any3 of t_any * t_value
 [%%expect {|
-Line 1, characters 15-41:
-1 | type t2_any3 = T2_any3 of t_any * t_value
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Constructor argument types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 2, characters 0-16.
-       But the layout of t_any must be representable
-         because it's the type of a constructor field.
+type t2_any3 = T2_any3 of t_any * t_value
 |}];;
 
 type 'a t1_constraint = T1_con of 'a constraint 'a = 'b t1_constraint'
@@ -139,82 +120,40 @@ Line 1, characters 16-35:
 Error: Records must contain at least one runtime value.
 |}]
 
-(**************************)
-(* Test 4: but any is not *)
+(*************************)
+(* Test 4: and so is any *)
 type t4_any1 = { x : t_any }
 [%%expect {|
-Line 1, characters 17-26:
-1 | type t4_any1 = { x : t_any }
-                     ^^^^^^^^^
-Error: Record element types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 2, characters 0-16.
-       But the layout of t_any must be representable
-         because it is the type of record field x.
+type t4_any1 = { x : t_any; }
 |}];;
 
 type t4_any2 = { x : t_immediate; y : t_any }
 [%%expect {|
-Line 1, characters 34-43:
-1 | type t4_any2 = { x : t_immediate; y : t_any }
-                                      ^^^^^^^^^
-Error: Record element types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 2, characters 0-16.
-       But the layout of t_any must be representable
-         because it is the type of record field y.
+type t4_any2 = { x : t_immediate; y : t_any; }
 |}];;
 
 type t4_any3 =  { x : t_any; y : t_value }
 [%%expect {|
-Line 1, characters 18-28:
-1 | type t4_any3 =  { x : t_any; y : t_value }
-                      ^^^^^^^^^^
-Error: Record element types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 2, characters 0-16.
-       But the layout of t_any must be representable
-         because it is the type of record field x.
+type t4_any3 = { x : t_any; y : t_value; }
 |}];;
 
 type t4_cany1 = C of { x : t_any }
 [%%expect {|
-Line 1, characters 23-32:
-1 | type t4_cany1 = C of { x : t_any }
-                           ^^^^^^^^^
-Error: Record element types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 2, characters 0-16.
-       But the layout of t_any must be representable
-         because it is the type of record field x.
+type t4_cany1 = C of { x : t_any; }
 |}];;
 
 type t4_cany2 = C of { x : t_immediate; y : t_any }
 [%%expect {|
-Line 1, characters 40-49:
-1 | type t4_cany2 = C of { x : t_immediate; y : t_any }
-                                            ^^^^^^^^^
-Error: Record element types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 2, characters 0-16.
-       But the layout of t_any must be representable
-         because it is the type of record field y.
+type t4_cany2 = C of { x : t_immediate; y : t_any; }
 |}];;
 
 type t4_cany3 = C of { x : t_any; y : t_value }
 [%%expect {|
-Line 1, characters 23-33:
-1 | type t4_cany3 = C of { x : t_any; y : t_value }
-                           ^^^^^^^^^^
-Error: Record element types must have a representable layout.
-       The layout of t_any is any
-         because of the definition of t_any at line 2, characters 0-16.
-       But the layout of t_any must be representable
-         because it is the type of record field x.
+type t4_cany3 = C of { x : t_any; y : t_value; }
 |}];;
 
 (*********************************************************)
-(* Test 5: These same rules apply to extensible variants *)
+(* Test 5: Allow void but not any in extensible variants *)
 type t5 = ..
 
 type t5 += T5_1 of t_void
@@ -243,7 +182,7 @@ Error: Constructor argument types must have a representable layout.
        The layout of t_any is any
          because of the definition of t_any at line 2, characters 0-16.
        But the layout of t_any must be representable
-         because it's the type of a constructor field.
+         because it's the type of an argument to an extension constructor.
 |}];;
 
 type t5 += T5_8 of t_immediate * t_any
@@ -255,7 +194,7 @@ Error: Constructor argument types must have a representable layout.
        The layout of t_any is any
          because of the definition of t_any at line 2, characters 0-16.
        But the layout of t_any must be representable
-         because it's the type of a constructor field.
+         because it's the type of an argument to an extension constructor.
 |}];;
 
 type t5 += T5_9 of t_any * t_value
@@ -267,7 +206,7 @@ Error: Constructor argument types must have a representable layout.
        The layout of t_any is any
          because of the definition of t_any at line 2, characters 0-16.
        But the layout of t_any must be representable
-         because it's the type of a constructor field.
+         because it's the type of an argument to an extension constructor.
 |}];;
 
 type t5 += T5_11 of { x : t_value }
@@ -303,7 +242,7 @@ Error: Record element types must have a representable layout.
        The layout of t_any is any
          because of the definition of t_any at line 2, characters 0-16.
        But the layout of t_any must be representable
-         because it is the type of record field y.
+         because it is the type of field y of an extension constructor.
 |}];;
 
 (**************************************************************************)
@@ -324,27 +263,27 @@ val f6 : t6 -> float = <fun>
 Line 8, characters 32-36:
 8 |   let { fld6 = fld6 } = x in S6 fld6;;
                                     ^^^^
-Error: This expression has type "float" but an expression was expected of type
+Error: The value "fld6" has type "float" but an expression was expected of type
          "('a : immediate)"
-       The kind of float is
-           value mod forkable unyielding many stateless immutable
+       The layout of float is value
          because it is the primitive type float.
-       But the kind of float must be a subkind of immediate
+       But the layout of float must be a sublayout of value non_pointer
          because of the definition of s6 at line 2, characters 0-35.
+       Note: The layout of immediate is value non_pointer.
 |}];;
 
 (*****************************************************)
 (* Test 7: Recursive propagation of immediacy checks *)
 
 (* See Note [Default layouts in transl_declaration] in Typedecl. *)
-type t7 = A | B | C | D of t7_void
+type t7 = A | B | C | D of t7_void [@immediate_all_void_constructor]
 and t7_2 = { x : t7 } [@@unboxed]
 and t7_void : void mod everything
 
 type t7_3 : immediate = t7_2
 
 [%%expect{|
-type t7 = A | B | C | D of t7_void
+type t7 = A | B | C | D of t7_void [@immediate_all_void_constructor]
 and t7_2 = { x : t7; } [@@unboxed]
 and t7_void : void mod everything
 type t7_3 = t7_2
@@ -388,7 +327,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is void
            because of the definition of void_t at line 1, characters 0-23.
-         But the layout of 'a must overlap with value
+         But the layout of 'a must be a value layout
            because it instantiates an unannotated type parameter of t8_5,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to
@@ -409,11 +348,12 @@ Error: Layout mismatch in final type declaration consistency check.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The kind of 'a is value
+         The layout of 'a is value
            because it instantiates an unannotated type parameter of t10,
-           chosen to have kind value.
-         But the kind of 'a must be a subkind of immediate
+           chosen to have layout value.
+         But the layout of 'a must be a sublayout of value non_pointer
            because of the definition of imm_t at line 1, characters 0-27.
+         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]

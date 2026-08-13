@@ -1,11 +1,7 @@
 (* TEST
    modules = "stubs.c";
  {
-   runtime4;
-   skip;
- }{
    include runtime_events;
-   runtime5;
    { bytecode; }
    { native; }
  }

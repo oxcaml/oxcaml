@@ -1025,4 +1025,4 @@ module MakePortable(Ord: sig @@ portable include OrderedType end) = struct
             end
       in
       seq_of_enum_ (aux low m End)
-end
+end [@@inline available]

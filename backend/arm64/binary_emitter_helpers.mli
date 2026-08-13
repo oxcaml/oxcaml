@@ -40,6 +40,9 @@ val should_use_binary_emitter : unit -> bool
 val begin_emission : unit -> Asm_targets.Asm_directives.Directive.t -> unit
 
 (** Finalize the binary emitter if it was enabled. This handles section
-    aggregation, file saving for verification, and JIT hook invocation. Call
-    this at the end of assembly. *)
+    aggregation and file saving for verification. If a JIT hook is registered, a
+    thunk to invoke it is stashed via [Proc.set_pending_jit_run] (so that
+    [Proc.assemble_file] runs it after [Zero_alloc_checker.record_unit_info] has
+    finished) rather than being invoked inline. Call this at the end of
+    assembly. *)
 val end_emission : unit -> unit

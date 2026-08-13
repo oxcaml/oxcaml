@@ -30,7 +30,7 @@ open! Int_replace_polymorphic_compare
 let verbose = ref false
 
 include Cfg_intf.S
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 type basic_instruction_list = basic instruction DLL.t
 
@@ -284,166 +284,6 @@ let register_predecessors_for_all_blocks (t : t) =
         targets)
     t.blocks
 
-(* Printing for debug *)
-
-let dump_basic ppf (basic : basic) =
-  let open Format in
-  match basic with
-  | Op op -> Operation.dump ppf op
-  | Reloadretaddr -> fprintf ppf "Reloadretaddr"
-  | Pushtrap { lbl_handler } ->
-    fprintf ppf "Pushtrap handler=%a" Label.format lbl_handler
-  | Poptrap { lbl_handler } ->
-    fprintf ppf "Poptrap handler=%a" Label.format lbl_handler
-  | Prologue -> fprintf ppf "Prologue"
-  | Epilogue -> fprintf ppf "Epilogue"
-  | Stack_check { max_frame_size_bytes } ->
-    fprintf ppf "Stack_check size=%d" max_frame_size_bytes
-
-let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
-    ?(sep = "\n") ppf (terminator : terminator) =
-  let first_arg =
-    if Array.length args >= 1
-    then Format.fprintf Format.str_formatter " %a" print_reg args.(0);
-    Format.flush_str_formatter ()
-  in
-  let second_arg =
-    if Array.length args >= 2
-    then Format.fprintf Format.str_formatter " %a" print_reg args.(1);
-    Format.flush_str_formatter ()
-  in
-  let print_args ppf args =
-    if Array.length args = 0
-    then ()
-    else Format.fprintf ppf " %a" (Printreg.regs' ~print_reg) args
-  in
-  let print_res ppf =
-    if Array.length res > 0
-    then Format.fprintf ppf "%a := " (Printreg.regs' ~print_reg) res
-  in
-  let dump_linear_call_op ppf op =
-    Printlinear.call_operation ~print_reg ppf op args
-  in
-  let open Format in
-  match terminator with
-  | Never -> fprintf ppf "deadend"
-  | Always l -> fprintf ppf "goto %a" Label.format l
-  | Parity_test { ifso; ifnot } ->
-    fprintf ppf "if even%s goto %a%selse goto %a" first_arg Label.format ifso
-      sep Label.format ifnot
-  | Truth_test { ifso; ifnot } ->
-    fprintf ppf "if true%s goto %a%selse goto %a" first_arg Label.format ifso
-      sep Label.format ifnot
-  | Float_test { width = _; lt; eq; gt; uo } ->
-    fprintf ppf "if%s <%s goto %a%s" first_arg second_arg Label.format lt sep;
-    fprintf ppf "if%s =%s goto %a%s" first_arg second_arg Label.format eq sep;
-    fprintf ppf "if%s >%s goto %a%s" first_arg second_arg Label.format gt sep;
-    fprintf ppf "else goto %a" Label.format uo
-  | Int_test { lt; eq; gt; is_signed; imm } ->
-    let cmp =
-      Printf.sprintf " %s%s"
-        (match is_signed with Signed -> "s" | Unsigned -> "u")
-        (match imm with None -> second_arg | Some i -> " " ^ Int.to_string i)
-    in
-    fprintf ppf "if%s <%s goto %a%s" first_arg cmp Label.format lt sep;
-    fprintf ppf "if%s =%s goto %a%s" first_arg cmp Label.format eq sep;
-    fprintf ppf "if%s >%s goto %a" first_arg cmp Label.format gt
-  | Switch labels ->
-    fprintf ppf "switch%s%s" first_arg sep;
-    let label_count = Array.length labels in
-    if label_count >= 1
-    then (
-      for i = 0 to label_count - 2 do
-        fprintf ppf "case %d: goto %a%s" i Label.format labels.(i) sep
-      done;
-      let i = label_count - 1 in
-      fprintf ppf "case %d: goto %a" i Label.format labels.(i))
-  | Call_no_return { func_symbol; _ } ->
-    fprintf ppf "Call_no_return %s%a" func_symbol print_args args
-  | Return -> fprintf ppf "Return%a" print_args args
-  | Raise _ -> fprintf ppf "Raise%a" print_args args
-  | Tailcall_self { destination } ->
-    dump_linear_call_op ppf
-      (Linear.Ltailcall_imm
-         { func =
-             { sym_name =
-                 Printf.sprintf "self(%s)" (Label.to_string destination);
-               sym_global = Local
-             }
-         })
-  | Tailcall_func call ->
-    (* CR ncourant: here and below, maybe the callees should be printed when
-       they are known *)
-    dump_linear_call_op ppf
-      (match call with
-      | Indirect _callees -> Linear.Ltailcall_ind
-      | Direct func -> Linear.Ltailcall_imm { func })
-  | Call { op = call; label_after } ->
-    Format.fprintf ppf "%t%a" print_res dump_linear_call_op
-      (match call with
-      | Indirect _callees -> Linear.Lcall_ind
-      | Direct func -> Linear.Lcall_imm { func });
-    Format.fprintf ppf "%sgoto %a" sep Label.format label_after
-  | Prim { op = prim; label_after } ->
-    Format.fprintf ppf "%t%a" print_res dump_linear_call_op
-      (match prim with
-      | External
-          { func_symbol = func;
-            ty_res;
-            ty_args;
-            alloc;
-            stack_ofs;
-            stack_align;
-            effects = _
-          } ->
-        Linear.Lextcall
-          { func;
-            ty_res;
-            ty_args;
-            returns = true;
-            alloc;
-            stack_ofs;
-            stack_align
-          }
-      | Probe { name; handler_code_sym; enabled_at_init } ->
-        Linear.Lprobe { name; handler_code_sym; enabled_at_init });
-    Format.fprintf ppf "%sgoto %a" sep Label.format label_after
-  | Invalid { message; label_after; _ } ->
-    Format.fprintf ppf "Invalid %S" message;
-    Option.iter (Format.fprintf ppf "%sgoto %a" sep Label.format) label_after
-
-let dump_terminator ?sep ppf terminator = dump_terminator' ?sep ppf terminator
-
-let print_basic' ?print_reg ppf (instruction : basic instruction) =
-  let desc = Cfg_to_linear_desc.from_basic instruction.desc in
-  let instruction =
-    { Linear.desc;
-      next = Linear.end_instr;
-      arg = instruction.arg;
-      res = instruction.res;
-      dbg = Debuginfo.none;
-      fdo = None;
-      live = Reg.Set.empty;
-      available_before = instruction.available_before;
-      available_across = instruction.available_across
-    }
-  in
-  Printlinear.instr' ?print_reg ppf instruction
-
-let print_basic ppf i = print_basic' ppf i
-
-let print_terminator' ?print_reg ppf (ti : terminator instruction) =
-  dump_terminator' ?print_reg ~res:ti.res ~args:ti.arg ~sep:"\n" ppf ti.desc
-
-let print_terminator ppf ti = print_terminator' ppf ti
-
-let print_instruction' ?print_reg ppf i =
-  match i with
-  | `Basic i -> print_basic' ?print_reg ppf i
-  | `Terminator i -> print_terminator' ?print_reg ppf i
-
-let print_instruction ppf i = print_instruction' ppf i
-
 let can_raise_terminator (i : terminator) =
   match i with
   | Call_no_return _ | Raise _ | Tailcall_func _ | Call _
@@ -515,6 +355,9 @@ let is_pure_basic : basic -> bool = function
     (* May reallocate the stack. *)
     false
 
+let is_dead_basic (instr : basic instruction) ~live_after =
+  is_pure_basic instr.desc && Reg.disjoint_set_array live_after instr.res
+
 let same_location (r1 : Reg.t) (r2 : Reg.t) =
   Reg.same_loc_fatal_on_unknown
     ~fatal_message:"Cfg got unknown register location." r1 r2
@@ -532,9 +375,9 @@ let is_noop_move instr =
       Reg.same_loc instr.res.(0) ifso && Reg.same_loc instr.res.(0) ifnot)
   | Op
       ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
-      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-      | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-      | Floatop _ | Opaque | Reinterpret_cast _ | Static_cast _
+      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
+      | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+      | Intop_atomic _ | Floatop _ | Opaque | Reinterpret_cast _ | Static_cast _
       | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Begin_region
       | End_region | Dls_get | Tls_get | Domain_index | Poll | Alloc _ | Pause
         )
@@ -614,7 +457,7 @@ let is_poll (instr : basic instruction) =
       ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Begin_region
       | End_region | Dls_get | Tls_get | Domain_index | Const_int _
       | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
+      | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -632,7 +475,26 @@ let is_alloc (instr : basic instruction) =
       ( Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
       | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Load _
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+      | Store (_, _, _)
+      | Intop _ | Int128op _
+      | Intop_imm (_, _)
+      | Intop_atomic _
+      | Floatop (_, _)
+      | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+      | Specific _ | Name_for_debugger _ ) ->
+    false
+
+let is_heap_alloc (instr : basic instruction) =
+  match instr.desc with
+  | Op (Alloc { mode = Heap; bytes = _; dbginfo = _ }) -> true
+  | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
+  | Op
+      ( Alloc { mode = Local; bytes = _; dbginfo = _ }
+      | Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
+      | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
+      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -650,7 +512,7 @@ let is_end_region (b : basic) =
       ( Alloc _ | Poll | Move | Spill | Reload | Opaque | Begin_region | Dls_get
       | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Load _
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -720,11 +582,11 @@ let remove_trap_instructions t removed_trap_handlers =
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-        | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
-        | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
-        | Alloc _ | Pause )
+        | Const_mask _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+        | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
+        | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+        | Domain_index | Poll | Alloc _ | Pause )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
@@ -787,3 +649,171 @@ let remove_blocks t labels_to_remove =
     Misc.fatal_errorf "Cfg.remove_blocks: not found blocks %a" Label.Set.print
       labels_not_found;
   remove_trap_instructions t !removed_trap_handlers
+
+let equal_basic left right =
+  match left, right with
+  | Op left_op, Op right_op -> Operation.equal left_op right_op
+  | Reloadretaddr, Reloadretaddr -> true
+  | Pushtrap { lbl_handler = left_lbl }, Pushtrap { lbl_handler = right_lbl }
+  | Poptrap { lbl_handler = left_lbl }, Poptrap { lbl_handler = right_lbl } ->
+    Label.equal left_lbl right_lbl
+  | Prologue, Prologue | Epilogue, Epilogue -> true
+  | ( Stack_check { max_frame_size_bytes = left_size },
+      Stack_check { max_frame_size_bytes = right_size } ) ->
+    Int.equal left_size right_size
+  | ( ( Op _ | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+      | Stack_check _ ),
+      _ ) ->
+    false
+
+let equal_bool_test ({ ifso = left_ifso; ifnot = left_ifnot } : bool_test)
+    ({ ifso = right_ifso; ifnot = right_ifnot } : bool_test) =
+  Label.equal left_ifso right_ifso && Label.equal left_ifnot right_ifnot
+
+let equal_int_test
+    ({ lt = left_lt;
+       eq = left_eq;
+       gt = left_gt;
+       is_signed = left_is_signed;
+       imm = left_imm
+     } :
+      int_test)
+    ({ lt = right_lt;
+       eq = right_eq;
+       gt = right_gt;
+       is_signed = right_is_signed;
+       imm = right_imm
+     } :
+      int_test) =
+  Label.equal left_lt right_lt
+  && Label.equal left_eq right_eq
+  && Label.equal left_gt right_gt
+  && Scalar.Signedness.equal left_is_signed right_is_signed
+  && Option.equal Int.equal left_imm right_imm
+
+let equal_float_test
+    ({ width = left_width;
+       lt = left_lt;
+       eq = left_eq;
+       gt = left_gt;
+       uo = left_uo
+     } :
+      float_test)
+    ({ width = right_width;
+       lt = right_lt;
+       eq = right_eq;
+       gt = right_gt;
+       uo = right_uo
+     } :
+      float_test) =
+  Cmm.equal_float_width left_width right_width
+  && Label.equal left_lt right_lt
+  && Label.equal left_eq right_eq
+  && Label.equal left_gt right_gt
+  && Label.equal left_uo right_uo
+
+let equal_func_call_operation left right =
+  match left, right with
+  | Indirect left_callees, Indirect right_callees ->
+    Option.equal (List.equal Cmm.equal_symbol) left_callees right_callees
+  | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
+  | (Indirect _ | Direct _), _ -> false
+
+let equal_external_call_operation
+    { func_symbol = left_func_symbol;
+      alloc = left_alloc;
+      effects = left_effects;
+      ty_res = left_ty_res;
+      ty_args = left_ty_args;
+      stack_ofs = left_stack_ofs;
+      stack_align = left_stack_align
+    }
+    { func_symbol = right_func_symbol;
+      alloc = right_alloc;
+      effects = right_effects;
+      ty_res = right_ty_res;
+      ty_args = right_ty_args;
+      stack_ofs = right_stack_ofs;
+      stack_align = right_stack_align
+    } =
+  String.equal left_func_symbol right_func_symbol
+  && Bool.equal left_alloc right_alloc
+  && Cmm.equal_effects left_effects right_effects
+  && Cmm.equal_machtype left_ty_res right_ty_res
+  && List.equal Cmm.equal_exttype left_ty_args right_ty_args
+  && Int.equal left_stack_ofs right_stack_ofs
+  && Cmm.equal_stack_align left_stack_align right_stack_align
+
+let equal_prim_call_operation left right =
+  match left, right with
+  | External left_op, External right_op ->
+    equal_external_call_operation left_op right_op
+  | ( Probe
+        { name = left_name;
+          handler_code_sym = left_handler;
+          enabled_at_init = left_enabled
+        },
+      Probe
+        { name = right_name;
+          handler_code_sym = right_handler;
+          enabled_at_init = right_enabled
+        } ) ->
+    String.equal left_name right_name
+    && String.equal left_handler right_handler
+    && Bool.equal left_enabled right_enabled
+  | (External _ | Probe _), _ -> false
+
+let equal_with_label_after equal_op
+    { op = left_op; label_after = left_label_after }
+    { op = right_op; label_after = right_label_after } =
+  equal_op left_op right_op && Label.equal left_label_after right_label_after
+
+let equal_terminator left right =
+  match left, right with
+  | Never, Never -> true
+  | Always left_lbl, Always right_lbl -> Label.equal left_lbl right_lbl
+  | Parity_test left_test, Parity_test right_test
+  | Truth_test left_test, Truth_test right_test ->
+    equal_bool_test left_test right_test
+  | Float_test left_test, Float_test right_test ->
+    equal_float_test left_test right_test
+  | Int_test left_test, Int_test right_test ->
+    equal_int_test left_test right_test
+  | Switch left_labels, Switch right_labels ->
+    Int.equal (Array.length left_labels) (Array.length right_labels)
+    && Array.for_all2 Label.equal left_labels right_labels
+  | Return, Return -> true
+  | Raise left_kind, Raise right_kind ->
+    Lambda.equal_raise_kind left_kind right_kind
+  | ( Tailcall_self { destination = left_dest },
+      Tailcall_self { destination = right_dest } ) ->
+    Label.equal left_dest right_dest
+  | Tailcall_func left_op, Tailcall_func right_op ->
+    equal_func_call_operation left_op right_op
+  | Call_no_return left_op, Call_no_return right_op ->
+    equal_external_call_operation left_op right_op
+  | Call left_call, Call right_call ->
+    equal_with_label_after equal_func_call_operation left_call right_call
+  | Prim left_prim, Prim right_prim ->
+    equal_with_label_after equal_prim_call_operation left_prim right_prim
+  | ( Invalid
+        { message = left_msg;
+          stack_ofs = left_ofs;
+          stack_align = left_align;
+          label_after = left_lbl
+        },
+      Invalid
+        { message = right_msg;
+          stack_ofs = right_ofs;
+          stack_align = right_align;
+          label_after = right_lbl
+        } ) ->
+    String.equal left_msg right_msg
+    && Int.equal left_ofs right_ofs
+    && Cmm.equal_stack_align left_align right_align
+    && Option.equal Label.equal left_lbl right_lbl
+  | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+      | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+      | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
+      _ ) ->
+    false

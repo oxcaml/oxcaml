@@ -1,23 +1,35 @@
 (* TEST
  include stdlib_stable;
  {
-   reference = "${test_source_directory}/float_iarray.heap.reference";
-   bytecode;
+   flat-float-array;
+   {
+     reference = "${test_source_directory}/float_iarray.heap.reference";
+     bytecode;
+   }{
+     stack-allocation;
+     reference = "${test_source_directory}/float_iarray.stack.reference";
+     native;
+   }{
+     no-stack-allocation;
+     reference = "${test_source_directory}/float_iarray.heap.reference";
+     native;
+   }
  }{
-   stack-allocation;
-   reference = "${test_source_directory}/float_iarray.stack.reference";
-   native;
- }{
-   no-stack-allocation;
-   reference = "${test_source_directory}/float_iarray.heap.reference";
-   native;
+   no-flat-float-array;
+   reference = "${test_source_directory}/float_iarray.heap.no-flat.reference";
+   {
+     bytecode;
+   }{
+     native;
+   }
  }
 *)
+
 
 (* Testing that local [float iarray]s don't allocate on access.  This is a
    question because for flat float arrays, accesses have to box the float. *)
 
-module Iarray = Stdlib_stable.Iarray
+module Iarray = Stdlib_stable.IarrayLabels
 
 let ( .:() ) = Iarray.( .:() )
 
@@ -63,7 +75,7 @@ let () =
   in
   let local_ r1 = run "access from Iarray.init"
     test_access
-    (Iarray.init_local 10 (fun i -> Float.of_int i))
+    (Iarray.init_local 10 ~f:(fun i -> Float.of_int i))
   in
   (* TODO: Matching currently allocates, but that should be fixed eventually *)
   let local_ r2 = run "match on literal"
@@ -72,7 +84,7 @@ let () =
   in
   let local_ r3 = run "match on Iarray.init"
     test_match
-    (Iarray.init_local 3 (fun i -> Float.of_int i))
+    (Iarray.init_local 3 ~f:(fun i -> Float.of_int i))
   in
   ignore_local (r0, r1, r2, r3);
   ()

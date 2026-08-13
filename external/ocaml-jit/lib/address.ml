@@ -41,3 +41,5 @@ let to_int64 t = Int64.of_nativeint t
 let pp fmt t = Format.fprintf fmt "%nx" t
 
 external to_obj : t -> Obj.t = "jit_addr_to_obj"
+
+external of_obj : Obj.t -> t = "jit_obj_to_addr"

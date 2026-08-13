@@ -16,12 +16,12 @@ mode ::= locality | uniqueness | linearity | portability | contention
 locality ::= `global` | `local`
 uniqueness ::= `unique` | `aliased`
 linearity ::= `many` | `once`
-portability ::= `portable` | `shareable` | `nonportable`
-contention ::= `uncontended` | `shared` | `contended`
+portability ::= `portable` | `corruptible` | `shareable` | `nonportable`
+contention ::= `uncontended` | `shared` | `corrupted` | `contended`
 yield ::= `unyielding` | `yielding`
 fork ::= `forkable` | `unforkable`
-statefulness ::= `stateless` | `observing` | `stateful`
-visibility ::= `read_write` | `read` | `immutable`
+statefulness ::= `stateless` | `writing` | `reading` | `stateful`
+visibility ::= `read_write` | `read` | `write` | `immutable`
 
 modes ::= mode
       |  mode modes
@@ -40,7 +40,7 @@ names.
 It is an error to specify more than one mode along the same axis in one mode
 expression.
 
-To write a mode expression in program, it has to be prefixed by an `@` symbol.
+To write a mode expression in a program, it has to be prefixed by an `@` symbol.
 It can appear in several places in a program as described below.
 
 ## Arrow types
@@ -137,9 +137,11 @@ include S @@ portable
 ## Expressions
 ```ocaml
 (expression : ty @ modes)
+(expression : @ modes)
 ```
 We don't support `(expression @ modes)` because `@` is already parsed as a binary operator.
-However, you can write `(expression : _ @ modes)` if you do not want to constrain the type.
+However, you can write `(expression : @ modes)` if you do not want to constrain the type,
+or `(expression : ty @ modes)` to combine both type and mode constraints.
 
 ## Modules
 Support for modules with modes is being worked on and not ready for wide adoption.
@@ -198,6 +200,41 @@ Record fields can have modalities:
 type r = {x : string @@ modalities}
 type r = {x : string @ modes -> string @ modes @@ modalities}
 ```
+
+Mutable record fields, including fields marked `[@atomic]`, differ from
+immutable fields in two ways. First, their default field modality is not the
+identity. For construction and reads, a plain mutable field behaves as if its
+field type were annotated with `@@ global many dynamic`. For example, `ref` is
+defined as a mutable record with one field:
+
+```ocaml
+type 'a ref = { mutable contents : 'a }
+```
+
+The implicit mutable-field modality means that `ref` behaves as if the
+`contents` field were annotated with `@@ global many dynamic`.
+
+As a modality, `global` implies `aliased`, `forkable`, and `unyielding`. For the
+locality, uniqueness, and linearity axes, the important part is therefore
+`@@ global many aliased`.
+
+This means that constructing a plain mutable field requires `global` and `many`
+contents. Reading such a field yields an `aliased` value, even if the record
+itself is `unique`.
+
+Explicit field modalities can override these defaults for construction and
+reads. For example:
+
+```ocaml
+type t = { mutable x : string option @@ local }
+```
+
+The `@@ local` annotation can allow local contents when constructing a
+non-escaping record, and reading `x` from a local record yields a local value.
+
+Second, assignment has a separate mutable-write rule. Even for a field annotated
+`@@ local`, a later assignment to the field must store a value that is `global`
+and `many`.
 
 ## Constructor fields
 Constructor fields can have modalities:
@@ -286,16 +323,20 @@ exist, all to lower users' annotation burden, all applying both to modes
 and modalities, according to this table:
 
 
-| this          | implies this |
-|---------------|--------------|
-| `global`      | `forkable`   |
-| `local`       | `unforkable` |
-| `global`      | `unyielding` |
-| `local`       | `yielding`   |
-| `stateless`   | `portable`   |
-| `observing`   | `shareable`  |
-| `immutable`   | `contended`  |
-| `read`        | `shared`     |
+| this         | implies this  |
+|--------------|---------------|
+| `global`     | `forkable`    |
+| `local`      | `unforkable`  |
+| `global`     | `unyielding`  |
+| `local`      | `yielding`    |
+| `stateless`  | `portable`    |
+| `reading`    | `shareable`   |
+| `writing`    | `corruptible` |
+| `stateful`   | `nonportable` |
+| `immutable`  | `contended`   |
+| `read`       | `shared`      |
+| `write`      | `corrupted`   |
+| `read_write` | `uncontended` |
 
 These implications exist only in the surface syntax for mode and modality
 expressions. Mode inference does not necessarily follow these implications.

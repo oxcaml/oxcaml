@@ -1,6 +1,5 @@
 (* TEST
  modules = "test2_.c";
- flags = "-alert -unsafe_multidomain";
 *)
 
 (* Tests nested calls from C (main C) to OCaml (main OCaml) to C (caml_to_c) to

@@ -572,9 +572,9 @@ let x_17 =
 Line 3, characters 7-8:
 3 |   x <- 3;
            ^
-Error: This expression has type "int" but an expression was expected of type
+Error: The constant "3" has type "int" but an expression was expected of type
          "float"
-  Hint: Did you mean "3."?
+Hint: Did you mean "3."?
 |}]
 
 (* Test 18.1: unmutated mutable variable warning *)
@@ -585,7 +585,7 @@ let x_18_1 =
 Line 2, characters 14-15:
 2 |   let mutable x = 3 in x + 1
                   ^
-Warning 186 [unmutated-mutable]: mutable variable x was never mutated.
+Warning 186 [unmutated-mutable]: mutable variable "x" was never mutated.
 
 val x_18_1 : int = 4
 |}]
@@ -598,7 +598,7 @@ let x_18_2 =
 Line 2, characters 14-15:
 2 |   let mutable x = 3 in x <- 4; 4
                   ^
-Warning 26 [unused-var]: variable x was mutated but never used.
+Warning 26 [unused-var]: variable "x" was mutated but never used.
 
 val x_18_2 : int = 4
 |}]
@@ -611,7 +611,7 @@ let x_18_3 =
 Line 2, characters 14-15:
 2 |   let mutable x = 3 in 5
                   ^
-Warning 26 [unused-var]: unused variable x.
+Warning 26 [unused-var]: unused variable "x".
 
 val x_18_3 : int = 5
 |}]

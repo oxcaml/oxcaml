@@ -34,7 +34,7 @@ let print_warning = Location.print_warning
 let input_name = Location.input_name
 
 let parse_mod_use_file name lb =
-  let modname = Unit_info.modname_from_source name in
+  let modname = Unit_info.lax_modname_from_source name in
   let items =
     List.concat
       (List.map
@@ -126,7 +126,7 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
 module MakeEvalPrinter (E: EVAL_BASE) = struct
 
   let rec eval_address = function
-    | Env.Aunit cu -> E.eval_compilation_unit cu
+    | Env.Aunit (cu, _) -> E.eval_compilation_unit cu
     | Env.Alocal id -> E.eval_ident id
     | Env.Adot(p, module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in
@@ -169,11 +169,12 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
 
   let print_untyped_exception ppf obj =
     !print_out_value ppf (Printer.outval_of_untyped_exception obj)
-  let outval_of_value env obj ty =
+  let outval_of_value env obj lpoly ty =
     Printer.outval_of_value !max_printer_steps !max_printer_depth
-      (fun _ _ _ -> None) env obj ty
+      (fun _ _ _ -> None) env obj lpoly ty
   let print_value env obj ppf ty =
-    !print_out_value ppf (outval_of_value env obj ty)
+    !print_out_value ppf
+      (outval_of_value env obj (Types.Lpoly.determined []) ty)
 
   (* Print an exception produced by an evaluation *)
 
@@ -182,7 +183,10 @@ module MakeEvalPrinter (E: EVAL_BASE) = struct
 
   let print_exception_outcome ppf exn =
     if exn = Out_of_memory then Gc.full_major ();
-    let outv = outval_of_value !toplevel_env (Obj.repr exn) Predef.type_exn in
+    let outv =
+      outval_of_value !toplevel_env (Obj.repr exn) (Types.Lpoly.determined [])
+        Predef.type_exn
+    in
     print_out_exception ppf exn outv;
     if Printexc.backtrace_status ()
     then
@@ -246,6 +250,20 @@ let preprocess_phrase ppf phr =
   if !Clflags.dump_source then Pprintast.top_phrase ppf phr;
   phr
 
+let typecheck_phrase ppf oldenv oldsig sstr =
+  Typecore.reset_delayed_checks ();
+  let (str, sg, sn, shape, newenv) =
+    Typemod.type_toplevel_phrase oldenv oldsig sstr
+  in
+  if !Clflags.dump_typedtree then Printtyped.implementation ppf str;
+  let sg' = Typemod.Signature_names.simplify newenv sn sg in
+  let modes = Includemod.modes_toplevel in
+  Includemod.check_implementation oldenv ~modes sg sg';
+  Typecore.force_delayed_checks ();
+  let shape = Shape_reduce.local_reduce Env.empty shape in
+  if !Clflags.dump_shape then Shape.print ppf shape;
+  (str, sg', newenv)
+
 (* Phrase buffer that stores the last toplevel phrase (see
    [Location.input_phrase_buffer]). *)
 let phrase_buffer = Buffer.create 1024
@@ -298,19 +316,23 @@ let refill_lexbuf buffer len =
       len
   end
 
-let set_paths ?(auto_include=Compmisc.auto_include) () =
+let set_paths ?(auto_include=Compmisc.auto_include) ?(dir="") () =
   (* Add whatever -I options have been specified on the command line,
      but keep the directories that user code linked in with ocamlmktop
      may have added to load_path. *)
   let expand = Misc.expand_directory Config.standard_library in
+  let expand_entry (e : Clflags.visible_include) : Clflags.visible_include =
+    { path = expand e.path; cmx_guaranteed = e.cmx_guaranteed }
+  in
+  let include_no_cmx path = { Clflags.path ; cmx_guaranteed = false } in
   let Load_path.{ visible; hidden } = Load_path.get_paths () in
   let visible = List.concat [
-      [ "" ];
-      List.map expand (List.rev !Compenv.first_include_dirs);
-      List.map expand (List.rev !Clflags.include_dirs);
-      List.map expand (List.rev !Compenv.last_include_dirs);
+      [ include_no_cmx dir ];
+      List.map expand_entry (List.rev !Compenv.first_include_dirs);
+      List.map expand_entry (List.rev !Clflags.include_dirs);
+      List.map expand_entry (List.rev !Compenv.last_include_dirs);
       visible;
-      [expand "+camlp4"];
+      [ include_no_cmx (expand "+camlp4") ];
     ]
   in
   let hidden = List.concat [
@@ -319,14 +341,20 @@ let set_paths ?(auto_include=Compmisc.auto_include) () =
     ]
   in
   Load_path.init ~auto_include ~visible ~hidden;
-  Dll.add_path (visible @ hidden)
+  let visible_dirs =
+    List.map (fun (e : Clflags.visible_include) -> e.path) visible
+  in
+  Dll.add_path (visible_dirs @ hidden)
 
 let update_search_path_from_env () =
   let extra_paths =
     let env = Sys.getenv_opt "OCAMLTOP_INCLUDE_PATH" in
     Option.fold ~none:[] ~some:Misc.split_path_contents env
   in
-  Clflags.include_dirs := List.rev_append extra_paths !Clflags.include_dirs
+  let extra_entries =
+    List.map (fun path -> { Clflags.path; cmx_guaranteed = false }) extra_paths
+  in
+  Clflags.include_dirs := List.rev_append extra_entries !Clflags.include_dirs
 
 let initialize_toplevel_env () =
   toplevel_env := Compmisc.initial_env();
@@ -384,11 +412,14 @@ let inline_code = Format_doc.compat Style.inline_code
 let try_run_directive ppf dir_name pdir_arg =
   begin match get_directive dir_name with
   | None ->
-      fprintf ppf "Unknown directive %a." inline_code dir_name;
-      let directives = all_directive_names () in
-      Format_doc.compat Misc.did_you_mean ppf
-        (fun () -> Misc.spellcheck directives dir_name);
-      fprintf ppf "@.";
+      let print ppf () =
+        let directives = all_directive_names () in
+        Misc.aligned_hint ~prefix:"" ppf
+          "@{<ralign>Unknown directive @}%a."
+          Style.inline_code dir_name
+          (Misc.did_you_mean (Misc.spellcheck directives dir_name))
+      in
+      fprintf ppf "%a@." (Format_doc.compat print) ();
       false
   | Some d ->
       match d, pdir_arg with
@@ -429,7 +460,7 @@ let try_run_directive ppf dir_name pdir_arg =
           | `String ->
               Format.fprintf ppf "a %a literal" inline_code "string"
           | `Int ->
-              Format.fprintf ppf "an %a literal" inline_code "string"
+              Format.fprintf ppf "an %a literal" inline_code "int"
           | `Ident ->
               Format.fprintf ppf "an identifier"
           | `Bool ->
@@ -445,7 +476,7 @@ let try_run_directive ppf dir_name pdir_arg =
 let loading_hint_printer ppf cu =
   let open Format_doc in
   let global = Symtable.Global.Glob_compunit cu in
-  Symtable.report_error ppf (Symtable.Undefined_global global);
+  Symtable.report_error_doc ppf (Symtable.Undefined_global global);
   let find_with_ext ext =
     let leafname =
       (Compilation_unit.Name.to_string (Compilation_unit.name cu)) ^ ext

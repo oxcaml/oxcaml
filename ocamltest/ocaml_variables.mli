@@ -119,7 +119,6 @@ val ocamlsrcdir : Variables.t
 
 val ocamldebug_flags : Variables.t
 
-val ocamldebug_script : Variables.t
 
 val os_type : Variables.t
 
@@ -133,12 +132,14 @@ val ocaml_script_as_argument : Variables.t
 
 val plugins : Variables.t
 
-val runtime_dir : Variables.t
-
 val shared_library_cflags : Variables.t
 
 val sharedobjext : Variables.t
 
 val use_runtime : Variables.t
+
+val fexpr_dump_files : Variables.t
+
+val fexpr_reference_suffix : Variables.t
 
 val init : unit -> unit

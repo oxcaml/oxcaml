@@ -26,12 +26,8 @@ val emit :
   debug_ranges_table:Debug_ranges_table.t ->
   address_table:Address_table.t ->
   location_list_table:Location_list_table.t ->
-  basic_block_sections:bool ->
   binary_backend_available:bool ->
   unit
 
 val emit_delayed :
-  asm_directives:Asm_directives_dwarf.t ->
-  basic_block_sections:bool ->
-  binary_backend_available:bool ->
-  unit
+  asm_directives:Asm_directives_dwarf.t -> binary_backend_available:bool -> unit

@@ -39,11 +39,11 @@ type rev_expr_holed =
 
 and rev_named =
   | Named of Flambda.named
-  | Set_of_closures of rev_set_of_closures
+  | Set_of_closures of rev_set_of_closures * Alloc_mode.For_allocations.t
   | Static_consts of rev_static_const_or_code list
 
 and rev_static_const_or_code =
-  | Code of rev_code
+  | Code (* Code is in the accumulator, to be found by its code_id. *)
   | Deleted_code
   | Static_const of rev_static_const
 
@@ -65,15 +65,13 @@ and rev_params_and_body =
     params : Bound_parameters.t;
     body : rev_expr;
     my_closure : Variable.t;
-    my_region : Variable.t option;
-    my_ghost_region : Variable.t option;
+    my_alloc_mode : Alloc_mode.For_applications.t;
     my_depth : Variable.t
   }
 
 and rev_set_of_closures =
   { value_slots : Simple.t Value_slot.Map.t;
-    function_decls : Function_declarations.t;
-    alloc_mode : Alloc_mode.For_allocations.t
+    function_decls : Function_declarations.t
   }
 
 and cont_handler =

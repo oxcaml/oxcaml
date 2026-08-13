@@ -37,6 +37,10 @@ module Extension : sig
     | F16C
     | FMA
     | AVX512F
+    | AVX512DQ
+    | AVX512CD
+    | AVX512BW
+    | AVX512VL
 
   val name : t -> string
 
@@ -90,6 +94,7 @@ type specific_operation =
                                           extension *)
   | Izextend32                         (* 32 to 64 bit conversion with zero
                                           extension *)
+  | Ineg                               (* integer negation *)
   | Irdtsc                             (* read timestamp *)
   | Irdpmc                             (* read performance counter *)
   | Ilfence                            (* load fence *)
@@ -130,6 +135,10 @@ val size_vec256 : int
 
 val size_vec512 : int
 
+(* Whether Ocaml provides shift operations where the shift amount is interpreted
+   modulo bitwidth. *)
+val ocaml_shifts_are_wrapping : bool
+
 val allow_unaligned_access : bool
 
 val division_crashes_on_overflow : bool
@@ -139,6 +148,18 @@ val identity_addressing : addressing_mode
 val offset_addressing : addressing_mode -> int -> addressing_mode
 
 val num_args_addressing : addressing_mode -> int
+
+(** [fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta] is used
+    by the peephole optimizer to delete an instruction [r := r + delta] that
+    immediately precedes the instruction carrying [op].
+    [arg_is_folded_reg.(i)] is true iff the [i]-th argument of that
+    instruction is [r]. Returns [Some op'] where [op'], reading the value [r]
+    had before the deleted addition, computes the same result as [op] reading
+    [r + delta]; returns [None] when [op] cannot absorb the delta. Never
+    returns [Some] when [op] does not read [r] (this preserves liveness). *)
+val fold_delta_into_specific_operation :
+  specific_operation -> arg_is_folded_reg:bool array -> delta:int ->
+  specific_operation option
 
 val addressing_displacement_for_llvmize : addressing_mode -> int
 

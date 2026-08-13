@@ -18,22 +18,22 @@ open Datalog_imports
 type action
 
 val bind_iterator :
-  'a option Channel.receiver with_name -> 'a Trie.Iterator.t with_name -> action
+  'a Or_null_receiver.t with_name -> 'a Trie.Iterator.t with_name -> action
 
 val unless :
   ('t, 'k, 'v) Table.Id.t ->
   't Channel.receiver ->
-  'k Option_receiver.hlist with_names ->
+  'k Or_null_receiver.hlist with_names ->
   action
 
 val unless_eq :
   'k Value.repr ->
-  'k option Channel.receiver with_name ->
-  'k option Channel.receiver with_name ->
+  'k Or_null_receiver.t with_name ->
+  'k Or_null_receiver.t with_name ->
   action
 
 val filter :
-  ('k Constant.hlist -> bool) -> 'k Option_receiver.hlist with_names -> action
+  ('k Constant.hlist -> bool) -> 'k Or_null_receiver.hlist with_names -> action
 
 type actions
 
@@ -72,7 +72,7 @@ module Level : sig
       the associated actions, if any, and can thus be used in actions for this
       level or levels of later orders. *)
   val use_output :
-    ?cardinality:cardinality -> 'a t -> 'a option Channel.receiver with_name
+    ?cardinality:cardinality -> 'a t -> 'a Or_null_receiver.t with_name
 
   (** Actions to execute immediately after a value is found at this level. *)
   val actions : 'a t -> actions
@@ -112,12 +112,12 @@ val create_call :
   ('c -> 'a Constant.hlist -> unit) ->
   name:string ->
   context:'c ->
-  'a Option_receiver.hlist with_names ->
+  'a Or_null_receiver.hlist with_names ->
   call
 
 val create :
   ?calls:call list ->
-  ?output:'v Option_receiver.hlist with_names ->
+  ?output:'v Or_null_receiver.hlist with_names ->
   context ->
   'v t
 
@@ -143,18 +143,14 @@ val naive_iter : 'v t -> Table.Map.t -> ('v Constant.hlist -> unit) -> unit
     binary query on [P] and [Q]; the output is computed by iterating over
     [join(P, Q)]. If [P = P + ΔP] and [Q = P + ΔQ], we can rewrite:
 
-    {v
-    join(P + ΔP, Q + ΔQ) = join(P, Q) + join(ΔP, Q) + join(P + ΔP, ΔQ)
-    v}
+    {v join(P + ΔP, Q + ΔQ) = join(P, Q) + join(ΔP, Q) + join(P + ΔP, ΔQ) v}
 
     Seminaive evaluation ignores the [join(P, Q)] term and only computes the
     last two terms. Note that the term [join(P + ΔP, ΔQ)] does not need to be
     further decomposed, so that in the general case we only need to combine
     linearly many terms of the form:
 
-    {v
-    join(P₁ + ΔP₁, …, Pᵢ-₁ + ΔPᵢ-₁, ΔPᵢ, Pᵢ+₁, …, Pₙ
-    v}
+    {v join(P₁ + ΔP₁, …, Pᵢ-₁ + ΔPᵢ-₁, ΔPᵢ, Pᵢ+₁, …, Pₙ v}
 
     The terms on the left use the [current] databse, the middle term uses the
     [diff] database, and the terms on the right use the [previous] database. *)
@@ -173,9 +169,9 @@ module With_parameters : sig
   val without_parameters : (nil, 'v) t -> 'v cursor
 
   val create :
-    parameters:'p Option_sender.hlist ->
+    parameters:'p Or_null_sender.hlist ->
     ?calls:call list ->
-    ?output:'v Option_receiver.hlist with_names ->
+    ?output:'v Or_null_receiver.hlist with_names ->
     context ->
     ('p, 'v) t
 

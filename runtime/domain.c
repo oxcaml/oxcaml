@@ -22,12 +22,13 @@
 #include "caml/config.h"
 #include <stdbool.h>
 #include <stdio.h>
-#ifdef HAS_UNISTD
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #include <pthread.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 #ifdef HAS_GNU_GETAFFINITY_NP
 #include <sched.h>
 #ifdef HAS_PTHREAD_NP_H
@@ -39,6 +40,13 @@
 #include <sys/cpuset.h>
 typedef cpuset_t cpu_set_t;
 #endif
+#if defined(HAS_SYS_EPOLL_H) && defined(HAS_SYS_TIMERFD_H) \
+    && defined(HAS_SYS_EVENTFD_H)
+#include <sys/epoll.h>
+#include <sys/timerfd.h>
+#include <sys/eventfd.h>
+#define HAS_INTERRUPTIBLE_TICK
+#endif
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -48,12 +56,14 @@ typedef cpuset_t cpu_set_t;
 #include "caml/backtrace.h"
 #include "caml/backtrace_prim.h"
 #include "caml/callback.h"
+#include "caml/camlatomic.h"
 #include "caml/debugger.h"
 #include "caml/domain.h"
 #include "caml/domain_state.h"
 #include "caml/runtime_events.h"
 #include "caml/fail.h"
 #include "caml/fiber.h"
+#include "caml/dynamic.h"
 #include "caml/finalise.h"
 #include "caml/gc_ctrl.h"
 #include "caml/globroots.h"
@@ -71,6 +81,7 @@ typedef cpuset_t cpu_set_t;
 #include "caml/startup_aux.h"
 #include "caml/sync.h"
 #include "caml/weak.h"
+#include "sync_posix.h"
 
 /* Check that the domain_state structure was laid out without padding,
    since the runtime assumes this in computing offsets */
@@ -112,8 +123,8 @@ static_assert(
    When the main C-stack for a domain enters a blocking call,
    a 'backup thread' becomes responsible for servicing the STW
    sections on behalf of the domain. Care is needed to hand off duties
-   for servicing STW sections between the main pthread and the backup
-   pthread when caml_enter_blocking_section and
+   for servicing STW sections between the main thread and the backup
+   thread when caml_enter_blocking_section and
    caml_leave_blocking_section are called.
 
    When the state for the backup thread is BT_IN_BLOCKING_SECTION
@@ -125,26 +136,26 @@ static_assert(
            BT_INIT  <---------------------------------------+
               |                                             |
    (install_backup_thread)                                  |
-       [main pthread]                                       |
+       [main thread]                                        |
               |                                             |
               v                                             |
        BT_ENTERING_OCAML  <-----------------+               |
               |                             |               |
 (caml_enter_blocking_section)               |               |
-       [main pthread]                       |               |
+        [main thread]                       |               |
               |                             |               |
               |                             |               |
               |               (caml_leave_blocking_section) |
-              |                      [main pthread]         |
+              |                       [main thread]         |
               v                             |               |
     BT_IN_BLOCKING_SECTION  ----------------+               |
               |                                             |
-     (domain_terminate)                                     |
-       [main pthread]                                       |
+     (caml_domain_terminate)                                |
+        [main thread]                                       |
               |                                             |
               v                                             |
         BT_TERMINATE                               (backup_thread_func)
-              |                                      [backup pthread]
+              |                                      [backup thread]
               |                                             |
               +---------------------------------------------+
 
@@ -157,6 +168,7 @@ static_assert(
 struct dom_internal {
   /* readonly fields, initialised and never modified */
   int id;
+  pthread_t tid; /* TODO: remove when we take out domain cancellation */
   caml_domain_state* state;
 
   /* control of STW interrupts */
@@ -174,14 +186,18 @@ struct dom_internal {
   uintnat unique_id;
 
   /* backup thread */
-  int backup_thread_running;
   pthread_t backup_thread;
   atomic_uintnat backup_thread_msg;
   caml_plat_mutex backup_thread_lock;
   caml_plat_cond backup_thread_cond;
 
+  /* Requested tick interval in us. If 0, this domain does not want any
+     ticks. */
+  atomic_uintnat tick_interval_usec;
+
   /* default domain lock (only used if systhreads is not loaded) */
   caml_plat_mutex default_domain_lock;
+  bool domain_canceled;
 
   /* modified only during STW sections */
   uintnat minor_heap_area_start;
@@ -196,6 +212,33 @@ Caml_inline void domain_set_handled(dom_internal *d)
 { atomic_store_release(&d->pending, 0); }
 Caml_inline void domain_set_pending(dom_internal *d)
 { atomic_store_release(&d->pending, 1); }
+
+uintnat caml_tick_use_usleep = 0;
+static struct {
+  /* This mutex protects mutation of `thread_id` and `running` */
+  caml_plat_mutex mutex;
+  pthread_t thread_id;
+  bool running;
+
+  atomic_bool enabled;
+  atomic_bool stop;
+
+#ifdef HAS_INTERRUPTIBLE_TICK
+  /* File descriptors for interruptible wait. -1 when not initialized. */
+  int epoll_fd;
+  int timer_fd;
+  int interrupt_fd;
+#endif
+} tick_thread = {
+  CAML_PLAT_MUTEX_INITIALIZER,
+  0,
+  false,
+  true,
+  false,
+#ifdef HAS_INTERRUPTIBLE_TICK
+  -1, -1, -1
+#endif
+};
 
 static struct {
   /* enter barrier for STW sections, participating domains arrive into
@@ -234,8 +277,9 @@ static atomic_uintnat /* dom_internal* */ stw_leader = 0;
 static uintnat stw_requests_suspended = 0; /* protected by all_domains_lock */
 static caml_plat_cond requests_suspended_cond = CAML_PLAT_COND_INITIALIZER;
 static dom_internal* all_domains;
+static atomic_intnat domains_exiting = 0;
 
-CAMLexport atomic_uintnat caml_num_domains_running;
+CAMLexport atomic_uintnat caml_num_domains_running = 0;
 
 /* size of the virtual memory reservation for the minor heap, per domain */
 uintnat caml_minor_heap_max_wsz;
@@ -272,14 +316,23 @@ static struct {
   NULL
 };
 
+/* Assumes the domain state at [domain_idx] has been initialized. */
+struct stack_cache* caml_get_stack_caches(int domain_idx) {
+  CAMLassert(domain_idx >= 0 && domain_idx < caml_params->max_domains);
+  CAMLassert(all_domains[domain_idx].state);
+  CAMLassert(all_domains[domain_idx].id == domain_idx);
+  return all_domains[domain_idx].state->stack_caches;
+}
+
 static void add_next_to_stw_domains(void)
 {
   CAMLassert(stw_domains.participating_domains < caml_params->max_domains);
   stw_domains.participating_domains++;
 #ifdef DEBUG
   /* Enforce here the invariant for early-exit in
-     [caml_interrupt_all_signal_safe], because the latter must be
-     async-signal-safe and one cannot CAMLassert inside it. */
+     [caml_interrupt_all_signal_safe] (which is also depended on by
+     [caml_tick]), because the former must be async-signal-safe and one cannot
+     CAMLassert inside it. */
   bool prev_has_interrupt_word = true;
   for (int i = 0; i < caml_params->max_domains; i++) {
     bool has_interrupt_word = all_domains[i].interrupt_word != NULL;
@@ -325,17 +378,24 @@ CAMLexport caml_domain_state* caml_get_domain_state(void)
 Caml_inline void interrupt_domain(dom_internal *d)
 {
   atomic_uintnat * interrupt_word = atomic_load_relaxed(&d->interrupt_word);
-  atomic_store_release(interrupt_word, UINTNAT_MAX);
+  atomic_store_release(interrupt_word, CAML_UINTNAT_MAX);
 }
 
 Caml_inline void interrupt_domain_local(caml_domain_state* dom_st)
 {
-  atomic_store_relaxed(&dom_st->young_limit, UINTNAT_MAX);
+  atomic_store_relaxed(&dom_st->young_limit, CAML_UINTNAT_MAX);
 }
 
 int caml_incoming_interrupts_queued(void)
 {
   return domain_has_pending(domain_self);
+}
+
+static void terminate_backup_thread(dom_internal *di);
+
+static inline bool backup_thread_running(dom_internal *di)
+{
+    return (atomic_load_acquire(&di->backup_thread_msg) != BT_INIT);
 }
 
 static void stw_handler(caml_domain_state* domain);
@@ -564,6 +624,7 @@ static uintnat fresh_domain_unique_id(void) {
 }
 
 static inline void domain_root_register(value *root, value t);
+static inline void domain_root_set(value *root, value t);
 static inline void domain_root_remove(value *root);
 
 /* must be run on the domain's thread */
@@ -625,20 +686,29 @@ static void domain_create(uintnat initial_minor_heap_wsize,
      - But currently there is no orphaning process for allocation stats,
        we just reuse the previous stats from the previous domain
        with the same index.
+
+     Reusing the slot also allows us to avoid synchronization for domain
+     termination in [caml_tick].
   */
-  if (d->state == NULL) {
+  bool fresh_state = d->state == NULL;
+  if (fresh_state) {
     /* FIXME: Never freed. Not clear when to. */
     domain_state = (caml_domain_state*)
       caml_stat_calloc_noexc(1, sizeof(caml_domain_state));
     if (domain_state == NULL)
       goto fail_domain;
+
+    /* The stack cache is per domain index, and is never freed */
+    domain_state->stack_caches = caml_alloc_stack_caches();
+    if(domain_state->stack_caches == NULL)
+      goto fail_stack_caches;
+
     d->state = domain_state;
     domain_state->id = d->id;
   } else {
     domain_state = d->state;
     CAMLassert(domain_state->id == d->id);
   }
-
 
   /* Set domain_self if we have successfully allocated the
    * caml_domain_state. Otherwise domain_self will be NULL and it's up
@@ -655,12 +725,15 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->young_limit = 0;
   domain_state->unique_id = d->unique_id;
+  atomic_store_relaxed(&domain_state->requested_tick, false);
 
   /* Synchronized with [caml_interrupt_all_signal_safe], so that the
-     initializing write of young_limit happens before any
+     initializing writes of young_limit and [requested_tick] happen before any
      interrupt. */
   atomic_store_explicit(&d->interrupt_word, &domain_state->young_limit,
                         memory_order_release);
+
+  domain_state->id = d->id;
 
   /* Tell memprof system about the new domain before either (a) new
    * domain can allocate anything or (b) parent domain can go away. */
@@ -671,8 +744,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   }
 
   CAMLassert(domain_state->dynamic_bindings == NULL);
-  domain_state->dynamic_bindings =
-    caml_dynamic_new_thread(parent ? parent->dynamic_bindings : NULL);
+  domain_state->dynamic_bindings = caml_dynamic_cache_new();
   if (!domain_state->dynamic_bindings) {
     goto fail_dynamic;
   }
@@ -716,10 +788,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_root_register(&domain_state->dls_state, Atom(0) /* Empty array */);
   domain_root_register(&domain_state->tls_state, Atom(0) /* Empty array */);
 
-  domain_state->stack_cache = caml_alloc_stack_cache();
-  if(domain_state->stack_cache == NULL) {
-    goto fail_stack_cache;
-  }
+  // Must happen after taking the domain lock
+  caml_enable_stack_caches(domain_state->stack_caches);
 
   domain_state->extern_state = NULL;
   domain_state->intern_state = NULL;
@@ -729,9 +799,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
     goto fail_main_stack;
   }
 
-  /* No remaining failure cases: domain creation is going to succeed,
-   * so we can update globally-visible state without needing to unwind
-   * it. */
   d->unique_id = fresh_domain_unique_id();
   domain_state->unique_id = d->unique_id;
   d->running = 1;
@@ -749,6 +816,9 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->allocated_words = 0;
   domain_state->allocated_words_direct = 0;
   domain_state->minor_words_at_last_slice = 0;
+  domain_state->allocated_words_suspended = 0;
+  domain_state->allocated_words_resumed = 0;
+  domain_state->current_ramp_up_allocated_words_diff = 0;
   domain_state->swept_words = 0;
 
   domain_state->local_roots = NULL;
@@ -768,7 +838,11 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
-  domain_state->requested_external_interrupt = 0;
+
+  /* Note that we do not make domain_state->preemption a domain_root, since as
+     long as it's a block (between being allocated and being initialized) it
+     must not be seen by the GC. */
+  domain_state->preemption = Val_unit;
 
   domain_state->parser_trace = 0;
 
@@ -792,27 +866,30 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   return;
 
 fail_main_stack:
-  caml_free_stack_cache(domain_state->stack_cache);
-fail_stack_cache:
   domain_root_remove(&domain_state->dls_state);
   domain_root_remove(&domain_state->tls_state);
   free_minor_heap();
 fail_minor_heap:
   caml_teardown_major_gc();
 fail_major_gc:
-  caml_teardown_shared_heap(d->state->shared_heap);
+  caml_orphan_shared_heap(domain_state->shared_heap);
+  domain_state->shared_heap = NULL;
 fail_shared_heap:
   caml_free_minor_tables(domain_state->minor_tables);
   domain_state->minor_tables = NULL;
 fail_minor_tables:
-  caml_dynamic_delete_thread(domain_state->dynamic_bindings);
+  caml_dynamic_cache_delete(domain_state->dynamic_bindings);
   domain_state->dynamic_bindings = NULL;
 fail_dynamic:
   caml_memprof_delete_domain(domain_state);
 fail_memprof:
   atomic_store_explicit(&d->interrupt_word, NULL, memory_order_release);
-  caml_stat_free(d->state);
-  d->state = NULL;
+  if(fresh_state) {
+    caml_free_stack_caches(domain_state->stack_caches);
+fail_stack_caches:
+    caml_stat_free(d->state);
+    d->state = NULL;
+  }
   caml_domain_unlock_hook();
   domain_self = NULL;
   caml_state = NULL;
@@ -986,7 +1063,8 @@ void caml_update_minor_heap_max(uintnat requested_wsz) {
 
 void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
 {
-  int i;
+  atomic_store_relaxed(&domains_exiting, 0);
+  atomic_store_relaxed(&caml_num_domains_running, 0);
 
   /* Use [caml_stat_calloc_noexc] to zero initialize [all_domains]. */
   all_domains = caml_stat_calloc_noexc(max_domains, sizeof(dom_internal));
@@ -1006,7 +1084,7 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
   reserve_minor_heaps_from_stw_single();
   /* stw_single: mutators and domains have not started yet. */
 
-  for (i = 0; i < max_domains; i++) {
+  for (int i = 0; i < max_domains; i++) {
     struct dom_internal* dom = &all_domains[i];
 
     stw_domains.domains[i] = dom;
@@ -1022,8 +1100,14 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
     caml_plat_mutex_init(&dom->default_domain_lock);
     caml_plat_mutex_init(&dom->backup_thread_lock);
     caml_plat_cond_init(&dom->backup_thread_cond);
-    dom->backup_thread_running = 0;
     dom->backup_thread_msg = BT_INIT;
+    dom->domain_canceled = false;
+
+    /* Start out with the tick interval at 0, because we start out not ticking.
+
+       [caml_domain_set_tick_interval_usec] will start the tick thread as soon
+       as this is changed to a nonzero value by any domain. */
+    dom->tick_interval_usec = 0;
   }
 
   domain_create(minor_heap_wsz, NULL);
@@ -1034,7 +1118,8 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
 }
 
 void caml_init_domain_self(int domain_id) {
-  CAMLassert (domain_id >= 0 && domain_id < caml_params->max_domains);
+  CAMLassert(0 <= domain_id);
+  CAMLassert(domain_id < caml_params->max_domains);
   domain_self = &all_domains[domain_id];
   caml_state = domain_self->state;
 }
@@ -1135,12 +1220,15 @@ static void install_backup_thread (dom_internal* di)
 #endif
 
   CAMLassert(di == domain_self);
-  if (di->backup_thread_running == 0) {
-    uintnat msg;
-    msg = atomic_load_acquire(&di->backup_thread_msg);
-    CAMLassert (msg == BT_INIT || /* Using fresh domain */
-                msg == BT_TERMINATE); /* Reusing domain */
-
+  /* Guard on the message directly rather than [backup_thread_running]: the
+     latter is derived from [backup_thread_msg] and is also true for
+     BT_TERMINATE, i.e. a backup thread from a previous user of this reused
+     domain slot that has been asked to terminate but has not yet reached
+     BT_INIT. We must install in that case too (after waiting for the old
+     thread to finish), otherwise a reused domain is left with no backup
+     thread and STW sections requested while it blocks are never serviced. */
+  uintnat msg = atomic_load_acquire(&di->backup_thread_msg);
+  if (msg == BT_INIT || msg == BT_TERMINATE) {
     while (msg != BT_INIT) {
       /* Give a chance for backup thread on this domain to terminate */
       caml_domain_unlock_hook();
@@ -1157,15 +1245,29 @@ static void install_backup_thread (dom_internal* di)
 
     atomic_store_release(&di->backup_thread_msg, BT_ENTERING_OCAML);
     err = pthread_create(&di->backup_thread, 0, backup_thread_func, (void*)di);
+    caml_check_error(err, "failed to create domain backup thread");
 
 #ifndef _WIN32
     pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
 #endif
 
-    if (err)
-      caml_failwith("failed to create domain backup thread");
-    di->backup_thread_running = 1;
     pthread_detach(di->backup_thread);
+  }
+}
+
+static void terminate_backup_thread(dom_internal *di)
+{
+/* TODO: remove this function when taking out domain cancellation */
+  CAMLassert(!caml_bt_is_self());
+
+  if (backup_thread_running(di)) {
+    atomic_store_release(&di->backup_thread_msg, BT_TERMINATE);
+    /* Wakeup backup thread if it is sleeping. Hold the lock across the signal:
+       [backup_thread_func] checks the message and waits under this lock, so an
+       unlocked signal can be lost, stranding the thread at BT_TERMINATE. */
+    caml_plat_lock_blocking(&di->backup_thread_lock);
+    caml_plat_signal(&di->backup_thread_cond);
+    caml_plat_unlock(&di->backup_thread_lock);
   }
 }
 
@@ -1189,7 +1291,7 @@ static void caml_domain_stop_default(void)
   return;
 }
 
-static void caml_domain_external_interrupt_hook_default(void)
+static void caml_domain_tick_hook_default(void)
 {
   return;
 }
@@ -1211,8 +1313,8 @@ CAMLexport void (*caml_domain_unlock_hook)(void) =
 CAMLexport void (*caml_domain_stop_hook)(void) =
    caml_domain_stop_default;
 
-CAMLexport void (*caml_domain_external_interrupt_hook)(void) =
-   caml_domain_external_interrupt_hook_default;
+CAMLexport void (*caml_domain_tick_hook)(void) =
+   caml_domain_tick_hook_default;
 
 CAMLexport void (*caml_domain_send_interrupt_hook)(caml_domain_state*) =
    caml_domain_send_interrupt_hook_default;
@@ -1220,20 +1322,15 @@ CAMLexport void (*caml_domain_send_interrupt_hook)(caml_domain_state*) =
 CAMLexport _Atomic caml_timing_hook caml_domain_terminated_hook =
   (caml_timing_hook)NULL;
 
-static void domain_terminate(void);
-
-static value make_finished(value res_or_exn)
+static value make_finished(caml_result result)
 {
   CAMLparam0();
   CAMLlocal1(res);
-  if (Is_exception_result(res_or_exn)) {
-    res = Extract_exception(res_or_exn);
-    /* [Error res] */
-    res = caml_alloc_1(1, res);
-  } else {
-    /* [Ok res_of_exn] */
-    res = caml_alloc_1(0, res_or_exn);
-  }
+  res = caml_alloc_1(
+    (caml_result_is_exception(result) ?
+     1 /* Error */ :
+     0 /* Ok */),
+    result.data);
   /* [Finished res] */
   res = caml_alloc_1(0, res);
   CAMLreturn(res);
@@ -1276,6 +1373,8 @@ static void* domain_thread_func(void* v)
 #endif
 
   domain_create(caml_params->init_minor_heap_wsz, p->parent->state);
+  if (domain_self)
+    domain_self->tid = pthread_self();
 
   /* this domain is now part of the STW participant set */
   p->newdom = domain_self;
@@ -1307,16 +1406,16 @@ static void* domain_thread_func(void* v)
        see the [note about callbacks and GC] in callback.c */
     value unrooted_callback = ml_values->callback;
     caml_modify_generational_global_root(&ml_values->callback, Val_unit);
-    value res_or_exn = caml_callback_exn(unrooted_callback, Val_unit);
-    value res = make_finished(res_or_exn);
+    value res =
+      make_finished(caml_callback_res(unrooted_callback, Val_unit));
     sync_result(ml_values->term_sync, res);
 
     sync_mutex mut = Mutex_val(*Term_mutex(ml_values->term_sync));
-    domain_terminate();
+    caml_domain_terminate(false);
 
     /* This domain currently holds [mut], and has signaled all the
        waiting domains to be woken up. We unlock [mut] to release the
-       joining domains. The unlock is done after [domain_terminate] to
+       joining domains. The unlock is done after [caml_domain_terminate] to
        ensure that this domain has released all of its runtime state.
        We call [caml_mutex_unlock] directly instead of
        [caml_ml_mutex_unlock] because the domain no longer exists at
@@ -1336,16 +1435,41 @@ static void* domain_thread_func(void* v)
   return 0;
 }
 
+/* Note: [caml_domain_spawn] and [caml_domain_alone()].
+
+   The use of [caml_domain_alone()] to implement sequential fast-path
+   requires that no other domain is operating in parallel. This is
+   indeed the case when [caml_domain_alone()] is observed while
+   holding the domain lock:
+
+   1. When a domain exits, it is careful to decrement
+      [caml_num_domains_running] as the very last step, so that
+      [caml_domain_alone()] does not return [true] while its mutator
+      or domain-termination cleanup logic are still in progress.
+
+   2. When a domain starts, it increments [caml_num_domains_running]
+      immediately after taking the domain lock, and its parent domain
+      blocks waiting for the child set the [Dom_started] flag, which
+      happens after this increment. Neither the parent nor the child
+      can wrongly observe [caml_domain_alone()] while the other may be
+      running code with its domain lock held.
+*/
+
+
 CAMLprim value caml_domain_spawn(value callback, value term_sync)
 {
   CAMLparam2 (callback, term_sync);
   struct domain_startup_params p;
   pthread_t th;
-  int err;
+
+  if (atomic_load_relaxed(&domains_exiting) != 0) {
+    caml_failwith("domain creation not allowed during shutdown");
+  }
 
   /* When domain 0 first spawns a domain, the backup thread is not active, we
      ensure it is started here. */
   install_backup_thread(domain_self);
+  domain_self->tid = pthread_self();
 
 #ifndef NATIVE_CODE
   if (caml_debugger_in_use)
@@ -1362,14 +1486,12 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
   init_domain_ml_values(p.ml_values, callback, term_sync);
 
   CAML_GC_MESSAGE(DOMAIN, "Creating a child domain.\n");
-  err = pthread_create(&th, 0, domain_thread_func, (void*)&p);
-
-  if (err) {
-    caml_failwith("failed to create domain thread");
-  }
+  int err = pthread_create(&th, 0, domain_thread_func, (void*)&p);
+  caml_check_error(err, "failed to create domain thread: pthread_create");
 
   caml_enter_blocking_section();
   caml_plat_lock_blocking(&p.lock);
+
   while (p.status == Dom_starting) {
     caml_plat_wait(&p.cond, &p.lock);
   }
@@ -1597,9 +1719,9 @@ int caml_domain_is_in_stw(void) {
    - Domain cleanup code runs after the terminating domain may run in
      parallel to a STW section, but only after that domain has safely
      removed itself from the STW participant set: the
-     [domain_terminate] function is careful to only leave the STW set
-     when (1) it has the [all_domains_lock] and (2) it hasn't received
-     any request to participate in a STW section.
+     [caml_domain_terminate] function is careful to only leave the STW
+     set when (1) it has the [all_domains_lock] and (2) it hasn't
+     received any request to participate in a STW section.
 
    Each domain leaves the section as soon as it is finished running
    the STW section callback. In particular, a mutator may resume while
@@ -1615,11 +1737,11 @@ int caml_domain_is_in_stw(void) {
    but additional synchronization would be required to update it
    during domain cleanup.
 
-   Note: in the case of both [domain_create] and [domain_terminate] it
-   is important that the loops (waiting for STW sections to finish)
+   Note: in the case of both [domain_create] and [caml_domain_terminate]
+   it is important that the loops (waiting for STW sections to finish)
    regularly release [all_domains_lock], to avoid deadlocks scenario
    with in-progress STW sections.
-    - For [domain_terminate] we release the lock and join
+    - For [caml_domain_terminate] we release the lock and join
       the STW section before resuming.
     - For [domain_create] we wait until the end of the section using
       the condition variable [all_domains_cond] over
@@ -1800,6 +1922,44 @@ void caml_interrupt_self(void)
   interrupt_domain_local(Caml_state);
 }
 
+/* If a preemption is pending, allocate a 3-word continuation for the preemption
+   and store it in Caml_state->preemption
+
+  The resulting preemption will not be fully initialized, so after this function
+  is run care must be taken not to enter the GC before returning from
+  caml_garbage_collection.
+*/
+#ifdef NATIVE_CODE
+void caml_domain_setup_preemption(void) {
+  CAMLparam0();
+  CAMLlocal1(cont);
+  /* Check if there is a pending preemption */
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
+  cont = caml_alloc_3(Cont_tag, Val_ptr(NULL), Val_ptr(NULL), Val_ptr(NULL));
+  /* Check if there is still a pending preemption. This might not be true if the
+     caml_alloc_3 also called the GC, which itself called
+  `  caml_domain_setup_preemption`. */
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
+#ifdef DEBUG
+  Field(cont, 0) = Debug_free_minor;
+  Field(cont, 1) = Debug_free_minor;
+  Field(cont, 2) = Debug_free_minor;
+#endif
+  Caml_state->preemption = cont;
+  CAMLreturn0;
+}
+#endif
+
+void caml_domain_reset_preemption(void) {
+  if (Is_block(Caml_state->preemption)) {
+    Caml_state->preemption = Val_long(1);
+  }
+}
+
 /*  This function is async-signal-safe as [all_domains] and
     [caml_params->max_domains] are set before signal handlers are installed and
     do not change afterwards. */
@@ -1816,19 +1976,6 @@ void caml_interrupt_all_signal_safe(void)
     /* Early exit: if the current domain was never initialized, then
        neither have been any of the remaining ones. */
     if (interrupt_word == NULL) return;
-    interrupt_domain(d);
-  }
-}
-
-void caml_external_interrupt_all_signal_safe(uintnat flags)
-{
-  for (dom_internal *d = all_domains;
-       d < &all_domains[caml_params->max_domains];
-       d++) {
-    atomic_uintnat * interrupt_word =
-      atomic_load_acquire(&d->interrupt_word);
-    if (interrupt_word == NULL) return;
-    atomic_fetch_or(&d->state->requested_external_interrupt, flags);
     interrupt_domain(d);
   }
 }
@@ -1862,18 +2009,19 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
       || dom_st->major_slice_epoch < atomic_load (&caml_major_slice_epoch)) {
     interrupt_domain_local(dom_st);
   }
-  /* We might be here due to a recently-recorded signal or forced
-     systhread switching, so we need to remember that we must run
-     signal handlers or systhread's yield. In addition, in the case of
-     long-running C code (that may regularly poll with
-     caml_process_pending_actions), we want to force a query of all
-     callbacks at every minor collection or major slice (similarly to
-     the OCaml behaviour).
+  /* We might be here due to a recently-recorded signal or tick, so we need to
+     remember that we must run signal handlers or tick handlers. In addition, in
+     the case of long-running C code (that may regularly poll with
+     caml_process_pending_actions), we want to force a query of all callbacks at
+     every minor collection or major slice (similarly to the OCaml behaviour).
 
      We don't need to check for internally triggered pending actions
-     (Memprof and finalisers), because they will already have set
+     (internal Memprof and finalisers), because they will already have set
      action_pending if needed. */
-  if (caml_check_pending_signals() || Caml_state->requested_external_interrupt)
+  if (caml_check_pending_signals() ||
+      atomic_load_relaxed(&Caml_state->requested_tick) ||
+      caml_memprof_pending_external_interrupt(dom_st) ||
+      Is_block(Caml_state->preemption))
     caml_set_action_pending(dom_st);
 }
 
@@ -1982,13 +2130,408 @@ void caml_handle_gc_interrupt(void)
   caml_poll_gc_work();
 }
 
-/* Preemptive systhread switching */
-void caml_process_external_interrupt(void)
+/* Tick thread
+   ===========
+
+   Every process runs up to one "tick thread", which periodically interrupts all
+   running domains, providing them the ability to react by running "tick hooks"
+   (and, in the future, tick handlers on fibers). The interval at which the tick
+   thread ticks is configured dynamically, at runtime - each domain has a
+   configured "tick request" interval, and the tick thread ticks at the minimum
+   tick request across all domains.
+
+   Changing the tick interval
+   --------------------------
+
+   When the tick interval might have been changed (due to a domain calling
+   [caml_domain_set_tick_interval_usec]), on supported platforms (currently just
+   linux via epoll+timerfd+eventfd, though this could be extended to MacOS using
+   kqueue in the future), we interrupt the ticker thread's sleep, causing it to
+   recompute the tick interval. This provides prompt changes to the tick
+   interval; otherwise we'd have to wait for the longer tick to expire before
+   reducing the tick interval.
+
+   Disabling the tick thread
+   -------------------------
+
+   The tick thread can be disabled, by calling [caml_enable_tick_thread] with a
+   [false] argument. In this case, all tick requests will be ignored.
+ */
+
+#ifdef HAS_INTERRUPTIBLE_TICK
+
+/* Interruptible wait helpers for the tick thread.
+
+   On Linux we use epoll + timerfd + eventfd.
+   On other platforms we fall back to (uninterruptible) usleep.
+*/
+/* CR-someday aspsmith: Consider using kqueue on MacOS */
+
+static void tick_thread_close_fd(int *fd)
 {
-  if (atomic_load_acquire(&Caml_state->requested_external_interrupt)) {
-    caml_domain_external_interrupt_hook();
+  if (*fd != -1) { close(*fd); *fd = -1; }
+}
+
+static void tick_thread_close_fds(void)
+{
+  tick_thread_close_fd(&tick_thread.epoll_fd);
+  tick_thread_close_fd(&tick_thread.timer_fd);
+  tick_thread_close_fd(&tick_thread.interrupt_fd);
+}
+
+/* Returns -1 on failure */
+static int tick_thread_open_fds(void)
+{
+  int timer_fd = -1, event_fd = -1, epoll_fd = -1;
+
+  timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
+  if (timer_fd == -1) goto fail;
+
+  event_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+  if (event_fd == -1) goto fail;
+
+  epoll_fd = epoll_create1(EPOLL_CLOEXEC);
+  if (epoll_fd == -1) goto fail;
+
+  struct epoll_event ev;
+  ev.events = EPOLLIN;
+  ev.data.fd = timer_fd;
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, timer_fd, &ev) == -1) {
+    goto fail;
+  }
+  ev.data.fd = event_fd;
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event_fd, &ev) == -1) {
+    goto fail;
+  }
+
+  tick_thread.epoll_fd = epoll_fd;
+  tick_thread.timer_fd = timer_fd;
+  tick_thread.interrupt_fd = event_fd;
+  return 0;
+
+fail:
+  if (timer_fd != -1) close(timer_fd);
+  if (event_fd != -1) close(event_fd);
+  if (epoll_fd != -1) close(epoll_fd);
+  return -1;
+}
+
+static void tick_thread_arm_timer(uintnat interval_usec)
+{
+  struct itimerspec its;
+  /* CR-someday aspsmith: We ostensibly could get better behavior / performance
+     by using a recurring interval timer rather than a one-shot timer, but
+     currently we tick infrequently enough that it doesn't seem like this is
+     worth it. But we should at least measure and see. */
+  its.it_interval.tv_sec = 0;
+  its.it_interval.tv_nsec = 0;
+  its.it_value.tv_sec = (time_t)(interval_usec / 1000000);
+  its.it_value.tv_nsec = (long)(interval_usec % 1000000) * 1000;
+  timerfd_settime(tick_thread.timer_fd, 0, &its, NULL);
+}
+
+static void tick_thread_wake(void)
+{
+  if (tick_thread.interrupt_fd == -1) return;
+
+  uint64_t val = 1;
+  /* We don't care about signals here since the eventfd is O_NONBLOCK, so the
+     write completes immediately and hence cannot be interrupted */
+  ssize_t ret = write(tick_thread.interrupt_fd, &val, sizeof(val));
+  (void)ret;
+}
+
+/* Returns true if the timer expired, false if interrupted. */
+static bool tick_thread_wait(void)
+{
+  /* Note we don't need to worry about signals here because signals are masked
+     in the tick thread. */
+
+  struct epoll_event events[2];
+  int n = epoll_wait(tick_thread.epoll_fd, events, 2, -1);
+  if (n <= 0) {
+    if (errno == EINTR) {
+      /* Despite what the man page for epoll_wait says, it *can* actually fail
+         with EINTR, even if the thread it's running on has signals masked, if
+         the process gets SIGSTOP and then SIGCONT. This is (likely) the only
+         case where we get EINTR, so we just unconditionally treat it as the
+         timer firing. */
+      return true;
+    }
+    caml_plat_fatal_error("tick_thread_wait", errno);
+  }
+
+  bool timer_fired = false;
+  for (int i = 0; i < n; i++) {
+    if (events[i].data.fd == tick_thread.timer_fd) {
+      /* Note: we read to clear the state of the timerfd, but don't actually use
+         the number of expirations at all */
+      uint64_t expirations;
+      ssize_t r = read(tick_thread.timer_fd, &expirations,
+                       sizeof(expirations));
+      (void)r;
+      timer_fired = true;
+    } else if (events[i].data.fd == tick_thread.interrupt_fd) {
+      /* Note: we read to clear the state of the timerfd, but don't actually use
+         the value at all */
+      uint64_t val;
+      ssize_t r = read(tick_thread.interrupt_fd, &val, sizeof(val));
+      (void)r;
+    }
+  }
+  return timer_fired;
+}
+
+#else /* !HAS_INTERRUPTIBLE_TICK */
+
+static int tick_thread_open_fds(void) { return 0; }
+static int tick_thread_close_fds(void) { return 0; }
+static void tick_thread_wake(void) {}
+
+#endif
+
+caml_result caml_process_tick_res(void)
+{
+  if (atomic_exchange_explicit(&Caml_state->requested_tick, false,
+                               memory_order_acquire)) {
+    caml_domain_tick_hook();
+
+    caml_result res = caml_tick_fiber_res(Caml_state->current_stack);
+    if (caml_result_is_exception(res)) {
+      return res;
+    }
+
+    if (res.data == Val_true) {
+      Caml_state->preemption = Val_long(1);
+    }
+  }
+  return Result_unit;
+}
+
+CAMLextern void caml_stop_tick_thread(void)
+{
+  caml_plat_lock_blocking(&tick_thread.mutex);
+  if (tick_thread.running) {
+    tick_thread.running = false;
+    atomic_store_release(&tick_thread.stop, true);
+    tick_thread_wake();
+    pthread_t thread = tick_thread.thread_id;
+    CAMLassert(thread);
+    pthread_join(thread, NULL);
+    tick_thread_close_fds();
+    atomic_store_release(&tick_thread.stop, false);
+  }
+  caml_plat_unlock(&tick_thread.mutex);
+}
+
+static void tick_thread_reset(void)
+{
+  /* Reset the state of the tick thread in the child process after fork().
+
+     See comment in caml_reset_domain_lock; this really is best-effort, and is
+     probably just UB. But there are tests in lib-systhreads that Unix.fork ()
+     works for multithreaded processes, so we must keep it working. */
+  caml_plat_mutex_init(&tick_thread.mutex);
+  tick_thread.thread_id = 0;
+  bool was_running = tick_thread.running;
+  tick_thread.running = false;
+  atomic_store_relaxed(&tick_thread.stop, false);
+  tick_thread_close_fds();
+  if (was_running) {
+    /* nb: this respects tick_thread.enabled */
+    caml_start_tick_thread();
   }
 }
+
+/* Compute the interval at which the tick thread will tick. */
+CAMLextern uintnat caml_effective_tick_interval_usec(void) {
+  if (!atomic_load_relaxed(&tick_thread.enabled)) {
+    return 0;
+  }
+
+  uintnat res = 0;
+
+  /* See [caml_interrupt_all_signal_safe] for why reading from this array can
+     be done without any synchronization */
+  for (dom_internal *d = all_domains;
+       d < &all_domains[caml_params->max_domains];
+       d++) {
+    /* Early exit: if the current domain was never initialized, then
+       neither have been any of the remaining ones. */
+    if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
+
+    uintnat dom_tick_interval =
+      atomic_load_relaxed(&d->tick_interval_usec);
+    if (dom_tick_interval == 0) { continue; }
+    else if (res == 0 || dom_tick_interval < res) {
+      res = dom_tick_interval;
+    }
+  }
+
+  return res;
+}
+
+CAMLprim value caml_effective_tick_interval_usec_bytecode(value v_unit) {
+  return Val_long(caml_effective_tick_interval_usec());
+}
+
+static void caml_do_tick_all_domains(void)
+{
+  /* See [caml_interrupt_all_signal_safe] for why reading from this array can
+     be done without any synchronization */
+  for (dom_internal *d = all_domains;
+       d < &all_domains[caml_params->max_domains]; d++) {
+    /* Early exit: if the current domain was never initialized, then
+       neither have been any of the remaining ones. */
+    if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
+    /* Note that even if the domain whose state we're writing to has
+       terminated by the time we got here, we won't run into issues, because
+       caml_state isn't freed or otherwise invalidated on domain
+       termination. */
+    atomic_store_release(&d->state->requested_tick, true);
+    interrupt_domain(d);
+  }
+}
+
+static void* caml_tick(void *arg)
+{
+  (void)arg;
+  /* OpenOnload uses LD_PRELOAD to replace epoll_wait with a busy-polling
+     version, which makes the epoll_wait ticker extremely expensive */
+  if (!caml_tick_use_usleep && caml_globalsym("onload_is_present") != NULL)
+    caml_tick_use_usleep = 1;
+  while (!atomic_load_acquire(&tick_thread.stop)) {
+    /* We re-calculate the interval each iteration of the loop so that the
+       per-domain tick interval can be changed. We use the (quite loose)
+       heuristic of always ticking at the minimum requested interval, allowing
+       domains which want coarser ticks to round up to a multiple of that
+       interval. */
+    uintnat interval = caml_effective_tick_interval_usec();
+
+#ifdef HAS_INTERRUPTIBLE_TICK
+    if (caml_tick_use_usleep) {
+      if (interval > 0) {
+        usleep(interval);
+        caml_do_tick_all_domains();
+      } else {
+        usleep(Tick_poll_interval_usec);
+      }
+    } else if (interval == 0) {
+      /* No domain wants ticks; sleep until woken by the eventfd. */
+      tick_thread_wait();
+    } else {
+      tick_thread_arm_timer(interval);
+      if (tick_thread_wait()) {
+        caml_do_tick_all_domains();
+      }
+
+      /* If we were interrupted (rather than the timer going off), we loop back
+         to recalculate the interval and re-arm the timer. */
+    }
+#else
+    if (interval > 0) {
+      /* Note: we don't need to handle signals here because signals are masked
+         when we start the tick thread */
+      usleep(interval);
+      caml_do_tick_all_domains();
+    } else {
+      /* No interruptible wait and no tick requests; poll up to the previous
+         systhreads default of 50ms. */
+      usleep(Tick_poll_interval_usec);
+    }
+#endif
+  }
+
+  return NULL;
+}
+
+CAMLextern int caml_start_tick_thread(void)
+{
+  caml_plat_lock_non_blocking(&tick_thread.mutex);
+  if (!atomic_load_acquire(&tick_thread.enabled)) {
+    caml_plat_unlock(&tick_thread.mutex);
+    return 0;
+  }
+
+  if (tick_thread.running) {
+    caml_plat_unlock(&tick_thread.mutex);
+    return 0;
+  }
+
+  if (tick_thread_open_fds() == -1) {
+    caml_plat_unlock(&tick_thread.mutex);
+    return errno;
+  }
+
+#ifdef POSIX_SIGNALS
+  sigset_t mask, old_mask;
+
+  /* Block all signals, so that we do not try to execute a C signal
+     handler in the new tick thread. */
+  sigfillset(&mask);
+  pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
+#endif
+  pthread_t thread;
+  int err = pthread_create(&thread, /* attr=*/NULL, caml_tick, (void *)NULL);
+
+#ifdef POSIX_SIGNALS
+  /* Reset the mask after starting the thread */
+  pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
+#endif
+
+  if (err != 0) {
+    tick_thread_close_fds();
+    caml_plat_unlock(&tick_thread.mutex);
+    return err;
+  }
+
+  tick_thread.running = true;
+  tick_thread.thread_id = thread;
+
+  caml_plat_unlock(&tick_thread.mutex);
+
+  return 0;
+}
+
+CAMLprim value caml_enable_tick_thread(value v_enable)
+{
+  bool enable = Long_val(v_enable) ? 1 : 0;
+  bool was_enabled = atomic_exchange_explicit(&tick_thread.enabled, enable,
+                                              memory_order_acq_rel);
+
+  if (enable && !was_enabled) {
+    int err = caml_start_tick_thread();
+    caml_check_error(err, "caml_enable_tick_thread");
+  } else {
+    caml_stop_tick_thread();
+  }
+
+  return Val_unit;
+}
+
+/* Set the requested tick interval for the current domain
+
+   If argument is 0, the current domain no longer wants ticks */
+CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
+{
+  atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
+  if (interval_usec != 0) {
+    caml_start_tick_thread();
+  }
+  /* NOTE: We don't worry too much about spurious wakes here, since we assume
+     changing the tick interval is uncommon */
+  tick_thread_wake();
+
+  return 0;
+}
+
+CAMLprim value caml_domain_set_tick_interval_usec_bytecode(value v_interval_usec) {
+  CAMLparam1(v_interval_usec);
+  caml_domain_set_tick_interval_usec(Long_val(v_interval_usec));
+  CAMLreturn(Val_unit);
+}
+
+/* Backup thread */
 
 CAMLexport int caml_bt_is_in_blocking_section(void)
 {
@@ -2003,8 +2546,8 @@ CAMLexport int caml_bt_is_self(void)
 
 CAMLexport intnat caml_domain_is_multicore (void)
 {
-  dom_internal *self = domain_self;
-  return (!caml_domain_alone() || self->backup_thread_running);
+  return (!caml_domain_alone() ||
+          backup_thread_running(domain_self));
 }
 
 CAMLexport void caml_acquire_domain_lock(void)
@@ -2017,10 +2560,10 @@ CAMLexport void caml_acquire_domain_lock(void)
 CAMLexport void caml_bt_enter_ocaml(void)
 {
   dom_internal* self = domain_self;
+  bool bt_running = backup_thread_running(self);
+  CAMLassert(caml_domain_alone() || bt_running);
 
-  CAMLassert(caml_domain_alone() || self->backup_thread_running);
-
-  if (self->backup_thread_running) {
+  if (bt_running) {
     atomic_store_release(&self->backup_thread_msg, BT_ENTERING_OCAML);
   }
 }
@@ -2034,10 +2577,11 @@ CAMLexport void caml_release_domain_lock(void)
 CAMLexport void caml_bt_exit_ocaml(void)
 {
   dom_internal* self = domain_self;
+  bool bt_running = backup_thread_running(self);
 
-  CAMLassert(caml_domain_alone() || self->backup_thread_running);
+  CAMLassert(caml_domain_alone() || bt_running);
 
-  if (self->backup_thread_running) {
+  if (bt_running) {
     atomic_store_release(&self->backup_thread_msg, BT_IN_BLOCKING_SECTION);
 
     /* We must [caml_bt_signal] when we set BT_IN_BLOCKING_SECTION and
@@ -2063,6 +2607,7 @@ static void caml_atfork_default(void)
 {
   caml_reset_domain_lock();
   caml_acquire_domain_lock();
+  tick_thread_reset();
   /* FIXME: For best portability, the IO channel locks should be
      reinitialised as well. (See comment in
      caml_reset_domain_lock.) */
@@ -2084,7 +2629,13 @@ int caml_domain_is_terminating (void)
   return domain_terminating(domain_self);
 }
 
-static void domain_terminate (void)
+static bool marking_and_sweeping_done(caml_domain_state *domain_state)
+{
+  return (domain_state->marking_done
+          && domain_state->sweeping_done);
+}
+
+void caml_domain_terminate(bool last)
 {
   caml_domain_state* domain_state = domain_self->state;
   int finished = 0;
@@ -2098,6 +2649,9 @@ static void domain_terminate (void)
   caml_domain_stop_hook();
   call_timing_hook(&caml_domain_terminated_hook);
 
+  /* Reset the tick interval back to 0, since we no longer want ticks */
+  caml_domain_set_tick_interval_usec(0);
+
   while (!finished) {
     caml_finish_sweeping();
 
@@ -2105,13 +2659,36 @@ static void domain_terminate (void)
     /* Note: [caml_empty_minor_heaps_once] will also join any ongoing
        STW sections that has sent an interrupt to this domain. */
 
+    if (last)
+      caml_finish_major_cycle(0);
+
     caml_finish_marking();
 
     caml_orphan_ephemerons(domain_state);
     caml_orphan_finalisers(domain_state);
 
-    /* take the all_domains_lock to try and exit the STW participant set
-       without racing with a STW section being triggered */
+    /* Orphaning ephemerons and finalizers may create new marking or
+       sweeping work, so we may need to mark and/or sweep again. */
+
+    /* No need to check for interrupts if we are the last domain running. */
+    if (last) {
+      CAML_EV_LIFECYCLE(EV_DOMAIN_TERMINATE, getpid());
+      break;
+    }
+
+    /* If new marking or sweeping work appeared during orphaning,
+       run a new loop iteration. */
+    if (!marking_and_sweeping_done(domain_state))
+      continue;
+
+    /* Orphan the local shared heap.
+       This is only valid when [sweeping_done], and does
+       not create any new major GC work. */
+    caml_orphan_shared_heap(domain_state->shared_heap);
+    CAMLassert(marking_and_sweeping_done(domain_state));
+
+    /* Take the all_domains_lock to try and exit the STW participant set
+       without racing with a STW section being triggered. */
     caml_plat_lock_blocking(&all_domains_lock);
 
     /* The interaction of termination and major GC is quite subtle.
@@ -2121,22 +2698,18 @@ static void domain_terminate (void)
        require this domain to participate, which in turn could involve a major
        GC cycle. This would then require finish marking and sweeping again in
        order to decrement the globals [num_domains_to_mark] and
-       [num_domains_to_sweep] (see major_gc.c).
+       [num_domains_to_sweep] (see major_gc.c). We do this by running a new
+       loop iteration.
      */
-
-    if (!caml_incoming_interrupts_queued() &&
-        domain_state->marking_done &&
-        domain_state->sweeping_done) {
-
+    if (!caml_incoming_interrupts_queued()) {
       finished = 1;
       domain_self->terminating = 0;
       domain_self->running = 0;
 
-      /* Remove this domain from stw_domains */
+      /* Remove this domain from stw_domains. */
       remove_from_stw_domains(domain_self);
 
-      CAMLassert (domain_self->backup_thread_running);
-      domain_self->backup_thread_running = 0;
+      CAMLassert (backup_thread_running(domain_self));
 
       /* We must signal domain termination before releasing [all_domains_lock]:
          after that, this domain will no longer take part in STWs and emitting
@@ -2145,6 +2718,8 @@ static void domain_terminate (void)
     }
     caml_plat_unlock(&all_domains_lock);
   }
+
+  if (!last) caml_assert_shared_heap_is_empty(domain_state->shared_heap);
 
   /* domain_state may be re-used by a fresh domain here (now that we
    * have done remove_from_stw_domains and released the
@@ -2167,44 +2742,140 @@ static void domain_terminate (void)
   caml_free_extern_state();
   caml_teardown_major_gc();
 
-  caml_dynamic_delete_thread(domain_state->dynamic_bindings);
+  caml_dynamic_cache_delete(domain_state->dynamic_bindings);
   domain_state->dynamic_bindings = NULL;
 
-  caml_teardown_shared_heap(domain_state->shared_heap);
-  domain_state->shared_heap = 0;
+  /* At this point, we know that the shared heap has been orphaned,
+     except if [last], if we are the last domain. In that case we
+     finalise all unswept objects and orphan the shared heap now. */
+  if (last) {
+    /* First adopt all orphan pools, to avoid missing unswept objects. */
+    caml_adopt_all_orphan_heaps(domain_state->shared_heap);
+
+    /* Call all custom finalisers of unswept objects. */
+    caml_finalise_heap();
+
+    /* Then orphan all pools again. */
+    caml_orphan_shared_heap(domain_state->shared_heap);
+  }
+  caml_assert_shared_heap_is_empty(domain_state->shared_heap);
+
+  caml_free_shared_heap(domain_state->shared_heap);
+  domain_state->shared_heap = NULL;
   caml_free_minor_tables(domain_state->minor_tables);
-  domain_state->minor_tables = 0;
+  domain_state->minor_tables = NULL;
 
-  caml_orphan_alloc_stats(domain_state);
-  /* Heap stats were orphaned by [caml_teardown_shared_heap] above.
-     At this point, the stats of the domain must be empty.
-
-     The sampled copy was also cleared by the minor collection(s)
-     performed above at [caml_empty_minor_heaps_once()], see the
-     termination-specific logic in [caml_collect_gc_stats_sample_stw].
+  /* At this point, the stats of the domain must be empty.
+     - heap stats were orphaned by [caml_orphan_shared_heap]
+     - alloc stats were orphaned by [caml_orphan_alloc_stats]
+     - the sampled copy in [sampled_gc_stats] was cleared by the minor
+       collection performed by [caml_empty_minor_heaps_once()], see
+       the termination-specific logic in
+       [caml_collect_gc_stats_sample_stw].
   */
 
   /* TODO: can this ever be NULL? can we remove this check? */
   if(domain_state->current_stack != NULL) {
     caml_free_stack(domain_state->current_stack);
   }
-  caml_free_stack_cache(domain_state->stack_cache);
+  caml_disable_stack_caches(domain_state->stack_caches);
+
   caml_free_backtrace_buffer(domain_state->backtrace_buffer);
   caml_free_gc_regs_buckets(domain_state->gc_regs_buckets);
 
-  /* signal the domain termination to the backup thread
-     NB: for a program with no additional domains, the backup thread
-     will not have been started */
-  atomic_store_release(&domain_self->backup_thread_msg, BT_TERMINATE);
-  caml_bt_signal(domain_self);
+  terminate_backup_thread(domain_self);
 
   caml_domain_unlock_hook();
 
   caml_plat_assert_all_locks_unlocked();
   /* This is the last thing we do because we need to be able to rely
      on caml_domain_alone (which uses caml_num_domains_running) in at least
-     the shared_heap lockfree fast paths */
-  (void)caml_atomic_counter_decr(&caml_num_domains_running);
+     the shared_heap lockfree fast paths. Also, we don't want to decrement
+     it back to zero when the last domain exits, for caml_domain_alone()
+     to remain accurate. */
+  if (!last)
+    caml_atomic_counter_decr(&caml_num_domains_running);
+}
+
+/* Try and terminate the currently running domain.
+   This is only invoked when extra domains are left running while the
+   main one is terminating. In this case, we are not in a state where
+   we can safely release resources. The best we can do is cancel the
+   extra running threads. */
+static void stw_terminate_domain(caml_domain_state *domain, void *data,
+  int participating_count,
+  caml_domain_state **participating)
+{
+  /* TODO: remove this function when we take out domain cancellation */
+  if (!pthread_equal(domain_self->tid, *(pthread_t *)data)) {
+    if (caml_bt_is_self()) {
+      /* If this STW request is handled by the backup thread, the
+         domain thread is currently running C code. */
+      domain_self->domain_canceled = true;
+      (void)pthread_cancel(domain_self->tid);
+      /* We are intentionally not waiting for the thread to terminate here,
+         and not decrementing the number of running domains either, since
+         we don't know the state of the various locks and condition
+         variables in this state. */
+      atomic_store_release(&domain_self->backup_thread_msg, BT_INIT);
+    } else {
+      /* Domain threads forced to exit here will not have a chance to
+         run caml_domain_terminate() on their own, so we need to ask
+         the backup thread to terminate here. */
+      terminate_backup_thread(domain_self);
+      caml_domain_unlock_hook();
+      /* No particular memory resource cleanup is attempted here, for we
+         have no idea which state each domain is in. */
+    }
+    pthread_exit(0);
+  }
+}
+
+void caml_stop_all_domains(void)
+{
+  atomic_store_relaxed(&domains_exiting, 1);
+
+  pthread_t myself = pthread_self();
+  do {} while (!caml_try_run_on_all_domains(
+               &stw_terminate_domain, &myself, NULL));
+
+  terminate_backup_thread(domain_self);
+  caml_release_domain_lock();
+
+  caml_plat_assert_all_locks_unlocked();
+}
+
+bool caml_free_domains(void)
+{
+  bool result = true;
+
+  for (int i = 0; i < caml_params->max_domains; i++) {
+    struct dom_internal* dom = &all_domains[i];
+
+    /* Give the backup thread time to terminate gracefully, if needed */
+    while (backup_thread_running(dom)) {
+      cpu_relax();
+    }
+
+    dom->interrupt_word = NULL;
+    caml_plat_mutex_free(&dom->backup_thread_lock);
+    caml_plat_cond_free(&dom->backup_thread_cond);
+
+    if (dom->domain_canceled)
+      result = false;
+    else
+      caml_plat_mutex_free(&dom->default_domain_lock);
+  }
+
+#ifdef WITH_THREAD_SANITIZER
+  /* When running with TSan, there will be reports of races between
+     freeing the all_domains synchronization objects and domain threads
+     accessing them, even though we wait first for the domain threads to
+     have terminated in the above loop. */
+  result = false;
+#endif
+
+  return result;
 }
 
 CAMLprim value caml_ml_domain_cpu_relax(value t)
@@ -2311,4 +2982,9 @@ CAMLprim value caml_recommended_domain_count(value unused)
     n = caml_params->max_domains;
 
   return (Val_long(n));
+}
+
+CAMLprim value caml_max_domain_count(value unused)
+{
+  return Val_long(caml_params->max_domains);
 }

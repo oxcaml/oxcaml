@@ -35,8 +35,17 @@ type unit_link_info =
     defines : Compilation_unit.t list;
     file_name : string;
     crc : Digest.t;
+    imports_cmx : Import_info.t list;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
+  }
+
+(** An object file or archive to pass to the linker, together with the
+    compilation units it contributes to the link (for an archive, only the units
+    of its required members). *)
+type objfile_to_link =
+  { path : string;
+    units : Compilation_unit.t list
   }
 
 (** Values of type [t] are mutable structures. *)
@@ -65,9 +74,13 @@ val add_required : t -> filepath * CU.Name.t option -> Import_info.t -> unit
 
 val remove_required : t -> CU.t -> unit
 
-val add_quoted_globals : t -> CU.Name.t list -> unit
+val add_quoted_cmi : t -> CU.Name.t list -> unit
 
-val get_quoted_globals : t -> CU.Name.Set.t
+val add_quoted_cmx : t -> CU.t list -> unit
+
+val get_quoted_cmi : t -> CU.Name.Set.t
+
+val get_quoted_cmx : t -> CU.Set.t
 
 val extract_missing_globals : t -> (CU.t * filepath list) list
 
@@ -80,6 +93,14 @@ val check_consistency :
 
 type error =
   | File_not_found of filepath
+    (* The link input [requested_filename] (a [.cmx] or [.cmxa]) was resolved
+       through a manifest entry (see [-I-manifest]), but its accompanying object
+       file [object_filename] has no manifest entry and was not found in the
+       load path. *)
+  | Companion_object_file_not_found_via_manifest of
+      { object_filename : filepath;
+        requested_filename : filepath
+      }
   | Not_an_object_file of filepath
   | Missing_implementations of (Compilation_unit.t * string list) list
   | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
@@ -89,5 +110,6 @@ type error =
   | Linking_error of int
   | Archiver_error of string
   | Metaprogramming_not_supported_by_backend of filepath
+  | Requires_metaprogramming_without_flag of filepath
 
 exception Error of error

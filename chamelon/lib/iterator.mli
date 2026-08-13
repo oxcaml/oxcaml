@@ -31,6 +31,8 @@ val basic : strategy
 
 val dichotomy : strategy
 
+val eager : strategy
+
 val test : pos:int -> len:int -> strategy
 
 type ('a, 'b) schedule

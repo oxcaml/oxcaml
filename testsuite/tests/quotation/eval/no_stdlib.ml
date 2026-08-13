@@ -1,4 +1,5 @@
 (* TEST
+  include eval;
   flags = "-extension runtime_metaprogramming";
   native;
 *)
@@ -10,6 +11,6 @@
 
 let () =
   Printf.printf "\nTest eval with no references to Stdlib\n";
-  let output = [%eval: int -> int] <[ fun x -> x ]> in
+  let output = Eval.eval (<[ fun x -> x ]> : <[int -> int]> expr) in
   Printf.printf "Output: %d\n" (output 42);
 ;;

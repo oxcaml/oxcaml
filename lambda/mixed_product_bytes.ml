@@ -60,12 +60,38 @@ let rec count (el : _ Lambda.mixed_block_element) : t =
   | Vec128 -> { value = 0; flat = 16 }
   | Vec256 -> { value = 0; flat = 32 }
   | Vec512 -> { value = 0; flat = 64 }
+  | Mask -> { value = 0; flat = 8 }
   | Product layouts ->
     Array.fold_left (fun cts l -> add cts (count l)) zero layouts
   | Splice_variable _ ->
     Misc.fatal_error "Mixed_product_bytes_count: layout poly not supported"
 
+let rec count_types_element (elt : Types.mixed_block_element) : t =
+  match elt with
+  | Scannable _ -> { value = 8; flat = 0 }
+  | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word
+  | Untagged_immediate ->
+    { value = 0; flat = 8 }
+  | Vec128 -> { value = 0; flat = 16 }
+  | Vec256 -> { value = 0; flat = 32 }
+  | Vec512 -> { value = 0; flat = 64 }
+  | Mask -> { value = 0; flat = 8 }
+  | Product elts ->
+    Array.fold_left (fun acc e -> add acc (count_types_element e)) zero elts
+  | Void -> zero
+
+let count_types_shape shape =
+  Array.fold_left (fun acc elt -> add acc (count_types_element elt)) zero shape
+
 let has_value_and_flat { value; flat } = value > 0 && flat > 0
+
+let all_value { flat; _ } = Byte_count.is_zero flat
+
+let shape_is_all_value shape = all_value (count (Product shape))
+
+let value_prefix_len t = Byte_count.on_64_bit_arch t.value / 8
+
+let types_shape_is_all_value shape = all_value (count_types_shape shape)
 
 module Wrt_path = struct
   type nonrec t =
@@ -86,7 +112,7 @@ module Wrt_path = struct
       match el with
       | Product shape -> count_shape_wrt_path shape i path_rest
       | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-      | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
+      | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate ->
         Misc.fatal_error "Mixed_product_bytes_wrt_path: bad mixed block path"
       | Splice_variable _ ->
         Misc.fatal_error

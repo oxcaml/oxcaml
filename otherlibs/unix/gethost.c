@@ -13,6 +13,8 @@
 /*                                                                        */
 /**************************************************************************/
 
+#define _WINSOCK_DEPRECATED_NO_WARNINGS /* gethostbyaddr, gethostbyname */
+
 #include <string.h>
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
@@ -77,7 +79,7 @@ static value alloc_host_entry(struct hostent *entry)
 
 CAMLprim value caml_unix_gethostbyaddr(value a)
 {
-  char * adr;
+  const char * adr;
   struct in_addr in4;
   struct hostent * hp;
   int addr_type = AF_INET;

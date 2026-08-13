@@ -1,12 +1,7 @@
 (* TEST
  {
-   runtime4;
-   skip;
- }{
    include runtime_events;
-   runtime5;
-   multidomain;
-   flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
+   multicore;
    { bytecode; }
    { native; }
  }

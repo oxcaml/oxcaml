@@ -15,20 +15,28 @@
 
 type continuation_handler =
   { handler : Flambda.Continuation_handler.t;
-    free_names : Name_occurrences.t
+    free_names : Name_occurrences.t;
+    code_size : Code_size.t
   }
 
 type continuation_handlers =
   { handlers : Flambda.Continuation_handler.t Continuation.Lmap.t;
-    free_names : Name_occurrences.t
+    free_names : Name_occurrences.t;
+    code_size : Code_size.t
   }
 
 type t =
   { expr : Flambda.expr;
-    free_names : Name_occurrences.t
+    free_names : Name_occurrences.t;
+    code_size : Code_size.t
   }
 
-val create_let : Bound_pattern.t -> Flambda.named -> body:t -> t
+val create_let :
+  Bound_pattern.t ->
+  Flambda.named ->
+  size_of_defining_expr:Code_size.t ->
+  body:t ->
+  t
 
 val create_continuation_handler :
   Bound_parameters.t ->
@@ -49,4 +57,8 @@ val create_recursive_let_cont :
   body:t ->
   t
 
-val from_expr : expr:Flambda.expr -> free_names:Name_occurrences.t -> t
+val from_expr :
+  expr:Flambda.expr ->
+  free_names:Name_occurrences.t ->
+  code_size:Code_size.t ->
+  t

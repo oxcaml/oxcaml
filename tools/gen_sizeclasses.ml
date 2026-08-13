@@ -119,8 +119,8 @@ let _ =
 
 #include <assert.h>
 #include <limits.h>
-|};
-  printf {|
+#include "mlvalues.h"
+
 #define POOL_WSIZE %d
 #define POOL_HEADER_WSIZE %d
 #define SIZECLASS_MAX %d
@@ -133,7 +133,7 @@ static_assert(NUM_SIZECLASSES < (1 << (CHAR_BIT * sizeof(sizeclass_t))), "");
 
 /* The slot sizes (and therefore the largest whsize) for each size class.
    (A gap is left after smaller objects) */
-static const unsigned int whsize_sizeclass[NUM_SIZECLASSES] =@[<2>{ %a };@]
+static const mlsize_t whsize_sizeclass[NUM_SIZECLASSES] =@[<2>{ %a };@]
 |}
     print_list whsize_sizeclass;
   printf {|

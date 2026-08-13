@@ -149,3 +149,7 @@ let compare_ascending_vma t1 t2 =
   | Location_list_entry entry1, Location_list_entry entry2 ->
     Asm_label.compare entry1.beginning_address_label
       entry2.beginning_address_label
+
+let is_base_address_selection_entry = function
+  | Base_address_selection_entry _ -> true
+  | Location_list_entry _ -> false

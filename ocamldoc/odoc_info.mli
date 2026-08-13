@@ -260,6 +260,7 @@ module Type :
         {
           rf_name : string ; (** Name of the field. *)
           rf_mutable : bool ; (** [true] if mutable. *)
+          rf_atomic : bool ; (** [true] if atomic. *)
           rf_type : Types.type_expr ; (** Type of the field. *)
           mutable rf_text : info option ; (** Optional description in the associated comment.*)
         }
@@ -1081,7 +1082,7 @@ end
    @return the list of analysed top modules. *)
 val analyse_files :
     ?merge_options:Odoc_types.merge_option list ->
-      ?include_dirs:string list ->
+      ?include_dirs:Clflags.visible_include list ->
         ?hidden_include_dirs:string list ->
           ?labels:bool ->
             ?sort_modules:bool ->

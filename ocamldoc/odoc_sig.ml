@@ -55,6 +55,8 @@ module Signature_search =
           Hashtbl.add table (M (Name.from_ident ident)) signat
       | Types.Sig_modtype (ident,_,_) ->
           Hashtbl.add table (MT (Name.from_ident ident)) signat
+      | Types.Sig_jkind _ ->
+          Misc.fatal_error "Unsupported: Sig_jkind"
 
     let table signat =
       let t = Hashtbl.create 13 in
@@ -121,7 +123,9 @@ module type Info_retriever =
 let alert_of_attribute attr =
   let open Parsetree in
   let load_constant_string = function
-    | { pexp_desc = Pexp_constant (Pconst_string (text, _, _)); _ } -> Some text
+    | { pexp_desc = Pexp_constant
+            { pconst_desc = Pconst_string (text, _, _); _ }; _ } ->
+        Some text
     | _ -> None
   in
   let load_alert_name name = Longident.last name.Location.txt in
@@ -432,7 +436,11 @@ module Analyser =
         Object_type (List.map f @@ fst @@ Ctype.flatten_fields fields)
       | _ -> Other (Odoc_env.subst_type env type_expr)
 
-    let get_field env name_comment_list {Types.ld_id=field_name;ld_mutable=mutable_flag;ld_type=type_expr;ld_attributes} =
+    let get_field env name_comment_list
+        {Types.ld_id=field_name;
+         ld_mutable=mutable_flag;
+         ld_type=type_expr;
+         ld_attributes; _} =
       let field_name = Ident.name field_name in
       let comment_opt =
         try List.assoc field_name name_comment_list
@@ -442,6 +450,7 @@ module Analyser =
       {
         rf_name = field_name ;
         rf_mutable = Types.is_mutable mutable_flag;
+        rf_atomic = Types.is_atomic mutable_flag;
         rf_type = Odoc_env.subst_type env type_expr ;
         rf_text = comment_opt
       }
@@ -493,10 +502,10 @@ module Analyser =
     let get_cstr_args env pos_end =
       let tuple ct = Odoc_env.subst_type env ct.Typedtree.ctyp_type in
       let record comments
-          { Typedtree.ld_id; ld_mutable; ld_type; ld_loc; ld_attributes } =
+          { Typedtree.ld_id; ld_mutable; ld_type; ld_loc; ld_attributes; _ } =
         get_field env comments @@
         {Types.ld_id; ld_mutable; ld_modalities = Mode.Modality.Const.id;
-         ld_sort=Jkind.Sort.Const.void (* ignored *);
+         ld_sort=Some Jkind.Sort.Const.void (* ignored *);
          ld_type=ld_type.Typedtree.ctyp_type;
          ld_loc; ld_attributes; ld_uid=Types.Uid.internal_not_actually_unique} in
       let open Typedtree in
@@ -533,14 +542,21 @@ module Analyser =
     let erased_names_of_constraints constraints acc =
       List.fold_right (fun constraint_ acc ->
         match constraint_ with
-        | Parsetree.Pwith_type _ | Parsetree.Pwith_module _ | Parsetree.Pwith_modtype _ -> acc
+        | Parsetree.Pwith_type _
+        | Parsetree.Pwith_module _
+        | Parsetree.Pwith_modtype _
+        | Parsetree.Pwith_jkind _ -> acc
         | Parsetree.Pwith_typesubst (s, typedecl) ->
            constraint_for_subitem acc s (fun s -> Parsetree.Pwith_typesubst (s, typedecl))
         | Parsetree.Pwith_modsubst (s, modpath) ->
            constraint_for_subitem acc s (fun s -> Parsetree.Pwith_modsubst (s, modpath))
         | Parsetree.Pwith_modtypesubst (s, modpath) ->
             constraint_for_subitem acc s
-              (fun s -> Parsetree.Pwith_modtypesubst (s, modpath)))
+              (fun s -> Parsetree.Pwith_modtypesubst (s, modpath))
+        | Parsetree.Pwith_jkindsubst (s, skd) ->
+            constraint_for_subitem acc s
+              (fun s -> Parsetree.Pwith_jkindsubst (s, skd))
+      )
         constraints acc
 
     let is_erased ident map =
@@ -564,7 +580,7 @@ module Analyser =
       else List.fold_right (fun sig_item acc ->
         let take_item psig_desc = { sig_item with Parsetree.psig_desc } :: acc in
         match sig_item.Parsetree.psig_desc with
-        | Parsetree.Psig_kind_abbrev _ -> Misc.fatal_error "Psig_kind_abbrev"
+        | Parsetree.Psig_jkind _ -> Misc.fatal_error "Psig_kind"
         | Parsetree.Psig_attribute _
         | Parsetree.Psig_extension _
         | Parsetree.Psig_value _
@@ -887,7 +903,7 @@ module Analyser =
     and analyse_signature_item_desc env _signat table current_module_name
         sig_item_loc pos_start_ele pos_end_ele pos_limit comment_opt sig_item_desc =
         match sig_item_desc with
-        | Parsetree.Psig_kind_abbrev _ -> Misc.fatal_error "Psig_kind_abbrev"
+        | Parsetree.Psig_jkind _ -> Misc.fatal_error "Psig_jkind"
         | Parsetree.Psig_value value_desc ->
             let name_pre = value_desc.Parsetree.pval_name in
             let type_expr =
@@ -1909,7 +1925,7 @@ module Analyser =
         ({psg_items; _} : Parsetree.signature) (signat : Types.signature) =
       prepare_file source_file input_file;
       (* We create the t_module for this file. *)
-      let mod_name = Unit_info.modname_from_source source_file in
+      let mod_name = Unit_info.lax_modname_from_source source_file in
       let len, info_opt = preamble !file_name !file
           (fun x -> x.Parsetree.psig_loc) psg_items in
       let info_opt = analyze_toplevel_alerts info_opt psg_items in

@@ -88,20 +88,22 @@ let types_are_compatible (left : Reg.t)  (right : Reg.t) =
     true
   | Vec512, Vec512 ->
     true
+  | Mask, Mask ->
+    true
   | (Int | Val | Addr | Float | Float32 |
-     Vec128 | Vec256 | Vec512 | Valx2), _ -> false
+     Vec128 | Vec256 | Vec512 | Mask | Valx2), _ -> false
 
 (* Representation of hard registers by pseudo-registers *)
 
 let hard_int_reg =
-  let v = Array.make 13 Reg.dummy in
-  for i = 0 to 12 do v.(i) <- Reg.create_at_location Int (Reg i) done;
-  v
+  Regs.phys_gpr_regs
+  |> Array.map (fun phys_gpr_reg ->
+     Reg.create_at_location Int (Reg phys_gpr_reg))
 
 let hard_float_reg =
-  let v = Array.make 16 Reg.dummy in
-  for i = 0 to 15 do v.(i) <- Reg.create_at_location Float (Reg (100 + i)) done;
-  v
+  Regs.phys_simd_regs
+  |> Array.map (fun phys_simd_reg ->
+     Reg.create_at_location Float (Reg phys_simd_reg))
 
 let hard_vec128_reg =
   Array.map (Reg.create_alias ~typ:Vec128) hard_float_reg
@@ -112,6 +114,11 @@ let hard_vec512_reg =
 let hard_float32_reg =
   Array.map (Reg.create_alias ~typ:Float32) hard_float_reg
 
+let hard_mask_reg =
+  Regs.phys_mask_regs
+  |> Array.map (fun phys_mask_reg ->
+     Reg.create_at_location Mask (Reg phys_mask_reg))
+
 let add_hard_vec256_regs list ~f =
   if Arch.Extension.enabled_vec256 ()
   then f hard_vec256_reg :: list else list
@@ -120,36 +127,43 @@ let add_hard_vec512_regs list ~f =
   if Arch.Extension.enabled_vec512 ()
   then f hard_vec512_reg :: list else list
 
-let all_phys_regs =
+let add_hard_mask_regs list ~f =
+  if Arch.Extension.enabled_vec512 ()
+  then f hard_mask_reg :: list else list
+
+let all_phys_regs = lazy ((* To be forced after flags are parsed. *)
   [hard_int_reg; hard_float_reg; hard_float32_reg; hard_vec128_reg]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> add_hard_mask_regs ~f:(fun regs -> regs)
+  |> Array.concat)
 
-let phys_reg ty n =
+let phys_reg ty (phys_reg : Regs.Phys_reg.t) =
+  let index_in_class = Regs.index_in_class phys_reg in
   match (ty : machtype_component) with
   | Int | Addr | Val ->
     (* CR yusumez: We need physical registers to have the appropriate machtype
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
        backend doesn't get that far. *)
-    let r = hard_int_reg.(n) in
+    let r = hard_int_reg.(index_in_class) in
     if !Clflags.llvm_backend
     then Reg.create_alias ~typ:ty r
     else r
-  | Float -> hard_float_reg.(n - 100)
-  | Float32 -> hard_float32_reg.(n - 100)
-  | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
-  | Vec256 -> hard_vec256_reg.(n - 100)
-  | Vec512 -> hard_vec512_reg.(n - 100)
+  | Float -> hard_float_reg.(index_in_class)
+  | Float32 -> hard_float32_reg.(index_in_class)
+  | Vec128 | Valx2 -> hard_vec128_reg.(index_in_class)
+  | Vec256 -> hard_vec256_reg.(index_in_class)
+  | Vec512 -> hard_vec512_reg.(index_in_class)
+  | Mask -> hard_mask_reg.(index_in_class)
 
-let rax = phys_reg Int 0
-let rdi = phys_reg Int 2
-let rdx = phys_reg Int 4
-let rcx = phys_reg Int 5
-let r10 = phys_reg Int 10
-let r11 = phys_reg Int 11
-let rbp = phys_reg Int 12
+let rax = phys_reg Int (P RAX)
+let rdi = phys_reg Int (P RDI)
+let rdx = phys_reg Int (P RDX)
+let rcx = phys_reg Int (P RCX)
+let r10 = phys_reg Int (P R10)
+let r11 = phys_reg Int (P R11)
+let rbp = phys_reg Int (P RBP)
 
 (* CSE needs to know that all versions of xmm15 are destroyed. *)
 let destroy_xmm =
@@ -159,7 +173,8 @@ let destroy_xmm =
     |> add_hard_vec512_regs ~f:(fun _ : machtype_component -> Vec512)
     |> Array.of_list
   in
-  fun n -> Array.map (fun t -> phys_reg t (100 + n)) types
+  fun (mm_reg : [`SIMD] Regs.phys_reg_classed) ->
+    Array.map (fun t -> phys_reg t (P mm_reg)) types
 
 let destroyed_by_plt_stub =
   if not X86_proc.use_plt then [| |] else [| r10; r11 |]
@@ -168,28 +183,23 @@ let destroyed_by_plt_stub_set = Reg.set_of_array destroyed_by_plt_stub
 
 let stack_slot slot ty = Reg.create_at_location ty (Stack slot)
 
-(* Instruction selection *)
-
-let word_addressed = false
-
 (* Calling conventions *)
 
 let size_domainstate_args = 64 * size_int
 
 let calling_conventions
-      ~first_int
-      ~last_int
-      ~step_int
-      ~first_float
-      ~last_float
+      ~int_registers
+      ~float_registers
+      ~mask_registers
       ~make_stack
       ~first_stack
       arg =
   let loc = Array.make (Array.length arg) Reg.dummy in
-  let int = ref first_int in
-  let float = ref first_float in
+  let int_registers = ref int_registers in
+  let float_registers = ref float_registers in
+  let mask_registers = Option.map ref mask_registers in
   let ofs = ref first_stack in
-  let stack_vec256, stack_vec512 = ref false, ref false in
+  let max_size = ref 0 in
   (* A negative offset indicates a domainstate slot, which will
      generate unaligned moves. *)
   let align ofs size =
@@ -198,68 +208,37 @@ let calling_conventions
     else Misc.align ofs size
   in
   for i = 0 to Array.length arg - 1 do
-    match (arg.(i) : machtype_component) with
-    | Val | Int | Addr as ty ->
-        if !int <= last_int then begin
-          loc.(i) <- phys_reg ty !int;
-          int := !int + step_int
-        end else begin
-          loc.(i) <- stack_slot (make_stack !ofs) ty;
-          ofs := !ofs + size_int
-        end;
-        assert (not (Reg.Set.mem loc.(i) destroyed_by_plt_stub_set))
-    | Float ->
-        if !float <= last_float then begin
-          loc.(i) <- phys_reg Float !float;
-          incr float
-        end else begin
-          loc.(i) <- stack_slot (make_stack !ofs) Float;
-          ofs := !ofs + size_float
-        end
-    | Vec128 ->
-      if !float <= last_float then begin
-        loc.(i) <- phys_reg Vec128 !float;
-        incr float
-      end else begin
-        ofs := align !ofs size_vec128;
-        loc.(i) <- stack_slot (make_stack !ofs) Vec128;
-        ofs := !ofs + size_vec128
-      end
-    | Vec256 ->
-      if !float <= last_float then begin
-        loc.(i) <- phys_reg Vec256 !float;
-        incr float
-      end else begin
-        stack_vec256 := true;
-        ofs := align !ofs size_vec256;
-        loc.(i) <- stack_slot (make_stack !ofs) Vec256;
-        ofs := !ofs + size_vec256
-      end
-    | Vec512 ->
-      if !float <= last_float then begin
-        loc.(i) <- phys_reg Vec512 !float;
-        incr float
-      end else begin
-        stack_vec512 := true;
-        ofs := align !ofs size_vec512;
-        loc.(i) <- stack_slot (make_stack !ofs) Vec512;
-        ofs := !ofs + size_vec512
-      end
-    | Valx2 ->
-      Misc.fatal_error "Unexpected machtype_component Valx2"
-    | Float32 ->
-        if !float <= last_float then begin
-          loc.(i) <- phys_reg Float32 !float;
-          incr float
-        end else begin
-          loc.(i) <- stack_slot (make_stack !ofs) Float32;
-          (* float32 slots still take up a full word *)
-          ofs := !ofs + size_float
-        end
+    let ty : machtype_component = arg.(i) in
+    let registers, size, ty =
+      match ty with
+      | Val | Int | Addr -> int_registers, size_int, ty
+      | Float | Float32 -> float_registers, size_float, ty
+      | Vec128 -> float_registers, size_vec128, ty
+      | Vec256 -> float_registers, size_vec256, ty
+      | Vec512 -> float_registers, size_vec512, ty
+      | Mask -> (
+        match mask_registers with
+        | Some mask_registers -> mask_registers, size_int, ty
+        | None ->
+          (* The C ABI passes masks in GPRs. The location is typed [Int] so
+             that instruction selection inserts the mask<->GPR conversions. *)
+          int_registers, size_int, Int)
+      | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
+    in
+    match !registers with
+    | reg :: regs ->
+      registers := regs;
+      loc.(i) <- phys_reg ty (P reg);
+      assert (not (Reg.Set.mem loc.(i) destroyed_by_plt_stub_set));
+    | [] ->
+      max_size := Int.max size !max_size;
+      ofs := align !ofs size;
+      loc.(i) <- stack_slot (make_stack !ofs) ty;
+      ofs := !ofs + size;
   done;
   let pre_align, post_align =
-    if !stack_vec512 then Align_64, 64
-    else if !stack_vec256 then Align_32, 32
+    if !max_size >= size_vec512 then Align_64, 64
+    else if !max_size >= size_vec256 then Align_32, 32
     else Align_16, 16
   in
   (loc, Misc.align (max 0 !ofs) post_align, pre_align)
@@ -274,14 +253,20 @@ let outgoing ofs : Reg.stack_location =
   else Domainstate (ofs + size_domainstate_args)
 let not_supported _ofs = fatal_error "Proc.loc_results: cannot call"
 
+let ocaml_int_registers = Regs.[RAX; RBX; RDI; RSI; RDX; RCX; R8; R9; R12; R13]
+
+let ocaml_float_registers =
+  Regs.[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7; MM8; MM9]
+
+let ocaml_mask_registers =
+  Regs.[K1; K2; K3; K4; K5; K6; K7]
+
 let loc_arguments arg =
   let (loc, ofs, _align) =
     calling_conventions
-        ~first_int:0
-        ~last_int:9
-        ~step_int:1
-        ~first_float:100
-        ~last_float:109
+        ~int_registers:ocaml_int_registers
+        ~float_registers:ocaml_float_registers
+        ~mask_registers:(Some ocaml_mask_registers)
         ~make_stack:outgoing
         ~first_stack:(- size_domainstate_args)
         arg
@@ -291,11 +276,9 @@ let loc_arguments arg =
 let loc_parameters arg =
   let (loc, _ofs, _align) =
     calling_conventions
-      ~first_int:0
-      ~last_int:9
-      ~step_int:1
-      ~first_float:100
-      ~last_float:109
+      ~int_registers:ocaml_int_registers
+      ~float_registers:ocaml_float_registers
+      ~mask_registers:(Some ocaml_mask_registers)
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       arg
@@ -305,11 +288,9 @@ let loc_parameters arg =
 let loc_results_call res =
   let (loc, ofs, _align) =
     calling_conventions
-      ~first_int:0
-      ~last_int:9
-      ~step_int:1
-      ~first_float:100
-      ~last_float:109
+      ~int_registers:ocaml_int_registers
+      ~float_registers:ocaml_float_registers
+      ~mask_registers:(Some ocaml_mask_registers)
       ~make_stack:outgoing
       ~first_stack:(- size_domainstate_args)
       res
@@ -319,11 +300,9 @@ let loc_results_call res =
 let loc_results_return res =
   let (loc, _ofs, _align) =
     calling_conventions
-      ~first_int:0
-      ~last_int:9
-      ~step_int:1
-      ~first_float:100
-      ~last_float:109
+      ~int_registers:ocaml_int_registers
+      ~float_registers:ocaml_float_registers
+      ~mask_registers:(Some ocaml_mask_registers)
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       res
@@ -349,11 +328,9 @@ let loc_external_results res =
     (* `~last_int:4 ~step_int:4` below is to get rdx as the second int register
        (See https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf, pages 21 and 22) *)
     calling_conventions
-      ~first_int:0
-      ~last_int:4
-      ~step_int:4
-      ~first_float:100
-      ~last_float:101
+      ~int_registers:[RAX; RDX]
+      ~float_registers:[MM0; MM1]
+      ~mask_registers:None
       ~make_stack:not_supported
       ~first_stack:0
       res
@@ -361,56 +338,39 @@ let loc_external_results res =
 
 let unix_loc_external_arguments arg =
   calling_conventions
-    ~first_int:2
-    ~last_int:7
-    ~step_int:1
-    ~first_float:100
-    ~last_float:107
+    ~int_registers:[RDI; RSI; RDX; RCX; R8; R9]
+    ~float_registers:[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7]
+    ~mask_registers:None
     ~make_stack:outgoing
     ~first_stack:0
     arg
 
-let win64_int_external_arguments =
-  [| 5 (*rcx*); 4 (*rdx*); 6 (*r8*); 7 (*r9*) |]
-let win64_float_external_arguments =
-  [| 100 (*xmm0*); 101 (*xmm1*); 102 (*xmm2*); 103 (*xmm3*) |]
+let win64_int_external_arguments = Regs.[| RCX; RDX; R8; R9 |]
+let win64_float_external_arguments = Regs.[| MM0; MM1; MM2; MM3 |]
 
 let win64_loc_external_arguments arg =
   let loc = Array.make (Array.length arg) Reg.dummy in
   let reg = ref 0
-  and ofs = ref (if Config.runtime5 then 0 else 32) in
+  and ofs = ref 0 in
   for i = 0 to Array.length arg - 1 do
-    match (arg.(i) : machtype_component) with
-    | Val | Int | Addr as ty ->
-        if !reg < 4 then begin
-          loc.(i) <- phys_reg ty win64_int_external_arguments.(!reg);
-          incr reg
-        end else begin
-          loc.(i) <- stack_slot (Outgoing !ofs) ty;
-          ofs := !ofs + size_int
-        end
-    | Float ->
-        if !reg < 4 then begin
-          loc.(i) <- phys_reg Float win64_float_external_arguments.(!reg);
-          incr reg
-        end else begin
-          loc.(i) <- stack_slot (Outgoing !ofs) Float;
-          ofs := !ofs + size_float
-        end
-    | Float32 ->
-        if !reg < 4 then begin
-          loc.(i) <- phys_reg Float32 win64_float_external_arguments.(!reg);
-          incr reg
-        end else begin
-          loc.(i) <- stack_slot (Outgoing !ofs) Float32;
-          (* float32 slots still take up a full word *)
-          ofs := !ofs + size_float
-        end
-    | Vec128 | Vec256 | Vec512 ->
+    let ty : machtype_component = arg.(i) in
+    let arguments, size =
+      match ty with
+      | Val | Int | Addr -> win64_int_external_arguments, size_int
+      | Float | Float32 -> win64_float_external_arguments, size_float
+      | Vec128 | Vec256 | Vec512 | Mask ->
         (* CR mslater: (SIMD) win64 calling convention requires pass by reference *)
         Misc.fatal_error "SIMD external arguments are not supported on Win64"
-    | Valx2 ->
-      Misc.fatal_error "Unexpected machtype_component Valx2"
+      | Valx2 ->
+        Misc.fatal_error "Unexpected machtype_component Valx2"
+    in
+    if !reg < Array.length arguments then begin
+      loc.(i) <- phys_reg ty (P arguments.(!reg));
+      incr reg
+    end else begin
+      loc.(i) <- stack_slot (Outgoing !ofs) ty;
+      ofs := !ofs + size
+    end
   done;
   (loc, Misc.align !ofs 16, Align_16) (* keep stack 16-aligned *)
 
@@ -431,34 +391,35 @@ let domainstate_ptr_dwarf_register_number = 14
 (* Registers destroyed by operations *)
 
 let int_regs_destroyed_at_c_call_win64 =
-  if Config.runtime5 then [|0;1;4;5;6;7;10;11;12|] else [|0;4;5;6;7;10;11|]
+  Regs.[|RAX; RBX; RDX; RCX; R8; R9; R10; R11; RBP|]
 
 let int_regs_destroyed_at_c_call =
-  if Config.runtime5 && not Config.no_stack_checks then
-    (* Clobbers r13 (9) to hold stack pointer. See emit.ml *)
-    [|0;2;3;4;5;6;7;9;10;11|]
-  else
-    [|0;2;3;4;5;6;7;10;11|]
+  if not Config.no_stack_checks
+  then (* Clobbers R13 to hold stack pointer. See emit.ml *)
+       Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9; R13; R10; R11|]
+  else Regs.[|RAX; RDI; RSI; RDX; RCX; R8; R9;      R10; R11|]
 
-let destroyed_at_c_call_win64 =
+let destroyed_at_c_call_win64 = lazy ((* To be forced after flags are parsed. *)
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
-  [ Array.map (phys_reg Int) int_regs_destroyed_at_c_call_win64;
+  [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call_win64;
     Array.sub hard_float_reg 0 6;
     Array.sub hard_float32_reg 0 6;
     Array.sub hard_vec128_reg 0 6 ]
   |> add_hard_vec256_regs ~f:(fun regs -> Array.sub regs 0 6)
   |> add_hard_vec512_regs ~f:(fun regs -> Array.sub regs 0 6)
-  |> Array.concat
+  |> add_hard_mask_regs ~f:(fun regs -> regs)
+  |> Array.concat)
 
-let destroyed_at_c_call_unix =
+let destroyed_at_c_call_unix = lazy ((* To be forced after flags are parsed. *)
   (* Unix: rbx, rbp, r12-r15 preserved *)
-  [ Array.map (phys_reg Int) int_regs_destroyed_at_c_call;
+  [ Array.map (fun p -> phys_reg Int (P p)) int_regs_destroyed_at_c_call;
     hard_float_reg;
     hard_float32_reg;
     hard_vec128_reg ]
   |> add_hard_vec256_regs ~f:(fun regs -> regs)
   |> add_hard_vec512_regs ~f:(fun regs -> regs)
-  |> Array.concat
+  |> add_hard_mask_regs ~f:(fun regs -> regs)
+  |> Array.concat)
 
 let destroyed_at_c_call =
   (* C calling conventions preserve rbx, but it is clobbered
@@ -467,13 +428,9 @@ let destroyed_at_c_call =
   if win64 then destroyed_at_c_call_win64 else destroyed_at_c_call_unix
 
 let destroyed_at_alloc_or_poll =
-  if X86_proc.use_plt then
-    destroyed_by_plt_stub
-  else
-    [| r11 |]
+  if X86_proc.use_plt then destroyed_by_plt_stub else [| r11 |]
 
-let destroyed_at_pushtrap =
-  [| r11 |]
+let destroyed_at_pushtrap = [| r11 |]
 
 let destroyed_at_large_memory_op =
   if Config.with_address_sanitizer then
@@ -502,9 +459,9 @@ let destroyed_at_small_memory_op =
 
 let destroyed_at_single_float64_store =
   if Config.with_address_sanitizer then
-    Array.append destroyed_at_small_memory_op (destroy_xmm 15)
+    Array.append destroyed_at_small_memory_op (destroy_xmm MM15)
   else
-    (destroy_xmm 15)
+    (destroy_xmm MM15)
 ;;
 
 let all_256bit_regs = []
@@ -525,7 +482,7 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
   | Vzeroall -> all_simd_regs
   | _ ->
     match instr.res with
-    | Res_none | First_arg -> [||]
+    | Res_none | Arg _ -> [||]
     | Res rr ->
       Array.fold_left (fun acc ({loc; _} : Simd.arg) ->
         match Simd.loc_is_pinned loc with
@@ -534,7 +491,7 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
         | Some RCX -> rcx :: acc
         | Some RDX -> rdx :: acc
         | Some XMM0 ->
-          let xmm0 = Array.to_list (destroy_xmm 0) in
+          let xmm0 = Array.to_list (destroy_xmm MM0) in
           xmm0 @ acc
         | None -> acc) [] rr
       |> Array.of_list
@@ -556,9 +513,14 @@ let destroyed_by_simd_mem_op (instr : Simd.Mem.operation) =
   match instr with
   | Load op | Store op -> destroyed_by_simd_op op
 
-let destroyed_at_raise = all_phys_regs
+let destroyed_at_raise () = Lazy.force all_phys_regs
 
 let destroyed_at_reloadretaddr = [| |]
+
+let destroyed_rax = [| rax |] (* CR-someday vkarvonen: Use [iarray] *)
+let destroyed_rax_rdx = [| rax; rdx |]
+let destroyed_rbp = [| rbp |]
+let destroyed_r10 = [| r10 |]
 
 let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   match basic with
@@ -566,8 +528,8 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_at_reloadretaddr
   | Pushtrap _ ->
     destroyed_at_pushtrap
-  | Op (Intop (Idiv | Imod)) | Op (Intop_imm ((Idiv | Imod), _)) ->
-    [| rax; rdx |]
+  | Op (Intop (Idiv _ | Imod _)) | Op (Intop_imm ((Idiv _ | Imod _), _)) ->
+    destroyed_rax_rdx
   | Op(Store(Single { reg = Float64 }, _, _)) ->
     destroyed_at_single_float64_store
   | Op (Store ((Byte_unsigned | Byte_signed | Sixteen_unsigned |
@@ -580,23 +542,23 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
   | Op(Specific (Ifloatarithmem (Float32, _, _)))
   | Op(Intop_atomic _) ->
     destroyed_at_small_memory_op
-  | Op(Store( (Word_int | Word_val | Double | Onetwentyeight_aligned |
-               Onetwentyeight_unaligned | Twofiftysix_aligned |
-               Twofiftysix_unaligned | Fivetwelve_aligned |
-               Fivetwelve_unaligned), _, _))
+  | Op(Store( (Word_int | Word_mask | Word_val | Double |
+               Onetwentyeight_aligned | Onetwentyeight_unaligned |
+               Twofiftysix_aligned | Twofiftysix_unaligned |
+               Fivetwelve_aligned | Fivetwelve_unaligned), _, _))
   | Op(Load { memory_chunk =
-                (Word_int | Word_val | Double | Onetwentyeight_aligned |
-                 Onetwentyeight_unaligned | Twofiftysix_aligned |
-                 Twofiftysix_unaligned | Fivetwelve_aligned |
-                 Fivetwelve_unaligned); _})
+                (Word_int | Word_mask | Word_val | Double |
+                 Onetwentyeight_aligned | Onetwentyeight_unaligned |
+                 Twofiftysix_aligned | Twofiftysix_unaligned |
+                 Fivetwelve_aligned | Fivetwelve_unaligned); _})
   | Op(Specific (Istore_int _))
   | Op(Specific (Ifloatarithmem (Float64, _, _)))
   | Op(Specific (Iprefetch _ | Icldemote _)) ->
     destroyed_at_large_memory_op
   | Op(Intop(Imulh _ | Icomp _) | Intop_imm((Icomp _), _)) ->
-    [| rax |]
+    destroyed_rax
   | Op (Specific (Irdtsc | Irdpmc)) ->
-    [| rax; rdx |]
+    destroyed_rax_rdx
   | Op Poll -> destroyed_at_alloc_or_poll
   | Op (Alloc _) ->
     destroyed_at_alloc_or_poll
@@ -609,16 +571,16 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
       Misc.fatal_errorf "destroyed_at_basic: Unexpected llvm_intrinsic %s: \
                          not using LLVM backend"
         intr
-  | Op (Move | Spill | Reload
-       | Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
-       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+  | Op (Move | Spill | Reload | Const_int _
+       | Const_float _ | Const_float32 _ | Const_symbol _
+       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
        | Stackoffset _
        | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr
-               | Iasr | Ipopcnt | Iclz _ | Ictz _
+               | Iasr | Ipopcnt | Iclz | Ictz
                )
        | Int128op (Iadd128 | Isub128 | Imul64 _)
        | Intop_imm ((Iadd | Isub | Imul | Imulh _ | Iand | Ior | Ixor | Ilsl
-                    | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ ),_)
+                    | Ilsr | Iasr | Ipopcnt | Iclz | Ictz ),_)
        | Floatop _
        | Csel _
        | Reinterpret_cast _
@@ -628,38 +590,44 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Begin_region
        | End_region
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
-                  | Isextend32 | Izextend32
+                  | Isextend32 | Izextend32 | Ineg
                   | Ilfence | Isfence | Imfence)
        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
   | Poptrap _ | Prologue | Epilogue ->
-    if fp then [| rbp |] else [||]
+    if fp then destroyed_rbp else [||]
   | Stack_check _ ->
     (* This case is used by [Cfg_available_regs].  r10 is actually saved and
        restored by the sequence to which [Stack_check] is expanded, but it may
        be clobbered in the middle. *)
-    [| r10 |]
+    destroyed_r10
 
 (* note: keep this function in sync with `is_destruction_point` below. *)
 let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
   match terminator with
-  | Never -> assert false
+  | Never ->
+    Misc.fatal_error
+      "Proc.destroyed_at_terminator: unexpected Never terminator"
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Return | Raise _ | Tailcall_self  _ | Tailcall_func _
   | Prim {op = Probe _; _}
   ->
     if fp then [| rbp |] else [||]
   | Switch _ ->
-    [| rax; rdx |]
+    destroyed_rax_rdx
   | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
                      stack_ofs; stack_align = _; effects = _; }
   | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
-    if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
+    if alloc || stack_ofs > 0
+    then Lazy.force all_phys_regs
+    else Lazy.force destroyed_at_c_call
   | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
     assert (stack_ofs >= 0);
-    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
-  | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
+    if stack_ofs > 0
+    then Lazy.force all_phys_regs
+    else Lazy.force destroyed_at_c_call
+  | Call {op = Indirect _ | Direct _; _} -> Lazy.force all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -669,19 +637,23 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
 (* note: keep this function in sync with `destroyed_at_terminator` above. *)
 let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_intf.S.terminator) =
   match terminator with
-  | Never -> assert false
+  | Never ->
+    Misc.fatal_error
+      "Proc.is_destruction_point: unexpected Never terminator"
   | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
   | Return | Raise _ | Tailcall_self  _ | Tailcall_func _
   | Prim {op = Probe _; _} ->
     false
   | Switch _ ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; _ }
-  | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _; _ }; _} ->
+  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                     stack_ofs; stack_align = _; effects = _; }
+  | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                          stack_ofs; stack_align = _; effects = _; }; _} ->
     if more_destruction_points then
       true
     else
-      if alloc then true else false
+      if alloc || stack_ofs > 0 then true else false
   | Invalid _ -> more_destruction_points
   | Call {op = Indirect _ | Direct _; _} ->
     true
@@ -693,7 +665,8 @@ let initial_stack_offset ~num_stack_slots:_ ~contains_calls:_ = 0
 let trap_frame_size_in_bytes = 16
 
 let frame_required ~fun_contains_calls ~fun_num_stack_slots =
-  fp || fun_contains_calls ||
+  (fp && not !Oxcaml_flags.omit_leaf_frame_pointers)
+  || fun_contains_calls ||
   Stack_class.Tbl.exists
     fun_num_stack_slots
     ~f:(fun _stack_class num -> num > 0)
@@ -744,10 +717,18 @@ let slot_offset loc ~stack_class ~stack_offset ~fun_contains_calls
 let assemble_file infile outfile =
   X86_proc.assemble_file infile outfile
 
+(* On amd64 the deferred-JIT-hook mechanism is implemented inside [X86_proc]
+   via the [binary_content] ref written by the registered internal assembler.
+   These entry points exist only so that the cross-architecture interface in
+   [proc.mli] is uniform. *)
+let set_pending_jit_run _ = ()
+
+let clear_pending_jit_run () = ()
+
 (* Precolored_regs is not always the same as [all_phys_regs], as some physical registers
    may not be allocatable (e.g. rbp when frame pointers are enabled). *)
 let precolored_regs () =
-  let phys_regs = Reg.set_of_array all_phys_regs in
+  let phys_regs = Reg.set_of_array (Lazy.force all_phys_regs) in
   if fp then Reg.Set.remove rbp phys_regs else phys_regs
 
 let has_three_operand_float_ops () = Arch.Extension.enabled AVX
@@ -760,14 +741,16 @@ let operation_supported = function
   | Creinterpret_cast (V512_of_vec _ | V128_of_vec Vec512 | V256_of_vec Vec512)
   | Cstatic_cast (V512_of_scalar _ | Scalar_of_v512 _) ->
     Arch.Extension.enabled_vec512 ()
+  | Creinterpret_cast (Mask_of_int64 | Int64_of_mask) ->
+    Arch.Extension.enabled AVX512BW
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Caddi128 | Csubi128 | Cmuli64 _
   | Cand | Cor | Cxor | Clsl | Clsr | Casr
   | Ccsel _
   | Cbswap _
-  | Cclz _ | Cctz _
+  | Cclz | Cctz
   | Ccmpi _ | Caddv | Cadda
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _
@@ -797,6 +780,7 @@ let expression_supported = function
   | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
   | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
+  | Cconst_mask _ -> Arch.Extension.enabled_vec512 ()
 
 let trap_size_in_bytes () =
   if !Clflags.llvm_backend then 32 else 16

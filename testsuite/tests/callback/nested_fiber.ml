@@ -1,6 +1,5 @@
 (* TEST
  modules = "nested_fiber_.c";
- runtime5;
  {
    bytecode;
  }{

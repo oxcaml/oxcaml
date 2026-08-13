@@ -10,7 +10,8 @@
  }
 *)
 
-(* Mixed float-float# blocks are always OK. *)
+(* Mixed float-float# records typecheck without [@@flatten_floats], producing
+   a non-flat mixed block (and thus get an unboxed version). *)
 type t =
   { a : float;
     b : float#;
@@ -20,14 +21,138 @@ type t =
 type t = { a : float; b : float#; }
 |}];;
 
-(* Mixed float-float# blocks are always OK. *)
+(* The non-flat representation gives [t] an unboxed version [t#]. *)
+let _f (x : t#) = x.#b
+[%%expect{|
+val _f : t# -> float# = <fun>
+|}];;
+
+(* Opt in to flat storage with [@@flatten_floats]. *)
+type t =
+  { a : float;
+    b : float#;
+  } [@@flatten_floats]
+
+[%%expect{|
+type t = { a : float; b : float#; }
+|}];;
+
 type t =
   { a : float#;
     b : float;
-  }
+  } [@@flatten_floats]
 
 [%%expect{|
 type t = { a : float#; b : float; }
+|}];;
+
+(* [@@flatten_floats] records don't get unboxed versions. *)
+type bad = t#
+[%%expect{|
+Line 1, characters 11-13:
+1 | type bad = t#
+               ^^
+Error: The type "t" has no unboxed version.
+Hint: Records with [@@flatten_floats] don't get unboxed versions.
+|}]
+
+(* A mismatch in [@@flatten_floats] is caught in the representation check*)
+module M : sig
+  type t = { a : float; b : float#; } [@@flatten_floats]
+end = struct
+  type t = { a : float; b : float#; }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { a : float; b : float#; }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { a : float; b : float#; } end
+       is not included in
+         sig type t = { a : float; b : float#; } end
+       Type declarations do not match:
+         type t = { a : float; b : float#; }
+       is not included in
+         type t = { a : float; b : float#; }
+       Their internal representations differ:
+       the second declaration uses a mixed representation where boxed floats are stored flat.
+|}]
+
+module M : sig
+  type t = { a : float; b : float#; }
+end = struct
+  type t = { a : float; b : float#; } [@@flatten_floats]
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { a : float; b : float#; } [@@flatten_floats]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { a : float; b : float#; } end
+       is not included in
+         sig type t = { a : float; b : float#; } end
+       Type declarations do not match:
+         type t = { a : float; b : float#; }
+       is not included in
+         type t = { a : float; b : float#; }
+       Their internal representations differ:
+       the first declaration uses a mixed representation where boxed floats are stored flat.
+|}]
+
+(* [@@flatten_floats] is rejected on records that don't mix [float] and
+   [float#]. *)
+type bad = { f : float } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-43:
+1 | type bad = { f : float } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
+
+type bad = { f : float# } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-44:
+1 | type bad = { f : float# } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
+
+type bad = { a : float; b : float#; c : int } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-64:
+1 | type bad = { a : float; b : float#; c : int } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
+
+type bad = A | B [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-35:
+1 | type bad = A | B [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
+
+(* Regression test: [type_unboxed_default] must be [false] when
+   [@@flatten_floats] is used, so that this declaration does not
+   trigger the [unboxable-type-in-prim-decl] warning. *)
+type r = { f : float; u : float# } [@@flatten_floats]
+external id : r -> r = "%identity"
+[%%expect{|
+type r = { f : float; u : float#; }
+external id : r -> r = "%identity"
 |}];;
 
 (* When a non-float/float# field appears, [float]
@@ -82,7 +207,7 @@ type t =
   { f1 : float#;
     f2 : float#;
     f3 : float;
-  }
+  } [@@flatten_floats]
 
 [%%expect{|
 type t = { f1 : float#; f2 : float#; f3 : float; }
@@ -193,7 +318,7 @@ Error: Layout mismatch in final type declaration consistency check.
        message, so we'll say this instead:
          The layout of 'a is float64
            because of the definition of t_float64_id at line 1, characters 0-37.
-         But the layout of 'a must overlap with value
+         But the layout of 'a must be a value layout
            because it instantiates an unannotated type parameter of t,
            chosen to have layout value.
        A good next step is to add a layout annotation on a parameter to
@@ -227,14 +352,14 @@ module _ : sig
   val t : t
 end = struct
   type u = float
-  type t = { u : float; f : float# }
+  type t = { u : float; f : float# } [@@flatten_floats]
   let t = { u = 3.0; f = #4.0 }
 end
 [%%expect {|
 Lines 5-9, characters 6-3:
 5 | ......struct
 6 |   type u = float
-7 |   type t = { u : float; f : float# }
+7 |   type t = { u : float; f : float# } [@@flatten_floats]
 8 |   let t = { u = 3.0; f = #4.0 }
 9 | end
 Error: Signature mismatch:
@@ -302,4 +427,77 @@ Lines 2-37, characters 0-3:
 36 |     unboxed:float#;
 37 |   }
 Error: Mixed records may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
+|}];;
+
+(* [@@flatten_floats] on all-float record is an error *)
+type t = { a : float; b : float } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-52:
+1 | type t = { a : float; b : float } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
+
+(* [@@flatten_floats] on all-float# record is an error *)
+type t = { a : float#; b : float# } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-54:
+1 | type t = { a : float#; b : float# } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
+
+(* [@@flatten_floats] on non-float record is an error *)
+type t = { a : int; b : string } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-51:
+1 | type t = { a : int; b : string } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
+
+(* [@@flatten_floats] on mixed record with non-float value fields is an error:
+   the float is in the value prefix, not flat. *)
+type t = { a : float; b : float#; c : int } [@@flatten_floats]
+[%%expect{|
+Line 1, characters 0-62:
+1 | type t = { a : float; b : float#; c : int } [@@flatten_floats]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
+|}];;
+
+(* void accepted *)
+type t =
+  { a : float#;
+    b : float;
+    u : unit#;
+  } [@@flatten_floats]
+[%%expect{|
+type t = { a : float#; b : float; u : unit#; }
+|}];;
+
+(* product of voids not counted as void *)
+type bad =
+  { a : float#;
+    b : float;
+    u : #(unit# * unit#);
+  } [@@flatten_floats]
+[%%expect{|
+Lines 1-5, characters 0-22:
+1 | type bad =
+2 |   { a : float#;
+3 |     b : float;
+4 |     u : #(unit# * unit#);
+5 |   } [@@flatten_floats]
+Error: The "[@@flatten_floats]" attribute is only allowed on records with one or more
+       non-atomic "float" fields, one or more "float#" fields, and all other fields
+       void.
 |}];;

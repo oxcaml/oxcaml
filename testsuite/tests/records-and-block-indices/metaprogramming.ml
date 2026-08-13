@@ -285,10 +285,9 @@ module Type_structure = struct
     | Unit_u -> Void
     | Int64x2_u -> Vec128
 
-  let is_flat_float_record t =
+  let flattens_floats t =
     match t with
-    | Record (ts, Boxed) ->
-      List.for_all ts ~f:(fun t -> layout t = Float64 || scrape t = Float)
+    | Record (ts, Boxed) -> List.for_all ts ~f:(fun t -> scrape t = Float)
     | _ -> false
 
   let rec contains_vec128 t =
@@ -926,8 +925,20 @@ module Type_naming = struct
                     match (c : Type.constructor).args with
                     | [] -> c.name
                     | args ->
-                      sprintf "%s of %s" c.name
+                      let all_void =
+                        List.for_all args ~f:(fun arg ->
+                            Layout.all_void
+                              (Type_structure.layout (Type.structure arg))
+                        )
+                      in
+                      let attr =
+                        if all_void
+                        then " [@immediate_all_void_constructor]"
+                        else ""
+                      in
+                      sprintf "%s of %s%s" c.name
                         (String.concat ~sep:" * " (List.map args ~f:Type.code))
+                        attr
                 )
               in
               String.concat ~sep:" | " constructor_defs

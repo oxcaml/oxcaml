@@ -168,7 +168,7 @@ let asmgen_skip_on_bytecode_only =
   Actions_helpers.skip_with_reason "native compiler disabled"
 
 let msvc64 =
-  Ocamltest_config.ccomptype = "msvc" && Ocamltest_config.arch="amd64"
+  Ocamltest_config.ccomp_type = "msvc" && Ocamltest_config.arch="amd64"
 
 let asmgen_skip_on_msvc64 =
   Actions_helpers.skip_with_reason "not ported to MSVC64 yet"
@@ -192,6 +192,22 @@ let asmgen =
   test_actions = asmgen_actions
 }
 
+let fexpr_actions = [
+  setup_simple_build_env;
+  fexpr;
+  check_fexpr_dump;
+  check_program_output;
+]
+
+let fexpr =
+{
+  test_name = "fexpr";
+  test_run_by_default = false;
+  test_description =
+    "Run middle-end on flambda expression";
+  test_actions = fexpr_actions
+}
+
 let init () =
   List.iter register
   [
@@ -203,4 +219,5 @@ let init () =
     natexpect;
     ocamldoc;
     asmgen;
+    fexpr;
   ]

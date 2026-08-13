@@ -21,18 +21,18 @@ module Id = struct
 
   let flags_size_in_bits = 3
 
+  let flags_shift = Sys.int_size - flags_size_in_bits
+
+  let mask_selecting_bottom_bits = -1 lsr flags_size_in_bits
+
   let create t flags =
     if flags < 0 || flags >= 1 lsl (flags_size_in_bits + 1)
     then Misc.fatal_errorf "Flags value 0x%x out of range" flags;
-    (t lsl flags_size_in_bits) lor flags
+    t land mask_selecting_bottom_bits lor (flags lsl flags_shift)
 
-  let mask_selecting_top_bits = -1 lsl flags_size_in_bits
+  let flags t = t lsr flags_shift
 
-  let mask_selecting_bottom_bits = lnot mask_selecting_top_bits
-
-  let flags t = t land mask_selecting_bottom_bits
-
-  let next t = t + (1 lsl flags_size_in_bits)
+  let next t = t + 1
 end
 
 module Make (E : sig
@@ -56,7 +56,7 @@ struct
     let equal t1 t2 = t1 == t2
   end)
 
-  let () = assert (E.flags land Id.mask_selecting_top_bits = 0)
+  let () = assert (E.flags lsr Id.flags_size_in_bits = 0)
 
   type t = E.t HT.t
 

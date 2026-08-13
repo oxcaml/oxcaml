@@ -82,12 +82,12 @@ Error: Signature mismatch:
          val baz : unit -> unit (* in a structure at nonportable *)
        is not included in
          val baz : unit -> unit @@ portable (* in a structure at nonportable *)
-       The left-hand side is "nonportable"
+       The first is "nonportable"
          because it closes over the value "bar" at line 8, characters 25-28
          which is "nonportable"
          because it closes over the value "foo" at line 7, characters 26-29
          which is "nonportable"
          because it contains a usage (of the value "x" at line 6, characters 17-18)
          which is expected to be "uncontended".
-       However, the right-hand side is "portable".
+       However, the second is "portable".
 |}]

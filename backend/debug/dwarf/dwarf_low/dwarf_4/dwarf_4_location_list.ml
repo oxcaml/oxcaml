@@ -27,7 +27,11 @@ type t =
    location list by increasing virtual memory address on the start addresses of
    the entries. *)
 let sort entries =
-  List.sort Dwarf_4_location_list_entry.compare_ascending_vma entries
+  Dwarf_4_entry_sorting.sort_preserving_base_addresses
+    ~is_base_address_selection_entry:
+      Dwarf_4_location_list_entry.is_base_address_selection_entry
+    ~compare_ascending_vma:Dwarf_4_location_list_entry.compare_ascending_vma
+    entries
 
 let create ~location_list_entries =
   { name = Asm_label.create (DWARF Debug_loc);

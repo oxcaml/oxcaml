@@ -1,3 +1,32 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ *                       Basile Clément, OCamlPro                             *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2025 OCamlPro                                                *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
 module ET = Expand_head.Expanded_type
 module TE = Typing_env
 module TG = Type_grammar
@@ -33,6 +62,7 @@ type discriminant =
   | Block of Tag.t option
   | Array
   | Closure
+  | Boxed_number of K.Boxable_number.t
 
 type accessor =
   | Untag_imm
@@ -43,6 +73,7 @@ type accessor =
   | Value_slot of Value_slot.t
   | Function_slot of Function_slot.t
   | Rec_info of Function_slot.t
+  | Unbox_number of K.Boxable_number.t
 
 module Accessor = struct
   module T0 = struct
@@ -71,6 +102,9 @@ module Accessor = struct
       | Rec_info function_slot ->
         Format.fprintf ppf "@[<hov 1>(rec_info@ %a)@]" Function_slot.print
           function_slot
+      | Unbox_number boxable_number ->
+        Format.fprintf ppf "@[<hov 1>(unbox_number@ %a)@]"
+          K.Boxable_number.print boxable_number
 
     let equal accessor1 accessor2 =
       match accessor1, accessor2 with
@@ -83,8 +117,9 @@ module Accessor = struct
       | Function_slot slot1, Function_slot slot2 ->
         Function_slot.equal slot1 slot2
       | Rec_info slot1, Rec_info slot2 -> Function_slot.equal slot1 slot2
+      | Unbox_number bn1, Unbox_number bn2 -> K.Boxable_number.equal bn1 bn2
       | ( ( Untag_imm | Is_int | Get_tag | Block_field _ | Array_field _
-          | Value_slot _ | Function_slot _ | Rec_info _ ),
+          | Value_slot _ | Function_slot _ | Rec_info _ | Unbox_number _ ),
           _ ) ->
         false
 
@@ -101,23 +136,27 @@ module Accessor = struct
       | Function_slot slot1, Function_slot slot2 ->
         Function_slot.compare slot1 slot2
       | Rec_info slot1, Rec_info slot2 -> Function_slot.compare slot1 slot2
+      | Unbox_number bn1, Unbox_number bn2 -> K.Boxable_number.compare bn1 bn2
       | ( Untag_imm,
           ( Is_int | Get_tag | Block_field _ | Array_field _ | Value_slot _
-          | Function_slot _ | Rec_info _ ) )
+          | Function_slot _ | Rec_info _ | Unbox_number _ ) )
       | ( Is_int,
           ( Get_tag | Block_field _ | Array_field _ | Value_slot _
-          | Function_slot _ | Rec_info _ ) )
+          | Function_slot _ | Rec_info _ | Unbox_number _ ) )
       | ( Get_tag,
           ( Block_field _ | Array_field _ | Value_slot _ | Function_slot _
-          | Rec_info _ ) )
+          | Rec_info _ | Unbox_number _ ) )
       | ( Block_field _,
-          (Array_field _ | Value_slot _ | Function_slot _ | Rec_info _) )
-      | Array_field _, (Value_slot _ | Function_slot _ | Rec_info _)
-      | Value_slot _, (Function_slot _ | Rec_info _)
-      | Function_slot _, Rec_info _ ->
+          ( Array_field _ | Value_slot _ | Function_slot _ | Rec_info _
+          | Unbox_number _ ) )
+      | ( Array_field _,
+          (Value_slot _ | Function_slot _ | Rec_info _ | Unbox_number _) )
+      | Value_slot _, (Function_slot _ | Rec_info _ | Unbox_number _)
+      | Function_slot _, (Rec_info _ | Unbox_number _)
+      | Rec_info _, Unbox_number _ ->
         -1
       | ( ( Is_int | Get_tag | Block_field _ | Array_field _ | Value_slot _
-          | Function_slot _ | Rec_info _ ),
+          | Function_slot _ | Rec_info _ | Unbox_number _ ),
           _ ) ->
         1
 
@@ -131,6 +170,8 @@ module Accessor = struct
       | Value_slot slot -> Hashtbl.hash (2, Value_slot.hash slot)
       | Function_slot slot -> Hashtbl.hash (3, Function_slot.hash slot)
       | Rec_info slot -> Hashtbl.hash (4, Function_slot.hash slot)
+      | Unbox_number boxable_number ->
+        Hashtbl.hash (5, K.Boxable_number.hash boxable_number)
   end
 
   include T0
@@ -145,6 +186,8 @@ let unknown_accessor ~machine_width = function
   | Function_slot function_slot ->
     MTC.unknown (Function_slot.kind function_slot)
   | Rec_info _ -> MTC.unknown K.rec_info
+  | Unbox_number boxable_number ->
+    MTC.unknown (K.Boxable_number.unboxed_kind boxable_number)
 
 let bottom_accessor ~machine_width accessor =
   MTC.bottom_like (unknown_accessor ~machine_width accessor)
@@ -159,8 +202,8 @@ let rec destructure_expanded_head ~machine_width discriminant accessor expanded
   | Ok
       ( Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-      | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _
-        ) ->
+      | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _
+      | Rec_info _ | Region _ ) ->
     Misc.fatal_error "Cannot destructure non-value kinds"
 
 and destructure_head_of_kind_value ~machine_width discriminant accessor head =
@@ -255,12 +298,37 @@ and destructure_head_of_kind_value_non_null ~machine_width discriminant accessor
       | Bottom -> bottom_accessor ~machine_width accessor
       | Unknown -> unknown_accessor ~machine_width accessor
       | Ok function_type -> TG.Function_type.rec_info function_type))
-  | ( (Tagged_immediate | Block _ | Array | Closure),
+  (* The type returned here must have the kind stored in the accessor (the
+     [Boxed_number] discriminant and [Unbox_number] accessor kinds always match
+     when built via [Pattern.boxed_number], but the accessor's kind is the
+     authoritative one). *)
+  | Boxed_number _, Unbox_number boxable_number, head -> (
+    match boxable_number, head with
+    | Naked_float32, Boxed_float32 (ty, _alloc_mode)
+    | Naked_float, Boxed_float (ty, _alloc_mode)
+    | Naked_int32, Boxed_int32 (ty, _alloc_mode)
+    | Naked_int64, Boxed_int64 (ty, _alloc_mode)
+    | Naked_nativeint, Boxed_nativeint (ty, _alloc_mode)
+    | Naked_vec128, Boxed_vec128 (ty, _alloc_mode)
+    | Naked_vec256, Boxed_vec256 (ty, _alloc_mode)
+    | Naked_vec512, Boxed_vec512 (ty, _alloc_mode)
+    | Naked_mask, Boxed_mask (ty, _alloc_mode) ->
+      ty
+    | ( ( Naked_float32 | Naked_float | Naked_int32 | Naked_int64
+        | Naked_nativeint | Naked_vec128 | Naked_vec256 | Naked_vec512
+        | Naked_mask ),
+        ( Variant _ | Mutable_block _ | Boxed_float32 _ | Boxed_float _
+        | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
+        | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_mask _ | Closures _ | String _
+        | Array _ ) ) ->
+      bottom_accessor ~machine_width accessor)
+  | ( (Tagged_immediate | Block _ | Array | Closure | Boxed_number _),
       ( Untag_imm | Is_int | Get_tag | Block_field _ | Array_field _
-      | Value_slot _ | Function_slot _ | Rec_info _ ),
+      | Value_slot _ | Function_slot _ | Rec_info _ | Unbox_number _ ),
       ( Variant _ | Mutable_block _ | Boxed_float32 _ | Boxed_float _
       | Boxed_int32 _ | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _
-      | Boxed_vec256 _ | Boxed_vec512 _ | Closures _ | String _ | Array _ ) ) ->
+      | Boxed_vec256 _ | Boxed_vec512 _ | Boxed_mask _ | Closures _ | String _
+      | Array _ ) ) ->
     bottom_accessor ~machine_width accessor
 
 and destructure_block_field_row_like_for_blocks ~machine_width tag index kind
@@ -376,6 +444,8 @@ module Pattern : sig
   val function_slot : Function_slot.t -> 'a t -> 'a closure_field
 
   val closure : 'a closure_field list -> 'a t
+
+  val boxed_number : K.Boxable_number.t -> 'a t -> 'a t
 end = struct
   type 'a t = 'a pattern
 
@@ -419,6 +489,10 @@ end = struct
   let array fields = unbox Array fields
 
   let closure fields = unbox Closure fields
+
+  let boxed_number boxable_number t =
+    unbox (Boxed_number boxable_number)
+      [accessor (Unbox_number boxable_number) t]
 end
 
 let rec fold_destructuring ~f destructuring env ty acc =
@@ -475,7 +549,6 @@ end
 type 'a expr =
   | Identity of 'a
   | Unknown of K.With_subkind.t
-  | Bottom of K.t
   | Tag_imm of 'a expr
   | Block of
       { is_unique : bool;
@@ -501,7 +574,6 @@ module Expr = struct
     | Identity x -> pp ppf x
     | Unknown kind ->
       Format.fprintf ppf "@[<hv 1>(unknown@ %a)@]" K.With_subkind.print kind
-    | Bottom kind -> Format.fprintf ppf "@[<hv 1>(bottom@ %a)@]" K.print kind
     | Tag_imm expr ->
       Format.fprintf ppf "@[<hv 1>(tag_imm@ %a)@]" (print pp) expr
     | Block _ -> Format.fprintf ppf "@[<hv 1>(block)@]"
@@ -564,8 +636,6 @@ module Expr = struct
 
   let unknown kind = Unknown (K.With_subkind.anything kind)
 
-  let bottom kind = Bottom kind
-
   let unknown_with_subkind kind = Unknown kind
 
   let tag_immediate naked = Tag_imm naked
@@ -591,7 +661,7 @@ module Expr = struct
       ~at_least_these_closure_types:closure_types_in_set
       ~at_least_these_value_slots:value_slots_in_set alloc_mode =
     Closure
-      { exact = true;
+      { exact = false;
         function_slot;
         function_slots_in_set;
         closure_types_in_set;
@@ -733,6 +803,9 @@ struct
       | Ok (Naked_vec512 head) ->
         let>+ head = rewrite_head_of_kind_naked_vec512 head in
         ET.create_naked_vec512 head
+      | Ok (Naked_mask head) ->
+        let>+ head = rewrite_head_of_kind_naked_mask head in
+        ET.create_naked_mask head
       | Ok (Rec_info head) ->
         let>+ head = rewrite_head_of_kind_rec_info head in
         ET.create_rec_info head
@@ -770,7 +843,6 @@ struct
       | Some ty -> ty
       | None -> Misc.fatal_errorf "Variable is not defined: %a" Var.print var)
     | Unknown kind -> MTC.unknown_with_subkind ~machine_width kind
-    | Bottom kind -> MTC.bottom kind
     | Tag_imm field ->
       TG.tag_immediate (rewrite_expr ~machine_width sigma field)
     | Block { is_unique; tag; shape; alloc_mode; fields } ->
@@ -819,7 +891,15 @@ struct
     | Identity ->
       let expanded = Expand_head.expand_head env ty in
       let expanded, acc = rewrite_expanded_head env acc abs expanded in
-      ET.to_type expanded, acc
+      (* Make sure to prefer alias type over singleton types, as this allows
+         more reification in the downstream compilation units. *)
+      let ty = ET.to_type expanded in
+      let ty =
+        match TG.must_be_singleton ty with
+        | None -> ty
+        | Some const -> TG.alias_type_of (TG.kind ty) (Simple.const const)
+      in
+      ty, acc
     | Rewrite (pattern, expr) -> (
       try
         let sigma, acc = match_pattern pattern env ty acc in
@@ -839,34 +919,44 @@ struct
       let canonical =
         TE.get_canonical_simple_exn ~min_name_mode:Name_mode.in_types env alias
       in
-      let canonical_with_metadata, acc =
-        Simple.pattern_match canonical
-          ~const:(fun _ -> canonical, acc)
-          ~name:(fun name ~coercion ->
-            let coercion, acc =
-              let acc_ref = ref acc in
-              let coercion =
-                Coercion.map_depth_variables coercion ~f:(fun variable ->
-                    if
-                      not
-                        (Compilation_unit.equal
-                           (Variable.compilation_unit variable)
-                           (Compilation_unit.get_current_exn ()))
-                    then variable
-                    else
-                      let canonical_var, acc =
-                        get_canonical_with !acc_ref (Name.var variable)
-                          K.rec_info (X.in_coercion abs)
-                      in
-                      acc_ref := acc;
-                      match Name.must_be_var_opt canonical_var with
-                      | Some var -> var
-                      | None ->
-                        Misc.fatal_error
-                          "Canonical name of depth variable is a symbol")
-              in
-              coercion, !acc_ref
+      Simple.pattern_match canonical
+        ~const:(fun const ->
+          (* CR bclement: unlike for names, we don't have a cache for constants.
+             This means that if we ever try to rewrite a constant to something
+             that also contain the same constant with the same abstraction, we
+             will loop.
+
+             This is highly unlikely to occur, however -- constants are
+             typically only going to be rewritten with either constants, or an
+             unknown type. *)
+          let ty = MTC.type_for_const const in
+          rewrite env acc abs ty)
+        ~name:(fun name ~coercion ->
+          let coercion, acc =
+            let acc_ref = ref acc in
+            let coercion =
+              Coercion.map_depth_variables coercion ~f:(fun variable ->
+                  if
+                    not
+                      (Compilation_unit.equal
+                         (Variable.compilation_unit variable)
+                         (Current_unit.get_cu_exn ()))
+                  then variable
+                  else
+                    let canonical_var, acc =
+                      get_canonical_with !acc_ref (Name.var variable) K.rec_info
+                        (X.in_coercion abs)
+                    in
+                    acc_ref := acc;
+                    match Name.must_be_var_opt canonical_var with
+                    | Some var -> var
+                    | None ->
+                      Misc.fatal_error
+                        "Canonical name of depth variable is a symbol")
             in
+            coercion, !acc_ref
+          in
+          let canonical_with_metadata, acc =
             (* Do not rewrite the types of names coming from other compilation
                units, since we can't re-define them and it's hard to think of a
                situation where it would be useful anyways.
@@ -879,16 +969,16 @@ struct
               not
                 (Compilation_unit.equal
                    (Name.compilation_unit name)
-                   (Compilation_unit.get_current_exn ()))
+                   (Current_unit.get_cu_exn ()))
             then canonical, acc
             else
               let canonical_name, acc =
                 get_canonical_with acc name (TG.kind ty) abs
               in
               let simple = Simple.name canonical_name in
-              Simple.with_coercion simple coercion, acc)
-      in
-      TG.alias_type_of (TG.kind ty) canonical_with_metadata, acc
+              Simple.with_coercion simple coercion, acc
+          in
+          TG.alias_type_of (TG.kind ty) canonical_with_metadata, acc)
     | None -> (
       try rewrite env acc abs ty
       with Misc.Fatal_error as e ->
@@ -975,6 +1065,9 @@ struct
     | Boxed_vec512 (ty, alloc_mode) ->
       let ty, acc = rewrite_arbitrary_type env acc metadata ty in
       TG.Head_of_kind_value_non_null.create_boxed_vec512 ty alloc_mode, acc
+    | Boxed_mask (ty, alloc_mode) ->
+      let ty, acc = rewrite_arbitrary_type env acc metadata ty in
+      TG.Head_of_kind_value_non_null.create_boxed_mask ty alloc_mode, acc
     | Closures { by_function_slot; alloc_mode } ->
       let by_function_slot, acc =
         rewrite_row_like_for_closures env acc metadata by_function_slot
@@ -1001,11 +1094,12 @@ struct
 
   and rewrite_head_of_kind_naked_immediate
       (head : TG.head_of_kind_naked_immediate) : _ Or_unknown.t =
-    match head with
-    | Naked_immediates _ -> Or_unknown.Known head
-    | Is_int _ | Get_tag _ | Is_null _ ->
-      (* CR bclement: replace with prove. *)
-      Or_unknown.Unknown
+    match TG.Head_of_kind_naked_immediate.descr head with
+    | { naked_immediates; inverse_relations = _ } ->
+      (* CR bclement: keep inverse_relations *)
+      Or_unknown.Known
+        (TG.Head_of_kind_naked_immediate.from_descr_non_empty
+           { naked_immediates; inverse_relations = TG.Relation.Map.empty })
 
   and rewrite_head_of_kind_naked_float32 head : _ Or_unknown.t =
     Or_unknown.Known head
@@ -1035,6 +1129,9 @@ struct
     Or_unknown.Known head
 
   and rewrite_head_of_kind_naked_vec512 head : _ Or_unknown.t =
+    Or_unknown.Known head
+
+  and rewrite_head_of_kind_naked_mask head : _ Or_unknown.t =
     Or_unknown.Known head
 
   and rewrite_head_of_kind_rec_info head : _ Or_unknown.t =
@@ -1234,7 +1331,6 @@ struct
       =
     let base_env =
       TE.create ~resolver:(TE.resolver env)
-        ~get_imported_names:(TE.get_imported_names env)
         ~machine_width:(TE.machine_width env)
     in
     let base_env =
@@ -1259,9 +1355,11 @@ struct
         live_vars env
     in
     let env =
-      ME.use_meet_env env ~f:(fun env ->
+      ME.use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) env
+        ~f:(fun env ->
           ME.add_env_extension_with_extra_variables
-            ~meet_type:(Meet.meet_type ()) env extension)
+            ~meet_expanded_head:(Meet.meet_expanded_head ())
+            env extension)
     in
     let sbs, base_env, new_types, acc =
       Variable.Map.fold
@@ -1281,7 +1379,7 @@ struct
                 TE.add_definition base_env bound_name (TG.kind ty')
               in
               let new_types = Name.Map.add (Name.var var') ty' new_types in
-              Var.Map.add var (var', ty') sbs, base_env, new_types, acc))
+              Var.Map.add var var' sbs, base_env, new_types, acc))
         live_vars
         (Var.Map.empty, base_env, Name.Map.empty, empty)
     in
@@ -1309,35 +1407,36 @@ struct
         aliases_of_names base_env
     in
     let final_env =
-      ME.use_meet_env base_env ~f:(fun env ->
+      ME.use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) base_env
+        ~f:(fun env ->
           Name.Map.fold
             (fun name ty env ->
-              ME.add_equation env name ty ~meet_type:(Meet.meet_type ()))
+              ME.add_equation env name ty
+                ~meet_expanded_head:(Meet.meet_expanded_head ()))
             new_types env)
     in
     let subst var =
       match Var.Map.find_opt var sbs with
-      | Some (v, ty) ->
-        Name.var v, ET.to_type (Expand_head.expand_head final_env ty)
+      | Some v ->
+        Name.var v, TE.find final_env (Name.var v) (Some (Variable.kind v))
       | None -> Misc.fatal_error "Not defined [subst]"
     in
     let to_keep =
       Var.Map.fold
-        (fun _ (var, _) acc -> Variable.Set.add var acc)
+        (fun _ var acc -> Variable.Set.add var acc)
         sbs Variable.Set.empty
     in
     let teev =
       Expand_head.make_suitable_for_environment final_env
         (All_variables_except to_keep) (List.map subst bind_to)
     in
-    Var.Map.map fst sbs, teev
+    sbs, teev
 
   let rewrite env symbol_abstraction =
     (* CR vlaviron for bclement: This should share more code with
        [rewrite_env_extension_with_extra_variables] above. *)
     let base_env =
       TE.create ~resolver:(TE.resolver env)
-        ~get_imported_names:(TE.get_imported_names env)
         ~machine_width:(TE.machine_width env)
     in
     let base_env =
@@ -1379,9 +1478,11 @@ struct
             aliases_of_name base_env)
         aliases_of_names base_env
     in
-    ME.use_meet_env base_env ~f:(fun env ->
+    ME.use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ()) base_env
+      ~f:(fun env ->
         Name.Map.fold
           (fun name ty env ->
-            ME.add_equation env name ty ~meet_type:(Meet.meet_type ()))
+            ME.add_equation env name ty
+              ~meet_expanded_head:(Meet.meet_expanded_head ()))
           new_types env)
 end

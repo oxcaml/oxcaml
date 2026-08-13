@@ -37,6 +37,7 @@ val transl_primitive :
   Types.type_expr ->
   poly_mode:Mode.Locality.l option ->
   poly_sort:Jkind.Sort.t option ->
+  yielding:Mode.Yielding.l ->
   Path.t option ->
   Lambda.lambda
 
@@ -44,7 +45,8 @@ val transl_primitive_application :
   Lambda.scoped_location -> Primitive.description -> Env.t ->
   Types.type_expr ->
   poly_mode:Mode.Locality.l option -> stack:bool ->
-  poly_sort:Jkind.Sort.t option -> Path.t ->
+  poly_sort:Jkind.Sort.t option ->
+  yielding:Lambda.yielding_kind -> Path.t ->
   Typedtree.expression option ->
   Lambda.lambda list -> Typedtree.expression list ->
   Lambda.region_close -> Lambda.lambda
@@ -71,7 +73,10 @@ type error =
   | Invalid_floatarray_glb
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
+  | Unable_to_specialize_array_idx_primitive of Types.type_expr
+  | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
 
-val report_error :  error Format_doc.printer
+val report_error :  error Format_doc.format_printer
+val report_error_doc:  error Format_doc.printer

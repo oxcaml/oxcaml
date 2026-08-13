@@ -49,7 +49,7 @@ let rec lookup_free p m =
 let rec lookup_map lid m =
   match lid with
     Lident s    -> String.Map.find s m
-  | Ldot (l, s) -> String.Map.find s (get_map (lookup_map l m))
+  | Ldot (l, s) -> String.Map.find s.txt (get_map (lookup_map l.txt m))
   | Lapply _    -> raise Not_found
 
 let free_structure_names = ref String.Set.empty
@@ -65,8 +65,8 @@ let rec add_path bv ?(p=[]) = function
       (*String.Set.iter (fun s -> Printf.eprintf "%s " s) free;
         prerr_endline "";*)
       add_names free
-  | Ldot(l, s) -> add_path bv ~p:(s::p) l
-  | Lapply(l1, l2) -> add_path bv l1; add_path bv l2
+  | Ldot(l, s) -> add_path bv ~p:(s.txt::p) l.txt
+  | Lapply(l1, l2) -> add_path bv l1.txt; add_path bv l2.txt
 
 let open_module bv lid =
   match lookup_map lid bv with
@@ -78,7 +78,7 @@ let open_module bv lid =
 
 let add_parent bv lid =
   match lid.txt with
-    Ldot(l, _s) -> add_path bv l
+    Ldot(l, _s) -> add_path bv l.txt
   | _ -> ()
 
 let add = add_parent
@@ -98,8 +98,8 @@ let rec add_type bv ty =
     Ptyp_any jkind
   | Ptyp_var (_, jkind) -> Option.iter (add_jkind bv) jkind
   | Ptyp_arrow(_, t1, t2, _, _) -> add_type bv t1; add_type bv t2
-  | Ptyp_tuple tl -> add_type_labeled_tuple bv tl
-  | Ptyp_unboxed_tuple tl -> add_type_labeled_tuple bv tl
+  | Ptyp_tuple tl -> List.iter (fun (_, t) -> add_type bv t) tl
+  | Ptyp_unboxed_tuple tl -> List.iter (fun (_, t) -> add_type bv t) tl
   | Ptyp_constr(c, tl) -> add bv c; List.iter (add_type bv) tl
   | Ptyp_object (fl, _) ->
       List.iter
@@ -127,21 +127,20 @@ let rec add_type bv ty =
   | Ptyp_splice t -> add_type bv t
   | Ptyp_of_kind jkind -> add_jkind bv jkind
   | Ptyp_repr(_, t) -> add_type bv t
+  | Ptyp_newlayout(_, t) -> add_type bv t
   | Ptyp_extension e -> handle_extension e
 
-and add_type_labeled_tuple bv tl =
-  List.iter (fun (_, ty) -> add_type bv ty) tl
-
-and add_package_type bv (lid, l) =
-  add bv lid;
-  List.iter (add_type bv) (List.map (fun (_, e) -> e) l)
+and add_package_type bv ptyp =
+  add bv ptyp.ppt_path;
+  List.iter (fun (_, ty) -> add_type bv ty) ptyp.ppt_cstrs
 
 (* CR layouts: Remember to add this when jkinds can have module
    prefixes. *)
 and add_jkind bv (jkind : jkind_annotation) =
-  match jkind.pjkind_desc with
+  match jkind.pjka_desc with
   | Pjk_default -> ()
-  | Pjk_abbreviation _ -> ()
+  | Pjk_abbreviation l -> add bv l
+  | Pjk_operator (jkind, _sa) -> add_jkind bv jkind
   | Pjk_mod (jkind, (_ : modes)) -> add_jkind bv jkind
   | Pjk_with (jkind, typ, (_ : modalities)) ->
       add_jkind bv jkind;
@@ -181,7 +180,9 @@ let add_type_declaration bv td =
   | Ptype_record_unboxed_product lbls ->
       List.iter (fun pld -> add_type bv pld.pld_type) lbls
   | Ptype_open -> () in
-  add_tkind td.ptype_kind
+  add_tkind td.ptype_kind;
+  List.iter (fun (ty, _) -> add_type bv ty) td.ptype_params;
+  add_opt add_jkind bv td.ptype_jkind_annotation
 
 let add_extension_constructor bv ext =
   match ext.pext_kind with
@@ -198,6 +199,9 @@ let add_type_extension bv te =
 let add_type_exception bv te =
   add_extension_constructor bv te.ptyexn_constructor
 
+let add_jkind_declaration bv jd =
+  Option.iter (add_jkind bv) jd.pjkind_manifest
+
 let pattern_bv = ref String.Map.empty
 
 let rec add_pattern bv pat =
@@ -209,8 +213,8 @@ let rec add_pattern bv pat =
   | Ppat_constant _ -> ()
   | Ppat_unboxed_unit -> ()
   | Ppat_unboxed_bool _ -> ()
-  | Ppat_tuple (pl, _) -> add_pattern_labeled_tuple bv pl
-  | Ppat_unboxed_tuple (pl, _)-> add_pattern_labeled_tuple bv pl
+  | Ppat_tuple (pl, _) -> List.iter (fun (_, p) -> add_pattern bv p) pl
+  | Ppat_unboxed_tuple (pl, _) -> List.iter (fun (_, p) -> add_pattern bv p) pl
   | Ppat_construct(c, opt) ->
       add bv c;
       add_opt
@@ -230,11 +234,9 @@ let rec add_pattern bv pat =
       Option.iter
         (fun name -> pattern_bv := String.Map.add name bound !pattern_bv) id.txt
   | Ppat_open ( m, p) -> let bv = open_module bv m.txt in add_pattern bv p
+  | Ppat_effect(p1, p2) -> add_pattern bv p1; add_pattern bv p2
   | Ppat_exception p -> add_pattern bv p
   | Ppat_extension e -> handle_extension e
-
-and add_pattern_labeled_tuple bv labeled_pl =
-  List.iter (fun (_, p) -> add_pattern bv p) labeled_pl
 
 let add_pattern bv pat =
   pattern_bv := bv;
@@ -257,8 +259,8 @@ let rec add_expr bv exp =
   | Pexp_try(e, pel) -> add_expr bv e; add_cases bv pel
   | Pexp_unboxed_unit -> ()
   | Pexp_unboxed_bool _ -> ()
-  | Pexp_tuple el -> add_labeled_tuple_expr bv el
-  | Pexp_unboxed_tuple el -> add_labeled_tuple_expr bv el
+  | Pexp_tuple el -> List.iter (fun (_, e) -> add_expr bv e) el
+  | Pexp_unboxed_tuple el -> List.iter (fun (_, e) -> add_expr bv e) el
   | Pexp_construct(c, opte) -> add bv c; add_opt add_expr bv opte
   | Pexp_variant(_, opte) -> add_opt add_expr bv opte
   | Pexp_record(lblel, opte)
@@ -305,7 +307,8 @@ let rec add_expr bv exp =
   | Pexp_newtype (_, jkind, e) ->
       Option.iter (add_jkind bv) jkind;
       add_expr bv e
-  | Pexp_pack m -> add_module_expr bv m
+  | Pexp_pack (m, opty) ->
+      add_module_expr bv m; add_opt add_package_type bv opty
   | Pexp_open (o, e) ->
       let bv = open_declaration bv o in
       add_expr bv e
@@ -363,12 +366,8 @@ and add_comprehension_iterator bv = function
   | Pcomp_in expr ->
     add_expr bv expr
 
-and add_labeled_tuple_expr bv el = List.iter (add_expr bv) (List.map snd el)
-
 and add_block_access bv = function
   | Baccess_field fld -> add bv fld
-  | Baccess_array (_, _, index) ->
-    add_expr bv index
   | Baccess_block (_, idx) ->
     add_expr bv idx
 
@@ -450,9 +449,11 @@ and add_modtype bv mty =
           | Pwith_type (_, td) -> add_type_declaration bv td
           | Pwith_module (_, lid) -> add_module_path bv lid
           | Pwith_modtype (_, mty) -> add_modtype bv mty
+          | Pwith_jkind (_, jd) -> add_jkind_declaration bv jd
           | Pwith_typesubst (_, td) -> add_type_declaration bv td
           | Pwith_modsubst (_, lid) -> add_module_path bv lid
           | Pwith_modtypesubst (_, mty) -> add_modtype bv mty
+          | Pwith_jkindsubst (_, jd) -> add_jkind_declaration bv jd
         )
         cstrl
   | Pmty_typeof m -> add_module_expr bv m
@@ -464,7 +465,7 @@ and add_modtype bv mty =
 and add_module_alias bv l =
   (* If we are in delayed dependencies mode, we delay the dependencies
        induced by "Lident s" *)
-  (if !Clflags.transparent_modules then add_parent else add_module_path) bv l;
+  (if !Clflags.no_alias_deps then add_parent else add_module_path) bv l;
   try
     lookup_map l.txt bv
   with Not_found ->
@@ -553,8 +554,9 @@ and add_sig_item (bv, m) item =
   | Psig_extension (e, _) ->
       handle_extension e;
       (bv, m)
-  | Psig_kind_abbrev (_, jkind) ->
-      add_jkind bv jkind; (bv, m)
+  | Psig_jkind d ->
+      add_jkind_declaration bv d;
+      (bv, m)
 
 and open_description bv od =
   let Node(s, m) = add_module_alias bv od.popen_expr in
@@ -648,7 +650,7 @@ and add_structure_binding bv item_list =
 (* When we merge [include functor] upstream this can get re-inlined *)
 and add_include_declaration (bv, m) incl =
   let Node (s, m') as n = add_module_binding bv incl.pincl_mod in
-  if !Clflags.transparent_modules then
+  if !Clflags.no_alias_deps then
     add_names s
   else
     (* If we are not in the delayed dependency mode, we need to
@@ -712,8 +714,9 @@ and add_struct_item (bv, m) item : _ String.Map.t * _ String.Map.t =
   | Pstr_extension (e, _) ->
       handle_extension e;
       (bv, m)
-  | Pstr_kind_abbrev (_name, jkind) ->
-      add_jkind bv jkind; (bv, m)
+  | Pstr_jkind d ->
+      add_jkind_declaration bv d;
+      (bv, m)
 
 and add_use_file bv top_phrs =
   ignore (List.fold_left add_top_phrase bv top_phrs)

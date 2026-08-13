@@ -110,20 +110,6 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
        2. All of the [machtype_component]s are singleton arrays. *)
     Array.map (fun machtype -> [| machtype |]) return_ty
   in
-  (* Returned small integer values need to be sign-extended because it's not
-     clear whether C code that returns a small integer returns one that is sign
-     extended or not. There is no need to wrap other return arities. *)
-  let maybe_sign_extend kind dbg cmm =
-    match Flambda_kind.With_subkind.kind kind with
-    | Naked_number Naked_int8 -> C.sign_extend ~bits:8 ~dbg cmm
-    | Naked_number Naked_int16 -> C.sign_extend ~bits:16 ~dbg cmm
-    | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
-    | Naked_number
-        ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
-        | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float32 )
-    | Value | Rec_info | Region ->
-      cmm
-  in
   let ty_args =
     List.map C.exttype_of_kind
       (Flambda_arity.unarize (Apply.args_arity apply)
@@ -131,9 +117,27 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
   in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
-  let extcall =
+  let { extcall; builtin_sign_extends } : Cmm_builtins.t =
     C.extcall ~dbg ~alloc:needs_caml_c_call ~is_c_builtin ~effects ~coeffects
       ~returns ~ty_args callee return_ty args
+  in
+  (* Returned small integer values need to be sign-extended because it's not
+     clear whether C code that returns a small integer returns one that is sign
+     extended or not. There is no need to wrap other return arities. *)
+  let maybe_sign_extend kind dbg cmm =
+    if builtin_sign_extends
+    then cmm
+    else
+      match Flambda_kind.With_subkind.kind kind with
+      | Naked_number Naked_int8 -> C.sign_extend ~bits:8 ~dbg cmm
+      | Naked_number Naked_int16 -> C.sign_extend ~bits:16 ~dbg cmm
+      | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
+      | Naked_number
+          ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
+          | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_mask
+          | Naked_float32 )
+      | Value | Rec_info | Region ->
+        cmm
   in
   let wrap return_values =
     let kinds = Flambda_arity.unarized_components return_arity in
@@ -161,9 +165,19 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
           | Naked_number
               (Naked_immediate | Naked_int64 | Naked_nativeint | Naked_float) ->
             ()
+          | Naked_number (Naked_float32 | Naked_vec128) -> (
+            match Target_system.architecture () with
+            | AArch64 -> ()
+            | X86_64 ->
+              Misc.fatal_errorf
+                "Cannot compile unboxed product return from external C call \
+                 with a component of kind %a"
+                Flambda_kind.With_subkind.print kind
+            | IA32 | ARM | POWER | Z | Riscv ->
+              Misc.fatal_error "Only x86-64 and arm64 are supported")
           | Naked_number
-              ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec128
-              | Naked_vec256 | Naked_vec512 | Naked_float32 )
+              ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec256
+              | Naked_vec512 | Naked_mask )
           | Region | Rec_info ->
             Misc.fatal_errorf
               "Cannot compile unboxed product return from external C call with \
@@ -322,7 +336,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           Apply.print apply
     in
     ( C.indirect_call ~dbg return_ty pos
-        (C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply))
+        (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
       env,
@@ -384,7 +398,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let free_vars = Backend_var.Set.union free_vars obj_free_vars in
     let kind = Call_kind.Method_kind.to_lambda kind in
     let alloc_mode =
-      C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply)
+      C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply)
     in
     ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
         dbg,
@@ -440,7 +454,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all )
-    | With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg } ->
+    | With_stack_preemptible { valuec; exnc; effc; handle_tick; f; arg } ->
       let { env; res; expr = { cmm = valuec; free_vars = fv0; effs = _ } } =
         simple env res valuec
       in
@@ -450,42 +464,60 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       let { env; res; expr = { cmm = effc; free_vars = fv2; effs = _ } } =
         simple env res effc
       in
-      let { env; res; expr = { cmm = dyn; free_vars = fv3; effs = _ } } =
-        simple env res dyn
+      let { env; res; expr = { cmm = handle_tick; free_vars = fv3; effs = _ } }
+          =
+        simple env res handle_tick
       in
-      let { env; res; expr = { cmm = bind; free_vars = fv4; effs = _ } } =
-        simple env res bind
-      in
-      let { env; res; expr = { cmm = f; free_vars = fv5; effs = _ } } =
+      let { env; res; expr = { cmm = f; free_vars = fv4; effs = _ } } =
         simple env res f
       in
-      let { env; res; expr = { cmm = arg; free_vars = fv6; effs = _ } } =
+      let { env; res; expr = { cmm = arg; free_vars = fv5; effs = _ } } =
         simple env res arg
       in
       let free_vars =
         BV.Set.union
-          (BV.Set.union
-             (BV.Set.union fv0 (BV.Set.union fv1 fv2))
-             (BV.Set.union fv3 fv4))
-          (BV.Set.union fv5 fv6)
+          (BV.Set.union fv0 (BV.Set.union fv1 fv2))
+          (BV.Set.union fv3 (BV.Set.union fv4 fv5))
       in
-      ( C.with_stack_bind ~dbg ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg,
+      ( C.with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg,
         free_vars,
         env,
         res,
         Ece.all )
-    | Resume { cont; f; arg } ->
+    | Continue { cont; value } ->
       let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
         simple env res cont
       in
-      let { env; res; expr = { cmm = f; free_vars = fv1; effs = _ } } =
-        simple env res f
+      let { env; res; expr = { cmm = value; free_vars = fv1; effs = _ } } =
+        simple env res value
       in
-      let { env; res; expr = { cmm = arg; free_vars = fv2; effs = _ } } =
-        simple env res arg
+      let free_vars = BV.Set.union fv0 fv1 in
+      C.continue ~dbg ~cont ~value, free_vars, env, res, Ece.all
+    | Discontinue { cont; exn } ->
+      let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
+        simple env res cont
+      in
+      let { env; res; expr = { cmm = exn; free_vars = fv1; effs = _ } } =
+        simple env res exn
+      in
+      let free_vars = BV.Set.union fv0 fv1 in
+      C.discontinue ~dbg ~cont ~exn, free_vars, env, res, Ece.all
+    | Discontinue_with_backtrace { cont; exn; bt } ->
+      let { env; res; expr = { cmm = cont; free_vars = fv0; effs = _ } } =
+        simple env res cont
+      in
+      let { env; res; expr = { cmm = exn; free_vars = fv1; effs = _ } } =
+        simple env res exn
+      in
+      let { env; res; expr = { cmm = bt; free_vars = fv2; effs = _ } } =
+        simple env res bt
       in
       let free_vars = BV.Set.union (BV.Set.union fv0 fv1) fv2 in
-      C.resume ~dbg ~cont ~f ~arg, free_vars, env, res, Ece.all)
+      ( C.discontinue_with_backtrace ~dbg ~cont ~exn ~bt,
+        free_vars,
+        env,
+        res,
+        Ece.all ))
 
 let translate_apply env res apply =
   let dbg = Env.add_inlined_debuginfo env (Apply.dbg apply) in
@@ -768,9 +800,9 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     cmm, free_vars, symbol_inits, res
   | Singleton v, Prim (p, dbg) ->
     let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body
-  | Set_of_closures bound_vars, Set_of_closures soc ->
+  | Set_of_closures bound_vars, Set_of_closures (soc, alloc_mode) ->
     To_cmm_set_of_closures.let_dynamic_set_of_closures env res ~body ~bound_vars
-      ~num_normal_occurrences_of_bound_vars soc ~translate_expr:expr
+      ~num_normal_occurrences_of_bound_vars soc alloc_mode ~translate_expr:expr
   | Static bound_static, Static_consts consts -> (
     let env, res, update_opt =
       To_cmm_static.static_consts env res

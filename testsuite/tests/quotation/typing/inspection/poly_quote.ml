@@ -7,11 +7,12 @@
 
 (* This test file tests that constructing a higher-rank function
    of quotes under quotes fails gracefully until they are supported,
-   and the corresponding test in [poly.ml] can be enabled. *)
+   and the corresponding test in [poly.ml] can be enabled.
+   See ticket 6357. *)
 
 (* This type should be the same as [B.t3''] *)
 let (f : <[
-  ('a 'b. unit -> ('a expr -> 'b expr) -> <[unit -> $('a) -> $('b)]> expr) ->
+  ('a 'b. unit -> ('a expr -> 'b expr @ once) -> <[unit -> $('a) -> $('b)]> expr) ->
   <[unit -> int -> int]> expr * <[unit -> int -> string]> expr
 ]> expr) =
   <[fun f -> (
@@ -20,8 +21,8 @@ let (f : <[
 
 [%%expect {|
 >> Fatal error: Translquote [at line 5, characters 8-9]:
-Explicitly quantified type variables cannot be spliced
-within quoted higher-rank function types
+Splices cannot appear in type annotations inserted in quotations
+for higher-rank or package types.
 Uncaught exception: Misc.Fatal_error
 
 |}]

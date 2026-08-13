@@ -1,7 +1,7 @@
 ROOTDIR = ../..
 include $(ROOTDIR)/Makefile.common
 
-TEXQUOTE = $(ROOTDIR)/runtime4/ocamlrun ../tools/texquote2
+TEXQUOTE = $(ROOTDIR)/runtime/ocamlrun ../tools/texquote2
 
 DIRS = infoman texstuff textman
 
@@ -56,7 +56,7 @@ $(DIRS):
 
 pdf: files latex_files | texstuff
 	cd texstuff \
-	  && TEXINPUTS=$(TEXINPUTS) pdflatex manual.tex
+	  && TEXINPUTS=$(TEXINPUTS) lualatex manual.tex
 
 index: | texstuff
 	cd texstuff \

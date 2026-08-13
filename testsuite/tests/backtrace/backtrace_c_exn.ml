@@ -2,13 +2,6 @@
 (* Blank lines added here to preserve locations. *)
 
 
-
-
-
-
-
-
-
 *)
 
 (* CR mshinwell: it isn't clear to me why the 5 reference output here
@@ -33,25 +26,6 @@ let () =
 
 (* TEST
  modules = "backtrace_c_exn_.c";
- flags = "-g -alert -unsafe_multidomain";
+ flags = "-g";
  ocamlrunparam += ",b=1";
- {
-   runtime4;
-   {
-     reference = "${test_source_directory}/backtrace_c_exn.byte4.reference";
-     bytecode;
-   }{
-     reference = "${test_source_directory}/backtrace_c_exn.opt4.reference";
-     native;
-   }
- }{
-   runtime5;
-   {
-     reference = "${test_source_directory}/backtrace_c_exn.r5.reference";
-     bytecode;
-   }{
-     reference = "${test_source_directory}/backtrace_c_exn.r5.reference";
-     native;
-   }
- }
 *)

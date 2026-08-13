@@ -44,9 +44,9 @@ extern int caml_attempt_open(char_os **name, struct exec_trailer *trail,
 extern int caml_read_trailer(int fd, struct exec_trailer *trail);
 extern void caml_read_section_descriptors(int fd, struct exec_trailer *trail);
 extern int32_t caml_seek_optional_section(int fd, struct exec_trailer *trail,
-                                        char *name);
+                                          const char *name);
 extern int32_t caml_seek_section(int fd, struct exec_trailer *trail,
-                                 char *name);
+                                 const char *name);
 
 enum caml_byte_program_mode
   {
@@ -57,5 +57,24 @@ enum caml_byte_program_mode
 extern enum caml_byte_program_mode caml_byte_program_mode;
 
 #endif /* CAML_INTERNALS */
+
+/* Initialize a module and its dependencies by name.
+   Requires the executable to be compiled with -manual-module-init
+   (only supported for native code compilation).
+   In bytecode, calls caml_fatal_error since manual module init
+   is not supported.
+
+   Must be called from the main thread only; not safe to call from
+   other domains. */
+CAMLextern void caml_init_module(const char *name);
+
+/* Exception-returning variant of [caml_init_module].
+   Returns an exception result on failure, Val_unit on success. Use
+   Is_exception_result to check for failure and Extract_exception to get the
+   exception value.
+
+   Must be called from the main thread only; not safe to call from
+   other domains. */
+CAMLextern value caml_init_module_exn(const char *name);
 
 #endif /* CAML_STARTUP_H */

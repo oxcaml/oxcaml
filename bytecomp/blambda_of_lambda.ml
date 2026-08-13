@@ -204,6 +204,85 @@ let static_cast ~src ~dst x =
        modulo 2^8 or 2^16. *)
     sign_extend dst x
 
+(** [copy_mixed_block_element elt expr] generates Blambda code that creates a
+    fresh deep copy of [expr] if [elt] is an unboxed product. For non-product
+    elements, returns [expr] unchanged. For products, allocates a fresh block
+    and recursively copies each field.
+
+    This is needed because in bytecode, unboxed products are represented as
+    boxed blocks. Without copying, reading or writing an unboxed product from/to
+    a mutable field (or to/from an array slot) would alias the original, causing
+    mutations to affect both. *)
+let rec copy_mixed_block_element (elt : _ Lambda.mixed_block_element)
+    (expr : Blambda.blambda) : Blambda.blambda =
+  match elt with
+  | Product elements ->
+    (* Bind expr to a variable so it's only evaluated once *)
+    let id = Ident.create_local "copy_src" in
+    let copied_fields =
+      Array.to_list
+        (Array.mapi
+           (fun i field_elt ->
+             copy_mixed_block_element field_elt (Prim (Getfield i, [Var id])))
+           elements)
+    in
+    Let { id; arg = expr; body = Prim (Makeblock { tag = 0 }, copied_fields) }
+  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+    expr
+  | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
+
+(** [copy_unboxed_product shape ~path expr] generates Blambda code that creates
+    a fresh deep copy of [expr] if the field at [path] in [shape] is an unboxed
+    product. *)
+let copy_unboxed_product shape ~path expr =
+  copy_mixed_block_element
+    (Lambda.project_from_mixed_block_shape shape ~path)
+    expr
+
+(** [element_of_array_kind k] returns the [mixed_block_element] describing one
+    element of an array of [array_kind] [k]. *)
+let element_of_array_kind (k : Lambda.array_kind) :
+    unit Lambda.mixed_block_element =
+  Lambda.mixed_block_element_of_layout (Lambda.element_layout_of_array_kind k)
+
+(** Build a chain of nested [Let] bindings around [body]. *)
+let lets (bindings : (Ident.t * Blambda.blambda) list) (body : Blambda.blambda)
+    : Blambda.blambda =
+  List.fold_right
+    (fun (id, arg) body -> Blambda.Let { id; arg; body })
+    bindings body
+
+(** [in_place_copy_array_slice ~length ~offset ~array ~elt] evaluates [length],
+    then [offset], then [array], binding each to a local. Then, for each [i] in
+    [0 .. length - 1], it overwrites the slot at index [offset + i] with a fresh
+    deep copy of its current contents. Returns the (bound) array. *)
+let in_place_copy_array_slice ~(length : Blambda.blambda)
+    ~(offset : Blambda.blambda) ~(array : Blambda.blambda)
+    ~(elt : unit Lambda.mixed_block_element) : Blambda.blambda =
+  let len_id = Ident.create_local "len" in
+  let offset_id = Ident.create_local "offset" in
+  let arr_id = Ident.create_local "arr" in
+  let i_id = Ident.create_local "i" in
+  lets
+    [len_id, length; offset_id, offset; arr_id, array]
+    (Sequence
+       ( Blambda.For
+           { id = i_id;
+             from = Const (Const_base (Const_int 0));
+             to_ = Prim (Offsetint (-1), [Var len_id]);
+             dir = Upto;
+             body =
+               (let idx = Prim (Addint, [Var offset_id; Var i_id]) in
+                Prim
+                  ( Setvectitem,
+                    [ Var arr_id;
+                      idx;
+                      copy_mixed_block_element elt
+                        (Prim (Getvectitem, [Var arr_id; idx])) ] ))
+           },
+         Var arr_id ))
+
 let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   let comp_fun ({ params; body; loc = _ } as lfunction : Lambda.lfunction) :
       Blambda.bfunction =
@@ -218,16 +297,18 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+    Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
-  | Lapply { ap_func; ap_args; ap_region_close } ->
+  | Lapply { ap_func; ap_args; ap_region_close; ap_yielding } ->
     Apply
       { func = comp_expr ap_func;
         args = List.map comp_expr ap_args;
-        nontail = is_nontail ap_region_close
+        nontail = is_nontail ap_region_close;
+        yielding = ap_yielding
       }
-  | Lsend (kind, met, obj, args, rc, _, _, _) ->
+  | Lsend (kind, met, obj, args, rc, _, _, _, yielding) ->
     Send
       { method_kind =
           (match (kind : Lambda.meth_kind) with
@@ -237,7 +318,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         met = comp_expr met;
         obj = comp_expr obj;
         args = List.map comp_expr args;
-        nontail = is_nontail rc
+        nontail = is_nontail rc;
+        yielding
       }
   | Lfunction f -> Pseudo_event (Function (comp_fun f), f.loc)
   | Llet (_, _k, id, _duid, arg, body) | Lmutlet (_k, id, _duid, arg, body) ->
@@ -356,6 +438,109 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       in
       Ccall (prefix ^ suffix)
     in
+    (* [array_ref ~unsafe ref_kind index_kind] compiles a Parrayref{s,u} of the
+       given [ref_kind] and [index_kind] to Blambda. For product ref kinds the
+       result is deep-copied so it doesn't alias the array slot; for other
+       kinds the copy is identity. *)
+    let array_ref ~unsafe (ref_kind : Lambda.array_ref_kind)
+        (index_kind : Lambda.array_index_kind) =
+      match ref_kind with
+      | Punspecializedarray_ref _ ->
+        Misc.fatal_error
+          "Blambda_of_lambda: array primitive with Punspecializedarray_ref"
+      | Punboxedvectorarray_ref _ | Punboxedmaskarray_ref ->
+        simd_is_not_supported ()
+      | _ ->
+        let primitive : Blambda.primitive =
+          match ref_kind, index_kind with
+          | Pgenarray_ref _, _
+          | ( ( Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
+              | Pfloatarray_ref _
+              | Punboxedfloatarray_ref (Unboxed_float64 | Unboxed_float32)
+              | Punboxedoruntaggedintarray_ref _
+              | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+                ),
+              Punboxed_or_untagged_integer_index _ ) ->
+            indexing_primitive index_kind
+              (if unsafe then "caml_array_unsafe_get" else "caml_array_get")
+          | ( (Punboxedfloatarray_ref Unboxed_float64 | Pfloatarray_ref _),
+              Ptagged_int_index ) ->
+            Ccall
+              (if unsafe
+               then "caml_floatarray_unsafe_get"
+               else "caml_floatarray_get")
+          | ( ( Punboxedfloatarray_ref Unboxed_float32
+              | Punboxedoruntaggedintarray_ref _ | Paddrarray_ref
+              | Pgcignorableaddrarray_ref | Pintarray_ref
+              | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+                ),
+              Ptagged_int_index ) ->
+            if unsafe then Getvectitem else Ccall "caml_array_get_addr"
+          | ( ( Punspecializedarray_ref _ | Punboxedvectorarray_ref _
+              | Punboxedmaskarray_ref ),
+              _ ) ->
+            (* Handled by the outer match. *)
+            assert false
+        in
+        copy_mixed_block_element
+          (element_of_array_kind (Lambda.array_kind_of_array_ref_kind ref_kind))
+          (binary primitive)
+    in
+    (* [array_set ~unsafe set_kind index_kind] compiles a Parrayset{s,u} of the
+       given [set_kind] and [index_kind] to Blambda. For product set kinds the
+       value being written is deep-copied; for other kinds the copy is
+       identity. *)
+    let array_set ~unsafe (set_kind : Lambda.array_set_kind)
+        (index_kind : Lambda.array_index_kind) =
+      match set_kind with
+      | Punspecializedarray_set _ ->
+        Misc.fatal_error
+          "Blambda_of_lambda: array primitive with Punspecializedarray_ref"
+      | Punboxedvectorarray_set _ | Punboxedmaskarray_set ->
+        simd_is_not_supported ()
+      | _ -> (
+        let primitive : Blambda.primitive =
+          match set_kind, index_kind with
+          | Pgenarray_set _, _
+          | ( ( Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
+              | Pfloatarray_set
+              | Punboxedfloatarray_set (Unboxed_float64 | Unboxed_float32)
+              | Punboxedoruntaggedintarray_set _
+              | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+                ),
+              Punboxed_or_untagged_integer_index _ ) ->
+            indexing_primitive index_kind
+              (if unsafe then "caml_array_unsafe_set" else "caml_array_set")
+          | ( (Punboxedfloatarray_set Unboxed_float64 | Pfloatarray_set),
+              Ptagged_int_index ) ->
+            Ccall
+              (if unsafe
+               then "caml_floatarray_unsafe_set"
+               else "caml_floatarray_set")
+          | ( ( Punboxedfloatarray_set Unboxed_float32
+              | Punboxedoruntaggedintarray_set _ | Paddrarray_set _
+              | Pgcignorableaddrarray_set | Pintarray_set
+              | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+                ),
+              Ptagged_int_index ) ->
+            if unsafe then Setvectitem else Ccall "caml_array_set_addr"
+          | ( ( Punspecializedarray_set _ | Punboxedvectorarray_set _
+              | Punboxedmaskarray_set ),
+              _ ) ->
+            (* Handled by the outer match. *)
+            assert false
+        in
+        match args with
+        | [arr; idx; value] ->
+          let copied_value =
+            copy_mixed_block_element
+              (element_of_array_kind
+                 (Lambda.array_kind_of_array_set_kind set_kind))
+              (comp_expr value)
+          in
+          Prim (primitive, [comp_expr arr; comp_expr idx; copied_value])
+        | _ -> wrong_arity ~expected:3)
+    in
     match (primitive : Lambda.primitive) with
     | Pphys_equal cmp -> (
       match check_arity ~arity:2 with
@@ -398,26 +583,38 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pmakearray (kind, _, _) ->
       pseudo_event
         (match kind with
-        (* arrays of unboxed types have the same representation
-           as the boxed ones on bytecode *)
-        | Pintarray | Paddrarray | Pgcignorableaddrarray
-        | Punboxedoruntaggedintarray _
-        | Punboxedfloatarray Unboxed_float32
-        | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
-          variadic (Makeblock { tag = 0 })
+        (* arrays of unboxed types have the same representation as the boxed
+           ones on bytecode. Product elements need an extra deep copy so the
+           array slot does not alias the caller's product block. *)
+        | ( Pintarray | Paddrarray | Pgcignorableaddrarray
+          | Punboxedoruntaggedintarray _
+          | Punboxedfloatarray Unboxed_float32
+          | Pgcscannableproductarray _ | Pgcignorableproductarray _ ) as kind ->
+          let elt = element_of_array_kind kind in
+          Prim
+            ( Makeblock { tag = 0 },
+              List.map
+                (fun a -> copy_mixed_block_element elt (comp_expr a))
+                args )
         | Pfloatarray | Punboxedfloatarray Unboxed_float64 ->
           variadic Makefloatblock
         | Punboxedvectorarray _ -> simd_is_not_supported ()
+        | Punboxedmaskarray -> simd_is_not_supported ()
         | Pgenarray -> (
           let block = variadic (Makeblock { tag = 0 }) in
           match args with
           | [] -> block
           | _ :: _ ->
             (* for the floatarray hack *)
-            Prim (Ccall "caml_array_of_uniform_array", [block])))
-    | Presume -> context_switch Resume ~arity:3
+            Prim (Ccall "caml_array_of_uniform_array", [block]))
+        | Punspecializedarray ->
+          Misc.fatal_error "Blambda_of_lambda: Pmakearray Punspecializedarray")
+    | Pcontinue -> context_switch Continue ~arity:2
+    | Pdiscontinue -> context_switch Discontinue ~arity:2
+    | Pdiscontinue_with_backtrace ->
+      context_switch Discontinue_with_backtrace ~arity:3
     | Pwith_stack -> context_switch With_stack ~arity:5
-    | Pwith_stack_bind -> context_switch With_stack_bind ~arity:7
+    | Pwith_stack_preemptible -> context_switch With_stack_preemptible ~arity:6
     | Preperform -> context_switch Reperform ~arity:3
     | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
       (* Use a dummy initializer to implement the "uninitialized" primitive *)
@@ -430,6 +627,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
               "Array kind %s should have been ruled out by the frontend for \
                %%makearray_dynamic_uninit"
               (Printlambda.array_kind kind)
+          | Punspecializedarray ->
+            Misc.fatal_error
+              "Blambda_of_lambda: Pmakearray_dynamic Punspecializedarray"
           | Punboxedfloatarray Unboxed_float32 ->
             Lconst (Const_base (Const_float32 "0.0"))
           | Punboxedfloatarray Unboxed_float64 ->
@@ -447,6 +647,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | Punboxedoruntaggedintarray Unboxed_nativeint ->
             Lconst (Const_base (Const_nativeint 0n))
           | Punboxedvectorarray _ -> raise Not_found
+          | Punboxedmaskarray -> raise Not_found
           | Pgcignorableproductarray ignorables ->
             let rec convert_ignorable
                 (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
@@ -493,7 +694,37 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [Lprim (Pmakearray (kind', _, m), args, _)] ->
         assert (kind = kind');
         comp_expr (Lambda.Lprim (Pmakearray (kind, mutability, m), args, loc))
-      | _ -> unary (Ccall "caml_obj_dup"))
+      | _ -> (
+        match kind with
+        | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+          (* In bytecode, [caml_obj_dup] only does a shallow copy, so each slot
+             of the duplicate would alias the corresponding slot in the source.
+             For product arrays we deep-copy every slot.
+
+             This extra copying of products is currently defensive, though: in
+             practice [Translcore] only produces [Pduparray] of a product array
+             with a [Pmakearray] argument, which the case above already handles.
+          *)
+          let src_arg =
+            match args with [s] -> comp_expr s | _ -> wrong_arity ~expected:1
+          in
+          let src_id = Ident.create_local "dup_src" in
+          Let
+            { id = src_id;
+              arg = src_arg;
+              body =
+                in_place_copy_array_slice
+                  ~length:(Prim (Vectlength, [Var src_id]))
+                  ~offset:(tagged_immediate 0)
+                  ~array:(Prim (Ccall "caml_obj_dup", [Var src_id]))
+                  ~elt:(element_of_array_kind kind)
+            }
+        | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
+        | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _
+        | Punboxedvectorarray _ | Punboxedmaskarray ->
+          unary (Ccall "caml_obj_dup")
+        | Punspecializedarray ->
+          Misc.fatal_error "Blambda_of_lambda: Pduparray Punspecializedarray"))
     | Pmakeblock (tag, _mut, shape, _) -> (
       match Lambda.mixed_block_of_block_shape shape with
       | None -> pseudo_event (variadic (Makeblock { tag }))
@@ -505,7 +736,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let total_len = Array.length shape in
         pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
-    | Pgetglobal cu -> nullary (Getglobal cu)
+    | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
     | Pfield (n, _, _) | Punboxed_product_field (n, _) -> unary (Getfield n)
     | Parray_element_size_in_bytes _array_kind -> (
@@ -518,8 +749,46 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let element_size = Prim (Lsrint, [word_size; tagged_immediate 3]) in
         Sequence (comp_expr arg, element_size)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
-    | Pget_idx _ -> binary (Ccall "caml_unsafe_get_idx_bytecode")
-    | Pset_idx _ -> ternary (Ccall "caml_unsafe_set_idx_bytecode")
+    | Pget_idx (layout, access) ->
+      let prim =
+        match Lambda.access_atomicity access with
+        | Nonatomic -> Ccall "caml_get_idx_bytecode"
+        | Atomic -> Ccall "caml_get_idx_atomic_bytecode"
+      in
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      copy_mixed_block_element elt (binary prim)
+    | Pset_idx (layout, _, atomicity) -> (
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      match args with
+      | [arr; idx; value] ->
+        let prim =
+          match atomicity with
+          | Nonatomic -> Ccall "caml_set_idx_bytecode"
+          | Atomic -> Ccall "caml_set_idx_atomic_bytecode"
+        in
+        let copied_value = copy_mixed_block_element elt (comp_expr value) in
+        Prim (prim, [comp_expr arr; comp_expr idx; copied_value])
+      | _ -> wrong_arity ~expected:3)
+    | Pget_ptr (layout, _) ->
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      copy_mixed_block_element elt (unary (Ccall "caml_get_ptr_bytecode"))
+    | Pset_ptr (layout, _) -> (
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      match args with
+      | [ptr; value] ->
+        let copied_value = copy_mixed_block_element elt (comp_expr value) in
+        Prim (Ccall "caml_set_ptr_bytecode", [comp_expr ptr; copied_value])
+      | _ -> wrong_arity ~expected:2)
+    | Pget_ext_ptr (layout, _) ->
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      copy_mixed_block_element elt (unary (Ccall "caml_get_ext_ptr_bytecode"))
+    | Pset_ext_ptr (layout, _) -> (
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      match args with
+      | [ptr; value] ->
+        let copied_value = copy_mixed_block_element elt (comp_expr value) in
+        Prim (Ccall "caml_set_ext_ptr_bytecode", [comp_expr ptr; copied_value])
+      | _ -> wrong_arity ~expected:2)
     | Pmake_idx_field pos ->
       Const (Const_block (0, [Const_base (Const_int pos)]))
     | Pmake_idx_mixed_field (_, pos, path) ->
@@ -574,50 +843,35 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pfloatfield (n, _, _) | Pufloatfield (n, _) ->
       pseudo_event (unary (Getfloatfield n))
     | Psetfloatfield (n, _) | Psetufloatfield (n, _) -> binary (Setfloatfield n)
-    | Pmixedfield ([], _, _) -> assert false
-    | Pmixedfield ([n], _, _) ->
-      (* CR layouts: This will need reworking if we ever want bytecode
-         to unbox fields that are written with unboxed types in the source
-         language. *)
-      (* Note, non-value mixed fields are always boxed in bytecode; they
-         aren't stored flat like they are in native code.
-      *)
-      unary (Getfield n)
-    | Pmixedfield (hd :: tl, _, _) ->
-      (* `Pmixedfield ([idx0, idx1, ..., idxn], [block])` is compiled to
-         `Getfield (idxn, [... Getfield (idx1, [Getfield (idx0, [block])])])` *)
-      List.fold_left
-        (fun expr idx -> Blambda.Prim (Getfield idx, [expr]))
-        (unary (Getfield hd)) tl
-    | Psetmixedfield ([], _, _) -> assert false
-    | Psetmixedfield ([n], _, _) ->
-      (* See the comment in the [Pmixedfield] case. *)
-      binary (Setfield n)
-    | Psetmixedfield (path, _, _) -> (
-      (* `Psetmixedfield ([idx0, idx1, ..., idxn], [block; value])` is compiled
-         to
-         `Setfield (idxn, [... Getfield (idx1, [Getfield (idx0, [block])]);
-           value])`
-         given the match case above, we know the path should have at least two
-         elements. *)
-      match args with
-      | [] | [_] | _ :: _ :: _ :: _ -> wrong_arity ~expected:2
-      | [block; value] -> (
+    | Pmixedfield ([], _, _) | Psetmixedfield ([], _, _) -> assert false
+    | Pmixedfield (path, shape, _sem) ->
+      (* Non-value mixed fields are always boxed in bytecode; they aren't
+         stored flat like they are in native code. *)
+      let read_expr =
+        List.fold_left
+          (fun expr idx -> Prim (Getfield idx, [expr]))
+          (unary (Getfield (List.hd path)))
+          (List.tl path)
+      in
+      copy_unboxed_product shape ~path read_expr
+    | Psetmixedfield (path, shape, _init) ->
+      let block, value =
+        match args with
+        | [block; value] -> comp_expr block, comp_expr value
+        | _ -> wrong_arity ~expected:2
+      in
+      let value_expr = copy_unboxed_product shape ~path value in
+      let parent_path, last_idx =
         match List.rev path with
-        | [] -> Misc.fatal_error "comp_expr: path must be non-empty"
-        | last :: rest -> (
-          match List.rev rest with
-          | [] ->
-            Misc.fatal_error
-              "comp_expr: path is expected to have at least two elements"
-          | hd :: tl ->
-            let block =
-              List.fold_left
-                (fun expr idx -> Blambda.Prim (Getfield idx, [expr]))
-                (Blambda.Prim (Getfield hd, [comp_expr block]))
-                tl
-            in
-            Blambda.Prim (Setfield last, [block; comp_expr value]))))
+        | last :: rest -> List.rev rest, last
+        | [] -> assert false
+      in
+      let target_block =
+        List.fold_left
+          (fun expr idx -> Prim (Getfield idx, [expr]))
+          block parent_path
+      in
+      Prim (Setfield last_idx, [target_block; value_expr])
     | Pduprecord _ -> unary (Ccall "caml_obj_dup")
     | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
     | Pperform -> context_switch Perform ~arity:1
@@ -630,6 +884,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pstringrefu -> binary Getstringchar
     | Pbytesrefu -> binary Getbyteschar
     | Pbytessetu -> ternary Setbyteschar
+    | Pstring_load_i8 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_geti8")
+    | Pstring_load_i16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_geti16")
     | Pstring_load_16 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_string_get16")
     | Pstring_load_32 { index_kind; _ } ->
@@ -638,6 +896,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       binary (indexing_primitive index_kind "caml_string_getf32")
     | Pstring_load_64 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_string_get64")
+    | Pbytes_set_8 { index_kind; _ } ->
+      ternary (indexing_primitive index_kind "caml_bytes_set8")
     | Pbytes_set_16 { index_kind; _ } ->
       ternary (indexing_primitive index_kind "caml_bytes_set16")
     | Pbytes_set_32 { index_kind; _ } ->
@@ -646,6 +906,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       ternary (indexing_primitive index_kind "caml_bytes_setf32")
     | Pbytes_set_64 { index_kind; _ } ->
       ternary (indexing_primitive index_kind "caml_bytes_set64")
+    | Pbytes_load_i8 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_geti8")
+    | Pbytes_load_i16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_geti16")
     | Pbytes_load_16 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_bytes_get16")
     | Pbytes_load_32 { index_kind; _ } ->
@@ -658,97 +922,14 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     (* In bytecode, nothing is ever actually stack-allocated, so we ignore the
        array modes (allocation for [Parrayref{s,u}], modification for
        [Parrayset{s,u}]). *)
-    | Parrayrefs (Pgenarray_ref _, index_kind, _)
-    | Parrayrefs
-        ( ( Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
-          | Pfloatarray_ref _
-          | Punboxedfloatarray_ref (Unboxed_float64 | Unboxed_float32)
-          | Punboxedoruntaggedintarray_ref _ | Pgcscannableproductarray_ref _
-          | Pgcignorableproductarray_ref _ ),
-          (Punboxed_or_untagged_integer_index _ as index_kind),
-          _ ) ->
-      binary (indexing_primitive index_kind "caml_array_get")
-    | Parrayrefs
-        ( (Punboxedfloatarray_ref Unboxed_float64 | Pfloatarray_ref _),
-          Ptagged_int_index,
-          _ ) ->
-      binary (Ccall "caml_floatarray_get")
-    | Parrayrefs
-        ( ( Punboxedfloatarray_ref Unboxed_float32
-          | Punboxedoruntaggedintarray_ref _ | Paddrarray_ref
-          | Pgcignorableaddrarray_ref | Pintarray_ref
-          | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
-          Ptagged_int_index,
-          _ ) ->
-      binary (Ccall "caml_array_get_addr")
-    | Parraysets (Pgenarray_set _, index_kind)
-    | Parraysets
-        ( ( Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
-          | Pfloatarray_set
-          | Punboxedfloatarray_set (Unboxed_float64 | Unboxed_float32)
-          | Punboxedoruntaggedintarray_set _ | Pgcscannableproductarray_set _
-          | Pgcignorableproductarray_set _ ),
-          (Punboxed_or_untagged_integer_index _ as index_kind) ) ->
-      ternary (indexing_primitive index_kind "caml_array_set")
-    | Parraysets
-        ( (Punboxedfloatarray_set Unboxed_float64 | Pfloatarray_set),
-          Ptagged_int_index ) ->
-      ternary (Ccall "caml_floatarray_set")
-    | Parraysets
-        ( ( Punboxedfloatarray_set Unboxed_float32
-          | Punboxedoruntaggedintarray_set _ | Paddrarray_set _
-          | Pgcignorableaddrarray_set | Pintarray_set
-          | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
-          Ptagged_int_index ) ->
-      ternary (Ccall "caml_array_set_addr")
-    | Parrayrefu (Pgenarray_ref _, index_kind, _)
-    | Parrayrefu
-        ( ( Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
-          | Pfloatarray_ref _
-          | Punboxedfloatarray_ref (Unboxed_float64 | Unboxed_float32)
-          | Punboxedoruntaggedintarray_ref _ | Pgcscannableproductarray_ref _
-          | Pgcignorableproductarray_ref _ ),
-          (Punboxed_or_untagged_integer_index _ as index_kind),
-          _ ) ->
-      binary (indexing_primitive index_kind "caml_array_unsafe_get")
-    | Parrayrefu
-        ( (Punboxedfloatarray_ref Unboxed_float64 | Pfloatarray_ref _),
-          Ptagged_int_index,
-          _ ) ->
-      binary (Ccall "caml_floatarray_unsafe_get")
-    | Parrayrefu
-        ( ( Punboxedfloatarray_ref Unboxed_float32
-          | Punboxedoruntaggedintarray_ref _ | Paddrarray_ref
-          | Pgcignorableaddrarray_ref | Pintarray_ref
-          | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _ ),
-          Ptagged_int_index,
-          _ ) ->
-      binary Getvectitem
-    | Parraysetu (Pgenarray_set _, index_kind)
-    | Parraysetu
-        ( ( Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
-          | Pfloatarray_set
-          | Punboxedfloatarray_set (Unboxed_float64 | Unboxed_float32)
-          | Punboxedoruntaggedintarray_set _ | Pgcscannableproductarray_set _
-          | Pgcignorableproductarray_set _ ),
-          (Punboxed_or_untagged_integer_index _ as index_kind) ) ->
-      ternary (indexing_primitive index_kind "caml_array_unsafe_set")
-    | Parraysetu
-        ( (Punboxedfloatarray_set Unboxed_float64 | Pfloatarray_set),
-          Ptagged_int_index ) ->
-      ternary (Ccall "caml_floatarray_unsafe_set")
-    | Parraysetu
-        ( ( Punboxedfloatarray_set Unboxed_float32
-          | Punboxedoruntaggedintarray_set _ | Paddrarray_set _
-          | Pgcignorableaddrarray_set | Pintarray_set
-          | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
-          Ptagged_int_index ) ->
-      ternary Setvectitem
-    | Parrayrefs (Punboxedvectorarray_ref _, _, _)
-    | Parraysets (Punboxedvectorarray_set _, _)
-    | Parrayrefu (Punboxedvectorarray_ref _, _, _)
-    | Parraysetu (Punboxedvectorarray_set _, _) ->
-      simd_is_not_supported ()
+    | Parrayrefs (ref_kind, index_kind, _) ->
+      array_ref ~unsafe:false ref_kind index_kind
+    | Parrayrefu (ref_kind, index_kind, _) ->
+      array_ref ~unsafe:true ref_kind index_kind
+    | Parraysets (set_kind, index_kind) ->
+      array_set ~unsafe:false set_kind index_kind
+    | Parraysetu (set_kind, index_kind) ->
+      array_set ~unsafe:true set_kind index_kind
     | Pctconst c -> unary (caml_sys_const c)
     | Pisint _ -> unary Isint
     | Pisout -> binary (Intcomp Ultint)
@@ -761,6 +942,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pbigarrayset (_, n, _, _) ->
       n_ary (Ccall ("caml_ba_set_" ^ Int.to_string n)) ~arity:(n + 2)
     | Pbigarraydim n -> unary (Ccall ("caml_ba_dim_" ^ Int.to_string n))
+    | Pbigstring_load_i8 { unsafe = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_geti8")
+    | Pbigstring_load_i16 { unsafe = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_geti16")
     | Pbigstring_load_16 { unsafe = _; index_kind } ->
       binary (indexing_primitive index_kind "caml_ba_uint8_get16")
     | Pbigstring_load_32 { unsafe = _; mode = _; index_kind } ->
@@ -769,6 +954,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       binary (indexing_primitive index_kind "caml_ba_uint8_getf32")
     | Pbigstring_load_64 { unsafe = _; mode = _; index_kind } ->
       binary (indexing_primitive index_kind "caml_ba_uint8_get64")
+    | Pbigstring_set_8 { unsafe = _; index_kind } ->
+      ternary (indexing_primitive index_kind "caml_ba_uint8_set8")
     | Pbigstring_set_16 { unsafe = _; index_kind } ->
       ternary (indexing_primitive index_kind "caml_ba_uint8_set16")
     | Pbigstring_set_32 { unsafe = _; index_kind } ->
@@ -785,7 +972,25 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pget_header _ -> unary (Ccall "caml_get_header")
     | Pobj_dup -> unary (Ccall "caml_obj_dup")
     | Patomic_load_field _ -> binary (Ccall "caml_atomic_load_field")
+    | Patomic_load_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record] ->
+        (* In bytecode, mixed record fields aren't reordered, so the shape
+             index [index] is also a field index at runtime. *)
+        Prim
+          ( Ccall "caml_atomic_load_field",
+            [comp_expr record; Const (Const_base (Const_int index))] )
+      | _ -> wrong_arity ~expected:1)
     | Patomic_set_field _ -> ternary (Ccall "caml_atomic_set_field")
+    | Patomic_set_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record; value] ->
+        let record = comp_expr record in
+        let value = comp_expr value in
+        Prim
+          ( Ccall "caml_atomic_set_field",
+            [record; Const (Const_base (Const_int index)); value] )
+      | _ -> wrong_arity ~expected:2)
     | Patomic_exchange_field _ -> ternary (Ccall "caml_atomic_exchange_field")
     | Patomic_compare_exchange_field _ ->
       n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_field")
@@ -804,15 +1009,20 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")
     | Pstring_load_vec _ | Pbytes_load_vec _ | Pbytes_set_vec _
+    | Pstring_load_mask _ | Pbytes_load_mask _ | Pbytes_set_mask _
     | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
-    | Pfloat_array_load_vec _ | Pint_array_load_vec _
+    | Pbigstring_load_mask _ | Pbigstring_set_mask _ | Pint_array_load_vec _
     | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+    | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
     | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
     | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
-    | Pfloat_array_set_vec _ | Pint_array_set_vec _
-    | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
-    | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
-    | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _ ->
+    | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
+    | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
+    | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
+    | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
+    | Pbox_vector _ | Punbox_vector _ | Pbox_mask _ | Punbox_mask | Pjoin_vec256
+    | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
+    | Preinterpret_tuple_as_boxed_vector _ ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
       if Target_system.is_64_bit ()
@@ -840,21 +1050,94 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
          arrays epic for out plan to deal with it. *)
       match kind with
       | Punboxedvectorarray _ -> simd_is_not_supported ()
+      | Punboxedmaskarray -> simd_is_not_supported ()
+      | (Pgcscannableproductarray _ | Pgcignorableproductarray _) as kind ->
+        (* In bytecode, [caml_array_make n init] makes every slot point to the
+           same [init] block. For unboxed products (boxed in bytecode), we must
+           overwrite each slot with a fresh deep copy so slots don't alias the
+           caller's initializer or each other. *)
+        let n_arg, init_arg =
+          match args with
+          | [n; init] -> comp_expr n, comp_expr init
+          | _ -> wrong_arity ~expected:2
+        in
+        let cname =
+          match locality with
+          | Alloc_heap -> "caml_array_make"
+          | Alloc_local -> "caml_array_make_local"
+        in
+        let init_id = Ident.create_local "init" in
+        let n_id = Ident.create_local "n" in
+        lets
+          [init_id, init_arg; n_id, n_arg]
+          (in_place_copy_array_slice ~length:(Var n_id)
+             ~offset:(tagged_immediate 0)
+             ~array:(Prim (Ccall cname, [Var n_id; Var init_id]))
+             ~elt:(element_of_array_kind kind))
+      | Pfloatarray | Punboxedfloatarray Unboxed_float64 -> (
+        (* These kinds are flat [Double_array_tag] arrays even under
+           [-no-flat-float-array], so [caml_array_make] must not be used. *)
+        match locality with
+        | Alloc_heap -> binary (Ccall "caml_floatarray_make")
+        | Alloc_local -> binary (Ccall "caml_floatarray_make_local"))
       | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
-      | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _
-      | Pgcscannableproductarray _ | Pgcignorableproductarray _ -> (
+      | Punboxedoruntaggedintarray _
+      | Punboxedfloatarray Unboxed_float32 -> (
         match locality with
         | Alloc_heap -> binary (Ccall "caml_array_make")
-        | Alloc_local -> binary (Ccall "caml_array_make_local")))
+        | Alloc_local -> binary (Ccall "caml_array_make_local"))
+      | Punspecializedarray ->
+        Misc.fatal_error
+          "Blambda_of_lambda: Pmakearray_dynamic Punspecializedarray")
     | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
       match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()
+      | Punboxedmaskarray_set -> simd_is_not_supported ()
+      | (Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _) as
+        set_kind ->
+        (* [caml_array_blit] is a shallow copy: each blitted slot of [dst]
+           ends up aliasing the corresponding block in [src]. For unboxed
+           product arrays we follow the blit with a pass that overwrites each
+           slot in the destination range with a fresh deep copy of itself. *)
+        let elt =
+          element_of_array_kind (Lambda.array_kind_of_array_set_kind set_kind)
+        in
+        let src_arg, srcofs_arg, dst_arg, dstofs_arg, len_arg =
+          match args with
+          | [s; so; d; doff; n] ->
+            comp_expr s, comp_expr so, comp_expr d, comp_expr doff, comp_expr n
+          | _ -> wrong_arity ~expected:5
+        in
+        let src_id = Ident.create_local "blit_src" in
+        let srcofs_id = Ident.create_local "blit_srcofs" in
+        let dst_id = Ident.create_local "blit_dst" in
+        let dstofs_id = Ident.create_local "blit_dstofs" in
+        let len_id = Ident.create_local "blit_len" in
+        let blit_call =
+          Blambda.Prim
+            ( Ccall "caml_array_blit",
+              [Var src_id; Var srcofs_id; Var dst_id; Var dstofs_id; Var len_id]
+            )
+        in
+        let copy_pass =
+          in_place_copy_array_slice ~length:(Var len_id) ~offset:(Var dstofs_id)
+            ~array:(Var dst_id) ~elt
+        in
+        lets
+          [ len_id, len_arg;
+            dstofs_id, dstofs_arg;
+            dst_id, dst_arg;
+            srcofs_id, srcofs_arg;
+            src_id, src_arg ]
+          (Sequence (Sequence (blit_call, copy_pass), unit))
       | Pgenarray_set _ | Pintarray_set | Paddrarray_set _
       | Pgcignorableaddrarray_set | Punboxedoruntaggedintarray_set _
-      | Pfloatarray_set | Punboxedfloatarray_set _
-      | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
-        n_ary (Ccall "caml_array_blit") ~arity:5)
-    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ | Pget_ptr _ | Pset_ptr _ ->
+      | Pfloatarray_set | Punboxedfloatarray_set _ ->
+        n_ary (Ccall "caml_array_blit") ~arity:5
+      | Punspecializedarray_set _ ->
+        Misc.fatal_error "Blambda_of_lambda: Parrayblit Punspecializedarray_set"
+      )
+    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive
     | Pmakelazyblock Lazy_tag ->
@@ -894,8 +1177,18 @@ and comp_binary_scalar_intrinsic : type a.
           | _ -> prim Subint)
         |> sign_extend taggable
       | Mul -> prim Mulint |> sign_extend taggable
-      | Div (Safe | Unsafe) -> prim Divint |> sign_extend taggable
-      | Mod (Safe | Unsafe) -> prim Modint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Signed) -> prim Divint |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Signed) -> prim Modint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_div",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_mod",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
       | And -> prim Andint
       | Or -> prim Orint
       | Xor -> prim Xorint)
@@ -909,8 +1202,10 @@ and comp_binary_scalar_intrinsic : type a.
       | Add -> c "add"
       | Sub -> c "sub"
       | Mul -> c "mul"
-      | Div (Safe | Unsafe) -> c "div"
-      | Mod (Safe | Unsafe) -> c "mod"
+      | Div ((Safe | Unsafe), Signed) -> c "div"
+      | Mod ((Safe | Unsafe), Signed) -> c "mod"
+      | Div ((Safe | Unsafe), Unsigned) -> c "unsigned_div"
+      | Mod ((Safe | Unsafe), Unsigned) -> c "unsigned_mod"
       | And -> c "and"
       | Or -> c "or"
       | Xor -> c "xor"))
@@ -1139,8 +1434,38 @@ and make_unsigned_comparison size signed_comparison x y =
    (pop)
 *)
 
+let thunkify_compilation_unit_initialization ~thunk_name blam =
+  (* Transforms [blam] into something like [let thunk () = blam in thunk ()].
+     Assumes no free variables in [blam]. *)
+  let thunk = Ident.create_local thunk_name in
+  Blambda.Let
+    { id = thunk;
+      arg =
+        Function
+          { params = [Ident.create_local "null"];
+            body = blam;
+            free_variables = Ident.Set.empty
+          };
+      body =
+        Apply
+          { func = Var thunk;
+            args = [Const Const_null];
+            nontail = false;
+            yielding = Unyielding
+          }
+    }
+
 let blambda_of_lambda ~compilation_unit x =
   let blam = comp_expr x in
   match compilation_unit with
   | None -> blam
-  | Some cu -> Blambda.Prim (Blambda.Setglobal cu, [blam])
+  | Some cu ->
+    let blam =
+      if !Clflags.thunkify_cu_init
+      then
+        thunkify_compilation_unit_initialization
+          ~thunk_name:("init_" ^ Compilation_unit.full_path_as_string cu)
+          blam
+      else blam
+    in
+    Blambda.Prim (Blambda.Setglobal cu, [blam])

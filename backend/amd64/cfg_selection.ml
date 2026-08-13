@@ -51,6 +51,10 @@ let rec select_addr exp =
       else default
     | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
       default)
+  | Cmm.Cop (Cmuli, [(Cvar _ as arg); Cconst_int (((3 | 5 | 9) as mult), _)], _)
+  | Cmm.Cop (Cmuli, [Cconst_int (((3 | 5 | 9) as mult), _); (Cvar _ as arg)], _)
+    ->
+    Ascaledadd (arg, arg, mult - 1), 0
   | Cmm.Cop (Cmuli, [arg; Cconst_int (((2 | 4 | 8) as mult), _)], _)
   | Cmm.Cop (Cmuli, [Cconst_int (((2 | 4 | 8) as mult), _); arg], _) -> (
     let default = Ascale (arg, mult), 0 in
@@ -89,11 +93,11 @@ let rec select_addr exp =
 
 exception Use_default_exn
 
-let rax = phys_reg Int 0
+let rax = phys_reg Int (P RAX)
 
-let rcx = phys_reg Int 5
+let rcx = phys_reg Int (P RCX)
 
-let rdx = phys_reg Int 4
+let rdx = phys_reg Int (P RDX)
 
 let select_locality (l : Cmm.prefetch_temporal_locality_hint) :
     Arch.prefetch_temporal_locality_hint =
@@ -117,7 +121,10 @@ let one_arg name args =
    [effects_of], below. *)
 let inline_ops = ["sqrt"]
 
-let int_is_immediate n = n <= 0x7FFF_FFFF && n >= -0x8000_0000
+(* While -0x8000_0000 is representable as a signed 32bit immediate, we make it
+   symmetric here so that we can negate the immediate when necessary, which is
+   needed to turn subtraction into lea. *)
+let int_is_immediate n = n <= 0x7FFF_FFFF && n >= -0x7FFF_FFFF
 
 let is_immediate_natint n =
   Nativeint.compare n 0x7FFF_FFFFn <= 0
@@ -128,7 +135,7 @@ let specific x : Cfg.basic_or_terminator = Basic (Op (Specific x))
 let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
   (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
-  | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
+  | Intop (Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
     [| res.(0); arg.(1) |], res
   | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf))
   | Specific (Ifloatarithmem (_, _, _)) ->
@@ -151,9 +158,11 @@ let pseudoregs_for_operation op arg res =
     arg.(0) <- res.(0);
     arg, res
   (* One-address unary operations: arg.(0) and res.(0) must be the same *)
-  | Intop_imm ((Iadd | Isub | Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
+  | Intop_imm ((Imul | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr), _)
   | Floatop ((Float64 | Float32), (Iabsf | Inegf))
-  | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour }) ->
+  | Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })
+  | Specific Ineg
+  | Opaque ->
     res, res
   (* For xchg, args must be a register allowing access to high 8 bit register
      (rax, rbx, rcx or rdx). Keep it simple, just force the argument in rax. *)
@@ -166,8 +175,8 @@ let pseudoregs_for_operation op arg res =
   (* For div and mod, first arg must be in rax, rdx is clobbered, and result is
      in rax or rdx respectively. Keep it simple, just force second argument in
      rcx. *)
-  | Intop Idiv -> [| rax; rcx |], [| rax |]
-  | Intop Imod -> [| rax; rcx |], [| rdx |]
+  | Intop (Idiv _) -> [| rax; rcx |], [| rax |]
+  | Intop (Imod _) -> [| rax; rcx |], [| rdx |]
   | Int128op (Iadd128 | Isub128) ->
     [| res.(0); res.(1); arg.(2); arg.(3) |], res
   | Int128op (Imul64 _) -> [| rax; arg.(1) |], [| rax; rdx |]
@@ -209,8 +218,11 @@ let pseudoregs_for_operation op arg res =
     arg, res
   (* Other instructions are regular *)
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
-  | Intop (Ipopcnt | Iclz _ | Ictz _ | Icomp _)
-  | Intop_imm ((Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz _ | Ictz _), _)
+  | Intop (Ipopcnt | Iclz | Ictz | Icomp _ | Iadd)
+  | Intop_imm
+      ( ( Iadd | Isub | Imulh _ | Idiv _ | Imod _ | Icomp _ | Ipopcnt | Iclz
+        | Ictz ),
+        _ )
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
       | Istore_int (_, _, _)
@@ -219,10 +231,10 @@ let pseudoregs_for_operation op arg res =
       | Irdtsc | Icldemote _ | Iprefetch _ )
   | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
   | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
-  | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
+  | Const_vec512 _ | Const_mask _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
-  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
-  | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index ->
+  | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Pause | Begin_region
+  | End_region | Poll | Dls_get | Tls_get | Domain_index ->
     raise Use_default_exn
   | Specific (Illvm_intrinsic intr) ->
     Misc.fatal_errorf "Unexpected llvm_intrinsic %s: not using LLVM backend"
@@ -279,12 +291,16 @@ let select_addressing chunk exp : addressing_mode * Cmm.expression =
 let select_store' ~is_assign addr (exp : Cmm.expression) :
     Cfg_selectgen_target_intf.select_store_result =
   match exp with
-  | Cconst_int (n, _dbg) when int_is_immediate n ->
+  (* The immediate of a store is never negated, so the full signed 32-bit range
+     applies (hence [is_immediate_natint] rather than [int_is_immediate], whose
+     range is symmetric). *)
+  | Cconst_int (n, _dbg) when is_immediate_natint (Nativeint.of_int n) ->
     Rewritten
       (Specific (Istore_int (Nativeint.of_int n, addr, is_assign)), Ctuple [])
   | Cconst_natint (n, _dbg) when is_immediate_natint n ->
     Rewritten (Specific (Istore_int (n, addr, is_assign)), Ctuple [])
   | Cconst_int _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+  | Cconst_mask _
   | Cconst_natint (_, _)
   | Cconst_float32 (_, _)
   | Cconst_float (_, _)
@@ -315,9 +331,19 @@ let is_store_out_of_range _chunk ~byte_offset:_ :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
   Within_range
 
-let insert_move_extcall_arg _exttype _src _dst :
+let is_offset_out_of_range _byte_offset :
+    Cfg_selectgen_target_intf.is_store_out_of_range_result =
+  Within_range
+
+let insert_move_extcall_arg _exttype (src : Reg.t array) (dst : Reg.t array) :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
-  Use_default
+  match src, dst with
+  | [| s |], [| d |]
+    when Cmm.equal_machtype_component s.typ Mask
+         && Cmm.equal_machtype_component d.typ Int ->
+    (* The C ABI passes masks in GPRs. *)
+    Rewritten (Op (Reinterpret_cast Cmm.Int64_of_mask), src, dst)
+  | _ -> Use_default
 
 (* Recognize float arithmetic with mem *)
 
@@ -346,7 +372,12 @@ let select_floatarith commutative width (regular_op : Operation.float_operation)
     Rewritten (specific (Ifloatarithmem (width, mem_op, addr)), [arg2; arg1])
   | _, [arg1; arg2] ->
     Rewritten (Basic (Op (Floatop (width, regular_op))), [arg1; arg2])
-  | _ -> assert false
+  | _ ->
+    Misc.fatal_errorf
+      "Cfg_selection.select_floatarith: unexpected combination of width %s and \
+       %d argument(s)"
+      (match width with Float64 -> "Float64" | Float32 -> "Float32")
+      (List.length args)
 
 let select_operation'
     ~(generic_select_condition :
@@ -354,12 +385,17 @@ let select_operation'
     (args : Cmm.expression list) dbg ~label_after:_ :
     Cfg_selectgen_target_intf.select_operation_result =
   match op with
-  (* Recognize the LEA instruction *)
-  | Caddi | Caddv | Cadda | Csubi | Cor -> (
-    match select_addressing Word_int (Cop (op, args, dbg)) with
-    | Iindexed _, _ | Iindexed2 0, _ -> Use_default
-    | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg ->
-      Rewritten (specific (Ilea addr), [arg]))
+  (* Recognize the NEG and LEA instructions *)
+  | Caddi | Caddv | Cadda | Csubi | Cor | Cmuli -> (
+    match op, args with
+    | Csubi, ([Cconst_int (0, _); arg] | [Cconst_natint (0n, _); arg]) ->
+      Rewritten (specific Ineg, [arg])
+    | _, _ -> (
+      match select_addressing Word_int (Cop (op, args, dbg)) with
+      | Iindexed _, _ | Iindexed2 0, _ -> Use_default
+      | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg
+        ->
+        Rewritten (specific (Ilea addr), [arg])))
   (* Recognize float arithmetic with memory. *)
   | Caddf width -> select_floatarith true width Iaddf Ifloatadd args
   | Csubf width -> select_floatarith false width Isubf Ifloatsub args

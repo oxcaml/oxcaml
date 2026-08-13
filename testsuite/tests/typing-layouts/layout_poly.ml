@@ -77,12 +77,14 @@ end
 Line 4, characters 63-68:
 4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
                                                                    ^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : float64)"
-       The layout of string is value
+       The layout of string is value non_float
          because it is the primitive type string.
        But the layout of string must be a sublayout of float64
          because of the definition of id' at line 2, characters 10-18.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (********************)
@@ -301,12 +303,14 @@ let () = Format.printf "%s\n" (S.id "abc")
 Line 1, characters 36-41:
 1 | let () = Format.printf "%s\n" (S.id "abc")
                                         ^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "('a : float64)"
-       The layout of string is value
+       The layout of string is value non_float
          because it is the primitive type string.
        But the layout of string must be a sublayout of float64
          because of the definition of id at line 2, characters 2-35.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 
@@ -556,7 +560,7 @@ Line 1, characters 40-42:
 1 | external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity" [@@unboxed]
                                             ^^
 Error: Don't know how to unbox this type.
-       Only "float", "int32", "int64", "nativeint", vector primitives, and
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
        the corresponding unboxed types can be marked unboxed.
 |}]
 
@@ -566,7 +570,7 @@ external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity" [@@untagged]
 Line 1, characters 40-42:
 1 | external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity" [@@untagged]
                                             ^^
-Error: Don't know how to untag this type. Only "int8", "int16", "int", and
+Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}]
 
@@ -641,7 +645,7 @@ external id : ('a : any mod separable). 'a t -> int = "%array_length"
 let id' x = id x
 
 [%%expect{|
-type ('a : any mod separable) t = 'a array
+type ('a : any separable) t = 'a array
 Line 2, characters 14-51:
 2 | external id : ('a : any mod separable). 'a t -> int = "%array_length"
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -653,17 +657,17 @@ external[@layout_poly] id : ('a : any mod separable). 'a t -> int = "%array_leng
 let id' x = id x
 
 [%%expect{|
-external id : ('a : any mod separable). 'a t -> int = "%array_length"
+external id : ('a : any separable). 'a t -> int = "%array_length"
   [@@layout_poly]
-val id' : ('a : value_or_null mod separable). 'a t -> int = <fun>
+val id' : ('a : value_maybe_null). 'a t -> int = <fun>
 |}]
 
 external id : ('a : any mod separable). 'a t -> int = "%identity"
 let id' x = id x
 
 [%%expect{|
-external id : ('a : any mod separable). 'a t -> int = "%identity"
-val id' : ('a : value_or_null mod separable). 'a t -> int = <fun>
+external id : ('a : any separable). 'a t -> int = "%identity"
+val id' : ('a : value_maybe_null). 'a t -> int = <fun>
 |}]
 
 
@@ -677,6 +681,8 @@ Line 1, characters 29-49:
                                  ^^^^^^^^^^^^^^^^^^^^
 Error: The primitive [%obj_dup] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: This was expected to be a value-only primitive. You might've
+      misspelled the primitive name.
 |}]
 
 external dup : float# -> float# = "%obj_dup"
@@ -686,6 +692,8 @@ Line 1, characters 15-31:
                    ^^^^^^^^^^^^^^^^
 Error: The primitive [%obj_dup] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
+Hint: This was expected to be a value-only primitive. You might've
+      misspelled the primitive name.
 |}]
 
 (*************************************************************)
@@ -714,7 +722,7 @@ Error: "[@layout_poly]" on this external declaration has no
 external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array =
   "%makearray_dynamic"
 [%%expect{|
-external makearray_dynamic : ('a : any mod separable). int -> 'a -> 'a array
+external makearray_dynamic : ('a : any separable). int -> 'a -> 'a array
   = "%makearray_dynamic" [@@layout_poly]
 |}]
 
@@ -723,14 +731,14 @@ external[@layout_poly] arrayblit :
   "%arrayblit"
 [%%expect{|
 external arrayblit :
-  ('a : any mod separable). 'a array -> int -> 'a array -> int -> int -> unit
+  ('a : any separable). 'a array -> int -> 'a array -> int -> int -> unit
   = "%arrayblit" [@@layout_poly]
 |}]
 
 external[@layout_poly] makearray_dynamic : ('a : any mod separable). int -> 'a array =
   "%makearray_dynamic_uninit"
 [%%expect{|
-external makearray_dynamic : ('a : any mod separable). int -> 'a array
+external makearray_dynamic : ('a : any separable). int -> 'a array
   = "%makearray_dynamic_uninit" [@@layout_poly]
 |}]
 
@@ -739,8 +747,7 @@ external[@layout_poly] arrayblit_src_immut :
   "%arrayblit_src_immut"
 [%%expect{|
 external arrayblit_src_immut :
-  ('a : any mod separable).
-    'a iarray -> int -> 'a array -> int -> int -> unit
+  ('a : any separable). 'a iarray -> int -> 'a array -> int -> int -> unit
   = "%arrayblit_src_immut" [@@layout_poly]
 |}]
 
@@ -751,9 +758,9 @@ external[@layout_poly] restricted : ('a : any mod separable portable contended).
   'a t -> int = "%array_length"
 
 [%%expect{|
-type ('a : any mod portable contended separable) t = 'a array
+type ('a : any separable mod portable contended) t = 'a array
 external restricted :
-  ('a : any mod portable contended separable). 'a t -> int = "%array_length"
+  ('a : any separable mod portable contended). 'a t -> int = "%array_length"
   [@@layout_poly]
 |}]
 
@@ -770,10 +777,10 @@ Line 1, characters 26-40:
 1 | let fails = restricted [| fun () -> "no" |]
                               ^^^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value mod aliased immutable non_float
+       The kind of 'a -> 'b is value non_float mod aliased immutable
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of
-           value_or_null mod portable contended separable
+           value_maybe_null mod portable contended
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).

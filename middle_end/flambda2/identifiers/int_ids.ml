@@ -52,7 +52,9 @@ module Const_data = struct
     | Naked_vec128 of Vector_types.Vec128.Bit_pattern.t
     | Naked_vec256 of Vector_types.Vec256.Bit_pattern.t
     | Naked_vec512 of Vector_types.Vec512.Bit_pattern.t
+    | Naked_mask of Vector_types.Mask.Bit_pattern.t
     | Null
+    | Poison of Flambda_kind.t * string
 
   let flags = const_flags
 
@@ -123,9 +125,20 @@ module Const_data = struct
           Flambda_colours.naked_number
           Vector_types.Vec512.Bit_pattern.print v
           Flambda_colours.pop
+      | Naked_mask v ->
+        Format.fprintf ppf "%t#mask[%a]%t"
+          Flambda_colours.naked_number
+          Vector_types.Mask.Bit_pattern.print v
+          Flambda_colours.pop
       | Null ->
         Format.fprintf ppf "%t#null%t"
           Flambda_colours.naked_number
+          Flambda_colours.pop
+      | Poison (kind, name) ->
+        Format.fprintf ppf "%t#poison[%s][%a]%t"
+          Flambda_colours.invalid_keyword
+          name
+          Flambda_kind.print kind
           Flambda_colours.pop
 
     let compare t1 t2 =
@@ -148,7 +161,12 @@ module Const_data = struct
         Vector_types.Vec256.Bit_pattern.compare v1 v2
       | Naked_vec512 v1, Naked_vec512 v2 ->
         Vector_types.Vec512.Bit_pattern.compare v1 v2
+      | Naked_mask v1, Naked_mask v2 ->
+        Vector_types.Mask.Bit_pattern.compare v1 v2
       | Null, Null -> 0
+      | Poison (kind1, name1), Poison (kind2, name2) ->
+        let c = Flambda_kind.compare kind1 kind2 in
+        if c <> 0 then c else String.compare name1 name2
       | Naked_immediate _, _ -> -1
       | _, Naked_immediate _ -> 1
       | Tagged_immediate _, _ -> -1
@@ -173,6 +191,10 @@ module Const_data = struct
       | _, Naked_vec256 _ -> 1
       | Naked_vec512 _, _ -> -1
       | _, Naked_vec512 _ -> 1
+      | Naked_mask _, _ -> -1
+      | _, Naked_mask _ -> 1
+      | Poison _, _ -> -1
+      | _, Poison _ -> 1
 
     let equal t1 t2 =
       if t1 == t2
@@ -197,11 +219,15 @@ module Const_data = struct
           Vector_types.Vec256.Bit_pattern.equal v1 v2
         | Naked_vec512 v1, Naked_vec512 v2 ->
           Vector_types.Vec512.Bit_pattern.equal v1 v2
+        | Naked_mask v1, Naked_mask v2 ->
+          Vector_types.Mask.Bit_pattern.equal v1 v2
         | Null, Null -> true
+        | Poison (kind1, name1), Poison (kind2, name2) ->
+          Flambda_kind.equal kind1 kind2 && String.equal name1 name2
         | ( ( Naked_immediate _ | Tagged_immediate _ | Naked_float _
             | Naked_float32 _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
-            | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_int64 _
-            | Naked_nativeint _ | Null ),
+            | Naked_mask _ | Naked_int8 _ | Naked_int16 _ | Naked_int32 _
+            | Naked_int64 _ | Naked_nativeint _ | Null | Poison _ ),
             _ ) ->
           false
 
@@ -219,7 +245,10 @@ module Const_data = struct
       | Naked_vec128 v -> Vector_types.Vec128.Bit_pattern.hash v
       | Naked_vec256 v -> Vector_types.Vec256.Bit_pattern.hash v
       | Naked_vec512 v -> Vector_types.Vec512.Bit_pattern.hash v
+      | Naked_mask v -> Vector_types.Mask.Bit_pattern.hash v
       | Null -> Hashtbl.hash 0
+      | Poison (kind, name) ->
+        Hashtbl.hash (Flambda_kind.hash kind, String.hash name)
   end)
 end
 
@@ -378,6 +407,8 @@ module Const = struct
 
   let naked_vec512 i = create (Naked_vec512 i)
 
+  let naked_mask i = create (Naked_mask i)
+
   let const_true machine_width =
     tagged_immediate (Target_ocaml_int.bool_true machine_width)
 
@@ -406,6 +437,8 @@ module Const = struct
   let const_unit machine_width = const_zero machine_width
 
   let const_null = create Null
+
+  let const_poison kind name = create (Poison (kind, name))
 
   let descr t = find_data t
 
@@ -471,7 +504,7 @@ module Variable = struct
       !previous_name_stamp
     in
     let data : Variable_data.t =
-      { compilation_unit = Compilation_unit.get_current_exn ();
+      { compilation_unit = Current_unit.get_cu_exn ();
         name;
         name_stamp;
         kind;
@@ -489,7 +522,7 @@ module Variable = struct
 
     let print ppf t =
       let cu = compilation_unit t in
-      if Compilation_unit.equal cu (Compilation_unit.get_current_exn ())
+      if Compilation_unit.equal cu (Current_unit.get_cu_exn ())
       then
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
@@ -834,12 +867,23 @@ module Code_id = struct
       !previous_name_stamp
     in
     let linkage_name =
-      let name =
-        if Flambda_features.Expert.shorten_symbol_names ()
-        then Printf.sprintf "%s_%d" name name_stamp
-        else Printf.sprintf "%s_%d_code" name name_stamp
-      in
-      Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
+      match Compilation_unit.name_mangling_scheme_for_current_unit () with
+      | Flat ->
+        let name =
+          if Flambda_features.Expert.shorten_symbol_names ()
+          then Printf.sprintf "%s_%d" name name_stamp
+          else Printf.sprintf "%s_%d_code" name name_stamp
+        in
+        Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
+      | Structured ->
+        let suffix =
+          if Flambda_features.Expert.shorten_symbol_names ()
+          then Printf.sprintf "_%d" name_stamp
+          else Printf.sprintf "_%d_code" name_stamp
+        in
+        let path = Debuginfo.to_structured_mangling_path ~name debug in
+        Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix
+        |> Symbol0.linkage_name
     in
     let data : Code_id_data.t =
       { compilation_unit; name; debug_info = debug; linkage_name }
@@ -847,12 +891,12 @@ module Code_id = struct
     Table.add !grand_table_of_code_ids data
 
   let rename t =
-    create ~name:(name t) ~debug:(debug t) (Compilation_unit.get_current_exn ())
+    create ~name:(name t) ~debug:(debug t) (Current_unit.get_cu_exn ())
 
   let in_compilation_unit t comp_unit =
     Compilation_unit.equal (get_compilation_unit t) comp_unit
 
-  let is_imported t = not (Compilation_unit.is_current (get_compilation_unit t))
+  let is_imported t = not (Current_unit.is_current (get_compilation_unit t))
 
   module T0 = struct
     let compare = Id.compare
@@ -943,18 +987,9 @@ module Code_id_or_symbol = struct
   module Map = Tree.Map
   module Lmap = Lmap.Make (T)
 
-  let set_of_code_id_set code_ids =
-    (* CR-someday lmaurer: This is just an expensive identity. Should add
-       something to [Patricia_tree] to let us translate. *)
-    Code_id.Set.fold
-      (fun code_id free_code_ids ->
-        Set.add (create_code_id code_id) free_code_ids)
-      code_ids Set.empty
+  let set_of_code_id_set (code_ids : Code_id.Set.t) : Set.t = code_ids
 
-  let set_of_symbol_set symbols =
-    Symbol.Set.fold
-      (fun sym free_syms -> Set.add (create_symbol sym) free_syms)
-      symbols Set.empty
+  let set_of_symbol_set (symbols : Symbol.Set.t) : Set.t = symbols
 end
 
 module Code_id_or_name = struct

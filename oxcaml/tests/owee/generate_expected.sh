@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Generate expected output for owee archive test using system tools
 # This produces the same output format as test_archive.ml
 #
@@ -23,7 +23,8 @@ echo "Archive: $ARCHIVE"
 
 # Count members by parsing headers
 OFFSET=8
-FILESIZE=$(stat -c%s "$ARCHIVE")
+# Follow symlinks (-L) to deal with Dune sandboxing
+FILESIZE=$(stat -L -c%s "$ARCHIVE")
 MEMBER_COUNT=0
 declare -a MEMBER_NAMES
 declare -a MEMBER_SIZES

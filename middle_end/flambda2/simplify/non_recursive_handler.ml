@@ -34,6 +34,8 @@ let create ~cont ~params ~lifted_params ~handler ~is_exn_handler ~can_be_lifted
     is_cold
   }
 
+let with_can_be_lifted can_be_lifted t = { t with can_be_lifted }
+
 let[@ocamlformat "disable"] print ppf
     { cont; params; lifted_params; handler; is_exn_handler; can_be_lifted; is_cold }
     =

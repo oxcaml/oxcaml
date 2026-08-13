@@ -53,7 +53,7 @@ type mixed_float_record =
     x6_1 : float;
     x7 : float#;
     x8_1 : float;
-    x9 : float# }
+    x9 : float# } [@@flatten_floats]
 
 type int_args =
   { x0_1 : int;
@@ -124,7 +124,7 @@ type t14 = { a : float#;
              c : float#;
              mutable d : float#;
              e : float;
-             mutable f : float# }
+             mutable f : float# } [@@flatten_floats]
 
 (* Construction *)
 let t14_1 = { a = Float_u.of_float 3.14;

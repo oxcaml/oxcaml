@@ -36,3 +36,5 @@ val to_int64 : t -> int64
 val pp : Format.formatter -> t -> unit
 
 val to_obj : t -> Obj.t
+
+val of_obj : Obj.t -> t

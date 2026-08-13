@@ -329,12 +329,92 @@ let () =
     ignore (Sys.opaque_identity outer)
   )
 
+(* Records with fields of kind [any] *)
+
+let () =
+  let open struct
+    type ('a : any) singleton_any = { mutable a : 'a }
+    type ('b : any, 'c : any) pair_any_any = { mutable b : 'b; mutable c : 'c }
+    type ('d : any) pair_any_int = { mutable d : 'd; mutable i : int }
+    type ('e : any, 'v : value) pair_any_value = { mutable e : 'e;
+                                                   mutable v : 'v; }
+  end in
+
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let sa_int = { a = 1 } in
+    sa_int.a <- 2;
+    ignore (Sys.opaque_identity sa_int);
+
+    let sa_int64u = { a = #1L } in
+    sa_int64u.a <- #2L;
+    ignore (Sys.opaque_identity sa_int64u);
+
+    let paa_array_int = { b = [| 1 |]; c = 2 } in
+    paa_array_int.c <- 3;
+    ignore (Sys.opaque_identity paa_array_int);
+
+    let paa_array_int64u = { b = [| 1 |]; c = #2L } in
+    paa_array_int64u.c <- #3L;
+    ignore (Sys.opaque_identity paa_array_int64u);
+
+    let pai_array = { d = [| 1 |]; i = 2 } in
+    pai_array.i <- 3;
+    ignore (Sys.opaque_identity paa_array_int64u);
+
+    let pav_array_int = { e = [| 1 |]; v = 2 } in
+    pav_array_int.v <- 3;
+    ignore (Sys.opaque_identity pav_array_int);
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let sa_array = { a = [| 1 |] } in
+    sa_array.a <- [| 2 |];
+    ignore (Sys.opaque_identity sa_array)
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let paa_array_int = { b = [| 1 |]; c = 2 } in
+    paa_array_int.b <- [| 3 |];
+    ignore (Sys.opaque_identity paa_array_int);
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let paa_array_int64u = { b = [| 1 |]; c = #2L } in
+    paa_array_int64u.b <- [| 3 |];
+    ignore (Sys.opaque_identity paa_array_int64u);
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let pai_array = { d = [| 1 |]; i = 2 } in
+    pai_array.d <- [| 3 |];
+    ignore (Sys.opaque_identity pai_array);
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let pav_array_int = { e = [| 1 |]; v = 2 } in
+    pav_array_int.e <- [| 3 |];
+    ignore (Sys.opaque_identity pav_array_int)
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let pav_int64u_array = { e = #1L; v = [| 2 |] } in
+    pav_int64u_array.v <- [| 3 |];
+    ignore (Sys.opaque_identity pav_int64u_array)
+  );
+
 (* Setting an immediate or non-value block index should give only the needed
    number of caml_modifies *)
 
 (* First layout poly versions *)
 external unsafe_set : ('a : value) ('b : any).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 [@@layout_poly]
 
 let () =
@@ -367,7 +447,7 @@ let () =
 
 (* Second, specialized versions *)
 external unsafe_set_imm : ('a : value) ('b : immediate).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -379,7 +459,7 @@ let () =
     (fun () -> unsafe_set_imm t idx 1; ignore (Sys.opaque_identity t))
 
 external unsafe_set_i64 : ('a : value) ('b : bits64).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -391,7 +471,7 @@ let () =
     (fun () -> unsafe_set_i64 t idx #1L; ignore (Sys.opaque_identity t))
 
 external unsafe_set_prod : ('a : value) ('b : bits64 & value & immediate).
-  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 let () =
   let open struct
@@ -407,7 +487,7 @@ external unsafe_set_or_null
   : ('a : value) ('b : any).
   'a or_null @ local -> ('a, 'b) idx_mut @ local -> 'b -> unit
   @@ portable
-  = "%unsafe_set_idx"
+  = "%set_idx"
 [@@layout_poly]
 
 let () =
@@ -565,3 +645,91 @@ let () =
   test ~expect_caml_modifies:1
     (fun () -> unsafe_set_ptr_prod #(t, idx) #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
+
+(* Parameterized unboxed records: type args must be substituted for params *)
+let () =
+  let open struct
+    type ('a : value_or_null) pair = #{ x : 'a; y : 'a }
+    type t = { mutable is : int pair }
+  end in
+  let[@inline never] f t is =
+    t.is <- is
+  in
+  let t = { is = #{ x = 1; y = 2 } } in
+  test ~expect_caml_modifies:0
+    (fun () -> f t #{ x = 3; y = 4 };
+               ignore (Sys.opaque_identity t))
+
+(* Two type params, one immediate and one pointer *)
+let () =
+  let open struct
+    type ('a : value_or_null, 'b : value_or_null) t2 =
+      #{ x : 'a; y : 'b }
+    type t = { mutable p : (int, string) t2 }
+  end in
+  let[@inline never] f t p = t.p <- p in
+  let t = { p = #{ x = 1; y = "a" } } in
+  test ~expect_caml_modifies:1
+    (fun () -> f t #{ x = 3; y = "b" };
+               ignore (Sys.opaque_identity t))
+
+(* Unboxed GADT: the existential component's immediacy is only visible in the
+   declared [immediate & immediate] field shape *)
+let () =
+  let open struct
+    type ('a : immediate) t' : immediate = Int : int t' | Unit : unit t'
+    type t : immediate & immediate = T : #('a t' * 'a) -> t [@@unboxed]
+    type holder = { mutable t : t }
+  end in
+  let r = { t = T #(Int, 1) } in
+  test ~expect_caml_modifies:0
+    (fun () -> r.t <- T #(Unit, ()); ignore (Sys.opaque_identity r));
+  let[@inline never] set r v = r.t <- v in
+  test ~expect_caml_modifies:0
+    (fun () -> set r (T #(Int, 2)); ignore (Sys.opaque_identity r))
+
+(* Same shape but with a genuinely pointer-carrying component *)
+let () =
+  let open struct
+    type ('a : immediate) t' : immediate = Int : int t' | Unit : unit t'
+    type p : immediate & value = P : #('a t' * string) -> p [@@unboxed]
+    type holder = { mutable p : p }
+  end in
+  let r = { p = P #(Int, "a") } in
+  test ~expect_caml_modifies:1
+    (fun () -> r.p <- P #(Unit, "b"); ignore (Sys.opaque_identity r))
+
+(* Polymorphic write where ['a]'s kind at the use site is more precise than
+   the declared [value] parameter: only the string word needs the barrier *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+  end in
+  let[@inline never] set : ('a : immediate). 'a t -> #(string * 'a) -> unit =
+    fun t v -> t.x <- v
+  in
+  let t = { x = #("s", 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> set t #("u", 2); ignore (Sys.opaque_identity t))
+
+(* Same, via a polymorphic record field *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+    type setter = { apply : ('b : immediate). 'b t -> #(string * 'b) -> unit }
+  end in
+  let s = Sys.opaque_identity { apply = fun t v -> t.x <- v } in
+  let t = { x = #("s", 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> s.apply t #("u", 2); ignore (Sys.opaque_identity t))
+
+(* Same, where the parameter is instantiated to an unboxed existential *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+    type u = U : ('a : immediate). 'a -> u [@@unboxed]
+  end in
+  let[@inline never] set (t : u t) v = t.x <- v in
+  let t = { x = #("s", U 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> set t #("u", U 2); ignore (Sys.opaque_identity t))

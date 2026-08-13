@@ -220,6 +220,7 @@ camlinternalOO.cmo : \
     stdlib__Map.cmi \
     stdlib__List.cmi \
     stdlib__Char.cmi \
+    stdlib__Atomic.cmi \
     stdlib__Array.cmi \
     camlinternalOO.cmi
 camlinternalOO.cmx : \
@@ -230,6 +231,7 @@ camlinternalOO.cmx : \
     stdlib__Map.cmx \
     stdlib__List.cmx \
     stdlib__Char.cmx \
+    stdlib__Atomic.cmx \
     stdlib__Array.cmx \
     camlinternalOO.cmi
 camlinternalOO.cmi : \
@@ -468,6 +470,19 @@ stdlib__Hashtbl.cmx : hashtbl.ml \
 stdlib__Hashtbl.cmi : hashtbl.mli \
     stdlib.cmi \
     stdlib__Seq.cmi
+stdlib__Iarray.cmo : iarray.ml \
+    stdlib.cmi \
+    stdlib__Seq.cmi \
+    stdlib__Array.cmi \
+    stdlib__Iarray.cmi
+stdlib__Iarray.cmx : iarray.ml \
+    stdlib.cmx \
+    stdlib__Seq.cmx \
+    stdlib__Array.cmx \
+    stdlib__Iarray.cmi
+stdlib__Iarray.cmi : iarray.mli \
+    stdlib.cmi \
+    stdlib__Seq.cmi
 stdlib__In_channel.cmo : in_channel.ml \
     stdlib__Sys.cmi \
     stdlib.cmi \
@@ -686,6 +701,13 @@ stdlib__Parsing.cmi : parsing.mli \
     stdlib.cmi \
     stdlib__Obj.cmi \
     stdlib__Lexing.cmi
+stdlib__Pqueue.cmo : pqueue.ml \
+    stdlib__Dynarray.cmi \
+    stdlib__Pqueue.cmi
+stdlib__Pqueue.cmx : pqueue.ml \
+    stdlib__Dynarray.cmx \
+    stdlib__Pqueue.cmi
+stdlib__Pqueue.cmi : pqueue.mli
 stdlib__Printexc.cmo : printexc.ml \
     stdlib.cmi \
     stdlib__Printf.cmi \
@@ -762,6 +784,13 @@ stdlib__Random.cmi : random.mli \
     stdlib__Nativeint.cmi \
     stdlib__Int64.cmi \
     stdlib__Int32.cmi
+stdlib__Repr.cmo : repr.ml \
+    stdlib.cmi \
+    stdlib__Repr.cmi
+stdlib__Repr.cmx : repr.ml \
+    stdlib.cmx \
+    stdlib__Repr.cmi
+stdlib__Repr.cmi : repr.mli
 stdlib__Result.cmo : result.ml \
     stdlib.cmi \
     stdlib__Seq.cmi \
@@ -876,12 +905,20 @@ std_exit.cmx : \
     std_exit.cmi
 std_exit.cmi :
 stdlib__String.cmo : string.ml \
+    stdlib__Uchar.cmi \
     stdlib.cmi \
+    stdlib__List.cmi \
+    stdlib__Int.cmi \
     stdlib__Bytes.cmi \
+    stdlib__Array.cmi \
     stdlib__String.cmi
 stdlib__String.cmx : string.ml \
+    stdlib__Uchar.cmx \
     stdlib.cmx \
+    stdlib__List.cmx \
+    stdlib__Int.cmx \
     stdlib__Bytes.cmx \
+    stdlib__Array.cmx \
     stdlib__String.cmi
 stdlib__String.cmi : string.mli \
     stdlib__Uchar.cmi \

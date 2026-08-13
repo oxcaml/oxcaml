@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare
 open! Regalloc_utils
 open! Regalloc_irc_utils
-module Doubly_linked_list = Oxcaml_utils.Doubly_linked_list
+module Doubly_linked_list = Doubly_linked_list
 
 module RegWorkListSet = Arrayset.Make (struct
   type t = Reg.t
@@ -30,6 +30,34 @@ let instruction_set_of_instruction_work_list (iwl : InstructionWorkList.t) :
   InstructionWorkList.fold iwl ~init:Instruction.Set.empty ~f:(fun acc elem ->
       Instruction.Set.add elem acc)
 
+module Priority = struct
+  (* Moves with equal priorities are extracted from the work list in decreasing
+     id order, matching the behaviour of the previously-used
+     `InstructionWorkList` (an `Arrayset` whose `choose_and_remove` returned the
+     greatest element). In particular, when the "AFFINITY" parameter is unset
+     all moves have the same priority, and the allocator hence behaves as it did
+     before the introduction of priorities. *)
+  type t =
+    { priority : int;
+      id : InstructionId.t
+    }
+
+  let compare left right =
+    let c = Int.compare left.priority right.priority in
+    if c <> 0 then c else InstructionId.compare left.id right.id
+
+  let to_string { priority; id } =
+    Printf.sprintf "%d(%s)" priority (InstructionId.to_string id)
+end
+
+module PrioritizedWorkList = Priority_queue.Make (Priority)
+
+let instruction_set_of_prioritized_work_list
+    (mwl : Instruction.t PrioritizedWorkList.t) : Instruction.Set.t =
+  PrioritizedWorkList.fold_unordered mwl ~init:Instruction.Set.empty
+    ~f:(fun acc { PrioritizedWorkList.priority = _; data = elem } ->
+      Instruction.Set.add elem acc)
+
 type t =
   { mutable initial : Reg.t Doubly_linked_list.t;
     simplify_work_list : RegWorkListSet.t;
@@ -42,7 +70,7 @@ type t =
     coalesced_moves : InstructionWorkList.t;
     constrained_moves : InstructionWorkList.t;
     frozen_moves : InstructionWorkList.t;
-    work_list_moves : InstructionWorkList.t;
+    work_list_moves : Instruction.t PrioritizedWorkList.t;
     active_moves : InstructionWorkList.t;
     graph : Regalloc_interf_graph.t;
     move_list : Instruction.Set.t Reg.Tbl.t;
@@ -51,14 +79,41 @@ type t =
     mutable inst_temporaries : Reg.Set.t;
     mutable block_temporaries : Reg.Set.t;
     reg_work_list : RegWorkList.t Reg.Tbl.t;
-    reg_color : int option Reg.Tbl.t;
+    reg_color : Regs.Phys_reg.t option Reg.Tbl.t;
     reg_alias : Reg.t option Reg.Tbl.t;
     instr_work_list : InstrWorkList.t InstructionId.Tbl.t
   }
 
+(* CR-someday xclerc for xclerc: the magic `8` default value is the priority
+   giving the best results on the compiler distribution. It is currently a
+   parameter only to make testing / benchmarking easy. *)
+let same_phi_class_prio : int Lazy.t =
+  Regalloc_utils.int_of_param ~default:8 "IRC_SAME_PHI_CLASS_PRIO"
+
+let priority_of_instruction : t -> Cfg.basic Cfg.instruction -> int =
+ fun state instr ->
+  if not (Lazy.force Regalloc_utils.affinity)
+  then 0
+  else
+    match[@ocaml.warning "-fragile-match"] instr.desc with
+    | Cfg.Op Move -> (
+      let src = instr.arg.(0) in
+      let dst = instr.res.(0) in
+      match src.loc, dst.loc with
+      | Unknown, Reg phys_reg ->
+        Regalloc_affinity.priority state.affinity ~temp:src ~phys_reg
+      | Reg phys_reg, Unknown ->
+        Regalloc_affinity.priority state.affinity ~temp:dst ~phys_reg
+      | Unknown, Unknown ->
+        if Regalloc_affinity.same_phi_class state.affinity src dst
+        then Lazy.force same_phi_class_prio
+        else 0
+      | _ -> 0)
+    | _ -> 0
+
 let[@inline] make ~initial ~stack_slots ~affinity () =
   let num_registers = List.length (Reg.all_relocatable_regs ()) in
-  let graph = Regalloc_interf_graph.make ~num_registers in
+  let graph = Regalloc_interf_graph.make () in
   let reg_work_list = Reg.Tbl.create num_registers in
   let reg_color = Reg.Tbl.create num_registers in
   let reg_alias = Reg.Tbl.create num_registers in
@@ -93,7 +148,9 @@ let[@inline] make ~initial ~stack_slots ~affinity () =
   let coalesced_moves = InstructionWorkList.make ~original_capacity in
   let constrained_moves = InstructionWorkList.make ~original_capacity in
   let frozen_moves = InstructionWorkList.make ~original_capacity in
-  let work_list_moves = InstructionWorkList.make ~original_capacity in
+  let work_list_moves =
+    PrioritizedWorkList.make ~initial_capacity:original_capacity
+  in
   let active_moves = InstructionWorkList.make ~original_capacity in
   let move_list = Reg.Tbl.create 128 in
   let inst_temporaries = Reg.Set.empty in
@@ -160,9 +217,12 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
           (Reg.Tbl.find state.reg_work_list reg)
           RegWorkList.Precolored);
       (match reg.Reg.loc, Reg.Tbl.find state.reg_color reg with
-      | Reg color, Some color' -> assert (color = color')
-      | Reg _, None -> assert false
-      | (Unknown | Stack _), _ -> assert false);
+      | Reg color, Some color' -> assert (Regs.Phys_reg.equal color color')
+      | Reg _, None | (Unknown | Stack _), _ ->
+        fatal
+          "Regalloc_irc_state.reset: precolored register %a has unexpected \
+           location/color"
+          Printreg.reg reg);
       Reg.Tbl.replace state.reg_alias reg None;
       Regalloc_interf_graph.init_register_with_infinite_degree state.graph reg;
       assert (Regalloc_interf_graph.degree state.graph reg = Degree.infinite))
@@ -183,7 +243,7 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   InstructionWorkList.clear state.coalesced_moves;
   InstructionWorkList.clear state.constrained_moves;
   InstructionWorkList.clear state.frozen_moves;
-  InstructionWorkList.clear state.work_list_moves;
+  PrioritizedWorkList.clear state.work_list_moves;
   InstructionWorkList.clear state.active_moves;
   Reg.Tbl.clear state.move_list;
   InstructionId.Tbl.clear state.instr_work_list
@@ -205,6 +265,9 @@ let[@inline] degree state reg = Regalloc_interf_graph.degree state.graph reg
 
 let[@inline] set_degree state reg degree =
   Regalloc_interf_graph.set_degree state.graph reg degree
+
+let[@inline] get_max_degree state =
+  Regalloc_interf_graph.get_max_degree state.graph
 
 let[@inline] is_precolored state reg =
   RegWorkList.equal (reg_work_list state reg) RegWorkList.Precolored
@@ -334,16 +397,22 @@ let[@inline] add_frozen_moves state (instr : Instruction.t) =
   InstructionWorkList.add state.frozen_moves instr
 
 let[@inline] is_empty_work_list_moves state =
-  InstructionWorkList.is_empty state.work_list_moves
+  PrioritizedWorkList.is_empty state.work_list_moves
 
 let[@inline] add_work_list_moves state (instr : Instruction.t) =
   set_instr_work_list state ~instruction_id:instr.id ~work_list:Work_list;
-  InstructionWorkList.add state.work_list_moves instr
+  let priority = priority_of_instruction state instr in
+  PrioritizedWorkList.add state.work_list_moves
+    ~priority:{ Priority.priority; id = instr.id }
+    ~data:instr
 
 let[@inline] choose_and_remove_work_list_moves state =
-  match InstructionWorkList.choose_and_remove state.work_list_moves with
-  | None -> fatal "work_list_moves is empty"
-  | Some res ->
+  match PrioritizedWorkList.is_empty state.work_list_moves with
+  | true -> fatal "work_list_moves is empty"
+  | false ->
+    let { PrioritizedWorkList.priority = _; data = res } =
+      PrioritizedWorkList.get_and_remove state.work_list_moves
+    in
     set_instr_work_list state ~instruction_id:(res : Instruction.t).id
       ~work_list:Unknown_list;
     res
@@ -388,7 +457,11 @@ let[@inline] for_all_adjacent state reg ~f =
   in
   Regalloc_interf_graph.for_all_adjacent_if state.graph reg ~should_visit ~f
 
-let[@inline] adj_set state = Regalloc_interf_graph.adj_set state.graph
+let[@inline] cardinal_edges state =
+  Regalloc_interf_graph.For_debug.cardinal_edges state.graph
+
+let[@inline] iter_edges state ~f =
+  Regalloc_interf_graph.For_debug.iter_edges state.graph ~f
 
 let[@inline] is_empty_node_moves state reg =
   match Reg.Tbl.find_opt state.move_list reg with
@@ -431,7 +504,10 @@ let[@inline] enable_moves_one state reg =
       | Active ->
         set_instr_work_list state ~instruction_id:m.id ~work_list:Work_list;
         InstructionWorkList.remove state.active_moves m;
-        InstructionWorkList.add state.work_list_moves m
+        let priority = priority_of_instruction state m in
+        PrioritizedWorkList.add state.work_list_moves
+          ~priority:{ Priority.priority; id = m.id }
+          ~data:m
       | Unknown_list | Coalesced | Constrained | Frozen | Work_list -> ())
 
 let[@inline] decr_degree state reg =
@@ -527,7 +603,9 @@ let update_register_locations state =
           (* because of rewrites, the register may no longer be present *)
           ()
         | Some color ->
-          if debug then log "updating %a to %d" Printreg.reg reg color;
+          if debug
+          then
+            log "updating %a to %a" Printreg.reg reg Regs.Phys_reg.print color;
           Reg.set_loc reg (Reg color)))
 
 let[@inline] check_disjoint sets ~is_disjoint =
@@ -628,7 +706,7 @@ let[@inline] invariant state =
         ( "frozen_moves",
           instruction_set_of_instruction_work_list state.frozen_moves );
         ( "work_list_moves",
-          instruction_set_of_instruction_work_list state.work_list_moves );
+          instruction_set_of_prioritized_work_list state.work_list_moves );
         ( "active_moves",
           instruction_set_of_instruction_work_list state.active_moves ) ];
     List.iter
@@ -643,7 +721,7 @@ let[@inline] invariant state =
           instruction_set_of_instruction_work_list state.frozen_moves,
           InstrWorkList.Frozen );
         ( "work_list_moves",
-          instruction_set_of_instruction_work_list state.work_list_moves,
+          instruction_set_of_prioritized_work_list state.work_list_moves,
           InstrWorkList.Work_list );
         ( "active_moves",
           instruction_set_of_instruction_work_list state.active_moves,

@@ -249,7 +249,7 @@ let construct_and_destruct_1_2 b imm fl i32 i64 i_n =
   +. Int64_u.to_float i64
   +. Nativeint_u.to_float i_n
 
-type t_opt2 = { x : float; y : float# }
+type t_opt2 = { x : float; y : float# } [@@flatten_floats]
 
 let construct_and_destruct_2_1 ~x ~y =
   match { x; y } with

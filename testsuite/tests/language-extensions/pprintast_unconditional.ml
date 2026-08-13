@@ -25,6 +25,7 @@ module Example = struct
   end
 
   let longident        = parse longident "No.Longidents.Require.extensions"
+  let constr           = longident
   let expression       = parse expression "[x for x = 1 to 10]"
   let pattern          = parse pattern "[:_:]"
   let core_type        = parse core_type "local_ ('a : value) -> unit"
@@ -75,6 +76,7 @@ module Example = struct
                          ; pvb_loc = loc
                          ; pvb_constraint = None
                          ; pvb_modes = []
+                         ; pvb_is_poly = false
                          }
   let payload          = PStr structure
   let class_signature  = { pcsig_self = core_type
@@ -90,18 +92,18 @@ module Example = struct
                          ; ptype_loc = loc
                          ; ptype_jkind_annotation =
                              Some
-                               { pjkind_loc = loc;
-                                 pjkind_desc =  Pjk_default;
+                               { pjka_loc = loc;
+                                 pjka_desc =  Pjk_default;
                                }
                          }
   let tyvar            = "no_tyvars_require_extensions"
   let tyvar_of_name    = "no_tyvars_require_extensions"
   let jkind_annotation : jkind_annotation =
-    { pjkind_loc = loc;
-      pjkind_desc =
+    { pjka_loc = loc;
+      pjka_desc =
         Pjk_with
-          ( { pjkind_loc = loc;
-              pjkind_desc = Pjk_abbreviation "value";
+          ( { pjka_loc = loc;
+              pjka_desc = Pjk_abbreviation { loc; txt = (Lident "value") };
             }
           , core_type
           , modalities
@@ -153,6 +155,7 @@ end = struct
   ;;
 
   let longident = test "longident" longident Example.longident
+  let constr = test "constr" constr Example.constr
   let expression = test "expression" expression Example.expression
   let pattern = test "pattern" pattern Example.pattern
   let core_type = test "core_type" core_type Example.core_type
@@ -185,8 +188,10 @@ end = struct
 
   module Doc = struct
     let longident = Doc.longident
+    let constr = Doc.constr
     let tyvar = Doc.tyvar
     let jkind_annotation = Doc.jkind_annotation
+    let nominal_exp = Doc.nominal_exp
   end
 end
 

@@ -188,7 +188,8 @@ val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 Line 3, characters 7-21:
 3 |   else f (fun x -> x)
            ^^^^^^^^^^^^^^
-Warning 18 [not-principal]: applying a higher-rank function here is not principal.
+Warning 18 [not-principal]: applying a higher-rank function here is not
+  principal.
 
 val non_principal1 : bool -> (('a. 'a -> 'a) -> 'b) -> 'b = <fun>
 |}];;
@@ -200,7 +201,7 @@ let non_principal2 p f =
 Line 3, characters 15-16:
 3 |   else with_id f
                    ^
-Error: This expression has type "('b -> 'b) -> 'c"
+Error: The value "f" has type "('b -> 'b) -> 'c"
        but an expression was expected of type "('a. 'a -> 'a) -> 'd"
        The universal variable "'a" would escape its scope
 |}];;
@@ -249,8 +250,47 @@ let non_principal4 =
 Line 2, characters 26-35:
 2 |   [ Some (fun y -> y 6, y "goodbye");
                               ^^^^^^^^^
-Error: This expression has type "string" but an expression was expected of type
+Error: This constant has type "string" but an expression was expected of type
          "int"
+|}];;
+
+(* These examples are similar to the above, but demonstrate we only issue
+   principality warnings for types that are genuinely polymorphic. Because,
+   e.g., explicit quantification over a phantom parameter doesn't rely on
+   inference order. *)
+type 'a phantom_int = int
+
+let use_phantom_int (f : ('a. 'a phantom_int) -> int) = f 42
+
+let phantom_principal1 p f =
+  if p then use_phantom_int f else f 42
+[%%expect {|
+type 'a phantom_int = int
+val use_phantom_int : (('a. int) -> int) -> int = <fun>
+val phantom_principal1 : bool -> (('a. int) -> int) -> int = <fun>
+|}];;
+
+let phantom_principal2 p f =
+  if p then f 42 else use_phantom_int f
+[%%expect {|
+val phantom_principal2 : bool -> (('a. int) -> int) -> int = <fun>
+|}];;
+
+type phantom_poly = ('a . 'a phantom_int) -> int
+
+let phantom_principle3 =
+  [ (Some (fun x -> x) : phantom_poly option);
+    Some (fun y -> y) ]
+[%%expect {|
+type phantom_poly = ('a. int) -> int
+val phantom_principle3 : phantom_poly option list = [Some <fun>; Some <fun>]
+|}];;
+
+let phantom_principle4 =
+  [ Some (fun x -> x);
+    (Some (fun y -> y) : phantom_poly option)]
+[%%expect {|
+val phantom_principle4 : phantom_poly option list = [Some <fun>; Some <fun>]
 |}];;
 
 (* Functions with polymorphic parameters are separate from other functions *)
@@ -280,7 +320,7 @@ let foo (f : p1) : p2 = f
 Line 1, characters 24-25:
 1 | let foo (f : p1) : p2 = f
                             ^
-Error: This expression has type "p1" = "('a. 'a -> 'a) -> int"
+Error: The value "f" has type "p1" = "('a. 'a -> 'a) -> int"
        but an expression was expected of type "('a 'b. 'a -> 'b) -> int"
        Type "'a" is not compatible with type "'b"
 |}];;
@@ -329,7 +369,7 @@ type p2 = ('a. 'a -> 'a) -> int
 Line 4, characters 24-25:
 4 | let foo (x : p1) : p2 = x
                             ^
-Error: This expression has type "p1" = "(bool -> bool) -> int"
+Error: The value "x" has type "p1" = "(bool -> bool) -> int"
        but an expression was expected of type "('a. 'a -> 'a) -> int"
        Type "bool" is not compatible with type "'a"
 |}];;

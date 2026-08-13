@@ -20,16 +20,15 @@ type t
 
 type raw
 
-val to_raw : t -> raw * Oxcaml_utils.File_sections.t
+val from_raw : sections:File_sections.t -> raw -> t
 
-val from_raw : sections:Oxcaml_utils.File_sections.t -> raw -> t
-
-val create :
+val create_raw :
   final_typing_env:Flambda2_types.Typing_env.Serializable.t ->
   all_code:Exported_code.t ->
   exported_offsets:Exported_offsets.t ->
   used_value_slots:Value_slot.Set.t ->
-  t
+  sections:File_sections.Builder.t ->
+  raw
 
 val import_typing_env_and_code :
   t -> Flambda2_types.Typing_env.Serializable.t * Exported_code.t
@@ -38,8 +37,8 @@ val exported_offsets : t -> Exported_offsets.t
 
 val with_exported_offsets : t -> Exported_offsets.t -> t
 
-(** Aggregate several cmx into one for packs *)
-val merge : t option -> t option -> t option
+(** Create the Flambda data for a pack *)
+val pack : sections:File_sections.Builder.t -> t option list -> raw option
 
 (** For ocamlobjinfo *)
 val print :

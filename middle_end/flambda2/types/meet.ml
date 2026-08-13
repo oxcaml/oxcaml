@@ -29,10 +29,10 @@ let meet env t1 t2 =
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
 (* Internal use only *)
-let[@inline] meet_type () =
+let[@inline] meet_expanded_head () =
   if Flambda_features.use_n_way_join ()
-  then Meet_and_n_way_join.meet_type
-  else Meet_and_join.meet_type
+  then Meet_and_n_way_join.meet_expanded_head
+  else Meet_and_join.meet_expanded_head
 
 let meet_shape env t ~shape : _ Or_bottom.t =
   if Typing_env.is_bottom env

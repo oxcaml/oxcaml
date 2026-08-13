@@ -21,6 +21,7 @@ want to modify OxCaml.  Jump to:
   - [How to add a new intrinsic to the compiler](#how-to-add-a-new-intrinsic-to-the-compiler)
   - [How to add a new command line option](#how-to-add-a-new-command-line-option)
   - [Installation tree comparison script](#installation-tree-comparison-script)
+  - [Updating Merlin](#updating-merlin)
 
 ## Branches, pull requests, etc.
 
@@ -56,8 +57,8 @@ In the event that one needs to rebase a patch over formatting changes, here is a
 Assuming a specific formatting commit:
 ```shell
 # main formatting commit for flambda2/ in the repository
-format_commit=first-ocamlformat.0.28.1
-previous_commit=last-ocamlformat.0.24.1 # or $format_commit~1
+format_commit=first-ocamlformat.0.29.0
+previous_commit=last-ocamlformat.0.28.1 # or $format_commit~1
 ```
 
 Rebase as usual until its parent:
@@ -82,9 +83,7 @@ Depending on the initial changes, it might be necessary to do this multiple time
 
 To rebuild after making changes, you can just type `make`. You need to
 have a working OCaml 5.4.0 compiler on your PATH before doing so,
-e.g. installed via OPAM. You also need to have dune and menhir.
-
-`menhir` should be pinned to a specific version: `opam pin add menhir 20231231`.
+e.g. installed via OPAM. You also need to have dune and menhir, which must be at specific versions.
 
 There is a special target `make hacking` which starts Dune in polling mode.  The rebuild
 performed here is equivalent to `make ocamlopt` in the upstream distribution: it rebuilds the
@@ -108,7 +107,6 @@ install parallel`.
 
 There is also a `make ci` target which does a full build and test run.
 
-Some of our tests are expect tests run using a custom tool called `flexpect`.
 Corrected outputs can be promoted using `make promote`.
 
 See `HACKING.ox.adoc` for documentation on additional test-related
@@ -274,7 +272,7 @@ ocamldebug emacs mode as follows:
    printing any value may produce `Cannot find module Misc.` or similar
    errors).  If debugging `ocamlc`, run:
    ```
-   (ocd) directory _build/main/.ocamlcommon.objs/byte
+   (ocd) directory _build/main/.ocamlfrontend.objs/byte
    ```
    If debugging `ocamlopt`, you'll need various additional directories depending
    on your middle end.  You can find the right directories by searching for cmo
@@ -303,8 +301,8 @@ for the first stage.
 This is still under development, but should work!
 ```shell
 opam repo add oxcaml git+https://github.com/chambart/opam-repository-js.git#with-extensions
-opam switch create 5.2.0+oxcaml --repos oxcaml,default
-eval $(opam env --switch=5.2.0+oxcaml)
+opam switch create 5.4.0+oxcaml --repos oxcaml,default
+eval $(opam env --switch=5.4.0+oxcaml)
 ```
 
 ## Testing the compiler built locally with OPAM (old method)
@@ -353,7 +351,7 @@ available whatever the current active switch is.
 Once the plugin is installed, we can use it to install the compiler:
 
 ```shell
-opam custom-install ocaml-variants.5.2.0+oxcaml -- make -C ${oxcaml-root-dir} install_for_opam
+opam custom-install ocaml-variants.5.4.0+oxcaml -- make -C ${oxcaml-root-dir} install_for_opam
 ```
 The `-C ${oxcaml-dir}` part can be omitted if we're still in the build directory.
 
@@ -362,7 +360,7 @@ it is recommended to run the command `opam reinstall --forget-pending` after
 every use of `opam custom-install`, otherwise any subsequent `opam` command
 tries to rebuild the compiler from scratch.
 
-To finish the installation, `opam install ocaml.5.2.0` will install the remaining
+To finish the installation, `opam install ocaml.5.4.0` will install the remaining
 auxiliary packages necessary for a regular switch. After that, normal opam
 packages can be installed the usual way.
 
@@ -375,7 +373,7 @@ As `opam-custom-install` is still experimental, it can sometimes be hard to inst
 In this case, it is possible to use the more fragile `opam install --fake` command:
 
 ```shell
-opam install --fake ocaml-variants.5.2.0+oxcaml
+opam install --fake ocaml-variants.5.4.0+oxcaml
 make -C ${oxcaml-root-dir} install_for_opam
 ```
 
@@ -477,3 +475,7 @@ takes a while (between 2 and 3 hours).
 
 On the OxCaml side (in this repo), modify `build.yml` to point to the new tag
 and branch the runner should use for the tests.
+
+## Updating Merlin
+
+This repository contains Merlin, a library and CLI for editor support for OCaml, in [`external/merlin`](./external/merlin). Merlin vendors the frontend code of the compiler, but makes some modifications to it. As a result, when we make a change to the compiler’s frontend, we must update Merlin accordingly (a GitHub CI check asserts that we do so). Take a look at [`external/merlin/HACKING.jst.md`](external/merlin/HACKING.jst.md) for more information.

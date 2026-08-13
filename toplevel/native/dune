@@ -23,7 +23,7 @@
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries
-  ocamlcommon
+  ocamlfrontend
   ocamlbytecomp
   ocamloptcomp
   oxcaml_common
@@ -42,6 +42,7 @@
 (executable
  (name topstart)
  (modes native)
+ (flags (:standard -linkall))
  (libraries ocamlopttoplevel)
  (modules topstart))
 

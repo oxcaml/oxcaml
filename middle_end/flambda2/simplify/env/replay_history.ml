@@ -22,11 +22,20 @@ module Action = struct
   type t =
     | Bound_variable of Variable.t
     | Bound_continuations of Continuation.t list
+    | Inlining_decision of Call_site_inlining_decision_type.t * Apply_expr.t
+  (* the apply is here for debug pruposes *)
 
   let[@ocamlformat "disable"] print ppf = function
     | Bound_variable v -> Variable.print ppf v
     | Bound_continuations l ->
-        Format.pp_print_list ~pp_sep:Format.pp_print_space Continuation.print ppf l
+      Format.pp_print_list ~pp_sep:Format.pp_print_space Continuation.print ppf l
+    | Inlining_decision (decision, apply) ->
+      Format.fprintf ppf "@[<hov 1>(inlining_decision@ \
+        @[<hov 1>(decision@ %a)@]@ \
+        @[<hov 1>(apply@ %a)@]\
+        )@]"
+      Call_site_inlining_decision_type.print decision
+      Apply_expr.print apply
 end
 
 (* Type def *)
@@ -109,6 +118,8 @@ let error_not_renamed_version_of replay old_action new_action =
      action: %a@ new action: %a@ replay: %a"
     Action.print old_action Action.print new_action print replay
 
+let check_coherent_inlining_decisions _old_decision _new_decision = ()
+
 let define_variable var replay =
   let action : Action.t = Bound_variable var in
   match replay with
@@ -126,7 +137,8 @@ let define_variable var replay =
       else
         let variables = Variable.Map.add var prev_var variables in
         Replaying { previous_history; variables; continuations; always_inline }
-    | Bound_continuations _ -> error_mismatched_action replay prev_bound action)
+    | Bound_continuations _ | Inlining_decision _ ->
+      error_mismatched_action replay prev_bound action)
   | Replaying { previous_history = []; _ } -> error_empty_history replay action
 
 let define_continuations ~can_be_lifted conts replay =
@@ -158,7 +170,26 @@ let define_continuations ~can_be_lifted conts replay =
             continuations prev_conts conts
         in
         Replaying { previous_history; variables; continuations; always_inline }
-    | Bound_variable _ -> error_mismatched_action replay prev_bound action)
+    | Bound_variable _ | Inlining_decision _ ->
+      error_mismatched_action replay prev_bound action)
+  | Replaying { previous_history = []; _ } -> error_empty_history replay action
+
+let record_inlining_decision ~apply decision replay =
+  let action : Action.t = Inlining_decision (decision, apply) in
+  match replay with
+  | First_pass { history } -> First_pass { history = action :: history }
+  | Replaying
+      { previous_history = prev_bound :: previous_history;
+        variables;
+        continuations;
+        always_inline
+      } -> (
+    match prev_bound with
+    | Inlining_decision (prev_decision, _apply) ->
+      check_coherent_inlining_decisions prev_decision decision;
+      Replaying { previous_history; variables; continuations; always_inline }
+    | Bound_variable _ | Bound_continuations _ ->
+      error_mismatched_action replay prev_bound action)
   | Replaying { previous_history = []; _ } -> error_empty_history replay action
 
 (* Inspection API *)
@@ -185,3 +216,15 @@ let replay_continuation_mapping = function
       { continuations; previous_history = _; variables = _; always_inline = _ }
     ->
     Replayed continuations
+
+let replay_inlining_decision = function
+  | First_pass _ -> Still_recording
+  | Replaying
+      { previous_history = Inlining_decision (decision, _apply) :: _; _ } ->
+    Replayed decision
+  | Replaying
+      { previous_history = [] | (Bound_variable _ | Bound_continuations _) :: _;
+        _
+      } ->
+    Misc.fatal_errorf
+      "Cannot replay: the last action was not an inlining decision"

@@ -201,13 +201,19 @@ let _ : int8 = 1s
 let _ : int8 = 0s
 let _ : int8 = 127s
 let _ : int8 = -128s
-let _ : int8 = 128s
 [%%expect{|
 - : int8 = 1s
 - : int8 = 0s
 - : int8 = 127s
 - : int8 = -128s
-- : int8 = -128s
+|}]
+
+let _ : int8 = 128s
+[%%expect{|
+Line 1, characters 15-19:
+1 | let _ : int8 = 128s
+                   ^^^^
+Error: Integer literal exceeds the range of representable integers of type "int8"
 |}]
 
 let _ : int8 = 129s
@@ -356,8 +362,7 @@ Lines 2-4, characters 2-11:
 3 |   | 0s -> 0
 4 |   | 1s -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-2s
+  Here is an example of a case that is not matched: "2s"
 
 - : int = 1
 |}]
@@ -403,13 +408,19 @@ let _ : int16 = 1S
 let _ : int16 = 0S
 let _ : int16 = 32767S
 let _ : int16 = -32768S
-let _ : int16 = 32768S
 [%%expect{|
 - : int16 = 1S
 - : int16 = 0S
 - : int16 = 32767S
 - : int16 = -32768S
-- : int16 = -32768S
+|}]
+
+let _ : int16 = 32768S
+[%%expect{|
+Line 1, characters 16-22:
+1 | let _ : int16 = 32768S
+                    ^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int16"
 |}]
 
 let _ : int16 = 32769S
@@ -558,8 +569,7 @@ Lines 2-4, characters 2-11:
 3 |   | 0S -> 0
 4 |   | 1S -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-2S
+  Here is an example of a case that is not matched: "2S"
 
 - : int = 1
 |}]
@@ -680,8 +690,7 @@ Lines 2-4, characters 2-13:
 3 |   | #'a' -> 0
 4 |   | #'b' -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#'c'
+  Here is an example of a case that is not matched: "#'c'"
 
 - : int = 1
 |}]
@@ -779,8 +788,7 @@ Lines 2-4, characters 2-12:
 3 |   | #0s -> 0
 4 |   | #1s -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#2s
+  Here is an example of a case that is not matched: "#2s"
 
 - : int = 1
 |}]
@@ -911,8 +919,7 @@ Lines 2-4, characters 2-12:
 3 |   | #0S -> 0
 4 |   | #1S -> 1
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-#2S
+  Here is an example of a case that is not matched: "#2S"
 
 - : int = 1
 |}]

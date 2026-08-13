@@ -1,6 +1,4 @@
-(* TEST
- flags = "-alert -unsafe_multidomain";
-*)
+(* TEST *)
 
 let r = Atomic.make 1
 let () = assert (Atomic.get r = 1)

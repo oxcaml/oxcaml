@@ -10,44 +10,17 @@ let float32 f = f |> Numeric_types.Float32_by_bit_pattern.to_float
 
 let float f = f |> Numeric_types.Float_by_bit_pattern.to_float
 
+let int i = i |> Target_ocaml_int.to_int64
+
 let vec128 v = v |> Vector_types.Vec128.Bit_pattern.to_bits
 
 let vec256 v = v |> Vector_types.Vec256.Bit_pattern.to_bits
 
 let vec512 v = v |> Vector_types.Vec512.Bit_pattern.to_bits
 
-let targetint i = i |> Targetint_32_64.to_int64
+let mask v = v |> Vector_types.Mask.Bit_pattern.to_bits
 
-let const c : Fexpr.const =
-  match Reg_width_const.descr c with
-  | Naked_immediate imm ->
-    Naked_immediate
-      (* CR mshinwell: machine_width should be passed through properly here *)
-      (let machine_width = Target_system.Machine_width.Sixty_four in
-       imm
-       |> Target_ocaml_int.to_targetint machine_width
-       |> Targetint_32_64.to_string)
-  | Tagged_immediate imm ->
-    Tagged_immediate
-      (* CR mshinwell: machine_width should be passed through properly here *)
-      (let machine_width = Target_system.Machine_width.Sixty_four in
-       imm
-       |> Target_ocaml_int.to_targetint machine_width
-       |> Targetint_32_64.to_string)
-  | Naked_float f -> Naked_float (f |> float)
-  | Naked_float32 f -> Naked_float32 (f |> float32)
-  | Naked_int32 i -> Naked_int32 i
-  | Naked_int64 i -> Naked_int64 i
-  | Naked_vec128 bits ->
-    Naked_vec128 (Vector_types.Vec128.Bit_pattern.to_bits bits)
-  | Naked_vec256 bits ->
-    Naked_vec256 (Vector_types.Vec256.Bit_pattern.to_bits bits)
-  | Naked_vec512 bits ->
-    Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
-  | Naked_nativeint i -> Naked_nativeint (i |> targetint)
-  | Naked_int8 _ | Naked_int16 _ ->
-    Misc.fatal_error "small integers not supported in fexpr"
-  | Null -> Null
+let targetint i = i |> Targetint_32_64.to_int64
 
 let depth_or_infinity (d : int Or_infinity.t) : Fexpr.rec_info =
   match d with Finite d -> Depth d | Infinity -> Infinity
@@ -77,19 +50,6 @@ let coercion env (co : Coercion.t) : Fexpr.coercion =
     let to_ = rec_info env to_ in
     Change_depth { from; to_ }
 
-let simple env s =
-  Simple.pattern_match s
-    ~name:(fun n ~coercion:co : Fexpr.simple ->
-      let s : Fexpr.simple =
-        match name env n with Var v -> Var v | Symbol s -> Symbol s
-      in
-      if Coercion.is_id co
-      then s
-      else
-        let co = coercion env co in
-        Coerce (s, co))
-    ~const:(fun c -> Fexpr.Const (const c))
-
 let is_default_kind_with_subkind (k : Flambda_kind.With_subkind.t) =
   Flambda_kind.is_value (Flambda_kind.With_subkind.kind k)
   && not (Flambda_kind.With_subkind.has_useful_subkind_info k)
@@ -106,6 +66,7 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Boxed_vec128 -> Boxed_vec128
   | Boxed_vec256 -> Boxed_vec256
   | Boxed_vec512 -> Boxed_vec512
+  | Boxed_mask -> Boxed_mask
   | Tagged_immediate -> Tagged_immediate
   | Variant { consts; non_consts } -> variant_subkind consts non_consts
   | Float_array -> Float_array
@@ -113,12 +74,18 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Value_array -> Value_array
   | Generic_array -> Generic_array
   | Float_block { num_fields } -> Float_block { num_fields }
-  | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
-  | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
-  | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
-  | Unboxed_vec512_array | Unboxed_product_array ->
-    Misc.fatal_error
-      "fexpr support for arrays of unboxed elements not yet implemented"
+  | Unboxed_float32_array -> Unboxed_float32_array
+  | Untagged_int_array -> Untagged_int_array
+  | Untagged_int8_array -> Untagged_int8_array
+  | Untagged_int16_array -> Untagged_int16_array
+  | Unboxed_int32_array -> Unboxed_int32_array
+  | Unboxed_int64_array -> Unboxed_int64_array
+  | Unboxed_nativeint_array -> Unboxed_nativeint_array
+  | Unboxed_vec128_array -> Unboxed_vec128_array
+  | Unboxed_vec256_array -> Unboxed_vec256_array
+  | Unboxed_vec512_array -> Unboxed_vec512_array
+  | Unboxed_mask_array -> Unboxed_mask_array
+  | Unboxed_product_array -> Unboxed_product_array
 
 and variant_subkind consts non_consts : Fexpr.subkind =
   let consts =
@@ -167,25 +134,79 @@ let kinded_parameter env (kp : Bound_parameter.t) :
   let param, env = Env.bind_var env (Bound_parameter.var kp) in
   { param; kind = k }, env
 
+let const c : Fexpr.const =
+  match Reg_width_const.descr c with
+  | Naked_immediate imm ->
+    Naked_immediate
+      (* CR mshinwell: machine_width should be passed through properly here *)
+      (let machine_width = Target_system.Machine_width.Sixty_four in
+       imm
+       |> Target_ocaml_int.to_targetint machine_width
+       |> Targetint_32_64.to_string)
+  | Tagged_immediate imm ->
+    Tagged_immediate
+      (* CR mshinwell: machine_width should be passed through properly here *)
+      (let machine_width = Target_system.Machine_width.Sixty_four in
+       imm
+       |> Target_ocaml_int.to_targetint machine_width
+       |> Targetint_32_64.to_string)
+  | Naked_float f -> Naked_float (f |> float)
+  | Naked_float32 f -> Naked_float32 (f |> float32)
+  | Naked_int8 i -> Naked_int8 i
+  | Naked_int16 i -> Naked_int16 i
+  | Naked_int32 i -> Naked_int32 i
+  | Naked_int64 i -> Naked_int64 i
+  | Naked_vec128 bits ->
+    Naked_vec128 (Vector_types.Vec128.Bit_pattern.to_bits bits)
+  | Naked_vec256 bits ->
+    Naked_vec256 (Vector_types.Vec256.Bit_pattern.to_bits bits)
+  | Naked_vec512 bits ->
+    Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
+  | Naked_mask bits -> Naked_mask (Vector_types.Mask.Bit_pattern.to_bits bits)
+  | Naked_nativeint i -> Naked_nativeint (i |> targetint)
+  | Null -> Null
+  | Poison (kind, name) ->
+    let kind = kind_with_subkind (Flambda_kind.With_subkind.anything kind) in
+    Poison (kind, name)
+
+let simple env s =
+  Simple.pattern_match s
+    ~name:(fun n ~coercion:co : Fexpr.simple ->
+      let s : Fexpr.simple =
+        match name env n with Var v -> Var v | Symbol s -> Symbol s
+      in
+      if Coercion.is_id co
+      then s
+      else
+        let co = coercion env co in
+        Coerce (s, co))
+    ~const:(fun c -> Fexpr.Const (const c))
+
 let recursive_flag (r : Recursive.t) : Fexpr.is_recursive =
   match r with Recursive -> Recursive | Non_recursive -> Nonrecursive
 
 let alloc_mode_for_allocations env (alloc : Alloc_mode.For_allocations.t) :
     Fexpr.alloc_mode_for_allocations =
   match alloc with
-  | Heap -> Heap
-  | Local { region = r } ->
-    let r = Env.find_region_exn env r in
-    Local { region = r }
+  | Heap { alloc_region } ->
+    let alloc_region = Env.find_region_exn env alloc_region in
+    Heap { alloc_region }
+  | Local { alloc_region; region } ->
+    let alloc_region = Env.find_region_exn env alloc_region in
+    let region = Env.find_region_exn env region in
+    Local { alloc_region; region }
 
 let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
-    Fexpr.alloc_mode_for_applications =
+    Fexpr.region Fexpr.alloc_mode_for_applications =
   match alloc with
-  | Heap -> Heap
-  | Local { region = r; ghost_region = r' } ->
-    let r = Env.find_region_exn env r in
-    let r' = Env.find_region_exn env r' in
-    Local { region = r; ghost_region = r' }
+  | Not_alloc_stack { alloc_region } ->
+    let alloc_region = Env.find_region_exn env alloc_region in
+    Not_alloc_stack { alloc_region }
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
+    let alloc_region = Env.find_region_exn env alloc_region in
+    let region = Env.find_region_exn env region in
+    let ghost_region = Env.find_region_exn env ghost_region in
+    Maybe_alloc_stack { alloc_region; region; ghost_region }
 
 let prim env (p : Flambda_primitive.t) : Fexpr.prim =
   let p, args = Fexpr_prim.OfFlambda.prim env p in
@@ -194,13 +215,17 @@ let prim env (p : Flambda_primitive.t) : Fexpr.prim =
 let value_slots env map =
   List.map
     (fun (var, value) ->
-      let kind = Value_slot.kind var in
-      if not (Flambda_kind.equal kind Flambda_kind.value)
-      then
-        Misc.fatal_errorf "Value slot %a not of kind Value" Simple.print value;
+      let kind : Flambda_kind.Naked_number_kind.t option =
+        match Value_slot.kind var with
+        | Value -> None
+        | Naked_number naked_number_kind -> Some naked_number_kind
+        | (Region | Rec_info) as kind ->
+          Misc.fatal_errorf "Value slot %a of unexpected kind %a" Simple.print
+            value Flambda_kind.print kind
+      in
       let var = Env.translate_value_slot env var in
       let value = simple env value in
-      { Fexpr.var; value })
+      { Fexpr.var; value; kind })
     (map |> Value_slot.Map.bindings)
 
 let function_declaration env code_id function_slot alloc : Fexpr.fun_decl =
@@ -212,11 +237,9 @@ let function_declaration env code_id function_slot alloc : Fexpr.fun_decl =
     then None
     else Some function_slot
   in
-  let alloc = alloc |> alloc_mode_for_allocations env in
   { code_id; function_slot; alloc }
 
-let set_of_closures env sc =
-  let alloc = Set_of_closures.alloc_mode sc in
+let set_of_closures env sc alloc =
   let fun_decls =
     List.map
       (fun (function_slot, fun_decl) ->
@@ -241,17 +264,7 @@ let field_of_block env field =
       Dynamically_computed (Env.find_var_exn env var))
     ~symbol:(fun symbol ~coercion:_ : Fexpr.field_of_block ->
       Symbol (Env.find_symbol_exn env symbol))
-    ~const:(fun cst : Fexpr.field_of_block ->
-      match[@ocaml.warning "-fragile-match"] Reg_width_const.descr cst with
-      | Tagged_immediate imm ->
-        Tagged_immediate
-          (* CR mshinwell: machine_width should be passed through properly
-             here *)
-          (let machine_width = Target_system.Machine_width.Sixty_four in
-           imm
-           |> Target_ocaml_int.to_targetint machine_width
-           |> Targetint_32_64.to_string)
-      | _ -> Misc.fatal_error "Mixed blocks not supported yet in fexpr")
+    ~const:(fun cst : Fexpr.field_of_block -> Const (const cst))
 
 let or_variable f env (ov : _ Or_variable.t) : _ Fexpr.or_variable =
   match ov with
@@ -273,20 +286,36 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
   | Boxed_vec128 i -> Boxed_vec128 (or_variable vec128 env i)
   | Boxed_vec256 i -> Boxed_vec256 (or_variable vec256 env i)
   | Boxed_vec512 i -> Boxed_vec512 (or_variable vec512 env i)
+  | Boxed_mask i -> Boxed_mask (or_variable mask env i)
   | Immutable_float_block elements ->
     Immutable_float_block (List.map (or_variable float env) elements)
   | Immutable_float_array elements ->
     Immutable_float_array (List.map (or_variable float env) elements)
+  | Immutable_float32_array elements ->
+    Immutable_float32_array (List.map (or_variable float32 env) elements)
   | Immutable_value_array elements ->
     Immutable_value_array (List.map (field_of_block env) elements)
-  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
-  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
-  | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _ ->
-    Misc.fatal_error
-      "fexpr support for arrays of unboxed elements not yet implemented"
+  | Immutable_int_array elements ->
+    Immutable_int_array (List.map (or_variable int env) elements)
+  | Immutable_int8_array elements ->
+    Immutable_int8_array (List.map (or_variable Fun.id env) elements)
+  | Immutable_int16_array elements ->
+    Immutable_int16_array (List.map (or_variable Fun.id env) elements)
+  | Immutable_int32_array elements ->
+    Immutable_int32_array (List.map (or_variable Fun.id env) elements)
+  | Immutable_int64_array elements ->
+    Immutable_int64_array (List.map (or_variable Fun.id env) elements)
+  | Immutable_nativeint_array elements ->
+    Immutable_nativeint_array (List.map (or_variable targetint env) elements)
+  | Immutable_vec128_array elements ->
+    Immutable_vec128_array (List.map (or_variable vec128 env) elements)
+  | Immutable_vec256_array elements ->
+    Immutable_vec256_array (List.map (or_variable vec256 env) elements)
+  | Immutable_vec512_array elements ->
+    Immutable_vec512_array (List.map (or_variable vec512 env) elements)
+  | Immutable_mask_array elements ->
+    Immutable_mask_array (List.map (or_variable mask env) elements)
   | Empty_array array_kind -> Empty_array array_kind
-  | Mutable_string { initial_value } -> Mutable_string { initial_value }
   | Immutable_string s -> Immutable_string s
 
 let inlining_state (is : Inlining_state.t) : Fexpr.inlining_state option =
@@ -324,8 +353,9 @@ and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
     match defining_expr with
     | Simple s -> ([Simple (simple env s)] : Fexpr.named list), None
     | Prim (p, _dbg) -> ([Prim (prim env p)] : Fexpr.named list), None
-    | Set_of_closures sc ->
-      let fun_decls, value_slots = set_of_closures env sc in
+    | Set_of_closures (sc, alloc_mode) ->
+      let alloc_mode = alloc_mode_for_allocations env alloc_mode in
+      let fun_decls, value_slots = set_of_closures env sc alloc_mode in
       let defining_exprs =
         List.map (fun decl : Fexpr.named -> Fexpr.Closure decl) fun_decls
       in
@@ -376,7 +406,9 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       Data { symbol; defining_expr }
     | Set_of_closures closure_symbols, Static_const const ->
       let set = Static_const.must_be_set_of_closures const in
-      let fun_decls, elements = set_of_closures env set in
+      let fun_decls, elements =
+        set_of_closures env set (Heap { alloc_region = Toplevel_alloc_region })
+      in
       let symbols_by_function_slot =
         closure_symbols |> Function_slot.Lmap.bindings
         |> Function_slot.Map.of_list
@@ -417,6 +449,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         else Some (Code.loopify code)
       in
       let is_tupled = Code.is_tupled code in
+      let stub = Code.stub code in
       let params_and_body =
         Flambda.Function_params_and_body.pattern_match
           (Code.params_and_body code)
@@ -427,8 +460,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               ~body
               ~my_closure
               ~is_my_closure_used:_
-              ~my_region
-              ~my_ghost_region
+              ~my_alloc_mode
               ~my_depth
               ~free_names_of_body:_
               :
@@ -445,15 +477,20 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
                 (Bound_parameters.to_list params)
             in
             let closure_var, env = Env.bind_var env my_closure in
-            let region_var, env =
-              match my_region with
-              | None -> nowhere "_region", env
-              | Some my_region -> Env.bind_var env my_region
-            in
-            let ghost_region_var, env =
-              match my_ghost_region with
-              | None -> nowhere "_ghost_region", env
-              | Some my_ghost_region -> Env.bind_var env my_ghost_region
+            let (region_vars : _ Fexpr.alloc_mode_for_applications), env =
+              match my_alloc_mode with
+              | Not_alloc_stack { alloc_region } ->
+                let alloc_region, env = Env.bind_var env alloc_region in
+                Not_alloc_stack { alloc_region }, env
+              | Maybe_alloc_stack
+                  { alloc_region = my_alloc_region;
+                    region = my_region;
+                    ghost_region = my_ghost_region
+                  } ->
+                let alloc_region, env = Env.bind_var env my_alloc_region in
+                let region, env = Env.bind_var env my_region in
+                let ghost_region, env = Env.bind_var env my_ghost_region in
+                Maybe_alloc_stack { alloc_region; region; ghost_region }, env
             in
             let depth_var, env = Env.bind_var env my_depth in
             let body = expr env body in
@@ -462,8 +499,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               ret_cont;
               exn_cont;
               closure_var;
-              region_var;
-              ghost_region_var;
+              region_vars;
               depth_var;
               body
             })
@@ -471,10 +507,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       let code_size =
         Code.cost_metrics code |> Cost_metrics.size |> Code_size.to_int
       in
-      let result_mode : Fexpr.alloc_mode_for_assignments =
+      let result_mode : Fexpr.alloc_mode_for_return =
         match Code.result_mode code with
-        | Alloc_heap -> Heap
-        | Alloc_local -> Local
+        | Not_alloc_stack -> Not_alloc_stack
+        | Maybe_alloc_stack -> Maybe_alloc_stack
       in
       Code
         { id = code_id;
@@ -487,6 +523,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
           params_and_body;
           code_size;
           is_tupled;
+          stub;
           result_mode
         }
     | Code code_id, Deleted_code ->
@@ -586,15 +623,7 @@ and cont_handler env cont_id (sort : Continuation.Sort.t) h =
       { name = cont_id; params; sort; handler })
 
 and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
-  (* CR mshinwell: support optional callee *)
-  let callee =
-    match Apply_expr.callee app with
-    | None ->
-      Misc.fatal_errorf "Missing callees are not yet supported:@ %a"
-        Apply_expr.print app
-    | Some callee -> callee
-  in
-  let func = simple env callee in
+  let func = Option.map (simple env) (Apply_expr.callee app) in
   let continuation : Fexpr.result_continuation =
     match Apply_expr.continuation app with
     | Return c -> Return (Env.find_continuation_exn env c)
@@ -612,7 +641,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   in
   let args = List.map (simple env) (Apply_expr.args app) in
   let alloc_mode =
-    alloc_mode_for_applications env (Apply_expr.alloc_mode app)
+    alloc_mode_for_applications env (Apply_expr.return_mode app)
   in
   let call_kind : Fexpr.call_kind =
     match Apply_expr.call_kind app with
@@ -625,7 +654,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
         { function_call = Indirect_unknown_arity | Indirect_known_arity _ } ->
       Function Indirect
     | C_call { needs_caml_c_call; _ } -> C_call { alloc = needs_caml_c_call }
-    | Method _ -> Misc.fatal_error "TODO: Method call kind"
+    | Method { kind; obj } -> Method { kind; obj = simple env obj }
     | Effect _ -> Misc.fatal_error "TODO: Effect call kind"
   in
   let param_arity = Apply_expr.args_arity app in
@@ -651,7 +680,10 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       let ret_arity = arity return_arity in
       Some { params_arity; ret_arity }
     | Function { function_call = Indirect_unknown_arity } -> None
-    | Method _ | Effect _ -> assert false
+    | Method _ ->
+      (* CR keryan: maybe use the method kind *)
+      None
+    | Effect _ -> assert false
   in
   let inlined : Fexpr.inlined_attribute option =
     if Flambda2_terms.Inlined_attribute.is_default (Apply_expr.inlined app)
@@ -711,7 +743,7 @@ and switch_expr env switch : Fexpr.expr =
           |> Targetint_32_64.to_int
         in
         let app_cont = apply_cont env app_cont in
-        tag, app_cont)
+        tag, Fexpr.Named_cont app_cont)
       (Switch_expr.arms switch |> Target_ocaml_int.Map.bindings)
   in
   Switch { scrutinee; cases }
@@ -732,7 +764,7 @@ module Iter = struct
   and named let_expr (bound_pattern : Bound_pattern.t) f_c f_s n =
     match (n : Named.t) with
     | Simple _ | Prim _ | Rec_info _ -> ()
-    | Set_of_closures s ->
+    | Set_of_closures (s, _alloc_mode) ->
       let is_phantom =
         Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
       in
@@ -799,8 +831,7 @@ module Iter = struct
               ~body
               ~my_closure:_
               ~is_my_closure_used:_
-              ~my_region:_
-              ~my_ghost_region:_
+              ~my_alloc_mode:_
               ~my_depth:_
               ~free_names_of_body:_
             -> expr f_c f_s body))
@@ -829,11 +860,20 @@ let bind_all_code_ids env unit =
 let conv flambda_unit =
   let done_ = Flambda_unit.return_continuation flambda_unit in
   let error = Flambda_unit.exn_continuation flambda_unit in
-  let toplevel = Flambda_unit.toplevel_my_region flambda_unit in
   let env = Env.create () in
   let env = Env.bind_special_continuation env done_ ~to_:Done in
   let env = Env.bind_special_continuation env error ~to_:Error in
-  let env = Env.bind_toplevel_region env toplevel in
+  let env =
+    Env.bind_toplevel_alloc_region env
+      (Flambda_unit.toplevel_my_alloc_region flambda_unit)
+  in
+  let env =
+    Env.bind_toplevel_region env (Flambda_unit.toplevel_my_region flambda_unit)
+  in
+  let env =
+    Env.bind_toplevel_ghost_region env
+      (Flambda_unit.toplevel_my_ghost_region flambda_unit)
+  in
   (* Bind all code ids in toplevel let bindings at the start, since they don't
      necessarily occur in dependency order *)
   let env = bind_all_code_ids env flambda_unit in

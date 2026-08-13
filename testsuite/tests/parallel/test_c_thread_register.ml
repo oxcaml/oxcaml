@@ -1,8 +1,6 @@
 (* TEST
- flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  modules = "test_c_thread_register_cstubs.c";
- runtime5;
- multidomain;
+ multicore;
  include systhreads;
  hassysthreads;
  {

@@ -16,7 +16,29 @@
 #ifndef __TEST_COMMON_H
 #define __TEST_COMMON_H
 
+#ifdef __x86_64__
+
 #include <immintrin.h>
+#define caml_float64x2     __m128d
+#define caml_int64x2       __m128i
+#define get_int128(n)      _mm_loadu_si128((__m128i*)(ocaml_buffer+((n)*STRIDE)))
+#define get_float128(n)    _mm_loadu_pd((double*)(ocaml_buffer+((n)*STRIDE)))
+#define set_int128(n, x)   _mm_storeu_si128((__m128i*)(c_buffer+((n)*STRIDE)), (x))
+#define set_float128(n, x) _mm_storeu_pd((double*)(c_buffer+((n)*STRIDE)), (x))
+
+#elif defined(__aarch64__)
+
+#include <arm_neon.h>
+#define caml_float64x2     float64x2_t
+#define caml_int64x2       uint64x2_t
+#define get_int128(n)      vld1q_u64((uint64_t*)(ocaml_buffer+((n)*STRIDE)))
+#define get_float128(n)    vld1q_f64((float64_t*)(ocaml_buffer+((n)*STRIDE)))
+#define set_int128(n, x)   vst1q_u64((uint64_t*)(c_buffer+((n)*STRIDE)), (x))
+#define set_float128(n, x) vst1q_f64((float64_t*)(c_buffer+((n)*STRIDE)), (x))
+
+#else
+#error "Target not supported"
+#endif
 
 /* Where the OCaml side stores the arguments and result for a test
    case. The C function will read the result it is supposed to return
@@ -39,14 +61,12 @@ extern char *c_buffer;
 #define get_int32(n) *(int32_t*)(ocaml_buffer+((n)*STRIDE))
 #define get_int64(n) *(int64_t*)(ocaml_buffer+((n)*STRIDE))
 #define get_double(n) *(double*)(ocaml_buffer+((n)*STRIDE))
-#define get_int128(n) _mm_loadu_si128((__m128i*)(ocaml_buffer+((n)*STRIDE)))
-#define get_float128(n) _mm_loadu_pd((double*)(ocaml_buffer+((n)*STRIDE)))
+#define get_float(n) *(float*)(ocaml_buffer+((n)*STRIDE))
 
 #define set_intnat(n, x) *(intnat*)(c_buffer+((n)*STRIDE)) = (x)
 #define set_int32(n, x) *(int32_t*)(c_buffer+((n)*STRIDE)) = (x)
 #define set_int64(n, x) *(int64_t*)(c_buffer+((n)*STRIDE)) = (x)
 #define set_double(n, x) *(double*)(c_buffer+((n)*STRIDE)) = (x)
-#define set_int128(n, x) _mm_storeu_si128((__m128i*)(c_buffer+((n)*STRIDE)), (x))
-#define set_float128(n, x) _mm_storeu_pd((double*)(c_buffer+((n)*STRIDE)), (x))
+#define set_float(n, x) *(float*)(c_buffer+((n)*STRIDE)) = (x)
 
 #endif /* __TEST_COMMON_H */

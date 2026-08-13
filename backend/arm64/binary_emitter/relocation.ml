@@ -189,6 +189,9 @@ let get_addend (kind : Kind.t) : int =
    depend on the helpers. These are pure bit-manipulation functions with no
    state dependencies. *)
 
+(* CR mshinwell: we need to make sure everything (except the _NC relocs) has
+   bounds checks *)
+
 let int64_of_int32_unsigned (x : int32) : int64 =
   Int64.logand (Int64.of_int32 x) 0xFFFFFFFFL
 
@@ -235,6 +238,10 @@ let patch_ldr_imm12 (insn : int32) (offset12 : int64) ~(scale : int) : int64 =
   let insn = logor insn (shift_left (of_int combined_scaled) 10) in
   int64_of_int32_unsigned insn
 
+(* CR mshinwell: see the comment on the max_displacement function in ast.ml. I'm
+   a bit concerned we may end up with overflow when calculating relocs for B and
+   BL, and instead will need to create and insert trampolines. *)
+
 let patch_branch26 (insn : int32) (offset : int64) : int64 =
   let imm26 = Int64.to_int offset / 4 in
   let open Int32 in
@@ -280,5 +287,10 @@ let compute_value (r : t) ~target_addr ~place_address ~read_instruction
       Error
         (Printf.sprintf "Minus target not found: %s"
            (target_to_string minus_target))
-    | Some minus_addr -> Ok (Int64.sub target_addr minus_addr))
+    | Some minus_addr ->
+      (* The data slot already contains an addend encoding the offsets from the
+         symbols to the actual target/place. We must add it to the symbol-level
+         difference. *)
+      let existing_addend = Int64.of_int32 (read_instruction ()) in
+      Ok (Int64.add (Int64.sub target_addr minus_addr) existing_addend))
   | R_AARCH64_PREL32 _ -> Ok (Int64.sub target_addr place_address)

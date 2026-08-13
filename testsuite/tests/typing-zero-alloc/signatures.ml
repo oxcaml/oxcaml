@@ -54,8 +54,8 @@ end
 Line 2, characters 7-17:
 2 |   val[@zero_alloc assume_unless_opt] f : int -> int
            ^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The payload "assume_unless_opt" is not supported in signatures.
+Warning 47 [attribute-payload]: illegal payload for attribute "zero_alloc".
+  The payload "assume_unless_opt" is not supported in signatures.
 
 module type S_payloads_assume_unless_opt =
   sig val f : int -> int [@@zero_alloc] end
@@ -794,8 +794,8 @@ end
 Line 2, characters 7-17:
 2 |   let[@zero_alloc arity 2] f x y = x + y
            ^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+Warning 47 [attribute-payload]: illegal payload for attribute "zero_alloc".
+  The "arity" field is only supported on "zero_alloc" in signatures
 
 module M_struct_arity_let_1 :
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -808,8 +808,8 @@ end
 Line 2, characters 7-17:
 2 |   let[@zero_alloc arity 2] f = fun x y -> x + y
            ^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+Warning 47 [attribute-payload]: illegal payload for attribute "zero_alloc".
+  The "arity" field is only supported on "zero_alloc" in signatures
 
 module M_struct_arity_let_2 :
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -822,8 +822,8 @@ end
 Line 2, characters 15-25:
 2 |   let f = fun[@zero_alloc arity 2]  x y -> x + y
                    ^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+Warning 47 [attribute-payload]: illegal payload for attribute "zero_alloc".
+  The "arity" field is only supported on "zero_alloc" in signatures
 
 module M_struct_arity_let_fun_1 :
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -840,8 +840,8 @@ end
 Line 4, characters 11-21:
 4 |       fun[@zero_alloc arity 1] y -> y
                ^^^^^^^^^^
-Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+Warning 47 [attribute-payload]: illegal payload for attribute "zero_alloc".
+  The "arity" field is only supported on "zero_alloc" in signatures
 
 module M_struct_arity_let_fun_2 : sig val f : int -> int -> int end
 |}]
@@ -1498,21 +1498,21 @@ Line 12, characters 2-42:
 12 |   val f_warn_one_arg : M_aliases.t_one_arg
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 198 [zero-alloc-all-hidden-arrow]: The type of this item is an
-alias of a function type, but the [@@@zero_alloc all] attribute for
-this signature does not apply to it because its type is not
-syntactically a function type. If it should be checked, use an
-explicit zero_alloc attribute with an arity. If not, use an explicit
-zero_alloc ignore attribute.
+  alias of a function type, but the "[@@@zero_alloc all]" attribute for
+  this signature does not apply to it
+  because its type is not syntactically a function type.
+  If it should be checked, use an explicit zero_alloc attribute
+  with an arity. If not, use an explicit zero_alloc ignore attribute.
 
 Line 13, characters 2-44:
 13 |   val f_warn_two_args : M_aliases.t_two_args
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 198 [zero-alloc-all-hidden-arrow]: The type of this item is an
-alias of a function type, but the [@@@zero_alloc all] attribute for
-this signature does not apply to it because its type is not
-syntactically a function type. If it should be checked, use an
-explicit zero_alloc attribute with an arity. If not, use an explicit
-zero_alloc ignore attribute.
+  alias of a function type, but the "[@@@zero_alloc all]" attribute for
+  this signature does not apply to it
+  because its type is not syntactically a function type.
+  If it should be checked, use an explicit zero_alloc attribute
+  with an arity. If not, use an explicit zero_alloc ignore attribute.
 
 module type S_all =
   sig
@@ -1556,21 +1556,21 @@ Line 12, characters 2-42:
 12 |   val f_warn_one_arg : M_aliases.t_one_arg
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 198 [zero-alloc-all-hidden-arrow]: The type of this item is an
-alias of a function type, but the [@@@zero_alloc all_opt] attribute for
-this signature does not apply to it because its type is not
-syntactically a function type. If it should be checked, use an
-explicit zero_alloc attribute with an arity. If not, use an explicit
-zero_alloc ignore attribute.
+  alias of a function type, but the "[@@@zero_alloc all_opt]" attribute for
+  this signature does not apply to it
+  because its type is not syntactically a function type.
+  If it should be checked, use an explicit zero_alloc attribute
+  with an arity. If not, use an explicit zero_alloc ignore attribute.
 
 Line 13, characters 2-44:
 13 |   val f_warn_two_args : M_aliases.t_two_args
        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 198 [zero-alloc-all-hidden-arrow]: The type of this item is an
-alias of a function type, but the [@@@zero_alloc all_opt] attribute for
-this signature does not apply to it because its type is not
-syntactically a function type. If it should be checked, use an
-explicit zero_alloc attribute with an arity. If not, use an explicit
-zero_alloc ignore attribute.
+  alias of a function type, but the "[@@@zero_alloc all_opt]" attribute for
+  this signature does not apply to it
+  because its type is not syntactically a function type.
+  If it should be checked, use an explicit zero_alloc attribute
+  with an arity. If not, use an explicit zero_alloc ignore attribute.
 
 module type S_all =
   sig
