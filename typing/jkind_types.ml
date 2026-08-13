@@ -799,10 +799,10 @@ module Sort = struct
       end
     | Some t -> get_representable t
 
-  let rec strip_root_addressable : t -> t = function
-    | Addressable s -> strip_root_addressable s
+  let rec strip_head_addressable : t -> t = function
+    | Addressable s -> strip_head_addressable s
     | Var { contents = Some s; _ } as t ->
-      let s' = strip_root_addressable s in
+      let s' = strip_head_addressable s in
       if s' == s then t else s'
     | (Var _ | Base _ | Product _ | Univar _) as t -> t
 
@@ -1093,8 +1093,8 @@ module Sort = struct
          unify ['var = bits8] or ['var = bits8 addressable], and neither is
          strictly better. *)
       equate_sort_sort
-        (strip_root_addressable arg1)
-        (strip_root_addressable arg2)
+        (strip_head_addressable arg1)
+        (strip_head_addressable arg2)
     | Var v1 -> equate_var_addressable v1 s2 arg2
     | (Base _ | Product _ | Univar _) as s1 -> (
       (* After constraining, [s1 = s1 addressable]. *)

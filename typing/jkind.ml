@@ -288,10 +288,10 @@ module Layout = struct
     | Not_known_addressable -> false
     | Addressable_no_mutation | Addressable_mutated -> true
 
-  let rec strip_root_addressable : Sort.t t -> Sort.t t = function
-    | Addressable t -> strip_root_addressable t
+  let rec strip_head_addressable : Sort.t t -> Sort.t t = function
+    | Addressable t -> strip_head_addressable t
     | Sort (s, sa) as t ->
-      let s' = Sort.strip_root_addressable s in
+      let s' = Sort.strip_head_addressable s in
       if s' == s then t else Sort (s', sa)
     | (Any _ | Product _) as t -> t
 
@@ -357,8 +357,8 @@ module Layout = struct
       (* Incomplete (and may make more unifications than necessary); see the
          [Addressable]/[Addressable] case of [Sort.equate_sort_addressable]. *)
       equate_or_equal ~allow_mutation
-        (strip_root_addressable l1)
-        (strip_root_addressable l2)
+        (strip_head_addressable l1)
+        (strip_head_addressable l2)
     | Addressable l1, ((Sort _ | Product _) as t2)
     | ((Sort _ | Product _) as t2), Addressable l1 ->
       constrain_addressable ~allow_mutation t2
@@ -412,12 +412,12 @@ module Layout = struct
       | Addressable l1, Addressable l2 ->
         (* Incomplete; see the [Addressable]/[Addressable] case of
            [Sort.equate_sort_addressable]. *)
-        sub (strip_root_addressable l1) (strip_root_addressable l2)
+        sub (strip_head_addressable l1) (strip_head_addressable l2)
       | Addressable l1, Any _ ->
         (* [any] lies strictly above all addressable layouts, so cap the
            result at [Less] (e.g. [any addressable] is not equal to
            [any]). *)
-        Misc.Le_result.combine (sub (strip_root_addressable l1) t2) Less
+        Misc.Le_result.combine (sub (strip_head_addressable l1) t2) Less
       | Addressable _, (Sort _ | Product _) ->
         if constrain_above_addressable ~allow_mutation:true t2
         then sub t1 (Addressable t2)
@@ -487,7 +487,7 @@ module Layout = struct
          [Sort.equate_sort_addressable]. *)
       Option.map
         (fun l -> Addressable l)
-        (intersection (strip_root_addressable l1) (strip_root_addressable l2))
+        (intersection (strip_head_addressable l1) (strip_head_addressable l2))
     | Addressable l1, ((Sort _ | Product _) as t2)
     | ((Sort _ | Product _) as t2), Addressable l1 ->
       if constrain_above_addressable ~allow_mutation:true t2
