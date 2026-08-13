@@ -584,21 +584,37 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let handler, uacc =
     Variable.Lmap.fold
       (fun var bound_to (handler, uacc) ->
-        let var_duid = Flambda_debug_uid.none in
-        (* CR sspies: [var] can be derived/aliased from a user visible variable.
-           If we can, it would be good to propagate debugging UIDs (or derived
-           UIDs) here in the future. For now, we make due without. See #3967 *)
-        let bound_pattern =
-          Bound_pattern.singleton
-            (Bound_var.create var var_duid Name_mode.normal)
+        let let_bindings () =
+          let var_duid = Flambda_debug_uid.none in
+          (* CR sspies: [var] can be derived/aliased from a user visible
+             variable. If we can, it would be good to propagate debugging UIDs
+             (or derived UIDs) here in the future. For now, we make due without.
+             See #3967 *)
+          let bound_pattern =
+            Bound_pattern.singleton
+              (Bound_var.create var var_duid Name_mode.normal)
+          in
+          let named = Named.create_simple bound_to in
+          let handler, uacc =
+            Expr_builder.create_let_binding uacc bound_pattern named
+              ~free_names_of_defining_expr:(Simple.free_names bound_to)
+              ~cost_metrics_of_defining_expr:Cost_metrics.zero ~body:handler
+          in
+          handler, uacc
         in
-        let named = Named.create_simple bound_to in
-        let handler, uacc =
-          Expr_builder.create_let_binding uacc bound_pattern named
-            ~free_names_of_defining_expr:(Simple.free_names bound_to)
-            ~cost_metrics_of_defining_expr:Cost_metrics.zero ~body:handler
-        in
-        handler, uacc)
+        Simple.pattern_match' bound_to
+          ~const:(fun _ -> let_bindings ())
+          ~symbol:(fun _ ~coercion:_ -> let_bindings ())
+          ~var:(fun bound_to ~coercion ->
+            if Coercion.is_id coercion
+            then
+              let renaming = Renaming.(add_variable empty var bound_to) in
+              let name_occurrences =
+                Name_occurrences.apply_renaming (UA.name_occurrences uacc) renaming
+              in
+              let uacc = UA.with_name_occurrences uacc ~name_occurrences in
+              Rebuilt_expr.apply_renaming handler renaming, uacc
+            else let_bindings ()))
       continuation_parameters.lets_to_introduce (handler, uacc)
   in
   let handler, uacc =
