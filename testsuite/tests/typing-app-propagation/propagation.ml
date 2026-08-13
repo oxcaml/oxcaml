@@ -221,6 +221,35 @@ Error: This expression has type "int box"
          because of the definition of require_portable at line 2, characters 4-20.
 |}]
 
+let require_portable_fst : ('a : value mod portable). 'a * 'b -> unit = fun _ -> ()
+
+let f (x : int) = require_portable_fst (id (Box x, ()))
+[%%expect{|
+val require_portable_fst : ('a : value mod portable) 'b. 'a * 'b -> unit =
+  <fun>
+Line 3, characters 44-49:
+3 | let f (x : int) = require_portable_fst (id (Box x, ()))
+                                                ^^^^^
+Error: This constructor has type "'a box"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a box is immutable_data with 'a
+         because of the definition of box at line 1, characters 0-23.
+       But the kind of 'a box must be a subkind of value mod portable
+         because of the definition of require_portable_fst at line 1, characters 4-24.
+|}, Principal{|
+val require_portable_fst : ('a : value mod portable) 'b. 'a * 'b -> unit =
+  <fun>
+Line 3, characters 39-55:
+3 | let f (x : int) = require_portable_fst (id (Box x, ()))
+                                           ^^^^^^^^^^^^^^^^
+Error: This expression has type "int box * unit"
+       but an expression was expected of type "'a * 'b"
+       The kind of int box is immutable_data with int
+         because of the definition of box at line 1, characters 0-23.
+       But the kind of int box must be a subkind of value mod portable
+         because of the definition of require_portable_fst at line 1, characters 4-24.
+|}]
+
 (* GADT equation scoping (trefis's example): the expected type here is a
    bare variable, into which we do not propagate, so the error is
    unchanged. *)
