@@ -305,7 +305,6 @@ logic.
   -gdwarf-config-max-cms-files-per-variable
   -gdwarf-config-max-evaluation-steps-per-variable
   -gdwarf-config-max-shape-reduce-steps-per-variable
-  -gdwarf-config-max-type-to-shape-depth
   -gdwarf-config-shape-eval-depth
   -gdwarf-config-shape-reduce-depth
   -gdwarf-config-shape-reduce-fuel
@@ -492,6 +491,7 @@ logic.
   -symbol-visibility-protected
   -thread
   -thunkify-compilation-unit-initialization
+  -type-to-shape-max-depth
   -unbox-closures
   -unbox-closures-factor
   -unboxed-types

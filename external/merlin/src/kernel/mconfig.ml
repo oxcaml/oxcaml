@@ -871,7 +871,7 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-max-cms-files-per-unit";
     "-name-mangling-scheme";
     "-gdwarf-config-max-cms-files-per-variable";
-    "-gdwarf-config-max-type-to-shape-depth";
+    "-type-to-shape-max-depth";
     "-gdwarf-config-max-shape-reduce-steps-per-variable";
     "-gdwarf-config-max-evaluation-steps-per-variable";
     "-gdwarf-config-shape-reduce-fuel";
