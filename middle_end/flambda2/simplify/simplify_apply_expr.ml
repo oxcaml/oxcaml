@@ -674,6 +674,19 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                   free_names ))
             ( Expr.create_apply full_application,
               cost_metrics,
+              (* [without_names_or_continuations] removes variables (all of
+                 which are bound by the stub's parameters, the value-slot
+                 projections added by the fold below, or [my_closure]) and
+                 continuations (bound above) — but it also removes symbols,
+                 which remain genuinely free in the stub's body: a symbol
+                 callee and any symbol-valued applied arguments are baked
+                 directly into the full application (they are deliberately
+                 not stored in value slots). The symbols must appear in the
+                 code's recorded free names; in particular, for unloadable
+                 compilation units they become [Code_block] dependencies,
+                 without which the GC could reclaim the statics while the
+                 stub is still callable. *)
+              (* TEMP-REVERT-F2 *)
               Apply.free_names full_application
               |> NO.without_names_or_continuations )
             (List.rev applied_values)

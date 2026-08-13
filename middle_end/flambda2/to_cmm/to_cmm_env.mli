@@ -109,13 +109,18 @@ val create :
 
 (** Given an existing environment providing the "global" information (such as
     the exported code structure), create an environment for translating the body
-    of a function. *)
+    of the function whose code ID is [code_id]. *)
 val enter_function_body :
   t ->
+  code_id:Code_id.t ->
   return_continuation:Continuation.t ->
   return_continuation_arity:Cmm.machtype list ->
   exn_continuation:Continuation.t ->
   t
+
+(** The code ID of the function whose body is currently being translated, or
+    [None] when translating the unit initialization code. *)
+val current_code_id : t -> Code_id.t option
 
 (** {2 Debuginfo} *)
 

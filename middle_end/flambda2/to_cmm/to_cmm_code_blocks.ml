@@ -61,6 +61,12 @@ let emit_code_block_for ~all_code (code : Code.t) res =
       Name_occurrences.symbols free_names
       |> Symbol.Set.filter (fun sym ->
           Compilation_unit.is_current (Symbol.compilation_unit sym))
+      (* Also include static data invented during Cmm translation of this
+         function's body (e.g. sets of closures lifted by To_cmm itself): such
+         symbols postdate simplification and so are absent from [free_names],
+         yet the function's machine code references them directly. They are
+         same-CU by construction. See [To_cmm_result.add_code_dep_symbol]. *)
+      |> Symbol.Set.union Symbol.Set.empty (* TEMP-REVERT-F1 *)
       |> Symbol.Set.elements
     in
     let dep_fields =

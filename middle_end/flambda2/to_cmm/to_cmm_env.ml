@@ -160,6 +160,12 @@ type t =
     (* Offsets for function and value slots. *)
     functions_info : Exported_code.t;
     (* Code and metadata of functions. *)
+    current_code_id : Code_id.t option;
+    (* The code ID of the function whose body is currently being translated
+       ([None] when translating the unit initialization code). Used to
+       attribute static data invented during Cmm translation (e.g. sets of
+       closures lifted by To_cmm itself) to the enclosing function's
+       [Code_block] dependencies in unloadable compilation units. *)
     (* Local information.
 
        This is relative to the flambda expression being currently translated,
@@ -295,6 +301,7 @@ let create offsets functions_info ~trans_prim ~return_continuation
   { exn_continuation;
     offsets;
     functions_info;
+    current_code_id = None;
     trans_prim;
     inlined_debuginfo = Inlined_debuginfo.none;
     effect_stages = [];
@@ -308,10 +315,15 @@ let create offsets functions_info ~trans_prim ~return_continuation
     symbol_inits = Backend_var.Map.empty
   }
 
-let enter_function_body env ~return_continuation ~return_continuation_arity
-    ~exn_continuation =
-  create env.offsets env.functions_info ~trans_prim:env.trans_prim
-    ~return_continuation ~return_continuation_arity ~exn_continuation
+let enter_function_body env ~code_id ~return_continuation
+    ~return_continuation_arity ~exn_continuation =
+  { (create env.offsets env.functions_info ~trans_prim:env.trans_prim
+       ~return_continuation ~return_continuation_arity ~exn_continuation)
+    with
+    current_code_id = Some code_id
+  }
+
+let current_code_id env = env.current_code_id
 
 (* Debuginfo *)
 

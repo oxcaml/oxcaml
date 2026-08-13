@@ -26,7 +26,17 @@ type t =
        [Symbol.t], e.g. module entry point names. *)
     module_symbol : Symbol.t;
     module_symbol_defined : bool;
-    invalid_message_symbols : Symbol.t String.Map.t
+    invalid_message_symbols : Symbol.t String.Map.t;
+    code_dep_symbols : Symbol.Set.t Code_id.Map.t
+        (* For unloadable compilation units: symbols of static data invented
+           during Cmm translation of a function's body (e.g. sets of closures
+           lifted by To_cmm itself), keyed by that function's code ID. Such
+           symbols postdate simplification, so they appear in no
+           [Code.free_names_of_params_and_body]; they are recorded here so
+           that [To_cmm_code_blocks.emit_code_block_for] can add them to the
+           function's [Code_block] dependencies. Without this, the GC could
+           reclaim a static block whose only reference is an immediate in the
+           function's machine code. *)
   }
 
 let create ~module_symbol ~reachable_names =
@@ -38,8 +48,24 @@ let create ~module_symbol ~reachable_names =
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
-    invalid_message_symbols = String.Map.empty
+    invalid_message_symbols = String.Map.empty;
+    code_dep_symbols = Code_id.Map.empty
   }
+
+let add_code_dep_symbol t code_id symbol =
+  { t with
+    code_dep_symbols =
+      Code_id.Map.update code_id
+        (function
+          | None -> Some (Symbol.Set.singleton symbol)
+          | Some symbols -> Some (Symbol.Set.add symbol symbols))
+        t.code_dep_symbols
+  }
+
+let code_dep_symbols t code_id =
+  match Code_id.Map.find_opt code_id t.code_dep_symbols with
+  | None -> Symbol.Set.empty
+  | Some symbols -> symbols
 
 (* Symbol handling
 

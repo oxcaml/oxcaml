@@ -3,7 +3,17 @@
         "allow": [
             "Bash(make:*)",
             "Bash(rg:*)",
-            "Bash(cat:*)"
+            "Bash(cat:*)",
+            "Bash(dwarfdump *)",
+            "Bash(llvm-dwarfdump *)",
+            "Bash(/opt/homebrew/opt/llvm/bin/llvm-dwarfdump *)",
+            "Bash(/Users/mark/dev/llvm-project/build/bin/llvm-dwarfdump *)",
+            "Bash(nm *)",
+            "Bash(otool *)",
+            "Bash(objdump *)",
+            "Bash(llvm-objdump *)",
+            "Bash(/opt/homebrew/opt/llvm/bin/llvm-objdump *)",
+            "Bash(/Users/mark/dev/llvm-project/build/bin/llvm-objdump *)"
         ]
     }
 }

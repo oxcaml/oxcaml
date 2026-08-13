@@ -86,8 +86,20 @@ let record_frame_descr ~label ~frame_size ~live_offset ~code_ptr_live_offset
      [FRAME_DESCRIPTOR_FLAGS = 0xF] in [frame_descriptors.h]), so the emitted
      [frame_size] must be 16-byte aligned. *)
   assert (frame_size land 0xF = 0);
+  (* The full flag word, matching what [emit_frames] will OR into the frame
+     word: bits 0-1 from the debuginfo, bit 2 for UNLOADABLE, bit 3 for
+     HAS_CODE_PTR_SLOTS. The long/short format decision below must be made on
+     the full value: deciding on a smaller value and then emitting a larger
+     one could produce a short frame word equal to
+     [Oxcaml_flags.max_long_frames_threshold] (= FRAME_LONG_MARKER in the
+     runtime), which the runtime would misparse as a long descriptor. *)
+  let flags =
+    get_flags debuginfo
+    lor (if unloadable then 4 else 0)
+    lor (match code_ptr_live_offset with [] -> 0 | _ :: _ -> 8)
+  in
   let fd_long =
-    is_long (frame_size + get_flags debuginfo)
+    is_long (frame_size + flags)
     (* The checks below are redundant (if they fail, then frame size check above
        should have failed), but they make the safety of [emit_frame] clear. *)
     || is_long (List.length live_offset)
@@ -212,7 +224,17 @@ let emit_frames a =
     let emit_unsigned_16_or_32 = if fd.fd_long then emit_u32 else emit_u16 in
     (* The live offsets are always unsigned. *)
     let emit_live_offset n = emit_unsigned_16_or_32 n in
-    emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
+    let frame_word = fd.fd_frame_size + flags in
+    (* A short frame word must not collide with FRAME_LONG_MARKER
+       (= [max_long_frames_threshold]) or FRAME_RETURN_TO_C (0xFFFF); the
+       [is_long] decision in [record_frame_descr] uses the full flag word
+       precisely to guarantee this. *)
+    if not fd.fd_long
+    then
+      assert (
+        frame_word <> Oxcaml_flags.max_long_frames_threshold
+        && frame_word <> 0xFFFF);
+    emit_unsigned_16_or_32 frame_word;
     emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
     List.iter emit_live_offset fd.fd_live_offset;
     (* Bits 0 (DEBUG) and 1 (ALLOC) determine whether the runtime expects a

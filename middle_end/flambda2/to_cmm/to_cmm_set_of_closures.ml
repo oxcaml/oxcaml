@@ -496,8 +496,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
       (Flambda_arity.unarized_components result_arity)
   in
   let env =
-    Env.enter_function_body env ~return_continuation ~return_continuation_arity
-      ~exn_continuation
+    Env.enter_function_body env ~code_id ~return_continuation
+      ~return_continuation_arity ~exn_continuation
   in
   (* [my_region] can be referenced in [Begin_region] primitives so must be in
      the environment; however it should never end up in actual generated code,
@@ -734,6 +734,29 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
         cid, Symbol.create comp_unit (Linkage_name.of_string name))
       cids bound_vars
     |> Function_slot.Map.of_list
+  in
+  (* In an unloadable compilation unit, the fresh symbols just created are
+     invisible to the GC liveness machinery: they postdate simplification, so
+     they appear in no [Code.free_names_of_params_and_body] and hence in no
+     [Code_block] dependency fields, yet the enclosing function's machine code
+     references them directly. Record them against the enclosing function's
+     code ID so [To_cmm_code_blocks.emit_code_block_for] adds them to that
+     function's [Code_block] dependencies. When translating the unit
+     initialization code there is no enclosing code ID; that is fine, because
+     the initializer runs exactly once, before the unit's static blocks are
+     donated to the heap, so its code references to the lifted set no longer
+     matter afterwards (any escaping value keeps the block alive through
+     ordinary heap edges). *)
+  let res =
+    if not !Clflags.unit_is_unloadable
+    then res
+    else
+      match Env.current_code_id env with
+      | None -> res
+      | Some enclosing_code_id ->
+        Function_slot.Map.fold
+          (fun _cid sym res -> R.add_code_dep_symbol res enclosing_code_id sym)
+          closure_symbols res
   in
   (* Statically allocate the set of closures *)
   let env, res, static_data, updates =
