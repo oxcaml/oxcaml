@@ -636,18 +636,20 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     |> force_runtime_shape_exn |> RS.mu |> runtime
   | Rec_var rv, use_layout -> (
     match Rec_binder_env.lookup rec_env rv ~use_layout with
-    | Bound (i, Some (Layout.Base base)) -> (
-      match RS.Runtime_layout.of_base_layout base with
-      | Void -> void
-      | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
-    | Bound (_, Some (Layout.(Product _ | Addressable _) as ly)) ->
-      (* We currently do not support unboxed recursive types; fall back to an
-         unknown shape for the layout. *)
-      layout_to_unknown_shape ly
-    | Bound (_, Some (Univar _)) ->
-      Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
-    | Bound (_, Some (Genvar _)) ->
-      Misc.fatal_error "type_shape_to_complex_shape_exn: Genvar"
+    | Bound (i, Some bound_layout) -> (
+      (* CR box: Addressability should be preserved here once it affects boxed
+         representations *)
+      match erase_addressable bound_layout with
+      | Layout.Base base -> (
+        match RS.Runtime_layout.of_base_layout base with
+        | Void -> void
+        | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
+      | Layout.(Product _ | Addressable _) as ly ->
+        (* We currently do not support unboxed recursive types; fall back to an
+           unknown shape for the layout. *)
+        layout_to_unknown_shape ly
+      | Univar _ -> Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
+      | Genvar _ -> Misc.fatal_error "type_shape_to_complex_shape_exn: Genvar")
     | Bound (_, None) -> raise Layout_missing
     | Layout_mismatch { bound; use } ->
       err_or_unknown_exn (fun f ->
