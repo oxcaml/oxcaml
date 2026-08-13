@@ -159,7 +159,7 @@ let () =
     ~extra_deps:[]
       (* The indirect call is part of a stub, and it gets transformed to a
          direct call when simplified. *)
-    ~extra_flags:"-flambda2-no-simplify-stubs" ~extra_sources:[] ~exit_code:2
+    ~extra_flags:"-no-flambda2-simplify-stubs" ~extra_sources:[] ~exit_code:2
     "t1";
   (* deleting dead functions works *)
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
