@@ -3780,6 +3780,17 @@ module Violation = struct
       | Kconstr _ -> false
       | Layout l -> has_sort_var_layout l
     in
+    (* CR box: This, and other logic such as handling the message for
+       [print_as_value_layout], could likely be folded into
+       [categorize_mismatch] to reduce duplication. *)
+    let layout_to_requirement (base : Sort.Flat.t Layout.t jkind_base) =
+      if has_sort_var base
+      then
+        match base with
+        | Layout (Layout.Addressable _) -> Some "addressable"
+        | Kconstr _ | Layout _ -> Some "representable"
+      else None
+    in
     let indent = pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "") in
     let format_base_or_kind (type l r) ppf (jkind : (l * r) jkind) =
       match mismatch_type with
@@ -3791,14 +3802,16 @@ module Violation = struct
         | Error p -> fprintf ppf "the abstract kind %s" (Path.name p))
     in
     let subjkind_format verb k2 =
-      if has_sort_var (get k2).base
-      then dprintf "%s representable" verb
-      else if print_as_value_layout
-      then
-        (* avoid printing "a sublayout of a value layout" *)
-        dprintf "%s@ a value layout" verb
-      else
-        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_base_or_kind k2
+      let base = (get k2).base in
+      match layout_to_requirement base with
+      | Some requirement -> dprintf "%s %s" verb requirement
+      | None ->
+        if print_as_value_layout
+        then
+          (* avoid printing "a sublayout of a value layout" *)
+          dprintf "%s@ a value layout" verb
+        else
+          dprintf "%s a sub%s of@ %a" verb layout_or_kind format_base_or_kind k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmis =
       match t with
@@ -3841,16 +3854,18 @@ module Violation = struct
     if display_histories
     then
       let connective =
-        if has_sort_var (get k2).base
-        then dprintf "be representable"
-        else if print_as_value_layout
-        then dprintf "be@ a value layout"
-        else
-          match t.violation with
-          | Not_a_subjkind _ ->
-            dprintf "be a sub%s of@ %a" layout_or_kind format_base_or_kind k2
-          | No_intersection _ ->
-            dprintf "overlap with@ %a" format_base_or_kind k2
+        let base = (get k2).base in
+        match layout_to_requirement base with
+        | Some requirement -> dprintf "be %s" requirement
+        | None -> (
+          if print_as_value_layout
+          then dprintf "be@ a value layout"
+          else
+            match t.violation with
+            | Not_a_subjkind _ ->
+              dprintf "be a sub%s of@ %a" layout_or_kind format_base_or_kind k2
+            | No_intersection _ ->
+              dprintf "overlap with@ %a" format_base_or_kind k2)
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
