@@ -1650,7 +1650,6 @@ and transl_apply ~scopes
       ~result_layout
       lam sargs loc
   =
-  let original_inlined = inlined in
   let lapply ~inlined funct args loc pos mode result_layout =
     match funct, pos with
     | Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _, sy), _ ->
@@ -1723,9 +1722,10 @@ and transl_apply ~scopes
        will occur exactly when all the arguments up to this parameter
        have been received.
 
-     The [inlined] attribute passed to [build_apply] is initlally the [@inlined]
-     attribute for the apply we are translating, but switches to forward
-     inlining if we need to build a stub.
+     We track, while building the [apply], whether we are inside an out-of-order
+     partial application stub with the [in_stub] parameter. Calls inside such a
+     stub get the `[@inlined forward]` attribute so that flambda2 will forward
+     `[@inlined]` attributes provided when calling the stub to the original call.
 
      Calls *outside* a stub needs to use the original [@inlined] attribute, so
      calls to [lapply] for an out-of-order partial application always use the
@@ -1776,7 +1776,7 @@ and transl_apply ~scopes
      multiple arguments [(f [@inlined hint]) x y] as if the attribute was
      present on each of the arguments, matching the behaviour of simplify.
   *)
-  let rec build_apply ~inlined lam args loc pos ap_mode result_layout = function
+  let rec build_apply ~in_stub lam args loc pos ap_mode result_layout = function
     | Omitted { mode_closure; mode_arg; mode_ret; sort_arg; sort_ret } :: l ->
         (* Out-of-order partial application; we will need to build a closure *)
         assert (pos = Rc_normal);
@@ -1793,8 +1793,7 @@ and transl_apply ~scopes
           if args = [] then
             lam
           else
-            lapply lam (List.rev args) loc pos ap_mode layout_function
-              ~inlined:original_inlined
+            lapply ~inlined lam (List.rev args) loc pos ap_mode layout_function
         in
         (* Evaluate the function, applied to the arguments in [args] *)
         let handle, _ = protect "func" (lam, layout_function) in
@@ -1819,13 +1818,8 @@ and transl_apply ~scopes
           let sort_arg = Jkind.Sort.default_for_transl_and_get sort_arg in
           let sort_ret = Jkind.Sort.default_for_transl_and_get sort_ret in
           let result_layout = layout_of_sort (to_location loc) sort_ret in
-          let inlined =
-            match inlined with
-            | Default_inlined -> forward_inlined_attribute ()
-            | _ -> inlined
-          in
           let body =
-            build_apply ~inlined handle [Lvar id_arg] loc Rc_normal ret_mode
+            build_apply ~in_stub:true handle [Lvar id_arg] loc Rc_normal ret_mode
               result_layout l
           in
           let nlocal =
@@ -1855,8 +1849,14 @@ and transl_apply ~scopes
           Llet(Strict, layout, id, Lambda.debug_uid_none, lam, body))
           !defs body
     | Arg (arg, _) :: l ->
-        build_apply ~inlined lam (arg :: args) loc pos ap_mode result_layout l
+        build_apply ~in_stub lam (arg :: args) loc pos ap_mode result_layout l
     | [] ->
+        let inlined =
+          if not in_stub then inlined else
+          match inlined with
+          | Default_inlined -> forward_inlined_attribute ()
+          | _ -> inlined
+        in
         lapply ~inlined lam (List.rev args) loc pos ap_mode result_layout
   in
   let args =
@@ -1870,7 +1870,7 @@ and transl_apply ~scopes
            Arg (transl_exp ~scopes layout exp, layout))
       sargs
   in
-  build_apply ~inlined lam [] loc position mode result_layout args
+  build_apply ~in_stub:false lam [] loc position mode result_layout args
 
 (* There are two cases in function translation:
     - [Tupled]. It takes a tupled argument, and we can flatten it.
