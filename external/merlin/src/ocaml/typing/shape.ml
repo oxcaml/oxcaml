@@ -1192,12 +1192,11 @@ let for_persistent_unit s =
 
 let leaf_for_unpack = leaf' None
 
-let set_uid_if_none t uid =
+let set_uid t uid =
   (* CR sspies: This function clears the approximated field of the shape.
      However, the alternative is setting the record field, which will result in
      wrong hash values. Perhaps we should fix this instead by removing the UIDs
      from the hash value computation. *)
-  let uid = Option.value ~default:uid t.uid in
   match t.desc with
   | Var v -> var uid v
   | Abs (x, t) -> abs ~uid x t
@@ -1225,6 +1224,10 @@ let set_uid_if_none t uid =
   | Proj_decl (t, i) -> proj_decl ~uid t i
   | Unknown_type -> unknown_type ~uid ()
   | At_layout (shape, layout) -> at_layout ~uid shape layout
+
+let set_uid_if_none t uid =
+  let uid = Option.value ~default:uid t.uid in
+  set_uid t uid
 
 
 module Map = struct

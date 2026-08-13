@@ -637,7 +637,12 @@ module Type_decl_shape = struct
       of_type_declaration_go type_declaration type_param_shapes shape_for_constr
     in
     let decl_shape = Shape.abs_list definition type_param_idents in
-    Shape.set_uid_if_none decl_shape type_declaration.type_uid
+    (* Use the declaration's own uid even if the definition already carries
+       one: for manifests such as [type t = unit] or [type u = t], the
+       definition keeps the uid of the aliased type (or predef), and
+       uid-based tooling would attribute occurrences of the alias to the
+       aliased type instead. *)
+    Shape.set_uid decl_shape type_declaration.type_uid
 
   (** [of_type_declarations type_declarations shape_for_constr] turns a block of
       type declarations into a list of shapes. The number of shapes that is
