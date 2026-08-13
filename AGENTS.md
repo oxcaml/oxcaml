@@ -1,71 +1,134 @@
-# AGENTS.md
+# OxCaml agent guide
 
-This file provides guidance to AI agents when working with code in this repository.
+Do not stage or commit changes unless asked.
 
-# OxCaml Compiler Development Guide
+Use the development commands below while editing. They keep a boot-compiler
+watcher in the background, wait for it before using its output, and report
+compiler errors before running a test or compiler command.
 
-Do not stage or commit your changes unless prompted to.
-Always check that your changes build with both (after configuration, see below):
-1. `make -s boot-compiler` - Quick build check
-2. `make -s test` - Full test suite (required before declaring success)
+## Initial setup
 
-You are working on the OxCaml compiler, a performance-focused fork of OCaml with Jane Street extensions, including the Flambda 2 optimizer and CFG backend.
+A fresh worktree needs one complete build and test installation:
 
-## Key Architecture
-
-**Directory Structure:**
-- `middle_end/flambda2/` - Flambda 2 optimizer implementation
-- `backend/cfg/` - Control Flow Graph backend
-- `driver/` - Compiler driver, including `oxcaml_*` files for OxCaml-specific options
-- `jane/` - Jane Street specific extensions and documentation
-- `testsuite/tests/` - Upstream OCaml test suite
-- `oxcaml/tests/` - OxCaml-specific tests
-
-**Important Files:**
-- `driver/oxcaml_flags.ml` - OxCaml compiler flags definitions
-- `driver/oxcaml_args.ml` - Command-line argument handling
-- Files ending in `.in` require configuration via `./configure`
-
-## Build Commands
-```bash
-make -s boot-compiler         # Quick build (recommended for development)
-make -s                       # Full build
-make -s install               # Install the compiler to $(pwd)/_install
-make -s fmt                   # Auto-format code (always run before committing)
+```sh
+autoconf
+./configure --prefix="$PWD/_install"
+make install
 ```
 
-## Test Commands
-```bash
-make -s test-one TEST=test-dir/path.ml      # Run a single test testsuite/tests/test-dir/path.ml
-make -s test-one DIR=test-dir               # Run all tests in testsuite/tests/test-dir
-make -s promote-one TEST=test-dir/path.ml   # Update expected test output
-make -s test                                # Run all tests
+On the measured Apple Silicon machine, configuration took about 15 seconds and
+the first optimized install took about 4.5 minutes.
+
+## Development loop
+
+Start speculative compilation before editing:
+
+```sh
+make dev
 ```
 
-## Configuration Commands
-```bash
-autoconf                  # Generate configure script
-./configure               # Configure the compiler
+`make dev` returns immediately. Starting it is optional because every command
+below starts or restarts it automatically. The watcher is local to this
+worktree and exits after 30 idle minutes.
+
+Run one test or test directory:
+
+```sh
+make dev-test TEST=typing-local/regression_class_type.ml
+make dev-test DIR=lib-bool
 ```
 
-If the execution of `autoconf` fails because the version is too old, try with `autoconf27` instead.
+Promote a focused test:
 
-Configuration is needed after changing `.in` files or the autoconf script.
+```sh
+make dev-promote TEST=typing-local/regression_class_type.ml
+```
 
-## Development Guidelines
-- Always verify changes build with `make -s boot-compiler`
-- Run `make -s fmt` to ensure code formatting
-- Keep lines under 80 characters
-- Don't add excessive comments unless prompted
-- Don't disable warnings or tests unless prompted
-- Use pattern-matching and functional programming idioms
-- Avoid `assert false` and other unreachable code
-- Rebuild the project often while using the LSP using `make -s boot-compiler`. When
-  you don't rebuild, the LSP may give you stale information from a previous build
+Compile files with the watched compiler:
 
-## Important Notes
+```sh
+make dev-ocamlc ARGS='-c /tmp/probe.ml -o /tmp/probe.cmo'
+make dev-ocamlopt ARGS='/tmp/probe.ml -o /tmp/probe.exe'
+```
 
-- NEVER create files unless absolutely necessary
-- ALWAYS prefer editing existing files
-- NEVER proactively create documentation files (*.md) or README files
-- NEVER stage or commit changes unless explicitly requested
+`ARGS` has the same contents as an `ocamlc` or `ocamlopt` command line. Quote
+it so Make and the shell preserve spaces. These targets select the watched
+compiler and its matching development standard library.
+
+The normal loop is therefore:
+
+```text
+make dev
+edit
+make dev-test TEST=...
+edit
+make dev-test TEST=...
+```
+
+The watcher begins compiling on each save. `dev-test`, `dev-promote`,
+`dev-ocamlc`, and `dev-ocamlopt` wait for the latest saved source state. They
+do not run when that build has a type error.
+
+Existing and newly added tests are read from the live `testsuite/tests` tree.
+No `_runtest` refresh is needed. Standard-library and runtime edits are also
+detected; the next development command refreshes those components before
+continuing.
+
+Expect tests embed compiler libraries in their runner. `dev-test` detects
+`expect` and `expectnat` actions and refreshes a stale runner automatically.
+The watcher uses an isolated Dune build directory, so it does not invalidate
+the main Dune context. A measured runner refresh after a compiler edit took
+about 38 seconds.
+
+The development test root intentionally has no `ocamlopt.byte`. Use the normal
+final-compiler test path for a test that explicitly requires the
+bytecode-hosted native compiler.
+
+Useful recovery commands are:
+
+```sh
+make dev-status
+make dev-log
+make dev-stop
+```
+
+Do not run another Dune or ordinary Make build while the watcher is active.
+Use `make dev-stop` first. The development commands coordinate with the
+watcher themselves.
+
+## Final validation
+
+The development compiler is an unoptimized boot compiler. It is intended for
+fast typechecking and functional tests, not final validation.
+
+Use the final compiler when testing self-hosting, bytecode-only compiler
+variants, release behavior, compiler performance, benchmarks, or memtraces:
+
+```sh
+make dev-stop
+make install
+make test-one TEST=test-dir/path.ml
+```
+
+Use targeted tests while iterating. Run `make test` only for broad changes or
+when asked. On the measured machine, a small warm `dev-test` took about one
+second, while the complete test suite took about 6 minutes 43 seconds.
+
+Always benchmark or memtrace with the compiler produced by `make install`,
+never with the boot compiler. Configure without `--enable-dev` for performance
+measurements.
+
+Run `make fmt` before committing when the changed files are covered by the
+formatter. Do not disable warnings or tests unless asked.
+
+## Repository map
+
+- `middle_end/flambda2/`: Flambda 2 optimizer
+- `backend/cfg/`: CFG backend
+- `driver/`: compiler drivers and OxCaml command-line handling
+- `jane/`: Jane Street extensions and documentation
+- `testsuite/tests/`: upstream OCaml tests
+- `oxcaml/tests/`: OxCaml-specific tests
+
+Files ending in `.in` require configuration after they change. Keep lines
+under 80 characters and prefer the existing functional OCaml style.

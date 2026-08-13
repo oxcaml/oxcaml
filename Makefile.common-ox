@@ -482,6 +482,139 @@ promote-one-no-rebuild:
 hacking: _build/_bootinstall
 	$(dune) build $(ws_boot) -w @merlin-support $(boot_targets)
 
+# The development watcher starts eagerly, but is managed as a worktree-local
+# background process. All public dev commands renew its idle lease and wait
+# for the latest compiler build before using its outputs.
+DEV_IDLE_TIMEOUT ?= 1800
+ARGS ?=
+dev_watcher = python3 tools/dev-watcher.py
+dev_build = _build/dev-dune
+dev_build_flag = --build-dir=$(CURDIR)/$(dev_build)
+dev_boot_targets = $(boot_targets) main.bc
+
+.PHONY: dev dev-runtime dev-check dev-test dev-promote dev-ocamlc dev-ocamlopt
+.PHONY: dev-expect-runners
+.PHONY: dev-status dev-log dev-stop
+
+dev: _build/_bootinstall
+	@$(dev_watcher) start --idle-timeout $(DEV_IDLE_TIMEOUT) -- \
+	  $(dune) build $(ws_boot) $(dev_build_flag) -w --display=short \
+	  @merlin-support $(dev_boot_targets)
+
+dev-runtime:
+	+@set -eu; \
+	  artifact=_build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/stdlib.cma; \
+	  if [ ! -f $$artifact ] || \
+	     [ Makefile.config -nt $$artifact ] || \
+	     [ duneconf/runtime_stdlib.ws -nt $$artifact ] || \
+	     find runtime stdlib otherlibs \
+	       \( -type d \( -name test -o -name tests \) -prune \) -o \
+	       \( -type f -newer $$artifact -print -quit \) | grep -q .; then \
+	    echo "dev: refreshing the runtime and standard library"; \
+	    $(dev_watcher) stop; \
+	    $(MAKE) runtime-stdlib; \
+	  fi
+
+dev-check: dev-runtime dev
+	@set -eu; \
+	  $(dev_watcher) wait-ready --timeout 300 -- \
+	    $(dune) rpc ping --root=. $(dev_build_flag); \
+	  if result="$$( \
+	    $(dune) rpc build $(ws_boot) $(dev_build_flag) \
+	      $(dev_boot_targets) 2>&1 \
+	  )"; then :; else \
+	    printf '%s\n' "$$result"; \
+	    exit 1; \
+	  fi; \
+	  printf '%s\n' "$$result"; \
+	  if printf '%s\n' "$$result" | grep -qx 'Success'; then \
+	    exit 0; \
+	  fi; \
+	  $(dune) diagnostics --root=. $(dev_build_flag); \
+	  exit 1
+
+DEV_RUNNERS ?=
+dev-expect-runners:
+	@test -n "$(DEV_RUNNERS)" || \
+	  { echo "dev: no expect-test runner selected" >&2; exit 2; }
+	@$(dev_watcher) stop
+	$(dune) build $(ws_main) \
+	  $(addprefix oxcaml/testsuite/tools/,$(addsuffix .exe,$(DEV_RUNNERS)))
+	@$(MAKE) --no-print-directory dev DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT)
+
+dev-test: dev-check
+	+@set -eu; \
+	  if [ -z "$(TEST)$(DIR)" ]; then \
+	    echo "Usage: make dev-test TEST=path/to/test.ml" >&2; \
+	    echo "   or: make dev-test DIR=path/to/test-directory" >&2; \
+	    exit 2; \
+	  fi; \
+	  selection="$(if $(TEST),$(call locate_test,$(TEST)),$(call locate_test,$(DIR)))"; \
+	  selection="testsuite/$$selection"; \
+	  stale_runners=""; \
+	  for runner in expect expectnat; do \
+	    case $$runner in \
+	      expect) pattern='(^|[;[:space:]])expect([;[:space:]]|$$)' ;; \
+	      expectnat) pattern='(^|[;[:space:]])expectnat([;[:space:]]|$$)' ;; \
+	    esac; \
+	    artifact=_build/main/oxcaml/testsuite/tools/$$runner.exe; \
+	    if grep -ERq --include='*.ml' "$$pattern" "$$selection" && \
+	       { [ ! -x $$artifact ] || \
+	         [ $(dev_build)/default/main_native.exe -nt $$artifact ] || \
+	         find oxcaml/testsuite/tools -type f -newer $$artifact \
+	           -print -quit | grep -q .; }; then \
+	      stale_runners="$$stale_runners $$runner"; \
+	    fi; \
+	  done; \
+	  if [ -n "$$stale_runners" ]; then \
+	    echo "dev: refreshing expect-test runner(s):$$stale_runners"; \
+	    $(MAKE) --no-print-directory dev-expect-runners \
+	      DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
+	      DEV_RUNNERS="$$stale_runners"; \
+	  fi; \
+	  $(dev_watcher) prepare-test-root; \
+	  echo "dev: compiler = $(dev_build)/default/main_native.exe"; \
+	  echo "dev: stdlib   = _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib"; \
+	  export OCAMLSRCDIR=$$(pwd)/_build/dev/runtest; \
+	  export CAML_LD_LIBRARY_PATH=$$(pwd)/_build/dev/runtest/stdlib/stublibs; \
+	  if $$(which gfortran > /dev/null 2>&1); then \
+	    export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
+	  fi; \
+	  cd _build/dev/runtest/testsuite; \
+	  $(MAKE) one \
+	    $(if $(TEST),TEST=$(call locate_test,$(TEST))) \
+	    $(if $(DIR),DIR=$(call locate_test,$(DIR)))
+
+dev-promote:
+	+@$(MAKE) --no-print-directory dev-test PROMOTE=1 \
+	  DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
+	  $(if $(TEST),TEST=$(TEST)) $(if $(DIR),DIR=$(DIR))
+
+dev-ocamlc: dev-check
+	@echo "dev: compiler = $(dev_build)/default/main_native.exe"
+	@echo "dev: stdlib   = _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib"
+	@OCAMLLIB="$$(pwd)/_build/runtime_stdlib_install/lib/ocaml_runtime_stdlib" \
+	  $(dev_build)/default/main_native.exe $(ARGS)
+
+dev-ocamlopt: dev-check
+	@echo "dev: compiler = $(dev_build)/default/boot_ocamlopt.exe"
+	@echo "dev: stdlib   = _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib"
+	@OCAMLLIB="$$(pwd)/_build/runtime_stdlib_install/lib/ocaml_runtime_stdlib" \
+	  $(dev_build)/default/boot_ocamlopt.exe $(ARGS)
+
+dev-status:
+	@$(dev_watcher) status
+
+dev-log:
+	@if [ -f _build/dev/watcher.log ]; then \
+	  tail -n 100 _build/dev/watcher.log; \
+	else \
+	  echo "dev: no watcher log"; \
+	fi
+
+dev-stop:
+	@$(dev_watcher) stop
+
 # The `hacking-emacs-poller` and `hacking-emacs-builder` targets make it
 # possible to run the polling build with Emacs's `M-x compile`.  You should run
 # `make hacking-emacs-poller` in your terminal from the root directory of the

@@ -92,6 +92,7 @@ endif
 
 .PHONY: clean
 clean:
+	$(if $(filter 1,$(V)),,@)python3 tools/dev-watcher.py stop
 	$(if $(filter 1,$(V)),,@)set -eu; \
 	  dirs="$(CLEAN_DIRS)"; \
 	  if [ -z "$$dirs" ]; then echo "Refusing to clean empty directory list" >&2; exit 1; fi; \
@@ -99,7 +100,7 @@ clean:
 	    case "$$dir" in ""|"/"|".") echo "Refusing to clean $$dir" >&2; exit 1;; esac; \
 	  done; \
 	  ws_list="$(CLEAN_DUNE_WORKSPACES)"; \
-	  if [ -n "$(strip $(CLEAN_DUNE_BIN))" ]; then \
+	  if [ -n "$(strip $(CLEAN_DUNE_BIN))" ] && [ -d _build ]; then \
 	    for ws in $$ws_list; do \
 	      if [ -f $$ws ]; then \
 	        if ! "$(strip $(CLEAN_DUNE_BIN))" clean --root=. --workspace=$$ws; then \
