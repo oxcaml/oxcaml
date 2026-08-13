@@ -254,6 +254,20 @@ Error: This value is "local"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
 |}]
+let app7 (f : a:int -> b:'b @ unique -> unit) (y @ unique) : (a:int -> unit) @ many = f ~b:y
+[%%expect{|
+Line 1, characters 86-92:
+1 | let app7 (f : a:int -> b:'b @ unique -> unit) (y @ unique) : (a:int -> unit) @ many = f ~b:y
+                                                                                          ^^^^^^
+Error: This value is "once" but is expected to be "many".
+|}]
+let app8 (f : a:int -> b:'b @ uncontended -> unit) (y @ uncontended) : (a:int -> unit) @ portable = f ~b:y
+[%%expect{|
+Line 1, characters 100-106:
+1 | let app8 (f : a:int -> b:'b @ uncontended -> unit) (y @ uncontended) : (a:int -> unit) @ portable = f ~b:y
+                                                                                                        ^^^^^^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
 
 let bug1 () =
   let foo : a:local_ string -> b:local_ string -> c:int -> unit =
