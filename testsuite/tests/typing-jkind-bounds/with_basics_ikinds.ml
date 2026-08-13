@@ -651,6 +651,66 @@ Error: This type definition does not satisfy its kind annotation
        - 'a is not mod portable
 |}]
 
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-73:
+3 | type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because
+       - 'a is not mod portable contended
+       - b is not mod portable
+|}]
+
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type 'a c : value mod portable contended = { b : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-55:
+3 | type 'a c : value mod portable contended = { b : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because
+       - b is not mod portable
+       - 'a is not mod contended
+|}]
+
+type bad : value
+type t : value mod contended = { x : (bad * int) ref }
+[%%expect {|
+type bad
+Line 2, characters 0-54:
+2 | type t : value mod contended = { x : (bad * int) ref }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
+       because ref is not mod contended.
+|}]
+
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { x : ('a ref * int) b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-67:
+3 | type 'a c : value mod portable contended = { x : ('a ref * int) b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because
+       - b is not mod portable
+       - ref is not mod contended
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t
