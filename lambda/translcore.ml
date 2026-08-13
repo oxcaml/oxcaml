@@ -1725,7 +1725,8 @@ and transl_apply ~scopes
      We track, while building the [apply], whether we are inside an out-of-order
      partial application stub with the [in_stub] parameter. Calls inside such a
      stub get the `[@inlined forward]` attribute so that flambda2 will forward
-     `[@inlined]` attributes provided when calling the stub to the original call.
+     `[@inlined]` attributes provided when calling the stub to the original
+     call.
 
      Calls *outside* a stub needs to use the original [@inlined] attribute, so
      calls to [lapply] for an out-of-order partial application always use the
@@ -1819,8 +1820,8 @@ and transl_apply ~scopes
           let sort_ret = Jkind.Sort.default_for_transl_and_get sort_ret in
           let result_layout = layout_of_sort (to_location loc) sort_ret in
           let body =
-            build_apply ~in_stub:true handle [Lvar id_arg] loc Rc_normal ret_mode
-              result_layout l
+            build_apply ~in_stub:true handle [Lvar id_arg] loc Rc_normal
+              ret_mode result_layout l
           in
           let nlocal =
             match
