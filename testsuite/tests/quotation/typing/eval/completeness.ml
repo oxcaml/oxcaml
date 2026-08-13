@@ -17,25 +17,36 @@ end)
 val eval : 'a expr @ once -> 'a eval = <fun>
 |}]
 
+let f x = eval x
+[%%expect {|
+val f : 'a expr -> 'a eval = <fun>
+|}]
+
+let f (x : <[int]> expr) = eval x
+[%%expect {|
+val f : <[int]> expr -> int = <fun>
+|}]
+
+let f x : int = eval 0
+[%%expect {|
+Line 1, characters 21-22:
+1 | let f x : int = eval 0
+                         ^
+Error: The constant "0" has type "int" but an expression was expected of type
+         "'a expr"
+|}]
+
 (** Unification **)
 
 (* Type constructors *)
 let f x : int = eval x
 [%%expect {|
-Line 4, characters 16-22:
-4 | let f x : int = eval x
-                    ^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type "int"
+val f : <[int]> expr -> int = <fun>
 |}]
 
 let f x : int list = eval x
 [%%expect {|
-Line 1, characters 21-27:
-1 | let f x : int list = eval x
-                         ^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type "int list"
+val f : <[int list]> expr -> int list = <fun>
 |}]
 
 let f x : 'a list = eval x
@@ -59,11 +70,7 @@ Error: This expression has type "'a eval"
 (* Arrows *)
 let f x : string -> int = eval x
 [%%expect {|
-Line 1, characters 26-32:
-1 | let f x : string -> int = eval x
-                              ^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type "string -> int"
+val f : <[string -> int]> expr -> string -> int = <fun>
 |}]
 let f x : 'a -> 'b = eval x
 [%%expect {|
@@ -77,11 +84,7 @@ Error: This expression has type "'c eval"
 (* Tuples *)
 let f x : int * string = eval x
 [%%expect {|
-Line 1, characters 25-31:
-1 | let f x : int * string = eval x
-                             ^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type "int * string"
+val f : <[int * string]> expr -> int * string = <fun>
 |}]
 let f x : 'a * 'b = eval x
 [%%expect {|
@@ -93,19 +96,15 @@ Error: This expression has type "'c eval"
 |}]
 
 (* Unboxed tuples *)
-let f x : #(int * float#) = eval x
+let f x : #(int * float#) = (x : _ eval)
 [%%expect {|
-Line 1, characters 28-34:
-1 | let f x : #(int * float#) = eval x
-                                ^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type "#(int * float#)"
+val f : #(int * float#) -> #(int * float#) = <fun>
 |}]
-let f x : #('a * 'b) = eval x
+let f x : #('a * 'b) = (x : _ eval)
 [%%expect {|
-Line 1, characters 23-29:
-1 | let f x : #('a * 'b) = eval x
-                           ^^^^^^
+Line 1, characters 23-35:
+1 | let f x : #('a * 'b) = (x : _ eval)
+                           ^^^^^^^^^^^^
 Error: This expression has type "'c eval"
        but an expression was expected of type "#('a * 'b)"
 |}]
@@ -113,11 +112,7 @@ Error: This expression has type "'c eval"
 (* Objects *)
 let f x : <a: int; b: string> = eval x
 [%%expect {|
-Line 1, characters 32-38:
-1 | let f x : <a: int; b: string> = eval x
-                                    ^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type "< a : int; b : string >"
+val f : <[< a : int; b : string >]> expr -> < a : int; b : string > = <fun>
 |}]
 let f x : <a: int; b: string; ..> = eval x
 [%%expect {|
@@ -129,15 +124,11 @@ Error: This expression has type "'a eval"
 |}]
 
 (* Polymorphic variants *)
-(* closed variant *)
 let f x : [ `A of int | `B of string | `C ] = eval x
 [%%expect {|
-Line 1, characters 46-52:
-1 | let f x : [ `A of int | `B of string | `C ] = eval x
-                                                  ^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type
-         "[ `A of int | `B of string | `C ]"
+val f :
+  <[[ `A of int | `B of string | `C ]]> expr ->
+  [ `A of int | `B of string | `C ] = <fun>
 |}]
 let f x : [> `A of int | `B of string | `C ] = eval x
 [%%expect {|
@@ -171,12 +162,9 @@ Error: This expression has type "'b eval"
 (* Package types *)
 let f x : (module Map.OrderedType with type t = int) -> unit = eval x
 [%%expect {|
-Line 1, characters 63-69:
-1 | let f x : (module Map.OrderedType with type t = int) -> unit = eval x
-                                                                   ^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type
-         "(module Map.OrderedType with type t = int) -> unit"
+val f :
+  <[(module Map.OrderedType with type t = int) -> unit]> expr ->
+  (module Map.OrderedType with type t = int) -> unit = <fun>
 |}]
 
 (** Subsumption **)
@@ -187,34 +175,7 @@ end ) : sig
   val x : int
 end = M
 [%%expect {|
-Line 7, characters 6-7:
-7 | end = M
-          ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val x : 'a eval end
-       is not included in
-         sig val x : int end
-       Values do not match: val x : 'a eval is not included in val x : int
-       The type "'a eval" is not compatible with the type "int"
-|}]
-
-module F (M : sig
-  val x : 'a eval
-end ) : sig
-  val x : 'b
-end = M
-[%%expect {|
-Line 5, characters 6-7:
-5 | end = M
-          ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val x : 'a eval end
-       is not included in
-         sig val x : 'b end
-       Values do not match: val x : 'a eval is not included in val x : 'b
-       The type "'a eval" is not compatible with the type "'b"
+module F : functor (M : sig val x : 'a eval end) -> sig val x : int end
 |}]
 
 module F (M : sig
@@ -274,4 +235,31 @@ Error: Signature mismatch:
          sig val x : 'a eval end
        Values do not match: val x : int is not included in val x : 'a eval
        The type "int" is not compatible with the type "'a eval"
+|}]
+
+(** Inject **)
+
+(* [inject] stub *)
+open (struct
+  let inject x = x |> Obj.magic
+end : sig
+  val inject : 'a eval -> 'a expr
+end)
+[%%expect {|
+val inject : 'a eval -> 'a expr = <fun>
+|}]
+
+let f x = inject x
+[%%expect {|
+val f : 'a eval -> 'a expr = <fun>
+|}]
+
+let f (x : int) = (x : _ eval)
+[%%expect {|
+val f : int -> int = <fun>
+|}]
+
+let f x : <[int]> expr = inject 0
+[%%expect {|
+val f : 'a -> <[int]> expr = <fun>
 |}]
