@@ -496,15 +496,25 @@ dev_build = _build/dev-dune
 dev_build_flag = --build-dir=$(CURDIR)/$(dev_build)
 dev_boot_targets = $(boot_targets) main.bc
 
-.PHONY: dev dev-runtime dev-check dev-test dev-test-all dev-promote
+.PHONY: dev dev-start dev-setup dev-runtime dev-check
+.PHONY: dev-test dev-test-all dev-promote
 .PHONY: dev-ocamlc dev-ocamlopt
 .PHONY: dev-expect-runners
 .PHONY: dev-status dev-log dev-stop
 
-dev: _build/_bootinstall
+dev-start: _build/_bootinstall
 	@$(dev_watcher) start --idle-timeout $(DEV_IDLE_TIMEOUT) -- \
 	  $(dune) build $(ws_boot) $(dev_build_flag) -w --display=short \
 	  @merlin-support $(dev_boot_targets)
+
+dev-setup:
+	+@set -eu; \
+	  if [ ! -x _install/bin/ocamlopt.opt ] || \
+	     [ ! -f _runtest/testsuite/Makefile ]; then \
+	    echo "dev: preparing the initial compiler and test installation"; \
+	    $(dev_watcher) stop; \
+	    $(MAKE) --no-print-directory install_for_test; \
+	  fi
 
 dev-runtime:
 	+@set -eu; \
@@ -520,7 +530,7 @@ dev-runtime:
 	    $(MAKE) runtime-stdlib; \
 	  fi
 
-dev-check: dev-runtime dev
+dev-check: dev-setup dev-runtime dev-start
 	@set -eu; \
 	  $(dev_watcher) wait-ready --timeout 300 -- \
 	    $(dune) rpc ping --root=. $(dev_build_flag); \
@@ -538,6 +548,8 @@ dev-check: dev-runtime dev
 	  $(dune) diagnostics --root=. $(dev_build_flag); \
 	  exit 1
 
+dev: dev-check
+
 DEV_RUNNERS ?=
 dev-expect-runners:
 	@test -n "$(DEV_RUNNERS)" || \
@@ -545,7 +557,8 @@ dev-expect-runners:
 	@$(dev_watcher) stop
 	$(dune) build $(ws_main) \
 	  $(addprefix oxcaml/testsuite/tools/,$(addsuffix .exe,$(DEV_RUNNERS)))
-	@$(MAKE) --no-print-directory dev DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT)
+	@$(MAKE) --no-print-directory dev-start \
+	  DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT)
 
 dev-test: dev-check
 	+@set -eu; \
@@ -586,7 +599,7 @@ dev-test: dev-check
 	    export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	  fi; \
 	  cd _build/dev/runtest/testsuite; \
-	  $(MAKE) one \
+	  $(MAKE) $(if $(PROMOTE),promote,one) \
 	    $(if $(TEST),TEST=$(call locate_test,$(TEST))) \
 	    $(if $(DIR),DIR=$(call locate_test,$(DIR)))
 
@@ -598,7 +611,7 @@ dev-test-all: dev-check
 	  fi; \
 	  $(dev_watcher) stop; \
 	  restart_watcher() { \
-	    $(MAKE) --no-print-directory dev \
+	    $(MAKE) --no-print-directory dev-start \
 	      DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) >/dev/null || true; \
 	  }; \
 	  trap restart_watcher EXIT; \
@@ -608,9 +621,24 @@ dev-test-all: dev-check
 	  $(MAKE) --no-print-directory test-no-rebuild
 
 dev-promote:
-	+@$(MAKE) --no-print-directory dev-test PROMOTE=1 \
-	  DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
-	  $(if $(TEST),TEST=$(TEST)) $(if $(DIR),DIR=$(DIR))
+	+@set -eu; \
+	  promote_log=$$(mktemp "$${TMPDIR:-/tmp}/oxcaml-dev-promote.XXXXXX"); \
+	  trap 'rm -f "$$promote_log"' EXIT; \
+	  if $(MAKE) --no-print-directory dev-test PROMOTE=1 \
+	      DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
+	      $(if $(TEST),TEST=$(TEST)) $(if $(DIR),DIR=$(DIR)) \
+	      >"$$promote_log" 2>&1; then \
+	    cat "$$promote_log"; \
+	    exit 0; \
+	  fi; \
+	  if $(MAKE) --no-print-directory dev-test \
+	      DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
+	      $(if $(TEST),TEST=$(TEST)) $(if $(DIR),DIR=$(DIR)); then \
+	    echo "dev: promoted test output"; \
+	    exit 0; \
+	  fi; \
+	  cat "$$promote_log" >&2; \
+	  exit 1
 
 dev-ocamlc: dev-check
 	@echo "dev: compiler = $(dev_build)/default/main_native.exe"
