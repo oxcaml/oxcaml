@@ -133,12 +133,44 @@ let analyze ?(speculative = false) ?print_name ~machine_width
           reference_result.T.Mutable_unboxing_result.additional_epa
           dead_variable_result.required_names
       in
+      (* The upwards pass uses [required_names] to decide whether a name may
+         still be referenced in the term being rebuilt (for example when
+         choosing aliases for the arguments of merged [Switch] arms, or when
+         patching unused exception buckets). The mutable unboxing pass deletes
+         the bindings of unboxed blocks; in addition the alias analysis
+         removes, without introducing any rebinding, any continuation
+         parameter whose canonical dominator is such a block (see
+         [Control_flow_graph.minimize_extra_args_for_one_continuation]). None
+         of these names will be bound in the rebuilt term, so they must not
+         stay in [required_names]. *)
+      let vars_deleted_by_mutable_unboxing =
+        let unboxed_block_vars =
+          Simple.Set.fold
+            (fun block acc ->
+              match Simple.must_be_var block with
+              | Some (var, _coercion) -> Variable.Set.add var acc
+              | None -> acc)
+            unboxed_blocks Variable.Set.empty
+        in
+        Continuation.Map.fold
+          (fun _cont (param_aliases : T.Continuation_param_aliases.t) acc ->
+            Variable.Set.fold
+              (fun param acc ->
+                match
+                  Variable.Lmap.find_opt param param_aliases.lets_to_introduce
+                with
+                | Some _ -> acc
+                | None -> Variable.Set.add param acc)
+              param_aliases.removed_aliased_params_and_extra_params acc)
+          continuation_parameters unboxed_block_vars
+      in
+      let required_names =
+        Name.Set.diff required_names_after_ref_reference_analysis
+          (Name.set_of_var_set vars_deleted_by_mutable_unboxing)
+      in
       let result =
         T.Flow_result.
-          { data_flow_result =
-              { dead_variable_result with
-                required_names = required_names_after_ref_reference_analysis
-              };
+          { data_flow_result = { dead_variable_result with required_names };
             aliases_result = { aliases_kind; continuation_parameters };
             mutable_unboxing_result = reference_result
           }
