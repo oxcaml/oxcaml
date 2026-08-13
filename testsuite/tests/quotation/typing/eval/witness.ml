@@ -33,11 +33,7 @@ val f : <[int]> expr -> int = <fun>
 
 let f x : int = eval Persistent x
 [%%expect {|
-Line 1, characters 16-33:
-1 | let f x : int = eval Persistent x
-                    ^^^^^^^^^^^^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type "int"
+val f : <[int]> expr -> int = <fun>
 |}]
 
 let f x = eval (Persistent : (<[int]>, _) evals) x
@@ -54,22 +50,13 @@ let g () = f Persistent Persistent <[true]> <[42]>
 [%%expect {|
 val f : ('a, bool) evals -> ('b, int) evals -> 'a expr -> 'b expr -> int =
   <fun>
-Line 4, characters 13-23:
-4 | let g () = f Persistent Persistent <[true]> <[42]>
-                 ^^^^^^^^^^
-Error: The constructor "Persistent" has type "('a, 'a eval) evals"
-       but an expression was expected of type "('a, bool) evals"
-       Type "'a eval" is not compatible with type "bool"
+val g : unit -> int = <fun>
 |}]
 let f' x y = if eval' x then eval' y else 0
 let g' () = f' <[true]> <[42]>
 [%%expect {|
-Line 1, characters 16-23:
-1 | let f' x y = if eval' x then eval' y else 0
-                    ^^^^^^^
-Error: This expression has type "'a eval"
-       but an expression was expected of type "bool"
-       because it is in the condition of an if-statement
+val f' : <[bool]> expr -> <[int]> expr -> int = <fun>
+val g' : unit -> int = <fun>
 |}]
 
 (** More complex example which needs a witness for ['a eval = 'b list] **)
