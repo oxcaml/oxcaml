@@ -76,7 +76,7 @@ let hash { hash; _ } = hash
 let runtime t =
   let desc = Runtime t in
   let layout =
-    Layout.of_base (RS.Runtime_layout.to_base_layout (RS.runtime_layout t))
+    Layout.base (RS.Runtime_layout.to_base_layout (RS.runtime_layout t))
   in
   { desc; layout; hash = Hashtbl.hash (hash_runtime, RS.hash t) }
 
@@ -107,7 +107,7 @@ let record_unboxed args =
 
 let void =
   let desc = Void in
-  { desc; layout = Layout.of_base Sort.Void; hash = Hashtbl.hash hash_void }
+  { desc; layout = Layout.base Sort.Void; hash = Hashtbl.hash hash_void }
 
 let rec print fmt { desc } =
   match desc with
@@ -674,7 +674,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | Unboxed_tuple _, Some (Base b) ->
     err_or_unknown_exn (fun f ->
         f "unboxed tuple must have product layout, but got: %a" pp_layout
-          (Layout.of_base b))
+          (Layout.base b))
   | Unboxed_tuple fields, Some (Product _ as type_layout) ->
     err_or_unknown_exn (fun f ->
         f

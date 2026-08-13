@@ -71,7 +71,7 @@ module type Sort = sig
           (** Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)] *)
 
-    val of_base : base -> t
+    val base : base -> t
 
     val product : t list -> t
 

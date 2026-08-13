@@ -302,24 +302,24 @@ module Type_decl_shape = struct
     (* CR layouts-scannable: We forget about the stored scannable axes when
        converting, since a [Layout.t] (which is a [Sort.Const.t]) doesn't have
        a place to put them. See the CR on [Layout] at the top of this file. *)
-    | Types.Scannable _ -> Layout.of_base Scannable
+    | Types.Scannable _ -> Layout.base Scannable
     | Types.Float_boxed ->
-      Layout.of_base Float64
+      Layout.base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,
          contrary to the name.*)
-    | Types.Float64 -> Layout.of_base Float64
-    | Types.Float32 -> Layout.of_base Float32
-    | Types.Bits8 -> Layout.of_base Bits8
-    | Types.Bits16 -> Layout.of_base Bits16
-    | Types.Bits32 -> Layout.of_base Bits32
-    | Types.Untagged_immediate -> Layout.of_base Untagged_immediate
-    | Types.Bits64 -> Layout.of_base Bits64
-    | Types.Vec128 -> Layout.of_base Vec128
-    | Types.Vec256 -> Layout.of_base Vec256
-    | Types.Vec512 -> Layout.of_base Vec512
-    | Types.Mask -> Layout.of_base Mask
-    | Types.Word -> Layout.of_base Word
-    | Types.Void -> Layout.of_base Void
+    | Types.Float64 -> Layout.base Float64
+    | Types.Float32 -> Layout.base Float32
+    | Types.Bits8 -> Layout.base Bits8
+    | Types.Bits16 -> Layout.base Bits16
+    | Types.Bits32 -> Layout.base Bits32
+    | Types.Untagged_immediate -> Layout.base Untagged_immediate
+    | Types.Bits64 -> Layout.base Bits64
+    | Types.Vec128 -> Layout.base Vec128
+    | Types.Vec256 -> Layout.base Vec256
+    | Types.Vec512 -> Layout.base Vec512
+    | Types.Mask -> Layout.base Mask
+    | Types.Word -> Layout.base Word
+    | Types.Void -> Layout.base Void
     | Types.Product args ->
       Layout.product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))

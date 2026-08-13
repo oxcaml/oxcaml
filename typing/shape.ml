@@ -459,7 +459,7 @@ module Predef = struct
         Scannable
       | Unboxed u -> unboxed_type_to_base_layout u
 
-    let to_layout (t: t) : Layout.t = Layout.of_base (to_base_layout t)
+    let to_layout (t: t) : Layout.t = Layout.base (to_base_layout t)
 
     let equal_simd_vec_split s1 s2 =
       match s1, s2 with
