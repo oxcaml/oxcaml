@@ -151,7 +151,12 @@ let process_append_bytecode oc state objfile compunit =
         compunit.cu_reloc
         state.relocs in
     let primitives = List.rev_append compunit.cu_primitives state.primitives in
-    seek_in ic compunit.cu_pos;
+    let pos =
+      match compunit.cu_pos with
+      | Pos_internal ofs -> ofs
+      | Pos_external _ -> raise (Error (Not_an_object_file objfile))
+    in
+    seek_in ic pos;
     Misc.copy_file_chunk ic oc compunit.cu_codesize;
     let events, debug_dirs =
       if !Clflags.debug && compunit.cu_debug > 0 then begin
@@ -324,7 +329,7 @@ let package_object_files ~ppf_dump files target coercion =
     in
     let compunit =
       { cu_name = packed_compilation_unit;
-        cu_pos = pos_code;
+        cu_pos = Pos_internal pos_code;
         cu_codesize = pos_debug - pos_code;
         cu_reloc = List.rev state.relocs;
         cu_arg_descr = None;

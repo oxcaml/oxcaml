@@ -612,6 +612,12 @@ let mk_strict_sequence f =
   "-strict-sequence", Arg.Unit f,
   " Left-hand part of a sequence must have type unit"
 
+let mk_thin_library f =
+  ( "-thin-library",
+    Arg.Unit f,
+    " Build .a/.cma files as thin libraries. These are smaller, but the \
+      .o/.cmo files must remain available at link time." )
+
 let mk_thread f =
   "-thread", Arg.Unit f,
   " (deprecated) same as -I +threads"
@@ -1279,6 +1285,7 @@ module type Compiler_options = sig
   val _with_runtime : unit -> unit
   val _without_runtime : unit -> unit
   val _short_paths : unit -> unit
+  val _thin_library : unit -> unit
   val _thread : unit -> unit
   val _v : unit -> unit
   val _verbose : unit -> unit
@@ -1580,6 +1587,7 @@ struct
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
+    mk_thin_library F._thin_library;
     mk_thread F._thread;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
@@ -1875,6 +1883,7 @@ struct
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
+    mk_thin_library F._thin_library;
     mk_thread F._thread;
     mk_unbox_closures F._unbox_closures;
     mk_unbox_closures_factor F._unbox_closures_factor;
@@ -2194,6 +2203,7 @@ struct
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
     mk_no_strict_formats F._no_strict_formats;
+    mk_thin_library F._thin_library;
     mk_thread F._thread;
     mk_unboxed_types F._unboxed_types;
     mk_no_unboxed_types F._no_unboxed_types;
@@ -2659,6 +2669,7 @@ module Default = struct
         | Some pass ->
           set_save_ir_before pass true
 
+    let _thin_library = set thin_library
     let _thread = set use_threads
     let _verbose = set verbose
     let _version () = Compenv.print_version_string ()

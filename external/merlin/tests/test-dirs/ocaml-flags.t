@@ -490,6 +490,7 @@ logic.
   -strict-formats
   -strict-sequence
   -symbol-visibility-protected
+  -thin-library
   -thread
   -thunkify-compilation-unit-initialization
   -unbox-closures
