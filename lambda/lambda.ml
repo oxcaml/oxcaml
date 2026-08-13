@@ -2068,43 +2068,44 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
 and transl_mixed_product_shape shape =
   Array.map transl_mixed_block_element shape
 
-let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi (fun i (elt : Types.mixed_block_element) ->
-    let rec transl (elt : Types.mixed_block_element) =
-      match elt with
-      | Scannable { separability; _ } ->
-        let raw_kind =
-          value_kind_of_pointerness (pointerness_of_separability separability)
-        in
-        Value { (get_value_kind i) with raw_kind }
-      | Float_boxed -> Float_boxed (get_mode i)
-      | Float64 -> Float64
-      | Float32 -> Float32
-      | Bits8 -> Bits8
-      | Bits16 -> Bits16
-      | Bits32 -> Bits32
-      | Bits64 -> Bits64
-      | Vec128 -> Vec128
-      | Vec256 ->
-        if split_vectors
-        then Product [|Vec128; Vec128|]
-        else Vec256
-      | Vec512 -> Vec512
-      | Mask -> Mask
-      | Word -> Word
-      | Untagged_immediate -> Untagged_immediate
-      | Product shapes ->
-        let get_value_kind _ = generic_value in
-        Product
-          (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-      | Void -> Product [||]
-      | Addressable elt ->
-        (* CR box: Addressability should be preserved here once it affects boxed
-           representations *)
-        transl elt
+let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
+    (elt : Types.mixed_block_element) =
+  match elt with
+  | Scannable { separability; _ } ->
+    let raw_kind =
+      value_kind_of_pointerness (pointerness_of_separability separability)
     in
-    transl elt
-  ) shape
+    Value { (get_value_kind i) with raw_kind }
+  | Float_boxed -> Float_boxed (get_mode i)
+  | Float64 -> Float64
+  | Float32 -> Float32
+  | Bits8 -> Bits8
+  | Bits16 -> Bits16
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Vec128 -> Vec128
+  | Vec256 ->
+    if split_vectors
+    then Product [|Vec128; Vec128|]
+    else Vec256
+  | Vec512 -> Vec512
+  | Mask -> Mask
+  | Word -> Word
+  | Untagged_immediate -> Untagged_immediate
+  | Product shapes ->
+    let get_value_kind _ = generic_value in
+    Product
+      (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+  | Void -> Product [||]
+  | Addressable elt ->
+    (* CR box: Addressability should be preserved here once it affects boxed
+       representations *)
+    transl_mixed_block_element_for_read ~get_value_kind ~get_mode i elt
+
+and transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  Array.mapi
+    (transl_mixed_block_element_for_read ~get_value_kind ~get_mode)
+    shape
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->
