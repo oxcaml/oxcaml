@@ -75,3 +75,65 @@ let test_or_null_atomic () =
 ;;
 
 let () = test_or_null_atomic ()
+
+(* Test getting/setting atomic fields of stack-allocated records *)
+let test_stack_alloc () =
+  let x = stack_ { contents = "hello" } in
+  print_string_atomic "String atomic get initial" x;
+  x.contents <- "world";
+  print_string_atomic "String atomic get after set" x;
+  ()
+;;
+
+let () = test_stack_alloc ()
+
+(* Test Atomic.Loc operations on atomic fields of stack-allocated records *)
+let test_stack_alloc_loc_ops () =
+  let world = "world" in
+  let waldo = "waldo" in
+  let x = stack_ { contents = "hello" } in
+  let prev = Atomic.Loc.exchange [%atomic.loc x.contents] world in
+  Printf.printf "Loc exchange returned: %s\n" prev;
+  print_string_atomic "After loc exchange" x;
+  let success =
+    Atomic.Loc.compare_and_set [%atomic.loc x.contents] world waldo
+  in
+  Printf.printf "Loc compare_and_set returned: %b\n" success;
+  print_string_atomic "After loc compare_and_set" x;
+  let prev = Atomic.Loc.compare_exchange [%atomic.loc x.contents] waldo "plugh" in
+  Printf.printf "Loc compare_exchange returned: %s\n" prev;
+  print_string_atomic "After loc compare_exchange" x;
+  ()
+;;
+
+let () = test_stack_alloc_loc_ops ()
+
+(* Test operations on stack-allocated atomic references *)
+let test_stack_atomic_ref () =
+  let world = "world" in
+  let a = stack_ (Atomic.make "hello") in
+  Printf.printf "Stack atomic get initial: %s\n" (Atomic.get a);
+  Atomic.set a world;
+  Printf.printf "Stack atomic get after set: %s\n" (Atomic.get a);
+  let prev = Atomic.exchange a "waldo" in
+  Printf.printf "Stack atomic exchange returned: %s\n" prev;
+  let success = Atomic.compare_and_set a world "xyzzy" in
+  Printf.printf "Stack atomic compare_and_set returned: %b\n" success;
+  Printf.printf "Stack atomic get final: %s\n" (Atomic.get a);
+  ()
+;;
+
+let () = test_stack_atomic_ref ()
+
+(* Test setting an atomic field of a stack-allocated mixed record *)
+type mixed = { f: float#; mutable s : string [@atomic] }
+
+let test_stack_alloc_mixed () =
+  let x = stack_ { f = #1.0; s = "hello" } in
+  Printf.printf "Mixed atomic get initial: %s\n" x.s;
+  x.s <- "world";
+  Printf.printf "Mixed atomic get after set: %s\n" x.s;
+  ()
+;;
+
+let () = test_stack_alloc_mixed ()

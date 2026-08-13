@@ -31,11 +31,11 @@ val f : t @ contended -> t = <fun>
 |}]
 
 (* If we set the attribute but *don't* get a kind mismatch, we ought to be fine *)
-type t : value mod many portable uncontended = string
+type t : value mod many portable = string
 [@@unsafe_allow_any_mode_crossing]
 [%%expect{|
 Lines 1-2, characters 0-34:
-1 | type t : value mod many portable uncontended = string
+1 | type t : value mod many portable = string
 2 | [@@unsafe_allow_any_mode_crossing]
 Error: [@@unsafe_allow_any_mode_crossing] is not allowed on this kind of type declaration.
        Only records, unboxed products, and variants are supported.
@@ -336,7 +336,7 @@ Error: Signature mismatch:
 |}]
 
 module A : sig
-  type t : value mod external_ global portable many uncontended unyielding
+  type t : value mod external_ global portable many
 end = struct
   type t = int
 end
@@ -419,10 +419,10 @@ Lines 1-2, characters 0-34:
 Error: This variant or record definition does not match that of type "'a t"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
-         immutable contended with 'a
-         but this has: mod forkable unyielding many stateless portable
-         immutable contended
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended
 |}]
 
 type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a }
@@ -440,10 +440,10 @@ Error: This variant or record definition does not match that of type
          "('a, 'b) arity_2"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
-         immutable contended with 'b
-         but this has: mod forkable unyielding many stateless portable
-         immutable contended with 'a
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'b
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
 |}]
 
 (* mcomp *)

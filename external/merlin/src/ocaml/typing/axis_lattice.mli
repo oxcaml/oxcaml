@@ -96,6 +96,6 @@ val immediate : t
 
 val object_legacy : t
 
-(** Map from internal axis number (used in diagnostics) to an axis
-    descriptor. *)
+(** Map from internal axis number (used in diagnostics) to an axis descriptor.
+*)
 val axis_number_to_axis_packed : int -> Jkind_axis.Axis.packed

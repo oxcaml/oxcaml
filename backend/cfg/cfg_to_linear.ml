@@ -28,7 +28,7 @@
 open! Int_replace_polymorphic_compare
 module CL = Cfg_with_layout
 module L = Linear
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let phantom_defining_expr_to_linear (expr : Cfg.phantom_defining_expr) =
   match expr with

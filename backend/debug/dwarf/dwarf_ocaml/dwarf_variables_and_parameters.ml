@@ -964,7 +964,7 @@ let iterate_over_variable_like_things ~available_ranges_all_vars
   ARAV.iter available_ranges_all_vars ~f:(fun var range ->
       if var_should_be_emitted ~proto_dies_for_vars ~which_vars var range
       then
-        let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
+        let ident_for_type = Some (Current_unit.get_cu_exn (), var) in
         f var ~ident_for_type ~range)
 
 let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
@@ -1003,9 +1003,7 @@ let dwarf_rvalue_dies state ~value_type_proto_die ~function_symbol
     | [] -> ()
     | _ :: _ ->
       ListLabels.iter pending ~f:(fun (var, range) ->
-          let ident_for_type =
-            Some (Compilation_unit.get_current_exn (), var)
-          in
+          let ident_for_type = Some (Current_unit.get_cu_exn (), var) in
           dwarf_for_variable state ~value_type_proto_die ~function_symbol
             ~function_proto_die ~proto_dies_for_vars ~fun_end_label
             ~available_ranges_all_vars ~vars_at_entry

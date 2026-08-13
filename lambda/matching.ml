@@ -2143,7 +2143,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         Punboxed_product layouts
       | Value _ | Float_boxed _ | Float64 | Float32
       | Bits8 | Bits16 | Bits32 | Bits64
-      | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+      | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
       | Splice_variable _ ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
@@ -2201,7 +2201,11 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         @ rem
     | Variant_unboxed | Variant_with_null ->
       if cstr.cstr_constant then
-        rem (* [Null] constructor case. *)
+        List.mapi
+          (fun i ca_sort ->
+             make_field_access binding_kind ca_sort ~field:i ~pos:i)
+          arg_sorts
+        @ rem
       else
         { arg; binding_kind; mut; sort; layout } :: rem
         (* the unboxed variant constructor, or the [This] constructor
@@ -2343,7 +2347,10 @@ let call_force_lazy_block ?(inlined = Default_inlined) varg loc ~pos =
       ap_args = [ Lprim (Popaque Lambda.layout_lazy, [ varg ], loc) ];
       ap_result_layout = Lambda.layout_lazy_contents;
       ap_region_close = pos;
-      ap_mode = alloc_heap;
+      ap_mode = not_alloc_stack;
+      (* Lazy thunks may never be at the yielding mode, so forcing a lazy value
+         never yields *)
+      ap_yielding = Unyielding;
       ap_inlined = inlined;
       ap_specialised = Default_specialise;
       ap_probe = None;
@@ -2429,7 +2436,10 @@ let inline_lazy_force arg pos loc =
         ap_args = [ Lconst (Const_base (Const_int 0)); arg ];
         ap_result_layout = Lambda.layout_lazy_contents;
         ap_region_close = pos;
-        ap_mode = alloc_heap;
+        ap_mode = not_alloc_stack;
+        (* Lazy thunks may never be at the yielding mode, so forcing a lazy
+           value never yields *)
+        ap_yielding = Unyielding;
         ap_inlined = Never_inlined;
         ap_specialised = Default_specialise;
         ap_probe=None;
@@ -2574,7 +2584,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
         match label_sort Legacy lbl all_sorts with
-        | `Sort s -> s
+        | `Sort s -> Jkind.Sort.default_for_transl_and_get s
         | `Same_as_record_sort -> sort
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
@@ -2655,7 +2665,9 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
   in
   let lbl_layouts =
     Array.map (fun lbl ->
-      Typeopt.layout_of_sort lbl.lbl_loc (unboxed_label_sort lbl all_sorts)
+      Typeopt.layout_of_sort lbl.lbl_loc
+        (Jkind.Sort.default_for_transl_and_get
+           (unboxed_label_sort lbl all_sorts))
     ) all_labels
     |> Array.to_list
   in
@@ -2677,7 +2689,10 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
         else
           Alias, compose_mut mut Immutable
       in
-      let lbl_sort = unboxed_label_sort lbl all_sorts in
+      let lbl_sort =
+        Jkind.Sort.default_for_transl_and_get
+          (unboxed_label_sort lbl all_sorts)
+      in
       let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       {
         arg = access;
@@ -4725,7 +4740,9 @@ let rec map_return f = function
           loc, k )
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
-    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ ) as l ->
+    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lkindtemplate _
+    | Lkindinstantiate _ )
+    as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
@@ -4795,8 +4812,51 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
+  | Tpat_fun_layout { id; uid = duid; sort; mode; lpoly; env_alloc_mode; _ }
+      when not (List.is_empty (Lpoly.get_exn lpoly)) ->
+    assert (mutable_flag == Asttypes.Immutable);
+    let sort = Jkind.Sort.default_for_transl_and_get sort in
+    let return = Typeopt.layout pat.pat_env pat.pat_loc sort pat.pat_type in
+    let mode = Mode.value_to_alloc_r2l mode in
+    let locality = Mode.Alloc.proj_comonadic Areality mode in
+    let ret_mode = Translmode.transl_return_mode_l locality in
+    let kind_params =
+      List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
+    in
+    let env_alloc_mode = Translmode.transl_alloc_mode env_alloc_mode in
+    let free_vars =
+      Lambda.free_variables param
+      |> Ident.Set.to_list
+      |> List.filter_map (fun ident ->
+          Option.map
+            (fun layout -> ident, layout)
+            (Typeopt.layout_of_ident pat.pat_env ident))
+    in
+    let fresh_vars, env =
+      List.fold_left
+        (fun (fresh_vars, env) (old_name, layout) ->
+          let new_name = Ident.rename old_name in
+          let fresh_vars = Ident.Map.add old_name new_name fresh_vars in
+          let env = Ident.Map.add new_name (Lvar old_name, layout) env in
+          (fresh_vars, env))
+        (Ident.Map.empty, Ident.Map.empty)
+        free_vars
+    in
+    let f =
+      Lkindtemplate
+        { ktmpl_params = kind_params;
+          ktmpl_return = return;
+          ktmpl_body = Lambda.rename fresh_vars param;
+          ktmpl_ret_mode = ret_mode;
+          ktmpl_env = env;
+          ktmpl_env_mode = env_alloc_mode;
+          ktmpl_loc = Scoped_location.of_location ~scopes loc;
+        }
+    in
+    Llet (Strict, layout_block, id, duid, f, body)
   | Tpat_var { id; uid = duid; _ }
-  | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ } ->
+  | Tpat_alias { pattern = { pat_desc = Tpat_any }; id; uid = duid; _ }
+  | Tpat_fun_layout { id; uid = duid; _ } ->
       (* Fast path, and keep track of simple bindings to unboxable numbers.
 
          Note: the (Tpat_alias (Tpat_any, id)) case needs to be

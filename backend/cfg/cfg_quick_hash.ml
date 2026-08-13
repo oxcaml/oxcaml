@@ -1,7 +1,7 @@
 [@@@ocaml.warning "+a-30-40-41-42"]
 
 open! Int_replace_polymorphic_compare
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let[@inline] hash_combine h1 h2 = (h1 * 65599) + h2
 
@@ -41,6 +41,7 @@ let operation : Operation.t -> int =
   | Specific _ -> 30
   | Name_for_debugger _ -> 31
   | Alloc _ -> 32
+  | Const_mask _ -> 33
 
 let basic : Cfg.basic -> int = function
   | Op op -> operation op

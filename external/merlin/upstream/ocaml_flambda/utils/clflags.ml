@@ -15,28 +15,33 @@
 
 (* Command-line parameters *)
 
-module Int_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
+(* Stripped down version of Numbers, as its dependencies are a lot of code *)
+module Numbers = struct
+  module Int = struct
+    type t = int
+    module Map = Map.Make(Stdlib.Int)
     let of_string = int_of_string
   end
-
-  module Value = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-end)
-module Float_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-
-  module Value = struct
-    include Numbers.Float
+  module Float = struct
+    type t = float
     let of_string = float_of_string
   end
+end
+
+module Int_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Int
 end)
+module Float_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Float
+end)
+
+type open_arg =
+  | Open of string
+  | Open_cmi of string
 
 let objfiles = ref ([] : string list)   (* .cmo and .cma files *)
 and ccobjs = ref ([] : string list)     (* .o, .a, .so and -cclib -lxxx *)
@@ -150,7 +155,7 @@ and noprompt = ref false                (* -noprompt *)
 and nopromptcont = ref false            (* -nopromptcont *)
 and init_file = ref (None : string option)   (* -init *)
 and noinit = ref false                  (* -noinit *)
-and open_modules = ref []               (* -open *)
+and open_args = ref ([] : open_arg list) (* -open / -open-cmi *)
 and use_prims = ref ""                  (* -use-prims ... *)
 and use_runtime = ref ""                (* -use-runtime ... *)
 and plugin = ref false                  (* -plugin ... *)

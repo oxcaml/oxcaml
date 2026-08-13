@@ -34,6 +34,7 @@ val create :
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
   my_region:Region_stack_element.t option ->
+  my_alloc_region:Ident.t ->
   t
 
 val current_unit : t -> Compilation_unit.t
@@ -213,3 +214,5 @@ type region_closure_continuation = private
 
 val region_closure_continuation :
   t -> Region_stack_element.t -> region_closure_continuation
+
+val current_alloc_region : t -> Ident.t

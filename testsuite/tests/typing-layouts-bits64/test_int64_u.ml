@@ -2,9 +2,15 @@
  include stdlib_upstream_compatible;
 *)
 
-(* External declarations for unsigned comparison primitives *)
+external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
+
+(* External declarations for unsigned primitives *)
 external unsigned_lt : int64# -> int64# -> bool = "%int64#_unsigned_lessthan"
 external unsigned_gt : int64# -> int64# -> bool = "%int64#_unsigned_greaterthan"
+external unsigned_div : int64# -> int64# -> int64# = "%int64#_unsigned_div"
+external unsigned_mod : int64# -> int64# -> int64# = "%int64#_unsigned_mod"
+external unsafe_unsigned_div : int64# -> int64# -> int64# = "%int64#_unsafe_unsigned_div"
+external unsafe_unsigned_mod : int64# -> int64# -> int64# = "%int64#_unsafe_unsigned_mod"
 
 module Int64_u = Stdlib_upstream_compatible.Int64_u
 module Int32_u = Stdlib_upstream_compatible.Int32_u
@@ -337,6 +343,10 @@ let () =
   test_binary_of "equal"               Int64.equal               Int64_u.equal                bool_result;
   test_binary    "min"                 Int64.min                 Int64_u.min;
   test_binary    "max"                 Int64.max                 Int64_u.max;
+  test_division "%unsigned_div" Int64.unsigned_div unsigned_div;
+  test_division "%unsafe_unsigned_div" Int64.unsigned_div unsafe_unsigned_div;
+  test_division "%unsigned_mod" Int64.unsigned_rem unsigned_mod;
+  test_division "%unsafe_unsigned_mod" Int64.unsigned_rem unsafe_unsigned_mod;
 
   (* Explicit unsigned comparison tests with hardcoded expected values *)
   let module I = Int64_u in
@@ -392,5 +402,74 @@ let () =
   assert (unsigned_gt max_int min_int = false);
   assert (unsigned_gt neg_billion pos_billion = true);
   assert (unsigned_gt pos_billion neg_billion = false);
+
+  (* Test unsigned div/mod primitives *)
+  let one_e_19_plus_42 = #0x8AC7_2304_89E8_002AL in
+  (* = #10_000_000_000_000_000_042L,
+     but we don't have unsigned decimal literals *)
+
+  assert
+    (I.equal
+      (unsigned_div one_e_19_plus_42 #10_000L)
+      #1_000_000_000_000_000L);
+  assert
+    (I.equal
+      (unsigned_div one_e_19_plus_42 (id #10_000L))
+      #1_000_000_000_000_000L);
+  assert
+    (I.equal
+      (unsigned_div (id one_e_19_plus_42) #10_000L)
+      #1_000_000_000_000_000L);
+  assert
+    (I.equal
+      (unsigned_div (id one_e_19_plus_42) (id #10_000L))
+      #1_000_000_000_000_000L);
+  assert (I.equal (unsigned_mod one_e_19_plus_42 #10_000L) #42L);
+  assert (I.equal (unsigned_mod one_e_19_plus_42 (id #10_000L)) #42L);
+  assert (I.equal (unsigned_mod (id one_e_19_plus_42) #10_000L) #42L);
+  assert (I.equal (unsigned_mod (id one_e_19_plus_42) (id #10_000L)) #42L);
+
+  (* Test right-shift optimization *)
+  assert
+    (I.equal
+      (unsigned_div #0xFFFF_FFFF_FFFF_FFFFL #256L)
+      #0xFF_FFFF_FFFF_FFFFL);
+  assert
+    (I.equal
+      (unsigned_div #0xFFFF_FFFF_FFFF_FFFFL (id #256L))
+      #0xFF_FFFF_FFFF_FFFFL);
+  assert
+    (I.equal
+      (unsigned_div (id #0xFFFF_FFFF_FFFF_FFFFL) #256L)
+      #0xFF_FFFF_FFFF_FFFFL);
+  assert
+    (I.equal
+      (unsigned_div (id #0xFFFF_FFFF_FFFF_FFFFL) (id #256L))
+      #0xFF_FFFF_FFFF_FFFFL);
+  assert (I.equal (unsigned_mod #0xFFFF_FFFF_FFFF_FFFFL #256L) #255L);
+  assert (I.equal (unsigned_mod #0xFFFF_FFFF_FFFF_FFFFL (id #256L)) #255L);
+  assert (I.equal (unsigned_mod (id #0xFFFF_FFFF_FFFF_FFFFL) #256L) #255L);
+  assert (I.equal (unsigned_mod (id #0xFFFF_FFFF_FFFF_FFFFL) (id #256L)) #255L);
+
+  (* Test div-by-minus-one optimization does not occur *)
+  assert (I.equal (unsigned_div #42L minus_one) #0L);
+  assert (I.equal (unsigned_div #42L (id minus_one)) #0L);
+  assert (I.equal (unsigned_div (id #42L) minus_one) #0L);
+  assert (I.equal (unsigned_div (id #42L) (id minus_one)) #0L);
+  assert (I.equal (unsigned_mod #42L minus_one) #42L);
+  assert (I.equal (unsigned_mod #42L (id minus_one)) #42L);
+  assert (I.equal (unsigned_mod (id #42L) minus_one) #42L);
+  assert (I.equal (unsigned_mod (id #42L) (id minus_one)) #42L);
+
+  (* Test div-by-min-int optimization does not occur *)
+  assert (I.equal (unsigned_div #0x8000_0000_0000_0042L min_int) #1L);
+  assert (I.equal (unsigned_div #0x8000_0000_0000_0042L (id min_int)) #1L);
+  assert (I.equal (unsigned_div (id #0x8000_0000_0000_0042L) min_int) #1L);
+  assert (I.equal (unsigned_div (id #0x8000_0000_0000_0042L) (id min_int)) #1L);
+  assert (I.equal (unsigned_mod #0x8000_0000_0000_0042L min_int) #0x42L);
+  assert (I.equal (unsigned_mod #0x8000_0000_0000_0042L (id min_int)) #0x42L);
+  assert (I.equal (unsigned_mod (id #0x8000_0000_0000_0042L) min_int) #0x42L);
+  assert
+    (I.equal (unsigned_mod (id #0x8000_0000_0000_0042L) (id min_int)) #0x42L);
 
   ()
