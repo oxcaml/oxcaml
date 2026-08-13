@@ -348,8 +348,7 @@ module Layout = struct
       List.equal (equate_or_equal ~allow_mutation) ts1 ts2
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
     | Addressable l1, Addressable l2 ->
-      (* Incomplete (and may make more unifications than necessary); see the
-         [Addressable]/[Addressable] case of [Sort.equate_sort_addressable]. *)
+      (* Incomplete; see [Sort.equate_sort_addressable]. *)
       equate_or_equal ~allow_mutation
         (strip_head_addressable l1)
         (strip_head_addressable l2)
@@ -404,13 +403,12 @@ module Layout = struct
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
       | Addressable l1, Addressable l2 ->
-        (* Incomplete; see the [Addressable]/[Addressable] case of
-           [Sort.equate_sort_addressable]. *)
+        (* Incomplete; see [Sort.equate_sort_addressable]. *)
         sub (strip_head_addressable l1) (strip_head_addressable l2)
       | Addressable l1, Any _ ->
-        (* [any] lies strictly above all addressable layouts, so cap the
-           result at [Less] (e.g. [any addressable] is not equal to
-           [any]). *)
+        (* Instead of [l1 addressable < any], we solve [l1 < any]
+           except return [Less] when the latter would return [Equal],
+           as [any] is strictly above every addressable layout. *)
         Misc.Le_result.combine (sub (strip_head_addressable l1) t2) Less
       | Addressable _, (Sort _ | Product _) ->
         if constrain_above_addressable ~allow_mutation:true t2
@@ -477,7 +475,6 @@ module Layout = struct
     | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
     | Addressable l1, Addressable l2 ->
       (* The meet of two addressable layouts is addressable. Incomplete; see
-         the [Addressable]/[Addressable] case of
          [Sort.equate_sort_addressable]. *)
       Option.map
         (fun l -> Addressable l)
@@ -889,7 +886,7 @@ module Base = struct
       | None -> (
         (* Stuck on an abstract [Kconstr] with no manifest. [sub_expanded] can
            still decide [Kconstr _, Layout (Any _)] via the stored [sa] upper
-           bound and addressability operator *)
+           bound and addressability operator; other stuck cases fail. *)
         match t1, t2 with
         | Kconstr _, Layout (Layout.Any _)
         | ( Kconstr (_, _, Addressable),
@@ -2996,8 +2993,12 @@ let decompose_product env jk =
     | Product sorts ->
       Some (List.map (fun sort -> Layout.Sort (sort, Scannable_axes.max)) sorts)
     | Addressable s ->
-      (* The only way for a plain product to be addressable is for all of its
-         components to be *)
+      (* Given a kind [jk] which should equal [k_0 & k_1 & ...] (e.g. for an
+         unboxed tuple/record being inspected in [Ctype.constrain_type_jkind]),
+         [decompose_product] tries to return the list of [k_i]s.
+
+         When [jk = _ addressable], the only way for [k_0 & k_1 & ...] to equal
+         [jk] is for each component to be addressable. *)
       Option.map (List.map (fun l -> Layout.Addressable l)) (deal_with_sort s)
     | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
   in
@@ -3007,8 +3008,7 @@ let decompose_product env jk =
     let rec deal_with_layout : _ Layout.t -> _ = function
       | Any _ -> None
       | Addressable l ->
-        (* The only way for a plain product to be addressable is for all of its
-           components to be *)
+        (* see [deal_with_sort] *)
         Option.map
           (List.map (fun l -> Layout.Addressable l))
           (deal_with_layout l)
