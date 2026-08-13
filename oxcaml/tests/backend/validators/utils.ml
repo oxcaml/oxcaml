@@ -1,5 +1,5 @@
 open Cfg_intf.S
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 module Instruction = struct
   type 'a t =

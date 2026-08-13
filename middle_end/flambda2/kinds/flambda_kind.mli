@@ -32,6 +32,7 @@ module Naked_number_kind : sig
     | Naked_vec128
     | Naked_vec256
     | Naked_vec512
+    | Naked_mask
 
   val print : Format.formatter -> t -> unit
 
@@ -79,6 +80,8 @@ val naked_vec256 : t
 
 val naked_vec512 : t
 
+val naked_mask : t
+
 val region : t
 
 val rec_info : t
@@ -101,6 +104,7 @@ type flat_suffix_element =
   | Naked_vec128
   | Naked_vec256
   | Naked_vec512
+  | Naked_mask
 
 module Mixed_block_lambda_shape = Mixed_block_shape
 
@@ -193,6 +197,7 @@ module Boxable_number : sig
     | Naked_vec128
     | Naked_vec256
     | Naked_vec512
+    | Naked_mask
 
   val unboxed_kind : t -> kind
 
@@ -226,6 +231,7 @@ module With_subkind : sig
       | Boxed_vec128
       | Boxed_vec256
       | Boxed_vec512
+      | Boxed_mask
       | Tagged_immediate
       | Variant of
           { consts : Target_ocaml_int.Set.t;
@@ -246,6 +252,7 @@ module With_subkind : sig
       | Unboxed_vec128_array
       | Unboxed_vec256_array
       | Unboxed_vec512_array
+      | Unboxed_mask_array
       | Unboxed_product_array
 
     include Container_types.S with type t := t
@@ -292,6 +299,8 @@ module With_subkind : sig
 
   val naked_vec512 : t
 
+  val naked_mask : t
+
   val region : t
 
   val boxed_float : t
@@ -303,6 +312,8 @@ module With_subkind : sig
   val boxed_nativeint : t
 
   val boxed_vec128 : t
+
+  val boxed_mask : t
 
   val tagged_immediate : t
 
@@ -321,6 +332,8 @@ module With_subkind : sig
   val unboxed_vec256_array : t
 
   val unboxed_vec512_array : t
+
+  val unboxed_mask_array : t
 
   val unboxed_product_array : t
 

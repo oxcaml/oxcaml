@@ -1,64 +1,63 @@
-let $camlVariant_unboxed__immstring26 = "variant_unboxed.ml" in
-let $camlVariant_unboxed__const_block28 =
-  Block 0 ($camlVariant_unboxed__immstring26, 32, 14)
+let $camlVariant_unboxed__immstring28 = "variant_unboxed.ml" in
+let $camlVariant_unboxed__const_block30 =
+  Block 0 ($camlVariant_unboxed__immstring28, 32, 14)
 in
-let $camlVariant_unboxed__Pmakeblock31 =
+let $camlVariant_unboxed__Pmakeblock33 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlVariant_unboxed__const_block28)
+           $camlVariant_unboxed__const_block30)
 in
 let code foo_0 deleted in
-let code loopify(never) size(48) newer_version_of(foo_0)
+let code loopify(never) size(47) newer_version_of(foo_0)
       foo_0_1
         (b : imm tagged,
          b' : imm tagged,
          x1 : imm tagged,
          x2 : imm tagged,
          y : float boxed)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let untagged = %untag_imm (b) in
    switch untagged
-     | 0 -> k3
-     | 1 -> k4)
-    where k4 =
+     | 0 ->
+       k2
+         (1i,
+          y,
+          x2,
+          poison.val.variant_unboxing_field,
+          poison.val.variant_unboxing_field)
+     | 1 -> k3)
+    where k3 =
       let untagged = %untag_imm (b') in
       switch untagged
         | 0 ->
           k2
             (0i,
-             poison.float.variant_unboxing_float,
+             poison.val.variant_unboxing_field,
              poison.val.variant_unboxing_field,
              x1,
              x2)
         | 1 ->
           k2
             (0i,
-             poison.float.variant_unboxing_float,
+             poison.val.variant_unboxing_field,
              poison.val.variant_unboxing_field,
              x2,
              x1)
-    where k3 =
-      let unboxed_float = %unbox_num.`float` (y) in
-      cont k2
-             (1i,
-              unboxed_float,
-              x2,
-              poison.val.variant_unboxing_field,
-              poison.val.variant_unboxing_field)
     where k2
             (tag : imm,
-             unboxed_float : float,
+             unboxed_field_1_1,
              unboxed_field_1_0,
              unboxed_field_0_1,
              unboxed_field_0_0) =
       (switch tag
          | 0 -> k2
          | 1 -> k3
-         | 2 -> k1 pop(regular k1) ($camlVariant_unboxed__Pmakeblock31)
+         | 2 -> k1 pop(regular k1) ($camlVariant_unboxed__Pmakeblock33)
          where k3 =
-           let prim = %num_conv.[`float`].[`imm`] (unboxed_float) in
-           let int_of_float = %tag_imm (prim) in
+           let prim = %unbox_num.`float` (unboxed_field_1_1) in
+           let prim_1 = %num_conv.[`float`].[`imm`] (prim) in
+           let int_of_float = %tag_imm (prim_1) in
            let int_add = %int_barith.add (unboxed_field_1_0, int_of_float) in
            cont k (int_add)
          where k2 =
@@ -67,6 +66,7 @@ let code loopify(never) size(48) newer_version_of(foo_0)
            in
            cont k (int_add))
 in
-let $camlVariant_unboxed__foo_1 = closure foo_0_1 @foo in
+let $camlVariant_unboxed__foo_1 = closure foo_0_1 @foo &toplevel.alloc_region
+in
 let $camlVariant_unboxed = Block 0 ($camlVariant_unboxed__foo_1) in
 cont done ($camlVariant_unboxed)

@@ -70,7 +70,7 @@ let symbol res sym =
   let sym_name = Linkage_name.to_string (Symbol.linkage_name sym) in
   let sym_global =
     if
-      Compilation_unit.is_current (Symbol.compilation_unit sym)
+      Current_unit.is_current (Symbol.compilation_unit sym)
       && (not (Name_occurrences.mem_symbol res.reachable_names sym))
       && not (symbol_must_be_global_for_dwarf ~sym_name)
     then Cmm.Local
@@ -93,7 +93,7 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
   in
   let sym_global =
     if
-      Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
+      Current_unit.is_current (Code_id.get_compilation_unit code_id)
       && (not (Name_occurrences.mem_code_id res.reachable_names code_id))
       && not (symbol_must_be_global_for_dwarf ~sym_name)
     then Cmm.Local

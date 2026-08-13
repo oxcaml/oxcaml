@@ -1,0 +1,40 @@
+File cross_module_static_lib.cmx
+Name: Cross_module_static_lib
+CRC of implementation: 00000000000000000000000000000000
+Globals defined:
+	Cross_module_static_lib
+Interfaces imported:
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	Cross_module_static_lib
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Implementations imported:
+Interfaces used in quotations:
+Implementations used in quotations:
+Flambda 2 unit with export information
+Currying functions:
+Apply functions:
+Send functions:
+Force link: no
+Static data:
+  [
+    (closure ⟨env⟩ layout_2 ->
+      { c = (missing)
+      ; r =
+        ⟪(function {nlocal = 1} closure/333[L]
+           (function {nlocal = 0} x/318[$layout_2] : $layout_2 x/318))⟫ });
+    (closure ⟨env⟩ layout_11 layout_12 ->
+      { c = (missing)
+      ; r =
+        ⟪(function {nlocal = 1} closure/334[L]
+           (function {nlocal = 0} x/321[$layout_11] y/322[$layout_12]
+             : #($layout_11, $layout_12)
+             (make_unboxed_product #($layout_11, $layout_12) x/321 y/322)))⟫ });
+    [ (missing); ];
+    (closure ⟨env⟩ layout_16 ->
+      { c = (missing)
+      ; r =
+        ⟪(function {nlocal = 1} closure/335[L]
+           (let (calls/332 =a (mixedfield 0  (*) closure/335))
+             (function {nlocal = 0} x/326[$layout_16] : $layout_16
+               (seq (+:=1 calls/332) x/326))))⟫ });
+    ]

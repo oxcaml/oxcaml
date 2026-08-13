@@ -526,8 +526,8 @@ let phantom cmm_expr free_vars = Phantom { cmm_expr; free_vars }
 let rec is_cmm_simple cmm =
   match (cmm : Cmm.expression) with
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
-  | Cvar _ ->
+  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+  | Cconst_symbol _ | Cvar _ ->
     true
   | Cname_for_debugger (_, body) ->
     (* [Cname_for_debugger] is transparent for the purposes of deciding
@@ -552,7 +552,11 @@ let create_binding_aux (type a) env effs (var : Bound_var.t)
     let incr =
       match bound_expr with
       | Inlined | Phantom _ | Simple _ | Split _ -> 1
-      | Splittable_prim { args; _ } -> List.length args + 1
+      | Splittable_prim { args; _ } ->
+        (* one binding for each arg + one for the actual binding + 1 for the
+           phantom binding left behind upon splitting (see
+           [new_bindings_for_splitting]) *)
+        List.length args + 1 + 1
     in
     next_order := !next_order + incr;
     !next_order
@@ -563,7 +567,10 @@ let create_binding_aux (type a) env effs (var : Bound_var.t)
       ~bv_is_parameter:(Bound_var.is_parameter var)
       (Bound_var.var var)
   in
-  let phantomize = Flambda_features.Expert.phantom_lets () in
+  let phantomize =
+    Flambda_features.Expert.phantom_lets ()
+    && Variable.user_visible (Bound_var.var var)
+  in
   let binding =
     Binding { order; inline; phantomize; effs; cmm_var; bound_expr }
   in
@@ -1164,9 +1171,12 @@ let get_variable_for_phantom_expr env res var =
        flushed *)
     match Variable.Map.find var env.vars with
     | exception Not_found ->
-      (* The variable may never have been bound at all, for example if it was
-         bound by a [Let] whose defining expression could not be phantomised.
-         There is then no way to describe it. *)
+      (* The variable may never have been bound at all: for phantom lets whose
+         defining expressions are not [Simple]s or primitives (e.g. sets of
+         closures, rec info), [To_cmm_expr.let_expr_phantom] binds nothing.
+         (Phantom lets binding [Simple]s or primitives always create bindings,
+         even when the defining expression cannot be phantomised.) There is no
+         way to describe such a variable. *)
       { env; res; var = None }
     | cmm, _free_vars -> (
       match[@warning "-4"] cmm with

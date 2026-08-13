@@ -71,22 +71,26 @@ module Env : sig
     defining_expr:Cmm.phantom_defining_expr option ->
     t
 
-  val place_phantom_lets : t -> Cmm.expression -> Cmm.expression
+  val register_name_for_debugger : t -> Backend_var.With_provenance.t -> t
+
+  val place_preserved_wrappers : t -> Cmm.expression -> Cmm.expression
 end = struct
+  (* Debugging-related wrappers that are skipped over during matching and placed
+     back around the rewritten expression when a clause matches. *)
+  type wrapper =
+    | Phantom_let of
+        Backend_var.With_provenance.t * Cmm.phantom_defining_expr option
+    | Name_for_debugger of Backend_var.With_provenance.t
+
   type t =
     { exprs : Cmm.expression IM.t;
       ints : int IM.t;
       natints : Nativeint.t IM.t;
-      phantom_lets_rev :
-        (Backend_var.With_provenance.t * Cmm.phantom_defining_expr option) list
+      wrappers_rev : wrapper list
     }
 
   let empty =
-    { exprs = IM.empty;
-      ints = IM.empty;
-      natints = IM.empty;
-      phantom_lets_rev = []
-    }
+    { exprs = IM.empty; ints = IM.empty; natints = IM.empty; wrappers_rev = [] }
 
   let add (type a) env (var : a pattern_var) (expr : a) =
     match var.kind with
@@ -111,14 +115,21 @@ end = struct
 
   let register_phantom_let env ~phantom_var ~defining_expr =
     { env with
-      phantom_lets_rev = (phantom_var, defining_expr) :: env.phantom_lets_rev
+      wrappers_rev =
+        Phantom_let (phantom_var, defining_expr) :: env.wrappers_rev
     }
 
-  let place_phantom_lets env expr =
+  let register_name_for_debugger env var =
+    { env with wrappers_rev = Name_for_debugger var :: env.wrappers_rev }
+
+  let place_preserved_wrappers env expr =
     List.fold_left
-      (fun expr (phantom_var, defining_expr) ->
-        Cmm.Cphantom_let (phantom_var, defining_expr, expr))
-      expr env.phantom_lets_rev
+      (fun expr wrapper ->
+        match wrapper with
+        | Phantom_let (phantom_var, defining_expr) ->
+          Cmm.Cphantom_let (phantom_var, defining_expr, expr)
+        | Name_for_debugger var -> Cmm.Cname_for_debugger (var, expr))
+      expr env.wrappers_rev
 end
 
 type binop =
@@ -162,17 +173,29 @@ let matches_binop (binop : binop) (cop : Cmm.operation) =
 
 let match_clauses_in_order ~default ~matches clauses expr =
   let ( let* ) = Option.bind in
-  let rec match_one_pattern env pat (expr : Cmm.expression) =
+  (* [toplevel] is [true] iff the expression being matched is the whole
+     expression the clauses are being run against, rather than a subexpression
+     of it. *)
+  let rec match_one_pattern ~toplevel env pat (expr : Cmm.expression) =
     match expr with
     | Cphantom_let (phantom_var, defining_expr, expr) ->
       let env = Env.register_phantom_let env ~phantom_var ~defining_expr in
-      match_one_pattern env pat expr
-    | Cname_for_debugger (_, body) -> match_one_pattern env pat body
+      match_one_pattern ~toplevel env pat expr
+    | Cname_for_debugger (var, body) ->
+      (* A matching clause rewrites the whole expression to one computing the
+         same value, so a name for that whole expression can be transferred onto
+         the rewritten expression. A name on a proper subexpression cannot be
+         preserved, however: the subexpression's value may not be computed by
+         the rewritten expression at all. Such names are dropped. *)
+      let env =
+        if toplevel then Env.register_name_for_debugger env var else env
+      in
+      match_one_pattern ~toplevel env pat body
     | _ -> (
       match pat, expr with
       | Any v, expr -> Some (Env.add env v expr)
       | As (v, pat), expr ->
-        let* env = match_one_pattern env pat expr in
+        let* env = match_one_pattern ~toplevel env pat expr in
         Some (Env.add env v expr)
       | Const_int_fixed n1, Cconst_int (n2, _) ->
         if Int.equal n1 n2 then Some env else None
@@ -183,26 +206,26 @@ let match_clauses_in_order ~default ~matches clauses expr =
       | Binop (binop, pat1, pat2), Cop (cop, [expr1; expr2], _) ->
         if matches_binop binop cop
         then
-          let* env = match_one_pattern env pat1 expr1 in
-          match_one_pattern env pat2 expr2
+          let* env = match_one_pattern ~toplevel:false env pat1 expr1 in
+          match_one_pattern ~toplevel:false env pat2 expr2
         else None
       | Guarded { pat; guard }, expr ->
-        let* env = match_one_pattern env pat expr in
+        let* env = match_one_pattern ~toplevel env pat expr in
         if guard env then Some env else None
       | _, _ -> None)
   in
   let rec find_matching_clause expr = function
     | [] -> default expr
     | (pat, f) :: clauses -> (
-      match match_one_pattern Env.empty pat expr with
+      match match_one_pattern ~toplevel:true Env.empty pat expr with
       | Some env -> matches env (f env)
       | None -> find_matching_clause expr clauses)
   in
   find_matching_clause expr clauses
 
 let run expr clauses =
-  match_clauses_in_order ~default:Fun.id ~matches:Env.place_phantom_lets clauses
-    expr
+  match_clauses_in_order ~default:Fun.id ~matches:Env.place_preserved_wrappers
+    clauses expr
 
 let run_default ~default expr clauses =
   match_clauses_in_order ~default ~matches:(fun _env x -> x) clauses expr
@@ -290,6 +313,7 @@ module Cmm_comparator = struct
     | Cconst_vec128 (v1, _), Cconst_vec128 (v2, _) -> equal_vec128_bits v1 v2
     | Cconst_vec256 (v1, _), Cconst_vec256 (v2, _) -> equal_vec256_bits v1 v2
     | Cconst_vec512 (v1, _), Cconst_vec512 (v2, _) -> equal_vec512_bits v1 v2
+    | Cconst_mask (n1, _), Cconst_mask (n2, _) -> Int64.equal n1 n2
     | Cconst_symbol (s1, _), Cconst_symbol (s2, _) -> equal_symbol s1 s2
     | Cvar v1, Cvar v2 -> V.equal v1 v2
     | Clet (v1, def1, body1), Clet (v2, def2, body2) ->
@@ -362,6 +386,7 @@ module Cmm_comparator = struct
         | Cconst_vec128 (_, _)
         | Cconst_vec256 (_, _)
         | Cconst_vec512 (_, _)
+        | Cconst_mask (_, _)
         | Cconst_symbol (_, _)
         | Cvar _
         | Clet (_, _, _)

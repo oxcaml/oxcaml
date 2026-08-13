@@ -2,5 +2,5 @@
   (names fldiff fexprc roundtrip)
   (modes native)
   (libraries
-   ocamlcommon ocamloptcomp
+   ocamlfrontend ocamloptcomp
    flambda2 flambda2_compare flambda2_parser flambda2_terms flambda2_cmx))

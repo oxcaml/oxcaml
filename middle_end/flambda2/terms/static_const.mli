@@ -37,6 +37,7 @@ type t = private
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.t Or_variable.t
   | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.t Or_variable.t
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.t Or_variable.t
+  | Boxed_mask of Vector_types.Mask.Bit_pattern.t Or_variable.t
   | Immutable_float_block of
       Numeric_types.Float_by_bit_pattern.t Or_variable.t list
   | Immutable_float_array of
@@ -55,6 +56,7 @@ type t = private
       Vector_types.Vec256.Bit_pattern.t Or_variable.t list
   | Immutable_vec512_array of
       Vector_types.Vec512.Bit_pattern.t Or_variable.t list
+  | Immutable_mask_array of Vector_types.Mask.Bit_pattern.t Or_variable.t list
   | Immutable_value_array of Simple.With_debuginfo.t list
       (** [Immutable_*_array] constructors always have at least one field. For
           empty arrays, [Empty_array] must be used. *)
@@ -64,7 +66,6 @@ type t = private
           representation (currently using custom blocks) from regular arrays of
           values. This affects all operations, most importantly the computation
           of the length of the array. *)
-  | Mutable_string of { initial_value : string }
   | Immutable_string of string
 
 include Container_types.S with type t := t
@@ -97,6 +98,8 @@ val boxed_vec128 : Vector_types.Vec128.Bit_pattern.t Or_variable.t -> t
 val boxed_vec256 : Vector_types.Vec256.Bit_pattern.t Or_variable.t -> t
 
 val boxed_vec512 : Vector_types.Vec512.Bit_pattern.t Or_variable.t -> t
+
+val boxed_mask : Vector_types.Mask.Bit_pattern.t Or_variable.t -> t
 
 val immutable_float_block :
   Numeric_types.Float_by_bit_pattern.t Or_variable.t list -> t
@@ -152,11 +155,14 @@ val immutable_vec512_array :
 
 (** This function can accept empty lists of fields; [Empty_array] will be
     produced. *)
+val immutable_mask_array :
+  Vector_types.Mask.Bit_pattern.t Or_variable.t list -> t
+
+(** This function can accept empty lists of fields; [Empty_array] will be
+    produced. *)
 val immutable_value_array : Simple.With_debuginfo.t list -> t
 
 val empty_array : Empty_array_kind.t -> t
-
-val mutable_string : initial_value:string -> t
 
 val immutable_string : string -> t
 
