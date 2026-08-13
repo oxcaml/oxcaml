@@ -24,13 +24,13 @@ and foo = Bar
 [%%expect{|
 {
  "foo"[type] ->
-   (Mutrec t/342 := Variant<.2> A<.4> of (foo/343  );
-           foo/343 := Variant<.3> Bar<.5>;
-    ).foo/343;
+   (Mutrec t/344 := Variant<.2> A<.4> of (foo/345  );
+           foo/345 := Variant<.3> Bar<.5>;
+    ).foo/345;
  "t"[type] ->
-   (Mutrec t/342 := Variant<.2> A<.4> of (foo/343  );
-           foo/343 := Variant<.3> Bar<.5>;
-    ).t/342;
+   (Mutrec t/344 := Variant<.2> A<.4> of (foo/345  );
+           foo/345 := Variant<.3> Bar<.5>;
+    ).t/344;
  }
 type t = A of foo
 and foo = Bar
@@ -141,9 +141,9 @@ type u = t
 [%%expect{|
 {
  "u"[type] ->
-   ((Mutrec t/342 := Variant<.2> A<.4> of (foo/343  );
-            foo/343 := Variant<.3> Bar<.5>;
-     ).t/342)<.36>;
+   ((Mutrec t/344 := Variant<.2> A<.4> of (foo/345  );
+            foo/345 := Variant<.3> Bar<.5>;
+     ).t/344)<.36>;
  }
 type u = t
 |}]
