@@ -151,7 +151,7 @@ end) = struct
     | NPredef of Predef.t * nf list
     | NArrow
     | NPoly_variant of nf poly_variant_constructors
-    | NVariant of  (delayed_nf * Layout.t) complex_constructors
+    | NVariant of  (delayed_nf * Layout.t option) complex_constructors
     | NVariant_unboxed of
       { name : string;
         variant_uid : Uid.t option;
@@ -198,10 +198,17 @@ end) = struct
   let approx_nf nf = { nf with approximated = true }
 
   let rec equal_local_env t1 t2 =
-    t1.depth = t2.depth &&
-    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst
+    (* Normal forms are heavily shared, and without these [==] short
+       circuits [equal] re-traverses shared sub-terms as a tree, which is
+       exponential on functor-heavy signatures.  Sound while all the
+       equalities below are reflexive (in particular, no float fields
+       compared with [=]). *)
+    t1 == t2 ||
+    (t1.depth = t2.depth &&
+    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst)
 
   and equal_delayed_nf t1 t2 =
+    t1 == t2 ||
     match t1, t2 with
     | Thunk (l1, t1), Thunk (l2, t2) ->
       if equal t1 t2 then equal_local_env l1 l2
@@ -252,7 +259,7 @@ end) = struct
       List.equal
         (Shape.equal_complex_constructor
           (fun (dnf1, ly1) (dnf2, ly2) ->
-            Layout.equal ly1 ly2 && equal_delayed_nf dnf1 dnf2))
+            Option.equal Layout.equal ly1 ly2 && equal_delayed_nf dnf1 dnf2))
         cc1 cc2
     | NVariant_unboxed { name = n1; variant_uid = vu1; arg_name = an1;
                          arg_uid = au1; arg_shape = as1; arg_layout = al1 },
@@ -283,8 +290,8 @@ end) = struct
         | NRec_var _ | NUnknown_type | NAt_layout _ ), _ ) -> false
 
   and equal_nf t1 t2 =
-    if not (Option.equal Uid.equal t1.uid t2.uid) then false
-    else equal_nf_desc t1.desc t2.desc
+    t1 == t2 ||
+    (Option.equal Uid.equal t1.uid t2.uid && equal_nf_desc t1.desc t2.desc)
 
   module ReduceMemoTable = Hashtbl.Make(struct
       type nonrec t = local_env * t
@@ -489,6 +496,12 @@ end) = struct
                                            field_value = sh, layout } ->
                   let name = Option.get field_name in
                   let sh = delayed_nf_set_uid sh field_uid in
+                  (* Since this projection only exists for Merlin (see comment
+                     above), we can choose any layout here. Merlin does not
+                     consume the layout. *)
+                  let layout =
+                    Option.value layout ~default:(Layout.Base Scannable)
+                  in
                   (name, field_uid, sh, layout)
                 ) args in
                 { desc = NRecord { fields; kind = Record_boxed };

@@ -27,6 +27,13 @@ module Int32_u = struct
   external of_int32 : (int32[@local_opt]) -> t @@ portable =
     "%unbox_int32" [@@warning "-187"]
 
+  external unsigned_div : t -> t -> t @@ portable = "%int32#_unsigned_div"
+  external unsigned_rem : t -> t -> t @@ portable = "%int32#_unsigned_mod"
+  external unsafe_unsigned_div : t -> t -> t @@ portable
+    = "%int32#_unsafe_unsigned_div"
+  external unsafe_unsigned_rem : t -> t -> t @@ portable
+    = "%int32#_unsafe_unsigned_mod"
+
   let[@inline always] add x y =
     of_int32 (Int32.add (to_int32 x) (to_int32 y))
 
@@ -352,6 +359,13 @@ module Int64_u = struct
   external of_int64 : (int64[@local_opt]) -> t @@ portable =
     "%unbox_int64" [@@warning "-187"]
 
+  external unsigned_div : t -> t -> t @@ portable = "%int64#_unsigned_div"
+  external unsigned_rem : t -> t -> t @@ portable = "%int64#_unsigned_mod"
+  external unsafe_unsigned_div : t -> t -> t @@ portable
+    = "%int64#_unsafe_unsigned_div"
+  external unsafe_unsigned_rem : t -> t -> t @@ portable
+    = "%int64#_unsafe_unsigned_mod"
+
   let[@inline always] neg x = of_int64 (Int64.neg (to_int64 x))
   let[@inline always] add x y =
     of_int64 (Int64.add (to_int64 x) (to_int64 y))
@@ -415,24 +429,6 @@ module Int64_u = struct
       (Int64.sub x 0x8000000000000000L)
       (Int64.sub y 0x8000000000000000L)
     < 0
-
-  let[@inline always] unsigned_div x y =
-    let n = to_int64 x and d = to_int64 y in
-    if d < 0L then if unsigned_lt n d then of_int64 0L else of_int64 1L
-    else
-      let q =
-        Int64.shift_left
-          (Int64.div (Int64.shift_right_logical n 1) d) 1
-      in
-      let r = Int64.sub n (Int64.mul q d) in
-      if unsigned_lt r d then of_int64 q
-      else of_int64 (Int64.add q 1L)
-
-  let[@inline always] unsigned_rem x y =
-    let n = to_int64 x in
-    let d = to_int64 y in
-    Int64.sub n (Int64.mul (to_int64 (unsigned_div x y)) d)
-    |> of_int64
 
   let[@inline always] of_float x = of_int64 (Int64.of_float x)
   let[@inline always] to_float x = Int64.to_float (to_int64 x)

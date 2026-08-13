@@ -27,7 +27,7 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation option;
+    cstr_shape: constructor_representation;
                                         (* Repr of the constructor itself *)
     cstr_constant: bool;
     (* True if it's the constructor of a non-[@@unboxed] variant with 0 bits of
