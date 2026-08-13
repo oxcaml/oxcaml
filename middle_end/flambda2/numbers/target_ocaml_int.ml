@@ -25,8 +25,6 @@ type t =
 module Int32_base = struct
   type t = int32
 
-  let machine_width _t = MW.Thirty_two
-
   let compare = Int32.compare
 
   let equal = Int32.equal
@@ -35,19 +33,19 @@ module Int32_base = struct
 
   let print ppf t = Format.fprintf ppf "%ld" t
 
-  let min_value _machine_width = Int32.min_int
+  let min_value = Int32.min_int
 
-  let max_value _machine_width = Int32.max_int
+  let max_value = Int32.max_int
 
-  let minus_one _machine_width = Int32.minus_one
+  let minus_one = Int32.minus_one
 
-  let zero _machine_width = Int32.zero
+  let zero = Int32.zero
 
-  let one _machine_width = Int32.one
+  let one = Int32.one
 
-  let ten _machine_width = 10l
+  let ten = 10l
 
-  let hex_ff _machine_width = 0xffl
+  let hex_ff = 0xffl
 
   let ( <= ) x y = Int32.compare x y <= 0
 
@@ -59,22 +57,22 @@ module Int32_base = struct
 
   let bottom_byte_to_int t = Int32.to_int (Int32.logand t 0xffl)
 
-  let of_char _machine_width c = Int32.of_int (Char.code c)
+  let of_char c = Int32.of_int (Char.code c)
 
-  let of_int _machine_width i = Int32.of_int i
+  let of_int i = Int32.of_int i
 
-  let of_int_option _machine_width i = Some (Int32.of_int i)
+  let of_int_option i = Some (Int32.of_int i)
 
-  let of_int32 _machine_width i = i
+  let of_int32 i = i
 
-  let of_int64 _machine_width i = Int64.to_int32 i
+  let of_int64 i = Int64.to_int32 i
 
-  let of_targetint _machine_width t =
+  let of_targetint t =
     match Targetint_32_64.repr t with
     | Targetint_32_64.Int32 x -> x
     | Targetint_32_64.Int64 x -> Int64.to_int32 x
 
-  let of_float _machine_width f = Int32.of_float f
+  let of_float f = Int32.of_float f
 
   let to_float = Int32.to_float
 
@@ -120,7 +118,11 @@ module Int32_base = struct
 
   let mod_ = Int32.rem
 
+  let unsigned_mod = Int32.unsigned_rem
+
   let div = Int32.div
+
+  let unsigned_div = Int32.unsigned_div
 
   let and_ = Int32.logand
 
@@ -143,8 +145,6 @@ end
 module Int64_base = struct
   type t = int64
 
-  let machine_width _t = MW.Sixty_four
-
   let compare = Int64.compare
 
   let equal = Int64.equal
@@ -153,19 +153,19 @@ module Int64_base = struct
 
   let print ppf t = Format.fprintf ppf "%Ld" t
 
-  let min_value _machine_width = Int64.min_int
+  let min_value = Int64.min_int
 
-  let max_value _machine_width = Int64.max_int
+  let max_value = Int64.max_int
 
-  let minus_one _machine_width = Int64.minus_one
+  let minus_one = Int64.minus_one
 
-  let zero _machine_width = Int64.zero
+  let zero = Int64.zero
 
-  let one _machine_width = Int64.one
+  let one = Int64.one
 
-  let ten _machine_width = 10L
+  let ten = 10L
 
-  let hex_ff _machine_width = 0xffL
+  let hex_ff = 0xffL
 
   let ( <= ) x y = Int64.compare x y <= 0
 
@@ -177,22 +177,22 @@ module Int64_base = struct
 
   let bottom_byte_to_int t = Int64.to_int (Int64.logand t 0xffL)
 
-  let of_char _machine_width c = Int64.of_int (Char.code c)
+  let of_char c = Int64.of_int (Char.code c)
 
-  let of_int _machine_width i = Int64.of_int i
+  let of_int i = Int64.of_int i
 
-  let of_int_option _machine_width i = Some (Int64.of_int i)
+  let of_int_option i = Some (Int64.of_int i)
 
-  let of_int32 _machine_width i = Int64.of_int32 i
+  let of_int32 i = Int64.of_int32 i
 
-  let of_int64 _machine_width i = i
+  let of_int64 i = i
 
-  let of_targetint _machine_width t =
+  let of_targetint t =
     match Targetint_32_64.repr t with
     | Targetint_32_64.Int32 x -> Int64.of_int32 x
     | Targetint_32_64.Int64 x -> x
 
-  let of_float _machine_width f = Int64.of_float f
+  let of_float f = Int64.of_float f
 
   let to_float = Int64.to_float
 
@@ -237,7 +237,11 @@ module Int64_base = struct
 
   let mod_ = Int64.rem
 
+  let unsigned_mod = Int64.unsigned_rem
+
   let div = Int64.div
+
+  let unsigned_div = Int64.unsigned_div
 
   let and_ = Int64.logand
 
@@ -290,45 +294,45 @@ let hash = function
 
 let zero machine_width =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.zero MW.Thirty_two)
+  | MW.Thirty_two -> Int31 Int31.zero
   | MW.Thirty_two_no_gc_tag_bit -> Int32 0l
-  | MW.Sixty_four -> Int63 (Int63.zero MW.Sixty_four)
+  | MW.Sixty_four -> Int63 Int63.zero
 
 let one machine_width =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.one MW.Thirty_two)
+  | MW.Thirty_two -> Int31 Int31.one
   | MW.Thirty_two_no_gc_tag_bit -> Int32 1l
-  | MW.Sixty_four -> Int63 (Int63.one MW.Sixty_four)
+  | MW.Sixty_four -> Int63 Int63.one
 
 let minus_one machine_width =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.minus_one MW.Thirty_two)
+  | MW.Thirty_two -> Int31 Int31.minus_one
   | MW.Thirty_two_no_gc_tag_bit -> Int32 (-1l)
-  | MW.Sixty_four -> Int63 (Int63.minus_one MW.Sixty_four)
+  | MW.Sixty_four -> Int63 Int63.minus_one
 
 let ten machine_width =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.ten MW.Thirty_two)
+  | MW.Thirty_two -> Int31 Int31.ten
   | MW.Thirty_two_no_gc_tag_bit -> Int32 10l
-  | MW.Sixty_four -> Int63 (Int63.ten MW.Sixty_four)
+  | MW.Sixty_four -> Int63 Int63.ten
 
 let hex_ff machine_width =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.hex_ff MW.Thirty_two)
+  | MW.Thirty_two -> Int31 Int31.hex_ff
   | MW.Thirty_two_no_gc_tag_bit -> Int32 0xffl
-  | MW.Sixty_four -> Int63 (Int63.hex_ff MW.Sixty_four)
+  | MW.Sixty_four -> Int63 Int63.hex_ff
 
 let min_value machine_width =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.min_value MW.Thirty_two)
+  | MW.Thirty_two -> Int31 Int31.min_value
   | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.min_int
-  | MW.Sixty_four -> Int63 (Int63.min_value MW.Sixty_four)
+  | MW.Sixty_four -> Int63 Int63.min_value
 
 let max_value machine_width =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.max_value MW.Thirty_two)
+  | MW.Thirty_two -> Int31 Int31.max_value
   | MW.Thirty_two_no_gc_tag_bit -> Int32 Int32.max_int
-  | MW.Sixty_four -> Int63 (Int63.max_value MW.Sixty_four)
+  | MW.Sixty_four -> Int63 Int63.max_value
 
 let bool_true machine_width = one machine_width
 
@@ -350,35 +354,35 @@ let bottom_byte_to_int = function
 
 let of_char machine_width c =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.of_char MW.Thirty_two c)
+  | MW.Thirty_two -> Int31 (Int31.of_char c)
   | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_int (Char.code c))
-  | MW.Sixty_four -> Int63 (Int63.of_char MW.Sixty_four c)
+  | MW.Sixty_four -> Int63 (Int63.of_char c)
 
 let of_int machine_width i =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.of_int MW.Thirty_two i)
+  | MW.Thirty_two -> Int31 (Int31.of_int i)
   | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_int i)
-  | MW.Sixty_four -> Int63 (Int63.of_int MW.Sixty_four i)
+  | MW.Sixty_four -> Int63 (Int63.of_int i)
 
 let of_int_option machine_width i = Some (of_int machine_width i)
 
 let of_int32 machine_width i =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.of_int32 MW.Thirty_two i)
+  | MW.Thirty_two -> Int31 (Int31.of_int32 i)
   | MW.Thirty_two_no_gc_tag_bit -> Int32 i
-  | MW.Sixty_four -> Int63 (Int63.of_int32 MW.Sixty_four i)
+  | MW.Sixty_four -> Int63 (Int63.of_int32 i)
 
 let of_int64 machine_width i =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.of_int64 MW.Thirty_two i)
+  | MW.Thirty_two -> Int31 (Int31.of_int64 i)
   | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int64.to_int32 i)
-  | MW.Sixty_four -> Int63 (Int63.of_int64 MW.Sixty_four i)
+  | MW.Sixty_four -> Int63 (Int63.of_int64 i)
 
 let of_float machine_width f =
   match machine_width with
-  | MW.Thirty_two -> Int31 (Int31.of_float MW.Thirty_two f)
+  | MW.Thirty_two -> Int31 (Int31.of_float f)
   | MW.Thirty_two_no_gc_tag_bit -> Int32 (Int32.of_float f)
-  | MW.Sixty_four -> Int63 (Int63.of_float MW.Sixty_four f)
+  | MW.Sixty_four -> Int63 (Int63.of_float f)
 
 let to_float = function
   | Int31 x -> Int31.to_float x
@@ -418,11 +422,9 @@ let to_int_exn t =
 
 let of_targetint machine_width t =
   match machine_width, Targetint_32_64.repr t with
-  | MW.Thirty_two, Targetint_32_64.Int32 x ->
-    Int31 (Int31.of_int32 MW.Thirty_two x)
+  | MW.Thirty_two, Targetint_32_64.Int32 x -> Int31 (Int31.of_int32 x)
   | MW.Thirty_two_no_gc_tag_bit, Targetint_32_64.Int32 x -> Int32 x
-  | MW.Sixty_four, Targetint_32_64.Int64 x ->
-    Int63 (Int63.of_int64 MW.Sixty_four x)
+  | MW.Sixty_four, Targetint_32_64.Int64 x -> Int63 (Int63.of_int64 x)
   | MW.Thirty_two, Targetint_32_64.Int64 _
   | MW.Thirty_two_no_gc_tag_bit, Targetint_32_64.Int64 _
   | MW.Sixty_four, Targetint_32_64.Int32 _ ->
@@ -491,6 +493,18 @@ let div t1 t2 =
     Misc.fatal_errorf "Target_ocaml_int.div: incompatible types %a and %a" print
       t1 print t2
 
+let unsigned_div t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.unsigned_div x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.unsigned_div x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.unsigned_div x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf
+      "Target_ocaml_int.unsigned_div: incompatible types %a and %a" print t1
+      print t2
+
 let mod_ t1 t2 =
   match t1, t2 with
   | Int31 x1, Int31 x2 -> Int31 (Int31.mod_ x1 x2)
@@ -501,6 +515,18 @@ let mod_ t1 t2 =
   | Int63 _, (Int31 _ | Int32 _) ->
     Misc.fatal_errorf "Target_ocaml_int.mod_: incompatible types %a and %a"
       print t1 print t2
+
+let unsigned_mod t1 t2 =
+  match t1, t2 with
+  | Int31 x1, Int31 x2 -> Int31 (Int31.unsigned_mod x1 x2)
+  | Int32 x1, Int32 x2 -> Int32 (Int32.unsigned_rem x1 x2)
+  | Int63 x1, Int63 x2 -> Int63 (Int63.unsigned_mod x1 x2)
+  | Int31 _, (Int32 _ | Int63 _)
+  | Int32 _, (Int31 _ | Int63 _)
+  | Int63 _, (Int31 _ | Int32 _) ->
+    Misc.fatal_errorf
+      "Target_ocaml_int.unsigned_mod: incompatible types %a and %a" print t1
+      print t2
 
 let and_ t1 t2 =
   match t1, t2 with

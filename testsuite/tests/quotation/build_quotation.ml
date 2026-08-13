@@ -63,7 +63,7 @@ end
 module Exc : sig exception E end
 |}];;
 
-#mark_toplevel_in_quotations;;
+#mark_persistent_in_quotations;;
 
 (* Tests *)
 
@@ -270,6 +270,17 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 - : <[int * int -> int]> expr = <[fun (x, y) -> x + y]>
 |}];;
 
+<[ fun (Some x) -> x ]>;;
+[%%expect {|
+Line 1, characters 7-15:
+1 | <[ fun (Some x) -> x ]>;;
+           ^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "None"
+
+- : <[$('a) option -> $('a)]> expr = <[fun (Some (x)) -> x]>
+|}];;
+
 <[ function | _ -> 12 ]>;;
 [%%expect {|
 - : <[$('a) -> int]> expr = <[function | _ -> 12]>
@@ -375,7 +386,8 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
    We should also support this construct (ticket 6790). *)
 <[ let f : type a. a -> a = fun x -> x in f ]>
 [%%expect {|
-Uncaught exception: Stdlib.Exit
+>> Fatal error: Translquote [at Line 1, characters 19-20]: cannot quote type a - this is either unsupported or a bug
+Uncaught exception: Misc.Fatal_error
 
 |}];;
 
@@ -520,7 +532,7 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 ]>
 |}];;
 
-(* Non-top-level functor *)
+(* Non-persistent functor *)
 module Make = Set.Make;;
 <[ let module M = Make(Int) in M.singleton 100 |> M.elements ]>;;
 [%%expect {|
@@ -533,7 +545,7 @@ Error: Identifier "Make" is used at line 2, characters 18-22,
        it is introduced at file "_none_", line 1, outside any quotations.
 |}];;
 
-(* Non-top-level functor argument *)
+(* Non-persistent functor argument *)
 module Int' = Int;;
 <[ let module M = Set.Make(Int') in M.singleton 100 |> M.elements ]>;;
 [%%expect {|
@@ -830,9 +842,23 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 |}];;
 
 <[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
+(* CR metaprogramming jbachurski: Eliminating the duplicate type constraint
+   to make the printer output nicer is tracked by internal ticket 7290. *)
 [%%expect {|
 - : <[(module Hashtbl.S) -> int -> unit]> expr =
-<[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
+<[
+  fun (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+    x -> M.clear (M.create x)
+]>
+|}];;
+
+<[fun (module M : Hashtbl.S) -> (module M : Hashtbl.S)]>;;
+[%%expect {|
+- : <[(module Hashtbl.S) -> (module Hashtbl.S)]> expr =
+<[
+  fun (((module M) : (module Stdlib.Hashtbl.S)) : (module Stdlib.Hashtbl.S))
+    -> ((module M) : (module Stdlib.Hashtbl.S))
+]>
 |}];;
 
 <[ fun (module _ : S) x -> 42 ]>;;
@@ -1385,7 +1411,8 @@ Error: Annotating types with kinds
 (* Pattern constraints *)
 <[ let (x @ unique portable) = "abc" in x ]>
 [%%expect {|
-- : <[string]> expr = <[let x = ("abc" : _ @ unique portable) in x]>
+- : <[string]> expr =
+<[let x : _ @ unique portable = ("abc" : _ @ unique portable) in x]>
 |}];;
 
 (* Expression constraints *)
@@ -1400,7 +1427,7 @@ Error: Annotating types with kinds
 - : <[$('a) -> $('a) @ local]> expr = <[fun x -> exclave_ (x : _ @ local)]>
 |}];;
 
-(* Function definitions *)
+(* Function definitions -- without type annotation *)
 <[ fun (x @ local unique) @ local unique -> x]>
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
@@ -1411,7 +1438,7 @@ Error: Annotating types with kinds
 [%%expect {|
 - : <[$('a) @ local unique -> $('a) @ local unique]> expr =
 <[
-  let f =
+  let f : _ @ unique portable =
   (fun (x : _ @ local unique) -> (x : _ @ local unique) :
     _ @ unique portable)
   in f
@@ -1426,24 +1453,74 @@ Error: Annotating types with kinds
 
 <[ let rec (f @ unique portable) (x @ local unique) = x in f ]>
 [%%expect {|
-- : <[$('a) @ local unique -> $('a) @ local]> expr =
-<[let rec f = (fun (x : _ @ local unique) -> x : _ @ unique portable) in f]>
+>> Fatal error: Translquote [at Line 1, characters 16-22]:
+no support for mode annotations in this position.
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 <[ let rec (f @ unique portable) (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
-- : <[$('a) @ local unique -> $('a) @ local unique]> expr =
-<[
-  let rec f =
-  (fun (x : _ @ local unique) -> (x : _ @ local unique) :
-    _ @ unique portable)
-  in f
-]>
+>> Fatal error: Translquote [at Line 1, characters 16-22]:
+no support for mode annotations in this position.
+Uncaught exception: Misc.Fatal_error
+
+|}];;
+
+<[ let rec (f @ unique portable)
+              (x : string @ local unique) : string @ local unique = x in f ]>
+[%%expect {|
+>> Fatal error: Translquote [at Line 1, characters 16-22]:
+no support for mode annotations in this position.
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 <[ let local_ f x = x in f "abc" ]>
 [%%expect {|
-- : <[string]> expr = <[let f = (fun x -> x : _ @ local) in f "abc"]>
+- : <[string]> expr =
+<[let f : _ @ local = (fun x -> (x : _ @ local) : _ @ local) in f "abc"]>
+|}];;
+
+(* Function definitions -- with type annotations *)
+<[ let f (x : _ @ local unique) = x in f ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local]> expr =
+<[let f = (fun (x : _ @ local unique) -> x) in f]>
+|}];;
+
+<[ let f (x : string @ local unique) = x in f ]>
+[%%expect {|
+- : <[string @ local unique -> string @ local]> expr =
+<[let f = (fun (x : string @ local unique) -> x) in f]>
+|}];;
+
+<[ let f (x : string @ local unique) : string @ local unique = x in f ]>
+[%%expect {|
+- : <[string @ local unique -> string @ local unique]> expr =
+<[
+  let f =
+  (fun (x : string @ local unique) -> ((x : string) : _ @ local unique)) in
+  f
+]>
+|}];;
+
+<[ fun (x : _ @ local unique) -> x ]>
+[%%expect {|
+- : <[$('a) @ local unique -> $('a) @ local]> expr =
+<[fun (x : _ @ local unique) -> x]>
+|}];;
+
+<[ fun (x : string @ local unique) -> x ]>
+[%%expect {|
+- : <[string @ local unique -> string @ local]> expr =
+<[fun (x : string @ local unique) -> x]>
+|}];;
+
+<[ fun x @ local unique -> x ]>
+[%%expect {|
+- : <[$('a) @ unique -> $('a) @ local unique]> expr =
+<[fun x -> (x : _ @ local unique)]>
 |}];;
 
 (* Function types *)
@@ -1678,7 +1755,7 @@ exception E
 <[ fun (module M : T) -> let open M in foo + 1 ]>
 [%%expect {|
 - : <[(module T) -> int]> expr =
-<[fun (module M : T) -> let open! M in M.foo + 1]>
+<[fun (((module M) : (module T)) : (module T)) -> let open! M in M.foo + 1]>
 |}];;
 
 (* Cross-stage open *)

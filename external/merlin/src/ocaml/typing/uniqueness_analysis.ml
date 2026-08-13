@@ -2405,7 +2405,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     (* we are constructing a closure here, and therefore any implicit
        borrowing of free variables in the closure is in fact using aliased. *)
     lift_implicit_borrowing uf
-  | Texp_apply (fn, args, _, _, _) ->
+  | Texp_apply (fn, args, _, _, _, _) ->
     let uf_fn = check_uniqueness_exp ~overwrite:None ienv fn in
     let uf_args =
       List.map
@@ -2547,7 +2547,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
     let uf_write = Value.mark_implicit_borrow_memory_address Write value in
     let uf_tag = Value.invalidate_tag value in
     UF.pars [uf_rcd; uf_arg; uf_write; uf_tag]
-  | Texp_atomic_loc (rcd, _, _, _, _) ->
+  | Texp_atomic_loc { record = rcd; _ } ->
     let value, uf_rcd = check_uniqueness_exp_as_value ienv rcd in
     let uf = Value.mark_consumed_memory_address value in
     UF.seq uf_rcd uf

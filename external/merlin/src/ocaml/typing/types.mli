@@ -189,6 +189,15 @@ and type_desc =
   (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
       The last parameter keep tracks of known expansions, see [abbrev_memo]. *)
 
+  | Tmod of type_expr * mod_bounds
+  (** [Tmod (t, bounds)] ==> [t @@ bounds]
+      The type [t] with its mode crossing bounded by [bounds]. This is a
+      transparent wrapper: it constrains mode crossing only, and erases at
+      runtime. The unboxing and kind-computation paths look through it to [t],
+      as they do for [Tpoly]; generic structural traversals rebuild it; the
+      leaf consumers that classify a type's runtime representation raise,
+      since a [Tmod] is not expected to reach them. *)
+
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]
       f1, fn are represented as a linked list of types using Tfield and Tnil
@@ -273,6 +282,9 @@ and type_desc =
       These types are uninhabited, and any appearing in translation will cause an error.
       They are only used to represent the kinds of existentially-quantified types
       mentioned in with-bounds. See test typing-jkind-bounds/gadt.ml *)
+
+  | Tbox of type_expr
+  (** [Tbox ty] ==> [ty box] *)
 
 (** This is used in the Typedtree. It is distinct from
     {{!Asttypes.arg_label}[arg_label]} because Position argument labels are
@@ -386,7 +398,7 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t
+  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -856,10 +868,8 @@ type type_declaration =
        records (besides records that flattens floats or have with atomic
        fields), but [None] for aliases of these types
 
-       invariants:
-       1. there are no "twice-unboxed" types: the [type_declaration] stored here
-          itself has [type_unboxed_version = None].
-       2. the Uid of the unboxed version is [Uid.unboxed_version <uid of boxed>]
+       invariant:
+       the Uid of the unboxed version is [Uid.unboxed_version <uid of boxed>]
     *)
   }
 
@@ -916,6 +926,7 @@ and mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
@@ -960,9 +971,9 @@ and record_representation =
 
      After [update_decls_jkind], no record should have this representation. *)
   | Record_variable
-  (* Used after [update_decls_jkind] for records whose representation cannot be
-     determined because at least one field has layout [any]. The actual
-     representation is decided at construction sites. *)
+  (* Used after [update_decls_jkind] for non-inlined records whose
+     representation cannot be determined because at least one field has layout
+     [any]. The actual representation is decided at construction sites. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -1009,6 +1020,9 @@ and constructor_representation =
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
+  | Constructor_variable
+  (* The constructor has an inlined record argument with a field of layout
+     [any], so its shape cannot be determined at typedecl time. *)
 
 and label_declaration =
   {
@@ -1211,7 +1225,9 @@ module type Wrapped = sig
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Staticity.Const.t
+  (** A left mode instead of a constant mode, in order to encode mode hints.
+      Note that cmi record constant modes anyway. *)
+  and persistent_signature = signature * Mode.Value.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility

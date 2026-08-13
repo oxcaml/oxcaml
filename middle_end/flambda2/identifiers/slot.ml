@@ -86,9 +86,7 @@ end) : S = struct
 
     let print ppf t =
       Format.fprintf ppf "@[%t(" P.colour;
-      if
-        Compilation_unit.equal t.compilation_unit
-          (Compilation_unit.get_current_exn ())
+      if Compilation_unit.equal t.compilation_unit (Current_unit.get_cu_exn ())
       then Format.fprintf ppf "%s/%d" t.name t.name_stamp
       else
         Format.fprintf ppf "%a.%s/%d"
@@ -127,7 +125,7 @@ end) : S = struct
   let in_compilation_unit t compilation_unit =
     Compilation_unit.equal compilation_unit t.compilation_unit
 
-  let is_imported t = not (Compilation_unit.is_current t.compilation_unit)
+  let is_imported t = not (Current_unit.is_current t.compilation_unit)
 
   let to_string t = t.name ^ "_" ^ string_of_int t.name_stamp
 

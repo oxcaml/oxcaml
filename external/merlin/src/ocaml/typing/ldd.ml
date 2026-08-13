@@ -34,19 +34,19 @@ module Make (V : Ordered) = struct
     { v : var;
       lo : node;
       hi : node;
-      down0 : Axis_lattice.t
-      (** Cached lattice value of the lo->lo->..->lo leaf. *);
+      down0 : Axis_lattice.t;
+          (** Cached lattice value of the lo->lo->..->lo leaf. *)
       up0 : Axis_lattice.t
-      (** Cached upper bound on [round_up]. After inlining solved vars this is
-          exact. *)
+          (** Cached upper bound on [round_up]. After inlining solved vars this
+              is exact. *)
     }
 
   and var =
-      { id : int;
+    { id : int;
       mutable state : var_state;
       mutable var_node : node
-      (** [var_node] is the node representing just this var
-          (⊥ ⊔ (v ⊓ ⊤)). *)
+          (** [var_node] is the node representing just this var (⊥ ⊔ (v ⊓ ⊤)).
+          *)
     }
 
   and var_state =
@@ -104,9 +104,7 @@ module Make (V : Ordered) = struct
   let[@inline] is_bot_node (node : node) : bool = node == bot
 
   let[@inline] down0 (node : node) : Axis_lattice.t =
-    if is_leaf node
-    then Unsafe.leaf_value node
-    else Unsafe.node_down0 node
+    if is_leaf node then Unsafe.leaf_value node else Unsafe.node_down0 node
 
   let[@inline] up0 (node : node) : Axis_lattice.t =
     if is_leaf node then Unsafe.leaf_value node else Unsafe.node_up0 node
@@ -176,9 +174,8 @@ module Make (V : Ordered) = struct
           v)
   end
 
-  (** Subtract subsets hi - lo (co-Heyting subtraction).
-      This preserves ordering and maintains canonical form
-      [hi = hi - lo]. *)
+  (** Subtract subsets hi - lo (co-Heyting subtraction). This preserves ordering
+      and maintains canonical form [hi = hi - lo]. *)
   let rec canonicalize ~(hi : node) ~(lo : node) : node =
     (* Ordering fast path: if [lo] has a larger top var, it cannot appear
        under [hi], so we only recurse into [hi]'s subtrees. *)
@@ -245,9 +242,7 @@ module Make (V : Ordered) = struct
 
   (** Build a canonical node; ensures [hi] is disjoint from [lo]. *)
   let node (v : var) ~(lo : node) ~(hi : node) : node =
-    if lo == bot
-    then node_raw v lo hi
-    else node_raw v lo (canonicalize ~hi ~lo)
+    if lo == bot then node_raw v lo hi else node_raw v lo (canonicalize ~hi ~lo)
 
   (* --------- boolean algebra over nodes --------- *)
   let rec join' (a : node) (b : node) =
@@ -261,17 +256,16 @@ module Make (V : Ordered) = struct
     let order = compare_var a_block.v b_block.v in
     if order = 0
     then
-      node_raw a_block.v (join a_block.lo b_block.lo)
+      node_raw a_block.v
+        (join a_block.lo b_block.lo)
         (join
            (canonicalize ~hi:a_block.hi ~lo:b_block.lo)
            (canonicalize ~hi:b_block.hi ~lo:a_block.lo))
     else if order < 0
     then
-      node_raw a_block.v (join a_block.lo b)
-        (canonicalize ~hi:a_block.hi ~lo:b)
+      node_raw a_block.v (join a_block.lo b) (canonicalize ~hi:a_block.hi ~lo:b)
     else
-      node_raw b_block.v (join a b_block.lo)
-        (canonicalize ~hi:b_block.hi ~lo:a)
+      node_raw b_block.v (join a b_block.lo) (canonicalize ~hi:b_block.hi ~lo:a)
 
   and join_with_leaf (leaf_value : Axis_lattice.t) (node : node) =
     let rec aux (leaf_value : Axis_lattice.t) (node : node) =
@@ -280,17 +274,16 @@ module Make (V : Ordered) = struct
       else
         let block = Unsafe.node_block node in
         let lo' = aux leaf_value block.lo in
-        let hi' =
-          canonicalize_right_leaf ~hi:block.hi ~lo:(leaf leaf_value)
-        in
+        let hi' = canonicalize_right_leaf ~hi:block.hi ~lo:(leaf leaf_value) in
         if lo' == block.lo && hi' == block.hi
         then node
         else node_raw block.v lo' hi'
     in
     if Axis_lattice.equal leaf_value Axis_lattice.top
     then top
-    else if (* Fast path: [down0] summarizes the lo-chain in order. *)
-            Axis_lattice.leq leaf_value (down0 node)
+    else if
+      (* Fast path: [down0] summarizes the lo-chain in order. *)
+      Axis_lattice.leq leaf_value (down0 node)
     then node
     else if Axis_lattice.leq (up0 node) leaf_value
     then leaf leaf_value
@@ -304,15 +297,11 @@ module Make (V : Ordered) = struct
     if order = 0
     then
       let lo = meet a_block.lo b_block.lo in
-      let hi =
-        meet (join a_block.hi a_block.lo) (join b_block.hi b_block.lo)
-      in
+      let hi = meet (join a_block.hi a_block.lo) (join b_block.hi b_block.lo) in
       node a_block.v ~lo ~hi
     else if order < 0
-    then
-      node a_block.v ~lo:(meet a_block.lo b) ~hi:(meet a_block.hi b)
-    else
-      node b_block.v ~lo:(meet a b_block.lo) ~hi:(meet a b_block.hi)
+    then node a_block.v ~lo:(meet a_block.lo b) ~hi:(meet a_block.hi b)
+    else node b_block.v ~lo:(meet a b_block.lo) ~hi:(meet a b_block.hi)
 
   and meet_with_leaf (leaf_node : node) (other : node) =
     let rec aux (leaf_value : Axis_lattice.t) (other : node) =
@@ -348,8 +337,7 @@ module Make (V : Ordered) = struct
     then
       let leaf_val = Unsafe.leaf_value b in
       join_with_leaf leaf_val a
-    else
-      join' a b
+    else join' a b
 
   and[@inline] meet (a : node) (b : node) =
     if a == b
@@ -362,17 +350,12 @@ module Make (V : Ordered) = struct
       else meet_with_leaf a b
     else if is_leaf b
     then meet_with_leaf b a
-    else
-      meet' a b
+    else meet' a b
 
   (* --------- public constructors --------- *)
   let[@inline] const (c : Axis_lattice.t) = leaf c
 
-  let sum xs ~base ~f =
-    List.fold_left
-      (fun acc x -> join acc (f x))
-      base
-      xs
+  let sum xs ~base ~f = List.fold_left (fun acc x -> join acc (f x)) base xs
 
   let[@inline] node_of_var (v : var) : node = v.var_node
 
@@ -381,6 +364,7 @@ module Make (V : Ordered) = struct
   let new_var () = Var.make_var ()
 
   (* --------- assignments (x ← ⊥ / ⊤) --------- *)
+
   (** Assign variable to bottom [var := ⊥]. *)
   let rec assign_bot ~(var : var) (node0 : node) : node =
     if is_leaf node0
@@ -480,7 +464,6 @@ module Make (V : Ordered) = struct
   let sub_subsets (a : node) (b : node) : node =
     canonicalize ~hi:(inline_solved_vars a) ~lo:(inline_solved_vars b)
 
-
   let solve_lfp (var : var) (rhs_raw : node) : unit =
     (* Solve the least fixpoint equation var := rhs_raw. 
        The rhs in general contains the var itself, and the
@@ -522,8 +505,7 @@ module Make (V : Ordered) = struct
     gfp_pending := [];
     List.iter (fun (var, rhs_raw) -> solve_gfp var rhs_raw) pending
 
-  let solve_pending () : unit =
-    solve_pending_gfps ()
+  let solve_pending () : unit = solve_pending_gfps ()
 
   (** Decompose into linear terms over [universe]. *)
   let decompose_into_linear_terms ~(universe : var list) (n : node) =
@@ -600,9 +582,7 @@ module Make (V : Ordered) = struct
     let terms =
       Hashtbl.fold
         (fun vs c acc ->
-          if Axis_lattice.equal c Axis_lattice.bot
-          then acc
-          else (vs, c) :: acc)
+          if Axis_lattice.equal c Axis_lattice.bot then acc else (vs, c) :: acc)
         tbl []
     in
     if terms = []
@@ -619,20 +599,19 @@ module Make (V : Ordered) = struct
       let items =
         terms
         |> List.map (fun (vs, c) ->
-               let body, has_meet = term_body vs c in
-               body, has_meet)
+            let body, has_meet = term_body vs c in
+            body, has_meet)
         |> List.sort (fun (a, _) (b, _) -> String.compare a b)
       in
       let n_terms = List.length items in
       items
       |> List.map (fun (body, has_meet) ->
-             if n_terms > 1 && has_meet then "(" ^ body ^ ")" else body)
+          if n_terms > 1 && has_meet then "(" ^ body ^ ")" else body)
       |> String.concat " ⊔ "
 
   (* Empty list means [a ⊑ b] succeeds.
      Non-empty list is the witness axes where it fails. *)
-  let leq_with_reason (a : node) (b : node) :
-      Jkind_axis.Axis.packed list =
+  let leq_with_reason (a : node) (b : node) : Jkind_axis.Axis.packed list =
     solve_pending ();
     let diff = sub_subsets a b in
     let witness = up0 diff in
@@ -641,36 +620,37 @@ module Make (V : Ordered) = struct
 
   let rec map_rigid_rec (f : V.t -> node) (node : node) : node =
     if is_leaf node
-      then node
-      else
-        let block = Unsafe.node_block node in
-        let var = block.v in
-        let lo = block.lo in
-        let hi = block.hi in
-        match var.state with
-        | Rigid name ->
-          let replacement = inline_solved_vars (f name) in
-          if is_leaf replacement then
-            let self' = join lo (meet hi replacement) in
-            map_rigid_rec f self'
-          else
-            let lo' = map_rigid_rec f lo in
-            let hi' = map_rigid_rec f hi in
-            join lo' (meet hi' replacement)
-        | Unsolved ->
+    then node
+    else
+      let block = Unsafe.node_block node in
+      let var = block.v in
+      let lo = block.lo in
+      let hi = block.hi in
+      match var.state with
+      | Rigid name ->
+        let replacement = inline_solved_vars (f name) in
+        if is_leaf replacement
+        then
+          let self' = join lo (meet hi replacement) in
+          map_rigid_rec f self'
+        else
           let lo' = map_rigid_rec f lo in
           let hi' = map_rigid_rec f hi in
-          if lo' == lo && hi' == hi
-          then node
-          else
-            let var_node = node_of_var var in
-            (* One might think we can directly construct a node here,
+          join lo' (meet hi' replacement)
+      | Unsolved ->
+        let lo' = map_rigid_rec f lo in
+        let hi' = map_rigid_rec f hi in
+        if lo' == lo && hi' == hi
+        then node
+        else
+          let var_node = node_of_var var in
+          (* One might think we can directly construct a node here,
                but that would break our invariants if the `f` function
                inserted arbitrary variables in lo' and hi'. *)
-            join lo' (meet hi' var_node)
-        | Solved _ ->
-          invalid_arg
-            "map_rigid: solved vars should not appear after inline_solved_vars"
+          join lo' (meet hi' var_node)
+      | Solved _ ->
+        invalid_arg
+          "map_rigid: solved vars should not appear after inline_solved_vars"
 
   let map_rigid (f : V.t -> node) (node : node) : node =
     map_rigid_rec f (inline_solved_vars node)
@@ -724,11 +704,9 @@ module Make (V : Ordered) = struct
         else
           let block = Unsafe.node_block node in
           Buffer.add_string b
-            (Printf.sprintf
-               "%sNode#%d %s down0=%s up0=%s lo=#%d hi=#%d\n" indent id
-               (pp_var_info block.v) (pp_coeff block.down0)
-               (pp_coeff block.up0)
-               (get_id block.lo) (get_id block.hi));
+            (Printf.sprintf "%sNode#%d %s down0=%s up0=%s lo=#%d hi=#%d\n"
+               indent id (pp_var_info block.v) (pp_coeff block.down0)
+               (pp_coeff block.up0) (get_id block.lo) (get_id block.hi));
           let indent' = indent ^ "  " in
           go indent' block.lo;
           go indent' block.hi)

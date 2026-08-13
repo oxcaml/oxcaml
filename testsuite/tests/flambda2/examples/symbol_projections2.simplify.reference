@@ -3,25 +3,27 @@ let code `fn[symbol_projections2.ml:21,8--17]_2` deleted in
 let code g_1 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(ignore_0)
       ignore_0_1 (param)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   cont k (0)
 in
-let $camlSymbol_projections2__ignore_3 = closure ignore_0_1 @ignore in
+let $camlSymbol_projections2__ignore_3 =
+  closure ignore_0_1 @ignore &toplevel.alloc_region
+in
 let v = %opaque (33) in
 let v_1 = v in
 let set_of_closures
       $camlSymbol_projections2__g_4 =
-      closure g_1_1 @g
+      closure g_1_1 @g &toplevel.alloc_region
       with { v = v }
     end
 and code loopify(never) size(5) newer_version_of(g_1)
       g_1_1 (param : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : val =
-  apply direct(ignore_0_1)
+  apply direct(ignore_0_1 &my_alloc_region)
     ($camlSymbol_projections2__ignore_3 : _ -> imm tagged) (0) -> k2 * k1
     where k2 (param_1 : imm tagged) =
       cont k
@@ -29,12 +31,12 @@ and code loopify(never) size(5) newer_version_of(g_1)
 and set_of_closures
       $`camlSymbol_projections2__fn[symbol_projections2.ml:21,8--17]_5` =
       closure `fn[symbol_projections2.ml:21,8--17]_2_1`
-        @`fn[symbol_projections2.ml:21,8--17]`
+        @`fn[symbol_projections2.ml:21,8--17]` &toplevel.alloc_region
       with { v_1 = v_1 }
     end
 and code loopify(never) size(4) newer_version_of(`fn[symbol_projections2.ml:21,8--17]_2`)
       `fn[symbol_projections2.ml:21,8--17]_2_1` (x : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let v_2 =

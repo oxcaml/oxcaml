@@ -46,6 +46,7 @@ type ustructured_constant =
         word6 : int64;
         word7 : int64
       }
+  | Const_mask of int64
   | Const_block of int * uconstant list
   | Const_float_array of float list
   | Const_string of string
@@ -101,6 +102,7 @@ let rank_structured_constant = function
   | Const_vec256 _ -> 8
   | Const_vec512 _ -> 9
   | Const_float32 _ -> 10
+  | Const_mask _ -> 11
 
 let compare_structured_constants c1 c2 =
   match c1, c2 with
@@ -146,9 +148,10 @@ let compare_structured_constants c1 c2 =
     Misc.Stdlib.Array.compare Int64.compare
       [| l0; l1; l2; l3; l4; l5; l6; l7 |]
       [| r0; r1; r2; r3; r4; r5; r6; r7 |]
+  | Const_mask x1, Const_mask x2 -> Int64.compare x1 x2
   | ( ( Const_string _ | Const_float _ | Const_int32 _ | Const_int64 _
       | Const_nativeint _ | Const_block _ | Const_float_array _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Const_float32 _ ),
+      | Const_vec256 _ | Const_vec512 _ | Const_float32 _ | Const_mask _ ),
       _ ) ->
     (* no overflow possible here *)
     rank_structured_constant c1 - rank_structured_constant c2

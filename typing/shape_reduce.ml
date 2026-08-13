@@ -141,8 +141,8 @@ end) = struct
     | NLeaf
     | NComp_unit of string
     | NError of string
-    | NMu of nf
-    | NRec_var of Shape.DeBruijn_index.t
+    | NMu of Shape.Rec_var_ident.t * nf
+    | NRec_var of Shape.Rec_var_ident.t
     | NMutrec of nf Ident.Map.t
     | NProj_decl of nf * Ident.t
     | NConstr of Ident.t * nf list
@@ -151,7 +151,7 @@ end) = struct
     | NPredef of Predef.t * nf list
     | NArrow
     | NPoly_variant of nf poly_variant_constructors
-    | NVariant of  (delayed_nf * Layout.t) complex_constructors
+    | NVariant of  (delayed_nf * Layout.t option) complex_constructors
     | NVariant_unboxed of
       { name : string;
         variant_uid : Uid.t option;
@@ -198,10 +198,17 @@ end) = struct
   let approx_nf nf = { nf with approximated = true }
 
   let rec equal_local_env t1 t2 =
-    t1.depth = t2.depth &&
-    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst
+    (* Normal forms are heavily shared, and without these [==] short
+       circuits [equal] re-traverses shared sub-terms as a tree, which is
+       exponential on functor-heavy signatures.  Sound while all the
+       equalities below are reflexive (in particular, no float fields
+       compared with [=]). *)
+    t1 == t2 ||
+    (t1.depth = t2.depth &&
+    Ident.Map.equal (Option.equal equal_delayed_nf) t1.subst t2.subst)
 
   and equal_delayed_nf t1 t2 =
+    t1 == t2 ||
     match t1, t2 with
     | Thunk (l1, t1), Thunk (l2, t2) ->
       if equal t1 t2 then equal_local_env l1 l2
@@ -220,17 +227,18 @@ end) = struct
       else false
     | NLeaf, NLeaf -> true
     | NStruct t1, NStruct t2 ->
-      Item.Map.equal equal_delayed_nf t1 t2
+      t1 == t2 || Item.Map.equal equal_delayed_nf t1 t2
     | NProj (t1, i1), NProj (t2, i2) ->
       if Item.compare i1 i2 <> 0 then false
       else equal_nf t1 t2
     | NComp_unit c1, NComp_unit c2 -> String.equal c1 c2
     | NAlias a1, NAlias a2 -> equal_delayed_nf a1 a2
     | NError e1, NError e2 -> String.equal e1 e2
-    | NMu (nf1), NMu (nf2) -> equal_nf nf1 nf2
-    | NRec_var i1, NRec_var i2 -> DeBruijn_index.equal i1 i2
+    | NMu (rv1, nf1), NMu (rv2, nf2) ->
+      Shape.Rec_var_ident.equal rv1 rv2 && equal_nf nf1 nf2
+    | NRec_var rv1, NRec_var rv2 -> Shape.Rec_var_ident.equal rv1 rv2
     | NMutrec defs1, NMutrec defs2 ->
-      Ident.Map.equal equal_nf defs1 defs2
+      defs1 == defs2 || Ident.Map.equal equal_nf defs1 defs2
     | NProj_decl (nf1, id1), NProj_decl (nf2, id2) ->
       Ident.equal id1 id2 && equal_nf nf1 nf2
     | NConstr (id1, args1), NConstr (id2, args2) ->
@@ -252,7 +260,7 @@ end) = struct
       List.equal
         (Shape.equal_complex_constructor
           (fun (dnf1, ly1) (dnf2, ly2) ->
-            Layout.equal ly1 ly2 && equal_delayed_nf dnf1 dnf2))
+            Option.equal Layout.equal ly1 ly2 && equal_delayed_nf dnf1 dnf2))
         cc1 cc2
     | NVariant_unboxed { name = n1; variant_uid = vu1; arg_name = an1;
                          arg_uid = au1; arg_shape = as1; arg_layout = al1 },
@@ -283,8 +291,8 @@ end) = struct
         | NRec_var _ | NUnknown_type | NAt_layout _ ), _ ) -> false
 
   and equal_nf t1 t2 =
-    if not (Option.equal Uid.equal t1.uid t2.uid) then false
-    else equal_nf_desc t1.desc t2.desc
+    t1 == t2 ||
+    (Option.equal Uid.equal t1.uid t2.uid && equal_nf_desc t1.desc t2.desc)
 
   module ReduceMemoTable = Hashtbl.Make(struct
       type nonrec t = local_env * t
@@ -489,6 +497,12 @@ end) = struct
                                            field_value = sh, layout } ->
                   let name = Option.get field_name in
                   let sh = delayed_nf_set_uid sh field_uid in
+                  (* Since this projection only exists for Merlin (see comment
+                     above), we can choose any layout here. Merlin does not
+                     consume the layout. *)
+                  let layout =
+                    Option.value layout ~default:(Layout.Base Scannable)
+                  in
                   (name, field_uid, sh, layout)
                 ) args in
                 { desc = NRecord { fields; kind = Record_boxed };
@@ -555,8 +569,8 @@ end) = struct
               reduce env res
           end
       | Leaf -> return NLeaf
-      | Mu t_body -> return (NMu (reduce env t_body))
-      | Rec_var n -> return (NRec_var n)
+      | Mu (rv, t_body) -> return (NMu (rv, reduce env t_body))
+      | Rec_var rv -> return (NRec_var rv)
       | Struct m ->
           let mnf = Item.Map.map (delay_reduce env) m in
           return (NStruct mnf)
@@ -644,10 +658,10 @@ end) = struct
     | NComp_unit s -> comp_unit ?uid s
     | NAlias nf -> alias ?uid (read_back_force nf)
     | NError t -> error ?uid t
-    | NMu (t_body) ->
-      mu ?uid (read_back t_body)
-    | NRec_var n ->
-      rec_var ?uid n
+    | NMu (rv, t_body) ->
+      mu ?uid rv (read_back t_body)
+    | NRec_var rv ->
+      rec_var ?uid rv
     | NMutrec defs ->
       let t_defs = Ident.Map.map read_back defs in
       mutrec ?uid t_defs

@@ -8,6 +8,7 @@
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
  flags += " -experimental-optimizations";
+ flags += " -flambda2-no-simplify-stubs";
  expect.opt;
 *)
 
@@ -96,7 +97,7 @@ loop_with_non_dominating_load:
 .L0:
   testb $1, %bl
   je    .L1
-  movq  camlStdlib__List__Pmakeblock2453@GOTPCREL(%rip), %rax
+  movq  camlStdlib__List__Pmakeblock2573@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -186,9 +187,9 @@ let f n =
   !sum
 [%%expect_asm X86_64{|
 f:
-  movq  %rax, %rbx
-  cmpq  $1, %rbx
+  cmpq  $1, %rax
   jl    .L1
+  movq  %rax, %rbx
   sarq  $1, %rbx
   movl  $1, %eax
   xorl  %edi, %edi
@@ -227,31 +228,31 @@ module M = struct
 end
 [%%expect_asm X86_64{|
 M.f:
-  movq  %rax, %rbx
-  movq  -8(%rbx), %rax
+  movq  %rax, %rdi
+  movq  -8(%rdi), %rax
   salq  $8, %rax
   shrq  $18, %rax
-  movq  %rax, %rdi
-  shrq  $63, %rdi
+  movq  %rax, %rbx
+  shrq  $63, %rbx
   movabsq $6148914691236517206, %rsi
   imulq %rsi
-  leaq  (%rdx,%rdi), %rax
+  leaq  (%rdx,%rbx), %rax
   leaq  -1(%rax,%rax), %rax
   cmpq  $1, %rax
   jl    .L1
   sarq  $1, %rax
   vxorpd %xmm0, %xmm0, %xmm0
-  xorl  %edi, %edi
+  xorl  %ebx, %ebx
 .L0:
-  movq  %rdi, %rsi
+  movq  %rbx, %rsi
   imulq $6, %rsi
   incq  %rsi
-  vmovsd -4(%rbx,%rsi,4), %xmm1
-  vmulsd 4(%rbx,%rsi,4), %xmm1, %xmm1
-  vmulsd 12(%rbx,%rsi,4), %xmm1, %xmm1
+  vmovsd -4(%rdi,%rsi,4), %xmm1
+  vmulsd 4(%rdi,%rsi,4), %xmm1, %xmm1
+  vmulsd 12(%rdi,%rsi,4), %xmm1, %xmm1
   vaddsd %xmm1, %xmm0, %xmm0
-  incq  %rdi
-  cmpq  %rax, %rdi
+  incq  %rbx
+  cmpq  %rax, %rbx
   jle   .L0
   ret
 .L1:

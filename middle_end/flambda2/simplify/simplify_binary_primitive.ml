@@ -326,8 +326,10 @@ end = struct
     | Add -> always_some I.Num.add
     | Sub -> always_some I.Num.sub
     | Mul -> always_some I.Num.mul
-    | Div -> I.Num.div n1 n2
-    | Mod -> I.Num.mod_ n1 n2
+    | Div Signed -> I.Num.div n1 n2
+    | Mod Signed -> I.Num.mod_ n1 n2
+    | Div Unsigned -> I.Num.unsigned_div n1 n2
+    | Mod Unsigned -> I.Num.unsigned_mod n1 n2
     | And -> always_some I.Num.and_
     | Or -> always_some I.Num.or_
     | Xor -> always_some I.Num.xor
@@ -385,7 +387,7 @@ end = struct
       if Num.equal rhs (Num.zero machine_width)
       then The_other_side
       else Cannot_simplify
-    | Div ->
+    | Div signedness ->
       (* Division ("safe" division, strictly speaking, in Lambda terminology) is
          translated to a conditional on the denominator followed by an unsafe
          division (the "Div" seen here) on the way into Flambda 2. So if the
@@ -396,17 +398,21 @@ end = struct
       then Invalid
       else if Num.equal rhs (Num.one machine_width)
       then The_other_side
-      else if Num.equal rhs (Num.minus_one machine_width)
+      else if
+        Num.equal rhs (Num.minus_one machine_width)
+        && match signedness with Signed -> true | Unsigned -> false
       then
         Negation_of_the_other_side (* CR mshinwell: Add 0 / x = 0 when x <> 0 *)
       else Cannot_simplify
-    | Mod ->
+    | Mod signedness ->
       (* CR mshinwell: We could be more clever for Mod and And *)
       if Num.equal rhs (Num.zero machine_width)
       then Invalid
       else if Num.equal rhs (Num.one machine_width)
       then Exactly (Num.zero machine_width)
-      else if Num.equal rhs (Num.minus_one machine_width)
+      else if
+        Num.equal rhs (Num.minus_one machine_width)
+        && match signedness with Signed -> true | Unsigned -> false
       then Exactly (Num.zero machine_width)
       else Cannot_simplify
 
@@ -422,7 +428,7 @@ end = struct
       if Num.equal lhs (Num.zero machine_width)
       then Negation_of_the_other_side
       else Cannot_simplify
-    | Div | Mod -> Cannot_simplify
+    | Div (Signed | Unsigned) | Mod (Signed | Unsigned) -> Cannot_simplify
 end
 [@@inline always]
 
@@ -1012,6 +1018,7 @@ let simplify_array_load (array_kind : P.Array_kind.t)
     | Naked_vec128s -> K.naked_vec128
     | Naked_vec256s -> K.naked_vec256
     | Naked_vec512s -> K.naked_vec512
+    | Naked_masks -> K.naked_mask
   in
   let array_kind =
     Simplify_common.specialise_array_kind dacc array_kind ~array_ty
@@ -1166,55 +1173,66 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~result_var
 
 let recover_comparison_primitive dacc (prim : P.binary_primitive) ~arg1 ~arg2 =
+  let try_one_direction left right (op : _ P.comparison) =
+    Simple.pattern_match right
+      ~name:(fun _ ~coercion:_ -> None)
+      ~const:(fun const ->
+        match[@warning "-fragile-match"] Const.descr const with
+        | Tagged_immediate i
+          when Target_ocaml_int.(
+                 equal i (zero (DE.machine_width (DA.denv dacc)))) ->
+          Simple.pattern_match' left
+            ~const:(fun _ -> None)
+            ~symbol:(fun _ ~coercion:_ -> None)
+            ~var:(fun var ~coercion:_ ->
+              match DE.find_comparison_result (DA.denv dacc) var with
+              | None -> None
+              | Some comp ->
+                Some
+                  (Comparison_result.convert_result_compared_to_tagged_zero comp
+                     op))
+        | _ -> None)
+  in
+  let try_both_directions op ~swapped_op =
+    match try_one_direction arg1 arg2 op with
+    | Some p -> Some p
+    | None -> try_one_direction arg2 arg1 swapped_op
+  in
   match prim with
   | Block_set _ | Array_load _ | Int_arith _ | Int_shift _
   | Int_comp (_, Yielding_int_like_compare_functions _)
-  | Float_arith _ | Float_comp _ | Phys_equal _ | String_or_bigstring_load _
-  | Bigarray_load _ | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _
-  | Read_offset _ ->
+  | Float_arith _ | Float_comp _ | String_or_bigstring_load _ | Bigarray_load _
+  | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _ | Read_offset _ ->
     None
+  | Phys_equal op ->
+    (* Integer (in)equality reaches Flambda2 as [Phys_equal] (cf.
+       [Lambda_to_flambda_primitives]), so this is the form taken by e.g.
+       [compare x y = 0]. The result of a comparison is always a tagged
+       immediate, for which physical equality is value equality, so it collapses
+       like [Int_comp] equality does. *)
+    let op : _ P.comparison =
+      match (op : P.equality_comparison) with Eq -> Eq | Neq -> Neq
+    in
+    try_both_directions op ~swapped_op:op
   | Int_comp (kind, Yielding_bool op) -> (
     match kind with
     | Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
     | Naked_nativeint ->
       None
-    | Tagged_immediate -> (
-      let try_one_direction left right op =
-        Simple.pattern_match right
-          ~name:(fun _ ~coercion:_ -> None)
-          ~const:(fun const ->
-            match[@warning "-fragile-match"] Const.descr const with
-            | Tagged_immediate i
-              when Target_ocaml_int.(
-                     equal i (zero (DE.machine_width (DA.denv dacc)))) ->
-              Simple.pattern_match' left
-                ~const:(fun _ -> None)
-                ~symbol:(fun _ ~coercion:_ -> None)
-                ~var:(fun var ~coercion:_ ->
-                  match DE.find_comparison_result (DA.denv dacc) var with
-                  | None -> None
-                  | Some comp ->
-                    Some
-                      (Comparison_result.convert_result_compared_to_tagged_zero
-                         comp op))
-            | _ -> None)
+    | Tagged_immediate ->
+      let swapped_op : _ P.comparison =
+        match op with
+        | Eq -> Eq
+        | Neq -> Neq
+        (* Note that this is not handling a negation of an inequality, it is
+           simply a pattern match for when the inequality appears the other way
+           around. So e.g. [Lt] maps to [Gt], not [Ge]. *)
+        | Lt s -> Gt s
+        | Gt s -> Lt s
+        | Le s -> Ge s
+        | Ge s -> Le s
       in
-      match try_one_direction arg1 arg2 op with
-      | Some p -> Some p
-      | None ->
-        let op : _ P.comparison =
-          match op with
-          | Eq -> Eq
-          | Neq -> Neq
-          (* Note that this is not handling a negation of an inequality, it is
-             simply a pattern match for when the inequality appears the other
-             way around. So e.g. [Lt] maps to [Gt], not [Ge]. *)
-          | Lt s -> Gt s
-          | Gt s -> Lt s
-          | Le s -> Ge s
-          | Ge s -> Le s
-        in
-        try_one_direction arg2 arg1 op))
+      try_both_directions op ~swapped_op)
 
 let simplify_binary_primitive dacc original_prim (prim : P.binary_primitive)
     ~arg1 ~arg1_ty ~arg2 ~arg2_ty dbg ~result_var =
