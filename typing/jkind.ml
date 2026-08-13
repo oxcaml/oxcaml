@@ -1859,7 +1859,7 @@ module Const = struct
   end = struct
     type printable_jkind =
       { base : string;
-        scannable_axes : string list;
+        operators : string list;  (** Scannable axes and [addressable] *)
         modal_bounds : string list;
         printable_with_bounds :
           (Outcometree.out_type * Outcometree.out_modality list) list
@@ -1955,19 +1955,19 @@ module Const = struct
         Base_and_axes.fully_expand_aliases_const env base.jkind
       in
       let actual = Base_and_axes.fully_expand_aliases_const env actual in
-      let matching_layouts, operator_strs =
+      let matching_layouts, addressable =
         match base_jkind.base, actual.base with
         | Kconstr (p1, _, op1), Kconstr (p2, _, op2) ->
-          Path.same p1 p2 && Jkind_types.Kind_operator.equal op1 op2, []
+          Path.same p1 p2 && Jkind_types.Kind_operator.equal op1 op2, false
         | Layout l1, Layout l2 -> (
           if Layout.Const.equal_up_to_scannable_axes l1 l2
-          then true, []
+          then true, false
           else
             match l2 with
             | Addressable l2 ->
-              Layout.Const.equal_up_to_scannable_axes l1 l2, ["addressable"]
-            | Any _ | Base _ | Product _ | Univar _ | Genvar _ -> false, [])
-        | (Kconstr _ | Layout _), _ -> false, []
+              Layout.Const.equal_up_to_scannable_axes l1 l2, true
+            | Any _ | Base _ | Product _ | Univar _ | Genvar _ -> false, false)
+        | (Kconstr _ | Layout _), _ -> false, false
       in
       let scannable_axes =
         get_scannable_axes_diff
@@ -2018,20 +2018,21 @@ module Const = struct
       | true, Some modal_bounds, Some scannable_axes ->
         Some
           { base = base.name;
-            scannable_axes = scannable_axes @ operator_strs;
+            operators =
+              (scannable_axes @ if addressable then ["addressable"] else []);
             modal_bounds;
             printable_with_bounds
           }
       | false, _, _ | _, None, _ | _, _, None -> None
 
     (** Select the out_jkind_const with the least number of modal bounds and
-        scannable axes to print *)
+        operators to print *)
     let rec select_simplest = function
       | a :: b :: tl ->
         let simpler =
           if
-            List.length a.modal_bounds + List.length a.scannable_axes
-            < List.length b.modal_bounds + List.length b.scannable_axes
+            List.length a.modal_bounds + List.length a.operators
+            < List.length b.modal_bounds + List.length b.operators
           then a
           else b
         in
@@ -2059,7 +2060,7 @@ module Const = struct
           |> select_simplest
         | Expanded | Expanded_with_all_mod_bounds -> None
       in
-      let { base; scannable_axes; modal_bounds; printable_with_bounds } =
+      let { base; operators; modal_bounds; printable_with_bounds } =
         match simplest with
         | Some simplest -> simplest
         | None -> (
@@ -2115,7 +2116,7 @@ module Const = struct
                layout matches and the modal bounds are all max *)
             Option.get out_jkind_verbose)
       in
-      let base = Outcometree.Ojkind_const_abbreviation (base, scannable_axes) in
+      let base = Outcometree.Ojkind_const_abbreviation (base, operators) in
       (* Add on [mod] bounds, if there are any *)
       let base =
         if modal_bounds = []
