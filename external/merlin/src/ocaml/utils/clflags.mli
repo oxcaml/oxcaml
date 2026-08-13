@@ -41,23 +41,6 @@ val zero_alloc_check     : Zero_alloc_annotations.Check.t ref
 val zero_alloc_assert    : Zero_alloc_annotations.Assert.t ref
 val infer_with_bounds    : bool ref
 val kind_verbosity : int ref
-<<<<<<< Merlin:stedolan/thin-libbie
-||||||| Compiler:last-imported
-val emit_optimized_probes : bool ref
-val supports_optimized_probes : bool
-
-val llvm_backend : bool ref
-
-=======
-val emit_optimized_probes : bool ref
-val supports_optimized_probes : bool
-
-val llvm_backend : bool ref
-
-(* Build .a files as thin archives (option declared in Oxcaml_args). *)
-val thin_library : bool ref
-
->>>>>>> Compiler:HEAD
 (* Dedicated flag for the ikinds kind checker (enabled by default). *)
 val ikinds : bool ref
 
