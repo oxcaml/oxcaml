@@ -432,6 +432,8 @@ and exp_extra =
         (* NB. If an expression has both [Texp_borrowed] and
         [Texp_ghost_region], we assume the [Texp_borrowed] is inner than
         [Texp_ghost_region]. Currently it's impossible. *)
+  | Texp_alloc_and_raise
+        (** alloc_and_raise_ E *)
 
 and arg_label = Types.arg_label =
   | Nolabel

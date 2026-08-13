@@ -450,6 +450,7 @@ let extra sub = function
   | Texp_poly cto -> Texp_poly (Option.map (sub.typ sub) cto)
   | Texp_borrowed as d -> d
   | Texp_ghost_region as d -> d
+  | Texp_alloc_and_raise as d -> d
   | Texp_stack as d -> d
   | Texp_mode modes -> Texp_mode (sub.modes sub modes)
   | Texp_inspected_type (Label_disambiguation _) as d -> d

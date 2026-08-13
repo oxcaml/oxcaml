@@ -2136,6 +2136,15 @@ module Lattices_mono = struct
           -> ('a comonadic_with, Monadic_op.t, disallowed * 'r) t
           (** Dualize the comonadic fragment to the monadic fragment. The
               areality axis is ignored. *)
+      | Alloc_if_noalloc : (Allocation.t, Allocation.t, 'l * disallowed) t
+      | Noalloc_strict_if_noalloc :
+          (Allocation.t, Allocation.t, disallowed * 'r) t
+      | Alloc_if_noalloc_full :
+          'a areality
+          -> ('a comonadic_with, 'b comonadic_with, 'l * disallowed) t
+      | Noalloc_strict_if_noalloc_full :
+          'a areality
+          -> ('a comonadic_with, 'b comonadic_with, disallowed * 'r) t
 
     let allow_left : type a b l r. (a, b, allowed * r) t -> (a, b, l * r) t =
       function
@@ -2150,6 +2159,8 @@ module Lattices_mono = struct
       | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
       | Monadic_to_comonadic_min -> Monadic_to_comonadic_min
       | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
+      | Alloc_if_noalloc -> Alloc_if_noalloc
+      | Alloc_if_noalloc_full a -> Alloc_if_noalloc_full a
 
     let allow_right : type a b l r. (a, b, l * allowed) t -> (a, b, l * r) t =
       function
@@ -2164,6 +2175,8 @@ module Lattices_mono = struct
       | Statefulness_to_visibility_op -> Statefulness_to_visibility_op
       | Comonadic_to_monadic_max a -> Comonadic_to_monadic_max a
       | Monadic_to_comonadic_max -> Monadic_to_comonadic_max
+      | Noalloc_strict_if_noalloc -> Noalloc_strict_if_noalloc
+      | Noalloc_strict_if_noalloc_full a -> Noalloc_strict_if_noalloc_full a
 
     let disallow_left : type a b l r.
         (a, b, l * r) t -> (a, b, disallowed * r) t = function
@@ -2180,6 +2193,10 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
       | Monadic_to_comonadic_max -> Monadic_to_comonadic_max
       | Comonadic_to_monadic_max a -> Comonadic_to_monadic_max a
+      | Alloc_if_noalloc -> Alloc_if_noalloc
+      | Noalloc_strict_if_noalloc -> Noalloc_strict_if_noalloc
+      | Alloc_if_noalloc_full a -> Alloc_if_noalloc_full a
+      | Noalloc_strict_if_noalloc_full a -> Noalloc_strict_if_noalloc_full a
 
     let disallow_right : type a b l r.
         (a, b, l * r) t -> (a, b, l * disallowed) t = function
@@ -2196,6 +2213,10 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_min a -> Comonadic_to_monadic_min a
       | Monadic_to_comonadic_max -> Monadic_to_comonadic_max
       | Comonadic_to_monadic_max a -> Comonadic_to_monadic_max a
+      | Alloc_if_noalloc -> Alloc_if_noalloc
+      | Noalloc_strict_if_noalloc -> Noalloc_strict_if_noalloc
+      | Alloc_if_noalloc_full a -> Alloc_if_noalloc_full a
+      | Noalloc_strict_if_noalloc_full a -> Noalloc_strict_if_noalloc_full a
 
     let src : type a b d. (a, b, d) t -> a obj = function
       | Locality_restricted m -> Locality_morph.src_restricted m
@@ -2210,6 +2231,10 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_min ar -> areality_comonadic_obj ar
       | Monadic_to_comonadic_max -> Monadic_op
       | Comonadic_to_monadic_max ar -> areality_comonadic_obj ar
+      | Alloc_if_noalloc -> Allocation
+      | Noalloc_strict_if_noalloc -> Allocation
+      | Alloc_if_noalloc_full ar -> areality_comonadic_obj ar
+      | Noalloc_strict_if_noalloc_full ar -> areality_comonadic_obj ar
 
     let compare_total : type a1 d1 a2 b d2.
         (a1, b, d1) t -> (a2, b, d2) t -> int =
@@ -2222,6 +2247,15 @@ module Lattices_mono = struct
       | Locality_full l1, Locality_full l2 -> Locality_morph.compare_total l1 l2
       | Locality_full _, _ -> -1
       | _, Locality_full _ -> 1
+      | Alloc_if_noalloc_full ar1, Alloc_if_noalloc_full ar2 ->
+        compare_areality ar1 ar2
+      | Alloc_if_noalloc_full _, _ -> -1
+      | _, Alloc_if_noalloc_full _ -> 1
+      | Noalloc_strict_if_noalloc_full ar1, Noalloc_strict_if_noalloc_full ar2
+        ->
+        compare_areality ar1 ar2
+      | Noalloc_strict_if_noalloc_full _, _ -> -1
+      | _, Noalloc_strict_if_noalloc_full _ -> 1
       | Uniqueness_op_to_linearity, Uniqueness_op_to_linearity -> 0
       | Uniqueness_op_to_linearity, _ -> .
       | _, Uniqueness_op_to_linearity -> .
@@ -2254,6 +2288,14 @@ module Lattices_mono = struct
         compare_areality ar1 ar2
       | Comonadic_to_monadic_max _, _ -> .
       | _, Comonadic_to_monadic_max _ -> .
+      | Alloc_if_noalloc, Alloc_if_noalloc -> 0
+      | Alloc_if_noalloc, Noalloc_strict_if_noalloc -> -1
+      | Noalloc_strict_if_noalloc, Alloc_if_noalloc -> 1
+      | Noalloc_strict_if_noalloc, Noalloc_strict_if_noalloc -> 0
+      | Alloc_if_noalloc, _ -> .
+      | _, Alloc_if_noalloc -> .
+      | Noalloc_strict_if_noalloc, _ -> .
+      | _, Noalloc_strict_if_noalloc -> .
 
     let equal : type a1 d1 a2 b d2.
         (a1, b, d1) t -> (a2, b, d2) t -> (a1, a2) Misc.is_eq =
@@ -2267,6 +2309,19 @@ module Lattices_mono = struct
         match Locality_morph.equal l1 l2 with
         | Misc.Is_eq -> Misc.Is_eq
         | Misc.Is_not_eq -> Misc.Is_not_eq)
+      | Alloc_if_noalloc_full ar1, Alloc_if_noalloc_full ar2 -> (
+        match equal_areality ar1 ar2 with
+        | Misc.Is_eq -> Misc.Is_eq
+        | Misc.Is_not_eq -> Misc.Is_not_eq)
+      | Alloc_if_noalloc_full _, _ -> Misc.Is_not_eq
+      | _, Alloc_if_noalloc_full _ -> Misc.Is_not_eq
+      | Noalloc_strict_if_noalloc_full ar1, Noalloc_strict_if_noalloc_full ar2
+        -> (
+        match equal_areality ar1 ar2 with
+        | Misc.Is_eq -> Misc.Is_eq
+        | Misc.Is_not_eq -> Misc.Is_not_eq)
+      | Noalloc_strict_if_noalloc_full _, _ -> Misc.Is_not_eq
+      | _, Noalloc_strict_if_noalloc_full _ -> Misc.Is_not_eq
       | Uniqueness_op_to_linearity, Uniqueness_op_to_linearity -> Misc.Is_eq
       | Uniqueness_op_to_linearity, _ -> .
       | _, Uniqueness_op_to_linearity -> .
@@ -2305,6 +2360,14 @@ module Lattices_mono = struct
         | Misc.Is_not_eq -> Misc.Is_not_eq)
       | Comonadic_to_monadic_max _, _ -> .
       | _, Comonadic_to_monadic_max _ -> .
+      | Alloc_if_noalloc, Alloc_if_noalloc -> Misc.Is_eq
+      | Alloc_if_noalloc, Noalloc_strict_if_noalloc -> Misc.Is_eq
+      | Noalloc_strict_if_noalloc, Alloc_if_noalloc -> Misc.Is_eq
+      | Noalloc_strict_if_noalloc, Noalloc_strict_if_noalloc -> Misc.Is_eq
+      | Alloc_if_noalloc, _ -> .
+      | _, Alloc_if_noalloc -> .
+      | Noalloc_strict_if_noalloc, _ -> .
+      | _, Noalloc_strict_if_noalloc -> .
 
     let print : type a b d. Fmt.formatter -> (a, b, d) t -> unit =
      fun ppf -> function
@@ -2326,6 +2389,11 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_min _ -> Fmt.fprintf ppf "comonadic_to_monadic_min"
       | Monadic_to_comonadic_max -> Fmt.fprintf ppf "monadic_to_comonadic_max"
       | Comonadic_to_monadic_max _ -> Fmt.fprintf ppf "comonadic_to_monadic_max"
+      | Alloc_if_noalloc -> Fmt.fprintf ppf "alloc_if_noalloc"
+      | Noalloc_strict_if_noalloc -> Fmt.fprintf ppf "noalloc_strict_if_noalloc"
+      | Alloc_if_noalloc_full _ -> Fmt.fprintf ppf "alloc_if_noalloc_full"
+      | Noalloc_strict_if_noalloc_full _ ->
+        Fmt.fprintf ppf "noalloc_strict_if_noalloc_full"
 
     let uniqueness_op_to_linearity = function
       | Uniqueness.Unique -> Linearity.Once
@@ -2414,6 +2482,49 @@ module Lattices_mono = struct
         allocation
       }
 
+    let alloc_if_noalloc = function
+      | Allocation.Noalloc_strict -> Allocation.Noalloc_strict
+      | Allocation.Noalloc | Allocation.Alloc -> Allocation.Alloc
+
+    let noalloc_strict_if_noalloc = function
+      | Allocation.Noalloc_strict | Allocation.Noalloc ->
+        Allocation.Noalloc_strict
+      | Allocation.Alloc -> Allocation.Alloc
+
+    let alloc_if_noalloc_full : type a b.
+        b comonadic_with obj -> a comonadic_with -> b comonadic_with =
+     fun obj m ->
+      let areality : b =
+        match obj with
+        | Comonadic_with_locality -> Locality.min
+        | Comonadic_with_regionality -> Regionality.min
+      in
+      { areality;
+        linearity = Linearity.min;
+        portability = Portability.min;
+        forkable = Forkable.min;
+        yielding = Yielding.min;
+        statefulness = Statefulness.min;
+        allocation = alloc_if_noalloc m.allocation
+      }
+
+    let noalloc_strict_if_noalloc_full : type a b.
+        b comonadic_with obj -> a comonadic_with -> b comonadic_with =
+     fun obj m ->
+      let areality : b =
+        match obj with
+        | Comonadic_with_locality -> Locality.max
+        | Comonadic_with_regionality -> Regionality.max
+      in
+      { areality;
+        linearity = Linearity.max;
+        portability = Portability.max;
+        forkable = Forkable.max;
+        yielding = Yielding.max;
+        statefulness = Statefulness.max;
+        allocation = noalloc_strict_if_noalloc m.allocation
+      }
+
     let comonadic_to_monadic_max : type a.
         a areality -> a comonadic_with -> Monadic_op.t =
      fun _ m ->
@@ -2440,6 +2551,10 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_min ar -> comonadic_to_monadic_min ar a
       | Monadic_to_comonadic_max -> monadic_to_comonadic_max dst a
       | Comonadic_to_monadic_max ar -> comonadic_to_monadic_max ar a
+      | Alloc_if_noalloc -> alloc_if_noalloc a
+      | Noalloc_strict_if_noalloc -> noalloc_strict_if_noalloc a
+      | Alloc_if_noalloc_full _ -> alloc_if_noalloc_full dst a
+      | Noalloc_strict_if_noalloc_full _ -> noalloc_strict_if_noalloc_full dst a
 
     let right_adjoint : type a b r.
         b obj -> (a, b, allowed * r) t -> (b, a, disallowed * allowed) t =
@@ -2456,6 +2571,9 @@ module Lattices_mono = struct
       | Monadic_to_comonadic_min ->
         Comonadic_to_monadic_max (comonadic_obj_areality dst)
       | Comonadic_to_monadic_min _ -> Monadic_to_comonadic_max
+      | Alloc_if_noalloc -> Noalloc_strict_if_noalloc
+      | Alloc_if_noalloc_full _ ->
+        Noalloc_strict_if_noalloc_full (comonadic_obj_areality dst)
 
     let left_adjoint : type a b l.
         b obj -> (a, b, l * allowed) t -> (b, a, allowed * disallowed) t =
@@ -2472,6 +2590,9 @@ module Lattices_mono = struct
       | Monadic_to_comonadic_max ->
         Comonadic_to_monadic_min (comonadic_obj_areality dst)
       | Comonadic_to_monadic_max _ -> Monadic_to_comonadic_min
+      | Noalloc_strict_if_noalloc -> Alloc_if_noalloc
+      | Noalloc_strict_if_noalloc_full _ ->
+        Alloc_if_noalloc_full (comonadic_obj_areality dst)
 
     type ('a, 'b, 'd) maybe_allowed_right =
       | Allowed_right :
@@ -2501,6 +2622,11 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_min _ -> Not_allowed_right
       | Monadic_to_comonadic_max as m -> Allowed_right m
       | Comonadic_to_monadic_max a -> Allowed_right (Comonadic_to_monadic_max a)
+      | Alloc_if_noalloc -> Not_allowed_right
+      | Noalloc_strict_if_noalloc as m -> Allowed_right m
+      | Alloc_if_noalloc_full _ -> Not_allowed_right
+      | Noalloc_strict_if_noalloc_full a ->
+        Allowed_right (Noalloc_strict_if_noalloc_full a)
 
     type ('a, 'b, 'd) maybe_allowed_left =
       | Allowed_left :
@@ -2530,6 +2656,10 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_min a -> Allowed_left (Comonadic_to_monadic_min a)
       | Monadic_to_comonadic_max -> Not_allowed_left
       | Comonadic_to_monadic_max _ -> Not_allowed_left
+      | Alloc_if_noalloc as m -> Allowed_left m
+      | Noalloc_strict_if_noalloc -> Not_allowed_left
+      | Alloc_if_noalloc_full a -> Allowed_left (Alloc_if_noalloc_full a)
+      | Noalloc_strict_if_noalloc_full _ -> Not_allowed_left
 
     (* Commutes a meet through a morphism from the right, such that:
        [apply dst m (meet_const c x)] is equivalent to
@@ -2553,7 +2683,9 @@ module Lattices_mono = struct
       | Contention_op_to_portability | Portability_to_contention_op
       | Visibility_op_to_statefulness | Statefulness_to_visibility_op
       | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
-      | Monadic_to_comonadic_max | Comonadic_to_monadic_max _ ->
+      | Monadic_to_comonadic_max | Comonadic_to_monadic_max _ | Alloc_if_noalloc
+      | Noalloc_strict_if_noalloc | Alloc_if_noalloc_full _
+      | Noalloc_strict_if_noalloc_full _ ->
         (* The following proof depends on the fact that [Core_morph.t] preserves binary
            meets: m(x meet y) == m(x) meet m(y).
 
@@ -2629,6 +2761,36 @@ module Lattices_mono = struct
       | Allocation -> Proj_id (Allocation, src)
       | Areality -> Proj_core (Locality_restricted lm1, Areality, src)
 
+    let compose_projection_alloc_if_noalloc_full : type a b p l.
+        (b comonadic_with, p) Axis.t ->
+        a areality ->
+        (a comonadic_with, p, l * disallowed) compose_proj_result =
+     fun ax0 ar ->
+      let src = areality_comonadic_obj ar in
+      match ax0 with
+      | Forkable -> Proj_const_min src
+      | Yielding -> Proj_const_min src
+      | Linearity -> Proj_const_min src
+      | Statefulness -> Proj_const_min src
+      | Portability -> Proj_const_min src
+      | Areality -> Proj_const_min src
+      | Allocation -> Proj_core (Alloc_if_noalloc, Allocation, src)
+
+    let compose_projection_noalloc_strict_if_noalloc_full : type a b p r.
+        (b comonadic_with, p) Axis.t ->
+        a areality ->
+        (a comonadic_with, p, disallowed * r) compose_proj_result =
+     fun ax0 ar ->
+      let src = areality_comonadic_obj ar in
+      match ax0 with
+      | Forkable -> Proj_const_max src
+      | Yielding -> Proj_const_max src
+      | Linearity -> Proj_const_max src
+      | Statefulness -> Proj_const_max src
+      | Portability -> Proj_const_max src
+      | Areality -> Proj_const_max src
+      | Allocation -> Proj_core (Noalloc_strict_if_noalloc, Allocation, src)
+
     let compose_projection_core : type a b p d.
         (b, p) Axis.t -> (a, b, d) t -> (a, p, d) compose_proj_result =
      fun ax0 m1 ->
@@ -2688,6 +2850,10 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_max areality, Staticity ->
         Proj_const_max (areality_comonadic_obj areality)
       | Locality_full lm, (_ as ax0) -> compose_projection_locality_full ax0 lm
+      | Alloc_if_noalloc_full ar, (_ as ax0) ->
+        compose_projection_alloc_if_noalloc_full ax0 ar
+      | Noalloc_strict_if_noalloc_full ar, (_ as ax0) ->
+        compose_projection_noalloc_strict_if_noalloc_full ax0 ar
       | _, _ -> .
     [@@warning "-4"]
 
@@ -2775,8 +2941,17 @@ module Lattices_mono = struct
       | Monadic_to_comonadic_max, Uniqueness ->
         And_max_core (Linearity, Uniqueness_op_to_linearity)
       | Locality_full lm, (_ as ax0) -> compose_locality_full_max_with lm ax0
+      | Noalloc_strict_if_noalloc_full _, Allocation ->
+        And_max_core (Allocation, Noalloc_strict_if_noalloc)
+      | Noalloc_strict_if_noalloc_full _, Areality -> Const_max_core
+      | Noalloc_strict_if_noalloc_full _, Forkable -> Const_max_core
+      | Noalloc_strict_if_noalloc_full _, Yielding -> Const_max_core
+      | Noalloc_strict_if_noalloc_full _, Linearity -> Const_max_core
+      | Noalloc_strict_if_noalloc_full _, Statefulness -> Const_max_core
+      | Noalloc_strict_if_noalloc_full _, Portability -> Const_max_core
       | Monadic_to_comonadic_min, _ -> Disallowed
       | Comonadic_to_monadic_min _, _ -> Disallowed
+      | Alloc_if_noalloc_full _, _ -> Disallowed
       | _, _ -> .
     [@@warning "-4"]
 
@@ -2828,8 +3003,17 @@ module Lattices_mono = struct
       | Monadic_to_comonadic_min, Uniqueness ->
         And_min_core (Linearity, Uniqueness_op_to_linearity)
       | Locality_full lm, (_ as ax0) -> compose_locality_full_min_with lm ax0
+      | Alloc_if_noalloc_full _, Allocation ->
+        And_min_core (Allocation, Alloc_if_noalloc)
+      | Alloc_if_noalloc_full _, Areality -> Const_min_core
+      | Alloc_if_noalloc_full _, Forkable -> Const_min_core
+      | Alloc_if_noalloc_full _, Yielding -> Const_min_core
+      | Alloc_if_noalloc_full _, Linearity -> Const_min_core
+      | Alloc_if_noalloc_full _, Statefulness -> Const_min_core
+      | Alloc_if_noalloc_full _, Portability -> Const_min_core
       | Monadic_to_comonadic_max, _ -> Disallowed
       | Comonadic_to_monadic_max _, _ -> Disallowed
+      | Noalloc_strict_if_noalloc_full _, _ -> Disallowed
       | _, _ -> .
     [@@warning "-4"]
 
@@ -2889,6 +3073,9 @@ module Lattices_mono = struct
         Morph (Comonadic_to_monadic_max (comonadic_obj_areality src))
       | Locality_restricted lm, Areality, Areality, _, _ ->
         Morph (Locality_full (Locality_morph.disallow_left lm))
+      | Noalloc_strict_if_noalloc, Allocation, Allocation, _, _ ->
+        Morph (Noalloc_strict_if_noalloc_full (comonadic_obj_areality src))
+      | Alloc_if_noalloc, Allocation, Allocation, _, _ -> Disallowed
       | _, _, _, _, _ -> .
     [@@warning "-4"]
 
@@ -2919,6 +3106,9 @@ module Lattices_mono = struct
         Morph (Comonadic_to_monadic_min (comonadic_obj_areality src))
       | Locality_restricted lm, Areality, Areality, _, _ ->
         Morph (Locality_full (Locality_morph.disallow_right lm))
+      | Alloc_if_noalloc, Allocation, Allocation, _, _ ->
+        Morph (Alloc_if_noalloc_full (comonadic_obj_areality src))
+      | Noalloc_strict_if_noalloc, Allocation, Allocation, _, _ -> Disallowed
       | _, _, _, _, _ -> .
     [@@warning "-4"]
 
@@ -2942,18 +3132,22 @@ module Lattices_mono = struct
       | Contention_op -> [To Portability_to_contention_op]
       | Visibility_op -> [To Statefulness_to_visibility_op]
       | Staticity_op -> []
-      | Allocation -> []
+      | Allocation -> [To Alloc_if_noalloc]
       | Monadic_op ->
         [ To (Comonadic_to_monadic_min Locality);
           To (Comonadic_to_monadic_min Regionality) ]
       | Comonadic_with_locality ->
         (let+ (Locality_morph.To lm) = Locality_morph.left_to Locality in
          To (Locality_full lm))
-        @ [To Monadic_to_comonadic_min]
+        @ [ To Monadic_to_comonadic_min;
+            To (Alloc_if_noalloc_full Locality);
+            To (Alloc_if_noalloc_full Regionality) ]
       | Comonadic_with_regionality ->
         (let+ (Locality_morph.To lm) = Locality_morph.left_to Regionality in
          To (Locality_full lm))
-        @ [To Monadic_to_comonadic_min]
+        @ [ To Monadic_to_comonadic_min;
+            To (Alloc_if_noalloc_full Locality);
+            To (Alloc_if_noalloc_full Regionality) ]
 
     let right_to : type b. b obj -> (b, right_only) to_ list = function
       | Locality ->
@@ -2971,18 +3165,22 @@ module Lattices_mono = struct
       | Contention_op -> [To Portability_to_contention_op]
       | Visibility_op -> [To Statefulness_to_visibility_op]
       | Staticity_op -> []
-      | Allocation -> []
+      | Allocation -> [To Noalloc_strict_if_noalloc]
       | Monadic_op ->
         [ To (Comonadic_to_monadic_max Locality);
           To (Comonadic_to_monadic_max Regionality) ]
       | Comonadic_with_locality ->
         (let+ (Locality_morph.To lm) = Locality_morph.right_to Locality in
          To (Locality_full lm))
-        @ [To Monadic_to_comonadic_max]
+        @ [ To Monadic_to_comonadic_max;
+            To (Noalloc_strict_if_noalloc_full Locality);
+            To (Noalloc_strict_if_noalloc_full Regionality) ]
       | Comonadic_with_regionality ->
         (let+ (Locality_morph.To lm) = Locality_morph.right_to Regionality in
          To (Locality_full lm))
-        @ [To Monadic_to_comonadic_max]
+        @ [ To Monadic_to_comonadic_max;
+            To (Noalloc_strict_if_noalloc_full Locality);
+            To (Noalloc_strict_if_noalloc_full Regionality) ]
   end
 
   let proj_obj : type t r. (t, r) Axis.t -> t obj -> r obj =
@@ -3425,6 +3623,53 @@ module Lattices_mono = struct
           Core Monadic_to_comonadic_max
         | Not_allowed_right -> Compose (Core m1, Core Monadic_to_comonadic_max)
         end
+      | Alloc_if_noalloc, Alloc_if_noalloc -> Core Alloc_if_noalloc
+      | Alloc_if_noalloc, Noalloc_strict_if_noalloc ->
+        Core Noalloc_strict_if_noalloc
+      | Noalloc_strict_if_noalloc, Alloc_if_noalloc -> Core Alloc_if_noalloc
+      | Noalloc_strict_if_noalloc, Noalloc_strict_if_noalloc ->
+        Core Noalloc_strict_if_noalloc
+      | Alloc_if_noalloc_full _, Alloc_if_noalloc_full ar2 ->
+        Core (Alloc_if_noalloc_full ar2)
+      | Noalloc_strict_if_noalloc_full _, Noalloc_strict_if_noalloc_full ar2 ->
+        Core (Noalloc_strict_if_noalloc_full ar2)
+      | Alloc_if_noalloc_full _, Noalloc_strict_if_noalloc_full _ ->
+        Compose (Core m1, Core m2)
+      | Noalloc_strict_if_noalloc_full _, Alloc_if_noalloc_full _ ->
+        Compose (Core m1, Core m2)
+      | Alloc_if_noalloc_full _, Locality_full lm2 ->
+        let src = Locality_morph.src_full lm2 in
+        Core (Alloc_if_noalloc_full (comonadic_obj_areality src))
+      | Noalloc_strict_if_noalloc_full _, Locality_full lm2 ->
+        let src = Locality_morph.src_full lm2 in
+        Core (Noalloc_strict_if_noalloc_full (comonadic_obj_areality src))
+      | Alloc_if_noalloc_full _, Monadic_to_comonadic_min ->
+        Meet_const_core (min dst, Monadic_to_comonadic_min)
+      | Alloc_if_noalloc_full _, Monadic_to_comonadic_max ->
+        Compose (Core m1, Core m2)
+      | Noalloc_strict_if_noalloc_full _, Monadic_to_comonadic_max ->
+        Core_imply_const (Monadic_to_comonadic_max, min Monadic_op)
+      | Noalloc_strict_if_noalloc_full _, Monadic_to_comonadic_min ->
+        Compose (Core m1, Core m2)
+      | Locality_full lm1, Alloc_if_noalloc_full ar2 ->
+        begin match Locality_morph.maybe_allowed_left lm1 with
+        | Allowed_left _ -> Core (Alloc_if_noalloc_full ar2)
+        | Not_allowed_left -> Compose (Core m1, Core m2)
+        end
+      | Locality_full lm1, Noalloc_strict_if_noalloc_full ar2 ->
+        begin match Locality_morph.maybe_allowed_right lm1 with
+        | Allowed_right _ -> Core (Noalloc_strict_if_noalloc_full ar2)
+        | Not_allowed_right -> Compose (Core m1, Core m2)
+        end
+      | Comonadic_to_monadic_min _, Alloc_if_noalloc_full ar2 ->
+        Meet_const_core (min dst, Comonadic_to_monadic_min ar2)
+      | Comonadic_to_monadic_max _, Alloc_if_noalloc_full _ ->
+        Compose (Core m1, Core m2)
+      | Comonadic_to_monadic_max _, Noalloc_strict_if_noalloc_full ar2 ->
+        Core_imply_const
+          (Comonadic_to_monadic_max ar2, min (areality_comonadic_obj ar2))
+      | Comonadic_to_monadic_min _, Noalloc_strict_if_noalloc_full _ ->
+        Compose (Core m1, Core m2)
       | Locality_restricted _, _ -> .
       | _, Locality_restricted _ -> .
       | Locality_full _, _ -> .
@@ -4381,6 +4626,22 @@ module Lattices_mono = struct
       | Comonadic_to_monadic_max _, Visibility -> Axis Statefulness
       | Comonadic_to_monadic_max _, Contention -> Axis Portability
       | Comonadic_to_monadic_max _, Staticity -> None_responsible
+      | Alloc_if_noalloc, _ -> .
+      | Noalloc_strict_if_noalloc, _ -> .
+      | Alloc_if_noalloc_full _, Allocation -> Axis Allocation
+      | Alloc_if_noalloc_full _, Areality -> None_responsible
+      | Alloc_if_noalloc_full _, Forkable -> None_responsible
+      | Alloc_if_noalloc_full _, Yielding -> None_responsible
+      | Alloc_if_noalloc_full _, Linearity -> None_responsible
+      | Alloc_if_noalloc_full _, Statefulness -> None_responsible
+      | Alloc_if_noalloc_full _, Portability -> None_responsible
+      | Noalloc_strict_if_noalloc_full _, Allocation -> Axis Allocation
+      | Noalloc_strict_if_noalloc_full _, Areality -> None_responsible
+      | Noalloc_strict_if_noalloc_full _, Forkable -> None_responsible
+      | Noalloc_strict_if_noalloc_full _, Yielding -> None_responsible
+      | Noalloc_strict_if_noalloc_full _, Linearity -> None_responsible
+      | Noalloc_strict_if_noalloc_full _, Statefulness -> None_responsible
+      | Noalloc_strict_if_noalloc_full _, Portability -> None_responsible
 
     let rec find_responsible_axis_proj_simple : type a b b_ax l r.
         (a, b, l * r) Simple_morph.t -> (b, b_ax) Axis.t -> a responsible_axis =
@@ -5986,6 +6247,10 @@ module Allocation = struct
 
   let zap_to_legacy = zap_to_ceil
 
+  let alloc_if_noalloc m =
+    m |> disallow_right
+    |> wrap (fun m -> S.Unhint.apply Obj.obj (Simple (Core Alloc_if_noalloc)) m)
+
   module Guts = struct
     let get_ceil m = Guts.get_ceil m
   end
@@ -6110,7 +6375,8 @@ module Comonadic_with (Areality : Areality) = struct
   let max_with ax m =
     S.apply ~hint:Skip Obj.obj (Max_with_simple (ax, Id)) (disallow_left m)
 
-  let meet_const_with ax c m = meet_const (C.max_with Obj.obj ax c) m
+  let meet_const_with ?hint ax c m =
+    meet_const ?hint (C.max_with Obj.obj ax c) m
 
   let zap_to_legacy m : Const.t =
     let areality = proj Areality m |> Areality.zap_to_legacy in
@@ -6869,9 +7135,9 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.disallow_left comonadic in
     { monadic; comonadic }
 
-  let meet_const_with ax c { monadic; comonadic } =
+  let meet_const_with ?hint ax c { monadic; comonadic } =
     let monadic = Monadic.disallow_right monadic in
-    let comonadic = Comonadic.meet_const_with ax c comonadic in
+    let comonadic = Comonadic.meet_const_with ?hint ax c comonadic in
     { comonadic; monadic }
 
   let join l =

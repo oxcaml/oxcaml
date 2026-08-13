@@ -2280,8 +2280,8 @@ Lines 2-4, characters 21-3:
 3 |     let bar = allocates2
 4 | end
 Error: The module is "alloc"
-         because it closes over the value "allocates2" at line 3, characters 14-24
-         which is "alloc".
+         because it closes over the allocation at line 3, characters 4-24
+         which is "alloc" because it is allocated on the heap.
        However, the module highlighted is expected to be "noalloc".
 |}]
 
@@ -2808,4 +2808,198 @@ Error: The return value of a zero_alloc function is "alloc"
        but is expected to be "noalloc_strict"
          because it is used inside the function at line 1, characters 35-58
          which is expected to be "noalloc_strict".
+|}]
+
+(** Test 10: Exceptions *)
+
+exception E10 of int * int
+type r10 = { x : int }
+[%%expect{|
+exception E10 of int * int
+type r10 = { x : int; }
+|}]
+
+(* Test 10.1: Allocation wrapped by [alloc_and_raise_] only forces the closure
+   that closes over the keyword to be [noalloc] rather than [alloc]. *)
+
+let (f @ noalloc) (x : int) =
+  if x < 0 then alloc_and_raise_
+    let _ = { x } in
+    raise (E10 (x, x))
+  else ()
+[%%expect{|
+val f : int -> unit = <fun>
+|}]
+
+(* The same allocations without [alloc_and_raise_] are rejected, and stay
+   rejected once the impl is finished. *)
+let (f @ noalloc) (x : int) =
+  if x < 0 then
+    let _ = { x } in
+    raise (E10 (x, x))
+  else ()
+[%%expect{|
+Line 4, characters 10-22:
+4 |     raise (E10 (x, x))
+              ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 1-5, characters 18-9,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* [alloc_and_raise_] does not help a [noalloc_strict] function, which cannot
+   allocate at all. *)
+let (f @ noalloc_strict) (x : int) =
+  if x < 0 then alloc_and_raise_
+    let _ = { x } in
+    raise (E10 (x, x))
+  else ()
+[%%expect{|
+Line 4, characters 10-22:
+4 |     raise (E10 (x, x))
+              ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 1-5, characters 25-9,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* Test 10.2: allocation or [noalloc] functions called within a [try ... with] block still
+   force the enclosing closure to be [alloc]. *)
+let wrapper () =
+  let (f @ noalloc) (x : int) =
+    if x < 0 then alloc_and_raise_
+      let _ = { x } in
+      raise (E10 (x, x))
+    else ()
+  in
+  let (g @ noalloc) () =
+    try
+      f 0
+    with
+    | _ -> ()
+  in
+  let _ = g in
+  ()
+[%%expect{|
+Line 10, characters 6-7:
+10 |       f 0
+           ^
+Error: The value "f" is "alloc"
+       but is expected to be "noalloc"
+         because it is used inside the function at lines 8-12, characters 20-13
+         which is expected to be "noalloc".
+|}]
+
+let wrapper () =
+  let (g @ noalloc) x =
+    try
+      if x < 0 then alloc_and_raise_
+        let _ = { x } in
+        raise (E10 (x, x))
+      else ()
+    with
+    | _ -> ()
+  in
+  let _ = g in
+  ()
+[%%expect{|
+Line 6, characters 14-26:
+6 |         raise (E10 (x, x))
+                  ^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at lines 2-9, characters 20-13,
+         which is "noalloc" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+(* Test 10.3: [alloc_and_raise_] can only wrap an expression that definitely
+   raises. *)
+let f x = alloc_and_raise_
+  if x > 0 then raise (Failure "error")
+  else ()
+[%%expect{|
+Lines 2-3, characters 2-9:
+2 | ..if x > 0 then raise (Failure "error")
+3 |   else ()
+Error: This expression can return normally.
+       "alloc_and_raise_" requires a body that always raises or diverges.
+|}]
+
+(* A body that always raises is accepted, whatever shape it has. *)
+let f () = alloc_and_raise_ (raise (Failure "error"))
+[%%expect{|
+val f : unit -> 'a = <fun>
+|}]
+
+let f x = alloc_and_raise_
+  (if x > 0 then raise (Failure "a") else raise (Failure "b"))
+[%%expect{|
+val f : int -> 'a = <fun>
+|}]
+
+let f () = alloc_and_raise_ (failwith "error")
+[%%expect{|
+val f : unit -> 'a = <fun>
+|}]
+
+let f () = alloc_and_raise_ (assert false)
+[%%expect{|
+val f : unit -> 'a = <fun>
+|}]
+
+(* A body that catches its own exception can return normally, and is the case
+   that motivates this check: it would otherwise let a [noalloc] closure
+   allocate on a path that returns. *)
+let f () = alloc_and_raise_ (try raise (Failure "error") with _ -> ())
+[%%expect{|
+Line 1, characters 28-70:
+1 | let f () = alloc_and_raise_ (try raise (Failure "error") with _ -> ())
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression can return normally.
+       "alloc_and_raise_" requires a body that always raises or diverges.
+|}]
+
+(* A [try] whose body and handlers all raise is still fine. *)
+let f () =
+  alloc_and_raise_
+    (try raise (Failure "a") with _ -> raise (Failure "b"))
+[%%expect{|
+val f : unit -> 'a = <fun>
+|}]
+
+(* Divergence counts: nothing returns normally, so no allocation escapes on a
+   returning path. *)
+let f () =
+  alloc_and_raise_ (let rec loop () = loop () in loop ())
+[%%expect{|
+val f : unit -> 'a = <fun>
+|}]
+
+(* Known incompleteness: annotating the body pins its type, so a body that
+   does always raise is rejected. *)
+let f () = alloc_and_raise_ ((raise (Failure "error") : int))
+[%%expect{|
+Line 1, characters 28-61:
+1 | let f () = alloc_and_raise_ ((raise (Failure "error") : int))
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression can return normally.
+       "alloc_and_raise_" requires a body that always raises or diverges.
+|}]
+
+(* The context still determines the type of the whole expression, as it does
+   for [raise]. *)
+let (f : unit -> int) = fun () -> alloc_and_raise_ (raise (Failure "error"))
+[%%expect{|
+val f : unit -> int = <fun>
+|}]
+
+let f x = alloc_and_raise_ x
+[%%expect{|
+Line 1, characters 27-28:
+1 | let f x = alloc_and_raise_ x
+                               ^
+Error: This expression can return normally.
+       "alloc_and_raise_" requires a body that always raises or diverges.
 |}]

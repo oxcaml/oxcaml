@@ -312,6 +312,7 @@ type error =
   | Nonoptional_call_pos_label of string
   | Unsupported_stack_allocation of unsupported_stack_allocation
   | Not_allocation
+  | Alloc_and_raise_may_return
   | Impossible_function_jkind of
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
@@ -7293,8 +7294,12 @@ and type_expect_
           in
           env, arg_mode, expected_mode, expected_mode
       in
+      (* CR shsong: exempt a [try ... with] whose cases are all effect
+         handlers, since it catches no exception and thus lets one propagate
+         out of the enclosing closures. *)
       let body =
-        type_expect env body_mode sbody ty_expected_explained
+        type_expect (Env.add_exception_handler_lock env) body_mode sbody
+          ty_expected_explained
       in
       let exn_cases, _ =
         type_cases Value env arg_mode expected_mode
@@ -8517,6 +8522,30 @@ and type_expect_
       end;
       let exp_extra = (Texp_stack, loc, []) :: exp.exp_extra in
       {exp with exp_extra}
+  | Pexp_alloc_and_raise e ->
+      let new_env = Env.add_raise_lock env in
+      let decl =
+        Ctype.new_local_type ~loc Definition
+          Jkind.Builtin.(value_or_null ~why:Alloc_and_raise)
+      in
+      let scope = Ctype.create_scope () in
+      let id, bottom_env =
+        Env.enter_type ~scope "alloc_and_raise" decl new_env
+      in
+      let ty_bottom = Ctype.newconstr (Path.Pident id) [] in
+      let ty_body =
+        newvar (Jkind.Builtin.value_or_null ~why:Alloc_and_raise)
+      in
+      let exp =
+        type_expect ~recarg bottom_env expected_mode e (mk_expected ty_body)
+      in
+      begin
+        try Ctype.unify bottom_env exp.exp_type ty_bottom
+        with Ctype.Unify _ ->
+          raise (Error (e.pexp_loc, env, Alloc_and_raise_may_return))
+      end;
+      let exp_extra = (Texp_alloc_and_raise, loc, []) :: exp.exp_extra in
+      {exp with exp_type = ty_expected; exp_extra}
   | Pexp_comprehension comp ->
       Language_extension.assert_enabled ~loc Comprehensions ();
       type_comprehension_expr
@@ -13278,6 +13307,11 @@ let report_error ~loc env =
       print_unsupported_stack_allocation category
   | Not_allocation ->
       Location.errorf ~loc "This expression is not an allocation site."
+  | Alloc_and_raise_may_return ->
+      Location.errorf ~loc
+        "@[This expression can return normally.@ %a requires a body that \
+         always raises or diverges.@]"
+        Style.inline_code "alloc_and_raise_"
   | Impossible_function_jkind { some_args_ok; ty_fun; jkind } ->
       let hint ppf =
         if some_args_ok

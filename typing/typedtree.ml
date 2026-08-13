@@ -268,6 +268,7 @@ and exp_extra =
   | Texp_inspected_type of [ `exp ] type_inspection
   | Texp_borrowed
   | Texp_ghost_region
+  | Texp_alloc_and_raise
 
 and arg_label = Types.arg_label =
   | Nolabel

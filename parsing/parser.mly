@@ -993,6 +993,7 @@ let maybe_pmod_constraint mode expr =
    string that will not trigger a syntax error; see how [not_expecting]
    is used in the definition of [type_variance]. */
 
+%token ALLOC_AND_RAISE        "alloc_and_raise_"
 %token AMPERAMPER             "&&"
 %token AMPERSAND              "&"
 %token AND                    "and"
@@ -2893,6 +2894,8 @@ fun_expr:
      { mkexp_constraint ~loc:$sloc ~exp ~cty:None ~modes:[mode] }
   | EXCLAVE seq_expr
      { mkexp_exclave ~loc:$sloc ~kwd_loc:($loc($1)) $2 }
+  | ALLOC_AND_RAISE seq_expr
+     { mkexp ~loc:$sloc (Pexp_alloc_and_raise $2) }
 ;
 %inline expr:
   | or_function(fun_expr) { $1 }

@@ -179,6 +179,8 @@ type lock =
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
+  | Raise_lock
+  | Exception_handler_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
 type lock_or_stage =
@@ -3135,6 +3137,10 @@ let add_region_lock env = add_lock Region_lock env
 
 let add_exclave_lock env = add_lock Exclave_lock env
 
+let add_raise_lock env = add_lock Raise_lock env
+
+let add_exception_handler_lock env = add_lock Exception_handler_lock env
+
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
 let enter_quotation env =
@@ -3786,20 +3792,67 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
 
     [pp] is the pinpoint used in errors. *)
 let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
+  let alloc_mode = Mode.Value.proj_comonadic Allocation mode in
+  let alloc_mode_at_most_noalloc =
+    Mode.Value.proj_comonadic Allocation
+      (Mode.Value.meet_const_with Allocation Mode.Allocation.Const.Noalloc
+         mode)
+  in
+  let mode =
+    Mode.Value.meet_const_with ~hint:Skip Allocation
+      Mode.Allocation.Const.Noalloc_strict mode
+  in
+  let (acc_unknown, acc_no_raise, acc_raise), vmode =
   List.fold_left
-    (fun vmode lock ->
+    (fun ((acc_unknown, acc_no_raise, acc_raise), vmode) lock ->
       match lock with
-      | Region_lock -> region_mode vmode
-      | Const_closure_lock (_, closure_context, comonadic) ->
-          const_closure_mode pp vmode closure_context comonadic
-      | Closure_lock (closure_context, comonadic) ->
-          closure_mode pp vmode closure_context comonadic
+      | Region_lock ->
+        (acc_unknown, acc_no_raise, acc_raise),
+        region_mode vmode
+      | Const_closure_lock (_, closure, comonadic) ->
+          let comonadic0 =
+            Mode.Value.Comonadic.of_const ~hint:(Is_used_in closure) comonadic
+          in
+          (comonadic0 :: acc_unknown, acc_no_raise, acc_raise),
+          const_closure_mode pp vmode closure comonadic
+      | Closure_lock (closure, comonadic) ->
+          let hinted =
+            Mode.Value.Comonadic.apply_hint
+              (Is_closed_by (Comonadic, {closure; closed = pp}))
+              comonadic
+          in
+          (hinted :: acc_unknown, acc_no_raise, acc_raise),
+          closure_mode pp vmode closure comonadic
       | Exclave_lock ->
+          (acc_unknown, acc_no_raise, acc_raise),
           exclave_mode ~errors ~env ~pp vmode
+      | Raise_lock -> ([], acc_no_raise, acc_unknown @ acc_raise), vmode
+      | Exception_handler_lock ->
+          ([], acc_unknown @ acc_no_raise, acc_raise), vmode
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
+          (acc_unknown, acc_no_raise, acc_raise),
           vmode
-    ) mode locks
+    ) (([], [], []), mode) locks
+    in
+    let constrain_closures alloc_mode closures =
+      List.iter
+        (fun closure_comonadic ->
+          Mode.Value.Comonadic.submode_err pp
+            (Mode.Value.Comonadic.min_with Allocation alloc_mode)
+            closure_comonadic)
+        closures
+    in
+    constrain_closures alloc_mode (List.rev acc_unknown);
+    constrain_closures alloc_mode_at_most_noalloc (List.rev acc_raise);
+    (* CR shsong: neither [alloc_if_noalloc] nor the [meet] above carries a
+       hint, so an allocation-axis error reported through them has its
+       explanation truncated. Add [Mode_hint.morph] constructors for both. *)
+    constrain_closures
+      (Mode.Allocation.alloc_if_noalloc alloc_mode)
+      (List.rev acc_no_raise);
+    Mode.Value.join
+      [vmode; Mode.Value.min_with_comonadic Allocation alloc_mode]
 
 (** Constrains every enclosing closure lock with the given minimum mode. *)
 let walk_locks_with_mode_constraint ~env pp ~mode =
@@ -3827,18 +3880,13 @@ let walk_locks_for_zero_alloc_return ~env ~loc mode =
       (Mode.Value.min_with_comonadic Allocation
          (Mode.Value.proj_comonadic Allocation mode))
 
-(** Registers a use of an allocation at the given pinpoint.
-
-    Returns the pinpoint and allocation mode of every enclosing closure.
-    The list is ordered from the innermost closure to the outermost one,
-    so that error messages blame the closure nearest to the allocation. *)
-(* CR shsong: currently it only considers noalloc_strict and alloc,
-    need to customize this to support noalloc later *)
+(** Registers a use of an allocation at the given pinpoint. *)
 let walk_locks_for_allocation ~env pp =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
+  let acc_unknown, acc_no_raise, acc_raise =
   List.fold_left
-    (fun acc lock ->
+    (fun (acc_unknown, acc_no_raise, acc_raise) lock ->
       match lock with
       | Closure_lock (closure, comonadic) ->
           let comonadic =
@@ -3846,15 +3894,25 @@ let walk_locks_for_allocation ~env pp =
               (Is_closed_by (Comonadic, {closure; closed = pp}))
               comonadic
           in
-          (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc
+          (closure, Mode.Value.Comonadic.proj Allocation comonadic) ::
+            acc_unknown,
+          acc_no_raise,
+          acc_raise
       | Const_closure_lock (_, closure, comonadic) ->
           let comonadic =
             Mode.Value.Comonadic.of_const ~hint:(Is_used_in closure) comonadic
           in
-          (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc
+          (closure, Mode.Value.Comonadic.proj Allocation comonadic) ::
+            acc_unknown,
+          acc_no_raise,
+          acc_raise
+      | Raise_lock -> [], acc_no_raise, acc_unknown @ acc_raise
+      | Exception_handler_lock -> [], acc_unknown @ acc_no_raise, acc_raise
       | Region_lock | Exclave_lock
-      | Unboxed_lock -> acc
-    ) [] locks
+      | Unboxed_lock -> acc_unknown, acc_no_raise, acc_raise
+    ) ([], [], []) locks
+    in
+    acc_unknown @ acc_no_raise, acc_raise
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either
@@ -3885,6 +3943,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
+      | Raise_lock | Exception_handler_lock -> mode
       | Const_closure_lock (true, _, _) -> mode
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env

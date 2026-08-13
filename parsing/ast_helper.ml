@@ -307,6 +307,7 @@ module Exp = struct
     }
 
   let borrow ?loc ?attrs a = mk ?loc ?attrs (Pexp_borrow a)
+  let alloc_and_raise ?loc ?attrs a = mk ?loc ?attrs (Pexp_alloc_and_raise a)
 end
 
 module Mty = struct

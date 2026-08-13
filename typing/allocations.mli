@@ -20,7 +20,8 @@ val reset_allocations : unit -> unit
 
 val register_mode_for_optimisation :
   Hint.pinpoint ->
-  ?closures:(Hint.pinpoint * Allocation.r) list ->
+  ?closures:((Hint.pinpoint * Allocation.r) list
+             * (Hint.pinpoint * Allocation.r) list) ->
   ('l * allowed) Alloc.t ->
   unit
 

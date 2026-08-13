@@ -2046,6 +2046,8 @@ and Exp_desc : sig
 
   val exclave : Debuginfo.Scoped_location.t -> Exp.t -> t'
 
+  val alloc_and_raise : Debuginfo.Scoped_location.t -> Exp.t -> t'
+
   val list_comprehension : Debuginfo.Scoped_location.t -> Comprehension.t -> t'
 
   val array_comprehension : Debuginfo.Scoped_location.t -> Comprehension.t -> t'
@@ -2205,6 +2207,9 @@ end = struct
     apply2 "Exp_desc" "let_open" loc (extract a1) (extract a2)
 
   let exclave loc a1 = apply1 "Exp_desc" "exclave" loc (extract a1)
+
+  let alloc_and_raise loc a1 =
+    apply1 "Exp_desc" "alloc_and_raise" loc (extract a1)
 
   let list_comprehension loc a1 =
     apply1 "Exp_desc" "list_comprehension" loc (extract a1)
@@ -3625,6 +3630,8 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
   | Texp_ghost_region -> lambda
   | Texp_borrowed ->
     Exp_desc.borrow loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
+  | Texp_alloc_and_raise ->
+    Exp_desc.alloc_and_raise loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
 
 and update_env_with_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3639,6 +3646,7 @@ and update_env_with_extra ~loc extra =
   | Texp_inspected_type (Polymorphic_parameter _) -> ()
   | Texp_ghost_region -> ()
   | Texp_borrowed -> ()
+  | Texp_alloc_and_raise -> ()
 
 and update_env_without_extra ~loc extra =
   let extra, _, _ = extra in
@@ -3653,6 +3661,7 @@ and update_env_without_extra ~loc extra =
   | Texp_inspected_type (Polymorphic_parameter _) -> ()
   | Texp_ghost_region -> ()
   | Texp_borrowed -> ()
+  | Texp_alloc_and_raise -> ()
 
 and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
   let env = e.exp_env in

@@ -588,6 +588,8 @@ module type S = sig
 
     val alloc : lr
 
+    val alloc_if_noalloc : ('l * 'r) t -> ('l * disallowed) t
+
     module Guts : sig
       val get_ceil : ('l * allowed) t -> Const.t
     end
@@ -674,6 +676,8 @@ module type S = sig
       end
 
       val max_with : 'a Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'r) t
+
+      val min_with : 'a Axis.t -> ('a, 'l * 'r) mode -> ('l * disallowed) t
     end
 
     module Axis : sig
@@ -814,7 +818,11 @@ module type S = sig
     val join_const : Monadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
 
     val meet_const_with :
-      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * disallowed) t
+      ?hint:('l * disallowed) pos_hint_morph ->
+      'a Comonadic.Axis.t ->
+      'a ->
+      ('l * 'r) t ->
+      ('l * disallowed) t
 
     val join_const_with :
       'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> (disallowed * 'r) t

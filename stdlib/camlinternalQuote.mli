@@ -659,6 +659,8 @@ and Exp_desc : sig
 
   val exclave : Exp.t -> t
 
+  val alloc_and_raise : Exp.t -> t
+
   val list_comprehension : Comprehension.t -> t
 
   val array_comprehension : Comprehension.t -> t

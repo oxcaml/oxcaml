@@ -809,6 +809,21 @@ Error: This expression is not an allocation site.
 - : <[int -> int]> expr = <[fun x -> let y = (borrow_ x) in y + 1]>
 |}];;
 
+<[ fun x -> alloc_and_raise_ raise (Failure x) ]>;;
+[%%expect {|
+- : <[string -> $('a)]> expr =
+<[fun x -> alloc_and_raise_ Stdlib.raise (Stdlib.Failure x)]>
+|}];;
+
+<[ fun x -> alloc_and_raise_ ignore (x, x); raise (Failure "error") ]>;;
+[%%expect {|
+- : <[$('a) -> $('b)]> expr =
+<[
+  fun x -> alloc_and_raise_ Stdlib.ignore (x, x);
+    Stdlib.raise (Stdlib.Failure "error")
+]>
+|}];;
+
 module type S = sig
   type t
   type t2

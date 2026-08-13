@@ -3000,6 +3000,8 @@ module Format_history = struct
     | Probe -> format_with_notify_js ppf "it's a probe"
     | Captured_in_object ->
       fprintf ppf "it's the type of a variable captured in an object"
+    | Alloc_and_raise ->
+      fprintf ppf "it's the type of the body of an [alloc_and_raise_]"
     | Let_rec_variable v ->
       fprintf ppf "it's the type of the recursive variable %s" (Ident.name v)
     | Type_argument { parent_path; position; arity } ->
@@ -4035,6 +4037,7 @@ module Debug_printers = struct
     | V1_safety_check -> fprintf ppf "V1_safety_check"
     | Probe -> fprintf ppf "Probe"
     | Captured_in_object -> fprintf ppf "Captured_in_object"
+    | Alloc_and_raise -> fprintf ppf "Alloc_and_raise"
     | Let_rec_variable v -> fprintf ppf "Let_rec_variable %a" Ident.print v
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
