@@ -374,6 +374,17 @@ let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
 let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
     ~down_to_up bound_pattern ~body =
   let module L = Flambda.Let in
+  (* Rewrite the [Debuginfo.t] on the bound variable(s) to reflect the current
+     inlining stack, just as is done for the [Debuginfo.t] on defining
+     expressions (see e.g. [Simplify_named]). This must happen exactly once per
+     [Let], on the downwards traversal, where the inlining context is known
+     precisely. The rewritten values are used to determine which (possibly
+     inlined) frame each variable belongs to when generating debugging
+     information. *)
+  let bound_pattern =
+    Bound_pattern.add_inlined_debuginfo bound_pattern
+      (DE.inlined_debuginfo (DA.denv dacc))
+  in
   let original_dacc = dacc in
   (* Remember then clear the lifted constants memory in [DA] so we can easily
      find out which constants are generated during simplification of the

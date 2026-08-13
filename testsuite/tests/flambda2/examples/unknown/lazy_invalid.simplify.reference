@@ -59,7 +59,7 @@ apply ccall noalloc
                   | 0 -> k2
                   | 1 -> k3
                   where k3 =
-                    invalid "(Defining_expr_of_let (bound_pattern Pfield/59N)\n (defining_expr\n  (((Block_load (Values (tag \226\138\164) (size \226\138\164) (field_kind Any_value)) Mutable 0)\n    foo/42N) lazy_invalid.ml:13,13--29)))"
+                    invalid "(Defining_expr_of_let (bound_pattern Pfield/59N)\n (defining_expr\n  (((Block_load (Values (tag \226\138\164) (size \226\138\164) (field_kind Any_value)) Mutable 0)\n    foo/42UV) lazy_invalid.ml:13,13--29)))"
                   where k2 =
                     ((let prim_1 = %int_comp.eq (tag, 246) in
                       switch prim_1
