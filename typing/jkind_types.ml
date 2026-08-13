@@ -173,7 +173,7 @@ module Sort = struct
       | Genvar of var
       | Addressable of t
 
-    let of_base b = Base b
+    let base b = Base b
 
     let product cs = Product cs
 
