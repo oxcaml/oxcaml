@@ -106,8 +106,6 @@ module Sort : sig
 
   val strip_head_addressable : t -> t
 
-  val is_surely_addressable : t -> bool
-
   (** Post-condition (which holds deeply within the sort): If the result is a
       [Var v], then [!v] is [None]. *)
   val get : t -> t

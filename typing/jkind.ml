@@ -316,12 +316,6 @@ module Layout = struct
     | Product ts ->
       List.for_all (constrain_above_addressable ~allow_mutation) ts
 
-  let rec is_surely_addressable : Sort.t t -> bool = function
-    | Addressable _ -> true
-    | Any _ -> false
-    | Sort (s, _) -> Sort.is_surely_addressable s
-    | Product ts -> List.for_all is_surely_addressable ts
-
   let rec is_surely_addressable_flat : Sort.Flat.t t -> bool = function
     | Addressable _ -> true
     | Any _ -> false
@@ -540,7 +534,7 @@ module Layout = struct
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
       | Addressable t ->
-        if is_surely_addressable t
+        if constrain_addressable ~allow_mutation:false t
         then pp_element ~nested ppf t
         else Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) t
     in
