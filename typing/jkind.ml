@@ -297,7 +297,7 @@ module Layout = struct
       if s' == s then t else Sort (s', sa)
     | (Any _ | Product _) as t -> t
 
-  (* [constrain_addressable t] constrains [t < _ addressable] *)
+  (* [constrain_addressable t] constrains [t < t addressable] *)
   let rec constrain_addressable ~allow_mutation : Sort.t t -> bool = function
     | Any _ -> false
     | Addressable _ -> true
@@ -305,7 +305,7 @@ module Layout = struct
       sort_constrain_result (Sort.constrain_addressable ~allow_mutation s)
     | Product ts -> List.for_all (constrain_addressable ~allow_mutation) ts
 
-  (* [constrain_above_addressable t] constrains [_ addressable < t].
+  (* [constrain_above_addressable t] constrains [t addressable < t].
      This differs from [constrain_addressable] only for [t = Any _]. *)
   let rec constrain_above_addressable ~allow_mutation : Sort.t t -> bool =
     function
