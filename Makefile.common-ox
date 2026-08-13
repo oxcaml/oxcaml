@@ -406,6 +406,10 @@ install_for_test: install
 	mkdir _runtest/ocamltest
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
 test: install_for_test
+	$(MAKE) test-no-rebuild
+
+.PHONY: test-no-rebuild
+test-no-rebuild:
 	if [ "$(middle_end)" = "flambda2" ]; then \
 	  for path in `cd testsuite; ls -1 -d tests/*`; do \
 	    if [[ -d "testsuite/$$path" ]] && ! grep -q "^  $$path " oxcaml/testsuite/flambda2-test-list; then \
@@ -492,7 +496,8 @@ dev_build = _build/dev-dune
 dev_build_flag = --build-dir=$(CURDIR)/$(dev_build)
 dev_boot_targets = $(boot_targets) main.bc
 
-.PHONY: dev dev-runtime dev-check dev-test dev-promote dev-ocamlc dev-ocamlopt
+.PHONY: dev dev-runtime dev-check dev-test dev-test-all dev-promote
+.PHONY: dev-ocamlc dev-ocamlopt
 .PHONY: dev-expect-runners
 .PHONY: dev-status dev-log dev-stop
 
@@ -584,6 +589,23 @@ dev-test: dev-check
 	  $(MAKE) one \
 	    $(if $(TEST),TEST=$(call locate_test,$(TEST))) \
 	    $(if $(DIR),DIR=$(call locate_test,$(DIR)))
+
+dev-test-all: dev-check
+	+@set -eu; \
+	  if ! parallel --version 2>/dev/null | grep -q 'GNU parallel'; then \
+	    echo "dev: GNU Parallel is required for dev-test-all" >&2; \
+	    exit 2; \
+	  fi; \
+	  $(dev_watcher) stop; \
+	  restart_watcher() { \
+	    $(MAKE) --no-print-directory dev \
+	      DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) >/dev/null || true; \
+	  }; \
+	  trap restart_watcher EXIT; \
+	  echo "dev: building the final compiler for the full test suite"; \
+	  $(MAKE) --no-print-directory \
+	    -o boot-compiler -o runtime-stdlib install_for_test; \
+	  $(MAKE) --no-print-directory test-no-rebuild
 
 dev-promote:
 	+@$(MAKE) --no-print-directory dev-test PROMOTE=1 \

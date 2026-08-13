@@ -38,6 +38,19 @@ make dev-test TEST=typing-local/regression_class_type.ml
 make dev-test DIR=lib-bool
 ```
 
+Run the entire test suite with the final compiler and GNU Parallel:
+
+```sh
+make dev-test-all
+```
+
+`dev-test-all` validates the watched compiler, stops the watcher to avoid CPU
+contention, incrementally builds the final compiler, recreates the normal test
+installation, and runs the full suite. It restarts the watcher before returning,
+including after a build or test failure. It requires GNU Parallel rather than
+silently falling back to a slow sequential run. Use this for broad validation,
+not for the normal edit loop.
+
 Promote a focused test:
 
 ```sh
@@ -111,8 +124,13 @@ make test-one TEST=test-dir/path.ml
 ```
 
 Use targeted tests while iterating. Run `make test` only for broad changes or
-when asked. On the measured machine, a small warm `dev-test` took about one
-second, while the complete test suite took about 6 minutes 43 seconds.
+when asked. `make dev-test-all` is the faster full-suite path after development
+edits. On the measured machine, a small warm `dev-test` took about one second,
+warm final-compiler preparation took about 10 seconds, and the complete parallel
+test execution took about 6 minutes 43 seconds, for about 6 minutes 53 seconds
+end to end when warm. After a compiler edit that caused a broad final rebuild,
+`dev-test-all` took about 10 minutes 19 seconds end to end. For a
+bootstrap-sensitive change, use ordinary `make test` instead.
 
 Always benchmark or memtrace with the compiler produced by `make install`,
 never with the boot compiler. Configure without `--enable-dev` for performance
