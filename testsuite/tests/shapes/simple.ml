@@ -24,9 +24,13 @@ and foo = Bar
 [%%expect{|
 {
  "foo"[type] ->
-   (Mutrec t/342 := Variant A<.4> of (foo/343  );foo/343 := Variant Bar<.5>; ).foo/343;
+   (Mutrec t/342 := Variant<.2> A<.4> of (foo/343  );
+           foo/343 := Variant<.3> Bar<.5>;
+    ).foo/343;
  "t"[type] ->
-   (Mutrec t/342 := Variant A<.4> of (foo/343  );foo/343 := Variant Bar<.5>; ).t/342;
+   (Mutrec t/342 := Variant<.2> A<.4> of (foo/343  );
+           foo/343 := Variant<.3> Bar<.5>;
+    ).t/342;
  }
 type t = A of foo
 and foo = Bar
@@ -53,7 +57,7 @@ exception E
 type ext = ..
 [%%expect{|
 {
- "ext"[type] -> ((? ) : value);
+ "ext"[type] -> ((? ) : value)<.9>;
  }
 type ext = ..
 |}]
@@ -101,11 +105,12 @@ end = struct
 end
 [%%expect{|
 {
- "M1"[module] -> {
-                  "t"[type] -> Variant C<.28> of (M2<.18> . "t"[type] );
-                  };
+ "M1"[module] ->
+   {
+    "t"[type] -> Variant<.27> C<.28> of (M2<.18> . "t"[type] );
+    };
  "M2"[module] -> {
-                  "t"[type] -> Variant T<.30>;
+                  "t"[type] -> Variant<.29> T<.30>;
                   "x"[value] -> <.31>;
                   };
  }
@@ -136,7 +141,9 @@ type u = t
 [%%expect{|
 {
  "u"[type] ->
-   (Mutrec t/342 := Variant A<.4> of (foo/343  );foo/343 := Variant Bar<.5>; ).t/342;
+   ((Mutrec t/342 := Variant<.2> A<.4> of (foo/343  );
+            foo/343 := Variant<.3> Bar<.5>;
+     ).t/342)<.36>;
  }
 type u = t
 |}]

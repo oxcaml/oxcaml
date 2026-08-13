@@ -21,11 +21,11 @@ end
 {
  "M"[module] ->
    {<.41>
-    "Exn"[extension constructor] -> Record_boxed { lbl_exn<.0>: int  };
-    "Ext"[extension constructor] -> Record_boxed { lbl_ext<.6>: int  };
-    "ext"[type] -> ((? ) : value);
-    "l"[type] -> Record_boxed { lbl<.4>: int  };
-    "t"[type] -> Variant C<.11> of lbl_cstr<.10>=int ;
+    "Exn"[extension constructor] -> Record_boxed<.1> { lbl_exn<.0>: int  };
+    "Ext"[extension constructor] -> Record_boxed<.7> { lbl_ext<.6>: int  };
+    "ext"[type] -> ((? ) : value)<.5>;
+    "l"[type] -> Record_boxed<.3> { lbl<.4>: int  };
+    "t"[type] -> Variant<.9> C<.11> of lbl_cstr<.10>=int ;
     };
  }
 module M :

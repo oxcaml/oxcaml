@@ -60,7 +60,7 @@ end
 {
  "Fignore"[module] ->
    Abs<.14>((), {
-                 "t"[type] -> Variant Fresh<.12>;
+                 "t"[type] -> Variant<.11> Fresh<.12>;
                  "x"[value] -> <.13>;
                  });
  }
@@ -73,10 +73,11 @@ module Arg : S = struct
 end
 [%%expect{|
 {
- "Arg"[module] -> {<.18>
-                   "t"[type] -> Variant T<.16>;
-                   "x"[value] -> <.17>;
-                   };
+ "Arg"[module] ->
+   {<.18>
+    "t"[type] -> Variant<.15> T<.16>;
+    "x"[value] -> <.17>;
+    };
  }
 module Arg : S
 |}]
@@ -84,7 +85,7 @@ module Arg : S
 include Falias(Arg)
 [%%expect{|
 {
- "t"[type] -> Variant T<.16>;
+ "t"[type] -> Variant<.15> T<.16>;
  "x"[value] -> <.17>;
  }
 type t = Arg.t
@@ -94,7 +95,7 @@ val x : t = <abstr>
 include Finclude(Arg)
 [%%expect{|
 {
- "t"[type] -> Variant T<.16>;
+ "t"[type] -> Variant<.15> T<.16>;
  "x"[value] -> <.17>;
  }
 type t = Arg.t
@@ -104,7 +105,7 @@ val x : t = <abstr>
 include Fredef(Arg)
 [%%expect{|
 {
- "t"[type] -> Variant T<.16>;
+ "t"[type] -> Variant<.8> T<.16>;
  "x"[value] -> <.9>;
  }
 type t = Arg.t
@@ -114,7 +115,7 @@ val x : Arg.t = <abstr>
 include Fignore(Arg)
 [%%expect{|
 {
- "t"[type] -> Variant Fresh<.12>;
+ "t"[type] -> Variant<.11> Fresh<.12>;
  "x"[value] -> <.13>;
  }
 type t = Fignore(Arg).t = Fresh
@@ -124,7 +125,7 @@ val x : t = Fresh
 include Falias(struct type t = int let x = 0 end)
 [%%expect{|
 {
- "t"[type] -> int;
+ "t"[type] -> int<.19>;
  "x"[value] -> <.20>;
  }
 type t = int
@@ -134,7 +135,7 @@ val x : t = 0
 include Finclude(struct type t = int let x = 0 end)
 [%%expect{|
 {
- "t"[type] -> int;
+ "t"[type] -> int<.21>;
  "x"[value] -> <.22>;
  }
 type t = int
@@ -144,7 +145,7 @@ val x : t = 0
 include Fredef(struct type t = int let x = 0 end)
 [%%expect{|
 {
- "t"[type] -> int;
+ "t"[type] -> int<.8>;
  "x"[value] -> <.9>;
  }
 type t = int
@@ -154,7 +155,7 @@ val x : int = 0
 include Fignore(struct type t = int let x = 0 end)
 [%%expect{|
 {
- "t"[type] -> Variant Fresh<.12>;
+ "t"[type] -> Variant<.11> Fresh<.12>;
  "x"[value] -> <.13>;
  }
 type t = Fresh
@@ -168,10 +169,11 @@ end
 [%%expect{|
 {
  "Fgen"[module] ->
-   Abs<.30>((), {
-                 "t"[type] -> Variant Fresher<.28>;
-                 "x"[value] -> <.29>;
-                 });
+   Abs<.30>
+      ((), {
+            "t"[type] -> Variant<.27> Fresher<.28>;
+            "x"[value] -> <.29>;
+            });
  }
 module Fgen : functor () -> sig type t = Fresher val x : t end
 |}]
@@ -179,7 +181,7 @@ module Fgen : functor () -> sig type t = Fresher val x : t end
 include Fgen ()
 [%%expect{|
 {
- "t"[type] -> Variant Fresher<.28>;
+ "t"[type] -> Variant<.27> Fresher<.28>;
  "x"[value] -> <.29>;
  }
 type t = Fresher

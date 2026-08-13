@@ -28,7 +28,7 @@ end
    Abs<.9>
       (X, Y,
        {
-        "t"[type] -> (X<.3> . "t"[type] ) * (Y<.4> . "t"[type] );
+        "t"[type] -> <.5>(X<.3> . "t"[type] ) * (Y<.4> . "t"[type] );
         "to_string"[value] -> <.6>;
         });
  }
@@ -44,7 +44,7 @@ end
 [%%expect{|
 {
  "Int"[module] -> {<.13>
-                   "t"[type] -> int;
+                   "t"[type] -> int<.10>;
                    "to_string"[value] -> <.11>;
                    };
  }
@@ -57,10 +57,11 @@ module String = struct
 end
 [%%expect{|
 {
- "String"[module] -> {<.17>
-                      "t"[type] -> string;
-                      "to_string"[value] -> <.15>;
-                      };
+ "String"[module] ->
+   {<.17>
+    "t"[type] -> string<.14>;
+    "to_string"[value] -> <.15>;
+    };
  }
 module String : sig type t = string val to_string : 'a -> 'a end
 |}]
@@ -70,7 +71,7 @@ module P = Pair(Int)(Pair(String)(Int))
 {
  "P"[module] ->
    {<.18>
-    "t"[type] -> int  * (string  * int  );
+    "t"[type] -> <.5>int<.10>  * (<.5>string<.14>  * int<.10>  );
     "to_string"[value] -> <.6>;
     };
  }
