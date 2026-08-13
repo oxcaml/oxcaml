@@ -89,9 +89,7 @@ val generate_code : (X86_ast.asm_program -> unit) option -> unit
 (** Iterate over all sections (both regular and delayed), calling [f] with the
     section name and the instruction stream for each. *)
 val iter_sections :
-  (X86_section.Section_name.t ->
-  X86_ast.asm_line Oxcaml_utils.Doubly_linked_list.t ->
-  unit) ->
+  (X86_section.Section_name.t -> X86_ast.asm_line Doubly_linked_list.t -> unit) ->
   unit
 
 (** Generate an object file corresponding to the last call to [generate_code].

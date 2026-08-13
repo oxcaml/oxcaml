@@ -419,8 +419,11 @@ let peephole_optimize_from pos =
     X86_peephole_optimize.optimize_from_cell start
 
 let iter_sections f =
-  Section_name.Tbl.iter f asm_code_by_section;
-  Section_name.Tbl.iter f delayed_sections
+  let iter_collected sections =
+    List.iter (fun (name, instrs) -> f name instrs) sections
+  in
+  iter_collected (collect_sections ~is_delayed:false);
+  iter_collected (collect_sections ~is_delayed:true)
 
 let generate_code asm =
   (match asm with

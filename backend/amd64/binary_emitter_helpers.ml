@@ -45,7 +45,7 @@ let save_binary_sections () =
       let buf =
         X86_binary_emitter.assemble_section X64
           { X86_binary_emitter.sec_name = name;
-            sec_instrs = Oxcaml_utils.Doubly_linked_list.to_array instructions
+            sec_instrs = Doubly_linked_list.to_array instructions
           }
       in
       let sec_name = X86_proc.Section_name.to_string name in
