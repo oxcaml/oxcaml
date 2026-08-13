@@ -1100,9 +1100,11 @@ let prepend_directory file_name =
   | Some directory -> Filename.concat directory file_name
   | None -> file_name
 
+(* Note: [-gupstream-dwarf] deliberately does not affect [shape_format].
+   Debugging shapes are the default format, independent of whether the full
+   DWARF information is emitted. *)
 let set_restrict_to_upstream_dwarf () =
-  restrict_to_upstream_dwarf := true;
-  shape_format := Old_merlin
+  restrict_to_upstream_dwarf := true
 
 let no_restrict_to_upstream_dwarf () =
   restrict_to_upstream_dwarf := false;
