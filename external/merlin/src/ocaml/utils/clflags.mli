@@ -5,7 +5,6 @@ type visible_include =
     cmx_guaranteed : bool;
   }
 
-<<<<<<< Merlin:gocamldebug
 (** {0 OCaml compiler compatible command-line parameters}
 
     For compatibility with typechecker.
@@ -30,126 +29,6 @@ val strict_sequence      : bool ref
 val applicative_functors : bool ref
 val nopervasives         : bool ref
 val strict_formats       : bool ref
-||||||| Compiler:last-imported
-module Dwarf_config_defaults : sig
-  val shape_reduce_depth : int option
-  val shape_eval_depth : int option
-  val max_cms_files_per_unit : int option
-  val max_cms_files_per_variable : int option
-  val max_type_to_shape_depth : int option
-  val max_shape_reduce_steps_per_variable : int option
-  val max_evaluation_steps_per_variable : int option
-  val shape_reduce_fuel : int option
-end
-
-val objfiles : string list ref
-val ccobjs : string list ref
-val dllibs : string list ref
-val cmi_file : string option ref
-val compile_only : bool ref
-val output_name : string option ref
-val include_dirs : visible_include list ref
-val hidden_include_dirs : string list ref
-val include_manifests : string list ref
-val hidden_include_manifests : string list ref
-val no_std_include : bool ref
-val no_cwd : bool ref
-val print_types : bool ref
-val make_archive : bool ref
-val debug : bool ref
-val debug_full : bool ref
-val dwarf_c_toolchain_flag : string ref
-val dwarf_fission : dwarf_fission ref
-val dwarf_pedantic : bool ref
-val gdwarf_config_shape_reduce_depth : int option ref
-val gdwarf_config_shape_eval_depth : int option ref
-val gdwarf_config_max_cms_files_per_unit : int option ref
-val gdwarf_config_max_cms_files_per_variable : int option ref
-val gdwarf_config_max_type_to_shape_depth : int option ref
-val gdwarf_config_max_shape_reduce_steps_per_variable : int option ref
-val gdwarf_config_max_evaluation_steps_per_variable : int option ref
-val gdwarf_config_shape_reduce_fuel : int option ref
-val gdwarf_fidelity : gdwarf_fidelity option ref
-val gdwarf_fidelity_of_string : string -> gdwarf_fidelity option
-val set_gdwarf_fidelity : gdwarf_fidelity -> unit
-val unsafe : bool ref
-val use_linscan : bool ref
-val link_everything : bool ref
-val requires_metaprogramming : bool ref
-val uses_metaprogramming : bool ref
-val custom_runtime : bool ref
-val no_check_prims : bool ref
-val bytecode_compatible_32 : bool ref
-val thunkify_cu_init : bool ref
-val output_c_object : bool ref
-val output_complete_object : bool ref
-val output_complete_executable : bool ref
-val all_ccopts : string list ref
-val classic : bool ref
-val nopervasives : bool ref
-val match_context_rows : int ref
-val safer_matching : bool ref
-=======
-module Dwarf_config_defaults : sig
-  val shape_reduce_depth : int option
-  val shape_eval_depth : int option
-  val max_cms_files_per_unit : int option
-  val max_cms_files_per_variable : int option
-  val max_type_to_shape_depth : int option
-  val max_shape_reduce_steps_per_variable : int option
-  val max_evaluation_steps_per_variable : int option
-  val shape_reduce_fuel : int option
-end
-
-val objfiles : string list ref
-val ccobjs : string list ref
-val dllibs : string list ref
-val cmi_file : string option ref
-val compile_only : bool ref
-val output_name : string option ref
-val include_dirs : visible_include list ref
-val hidden_include_dirs : string list ref
-val include_manifests : string list ref
-val hidden_include_manifests : string list ref
-val no_std_include : bool ref
-val no_cwd : bool ref
-val print_types : bool ref
-val make_archive : bool ref
-val debug : bool ref
-val debug_ocamldebug_types : bool ref
-val debug_full : bool ref
-val dwarf_c_toolchain_flag : string ref
-val dwarf_fission : dwarf_fission ref
-val dwarf_pedantic : bool ref
-val gdwarf_config_shape_reduce_depth : int option ref
-val gdwarf_config_shape_eval_depth : int option ref
-val gdwarf_config_max_cms_files_per_unit : int option ref
-val gdwarf_config_max_cms_files_per_variable : int option ref
-val gdwarf_config_max_type_to_shape_depth : int option ref
-val gdwarf_config_max_shape_reduce_steps_per_variable : int option ref
-val gdwarf_config_max_evaluation_steps_per_variable : int option ref
-val gdwarf_config_shape_reduce_fuel : int option ref
-val gdwarf_fidelity : gdwarf_fidelity option ref
-val gdwarf_fidelity_of_string : string -> gdwarf_fidelity option
-val set_gdwarf_fidelity : gdwarf_fidelity -> unit
-val unsafe : bool ref
-val use_linscan : bool ref
-val link_everything : bool ref
-val requires_metaprogramming : bool ref
-val uses_metaprogramming : bool ref
-val custom_runtime : bool ref
-val no_check_prims : bool ref
-val bytecode_compatible_32 : bool ref
-val thunkify_cu_init : bool ref
-val output_c_object : bool ref
-val output_complete_object : bool ref
-val output_complete_executable : bool ref
-val all_ccopts : string list ref
-val classic : bool ref
-val nopervasives : bool ref
-val match_context_rows : int ref
-val safer_matching : bool ref
->>>>>>> Compiler:HEAD
 type open_arg =
   | Open of string
   | Open_cmi of string

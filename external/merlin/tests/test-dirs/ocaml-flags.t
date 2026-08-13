@@ -319,6 +319,7 @@ logic.
   -gno-dwarf-inlined-frames
   -gno-dwarf-may-alter-codegen
   -gno-dwarf-may-alter-codegen-experimental
+  -gno-ocamldebug-types
   -gno-startup
   -gno-upstream-dwarf
   -gstartup

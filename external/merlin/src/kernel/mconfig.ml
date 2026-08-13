@@ -585,6 +585,7 @@ let ocaml_ignored_flags =
     "-disable-poll-insertion";
     "-gdwarf-may-alter-codegen";
     "-gno-dwarf-may-alter-codegen";
+    "-gno-ocamldebug-types";
     "-davail";
     "-dranges";
     "-ddebug-invariants";
