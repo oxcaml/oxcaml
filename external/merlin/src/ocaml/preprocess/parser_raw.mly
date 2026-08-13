@@ -2354,8 +2354,8 @@ module_declaration_body(module_type_with_optional_modal_expr):
   }
 ;
 %inline module_expr_alias:
-  id = mkrhs(mod_longident)
-    { Mty.alias ~loc:(make_loc $sloc) id }
+  id = mkrhs(mod_longident) attrs = attributes
+    { Mty.alias ~loc:(make_loc $loc(id)) ~attrs id }
 ;
 (* A module substitution (in a signature). *)
 module_subst:
@@ -3277,8 +3277,9 @@ block_access:
   | DOT ident _p=LPAREN i=seq_expr RPAREN
     {
       match $2 with
-      | "idx_imm" -> Baccess_block (Immutable, i)
-      | "idx_mut" -> Baccess_block (Mutable, i)
+      | "idx_imm" -> Baccess_block (Immutable_access, i)
+      | "idx_mut" -> Baccess_block (Mutable_access, i)
+      | "idx_atomic" -> Baccess_block (Atomic_access, i)
       | _ ->
         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
     }
@@ -4302,8 +4303,13 @@ jkind_desc_gen(self):
       in
       Pjk_mod ($1, modes)
     }
-  | mkrhs(type_longident) mkrhs(LIDENT)* {
-      Pjk_abbreviation ($1, $2)
+  | name = mkrhs(type_longident) axes = mkrhs(LIDENT)* {
+      match axes with
+      | [] -> Pjk_abbreviation name
+      | _ :: _ ->
+        Pjk_operator
+          ({ pjka_loc = make_loc $loc(name);
+             pjka_desc = Pjk_abbreviation name }, axes)
     }
   | KIND_OF ty=core_type %prec below_LBRACKETAT {
       Pjk_kind_of ty
@@ -4314,8 +4320,12 @@ jkind_desc_gen(self):
   | reverse_product_jkind_gen(self) %prec below_AMPERSAND {
       Pjk_product (List.rev $1)
     }
-  | LPAREN self RPAREN {
-      $2
+  | LPAREN inner = self RPAREN axes = mkrhs(LIDENT)* {
+      match axes with
+      | [] -> inner
+      | _ :: _ ->
+        Pjk_operator
+          ({ pjka_loc = make_loc $loc(inner); pjka_desc = inner }, axes)
     }
 ;
 

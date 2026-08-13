@@ -271,27 +271,26 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 ;;
 [%%expect_asm X86_64{|
 unnecessary_moves:
-  movq  %rax, %rcx
-  movq  %rbx, %r8
+  movq  %rbx, %rcx
   movq  %rdx, %rbx
-  leaq  -1(%rcx,%r8), %rax
-  cmpq  %r8, %rcx
+  leaq  -1(%rax,%rcx), %rdx
+  cmpq  %rcx, %rax
   jge   .L0
-  movq  %rcx, %rax
   ret
 .L0:
   cmpq  %rsi, %rdi
   jge   .L2
   subq  $8, %rsp
-  movq  %rax, (%rsp)
+  movq  %rdx, (%rsp)
   movq  (%rbx), %rdi
-  movq  %r8, %rax
+  movq  %rcx, %rax
   call  *%rdi
 .L1:
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
 .L2:
+  movq  %rdx, %rax
   ret
 |}]
 
@@ -336,13 +335,13 @@ let double_loop_no_definition_at_beginning array n list =
 [%%expect_asm X86_64{|
 double_loop_no_definition_at_beginning:
   subq  $72, %rsp
-  movq  %rbx, %rsi
-  movq  64(%r14), %rbx
-  cmpq  $1, %rsi
+  movq  64(%r14), %rsi
+  cmpq  $1, %rbx
   jl    .L5
-  movq  %rbx, 16(%rsp)
+  movq  %rsi, 16(%rsp)
   movq  %rdi, 32(%rsp)
   movq  %rax, 24(%rsp)
+  movq  %rbx, %rsi
   sarq  $1, %rsi
   movq  %rsi, 40(%rsp)
   xorl  %edx, %edx
@@ -390,9 +389,9 @@ double_loop_no_definition_at_beginning:
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L0
-  movq  16(%rsp), %rbx
+  movq  16(%rsp), %rsi
 .L5:
-  movq  %rbx, 64(%r14)
+  movq  %rsi, 64(%r14)
   movl  $1, %eax
   addq  $72, %rsp
   ret
@@ -556,10 +555,10 @@ let f ~(s: int64#) (t : int64#) =
   Int64_u.sub t (Int64_u.mul t s)
 [%%expect_asm X86_64{|
 f:
-  movq  %rax, %rdi
+  movq  %rbx, %rdi
+  imulq %rax, %rdi
   movq  %rbx, %rax
-  imulq %rdi, %rbx
-  subq  %rbx, %rax
+  subq  %rdi, %rax
   ret
 |}]
 

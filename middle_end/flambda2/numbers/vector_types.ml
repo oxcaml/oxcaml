@@ -136,3 +136,20 @@ module Vec512 = struct
         [| word0; word1; word2; word3; word4; word5; word6; word7 |]
   end
 end
+
+module Mask = struct
+  module Bit_pattern = struct
+    include Vector_by_bit_pattern (struct
+      let size_in_int64s = 1
+    end)
+
+    type bits = { word0 : int64 }
+
+    let to_bits t =
+      match to_int64_array t with
+      | [| word0 |] -> { word0 }
+      | _ -> Misc.fatal_error "Mask.to_bits: wrong size vector"
+
+    let of_bits { word0 } = of_int64_array [| word0 |]
+  end
+end

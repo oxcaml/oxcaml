@@ -114,7 +114,7 @@ let reset () = initialise ()
 
 let create ?sort ?name () : t =
   let sort = Option.value sort ~default:Sort.Normal_or_exn in
-  let compilation_unit = Compilation_unit.get_current_exn () in
+  let compilation_unit = Current_unit.get_cu_exn () in
   let name_stamp = next_stamp () in
   let name =
     let default =

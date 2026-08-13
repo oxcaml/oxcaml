@@ -68,6 +68,12 @@ let fmt_mutable_flag f x =
   | Immutable -> fprintf f "Immutable"
   | Mutable -> fprintf f "Mutable"
 
+let fmt_access_flag f x =
+  match x with
+  | Immutable_access -> fprintf f "Immutable"
+  | Mutable_access -> fprintf f "Mutable"
+  | Atomic_access -> fprintf f "Atomic"
+
 let fmt_virtual_flag f x =
   match x with
   | Virtual -> fprintf f "Virtual"
@@ -528,7 +534,7 @@ and block_access i ppf = function
       line i ppf "Baccess_field %a\n" fmt_longident_loc lid
   | Baccess_block (mut, idx) ->
       line i ppf "Baccess_block %a\n"
-        fmt_mutable_flag mut;
+        fmt_access_flag mut;
       expression i ppf idx
 
 and unboxed_access i ppf = function
@@ -580,8 +586,11 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   line i ppf "jkind %a\n" fmt_location jkind.pjka_loc;
   match jkind.pjka_desc with
   | Pjk_default -> line i ppf "Pjk_default\n"
-  | Pjk_abbreviation (abbrev, sa) ->
-      line i ppf "Pjk_abbreviation %a\n" fmt_longident_loc abbrev;
+  | Pjk_abbreviation abbrev ->
+      line i ppf "Pjk_abbreviation %a\n" fmt_longident_loc abbrev
+  | Pjk_operator (jkind, sa) ->
+      line i ppf "Pjk_operator\n";
+      jkind_annotation (i+1) ppf jkind;
       List.iter
         (fun a -> line (i+1) ppf "scannable_axis %a\n" fmt_string_loc a) sa
   | Pjk_mod (jkind, m) ->

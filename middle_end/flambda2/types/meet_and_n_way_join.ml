@@ -25,6 +25,7 @@ module TEL = Typing_env_level
 module Vec128 = Vector_types.Vec128.Bit_pattern
 module Vec256 = Vector_types.Vec256.Bit_pattern
 module Vec512 = Vector_types.Vec512.Bit_pattern
+module Mask = Vector_types.Mask.Bit_pattern
 
 type 'a meet_return_value = 'a ME.meet_return_value =
   | Left_input
@@ -55,13 +56,6 @@ let map_result ~f = function
   | Ok (Right_input, env) -> Ok (Right_input, env)
   | Ok (Both_inputs, env) -> Ok (Both_inputs, env)
   | Ok (New_result x, env) -> Ok (New_result (f x), env)
-
-let map_env ~f = function
-  | Bottom r -> Bottom r
-  | Ok (r, env) -> (
-    match (f env : _ Or_bottom.t) with
-    | Bottom -> Bottom (map_return_value (fun _ -> ()) r)
-    | Ok env -> Ok (r, env))
 
 let extract_value res left right =
   match res with
@@ -268,18 +262,18 @@ let add_defined_vars env level =
         kind)
     level env
 
-let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_expanded_head
-    ~n_way_join initial_env val_a1 val_b1 extensions1 val_a2 val_b2 extensions2
-    =
-  let join_scope = ME.current_scope initial_env in
-  let env = ME.increment_scope initial_env in
-  let direct_return r =
-    map_env r ~f:(fun scoped_env ->
-        (* Need to cut as a level because we could have added new variables. *)
-        let level = ME.cut scoped_env ~cut_after:join_scope in
-        let initial_env = add_defined_vars initial_env level in
-        let ext = TEE.from_map (TEL.equations level) in
-        ME.add_env_extension_strict initial_env ext ~meet_expanded_head)
+let[@inline] meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b
+    ~meet_expanded_head ~n_way_join initial_env val_a1 val_b1 extensions1 val_a2
+    val_b2 extensions2 =
+  let join_scope, initial_tenv, env = ME.enter_scope initial_env in
+  let direct_return result scoped_env =
+    (* Need to cut as a level because we could have added new variables. *)
+    let level = TE.cut scoped_env ~cut_after:join_scope in
+    let initial_env = add_defined_vars initial_env level in
+    let ext = TEE.from_map (TEL.equations level) in
+    match ME.add_env_extension_strict initial_env ext ~meet_expanded_head with
+    | Bottom -> Bottom (map_return_value (fun _ -> ()) result)
+    | Ok env -> Ok (result, env)
   in
   let env_a, env_b = Or_bottom.Ok env, Or_bottom.Ok env in
   let env_a, env_b =
@@ -300,15 +294,32 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_expanded_head
         Or_bottom.bind env_b ~f:(fun env ->
             ME.add_env_extension_strict env when_b ~meet_expanded_head) )
   in
-  let a_result : _ meet_result =
+  let module Extension_meet = struct
+    type 'a meet_result =
+      | Bottom of unit meet_return_value
+      | Ok of 'a meet_return_value * TE.t
+  end in
+  let a_result : _ Extension_meet.meet_result =
     match env_a with
     | Bottom -> Bottom (New_result ())
-    | Ok env -> meet_a env val_a1 val_a2
+    | Ok env -> (
+      match meet_a env val_a1 val_a2 with
+      | Bottom r -> Bottom r
+      | Ok (result, env) -> (
+        match ME.final_typing_env_strict ~meet_expanded_head env with
+        | Bottom -> Bottom (New_result ())
+        | Ok env -> Ok (result, env)))
   in
-  let b_result : _ meet_result =
+  let b_result : _ Extension_meet.meet_result =
     match env_b with
     | Bottom -> Bottom (New_result ())
-    | Ok env -> meet_b env val_b1 val_b2
+    | Ok env -> (
+      match meet_b env val_b1 val_b2 with
+      | Bottom r -> Bottom r
+      | Ok (result, env) -> (
+        match ME.final_typing_env_strict ~meet_expanded_head env with
+        | Bottom -> Bottom (New_result ())
+        | Ok env -> Ok (result, env)))
   in
   match a_result, b_result with
   | Bottom r1, Bottom r2 ->
@@ -320,7 +331,7 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_expanded_head
           let val_b = bottom_b () in
           val_a, val_b, No_extensions)
     in
-    direct_return (Ok (result, env))
+    direct_return result env
   | Bottom a, Ok (b_result, env) ->
     let result =
       combine_meet_return_values a b_result (fun () ->
@@ -328,17 +339,17 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_expanded_head
           let val_a = bottom_a () in
           val_a, val_b, No_extensions)
     in
-    direct_return (Ok (result, env))
-  | Ok (a_result, env_a), Ok (b_result, env_b) ->
+    direct_return result env
+  | Ok (a_result, tenv_a), Ok (b_result, tenv_b) ->
     let result_env =
       (* Not strict, as we don't expect to be able to get bottom equations from
          joining non-bottom ones *)
       Join_env.cut_and_n_way_join ~meet_expanded_head
         ~n_way_join_type:n_way_join ~cut_after:join_scope initial_env
-        [ME.typing_env env_a; ME.typing_env env_b]
+        initial_tenv [tenv_a; tenv_b]
     in
-    let when_a_level = ME.cut env_a ~cut_after:join_scope in
-    let when_b_level = ME.cut env_b ~cut_after:join_scope in
+    let when_a_level = TE.cut tenv_a ~cut_after:join_scope in
+    let when_b_level = TE.cut tenv_b ~cut_after:join_scope in
     (* New variables introduced by either [meet_a] or [meet_b] are not
        guaranteed to end up in the [result_env] (in fact, they will probably get
        renamed), but they can still appear in [a_result] and [b_result], so we
@@ -380,6 +391,349 @@ let meet_disjunction ~meet_a ~meet_b ~bottom_a ~bottom_b ~meet_expanded_head
     in
     Ok (result, result_env)
 
+let[@inline] meet_row_like :
+    'lattice 'shape 'maps_to 'row_tag 'known.
+    meet_maps_to:(ME.t -> 'maps_to -> 'maps_to -> 'maps_to meet_result) ->
+    equal_index:('lattice -> 'lattice -> bool) ->
+    subset_index:('lattice -> 'lattice -> bool) ->
+    union_index:('lattice -> 'lattice -> 'lattice) ->
+    meet_shape:('shape -> 'shape -> 'shape Or_bottom.t) ->
+    is_empty_map_known:('known -> bool) ->
+    get_singleton_map_known:
+      ('known ->
+      ('row_tag * ('lattice, 'shape, 'maps_to) TG.Row_like_case.t) option) ->
+    merge_map_known:
+      (('row_tag ->
+       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option ->
+       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option ->
+       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option) ->
+      'known ->
+      'known ->
+      'known) ->
+    n_way_join_type:Join_env.n_way_join_type ->
+    meet_expanded_head:(ME.t -> ET.t -> ET.t -> ET.t meet_result) ->
+    ME.t ->
+    known1:'known ->
+    known2:'known ->
+    other1:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
+    other2:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
+    ('known * ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t)
+    meet_result =
+ fun ~meet_maps_to ~equal_index ~subset_index ~union_index ~meet_shape
+     ~is_empty_map_known ~get_singleton_map_known ~merge_map_known
+     ~n_way_join_type ~meet_expanded_head initial_env ~known1 ~known2 ~other1
+     ~other2 ->
+  let common_scope, initial_tenv, base_env = ME.enter_scope initial_env in
+  let base_tenv = ME.final_typing_env ~meet_expanded_head base_env in
+  (* Keep track of the variables used by all extensions and lift them to the
+     result env in [extract_and_join_extensions]. *)
+  let extra_variables = ref Variable.Map.empty in
+  let add_extra_variables_and_extract_extension scoped_env =
+    let level = TE.cut scoped_env ~cut_after:common_scope in
+    extra_variables
+      := Variable.Map.union_total_shared
+           (fun var k1 k2 ->
+             if not (K.equal k1 k2)
+             then Misc.fatal_errorf "Different kinds for %a" Variable.print var;
+             k1)
+           !extra_variables
+           (TEL.defined_variables_with_kinds level);
+    TEE.from_map (TEL.equations level)
+  in
+  let extract_and_join_extensions scoped_envs =
+    (* We add the extra variables after the join, because some of the extra
+       variables could appear in one of the [scoped_envs] and the join expects
+       that variables defined in the central env are defined in all the joined
+       envs. *)
+    let result_env =
+      Join_env.cut_and_n_way_join ~n_way_join_type ~meet_expanded_head
+        ~cut_after:common_scope initial_env initial_tenv scoped_envs
+    in
+    Variable.Map.fold
+      (fun var kind env ->
+        ME.add_definition env
+          (Bound_name.create_var
+             (* Variables with [Name_mode.in_types] do not exist at runtime, so
+                we do not equip them with a [Flambda_debug_uid.t]. See #3967. *)
+             (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types))
+          kind)
+      !extra_variables result_env
+  in
+  let open struct
+    type result_env =
+      | No_result
+      | Extension of TE.t list
+  end in
+  let result_env = ref No_result in
+  let need_join =
+    (* The returned env_extension is the join of the env_extension produced by
+       each non bottom cases. Therefore there is some loss of precision in that
+       case and we need to store the one produced for each tag. But when only
+       one tag is kept it would be wasteful (but correct) to store it.
+
+       We consider that the result of the meet between t1 and t2 will have only
+       one tag when t1 (or t2) has exactly one tag (one that and no 'other'
+       cases).
+
+       This is an overapproximation because the result could have only one tag
+       for instance if
+
+       t1 = [Tag 1 | Tag 2] and t2 = [Tag 2 | Tag 3], or if
+
+       t1 = [Tag 1 | Tag 2] and t2 = [Tag 1 | Tag 2]
+
+       but the meet between some combinations result in a bottom. *)
+    match
+      ( other1,
+        get_singleton_map_known known1,
+        other2,
+        get_singleton_map_known known2 )
+    with
+    | Bottom, Some _, _, _ | _, _, Bottom, Some _ -> false
+    | (Ok _ | Bottom), _, (Ok _ | Bottom), _ ->
+      if is_empty_map_known known1 && is_empty_map_known known2
+      then false
+      else true
+  in
+  let result_is_t1 = ref true in
+  let result_is_t2 = ref true in
+  let update_refs = function
+    | Both_inputs -> ()
+    | Left_input -> result_is_t2 := false
+    | Right_input -> result_is_t1 := false
+    | New_result _ ->
+      result_is_t1 := false;
+      result_is_t2 := false
+  in
+  let join_result_env scoped_env =
+    let new_result_env =
+      match !result_env with
+      | No_result -> Extension [scoped_env]
+      | Extension other_envs ->
+        assert need_join;
+        Extension (scoped_env :: other_envs)
+    in
+    result_env := new_result_env
+  in
+  let meet_index env (i1 : ('lattice, 'shape) TG.row_like_index)
+      (i2 : ('lattice, 'shape) TG.row_like_index) :
+      ('lattice, 'shape) TG.row_like_index meet_result =
+    match meet_shape i1.shape i2.shape with
+    | Bottom -> Bottom (New_result ())
+    | Ok shape -> (
+      match i1.domain, i2.domain with
+      | Known i1', Known i2' ->
+        if equal_index i1' i2'
+        then Ok (Both_inputs, env)
+        else Bottom (New_result ())
+      | Known known, At_least at_least ->
+        if subset_index at_least known
+        then
+          (* [at_least] is included in [known] hence [Known known] is included
+             in [At_least at_least], hence [Known known] \inter [At_least
+             at_least] = [Known known] *)
+          Ok (Left_input, env)
+        else Bottom (New_result ())
+      | At_least at_least, Known known ->
+        if subset_index at_least known
+        then Ok (Right_input, env)
+        else Bottom (New_result ())
+      | At_least i1', At_least i2' ->
+        if subset_index i1' i2'
+        then
+          if subset_index i2' i1'
+          then Ok (Both_inputs, env)
+          else Ok (Right_input, env)
+        else if subset_index i2' i1'
+        then Ok (Left_input, env)
+        else
+          let domain =
+            TG.Row_like_index_domain.at_least (union_index i1' i2')
+          in
+          Ok (New_result (TG.Row_like_index.create ~domain ~shape), env))
+  in
+  let bottom_case r =
+    update_refs r;
+    None
+  in
+  let meet_case env (case1 : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t)
+      (case2 : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t) =
+    match meet_index env case1.index case2.index with
+    | Bottom r -> bottom_case r
+    | Ok (index_result, env) -> (
+      match meet_maps_to env case1.maps_to case2.maps_to with
+      | Bottom r -> bottom_case r
+      | Ok (maps_to_result, env) -> (
+        let env : _ Or_bottom.t =
+          match
+            ME.add_env_extension_strict env case1.env_extension
+              ~meet_expanded_head
+          with
+          | Bottom -> Bottom
+          | Ok env ->
+            ME.add_env_extension_strict env case2.env_extension
+              ~meet_expanded_head
+        in
+        let env =
+          Or_bottom.bind env ~f:(ME.final_typing_env_strict ~meet_expanded_head)
+        in
+        match env with
+        | Bottom -> bottom_case (New_result ())
+        | Ok env ->
+          join_result_env env;
+          update_refs index_result;
+          update_refs maps_to_result;
+          let index = extract_value index_result case1.index case2.index in
+          let maps_to =
+            extract_value maps_to_result case1.maps_to case2.maps_to
+          in
+          let env_extension =
+            if need_join
+            then add_extra_variables_and_extract_extension env
+            else TEE.empty
+          in
+          if TEE.is_empty env_extension
+          then ()
+          else (
+            result_is_t1 := false;
+            result_is_t2 := false);
+          Some
+            (Or_unknown.Known
+               (TG.Row_like_case.create ~maps_to ~index ~env_extension))))
+  in
+  let meet_knowns
+      (case1 :
+        ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option)
+      (case2 :
+        ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option) :
+      ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option =
+    (* CR bclement: When we return [None] below but either of the inputs were
+       not [None], we fall back to the [other] case. This can cause loss of
+       precision if the [other] case is not [Bottom], as we forget that the
+       current case is impossible.
+
+       Fixing this would require storing [Or_unknown_or_bottom.t] in the
+       row_like_for_block case, so leave it as is for now -- this should be
+       fairly rare. *)
+    match case1, case2 with
+    | None, None -> None
+    | Some case1, None -> (
+      match other2 with
+      | Bottom ->
+        result_is_t1 := false;
+        None
+      | Ok other_case -> (
+        match case1 with
+        | Unknown -> (
+          match
+            Or_bottom.bind
+              ~f:(ME.final_typing_env_strict ~meet_expanded_head)
+              (ME.add_env_extension_strict base_env other_case.env_extension
+                 ~meet_expanded_head)
+          with
+          | Bottom -> None
+          | Ok env ->
+            join_result_env env;
+            result_is_t1 := false;
+            result_is_t2 := false;
+            Some (Known other_case))
+        | Known case1 -> meet_case base_env case1 other_case))
+    | None, Some case2 -> (
+      match other1 with
+      | Bottom ->
+        result_is_t2 := false;
+        None
+      | Ok other_case -> (
+        match case2 with
+        | Unknown -> (
+          match
+            Or_bottom.bind
+              ~f:(ME.final_typing_env_strict ~meet_expanded_head)
+              (ME.add_env_extension_strict base_env other_case.env_extension
+                 ~meet_expanded_head)
+          with
+          | Bottom -> None
+          | Ok env ->
+            join_result_env env;
+            result_is_t1 := false;
+            result_is_t2 := false;
+            Some (Known other_case))
+        | Known case2 -> meet_case base_env other_case case2))
+    | Some case1, Some case2 -> (
+      match case1, case2 with
+      | Unknown, Unknown ->
+        join_result_env base_tenv;
+        Some Unknown
+      | Known case, Unknown -> (
+        match
+          Or_bottom.bind
+            ~f:(ME.final_typing_env_strict ~meet_expanded_head)
+            (ME.add_env_extension_strict base_env case.env_extension
+               ~meet_expanded_head)
+        with
+        | Bottom -> None
+        | Ok env ->
+          join_result_env env;
+          result_is_t2 := false;
+          Some (Known case))
+      | Unknown, Known case -> (
+        match
+          Or_bottom.bind
+            ~f:(ME.final_typing_env_strict ~meet_expanded_head)
+            (ME.add_env_extension_strict base_env case.env_extension
+               ~meet_expanded_head)
+        with
+        | Bottom -> None
+        | Ok env ->
+          join_result_env env;
+          result_is_t1 := false;
+          Some (Known case))
+      | Known case1, Known case2 -> meet_case base_env case1 case2)
+  in
+  let known =
+    merge_map_known
+      (fun _tag case1 case2 -> meet_knowns case1 case2)
+      known1 known2
+  in
+  let other : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t =
+    match other1, other2 with
+    | Bottom, Bottom -> Bottom
+    | Bottom, _ ->
+      result_is_t2 := false;
+      Bottom
+    | _, Bottom ->
+      result_is_t1 := false;
+      Bottom
+    | Ok other1, Ok other2 -> (
+      match meet_case base_env other1 other2 with
+      | None -> Bottom
+      | Some Unknown -> Misc.fatal_error "meet_case should not produce Unknown"
+      | Some (Known r) -> Ok r)
+  in
+  if
+    is_empty_map_known known
+    && match other with Bottom -> true | Ok _ -> false
+  then Bottom (New_result ())
+  else
+    let env : _ Or_bottom.t =
+      match !result_env with
+      | No_result -> Bottom
+      | Extension scoped_envs ->
+        (* We used add_env_extension_strict here before, but we don't expect to
+           get bottom equations from joining non-bottom ones. *)
+        Ok (extract_and_join_extensions scoped_envs)
+    in
+    let match_with_input v =
+      match !result_is_t1, !result_is_t2 with
+      | true, true -> Both_inputs
+      | true, false -> Left_input
+      | false, true -> Right_input
+      | false, false -> New_result v
+    in
+    match env with
+    | Bottom -> Bottom (match_with_input ())
+    | Ok env -> Ok (match_with_input (known, other), env)
+
 let meet_code_id (env : ME.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
     Code_id.t meet_result =
   if Code_id.equal code_id1 code_id2
@@ -401,15 +755,6 @@ let meet_code_id (env : ME.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
       else if Code_id.equal code_id code_id2
       then Ok (Right_input, env)
       else Ok (New_result code_id, env)
-
-type meet_keep_side =
-  | Left
-  | Right
-
-(* type meet_expanded_head_result =
- *   | Left_head_unchanged
- *   | Right_head_unchanged
- *   | New_head of ET.t * TEE.t *)
 
 let meet_alloc_mode env (alloc_mode1 : Alloc_mode.For_types.t)
     (alloc_mode2 : Alloc_mode.For_types.t) : Alloc_mode.For_types.t meet_result
@@ -616,6 +961,111 @@ let join_array_element_kinds (element_kind1 : _ Or_unknown_or_bottom.t)
     then Ok element_kind1
     else Unknown
 
+let reduce_head_of_kind_naked_immediate env head : _ Or_bottom.t =
+  let descr = TG.Head_of_kind_naked_immediate.descr head in
+  let changed = ref false in
+  let exception Bottom_result in
+  match
+    TG.Relation.Map.fold
+      (fun relation names (imms, inverse_relations) ->
+        let imms, names' =
+          Name.Set.fold
+            (fun name (imms, names) ->
+              Simple.pattern_match
+                (TE.get_canonical_simple_ignoring_name_mode env
+                   (Simple.name name))
+                ~const:(fun const : (_ Or_unknown.t * Name.Set.t) ->
+                  match
+                    TG.Relation.of_const ~machine_width:(TE.machine_width env)
+                      relation const
+                  with
+                  | Bottom ->
+                    (* CR bclement: we need to ignore [Bottom] here because
+                       unboxing can create inverse relations that wouldn't be
+                       valid e.g. for [get_tag] of something that we don't know
+                       is a block. *)
+                    changed := true;
+                    imms, names
+                  | Ok imm -> (
+                    let imms' = Target_ocaml_int.Set.singleton imm in
+                    match (imms : _ Or_unknown.t) with
+                    | Known imms ->
+                      if Target_ocaml_int.Set.equal imms' imms
+                      then Known imms, names
+                      else (
+                        if not (Target_ocaml_int.Set.mem imm imms)
+                        then raise Bottom_result;
+                        changed := true;
+                        Known imms', names)
+                    | Unknown ->
+                      changed := true;
+                      Known imms', names))
+                ~name:(fun name' ~coercion:_ ->
+                  if name' != name then changed := true;
+                  imms, Name.Set.add name' names))
+            names (imms, Name.Set.empty)
+        in
+        imms, TG.Relation.Map.add relation names' inverse_relations)
+      descr.inverse_relations
+      (descr.naked_immediates, TG.Relation.Map.empty)
+  with
+  | exception Bottom_result -> Bottom
+  | naked_immediates, inverse_relations ->
+    if not !changed
+    then Ok head
+    else
+      TG.Head_of_kind_naked_immediate.from_descr
+        { naked_immediates; inverse_relations }
+
+type 'a reverse_mapping_meet_return_value =
+  { left_inputs_only : 'a;
+    meet_return_value : 'a meet_return_value;
+    right_inputs_only : 'a
+  }
+
+let meet_inverse_relations inverse_relations1 inverse_relations2 =
+  if inverse_relations1 == inverse_relations2
+  then
+    { left_inputs_only = TG.Relation.Map.empty;
+      meet_return_value = Both_inputs;
+      right_inputs_only = TG.Relation.Map.empty
+    }
+  else
+    let left_inputs_only = ref TG.Relation.Map.empty in
+    let right_inputs_only = ref TG.Relation.Map.empty in
+    let inverse_relations =
+      TG.Relation.Map.merge
+        (fun relation names1 names2 ->
+          let names1 = Option.value ~default:Name.Set.empty names1 in
+          let names2 = Option.value ~default:Name.Set.empty names2 in
+          let left_input = Name.Set.diff names1 names2 in
+          let right_input = Name.Set.diff names2 names1 in
+          if not (Name.Set.is_empty left_input)
+          then
+            left_inputs_only
+              := TG.Relation.Map.add relation left_input !left_inputs_only;
+          if not (Name.Set.is_empty right_input)
+          then
+            right_inputs_only
+              := TG.Relation.Map.add relation right_input !right_inputs_only;
+          Some (Name.Set.union names1 names2))
+        inverse_relations1 inverse_relations2
+    in
+    let meet_return_value =
+      match
+        ( TG.Relation.Map.is_empty !left_inputs_only,
+          TG.Relation.Map.is_empty !right_inputs_only )
+      with
+      | true, true -> Both_inputs
+      | false, true -> Left_input
+      | true, false -> Right_input
+      | false, false -> New_result inverse_relations
+    in
+    { left_inputs_only = !left_inputs_only;
+      meet_return_value;
+      right_inputs_only = !right_inputs_only
+    }
+
 let rec meet env t1 t2 = ME.meet_type env t1 t2 ~meet_expanded_head
 
 and meet_or_unknown_or_bottom : type a b.
@@ -627,12 +1077,12 @@ and meet_or_unknown_or_bottom : type a b.
  fun meet_elt env (input1 : a Or_unknown_or_bottom.t)
      (input2 : a Or_unknown_or_bottom.t) ->
   match input1, input2 with
-  | Unknown, Unknown -> Ok (Both_inputs, env)
-  | _, Unknown -> Ok (Left_input, env)
-  | Unknown, _ -> Ok (Right_input, env)
   | Bottom, Bottom -> Bottom Both_inputs
   | Bottom, _ -> Bottom Left_input
   | _, Bottom -> Bottom Right_input
+  | Unknown, Unknown -> Ok (Both_inputs, env)
+  | _, Unknown -> Ok (Left_input, env)
+  | Unknown, _ -> Ok (Right_input, env)
   | Ok elt1, Ok elt2 -> meet_elt env elt1 elt2
 
 and meet_expanded_head env (expanded1 : ET.t) (expanded2 : ET.t) :
@@ -678,6 +1128,9 @@ and meet_expanded_head0 env (descr1 : ET.descr) (descr2 : ET.descr) :
   | Naked_vec512 head1, Naked_vec512 head2 ->
     map_result ~f:ET.create_naked_vec512
       (meet_head_of_kind_naked_vec512 env head1 head2)
+  | Naked_mask head1, Naked_mask head2 ->
+    map_result ~f:ET.create_naked_mask
+      (meet_head_of_kind_naked_mask env head1 head2)
   | Rec_info head1, Rec_info head2 ->
     map_result ~f:ET.create_rec_info
       (meet_head_of_kind_rec_info env head1 head2)
@@ -685,8 +1138,8 @@ and meet_expanded_head0 env (descr1 : ET.descr) (descr2 : ET.descr) :
     map_result ~f:ET.create_region (meet_head_of_kind_region env head1 head2)
   | ( ( Value _ | Naked_immediate _ | Naked_float _ | Naked_float32 _
       | Naked_int8 _ | Naked_int16 _ | Naked_int32 _ | Naked_vec128 _
-      | Naked_vec256 _ | Naked_vec512 _ | Naked_int64 _ | Naked_nativeint _
-      | Rec_info _ | Region _ ),
+      | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Naked_int64 _
+      | Naked_nativeint _ | Rec_info _ | Region _ ),
       _ ) ->
     assert false
 
@@ -857,6 +1310,11 @@ and meet_head_of_kind_value_non_null env
       ~rebuild:TG.Head_of_kind_value_non_null.create_boxed_vec512 ~meet_a:meet
       ~meet_b:meet_alloc_mode ~left_a:n1 ~right_a:n2 ~left_b:alloc_mode1
       ~right_b:alloc_mode2
+  | Boxed_mask (n1, alloc_mode1), Boxed_mask (n2, alloc_mode2) ->
+    combine_results2 env
+      ~rebuild:TG.Head_of_kind_value_non_null.create_boxed_mask ~meet_a:meet
+      ~meet_b:meet_alloc_mode ~left_a:n1 ~right_a:n2 ~left_b:alloc_mode1
+      ~right_b:alloc_mode2
   | ( Closures { by_function_slot = by_function_slot1; alloc_mode = alloc_mode1 },
       Closures
         { by_function_slot = by_function_slot2; alloc_mode = alloc_mode2 } ) ->
@@ -884,7 +1342,8 @@ and meet_head_of_kind_value_non_null env
       (element_kind2, length2, contents2, alloc_mode2)
   | ( ( Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
       | Boxed_int32 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-      | Boxed_int64 _ | Boxed_nativeint _ | Closures _ | String _ | Array _ ),
+      | Boxed_mask _ | Boxed_int64 _ | Boxed_nativeint _ | Closures _ | String _
+      | Array _ ),
       _ ) ->
     (* This assumes that all the different constructors are incompatible. This
        could break very hard for dubious uses of Obj. *)
@@ -1053,111 +1512,132 @@ and meet_variant env ~(is_int1 : Variable.t option)
     ~left_b:(get_tag1, blocks1, imms1, extensions1)
     ~right_b:(get_tag2, blocks2, imms2, extensions2)
 
+and reduce_inverse_relations env naked_immediates inverse_relations :
+    _ Or_bottom.t =
+  let module I = struct
+    include Target_ocaml_int
+
+    let machine_width = ME.machine_width env
+
+    let zero = zero machine_width
+
+    let one = one machine_width
+  end in
+  match (naked_immediates : _ Or_unknown.t) with
+  | Unknown -> Ok env
+  | Known imms -> (
+    let exception Bottom_result in
+    match
+      TG.Relation.Map.fold
+        (fun relation names env ->
+          Name.Set.fold
+            (fun name env ->
+              let add_equation ty =
+                match
+                  ME.add_equation_strict env name ty ~meet_expanded_head
+                with
+                | Ok env -> env
+                | Bottom -> raise Bottom_result
+              in
+              match TG.Relation.descr relation with
+              | Is_null -> (
+                match I.Set.mem I.zero imms, I.Set.mem I.one imms with
+                | false, false -> raise Bottom_result
+                | true, true -> env
+                | true, false -> add_equation TG.any_non_null_value
+                | false, true -> add_equation TG.null)
+              | Is_int -> (
+                match I.Set.mem I.zero imms, I.Set.mem I.one imms with
+                | false, false -> raise Bottom_result
+                | true, true -> env
+                | true, false -> add_equation MTC.any_block
+                | false, true -> add_equation MTC.any_tagged_immediate)
+              | Get_tag -> (
+                let tags =
+                  I.Set.fold
+                    (fun tag tags ->
+                      match Tag.create_from_targetint I.machine_width tag with
+                      | Some tag -> Tag.Set.add tag tags
+                      | None -> tags (* No blocks exist with this tag *))
+                    imms Tag.Set.empty
+                in
+                match
+                  MTC.blocks_with_these_tags ~machine_width:I.machine_width tags
+                    (Alloc_mode.For_types.unknown ())
+                with
+                | Known shape -> add_equation shape
+                | Unknown -> env))
+            names env)
+        inverse_relations env
+    with
+    | exception Bottom_result -> Bottom
+    | env -> Ok env)
+
 and meet_head_of_kind_naked_immediate env (t1 : TG.head_of_kind_naked_immediate)
     (t2 : TG.head_of_kind_naked_immediate) :
     TG.head_of_kind_naked_immediate meet_result =
   let module I = Target_ocaml_int in
-  let keep_side side : _ meet_result =
-    match side with
-    | Left -> Ok (Left_input, env)
-    | Right -> Ok (Right_input, env)
-  in
-  let bottom_other_side side : _ meet_result =
-    match side with Left -> Bottom Right_input | Right -> Bottom Left_input
-  in
-  let meet_with_shape ~rebuild ty shape side =
-    map_result ~f:rebuild
-      (match side with Left -> meet env ty shape | Right -> meet env shape ty)
-  in
-  let is_int_immediate ~is_int_ty ~immediates ~is_int_side =
-    if I.Set.is_empty immediates
-    then bottom_other_side is_int_side
-    else
-      let rebuild = TG.Head_of_kind_naked_immediate.create_is_int in
-      let machine_width = ME.machine_width env in
-      match
-        ( I.Set.mem (I.zero machine_width) immediates,
-          I.Set.mem (I.one machine_width) immediates )
-      with
-      | false, false -> Bottom (New_result ())
-      | true, true -> keep_side is_int_side
-      | true, false ->
-        meet_with_shape ~rebuild is_int_ty MTC.any_block is_int_side
-      | false, true ->
-        meet_with_shape ~rebuild is_int_ty MTC.any_tagged_immediate is_int_side
-  in
-  let is_null_immediate ~is_null_ty ~immediates ~is_null_side =
-    if I.Set.is_empty immediates
-    then bottom_other_side is_null_side
-    else
-      let rebuild = TG.Head_of_kind_naked_immediate.create_is_null in
-      let machine_width = ME.machine_width env in
-      match
-        ( I.Set.mem (I.zero machine_width) immediates,
-          I.Set.mem (I.one machine_width) immediates )
-      with
-      | false, false -> Bottom (New_result ())
-      | true, true -> keep_side is_null_side
-      | true, false ->
-        meet_with_shape ~rebuild is_null_ty TG.any_non_null_value is_null_side
-      | false, true -> meet_with_shape ~rebuild is_null_ty TG.null is_null_side
-  in
-  let get_tag_immediate ~get_tag_ty ~immediates ~get_tag_side =
-    if I.Set.is_empty immediates
-    then bottom_other_side get_tag_side
-    else
-      let tags =
-        I.Set.fold
-          (fun tag tags ->
-            let machine_width = ME.machine_width env in
-            match Tag.create_from_targetint machine_width tag with
-            | Some tag -> Tag.Set.add tag tags
-            | None -> tags (* No blocks exist with this tag *))
-          immediates Tag.Set.empty
+  match
+    ( reduce_head_of_kind_naked_immediate (ME.current_typing_env env) t1,
+      reduce_head_of_kind_naked_immediate (ME.current_typing_env env) t2 )
+  with
+  | Bottom, Bottom -> Bottom Both_inputs
+  | Bottom, Ok _ -> Bottom Left_input
+  | Ok _, Bottom -> Bottom Right_input
+  | Ok t1, Ok t2 -> (
+    let descr1 = TG.Head_of_kind_naked_immediate.descr t1 in
+    let descr2 = TG.Head_of_kind_naked_immediate.descr t2 in
+    let naked_immediates =
+      meet_unknown
+        (set_meet (module I.Set) ~of_set:Fun.id)
+        ~contents_is_bottom:I.Set.is_empty env descr1.naked_immediates
+        descr2.naked_immediates
+    in
+    match naked_immediates with
+    | Bottom r -> Bottom r
+    | Ok (naked_immediates, env) -> (
+      let inverse_relations =
+        meet_inverse_relations descr1.inverse_relations descr2.inverse_relations
       in
-      if Tag.Set.is_empty tags
-      then Bottom (New_result ())
-      else
-        let machine_width = ME.machine_width env in
-        match
-          MTC.blocks_with_these_tags ~machine_width tags
-            (Alloc_mode.For_types.unknown ())
-        with
-        | Known shape ->
-          meet_with_shape
-            ~rebuild:TG.Head_of_kind_naked_immediate.create_get_tag get_tag_ty
-            shape get_tag_side
-        | Unknown -> keep_side get_tag_side
-  in
-  match t1, t2 with
-  | Naked_immediates is1, Naked_immediates is2 ->
-    map_result
-      ~f:TG.Head_of_kind_naked_immediate.create_naked_immediates_non_empty
-      (set_meet (module I.Set) env is1 is2 ~of_set:Fun.id)
-  | Is_int is_int_ty, Naked_immediates immediates ->
-    is_int_immediate ~is_int_ty ~immediates ~is_int_side:Left
-  | Naked_immediates immediates, Is_int is_int_ty ->
-    is_int_immediate ~is_int_ty ~immediates ~is_int_side:Right
-  | Get_tag get_tag_ty, Naked_immediates immediates ->
-    get_tag_immediate ~get_tag_ty ~immediates ~get_tag_side:Left
-  | Naked_immediates immediates, Get_tag get_tag_ty ->
-    get_tag_immediate ~get_tag_ty ~immediates ~get_tag_side:Right
-  | Is_null is_null_ty, Naked_immediates immediates ->
-    is_null_immediate ~is_null_ty ~immediates ~is_null_side:Left
-  | Naked_immediates immediates, Is_null is_null_ty ->
-    is_null_immediate ~is_null_ty ~immediates ~is_null_side:Right
-  | (Is_int _ | Get_tag _ | Is_null _), (Is_int _ | Get_tag _ | Is_null _) ->
-    (* CR mshinwell: introduce improved handling for
-     *   Is_int meet Is_int
-     *   Get_tag meet Get_tag
-     * i.e. a better fix for PR1515, at which point we might also be able
-     * to consider improving:
-     *   Is_int meet Get_tag
-     * and vice-versa. *)
-    (* We can't return Bottom, as it would be unsound, so we need to either do
-       the actual meet with Naked_immediates, or just give up and return one of
-       the arguments. *)
-    Ok (Left_input, env)
+      let head =
+        combine_meet_return_values naked_immediates
+          inverse_relations.meet_return_value (fun () ->
+            let naked_immediates =
+              extract_value naked_immediates descr1.naked_immediates
+                descr2.naked_immediates
+            in
+            let inverse_relations =
+              extract_value inverse_relations.meet_return_value
+                descr1.inverse_relations descr2.inverse_relations
+            in
+            TG.Head_of_kind_naked_immediate.from_descr_non_empty
+              { naked_immediates; inverse_relations })
+      in
+      let[@local] head_in_env_or_bottom (env_ob : _ Or_bottom.t) =
+        match env_ob with
+        | Bottom -> Bottom (New_result ())
+        | Ok env -> Ok (head, env)
+      in
+      (* Only perform reverse reductions for relations that were not already
+         known in the corresponding side, e.g. if we meet [(Naked_immediate (0 1
+         2) (%get_tag x)] and [(Naked_immediate T (%get_tag y))] we only update
+         the tag of [y], but not of [x] (which we assume to already have been
+         reduced). *)
+      match naked_immediates with
+      | Both_inputs -> Ok (head, env)
+      | Left_input ->
+        head_in_env_or_bottom
+          (reduce_inverse_relations env descr1.naked_immediates
+             inverse_relations.right_inputs_only)
+      | Right_input ->
+        head_in_env_or_bottom
+          (reduce_inverse_relations env descr2.naked_immediates
+             inverse_relations.left_inputs_only)
+      | New_result naked_immediates ->
+        head_in_env_or_bottom
+          (reduce_inverse_relations env naked_immediates
+             (extract_value inverse_relations.meet_return_value
+                descr1.inverse_relations descr2.inverse_relations))))
 
 and meet_head_of_kind_naked_float32 env t1 t2 =
   set_meet
@@ -1247,6 +1727,14 @@ and meet_head_of_kind_naked_vec512 env t1 t2 =
     (t2 : TG.head_of_kind_naked_vec512 :> Vec512.Set.t)
     ~of_set:TG.Head_of_kind_naked_vec512.create_non_empty_set
 
+and meet_head_of_kind_naked_mask env t1 t2 =
+  set_meet
+    (module Mask.Set)
+    env
+    (t1 : TG.head_of_kind_naked_mask :> Mask.Set.t)
+    (t2 : TG.head_of_kind_naked_mask :> Mask.Set.t)
+    ~of_set:TG.Head_of_kind_naked_mask.create_non_empty_set
+
 and meet_head_of_kind_rec_info env _t1 _t2 =
   (* CR-someday lmaurer: This could be doing things like discovering two depth
      variables are equal *)
@@ -1256,336 +1744,6 @@ and meet_head_of_kind_rec_info env _t1 _t2 =
   Ok (Both_inputs, env)
 
 and meet_head_of_kind_region env () () : _ meet_result = Ok (Both_inputs, env)
-
-and meet_row_like :
-    'lattice 'shape 'maps_to 'row_tag 'known.
-    meet_maps_to:(ME.t -> 'maps_to -> 'maps_to -> 'maps_to meet_result) ->
-    equal_index:('lattice -> 'lattice -> bool) ->
-    subset_index:('lattice -> 'lattice -> bool) ->
-    union_index:('lattice -> 'lattice -> 'lattice) ->
-    meet_shape:('shape -> 'shape -> 'shape Or_bottom.t) ->
-    is_empty_map_known:('known -> bool) ->
-    get_singleton_map_known:
-      ('known ->
-      ('row_tag * ('lattice, 'shape, 'maps_to) TG.Row_like_case.t) option) ->
-    merge_map_known:
-      (('row_tag ->
-       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option ->
-       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option ->
-       ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option) ->
-      'known ->
-      'known ->
-      'known) ->
-    ME.t ->
-    known1:'known ->
-    known2:'known ->
-    other1:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
-    other2:('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t ->
-    ('known * ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t)
-    meet_result =
- fun ~meet_maps_to ~equal_index ~subset_index ~union_index ~meet_shape
-     ~is_empty_map_known ~get_singleton_map_known ~merge_map_known initial_env
-     ~known1 ~known2 ~other1 ~other2 ->
-  let common_scope = ME.current_scope initial_env in
-  (* Keep track of the variables used by all extensions and lift them to the
-     result env in [extract_and_join_extensions]. *)
-  let extra_variables = ref Variable.Map.empty in
-  let base_env = ME.increment_scope initial_env in
-  let add_extra_variables_and_extract_extension scoped_env =
-    let level = ME.cut scoped_env ~cut_after:common_scope in
-    extra_variables
-      := Variable.Map.union_total_shared
-           (fun var k1 k2 ->
-             if not (K.equal k1 k2)
-             then Misc.fatal_errorf "Different kinds for %a" Variable.print var;
-             k1)
-           !extra_variables
-           (TEL.defined_variables_with_kinds level);
-    TEE.from_map (TEL.equations level)
-  in
-  let extract_and_join_extensions scoped_envs =
-    (* We add the extra variables after the join, because some of the extra
-       variables could appear in one of the [scoped_envs] and the join expects
-       that variables defined in the central env are defined in all the joined
-       envs. *)
-    let result_env =
-      Join_env.cut_and_n_way_join ~n_way_join_type:n_way_join
-        ~meet_expanded_head ~cut_after:common_scope initial_env scoped_envs
-    in
-    Variable.Map.fold
-      (fun var kind env ->
-        ME.add_definition env
-          (Bound_name.create_var
-             (* Variables with [Name_mode.in_types] do not exist at runtime, so
-                we do not equip them with a [Flambda_debug_uid.t]. See #3967. *)
-             (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types))
-          kind)
-      !extra_variables result_env
-  in
-  let open struct
-    type result_env =
-      | No_result
-      | Extension of TE.t list
-  end in
-  let result_env = ref No_result in
-  let need_join =
-    (* The returned env_extension is the join of the env_extension produced by
-       each non bottom cases. Therefore there is some loss of precision in that
-       case and we need to store the one produced for each tag. But when only
-       one tag is kept it would be wasteful (but correct) to store it.
-
-       We consider that the result of the meet between t1 and t2 will have only
-       one tag when t1 (or t2) has exactly one tag (one that and no 'other'
-       cases).
-
-       This is an overapproximation because the result could have only one tag
-       for instance if
-
-       t1 = [Tag 1 | Tag 2] and t2 = [Tag 2 | Tag 3], or if
-
-       t1 = [Tag 1 | Tag 2] and t2 = [Tag 1 | Tag 2]
-
-       but the meet between some combinations result in a bottom. *)
-    match
-      ( other1,
-        get_singleton_map_known known1,
-        other2,
-        get_singleton_map_known known2 )
-    with
-    | Bottom, Some _, _, _ | _, _, Bottom, Some _ -> false
-    | (Ok _ | Bottom), _, (Ok _ | Bottom), _ ->
-      if is_empty_map_known known1 && is_empty_map_known known2
-      then false
-      else true
-  in
-  let result_is_t1 = ref true in
-  let result_is_t2 = ref true in
-  let update_refs = function
-    | Both_inputs -> ()
-    | Left_input -> result_is_t2 := false
-    | Right_input -> result_is_t1 := false
-    | New_result _ ->
-      result_is_t1 := false;
-      result_is_t2 := false
-  in
-  let join_result_env scoped_env =
-    let scoped_env = ME.typing_env scoped_env in
-    let new_result_env =
-      match !result_env with
-      | No_result -> Extension [scoped_env]
-      | Extension other_envs ->
-        assert need_join;
-        Extension (scoped_env :: other_envs)
-    in
-    result_env := new_result_env
-  in
-  let meet_index env (i1 : ('lattice, 'shape) TG.row_like_index)
-      (i2 : ('lattice, 'shape) TG.row_like_index) :
-      ('lattice, 'shape) TG.row_like_index meet_result =
-    match meet_shape i1.shape i2.shape with
-    | Bottom -> Bottom (New_result ())
-    | Ok shape -> (
-      match i1.domain, i2.domain with
-      | Known i1', Known i2' ->
-        if equal_index i1' i2'
-        then Ok (Both_inputs, env)
-        else Bottom (New_result ())
-      | Known known, At_least at_least ->
-        if subset_index at_least known
-        then
-          (* [at_least] is included in [known] hence [Known known] is included
-             in [At_least at_least], hence [Known known] \inter [At_least
-             at_least] = [Known known] *)
-          Ok (Left_input, env)
-        else Bottom (New_result ())
-      | At_least at_least, Known known ->
-        if subset_index at_least known
-        then Ok (Right_input, env)
-        else Bottom (New_result ())
-      | At_least i1', At_least i2' ->
-        if subset_index i1' i2'
-        then
-          if subset_index i2' i1'
-          then Ok (Both_inputs, env)
-          else Ok (Right_input, env)
-        else if subset_index i2' i1'
-        then Ok (Left_input, env)
-        else
-          let domain =
-            TG.Row_like_index_domain.at_least (union_index i1' i2')
-          in
-          Ok (New_result (TG.Row_like_index.create ~domain ~shape), env))
-  in
-  let bottom_case r =
-    update_refs r;
-    None
-  in
-  let meet_case env (case1 : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t)
-      (case2 : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t) =
-    match meet_index env case1.index case2.index with
-    | Bottom r -> bottom_case r
-    | Ok (index_result, env) -> (
-      match meet_maps_to env case1.maps_to case2.maps_to with
-      | Bottom r -> bottom_case r
-      | Ok (maps_to_result, env) -> (
-        let env : _ Or_bottom.t =
-          match
-            ME.add_env_extension_strict env case1.env_extension
-              ~meet_expanded_head
-          with
-          | Bottom -> Bottom
-          | Ok env ->
-            ME.add_env_extension_strict env case2.env_extension
-              ~meet_expanded_head
-        in
-        match env with
-        | Bottom -> bottom_case (New_result ())
-        | Ok env ->
-          join_result_env env;
-          update_refs index_result;
-          update_refs maps_to_result;
-          let index = extract_value index_result case1.index case2.index in
-          let maps_to =
-            extract_value maps_to_result case1.maps_to case2.maps_to
-          in
-          let env_extension =
-            if need_join
-            then add_extra_variables_and_extract_extension env
-            else TEE.empty
-          in
-          if TEE.is_empty env_extension
-          then ()
-          else (
-            result_is_t1 := false;
-            result_is_t2 := false);
-          Some
-            (Or_unknown.Known
-               (TG.Row_like_case.create ~maps_to ~index ~env_extension))))
-  in
-  let meet_knowns
-      (case1 :
-        ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option)
-      (case2 :
-        ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option) :
-      ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_unknown.t option =
-    (* CR bclement: When we return [None] below but either of the inputs were
-       not [None], we fall back to the [other] case. This can cause loss of
-       precision if the [other] case is not [Bottom], as we forget that the
-       current case is impossible.
-
-       Fixing this would require storing [Or_unknown_or_bottom.t] in the
-       row_like_for_block case, so leave it as is for now -- this should be
-       fairly rare. *)
-    match case1, case2 with
-    | None, None -> None
-    | Some case1, None -> (
-      match other2 with
-      | Bottom ->
-        result_is_t1 := false;
-        None
-      | Ok other_case -> (
-        match case1 with
-        | Unknown -> (
-          match
-            ME.add_env_extension_strict base_env other_case.env_extension
-              ~meet_expanded_head
-          with
-          | Bottom -> None
-          | Ok env ->
-            join_result_env env;
-            result_is_t1 := false;
-            result_is_t2 := false;
-            Some (Known other_case))
-        | Known case1 -> meet_case base_env case1 other_case))
-    | None, Some case2 -> (
-      match other1 with
-      | Bottom ->
-        result_is_t2 := false;
-        None
-      | Ok other_case -> (
-        match case2 with
-        | Unknown -> (
-          match
-            ME.add_env_extension_strict base_env other_case.env_extension
-              ~meet_expanded_head
-          with
-          | Bottom -> None
-          | Ok env ->
-            join_result_env env;
-            result_is_t1 := false;
-            result_is_t2 := false;
-            Some (Known other_case))
-        | Known case2 -> meet_case base_env other_case case2))
-    | Some case1, Some case2 -> (
-      match case1, case2 with
-      | Unknown, Unknown ->
-        join_result_env base_env;
-        Some Unknown
-      | Known case, Unknown -> (
-        match
-          ME.add_env_extension_strict base_env case.env_extension
-            ~meet_expanded_head
-        with
-        | Bottom -> None
-        | Ok env ->
-          join_result_env env;
-          result_is_t2 := false;
-          Some (Known case))
-      | Unknown, Known case -> (
-        match
-          ME.add_env_extension_strict base_env case.env_extension
-            ~meet_expanded_head
-        with
-        | Bottom -> None
-        | Ok env ->
-          join_result_env env;
-          result_is_t1 := false;
-          Some (Known case))
-      | Known case1, Known case2 -> meet_case base_env case1 case2)
-  in
-  let known =
-    merge_map_known
-      (fun _tag case1 case2 -> meet_knowns case1 case2)
-      known1 known2
-  in
-  let other : ('lattice, 'shape, 'maps_to) TG.Row_like_case.t Or_bottom.t =
-    match other1, other2 with
-    | Bottom, Bottom -> Bottom
-    | Bottom, _ ->
-      result_is_t2 := false;
-      Bottom
-    | _, Bottom ->
-      result_is_t1 := false;
-      Bottom
-    | Ok other1, Ok other2 -> (
-      match meet_case base_env other1 other2 with
-      | None -> Bottom
-      | Some Unknown -> Misc.fatal_error "meet_case should not produce Unknown"
-      | Some (Known r) -> Ok r)
-  in
-  if
-    is_empty_map_known known
-    && match other with Bottom -> true | Ok _ -> false
-  then Bottom (New_result ())
-  else
-    let env : _ Or_bottom.t =
-      match !result_env with
-      | No_result -> Bottom
-      | Extension scoped_envs ->
-        (* We used add_env_extension_strict here before, but we don't expect to
-           get bottom equations from joining non-bottom ones. *)
-        Ok (extract_and_join_extensions scoped_envs)
-    in
-    let match_with_input v =
-      match !result_is_t1, !result_is_t2 with
-      | true, true -> Both_inputs
-      | true, false -> Left_input
-      | false, true -> Right_input
-      | false, false -> New_result v
-    in
-    match env with
-    | Bottom -> Bottom (match_with_input ())
-    | Ok env -> Ok (match_with_input (known, other), env)
 
 and meet_row_like_for_blocks env
     ({ known_tags = known1; other_tags = other1; alloc_mode = alloc_mode1 } :
@@ -1604,11 +1762,12 @@ and meet_row_like_for_blocks env
     ~rebuild:(fun (known_tags, other_tags) alloc_mode ->
       TG.Row_like_for_blocks.create_raw ~known_tags ~other_tags ~alloc_mode)
     ~meet_a:(fun env (known1, other1) (known2, other2) ->
-      meet_row_like ~meet_maps_to:meet_int_indexed_product
-        ~equal_index:TG.Block_size.equal ~subset_index:TG.Block_size.subset
-        ~union_index:TG.Block_size.union ~meet_shape
-        ~is_empty_map_known:Tag.Map.is_empty ~get_singleton_map_known
-        ~merge_map_known:Tag.Map.merge env ~known1 ~known2 ~other1 ~other2)
+      meet_row_like ~meet_expanded_head ~n_way_join_type:n_way_join
+        ~meet_maps_to:meet_int_indexed_product ~equal_index:TG.Block_size.equal
+        ~subset_index:TG.Block_size.subset ~union_index:TG.Block_size.union
+        ~meet_shape ~is_empty_map_known:Tag.Map.is_empty
+        ~get_singleton_map_known ~merge_map_known:Tag.Map.merge env ~known1
+        ~known2 ~other1 ~other2)
     ~meet_b:meet_alloc_mode ~left_a:(known1, other1) ~right_a:(known2, other2)
     ~left_b:alloc_mode1 ~right_b:alloc_mode2
 
@@ -1633,7 +1792,8 @@ and meet_row_like_for_closures env
   map_result
     ~f:(fun (known_closures, other_closures) ->
       TG.Row_like_for_closures.create_raw ~known_closures ~other_closures)
-    (meet_row_like ~meet_maps_to:meet_closures_entry
+    (meet_row_like ~meet_expanded_head ~n_way_join_type:n_way_join
+       ~meet_maps_to:meet_closures_entry
        ~equal_index:Set_of_closures_contents.equal
        ~subset_index:Set_of_closures_contents.subset
        ~union_index:Set_of_closures_contents.union ~meet_shape
@@ -1924,6 +2084,17 @@ and n_way_join_expanded_head env kind (expandeds : ET.t Join_env.join_arg list)
               n_way_join_head_of_kind_naked_vec512 env (head1, id1) heads
             in
             ET.create_naked_vec512 head
+          | Naked_mask head1 ->
+            let heads =
+              extract_head_exn
+                (function[@warning "-fragile-match"]
+                  | Naked_mask head -> head | _ -> assert false)
+                expandeds
+            in
+            let>>+ head =
+              n_way_join_head_of_kind_naked_mask env (head1, id1) heads
+            in
+            ET.create_naked_mask head
           | Rec_info head1 ->
             let heads =
               extract_head_exn
@@ -2255,6 +2426,22 @@ and n_way_join_head_of_kind_value_non_null env
         in
         let>>+ n = n_way_join env ns in
         TG.Head_of_kind_value_non_null.create_boxed_vec512 n alloc_mode
+      | Boxed_mask (n, alloc_mode) ->
+        let ns, alloc_mode =
+          List.fold_right
+            (fun (other_id, other_head) (ns, alloc_mode) ->
+              match[@warning "-fragile-match"]
+                (other_head : TG.head_of_kind_value_non_null)
+              with
+              | Boxed_mask (other_n, other_alloc_mode) ->
+                ( (other_id, other_n) :: ns,
+                  join_alloc_mode alloc_mode other_alloc_mode )
+              | _ -> raise Unknown_result)
+            other_heads
+            ([first_id, n], alloc_mode)
+        in
+        let>>+ n = n_way_join env ns in
+        TG.Head_of_kind_value_non_null.create_boxed_mask n alloc_mode
       | Closures { by_function_slot; alloc_mode } ->
         let function_slots, alloc_mode =
           List.fold_right
@@ -2418,53 +2605,32 @@ and n_way_join_head_of_kind_naked_immediate env
     (heads : TG.Head_of_kind_naked_immediate.t Join_env.join_arg list) :
     TG.Head_of_kind_naked_immediate.t n_way_join_result =
   let module I = Target_ocaml_int in
-  let immediates, is_int, get_tag, is_null =
+  (* We drop the reverse relations here -- they are instead rebuilt from the
+     direct relations during the join (see join_env.ml). *)
+  let immediates =
     List.fold_left
-      (fun (immediates, is_int, get_tag, is_null) (id2, head2) ->
-        match (head2 : TG.head_of_kind_naked_immediate) with
-        | Is_int ty -> immediates, (id2, ty) :: is_int, get_tag, is_null
-        | Get_tag ty -> immediates, is_int, (id2, ty) :: get_tag, is_null
-        | Is_null ty -> immediates, is_int, get_tag, (id2, ty) :: is_null
-        | Naked_immediates is ->
-          I.Set.union is immediates, is_int, get_tag, is_null)
-      (I.Set.empty, [], [], []) heads
+      (fun (immediates : _ Or_unknown.t) (id2, head2) ->
+        match
+          reduce_head_of_kind_naked_immediate
+            (Join_env.joined_env env id2)
+            head2
+        with
+        | Bottom -> immediates
+        | Ok head2 ->
+          let descr2 = TG.Head_of_kind_naked_immediate.descr head2 in
+          let immediates : _ Or_unknown.t =
+            match immediates, descr2.naked_immediates with
+            | Unknown, _ | _, Unknown -> Unknown
+            | Known imms, Known imms2 -> Known (I.Set.union imms imms2)
+          in
+          immediates)
+      (Or_unknown.Known I.Set.empty) heads
   in
-  match is_int, get_tag, is_null with
-  | [], [], [] -> (
-    let head =
-      TG.Head_of_kind_naked_immediate.create_naked_immediates immediates
-    in
-    match head with
-    | Ok head -> Known head, env
-    | Bottom ->
-      Misc.fatal_error "Did not expect [Bottom] from [create_naked_immediates]")
-  | _ :: _, [], [] when I.Set.is_empty immediates ->
-    let>>+ ty = n_way_join env is_int in
-    TG.Head_of_kind_naked_immediate.create_is_int ty
-  | [], _ :: _, [] when I.Set.is_empty immediates ->
-    let>>+ ty = n_way_join env get_tag in
-    TG.Head_of_kind_naked_immediate.create_get_tag ty
-  | [], [], _ :: _ when I.Set.is_empty immediates ->
-    let>>+ ty = n_way_join env is_null in
-    TG.Head_of_kind_naked_immediate.create_is_null ty
-  (* From now on: Irregular cases *)
-  (* CR vlaviron: There could be improvements based on reduction (trying to
-     reduce the is_int and get_tag cases to naked_immediate sets, then joining
-     those) but this looks unlikely to be useful and could end up begin quite
-     expensive. *)
-  | _, _ :: _, _ -> Unknown, env
-  | _ :: _, [], _ | _, [], _ :: _ -> (
-    (* Slightly better than Unknown *)
-    let head =
-      let machine_width = Join_env.machine_width env in
-      TG.Head_of_kind_naked_immediate.create_naked_immediates
-        (I.Set.add (I.zero machine_width)
-           (I.Set.add (I.one machine_width) immediates))
-    in
-    match head with
-    | Ok head -> Known head, env
-    | Bottom ->
-      Misc.fatal_error "Did not expect [Bottom] from [create_naked_immediates]")
+  let head =
+    Or_unknown.map immediates
+      ~f:TG.Head_of_kind_naked_immediate.create_naked_immediates_non_empty
+  in
+  head, env
 
 and n_way_join_head_of_kind_naked_float32 env t1 ts : _ n_way_join_result =
   n_way_join_head_of_kind_naked_number
@@ -2504,6 +2670,10 @@ and n_way_join_head_of_kind_naked_vec256 env t1 ts : _ n_way_join_result =
 
 and n_way_join_head_of_kind_naked_vec512 env t1 ts : _ n_way_join_result =
   n_way_join_head_of_kind_naked_number ~union:TG.Head_of_kind_naked_vec512.union
+    env t1 ts
+
+and n_way_join_head_of_kind_naked_mask env t1 ts : _ n_way_join_result =
+  n_way_join_head_of_kind_naked_number ~union:TG.Head_of_kind_naked_mask.union
     env t1 ts
 
 and n_way_join_head_of_kind_rec_info env (t1, _) ts : _ n_way_join_result =
@@ -2964,6 +3134,9 @@ let meet env ty1 ty2 : _ Or_bottom.t =
     match meet (ME.create env) ty1 ty2 with
     | Bottom _ -> Bottom
     | Ok (r, env) ->
-      let env = ME.typing_env env in
       let res_ty = extract_value r ty1 ty2 in
-      if TG.is_obviously_bottom res_ty then Bottom else Ok (res_ty, env)
+      if TG.is_obviously_bottom res_ty
+      then Bottom
+      else
+        Or_bottom.map (ME.final_typing_env_strict ~meet_expanded_head env)
+          ~f:(fun env -> res_ty, env)

@@ -503,8 +503,9 @@ and type_with_label ctxt f (label, c, mode) =
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
-  | Pjk_abbreviation (s, sa) ->
-    value_longident_loc f s;
+  | Pjk_abbreviation s -> value_longident_loc f s
+  | Pjk_operator (t, sa) ->
+    jkind_annotation ~nested:true ctxt f t;
     List.iter (fun a -> pp f " %s" a.Location.txt) sa
   | Pjk_mod (t, modes) ->
     begin match modes with
@@ -1678,10 +1679,11 @@ and signature_item ctxt f x : unit =
               (list ~sep:"@," (class_description "and")) xs
       end
   | Psig_module ({pmd_type={pmty_desc=Pmty_alias alias;
-                            pmty_attributes=[]; _}; _} as pmd) ->
-      pp f "@[<hov>module@ %s@ =@ %a%a@]%a"
+                            pmty_attributes; _}; _} as pmd) ->
+      pp f "@[<hov>module@ %s@ =@ %a%a%a@]%a"
         (Option.value pmd.pmd_name.txt ~default:"_")
         value_longident_loc alias
+        (attributes ctxt) pmty_attributes
         optional_space_atat_modalities pmd.pmd_modalities
         (item_attributes ctxt) pmd.pmd_attributes
   | Psig_module pmd ->
@@ -2335,8 +2337,9 @@ and block_access ctxt f = function
   | Baccess_block (mut, index) ->
     let s =
       match mut with
-      | Mutable -> "idx_mut"
-      | Immutable -> "idx_imm"
+      | Immutable_access -> "idx_imm"
+      | Mutable_access -> "idx_mut"
+      | Atomic_access -> "idx_atomic"
     in
     pp f ".%s(%a)" s (expression ctxt) index
 

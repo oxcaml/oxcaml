@@ -18,7 +18,7 @@ type ocaml =
     applicative_functors : bool;
     nopervasives : bool;
     strict_formats : bool;
-    open_modules : string list;
+    open_args : Clflags.open_arg list;
     ppx : string with_workdir list;
     pp : string with_workdir option;
     warnings : Warnings.state;
@@ -55,7 +55,13 @@ let dump_ocaml x =
       ("applicative_functors", `Bool x.applicative_functors);
       ("nopervasives", `Bool x.nopervasives);
       ("strict_formats", `Bool x.strict_formats);
-      ("open_modules", Json.list Json.string x.open_modules);
+      ( "open_args",
+        Json.list
+          (fun (arg : Clflags.open_arg) ->
+            match arg with
+            | Open md -> `Assoc [ ("open", `String md) ]
+            | Open_cmi file -> `Assoc [ ("open-cmi", `String file) ])
+          x.open_args );
       ("ppx", Json.list (dump_with_workdir Json.string) x.ppx);
       ("pp", Json.option (dump_with_workdir Json.string) x.pp);
       ("warnings", dump_warnings x.warnings);
@@ -588,6 +594,7 @@ let ocaml_ignored_flags =
     "-no-x86-peephole-optimize";
     "-no-x86-peephole-remove-mov-to-dead-register";
     "-no-x86-peephole-remove-redundant-cmp";
+    "-no-x86-peephole-remove-redundant-extension";
     "-no-x86-peephole-combine-add-rsp";
     "-verbose-types";
     "-no-verbose-types";
@@ -616,6 +623,7 @@ let ocaml_ignored_flags =
     "-fno-popcnt";
     "-disable-zero-alloc-checker";
     "-disable-precise-zero-alloc-checker";
+    "-no-x86-peephole-remove-redundant-test";
     "-cfg-stack-checks";
     "-no-cfg-stack-checks";
     "-gdwarf-inlined-frames";
@@ -626,6 +634,7 @@ let ocaml_ignored_flags =
     "-dzero-alloc";
     "-dletreclambda";
     "-dcounters";
+    "-experimental-optimizations";
     "-vectorize";
     "-no-vectorize";
     "-dvectorize";
@@ -662,6 +671,8 @@ let ocaml_ignored_flags =
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
     "-no-cfg-prologue-shrink-wrap";
+    "-omit-leaf-frame-pointers";
+    "-no-omit-leaf-frame-pointers";
     "-cfg-merge-blocks";
     "-no-cfg-merge-blocks";
     "-cfg-value-propagation";
@@ -728,6 +739,7 @@ let ocaml_ignored_flags =
     "-dcfg";
     "-dcfg-invariants";
     "-dcmm-invariants";
+    "-ddebug-avail-sets";
     "-ddebug-available-regs";
     "-dfexpr";
     "-dflambda-invariants";
@@ -739,6 +751,14 @@ let ocaml_ignored_flags =
     "-dump-inlining-paths";
     "-enable-poll-insertion";
     "-fno-asan";
+    "-favx512vl";
+    "-fno-avx512vl";
+    "-favx512bw";
+    "-fno-avx512bw";
+    "-favx512cd";
+    "-fno-avx512cd";
+    "-favx512dq";
+    "-fno-avx512dq";
     "-fno-trap-notes";
     "-ftrap-notes";
     "-function-sections";
@@ -759,7 +779,9 @@ let ocaml_ignored_flags =
     "-flambda2-match-in-match";
     "-no-flambda2-match-in-match";
     "-frametables-in-rodata";
-    "-no-frametables-in-rodata"
+    "-no-frametables-in-rodata";
+    "-flambda2-no-simplify-stubs";
+    "-flambda2-simplify-stubs"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -808,6 +830,7 @@ let ocaml_ignored_parametrized_flags =
     "-reorder-blocks-random";
     "-heap-reduction-threshold";
     "-flambda2-cse-depth";
+    "-dbranch-relaxation-max-displacement";
     "-flambda2-expert-max-block-size-for-projections";
     "-flambda2-expert-max-unboxing-depth";
     "-flambda2-join-depth";
@@ -869,7 +892,8 @@ let ocaml_ignored_parametrized_flags =
     "-llvm-flags";
     "-reaper-preserve-direct-calls";
     "-save-ir-after";
-    "-X"
+    "-X";
+    "-dissector-max-linker-parallelism"
   ]
 
 let ocaml_warnings_spec ~error =
@@ -960,8 +984,13 @@ let ocaml_flags =
       " Reject invalid formats accepted by legacy implementations" );
     ( "-open",
       Marg.param "module" (fun md ocaml ->
-          { ocaml with open_modules = md :: ocaml.open_modules }),
+          { ocaml with open_args = Clflags.Open md :: ocaml.open_args }),
       "<module>  Opens the module <module> before typing" );
+    ( "-open-cmi",
+      Marg.param "file" (fun file ocaml ->
+          { ocaml with open_args = Clflags.Open_cmi file :: ocaml.open_args }),
+      "<file>  Opens the module whose compiled interface is <file> before \
+       typing" );
     ( "-ppx",
       marg_commandline (fun command ocaml ->
           { ocaml with ppx = command :: ocaml.ppx }),
@@ -1064,7 +1093,7 @@ let initial =
         applicative_functors = true;
         nopervasives = false;
         strict_formats = false;
-        open_modules = [];
+        open_args = [];
         ppx = [];
         pp = None;
         warnings = Warnings.backup ();

@@ -276,7 +276,7 @@ let print_out_value ppf tree =
        fprintf ppf "@[<2>[|%a|]@]"
          (pp_print_seq ~pp_sep:semicolon pp_print_float)
          (Float.Array.to_seq arr)
-    | Oval_code e ->
+    | Oval_quote e ->
         deprecated_printer (fun fmt -> CamlinternalQuote.Code.print fmt e) ppf
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
   and print_fields first ppf =
@@ -494,6 +494,10 @@ and print_simple_out_type ppf =
   | Otyp_attribute (t, attr) ->
       fprintf ppf "@[<1>(%a [@@%s])@]"
         print_out_type_0 t attr.oattr_name
+  | Otyp_mod (t, []) -> print_simple_out_type ppf t
+  | Otyp_mod (t, modalities) ->
+      fprintf ppf "@[<1>(%a%a)@]"
+        print_out_type_0 t print_out_modalities modalities
   | Otyp_jkind_annot (t, jk) ->
     fprintf ppf "@[<1>(%a@ :@ %a)@]"
       print_out_type_0 t
@@ -807,6 +811,7 @@ let constructor_of_extension_constructor
     ocstr_name = ext.oext_name;
     ocstr_args = ext.oext_args;
     ocstr_return_type = ext.oext_ret_type;
+    ocstr_all_void = false;
   }
 
 let rec print_out_module_type ppf = function
@@ -943,8 +948,9 @@ and print_out_sig_item ppf =
            | Orec_next  -> "and")
           ppf td
   | Osig_value { oval_name; oval_type; oval_modalities;
-                 oval_prims; oval_attributes } ->
+                 oval_prims; oval_attributes; oval_poly } ->
       let kwd = if oval_prims = [] then "val" else "external" in
+      let poly = if oval_poly then "poly_ " else "" in
       let pr_prims ppf =
         function
           [] -> ()
@@ -952,7 +958,7 @@ and print_out_sig_item ppf =
             fprintf ppf "@ = \"%s\"" s;
             List.iter (fun s -> fprintf ppf "@ \"%s\"" s) sl
       in
-      fprintf ppf "@[<2>%s %a :@ %a%a%a%a@]" kwd value_ident oval_name
+      fprintf ppf "@[<2>%s %s%a :@ %a%a%a%a@]" kwd poly value_ident oval_name
         !out_type oval_type
         print_out_modalities oval_modalities
         pr_prims oval_prims
@@ -1058,11 +1064,16 @@ and print_out_constr ppf constr =
     ocstr_name = name;
     ocstr_args = tyl;
     ocstr_return_type = return_type;
+    ocstr_all_void;
   } = constr in
   let name =
     match name with
     | "::" -> "(::)"   (* #7200 *)
     | s -> s
+  in
+  let print_all_void ppf =
+    if ocstr_all_void
+    then pp_print_string ppf " [@immediate_all_void_constructor]"
   in
   match return_type with
   | None ->
@@ -1070,8 +1081,8 @@ and print_out_constr ppf constr =
       | [] ->
           pp_print_string ppf name
       | _ ->
-          fprintf ppf "@[<2>%s of@ %a@]" name
-            print_out_constr_args tyl
+          fprintf ppf "@[<2>%s of@ %a%t@]" name
+            print_out_constr_args tyl print_all_void
       end
   | Some (vars_jkinds, ret_type) ->
       fprintf ppf "@[<2>%s :@ " name;
@@ -1081,10 +1092,11 @@ and print_out_constr ppf constr =
       end;
       begin match tyl with
       | [] ->
-          fprintf ppf "%a@]" print_simple_out_type ret_type
+          fprintf ppf "%a%t@]" print_simple_out_type ret_type print_all_void
       | _ ->
-          fprintf ppf "%a -> %a@]"
+          fprintf ppf "%a -> %a%t@]"
             print_out_constr_args tyl print_simple_out_type ret_type
+            print_all_void
       end
 
 and print_out_extension_constructor ppf ext =
