@@ -60,10 +60,7 @@ val apply_variable : t -> Variable.t -> Variable.t
 
 val apply_variable_set : t -> Variable.Set.t -> Variable.Set.t
 
-val add_symbol : t -> Symbol.t -> Symbol.t -> t
-
-val add_fresh_symbol : t -> Symbol.t -> guaranteed_fresh:Symbol.t -> t
-
+(* This is only used by the importing code. We don't permute symbols. *)
 val apply_symbol : t -> Symbol.t -> Symbol.t
 
 val apply_symbol_set : t -> Symbol.Set.t -> Symbol.Set.t
@@ -77,10 +74,7 @@ val add_fresh_continuation :
 
 val apply_continuation : t -> Continuation.t -> Continuation.t
 
-val add_code_id : t -> Code_id.t -> Code_id.t -> t
-
-val add_fresh_code_id : t -> Code_id.t -> guaranteed_fresh:Code_id.t -> t
-
+(* This is only used by the importing code. We don't permute code ids. *)
 val apply_code_id : t -> Code_id.t -> Code_id.t
 
 (* This is only used by the importing code. We don't permute constants. *)
