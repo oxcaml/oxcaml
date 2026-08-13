@@ -806,13 +806,6 @@ module Sort = struct
       if s' == s then t else s'
     | (Var _ | Base _ | Product _ | Univar _) as t -> t
 
-  let rec is_surely_addressable s =
-    match get s with
-    | Base b -> base_is_addressable b
-    | Addressable _ -> true
-    | Product ts -> List.for_all is_surely_addressable ts
-    | Var _ | Univar _ -> false
-
   let rec subst s t =
     match t with
     | Var v ->
@@ -967,6 +960,11 @@ module Sort = struct
       | None ->
         set v (Some (Addressable (of_var (new_var ~level:level_fresh))));
         Addressable_mutated)
+
+  let is_surely_addressable t =
+    match constrain_addressable ~allow_mutation:false t with
+    | Not_known_addressable -> false
+    | Addressable_no_mutation | Addressable_mutated -> true
 
   let rec var_occurs v = function
     | Var v' -> (
