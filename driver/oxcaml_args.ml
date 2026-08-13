@@ -772,7 +772,7 @@ let mk_simplify_stubs f =
       (format_default Flambda2.Default.simplify_stubs) )
 
 let mk_no_simplify_stubs f =
-  ( "-flambda2-no-simplify-stubs",
+  ( "-no-flambda2-simplify-stubs",
     Arg.Unit f,
     Printf.sprintf
       " Prevent the simplification of stub functions%s (Flambda2 only)"

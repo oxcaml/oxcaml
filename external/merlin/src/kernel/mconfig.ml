@@ -780,7 +780,7 @@ let ocaml_ignored_flags =
     "-no-flambda2-match-in-match";
     "-frametables-in-rodata";
     "-no-frametables-in-rodata";
-    "-flambda2-no-simplify-stubs";
+    "-no-flambda2-simplify-stubs";
     "-flambda2-simplify-stubs"
   ]
 
