@@ -10548,6 +10548,10 @@ and type_application env app_loc expected_mode position_and_mode
             in
             let ty_expected = expand_head env (instance ty_expected) in
             if not (is_Tvar ty_expected) then
+              (* This extra unification might trigger incompleteness in the
+                 type checker (like due to lack of [Tquote_eval]-constraints).
+                 Backtracking might be expensive, but will only happen in cases
+                 we'll fail anyway or when type inference is incomplete. *)
               let snap = snapshot () in
               try Ctype.unify env ty_res ty_expected
               with Unify _ -> backtrack snap
