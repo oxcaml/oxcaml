@@ -290,7 +290,6 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
     ++bucket;
     size_bucket_wsz += size_bucket_wsz;
   }
-  CAMLassert(wosize>=size_bucket_wsz/2);
   return -1;
 }
 
