@@ -123,6 +123,8 @@ module type Compiler_options = sig
   val _for_pack : string -> unit
   val _g : unit -> unit
   val _no_g : unit -> unit
+  val _gsframe : unit -> unit
+  val _no_gsframe : unit -> unit
   val _stop_after : string -> unit
   val _i : unit -> unit
   val _i_variance : unit -> unit
