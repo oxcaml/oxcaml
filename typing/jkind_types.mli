@@ -104,7 +104,7 @@ module Sort : sig
   val constrain_addressable :
     allow_mutation:bool -> t -> constrain_addressable_result
 
-  val strip_root_addressable : t -> t
+  val strip_head_addressable : t -> t
 
   val is_surely_addressable : t -> bool
 
