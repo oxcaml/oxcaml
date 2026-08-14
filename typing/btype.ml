@@ -1062,6 +1062,16 @@ module Jkind0 = struct
 
     let min = create Crossing.min ~externality:Externality.min
 
+    (* [min] with erasure pinned to no-crossing. Any [Mod_bounds] stored as an
+       actual kind must use this rather than [min]: no type crosses erasure,
+       and the with-bounds that would normally raise the bound are not
+       consulted by every reader of the crossing. [min] itself remains the
+       identity for joins. *)
+    let min_crossable =
+      let er : _ Mode.Crossing.Axis.t = Comonadic Erasure in
+      create Mode.Crossing.(set er (Per_axis.max er) min)
+        ~externality:Externality.min
+
     let max = create Crossing.max ~externality:Externality.max
 
     let[@inline] is_max m = m = max
@@ -2015,7 +2025,7 @@ module Jkind0 = struct
 
     let product tys_modalities layouts =
       let base = Layout (Jkind_types.Layout.product layouts) in
-      let mod_bounds = Mod_bounds.min in
+      let mod_bounds = Mod_bounds.min_crossable in
       let with_bounds =
         List.fold_right
           (fun (type_expr, modality) bounds ->

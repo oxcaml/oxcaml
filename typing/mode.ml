@@ -6514,7 +6514,9 @@ module Comonadic_with (Areality : Areality) = struct
   let max_with ax m =
     S.apply ~hint:Skip Obj.obj (Max_with_simple (ax, Id)) (disallow_left m)
 
-  let meet_const_with ax c m = meet_const (C.max_with Obj.obj ax c) m
+  (* Like [min_with]/[max_with], a per-axis tweak: [Skip] keeps it out of
+     error explanation chains, which continue through to [m]'s own history. *)
+  let meet_const_with ax c m = meet_const ~hint:Skip (C.max_with Obj.obj ax c) m
 
   let zap_to_legacy m : Const.t =
     let areality = proj Areality m |> Areality.zap_to_legacy in

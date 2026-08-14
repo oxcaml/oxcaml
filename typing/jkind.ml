@@ -2437,7 +2437,7 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   in
   fresh_jkind_poly
     { base = jkind.jkind.base;
-      mod_bounds = Mod_bounds.min;
+      mod_bounds = Mod_bounds.min_crossable;
       with_bounds = With_bounds with_bounds_types
     }
     ~annotation:None ~why:Abbreviation
