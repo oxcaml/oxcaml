@@ -351,6 +351,16 @@ module Sort = struct
     let[@inline] some : t -> t option = function
       | Base b -> some_of_base b
       | (Product _ | Univar _ | Genvar _) as t -> Some t
+
+    let rec subst s t =
+      match t with
+      | Genvar v ->
+        begin match v.contents with
+        | Some _ -> assert false
+        | None -> ( match List.assq_opt v s with Some t -> t | None -> t)
+        end
+      | Base _ | Univar _ -> t
+      | Product ts -> Product (List.map (subst s) ts)
   end
 
   module Var = struct

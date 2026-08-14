@@ -81,6 +81,8 @@ Error: Signature mismatch:
        The type "'a -> 'b -> 'a" is not compatible with the type "int"
 |}]
 
+(* CR jbachurski: The [moregeneral] check has a bug for
+   that permits setting weak pattern variables to generic subject variables. *)
 (* Regular let cannot be given a layout_ type *)
 module _ : sig
   val regular_id : layout_ x. ('a : x). 'a -> 'a
@@ -88,21 +90,6 @@ end = struct
   let regular_id x = x
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   let regular_id x = x
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val regular_id : 'a -> 'a end
-       is not included in
-         sig val poly_ regular_id : 'a -> 'a end
-       Values do not match:
-         val regular_id : 'a -> 'a
-       is not included in
-         val poly_ regular_id : 'a -> 'a
-       the second has 1 more layout parameter that is not used,
-       which is not supported yet.
 |}]
 
 (* a [let poly_] binding of a tuple. The middle-end won't support this in the
@@ -136,29 +123,13 @@ Error: This binding has no layout variables, so "poly_" has no effect.
        Consider using a regular "let" instead.
 |}]
 
-(* layout-polymorphic id is not included in regular id,
-   even though the former can be instantiated to the latter *)
+(* layout-polymorphic id can be instatiated to value id *)
 module _ : sig
   val id : 'a -> 'a
 end = struct
   let poly_ id x = x
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   let poly_ id x = x
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ id : 'a -> 'a end
-       is not included in
-         sig val id : 'a -> 'a end
-       Values do not match:
-         val poly_ id : 'a -> 'a
-       is not included in
-         val id : 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
 |}]
 
 (* The RHS has to be a syntactic value *)

@@ -144,14 +144,17 @@ let rec apply_coercion loc strict restr arg =
         [{name = param; debug_uid = param_duid; layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute; mode = alloc_heap}]
         [carg] yielding cc_res
+  | Tcoerce_kindtemplate tc ->
+      apply_kindtemplate_coercion loc tc arg
   | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort;
-                        pc_yielding; pc_zero_alloc_check } ->
+                        pc_yielding; pc_kindtemplate; pc_zero_alloc_check } ->
       Translprim.transl_primitive loc pc_desc pc_env pc_type
         ~poly_mode:pc_poly_mode
         ~poly_sort:pc_poly_sort
         ~yielding:pc_yielding
         ~zero_alloc_check:pc_zero_alloc_check
         None
+      |> apply_kindtemplate_coercion loc pc_kindtemplate
   | Tcoerce_alias (env, path, cc) ->
       let lam = transl_module_path loc env path in
       name_lambda strict arg Lambda.layout_module
@@ -231,6 +234,39 @@ and wrap_id_pos_list loc id_pos_list get_field get_layout lam =
   in
   if s == Ident.Map.empty then lam else Lambda.rename s lam
 
+and apply_kindtemplate_coercion loc { tc_params; tc_args } body =
+  (* Currently only functions (which are [value]s) may be kind-templated. *)
+  let kindtemplate_layout = layout_value_field in
+  let instantiate kinst_func =
+    match tc_args with
+    | [] -> kinst_func
+    | tc_args ->
+      Lkindinstantiate {
+        kinst_func;
+        kinst_args =
+          List.map (Typeopt.layout_of_sort (to_location loc)) tc_args;
+        kinst_result_layout = kindtemplate_layout;
+        kinst_mode = maybe_alloc_stack;
+        kinst_loc = loc;
+      }
+  in
+  let body =
+    match tc_params with
+    | [] -> instantiate body
+    | _ :: _ ->
+      let id = Ident.create_local "inst" in
+      let ktmpl_env = Ident.Map.singleton id (body, kindtemplate_layout)
+      and body = instantiate (Lvar id) in
+      Lkindtemplate
+        { ktmpl_params = List.map Slambdaident.of_sort_var tc_params;
+          ktmpl_return = kindtemplate_layout;
+          ktmpl_body = body;
+          ktmpl_ret_mode = not_alloc_stack;
+          ktmpl_env;
+          ktmpl_env_mode = alloc_heap;
+          ktmpl_loc = loc; }
+  in
+  body
 
 (* Compose two coercions
    apply_coercion c1 (apply_coercion c2 e) behaves like
@@ -279,8 +315,24 @@ let rec compose_coercions c1 c2 =
                       Mode.Yielding.join [y1; y2])
   | (c1, Tcoerce_alias (env, path, c2)) ->
       Tcoerce_alias (env, path, compose_coercions c1 c2)
+  | (Tcoerce_kindtemplate tc, Tcoerce_kindtemplate tc') -> begin
+      match compose_kindtemplate_coercions tc tc' with
+      | { tc_params = []; tc_args = [] } -> Tcoerce_none
+      | tc -> Tcoerce_kindtemplate tc
+      end
+  | (Tcoerce_kindtemplate tc,
+     Tcoerce_primitive ({ pc_kindtemplate = tc' } as pc )) ->
+      Tcoerce_primitive
+        { pc with pc_kindtemplate = compose_kindtemplate_coercions tc tc' }
   | (_, _) ->
       fatal_error "Translmod.compose_coercions"
+
+and compose_kindtemplate_coercions
+    { tc_params = tc_params_out; tc_args = tc_args_out }
+    { tc_params = tc_params_in; tc_args = tc_args_in } =
+  let in_to_out = List.combine tc_params_in tc_args_out in
+  { tc_params = tc_params_out;
+    tc_args = List.map (Jkind.Sort.Const.subst in_to_out) tc_args_in }
 
 let dump_coercions = Option.is_some (Sys.getenv_opt "DUMP_COERCIONS")
 
@@ -1145,6 +1197,7 @@ let module_block_size component_names coercion =
   | Tcoerce_functor _
   | Tcoerce_primitive _
   | Tcoerce_alias _
+  | Tcoerce_kindtemplate _
   | Tcoerce_invalid -> assert false
 
 let transl_implementation compilation_unit impl ~loc =

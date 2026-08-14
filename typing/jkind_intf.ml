@@ -74,6 +74,10 @@ module type Sort = sig
 
     val all_void : t -> bool
 
+    (** [subst s t] applies the variable substitution [s] to [t], replacing each
+        [Genvar v], where [(v, t')] is in [s], with [t']. *)
+    val subst : (var * t) list -> t -> t
+
     val scannable : t
 
     val void : t
@@ -266,7 +270,7 @@ module type Sort = sig
   val get_representable_var : var -> t option
 
   (** [subst s t] applies the variable substitution [s] to [t], replacing each
-      [Var v] where [(v, t')] is in [subst] with [t']. *)
+      [Var v], where [(v, t')] is in [s], with [t']. *)
   val subst : (var * t) list -> t -> t
 
   (** [instance_with ~level vars f] creates a fresh sort var at [level] for each

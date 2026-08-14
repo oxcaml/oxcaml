@@ -357,6 +357,8 @@ let classify_expression : Typedtree.expression -> sd =
             Misc.fatal_error "letrec: primitive coercion on a module"
         | Tcoerce_alias _ ->
             Misc.fatal_error "letrec: alias coercion on a module"
+        | Tcoerce_kindtemplate _ ->
+            Misc.fatal_error "letrec: kind-instantiating coercion on a module"
         | Tcoerce_invalid ->
             Misc.fatal_error "letrec: invalid coercion on a module"
         end
@@ -1214,6 +1216,10 @@ and modexp : Typedtree.module_expr -> term_judg =
           (* These coercions perform a shallow copy of the input module,
              by creating a new module with fields obtained by accessing
              the same fields in the input module. *)
+           k Dereference
+        | Tcoerce_kindtemplate _ ->
+          (* This corresponds to kind template instantiation,
+             which uses its argument. *)
            k Dereference
         | Tcoerce_primitive _ ->
           (* This corresponds to 'external' declarations,
