@@ -2982,7 +2982,7 @@ let check_recmodule_inclusion env bindings =
         in
         let coercion, shape =
           try
-            Includemod.modtypes_constraint ~shape
+            Includemod.modtypes_constraint ~self_check:false ~shape
               ~loc:modl.mod_loc ~mark:true
               env ~modes mty_actual' mty_decl'
           with Includemod.Error msg ->
@@ -3141,13 +3141,13 @@ let wrap_constraint_package env mark arg mty mode explicit =
     mod_attributes = [];
     mod_loc = arg.mod_loc }
 
-let wrap_constraint_with_shape env mark arg mty mode
+let wrap_constraint_with_shape ~self_check env mark arg mty mode
   shape explicit =
   let modes : Includemod.modes = Specific (arg.mod_mode, mode) in
   let coercion, shape =
     try
-      Includemod.modtypes_constraint ~shape ~loc:arg.mod_loc env ~mark
-        ~modes arg.mod_type mty
+      Includemod.modtypes_constraint ~self_check ~shape ~loc:arg.mod_loc env
+        ~mark ~modes arg.mod_type mty
     with Includemod.Error msg ->
       raise(Error(arg.mod_loc, env, Not_included msg)) in
   { mod_desc = Tmod_constraint(arg, mty, explicit, coercion);
@@ -3236,7 +3236,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       let sg' = Signature_names.simplify _finalenv names sg in
       let md, shape =
         if List.length sg' = List.length sg then md, shape else
-        wrap_constraint_with_shape env false md
+        wrap_constraint_with_shape ~self_check:true env false md
           (Mty_signature sg') mode shape Tmodtype_implicit
       in
       md, shape
@@ -3342,7 +3342,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             arg_shape
         | Some smty ->
             let mty = transl_modtype env smty in
-            wrap_constraint_with_shape env true arg mty.mty_type mode.mode_modes
+            wrap_constraint_with_shape ~self_check:false env true arg mty.mty_type mode.mode_modes
               arg_shape (Tmodtype_explicit (mty, mode))
       in
       { md with

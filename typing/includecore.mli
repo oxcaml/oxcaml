@@ -194,7 +194,7 @@ val check_modes : Env.t -> ?crossing:Mode.Crossing.t ->
 
 val value_descriptions:
   loc:Location.t -> Env.t -> string ->
-  mmodes:mmodes ->
+  mmodes:mmodes -> self_check:bool ->
   value_description -> value_description -> module_coercion
 
 val type_declarations:

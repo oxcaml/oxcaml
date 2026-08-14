@@ -257,13 +257,14 @@ module Core_inclusion = struct
 
   (* Inclusion between value descriptions *)
 
-  let value_descriptions ~loc env ~direction subst id ~mmodes vd1 vd2 =
+  let value_descriptions ~self_check ~loc env ~direction subst id ~mmodes vd1
+      vd2 =
     if Directionality.mark_as_used direction then
       Env.mark_value_used vd1.val_uid;
     let vd2 = Subst.value_description subst vd2 in
     try
       Ok (Includecore.value_descriptions ~loc env (Ident.name id) ~mmodes
-            vd1 vd2)
+            ~self_check vd1 vd2)
     with Includecore.Dont_match err ->
       Error Error.(Core (Value_descriptions (mdiff vd1 vd2 mmodes err)))
 
@@ -1254,14 +1255,18 @@ let can_alias env path =
   in
   no_apply path && not (Env.is_functor_arg path env)
 
-let core_inclusion = Core_inclusion.{
+let make_core_inclusion ~self_check = Core_inclusion.{
   type_declarations;
-  value_descriptions;
+  value_descriptions = value_descriptions ~self_check;
   extension_constructors;
   class_type_declarations;
   class_declarations;
   jkind_declarations;
 }
+
+let core_inclusion = make_core_inclusion ~self_check:false
+
+let core_inclusion_self_check = make_core_inclusion ~self_check:true
 
 let core_consistency =
   let type_declarations ~loc:_ env ~direction:_ _ _ ~mmodes:_ d1 d2 =
@@ -1612,11 +1617,13 @@ end
 
 (* Hide the context and substitution parameters to the outside world *)
 
-let modtypes_constraint ~shape ~loc env ~mark ~modes mty1 mty2 =
+let modtypes_constraint ~self_check ~shape ~loc env ~mark ~modes
+    mty1 mty2 =
   (* modtypes with shape is used when typing module expressions in [Typemod] *)
   let direction = Directionality.strictly_positive ~mark ~both:true in
+  let core = if self_check then core_inclusion_self_check else core_inclusion in
   match
-    modtypes ~core:core_inclusion ~direction ~loc env
+    modtypes ~core ~direction ~loc env
       Subst.identity ~modes mty1 mty2 shape
   with
   | Ok (cc, shape) -> cc, shape
