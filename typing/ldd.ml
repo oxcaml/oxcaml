@@ -529,6 +529,11 @@ module Make (V : Ordered) = struct
     let node = inline_solved_vars node in
     up0 node
 
+  let round_down (node : node) =
+    solve_pending ();
+    let node = inline_solved_vars node in
+    down0 node
+
   let is_const (node : node) : bool =
     let node = inline_solved_vars node in
     is_leaf node

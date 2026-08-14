@@ -14,9 +14,9 @@
 
 (* Axis lattice: efficient bitfield encoding of jkind axes.
 
-   This module packs 11 axes into an OCaml immediate-sized integer. The axes
-   are indexed 0-10 and their values are ordered from most restrictive (0) to
-   least restrictive (max).
+   This module packs 11 public axes and one internal bit into an OCaml
+   immediate-sized integer. The public axes are indexed 0-10 and their values
+   are ordered from most restrictive (0) to least restrictive (max).
 
    Axis layout (index, name, values from level 0 to max):
    0. Areality (Regionality): Global -> Regional -> Local
@@ -33,6 +33,11 @@
 
    Axes 0-9 are modal axes (affect mode-crossing).
    Axis 10 is the only non-modal axis (externality).
+
+   The internal bit tracks whether unique-implies-uncontended is disabled.
+   The bit is absent when unique-implies-uncontended is allowed and present
+   when it is disabled, matching the rest of this lattice: more bits means a
+   less restrictive type.
 
    Each 2-valued axis uses 1 bit. The 3-valued chain axes and 4-valued diamond
    axes use 2 bits.
@@ -102,12 +107,13 @@ let hi_mask =
 
 let axis_mask = Array.map2 (fun lo hi -> lo lor hi) lo_mask hi_mask
 
+let uic_disabled_mask = 1 lsl 20
+
 type t = int
 
 let bot : t = 0
 
-(* For this layout top happens to be all 20 bits set: 0xF_FFFF. *)
-let top : t = Array.fold_left ( lor ) 0 axis_mask
+let top : t = Array.fold_left ( lor ) uic_disabled_mask axis_mask
 
 let join (a : t) (b : t) : t = a lor b
 
@@ -221,6 +227,29 @@ let relevant_axes_of_modality (modality : Mode.Modality.Const.t) :
 (* Directly produce an axis-lattice mask from a constant modality. *)
 let mask_of_modality (modality : Mode.Modality.Const.t) : t =
   relevant_axes_of_modality modality |> of_axis_set
+
+let modality_makes_axis_constant : type a.
+    a Mode.Crossing.Axis.t -> Mode.Modality.Const.t -> bool =
+ fun axis modality ->
+  let (Mode.Modality.Axis.P axis_for_modality) =
+    Mode.Crossing.Axis.(P axis |> to_modality)
+  in
+  let modality_on_axis = Mode.Modality.Const.proj axis_for_modality modality in
+  Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis
+
+let modality_makes_uniqueness_constant modality =
+  let open Mode.Crossing.Axis in
+  modality_makes_axis_constant (Monadic Uniqueness) modality
+
+let modality_has_contended_contention modality =
+  let open Mode in
+  let axis_for_modality = Modality.Axis.Monadic Axis.Contention in
+  let (Modality.Monadic.Atom.Join_const contention) =
+    Modality.Const.proj axis_for_modality modality
+  in
+  match contention with
+  | Contention.Const.Contended -> true
+  | Uncontended | Corrupted | Shared -> false
 
 (* Helpers to translate between axis enumerations and packed levels. *)
 module Levels = struct
@@ -383,6 +412,14 @@ let staticity (x : t) : Mode.Staticity.const =
 let externality (x : t) : Jkind_axis.Externality.t =
   Levels.externality_of_level (get_axis x ~axis:10)
 
+let uic_disabled : t = uic_disabled_mask
+
+let disable_uic (x : t) : t = x lor uic_disabled_mask
+
+let allow_uic (x : t) : t = x land lnot uic_disabled_mask
+
+let uic_allowed (x : t) : bool = x land uic_disabled_mask = 0
+
 let set_areality (a : Mode.Regionality.Const.t) (x : t) : t =
   set_axis x ~axis:0 ~level:(Levels.level_of_areality a)
 
@@ -454,7 +491,9 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const (statefulness x)))
   in
-  { monadic; comonadic }
+  { crossing = { monadic; comonadic };
+    unique_implies_uncontended = uic_allowed x
+  }
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
     ~yielding ~statefulness ~visibility ~staticity ~externality =
@@ -486,6 +525,7 @@ let immutable_data : t =
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Immutable ~staticity:Mode.Staticity.Static
     ~externality:Jkind_axis.Externality.max
+  |> disable_uic
 
 let mutable_data : t =
   create ~areality:Mode.Regionality.Const.max
@@ -496,6 +536,7 @@ let mutable_data : t =
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+  |> disable_uic
 
 let sync_data : t =
   create ~areality:Mode.Regionality.Const.max
@@ -506,6 +547,7 @@ let sync_data : t =
     ~statefulness:Mode.Statefulness.Const.min
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+  |> disable_uic
 
 let value : t =
   create ~areality:Mode.Regionality.Const.max
@@ -516,6 +558,7 @@ let value : t =
     ~statefulness:Mode.Statefulness.Const.max
     ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+  |> disable_uic
 
 let arrow : t =
   create ~areality:Mode.Regionality.Const.max
@@ -548,6 +591,7 @@ let object_legacy : t =
     ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max
+  |> disable_uic
 
 let axis_number_to_axis_packed (axis_number : int) : Jkind_axis.Axis.packed =
   if axis_number < 0 || axis_number >= Array.length axis_by_number

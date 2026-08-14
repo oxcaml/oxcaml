@@ -529,11 +529,11 @@ let foo (x : int box @ contended) = use_uncontended x
 val foo : int box @ contended -> unit = <fun>
 |}]
 
-let should_reject (x : int ref box @ contended) = use_uncontended x
+let rejects_ref_payload (x : int ref box @ contended) = use_uncontended x
 [%%expect{|
-Line 1, characters 66-67:
-1 | let should_reject (x : int ref box @ contended) = use_uncontended x
-                                                                      ^
+Line 1, characters 72-73:
+1 | let rejects_ref_payload (x : int ref box @ contended) = use_uncontended x
+                                                                            ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
@@ -548,11 +548,13 @@ let foo (x : (int, int) box2 @ contended) = use_uncontended x
 val foo : (int, int) box2 @ contended -> unit = <fun>
 |}]
 
-let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
+let rejects_both_ref_payloads
+    (x : (int ref, int ref) box2 @ contended) =
+  use_uncontended x
 [%%expect{|
-Line 1, characters 78-79:
-1 | let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
-                                                                                  ^
+Line 3, characters 18-19:
+3 |   use_uncontended x
+                      ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
@@ -594,13 +596,12 @@ let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
 val crosses : (int, int ref) box2 @ contended -> unit = <fun>
 |}]
 
-let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
-(* CR layouts v2.8: arguably this should be accepted if [crosses] is accepted (even though
-   x is uninhabited). Internal ticket 4973. *)
+let ref_payload_is_not_uic (x : (int ref, int) box2 @ contended) =
+  use_uncontended x
 [%%expect{|
-Line 1, characters 74-75:
-1 | let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
-                                                                              ^
+Line 2, characters 18-19:
+2 |   use_uncontended x
+                      ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 

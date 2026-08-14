@@ -207,15 +207,7 @@ val foo : unit -> 'a = <fun>
 let (foo @ portable) () =
     raise (Contended (ref 42))
 [%%expect{|
-Line 2, characters 11-20:
-2 |     raise (Contended (ref 42))
-               ^^^^^^^^^
-Error: This value is "contended"
-         because it is used inside the function at lines 1-2, characters 21-30
-         which is expected to be "portable".
-       However, the highlighted expression is expected to be "uncontended".
-Hint: All arguments of the constructor "Contended"
-must cross this axis to use it in this position.
+val foo : unit -> 'a = <fun>
 |}]
 
 (* rebinding counts as usage *)
@@ -489,20 +481,18 @@ Lines 8-13, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val wrap : unit -> exn
-           val unwrap : exn -> int ref @ contended @@ portable
-         end @ nonportable
+           val wrap : unit -> exn @ contended
+           val unwrap : exn -> int ref @ contended
+         end
        is not included in
          sig
            val wrap : unit -> exn @@ portable
            val unwrap : exn -> int ref @@ portable
-         end @ nonportable
+         end
        Values do not match:
-         val wrap : unit -> exn (* in a structure at nonportable *)
+         val unwrap : exn -> int ref @ contended
        is not included in
-         val wrap : unit -> exn @@ portable (* in a structure at nonportable *)
-       The first is "nonportable"
-         because it contains a usage (of the constructor "R" at line 9, characters 16-17)
-         which is expected to be "uncontended".
-       However, the second is "portable".
+         val unwrap : exn -> int ref @@ portable
+       The type "exn -> int ref @ contended" is not compatible with the type
+         "exn -> int ref"
 |}]
