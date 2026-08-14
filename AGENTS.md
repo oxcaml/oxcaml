@@ -4,7 +4,7 @@
 
 A fresh worktree needs one complete build and test installation:
 ```sh
-autoconf
+autoconf27
 ./configure --prefix="$PWD/_install"
 make dev
 ```
