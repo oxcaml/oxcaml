@@ -20,7 +20,8 @@
    The representation is canonical: no leading zero limbs, and zero has
    sign 0 with an empty magnitude.  Canonicity is load-bearing: it is what
    makes polymorphic equality agree with [equal].  Every magnitude is
-   built by [trim], which is the one place that enforces it. *)
+   built by [trim], which drops leading zero limbs, and every value by
+   [make], which forces sign 0 on the empty magnitude. *)
 
 let radix_bits = (Sys.int_size - 1) / 2
 let radix = 1 lsl radix_bits
@@ -48,21 +49,18 @@ let make sign mag =
 
 let is_zero value = value.sign = 0
 
-let int_compare (left : int) right =
-  if left < right then -1 else if left > right then 1 else 0
-
 let compare_magnitude left right =
   let left_length = Iarray.length left in
   let right_length = Iarray.length right in
   if left_length <> right_length
-  then int_compare left_length right_length
+  then Int.compare left_length right_length
   else begin
     let rec from index =
       if index < 0
       then 0
       else begin
         let order =
-          int_compare (Iarray.get left index) (Iarray.get right index)
+          Int.compare (Iarray.get left index) (Iarray.get right index)
         in
         if order <> 0 then order else from (index - 1)
       end
@@ -72,7 +70,7 @@ let compare_magnitude left right =
 
 let compare left right =
   if left.sign <> right.sign
-  then int_compare left.sign right.sign
+  then Int.compare left.sign right.sign
   else if left.sign >= 0
   then compare_magnitude left.mag right.mag
   else compare_magnitude right.mag left.mag
@@ -130,7 +128,9 @@ let subtract_magnitude left right =
   trim scratch
 
 (* Schoolbook multiplication.  Every intermediate value is at most
-   (radix - 1)^2 + 2 * (radix - 1) = radix^2 - 1 <= max_int. *)
+   (radix - 1)^2 + 2 * (radix - 1) = radix^2 - 1 <= max_int -- an exact
+   fit, with zero headroom when Sys.int_size is odd, so no term can be
+   added to the inner sum. *)
 let multiply_magnitude left right =
   let left_length = Iarray.length left in
   let right_length = Iarray.length right in
@@ -147,6 +147,8 @@ let multiply_magnitude left right =
       scratch.(left_index + right_index) <- product land mask;
       carry := product lsr radix_bits
     done;
+    (* A store, not an accumulate: the previous outer iteration's final
+       carry landed one position lower, so this slot is still 0. *)
     scratch.(left_index + right_length) <- !carry
   done;
   trim scratch
@@ -185,7 +187,7 @@ let of_int integer =
       remaining := !remaining / radix;
       index := !index + 1
     done;
-    { sign = (if integer < 0 then -1 else 1); mag = trim scratch }
+    make (if integer < 0 then -1 else 1) (trim scratch)
   end
 
 let one = of_int 1
@@ -207,21 +209,16 @@ let to_int_opt value =
     Some (if value.sign < 0 then negated_value else -negated_value)
   end
 
-(* Decimal conversion peels [decimal_chunk_width] digits at a time.  The
-   chunk is sized so that the division step's intermediate value,
-   (decimal_chunk - 1) * radix + mask, stays within [max_int]. *)
-let decimal_chunk, decimal_chunk_width =
-  if Sys.int_size <= 32 then 10_000, 4 else 1_000_000_000, 9
-
-(* Divide a magnitude by a small positive integer; quotient and remainder. *)
-let divide_magnitude_small magnitude divisor =
+(* Divide a magnitude by ten; quotient magnitude and remainder digit.  The
+   intermediate value is at most 9 * radix + mask, well within [max_int]. *)
+let divide_magnitude_by_ten magnitude =
   let length = Iarray.length magnitude in
   let scratch = Array.make length 0 in
   let remainder = ref 0 in
   for index = length - 1 downto 0 do
     let current = (!remainder * radix) + Iarray.get magnitude index in
-    scratch.(index) <- current / divisor;
-    remainder := current mod divisor
+    scratch.(index) <- current / 10;
+    remainder := current mod 10
   done;
   trim scratch, !remainder
 
@@ -229,35 +226,21 @@ let to_string value =
   if value.sign = 0
   then "0"
   else begin
-    let rec chunks magnitude collected =
-      if Iarray.length magnitude = 0
-      then collected
-      else begin
-        let quotient, chunk =
-          divide_magnitude_small magnitude decimal_chunk
-        in
-        chunks quotient (chunk :: collected)
-      end
-    in
-    match chunks value.mag [] with
-    | [] -> assert false (* a nonzero value has a nonempty magnitude *)
-    | most_significant :: rest ->
-      let buffer = Buffer.create 32 in
-      if value.sign < 0 then Buffer.add_char buffer '-';
-      Buffer.add_string buffer (string_of_int most_significant);
-      List.iter
-        (fun chunk ->
-          let digits = string_of_int chunk in
-          for _ = String.length digits + 1 to decimal_chunk_width do
-            Buffer.add_char buffer '0'
-          done;
-          Buffer.add_string buffer digits)
-        rest;
-      Buffer.contents buffer
+    (* Decimal digits fall out least significant first; reverse at the end. *)
+    let buffer = Buffer.create 32 in
+    let magnitude = ref value.mag in
+    while Iarray.length !magnitude > 0 do
+      let quotient, digit = divide_magnitude_by_ten !magnitude in
+      Buffer.add_char buffer (Char.chr (Char.code '0' + digit));
+      magnitude := quotient
+    done;
+    if value.sign < 0 then Buffer.add_char buffer '-';
+    let length = Buffer.length buffer in
+    String.init length (fun index -> Buffer.nth buffer (length - 1 - index))
   end
 
 let of_string string =
-  let reject reason = invalid_arg ("Bigint.of_string: " ^ reason) in
+  let reject reason = failwith ("Bigint.of_string: " ^ reason) in
   let length = String.length string in
   if length = 0 then reject "empty string";
   let negative = string.[0] = '-' in

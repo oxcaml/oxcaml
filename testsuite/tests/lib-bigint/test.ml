@@ -377,7 +377,7 @@ let check_strings () =
       check ("invalid string rejected " ^ String.escaped string)
         (match Bigint.of_string string with
          | _ -> false
-         | exception Invalid_argument _ -> true))
+         | exception Failure _ -> true))
     [ ""; "-"; "00"; "01"; "-0"; "-00"; "-01"; "+1"; " 1"; "1 "; "1x"; "--1"
     ; "1\000"; "\0001"; "1\n"; "\t1"; "1e5"; "0x1"; "1_000"; "- 1" ]
 

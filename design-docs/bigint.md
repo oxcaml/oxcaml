@@ -44,8 +44,10 @@ It is public rather than `Camlinternal`-prefixed, because specification authors
 write `Bigint.t` in source.
 
 The cost is real: this joins the public stdlib API and touches `StdlibModules`,
-`.depend`, `dune`, `stdlib.ml` and `stdlib.mli`. Worth naming so nobody thinks
-it was chosen for convenience.
+`.depend`, `dune`, `stdlib.ml` and `stdlib.mli`. It also permanently claims the
+name `Bigint` in the default-opened namespace, which any third-party code with
+its own `bigint.ml` will feel. Worth naming so nobody thinks it was chosen for
+convenience.
 
 ## The API is determined by the solver
 
