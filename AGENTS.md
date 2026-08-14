@@ -69,6 +69,21 @@ below.
   cannot be created, e.g. `bind(): Operation not permitted` in a sandbox): use
   `make dev NOWATCH=1`, which skips the watcher and rpc entirely. Slower per
   invocation, works anywhere, and applies to the other `dev-*` targets too.
+- **An `expect.opt` test whose result looks too good.** `dev-test` rebuilds an
+  expect-test runner when the selected tests ask for it, and you can check that
+  decision directly:
+  ```sh
+  make dev-runners-needed DIR=codegen     # prints: expectnat
+  ```
+  If a result is suspicious, the manual escape hatch is to refresh the runner
+  yourself before running anything (~3 min, it is a 110M link):
+  ```sh
+  make dev-expect-runners DEV_RUNNERS=expectnat
+  ```
+  Until PR #6794 landed, the native runner was never refreshed at all, so
+  `codegen/*` results under the dev loop before that should not be trusted: a
+  compiler change could be followed by a passing test that had exercised the
+  previous compiler.
 - **A test reported as `skipped` under `make dev-test` that runs elsewhere.** The
   dev test root's `ocamlc.byte` is the boot `main.bc`, built by the host compiler,
   so the in-tree `ocamlrun` cannot execute it. Rather than failing, those actions

@@ -673,7 +673,7 @@ dev-runners-needed:
 	  for runner in expect expectnat; do \
 	    case $$runner in \
 	      expect) pattern='(^|[;[:space:]])expect([;[:space:]]|$$)' ;; \
-	      expectnat) pattern='(^|[;[:space:]])expectnat([;[:space:]]|$$)' ;; \
+	      expectnat) pattern='(^|[;[:space:]])expect\.opt([;[:space:]]|$$)' ;; \
 	    esac; \
 	    if grep -ERq --include='*.ml' "$$pattern" "$$selection"; then \
 	      printf '%s\n' $$runner; \
@@ -697,8 +697,8 @@ dev-selftest:
 	      failures=1; \
 	    fi; \
 	  }; \
-	  check codegen ""; \
-	  check tool-expect-test "expect "; \
+	  check codegen "expectnat "; \
+	  check tool-expect-test "expect expectnat "; \
 	  test $$failures = 0
 
 # Fresh diagnostics straight from the running watcher, without a build round
