@@ -169,16 +169,40 @@ simpler and more correct than what I wrote.
 
 ## Deliberately not done
 
-- **Item 3b, the `ocamlc.byte` magic mismatch (4/5 reports) — not done, and this
-  is the largest gap.** The design doc committed to *measuring* rather than
-  deciding: apply the `main_native.exe` redirect and compare per-test pass/fail
-  against `_runtest`. I did not run that comparison, so I did not land either the
-  redirect or a skip marker. 3a (the missing `ocamlopt`/`ocamlopt.byte` links) did
-  land, which unblocks the `ocamlopt.byte` half — a genuinely separate defect, not
-  the magic mismatch. Consequence: `dev-test-all` still cannot be green, and the
-  affected tests still present as regressions rather than saying they are
-  unsupported. Both reviewers flagged this. It needs the measurement, not more
-  reasoning.
+- **Item 3b, the `ocamlc.byte` magic mismatch (4/5 reports) — measured, and the
+  measurement rules out both candidate fixes.** No code landed for it, but the
+  question is now answered rather than open.
+
+  Baseline, three affected directories: under the dev harness 12 tests fail
+  (`formatting` 1, `typing-ocamlc-i` 6, `tool-ocamlc-stop-after` 5); under
+  `_runtest` all 12 pass. So they are purely harness failures, as reported.
+
+  I then applied the candidate fix — point `ocamlc.byte` at `main_native.exe` in
+  `prepare_test_root` — and re-ran: **exactly the same 12 failures**. The reason is
+  visible in the failing command, and it refines the reports' account:
+
+      <runtest>/runtime/ocamlrun <runtest>/ocamlc -use-runtime ... -i -o ... local.ml
+      the file '<runtest>/ocamlc' has not the right magic number:
+        expected Caml1999X583, got
+
+  ocamltest runs `ocamlc` *through* the in-tree `ocamlrun`, so `ocamlc` must be a
+  bytecode image with that runtime's magic. `main.bc` carries trailing magic
+  `Caml1999X036` and a shebang pointing at the opam `ocamlrun`
+  (`~/.opam/5.4.0/bin/ocamlrun`), which is why the unmodified harness reports
+  "got Caml1999X036"; the native executable has no Caml magic at all, which is why
+  the redirect reports "got " and fails identically. **No symlink arrangement can
+  fix this**: the only real fix is producing a `main.bc` whose magic matches the
+  in-tree runtime, i.e. building the bytecode compiler in a context that uses it —
+  a build-system change, out of scope here.
+
+  So the answer to the design doc's open question is the skip-list, now on evidence
+  rather than as a default. ocamltest already has the mechanism:
+  `OCAMLTEST_SKIP_TESTS` (`ocamltest/main.ml:254`), matched against the test
+  filename. I did not implement it, because deciding what the dev harness declares
+  it does not cover is a scoping decision I would rather you make (open question 1).
+  Consequence meanwhile: `dev-test-all` cannot be green, and these tests present as
+  regressions. 3a (the missing `ocamlopt`/`ocamlopt.byte` links) did land, and is a
+  genuinely separate defect from this one.
 - **Item 9's stdlib fingerprinting** stays out of scope for the reasons in the
   design doc. The *detection* the doc promised was initially missing — the claude
   reviewer caught the discrepancy — and is now in `e95dc422b7`: when `dev-test-all`
@@ -238,12 +262,14 @@ Neither caused a failure. The whole `tool-ocamltest` directory also passes, 7/7.
 
 ## Open questions for the owner
 
-1. **Item 3b.** My default remains a skip-list with a marker naming what is not
-   covered, over redirecting `ocamlc.byte` to `main_native.exe` (which would make
-   `dev-test-all` green while silently ceasing to test the bytecode compiler).
-   `ocamltest/ocaml_actions.ml:1033` warns that under flambda2 the two "sometimes
-   generate equivalent" output, so the risk is real. The measurement is the next
-   step either way — say if you want the other default.
+1. **Item 3b.** The measurement above removes the choice I thought I had: the
+   `main_native.exe` redirect cannot work, so it is a skip-list or nothing. What I
+   want a ruling on is the scope — skip-list the ~12 tests in the three directories
+   I measured, or sweep the whole suite for `ocamlc.byte`/`ocamlopt.byte` actions
+   first so `dev-test-all` can actually be asserted green? I would do the sweep,
+   since a partial list leaves the full suite red and therefore ignored, which is
+   the status quo. Either way the marker text should name what the dev harness does
+   not cover, so nobody re-does this forensics.
 2. **Promotion of a missing reference file.** A missing reference is also how
    ocamltest spells "this output must be empty", and the claude reviewer counted
    **290** tests under `testsuite/tests/` that run an output check with no
