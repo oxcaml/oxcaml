@@ -1,0 +1,116 @@
+== a parameter expectation is checked at each application
+digest: checks 2 (argument 2) deps 1 (alias 1) equalities 2 omissions 0
+check argument A : S apply.ml:6:15-6:16
+check argument B : S apply.ml:7:15-7:16
+dep <S> -alias-> S
+equal F(A) = FA
+equal F(B) = FB
+== the parameter of a functor type in a signature
+digest: checks 1 (ascription 1) deps 5 (definition 1 alias 1 functor-type 2 interface 1) equalities 0 omissions 0
+check ascription G : F functortype.ml:5:23-5:57
+dep F -definition-> <#1>
+dep <S> -alias-> S
+dep <#1> -functor-type-> T
+dep <#1> -functor-type-> <S>
+dep <G> -interface-> F
+== an anonymous parameter and an opaque result signature
+digest: checks 3 (ascription 2 argument 1) deps 5 (definition 1 alias 1 instance 1 interface 2) equalities 1 omissions 0
+check argument Int : PARAM opaque.ml:8:14-8:17
+check ascription opaque.ml:4:21-6:3 : OUT opaque.ml:4:29-6:3
+check ascription M : OUT.T@R opaque.ml:9:17-9:40
+dep OUT -definition-> <#1>
+dep OUT.T@F(Int) -instance-> OUT.T@body(OUT)
+dep <PARAM> -alias-> PARAM
+dep <#1> -interface-> OUT.T@body(OUT)
+dep <M> -interface-> OUT.T@R
+equal F(Int) = R
+== applicative applications of equal arguments share one instance
+digest: checks 5 (ascription 3 argument 2) deps 6 (definition 1 instance 2 interface 3) equalities 2 omissions 0
+check ascription applicative.ml:3:30-3:77 : S applicative.ml:3:36-3:77
+check argument A : param(F.X)@F(A) applicative.ml:5:15-5:16
+check argument A : param(F.X)@F(A) applicative.ml:6:15-6:16
+check ascription M1 : S.T@R1 applicative.ml:7:19-7:42
+check ascription M2 : S.T@R2 applicative.ml:8:19-8:42
+dep S -definition-> <#1>
+dep S.T@F(A) -instance-> S.T@body(S)
+dep param(F.X)@F(A) -instance-> <param(F.X)>
+dep <#1> -interface-> S.T@body(S)
+dep <M1> -interface-> S.T@R1
+dep <M2> -interface-> S.T@R2
+equal F(A) = R1
+equal F(A) = R2
+== generative applications get distinct site anchors
+digest: checks 3 (ascription 3) deps 6 (definition 1 instance 2 interface 3) equalities 0 omissions 0
+check ascription generative.ml:3:12-3:59 : S generative.ml:3:18-3:59
+check ascription M1 : S.T@R1 generative.ml:6:19-6:42
+check ascription M2 : S.T@R2 generative.ml:7:19-7:42
+dep S -definition-> <#1>
+dep S.T@R1 -instance-> S.T@body(S)
+dep S.T@R2 -instance-> S.T@body(S)
+dep <#1> -interface-> S.T@body(S)
+dep <M1> -interface-> S.T@R1
+dep <M2> -interface-> S.T@R2
+== parameter members are checked against the argument's members
+digest: checks 2 (ascription 1 argument 1) deps 11 (definition 1 alias 3 instance 2 argument-member 1 interface 4) equalities 1 omissions 0
+check ascription A.M : S argmember.ml:12:17-12:40
+check argument A : Members@F(A) argmember.ml:14:15-14:16
+dep Members -definition-> <#1>
+dep Members@F(A) -instance-> Members
+dep Members@F(A) -argument-member-> A.T@A
+dep Members@F(A) -instance-> <Members>
+dep A.T@A -alias-> S
+dep Members.T@body(Members) -alias-> S
+dep <Members.M> -interface-> S
+dep <#1> -interface-> Members.T@body(Members)
+dep <#1> -interface-> <Members.M>
+dep <Members> -alias-> Members
+dep <A.M> -interface-> S
+equal F(A) = FA
+== a strengthened parameter keeps the subject at the argument
+digest: checks 3 (ascription 2 argument 1) deps 6 (strengthen 4 instance 1 interface 1) equalities 1 omissions 0
+check ascription M : S strengthparam.ml:3:15-3:38
+check ascription M : S strengthparam.ml:4:14-4:22
+check argument M : S@F(M) strengthparam.ml:5:15-5:16
+dep S@F(M) -strengthen-> S
+dep S@F(M) -strengthen-> <M>
+dep S@F(M) -instance-> <param(F.X)>
+dep <M> -interface-> S
+dep <param(F.X)> -strengthen-> S
+dep <param(F.X)> -strengthen-> <M>
+equal F(M) = FM
+== a functor body declaration is reached through the body
+digest: checks 2 (ascription 1 argument 1) deps 3 (instance 2 interface 1) equalities 1 omissions 0
+check argument Int : param(F.X)@F(Int) template.ml:7:14-7:17
+check ascription F.M : F.S@body(F) template.ml:4:17-4:40
+dep param(F.X)@F(Int) -instance-> <param(F.X)>
+dep F.S@F(Int) -instance-> F.S@body(F)
+dep <F.M> -interface-> F.S@body(F)
+equal F(Int) = R
+== inline and generative inclusions anchor at a site
+digest: checks 5 (ascription 4 argument 1) deps 11 (definition 2 include 2 instance 3 interface 4) equalities 0 omissions 0
+check ascription site.ml:4:30-4:77 : S site.ml:4:36-4:77
+check ascription site.ml:5:12-5:60 : S2 site.ml:5:19-5:60
+check ascription M : S.T@site(Site.ml#0) site.ml:8:15-8:38
+check argument site.ml:6:11-6:34 : param(F.X)@site(Site.ml#1) site.ml:6:11-6:34
+check ascription N : S2.U@site(Site.ml#2) site.ml:9:15-9:38
+dep S.T -include-> S.T@site(Site.ml#0)
+dep S -definition-> <#1>
+dep S2.U -include-> S2.U@site(Site.ml#2)
+dep S2 -definition-> <#2>
+dep S.T@site(Site.ml#0) -instance-> S.T@body(S)
+dep param(F.X)@site(Site.ml#1) -instance-> <param(F.X)>
+dep S2.U@site(Site.ml#2) -instance-> S2.U@body(S2)
+dep <#1> -interface-> S.T@body(S)
+dep <#2> -interface-> S2.U@body(S2)
+dep <M> -interface-> S.T@site(Site.ml#0)
+dep <N> -interface-> S2.U@site(Site.ml#2)
+== applications appearing in a module type path
+digest: checks 3 (ascription 2 argument 1) deps 5 (definition 1 instance 2 interface 2) equalities 0 omissions 0
+check ascription pathapply.ml:3:30-3:77 : S pathapply.ml:3:36-3:77
+check ascription M : S.T@F(A) pathapply.ml:5:20-5:43
+check argument A : param(F.X)@F(A) pathapply.ml:5:11-5:17
+dep S -definition-> <#1>
+dep S.T@F(A) -instance-> S.T@body(S)
+dep param(F.X)@F(A) -instance-> <param(F.X)>
+dep <#1> -interface-> S.T@body(S)
+dep <M> -interface-> S.T@F(A)

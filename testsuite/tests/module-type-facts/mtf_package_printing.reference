@@ -1,0 +1,11 @@
+== the package constraints recorded in the typedtree
+package constraint: S
+package constraint: S
+== and printed as the constraint it replaced
+prints Tmod_constraint: false
+prints Tmodtype_package: false
+prints Texp_pack: true
+== untyping a package keeps the same facts
+check package <location> : S
+check package <location> : S
+same facts after untyping: true
