@@ -41,7 +41,7 @@ let code loopify(never) size(2) newer_version_of(match_tagged_immediate_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  let arg = %array_load ($camlTOP2__switch_block31, t) in
+  let arg = %array_load.`imm` ($camlTOP2__switch_block31, t) in
   cont k (arg)
 in
 let $camlTOP2__match_tagged_immediate_1 =
