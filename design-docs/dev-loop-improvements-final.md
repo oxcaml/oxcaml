@@ -1,7 +1,7 @@
 # dev-loop-improvements — final report
 
 Branch `jujacobs/vox/dev-loop-improvements`, based on `jujacobs/optimize-dev-loop`
-@ `6929017cbd`. Plan and evidence base: `design-docs/dev-loop-improvements.md`.
+@ `6f4374f24b`. Plan and evidence base: `design-docs/dev-loop-improvements.md`.
 
 ## Commits
 
@@ -32,25 +32,25 @@ the failure into an instruction.
 ## What landed, and whether it was exercised
 
 "Exercised" means run against the failure it targets. I distinguish that from
-"reasoned through" per item, because three items are only the latter.
+"reasoned through" per item, because a few items are only the latter.
 
 | Item | Convergence | State |
 | --- | --- | --- |
 | 1. rpc wedge: heartbeat, timeout, watcher restart + one retry, direct fallback | 5/5 | **Exercised, including a real wedge** |
 | 2. stale `_runtest` stdlib detector + `dev-refresh-stdlib` | 2/5 | **Exercised against a real SIGSEGV**; cure verified |
-| 3a. `ocamlopt`/`ocamlopt.byte` missing from the dev test root | 4/5 | Landed, **not exercised** |
+| 3a. `ocamlopt`/`ocamlopt.byte` missing from the dev test root | 4/5 | **Exercised** |
 | 3b. `ocamlc.byte` magic mismatch | 4/5 | **Measured, then landed** — red-green, see below |
 | 4a. `-promote` cannot create a missing reference | 1/5 | **Exercised**, red-green |
 | 4b. promote iterates to a fixpoint | 1/5 | Partly exercised |
 | 4c. `/tmp` scratch → `_build/dev`, `TMPDIR` exported | 1/5 + found | **Exercised** |
-| 4d. promote log printed before the verify output | 1/5 | Landed, not exercised |
-| 4e. names plain-vs-`-principal` instability | 2/5 | Landed, **not exercised** |
+| 4d. promote log printed before the verify output | 1/5 | **Exercised** |
+| 4e. names plain-vs-`-principal` instability | 2/5 | **Exercised**, and reworded after review |
 | 5. `make dev NOWATCH=1` | 1/5 | **Exercised in a real restricted sandbox** |
 | 6a. `make dev-configure` + `Makefile.config` precondition | 5/5 | **Exercised in a fresh worktree** |
 | 6b. `make dev-errors` | 1/5 | Landed, lightly exercised |
 | 6c. `make dev-diff` | 1/5 | **Exercised**, both test kinds |
-| 6d. `dev-test-all` names its artifact location | 1/5 | Landed, not exercised |
-| 6e. python ≥ 3.7 guard | 2/5 | Landed, **not exercised** (needs a 3.6 interpreter) |
+| 6d. `dev-test-all` names its artifact location | 1/5 | **Exercised** in the full-suite run |
+| 6e. python ≥ 3.7 guard | 2/5 | **Exercised** under the system python 3.6.8 |
 | 6f. suppress dune's forwarding notice | 1/5 | **Reversed after review — deleted** |
 | 6g. docs: setup, blessed scratch path, never copy `.corrected` | — | Landed |
 
@@ -125,7 +125,7 @@ Two reviewers in their own worktrees under `vox/dev-loop/review/`: one claude
 (findings returned as text) and one codex 0.147.0 `gpt-5.6-sol` (`report.md` in
 its worktree). They ran independently and **converged on the same three top
 defects**, each of which defeated a headline claim rather than being a corner
-case. I reproduced every finding before acting on it. Fixes are in `e7159b3af9`.
+case. I reproduced every finding before acting on it. Fixes are in `a7bd9f2024`.
 
 1. **`make dev-configure` could not be reached in a fresh worktree** — the exact
    situation it was written for. `Makefile.config_if_required` exempts only the
@@ -265,7 +265,7 @@ simpler and more correct than what I wrote.
   and landed earlier.
 - **Item 9's stdlib fingerprinting** stays out of scope for the reasons in the
   design doc. The *detection* the doc promised was initially missing — the claude
-  reviewer caught the discrepancy — and is now in `e95dc422b7`: when `dev-test-all`
+  reviewer caught the discrepancy — and is now in `fa727a341c`: when `dev-test-all`
   output contains "inconsistent assumptions over interface Stdlib", it prints the
   cause and the known-working recovery, including that `rm -rf _build/main` alone
   corrupts dune's incremental state. Not exercised: I did not reproduce the 661-
@@ -390,7 +390,7 @@ the result was the pre-fix `reference not created`.
 This is the same class as the stale-stdlib and stale-compilerlibs traps the reports
 describe — with the harness itself as the stale artifact — and silent in the same
 way. It only surfaced because a test happened to assert on ocamltest's own
-behaviour. Fixed in `e95dc422b7` by building `ocamltest/ocamltest.native` before
+behaviour. Fixed in `fa727a341c` by building `ocamltest/ocamltest.native` before
 `install_for_test` (seconds, not a boot-compiler rebuild). Verified: with the
 refreshed harness the fixture passes under `_runtest`, where it had failed.
 
