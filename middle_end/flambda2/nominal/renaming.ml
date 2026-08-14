@@ -41,7 +41,7 @@ module Import_map : sig
   val symbol : t -> Symbol.t -> Symbol.t
 
   val simple :
-    t -> Simple.t -> import_variable:(Variable.t -> Variable.t) -> Simple.t
+    t -> Simple.t -> import_var:(Variable.t -> Variable.t) -> Simple.t
 
   val code_id : t -> Code_id.t -> Code_id.t
 
@@ -99,22 +99,12 @@ end = struct
 
   let continuation t orig = Continuation.import t.continuations orig
 
-  let simple t simple ~import_variable =
+  let simple t simple ~import_var =
     (* Constants and symbols are never permuted, only freshened upon import. *)
-    let[@inline always] name_not_imported old_name ~coercion:old_coercion =
-      let new_name =
-        Name.pattern_match old_name
-          ~symbol:(fun orig -> Name.symbol (symbol t orig))
-          ~var:(fun orig -> Name.var (import_variable orig))
-      in
-      let new_coercion =
-        Coercion.map_depth_variables old_coercion ~f:(fun dv ->
-            import_variable dv)
-      in
-      Simple.with_coercion (Simple.name new_name) new_coercion
-    in
-    Simple.pattern_match_imported t.simples simple ~name_not_imported
-      ~const_not_imported:(fun cst -> Simple.const (const t cst))
+    Simple.import t.simples simple
+      ~import_const:(fun orig -> const t orig)
+      ~import_symbol:(fun orig -> symbol t orig)
+      ~import_var
 
   let value_slot_is_used t var =
     if Value_slot.in_compilation_unit var t.original_compilation_unit
@@ -291,7 +281,7 @@ let apply_simple t simple =
   | Some import_map ->
     (* This is a bit tricky -- we want to be able to use [apply_variable] here
        so the variables in [Import_map.simple] cannot have been imported yet. *)
-    Import_map.simple import_map simple ~import_variable:(fun var ->
+    Import_map.simple import_map simple ~import_var:(fun var ->
         apply_variable t var)
 
 let value_slot_is_used t value_slot =

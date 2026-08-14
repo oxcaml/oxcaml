@@ -835,25 +835,25 @@ module Simple = struct
   let export simples =
     Table.export !grand_table_of_simples ~iter:(fun f -> Set.iter f simples)
 
-  let pattern_match_imported importer t ~name_not_imported:name
-      ~const_not_imported:const =
+  let import importer t ~import_const ~import_symbol ~import_var =
     let flags = Id.flags t in
     if flags = var_flags
-    then (name [@inlined hint]) (Name.var t) ~coercion:Coercion.id
+    then (import_var [@inlined hint]) t
     else if flags = symbol_flags
-    then (name [@inlined hint]) (Name.symbol t) ~coercion:Coercion.id
+    then (import_symbol [@inlined hint]) t
     else if flags = const_flags
-    then (const [@inlined hint]) t
+    then (import_const [@inlined hint]) t
     else if flags = simple_flags
     then
       let { Simple_data.simple = t; coercion } = Table.import importer t in
+      let coercion = Coercion.map_depth_variables coercion ~f:import_var in
       let flags = Id.flags t in
       if flags = var_flags
-      then (name [@inlined hint]) (Name.var t) ~coercion
+      then with_coercion ((import_var [@inlined hint]) t) coercion
       else if flags = symbol_flags
-      then (name [@inlined hint]) (Name.symbol t) ~coercion
+      then with_coercion ((import_symbol [@inlined hint]) t) coercion
       else if flags = const_flags
-      then (const [@inlined hint]) t
+      then (import_const [@inlined hint]) t
       else assert false
     else assert false
 end
