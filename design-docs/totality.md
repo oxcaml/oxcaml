@@ -205,11 +205,14 @@ the route taken and why.
 
 - **(Rec) as a floor on the group's mode variable.** The recursive group's
   mode variable has its totality floored at `partial`, so the bound variables
-  are partial both inside the right-hand sides and after the binding. vox2
-  instead builds a separate RHS environment so the after-binding mode is the
-  RHS's derived mode. Observable behaviour is the same: a recursive closure is
-  partial either way, and an arrow-free recursive value (`let rec x = 1`)
-  crosses totality at its use sites, so nothing is lost by the simpler rule.
+  are partial both inside the right-hand sides and after the binding. This is
+  deliberately group-wide: the base typechecker gives the whole `let rec`
+  group a single mode variable, so a member that never refers to the group
+  (`let rec a x = a x and b x = x`) also comes out partial (pinned by a test).
+  Per-member precision needs per-binding mode variables for recursive groups,
+  a base-machinery change left as a follow-up; moving such a member out of
+  the group is the workaround. An arrow-free recursive value (`let rec x =
+  1`) still crosses totality at its use sites.
 
 - **The allowlist** covers `%identity`, integer and float arithmetic, boolean
   connectives, `%field0_immut`/`%field1_immut` (fst/snd), and
@@ -285,3 +288,31 @@ the route taken and why.
   contention, which the fixture itself marks as the desired outcome;
   non-degenerate variants still do not cross (checked with discriminating
   probes).
+
+- **Totality is capture-based, exactly like portability.** Parameters are not
+  captures: a total closure may call a `partial` parameter, read mutable
+  state through a parameter, send a message to a parameter object, and the
+  `%apply`/`%revapply` operators are total even though they call their
+  function argument. The guarantee `total` provides is compositional:
+  a total context can only supply total (and logical) arguments — submoding
+  stops partial values at every entry point into the total fragment — so a
+  call graph that lives entirely in the fragment terminates and performs no
+  effects. The alternative reading, where `f @ total` promises termination
+  for arbitrary well-moded arguments, would require constraining the callee's
+  totality into the enclosing locks at every application; that would also
+  diverge from the portability/contention twin, which accepts all three
+  shapes above (pinned by tests). Flagged for explicit confirmation because a
+  reviewer read the axis the other way.
+
+- **KNOWN GAP: recursive modules can claim totality circularly.** In
+  `module rec M : sig val loop : int -> int @@ total end = struct let loop x
+  = M.loop x end`, the body is checked against the declared signature, so the
+  `total` claim justifies its own recursive call and `M.loop` diverges at
+  mode total. The (Rec) floor only covers `let rec`. Portability tolerates
+  this self-assumption (it is a coinductive property); termination does not.
+  The fix is to weaken the totality component of every value modality in the
+  recursive-approximation environment (the analogue of (Rec) for
+  `module rec`), which needs a signature-modality rewriting pass including
+  named module-type expansion — deferred to a follow-up and pinned by a
+  fixture in the test file. Without an explicit `@@ total` claim, recursive
+  module values correctly stay partial.

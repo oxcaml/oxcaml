@@ -392,6 +392,51 @@ val exhaustive_match : int option -> int = <fun>
 |}]
 
 (* ------------------------------------------------------------------ *)
+(* Totality is capture-based: parameters are not captures.  A total closure
+   may call a partial parameter, read mutable state through a parameter, or
+   send a message to a parameter object.  Termination of calls from the total
+   fragment still follows compositionally, because a total context can only
+   supply total (and logical) arguments.  The portability/contention twin
+   behaves identically on all three shapes. *)
+
+let calls_partial_param @ total = fun (h @ partial) -> h ()
+let calls_nonportable_param @ portable = fun (h @ nonportable) -> h ()
+[%%expect{|
+val calls_partial_param : (unit -> 'a) -> 'a = <fun>
+val calls_nonportable_param : (unit -> 'a) -> 'a = <fun>
+|}]
+
+let reads_param @ total = fun (r : int ref) -> r.contents
+[%%expect{|
+val reads_param : int ref -> int = <fun>
+|}]
+
+(* ... but a total context cannot supply the partial argument such a function
+   would need to go wrong. *)
+let _ @ total = fun () -> calls_partial_param g_partial
+[%%expect{|
+Line 1, characters 46-55:
+1 | let _ @ total = fun () -> calls_partial_param g_partial
+                                                  ^^^^^^^^^
+Error: The value "g_partial" is "partial"
+       but is expected to be "total"
+         because it is used inside the function at line 1, characters 16-55
+         which is expected to be "total".
+|}]
+
+(* Instance-variable assignment constrains enclosing closures. *)
+class has_ivar = object
+  val mutable v = 0
+  method set_via_total = let f @ total = fun () -> v <- 1 in f ()
+end
+[%%expect{|
+Line 3, characters 51-57:
+3 |   method set_via_total = let f @ total = fun () -> v <- 1 in f ()
+                                                       ^^^^^^
+Error: The function is "partial" but is expected to be "total".
+|}]
+
+(* ------------------------------------------------------------------ *)
 (* Recursion. *)
 
 let rec looper x = looper x
@@ -456,6 +501,20 @@ Error: The value "ref" is "partial"
          which is expected to be "total".
 |}]
 
+(* The whole recursive group sits at partial, including a member that never
+   refers to the group: the group shares one mode variable. *)
+let rec rec_member x = rec_member x
+and plain_member x = x
+let _ = f plain_member
+[%%expect{|
+val rec_member : 'a -> 'b = <fun>
+val plain_member : 'a -> 'a = <fun>
+Line 3, characters 10-22:
+3 | let _ = f plain_member
+              ^^^^^^^^^^^^
+Error: This value is "partial" but is expected to be "total".
+|}]
+
 (* Mutual recursion.  Written with [match] rather than [=] so that the only
    partiality source is the recursion itself. *)
 let mutual @ total = fun () ->
@@ -482,6 +541,38 @@ Line 1, characters 36-42:
 Error: The value "looper" is "partial"
        but is expected to be "total"
          because it is used inside the function at line 1, characters 26-42
+         which is expected to be "total".
+|}]
+
+(* KNOWN GAP (see the design doc's decision log): a recursive module's
+   signature can claim [@@ total] and the claim justifies its own recursive
+   call, because the body is checked against the declared signature.
+   Termination is inductive, so this self-assumption is unsound; fixing it
+   needs the recursive-approximation environment to weaken totality
+   modalities, a follow-up. This fixture pins the current behaviour so the
+   fix shows up as a diff here. *)
+module rec MRec : sig val loop : int -> int @@ total end = struct
+  let loop x = MRec.loop x
+end
+let uses_rec_module @ total = fun () -> MRec.loop 0
+[%%expect{|
+module rec MRec : sig val loop : int -> int @@ total end
+val uses_rec_module : unit -> int = <fun>
+|}]
+
+(* Without the modality claim, the recursive module's value stays partial. *)
+module rec NRec : sig val loop : int -> int end = struct
+  let loop x = NRec.loop x
+end
+let uses_rec_module2 @ total = fun () -> NRec.loop 0
+[%%expect{|
+module rec NRec : sig val loop : int -> int end
+Line 4, characters 41-50:
+4 | let uses_rec_module2 @ total = fun () -> NRec.loop 0
+                                             ^^^^^^^^^
+Error: The value "NRec.loop" is "partial"
+       but is expected to be "total"
+         because it is used inside the function at line 4, characters 31-52
          which is expected to be "total".
 |}]
 

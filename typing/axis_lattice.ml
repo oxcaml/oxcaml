@@ -14,8 +14,8 @@
 
 (* Axis lattice: efficient bitfield encoding of jkind axes.
 
-   This module packs 11 axes into an OCaml immediate-sized integer. The axes
-   are indexed 0-10 and their values are ordered from most restrictive (0) to
+   This module packs 13 axes into an OCaml immediate-sized integer. The axes
+   are indexed 0-12 and their values are ordered from most restrictive (0) to
    least restrictive (max).
 
    Axis layout (index, name, values from level 0 to max):
@@ -23,16 +23,18 @@
    1. Uniqueness (monadic): Aliased -> Unique
    2. Linearity: Many -> Once
    3. Contention (monadic): Contended -> Corrupted / Shared -> Uncontended
-   4. Portability: Portable -> Shareable / Corruptible -> Nonportable
-   5. Forkable: Forkable -> Unforkable
-   6. Yielding: Unyielding -> Yielding
-   7. Statefulness: Stateless -> Writing / Reading -> Stateful
-   8. Visibility (monadic): Immutable -> Read / Write -> Read_write
-   9. Staticity (monadic): Dynamic -> Static
-   10. Externality: External -> External64 -> Internal
+   4. Logicality (monadic): Logical -> Physical
+   5. Portability: Portable -> Shareable / Corruptible -> Nonportable
+   6. Totality: Total -> Partial
+   7. Forkable: Forkable -> Unforkable
+   8. Yielding: Unyielding -> Yielding
+   9. Statefulness: Stateless -> Writing / Reading -> Stateful
+   10. Visibility (monadic): Immutable -> Read / Write -> Read_write
+   11. Staticity (monadic): Dynamic -> Static
+   12. Externality: External -> External64 -> Internal
 
-   Axes 0-9 are modal axes (affect mode-crossing).
-   Axis 10 is the only non-modal axis (externality).
+   Axes 0-11 are modal axes (affect mode-crossing).
+   Axis 12 is the only non-modal axis (externality).
 
    Each 2-valued axis uses 1 bit. The 3-valued chain axes and 4-valued diamond
    axes use 2 bits.
