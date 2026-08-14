@@ -1552,6 +1552,12 @@ module Lattices_mono = struct
     let compare : type p r1 r2. (p, r1) t -> (p, r2) t -> int =
      fun ax1 ax2 -> Int.compare (ord ax1) (ord ax2)
 
+    type packed = P : ('t, 'r) t -> packed
+
+    let equal_packed (P ax1) (P ax2) = Int.equal (ord ax1) (ord ax2)
+
+    let print_packed ppf (P ax) = print ppf ax
+
     let proj : type p r. (p, r) t -> p -> r =
      fun ax t ->
       match ax with
@@ -1654,6 +1660,12 @@ module Lattices_mono = struct
   end
 
   type packed_obj = Obj : 'a obj -> packed_obj
+
+  let axis_of_obj : type a. a obj -> Axis.packed option =
+   fun obj ->
+    match Axis.to_ obj with
+    | [] -> None
+    | Axis.To (_, ax) :: _ -> Some (Axis.P ax)
 
   let all_objs =
     [ Obj Locality;
@@ -4420,6 +4432,92 @@ end
 module C = Lattices_mono
 module S = Solver_mono (Hint_for_solver) (C)
 
+module Mode_point = struct
+  type t = P : 'a C.obj * 'a -> t
+end
+
+module Mode_description = struct
+  type atom =
+    | Exact of Mode_point.t
+    | Local_to_parent_region of
+        { displayed : Mode_point.t;
+          semantic : Mode_point.t
+        }
+
+  type t =
+    { first : atom;
+      alternatives : atom list
+    }
+end
+
+let mode_atom obj mode = Mode_description.Exact (Mode_point.P (obj, mode))
+
+let local_to_parent_region obj =
+  Mode_description.Local_to_parent_region
+    { displayed = Mode_point.P (obj, C.Regionality.Local);
+      semantic = Mode_point.P (obj, C.Regionality.Regional)
+    }
+
+let describe_mode : type a.
+    [`Actual | `Expected] -> a C.obj -> a -> Mode_description.t =
+ fun side obj x ->
+  let one first = { Mode_description.first; alternatives = [] } in
+  let alternatives first alternatives =
+    { Mode_description.first; alternatives }
+  in
+  match side, obj, x with
+  | `Actual, Regionality, Regional -> one (local_to_parent_region obj)
+  | `Expected, Contention_op, Shared ->
+    alternatives
+      (mode_atom obj C.Contention.Shared)
+      [mode_atom obj C.Contention.Uncontended]
+  | `Expected, Contention_op, Corrupted ->
+    alternatives
+      (mode_atom obj C.Contention.Corrupted)
+      [mode_atom obj C.Contention.Uncontended]
+  | `Expected, Visibility_op, Read ->
+    alternatives
+      (mode_atom obj C.Visibility.Read)
+      [mode_atom obj C.Visibility.Read_write]
+  | `Expected, Visibility_op, Write ->
+    alternatives
+      (mode_atom obj C.Visibility.Write)
+      [mode_atom obj C.Visibility.Read_write]
+  | `Expected, Regionality, Regional ->
+    alternatives
+      (local_to_parent_region obj)
+      [mode_atom obj C.Regionality.Global]
+  | _ -> one (mode_atom obj x)
+[@@ocaml.warning "-4"]
+
+module Hint_chain = struct
+  module Mode = struct
+    type t = Mode_point.t = P : 'a C.obj * 'a -> t
+
+    let name (P (obj, m) : t) = Fmt.asprintf "%a" (C.print obj) m
+
+    let equal (P (obj1, m1) : t) (P (obj2, m2) : t) =
+      match C.equal_obj obj1 obj2 with
+      | Misc.Is_eq -> C.equal obj1 m1 m2
+      | Misc.Is_not_eq -> false
+
+    let describe (P (obj, m) : t) = describe_mode `Actual obj m
+  end
+
+  type kind =
+    | Morph : ('l * 'r) Mode_hint.morph -> kind
+    | Const : ('l * 'r) Mode_hint.const -> kind
+
+  type step =
+    { mode : Mode.t;
+      pinpoint : Hint.pinpoint;
+      kind : kind;
+      axis : C.Axis.packed option
+    }
+
+  type t = step list
+end
+
 let erase_hints () = S.erase_hints ()
 
 type monadic = C.monadic =
@@ -4440,7 +4538,21 @@ type 'a comonadic_with = 'a C.comonadic_with =
 
 module Axis = C.Axis
 
+type axis_error =
+  { axis : Axis.packed;
+    actual_chain : Hint_chain.t;
+    expected_chain : Hint_chain.t;
+    actual_description : Mode_description.t;
+    expected_description : Mode_description.t;
+    actual_loosening : loosening;
+    expected_loosening : loosening
+  }
+
 type nonrec 'a simple_error = 'a simple_error
+
+type nonrec loosening = loosening =
+  | Loosened
+  | Not_loosened
 
 let print_longident =
   ref (fun _ _ -> assert false : Fmt.formatter -> Longident.t -> unit)
@@ -5072,6 +5184,22 @@ module Report = struct
       Some (print_is_contained_by ~fixpoint is_contained_by)
     | Function_argument _ -> None
 
+  let morph_src_pinpoint : type l r. pinpoint -> (l * r) morph -> pinpoint =
+   fun pp -> function
+    | Skip | Unknown | Crossing | Allocation_r _ | Allocation_l _ | Allocation _
+      ->
+      pp
+    | Functor_to_parameter loc -> loc, Functor
+    | Parameter_to_functor loc -> loc, Functor_parameter
+    | Functor_to_application loc -> loc, Functor
+    | Application_to_functor loc -> loc, Module
+    | Close_over (_, { closed; _ }) -> closed
+    | Is_closed_by (_, { closure; _ }) -> closure
+    | Contains_l (_, { contained; _ }) | Contains_r (_, { contained; _ }) ->
+      contained
+    | Is_contained_by (_, { container; _ }) -> container
+    | Function_argument { callee; _ } -> callee
+
   let print_mode : type a.
       [`Actual | `Expected] -> a C.obj -> Fmt.formatter -> a -> unit =
    fun side obj ppf x ->
@@ -5265,6 +5393,28 @@ module Report = struct
       Some Mode_with_hint
   [@@ocaml.warning "-4"]
 
+  let rec walk_ahint : type a l r.
+      pinpoint -> a C.obj -> (a, l * r) ahint -> Hint_chain.t =
+   fun pp obj (a, hint) ->
+    let mode = Hint_chain.Mode.P (obj, a) in
+    let axis = C.axis_of_obj obj in
+    match hint with
+    | Apply (morph_hint, src, ahint) ->
+      let step =
+        { Hint_chain.mode; pinpoint = pp; kind = Morph morph_hint; axis }
+      in
+      let src_pp = morph_src_pinpoint pp morph_hint in
+      step :: walk_ahint src_pp src ahint
+    | Const c -> [{ Hint_chain.mode; pinpoint = pp; kind = Const c; axis }]
+    | Irrelevant -> []
+
+  let walk_ahint_loosening : type a l r.
+      pinpoint ->
+      a C.obj ->
+      loosening * (a, l * r) ahint ->
+      loosening * Hint_chain.t =
+   fun pp obj (loosening, ahint) -> loosening, walk_ahint pp obj ahint
+
   let print_ahint_loosening : type a l r.
       [`Left | `Right] ->
       pinpoint ->
@@ -5346,6 +5496,14 @@ module Error = struct
     | Proj : 'r C.obj * ('r, 'a) Axis.t * 'r t -> packed
     | All : 'a C.obj * 'a t -> packed
 
+  let failing_axes : type r. r C.obj -> r t -> r C.Axis.from list =
+   fun obj { left; right; _ } ->
+    List.filter
+      (fun (C.Axis.From ax) ->
+        let ax_obj = C.proj_obj ax obj in
+        not (C.le ax_obj (C.Axis.proj ax left) (C.Axis.proj ax right)))
+      (C.Axis.from obj)
+
   let print_proj : type r a.
       Hint.pinpoint -> r C.obj -> (r, a) Axis.t -> r t -> print_error =
    fun pp obj ax err ->
@@ -5359,6 +5517,67 @@ module Error = struct
     let err = S.populate_error obj err in
     let err = Report.Of_solver.error_all obj err in
     Report.print pp obj err
+
+  let walk_report ~axis pp obj ({ Report.left; right } : _ Report.t) =
+    let _, (left_mode, _) = left in
+    let _, (right_mode, _) = right in
+    let left_loosening, left_chain = Report.walk_ahint_loosening pp obj left in
+    let right_loosening, right_chain =
+      Report.walk_ahint_loosening pp obj right
+    in
+    if C.is_opposite obj
+    then
+      { axis;
+        actual_chain = right_chain;
+        expected_chain = left_chain;
+        actual_description = describe_mode `Actual obj right_mode;
+        expected_description = describe_mode `Expected obj left_mode;
+        actual_loosening = right_loosening;
+        expected_loosening = left_loosening
+      }
+    else
+      { axis;
+        actual_chain = left_chain;
+        expected_chain = right_chain;
+        actual_description = describe_mode `Actual obj left_mode;
+        expected_description = describe_mode `Expected obj right_mode;
+        actual_loosening = left_loosening;
+        expected_loosening = right_loosening
+      }
+
+  let walk_proj : type r a.
+      Hint.pinpoint ->
+      axis:Axis.packed ->
+      r C.obj ->
+      (r, a) Axis.t ->
+      r t ->
+      axis_error =
+   fun pp ~axis obj ax err ->
+    let err = S.populate_error obj err in
+    let report = Report.Of_solver.error_proj obj ax err in
+    walk_report ~axis pp (C.proj_obj ax obj) report
+
+  let walk_all : type a.
+      Hint.pinpoint -> axis:Axis.packed -> a C.obj -> a t -> axis_error =
+   fun pp ~axis obj err ->
+    let err = S.populate_error obj err in
+    let report = Report.Of_solver.error_all obj err in
+    walk_report ~axis pp obj report
+
+  let walk_error_all : type a.
+      Hint.pinpoint -> a C.obj -> a t -> axis_error list =
+   fun pp obj err ->
+    match C.axis_of_obj obj with
+    | Some axis -> [walk_all pp ~axis obj err]
+    | None ->
+      List.map
+        (fun (C.Axis.From ax) -> walk_proj pp ~axis:(Axis.P ax) obj ax err)
+        (failing_axes obj err)
+
+  let walk_packed_all : Hint.pinpoint -> packed -> axis_error list =
+   fun pp -> function
+    | Proj (obj, _ax, err) -> walk_error_all pp obj err
+    | All (obj, err) -> walk_error_all pp obj err
 
   let print_packed : Hint.pinpoint -> packed -> print_error =
    fun pp -> function
@@ -5404,6 +5623,12 @@ let () =
     | Submode_error_simple_context (pp, err) ->
       Some (Error.print_packed_simple_context pp err)
     | _ -> None)
+
+let walk_error_all_exn exn =
+  match exn with
+  | Submode_error_simple_context (pp, packed) ->
+    Some (Error.walk_packed_all pp packed)
+  | _ -> None
 
 module type Common_axis_pos = sig
   module Const : Const
@@ -5524,6 +5749,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let print_error pp err = Error.print_all pp obj err
 
+  let walk_error_all pp err = Error.walk_error_all pp obj err
+
   let join l = S.join obj l
 
   let meet l = S.meet obj l
@@ -5630,6 +5857,8 @@ module Monadic_gen (Obj : Obj) = struct
     | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
 
   let print_error pp err = Error.print_all pp obj err
+
+  let walk_error_all pp err = Error.walk_error_all pp obj err
 
   let join l = S.meet obj l
 
@@ -6720,6 +6949,10 @@ module Value_with (Areality : Areality) = struct
       let (Error (ax, e)) = Comonadic.to_simple_error e in
       Error (Comonadic ax, e)
 
+  let walk_error_all pp : error -> _ = function
+    | Monadic e -> Monadic.walk_error_all pp e
+    | Comonadic e -> Comonadic.walk_error_all pp e
+
   let print_error pp = function
     | Monadic e -> Monadic.print_error pp e
     | Comonadic e -> Comonadic.print_error pp e
@@ -6895,6 +7128,42 @@ end
 
 module Value = Value_with (Regionality)
 module Alloc = Value_with (Locality)
+
+let alloc_atom_of_hint_mode (Hint_chain.Mode.P (obj, m)) : Alloc.atom option =
+  match obj with
+  | C.Locality -> Some (Alloc.Atom (Comonadic Areality, m))
+  | C.Regionality ->
+    begin match m with
+    | C.Regionality.Global ->
+      Some (Alloc.Atom (Comonadic Areality, C.Locality.Global))
+    | C.Regionality.Local ->
+      Some (Alloc.Atom (Comonadic Areality, C.Locality.Local))
+    | C.Regionality.Regional -> None
+    end
+  | C.Linearity -> Some (Alloc.Atom (Comonadic Linearity, m))
+  | C.Portability -> Some (Alloc.Atom (Comonadic Portability, m))
+  | C.Forkable -> Some (Alloc.Atom (Comonadic Forkable, m))
+  | C.Yielding -> Some (Alloc.Atom (Comonadic Yielding, m))
+  | C.Statefulness -> Some (Alloc.Atom (Comonadic Statefulness, m))
+  | C.Uniqueness_op -> Some (Alloc.Atom (Monadic Uniqueness, m))
+  | C.Contention_op -> Some (Alloc.Atom (Monadic Contention, m))
+  | C.Visibility_op -> Some (Alloc.Atom (Monadic Visibility, m))
+  | C.Staticity_op -> Some (Alloc.Atom (Monadic Staticity, m))
+  | C.Monadic_op | C.Comonadic_with_locality | C.Comonadic_with_regionality ->
+    None
+
+let hint_mode_of_alloc_atom (Alloc.Atom (ax, m)) : Hint_chain.Mode.t =
+  match ax with
+  | Comonadic Areality -> Hint_chain.Mode.P (C.Locality, m)
+  | Comonadic Linearity -> Hint_chain.Mode.P (C.Linearity, m)
+  | Comonadic Portability -> Hint_chain.Mode.P (C.Portability, m)
+  | Comonadic Forkable -> Hint_chain.Mode.P (C.Forkable, m)
+  | Comonadic Yielding -> Hint_chain.Mode.P (C.Yielding, m)
+  | Comonadic Statefulness -> Hint_chain.Mode.P (C.Statefulness, m)
+  | Monadic Uniqueness -> Hint_chain.Mode.P (C.Uniqueness_op, m)
+  | Monadic Contention -> Hint_chain.Mode.P (C.Contention_op, m)
+  | Monadic Visibility -> Hint_chain.Mode.P (C.Visibility_op, m)
+  | Monadic Staticity -> Hint_chain.Mode.P (C.Staticity_op, m)
 
 module Const = struct
   let locality_as_regionality = C.Locality_morph.apply Locality_as_regionality
