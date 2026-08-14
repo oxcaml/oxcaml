@@ -152,6 +152,9 @@ typing_SOURCES = \
   typing/typedecl_unboxed.mli typing/typedecl_unboxed.ml \
   typing/typedecl_immediacy.mli typing/typedecl_immediacy.ml \
   typing/typedecl_separability.mli typing/typedecl_separability.ml \
+  typing/vox_logic.mli typing/vox_logic.ml \
+  typing/vox_smtlib.mli typing/vox_smtlib.ml \
+  typing/vox_backend.mli typing/vox_backend.ml \
   typing/typeopt.mli typing/typeopt.ml \
   typing/typedecl.mli typing/typedecl.ml \
   typing/value_rec_check.mli typing/value_rec_check.ml \

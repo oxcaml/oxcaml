@@ -1,0 +1,7 @@
+x >= 0 |- x + 1 >= 0: unknown (prove query: sat; disprove query: sat)
+x >= 0, x < max_int, x < 100 |- x + 1 >= 1: proved (unused hypotheses: 1)
+x > 5 |- x < 3: refuted, e.g. x = 2305843009213693954:bv63
+|- x > 5: unknown (prove query: sat; disprove query: sat)
+xs = Cons(42, Nil) |- is-Nil xs: refuted, e.g. xs = (Cons<Int> 42 Nil<Int>)
+factoring, briefly: unknown (timeout)
+insert law at x |- member x (insert x s): proved (no unused hypotheses found)

@@ -308,6 +308,9 @@
   typedecl_variance
   typedecl_properties
   typedecl_separability
+  vox_logic
+  vox_smtlib
+  vox_backend
   cmt2annot
   out_type
   data_types
