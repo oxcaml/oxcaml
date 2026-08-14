@@ -190,7 +190,9 @@ Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended
+         logicality: mod physical ≰ mod logical
          portability: mod portable with 'a ≰ mod portable
+         totality: mod total with 'a ≰ mod total
          statefulness: mod stateless with 'a ≰ mod stateless
          visibility: mod read_write ≰ mod immutable
 |}]
@@ -211,7 +213,7 @@ type t : immutable_data = Foo of (unit -> unit)
 Line 1, characters 0-47:
 1 | type t : immutable_data = Foo of (unit -> unit)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value non_float mod immutable
+Error: The kind of type "t" is value non_float mod immutable logical
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data
          because of the annotation on the declaration of the type t.
@@ -244,7 +246,7 @@ type t : mutable_data = Foo of { x : unit -> unit }
 Line 1, characters 0-51:
 1 | type t : mutable_data = Foo of { x : unit -> unit }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value non_float mod immutable
+Error: The kind of type "t" is value non_float mod immutable logical
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of mutable_data
          because of the annotation on the declaration of the type t.
@@ -357,6 +359,7 @@ Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended with 'a
+         logicality: mod physical ≰ mod logical with 'a
          visibility: mod read_write ≰ mod immutable with 'a
 |}]
 
@@ -365,7 +368,7 @@ type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
 Line 1, characters 0-60:
 1 | type 'a t : immutable_data with 'a = Foo of { x : 'a -> 'a }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value non_float mod immutable
+Error: The kind of type "t" is value non_float mod immutable logical
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immutable_data with 'a
          because of the annotation on the declaration of the type t.
@@ -700,7 +703,7 @@ Line 1, characters 24-28:
                             ^^^^
 Error: The value "func" has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod portable)"
-       The kind of (unit -> unit) t is value non_float mod immutable
+       The kind of (unit -> unit) t is value non_float mod immutable logical
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod portable
@@ -725,7 +728,7 @@ Line 1, characters 24-28:
                             ^^^^
 Error: The value "func" has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod external_)"
-       The kind of (unit -> unit) t is value non_float mod immutable
+       The kind of (unit -> unit) t is value non_float mod immutable logical
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod external_
@@ -820,7 +823,7 @@ Line 1, characters 14-30:
                   ^^^^^^^^^^^^^^^^
 Error: This type "(unit -> unit) t" should be an instance of type
          "('a : value mod portable)"
-       The kind of (unit -> unit) t is value non_float mod immutable
+       The kind of (unit -> unit) t is value non_float mod immutable logical
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod portable
@@ -1072,13 +1075,5 @@ let f (x : M.t many) = cross_contended x
 [%%expect {|
 module M : sig type t end
 type 'a many = Foo of ('a * 'a) many | Leaf
-Line 3, characters 39-40:
-3 | let f (x : M.t many) = cross_contended x
-                                           ^
-Error: The value "x" has type "M.t many" but an expression was expected of type
-         "('a : value mod contended)"
-       The kind of M.t many is immutable_data with (M.t * M.t) many
-         because of the definition of many at line 2, characters 0-43.
-       But the kind of M.t many must be a subkind of value mod contended
-         because of the definition of cross_contended at line 9, characters 59-70.
+val f : M.t many -> unit = <fun>
 |}]

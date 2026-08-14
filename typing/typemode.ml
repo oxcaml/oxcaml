@@ -80,6 +80,10 @@ module Mode_axis_pair = struct
     | "corruptible" -> comonadic Portability Corruptible
     | "shareable" -> comonadic Portability Shareable
     | "portable" -> comonadic Portability Portable
+    | "total" -> comonadic Totality Total
+    | "partial" -> comonadic Totality Partial
+    | "physical" -> monadic Logicality Physical
+    | "logical" -> monadic Logicality Logical
     | "contended" -> monadic Contention Contended
     | "corrupted" -> monadic Contention Corrupted
     | "shared" -> monadic Contention Shared
@@ -105,11 +109,18 @@ module Modality_axis_pair = struct
   type t = Modality.atom
 
   let of_string s : t =
-    match[@warning "-18"]
-      Mode_axis_pair.to_value (Mode_axis_pair.of_string s)
-    with
-    | Atom (Monadic ax, mode) -> Atom (Monadic ax, Join_const mode)
-    | Atom (Comonadic ax, mode) -> Atom (Comonadic ax, Meet_const mode)
+    (* The modality parser reads a monadic axis as a join, so the Physical end
+       of logicality is spelled [nonlogical] and [physical] does not exist in
+       modality position. *)
+    match[@warning "-18"] s with
+    | "nonlogical" -> Modality.Atom (Monadic Logicality, Join_const Physical)
+    | "physical" -> raise Not_found
+    | _ -> (
+      match[@warning "-18"]
+        Mode_axis_pair.to_value (Mode_axis_pair.of_string s)
+      with
+      | Atom (Monadic ax, mode) -> Atom (Monadic ax, Join_const mode)
+      | Atom (Comonadic ax, mode) -> Atom (Comonadic ax, Meet_const mode))
 end
 
 module Nonmodal_axis_pair = struct
@@ -269,24 +280,14 @@ let untransl_mode modes =
   in
   List.map untransl_annot modes.mode_desc
 
-let mode_annot_to_modality_annot mode_annot =
-  Location.map
-    (fun mode : Modality.atom ->
-      let (Atom (ax, mode)) = Mode_axis_pair.to_value mode in
-      match[@warning "-18"] ax with
-      | Comonadic ax -> Atom (Comonadic ax, Meet_const mode)
-      | Monadic ax -> Atom (Monadic ax, Join_const mode))
-    mode_annot
-
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
-  let mode =
-    try Mode_axis_pair.(of_string modality)
+  let atom =
+    try Modality_axis_pair.of_string modality
     with Not_found ->
       raise (Error (loc, Unrecognized_modifier (Modality, modality)))
   in
-  let mode_annot = { txt = mode; loc } in
-  mode_annot_to_modality_annot mode_annot
+  { txt = atom; loc }
 
 let untransl_modality =
   Location.map (fun (Atom (ax, t) : Modality.atom) : Parsetree.modality ->

@@ -6310,10 +6310,12 @@ let mode_crossing_structure_memaddr =
   Mode.Crossing.create
     ~uniqueness:false
     ~contention:true
+    ~logicality:false
     ~visibility:true
     ~regionality:false
     ~linearity:true
     ~portability:true
+    ~totality:true
     ~forkable:true
     ~yielding:true
     ~statefulness:true
@@ -6324,10 +6326,12 @@ let mode_crossing_functor =
   Mode.Crossing.create
     ~uniqueness:true
     ~contention:true
+    ~logicality:true
     ~visibility:true
     ~regionality:false
     ~linearity:false
     ~portability:false
+    ~totality:false
     ~forkable:false
     ~yielding:false
     ~statefulness:false
@@ -8905,8 +8909,8 @@ let exn_constructor_crossing env lid ~args locks =
       None ((Mode.Value.(disallow_right min)), locks)
   in
   (* Exceptions cross contention and visibility on the monadic side, and
-     portability and statefulness on the comonadic side, so we project those
-     axes. *)
+     portability, totality, and statefulness on the comonadic side, so we
+     project those axes. *)
   let monadic_mode = vmode.monadic in
   let monadic =
     [ monadic_mode
@@ -8925,6 +8929,9 @@ let exn_constructor_crossing env lid ~args locks =
     [ comonadic_source
       |> Mode.Value.Comonadic.proj Portability
       |> Mode.Value.Comonadic.max_with Portability;
+      comonadic_source
+      |> Mode.Value.Comonadic.proj Totality
+      |> Mode.Value.Comonadic.max_with Totality;
       comonadic_source
       |> Mode.Value.Comonadic.proj Statefulness
       |> Mode.Value.Comonadic.max_with Statefulness

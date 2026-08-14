@@ -777,7 +777,7 @@ Line 1, characters 26-40:
 1 | let fails = restricted [| fun () -> "no" |]
                               ^^^^^^^^^^^^^^
 Error:
-       The kind of 'a -> 'b is value non_float mod aliased immutable
+       The kind of 'a -> 'b is value non_float mod aliased immutable logical
          because it's a function type.
        But the kind of 'a -> 'b must be a subkind of
            value_maybe_null mod portable contended

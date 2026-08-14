@@ -54,6 +54,8 @@ Error: The kind of type "t" is immutable_data with 'a @@ portable
        The first mode-crosses less than the second along:
          linearity: mod many with 'a ≰ mod many
          contention: mod contended with 'a ≰ mod contended
+         logicality: mod logical with 'a ≰ mod logical
+         totality: mod total with 'a ≰ mod total
          forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
          statefulness: mod stateless with 'a ≰ mod stateless
@@ -107,7 +109,9 @@ Error: Signature mismatch:
          because of the definition of t at line 2, characters 2-28.
 
        The first mode-crosses less than the second along:
+         logicality: mod logical with 'a ≰ mod logical
          portability: mod portable with 'a ≰ mod portable
+         totality: mod total with 'a ≰ mod total
          forkable: mod forkable with 'a ≰ mod forkable
          yielding: mod unyielding with 'a ≰ mod unyielding
          statefulness: mod stateless with 'a ≰ mod stateless
@@ -208,7 +212,8 @@ Line 3, characters 11-25:
                ^^^^^^^^^^^^^^
 Error: This type "(int -> int) u" should be an instance of type
          "('a : immutable_data)"
-       The kind of (int -> int) u is value non_float mod immutable portable
+       The kind of (int -> int) u is
+           value non_float mod immutable portable logical
          because of the definition of u at line 1, characters 0-33.
        But the kind of (int -> int) u must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.
@@ -447,5 +452,6 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended with 'a
+         logicality: mod physical ≰ mod logical with 'a
          visibility: mod read_write ≰ mod immutable with 'a
 |}]

@@ -21,6 +21,8 @@ type t
           many
           stateless
           immutable
+          total
+          logical
           portable
           contended
           local
@@ -37,6 +39,8 @@ type t
           many
           stateless
           immutable
+          total
+          logical
           forkable
           unyielding
           aliased
@@ -60,6 +64,8 @@ type t
           read_write
           nonportable
           uncontended
+          partial
+          nonlogical
           static
 |}]
 
@@ -76,6 +82,8 @@ type t
           read_write
           nonportable
           uncontended
+          partial
+          nonlogical
           static
           internal
 |}]
@@ -93,6 +101,8 @@ type t
           stateful
           read_write
           uncontended
+          partial
+          nonlogical
           static
           internal
 |}]
@@ -110,6 +120,8 @@ type t
           unique
           read_write
           uncontended
+          partial
+          nonlogical
           static
           internal
 |}]
@@ -123,6 +135,8 @@ type 'a t
           many
           stateless
           immutable
+          total
+          logical
           portable
           contended
           local
@@ -141,6 +155,8 @@ type ('a
              many
              stateless
              immutable
+             total
+             logical
              portable
              contended
              local
@@ -163,6 +179,8 @@ type ('a
              unique
              read_write
              uncontended
+             partial
+             nonlogical
              static
              internal)
      t
@@ -182,6 +200,8 @@ type 'a t
           stateful
           read_write
           uncontended
+          partial
+          nonlogical
           static
       with 'a @@ external_
 |}]
@@ -200,6 +220,8 @@ type 'a t
           read_write
           nonportable
           uncontended
+          partial
+          nonlogical
           static
 |}]
 
@@ -212,6 +234,8 @@ type 'a t
           many
           stateless
           immutable
+          total
+          logical
           portable
           contended
           local

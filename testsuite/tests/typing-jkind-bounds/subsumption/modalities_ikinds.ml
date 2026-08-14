@@ -375,9 +375,21 @@ end
 
 module type T = S with type t = t
 [%%expect {|
-type t : immutable_data
+type t : mutable_data mod immutable
 module type S = sig type t : immutable_data end
-module type T = sig type t = t end
+Line 7, characters 16-33:
+7 | module type T = S with type t = t
+                    ^^^^^^^^^^^^^^^^^
+Error: In this "with" constraint, the new definition of "t"
+       does not match its original definition in the constrained signature:
+       Type declarations do not match:
+         type t = t
+       is not included in
+         type t : immutable_data
+       The kind of the first is mutable_data mod immutable
+         because of the definition of t at line 1, characters 0-49.
+       But the kind of the first must be a subkind of immutable_data
+         because of the definition of t at line 4, characters 2-25.
 |}]
 
 (* Test case for bug where type abbreviations incorrectly satisfy modal kinds.

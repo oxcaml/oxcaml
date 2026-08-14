@@ -53,21 +53,23 @@ kind_ immutable_data =
             non_float
 
 [%%expect{|
-kind_ immutable_data = immutable_data
+kind_ immutable_data =
+value non_float mod forkable unyielding many stateless immutable
 |}]
 
 kind_ sync_data = value mod many contended portable forkable unyielding
                             stateless non_float
 
 [%%expect{|
-kind_ sync_data = sync_data
+kind_ sync_data =
+value non_float mod forkable unyielding many stateless contended
 |}]
 
 kind_ mutable_data = value mod many portable forkable unyielding stateless
                                non_float
 
 [%%expect{|
-kind_ mutable_data = mutable_data
+kind_ mutable_data = value non_float mod forkable unyielding many stateless
 |}]
 
 module type S = sig
@@ -222,7 +224,7 @@ Error: The layout of type "a" is value
 type a : value non_pointer mod global many immutable stateless external_
 type b : value mod contended = a
 [%%expect{|
-type a : immediate
+type a : value non_pointer mod global many stateless immutable external_
 type b = a
 |}]
 
@@ -283,8 +285,15 @@ type d : immediate = c
 [%%expect{|
 type a : immediate
 type b = a
-type c : immediate
-type d = c
+type c : value non_pointer mod global many stateless immutable external_
+Line 4, characters 0-22:
+4 | type d : immediate = c
+    ^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is
+           value non_pointer mod global many stateless immutable external_
+         because of the definition of c at line 3, characters 0-72.
+       But the kind of type "c" must be a subkind of immediate
+         because of the definition of d at line 4, characters 0-22.
 |}]
 
 type a : immediate64
@@ -294,8 +303,15 @@ type d : immediate64 = c
 [%%expect{|
 type a : immediate64
 type b = a
-type c : immediate64
-type d = c
+type c : value non_pointer64 mod global many stateless immutable external64
+Line 4, characters 0-24:
+4 | type d : immediate64 = c
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is
+           value non_pointer64 mod global many stateless immutable external64
+         because of the definition of c at line 3, characters 0-75.
+       But the kind of type "c" must be a subkind of immediate64
+         because of the definition of d at line 4, characters 0-24.
 |}]
 
 type a : float64 = float#
@@ -305,7 +321,7 @@ type d : float64 = c
 [%%expect{|
 type a = float#
 type b = a
-type c : float64 mod everything
+type c : float64 mod global many stateless immutable
 type d = c
 |}]
 
@@ -316,7 +332,7 @@ type d : float32 = c
 [%%expect{|
 type a = float32#
 type b = a
-type c : float32 mod everything
+type c : float32 mod global many stateless immutable
 type d = c
 |}]
 
@@ -1286,7 +1302,8 @@ type ('a : bits32 mod aliased) t = ('a : any mod global)
 type ('a : value mod global) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
-type ('a : value mod everything non_float) t = 'a
+type ('a : value non_float mod global many stateless immutable external_) t =
+    'a
 type 'a t = 'a
 type 'a t = 'a
 type ('a : bits32 mod global) t = 'a

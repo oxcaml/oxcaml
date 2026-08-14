@@ -513,7 +513,9 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Monadic Uniqueness))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Linearity))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Contention))
+    @@ Sub_result.combine (modal_less_or_equal (Monadic Logicality))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Portability))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Totality))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Forkable))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Yielding))
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
@@ -545,7 +547,9 @@ module Mod_bounds = struct
     |> add_crossing_if (Comonadic Linearity)
     |> add_crossing_if (Monadic Uniqueness)
     |> add_crossing_if (Comonadic Portability)
+    |> add_crossing_if (Comonadic Totality)
     |> add_crossing_if (Monadic Contention)
+    |> add_crossing_if (Monadic Logicality)
     |> add_crossing_if (Comonadic Forkable)
     |> add_crossing_if (Comonadic Yielding)
     |> add_crossing_if (Comonadic Statefulness)
@@ -1242,6 +1246,8 @@ module Base_and_axes = struct
                     (value_for_axis ~axis:(Modal (Monadic Uniqueness)))
                   ~contention:
                     (value_for_axis ~axis:(Modal (Monadic Contention)))
+                  ~logicality:
+                    (value_for_axis ~axis:(Modal (Monadic Logicality)))
                   ~visibility:
                     (value_for_axis ~axis:(Modal (Monadic Visibility)))
                   ~staticity:(value_for_axis ~axis:(Modal (Monadic Staticity)))
@@ -1254,6 +1260,7 @@ module Base_and_axes = struct
                     (value_for_axis ~axis:(Modal (Comonadic Linearity)))
                   ~portability:
                     (value_for_axis ~axis:(Modal (Comonadic Portability)))
+                  ~totality:(value_for_axis ~axis:(Modal (Comonadic Totality)))
                   ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
                   ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
                   ~statefulness:
@@ -2514,6 +2521,7 @@ let for_object =
         (* Since [global] implies [aliased] in presence of borrowing,
            objects also cross uniqueness. *)
       ~contention:(Crossing.Per_axis.max (Crossing.Axis.Monadic Contention))
+      ~logicality:(Crossing.Per_axis.max (Crossing.Axis.Monadic Logicality))
       ~visibility:(Crossing.Per_axis.max (Crossing.Axis.Monadic Visibility))
       ~staticity:(Crossing.Per_axis.max (Crossing.Axis.Monadic Staticity))
   in

@@ -596,7 +596,8 @@ type fails : immutable_data = int -> int
 Line 1, characters 0-40:
 1 | type fails : immutable_data = int -> int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "int -> int" is value non_float mod aliased immutable
+Error: The kind of type "int -> int" is
+           value non_float mod aliased immutable logical
          because it's a function type.
        But the kind of type "int -> int" must be a subkind of immutable_data
          because of the definition of fails at line 1, characters 0-40.
@@ -607,7 +608,8 @@ type should_fail : immutable_data = [`A of int -> int]
 Line 1, characters 0-54:
 1 | type should_fail : immutable_data = [`A of int -> int]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "[ `A of int -> int ]" is value non_float mod immutable
+Error: The kind of type "[ `A of int -> int ]" is
+           value non_float mod immutable logical
          because it's a polymorphic variant type.
        But the kind of type "[ `A of int -> int ]" must be a subkind of
            immutable_data
@@ -620,7 +622,7 @@ Line 1, characters 0-76:
 1 | type should_also_fail : immutable_data = [`A of int -> int | `B of 'a] as 'a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "[ `A of int -> int | `B of 'a ] as 'a" is
-           value non_float mod immutable
+           value non_float mod immutable logical
          because it's a polymorphic variant type.
        But the kind of type "[ `A of int -> int | `B of 'a ] as 'a" must be a subkind of
          immutable_data
@@ -681,7 +683,8 @@ type this_fails : immutable_data = (int -> int) list
 Line 1, characters 0-52:
 1 | type this_fails : immutable_data = (int -> int) list
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "(int -> int) list" is value non_float mod immutable
+Error: The kind of type "(int -> int) list" is
+           value non_float mod immutable logical
          because it's a boxed variant type.
        But the kind of type "(int -> int) list" must be a subkind of
            immutable_data

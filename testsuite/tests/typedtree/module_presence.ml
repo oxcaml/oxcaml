@@ -60,7 +60,7 @@ module type T = sig module Y = X end
               module_type
                 Tmty_alias "X/328"
         ]
-        join_const(unique,uncontended,read_write,static);meet_const(local,once,nonportable,unforkable,yielding,stateful)
+        join_const(unique,uncontended,physical,read_write,static);meet_const(local,once,nonportable,partial,unforkable,yielding,stateful)
         []
 ]
 

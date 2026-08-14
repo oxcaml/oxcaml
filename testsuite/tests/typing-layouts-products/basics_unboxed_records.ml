@@ -764,8 +764,8 @@ Line 1, characters 0-61:
 1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "q" is
-           value non_float mod aliased immutable
-           & value non_float mod aliased immutable
+           value non_float mod aliased immutable logical
+           & value non_float mod aliased immutable logical
          because it is an unboxed record.
        But the kind of type "q" must be a subkind of
            any mod portable & any mod portable

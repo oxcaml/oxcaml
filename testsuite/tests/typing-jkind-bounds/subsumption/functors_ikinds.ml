@@ -67,6 +67,7 @@ Error: The kind of type "'a F(Ref).t" is
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended with 'a
+         logicality: mod physical ≰ mod logical with 'a
          visibility: mod read_write ≰ mod immutable with 'a
 |}]
 
@@ -87,6 +88,7 @@ Error: The kind of type "'a F(Ref).t" is
 
        The first mode-crosses less than the second along:
          portability: mod portable with 'a ≰ mod portable
+         totality: mod total with 'a ≰ mod total
          statefulness: mod stateless with 'a ≰ mod stateless
 |}]
 

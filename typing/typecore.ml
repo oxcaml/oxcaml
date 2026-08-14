@@ -676,6 +676,36 @@ let mode_strictly_local expected_mode =
 let mode_coerce mode expected_mode =
   mode_morph (fun m -> Value.meet [m; mode]) expected_mode
 
+(* For anything interesting to be total, total primitives must be declared
+   total; otherwise only closures that call nothing qualify.  These neither
+   diverge nor raise nor touch mutable state.  [%divint] and [%modint] are
+   deliberately absent: they raise on a zero divisor.  Comparisons are also
+   absent: polymorphic comparison can raise on functions and diverge on cyclic
+   values. *)
+let primitive_is_total = function
+  | "%identity"
+  | "%negint" | "%succint" | "%predint"
+  | "%addint" | "%subint" | "%mulint"
+  | "%andint" | "%orint" | "%xorint"
+  | "%lslint" | "%lsrint" | "%asrint"
+  | "%negfloat" | "%absfloat"
+  | "%addfloat" | "%subfloat" | "%mulfloat" | "%divfloat"
+  | "%floatofint" | "%intoffloat"
+  | "%boolnot" | "%sequand" | "%sequor"
+  | "%field0_immut" | "%field1_immut"
+  | "%apply" | "%revapply" -> true
+  | _ -> false
+
+let total_primitive_mode mode =
+  mode |> Value.meet_const_with Totality Totality.Const.Total
+
+(* Syntactic effect forms ([while], [for], mutable assignment, forcing a lazy)
+   have no partial value to capture, so each constrains the totality of every
+   enclosing closure to partial by walking the closure locks, in the same way
+   [Env.walk_locks_for_legacy_construct] does for effect handlers. *)
+let constrain_enclosing_totality ~loc env =
+  Env.constrain_enclosing_totality_partial ~env (loc, Function)
+
 let mode_lazy expected_mode =
   let mode =
     Value.{
@@ -688,8 +718,13 @@ let mode_lazy expected_mode =
     mode_coerce (Value.of_const ~hint_comonadic:Lazy_allocated_on_heap mode)
       expected_mode
   in
+  (* [~totality:false] couples the lazy to its thunk: forcing runs the whole
+     thunk, so a partial body has to make the lazy partial.  [~portability:true]
+     decouples because a lazy's portability is that of its forced result, not of
+     values merely used inside the thunk. *)
   let mode_crossing =
     Crossing.create ~linearity:true ~portability:true
+      ~totality:false ~logicality:false
       ~regionality:false ~uniqueness:false ~contention:false ~statefulness:false
       ~visibility:false ~forkable:false ~yielding:false ~staticity:false
   in
@@ -1277,7 +1312,8 @@ let mode_project_mutable mut_name =
   let mode =
     { Value.Const.max with
       visibility = Visibility.Const.Read;
-      contention = Contention.Const.Shared }
+      contention = Contention.Const.Shared;
+      logicality = Logicality.Const.Physical }
     |> Value.of_const ~hint_monadic:(Mutable_read mut_name)
   in
   mode_default mode
@@ -1287,7 +1323,8 @@ let mode_mutate_mutable mut_name =
   let mode =
     { Value.Const.max with
       visibility = Write;
-      contention = Corrupted }
+      contention = Corrupted;
+      logicality = Logicality.Const.Physical }
     |> Value.of_const ~hint_monadic:(Mutable_write mut_name)
   in
   mode_default mode
@@ -3980,6 +4017,9 @@ and type_pat_aux
            pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_lazy sp1 ->
       submode ~loc ~env:!!penv alloc_mode.mode mode_force_lazy;
+      (* Matching a [lazy] pattern forces the thunk, which runs arbitrary
+         code. *)
+      constrain_enclosing_totality ~loc !!penv;
       let nv = solve_Ppat_lazy loc penv expected_ty in
       let alloc_mode = global_pat_mode alloc_mode in
       let p1 =
@@ -6344,6 +6384,15 @@ let split_function_ty
     match is_first_val_param with
     | false -> env
     | true ->
+        (* (Hereditary): a function literal nested inside a closure demanded
+           total must itself be total, whatever the source of its partiality.
+           Submoding this literal's totality into every enclosing closure lock
+           reaches let-bound literals that the expected-mode edge (return, if
+           and argument position) misses.  [env] here still holds only the
+           enclosing closure locks; this literal's own lock is added below. *)
+        Env.constrain_enclosing_totality_at_least ~env (loc_fun, Function)
+          (Alloc.proj_comonadic Totality alloc_mode
+           |> Totality.disallow_right);
         let env =
           Env.add_closure_lock
             (loc, Function)
@@ -6572,7 +6621,36 @@ let vb_pat_constraint
 let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   let pat_mode, exp_mode =
     if force_toplevel
-    then simple_pat_mode Value.legacy, mode_legacy
+    then begin
+      (* Toplevel bindings are pinned to legacy, except that a [total] or
+         [logical] annotation raises the floor on its axis (so the binding is
+         usable at that mode later), and an unannotated binding's logicality is
+         left free between [physical] and [logical] so that rebinding a logical
+         value stays possible. *)
+      let mode_annots = mode_annots_from_pat spat in
+      let lower = Value.Const.legacy in
+      let lower =
+        match mode_annots.mode_modes.totality with
+        | Some Totality.Const.Total ->
+            { lower with totality = Totality.Const.Total }
+        | Some Partial | None -> lower
+      in
+      let lower =
+        match mode_annots.mode_modes.logicality with
+        | Some Logicality.Const.Logical ->
+            { lower with logicality = Logicality.Const.Logical }
+        | Some Physical | None -> lower
+      in
+      let upper =
+        match mode_annots.mode_modes.logicality with
+        | None -> { lower with logicality = Logicality.Const.Logical }
+        | Some _ -> lower
+      in
+      let mode = Value.newvar () in
+      Value.submode_exn (Value.of_const lower) mode;
+      Value.submode_exn mode (Value.of_const upper);
+      simple_pat_mode mode, mode_default mode
+    end
     else match rec_mode_var with
     | None -> begin
         match pat_tuple_arity spat with
@@ -7728,6 +7806,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_setfield(srecord, lid, snewval) ->
+      constrain_enclosing_totality ~loc env;
       let (record, _, rmode, label, expected_type, ambiguity) =
         type_label_access Legacy env srecord Env.Mutation lid in
       let ty_record =
@@ -7982,6 +8061,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_while(scond, sbody) ->
+      constrain_enclosing_totality ~loc env;
       let env =
         Env.add_const_closure_lock ~ghost:true (loc, Loop)
           {Value.Comonadic.Const.max with linearity = Many} env
@@ -8011,6 +8091,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_for(param, slow, shigh, dir, sbody) ->
+      constrain_enclosing_totality ~loc env;
       let for_from =
         type_expect env (mode_region Value.max) slow
           (mk_expected ~explanation:For_loop_start_index Predef.type_int)
@@ -8173,6 +8254,7 @@ and type_expect_
               exp_env = env }
         end
   | Pexp_setvar (lab, snewval) ->
+      constrain_enclosing_totality ~loc env;
       let desc =
         match Env.lookup_settable_variable ~loc lab.txt env with
         | Instance_variable (path, Mutable, cl_num,ty) ->
@@ -8313,6 +8395,8 @@ and type_expect_
         exp_env = env }
 
   | Pexp_assert (e) ->
+      (* [assert] can raise [Assert_failure]. *)
+      constrain_enclosing_totality ~loc env;
       let cond =
         type_expect env mode_max e
           (mk_expected ~explanation:Assert_condition Predef.type_bool)
@@ -8781,6 +8865,7 @@ and type_expect_
         ~attributes:sexp.pexp_attributes
         comp
   | Pexp_overwrite (exp1, exp2) ->
+      constrain_enclosing_totality ~loc env;
       if not (Language_extension.is_enabled Overwriting) then
         raise (Typetexp.Error (loc, env, Unsupported_extension Overwriting));
       if not (can_be_overwritten exp2.pexp_desc) then
@@ -9221,6 +9306,16 @@ and type_ident env ?(recarg=Rejected) lid =
   Therefore, we need to cross modes upon look-up. Ideally that should be done in
   [Env], but that is difficult due to cyclic dependency between jkind and env. *)
   let mode = cross_left env desc.val_type mode in
+  (* Total primitives are declared total here: primitives sit at legacy
+     [partial] like every other value, and the allowlist is what lets a total
+     closure call them. *)
+  let mode =
+    match desc.val_kind with
+    | Val_prim { prim_name; _ } when primitive_is_total prim_name ->
+        total_primitive_mode mode
+    | Val_reg _ | Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _
+    | Val_anc _ -> mode
+  in
   (* There can be locks between the definition and a use of a value. For
   example, if a function closes over a value, there will be Closure_lock between
   the value's definition and the value's use in the function. Walking the locks
@@ -11221,8 +11316,16 @@ and map_half_typed_cases
   if val_cases = [] && exn_cases <> [] then
     raise (Error (loc, env, No_value_clauses));
   let partial =
-    if check_if_total then
-      check_partial ~lev env ty_arg_check loc val_cases
+    if check_if_total then begin
+      let partial = check_partial ~lev env ty_arg_check loc val_cases in
+      (* A non-exhaustive match can raise [Match_failure], so it constrains
+         the enclosing closures to partial, like the other syntactic effect
+         forms. *)
+      (match partial with
+       | Partial -> constrain_enclosing_totality ~loc env
+       | Total -> ());
+      partial
+    end
     else
       Partial
   in
@@ -11455,6 +11558,17 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         Some m
     | Nonrecursive -> None
   in
+  (* (Rec): inside the right-hand sides of a [let rec], the bound variables sit
+     at [partial], so a recursive closure captures itself at partial and comes
+     out partial.  Crossing stays type-directed: an arrow-free recursive value
+     (e.g. [let rec x = 1]) still crosses to total at its use sites. *)
+  Option.iter
+    (fun m ->
+      Value.submode_exn
+        (Value.of_const
+           { Value.Const.min with totality = Totality.Const.Partial })
+        m)
+    rec_mode_var;
   let spatl = List.map vb_pat_constraint spat_sexp_list in
   let spatl =
     List.map (pat_modes ~force_toplevel rec_mode_var ~is_lpoly) spatl
@@ -11588,8 +11702,11 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           Builtin_attributes.warning_scope ~ppwarning:false attrs
             (fun () ->
               let case = Parmatch.typed_case (case pat exp) in
-              ignore(check_partial env pat.pat_type pat.pat_loc
-                       [case] : Typedtree.partial)
+              (match check_partial env pat.pat_type pat.pat_loc [case] with
+               | Partial ->
+                   (* A non-exhaustive let pattern can raise [Match_failure]. *)
+                   constrain_enclosing_totality ~loc:pat.pat_loc env
+               | Total -> ())
             )
         )
         mode_pat_typ_list

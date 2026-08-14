@@ -152,6 +152,7 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended with 'b
+         logicality: mod physical ≰ mod logical with 'b
          visibility: mod read_write ≰ mod immutable with 'b
 |}]
 

@@ -23,7 +23,7 @@ end
 val portable_use : 'a @ portable -> unit = <fun>
 module type S = sig val x : 'a -> unit end
 module type SL = sig type 'a t end
-module M : sig type 'a t = int val x : 'a -> unit end @@ stateless
+module M : sig type 'a t = int val x : 'a -> unit end @@ stateless total
 val foo : unit -> unit = <fun>
 module F : functor (X : S) -> sig type t = int val x : 'a -> unit end
 |}]
@@ -161,7 +161,7 @@ module M : S = struct
 end
 [%%expect{|
 module type S = sig val foo : 'a -> 'a val baz : 'a -> 'a @@ portable end
-module M : S @@ stateless nonportable
+module M : S @@ stateless nonportable total
 |}]
 
 let (bar @ portable) () =
@@ -243,7 +243,7 @@ Error: The module "M" is "nonportable"
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-module F : functor (X : S @ portable) -> sig end @@ stateless
+module F : functor (X : S @ portable) -> sig end @@ stateless total
 |}]
 
 module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
@@ -260,8 +260,9 @@ module F () = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-module F : functor () -> sig val foo : unit -> unit @@ stateless end @ once
-  @@ stateless
+module F :
+  functor () -> sig val foo : unit -> unit @@ stateless total end @ once @@
+  stateless total
 |}]
 
 module type Empty = sig end
@@ -326,13 +327,13 @@ end
 [%%expect{|
 module Test_incl :
   sig
-    module M : sig val foo : 'a -> 'a @@ stateless end
-    module type S = sig val foo : 'a -> 'a @@ stateless end
+    module M : sig val foo : 'a -> 'a @@ stateless total end
+    module type S = sig val foo : 'a -> 'a @@ stateless total end
     module N :
       sig
-        val x : int ref @@ stateless
+        val x : int ref @@ stateless total
         val f : unit -> unit
-        val foo : 'a -> 'a @@ stateless
+        val foo : 'a -> 'a @@ stateless total
       end
   end
 |}]
@@ -393,7 +394,7 @@ end
 [%%expect{|
 module F :
   functor (X : sig val x : int -> int end) -> sig val bar : int -> int end @@
-  stateless
+  stateless total
 |}]
 
 

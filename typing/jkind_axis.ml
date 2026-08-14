@@ -140,7 +140,9 @@ module Axis = struct
       Pack (Modal (Monadic Uniqueness));
       Pack (Modal (Comonadic Linearity));
       Pack (Modal (Monadic Contention));
+      Pack (Modal (Monadic Logicality));
       Pack (Modal (Comonadic Portability));
+      Pack (Modal (Comonadic Totality));
       Pack (Modal (Comonadic Forkable));
       Pack (Modal (Comonadic Yielding));
       Pack (Modal (Comonadic Statefulness));
@@ -258,14 +260,16 @@ module Axis_set = struct
     | Modal (Monadic Uniqueness) -> 1
     | Modal (Comonadic Linearity) -> 2
     | Modal (Monadic Contention) -> 3
-    | Modal (Comonadic Portability) -> 4
-    | Modal (Comonadic Forkable) -> 5
-    | Modal (Comonadic Yielding) -> 6
-    | Modal (Comonadic Statefulness) -> 7
-    | Modal (Monadic Visibility) -> 8
-    | Modal (Monadic Staticity) -> 9
+    | Modal (Monadic Logicality) -> 4
+    | Modal (Comonadic Portability) -> 5
+    | Modal (Comonadic Totality) -> 6
+    | Modal (Comonadic Forkable) -> 7
+    | Modal (Comonadic Yielding) -> 8
+    | Modal (Comonadic Statefulness) -> 9
+    | Modal (Monadic Visibility) -> 10
+    | Modal (Monadic Staticity) -> 11
     (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
-    | Nonmodal Externality -> 10
+    | Nonmodal Externality -> 12
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 
@@ -289,7 +293,9 @@ module Axis_set = struct
     |> set_axis (Modal (Monadic Uniqueness))
     |> set_axis (Modal (Comonadic Linearity))
     |> set_axis (Modal (Monadic Contention))
+    |> set_axis (Modal (Monadic Logicality))
     |> set_axis (Modal (Comonadic Portability))
+    |> set_axis (Modal (Comonadic Totality))
     |> set_axis (Modal (Comonadic Forkable))
     |> set_axis (Modal (Comonadic Yielding))
     |> set_axis (Modal (Comonadic Statefulness))

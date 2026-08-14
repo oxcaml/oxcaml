@@ -172,7 +172,8 @@ type t17b : value & value
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
   ('a : value mod immutable global)
 [%%expect{|
-type ('a : value mod everything non_float) t18 = 'a
+type ('a : value non_float mod global many stateless immutable external_) t18 =
+    'a
 |}]
 
 type t = #(int * float#)
@@ -193,7 +194,7 @@ let x () = #( M.Null, M.This "hi" )
 [%%expect{|
 module M :
   sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
-  stateless
+  stateless total
 val x : unit -> #('a M.t * string M.t) = <fun>
 |}]
 
@@ -204,7 +205,7 @@ let y () = #( Or_null_names.Nope, Or_null_names.Yep "hi" )
 
 [%%expect{|
 module Or_null_names : sig type 'a t = Nope | Yep of 'a [@@or_null] end @@
-  stateless
+  stateless total
 val y : unit -> #('a Or_null_names.t * string Or_null_names.t) = <fun>
 |}]
 
@@ -675,36 +676,36 @@ module type S = sig end
 module M = struct end
 [%%expect{|
 module type S = sig end
-module M : sig end @@ stateless
+module M : sig end @@ stateless total
 |}]
 
 module F (X : S @ portable) = struct
 end
 [%%expect{|
-module F : functor (X : S @ portable) -> sig end @@ stateless
+module F : functor (X : S @ portable) -> sig end @@ stateless total
 |}]
 
 module F (_ : S @ portable) = struct
 end
 [%%expect{|
-module F : S @ portable -> sig end @@ stateless
+module F : S @ portable -> sig end @@ stateless total
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-module M' : S @@ stateless
+module M' : S @@ stateless total
 |}]
 
 module F (M : S @ portable) : S @ portable = struct
 end
 [%%expect{|
-module F : functor (M : S @ portable) -> S @@ stateless
+module F : functor (M : S @ portable) -> S @@ stateless total
 |}]
 
 module F (M : S @ portable) @ portable = struct
 end
 [%%expect{|
-module F : functor (M : S @ portable) -> sig end @@ stateless
+module F : functor (M : S @ portable) -> sig end @@ stateless total
 |}]
 
 
@@ -713,22 +714,22 @@ module F : functor (M : S @ portable) -> sig end @@ stateless
   be an binary operator *)
 module M' = (M @ portable)
 [%%expect{|
-module M' = M @@ stateless
+module M' = M @@ stateless total
 |}]
 
 module M' = (M : S @ portable)
 [%%expect{|
-module M' : S @@ stateless
+module M' : S @@ stateless total
 |}]
 
 module M @ portable = struct end
 [%%expect{|
-module M : sig end @@ stateless
+module M : sig end @@ stateless total
 |}]
 
 module M : S @ portable = struct end
 [%%expect{|
-module M : S @@ stateless
+module M : S @@ stateless total
 |}]
 
 module type S' = functor () (M : S @ portable) (_ : S @ portable) -> S @ portable
@@ -754,7 +755,7 @@ module type S'' = S @ local -> S -> S
 
 module (F @ portable) () = struct end
 [%%expect{|
-module F : functor () -> sig end @@ stateless
+module F : functor () -> sig end @@ stateless total
 |}]
 
 module (G @ portable) () = F
@@ -767,12 +768,12 @@ module (G @ portable) (F : (S @ unique -> S @ once) @ local) @ contended = struc
 [%%expect{|
 module G :
   functor (F : (S @ unique -> S @ once) @ local) -> sig end @ contended @@
-  stateless
+  stateless total
 |}]
 
 module (G' @ portable) = F
 [%%expect{|
-module G' = F @@ stateless
+module G' = F @@ stateless total
 |}]
 
 module rec (F @ portable) () = struct end
@@ -918,9 +919,9 @@ module type S = sig
 end;;
 
 [%%expect{|
-module F_struct : sig end -> sig end @@ stateless
+module F_struct : sig end -> sig end @@ stateless total
 module type F_sig = sig end -> sig end
-module T : sig end @@ stateless
+module T : sig end @@ stateless total
 module type S = sig end
 |}]
 
@@ -959,17 +960,17 @@ exception Odd
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
-val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
-val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless total = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless total = (~x:1, ~y:2)
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
    (~x: 1, ~s: "a", ~y: 2, "ignore me")
 
 [%%expect{|
-val x0 : int @@ stateless = 1
-val s : string @@ stateless = "a"
-val y : int @@ stateless = 2
+val x0 : int @@ stateless total = 1
+val s : string @@ stateless total = "a"
+val y : int @@ stateless total = 2
 |}]
 
 module M : sig
@@ -989,8 +990,8 @@ module M :
   sig
     val f : (x:int * string) -> x:int * string
     val mk : unit -> x:bool * y:string
-  end @@ stateless
-module X_int_int : sig type t = x:int * int end @@ stateless
+  end @@ stateless total
+module X_int_int : sig type t = x:int * int end @@ stateless total
 |}]
 
 let foo xy k_good k_bad =
@@ -1005,9 +1006,9 @@ let f ((~(x:int),y) : (x:int * int)) : int = x + y
 
 [%%expect{|
 val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
-val x : int @@ stateless = 1
+val x : int @@ stateless total = 1
 val y : int = 2
-val x : int @@ stateless = 1
+val x : int @@ stateless total = 1
 val y : int = 2
 val f : (foo:int * bar:int) -> int = <fun>
 val f : (x:int * int) -> int = <fun>
@@ -1390,7 +1391,7 @@ module M :
     kind_ immutable = value
     kind_ data = value mod many
     kind_ abstract
-  end @@ stateless
+  end @@ stateless total
 |}]
 
 module type S = sig kind_ k end
@@ -1452,6 +1453,7 @@ module type S2 = S with M
 [%%expect{|
 module type S = sig type t1 type t2 type t3 end
 module M : sig type t1 = int type t2 = K of string type t3 end @@ stateless
+  total
 module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 |}]
 
@@ -1558,13 +1560,13 @@ module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_eras
 
 [%%expect{|
 module Base : sig end -> sig end -> sig end -> sig end -> sig end @@
-  stateless
-module Name1 : sig end @@ stateless
-module Name2 : sig end @@ stateless
-module Value1 : sig end @@ stateless
-module Value2 : sig end -> sig end -> sig end @@ stateless
-module Name2_1 : sig end @@ stateless
-module Name2_1 : sig end @@ stateless
+  stateless total
+module Name1 : sig end @@ stateless total
+module Name2 : sig end @@ stateless total
+module Value1 : sig end @@ stateless total
+module Value2 : sig end -> sig end -> sig end @@ stateless total
+module Name2_1 : sig end @@ stateless total
+module Name2_1 : sig end @@ stateless total
 Line 9, characters 11-95:
 9 | module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_erasable.instances]
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1693,7 +1695,7 @@ module type S = sig
   module Foo = Foo [@foo] @@ nonportable
 end
 [%%expect{|
-module Foo : sig end @@ stateless
+module Foo : sig end @@ stateless total
 module type S = sig module Foo = Foo end
 |}]
 

@@ -2898,7 +2898,9 @@ Line 1, characters 28-32:
 Error: This function application uses an expression with type "'a"
        as a function, but that type has kind "bits64", which cannot
        be the kind of a function.
-       (Functions always have kind "value non_float mod aliased immutable".)
+       (Functions always have kind "value
+                                     non_float
+                                     mod aliased immutable logical".)
 |}]
 
 let f (x : ('a : value mod portable)) = x ()
@@ -2910,7 +2912,9 @@ Line 1, characters 40-44:
 Error: This function application uses an expression with type "'a"
        as a function, but that type has kind "value mod portable", which cannot
        be the kind of a function.
-       (Functions always have kind "value non_float mod aliased immutable".)
+       (Functions always have kind "value
+                                     non_float
+                                     mod aliased immutable logical".)
 |}]
 
 let f (x : ('a : value)) = x ()
@@ -2945,7 +2949,9 @@ Line 9, characters 10-22:
 Error: This function application uses an expression with type "'a"
        as a function, but that type has kind "immediate", which cannot
        be the kind of a function.
-       (Functions always have kind "value non_float mod aliased immutable".)
+       (Functions always have kind "value
+                                     non_float
+                                     mod aliased immutable logical".)
        Hint: Perhaps you have over-applied the function or used an incorrect label.
 |}]
 
@@ -2958,7 +2964,9 @@ Line 1, characters 10-22:
 Error: This function application uses an expression with type "'a"
        as a function, but that type has kind "immediate", which cannot
        be the kind of a function.
-       (Functions always have kind "value non_float mod aliased immutable".)
+       (Functions always have kind "value
+                                     non_float
+                                     mod aliased immutable logical".)
        Hint: Perhaps you have over-applied the function or used an incorrect label.
 |}]
 
