@@ -176,24 +176,27 @@ end = struct
       match t.import_map with
       | None -> Or_null.null
       | Some import_map -> (
-        let orig =
+        match
           Name.pattern_match name
             ~var:(fun var ->
               let variables = Renaming.imported_variables import_map in
-              Name.var (Variable.import_backwards variables var))
+              Name.var (Variable.import_backwards_exn variables var))
             ~symbol:(fun symbol ->
               let symbols = Renaming.imported_symbols import_map in
-              Name.symbol (Symbol.import_backwards symbols symbol))
-        in
-        let not_yet_imported = t.not_yet_imported in
-        match Name.Map.find_or_null orig not_yet_imported with
-        | This orig_value ->
-          let renaming = Renaming.from_import_map import_map in
-          let value = apply_renaming_to_value orig_value renaming in
-          t.not_yet_imported <- Name.Map.remove orig not_yet_imported;
-          t.already_imported <- Name.Map.add name value already_imported;
-          Or_null.this value
-        | Null -> Or_null.null))
+              Name.symbol (Symbol.import_backwards_exn symbols symbol))
+        with
+        | (exception Variable.Not_exported) | (exception Symbol.Not_exported) ->
+          Or_null.null
+        | orig -> (
+          let not_yet_imported = t.not_yet_imported in
+          match Name.Map.find_or_null orig not_yet_imported with
+          | This orig_value ->
+            let renaming = Renaming.from_import_map import_map in
+            let value = apply_renaming_to_value orig_value renaming in
+            t.not_yet_imported <- Name.Map.remove orig not_yet_imported;
+            t.already_imported <- Name.Map.add name value already_imported;
+            Or_null.this value
+          | Null -> Or_null.null)))
 end
 
 type t =
