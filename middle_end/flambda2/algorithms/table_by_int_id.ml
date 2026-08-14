@@ -103,4 +103,61 @@ struct
   let find t id =
     assert (Id.flags id = E.flags);
     HT.find t id
+
+  (* We serialize a table using the exact same format we use in memory, except
+     that we only store the data for the exported elements.
+
+     We also record the largest difference between a hash and its final
+     identifier so that we do not loop forever when calling [import_backwards]
+     on data that was not exported. *)
+  type serializable =
+    { exported : E.t HT.t;
+      max_diff : int
+    }
+
+  let export t ~iter =
+    let exported = HT.create 0 in
+    let max_diff = ref 0 in
+    iter (fun id ->
+        let elt = find t id in
+        let starting_id = Id.create (E.hash elt) E.flags in
+        max_diff := max !max_diff (id - starting_id);
+        HT.replace exported id elt);
+    { exported; max_diff = !max_diff }
+
+  exception Not_exported
+
+  let import_exn t id =
+    assert (Id.flags id = E.flags);
+    try HT.find t.exported id with Not_found -> raise Not_exported
+
+  let import t id =
+    try import_exn t id
+    with Not_exported ->
+      Misc.fatal_error "Id was not exported from this compilation unit."
+
+  exception Found_id
+
+  let import_backwards_exn { exported; max_diff } elt =
+    let id = Id.create (E.hash elt) E.flags in
+    match HT.find exported id with
+    | existing_elt when E.equal elt existing_elt -> id
+    | _ | (exception Not_found) -> (
+      (* Replicate the search for another id that was performed in the original
+         map to compute the actual id for [elt], skipping over empty slots that
+         have not been exported.
+
+         We recorded the maximum difference between a [starting_id] and its
+         actual id in the exported data, so we can stop looking after [max_diff]
+         steps (which might well be immediately). *)
+      let id = ref (Id.next id) in
+      let stopping_id = !id + max_diff in
+      try
+        while !id <> stopping_id do
+          match HT.find exported !id with
+          | existing_elt when E.equal elt existing_elt -> raise_notrace Found_id
+          | _ | (exception Not_found) -> id := Id.next !id
+        done;
+        raise Not_exported
+      with Found_id -> !id)
 end

@@ -17,10 +17,6 @@ type t
 
 type raw
 
-include Contains_ids.S with type t := t
-
-val apply_renaming : Code_id.t Code_id.Map.t -> Renaming.t -> t -> t
-
 val print : Format.formatter -> t -> unit
 
 val print_view : Format.formatter -> t -> unit
@@ -53,8 +49,10 @@ val prepare_for_export :
 
 val iter_code : t -> f:(Code.t -> unit) -> unit
 
-val from_raw : sections:File_sections.t -> raw -> t
+val from_raw :
+  sections:File_sections.t -> import_map:Renaming.import_map -> raw -> t
 
-val to_raw : add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw
+val to_raw :
+  add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw * Ids_for_export.t
 
 val map_raw_index : (File_sections.Idx.t -> File_sections.Idx.t) -> raw -> raw

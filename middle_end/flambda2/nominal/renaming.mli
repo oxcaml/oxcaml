@@ -27,6 +27,18 @@ module Simple = Int_ids.Simple
 
 type t
 
+type import_map
+
+val imported_variables : import_map -> Variable.importer
+
+val imported_symbols : import_map -> Symbol.importer
+
+val with_extra_imported_variables :
+  import_map -> Variable.importer -> import_map
+
+val with_extra_imported_continuations :
+  import_map -> Continuation.importer -> import_map
+
 val empty : t
 
 val print : Format.formatter -> t -> unit
@@ -34,15 +46,16 @@ val print : Format.formatter -> t -> unit
 val is_identity : t -> bool
 
 val create_import_map :
-  symbols:Symbol.t Symbol.Map.t ->
-  variables:Variable.t Variable.Map.t ->
-  simples:Simple.t Simple.Map.t ->
-  consts:Reg_width_const.t Reg_width_const.Map.t ->
-  code_ids:Code_id.t Code_id.Map.t ->
-  continuations:Continuation.t Continuation.Map.t ->
+  symbols:Symbol.importer ->
+  variables:Variable.importer ->
+  simples:Simple.importer ->
+  consts:Reg_width_const.importer ->
+  code_ids:Code_id.importer ->
   used_value_slots:Value_slot.Set.t ->
   original_compilation_unit:Compilation_unit.t ->
-  t
+  import_map
+
+val from_import_map : import_map -> t
 
 val has_import_map : t -> bool
 
@@ -56,14 +69,13 @@ val add_variable : t -> Variable.t -> Variable.t -> t
 
 val add_fresh_variable : t -> Variable.t -> guaranteed_fresh:Variable.t -> t
 
+val bind_variable : t -> Variable.t -> t * Variable.t
+
 val apply_variable : t -> Variable.t -> Variable.t
 
 val apply_variable_set : t -> Variable.Set.t -> Variable.Set.t
 
-val add_symbol : t -> Symbol.t -> Symbol.t -> t
-
-val add_fresh_symbol : t -> Symbol.t -> guaranteed_fresh:Symbol.t -> t
-
+(* This is only used by the importing code. We don't permute symbols. *)
 val apply_symbol : t -> Symbol.t -> Symbol.t
 
 val apply_symbol_set : t -> Symbol.Set.t -> Symbol.Set.t
@@ -75,12 +87,11 @@ val add_continuation : t -> Continuation.t -> Continuation.t -> t
 val add_fresh_continuation :
   t -> Continuation.t -> guaranteed_fresh:Continuation.t -> t
 
+val bind_continuation : t -> Continuation.t -> t * Continuation.t
+
 val apply_continuation : t -> Continuation.t -> Continuation.t
 
-val add_code_id : t -> Code_id.t -> Code_id.t -> t
-
-val add_fresh_code_id : t -> Code_id.t -> guaranteed_fresh:Code_id.t -> t
-
+(* This is only used by the importing code. We don't permute code ids. *)
 val apply_code_id : t -> Code_id.t -> Code_id.t
 
 (* This is only used by the importing code. We don't permute constants. *)

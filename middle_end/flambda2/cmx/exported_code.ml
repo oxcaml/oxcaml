@@ -95,42 +95,35 @@ let prepare_for_export t ~reachable_names ~used_value_slots ~canonicalise =
         Some code_or_metadata)
     t
 
-let ids_for_export t =
-  Code_id.Map.fold
-    (fun code_id code_or_metadata all_ids ->
-      Ids_for_export.union
-        (Ids_for_export.add_code_id all_ids code_id)
-        (Code_or_metadata.ids_for_export code_or_metadata))
-    t Ids_for_export.empty
-
-let apply_renaming code_id_map renaming t =
-  if Renaming.is_identity renaming && Code_id.Map.is_empty code_id_map
-  then t
-  else
-    Code_id.Map.fold
-      (fun code_id code_or_metadata all_code ->
-        let code_id =
-          match Code_id.Map.find code_id code_id_map with
-          | exception Not_found -> code_id
-          | code_id -> code_id
-        in
-        let code_or_metadata =
-          Code_or_metadata.apply_renaming code_or_metadata renaming
-        in
-        Code_id.Map.add code_id code_or_metadata all_code)
-      t Code_id.Map.empty
-
 let iter_code t ~f =
   Code_id.Map.iter
     (fun _code_id code_or_metadata ->
       Code_or_metadata.iter_code code_or_metadata ~f)
     t
 
-let from_raw ~sections t =
-  Code_id.Map.map (Code_or_metadata.from_raw ~sections) t
+let from_raw ~sections ~import_map raw =
+  let[@inline] import_code_id import_map code_id =
+    Renaming.apply_code_id (Renaming.from_import_map import_map) code_id
+  in
+  Code_id.Map.fold
+    (fun code_id code_or_metadata t ->
+      Code_id.Map.add
+        (import_code_id import_map code_id)
+        (Code_or_metadata.from_raw ~sections ~import_map code_or_metadata)
+        t)
+    raw Code_id.Map.empty
 
 let to_raw ~add_section t =
-  Code_id.Map.map (Code_or_metadata.to_raw ~add_section) t
+  Code_id.Map.fold
+    (fun code_id code_or_metadata (raw, all_ids) ->
+      let raw_code_or_metadata, code_or_metadata_ids =
+        Code_or_metadata.to_raw ~add_section code_or_metadata
+      in
+      ( Code_id.Map.add code_id raw_code_or_metadata raw,
+        Ids_for_export.union code_or_metadata_ids
+          (Ids_for_export.add_code_id all_ids code_id) ))
+    t
+    (Code_id.Map.empty, Ids_for_export.empty)
 
 let map_raw_index map_index t =
   Code_id.Map.map (Code_or_metadata.map_raw_index map_index) t
