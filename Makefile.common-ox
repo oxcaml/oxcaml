@@ -540,6 +540,7 @@ dev_direct_command = $(dune) build $(ws_boot) $(dev_build_flag) \
 .PHONY: dev-expect-runners
 .PHONY: dev-status dev-log dev-stop dev-errors dev-diff
 .PHONY: dev-stdlib-check dev-refresh-stdlib dev-configure dev-selftest
+.PHONY: dev-runners-needed
 
 dev-start: _build/_bootinstall
 	@if [ -n "$(NOWATCH)" ]; then exit 0; fi; \
@@ -662,10 +663,43 @@ dev-refresh-stdlib:
 	+@$(dev_watcher) stop; \
 	  $(MAKE) --no-print-directory runtime-stdlib
 
+# Which expect-test runners a selection's tests ask for, decided by the token in
+# their TEST blocks. Separate from the staleness comparison, and printed rather
+# than only used internally, so the decision can be checked: this is exactly the
+# decision that was silently wrong, and nothing could observe it.
+dev-runners-needed:
+	@set -eu; \
+	  selection="testsuite/$(call locate_test,$(if $(TEST),$(TEST),$(DIR)))"; \
+	  for runner in expect expectnat; do \
+	    case $$runner in \
+	      expect) pattern='(^|[;[:space:]])expect([;[:space:]]|$$)' ;; \
+	      expectnat) pattern='(^|[;[:space:]])expectnat([;[:space:]]|$$)' ;; \
+	    esac; \
+	    if grep -ERq --include='*.ml' "$$pattern" "$$selection"; then \
+	      printf '%s\n' $$runner; \
+	    fi; \
+	  done
+
 # Check the watcher's own recovery logic against a stub dune. Needs no compiler,
 # so it runs in seconds and does not touch this worktree's watcher.
 dev-selftest:
 	@sh tools/dev-watcher-test.sh
+	@set -eu; \
+	  echo "== the runners a selection needs come from its TEST-block tokens"; \
+	  failures=0; \
+	  check() { \
+	    actual=$$($(MAKE) --no-print-directory dev-runners-needed DIR=$$1 \
+	      | tr '\n' ' '); \
+	    if [ "$$actual" = "$$2" ]; then \
+	      echo "ok: $$1 needs [$$actual]"; \
+	    else \
+	      echo "FAIL: $$1 needs [$$actual], expected [$$2]"; \
+	      failures=1; \
+	    fi; \
+	  }; \
+	  check codegen ""; \
+	  check tool-expect-test "expect "; \
+	  test $$failures = 0
 
 # Fresh diagnostics straight from the running watcher, without a build round
 # trip. This is the tightest error loop the watcher supports.
@@ -694,17 +728,13 @@ dev-test: dev-check
 	  selection="$(if $(TEST),$(call locate_test,$(TEST)),$(call locate_test,$(DIR)))"; \
 	  selection="testsuite/$$selection"; \
 	  stale_runners=""; \
-	  for runner in expect expectnat; do \
-	    case $$runner in \
-	      expect) pattern='(^|[;[:space:]])expect([;[:space:]]|$$)' ;; \
-	      expectnat) pattern='(^|[;[:space:]])expectnat([;[:space:]]|$$)' ;; \
-	    esac; \
+	  for runner in $$($(MAKE) --no-print-directory dev-runners-needed \
+	      $(if $(TEST),TEST=$(TEST)) $(if $(DIR),DIR=$(DIR))); do \
 	    artifact=_build/main/oxcaml/testsuite/tools/$$runner.exe; \
-	    if grep -ERq --include='*.ml' "$$pattern" "$$selection" && \
-	       { [ ! -x $$artifact ] || \
-	         [ $(dev_build)/default/main_native.exe -nt $$artifact ] || \
-	         find oxcaml/testsuite/tools -type f -newer $$artifact \
-	           -print -quit | grep -q .; }; then \
+	    if [ ! -x $$artifact ] || \
+	       [ $(dev_compiler) -nt $$artifact ] || \
+	       find oxcaml/testsuite/tools -type f -newer $$artifact \
+	         -print -quit | grep -q .; then \
 	      stale_runners="$$stale_runners $$runner"; \
 	    fi; \
 	  done; \
