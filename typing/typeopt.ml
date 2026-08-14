@@ -1373,6 +1373,20 @@ let function2_return_layout env loc sort ty =
   | Some (_lhs, rhs) -> function_return_layout env loc sort rhs
   | None -> Misc.fatal_errorf "function_return_layout called on non-function type"
 
+let rec function_arg_erasures env ty n =
+  if n = 0 then []
+  else
+    match scrape env ty with
+    | Some (Tarrow ((_, _, marg, _), _, rhs, _)) ->
+      let erased =
+        match Mode.Erasure.zap_to_floor
+                (Mode.Alloc.proj_comonadic Erasure marg) with
+        | Mode.Erasure.Const.Erased -> true
+        | Mode.Erasure.Const.Retained -> false
+      in
+      erased :: function_arg_erasures env rhs (n - 1)
+    | _ -> []
+
 let function_arg_layout env loc sort ty =
   match is_function_type env ty with
   | Some (arg_type, _) -> layout env loc sort arg_type

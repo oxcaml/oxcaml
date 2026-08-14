@@ -7161,6 +7161,9 @@ module Value_with (Areality : Areality) = struct
     (** See [Alloc.close_over] for explanation. *)
     let close_over m =
       let { monadic; comonadic } = split m in
+      (* Erasure is excluded: an erased argument is not stored in the
+         closure, so it does not constrain the closure's mode. *)
+      let comonadic = { comonadic with erasure = C.Erasure.min } in
       Comonadic.Const.join comonadic (monadic_to_comonadic_min monadic)
 
     (** See [Alloc.partial_apply] for explanation. *)
@@ -7396,6 +7399,11 @@ module Value_with (Areality : Areality) = struct
       need to give the lower bound mode of [B -> C]. *)
   let close_over { comonadic; monadic } =
     let comonadic = Comonadic.disallow_right comonadic in
+    (* Erasure is excluded: an erased argument is not stored in the closure,
+       so it does not constrain the closure's mode. *)
+    let comonadic =
+      Comonadic.meet_const_with Erasure C.Erasure.Retained comonadic
+    in
     (* The comonadic of the returned function is constrained by the monadic of the closed argument via the dualizing morphism. *)
     let comonadic_dual = monadic_to_comonadic_min monadic in
     (* It's also constrained by the comonadic of the closed argument. *)

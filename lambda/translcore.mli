@@ -32,6 +32,7 @@ val transl_apply: scopes:scopes
                   -> ?position:region_close
                   -> ?mode:return_mode
                   -> ?yielding:yielding_kind
+                  -> ?erased_args:bool list
                   -> result_layout:Lambda.layout
                   -> lambda
                   -> (arg_label * apply_arg) list

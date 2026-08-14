@@ -22,6 +22,11 @@ val transl_return_mode_l : (allowed * 'r) Locality.t -> Lambda.return_mode
 
 val transl_alloc_mode_l : (allowed * 'r) Alloc.t -> Lambda.locality_mode
 
+(** Whether a mode is erased on the erasure axis; used to give erased
+    occurrences the void layout. Zaps the erasure axis to its floor, so an
+    unconstrained mode reads as retained. *)
+val erased_mode_l : (allowed * 'r) Alloc.t -> bool
+
 val transl_alloc_mode_r : ('l * allowed) Alloc.t -> Lambda.locality_mode
 
 val transl_ret_mode : (allowed * 'r) Alloc.t -> Lambda.return_mode

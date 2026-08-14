@@ -39,6 +39,11 @@ let transl_yielding_mode_l yielding =
   | Yielding.Const.Unyielding -> Unyielding
   | Yielding.Const.Yielding -> May_yield
 
+let erased_mode_l mode =
+  match Erasure.zap_to_floor (Alloc.proj_comonadic Erasure mode) with
+  | Erased -> true
+  | Retained -> false
+
 let transl_alloc_mode_l mode =
   (* we only take the locality axis *)
   Alloc.proj_comonadic Areality mode |> transl_locality_mode_l

@@ -434,6 +434,36 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
+(* Identifiers bound to erased values: erased function parameters and
+   variables bound to erased expressions. Uses of these variables translate
+   at the void layout. Per-unit state like [Translprim]'s; idents are unique
+   within a unit, so entries never conflict and stale ones are harmless. *)
+let erased_ids = ref Ident.Set.empty
+
+let layout_erased = Lambda.layout_unboxed_unit
+
+let void_value loc = Lprim (Pmake_unboxed_product [], [], loc)
+
+let mark_erased_ident id = erased_ids := Ident.Set.add id !erased_ids
+
+let mark_erased_pat pat =
+  List.iter mark_erased_ident (Typedtree.pat_bound_idents pat)
+
+(* Must run before the let's body is translated: uses of the bound variables
+   inside the body consult [erased_ids]. *)
+let mark_erased_bindings pat_expr_list =
+  List.iter
+    (fun { vb_pat; vb_expr; _ } ->
+       if List.exists
+            (function (Texp_erased, _, _) -> true | _ -> false)
+            vb_expr.exp_extra
+          || (match vb_expr.exp_desc with
+              | Texp_ident { path = Path.Pident id; _ } ->
+                  Ident.Set.mem id !erased_ids
+              | _ -> false)
+       then mark_erased_pat vb_pat)
+    pat_expr_list
+
 let rec transl_exp ~scopes layout e =
   transl_exp1 ~scopes ~in_new_scope:false layout e
 
@@ -467,11 +497,22 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
 and transl_erased ~scopes (layout : Lambda.layout) e =
   match layout with
   | Pvalue _ -> dummy_constant
-  | Punboxed_product [] ->
-      Lprim (Pmake_unboxed_product [], [], of_location ~scopes e.exp_loc)
+  | Punboxed_product [] -> void_value (of_location ~scopes e.exp_loc)
   | _ ->
       Misc.fatal_errorf "erased_ is not yet supported at layout %a"
         Printlambda.layout layout
+
+(* Whether an expression is erased, i.e. translates to a zero-width value:
+   [erased_ e] itself, or a variable bound to an erased value. The layout of
+   such an expression is [layout_erased] rather than what its sort says. *)
+and is_erased_exp e =
+  List.exists
+    (function (Texp_erased, _, _) -> true | _ -> false)
+    e.exp_extra
+  || (match e.exp_desc with
+      | Texp_ident { path = Path.Pident id; _ } ->
+          Ident.Set.mem id !erased_ids
+      | _ -> false)
 
 and transl_exp0_desc ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with
@@ -492,6 +533,9 @@ and transl_exp0_desc ~in_new_scope ~scopes (layout : Lambda.layout) e =
       }
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
+      (match rec_flag with
+       | Nonrecursive -> mark_erased_bindings pat_expr_list
+       | Recursive -> ());
       transl_let ~scopes ~return_layout:layout rec_flag pat_expr_list
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_letmutable(pat_expr, body) ->
@@ -574,9 +618,13 @@ and transl_exp0_desc ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
       in
+      let erased_args =
+        Typeopt.function_arg_erasures funct.exp_env funct.exp_type
+          (List.length oargs)
+      in
       event_after ~scopes e
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
-           ~assume_zero_alloc
+           ~assume_zero_alloc ~erased_args
            ~result_layout:layout
            ~position ~mode ~yielding
            (transl_exp ~scopes Lambda.layout_function funct)
@@ -1666,6 +1714,7 @@ and transl_apply ~scopes
       ?(position=Rc_normal)
       ?(mode=not_alloc_stack)
       ?(yielding=May_yield)
+      ?(erased_args = ([] : bool list))
       ~result_layout
       lam sargs loc
   =
@@ -1783,6 +1832,7 @@ and transl_apply ~scopes
           let sort_arg = Jkind.Sort.default_for_transl_and_get sort_arg in
           let sort_ret = Jkind.Sort.default_for_transl_and_get sort_ret in
           let result_layout = layout_of_sort (to_location loc) sort_ret in
+          let arg_is_erased = Translmode.erased_mode_l mode_arg in
           let body =
             build_apply handle [Lvar id_arg] loc Rc_normal ret_mode
               result_layout l
@@ -1795,7 +1845,10 @@ and transl_apply ~scopes
             | _, Maybe_alloc_stack -> 1
             | Alloc_heap, Not_alloc_stack -> 0
           in
-          let layout_arg = layout_of_sort (to_location loc) sort_arg in
+          let layout_arg =
+            if arg_is_erased then layout_erased
+            else layout_of_sort (to_location loc) sort_arg
+          in
           let params = [{
               name = id_arg;
               debug_uid = id_arg_duid;
@@ -1819,15 +1872,34 @@ and transl_apply ~scopes
         lapply lam (List.rev args) loc pos ap_mode result_layout
   in
   let args =
-    List.map
-      (fun (_, arg) ->
+    let erased_args =
+      (* Positions beyond the known arrows are retained. *)
+      let missing = List.length sargs - List.length erased_args in
+      if missing <= 0 then erased_args
+      else erased_args @ List.init missing (fun _ -> false)
+    in
+    List.map2
+      (fun (_, arg) erased ->
          match arg with
          | Omitted _ as arg -> arg
          | Arg (exp, sort_arg) ->
-           let sort_arg = Jkind.Sort.default_for_transl_and_get sort_arg in
-           let layout = layout_exp sort_arg exp in
-           Arg (transl_exp ~scopes layout exp, layout))
-      sargs
+           if erased then
+             if is_erased_exp exp then
+               (* Already zero-width; nothing is passed. *)
+               Arg (transl_exp ~scopes layout_erased exp, layout_erased)
+             else begin
+               (* A retained argument at an erased parameter is evaluated
+                  for its effects and dropped at the boundary. *)
+               let sort_arg = Jkind.Sort.default_for_transl_and_get sort_arg in
+               let layout = layout_exp sort_arg exp in
+               Arg (Lsequence (transl_exp ~scopes layout exp, void_value loc),
+                    layout_erased)
+             end
+           else
+             let sort_arg = Jkind.Sort.default_for_transl_and_get sort_arg in
+             let layout = layout_exp sort_arg exp in
+             Arg (transl_exp ~scopes layout exp, layout))
+      sargs erased_args
   in
   build_apply lam [] loc position mode result_layout args
 
@@ -1843,6 +1915,23 @@ and transl_apply ~scopes
 and transl_function_without_attributes
     ~scopes ~return_sort ~return_mode ~mode ~region ~fun_ty loc repr params
     body =
+  (* Erased parameters are not passed: they get the void layout. Mark them
+     before translating the body, so their uses translate as zero-width.
+     Typing restricts patterns for erased values to variables and aliases. *)
+  List.iter
+    (fun fp ->
+       match fp.fp_kind with
+       | Tparam_pat pat when Translmode.erased_mode_l fp.fp_mode.mode_modes ->
+           mark_erased_ident fp.fp_param;
+           mark_erased_pat pat
+       | Tparam_pat _ | Tparam_optional_default _ -> ())
+    params;
+  (match body with
+   | Tfunction_cases { fc_cases; fc_param; fc_arg_mode; _ }
+     when Translmode.erased_mode_l fc_arg_mode ->
+       mark_erased_ident fc_param;
+       List.iter (fun c -> mark_erased_pat c.c_lhs) fc_cases
+   | Tfunction_cases _ | Tfunction_body _ -> ());
   let return_layout =
     match body with
     | Tfunction_body exp ->
@@ -2054,7 +2143,8 @@ and transl_curried_function ~scopes loc repr params body
         let fc_arg_sort = Jkind.Sort.default_for_transl_and_get fc_arg_sort in
         let fc_arg_ty, _ = split_fun_ty fc_fun_ty in
         let arg_layout =
-          if any_param_is_partial_gadt_match
+          if Ident.Set.mem fc_param !erased_ids then layout_erased
+          else if any_param_is_partial_gadt_match
              || cases_are_partial_gadt_match fc_cases fc_partial
           then layout_of_fun_arg_ty fc_arg_ty fc_loc fc_arg_sort
           else
@@ -2101,7 +2191,8 @@ and transl_curried_function ~scopes loc repr params body
         in
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let arg_layout =
-          if follows_partial_gadt || param_is_partial_gadt_match fp
+          if Ident.Set.mem fp_param !erased_ids then layout_erased
+          else if follows_partial_gadt || param_is_partial_gadt_match fp
           then layout_of_fun_arg_ty fun_arg_ty fp_loc fp_sort
           else layout arg_env fp_loc fp_sort arg_type
         in
@@ -2330,7 +2421,10 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       | {vb_pat=pat; vb_expr=expr; vb_sort=sort; vb_rec_kind=_; vb_attributes; vb_loc}
         :: rem ->
           let sort = Jkind.Sort.default_for_transl_and_get sort in
-          let layout = layout_exp sort expr in
+          let erased = is_erased_exp expr in
+          if erased then mark_erased_pat pat;
+          let sort = if erased then Jkind.Sort.Const.(Base Void) else sort in
+          let layout = if erased then layout_erased else layout_exp sort expr in
           let lam =
             transl_bound_exp ~scopes ~in_structure pat layout expr vb_loc
               vb_attributes
@@ -3177,12 +3271,12 @@ let transl_scoped_exp ~scopes layout exp =
 
 let transl_apply
       ~scopes ?tailcall ?inlined ?specialised ?position ?mode ?yielding
-      ~result_layout fn args loc =
+      ?erased_args ~result_layout fn args loc =
   maybe_region_layout result_layout
     (transl_apply
        ~scopes ?tailcall ?inlined ?specialised
        ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none ?position ?mode
-       ?yielding ~result_layout fn args loc)
+       ?yielding ?erased_args ~result_layout fn args loc)
 
 (* Error report *)
 

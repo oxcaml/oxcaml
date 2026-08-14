@@ -6426,7 +6426,21 @@ let submode_with_cross env ~is_ret ty l r =
   Alloc.submode l r'
 
 let moregen_alloc_mode env ~is_ret ty v a1 a2 =
+  (* Erasure is invariant in argument position: whether an argument is passed
+     is ABI, so the two sides must agree exactly. Contravariance would allow
+     an erased-parameter implementation behind a retained-parameter
+     signature, and callers would pass an argument the callee has no
+     parameter for. Return position keeps the ordinary rule. *)
+  let erasure_invariant () =
+    if is_ret then Ok ()
+    else
+      Mode.Erasure.submode
+        (Alloc.proj_comonadic Erasure a1)
+        (Alloc.proj_comonadic Erasure a2)
+      |> Result.map_error ignore
+  in
   match
+    Result.bind (erasure_invariant ()) (fun () ->
     match v with
     | Invariant ->
         Result.bind (submode_with_cross env ~is_ret ty a1 a2)
@@ -6434,7 +6448,7 @@ let moregen_alloc_mode env ~is_ret ty v a1 a2 =
         |> Result.map_error ignore
     | Covariant -> Result.map_error ignore (submode_with_cross env ~is_ret ty a1 a2)
     | Contravariant -> Result.map_error ignore (submode_with_cross env ~is_ret ty a2 a1)
-    | Bivariant -> Ok ()
+    | Bivariant -> Ok ())
   with
   | Ok () -> ()
   | Error _  -> raise_unexplained_for Moregen
@@ -7923,6 +7937,16 @@ let rec subtype_rec env trace t1 t2 cstrs =
             t2 t1
             cstrs
         in
+        (* Erasure is invariant in argument position; see
+           [moregen_alloc_mode]. Checked on the arrow's own modes: crossing
+           never applies to erasure. *)
+        (match
+           Mode.Erasure.submode
+             (Alloc.proj_comonadic Erasure a1)
+             (Alloc.proj_comonadic Erasure a2)
+         with
+         | Ok () -> ()
+         | Error _ -> subtype_error ~env ~trace ~unification_trace:[]);
         let a2 = cross_left_alloc env t2 a2 in
         subtype_alloc_mode env trace a2 a1;
         let r2 = cross_right_alloc_ret env u2 r2 in
