@@ -74,6 +74,10 @@ end) : sig
            intermediate [Map] for the result, when it feeds directly into
            something else. *)
 
+  val fold:
+    (Module_name.t -> Data.t -> Digest.t -> 'a -> 'a) -> t -> 'a -> 'a
+        (* Fold over all (name, data, CRC) triples recorded in the table. *)
+
   val filter: (Module_name.t -> bool) -> t -> unit
         (* [filter pred tbl] removes from [tbl] table all (name, CRC) pairs
            such that [pred name] is [false]. *)

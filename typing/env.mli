@@ -180,12 +180,12 @@ val add_required_global: Path.t -> t -> unit
 val add_required_global_for_quote: Path.t -> t -> unit
 
 (* Return the set of interfaces referenced by quotes *)
-val quoted_intfs: unit -> Compilation_unit.Name.Set.t
+val quoted_intfs: unit -> Compilation_unit.Set.t
 
 (* Compute the transitive closure of the dependencies of these interfaces that
    have been loaded by typing. Always includes the input interfaces. *)
 val loaded_transitive_dependencies:
-  Compilation_unit.Name.Set.t -> Compilation_unit.Name.Set.t
+  Compilation_unit.Set.t -> Compilation_unit.Set.t
 
 (* Return the set of implementations referenced by quotes *)
 val quoted_impls: unit -> Compilation_unit.Set.t
@@ -352,7 +352,8 @@ val lookup_module_path:
 val lookup_modtype_path:
   ?use:bool -> loc:Location.t -> Longident.t -> t -> Path.t
 val lookup_module_instance_path:
-  ?use:bool -> loc:Location.t -> load:bool -> Global_module.Name.t -> t ->
+  ?use:bool -> loc:Location.t -> load:bool
+  -> Global_module.Name_unprefixed.t -> t ->
     Path.t * mode_with_locks
 
 val lookup_constructor:
@@ -631,12 +632,12 @@ val read_signature:
            the module in the environment. *)
 val save_signature:
   alerts:alerts -> signature * Mode.Staticity.Const.t
-  -> Compilation_unit.Name.t -> Cmi_format.kind
+  -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Cmi_format.cmi_infos_lazy
-        (* Arguments: signature, module name, module kind, file name. *)
+        (* Arguments: signature, module kind, file name. *)
 val save_signature_with_imports:
   alerts:alerts -> signature * Mode.Staticity.Const.t
-  -> Compilation_unit.Name.t -> Cmi_format.kind
+  -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Import_info.t array -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind,
            file name, imported units with their CRCs. *)
@@ -645,7 +646,7 @@ val save_signature_with_imports:
 val register_parameter: Global_module.Parameter_name.t -> unit
 
 (* Return the CRC of the interface of the given compilation unit *)
-val crc_of_unit: Compilation_unit.Name.t -> Digest.t
+val crc_of_unit: Compilation_unit.t -> Digest.t
 
 (* Return the set of compilation units imported, with their CRC *)
 val imports: unit -> Import_info.t list

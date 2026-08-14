@@ -125,10 +125,14 @@ let emit_signature info alerts tsg =
     let kind : Cmi_format.kind =
       if !Clflags.as_parameter then
         Parameter
+          (Compilation_unit.name info.module_name
+          |> Compilation_unit.Intf.of_name)
       else begin
         let cmi_arg_for =
           !Clflags.as_argument_for
-          |> Option.map Global_module.Parameter_name.of_string
+          |> Option.map (fun param ->
+              Global_module.Parameter_name.of_string param
+              |> Compilation_unit.Intf.of_parameter_name)
         in
         Normal { cmi_impl = info.module_name; cmi_arg_for }
       end
@@ -136,8 +140,7 @@ let emit_signature info alerts tsg =
     let staticity =
       Typemod.staticity_of_modalities tsg.Typedtree.sig_modalities
     in
-    Env.save_signature ~alerts (tsg.Typedtree.sig_type, staticity)
-      (Compilation_unit.name info.module_name) kind
+    Env.save_signature ~alerts (tsg.Typedtree.sig_type, staticity) kind
       (Unit_info.cmi info.target)
   in
   Typemod.save_signature info.target info.module_name tsg info.env sg

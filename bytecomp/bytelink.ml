@@ -35,7 +35,8 @@ type error =
   | Not_an_object_file of filepath
   | Wrong_object_name of filepath
   | Symbol_error of filepath * Symtable.error
-  | Inconsistent_import of CU.Name.t * filepath * filepath
+  | Inconsistent_import of CU.t * filepath * filepath
+  | Inconsistent_import_intf of CU.Intf.t * filepath * filepath
   | Custom_runtime
   | File_exists of filepath
   | Cannot_open_dll of filepath
@@ -168,37 +169,56 @@ let scan_file ldeps obj_name tolink =
 
 (* Consistency check between interfaces *)
 
-module Consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
+module Consistbl_intf = Consistbl.Make (CU.Intf) (Unit)
+module Consistbl = Consistbl.Make (CU) (Unit)
 
 let crc_interfaces = Consistbl.create ()
-let interfaces = ref ([] : CU.Name.t list)
+let crc_param_interfaces = Consistbl_intf.create ()
+let interfaces = ref ([] : CU.t list)
 
 let check_consistency file_name cu =
   try
     Array.iter
       (fun import ->
-        let name = Import_info.name import in
-        let info = Import_info.Intf.info import in
-        interfaces := name :: !interfaces;
-        match info with
-          None -> ()
-        | Some (kind, crc) ->
-            Consistbl.check crc_interfaces name kind crc file_name)
+        match Import_info.Intf.view import with
+        | Alias name -> interfaces := name :: !interfaces
+        | Normal (name, crc) ->
+            interfaces := name :: !interfaces;
+            Consistbl.check crc_interfaces name () crc file_name
+        | Parameter (intf, crc) ->
+            Consistbl_intf.check crc_param_interfaces intf () crc file_name)
       cu.cu_imports
-  with Consistbl.Inconsistency {
+  with
+  | Consistbl.Inconsistency {
       unit_name = name;
       inconsistent_source = user;
       original_source = auth;
     } ->
     raise(Error(Inconsistent_import(name, user, auth)))
+  | Consistbl_intf.Inconsistency {
+      unit_name = name;
+      inconsistent_source = user;
+      original_source = auth;
+    } ->
+    raise(Error(Inconsistent_import_intf(name, user, auth)))
 
 let extract_crc_interfaces () =
+  let params =
+    Consistbl_intf.fold
+      (fun intf () crc acc ->
+        Import_info.Intf.create_parameter intf ~crc :: acc)
+      crc_param_interfaces []
+  in
   Consistbl.extract !interfaces crc_interfaces
   |> List.map (fun (name, crc_with_unit) ->
-       Import_info.Intf.create name crc_with_unit)
+       match crc_with_unit with
+       | None -> Import_info.Intf.create_alias name
+       | Some ((), crc) -> Import_info.Intf.create_normal name ~crc)
+  |> List.append params
 
 let clear_crc_interfaces () =
   Consistbl.clear crc_interfaces;
+  Consistbl_intf.clear crc_param_interfaces;
   interfaces := []
 
 (* Record compilation events *)
@@ -917,7 +937,14 @@ let report_error_doc ppf = function
                  make inconsistent assumptions over interface %a@]"
         Location.Doc.quoted_filename file1
         Location.Doc.quoted_filename file2
-        CU.Name.print_as_inline_code intf
+        CU.print_as_inline_code intf
+  | Inconsistent_import_intf(intf, file1, file2) ->
+      fprintf ppf
+        "@[<hov>Files %a@ and %a@ \
+                 make inconsistent assumptions over interface %a@]"
+        Location.Doc.quoted_filename file1
+        Location.Doc.quoted_filename file2
+        CU.Intf.print_as_inline_code intf
   | Custom_runtime ->
       fprintf ppf "Error while building custom runtime system"
   | File_exists file ->

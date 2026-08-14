@@ -28,38 +28,55 @@
 [@@@ocaml.warning "+a-9-40-41-42"]
 
 module Name : sig
-  (** The name of a compilation unit without any "-for-pack" prefix. *)
+  (** The basename by which an artifact (.cmi, .cmx, ...) of a compilation
+      unit is sought on disk: the unit's name without any "-for-pack" prefix.
+      This is never a unit's identity - use [t] for that, since it includes
+      the pack prefix. *)
   type t
 
   (** Printing, comparison, sets, maps, etc. *)
   include Identifiable.S with type t := t
 
-  (** [dummy] is a placeholder for units that does not have a valid name, as in
-      the, or during initialisation of the compiler. It is not a valid
-      identifier and thus cannot be generated through [of_string]. *)
-  val dummy : t
-
-  (** [of_string s] checks the given module name is a valid compilation unit
-      name and generates its representation. *)
+  (** [of_string s] checks that [s] is a valid compilation unit name and
+      generates its representation. *)
   val of_string : string -> t
 
   val to_string : t -> string
 
-  val of_head_of_global_name : Global_module.Name.t -> t
+  (** The basename at which a reference to the given name is sought: its
+      head. *)
+  val of_head_of_global_name : Global_module.Name_unprefixed.t -> t
+
+  (** The basename at which a parameter's interface is sought. *)
+  val of_parameter_name : Global_module.Parameter_name.t -> t
+
+  val print : Format_doc.formatter -> t -> unit
+
+  val print_as_inline_code : Format_doc.formatter -> t -> unit
+end
+
+(** The name of a compilation-unit-level module type declaration, such as a
+    parameter. Whereas a [t] names a module declaration (an implementation),
+    an [Intf.t] names a module type declaration; neither is more complete
+    than the other, and there is deliberately no conversion between them.
+    (Currently an [Intf.t] is internally just a [Name.t].) *)
+module Intf : sig
+  type t
+
+  (** Printing, comparison, sets, maps, etc. *)
+  include Identifiable.S with type t := t
+
+  val of_name : Name.t -> t
+
+  val to_name : t -> Name.t
 
   val of_parameter_name : Global_module.Parameter_name.t -> t
 
-  val to_global_name : t -> Global_module.Name.t
-
-  (** The name of the distinguished compilation unit for predefined exceptions.
-  *)
-  val predef_exn : t
-
-  (** Print the name for use in error messages. Uses [Format_doc.formatter] and
-      applies inline code styling. *)
-  val print_as_inline_code : Format_doc.formatter -> t -> unit
+  val to_parameter_name : t -> Global_module.Parameter_name.t
 
   val print : Format_doc.formatter -> t -> unit
+
+  val print_as_inline_code : Format_doc.formatter -> t -> unit
 end
 
 module Prefix : sig
@@ -82,6 +99,8 @@ module Prefix : sig
 
   (** Return the list of names comprising the prefix, outermost first. *)
   val to_list : t -> Name.t list
+
+  val of_list : Name.t list -> t
 
   val to_string : t -> string
 
@@ -130,17 +149,15 @@ type argument =
     arguments. The arguments will be sorted alphabetically by parameter name. *)
 val create_instance : t -> argument list -> t
 
-(** Convert the compilation unit to a [Global_module.Name.t], if possible (which
-    is to say, if its prefix is empty). *)
-val to_global_name : t -> Global_module.Name.t option
+(** Convert the compilation unit to a [Global_module.Name.t], including the
+    pack prefix when present. *)
+val to_global_name : t -> Global_module.Name.t
 
-(** Like [to_global_name] but throw a fatal error if there is a non-empty
-    prefix. *)
-val to_global_name_exn : t -> Global_module.Name.t
-
-(** Like [to_global_name] but succeed even when there is a pack prefix,
-    discarding the prefix in that case. *)
-val to_global_name_without_prefix : t -> Global_module.Name.t
+(** The name of an elaborated global, given the implementation info of its
+    unit: the pack prefix from the implementation is preserved when
+    present. *)
+val prefixed_name_of_global :
+  impl:t -> Global_module.t -> Global_module.Name.t
 
 (** Create the compilation unit named by the given [Global_module.t]. Throws a
     fatal error if the global is not a complete instantiation, which is to say,

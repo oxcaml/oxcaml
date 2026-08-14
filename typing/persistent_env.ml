@@ -19,19 +19,29 @@
 open Misc
 open Cmi_format
 
+module Global_module = struct
+  include Global_module
+  module Name_prefixed = Name
+  module Name = Name_unprefixed
+
+  (* Within this file, globals are always named by their unprefixed form *)
+  let to_name = unprefixed_name
+end
+
 module CU = Compilation_unit
-module Consistbl_data = Import_info.Intf.Nonalias.Kind
-module Consistbl = Consistbl.Make (CU.Name) (Consistbl_data)
+
+module Consistbl_intf = Consistbl.Make (CU.Intf) (Unit)
+module Consistbl = Consistbl.Make (CU) (Unit)
 module Style = Misc.Style
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
 
 type error =
-  | Illegal_renaming of CU.Name.t * CU.Name.t * filepath
-  | Inconsistent_import of CU.Name.t * filepath * filepath
+  | Illegal_renaming of
+      Global_module.Name_prefixed.t * Global_module.Name_prefixed.t * filepath
+  | Inconsistent_import of CU.t * filepath * filepath
+  | Inconsistent_import_intf of CU.Intf.t * filepath * filepath
   | Need_recursive_types of CU.Name.t
-  | Inconsistent_package_declaration_between_imports of
-      filepath * CU.t * CU.t
   | Direct_reference_from_wrong_package of
       CU.t * filepath * CU.Prefix.t
   | Illegal_import_of_parameter of Global_module.Name.t * filepath
@@ -72,7 +82,7 @@ module Persistent_signature = struct
       visibility : Load_path.visibility }
 
   let load = ref (fun ~allow_hidden ~unit_name ->
-    let unit_name = CU.Name.to_string unit_name in
+    let unit_name = CU.name_as_string unit_name in
     match Load_path.find_normalized_with_visibility (unit_name ^ ".cmi") with
     | filename, visibility when allow_hidden ->
       Some { filename; cmi = read_cmi_lazy filename; visibility}
@@ -102,7 +112,8 @@ type import = {
   imp_is_param : bool;
   imp_params : Global_module.Parameter_name.t list;
   imp_arg_for : Global_module.Parameter_name.t option;
-  imp_impl : CU.t option; (* None iff import is a parameter *)
+  imp_impl : CU.t; (* for a parameter, just its name: there is no
+                      implementation *)
   imp_raw_sign : Signature_with_global_bindings.t;
   imp_filename : string;
   imp_uid : Shape.Uid.t;
@@ -125,6 +136,9 @@ type import_info =
 type pers_name = {
   pn_import : import;
   pn_global : Global_module.t;
+  pn_name : Global_module.Name_prefixed.t;
+    (* the canonical prefixed name: [pn_global] with the pack prefix from
+       [pn_import.imp_impl] *)
   pn_sign : Subst.Lazy.persistent_signature;
 }
 
@@ -149,15 +163,21 @@ type 'a t = {
   globals : (Global_module.Name.t, global_name_info) Hashtbl.t;
   imports : (CU.Name.t, import_info) Hashtbl.t;
   persistent_names : (Global_module.Name.t, pers_name) Hashtbl.t;
+  (* Keyed by the unprefixed name: we can never have two persistent
+     structures loaded with the same unprefixed name but different
+     prefixes. *)
   persistent_structures :
     (Global_module.Name.t, 'a pers_struct_info) Hashtbl.t;
   locals_bound_to_runtime_parameters : unit Ident.Tbl.t;
+  (* Units referenced without their cmi having been loaded (aliases). Loaded
+     units are recorded in [imports] *)
   imported_units: CU.Name.Set.t ref;
   imported_opaque_units: CU.Name.Set.t ref;
-  quoted_intfs: CU.Name.Set.t ref;
+  quoted_intfs: CU.Set.t ref;
   quoted_impls: CU.Set.t ref;
   param_imports : Param_set.t ref;
   crc_units: Consistbl.t;
+  crc_params: Consistbl_intf.t;
   can_load_cmis: can_load_cmis ref;
 }
 
@@ -169,10 +189,11 @@ let empty () = {
   locals_bound_to_runtime_parameters = Ident.Tbl.create 17;
   imported_units = ref CU.Name.Set.empty;
   imported_opaque_units = ref CU.Name.Set.empty;
-  quoted_intfs = ref CU.Name.Set.empty;
+  quoted_intfs = ref CU.Set.empty;
   quoted_impls = ref CU.Set.empty;
   param_imports = ref Param_set.empty;
   crc_units = Consistbl.create ();
+  crc_params = Consistbl_intf.create ();
   can_load_cmis = ref Can_load_cmis;
 }
 
@@ -189,6 +210,7 @@ let clear penv =
     quoted_impls;
     param_imports;
     crc_units;
+    crc_params;
     can_load_cmis;
   } = penv in
   Hashtbl.clear globals;
@@ -198,10 +220,11 @@ let clear penv =
   Ident.Tbl.clear locals_bound_to_runtime_parameters;
   imported_units := CU.Name.Set.empty;
   imported_opaque_units := CU.Name.Set.empty;
-  quoted_intfs := CU.Name.Set.empty;
+  quoted_intfs := CU.Set.empty;
   quoted_impls := CU.Set.empty;
   param_imports := Param_set.empty;
   Consistbl.clear crc_units;
+  Consistbl_intf.clear crc_params;
   can_load_cmis := Can_load_cmis;
   ()
 
@@ -260,33 +283,36 @@ let register_parameter ({param_imports; _} as penv) modname =
   param_imports := Param_set.add modname !param_imports
 
 let import_crcs penv ~source crcs =
-  let {crc_units; _} = penv in
+  let {crc_units; crc_params; _} = penv in
   let import_crc import_info =
-    let name = Import_info.Intf.name import_info in
     let info = Import_info.Intf.info import_info in
     match info with
     | None -> ()
-    | Some (kind, crc) ->
-        add_import penv name;
-        Consistbl.check crc_units name kind crc source
+    | Some (Normal unit, crc) ->
+        Consistbl.check crc_units unit () crc source
+    | Some (Parameter intf, crc) ->
+        Consistbl_intf.check crc_params intf () crc source
   in Array.iter import_crc crcs
 
 let check_consistency penv imp =
   try import_crcs penv ~source:imp.imp_filename imp.imp_crcs
-  with Consistbl.Inconsistency {
+  with
+  | Consistbl.Inconsistency {
       unit_name = name;
       inconsistent_source = source;
       original_source = auth;
-      inconsistent_data = source_kind;
-      original_data = auth_kind;
+      inconsistent_data = _;
+      original_data = _;
     } ->
-    match source_kind, auth_kind with
-    | Normal source_unit, Normal auth_unit
-      when not (CU.equal source_unit auth_unit) ->
-        error (Inconsistent_package_declaration_between_imports(
-            imp.imp_filename, auth_unit, source_unit))
-    | (Normal _ | Parameter), _ ->
-      error (Inconsistent_import(name, auth, source))
+    error (Inconsistent_import(name, auth, source))
+  | Consistbl_intf.Inconsistency {
+      unit_name = name;
+      inconsistent_source = source;
+      original_source = auth;
+      inconsistent_data = _;
+      original_data = _;
+    } ->
+    error (Inconsistent_import_intf(name, auth, source))
 
 let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
@@ -314,35 +340,40 @@ let without_cmis penv f x =
 
 let fold {persistent_structures; _} f x =
   Hashtbl.fold
-    (fun name ps x -> if ps.ps_canonical then f name ps.ps_val x else x)
+    (fun _name ps x ->
+       if ps.ps_canonical then f ps.ps_name_info.pn_name ps.ps_val x else x)
     persistent_structures x
 
 (* Reading persistent structures from .cmi files *)
 
-let save_import penv crc modname impl flags filename =
-  let {crc_units; _} = penv in
+let save_import penv crc (kind : Import_info.Intf.Nonalias.Kind.t) flags
+    filename =
+  let {crc_units; crc_params; _} = penv in
+  let name =
+    match kind with
+    | Normal unit -> CU.name unit
+    | Parameter intf -> CU.Intf.to_name intf
+  in
   List.iter
     (function
         | Rectypes -> ()
         | Alerts _ -> ()
-        | Opaque -> register_import_as_opaque penv modname)
+        | Opaque -> register_import_as_opaque penv name)
     flags;
-  Consistbl.check crc_units modname impl crc filename;
-  add_import penv modname
+  match kind with
+  | Normal unit -> Consistbl.check crc_units unit () crc filename
+  | Parameter intf -> Consistbl_intf.check crc_params intf () crc filename
 
 (* Add an import to the hash table. Checks that we are allowed to access
    this .cmi. *)
 
 let acknowledge_import penv ~check modname pers_sig =
   let { Persistent_signature.filename; cmi; visibility } = pers_sig in
-  let found_name = cmi.cmi_name in
   let kind = cmi.cmi_kind in
   let params = cmi.cmi_params in
   let crcs = cmi.cmi_crcs in
   let flags = cmi.cmi_flags in
   let sign = Signature_with_global_bindings.read_from_cmi cmi in
-  if not (CU.Name.equal modname found_name) then
-    error (Illegal_renaming(modname, found_name, filename));
   List.iter
     (function
         | Rectypes ->
@@ -364,24 +395,16 @@ let acknowledge_import penv ~check modname pers_sig =
   let is_param =
     match kind with
     | Normal _ -> false
-    | Parameter -> true
+    | Parameter _ -> true
   in
   let arg_for, impl =
     match kind with
-    | Normal { cmi_arg_for; cmi_impl } -> cmi_arg_for, Some cmi_impl
-    | Parameter -> None, None
+    | Normal { cmi_arg_for; cmi_impl } ->
+      Option.map CU.Intf.to_parameter_name cmi_arg_for, cmi_impl
+    | Parameter intf ->
+      None, CU.create CU.Prefix.empty (CU.Intf.to_name intf)
   in
-  let uid =
-    (* Awkwardly, we need to make sure the uid includes the pack prefix, which
-       is only stored in the [cmi_impl], which only exists for the kind
-       [Normal]. (There can be no pack prefix for a parameter, so it's not like
-       we're missing information, but it is awkward.) *)
-    (* CR-someday lmaurer: Just store the pack prefix separately like we used
-       to. Then we wouldn't need [cmi_impl] at all. *)
-    match kind with
-    | Normal { cmi_impl; _ } -> Shape.Uid.of_compilation_unit_id cmi_impl
-    | Parameter -> Shape.Uid.of_compilation_unit_name modname
-  in
+  let uid = Shape.Uid.of_compilation_unit_id impl in
   let {imports; _} = penv in
   let import =
     { imp_is_param = is_param;
@@ -417,7 +440,7 @@ let check_visibility ~allow_hidden imp =
 
 let find_import ~allow_hidden penv ~check modname =
   let {imports; _} = penv in
-  if CU.Name.equal modname CU.Name.predef_exn then raise Not_found;
+  if CU.Name.equal modname (CU.name CU.predef_exn) then raise Not_found;
   match Hashtbl.find imports modname with
   | Found imp -> check_visibility ~allow_hidden imp; imp
   | Missing -> raise Not_found
@@ -426,13 +449,13 @@ let find_import ~allow_hidden penv ~check modname =
       | Cannot_load_cmis _ -> raise Not_found
       | Can_load_cmis ->
           let psig =
-            match !Persistent_signature.load ~allow_hidden ~unit_name:modname with
+            let unit_name = CU.create CU.Prefix.empty modname in
+            match !Persistent_signature.load ~allow_hidden ~unit_name with
             | Some psig -> psig
             | None ->
                 if allow_hidden then Hashtbl.add imports modname Missing;
                 raise Not_found
           in
-          add_import penv modname;
           acknowledge_import penv ~check modname psig
 
 let remember_global { globals; _ } global ~precision ~mentioned_by =
@@ -502,10 +525,11 @@ let current_unit_is_aux name ~allow_args =
   | None -> false
   | Some current ->
       match CU.to_global_name current with
-      | Some { head; args } ->
+      | Without_prefix ({ head = _; args } as unprefixed) ->
           (args = [] || allow_args)
-          && CU.Name.equal name (head |> CU.Name.of_string)
-      | None -> false
+          && CU.Name.equal name
+               (CU.Name.of_head_of_global_name unprefixed)
+      | With_prefix _ -> false
 
 let current_unit_is name =
   current_unit_is_aux name ~allow_args:false
@@ -519,7 +543,7 @@ let current_unit_is_instance_of name =
    itself (in other words, we don't need to recurse).
 
    Formally, the subset rule for an unelaborated global (that is, a
-   [Global_module.Name.t]) says that [M[P_1:A_1]...[P_n:A_n]] is accessible if,
+   [Global_module.Name_prefixed.t]) says that [M[P_1:A_1]...[P_n:A_n]] is accessible if,
    for each parameter [P] that [M] takes, either [P] is one of the parameters
    [P_i], or the current compilation unit also takes [P].
 
@@ -717,13 +741,15 @@ and acknowledge_new_pers_name penv check global_name global import =
           [ mode;
             Mode.Value.min_with_monadic Staticity
               (Mode.Staticity.of_const
-                 ~hint:(Cmx_not_guaranteed import.imp_impl)
+                 ~hint:(Cmx_not_guaranteed (Some import.imp_impl))
                  Mode.Staticity.Dynamic) ]
     in
     signature, mode
   in
   let pn = { pn_import = import;
              pn_global = global;
+             pn_name =
+               CU.prefixed_name_of_global ~impl:import.imp_impl global;
              pn_sign;
            } in
   if check then check_consistency penv import;
@@ -745,12 +771,22 @@ let read_pers_name penv check name filename =
   let import = read_import penv ~check unit_name filename in
   acknowledge_pers_name penv check name import
 
-let normalize_global_name penv modname =
+let remove_excess_args penv modname =
   let new_modname =
     global_of_global_name penv modname ~check:true ~allow_excess_args:true
     |> Global_module.to_name
   in
   if Global_module.Name.equal modname new_modname then modname else new_modname
+
+let normalize_global_name penv (modname : Global_module.Name_prefixed.t) =
+  match modname with
+  | With_prefix _ ->
+      (* prefixed names have no arguments to normalize *)
+      modname
+  | Without_prefix name ->
+      let name' = remove_excess_args penv name in
+      if name == name' then modname
+      else Global_module.Name_prefixed.Without_prefix name'
 
 let need_local_ident penv (global : Global_module.t) =
   (* There are three equivalent ways to phrase the question we're asking here:
@@ -791,25 +827,18 @@ let need_local_ident penv (global : Global_module.t) =
        so it's not a compile-time constant *)
     true
 
-let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding =
-  let name = Global_module.to_name global in
+let make_binding penv (global : Global_module.t) (impl : CU.t) : binding =
+  let name = CU.prefixed_name_of_global ~impl global in
   if need_local_ident penv global
   then Runtime_parameter (Ident.create_local_binding_for_global name)
   else
-    let unit_from_cmi =
-      match impl with
-      | Some unit -> unit
-      | None ->
-          Misc.fatal_errorf_doc
-            "Can't bind a parameter statically:@ %a"
-            Global_module.print global
-    in
+    let unit_from_cmi = impl in
     let unit =
       match global.visible_args with
       | [] ->
-          (* Make sure the names are consistent up to the pack prefix *)
-          assert (Global_module.Name.equal
-                    (unit_from_cmi |> CU.to_global_name_without_prefix)
+          (* Make sure the names are consistent *)
+          assert (Global_module.Name_prefixed.equal
+                    (unit_from_cmi |> CU.to_global_name)
                     name);
           unit_from_cmi
       | _ ->
@@ -826,7 +855,7 @@ type address =
 
 type 'a sig_reader =
   Subst.Lazy.persistent_signature
-  -> Global_module.Name.t
+  -> Global_module.Name_prefixed.t
   -> Shape.Uid.t
   -> shape:Shape.t
   -> address:address
@@ -861,13 +890,13 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
     | Constant unit -> Aunit (unit, mode)
   in
   let shape =
-    match import.imp_impl, import.imp_params with
-    | Some unit, [] -> Shape.for_persistent_unit (CU.full_path_as_string unit)
+    match is_param, import.imp_params with
+    | false, [] -> Shape.for_persistent_unit (CU.full_path_as_string impl)
     | _, _ ->
         (* TODO Implement shapes for parameters and parameterised modules *)
         Shape.error ~uid "parameter or parameterised module"
   in
-  let pm = val_of_pers_sig sign modname uid ~shape ~address ~flags in
+  let pm = val_of_pers_sig sign pers_name.pn_name uid ~shape ~address ~flags in
   let ps =
     { ps_name_info = pers_name;
       ps_binding = binding;
@@ -939,23 +968,16 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
   | Error err ->
       let msg =
         match err with
-        | Illegal_renaming(name, ps_name, filename) ->
-            Format_doc.doc_printf
-              " %a@ contains the compiled interface for @ \
-               %a when %a was expected"
-              Location.Doc.quoted_filename filename
-              CU.Name.print_as_inline_code ps_name
-              CU.Name.print_as_inline_code name
-        | Inconsistent_import _ ->
+        | Illegal_renaming _ ->
+            (* Can't be raised by [find_pers_struct ~check:false] *)
+            assert false
+        | Inconsistent_import _ | Inconsistent_import_intf _ ->
             (* Can't be raised by [find_pers_struct ~check:false] *)
             assert false
         | Need_recursive_types name ->
             Format_doc.doc_printf
               "%a uses recursive types"
               CU.Name.print_as_inline_code name
-        | Inconsistent_package_declaration_between_imports _ ->
-            (* Can't be raised by [find_pers_struct ~check:false] *)
-            assert false
         | Direct_reference_from_wrong_package (unit, _filename, prefix) ->
             Format_doc.doc_printf "%a is inaccessible from %a"
               CU.print_as_inline_code unit
@@ -992,28 +1014,66 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
 
-let read penv modname a =
+let read penv (modname : Global_module.Name_prefixed.t) a =
+  let modname =
+    match modname with
+    | With_prefix (_, head) -> Global_module.Name.create_no_args head
+    | Without_prefix name -> name
+  in
   read_pers_struct penv true modname a
 
 let read_cmi_file penv filename =
   let cmi = read_cmi_lazy filename in
-  let unit_name = cmi.cmi_name in
-  let modname = CU.Name.to_global_name unit_name in
-  add_import penv unit_name;
+  let unit_name, (modname : Global_module.Name_prefixed.t) =
+    match cmi.cmi_kind with
+    | Normal { cmi_impl; _ } -> CU.name cmi_impl, CU.to_global_name cmi_impl
+    | Parameter intf ->
+      let name = CU.Intf.to_name intf in
+      ( name,
+        Without_prefix (Global_module.Name.create_no_args
+                          (CU.Name.to_string name)) )
+  in
   (* Register as hidden so that direct user-code references to the module
      are still reported as unbound; only transitive lookups can reach it. *)
   let pers_sig =
     { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
   in
   let import = acknowledge_import penv ~check:true unit_name pers_sig in
+  let unprefixed_modname =
+    match (modname : Global_module.Name_prefixed.t) with
+    | With_prefix (_, head) -> Global_module.Name.create_no_args head
+    | Without_prefix name -> name
+  in
   let pers_name =
-    acknowledge_pers_name penv true modname import ~allow_excess_args:false
+    acknowledge_pers_name penv true unprefixed_modname import
+      ~allow_excess_args:false
   in
   modname, pers_name.pn_sign
 
-let find ~allow_hidden penv f name ~allow_excess_args =
-  (find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true
-     name).ps_val
+let find ~allow_hidden penv f (name : Global_module.Name_prefixed.t)
+    ~allow_excess_args =
+  let unprefixed_name =
+    (* The result is checked against [name] below *)
+    match name with
+    | With_prefix (_, head) -> Global_module.Name.create_no_args head
+    | Without_prefix name -> name
+  in
+  let ps =
+    find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true
+      unprefixed_name
+  in
+  let found_name = ps.ps_name_info.pn_name in
+  if not (Global_module.Name_prefixed.equal found_name name) then
+    error
+      (Illegal_renaming
+         (name, found_name, ps.ps_name_info.pn_import.imp_filename));
+  ps.ps_val
+
+let lookup ~allow_hidden penv f name ~allow_excess_args =
+  let ps =
+    find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true name
+  in
+  ps.ps_val
 
 let check ~allow_hidden penv f ~loc name =
   let {persistent_structures; _} = penv in
@@ -1049,52 +1109,97 @@ let crc_of_unit penv name =
   match Consistbl.find penv.crc_units name with
   | Some (_impl, crc) -> crc
   | None ->
-    let import = find_import ~allow_hidden:true penv ~check:true name in
-    match Array.find_opt (Import_info.Intf.has_name ~name) import.imp_crcs with
+    let import =
+      find_import ~allow_hidden:true penv ~check:true (CU.name name)
+    in
+    match
+      Array.find_opt (Import_info.Intf.has_name ~name) import.imp_crcs
+    with
     | None -> assert false
     | Some import_info ->
       match Import_info.crc import_info with
       | None -> assert false
       | Some crc -> crc
 
-let imports {imported_units; crc_units; _} =
-  let imports =
-    Consistbl.extract (CU.Name.Set.elements !imported_units)
-      crc_units
+let imports {imported_units; crc_units; crc_params; _} =
+  let with_crcs, names_with_crcs =
+    Consistbl.fold
+      (fun unit () crc (acc, names) ->
+         Import_info.Intf.create_normal unit ~crc :: acc,
+         CU.Name.Set.add (CU.name unit) names)
+      crc_units ([], CU.Name.Set.empty)
   in
-  List.map (fun (cu_name, spec) -> Import_info.Intf.create cu_name spec)
-    imports
+  let with_crcs, names_with_crcs =
+    Consistbl_intf.fold
+      (fun intf () crc (acc, names) ->
+         Import_info.Intf.create_parameter intf ~crc :: acc,
+         CU.Name.Set.add (CU.Intf.to_name intf) names)
+      crc_params (with_crcs, names_with_crcs)
+  in
+  let aliases =
+    CU.Name.Set.fold
+      (fun name acc ->
+         if CU.Name.Set.mem name names_with_crcs then acc
+         else
+           Import_info.Intf.create_alias (CU.create CU.Prefix.empty name)
+           :: acc)
+      !imported_units []
+  in
+  (* Sorted by basename in descending order, matching the order historically
+     produced by [Consistbl.extract] *)
+  List.sort
+    (fun i1 i2 ->
+      CU.Name.compare
+        (Import_info.Intf.basename i2)
+        (Import_info.Intf.basename i1))
+    (with_crcs @ aliases)
 
-let require_intf_for_quote {quoted_intfs; _} name =
-  quoted_intfs := CU.Name.Set.add name !quoted_intfs
+let require_intf_for_quote penv name =
+  let unit =
+    match find_import_info_in_cache penv name with
+    | Some { imp_impl; _ } -> imp_impl
+    | None ->
+        (* The current unit, which is not an import of itself *)
+        Current_unit.get_cu_exn ()
+  in
+  penv.quoted_intfs := CU.Set.add unit !(penv.quoted_intfs)
 
 let quoted_intfs { quoted_intfs; _ } = !quoted_intfs
 
 let loaded_transitive_dependencies penv intfs =
-  let names = ref Compilation_unit.Name.Set.empty in
+  let units = ref CU.Set.empty in
   let rec add_loaded_deps name =
-    match find_import_info_in_cache penv name with
+    match find_import_info_in_cache penv (CU.name name) with
     | None -> ()
-    | Some { imp_crcs; _ } ->
-      if not (CU.Name.Set.mem name !names)
+    | Some { imp_impl; imp_crcs; _ } ->
+      if not (CU.Set.mem imp_impl !units)
       then (
-        names := CU.Name.Set.add name !names;
+        units := CU.Set.add imp_impl !units;
         Array.iter
-          (fun import_info -> add_loaded_deps (Import_info.name import_info))
+          (fun import_info ->
+            match Import_info.Intf.view import_info with
+            | Normal (cu, _) | Alias cu -> add_loaded_deps cu
+            | Parameter _ -> ())
           imp_crcs)
   in
-  Compilation_unit.Name.Set.iter add_loaded_deps intfs;
-  !names
+  CU.Set.iter add_loaded_deps intfs;
+  !units
 
 let require_impl_for_quote {quoted_impls; _} name =
   quoted_impls := CU.Set.add name !quoted_impls
 
 let quoted_impls {quoted_impls; _} = !quoted_impls
 
-let is_imported_parameter penv modname =
-  match find_info_in_cache penv modname with
-  | Some pers_struct -> pers_struct.ps_name_info.pn_import.imp_is_param
-  | None -> false
+let is_imported_parameter penv (modname : Global_module.Name_prefixed.t) =
+  match modname with
+  | With_prefix _ ->
+      (* Packed units are never parameters *)
+      false
+  | Without_prefix modname -> begin
+      match find_info_in_cache penv modname with
+      | Some pers_struct -> pers_struct.ps_name_info.pn_import.imp_is_param
+      | None -> false
+    end
 
 let runtime_parameter_bindings {persistent_structures; _} =
   (* This over-approximates the runtime parameters that are actually needed:
@@ -1130,18 +1235,33 @@ let is_bound_to_runtime_parameter {locals_bound_to_runtime_parameters; _} id =
 let parameters {param_imports; _} =
   Param_set.elements !param_imports
 
-let looked_up {persistent_structures; _} modname =
-  Hashtbl.mem persistent_structures modname
+let looked_up {persistent_structures; _}
+    (modname : Global_module.Name_prefixed.t) =
+  let unprefixed_modname =
+    (* The result is checked against [modname] below *)
+    match modname with
+    | With_prefix (_, head) -> Global_module.Name.create_no_args head
+    | Without_prefix name -> name
+  in
+  match Hashtbl.find_opt persistent_structures unprefixed_modname with
+  | None -> false
+  | Some ps -> Global_module.Name_prefixed.equal ps.ps_name_info.pn_name modname
 
 let is_imported_opaque {imported_opaque_units; _} s =
   CU.Name.Set.mem s !imported_opaque_units
 
-let implemented_parameter penv modname =
-  match find_name_info_in_cache penv modname with
-  | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
-  | None -> None
+let implemented_parameter penv (modname : Global_module.Name_prefixed.t) =
+  match modname with
+  | With_prefix _ ->
+      (* Packed units are never arguments *)
+      None
+  | Without_prefix modname -> begin
+      match find_name_info_in_cache penv modname with
+      | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
+      | None -> None
+    end
 
-let make_cmi penv modname kind sign alerts =
+let make_cmi penv kind sign alerts =
   let flags =
     List.concat [
       if !Clflags.recursive_types then [Cmi_format.Rectypes] else [];
@@ -1170,7 +1290,6 @@ let make_cmi penv modname kind sign alerts =
     |> Array.of_seq
   in
   {
-    cmi_name = modname;
     cmi_kind = kind;
     cmi_globals = globals;
     cmi_sign = sign;
@@ -1182,11 +1301,7 @@ let make_cmi penv modname kind sign alerts =
 let save_cmi penv psig =
   let { Persistent_signature.filename; cmi; _ } = psig in
   Misc.try_finally (fun () ->
-      let {
-        cmi_name = modname;
-        cmi_kind = kind;
-        cmi_flags = flags;
-      } = cmi in
+      let { cmi_kind = kind; cmi_flags = flags; _ } = cmi in
       let crc =
         output_to_file_via_temporary (* see MPR#7472, MPR#4991 *)
           ~mode: [Open_binary] filename
@@ -1195,10 +1310,10 @@ let save_cmi penv psig =
          also return its crc *)
       let data : Import_info.Intf.Nonalias.Kind.t =
         match kind with
-        | Normal { cmi_impl } -> Normal cmi_impl
-        | Parameter -> Parameter
+        | Normal { cmi_impl; _ } -> Normal cmi_impl
+        | Parameter intf -> Parameter intf
       in
-      save_import penv crc modname data flags filename
+      save_import penv crc data flags filename
     )
     ~exceptionally:(fun () -> remove_file filename)
 
@@ -1209,26 +1324,26 @@ let report_error_doc ppf =
       "Wrong file naming: %a@ contains the compiled interface for@ \
        %a when %a was expected"
       Location.Doc.quoted_filename filename
-      CU.Name.print_as_inline_code ps_name
-      CU.Name.print_as_inline_code modname
+      Style.inline_code (Global_module.Name_prefixed.to_string ps_name)
+      Style.inline_code (Global_module.Name_prefixed.to_string modname)
   | Inconsistent_import(name, source1, source2) -> fprintf ppf
       "@[<hov>The files %a@ and %a@ \
               make inconsistent assumptions@ over interface %a@]"
       Location.Doc.quoted_filename source1
       Location.Doc.quoted_filename source2
-      CU.Name.print_as_inline_code name
+      CU.print_as_inline_code name
+  | Inconsistent_import_intf(name, source1, source2) -> fprintf ppf
+      "@[<hov>The files %a@ and %a@ \
+              make inconsistent assumptions@ over interface %a@]"
+      Location.Doc.quoted_filename source1
+      Location.Doc.quoted_filename source2
+      CU.Intf.print_as_inline_code name
   | Need_recursive_types(import) ->
       fprintf ppf
         "@[<hov>Invalid import of %a, which uses recursive types.@ \
          The compilation flag %a is required@]"
         CU.Name.print_as_inline_code import
         Style.inline_code "-rectypes"
-  | Inconsistent_package_declaration_between_imports (filename, unit1, unit2) ->
-      fprintf ppf
-        "@[<hov>The file %s@ is imported both as %a@ and as %a.@]"
-        filename
-        CU.print_as_inline_code unit1
-        CU.print_as_inline_code unit2
   | Direct_reference_from_wrong_package(unit, filename, prefix) ->
       fprintf ppf
         "@[<hov>Invalid reference to %a (in file %s) from %a.@ %s]"
