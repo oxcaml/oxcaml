@@ -440,6 +440,28 @@ test-no-rebuild:
                fi \
              fi)
 
+.PHONY: test-files-parallel
+test-files-parallel:
+	if [ "$(middle_end)" = "flambda2" ]; then \
+	  for path in `cd testsuite; ls -1 -d tests/*`; do \
+	    if [[ -d "testsuite/$$path" ]] && ! grep -q "^  $$path " oxcaml/testsuite/flambda2-test-list; then \
+	      echo "  $$path"; \
+	    fi; \
+	  done > _runtest/flambda2-test-list; \
+	fi
+	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
+	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
+	 if $$(which gfortran > /dev/null 2>&1); then \
+	   export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
+	 fi; \
+	 cd _runtest/testsuite; \
+	 if [ "$(middle_end)" = "flambda2" ]; then \
+	   $(MAKE) --no-print-directory files-parallel \
+	     FILE=$$(pwd)/../flambda2-test-list; \
+	 else \
+	   $(MAKE) --no-print-directory files-parallel DIR=tests; \
+	 fi)
+
 promote-failed:
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
@@ -599,7 +621,7 @@ dev-test: dev-check
 	    export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	  fi; \
 	  cd _build/dev/runtest/testsuite; \
-	  $(MAKE) $(if $(PROMOTE),promote,one) \
+	  $(MAKE) $(if $(PROMOTE),promote,$(if $(DIR),files-parallel,one)) \
 	    $(if $(TEST),TEST=$(call locate_test,$(TEST))) \
 	    $(if $(DIR),DIR=$(call locate_test,$(DIR)))
 
@@ -618,7 +640,7 @@ dev-test-all: dev-check
 	  echo "dev: building the final compiler for the full test suite"; \
 	  $(MAKE) --no-print-directory \
 	    -o boot-compiler -o runtime-stdlib install_for_test; \
-	  $(MAKE) --no-print-directory test-no-rebuild
+	  $(MAKE) --no-print-directory test-files-parallel
 
 dev-promote:
 	+@set -eu; \

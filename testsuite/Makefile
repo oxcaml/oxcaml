@@ -275,6 +275,43 @@ list-parallel: lib tools
 	 | tee $(TESTLOG)
 	@$(MAKE) report
 
+# Run each test file as a separate GNU Parallel job. This gives better load
+# balancing than [list-parallel], which runs all files in a directory in one
+# serial job.
+.PHONY: files-parallel
+files-parallel: lib tools
+	@if [ "$(words $(DIR) $(FILE))" != 1 ]; then \
+	  echo "Specify exactly one of DIR or FILE."; \
+	  exit 1; \
+	fi
+	@echo | parallel >/dev/null 2>/dev/null \
+	 || (echo "Unable to run the GNU parallel tool;";\
+	     echo "You should install it before using files-parallel.";\
+	     exit 1)
+	@echo | parallel --gnu --no-notice >/dev/null 2>/dev/null \
+	 || (echo "Your 'parallel' tool seems incompatible with GNU parallel.";\
+	     echo "This target requires GNU parallel.";\
+	     exit 1)
+	@(if [ -n "$(DIR)" ]; then echo "$(DIR)"; else cat "$(FILE)"; fi) \
+	 | while $(IFS_LINE) read -r requested_dir; do \
+	     requested_dir=$${requested_dir#  }; \
+	     $(ocamltest) -find-test-dirs "$$requested_dir"; \
+	   done \
+	 | while $(IFS_LINE) read -r test_dir; do \
+	     $(ocamltest) -list-tests "$$test_dir" \
+	       | while $(IFS_LINE) read -r test_file; do \
+	           case "$$test_file" in *.corrected) continue;; esac; \
+	           echo "$$test_dir/$$test_file"; \
+	         done; \
+	   done \
+	 | parallel --gnu --no-notice --keep-order $(J_ARGUMENT) \
+	     'test_path={}; test_dir="$${test_path%/*}"; \
+	      echo "Running tests from '\''$$test_dir'\'' ..."; \
+	      TERM=dumb $(OCAMLTESTENV) $(ocamltest) $(OCAMLTESTFLAGS) \
+	        "$$test_path"' \
+	 | tee $(TESTLOG)
+	@$(MAKE) report
+
 .PHONY: one
 one:
 	@case "$(words $(DIR) $(LIST) $(TEST))" in \
