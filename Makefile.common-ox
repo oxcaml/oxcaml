@@ -788,26 +788,7 @@ dev-diff:
 	    echo "Usage: make dev-diff TEST=path/to/test.ml" >&2; \
 	    exit 2; \
 	  fi; \
-	  source="testsuite/$(call locate_test,$(TEST))"; \
-	  name=$$(basename "$$source"); \
-	  roots=""; \
-	  for root in _build/dev/runtest/testsuite _runtest/testsuite testsuite; do \
-	    if [ -d $$root ]; then roots="$$roots $$root"; fi; \
-	  done; \
-	  candidates=$$(find $$roots -name "$$name.corrected.corrected" 2>/dev/null); \
-	  if [ -z "$$candidates" ]; then \
-	    candidates=$$(find $$roots -name "$$name.corrected" 2>/dev/null); \
-	  fi; \
-	  if [ -z "$$candidates" ]; then \
-	    echo "dev: no corrected output for $$source." >&2; \
-	    echo "dev: run \`make dev-test TEST=$(TEST)\` first; note that" >&2; \
-	    echo "dev: prepare-test-root discards the previous run's artifacts." >&2; \
-	    exit 1; \
-	  fi; \
-	  newest=$$(ls -t $$candidates | head -1); \
-	  echo "dev: corrected output $$newest"; \
-	  echo "dev: promote it with \`make dev-promote TEST=$(TEST)\`, not by copying."; \
-	  diff -u "$$source" "$$newest" || true
+	  $(dev_watcher) diff --test "$(call locate_test,$(TEST))"
 
 dev-ocamlc: dev-check
 	@echo "dev: compiler = $(dev_build)/default/main_native.exe"

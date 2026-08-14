@@ -406,6 +406,70 @@ def build_directly(fallback):
     return subprocess.run(fallback, cwd=ROOT).returncode
 
 
+# Where a test's fresh output can end up. dev-test uses the dev root; dev-test-all
+# uses _runtest; and the promote path for a whole directory runs ocamltest with
+# OCAMLTESTDIR under the test's own directory, which the dev root symlinks back
+# into the source tree.
+ARTIFACT_ROOTS = ("_build/dev/runtest/testsuite", "_runtest/testsuite", "testsuite")
+
+
+def newest(paths):
+    return max(paths, key=lambda path: path.stat().st_mtime)
+
+
+def find_artifacts(patterns):
+    for pattern in patterns:
+        found = [
+            path
+            for root in ARTIFACT_ROOTS
+            if (ROOT / root).is_dir()
+            for path in (ROOT / root).rglob(pattern)
+            if path.is_file()
+        ]
+        if found:
+            return newest(found)
+    return None
+
+
+def diff(args):
+    """Show a test's newest fresh output against what it is compared to.
+
+    Expect tests are the subtle case: the -principal pass writes
+    <test>.corrected.corrected, which supersedes <test>.corrected, so promoting
+    the latter by hand drops the principal updates silently.
+    """
+    source = ROOT / "testsuite" / args.test
+    stem = source.name.rsplit(".", 1)[0]
+
+    corrected = find_artifacts(
+        [f"{source.name}.corrected.corrected", f"{source.name}.corrected"]
+    )
+    if corrected is not None:
+        announce(f"corrected output {corrected.relative_to(ROOT)}")
+        announce("promote with `make dev-promote`, never by copying this file")
+        return show_diff(source, corrected)
+
+    output = find_artifacts([f"{stem}.output", f"{stem}.result"])
+    if output is None:
+        announce(f"no fresh output for {source.relative_to(ROOT)}")
+        announce("run `make dev-test TEST=...` first; note that prepare-test-root")
+        announce("discards the previous run's artifacts")
+        return 1
+
+    announce(f"program output {output.relative_to(ROOT)}")
+    reference = source.parent / f"{stem}.reference"
+    if not reference.is_file():
+        announce(f"no reference {reference.relative_to(ROOT)} yet; the output is:")
+        print(output.read_text(errors="replace"), end="")
+        return 0
+    return show_diff(reference, output)
+
+
+def show_diff(reference, output):
+    subprocess.run(["diff", "-u", str(reference), str(output)], cwd=ROOT)
+    return 0
+
+
 def link(source, destination):
     destination.symlink_to(
         source.resolve(), target_is_directory=source.is_dir()
@@ -587,6 +651,10 @@ def parser():
 
     filter_parser = commands.add_parser("filter-notices")
     filter_parser.set_defaults(function=filter_notices)
+
+    diff_parser = commands.add_parser("diff")
+    diff_parser.add_argument("--test", required=True)
+    diff_parser.set_defaults(function=diff)
 
     test_root_parser = commands.add_parser("prepare-test-root")
     test_root_parser.set_defaults(function=prepare_test_root)
