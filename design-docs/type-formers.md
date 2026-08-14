@@ -268,12 +268,13 @@ which route was taken and why, and what was considered.
   (`Types.refinement_expression`) resolves value names — bound names to
   idents, free names to paths via `Env.lookup_value` — but carries no
   types except those written in the source (`Rexp_constraint`).
-  Constructor and record-label names are checked for existence at
-  translation and stored as longidents; resolving them to descriptions
-  would drag `constructor_description`s (and their types) into the type
-  graph, and no rule consumes them yet. Consequence to revisit in a later
-  piece: a module renaming via `Subst` rewrites value paths but not
-  constructor names.
+  Constructors resolve to paths too (`Pextra_ty (type_path, Pcstr_ty
+  name)`, or the constructor's own path for extension constructors), which
+  `Subst.type_path` rewrites, so functor application and signature
+  prefixing keep them meaningful. Record labels have no path
+  representation in the compiler; field names are checked for existence
+  and stay longidents — a known gap should a predicate project a field of
+  a functor-parameter record.
 - **The predicate sublanguage, concretely.** Idents, constants,
   application, labeled tuples, constructors, record field access,
   `if`/`then`/`else`, single non-recursive `let x = e in e`, `fun x -> e`,
@@ -296,19 +297,16 @@ which route was taken and why, and what was considered.
   conversion time and printed by `Pprintast`. Interior types are rendered
   through the type printer and re-parsed with `Parse.core_type`, so paths
   and nested refinements print consistently with the enclosing output.
-  The label slot of `Otyp_arrow` is the printed name slot verbatim
-  (`Labelled "x"` for a binder, `Labelled "~x"` for an escaped label);
-  outcometree consumers that pattern-match labels see strings, which is
-  what they print. The alternative — new outcometree label constructors —
-  touches every outcometree consumer for the same output.
+  The name slot of `Otyp_arrow` is typed: `Binder` and `Tilde_labelled`
+  are outcometree `arg_label` constructors (initially this was a string
+  convention inside `Labelled`; the first review round pointed out that
+  the honest representation costs three small consumers).
 - **When `~` is printed.** Only when needed: a label prints bare unless
-  its name occurs in a refinement predicate in scope (its own binder, an
-  outer binder with the same printed name, or a free identifier printed as
-  that bare name), in which case re-parsing would turn it into a binder
-  and the printer escapes it. This can over-escape in corner cases (an
-  occurrence bound by a deeper arrow); the output still re-parses to the
-  same type. Positional binders are renamed (`x` → `x1`) when they collide
-  with an enclosing binder still in scope.
+  re-parsing the converted output would turn it into a binder
+  (`out_label_needs_escape`, which runs the occurrence test's scoping
+  rules on the artifact that is actually printed). Binder names print as
+  written; the printer does not rename binders — see the review-round
+  decisions below.
 - **Unification and the binder.** The binder ident is not part of type
   identity. `unify`, `eqtype` and `moregen` pair the two binders on a
   stack (mirroring `univar_pairs`) and compare predicates
@@ -377,10 +375,13 @@ Decisions and accepted costs recorded here:
   string conventions inside `Labelled`.
 - **Dependent arrows survive partial application**: the omitted-parameter
   record carries the binder and every arrow reconstruction in `Typecore`
-  preserves it. Whether *applying* a dependent arrow should be allowed at
-  all is an elimination-rule question for a later piece; today the domain
-  type escapes its binder and the escaped occurrence prints under the
-  binder's name (pinned by a test).
+  preserves it. *Consuming* a dependent parameter — applying it to an
+  argument, or defining a `fun` against a dependent annotation
+  (`Ctype.filter_arrow`) — is rejected with a located error
+  (`Unsupported_dependent_arrow`): it would let the domain or codomain
+  escape the binder's scope, producing types that print as unparseable
+  source. The elimination and introduction rules of a later piece will
+  replace the rejection.
 - **Predicate-local binders scope into interior types** (and therefore
   into refinements nested in them), matching the occurrence test.
 - **Refinements in quotations are a located error**, not a fatal error:

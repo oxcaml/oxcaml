@@ -785,6 +785,7 @@ let rec typexp copy_scope s rename ty =
               ref_pred =
                 Vox_rexp.map ~rename ~freshen:true
                   ~value_path:(value_path s)
+                  ~constructor_path:(type_path s)
                   ~type_expr:(typexp copy_scope s rename) ref_pred }
       | Tof_kind jk -> Tof_kind (jkind copy_scope s rename jk)
       | Tmod (ty, mod_bounds) ->

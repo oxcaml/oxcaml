@@ -1578,25 +1578,41 @@ let rec tree_of_modal_typexp mode modal ty =
           | ct -> ct
           | exception _ -> Ast_helper.Typ.any None
         in
+        (* Names render through the printer's path machinery, so that
+           shortening and substitution are reflected. *)
+        let rec longident : Outcometree.out_ident -> Longident.t = function
+          | Oide_ident { printed_name } -> Lident printed_name
+          | Oide_dot (id, s) ->
+              Ldot (Location.mknoloc (longident id), Location.mknoloc s)
+          | Oide_apply (a, b) ->
+              Lapply
+                (Location.mknoloc (longident a),
+                 Location.mknoloc (longident b))
+          | Oide_hash id -> longident id
+        in
         let value_ident path =
-          (* Through the printer's path machinery, so that shortening and
-             substitution are reflected. *)
-          let rec longident : Outcometree.out_ident -> Longident.t = function
-            | Oide_ident { printed_name } -> Lident printed_name
-            | Oide_dot (id, s) ->
-                Ldot (Location.mknoloc (longident id), Location.mknoloc s)
-            | Oide_apply (a, b) ->
-                Lapply
-                  (Location.mknoloc (longident a),
-                   Location.mknoloc (longident b))
-            | Oide_hash id -> longident id
-          in
           Location.mknoloc (longident (tree_of_path (Some Value) path))
+        in
+        let constructor_ident path =
+          (* A constructor is qualified by the module of its type. *)
+          match (path : Path.t) with
+          | Pextra_ty (tp, Pcstr_ty name) -> (
+              match tp with
+              | Pdot (m, _) | Pextra_ty (Pdot (m, _), _) ->
+                  Location.mknoloc
+                    (Longident.Ldot
+                       (Location.mknoloc
+                          (longident (tree_of_path (Some Module) m)),
+                        Location.mknoloc name))
+              | _ -> Location.mknoloc (Longident.Lident name))
+          | path ->
+              (* extension constructor *)
+              Location.mknoloc (longident (tree_of_path None path))
         in
         Otyp_refine
           (payload,
-           Vox_rexp.untype ~var_name:Ident.name ~value_ident ~core_type
-             ref_pred)
+           Vox_rexp.untype ~var_name:Ident.name ~value_ident
+             ~constructor_ident ~core_type ref_pred)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->

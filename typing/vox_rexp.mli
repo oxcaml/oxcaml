@@ -35,6 +35,7 @@ val map :
   ?rename:Ident.t Ident.Map.t ->
   ?freshen:bool ->
   ?value_path:(Path.t -> Path.t) ->
+  ?constructor_path:(Path.t -> Path.t) ->
   type_expr:(type_expr -> type_expr) ->
   refinement_expression -> refinement_expression
 
@@ -53,14 +54,15 @@ val equal :
 val untype :
   var_name:(Ident.t -> string) ->
   value_ident:(Path.t -> Longident.t Location.loc) ->
+  constructor_ident:(Path.t -> Longident.t Location.loc) ->
   core_type:(type_expr -> Parsetree.core_type) ->
   refinement_expression -> Parsetree.expression
 
 (** Does the predicate mention the given bound ident? *)
 val mentions_ident : Ident.t -> refinement_expression -> bool
 
-(** The first free value path in the predicate for which [f] answers, if
-    any.  Interior types are not scanned here; the caller scans the type
-    graph. *)
+(** The first free value or constructor path in the predicate for which
+    [f] answers, if any.  Interior types are not scanned here; the caller
+    scans the type graph. *)
 val find_value_path :
   (Path.t -> 'a option) -> refinement_expression -> 'a option

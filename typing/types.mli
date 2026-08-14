@@ -329,7 +329,10 @@ and refinement_expression_desc =
   | Rexp_apply of
       refinement_expression * (Asttypes.arg_label * refinement_expression) list
   | Rexp_tuple of (string option * refinement_expression) list
-  | Rexp_construct of Longident.t loc * refinement_expression option
+  | Rexp_construct of Path.t * Longident.t loc * refinement_expression option
+  (** The path is [Pextra_ty (type_path, Pcstr_ty name)] for an ordinary
+      constructor and the constructor's own path for an extension
+      constructor, so that substitution keeps it meaningful. *)
   | Rexp_field of refinement_expression * Longident.t loc
   | Rexp_ifthenelse of
       refinement_expression * refinement_expression
@@ -359,7 +362,7 @@ and refinement_pattern_desc =
   | Rpat_var of Ident.t
   | Rpat_constant of Parsetree.constant
   | Rpat_tuple of (string option * refinement_pattern) list
-  | Rpat_construct of Longident.t loc * refinement_pattern option
+  | Rpat_construct of Path.t * Longident.t loc * refinement_pattern option
   | Rpat_alias of refinement_pattern * Ident.t
 
 (** This is used in the Typedtree. It is distinct from

@@ -315,6 +315,7 @@ type error =
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
   | Function_type_not_rep of type_expr * Jkind.Violation.t
+  | Unsupported_dependent_arrow
   | Function_type_escapes_partial_match of
       { ty : type_expr;
         match_loc : Location.t;
@@ -365,6 +366,7 @@ let error_of_filter_arrow_failure ~explanation ~first ty_fun
       else Too_many_arguments(ty_fun, explanation)
     end
   | Jkind_error (ty, err) -> Function_type_not_rep (ty, err)
+  | Dependent_arrow -> Unsupported_dependent_arrow
 
 (* Forward declaration, to be filled in by Typemod.type_module *)
 
@@ -4964,7 +4966,10 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
                               { some_args_ok; ty_fun; jkind }))
               end;
               (sort_arg, mode_arg, ty_arg_mono, mode_ret, ty_res)
-        | Tarrow ((l, _, mode_arg, mode_ret), ty_arg, ty_res, _)
+        | Tarrow ((l, Some _, _, _), _, _, _)
+          when labels_match ~param:l ~arg:lbl ->
+            raise (Error (sarg.pexp_loc, env, Unsupported_dependent_arrow))
+        | Tarrow ((l, None, mode_arg, mode_ret), ty_arg, ty_res, _)
           when labels_match ~param:l ~arg:lbl ->
             let sort_arg =
               match
@@ -5103,6 +5108,12 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
             let arg =
               match arg_opt with
               | Some (sarg, l', ~commuted) ->
+                  (* Consuming a dependent parameter would let the rest of
+                     the arrow escape the binder's scope; the elimination
+                     rules are a later piece. *)
+                  if arg_binder <> None then
+                    raise (Error (sarg.pexp_loc, env,
+                                  Unsupported_dependent_arrow));
                   let wrapped_in_some = optional && not (is_optional l') in
                   if wrapped_in_some then
                     may_warn sarg.pexp_loc
@@ -11972,6 +11983,11 @@ and type_n_ary_function
                     fatal_error
                       "Jkind_error not expected as this point; this should \
                        have been caught when the function was typechecked."
+                | Dependent_arrow ->
+                    fatal_error
+                      "Dependent_arrow not expected at this point; this \
+                       should have been caught when the function was \
+                       typechecked."
               in
               let err =
                 Function_arity_type_clash
@@ -13571,6 +13587,11 @@ let report_error ~loc env =
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation
+  | Unsupported_dependent_arrow ->
+      Location.errorf ~loc
+        "@[Functions with a dependent arrow type cannot be defined or@ \
+         applied yet: the introduction and elimination rules for@ \
+         refinements are not implemented.@]"
   | Function_type_escapes_partial_match { ty; match_loc; kind; why } ->
       let what =
         match kind with `Argument -> "argument" | `Result -> "result"

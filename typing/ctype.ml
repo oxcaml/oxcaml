@@ -5767,6 +5767,10 @@ type filter_arrow_failure =
       }
   | Not_a_function
   | Jkind_error of type_expr * Jkind.Violation.t
+  | Dependent_arrow
+    (* The arrow carries a value binder; decomposing it would let the
+       domain or codomain escape the binder's scope.  The introduction and
+       elimination rules for refinements are a later piece. *)
 
 exception Filter_arrow_failed of filter_arrow_failure
 
@@ -5834,7 +5838,8 @@ let filter_arrow env t l ~force_tpoly =
       end;
       link_type t t';
       arrow_desc
-  | Tarrow((l', _, arg_mode, ret_mode), ty_arg, ty_ret, _) ->
+  | Tarrow((l', binder, arg_mode, ret_mode), ty_arg, ty_ret, _) ->
+      if binder <> None then raise (Filter_arrow_failed Dependent_arrow);
       if l = l' || !Clflags.classic && l = Nolabel &&
         equivalent_with_nolabels l l'
       then

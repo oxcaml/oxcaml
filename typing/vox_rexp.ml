@@ -25,7 +25,7 @@ let rec fold_types f acc rexp =
       List.fold_left
         (fun acc (_, component) -> fold_types f acc component)
         acc components
-  | Rexp_construct (_, arg) ->
+  | Rexp_construct (_, _, arg) ->
       Option.fold ~none:acc ~some:(fold_types f acc) arg
   | Rexp_field (e, _) -> fold_types f acc e
   | Rexp_ifthenelse (cond, ifso, ifnot) ->
@@ -48,8 +48,8 @@ let iter_types f rexp = fold_types (fun () ty -> f ty) () rexp
 
 (* Rebuilding *)
 
-let map ?(rename = Ident.Map.empty) ?(freshen = false) ?value_path ~type_expr
-    rexp =
+let map ?(rename = Ident.Map.empty) ?(freshen = false) ?value_path
+    ?constructor_path ~type_expr rexp =
   let rename_var rename id =
     match Ident.Map.find_opt id rename with Some id' -> id' | None -> id
   in
@@ -77,8 +77,11 @@ let map ?(rename = Ident.Map.empty) ?(freshen = false) ?value_path ~type_expr
       | Rexp_tuple components ->
           Rexp_tuple
             (List.map (fun (lbl, c) -> lbl, map_rexp rename c) components)
-      | Rexp_construct (lid, arg) ->
-          Rexp_construct (lid, Option.map (map_rexp rename) arg)
+      | Rexp_construct (path, lid, arg) ->
+          let path =
+            match constructor_path with Some f -> f path | None -> path
+          in
+          Rexp_construct (path, lid, Option.map (map_rexp rename) arg)
       | Rexp_field (e, lid) -> Rexp_field (map_rexp rename e, lid)
       | Rexp_ifthenelse (cond, ifso, ifnot) ->
           Rexp_ifthenelse
@@ -119,7 +122,10 @@ let map ?(rename = Ident.Map.empty) ?(freshen = false) ?value_path ~type_expr
               rename components
           in
           rename, Rpat_tuple components
-      | Rpat_construct (lid, arg) ->
+      | Rpat_construct (path, lid, arg) ->
+          let path =
+            match constructor_path with Some f -> f path | None -> path
+          in
           let rename, arg =
             match arg with
             | None -> rename, None
@@ -127,7 +133,7 @@ let map ?(rename = Ident.Map.empty) ?(freshen = false) ?value_path ~type_expr
                 let rename, p = map_pat rename p in
                 rename, Some p
           in
-          rename, Rpat_construct (lid, arg)
+          rename, Rpat_construct (path, lid, arg)
       | Rpat_alias (p, id) ->
           let rename, p = map_pat rename p in
           let rename, id = bind rename id in
@@ -178,8 +184,8 @@ let equal ~type_eq ~pairs rexp1 rexp2 =
         && List.for_all2
              (fun (l1, e1) (l2, e2) -> l1 = l2 && eq pairs e1 e2)
              c1 c2
-    | Rexp_construct (lid1, arg1), Rexp_construct (lid2, arg2) ->
-        lid1.txt = lid2.txt
+    | Rexp_construct (p1, _, arg1), Rexp_construct (p2, _, arg2) ->
+        Path.same p1 p2
         && Option.equal (eq pairs) arg1 arg2
     | Rexp_field (e1, lid1), Rexp_field (e2, lid2) ->
         lid1.txt = lid2.txt && eq pairs e1 e2
@@ -221,8 +227,8 @@ let equal ~type_eq ~pairs rexp1 rexp2 =
                   if l1 = l2 then eq_pat pairs p1 p2 else None))
             (Some pairs) c1 c2
         else None
-    | Rpat_construct (lid1, arg1), Rpat_construct (lid2, arg2) ->
-        if lid1.txt = lid2.txt then
+    | Rpat_construct (c1, _, arg1), Rpat_construct (c2, _, arg2) ->
+        if Path.same c1 c2 then
           match arg1, arg2 with
           | None, None -> Some pairs
           | Some p1, Some p2 -> eq_pat pairs p1 p2
@@ -240,7 +246,7 @@ let equal ~type_eq ~pairs rexp1 rexp2 =
 
 (* Back to surface syntax *)
 
-let untype ~var_name ~value_ident ~core_type rexp =
+let untype ~var_name ~value_ident ~constructor_ident ~core_type rexp =
   let open Ast_helper in
   let lid_of_name name = Location.mknoloc (Longident.Lident name) in
   let rec untype_rexp rexp =
@@ -260,8 +266,9 @@ let untype ~var_name ~value_ident ~core_type rexp =
     | Rexp_tuple components ->
         Exp.tuple ~loc
           (List.map (fun (lbl, c) -> lbl, untype_rexp c) components)
-    | Rexp_construct (lid, arg) ->
-        Exp.construct ~loc lid (Option.map untype_rexp arg)
+    | Rexp_construct (path, _, arg) ->
+        Exp.construct ~loc (constructor_ident path)
+          (Option.map untype_rexp arg)
     | Rexp_field (e, lid) -> Exp.field ~loc (untype_rexp e) lid
     | Rexp_ifthenelse (cond, ifso, ifnot) ->
         Exp.ifthenelse ~loc (untype_rexp cond) (untype_rexp ifso)
@@ -301,8 +308,8 @@ let untype ~var_name ~value_ident ~core_type rexp =
         Pat.tuple ~loc
           (List.map (fun (lbl, p) -> lbl, untype_pat p) components)
           Asttypes.Closed
-    | Rpat_construct (lid, arg) ->
-        Pat.construct ~loc lid
+    | Rpat_construct (path, _, arg) ->
+        Pat.construct ~loc (constructor_ident path)
           (Option.map (fun p -> [], untype_pat p) arg)
     | Rpat_alias (p, id) ->
         Pat.alias ~loc (untype_pat p) (Location.mknoloc (var_name id))
@@ -321,7 +328,7 @@ let exists_rexp pred rexp =
         walk fn;
         List.iter (fun (_, arg) -> walk arg) args
     | Rexp_tuple components -> List.iter (fun (_, c) -> walk c) components
-    | Rexp_construct (_, arg) -> Option.iter walk arg
+    | Rexp_construct (_, _, arg) -> Option.iter walk arg
     | Rexp_field (e, _) -> walk e
     | Rexp_ifthenelse (cond, ifso, ifnot) ->
         walk cond; walk ifso; Option.iter walk ifnot
@@ -340,16 +347,29 @@ let exists_rexp pred rexp =
 
 let find_value_path (f : Path.t -> 'a option) rexp : 'a option =
   let result = ref None in
+  let check path =
+    match f path with
+    | Some _ as found ->
+        result := found;
+        true
+    | None -> false
+  in
   ignore
     (exists_rexp
        (fun r ->
          match r.rexp_desc with
-         | Rexp_ident (path, _) -> (
-             match f path with
-             | Some _ as found ->
-                 result := found;
-                 true
-             | None -> false)
+         | Rexp_ident (path, _) | Rexp_construct (path, _, _) -> check path
+         | Rexp_match (_, cases) ->
+             let rec pat_path p =
+               match p.rpat_desc with
+               | Rpat_construct (path, _, arg) ->
+                   check path
+                   || Option.fold ~none:false ~some:pat_path arg
+               | Rpat_alias (p, _) -> pat_path p
+               | Rpat_tuple ps -> List.exists (fun (_, p) -> pat_path p) ps
+               | Rpat_any | Rpat_var _ | Rpat_constant _ -> false
+             in
+             List.exists (fun c -> pat_path c.rc_lhs) cases
          | _ -> false)
        rexp
      : bool);

@@ -1058,8 +1058,8 @@ let typ sub x =
         Ttyp_arrow (label, binder, sub.typ sub ct1, sub.modes sub ma1,
                     sub.typ sub ct2, sub.modes sub ma2)
     | Ttyp_refine (payload, pred) ->
-        (* The predicate is resolved syntax shared with the type graph, not
-           a typedtree fragment. *)
+        (* The predicate is the source expression; the resolved form lives
+           in the type graph. *)
         Ttyp_refine (sub.typ sub payload, pred)
     | Ttyp_tuple list ->
         Ttyp_tuple (List.map (fun (label, t) -> label, sub.typ sub t) list)

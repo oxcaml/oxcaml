@@ -387,11 +387,41 @@ val mk : (~x:int{ x > 0 } -> y:int -> unit) -> ~x:int{ x > 0 } -> unit =
   <fun>
 |}]
 
-(* Applying a dependent arrow lets the domain type escape its binder; the
-   escaped occurrence prints under the binder's name.  Elimination rules —
-   including whether this should be rejected or substituted — belong to a
-   later piece; this pins the current, inert behaviour. *)
+(* Consuming a dependent parameter is rejected: it would let the rest of
+   the arrow escape the binder's scope.  The elimination rules belong to a
+   later piece. *)
 let apply (f : x:int{ x > 0 } -> unit) v = f v;;
 [%%expect{|
-val apply : (x:int{ x > 0 } -> unit) -> int{ x > 0 } -> unit = <fun>
+Line 1, characters 45-46:
+1 | let apply (f : x:int{ x > 0 } -> unit) v = f v;;
+                                                 ^
+Error: Functions with a dependent arrow type cannot be defined or
+       applied yet: the introduction and elimination rules for
+       refinements are not implemented.
+|}]
+
+(* ... and so is defining a function against a dependent annotation *)
+let f : x:int{ x > 0 } -> unit = fun v -> ();;
+[%%expect{|
+Line 1, characters 33-44:
+1 | let f : x:int{ x > 0 } -> unit = fun v -> ();;
+                                     ^^^^^^^^^^^
+Error: Functions with a dependent arrow type cannot be defined or
+       applied yet: the introduction and elimination rules for
+       refinements are not implemented.
+|}]
+
+(* Constructors in predicates are resolved paths: a functor application
+   substitutes them like values *)
+module FC (X : sig type t = C end) = struct
+  type u = int{ match X.C with X.C -> true }
+end
+module AC = struct type t = C end
+module RC = FC (AC);;
+[%%expect{|
+module FC :
+  functor (X : sig type t = C end) ->
+    sig type u = int{ match X.C with | X.C -> true } end
+module AC : sig type t = C end
+module RC : sig type u = int{ match AC.C with | AC.C -> true } end
 |}]

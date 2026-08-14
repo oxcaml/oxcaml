@@ -361,6 +361,7 @@ type error =
   | Exclave_returns_not_local
   | Unboxed_int_literals_not_supported
   | Function_type_not_rep of type_expr * Jkind.Violation.t
+  | Unsupported_dependent_arrow
   | Function_type_escapes_partial_match of
       { ty : type_expr;
         match_loc : Location.t;

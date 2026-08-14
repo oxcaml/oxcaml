@@ -428,6 +428,9 @@ type filter_arrow_failure =
       }
   | Not_a_function
   | Jkind_error of type_expr * Jkind.Violation.t
+  | Dependent_arrow
+    (** The arrow carries a value binder; using it as a function is not
+        supported until the refinement introduction/elimination piece. *)
 
 exception Filter_arrow_failed of filter_arrow_failure
 

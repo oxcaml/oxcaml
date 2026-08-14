@@ -877,6 +877,22 @@ let get_type_param_name styp =
   | Ptyp_var (name, _) -> Some name
   | _ -> Misc.fatal_error "non-type-variable in get_type_param_name"
 
+(* The path under which a constructor referenced by a refinement predicate
+   is recorded: the constructor path of an extension constructor, and
+   [Pextra_ty (type_path, Pcstr_ty name)] for an ordinary constructor.
+   Both are rewritten by [Subst.type_path], which is what keeps the
+   reference meaningful across signature prefixing and functor
+   application. *)
+let refinement_constructor_path (cstr : Data_types.constructor_description) =
+  match cstr.cstr_tag with
+  | Extension p -> p
+  | Ordinary _ | Null -> (
+      match get_desc cstr.cstr_res with
+      | Tconstr (p, _, _) -> Path.Pextra_ty (p, Pcstr_ty cstr.cstr_name)
+      | _ ->
+          Misc.fatal_error
+            "Typetexp.refinement_constructor_path: malformed constructor")
+
 (* Dependent-arrow binders currently in scope, for resolving names inside
    refinement predicates.  The dynamic extent of translating an arrow's
    domain and codomain is exactly the binder's lexical scope, so a
@@ -1504,12 +1520,12 @@ and transl_refinement_predicate env ~policy ~row_context locals sexp
       mk (Rexp_tuple
             (List.map (fun (lbl, c) -> lbl, transl locals c) components))
   | Pexp_construct (lid, arg) ->
-      (* Resolve, to reject unbound names here rather than in a later
-         piece; the predicate keeps the source name. *)
-      ignore
-        (Env.lookup_constructor ~loc:lid.loc Env.Positive lid.txt env
-         : _ * _);
-      mk (Rexp_construct (lid, Option.map (transl locals) arg))
+      let cstr, _ =
+        Env.lookup_constructor ~loc:lid.loc Env.Positive lid.txt env
+      in
+      mk (Rexp_construct
+            (refinement_constructor_path cstr, lid,
+             Option.map (transl locals) arg))
   | Pexp_field (e, lid) ->
       ignore
         (Env.lookup_label ~record_form:Legacy ~loc:lid.loc Env.Projection
@@ -1626,9 +1642,9 @@ and transl_refinement_pattern env locals pat =
       locals, mk (Rpat_tuple components)
   | Ppat_tuple (_, Open) -> unsupported "A partial tuple pattern"
   | Ppat_construct (lid, arg) ->
-      ignore
-        (Env.lookup_constructor ~loc:lid.loc Env.Pattern lid.txt env
-         : _ * _);
+      let cstr, _ =
+        Env.lookup_constructor ~loc:lid.loc Env.Pattern lid.txt env
+      in
       let locals, arg =
         match arg with
         | None -> locals, None
@@ -1637,7 +1653,7 @@ and transl_refinement_pattern env locals pat =
             locals, Some p
         | Some (_ :: _, _) -> unsupported "An existential type binding"
       in
-      locals, mk (Rpat_construct (lid, arg))
+      locals, mk (Rpat_construct (refinement_constructor_path cstr, lid, arg))
   | Ppat_alias (p, name) ->
       let locals, p = transl_refinement_pattern env locals p in
       let id = Ident.create_local name.txt in
