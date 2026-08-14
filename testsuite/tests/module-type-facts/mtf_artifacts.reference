@@ -1,0 +1,139 @@
+== facts of an implementation, read back from its .cmt
+present: true
+digest: checks 9 (ascription 3 argument 1 interface 5) deps 17 (definition 3 alias 3 with 1 interface 10) equalities 1 omissions 1 (unresolved-module 1)
+check ascription M : S
+check argument M : S
+check ascription Snapshotted : Snapshot
+check ascription Wrapper.N : Wrapper.Inner@Wrapper
+check interface Mtf_aux : <Mtf_aux>
+check interface M : <[intf]M>
+check interface F : <[intf]F>
+check interface Wrapper.N : <[intf]Wrapper.N>
+check interface Wrapper : <[intf]Wrapper>
+dep S -interface-> [intf]S
+dep T -interface-> [intf]T
+dep T -definition-> <#1>
+dep Container -interface-> [intf]Container
+dep Container -definition-> <#2>
+dep Snapshot -definition-> <#3>
+dep Wrapper.Inner@Wrapper -alias-> S
+dep Wrapper.Inner@Wrapper -interface-> [intf]Wrapper.Inner@[intf]Wrapper
+dep Container.Local@body(Container) -alias-> S
+dep <S> -alias-> S
+dep <#1> -with-> S
+dep <M> -interface-> S
+dep <Wrapper.N> -interface-> Wrapper.Inner@Wrapper
+dep <Container.Member> -interface-> S
+dep <#2> -interface-> Container.Local@body(Container)
+dep <#2> -interface-> <Container.Member>
+dep <Snapshotted> -interface-> Snapshot
+equal F(M) = FM
+omission: affected=<#3> source=none reason=unresolved-module
+== facts of an interface, read back from its .cmti
+present: true
+digest: checks 0 deps 22 (definition 2 alias 3 with 1 functor-type 1 interface 15) equalities 0 omissions 0
+dep T -definition-> <#1>
+dep Container -definition-> <#2>
+dep Wrapper.Inner@Wrapper -alias-> S
+dep Container.Local@body(Container) -alias-> S
+dep <Mtf_aux> -interface-> S
+dep <Mtf_aux> -interface-> T
+dep <Mtf_aux> -interface-> Container
+dep <Mtf_aux> -interface-> <M>
+dep <Mtf_aux> -interface-> <F>
+dep <Mtf_aux> -interface-> <Wrapper>
+dep <S> -alias-> S
+dep <#1> -with-> S
+dep <M> -interface-> S
+dep <#3> -functor-type-> <S>
+dep <F> -interface-> <#3>
+dep <Wrapper.N> -interface-> Wrapper.Inner@Wrapper
+dep <#4> -interface-> Wrapper.Inner@Wrapper
+dep <#4> -interface-> <Wrapper.N>
+dep <Wrapper> -interface-> <#4>
+dep <Container.Member> -interface-> S
+dep <#2> -interface-> Container.Local@body(Container)
+dep <#2> -interface-> <Container.Member>
+== the interface pairs of the unit are directional
+pair S <- [intf]S
+pair T <- [intf]T
+pair Container <- [intf]Container
+pair Wrapper.Inner@Wrapper <- [intf]Wrapper.Inner@[intf]Wrapper
+== .cms and .cmsi hold the same facts as .cmt and .cmti
+present: cms true cmsi true
+cms = cmt: true
+cmsi = cmti: true
+digest: checks 9 (ascription 3 argument 1 interface 5) deps 17 (definition 3 alias 3 with 1 interface 10) equalities 1 omissions 1 (unresolved-module 1)
+check ascription M : S
+check argument M : S
+check ascription Snapshotted : Snapshot
+check ascription Wrapper.N : Wrapper.Inner@Wrapper
+check interface Mtf_aux : <Mtf_aux>
+check interface M : <[intf]M>
+check interface F : <[intf]F>
+check interface Wrapper.N : <[intf]Wrapper.N>
+check interface Wrapper : <[intf]Wrapper>
+dep S -interface-> [intf]S
+dep T -interface-> [intf]T
+dep T -definition-> <#1>
+dep Container -interface-> [intf]Container
+dep Container -definition-> <#2>
+dep Snapshot -definition-> <#3>
+dep Wrapper.Inner@Wrapper -alias-> S
+dep Wrapper.Inner@Wrapper -interface-> [intf]Wrapper.Inner@[intf]Wrapper
+dep Container.Local@body(Container) -alias-> S
+dep <S> -alias-> S
+dep <#1> -with-> S
+dep <M> -interface-> S
+dep <Wrapper.N> -interface-> Wrapper.Inner@Wrapper
+dep <Container.Member> -interface-> S
+dep <#2> -interface-> Container.Local@body(Container)
+dep <#2> -interface-> <Container.Member>
+dep <Snapshotted> -interface-> Snapshot
+equal F(M) = FM
+omission: affected=<#3> source=none reason=unresolved-module
+== facts of a unit whose expectations come from a .cmi
+present: true
+digest: checks 10 (ascription 9 argument 1) deps 13 (definition 1 alias 1 with 1 strengthen 2 interface 8) equalities 1 omissions 0
+check argument A : Mtf_aux.S
+check ascription M : Mtf_aux.S
+check ascription Mtf_aux.M : Mtf_aux.S
+check ascription Container.Member : Mtf_aux.S
+check ascription Q : Mtf_aux.T
+check ascription Container : Mtf_aux.Container
+check ascription P : Local
+check ascription N : Mtf_aux.Wrapper.Inner@Mtf_aux.Wrapper
+check ascription R : <#1>
+check ascription Container.Member : <Mtf_aux.Container.Member>
+dep Local -definition-> <#2>
+dep Mtf_aux.Container.Local@Container -interface-> Container.Local@Container
+dep Container.Local@Container -alias-> Mtf_aux.S
+dep <M> -interface-> Mtf_aux.S
+dep <N> -interface-> Mtf_aux.Wrapper.Inner@Mtf_aux.Wrapper
+dep <#2> -with-> Mtf_aux.S
+dep <P> -interface-> Local
+dep <Q> -interface-> Mtf_aux.T
+dep <#1> -strengthen-> Mtf_aux.S
+dep <#1> -strengthen-> <Mtf_aux.M>
+dep <R> -interface-> <#1>
+dep <Container.Member> -interface-> Mtf_aux.S
+dep <Container> -interface-> Mtf_aux.Container
+equal Mtf_aux.F(A) = FA
+== an ascription against another unit's signature is no pair
+mtf_aux, which has an .mli: interface checks 5, interface pairs 4
+mtf_client, which has none: interface checks 0, interface pairs 0
+== the parameter expectation of a functor loaded from a .cmi
+loaded from the .cmi: Mtf_aux.S
+after substitution: Mtf_aux.S
+after strengthening: Mtf_aux.S
+== the interface a unit is an argument for
+digest: checks 1 (interface 1) deps 0 equalities 0 omissions 0
+check interface Mtf_argument : <Mtf_param>
+== a partial artifact carries no facts
+partial implementation: true
+present: false
+digest: checks 0 deps 0 equalities 0 omissions 0
+== facts are only extracted for the artifacts that are written
+mtf_gate_cmt: cmt true, cms no artifact
+mtf_gate_cms: cmt no artifact, cms true
+mtf_gate_none: cmt no artifact, cms no artifact

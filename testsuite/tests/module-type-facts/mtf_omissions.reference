@@ -1,0 +1,25 @@
+== a module type of a structure that is not a path
+digest: checks 1 (ascription 1) deps 2 (definition 1 interface 1) equalities 0 omissions 1 (unresolved-module 1)
+check ascription M : T
+dep T -definition-> <#1>
+dep <M> -interface-> T
+omission: affected=<#1> source=none reason=unresolved-module
+== a module type path that does not resolve
+digest: checks 1 (ascription 1) deps 1 (interface 1) equalities 0 omissions 1 (unresolved-module-type 1)
+check ascription M : <S>
+dep <M> -interface-> <S>
+omission: affected=<S> source=none reason=unresolved-module-type
+== an applicative path where a module type is expected
+digest: checks 1 (ascription 1) deps 1 (interface 1) equalities 0 omissions 2 (unresolved-module-type 1 unsupported-path 1)
+check ascription M : <S>
+dep <M> -interface-> <S>
+omission: affected=none source=none reason=unsupported-path
+omission: affected=<S> source=none reason=unresolved-module-type
+== a functor parameter whose expectation was not recorded
+digest: checks 1 (ascription 1) deps 3 (interface 3) equalities 1 omissions 1 (missing-parameter-expectation 1)
+check ascription A.M : S
+dep <F.X.M> -interface-> S
+dep <param(F.X)> -interface-> <F.X.M>
+dep <A.M> -interface-> S
+equal F(A) = FA
+omission: affected=none source=S reason=missing-parameter-expectation
