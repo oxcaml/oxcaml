@@ -1,0 +1,98 @@
+== members of an ascribed signature are checked pairwise
+digest: checks 3 (ascription 3) deps 3 (interface 3) equalities 0 omissions 0
+check ascription M.Inner : <M.Inner'> members.ml:6:6-9:3
+check ascription M.Other : <M.Other'> members.ml:6:6-9:3
+check ascription M : <#1> members.ml:6:6-9:3
+dep <M.Inner'> -interface-> S
+dep <#1> -interface-> <M.Inner'>
+dep <M> -interface-> <#1>
+== nested members pair with each side's own declaration
+digest: checks 2 (ascription 2) deps 6 (alias 1 interface 5) equalities 0 omissions 0
+check ascription M.N : <M.N'> nestpair.ml:5:6-7:3
+check ascription M : <#1> nestpair.ml:5:6-7:3
+dep M.N.T@M.N -alias-> SB
+dep M.N'.T'@M.N' -interface-> M.N.T@M.N
+dep <#2> -interface-> M.N'.T'@M.N'
+dep <M.N'> -interface-> <#2>
+dep <#1> -interface-> <M.N'>
+dep <M> -interface-> <#1>
+== members reached through an include pair through the body
+digest: checks 1 (ascription 1) deps 5 (alias 1 include 1 interface 3) equalities 0 omissions 0
+check ascription M : <#1> incpair.ml:4:52-6:3
+dep Base.T@Base -alias-> SB
+dep Base.T@M -include-> Base.T@Base
+dep M.T'@M -interface-> Base.T@M
+dep <#1> -interface-> M.T'@M
+dep <M> -interface-> <#1>
+== an abstract expected module type seals without pairing
+digest: checks 1 (ascription 1) deps 3 (alias 1 interface 2) equalities 0 omissions 0
+check ascription M : <#1> abspair.ml:3:35-3:64
+dep M.A@M -alias-> SB
+dep <#1> -interface-> M.A'@M
+dep <M> -interface-> <#1>
+== members of a module type of a named module
+digest: checks 4 (ascription 4) deps 5 (definition 1 typeof 1 interface 3) equalities 0 omissions 0
+check ascription Base.Inner : S typeofmember.ml:3:40-3:63
+check ascription N : T typeofmember.ml:5:15-5:64
+check ascription P : T typeofmember.ml:6:15-6:19
+check ascription N.Inner : <Base.Inner> typeofmember.ml:5:15-5:64
+dep T -definition-> <#1>
+dep <Base.Inner> -interface-> S
+dep <#1> -typeof-> <Base>
+dep <N> -interface-> T
+dep <P> -interface-> T
+== members of a module type of an anonymous structure
+digest: checks 3 (ascription 3) deps 3 (definition 1 interface 2) equalities 0 omissions 1 (unresolved-module 1)
+check ascription T.Inner : S typeofanonmember.ml:4:21-4:44
+check ascription N : T typeofanonmember.ml:6:15-8:3
+check ascription N.Inner : <T.Inner> typeofanonmember.ml:6:15-8:3
+dep T -definition-> <#1>
+dep <T.Inner> -interface-> S
+dep <N> -interface-> T
+omission: affected=<#1> source=none reason=unresolved-module
+== recursive modules resolve in their final declarations
+digest: checks 3 (ascription 3) deps 6 (interface 6) equalities 0 omissions 0
+check ascription Client : A.LOCAL'@A recursive.ml:10:26-10:50
+check ascription A.Inner : <A.Inner'> recursive.ml:5:6-8:3
+check ascription A : <#1> recursive.ml:5:6-8:3
+dep A.LOCAL'@A -interface-> A.LOCAL@A
+dep <A> -interface-> <#1>
+dep <A.Inner'> -interface-> A.LOCAL'@A
+dep <#1> -interface-> A.LOCAL'@A
+dep <#1> -interface-> <A.Inner'>
+dep <Client> -interface-> A.LOCAL'@A
+== an ascription inside a recursive group keeps its check
+digest: checks 4 (ascription 4) deps 4 (interface 4) equalities 0 omissions 0
+check ascription N.A : S recrelev.ml:7:21-7:44
+check ascription N.A : <N.A'> recrelev.ml:6:6-9:3
+check ascription N.B : <N.B'> recrelev.ml:6:6-9:3
+check ascription N : <#1> recrelev.ml:6:6-9:3
+dep <N.A> -interface-> S
+dep <N.A'> -interface-> S
+dep <#1> -interface-> <N.A'>
+dep <N> -interface-> <#1>
+== a forward reference in a recursive group
+digest: checks 2 (ascription 2) deps 7 (definition 1 include 1 typeof 2 interface 3) equalities 0 omissions 0
+check ascription A : <#1> recforward.ml:3:39-5:3
+check ascription B : <#2> recforward.ml:6:28-6:51
+dep A.T@A -definition-> <#3>
+dep <A> -interface-> <#1>
+dep <B> -interface-> <#2>
+dep <#1> -interface-> A.T'@A
+dep <#2> -include-> S
+dep <#3> -typeof-> <B>
+dep <#3> -typeof-> <#2>
+== a recursive functor keeps its parameter expectation
+digest: checks 3 (ascription 2 argument 1) deps 4 (alias 1 functor-type 1 interface 2) equalities 1 omissions 0
+check ascription A : S recfunctor.ml:5:12-5:35
+check argument A : S recfunctor.ml:6:15-6:16
+check ascription F : <#1> recfunctor.ml:4:10-4:44
+dep <S> -alias-> S
+dep <F> -interface-> <#1>
+dep <A> -interface-> S
+dep <#1> -functor-type-> <S>
+equal F(A) = FA
+== a local module in an expression is checked
+digest: checks 1 (ascription 1) deps 1 (interface 1) equalities 0 omissions 0
+check ascription #1 : S localmodule.ml:4:30-4:31
+dep <#1> -interface-> S

@@ -68,12 +68,15 @@ val parse_intf : info -> Parsetree.signature Parse_result.t
 (** [parse_intf info] parses an interface (usually an [.mli] file). *)
 
 val typecheck_intf :
-  info -> Parsetree.signature -> Misc.alerts * Typedtree.signature
+  info -> Parsetree.signature ->
+  Misc.alerts * Typedtree.signature * Typedtree.argument_interface option
 (** [typecheck_intf info parsetree] typechecks an interface and returns
     the typedtree of the associated signature.
 *)
 
-val emit_signature : info -> Misc.alerts -> Typedtree.signature -> unit
+val emit_signature :
+  info -> Misc.alerts -> ?argument_interface:Typedtree.argument_interface ->
+  Typedtree.signature -> unit
 (** [emit_signature info parsetree typedtree] emits the [.cmi] file
     containing the given signature.
 *)
