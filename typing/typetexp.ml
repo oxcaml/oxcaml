@@ -921,14 +921,14 @@ let decide_arrow_arg_name (arg : Parsetree.arrow_arg_name)
       { aan_label = Labelled name.txt; aan_binder = binder;
         aan_bare_label = false }
   | Pan_name name ->
-      match Vox_binding.classify_bare_name name.txt ~domain ~codomain with
-      | Positional_binder ->
-          { aan_label = Nolabel;
-            aan_binder = Some (name.txt, `Domain_and_codomain);
-            aan_bare_label = false }
-      | Ordinary_label ->
-          { aan_label = Labelled name.txt; aan_binder = None;
-            aan_bare_label = true }
+      if Vox_binding.name_used_in_refinement name.txt [domain; codomain]
+      then
+        { aan_label = Nolabel;
+          aan_binder = Some (name.txt, `Domain_and_codomain);
+          aan_bare_label = false }
+      else
+        { aan_label = Labelled name.txt; aan_binder = None;
+          aan_bare_label = true }
 
 let rec extract_params styp =
   match styp.ptyp_desc with
@@ -1443,7 +1443,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         newty (Trefine { ref_payload = payload_cty.ctyp_type;
                          ref_pred = pred })
       in
-      ctyp (Ttyp_refine (payload_cty, pred)) ty
+      ctyp (Ttyp_refine (payload_cty, spred)) ty
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
 
@@ -1466,6 +1466,17 @@ and transl_refinement_predicate env ~policy ~row_context locals sexp
   in
   let transl locals sexp =
     transl_refinement_predicate env ~policy ~row_context locals sexp
+  in
+  (* Interior types are translated with the predicate's own binders added
+     to the ambient scope, so that refinements nested inside them can
+     mention them (locals shadow arrow binders). *)
+  let transl_interior_type locals ty =
+    Misc.protect_refs
+      [ Misc.R (refinement_scope,
+                Misc.Stdlib.String.Map.union
+                  (fun _ _outer local -> Some local)
+                  !refinement_scope locals) ]
+      (fun () -> transl_type env ~policy ~row_context Alloc.Const.legacy ty)
   in
   match sexp.pexp_desc with
   | Pexp_hole -> mk Rexp_hole
@@ -1550,9 +1561,7 @@ and transl_refinement_predicate env ~policy ~row_context locals sexp
             ret_type_constraint = None } -> body
         | { ret_type_constraint = Some (Pconstraint ty);
             mode_annotations = []; ret_mode_annotations = [] } ->
-            let cty =
-              transl_type env ~policy ~row_context Alloc.Const.legacy ty
-            in
+            let cty = transl_interior_type locals ty in
             { rexp_desc = Rexp_constraint (body, cty.ctyp_type);
               rexp_loc = loc }
         | _ -> unsupported "This function constraint"
@@ -1565,7 +1574,7 @@ and transl_refinement_predicate env ~policy ~row_context locals sexp
                (transl_refinement_case env ~policy ~row_context locals)
                cases))
   | Pexp_constraint (e, Some ty, []) ->
-      let cty = transl_type env ~policy ~row_context Alloc.Const.legacy ty in
+      let cty = transl_interior_type locals ty in
       mk (Rexp_constraint (transl locals e, cty.ctyp_type))
   | Pexp_constraint _ -> unsupported "This form of constraint"
   | Pexp_while _ -> not_total "While loops are"
@@ -1582,8 +1591,6 @@ and transl_refinement_predicate env ~policy ~row_context locals sexp
   | _ -> unsupported "This expression form"
 
 and transl_refinement_case env ~policy ~row_context locals case =
-  (match case.pc_lhs.ppat_desc with
-   | _ -> ());
   let locals, rc_lhs =
     transl_refinement_pattern env locals case.pc_lhs
   in

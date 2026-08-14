@@ -1134,18 +1134,7 @@ let core_type sub ct =
         in
         Ptyp_arrow (name, ct1, ct2, modes1, modes2)
     | Ttyp_refine (payload, pred) ->
-        let core_type_of_type_expr ty =
-          (* Interior types live in the type graph, not in the typedtree;
-             render and re-parse them. *)
-          let rendered = Format.asprintf "%a" Printtyp.type_expr ty in
-          match Parse.core_type (Lexing.from_string rendered) with
-          | ct -> ct
-          | exception _ -> Ast_helper.Typ.any None
-        in
-        Ptyp_refine
-          (sub.typ sub payload,
-           Vox_rexp.untype ~var_name:Ident.name
-             ~core_type:core_type_of_type_expr pred)
+        Ptyp_refine (sub.typ sub payload, pred)
     | Ttyp_tuple list ->
         Ptyp_tuple (List.map (fun (l, typ) -> l, sub.typ sub typ) list)
     | Ttyp_unboxed_tuple list ->

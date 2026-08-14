@@ -2701,9 +2701,10 @@ let type_for_annotation ~env ~loc typ =
               tpt_txt = mkloc (Untypeast.lident_of_path pack_path) loc
             }
         | Trefine _ ->
-          fatal_errorf
-            "Translquote [at %a]: no support for refinement types"
-            Location.print_loc_in_lowercase loc
+          (* Reachable from valid source; quotation of refinements is not
+             yet specified. *)
+          Location.raise_errorf ~loc
+            "Refinement types are not yet supported in quotations"
         | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
           fatal_errorf
             "Translquote [at %a]:@ Unexpected type expression@ in a quoted \
@@ -3025,7 +3026,10 @@ and quote_core_type ~scopes ty =
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ~scopes ty) |> Type.wrap
   | Ttyp_splice _ -> Type.var loc None |> Type.wrap
   | Ttyp_refine _ ->
-    fatal_error "Translquote: Ttyp_refine not implemented."
+    (* Reachable from valid source; quotation of refinements is not yet
+       specified. *)
+    Location.raise_errorf ~loc:ty.ctyp_loc
+      "Refinement types are not yet supported in quotations"
   | Ttyp_repr _ -> fatal_error "Translquote: Ttyp_repr not implemented."
   | Ttyp_newlayout _ ->
     fatal_error "Translquote: Ttyp_newlayout not implemented."

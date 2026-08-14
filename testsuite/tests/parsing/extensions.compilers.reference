@@ -166,7 +166,7 @@
           Ptyp_extension "foo"
           core_type (extensions.ml[16,344+29]..[16,344+35])
             Ptyp_arrow
-            Nolabel
+            Pan_nolabel
             core_type (extensions.ml[16,344+29]..[16,344+30])
               Ptyp_constr "t" (extensions.ml[16,344+29]..[16,344+30])
               []

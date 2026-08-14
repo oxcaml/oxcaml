@@ -352,7 +352,8 @@ let print_out_modalities ppf l =
 let print_arg_label_and_out_type ppf (lbl : arg_label) ty ~print_type =
   match lbl with
   | Nolabel -> print_type ppf ty
-  | Labelled l -> fprintf ppf "%a:%a" print_lident l print_type ty
+  | Labelled l | Binder l -> fprintf ppf "%a:%a" print_lident l print_type ty
+  | Tilde_labelled l -> fprintf ppf "~%a:%a" print_lident l print_type ty
   | Position l -> fprintf ppf "%a:[%%call_pos]" print_lident l
   | Optional l -> fprintf ppf "?%a:%a" print_lident l print_type ty
 

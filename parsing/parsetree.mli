@@ -235,7 +235,7 @@ and core_type_desc =
 
 (** The name slot of an arrow type, [Ptyp_arrow].  A bare name [x:T -> U] is
     a positional binder if [x] occurs free in a refinement predicate in [T]
-    or [U] (see {!Vox_binding.classify}), and the ordinary label [x]
+    or [U] (see {!Vox_binding.name_used_in_refinement}), and the ordinary label [x]
     otherwise.  [~x:T -> U] is always the label [x]; the spelling is new and
     the tilde must be preserved for re-parsing.  [?x:T -> U] is always the
     optional label [x] and never binds. *)

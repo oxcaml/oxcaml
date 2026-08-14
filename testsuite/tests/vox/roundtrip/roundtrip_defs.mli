@@ -12,3 +12,9 @@ val labelled : ~x:int{ x > 0 } -> unit
 type wf = { size : int{ _ >= 0 } }
 
 type pos = Pos of int{ _ > 0 }
+
+(* A predicate referencing a value of the same signature: import must
+   rewrite the path. *)
+val positive : int -> bool
+
+type p = int{ positive _ }

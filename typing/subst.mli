@@ -50,6 +50,8 @@ val unsafe: t -> unsafe subst
 
 val add_type: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_module: Ident.t -> Path.t -> 'k subst -> 'k subst
+(* Value paths occur in types only inside refinement predicates. *)
+val add_value: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_modtype: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_jkind: Ident.t -> Path.t -> t -> t
 

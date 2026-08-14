@@ -437,14 +437,7 @@ let rec core_type i ppf x =
   | Ttyp_refine (ct, pred) ->
       line i ppf "Ttyp_refine\n";
       core_type i ppf ct;
-      (* The predicate is resolved syntax shared with the type graph; print
-         it back as source. *)
-      line (i+1) ppf "predicate %a\n"
-        (fun ppf pred ->
-          Pprintast.expression ppf
-            (Vox_rexp.untype ~var_name:Ident.name
-               ~core_type:(fun _ -> Ast_helper.Typ.any None) pred))
-        pred
+      line (i+1) ppf "predicate %a\n" Pprintast.expression pred
   | Ttyp_repr (lv, ct) ->
       line i ppf "Ttyp_repr%a\n"
         (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;

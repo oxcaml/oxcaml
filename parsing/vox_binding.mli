@@ -32,14 +32,3 @@ val name_used_in_refinement : string -> Parsetree.core_type list -> bool
     already inside a refinement)?  Used by the printers to decide when a
     printed label must be escaped as [~x:]. *)
 val name_used_in_predicate : string -> Parsetree.expression -> bool
-
-type bare_name_classification =
-  | Positional_binder
-  | Ordinary_label
-
-(** Classify the bare name [x] of [x:domain -> codomain]. *)
-val classify_bare_name :
-  string ->
-  domain:Parsetree.core_type ->
-  codomain:Parsetree.core_type ->
-  bare_name_classification

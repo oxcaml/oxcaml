@@ -8493,6 +8493,19 @@ let rec nondep_type_rec ?(expand_private=false) env ids ty =
                *)
             with Cannot_expand -> raise exn
           end
+      | Trefine { ref_payload = _; ref_pred }
+        when Vox_rexp.find_value_path (Path.find_free_opt ids) ref_pred
+             <> None ->
+          (* A predicate mentioning the erased module cannot be kept: the
+             value path has no meaning without it. *)
+          let id =
+            match
+              Vox_rexp.find_value_path (Path.find_free_opt ids) ref_pred
+            with
+            | Some id -> id
+            | None -> assert false
+          in
+          raise (Nondep_cannot_erase id)
       | Tpackage pack when Path.exists_free ids pack.pack_path ->
           let p' = normalize_package_path env pack.pack_path in
           begin match Path.find_free_opt ids p' with

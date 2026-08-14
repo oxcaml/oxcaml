@@ -4739,7 +4739,11 @@ type untyped_omitted_param =
     ty_arg : type_expr;
     mode_arg : Alloc.lr;
     level: int;
-    sort_arg : Jkind.sort }
+    sort_arg : Jkind.sort;
+    arg_binder : Ident.t option
+    (* The dependent-arrow binder of the omitted parameter: [ty_arg]'s
+       refinements may reference it, so reconstructed arrows must carry
+       it. *) }
 
 let is_partial_apply args =
   List.exists
@@ -4867,22 +4871,27 @@ let remaining_function_type_for_error ty_ret mode_ret rev_args =
   let ty_ret, _, _ =
     List.fold_left
       (fun (ty_ret, mode_ret, closed_args) (lbl, arg) ->
+         let rebuild ~arg_binder ~mode_fun ~ty_arg ~mode_arg ~level =
+           let arrow_desc = lbl, arg_binder, mode_arg, mode_ret in
+           let ty_ret =
+             newty2 ~level
+               (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
+           in
+           let mode_ret, _ =
+             Alloc.newvar_above (Alloc.join (mode_fun :: closed_args))
+           in
+           (ty_ret, mode_ret, closed_args)
+         in
          match arg with
          | Arg (Unknown_arg { mode_arg; _ } | Known_arg { mode_arg; _ }) ->
              let closed_args = mode_arg :: closed_args in
              (ty_ret, mode_ret, closed_args)
          | Arg (Eliminated_optional_arg
-                  { mode_fun; ty_arg; mode_arg; level; _ })
-         | Omitted { mode_fun; ty_arg; mode_arg; level } ->
-             let arrow_desc = lbl, None, mode_arg, mode_ret in
-             let ty_ret =
-               newty2 ~level
-                 (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
-             in
-             let mode_ret, _ =
-               Alloc.newvar_above (Alloc.join (mode_fun :: closed_args))
-             in
-             (ty_ret, mode_ret, closed_args))
+                  { mode_fun; ty_arg; mode_arg; level; _ }) ->
+             (* Optional parameters never bind. *)
+             rebuild ~arg_binder:None ~mode_fun ~ty_arg ~mode_arg ~level
+         | Omitted { mode_fun; ty_arg; mode_arg; level; arg_binder; _ } ->
+             rebuild ~arg_binder ~mode_fun ~ty_arg ~mode_arg ~level)
       (ty_ret, mode_ret, []) rev_args
   in
   ty_ret
@@ -5031,7 +5040,7 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
         ret_tvar
     | Some (ad, arrow_kind) ->
       begin
-        let (l, _, mode_arg, mode_ret) = ad in
+        let (l, arg_binder, mode_arg, mode_ret) = ad in
         let name = label_name l
         and optional = is_optional l
         and omittable = is_omittable l in
@@ -5113,7 +5122,8 @@ let collect_apply_args env funct ignore_labels ty_fun ty_fun0 mode_fun sargs
                      over it. *)
                   may_warn funct.exp_loc
                     (Warnings.Non_principal_labels "commuted an argument");
-                  Omitted { mode_fun; ty_arg; mode_arg; level = lv; sort_arg }
+                  Omitted { mode_fun; ty_arg; mode_arg; level = lv;
+                            sort_arg; arg_binder }
                 end
             in
             loop ty_ret ty_ret0 mode_ret ((l, arg) :: rev_args) remaining_sargs
@@ -5132,8 +5142,9 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              let open_args = (exp, marg) :: open_args in
              let args = (lbl, Arg (exp, sort), sch) :: args in
              (ty_ret, mode_ret, open_args, closed_args, args)
-         | Omitted { mode_fun; ty_arg; mode_arg; level; sort_arg } ->
-             let arrow_desc = (lbl, None, mode_arg, mode_ret) in
+         | Omitted { mode_fun; ty_arg; mode_arg; level; sort_arg;
+                     arg_binder } ->
+             let arrow_desc = (lbl, arg_binder, mode_arg, mode_ret) in
              let sort_ret =
                match type_sort ~why:Function_result ~fixed:false env ty_ret with
                | Ok sort -> sort
@@ -10159,14 +10170,16 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
     let lv = get_level expty in
     let lv' = get_level expty' in
     match get_desc expty', get_desc expty with
-    | Tarrow((l, binder, marg, mret), ty_arg', ty_res', _),
-      Tarrow(_, ty_arg,  ty_res,  _)
+    | Tarrow((l, binder', marg, mret), ty_arg', ty_res', _),
+      Tarrow((_, binder, _, _), ty_arg,  ty_res,  _)
       when lv' = generic_level || not !Clflags.principal ->
       let ty_res', ty_res, changed = loosen_arrow_modes ty_res' ty_res in
       let mret, changed' = Alloc.newvar_below mret in
       let marg, changed'' = Alloc.newvar_above marg in
       if changed || changed' || changed'' then
-        newty2 ~level:lv' (Tarrow((l, binder, marg, mret), ty_arg', ty_res', commu_ok)),
+        (* Each rebuilt arrow keeps its own binder: the refinements under
+           it reference that ident. *)
+        newty2 ~level:lv' (Tarrow((l, binder', marg, mret), ty_arg', ty_res', commu_ok)),
         newty2 ~level:lv  (Tarrow((l, binder, marg, mret), ty_arg,  ty_res,  commu_ok)),
         true
       else

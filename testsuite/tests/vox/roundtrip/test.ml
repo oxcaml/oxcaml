@@ -22,6 +22,8 @@ module Roundtrip_defs :
     val labelled : ~x:int{ x > 0 } -> unit
     type wf = { size : int{ _ >= 0 }; }
     type pos = Pos of int{ _ > 0 }
+    val positive : int -> bool
+    type p = int{ positive _ }
   end
 |}]
 
@@ -35,4 +37,10 @@ val l : (x:int{ x > 0 } -> int{ _ >= x }) list = []
 let l : int{ _ >= 0 } list = ([] : Roundtrip_defs.nat list);;
 [%%expect{|
 val l : int{ _ >= 0 } list = []
+|}]
+
+(* A same-signature value reference is prefixed on import *)
+let l : int{ Roundtrip_defs.positive _ } list = ([] : Roundtrip_defs.p list);;
+[%%expect{|
+val l : int{ Roundtrip_defs.positive _ } list = []
 |}]

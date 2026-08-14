@@ -2229,7 +2229,9 @@ let prefix_idents root prefixing_sub sg =
     | Sig_value(id, _, _) as item :: rem ->
       let p = Pdot(root, Ident.name id) in
       prefix_idents root
-        ((item, p) :: items_and_paths) prefixing_sub rem
+        ((item, p) :: items_and_paths)
+        (Subst.add_value id p prefixing_sub)
+        rem
     | Sig_type(id, td, rs, vis) :: rem ->
       let p = Pdot(root, Ident.name id) in
       prefix_idents root

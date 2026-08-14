@@ -78,7 +78,7 @@ val transl_label :
 
 (** The label of an arrow type, for callers that do not translate the
     arrow itself: decides bare names by the occurrence test
-    ({!Vox_binding.classify_bare_name}) and then behaves as
+    ({!Vox_binding.name_used_in_refinement}) and then behaves as
     {!transl_label}. *)
 val transl_arrow_arg_label :
         Parsetree.arrow_arg_name ->

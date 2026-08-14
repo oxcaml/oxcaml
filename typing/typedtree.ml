@@ -885,10 +885,11 @@ and core_type_desc =
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
-  | Ttyp_refine of core_type * Types.refinement_expression
-      (** [T{ P }].  The predicate is the resolved form shared with the
-          type graph; there is no separately-typed predicate because
-          refinements are inert in this piece. *)
+  | Ttyp_refine of core_type * Parsetree.expression
+      (** [T{ P }].  The predicate is kept as the source expression: the
+          resolved form lives in the type graph ([ctyp_type]), and there is
+          no separately-typed predicate because refinements are inert in
+          this piece. *)
   | Ttyp_newlayout of string loc list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos

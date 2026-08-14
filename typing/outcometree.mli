@@ -81,6 +81,12 @@ type arg_label =
   | Labelled of string
   | Optional of string
   | Position of string
+  | Binder of string
+      (** The value binder of a dependent arrow: prints as [x:], not a
+          label. *)
+  | Tilde_labelled of string
+      (** A label printed [~x:], so that it does not re-parse as a
+          binder. *)
 
 type out_mode = string
 
@@ -128,11 +134,7 @@ and out_type =
   | Otyp_open
   | Otyp_alias of {non_gen:bool; aliased:out_type; alias:string}
   | Otyp_arrow of arg_label * out_arg_mode * out_type * out_type
-  (** INVARIANT: the [out_type] for the return must be [Otyp_ret].
-
-      The label string is the printed name slot verbatim: a dependent-arrow
-      binder is [Labelled "x"], and a label escaped so that it does not
-      re-parse as a binder is [Labelled "~x"]. *)
+  (** INVARIANT: the [out_type] for the return must be [Otyp_ret]. *)
   | Otyp_refine of out_type * Parsetree.expression
   (** [T{ P }]: a refinement type.  The predicate is carried as surface
       syntax, produced by [Out_type], and printed with [Pprintast]. *)

@@ -73,6 +73,10 @@ type s =
     modules: Path.t Path.Map.t;
     modtypes: module_type Path.Map.t;
     jkinds: kind_replacement Path.Map.t;
+    values: Path.t Path.Map.t;
+    (* Value paths only occur in types inside refinement predicates
+       ([Rexp_ident]); this map is what keeps them meaningful across
+       signature prefixing and binder renaming. *)
 
     additional_action: additional_action;
     sort_var_mapping: sort_map;
@@ -110,6 +114,7 @@ let identity =
     modules = Path.Map.empty;
     modtypes = Path.Map.empty;
     jkinds = Path.Map.empty;
+    values = Path.Map.empty;
     additional_action = No_action;
     sort_var_mapping = Nothing;
     loc = None;
@@ -152,6 +157,9 @@ let add_type id p s =
 
 let add_module id p s =
   { s with modules = Path.Map.add (Pident id) p s.modules; last_compose = None }
+
+let add_value id p s =
+  { s with values = Path.Map.add (Pident id) p s.values; last_compose = None }
 
 let add_modtype_gen p ty s =
   { s with modtypes = Path.Map.add p ty s.modtypes; last_compose = None }
@@ -407,10 +415,13 @@ let jkind_path s path =
 
 (* For values, extension constructors, classes and class types *)
 let value_path s path =
-  match path with
-  | Pident _ -> path
-  | Pdot(p, n) -> Pdot(module_path s p, n)
-  | Papply _ | Pextra_ty _ -> fatal_error "Subst.value_path"
+  match Path.Map.find path s.values with
+  | p -> p
+  | exception Not_found ->
+      match path with
+      | Pident _ -> path
+      | Pdot(p, n) -> Pdot(module_path s p, n)
+      | Papply _ | Pextra_ty _ -> fatal_error "Subst.value_path"
 
 let rec type_path s path =
   match Path.Map.find path s.types with
@@ -628,7 +639,7 @@ let rec typexp copy_scope s rename ty =
   match desc with
     Tvar { jkind = jk } | Tunivar { jkind = jk } ->
       let desc, jkind_changed =
-        let jk' = jkind copy_scope s jk in
+        let jk' = jkind copy_scope s rename jk in
         if jk == jk' then desc, false else
           let desc =
             match desc with
@@ -775,7 +786,7 @@ let rec typexp copy_scope s rename ty =
                 Vox_rexp.map ~rename ~freshen:true
                   ~value_path:(value_path s)
                   ~type_expr:(typexp copy_scope s rename) ref_pred }
-      | Tof_kind jk -> Tof_kind (jkind copy_scope s jk)
+      | Tof_kind jk -> Tof_kind (jkind copy_scope s rename jk)
       | Tmod (ty, mod_bounds) ->
           Tmod (typexp copy_scope s rename ty, mod_bounds)
       | _ -> copy_type_desc (typexp copy_scope s rename) desc
@@ -783,8 +794,8 @@ let rec typexp copy_scope s rename ty =
     Transient_expr.set_stub_desc ty' desc;
     ty'
 
-and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
-  fun copy_scope s jkind ->
+and jkind : 'l 'r. _ -> _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
+  fun copy_scope s rename jkind ->
   let jkind =
     match s.additional_action with
     | Prepare_for_saving { prepare_jkind; _ } ->
@@ -792,7 +803,7 @@ and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
     | Duplicate_variables | No_action -> jkind
   in
   (* CR-soon layouts aivaskovic: get rid of map_type_expr *)
-  let jkind = Jkind.map_type_expr (typexp copy_scope s Ident.Map.empty) jkind in
+  let jkind = Jkind.map_type_expr (typexp copy_scope s rename) jkind in
   let jkind_desc = jkind_desc s jkind.jkind in
   if jkind_desc == jkind.jkind then jkind
   else { jkind with jkind = jkind_desc }
@@ -809,7 +820,7 @@ let typexp copy_scope s loc ty =
 
 let jkind copy_scope s loc jk =
   location_for_jkind_check_errors := loc;
-  jkind copy_scope s jk
+  jkind copy_scope s Ident.Map.empty jk
 
 (*
    Always make a copy of the type. If this is not done, type levels
@@ -1175,7 +1186,10 @@ let rename_bound_idents scoping s sg =
     | Sig_value(id, vd, vis) :: rest ->
         (* scope doesn't matter for value identifiers. *)
         let id' = rename_ident s id in
-        rename_bound_idents s (Sig_value(id', vd, vis) :: sg) rest
+        rename_bound_idents
+          (add_value id (Pident id') s)
+          (Sig_value(id', vd, vis) :: sg)
+          rest
     | Sig_typext(id, ec, es, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents s (Sig_typext(id',ec,es,vis) :: sg) rest
@@ -1358,6 +1372,7 @@ and compose s1 s2 =
           modules = merge_path_maps (module_path s2) s1.modules s2.modules;
           modtypes = merge_path_maps (modtype Keep s2) s1.modtypes s2.modtypes;
           jkinds = merge_path_maps (jkind_replacement s2) s1.jkinds s2.jkinds;
+          values = merge_path_maps (value_path s2) s1.values s2.values;
           additional_action = begin
             match s1.additional_action, s2.additional_action with
             | action, No_action | No_action, action -> action

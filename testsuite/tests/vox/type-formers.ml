@@ -153,6 +153,48 @@ type opt = ?x:int{ _ > 0 } -> unit -> unit;;
 type opt = ?x:int{ _ > 0 } -> unit -> unit
 |}]
 
+type bad = ?x:int{ x > 0 } -> unit -> unit;;
+[%%expect{|
+Line 1, characters 19-20:
+1 | type bad = ?x:int{ x > 0 } -> unit -> unit;;
+                       ^
+Error: Unbound value "x"
+|}]
+
+(* [~x:] scopes over the whole argument, and only the argument *)
+type tilde_tuple = ~x:(int{ x > 0 } * int) -> unit;;
+[%%expect{|
+type tilde_tuple = ~x:int{ x > 0 } * int -> unit
+|}]
+
+type bad = ~x:int -> int{ _ >= x };;
+[%%expect{|
+Line 1, characters 31-32:
+1 | type bad = ~x:int -> int{ _ >= x };;
+                                   ^
+Error: Unbound value "x"
+|}]
+
+(* A positional binder scopes over refinements anywhere in its domain *)
+type nested_domain = x:(int{ x > 0 } * int) -> unit;;
+[%%expect{|
+type nested_domain = x:int{ x > 0 } * int -> unit
+|}]
+
+(* A [fun] parameter in the predicate shadows the name, so [x] stays a
+   label *)
+type still_label = x:int list{ List.for_all (fun x -> x > 0) _ } -> unit;;
+[%%expect{|
+type still_label = x:int list{ List.for_all (fun x -> x > 0) _ } -> unit
+|}]
+
+(* A predicate-local binder is in scope in nested refinements through a
+   constraint type *)
+type local_nested = int{ (fun x -> (x : int{ x = 0 })) 0 = 0 };;
+[%%expect{|
+type local_nested = int{ ((fun x -> (x : int{ x = 0 })) 0) = 0 }
+|}]
+
 (* Mixed arrow: a positional binder and a bare-spelled label in one
    chain warns *)
 type mixed = x:int -> y:int -> int{ _ >= x };;
@@ -202,13 +244,32 @@ Error: Unbound value "n"
 |}]
 
 (* Rejections: non-total forms *)
-type bad = int{ while true do () done; true };;
+type bad = int{ while true do () done };;
 [%%expect{|
-Line 1, characters 16-43:
-1 | type bad = int{ while true do () done; true };;
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 16-37:
+1 | type bad = int{ while true do () done };;
+                    ^^^^^^^^^^^^^^^^^^^^^
+Error: While loops are not allowed in a refinement predicate:
+       predicates must be total.
+|}]
+
+type bad = int{ (); true };;
+[%%expect{|
+Line 1, characters 16-24:
+1 | type bad = int{ (); true };;
+                    ^^^^^^^^
 Error: Sequencing is not allowed in a refinement predicate:
        predicates must be total.
+|}]
+
+(* Total but not yet part of the predicate sublanguage: a real located
+   error, not a crash *)
+type bad = int{ { contents = 1 } = _ };;
+[%%expect{|
+Line 1, characters 16-32:
+1 | type bad = int{ { contents = 1 } = _ };;
+                    ^^^^^^^^^^^^^^^^
+Error: A record expression is not supported in refinement predicates.
 |}]
 
 type bad = unit{ ref true };;
@@ -254,6 +315,58 @@ type wft = t tree{ well_formed (_ : t tree) }
 and t = int
 |}]
 
+(* String constants compare by contents, not by where they were
+   written *)
+type s = string{ _ = "a" }
+let l : s list = ([] : string{ _ = "a" } list);;
+[%%expect{|
+type s = string{ _ = "a" }
+val l : s list = []
+|}]
+
+(* Type variables inside a predicate are live in the type graph:
+   instantiating the declaration substitutes them *)
+type 'a t = int{ (_ : 'a list) = [] }
+let l : int t list = ([] : int{ (_ : int list) = [] } list);;
+[%%expect{|
+type 'a t = int{ (_ : 'a list) = [] }
+val l : int t list = []
+|}]
+
+(* A self-referential predicate, to pin what the occur check does *)
+type u = int{ (_ : u) = _ };;
+[%%expect{|
+Line 1, characters 0-27:
+1 | type u = int{ (_ : u) = _ };;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type abbreviation "u" is cyclic:
+         "u" = "int{ (_ : u) = _ }",
+         "int{ (_ : u) = _ }" contains "u"
+|}]
+
+(* Predicates print resolved names: a functor application substitutes the
+   value path *)
+module F (X : sig val p : int end) = struct
+  type t = int{ _ > X.p }
+end
+module A = struct let p = 0 end
+module R = F (A);;
+[%%expect{|
+module F :
+  functor (X : sig val p : int end) -> sig type t = int{ _ > X.p } end
+module A : sig val p : int end
+module R : sig type t = int{ _ > A.p } end
+|}]
+
+(* A label whose name is a value mentioned in a refinement is escaped, so
+   the printed form re-parses to the same type *)
+let x = 0
+type esc = ~x:int -> int{ x > 0 };;
+[%%expect{|
+val x : int = 0
+type esc = ~x:int -> int{ x > 0 }
+|}]
+
 (* --- Inertness ------------------------------------------------------- *)
 
 (* No introduction rule: a refined type cannot be consumed or produced *)
@@ -264,4 +377,21 @@ Line 1, characters 27-28:
                                ^
 Error: The value "x" has type "int{ _ > 0 }"
        but an expression was expected of type "int"
+|}]
+
+(* Partial application preserves the binder of an omitted argument *)
+let mk (g : ~x:int{ x > 0 } -> y:int -> unit) : ~x:int{ x > 0 } -> unit =
+  g ~y:0;;
+[%%expect{|
+val mk : (~x:int{ x > 0 } -> y:int -> unit) -> ~x:int{ x > 0 } -> unit =
+  <fun>
+|}]
+
+(* Applying a dependent arrow lets the domain type escape its binder; the
+   escaped occurrence prints under the binder's name.  Elimination rules —
+   including whether this should be rejected or substituted — belong to a
+   later piece; this pins the current, inert behaviour. *)
+let apply (f : x:int{ x > 0 } -> unit) v = f v;;
+[%%expect{|
+val apply : (x:int{ x > 0 } -> unit) -> int{ x > 0 } -> unit = <fun>
 |}]

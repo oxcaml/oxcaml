@@ -1303,29 +1303,6 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Optional l -> Optional l
   | Position l -> Position l
 
-(* Dependent-arrow binders in scope during conversion: the ident and the
-   name chosen for printing.  A positional binder is renamed when its name
-   collides with an enclosing binder still in scope. *)
-let refinement_binders : (Ident.t * string) list ref = ref []
-
-let refinement_binder_name id =
-  match List.assq_opt id !refinement_binders with
-  | Some name -> name
-  | None -> Ident.name id
-
-let choose_refinement_binder_name id =
-  let taken name =
-    List.exists (fun (_, n) -> String.equal n name) !refinement_binders
-  in
-  let base = Ident.name id in
-  if not (taken base) then base
-  else
-    let rec pick i =
-      let candidate = base ^ string_of_int i in
-      if taken candidate then pick (i + 1) else candidate
-    in
-    pick 1
-
 (* Does some refinement predicate reachable from [tys] satisfy [f]?  The
    walk goes through payloads, predicates' interior types and ordinary
    structure, and is guarded against cycles. *)
@@ -1360,16 +1337,15 @@ let out_label_needs_escape name t1 t2 =
     | Otyp_arrow (slot, _, dom, ret) ->
         let shadows s = String.equal s name in
         (match slot with
-         | Labelled s when shadows s ->
+         | (Labelled s | Binder s) when shadows s ->
              (* a bare slot [name:] re-binds occurrences below it *)
              ()
-         | Labelled s
-           when String.length s > 0 && s.[0] = '~'
-                && shadows (String.sub s 1 (String.length s - 1)) ->
+         | Tilde_labelled s when shadows s ->
              (* [~name:] shadows its own domain only *)
              walk ret
          | Position s when shadows s -> ()
-         | Nolabel | Labelled _ | Optional _ | Position _ ->
+         | Nolabel | Labelled _ | Binder _ | Tilde_labelled _ | Optional _
+         | Position _ ->
              walk dom; walk ret)
     | Otyp_ret (_, t) | Otyp_alias { aliased = t; _ } | Otyp_mod (t, _)
     | Otyp_poly (_, t) | Otyp_newlayout (_, t) | Otyp_repr (_, t)
@@ -1534,16 +1510,12 @@ let rec tree_of_modal_typexp mode modal ty =
               Some id
           | Some _ | None -> None
         in
-        let pre_lab, bound_name =
+        let pre_lab =
           match l, binder with
-          | Nolabel, Some id ->
-              let name = choose_refinement_binder_name id in
-              Some (Outcometree.Labelled name), Some (id, name)
-          | Labelled lbl, Some id ->
-              (* The name of a [~x:] binder is the label itself; it cannot
-                 collide, because its scope is the argument's own
-                 refinements, where the label shadows everything else. *)
-              Some (Outcometree.Labelled ("~" ^ lbl)), Some (id, lbl)
+          | Nolabel, Some id -> Some (Outcometree.Binder (Ident.name id))
+          | Labelled lbl, Some _ ->
+              (* The name of a [~x:] binder is the label itself. *)
+              Some (Outcometree.Tilde_labelled lbl)
           | (Optional _ | Position _), Some _ ->
               Misc.fatal_error
                 "Out_type.tree_of_typexp: binder on an optional or position \
@@ -1551,14 +1523,8 @@ let rec tree_of_modal_typexp mode modal ty =
           | _, None ->
               (* For a plain label the spelling is decided below, on the
                  converted output. *)
-              None, None
+              None
         in
-        protect_refs
-          [ R (refinement_binders,
-               (match bound_name with
-                | Some binding -> binding :: !refinement_binders
-                | None -> !refinement_binders)) ]
-        @@ fun () ->
         (* [marg] will contain undetermined axes. It would be imprecise if we
            don't print anything for those axes, since user would interpret that
            as legacy. The best we can do is to zap to legacy and if they do land
@@ -1591,7 +1557,7 @@ let rec tree_of_modal_typexp mode modal ty =
                  binder. *)
               match lab with
               | Labelled lbl when out_label_needs_escape lbl t1 t2 ->
-                  Labelled ("~" ^ lbl)
+                  Tilde_labelled lbl
               | lab -> lab
         in
         Otyp_arrow (lab, tree_of_modes arg_mode, t1, t2)
@@ -1612,9 +1578,24 @@ let rec tree_of_modal_typexp mode modal ty =
           | ct -> ct
           | exception _ -> Ast_helper.Typ.any None
         in
+        let value_ident path =
+          (* Through the printer's path machinery, so that shortening and
+             substitution are reflected. *)
+          let rec longident : Outcometree.out_ident -> Longident.t = function
+            | Oide_ident { printed_name } -> Lident printed_name
+            | Oide_dot (id, s) ->
+                Ldot (Location.mknoloc (longident id), Location.mknoloc s)
+            | Oide_apply (a, b) ->
+                Lapply
+                  (Location.mknoloc (longident a),
+                   Location.mknoloc (longident b))
+            | Oide_hash id -> longident id
+          in
+          Location.mknoloc (longident (tree_of_path (Some Value) path))
+        in
         Otyp_refine
           (payload,
-           Vox_rexp.untype ~var_name:refinement_binder_name ~core_type
+           Vox_rexp.untype ~var_name:Ident.name ~value_ident ~core_type
              ref_pred)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)

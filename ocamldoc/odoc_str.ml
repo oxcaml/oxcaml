@@ -47,7 +47,7 @@ let rec is_arrow_type t =
   | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ | Types.Tbox _
   | Types.Trepr _
   | Types.Tfield _ | Types.Tnil | Types.Tvariant _ | Types.Tpackage _
-  | Types.Tof_kind _ -> false
+  | Types.Tof_kind _ | Types.Trefine _ -> false
   | Types.Tsubst _ -> assert false
 
 
@@ -61,7 +61,7 @@ let rec need_parent t =
   | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ | Types.Trepr _
   | Types.Tbox _
   | Types.Tfield _ | Types.Tnil | Types.Tvariant _ | Types.Tpackage _
-  | Types.Tof_kind _ -> false
+  | Types.Tof_kind _ | Types.Trefine _ -> false
   | Types.Tsubst _ -> assert false
 
 let print_type_scheme ppf t =

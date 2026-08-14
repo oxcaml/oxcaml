@@ -144,8 +144,9 @@ and child_walker name =
     typ = (fun _ t -> walk_type name t);
     expr = (fun _ e -> walk_pred name e);
     pat = (fun _ p -> default_walk_pat name p);
-    (* Attribute payloads are not part of the type. *)
-    attribute = (fun _ _ -> ())
+    (* Attribute and extension payloads are not part of the type. *)
+    attribute = (fun _ _ -> ());
+    extension = (fun _ _ -> ())
   }
 
 let name_used_in_refinement name tys =
@@ -157,11 +158,3 @@ let name_used_in_predicate name pred =
   match walk_pred name pred with
   | () -> false
   | exception Found -> true
-
-type bare_name_classification =
-  | Positional_binder
-  | Ordinary_label
-
-let classify_bare_name name ~domain ~codomain =
-  if name_used_in_refinement name [ domain; codomain ] then Positional_binder
-  else Ordinary_label

@@ -47,13 +47,20 @@ val equal :
   refinement_expression -> refinement_expression -> bool
 
 (** Back to surface syntax, for printing.  [var_name] chooses the printed
-    name of a bound ident (the printer renames binders to avoid capture);
-    [core_type] renders an interior type.  Holes print as [_] via
-    [Pexp_hole]. *)
+    name of a bound ident; [value_ident] renders a free ident from its
+    resolved (possibly substituted) path; [core_type] renders an interior
+    type.  Holes print as [_] via [Pexp_hole]. *)
 val untype :
   var_name:(Ident.t -> string) ->
+  value_ident:(Path.t -> Longident.t Location.loc) ->
   core_type:(type_expr -> Parsetree.core_type) ->
   refinement_expression -> Parsetree.expression
 
 (** Does the predicate mention the given bound ident? *)
 val mentions_ident : Ident.t -> refinement_expression -> bool
+
+(** The first free value path in the predicate for which [f] answers, if
+    any.  Interior types are not scanned here; the caller scans the type
+    graph. *)
+val find_value_path :
+  (Path.t -> 'a option) -> refinement_expression -> 'a option

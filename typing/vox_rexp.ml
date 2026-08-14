@@ -139,6 +139,15 @@ let map ?(rename = Ident.Map.empty) ?(freshen = false) ?value_path ~type_expr
 
 (* Alpha-equivalence *)
 
+(* [Pconst_string] carries the location of the string contents inside the
+   description; it is not part of the syntax and must not be part of type
+   identity. *)
+let constant_equal (c1 : Parsetree.constant) (c2 : Parsetree.constant) =
+  match c1.pconst_desc, c2.pconst_desc with
+  | Pconst_string (s1, _, d1), Pconst_string (s2, _, d2) ->
+      String.equal s1 s2 && Option.equal String.equal d1 d2
+  | desc1, desc2 -> desc1 = desc2
+
 let equal ~type_eq ~pairs rexp1 rexp2 =
   (* [pairs] pairs the binders of the left predicate with the binders of
      the right one, innermost first. *)
@@ -157,8 +166,7 @@ let equal ~type_eq ~pairs rexp1 rexp2 =
     | Rexp_hole, Rexp_hole -> true
     | Rexp_var id1, Rexp_var id2 -> var_eq pairs id1 id2
     | Rexp_ident (p1, _), Rexp_ident (p2, _) -> Path.same p1 p2
-    | Rexp_constant c1, Rexp_constant c2 ->
-        c1.pconst_desc = c2.pconst_desc
+    | Rexp_constant c1, Rexp_constant c2 -> constant_equal c1 c2
     | Rexp_apply (f1, args1), Rexp_apply (f2, args2) ->
         eq pairs f1 f2
         && List.compare_lengths args1 args2 = 0
@@ -204,7 +212,7 @@ let equal ~type_eq ~pairs rexp1 rexp2 =
     | Rpat_any, Rpat_any -> Some pairs
     | Rpat_var id1, Rpat_var id2 -> Some ((id1, id2) :: pairs)
     | Rpat_constant c1, Rpat_constant c2 ->
-        if c1.pconst_desc = c2.pconst_desc then Some pairs else None
+        if constant_equal c1 c2 then Some pairs else None
     | Rpat_tuple c1, Rpat_tuple c2 ->
         if List.compare_lengths c1 c2 = 0 then
           List.fold_left2
@@ -232,7 +240,7 @@ let equal ~type_eq ~pairs rexp1 rexp2 =
 
 (* Back to surface syntax *)
 
-let untype ~var_name ~core_type rexp =
+let untype ~var_name ~value_ident ~core_type rexp =
   let open Ast_helper in
   let lid_of_name name = Location.mknoloc (Longident.Lident name) in
   let rec untype_rexp rexp =
@@ -240,7 +248,11 @@ let untype ~var_name ~core_type rexp =
     match rexp.rexp_desc with
     | Rexp_hole -> Exp.mk ~loc Pexp_hole
     | Rexp_var id -> Exp.ident ~loc (lid_of_name (var_name id))
-    | Rexp_ident (_, lid) -> Exp.ident ~loc lid
+    | Rexp_ident (path, _) ->
+        (* Render from the resolved path: the source longident may not
+           resolve at the printing site, and substitution rewrites only the
+           path. *)
+        Exp.ident ~loc (value_ident path)
     | Rexp_constant const -> Exp.constant ~loc const
     | Rexp_apply (fn, args) ->
         Exp.apply ~loc (untype_rexp fn)
@@ -325,6 +337,23 @@ let exists_rexp pred rexp =
     | Rexp_constraint (e, _) -> walk e
   in
   match walk rexp with () -> false | exception Found -> true
+
+let find_value_path (f : Path.t -> 'a option) rexp : 'a option =
+  let result = ref None in
+  ignore
+    (exists_rexp
+       (fun r ->
+         match r.rexp_desc with
+         | Rexp_ident (path, _) -> (
+             match f path with
+             | Some _ as found ->
+                 result := found;
+                 true
+             | None -> false)
+         | _ -> false)
+       rexp
+     : bool);
+  !result
 
 let mentions_ident id rexp =
   exists_rexp

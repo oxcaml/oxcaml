@@ -63,7 +63,7 @@ let update_value_parameters_text v =
 let parameter_list_from_arrows typ =
   let rec iter t =
     match Types.get_desc t with
-      Types.Tarrow ((l,_,_), t1, t2, _) ->
+      Types.Tarrow ((l,_,_,_), t1, t2, _) ->
         (l, t1) :: (iter t2)
     | Types.Tlink texp
     | Types.Tpoly (texp, _) | Types.Trepr (texp, _) -> iter texp
@@ -82,7 +82,8 @@ let parameter_list_from_arrows typ =
     | Types.Tpackage _
     | Types.Tvariant _
     | Types.Tof_kind _
-    | Types.Tbox _ ->
+    | Types.Tbox _
+    | Types.Trefine _ ->
         []
     | Types.Tsubst _ ->
         assert false

@@ -310,13 +310,16 @@ which route was taken and why, and what was considered.
   same type. Positional binders are renamed (`x` → `x1`) when they collide
   with an enclosing binder still in scope.
 - **Unification and the binder.** The binder ident is not part of type
-  identity. `unify`/`eqtype` pair the two binders on a stack (mirroring
-  `univar_pairs`) and compare predicates alpha-equivalently
-  (`Vox_rexp.equal`); a one-sided binder is ignored at the arrow and can
-  only be followed by a predicate mismatch at the refinements themselves.
-  `moregen`, `mcomp` beyond payload compatibility, and `subtype` have no
-  refinement rules — signature matching and coercions are later pieces —
-  so they fall into their generic mismatch cases.
+  identity. `unify`, `eqtype` and `moregen` pair the two binders on a
+  stack (mirroring `univar_pairs`) and compare predicates
+  alpha-equivalently (`Vox_rexp.equal`); a one-sided binder is ignored at
+  the arrow and can only be followed by a predicate mismatch at the
+  refinements themselves. `moregen` has the *identity* arm only — a
+  toplevel `let` of a refined-function type includes its own signature —
+  with no weakening; `mcomp` beyond payload compatibility and `subtype`
+  have no refinement rules, so they fall into their generic mismatch
+  cases. Signature matching beyond identity and coercions are later
+  pieces.
 - **Class types.** Refinements are permitted in every `core_type`,
   including class arrow domains, but class arrows keep today's label
   grammar and never bind: a name used in a refinement there is simply
@@ -343,3 +346,55 @@ which route was taken and why, and what was considered.
   written name from the printed form or thread arrow context into
   predicate comparison; both cost more than the distinction is worth while
   refinements are inert. Revisit if it bites once refinements are used.
+
+
+## Decisions from the first review round
+
+Four reviewers (two claude, two codex) reviewed commit `24bc7ffacc`; the
+verified defects they found are fixed and their repros pinned as tests.
+Decisions and accepted costs recorded here:
+
+- **Value paths are substituted first-class.** `Subst` gained a `values`
+  map (`add_value`), used by signature prefixing (`Env.prefix_idents`) and
+  binder renaming (`rename_bound_idents`), because a predicate referencing
+  a value of its own signature must be re-prefixed on `.cmi` import, and
+  `value_path` alone is a no-op on `Pident`. Printing renders free idents
+  from the (substituted) path through the printer's path machinery, not
+  from the stored source longident — the longident is kept only as
+  documentation of what was written.
+- **`Ttyp_refine` carries the source predicate expression** (precedent:
+  `Parsetree.jkind_annotation` in the typedtree). `Untypeast` returns it
+  verbatim, and only `Out_type` reconstructs surface syntax from the
+  resolved predicate. The interior-type render-and-reparse remains in
+  `Out_type` only.
+- **The printer does not rename binders.** Binder names print as written
+  (`Ident.name`); the only capture-avoidance mechanism is `~`-escaping of
+  labels, decided on the converted output. Renaming was reachable only
+  from graphs no source can produce, and it could itself capture a free
+  identifier of the chosen name.
+- **The outcometree name slot is typed**: `Binder of string` and
+  `Tilde_labelled of string` are outcometree `arg_label` constructors, not
+  string conventions inside `Labelled`.
+- **Dependent arrows survive partial application**: the omitted-parameter
+  record carries the binder and every arrow reconstruction in `Typecore`
+  preserves it. Whether *applying* a dependent arrow should be allowed at
+  all is an elimination-rule question for a later piece; today the domain
+  type escapes its binder and the escaped occurrence prints under the
+  binder's name (pinned by a test).
+- **Predicate-local binders scope into interior types** (and therefore
+  into refinements nested in them), matching the occurrence test.
+- **Refinements in quotations are a located error**, not a fatal error:
+  they are reachable from valid source. Neighbouring unimplemented
+  quotation forms keep their fatal errors; that is the quotation
+  feature's own convention.
+- **`nondep_type` refuses to erase a module mentioned by a predicate**
+  (`Nondep_cannot_erase`), like packages do.
+- **Known accepted costs** (measured against the spec's "simplest" bar,
+  kept deliberately): the occurrence test walks the arrow's syntax once
+  per bare name (types are small; a one-pass free-name-set computation is
+  the alternative if this ever shows up in profiles); the printer's escape
+  check walks the converted output per plain-labelled arrow; `ref`, `!`
+  and `:=` are rejected by bare name only, so qualified or rebound
+  spellings pass name resolution — the predicate sublanguage is
+  *syntactically* total, and real totality checking is a later piece's
+  job.
