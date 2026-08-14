@@ -1,0 +1,10 @@
+(* CHILDTEST
+ setup-ocamlc.byte-build-env;
+ ocamlc.byte;
+*)
+
+(* Run by skip-bytecode-compilers.sh, which copies this to a .ml in the parent
+   test's build directory so the Make-based drivers do not treat it as a test of
+   its own. It exists only to reach the ocamlc.byte action. *)
+
+let () = print_string "unreachable when the action is skipped\n"
