@@ -27,6 +27,29 @@ let native_action a =
   if Ocamltest_config.native_compiler then a
   else (Actions.update a no_native_compilers)
 
+(* A harness can substitute its own compilers for the installed ones, and may not
+   be able to supply a runnable bytecode compiler: the fast development loop
+   (`make dev-test`) points ocamlc.byte at a boot main.bc carrying the host
+   runtime's magic, which the in-tree ocamlrun refuses. Such tests then present as
+   ordinary failures, so every reader re-derives that from a magic-number error
+   buried in a log. Setting this variable makes them skip instead, and the skip
+   names the compiler that consequently went untested. *)
+let skip_bytecode_compilers =
+  Sys.safe_getenv "OCAMLTEST_SKIP_BYTECODE_COMPILERS" <> ""
+
+let no_bytecode_compiler name _log env =
+  let reason =
+    Printf.sprintf
+      "%s is not runnable under this harness, so this test does not cover it"
+      name
+  in
+  (Result.skip_with_reason reason, env)
+
+let bytecode_compiler_action name a =
+  if skip_bytecode_compilers
+  then Actions.update a (no_bytecode_compiler name)
+  else a
+
 let get_backend_value_from_env env bytecode_var native_var =
   Ocaml_backends.make_backend_function
     (Environments.safe_lookup bytecode_var env)
@@ -516,11 +539,12 @@ let compile (compiler : Ocaml_compilers.compiler) log env =
 (* Compile actions *)
 
 let ocamlc_byte =
-  Actions.make
-    ~name:"ocamlc.byte"
-    ~description:"Compile the program using ocamlc.byte"
-    ~does_something:true
-    (compile Ocaml_compilers.ocamlc_byte)
+  bytecode_compiler_action "ocamlc.byte"
+    (Actions.make
+      ~name:"ocamlc.byte"
+      ~description:"Compile the program using ocamlc.byte"
+      ~does_something:true
+      (compile Ocaml_compilers.ocamlc_byte))
 
 let ocamlc_opt =
   native_action
@@ -532,11 +556,12 @@ let ocamlc_opt =
 
 let ocamlopt_byte =
   native_action
-    (Actions.make
-      ~name:"ocamlopt.byte"
-      ~description:"Compile the program using ocamlopt.byte"
-      ~does_something:true
-      (compile Ocaml_compilers.ocamlopt_byte))
+    (bytecode_compiler_action "ocamlopt.byte"
+      (Actions.make
+        ~name:"ocamlopt.byte"
+        ~description:"Compile the program using ocamlopt.byte"
+        ~does_something:true
+        (compile Ocaml_compilers.ocamlopt_byte)))
 
 let ocamlopt_opt =
   native_action

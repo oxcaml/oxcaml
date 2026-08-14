@@ -1,2 +1,3 @@
 child ocamltest exit: 0
-ocamlc.byte => failed
+ocamlc.byte => skipped
+reason: ocamlc.byte is not runnable under this harness, so this test does not cover it

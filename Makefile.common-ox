@@ -721,6 +721,7 @@ dev-test: dev-check
 	  export CAML_LD_LIBRARY_PATH=$$(pwd)/_build/dev/runtest/stdlib/stublibs; \
 	  export TMPDIR="$${TMPDIR:-$$(pwd)/_build/dev/tmp}"; \
 	  mkdir -p "$$TMPDIR"; \
+	  export OCAMLTEST_SKIP_BYTECODE_COMPILERS=1; \
 	  if $$(which gfortran > /dev/null 2>&1); then \
 	    export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	  fi; \
