@@ -1,0 +1,11 @@
+File user.cmi
+Unit name: User
+Is parameter: no
+Parameters:
+	Elt
+Interfaces imported:
+	00000000000000000000000000000000	User
+	00000000000000000000000000000000	Stdlib
+	00000000000000000000000000000000	Elt
+	00000000000000000000000000000000	CamlinternalFormatBasics
+Globals in scope:
