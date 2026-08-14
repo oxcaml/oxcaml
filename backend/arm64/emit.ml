@@ -974,7 +974,7 @@ let emit_literals_list literals align emit_literal =
       D.switch_to_section_raw
         ~names:[".rodata.cst" ^ Int.to_string align]
         ~flags:(Some "aM")
-        ~args:["@progbits"; Int.to_string align]
+        ~args:["%progbits"; Int.to_string align]
         ~is_delayed:false;
     (* CR sspies: We set the internal section ref to Text here, because section
        ref does not support named text sections yet. Fix this when cleaning up
