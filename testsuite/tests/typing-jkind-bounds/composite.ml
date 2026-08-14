@@ -197,7 +197,9 @@ Error: This type "int ref" should be an instance of type "('a : immutable_data)"
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended
+         logicality: mod physical ≰ mod logical
          portability: mod portable with int ≰ mod portable
+         totality: mod total with int ≰ mod total
          statefulness: mod stateless with int ≰ mod stateless
          visibility: mod read_write ≰ mod immutable
 |}]
@@ -350,7 +352,9 @@ Error: This type "int ref" should be an instance of type "('a : immutable_data)"
 
        The first mode-crosses less than the second along:
          contention: mod uncontended ≰ mod contended
+         logicality: mod physical ≰ mod logical
          portability: mod portable with int ≰ mod portable
+         totality: mod total with int ≰ mod total
          statefulness: mod stateless with int ≰ mod stateless
          visibility: mod read_write ≰ mod immutable
 |}]

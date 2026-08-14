@@ -1076,4 +1076,16 @@ let f (x : M.t many) = cross_contended x
 module M : sig type t end
 type 'a many = Foo of ('a * 'a) many | Leaf
 val f : M.t many -> unit = <fun>
+|}, Principal{|
+module M : sig type t end
+type 'a many = Foo of ('a * 'a) many | Leaf
+Line 3, characters 39-40:
+3 | let f (x : M.t many) = cross_contended x
+                                           ^
+Error: The value "x" has type "M.t many" but an expression was expected of type
+         "('a : value mod contended)"
+       The kind of M.t many is immutable_data with (M.t * M.t) many
+         because of the definition of many at line 2, characters 0-43.
+       But the kind of M.t many must be a subkind of value mod contended
+         because of the definition of cross_contended at line 9, characters 59-70.
 |}]

@@ -331,6 +331,14 @@ type t3 : value non_float mod everything with [ `A of string] t1 = C of string  
    Internal ticket 6481. *)
 [%%expect{|
 type t3 = C of string
+|}, Principal{|
+Line 1, characters 0-78:
+1 | type t3 : value non_float mod everything with [ `A of string] t1 = C of string  (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t3" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t3" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t3.
 |}]
 
 type 'a t1 = [> `A of string | `B of int ] as 'a
@@ -354,6 +362,14 @@ type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] 
    Internal ticket 6481. *)
 [%%expect{|
 type t3 = C of string
+|}, Principal{|
+Line 1, characters 0-96:
+1 | type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t3" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t3" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t3.
 |}]
 
 module type S = sig

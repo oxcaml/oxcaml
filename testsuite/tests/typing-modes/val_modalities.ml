@@ -168,12 +168,12 @@ Error: Signature mismatch:
          sig
            val y : int ref
            val z : 'a -> 'a
-           val x : 'a -> 'a @@ stateless
+           val x : 'a -> 'a @@ stateless total
          end @ stateful
        Values do not match:
          val x : 'a -> 'a (* in a structure at stateful *)
        is not included in
-         val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
+         val x : 'a -> 'a @@ stateless total (* in a structure at stateful *)
        The first is "stateful"
          because it contains a usage (of the value "y" at line 11, characters 29-30)
          which is expected to be "read_write".
@@ -235,14 +235,14 @@ module Module_type_nested :
   sig
     module M :
       sig
-        val x : 'a -> 'a @@ stateless
+        val x : 'a -> 'a @@ stateless total
         module N : sig val y : string ref end
       end
     module M' :
       sig
-        val x : 'a -> 'a @@ stateless
+        val x : 'a -> 'a @@ stateless total
         module N : sig val y : string ref end
-      end @@ stateless contended
+      end @@ stateless contended total
   end
 |}]
 
