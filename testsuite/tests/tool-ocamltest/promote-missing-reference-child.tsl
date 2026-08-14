@@ -1,0 +1,8 @@
+(* CHILDTEST
+ output = "${test_source_directory}/promote-missing-input";
+ check-program-output;
+*)
+
+(* Run by promote-missing-reference.sh, which copies this file to a .ml in the
+   parent test's build directory so the Make-based drivers do not mistake it for a
+   test of its own. Its reference file deliberately does not exist. *)
