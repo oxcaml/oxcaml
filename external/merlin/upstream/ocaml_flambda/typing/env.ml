@@ -1234,9 +1234,6 @@ let without_cmis f x =
 
 let imports () = Persistent_env.imports !persistent_env
 
-let import_crcs ~source crcs =
-  Persistent_env.import_crcs !persistent_env ~source crcs
-
 let runtime_parameter_bindings () =
   Persistent_env.runtime_parameter_bindings !persistent_env
 
