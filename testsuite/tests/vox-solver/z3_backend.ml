@@ -195,3 +195,99 @@ let () =
                   ] ))
          ]
        (member x (insert x s)))
+
+(* An empty unsat core: the goal holds on its own, so every hypothesis is
+   unused.  Distinguishes Some [] handling from "no claim". *)
+
+let () =
+  check "x > 0 |- x = x"
+    (obligation ~signature:int_signature
+       ~hypotheses:[hyp 0 (App (Bv_sgt, [x; ocaml_int 0]))]
+       (App (Eq, [x; x])))
+
+(* A refutation whose witness lives in an uninterpreted sort: opaque
+   universe elements read back as Term.Var. *)
+
+let () =
+  let set = Sort.Uninterpreted "int_set" in
+  let member x s = Term.Call ("member", [x; s]) in
+  check "not (member x s) |- member x s"
+    (obligation
+       ~signature:
+         { Signature.empty with
+           sorts = ["int_set"]
+         ; variables = ["s", set; "x", Sort.Int]
+         ; functions = ["member", [Sort.Int; set], Sort.Bool]
+         }
+       ~hypotheses:[hyp 0 (App (Not, [member (Var "x") (Var "s")]))]
+       (member (Var "x") (Var "s")))
+
+(* A declared nullary function is an atom in the script; [f |- f] must
+   prove. *)
+
+let () =
+  let f = Term.Call ("f", []) in
+  check "f |- f"
+    (obligation
+       ~signature:{ Signature.empty with functions = ["f", [], Sort.Bool] }
+       ~hypotheses:[hyp 0 f]
+       f)
+
+(* A variable named like a hypothesis label.  z3 4.8.5 drops the colliding
+   named assertion with an (error ...) line and answers from what remains:
+   the prove query answers sat, the disprove query unsat, and a vacuously
+   provable obligation comes back "refuted".  The obligation must instead
+   be rejected. *)
+
+let () =
+  check "h0 : bool, hypothesis false |- false"
+    (obligation
+       ~signature:{ Signature.empty with variables = ["h0", Sort.Bool] }
+       ~hypotheses:[hyp 0 (Const (Bool false))]
+       (Const (Bool false)))
+
+(* A signature sort named like a builtin.  z3 4.8.5 reports the redeclaration
+   with an (error ...) line before the status and then uses the builtin Int,
+   so an obligation about an abstract sort is answered with integer
+   semantics.  The error must surface as a failure, not be swallowed. *)
+
+let () =
+  check "x : (an abstract sort named Int) |- x >= x"
+    (obligation
+       ~signature:
+         { Signature.empty with
+           sorts = ["Int"]
+         ; variables = ["a", Sort.Uninterpreted "Int"]
+         }
+       (App (Ge, [Var "a"; Var "a"])))
+
+(* A script z3 rejects must be a failure, not a verdict.  The renderer does
+   not sort-check on purpose, so an ill-sorted hypothesis reaches z3, which
+   drops it with an (error ...) line and answers from what remains: without
+   the pre-status error check this contradictory goal would be reported
+   "refuted" on the strength of a hypothesis that was never asserted. *)
+
+let () =
+  check "n = b (ill-sorted) |- n > 0 && n < 0"
+    (obligation
+       ~signature:
+         { Signature.empty with
+           variables = ["n", Sort.Int; "b", Sort.Bool]
+         }
+       ~hypotheses:[hyp 0 (App (Eq, [Var "n"; Var "b"]))]
+       (App
+          ( And,
+            [ App (Gt, [Var "n"; Const (Int "0")])
+            ; App (Lt, [Var "n"; Const (Int "0")])
+            ] )))
+
+(* A wedged solver process is killed by the wall clock (exit 124 from
+   timeout(1)) and reported as a timeout. *)
+
+let () =
+  check "wedged solver"
+    ~config:
+      { Config.timeout_seconds = Some 0.05
+      ; z3_command = Some "sh -c 'sleep 30' wedged"
+      }
+    (obligation (Const (Bool true)))

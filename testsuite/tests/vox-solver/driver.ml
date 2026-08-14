@@ -10,7 +10,7 @@
 open Vox_logic
 open Vox_backend
 
-let obligation =
+let obligation () =
   { Obligation.signature =
       { Signature.empty with variables = ["n", Sort.Int] }
   ; hypotheses =
@@ -37,36 +37,10 @@ let run backend_name config =
   | Ok No_discharge -> Format.printf "not discharged@."
   | Ok (Discharge (module Backend)) ->
     Format.printf "discharging with %s:@." Backend.name;
-    Format.printf "%s@." (describe (Backend.discharge ~config obligation))
+    Format.printf "%s@." (describe (Backend.discharge ~config (obligation ())))
 
 [%%expect{|
-val obligation : Vox_logic.Obligation.t =
-  {Obligation.signature =
-    {Signature.sorts = []; datatypes = []; variables = [("n", Sort.Int)];
-     functions = []};
-   hypotheses =
-    [{Obligation.id = 0;
-      term = Term.App (Op.Ge, [Term.Var "n"; Term.Const (Literal.Int "0")]);
-      origin =
-       {Origin.label = "n is a length";
-        location =
-         {Location.loc_start =
-           {Lexing.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
-            pos_cnum = -1};
-          loc_end =
-           {Lexing.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0;
-            pos_cnum = -1};
-          loc_ghost = true}}}];
-   goal =
-    Term.App (Op.Ge,
-     [Term.App (Op.Add, [Term.Var "n"; Term.Const (Literal.Int "1")]);
-      Term.Const (Literal.Int "1")]);
-   location =
-    {Location.loc_start =
-      {Lexing.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1};
-     loc_end =
-      {Lexing.pos_fname = "_none_"; pos_lnum = 0; pos_bol = 0; pos_cnum = -1};
-     loc_ghost = true}}
+val obligation : unit -> Vox_logic.Obligation.t = <fun>
 val describe : (Vox_backend.verdict, Vox_backend.failure) Result.t -> string =
   <fun>
 val run : string -> Vox_backend.Config.t -> unit = <fun>
@@ -114,4 +88,12 @@ let () = run "lean" Config.default
 
 [%%expect{|
 selection failed: unknown vox backend lean (valid backends: printing, z3; or none to typecheck only)
+|}]
+
+(* A configured command that cannot run also fails once, at selection. *)
+
+let () = run "z3" { Config.default with z3_command = Some "false" }
+
+[%%expect{|
+selection failed: z3 backend: solver command false failed (exit code 1):
 |}]

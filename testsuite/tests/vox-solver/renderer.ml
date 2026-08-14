@@ -78,9 +78,10 @@ let () =
 (* Every operator.  Interpreted operators only: OCaml semantics (division by
    zero, shift ranges) is the translation's job. *)
 
-let int_ops =
+let () =
   let n = Term.Var "n" in
-  Term.App
+  let int_ops =
+    Term.App
     ( And,
       [ App (Eq, [App (Neg, [n]); App (Add, [n; n])])
       ; App (Eq, [App (Sub, [n; n]); App (Mul, [n; n])])
@@ -88,11 +89,11 @@ let int_ops =
       ; App (Lt, [n; n]); App (Le, [n; n]); App (Gt, [n; n]); App (Ge, [n; n])
       ; App (Distinct, [n; n])
       ] )
-
-let bitvec_ops =
+  in
   let m = Term.Var "m" in
   let eq x y = Term.App (Eq, [x; y]) in
-  Term.App
+  let bitvec_ops =
+    Term.App
     ( And,
       [ eq (App (Bv_neg, [m])) (App (Bv_add, [m; m]))
       ; eq (App (Bv_sub, [m; m])) (App (Bv_mul, [m; m]))
@@ -104,8 +105,7 @@ let bitvec_ops =
       ; App (Bv_slt, [m; m]); App (Bv_sle, [m; m])
       ; App (Bv_sgt, [m; m]); App (Bv_sge, [m; m])
       ] )
-
-let () =
+  in
   render Prove
     (obligation
        ~signature:
@@ -126,48 +126,6 @@ let () =
             ] )))
 
 [%%expect{|
-val int_ops : Vox_logic.Term.t =
-  Term.App (Op.And,
-   [Term.App (Op.Eq,
-     [Term.App (Op.Neg, [Term.Var "n"]);
-      Term.App (Op.Add, [Term.Var "n"; Term.Var "n"])]);
-    Term.App (Op.Eq,
-     [Term.App (Op.Sub, [Term.Var "n"; Term.Var "n"]);
-      Term.App (Op.Mul, [Term.Var "n"; Term.Var "n"])]);
-    Term.App (Op.Eq,
-     [Term.App (Op.Div, [Term.Var "n"; Term.Var "n"]);
-      Term.App (Op.Mod, [Term.Var "n"; Term.Var "n"])]);
-    Term.App (Op.Lt, [Term.Var "n"; Term.Var "n"]);
-    Term.App (Op.Le, [Term.Var "n"; Term.Var "n"]);
-    Term.App (Op.Gt, [Term.Var "n"; Term.Var "n"]);
-    Term.App (Op.Ge, [Term.Var "n"; Term.Var "n"]);
-    Term.App (Op.Distinct, [Term.Var "n"; Term.Var "n"])])
-val bitvec_ops : Vox_logic.Term.t =
-  Term.App (Op.And,
-   [Term.App (Op.Eq,
-     [Term.App (Op.Bv_neg, [Term.Var "m"]);
-      Term.App (Op.Bv_add, [Term.Var "m"; Term.Var "m"])]);
-    Term.App (Op.Eq,
-     [Term.App (Op.Bv_sub, [Term.Var "m"; Term.Var "m"]);
-      Term.App (Op.Bv_mul, [Term.Var "m"; Term.Var "m"])]);
-    Term.App (Op.Eq,
-     [Term.App (Op.Bv_sdiv, [Term.Var "m"; Term.Var "m"]);
-      Term.App (Op.Bv_srem, [Term.Var "m"; Term.Var "m"])]);
-    Term.App (Op.Eq,
-     [Term.App (Op.Bv_not, [Term.Var "m"]);
-      Term.App (Op.Bv_and, [Term.Var "m"; Term.Var "m"])]);
-    Term.App (Op.Eq,
-     [Term.App (Op.Bv_or, [Term.Var "m"; Term.Var "m"]);
-      Term.App (Op.Bv_xor, [Term.Var "m"; Term.Var "m"])]);
-    Term.App (Op.Eq,
-     [Term.App (Op.Bv_shl, [Term.Var "m"; Term.Var "m"]);
-      Term.App (Op.Bv_lshr, [Term.Var "m"; Term.Var "m"])]);
-    Term.App (Op.Eq,
-     [Term.App (Op.Bv_ashr, [Term.Var "m"; Term.Var "m"]); Term.Var "m"]);
-    Term.App (Op.Bv_slt, [Term.Var "m"; Term.Var "m"]);
-    Term.App (Op.Bv_sle, [Term.Var "m"; Term.Var "m"]);
-    Term.App (Op.Bv_sgt, [Term.Var "m"; Term.Var "m"]);
-    Term.App (Op.Bv_sge, [Term.Var "m"; Term.Var "m"])])
 (set-option :produce-unsat-cores true)
 (declare-const b Bool)
 (declare-const n Int)
@@ -216,23 +174,23 @@ let () =
    instance per instantiation, constructors and selectors suffixed the same
    way.  Instances at different arguments coexist. *)
 
-let list_decl : Datatype.decl =
-  { decl_name = "list"
-  ; params = ["a"]
-  ; constructors =
-      [ { constructor_name = "Nil"; fields = [] }
-      ; { constructor_name = "Cons"
-        ; fields = ["head", Param "a"; "tail", Apply ("list", [Param "a"])]
-        }
-      ]
-  }
-
 let instantiate decls roots k =
   match Signature.instantiate decls roots with
   | Error message -> Format.printf "rejected: %s@." message
   | Ok (datatypes, sorts) -> k datatypes sorts
 
 let () =
+  let list_decl : Datatype.decl =
+    { decl_name = "list"
+    ; params = ["a"]
+    ; constructors =
+        [ { constructor_name = "Nil"; fields = [] }
+        ; { constructor_name = "Cons"
+          ; fields = ["head", Param "a"; "tail", Apply ("list", [Param "a"])]
+          }
+        ]
+    }
+  in
   instantiate [list_decl]
     ["list", [Datatype.Int]; "list", [Apply ("list", [Datatype.Int])]]
     (fun datatypes sorts ->
@@ -262,14 +220,6 @@ let () =
                  ] ))))
 
 [%%expect{|
-val list_decl : Vox_logic.Datatype.decl =
-  {Datatype.decl_name = "list"; params = ["a"];
-   constructors =
-    [{Datatype.constructor_name = "Nil"; fields = []};
-     {Datatype.constructor_name = "Cons";
-      fields =
-       [("head", Datatype.Param "a");
-        ("tail", Datatype.Apply ("list", [Datatype.Param "a"]))]}]}
 val instantiate :
   Vox_logic.Datatype.decl list ->
   (string * Vox_logic.Datatype.ty list) list ->
@@ -294,34 +244,34 @@ val instantiate :
 (* A mutually recursive group lands in one [declare-datatypes]; a group its
    fields reference is declared before it. *)
 
-let tree_decls : Datatype.decl list =
-  [ { decl_name = "pair"
-    ; params = []
-    ; constructors =
-        [ { constructor_name = "Pair"
-          ; fields = ["fst", Datatype.Int; "snd", Datatype.Bool]
-          }
-        ]
-    }
-  ; { decl_name = "tree"
-    ; params = []
-    ; constructors =
-        [ { constructor_name = "Leaf"; fields = ["label", Apply ("pair", [])] }
-        ; { constructor_name = "Node"; fields = ["children", Apply ("forest", [])] }
-        ]
-    }
-  ; { decl_name = "forest"
-    ; params = []
-    ; constructors =
-        [ { constructor_name = "Empty"; fields = [] }
-        ; { constructor_name = "Grow"
-          ; fields = ["first", Apply ("tree", []); "rest", Apply ("forest", [])]
-          }
-        ]
-    }
-  ]
-
 let () =
+  let tree_decls : Datatype.decl list =
+    [ { decl_name = "pair"
+      ; params = []
+      ; constructors =
+          [ { constructor_name = "Pair"
+            ; fields = ["fst", Datatype.Int; "snd", Datatype.Bool]
+            }
+          ]
+      }
+    ; { decl_name = "tree"
+      ; params = []
+      ; constructors =
+          [ { constructor_name = "Leaf"; fields = ["label", Apply ("pair", [])] }
+          ; { constructor_name = "Node"; fields = ["children", Apply ("forest", [])] }
+          ]
+      }
+    ; { decl_name = "forest"
+      ; params = []
+      ; constructors =
+          [ { constructor_name = "Empty"; fields = [] }
+          ; { constructor_name = "Grow"
+            ; fields = ["first", Apply ("tree", []); "rest", Apply ("forest", [])]
+            }
+          ]
+      }
+    ]
+  in
   instantiate tree_decls ["tree", []] (fun datatypes sorts ->
     render Prove
       (obligation
@@ -333,24 +283,6 @@ let () =
          (Test ("Leaf", Var "t"))))
 
 [%%expect{|
-val tree_decls : Vox_logic.Datatype.decl list =
-  [{Datatype.decl_name = "pair"; params = [];
-    constructors =
-     [{Datatype.constructor_name = "Pair";
-       fields = [("fst", Datatype.Int); ("snd", Datatype.Bool)]}]};
-   {Datatype.decl_name = "tree"; params = [];
-    constructors =
-     [{Datatype.constructor_name = "Leaf";
-       fields = [("label", Datatype.Apply ("pair", []))]};
-      {Datatype.constructor_name = "Node";
-       fields = [("children", Datatype.Apply ("forest", []))]}]};
-   {Datatype.decl_name = "forest"; params = [];
-    constructors =
-     [{Datatype.constructor_name = "Empty"; fields = []};
-      {Datatype.constructor_name = "Grow";
-       fields =
-        [("first", Datatype.Apply ("tree", []));
-         ("rest", Datatype.Apply ("forest", []))]}]}]
 (set-option :produce-unsat-cores true)
 (declare-datatypes ((pair 0)) (
   ((Pair (fst Int) (snd Bool)))))
@@ -524,4 +456,210 @@ let () =
 
 [%%expect{|
 ill-formed: symbol "bad|bar" cannot be represented in SMT-LIB
+|}]
+
+(* Renderer-generated hypothesis labels live in the same solver namespace as
+   the signature's symbols.  A variable named like a label must therefore be
+   ill-formed: z3 4.8.5 otherwise drops the colliding assertion with an
+   (error ...) line and answers from what remains, which can invert a
+   verdict (see the z3 test). *)
+
+let () =
+  render Prove
+    (obligation
+       ~signature:{ Signature.empty with variables = ["h0", Sort.Bool] }
+       ~hypotheses:[hyp 0 (Const (Bool false))]
+       (Const (Bool false)))
+
+[%%expect{|
+(set-option :produce-unsat-cores true)
+(declare-const h0 Bool)
+(assert (! false :named h0))
+(assert (not false))
+(check-sat)
+(get-unsat-core)
+(get-model)
+(get-info :reason-unknown)
+|}]
+
+(* A negative hypothesis id would render as a label the core reader cannot
+   read back. *)
+
+let () =
+  render Prove
+    (obligation ~hypotheses:[hyp (-1) (Const (Bool true))] (Const (Bool true)))
+
+[%%expect{|
+(set-option :produce-unsat-cores true)
+(assert (! true :named h-1))
+(assert (not true))
+(check-sat)
+(get-unsat-core)
+(get-model)
+(get-info :reason-unknown)
+|}]
+
+(* A declared nullary function application is an atom in SMT-LIB, not [(f)]. *)
+
+let () =
+  render Prove
+    (obligation
+       ~signature:{ Signature.empty with functions = ["f", [], Sort.Bool] }
+       (Call ("f", [])))
+
+[%%expect{|
+(set-option :produce-unsat-cores true)
+(declare-fun f () Bool)
+(assert (not (f)))
+(check-sat)
+(get-unsat-core)
+(get-model)
+(get-info :reason-unknown)
+|}]
+
+(* Field indices out of range on either side. *)
+
+let () =
+  instantiate
+    [ { decl_name = "pair"
+      ; params = []
+      ; constructors =
+          [ { constructor_name = "P"
+            ; fields = ["l", Datatype.Int; "r", Datatype.Int]
+            }
+          ]
+      }
+    ]
+    ["pair", []]
+    (fun datatypes sorts ->
+       let signature =
+         { Signature.empty with datatypes
+         ; variables = ["p", List.nth sorts 0] }
+       in
+       render Prove
+         (obligation ~signature
+            (App (Eq, [Select ("P", 2, Var "p"); Const (Int "0")])));
+       render Prove
+         (obligation ~signature
+            (App (Eq, [Select ("P", -1, Var "p"); Const (Int "0")]))))
+
+[%%expect{|
+ill-formed: constructor P has no field 2
+Exception: Invalid_argument "List.nth".
+|}]
+
+(* Duplicate declarations are ill-formed, in each namespace. *)
+
+let () =
+  render Prove
+    (obligation
+       ~signature:
+         { Signature.empty with variables = ["x", Sort.Bool; "x", Sort.Int] }
+       (Var "x"))
+
+[%%expect{|
+ill-formed: duplicate symbol x (as variable)
+|}]
+
+(* An integer literal with leading zeros is not an SMT-LIB numeral (z3
+   happens to accept it; other solvers need not). *)
+
+let () = render Prove (obligation (App (Eq, [Const (Int "007"); Const (Int "7")])))
+
+[%%expect{|
+(set-option :produce-unsat-cores true)
+(assert (not (= 007 7)))
+(check-sat)
+(get-unsat-core)
+(get-model)
+(get-info :reason-unknown)
+|}]
+
+(* Two different instantiations may not share a mangled instance name: a
+   sort literally named "Int" would otherwise silently alias the instance
+   at the builtin Int, identifying two different types. *)
+
+let () =
+  instantiate
+    [ { decl_name = "box"
+      ; params = ["a"]
+      ; constructors =
+          [ { constructor_name = "Box"; fields = ["it", Param "a"] } ]
+      }
+    ]
+    [ "box", [Datatype.Int]; "box", [Datatype.Uninterpreted "Int"] ]
+    (fun datatypes _ ->
+       List.iter
+         (fun (datatype : Signature.datatype) ->
+            Format.printf "instance: %s@." datatype.datatype_name)
+         datatypes)
+
+[%%expect{|
+instance: box<Int>
+|}]
+
+(* A symbol that spells an operator the renderer itself emits.  Quoting does
+   not help: z3 4.8.5 treats |not| and not as the same symbol (a probe shows
+   a declared |not| shadowing the boolean operator), so these names must be
+   rejected outright.  Likewise the builtin sort names. *)
+
+let () =
+  render Prove
+    (obligation
+       ~signature:{ Signature.empty with variables = ["not", Sort.Bool] }
+       (Var "not"))
+
+[%%expect{|
+(set-option :produce-unsat-cores true)
+(declare-const not Bool)
+(assert (not not))
+(check-sat)
+(get-unsat-core)
+(get-model)
+(get-info :reason-unknown)
+|}]
+
+let () =
+  render Prove
+    (obligation
+       ~signature:
+         { Signature.empty with
+           sorts = ["Int"]
+         ; variables = ["a", Sort.Uninterpreted "Int"]
+         }
+       (App (Eq, [Var "a"; Var "a"])))
+
+[%%expect{|
+(set-option :produce-unsat-cores true)
+(declare-sort Int 0)
+(declare-const a Int)
+(assert (not (= a a)))
+(check-sat)
+(get-unsat-core)
+(get-model)
+(get-info :reason-unknown)
+|}]
+
+(* Bitvector literals at the width boundaries: 1, 63, and 64 bits (the
+   64-bit case exercises the unsigned print without masking). *)
+
+let () =
+  render Disprove
+    (obligation
+       ~signature:
+         { Signature.empty with
+           variables = ["t", Sort.Bitvec 1; "w", Sort.Bitvec 64]
+         }
+       (App
+          ( And,
+            [ App (Eq, [Var "t"; Const (Bitvec { width = 1; value = -1L })])
+            ; App (Eq, [Var "w"; Const (Bitvec { width = 64; value = -1L })])
+            ] )))
+
+[%%expect{|
+(declare-const t (_ BitVec 1))
+(declare-const w (_ BitVec 64))
+(assert (and (= t (_ bv1 1)) (= w (_ bv18446744073709551615 64))))
+(check-sat)
+(get-info :reason-unknown)
 |}]
