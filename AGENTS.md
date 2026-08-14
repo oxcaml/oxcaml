@@ -4,21 +4,32 @@
 
 A fresh worktree needs one complete build and test installation:
 ```sh
-autoconf27
-./configure --prefix="$PWD/_install"
+make dev-configure
 make dev
 ```
 This takes about 5 minutes. Subsequent `make dev` invocations are much faster
 because they use an incremental background watcher.
 
+`configure` is not tracked in git, so every new worktree needs generating it, and
+`configure.ac` requires autoconf >= 2.71 — newer than the `autoconf` on many
+systems, where the one to use is `autoconf27`. `make dev-configure` finds a
+suitable autoconf and configures with `--prefix="$PWD/_install"`; do that by hand
+only if you need different flags.
+
 ## Development loop
 ```sh
 # edit compiler code, then typecheck/build:
 make dev
+# fresh errors from the running watcher, with no build round trip (fastest loop):
+make dev-errors
+# watch a long build's progress:
+make dev-log
 # edit compiler code or a test, then build & run a test:
 make dev-test TEST=typing-local/regression_class_type.ml
 # edit again, test an entire dir:
 make dev-test DIR=typing-local
+# review a test's new output before accepting it:
+make dev-diff TEST=path/to/test.ml
 # promote current outputs as expect goldens
 make dev-promote TEST=path/to/test.ml
 # compile separate files
@@ -27,6 +38,40 @@ make dev-ocamlopt ARGS='file.ml -o file.exe'
 # run the full compiler test suite
 make dev-test-all
 ```
+
+Promote with `make dev-promote`, **never** by copying a `.corrected` file. The
+expect harness runs twice, plain and `-principal`; the second pass writes
+`<test>.ml.corrected.corrected`, so copying `<test>.ml.corrected` silently drops
+the principal-block updates and the parallel suite then fails tests that serial
+spot checks show green. `make dev-diff` always shows the artifact that supersedes.
+
+For one-file experiments the dev compiler can be called directly, which is faster
+and more scriptable than `make dev-ocamlc`:
+```sh
+_build/dev-dune/default/main_native.exe -nostdlib -I _build/dev/runtest/stdlib
+```
+Note that this bypasses `make dev`'s checks, including the stale-stdlib check
+below.
+
+### When things go wrong
+
+- **A build that seems to hang.** `make dev` reports progress every 30s and names
+  `make dev-log`. The watcher's rpc has been seen to wedge — alive, answering
+  pings, never starting the build — so the build is bounded by
+  `DEV_RPC_TIMEOUT` (default 1800s), after which the watcher is restarted and the
+  build retried once, then run directly without the watcher. `make dev-status`
+  shows whether the watcher is idle.
+- **The compiler segfaults, or tests crash for no reason, after a compiler
+  change.** A change to marshaled `.cmi` shapes leaves the previously built
+  stdlib unreadable. `make dev` detects this and tells you to run
+  `make dev-refresh-stdlib`.
+- **A restricted environment where the watcher cannot start** (dune's RPC socket
+  cannot be created, e.g. `bind(): Operation not permitted` in a sandbox): use
+  `make dev NOWATCH=1`, which skips the watcher and rpc entirely. Slower per
+  invocation, works anywhere, and applies to the other `dev-*` targets too.
+- **`ocamlc.byte`-flavoured tests.** The dev test root's `ocamlc.byte` is the boot
+  `main.bc`, built by the host compiler, so it cannot run under the in-tree
+  `ocamlrun`. See `design-docs/dev-loop-improvements.md`.
 
 ## Release builds
 
