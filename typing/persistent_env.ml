@@ -21,15 +21,12 @@ open Cmi_format
 
 module CU = Compilation_unit
 module CUI = Compilation_unit_intf
-module Consistbl_data = Import_info.Intf.Nonalias.Kind
-module Consistbl = Consistbl.Make (CUI) (Consistbl_data)
 module Style = Misc.Style
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
 
 type error =
   | Illegal_renaming of CUI.t * CUI.t * filepath
-  | Inconsistent_import of CUI.t * filepath * filepath
   | Need_recursive_types of CUI.t
   | Direct_reference_from_wrong_package of
       CU.t * filepath * CU.Prefix.t
@@ -117,11 +114,8 @@ type import = {
   imp_uid : Shape.Uid.t;
   mutable imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
+  imp_self_crc : Digest.t;
   imp_flags : Cmi_format.pers_flags list;
-  (* Whether [check_consistency] has run for this import. An import first
-     loaded without checking (e.g. by [check_pers_struct] for warning 49) must
-     still record and check its crcs on its first checked access. *)
-  mutable imp_checked : bool;
 }
 
 (* If a .cmi file is missing (or invalid), we
@@ -169,7 +163,6 @@ type 'a t = {
   quoted_intfs: CUI.Set.t ref;
   quoted_impls: CU.Set.t ref;
   param_imports : Param_set.t ref;
-  crc_units: Consistbl.t;
   can_load_cmis: can_load_cmis ref;
 }
 
@@ -184,7 +177,6 @@ let empty () = {
   quoted_intfs = ref CUI.Set.empty;
   quoted_impls = ref CU.Set.empty;
   param_imports = ref Param_set.empty;
-  crc_units = Consistbl.create ();
   can_load_cmis = ref Can_load_cmis;
 }
 
@@ -200,7 +192,6 @@ let clear penv =
     quoted_intfs;
     quoted_impls;
     param_imports;
-    crc_units;
     can_load_cmis;
   } = penv in
   Global_module.Name.Tbl.clear globals;
@@ -213,7 +204,6 @@ let clear penv =
   quoted_intfs := CUI.Set.empty;
   quoted_impls := CU.Set.empty;
   param_imports := Param_set.empty;
-  Consistbl.clear crc_units;
   can_load_cmis := Can_load_cmis;
   ()
 
@@ -271,35 +261,6 @@ let register_parameter ({param_imports; _} as penv) modname =
   end;
   param_imports := Param_set.add modname !param_imports
 
-let import_crcs penv ~source crcs =
-  let {crc_units; _} = penv in
-  let import_crc import_info =
-    let name = Import_info.Intf.name import_info in
-    let info = Import_info.Intf.info import_info in
-    match info with
-    | None -> ()
-    | Some (kind, crc) ->
-        add_import penv name;
-        Consistbl.check crc_units name kind crc source
-  in Array.iter import_crc crcs
-
-let check_consistency penv imp =
-  try import_crcs penv ~source:imp.imp_filename imp.imp_crcs
-  with Consistbl.Inconsistency {
-      unit_name = name;
-      inconsistent_source = source;
-      original_source = auth;
-      inconsistent_data = _;
-      original_data = _;
-    } ->
-    error (Inconsistent_import(name, auth, source))
-
-let complete_consistency_check penv imp =
-  if not imp.imp_checked then begin
-    check_consistency penv imp;
-    imp.imp_checked <- true
-  end
-
 let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
 
@@ -330,15 +291,10 @@ let fold {persistent_structures; _} f x =
 
 (* Reading persistent structures from .cmi files *)
 
-let save_import penv crc modname impl filename =
-  let {crc_units; _} = penv in
-  Consistbl.check crc_units modname impl crc filename;
-  add_import penv modname
-
 (* Add an import to the hash table. Checks that we are allowed to access
    this .cmi. *)
 
-let acknowledge_import penv ~check modname pers_sig =
+let acknowledge_import ?(record = true) penv modname pers_sig =
   let { Persistent_signature.filename; cmi; visibility } = pers_sig in
   let found_name = cmi.cmi_name in
   let kind = cmi.cmi_kind in
@@ -402,15 +358,15 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_uid = uid;
       imp_visibility = visibility;
       imp_crcs = crcs;
+      imp_self_crc = cmi.cmi_self_crc;
       imp_flags = flags;
-      imp_checked = check;
     }
   in
-  if check then check_consistency penv import;
+  if record then add_import penv modname;
   CUI.Tbl.add imports modname (Found import);
   import
 
-let read_import penv ~check modname cmi =
+let read_import penv modname cmi =
   let filename = Unit_info.Artifact.filename cmi in
   add_import penv modname;
   let cmi = read_cmi_lazy filename in
@@ -418,7 +374,7 @@ let read_import penv ~check modname cmi =
     { Persistent_signature.filename; cmi;
       visibility = Visible { cmx_guaranteed = false } }
   in
-  acknowledge_import penv ~check modname pers_sig
+  acknowledge_import penv modname pers_sig
 
 let check_visibility ~allow_hidden ~intf imp =
   match imp.imp_visibility with
@@ -436,14 +392,14 @@ let check_visibility ~allow_hidden ~intf imp =
       | (_, (Visible _ as visibility)) -> imp.imp_visibility <- visibility
       | (_, Hidden) | exception Not_found -> raise Not_found
 
-let find_import ~allow_hidden penv ~check modname =
+let find_import ~allow_hidden penv modname =
   let {imports; _} = penv in
   let intf = CUI.Found.intf modname in
   if CUI.equal intf CUI.predef_exn then raise Not_found;
   match CUI.Tbl.find imports intf with
   | Found imp ->
       check_visibility ~allow_hidden ~intf imp;
-      if check then complete_consistency_check penv imp;
+      add_import penv intf;
       imp
   | Missing -> raise Not_found
   | exception Not_found ->
@@ -458,7 +414,7 @@ let find_import ~allow_hidden penv ~check modname =
                 raise Not_found
           in
           add_import penv intf;
-          acknowledge_import penv ~check intf psig
+          acknowledge_import penv intf psig
 
 (* Load the cmi for [intf] in order to classify a mention rooted at it. Unlike
    [find_import], this neither registers the unit as an import of the current
@@ -476,7 +432,7 @@ let load_import_unrecorded penv intf =
               ~unit_name:(CUI.Found.without_cmi_path intf)
           with
           | None -> None
-          | Some psig -> Some (acknowledge_import penv ~check:false intf psig)
+          | Some psig -> Some (acknowledge_import ~record:false penv intf psig)
           | exception (Error _ | Cmi_format.Error _ | Sys_error _) ->
               (* [Sys_error]: the cmi is not a declared dependency of this
                  compilation, so a concurrent build tool may remove it between
@@ -892,7 +848,7 @@ and acknowledge_pers_name penv check global_name import ~allow_excess_args =
     | Some pn ->
         pn
     | None ->
-        acknowledge_new_pers_name penv check canonical_global_name global import
+        acknowledge_new_pers_name penv canonical_global_name global import
   in
   if not (Global_module.Name.equal global_name canonical_global_name) then
     (* Just remember that both names point here. Note that we don't call
@@ -906,7 +862,7 @@ and acknowledge_pers_name penv check global_name import ~allow_excess_args =
        relevant if there are _a lot_ of bound globals. *)
     Global_module.Name.Tbl.add persistent_names global_name pn;
   pn
-and acknowledge_new_pers_name penv check global_name global import =
+and acknowledge_new_pers_name penv global_name global import =
   (* This checks only [global] itself without recursing into argument values.
      That's fine, however, since those argument values will have come from
      recursive calls to [global_of_global_name] and therefore have passed
@@ -953,7 +909,6 @@ and acknowledge_new_pers_name penv check global_name global import =
              pn_global = global;
              pn_sign;
            } in
-  if check then check_consistency penv import;
   Global_module.Name.Tbl.add persistent_names global_name pn;
   remember_global penv global ~precision:Exact ~mentioned_by:Current;
   pn
@@ -964,15 +919,14 @@ and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
   | pn ->
       check_visibility ~allow_hidden
         ~intf:(CUI.Found.intf name.Global_module.Name.head) pn.pn_import;
-      if check then complete_consistency_check penv pn.pn_import;
       pn
   | exception Not_found ->
       let unit_name = name.Global_module.Name.head in
-      let import = find_import ~allow_hidden penv ~check unit_name in
+      let import = find_import ~allow_hidden penv unit_name in
       acknowledge_pers_name penv check name import ~allow_excess_args
 
 let read_pers_name penv check (name : Global_module.Name.t) filename =
-  let import = read_import penv ~check (CUI.Found.intf name.head) filename in
+  let import = read_import penv (CUI.Found.intf name.head) filename in
   acknowledge_pers_name penv check name import
 
 let normalize_global_name penv modname =
@@ -1152,7 +1106,6 @@ let find_pers_struct
       check_visibility ~allow_hidden
         ~intf:(CUI.Found.intf name.Global_module.Name.head)
         ps.ps_name_info.pn_import;
-      if check then complete_consistency_check penv ps.ps_name_info.pn_import;
       ps
   | exception Not_found ->
       let pers_name =
@@ -1200,9 +1153,6 @@ let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
               Location.Doc.quoted_filename filename
               CUI.print_as_inline_code ps_name
               CUI.print_as_inline_code name
-        | Inconsistent_import _ ->
-            (* Can't be raised by [find_pers_struct ~check:false] *)
-            assert false
         | Need_recursive_types name ->
             Format_doc.doc_printf
               "%a uses recursive types"
@@ -1256,7 +1206,7 @@ let read_cmi_file penv filename =
   let pers_sig =
     { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
   in
-  let import = acknowledge_import penv ~check:true unit_name pers_sig in
+  let import = acknowledge_import penv unit_name pers_sig in
   let pers_name =
     acknowledge_pers_name penv true modname import ~allow_excess_args:false
   in
@@ -1302,26 +1252,30 @@ let check ~allow_hidden penv f ~loc name =
   else check_pers_struct ~allow_hidden penv f ~loc name
 
 let crc_of_unit penv name =
-  match Consistbl.find penv.crc_units name with
-  | Some (_impl, crc) -> crc
-  | None ->
-    let import =
-      find_import ~allow_hidden:true penv ~check:true
-        (CUI.Found.without_cmi_path name)
-    in
-    match Array.find_opt (Import_info.Intf.has_name ~name) import.imp_crcs with
-    | None -> assert false
-    | Some import_info ->
-      match Import_info.crc import_info with
-      | None -> assert false
-      | Some crc -> crc
+  (find_import ~allow_hidden:true penv
+     (CUI.Found.without_cmi_path name)).imp_self_crc
 
-let imports {imported_units; crc_units; _} =
-  let imports =
-    Consistbl.extract (CUI.Set.elements !imported_units)
-      crc_units
-  in
-  List.map (fun (intf, spec) -> Import_info.Intf.create intf spec) imports
+let imports penv =
+  (* Reversed to match the historical order of import tables *)
+  let names = List.rev (CUI.Set.elements !(penv.imported_units)) in
+  (* Direct dependencies only: for each imported unit record just its own
+     CRC. Names referenced but never loaded (e.g. weak dependencies) become
+     alias-only entries. *)
+  List.map
+    (fun name ->
+       let spec =
+         match find_import_info_in_cache penv name with
+         | Some imp ->
+           let kind : Import_info.Intf.Nonalias.Kind.t =
+             match imp.imp_impl with
+             | Some _ -> Normal
+             | None -> Parameter
+           in
+           Some (kind, imp.imp_self_crc)
+         | None -> None
+       in
+       Import_info.Intf.create name spec)
+    names
 
 let require_intf_for_quote {quoted_intfs; _} name =
   quoted_intfs := CUI.Set.add name !quoted_intfs
@@ -1347,7 +1301,7 @@ let loaded_transitive_dependencies penv intfs =
 
 let find_import penv modname =
   let import =
-    find_import ~allow_hidden:true penv ~check:true
+    find_import ~allow_hidden:true penv
       (CUI.Found.without_cmi_path modname)
   in
   import.imp_impl, import.imp_params, import.imp_raw_sign
@@ -1407,6 +1361,9 @@ let implemented_parameter penv modname =
   | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
   | None -> None
 
+(* Placeholder until [save_cmi] computes the real digest *)
+let dummy_self_crc = String.make 16 '\000'
+
 let make_cmi penv modname kind sign alerts ~closed =
   let params =
     (* Needs to be consistent with [Translmod] *)
@@ -1450,29 +1407,22 @@ let make_cmi penv modname kind sign alerts ~closed =
     cmi_sign = sign;
     cmi_params = params;
     cmi_crcs = Array.of_list crcs;
+    cmi_self_crc = dummy_self_crc;
     cmi_flags = flags
   }
 
 let save_cmi penv psig =
   let { Persistent_signature.filename; cmi; _ } = psig in
   Misc.try_finally (fun () ->
-      let {
-        cmi_name = modname;
-        cmi_kind = kind;
-        _
-      } = cmi in
       let crc =
         output_to_file_via_temporary (* see MPR#7472, MPR#4991 *)
           ~mode: [Open_binary] filename
           (fun temp_filename oc -> output_cmi temp_filename oc cmi) in
-      (* Enter signature in consistbl so that imports() and crc_of_unit() will
-         also return its crc *)
-      let data : Import_info.Intf.Nonalias.Kind.t =
-        match kind with
-        | Normal _ -> Normal
-        | Parameter -> Parameter
-      in
-      save_import penv crc modname data filename
+      (* Enter signature in the imports cache so that imports() and
+         crc_of_unit() will also return its crc *)
+      let cmi = { cmi with cmi_self_crc = crc } in
+      let psig = { psig with Persistent_signature.cmi } in
+      ignore (acknowledge_import penv cmi.cmi_name psig : import)
     )
     ~exceptionally:(fun () -> remove_file filename)
 
@@ -1485,12 +1435,6 @@ let report_error_doc ppf =
       Location.Doc.quoted_filename filename
       CUI.print_as_inline_code ps_name
       CUI.print_as_inline_code modname
-  | Inconsistent_import(name, source1, source2) -> fprintf ppf
-      "@[<hov>The files %a@ and %a@ \
-              make inconsistent assumptions@ over interface %a@]"
-      Location.Doc.quoted_filename source1
-      Location.Doc.quoted_filename source2
-      CUI.print_as_inline_code name
   | Need_recursive_types(import) ->
       fprintf ppf
         "@[<hov>Invalid import of %a, which uses recursive types.@ \

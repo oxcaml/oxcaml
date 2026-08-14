@@ -70,7 +70,7 @@ let maybe_register_parameter p_name state =
       state.param_map <- GM.Parameter_name.Map.add p_name id state.param_map;
       id
 
-let assert_subset ~gm ~chain sub sup =
+let check_parameter_subset ~gm ~chain sub sup =
   if not (GM.Parameter_name.Set.subset sub sup) then
     let set_to_string s =
       GM.Parameter_name.Set.elements s
@@ -80,9 +80,10 @@ let assert_subset ~gm ~chain sub sup =
     let chain_to_string chain =
       List.map CUI.to_string chain |> String.concat ", required by "
     in
-    Misc.fatal_errorf
-      "{%s} is not a subset of {%s} (while loading %s, required by %s)"
-      (set_to_string sub) (set_to_string sup) (GM.to_string gm)
+    Location.raise_errorf
+      "Inconsistent parameters for %s: {%s} is not a subset of {%s} (required \
+       by %s)"
+      (GM.to_string gm) (set_to_string sub) (set_to_string sup)
       (chain_to_string chain)
 
 let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
@@ -94,8 +95,8 @@ let load_exact ~chain (gm : GM.t) : Signature_with_global_bindings.t =
     |> GM.Parameter_name.Set.of_list
   in
   let cmi_set = GM.Parameter_name.Set.of_list cmi_params in
-  assert_subset ~gm ~chain tracked_set cmi_set;
-  assert_subset ~gm ~chain cmi_set tracked_set;
+  check_parameter_subset ~gm ~chain tracked_set cmi_set;
+  check_parameter_subset ~gm ~chain cmi_set tracked_set;
   swg
 
 let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
@@ -114,7 +115,7 @@ let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
   in
   let visible_set = param_set visible_args in
   let hidden_set = GM.Parameter_name.Set.diff cmi_set visible_set in
-  assert_subset ~gm ~chain hidden_set (param_set gm.hidden_args);
+  check_parameter_subset ~gm ~chain hidden_set (param_set gm.hidden_args);
   let hidden_args = GM.Parameter_name.Set.elements hidden_set in
   (* The visible args' values are over-approximated as well; complete
      them recursively. *)

@@ -36,6 +36,7 @@ let () =
           cmi_sign = (cmi_sign, cmi_staticity);
           cmi_globals;
           cmi_crcs;
+          cmi_self_crc;
           cmi_flags
         } =
         Marshal.from_string Cached_cmi.foo 0
@@ -47,6 +48,7 @@ let () =
           cmi_sign = (Subst.Lazy.of_signature cmi_sign, cmi_staticity);
           cmi_globals;
           cmi_crcs;
+          cmi_self_crc;
           cmi_flags
         }
       in

@@ -1,5 +1,0 @@
-File "main.ml", line 28, characters 11-30:
-28 | module _ = Use_member_directly
-                ^^^^^^^^^^^^^^^^^^^
-Error: The files member.cmi and subdir/use_member_directly.cmi
-       make inconsistent assumptions over interface Member

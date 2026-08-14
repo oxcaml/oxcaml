@@ -1,3 +1,2 @@
 File "_none_", line 1:
-Error: The files ./user_pq.cmi and ./basic_pq.cmi
-       make inconsistent assumptions over interface Basic_pq
+Error: Inconsistent parameters for Basic_pq{P}{Q}: {P, Q} is not a subset of {P} (required by User_pq)
