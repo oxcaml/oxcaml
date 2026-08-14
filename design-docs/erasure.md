@@ -461,15 +461,24 @@ The doc offered a modality-based framing for captures; the machinery applies
 locks uniformly across captures, so the carve-out was the available route
 (as the doc anticipated).
 
-### Erasure is fixed top-down: current approximation
+### Erasure is fixed top-down
 
 A lambda's body is an erased context exactly when the lambda is syntactically
 under `erased_`. A lambda written directly at an `@ erased` arg position
-without `erased_` is checked with a retained body — stricter than the doc's
-rule, sound (retained-checked bodies are usable as erased), and expressible
-by wrapping in `erased_`. Reading "the expectation's erasure is constantly
-Erased" off a right-mode without zapping it needs solver support that
-doesn't exist; deferred.
+without `erased_` is checked with a retained body.
+
+This is the correct rule, not an approximation of a laxer one. Such a lambda's
+own erasure is Retained, so it is genuinely constructed and evaluated, and
+merely dropped at the argument boundary — checking its body as though it were
+in an erased context, while still evaluating it, would be unsound. `erased_`
+is what makes the lambda itself erased, and wrapping in it is the way to ask
+for an erased body. An earlier draft of this section called the rule "stricter
+than the doc's rule" and invited someone to complete it; that would be a
+mistake.
+
+Separately deferred, and genuinely a missing capability: reading "the
+expectation's erasure is constantly Erased" off a right-mode without zapping
+it needs solver support that does not exist.
 
 ### Codegen realized via the void layout
 
@@ -508,13 +517,26 @@ a value binding whose erasure the analysis doesn't see) emits
 `Lambda.dummy_constant` — a recognizable placeholder that only other erased
 positions consume.
 
+### What the deferrals add up to
+
+Taken individually the items below are each a bounded gap, but two of them
+compose into the largest reduction in scope versus the design as settled, and
+it is worth stating outright rather than leaving to be inferred: with the field
+modality missing **and** structure-level erased bindings rejected, an erased
+value can only exist as a parameter annotated `@ erased` or as a local `let`
+inside a function. Nothing can *store* one, and there are no partially erased
+structures. Erasure is currently a property of arguments and locals, not of
+data.
+
 ### Deferred beyond the doc's deferred list
 
 - **Erased record fields**: the doc's `@@ erased` mechanism does not exist.
   Comonadic modalities are `Meet_const` only — they can strengthen a field
   relative to the record (`@@ global` in a local record) but not weaken one,
-  and an erased field in a retained record is a weakening. `@@ erased`
-  today parses and is correctly reported as redundant (warning 220). Options
+  and an erased field in a retained record is a weakening. `@@ erased` is
+  rejected outright — `Error: Unrecognized modality erased.` — which is the
+  right behaviour while the mechanism is missing: it fails closed rather than
+  accepting an annotation it would silently ignore. Options
   are a comonadic `Join_const` modality (touches modality composition,
   zapping, inclusion, cmi) or a special-cased representation-bearing marker;
   both are big enough to be their own piece. **The doc's analogy to
@@ -527,9 +549,19 @@ positions consume.
   rejected: the structure's mode is the join of its items' modes, and
   compilation units are legacy. Insulating them needs the same missing
   modality direction as record fields.
-- **Erased optional parameters** are not given the void representation, on
-  both sides of a call: `function_arg_erasures` reads optional labels as
-  retained, so caller and callee agree.
+- **Erased optional parameters** were intended to keep the retained
+  representation on both sides of a call, so that caller and callee agree.
+  **Only the caller does.** `Typeopt.function_arg_erasures` answers `false`
+  for `Optional _`, but `Translcore` marks any `Tparam_pat` whose mode is
+  erased without consulting the label, and an optional *without* a default is
+  a `Tparam_pat`. A defaulted optional is `Tparam_optional_default` and so
+  escapes the marking, which isolates the label as the cause: the defaulted
+  spelling runs correctly, while `let opt ?a:(a : int option @ erased) () = 1`
+  compiles and then aborts, flambda2 reporting
+  `params_arity (void x int)` against `args_arity (V x int)`. The fix is a
+  guard on `fp_arg_label`, or — better, since there is no erased optional
+  convention to make work — rejecting the declaration as erased externals
+  already are. Pinned as a failing test.
 - **Externals cannot take erased parameters** (rejected at declaration):
   there is no erased calling convention across the FFI.
 - **`erased_` in quotations** is rejected.
