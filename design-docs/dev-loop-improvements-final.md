@@ -17,6 +17,7 @@ Branch `jujacobs/vox/dev-loop-improvements`, based on `jujacobs/optimize-dev-loo
 | `daab428772` / `48892bda89` | RED / GREEN: `ocamlc.byte` tests skip, naming the compiler |
 | `5b051426d2` / `b385cca223` | RED / GREEN: match `expect.opt`, so the native expect runner is refreshed |
 | `c38d1c98f5` | the bytecode-compiler sweep: measurement, visible skip counts, the re-run knob |
+| `81cdb42bea` | `dev-promote` no longer asserts principal instability for any unpromotable failure |
 
 Plus this report and its amendments.
 
@@ -53,6 +54,8 @@ the failure into an instruction.
 | 6e. python ≥ 3.7 guard | 2/5 | **Exercised** under the system python 3.6.8 |
 | 6f. suppress dune's forwarding notice | 1/5 | **Reversed after review — deleted** |
 | 6g. docs: setup, blessed scratch path, never copy `.corrected` | — | Landed |
+| (found here) `dev-test-all` ran against a stale ocamltest | 0/5 | **Exercised** — a fixture on this branch failed until it was fixed |
+| (reported later) the `expect.opt` runner was never refreshed | — | **Exercised**, red-green; cost measured |
 
 ### The evidence for items 1, 2 and 5
 
@@ -397,7 +400,8 @@ refreshed harness the fixture passes under `_runtest`, where it had failed.
 Two changes on this branch are shared beyond the dev loop and so were the reason
 for running the suite at all: `Makefile.config_if_required` (the configuration gate
 for every target) and `ocamltest/actions_helpers.ml` (promotion for every test).
-Neither caused a failure. The whole `tool-ocamltest` directory also passes, 7/7.
+Neither caused a failure. The whole `tool-ocamltest` directory passes too — 7/7 at
+that point, 8/8 at the tip once the `ocamlc.byte` skip fixture joined it.
 
 ## The `/tmp` rule: what was leaking, and what was left behind
 
@@ -432,12 +436,15 @@ happening repeatedly to wedged runs, and which happened several times during thi
 work. The rule violation was real and is fixed; the accumulation had not yet
 happened.
 
-## Verification I did not do
+## The two gaps flagged earlier are closed
 
-- The full suite was run again at the branch tip: **2444 passed, 208 skipped, 0
-  failed** of 2652 considered, exit 0. So the number matches the tip, and the
-  harness-refresh fix is confirmed by the fixture that exposed it now passing under
-  `_runtest`. The earlier run (2442/208/1) is the one that found that defect.
+- The full suite was run again after items 3b and the `expect.opt` fix had landed:
+  **2444 passed, 208 skipped, 0 failed** of 2652 considered, exit 0. The tree was
+  `c38d1c98f5`; the only later change to code is `81cdb42bea`, one diagnostic string
+  in `dev-promote`, a target the suite does not invoke. The harness-refresh fix is
+  confirmed by the fixture that exposed it now passing under `_runtest`, and the
+  whole `tool-ocamltest` directory passes 8/8, including both new fixtures. The
+  earlier run (2442/208/1) is the one that found that defect.
 - Items 3a, 4d, 4e, 6d, 6e are no longer unexercised:
   - **3a** — `_build/dev/runtest/ocamlopt` → `ocamlopt.byte` → `boot_ocamlopt.exe`;
     the path bigint reported as "cannot find file" now exists and resolves to the dev
@@ -450,9 +457,35 @@ happened.
   - **6e** — run under the real system python 3.6.8: `dev watcher: python 3.7 or
     newer is required (running 3.6.8 from /usr/bin/python3)`, exit 1, instead of an
     argparse traceback.
-- Items 3a, 4d, 4e, 6d, 6e are landed but not exercised (table above). 4e and 6e
-  in particular need a fixture that is genuinely unstable between the plain and
-  `-principal` runs, and a python 3.6 interpreter, respectively.
+## The costly failures were the ones that returned a wrong answer
+
+Worth separating from the friction, because it changes how these items should be
+ranked. The reports mostly describe time lost, and the loudest items are the slow
+ones. But the items that did the most damage are the ones where the loop answered a
+question *incorrectly* and the answer was then believed and repeated:
+
+- **`expect.opt`.** A green test that had exercised the previous compiler. One
+  session saw two different mutations produce a byte-identical diff, then filed and
+  retracted a claim about test coverage that was an artifact of the runner, not of
+  the compiler.
+- **The stale harness.** The full suite reported a changed ocamltest's *pre-change*
+  behaviour, so the suite's answer about a shared file was wrong for 39 minutes'
+  worth of edits, with nothing in the output to say so.
+- **"`dev-test-all` can never be green."** Stated in the source reports, repeated
+  into this piece's own brief as established, and false: the skip flag is exported by
+  `dev-test` only (`Makefile.common-ox:761`, inside `dev-test` from 727;
+  `dev-test-all` begins at 804). Checking it took one grep, and it had already
+  propagated through two layers.
+
+The pattern is why the verification pass over the reports came first: of the
+load-bearing claims checked, 10 held, **5 needed correcting**, and 2 defects nobody
+had reported turned up. It is also why several fixes here are shaped as *making a
+decision observable* rather than as changing the decision —
+`make dev-runners-needed`, the skipped-action count, the artifact-location line. A
+wrong answer that can be checked cheaply stops propagating.
+
+## Verification I did not do
+
 - I did not measure whether the 5s-per-signal escalation grace is right; it makes
   the worst case `2 × (timeout + 10s)` plus the fallback, which is negligible at
   the default 1800s timeout and disproportionate at a very short one.

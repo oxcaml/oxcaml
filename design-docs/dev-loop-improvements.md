@@ -269,7 +269,11 @@ a warm `make dev`, the check moves behind a flag.
 **Evidence.** 4/5 reports (totality, type-formers, erasure, bigint). The cost is
 not one big incident but a recurring tax: the failure presents as a magic-number
 error buried in a test log, every session reclassifies it from scratch, and
-`dev-test-all` can never be green, which devalues the whole full-suite signal.
+`make dev-test` can never be green on them. (The reports say `dev-test-all` can
+never be green either, and the synthesis repeats it. That is a sixth correction,
+found while implementing 3b: `dev-test-all` goes through `_runtest` and its
+`ocamlc.byte` is the real installed bytecode compiler, so these tests pass there.
+See the final report.)
 Affected: `formatting/`, `tool-ocamlc-stop-after/`, `zero-alloc/cmi_test`,
 `parsetree/test_ppx`, `templates/`, `typing-ocamlc-i/`, and via `ocamlopt.byte`
 `flambda2/` and `layout_poly/`.
