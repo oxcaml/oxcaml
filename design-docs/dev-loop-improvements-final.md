@@ -15,6 +15,8 @@ Branch `jujacobs/vox/dev-loop-improvements`, based on `jujacobs/optimize-dev-loo
 | `a7bd9f2024` | fixes from the review loop |
 | `fa727a341c` | `dev-test-all` refreshes the test harness; stdlib-digest diagnosis |
 | `daab428772` / `48892bda89` | RED / GREEN: `ocamlc.byte` tests skip, naming the compiler |
+| `5b051426d2` / `b385cca223` | RED / GREEN: match `expect.opt`, so the native expect runner is refreshed |
+| `c38d1c98f5` | the bytecode-compiler sweep: measurement, visible skip counts, the re-run knob |
 
 Plus this report and its amendments.
 
@@ -206,6 +208,33 @@ simpler and more correct than what I wrote.
   in-tree runtime, i.e. building the bytecode compiler in a context that uses it —
   a build-system change, out of scope here.
 
+  **The sweep, per the ruling.** 548 test files declare `ocamlc.byte` or
+  `ocamlopt.byte` — far beyond my original three directories: 95 in
+  `flambda2/examples`, 39 in `typing-modules-bugs`, 27 in `warnings`, 25 in
+  `typing-recmod`, and so on. Nineteen directories were then measured **both ways**,
+  skip off and skip on (full table in `c38d1c98f5`). The result that decides the
+  design: **the passed count is identical with the skip off and on in every
+  directory**. Nothing that passes is skipped, so the concern behind the ruling —
+  skipping tests that would have passed — does not materialise, and the skip is not
+  masking unrelated failures either (`warnings` keeps its `mnemonics.mll` failure, a
+  lexer test; `tool-ocamlopt-save-ir` keeps one). That is why this stays a per-action
+  decision rather than a checked-in list: the skip is already exactly targeted, and a
+  list would be a second copy of the same fact with a way to go stale.
+
+  **One case did need the ruling's third step.** `typing-layouts-products` goes from
+  27 passed to **31**: four tests there are multi-branch, and their `ocamlc.byte`
+  branch skips while their `native` branches run and pass, so the test reports
+  *passed* with a branch never exercised. No count of skipped *tests* shows that. So
+  `dev-test` now counts skipped **actions** and says what was not covered, naming the
+  compiler and warning that a test reported as passed may be affected. `dev-test-all`
+  needs no such count because it does not set the variable — `_runtest` has the real
+  bytecode compiler — and the message points there.
+
+  **Noticing when a skipped test starts passing** is `DEV_SKIP_BYTECODE_COMPILERS=`,
+  which runs the actions for real in any selection and needs no list to maintain. The
+  measurement above is what a list file would have recorded; its provenance is this
+  report and `c38d1c98f5`, measured 2026-08-14 against branch tip.
+
   **Landed** in `daab428772` (RED) and `48892bda89` (GREEN):
   `OCAMLTEST_SKIP_BYTECODE_COMPILERS` makes the `ocamlc.byte` and `ocamlopt.byte`
   actions skip rather than fail, with a reason naming the compiler —
@@ -296,6 +325,53 @@ speed, and it deserves its own design doc and its own review — which is why it
 kept out of this branch. Whoever picks it up should start by establishing what the
 runner is supposed to be built against and why, not by making the build faster.
 
+## The `expect.opt` runner was never refreshed: `codegen/*` results were vacuous
+
+Reported by another session while using the loop, and it is the same class as the
+stale-harness defect below with a worse blast radius, because the failure mode is a
+*passing* test.
+
+`dev-test` decided whether to rebuild an expect runner by grepping the selected test
+files for the runner's name. For the byte runner that works — the TEST-block token
+really is `expect` (`ocamltest/ocaml_tests.ml:121`). For the native runner it grepped
+for `expectnat`, but the token is `expect.opt` (`ocaml_tests.ml:136`), so the branch
+was dead code and `expectnat.exe` stayed whatever the last full build left behind.
+
+Verified over `testsuite/tests` rather than taken on report:
+
+| token searched for | files containing it |
+| --- | --- |
+| `expectnat` (what the code looked for) | **0** — so the branch could never fire |
+| `expect.opt` (the real spelling) | 43, of which 29 in `codegen/` |
+| `expect` (the byte runner) | 753 — that pattern is right by design, not by luck |
+
+Only 5 of the 43 also carry a bare `expect`, so for the other 38 *neither* runner was
+refreshed. `codegen/` is 29 of its 30 `.ml` tests, which is why **every `codegen/*`
+result under the dev loop before this fix should not be trusted**: a compiler change
+could be followed by a passing test that had exercised the previous compiler. The
+session that found it saw two different mutations produce a byte-identical diff, and
+filed then retracted a false claim about test coverage. `dev-test-all` is unaffected —
+it goes through `_runtest`.
+
+Fixed in `5b051426d2` (RED) / `b385cca223` (GREEN). The fix is one token, but the
+reason it survived is that the decision was unobservable, so it is now split in two
+and the deterministic half is a target: `make dev-runners-needed DIR=codegen` prints
+`expectnat`. `dev-selftest` pins both cases, and the RED→GREEN diff is exactly those
+two expectation lines.
+
+**Cost**, since the worry was that every `codegen/` test would start paying a 110M
+link: measured twice at **~4s** when the main workspace has nothing to rebuild — the
+refresh asks dune, dune answers immediately. The link is only paid after a compiler
+source change, which is precisely when the old behaviour was returning a result from
+the previous compiler. I did not measure that case; the ~3 min figure is the
+reporting session's.
+
+Worth being exact about the trigger, because it is weaker than it looks: it compares
+the runner against the *dev* compiler, while the runner is built by the *main*
+workspace, so it can fire when nothing needs rebuilding (harmless, 4s). What actually
+keeps the runner honest is dune's dependency tracking of main-workspace sources. The
+defect was never a wrong criterion; it was never consulting one.
+
 ## The full suite found a defect nobody had listed
 
 `make dev-test-all` on this branch: **2442 passed, 208 skipped, 1 failed** of 2651
@@ -358,9 +434,22 @@ happened.
 
 ## Verification I did not do
 
-- I did run the full suite, and it earned its keep — see below. What is *not*
-  verified is a second full-suite run after `e95dc422b7`, so the harness-refresh
-  fix is verified only against the single test that exposed it.
+- The full suite was run again at the branch tip: **2444 passed, 208 skipped, 0
+  failed** of 2652 considered, exit 0. So the number matches the tip, and the
+  harness-refresh fix is confirmed by the fixture that exposed it now passing under
+  `_runtest`. The earlier run (2442/208/1) is the one that found that defect.
+- Items 3a, 4d, 4e, 6d, 6e are no longer unexercised:
+  - **3a** — `_build/dev/runtest/ocamlopt` → `ocamlopt.byte` → `boot_ocamlopt.exe`;
+    the path bigint reported as "cannot find file" now exists and resolves to the dev
+    compiler.
+  - **4d** — in a real promote, `Promoting ... to reference` appears before the verify
+    run's output, i.e. chronologically.
+  - **4e** — forced non-convergence by appending `exit 3` to a fixture's driver, with
+    `DEV_PROMOTE_PASSES=2`; the path fires and gives the reworded diagnosis.
+  - **6d** — the artifact-location line fired in the full-suite run above.
+  - **6e** — run under the real system python 3.6.8: `dev watcher: python 3.7 or
+    newer is required (running 3.6.8 from /usr/bin/python3)`, exit 1, instead of an
+    argparse traceback.
 - Items 3a, 4d, 4e, 6d, 6e are landed but not exercised (table above). 4e and 6e
   in particular need a fixture that is genuinely unstable between the plain and
   `-principal` runs, and a python 3.6 interpreter, respectively.

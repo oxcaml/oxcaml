@@ -816,6 +816,7 @@ dev-test-all: dev-check
 	  export TMPDIR="$${TMPDIR:-$$(pwd)/_build/dev/tmp}"; \
 	  mkdir -p "$$TMPDIR"; \
 	  echo "dev: building the final compiler for the full test suite"; \
+	  echo "dev: refreshing the test harness"; \
 	  $(dune) build $(ws_boot) ocamltest/ocamltest.native; \
 	  $(MAKE) --no-print-directory \
 	    -o boot-compiler -o runtime-stdlib install_for_test; \
