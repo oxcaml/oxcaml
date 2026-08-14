@@ -539,7 +539,7 @@ dev_direct_command = $(dune) build $(ws_boot) $(dev_build_flag) \
 .PHONY: dev-ocamlc dev-ocamlopt
 .PHONY: dev-expect-runners
 .PHONY: dev-status dev-log dev-stop dev-errors dev-diff
-.PHONY: dev-stdlib-check dev-refresh-stdlib dev-configure
+.PHONY: dev-stdlib-check dev-refresh-stdlib dev-configure dev-selftest
 
 dev-start: _build/_bootinstall
 	@if [ -n "$(NOWATCH)" ]; then exit 0; fi; \
@@ -550,25 +550,29 @@ dev-start: _build/_bootinstall
 # is newer than the autoconf on many systems, so a fresh worktree reliably fails
 # here. Without this check the failure surfaces from the Makefile.config
 # prerequisite of _build/_bootinstall, which says nothing about autoconf.
+# No version parsing: configure.ac's AC_PREREQ([2.71]) already makes a too-old
+# autoconf fail, so trying each candidate and keeping the one that works cannot
+# accept a version that would not have worked. tools/autogen is not used, despite
+# being the wrapper intended for this, because its --warnings=all,error rejects
+# this fork's configure.ac (many AC_RUN_IFELSE cross-compiling warnings).
 dev-configure:
 	@set -eu; \
+	  log=""; \
 	  for candidate in autoconf27 autoconf-2.71 autoconf2.71 autoconf; do \
-	    if command -v $$candidate >/dev/null 2>&1 && \
-	       $$candidate --version 2>/dev/null | head -n 1 | \
-	         awk '{ split($$NF, v, "."); \
-	                exit !(v[1] > 2 || (v[1] == 2 && v[2] >= 71)) }'; then \
-	      found=$$candidate; \
-	      break; \
+	    if ! command -v $$candidate >/dev/null 2>&1; then continue; fi; \
+	    rm -rf autom4te.cache; \
+	    if log=$$($$candidate 2>&1) && [ -f configure ]; then \
+	      echo "dev: generated configure with $$candidate"; \
+	      ./configure --prefix="$$(pwd)/_install"; \
+	      exit 0; \
 	    fi; \
 	  done; \
-	  if [ -z "$${found:-}" ]; then \
-	    echo "dev: no autoconf >= 2.71 on PATH, which configure.ac requires." >&2; \
-	    echo "dev: on these boxes the one to use is usually autoconf27." >&2; \
-	    exit 2; \
-	  fi; \
-	  echo "dev: generating configure with $$found"; \
-	  $$found; \
-	  ./configure --prefix="$$(pwd)/_install"
+	  echo "dev: could not generate configure." >&2; \
+	  echo "dev: configure.ac has AC_PREREQ([2.71]), so an older autoconf fails;" >&2; \
+	  echo "dev: on these boxes the one that works is usually autoconf27." >&2; \
+	  echo "dev: tried autoconf27 autoconf-2.71 autoconf2.71 autoconf." >&2; \
+	  printf '%s\n' "$$log" >&2; \
+	  exit 2
 
 dev-setup:
 	+@set -eu; \
@@ -623,8 +627,11 @@ dev-check: dev-setup dev-runtime dev-start
 # built compiler, which points nowhere. Predicting this from compiler-source
 # mtimes would rebuild the stdlib on nearly every edit, so detect it instead --
 # compiling one line against the installed stdlib is enough to provoke it.
+DEV_SKIP_STDLIB_CHECK ?=
+
 dev-stdlib-check:
 	@set -eu; \
+	  if [ -n "$(DEV_SKIP_STDLIB_CHECK)" ]; then exit 0; fi; \
 	  if [ ! -x $(dev_compiler) ] || \
 	     [ ! -f $(dev_stdlib)/stdlib.cmi ]; then exit 0; fi; \
 	  scratch=_build/dev/stdlib-check; \
@@ -638,15 +645,18 @@ dev-stdlib-check:
 	      >$$scratch/probe.log 2>&1 \
 	  ) 2>/dev/null || status=$$?; \
 	  if [ $$status = 0 ]; then rm -rf $$scratch; exit 0; fi; \
-	  echo "dev: the compiler cannot read the installed standard library," >&2; \
-	  echo "dev: so a compiler change may have altered .cmi shapes." >&2; \
-	  if [ $$status -gt 128 ]; then \
-	    echo "dev: (it died on signal $$(($$status - 128)), which is what a" >&2; \
-	    echo "dev: stale marshaled .cmi looks like)" >&2; \
-	  fi; \
-	  echo "dev: run \`make dev-refresh-stdlib\` to rebuild it." >&2; \
 	  sed 's/^/dev: /' $$scratch/probe.log >&2; \
-	  exit 1
+	  if [ $$status -gt 128 ]; then \
+	    echo "dev: the compiler died on signal $$(($$status - 128)) reading the" >&2; \
+	    echo "dev: installed standard library, which is what a stale marshaled" >&2; \
+	    echo "dev: .cmi looks like: a compiler change may have altered .cmi" >&2; \
+	    echo "dev: shapes. Run \`make dev-refresh-stdlib\` to rebuild it." >&2; \
+	    exit 1; \
+	  fi; \
+	  echo "dev: warning: the compiler failed on a one-line program. That is" >&2; \
+	  echo "dev: most likely your change rather than a stale standard library," >&2; \
+	  echo "dev: so this is a warning; \`make dev-ocamlc\` still works." >&2; \
+	  exit 0
 
 dev-refresh-stdlib:
 	+@$(dev_watcher) stop; \
@@ -660,8 +670,7 @@ dev-selftest:
 # Fresh diagnostics straight from the running watcher, without a build round
 # trip. This is the tightest error loop the watcher supports.
 dev-errors:
-	@$(dune) diagnostics --root=. $(dev_build_flag) 2>&1 \
-	  | $(dev_watcher) filter-notices
+	@$(dune) diagnostics --root=. $(dev_build_flag)
 
 dev: dev-check
 
@@ -732,6 +741,8 @@ dev-test-all: dev-check
 	      DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) >/dev/null || true; \
 	  }; \
 	  trap restart_watcher EXIT; \
+	  export TMPDIR="$${TMPDIR:-$$(pwd)/_build/dev/tmp}"; \
+	  mkdir -p "$$TMPDIR"; \
 	  echo "dev: building the final compiler for the full test suite"; \
 	  $(MAKE) --no-print-directory \
 	    -o boot-compiler -o runtime-stdlib install_for_test; \
@@ -752,8 +763,9 @@ dev-promote:
 	+@set -eu; \
 	  scratch=_build/dev/promote; \
 	  mkdir -p $$scratch; \
-	  promote_log=$$scratch/promote.log; \
+	  promote_log=$$scratch/promote.$$$$.log; \
 	  pass=1; \
+	  promoted=no; \
 	  while [ $$pass -le $(DEV_PROMOTE_PASSES) ]; do \
 	    if $(MAKE) --no-print-directory dev-test PROMOTE=1 \
 	        DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
@@ -769,12 +781,25 @@ dev-promote:
 	      echo "dev: promoted test output (converged after $$pass pass(es))"; \
 	      exit 0; \
 	    fi; \
+	    if grep -q '^Promoting ' "$$promote_log"; then \
+	      promoted=yes; \
+	    else \
+	      promoted=no; \
+	    fi; \
 	    pass=$$((pass + 1)); \
 	  done; \
 	  echo "dev: promotion did not converge in $(DEV_PROMOTE_PASSES) passes." >&2; \
-	  echo "dev: the usual cause is output that differs between the plain and" >&2; \
-	  echo "dev: -principal runs, which promotion cannot settle: the test needs a" >&2; \
-	  echo "dev: Principal{| ... |} block written by hand." >&2; \
+	  if [ "$$promoted" = yes ]; then \
+	    echo "dev: the last pass still promoted something, so it is probably a" >&2; \
+	    echo "dev: test with more reference files than passes: promotion stops at" >&2; \
+	    echo "dev: the first one it updates. Raise DEV_PROMOTE_PASSES and retry." >&2; \
+	  else \
+	    echo "dev: the last pass promoted nothing, so the output is unstable" >&2; \
+	    echo "dev: rather than merely stale. The usual cause is output that" >&2; \
+	    echo "dev: differs between the plain and -principal runs, which promotion" >&2; \
+	    echo "dev: cannot settle: the test needs a Principal{| ... |} block" >&2; \
+	    echo "dev: written by hand." >&2; \
+	  fi; \
 	  echo "dev: run \`make dev-diff TEST=...\` to see the difference." >&2; \
 	  exit 1
 

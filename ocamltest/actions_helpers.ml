@@ -409,7 +409,13 @@ let compare_files kind_of_output output_filename reference_filename log
           reference file %s but it is not:\n%s\n"
         output_filename reference_filename unexpected_output_with_banners in
       (* A missing reference is what a brand-new test looks like, so promotion
-         should create it rather than making the author write it by hand. *)
+         should create it rather than making the author write it by hand.
+
+         Note that a missing reference is also how a test spells "this output must
+         be empty", so promoting here turns such a test into one that asserts the
+         output it happened to produce. That is the same hazard promotion always
+         has -- it records what happened rather than what was meant -- but it
+         applies to a file that did not exist before, so review what appears. *)
       promote_if_requested ();
       (Result.fail_with_reason reason, env)
     | Filecompare.Error (commandline, exitcode) ->

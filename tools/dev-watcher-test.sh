@@ -12,7 +12,9 @@
 set -eu
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-scratch=$root/_build/dev/watcher-test
+# Per-process, so two runs of this suite -- or two reviewers in one worktree --
+# cannot delete each other's scratch mid-test.
+scratch=$root/_build/dev/watcher-test.$$
 export TMPDIR=$scratch
 
 failures=0
@@ -42,7 +44,15 @@ case "$1 ${2-}" in
         printf 'certain command line arguments may be ignored.\n'
         printf 'Success\n'
         exit 0 ;;
-      hang) exec sleep 600 ;;
+      # 601, distinct from the watcher's own `sleep 600`, so the tests can tell an
+      # abandoned build from a healthy watcher.
+      # Record the pid so the tests can check this build really died, rather than
+      # matching on a command line, which would also match a sibling worktree
+      # running this same suite.
+      hang) echo $$ >> "$HANGS"; exec sleep 601 ;;
+      # Ignores the polite signals, so only SIGKILL ends it. Without escalation a
+      # wedged build like this makes the timeout unbounded.
+      stubborn) echo $$ >> "$HANGS"; trap '' INT TERM; exec sleep 601 ;;
       dead)
         echo 'Error: Server returned error: Connection terminated (error' \
              'kind: Connection_dead)'
@@ -51,7 +61,7 @@ case "$1 ${2-}" in
     esac ;;
 esac
 case "$1" in
-  build) echo "FALLBACK BUILD RAN"; exit 0 ;;
+  build) echo "FALLBACK BUILD RAN"; exit "${FALLBACK_STATUS-0}" ;;
   diagnostics) echo "DIAGNOSTICS RAN"; exit 0 ;;
 esac
 echo "stub dune: unexpected arguments: $*" >&2
@@ -59,6 +69,8 @@ exit 99
 STUB
   chmod +x "$scratch/bin/dune"
   export COUNTER=$scratch/build-count
+  export HANGS=$scratch/hung-pids
+  : > "$HANGS"
   export PATH=$scratch/bin:$PATH
 }
 
@@ -71,6 +83,7 @@ watcher() {
 # on the prefix being scoped.
 start_stub_watcher() {
   : > "$COUNTER"
+  : > "$HANGS"
   unset BUILD_1 BUILD_2 BUILD_3 BUILD_4 BUILD_5 || true
   BUILD_DEFAULT=${1-success}
   export BUILD_DEFAULT
@@ -129,6 +142,38 @@ expect_build_count() {
   fi
 }
 
+watcher_pid() {
+  cat "$scratch/_build/dev/watcher.pid" 2>/dev/null || echo none
+}
+
+# The recovery path is defined by two effects, not by its messages: the watcher is
+# really replaced, and the abandoned build really dies.
+expect_watcher_replaced() {
+  if [ "$1" != "$(watcher_pid)" ] && [ "$(watcher_pid)" != none ]; then
+    echo "  ok: watcher was replaced ($1 -> $(watcher_pid))"
+  else
+    echo "  FAIL: watcher not replaced (was $1, now $(watcher_pid))"
+    failures=$((failures + 1))
+  fi
+}
+
+expect_no_abandoned_builds() {
+  stragglers=0
+  while read -r pid; do
+    [ -n "$pid" ] || continue
+    if kill -0 "$pid" 2>/dev/null; then
+      stragglers=$((stragglers + 1))
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+  done < "$HANGS"
+  if [ "$stragglers" -eq 0 ]; then
+    echo "  ok: no abandoned build processes"
+  else
+    echo "  FAIL: $stragglers abandoned build process(es) left behind"
+    failures=$((failures + 1))
+  fi
+}
+
 setup
 trap 'watcher stop >/dev/null 2>&1 || true' EXIT
 
@@ -137,19 +182,30 @@ start_stub_watcher success
 run_build 0 "success"
 expect_output "Success"
 expect_build_count 1
-# The forwarding notice and the bare "Warning:" that introduces it are dropped.
-expect_no_output "being forwarded"
-expect_no_output "Warning:"
+# Dune's rpc forwarding notice is passed through rather than filtered. Suppressing
+# it needed matching on substrings, which could hide a real diagnostic that
+# happened to contain one; three lines of noise is the cheaper problem.
+expect_output "being forwarded"
 
 echo "== a wedged build times out, bounces the watcher, and retries once"
 start_stub_watcher success
 behaviour 1 hang
+before=$(watcher_pid)
 run_build 0 "timeout then retry" --timeout 2 --heartbeat 1
 expect_output "exceeded 2s"
 expect_output "restarting the watcher and retrying"
 expect_output "Success"
 expect_build_count 2
 expect_no_output "FALLBACK BUILD RAN"
+expect_watcher_replaced "$before"
+expect_no_abandoned_builds
+
+echo "== a build that ignores SIGINT and SIGTERM is still bounded"
+start_stub_watcher stubborn
+run_build 0 "stubborn build" --timeout 2 --heartbeat 1
+expect_output "building directly"
+expect_output "FALLBACK BUILD RAN"
+expect_no_abandoned_builds
 
 echo "== a heartbeat is printed while a build is running"
 start_stub_watcher success
@@ -166,6 +222,13 @@ expect_output "FALLBACK BUILD RAN"
 # Exactly two rpc attempts, then the fallback: retrying without a bound would
 # be a new silent hang.
 expect_build_count 2
+
+echo "== a failing direct build reports its own exit status"
+start_stub_watcher hang
+FALLBACK_STATUS=7 export FALLBACK_STATUS
+run_build 7 "fallback status" --timeout 2 --heartbeat 1
+expect_output "FALLBACK BUILD RAN"
+unset FALLBACK_STATUS
 
 echo "== a dead connection is recovered without waiting for the timeout"
 start_stub_watcher success

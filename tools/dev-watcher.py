@@ -30,15 +30,6 @@ TIMEOUT_FILE = STATE / "idle-timeout"
 LOG_FILE = STATE / "watcher.log"
 LOCK_FILE = STATE / "lock"
 WATCHER_COMMAND_FILE = STATE / "watcher-command"
-BUILD_LOG_FILE = STATE / "rpc-build.log"
-
-# Dune prints a three-line warning on every rpc-forwarded command, which is
-# noise once known. There is no dune flag to suppress it (checked against 3.23),
-# so match its body and the bare "Warning:" that introduces it.
-FORWARDING_NOTICE = (
-    "build request is being forwarded",
-    "certain command line arguments may be ignored",
-)
 
 # What a dune rpc client says when the watcher's RPC server has gone away.
 CONNECTION_FAILURES = ("Connection_dead", "Connection terminated")
@@ -106,13 +97,15 @@ def start_watcher(command, idle_timeout):
         raise SystemExit("dev watcher: missing watcher command")
     with locked():
         clean_stale_state()
-        save_watcher_command(command, idle_timeout)
         pid = read_pid(PID_FILE)
         if alive(pid):
             touch_lease(idle_timeout)
             return
 
         touch_lease(idle_timeout)
+        # Recorded only when this call is the one that starts the watcher, so the
+        # file always describes the command the running watcher is executing.
+        save_watcher_command(command, idle_timeout)
         if LOG_FILE.exists() and LOG_FILE.stat().st_size > 1_000_000:
             LOG_FILE.write_bytes(b"")
         log = LOG_FILE.open("ab", buffering=0)
@@ -151,20 +144,32 @@ def start(args):
     start_watcher(args.command, args.idle_timeout)
 
 
-def terminate_process_group(child):
-    if child.poll() is not None:
-        return
+def signal_process_group(child, number):
     try:
-        os.killpg(child.pid, signal.SIGINT)
+        os.killpg(child.pid, number)
     except ProcessLookupError:
-        return
-    deadline = time.monotonic() + 5
+        pass
+
+
+def await_exit(child, seconds):
+    deadline = time.monotonic() + seconds
     while time.monotonic() < deadline and child.poll() is None:
         time.sleep(0.05)
-    if child.poll() is None:
-        try:
-            os.killpg(child.pid, signal.SIGTERM)
-        except ProcessLookupError:
+    return child.poll() is not None
+
+
+def terminate_process_group(child):
+    """Stop [child]'s process group, escalating to SIGKILL.
+
+    Escalating matters: a child that ignores SIGINT and SIGTERM would otherwise
+    make a bounded wait unbounded, which is the failure this whole mechanism
+    exists to avoid.
+    """
+    for number in (signal.SIGINT, signal.SIGTERM, signal.SIGKILL):
+        if child.poll() is not None:
+            return
+        signal_process_group(child, number)
+        if await_exit(child, 5):
             return
 
 
@@ -274,62 +279,52 @@ def announce(message):
 
 
 def run_with_heartbeat(command, timeout, heartbeat):
-    """Run [command], capturing its combined output into BUILD_LOG_FILE while
-    printing a heartbeat so a long build is distinguishable from a wedged one.
-    Returns (exit status, output), with a status of None on timeout."""
-    BUILD_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with BUILD_LOG_FILE.open("wb") as sink:
-        child = subprocess.Popen(
-            command,
-            cwd=ROOT,
-            stdin=subprocess.DEVNULL,
-            stdout=sink,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-        start_time = time.monotonic()
-        next_heartbeat = start_time + heartbeat
-        timed_out = False
-        while child.poll() is None:
-            now = time.monotonic()
-            if timeout and now - start_time >= timeout:
-                announce(f"the build exceeded {timeout}s; stopping it")
-                terminate_process_group(child)
-                child.wait()
-                timed_out = True
-                break
-            if heartbeat and now >= next_heartbeat:
-                announce(
-                    f"still building ({int(now - start_time)}s elapsed; "
-                    "progress: make dev-log)"
-                )
-                next_heartbeat = now + heartbeat
-            time.sleep(0.2)
-    output = BUILD_LOG_FILE.read_text(errors="replace")
+    """Run [command], capturing its combined output while printing a heartbeat so
+    a long build is distinguishable from a wedged one. Returns (exit status,
+    output), with a status of None on timeout."""
+    # Per invocation, not a fixed path: two dev commands in one worktree would
+    # otherwise truncate and read each other's output, and a build that read a
+    # sibling's "Success" would report success it never achieved.
+    log_file = STATE / f"rpc-build.{os.getpid()}.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with log_file.open("wb") as sink:
+            child = subprocess.Popen(
+                command,
+                cwd=ROOT,
+                stdin=subprocess.DEVNULL,
+                stdout=sink,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            start_time = time.monotonic()
+            next_heartbeat = start_time + heartbeat
+            timed_out = False
+            while child.poll() is None:
+                now = time.monotonic()
+                if timeout and now - start_time >= timeout:
+                    announce(f"the build exceeded {timeout}s; stopping it")
+                    terminate_process_group(child)
+                    # The child may have exited on its own just as the deadline
+                    # passed, in which case its result is real.
+                    timed_out = child.poll() != 0
+                    break
+                if heartbeat and now >= next_heartbeat:
+                    announce(
+                        f"still building ({int(now - start_time)}s elapsed; "
+                        "progress: make dev-log)"
+                    )
+                    next_heartbeat = now + heartbeat
+                time.sleep(0.2)
+        output = log_file.read_text(errors="replace")
+    finally:
+        log_file.unlink(missing_ok=True)
     return (None if timed_out else child.returncode), output
 
 
 def emit(output):
-    lines = output.splitlines()
-    noise = [
-        any(fragment in line for fragment in FORWARDING_NOTICE)
-        for line in lines
-    ]
-    for index, line in enumerate(lines):
-        introduces_noise = (
-            line.strip() == "Warning:"
-            and index + 1 < len(lines)
-            and noise[index + 1]
-        )
-        if introduces_noise:
-            noise[index] = True
-    for line, is_noise in zip(lines, noise):
-        if not is_noise:
-            print(line, flush=True)
-
-
-def filter_notices(_args):
-    emit(sys.stdin.read())
+    sys.stdout.write(output)
+    sys.stdout.flush()
 
 
 def lost_connection(output):
@@ -374,7 +369,13 @@ def build(args):
     """
     touch_lease()
     if args.ping:
-        await_ready(args.ping, args.ready_timeout)
+        try:
+            await_ready(args.ping, args.ready_timeout)
+        except SystemExit as unready:
+            # A watcher that never becomes ready is exactly the case the
+            # fallback exists for, so do not fail here.
+            announce(f"the watcher is not ready ({unready}); building directly")
+            return build_directly(args.fallback)
     announce("building via the watcher (progress: make dev-log)")
     status, output, failure = attempt_rpc_build(args)
 
@@ -383,11 +384,12 @@ def build(args):
         emit(output)
         if restart_watcher(args.ping, args.ready_timeout):
             status, output, failure = attempt_rpc_build(args)
+            if failure is not None:
+                emit(output)
         else:
             failure = "could not restart the watcher"
         if failure is not None:
             announce(f"the build {failure}; building directly instead")
-            emit(output)
             return build_directly(args.fallback)
 
     emit(output)
@@ -417,14 +419,34 @@ def newest(paths):
     return max(paths, key=lambda path: path.stat().st_mtime)
 
 
-def find_artifacts(patterns):
+def within(path, parts):
+    """Whether [parts] occurs as a contiguous run of directories in [path]."""
+    candidate = path.parts
+    return any(
+        candidate[index:index + len(parts)] == parts
+        for index in range(len(candidate) - len(parts) + 1)
+    )
+
+
+def find_artifacts(directory, patterns):
+    """Newest artifact matching one of [patterns], from within the test's own
+    directory under each artifact root.
+
+    Scoping to that directory is not optional: 609 of this tree's test files share
+    a basename with a test elsewhere (test.ml alone occurs 83 times), so a
+    basename search across the roots readily finds an unrelated test's output. The
+    directory is matched anywhere in the path rather than as a prefix, because
+    each root nests it differently and ocamltest adds a per-test level.
+    """
+    parts = Path(directory).parts
     for pattern in patterns:
         found = [
             path
             for root in ARTIFACT_ROOTS
-            if (ROOT / root).is_dir()
-            for path in (ROOT / root).rglob(pattern)
-            if path.is_file()
+            for base in [ROOT / root]
+            if base.is_dir()
+            for path in base.rglob(pattern)
+            if path.is_file() and within(path, parts)
         ]
         if found:
             return newest(found)
@@ -439,17 +461,24 @@ def diff(args):
     the latter by hand drops the principal updates silently.
     """
     source = ROOT / "testsuite" / args.test
+    if not source.is_file():
+        announce(f"no such test: {source}")
+        return 2
     stem = source.name.rsplit(".", 1)[0]
+    # args.test is "tests/<dir>/<file>.ml"; artifacts sit under the same
+    # "tests/<dir>" path within whichever root ran the test.
+    directory = str(Path(args.test).parent)
 
     corrected = find_artifacts(
-        [f"{source.name}.corrected.corrected", f"{source.name}.corrected"]
+        directory,
+        [f"{source.name}.corrected.corrected", f"{source.name}.corrected"],
     )
     if corrected is not None:
         announce(f"corrected output {corrected.relative_to(ROOT)}")
         announce("promote with `make dev-promote`, never by copying this file")
         return show_diff(source, corrected)
 
-    output = find_artifacts([f"{stem}.output", f"{stem}.result"])
+    output = find_artifacts(directory, [f"{stem}.output", f"{stem}.result"])
     if output is None:
         announce(f"no fresh output for {source.relative_to(ROOT)}")
         announce("run `make dev-test TEST=...` first; note that prepare-test-root")
@@ -648,9 +677,6 @@ def parser():
 
     touch_parser = commands.add_parser("touch")
     touch_parser.set_defaults(function=lambda _args: touch_lease())
-
-    filter_parser = commands.add_parser("filter-notices")
-    filter_parser.set_defaults(function=filter_notices)
 
     diff_parser = commands.add_parser("diff")
     diff_parser.add_argument("--test", required=True)

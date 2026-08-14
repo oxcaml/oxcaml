@@ -17,11 +17,18 @@ MAKECMDGOALS ?= defaultentry
 
 CLEAN_TARGET_NAMES=clean partialclean distclean
 
+# Targets that bootstrap the dev loop, or test it without building anything,
+# must be usable before the tree is configured -- configuring is what
+# dev-configure is for, so requiring configuration to reach it is circular.
+UNCONFIGURED_TARGET_NAMES=dev-configure dev-selftest
+
 # Some special targets ('*clean' and 'configure') do not require configuration.
 # REQUIRES_CONFIGURATION is empty if only those targets are requested,
 # and non-empty if configuration is required.
 REQUIRES_CONFIGURATION := $(strip \
-  $(filter-out $(CLEAN_TARGET_NAMES) configure, $(MAKECMDGOALS)))
+  $(filter-out \
+    $(CLEAN_TARGET_NAMES) $(UNCONFIGURED_TARGET_NAMES) configure, \
+    $(MAKECMDGOALS)))
 
 ifneq "$(REQUIRES_CONFIGURATION)" ""
 ifneq "$(origin BUILD_CONFIG_INCLUDED)" "override"

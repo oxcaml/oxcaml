@@ -4,7 +4,7 @@
 
 A fresh worktree needs one complete build and test installation:
 ```sh
-make dev-configure
+make dev-configure   # or, by hand: autoconf27 && ./configure --prefix="$PWD/_install"
 make dev
 ```
 This takes about 5 minutes. Subsequent `make dev` invocations are much faster
