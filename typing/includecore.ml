@@ -38,12 +38,6 @@ type primitive_mismatch =
   | Argument_repr of int
   | Layout_poly_attr
 
-type layout_poly_coercion =
-  | Extra_lhs of { extra: int }
-  | Extra_rhs of { extra: int }
-  | Instantiate_lhs_to_rhs of { index_lhs: int; index_rhs: int }
-  | Instantiate_lhs of { index_lhs: int; arg: Jkind_types.Sort.t option }
-
 type value_mismatch =
   | Primitive_mismatch of primitive_mismatch
   | Not_a_primitive
@@ -51,7 +45,6 @@ type value_mismatch =
   | Zero_alloc of Zero_alloc.error
   | Modality of Mode.Modality.error
   | Mode of Mode.Value.error
-  | Layout_poly_coercion of layout_poly_coercion
 
 exception Dont_match of value_mismatch
 
@@ -182,40 +175,30 @@ let value_descriptions_consistency _env vd1 vd2 =
   | (_, _) -> Tcoerce_none
 
 let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 ty2 =
-  let pat_refs =
+  let tc_args =
     Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 ty2
   in
-  (* Map from RHS sort poly var to its 1-indexed position *)
-  let subj_index = List.mapi (fun i v -> (v, i + 1)) subj_lpoly in
-  let subj_rest =
-    List.fold_left
-      (fun (i, subj_rest) r ->
-        let i = i + 1 in
-        let v, subj_rest = match subj_rest with
-          | v :: rest -> v, rest
-          | [] ->
-            let extra = List.length pat_refs - i + 1 in
-            raise (Dont_match (Layout_poly_coercion (Extra_lhs { extra })))
-        in
-        (match r with
-        | Some (Jkind_types.Sort.Var v') when v' == v -> ()
-        | Some (Jkind_types.Sort.Var v') ->
-          let j = List.assq v' subj_index in
-          raise (Dont_match (Layout_poly_coercion
-            (Instantiate_lhs_to_rhs { index_lhs = i; index_rhs = j })))
-        | _ ->
-          raise (Dont_match (Layout_poly_coercion
-            (Instantiate_lhs { index_lhs = i; arg = r }))));
-        (i, subj_rest))
-      (0, subj_lpoly)
-      pat_refs
-    |> snd
-  in
-  match subj_rest with
-  | [] -> ()
-  | _ ->
-    raise (Dont_match (Layout_poly_coercion
-      (Extra_rhs { extra = List.length subj_rest })))
+  (* We can set uninstantiated variables (given by [None]) to anything,
+     including the variable at the same position.
+     This way, equivalent schemes return an identity coercion. *)
+  if List.length subj_lpoly = List.length tc_args &&
+     List.for_all2
+        (fun v v' ->
+          match v, v' with
+          | v, Some (Jkind.Sort.Const.Genvar v')
+            when Jkind.Sort.Const.(equal (genvar v) (genvar v')) -> true
+          | _, None -> true
+          | _, Some _ -> false)
+        subj_lpoly tc_args
+  then None
+  else
+    (* Set uninstantiated variables to [void] *)
+    let tc_args =
+      List.map
+        (Option.value ~default:Jkind.Sort.Const.void)
+        tc_args
+    in
+    Some { tc_params = subj_lpoly; tc_args }
 
 let value_descriptions_zero_alloc
     (vd1 : Types.value_description)
@@ -292,11 +275,17 @@ let value_descriptions ~loc env name
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
              Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
-             try
-               moregeneral_lpoly ~self_check env
-                 val_lpoly1 val_lpoly2 ty1 ty2
-             with Ctype.Moregen err ->
-               raise (Dont_match (Type err))
+             match moregeneral_lpoly ~self_check env
+                 val_lpoly1 val_lpoly2 ty1 ty2 with
+             | None -> ()
+             | Some _ ->
+              Misc.fatal_errorf
+                "Primitives cannot be layout-polymorphic,@ \
+                but a kind-template coercion is necessary@ \
+                between primitives at %a@ and %a."
+                Location.print_loc_in_lowercase vd1.val_loc
+                Location.print_loc_in_lowercase vd2.val_loc
+             | exception Ctype.Moregen err -> raise (Dont_match (Type err))
            ) yielding
           ) forkable
          ) locality;
@@ -308,9 +297,13 @@ let value_descriptions ~loc env name
         let ty1, mode_l1, _, sort1 =
           Ctype.instance_prim env p1 vd1.val_type
         in
-        (try moregeneral_lpoly ~self_check env
-               val_lpoly1 val_lpoly2 ty1 vd2.val_type
-         with Ctype.Moregen err -> raise (Dont_match (Type err)));
+        let tc =
+          try
+            moregeneral_lpoly ~self_check env
+              val_lpoly1 val_lpoly2 ty1 vd2.val_type
+            |> Option.value ~default:{ tc_params = []; tc_args = [] }
+          with Ctype.Moregen err -> raise (Dont_match (Type err))
+        in
         let pc_loc =
           (* Prefer a declaration from the current unit.  A foreign primitive
              or signature location may not resolve against this unit's source
@@ -329,19 +322,24 @@ let value_descriptions ~loc env name
              Ctype.prim_params_yielding env vd2.Types.val_type
                ~arity:p1.prim_arity;
            pc_zero_alloc_check = prim_coercion_zero_alloc_check;
+           pc_kindtemplate = tc;
            pc_env = env;
            pc_loc;
-          } in
+          }
+        in
         Tcoerce_primitive pc
      end
   | _ ->
      match moregeneral_lpoly ~self_check env
              val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
-     | () -> begin
+     | tc -> begin
        match vd2.val_kind with
          | Val_prim _ -> raise (Dont_match Not_a_primitive)
-         | _ -> Tcoerce_none
+         | _ ->
+          match tc with
+          | Some tc -> Tcoerce_kindtemplate tc
+          | None -> Tcoerce_none
      end
 
 (* Inclusion between manifest types (particularly for private row types) *)
@@ -561,33 +559,6 @@ let report_value_mismatch ~pp first second env ppf err =
       let got = first ^ " is" in
       let expected = second ^ " is" in
       report_mode_sub_error ~pp got expected ppf e
-  | Layout_poly_coercion (Extra_lhs { extra }) ->
-      pr "%s has %d more layout parameter%s that %s not used,@ \
-          which is not supported yet."
-        first extra
-        (if extra = 1 then "" else "s")
-        (if extra = 1 then "is" else "are")
-  | Layout_poly_coercion (Extra_rhs { extra }) ->
-      pr "%s has %d more layout parameter%s that %s not used,@ \
-          which is not supported yet."
-        second extra
-        (if extra = 1 then "" else "s")
-        (if extra = 1 then "is" else "are")
-  | Layout_poly_coercion (Instantiate_lhs_to_rhs { index_lhs; index_rhs }) ->
-      pr "The layout parameter at position %d in %s@ \
-          corresponds to the parameter at position %d in %s,@ \
-          which is not supported yet."
-        index_lhs first index_rhs second
-  | Layout_poly_coercion (Instantiate_lhs { index_lhs; arg }) ->
-      let format_got ppf = match arg with
-        | None -> Fmt.fprintf ppf "an unconstrained layout variable"
-        | Some s ->
-          Fmt.fprintf ppf "layout %a"
-            (Style.as_inline_code Jkind_types.Sort.format) s
-      in
-      pr "The layout parameter at position %d in %s@ \
-          is instantiated with %t,@ \
-          which is not supported yet." index_lhs first format_got
 
 let report_type_inequality env ppf err =
   let msg = Fmt.Doc.msg in

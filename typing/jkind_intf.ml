@@ -104,6 +104,10 @@ module type Sort = sig
 
     val all_void : t -> bool
 
+    (** [subst s t] applies the variable substitution [s] to [t], replacing each
+        [Genvar v], where [(v, t')] is in [s], with [t']. *)
+    val subst : (var * t) list -> t -> t
+
     (** True if the sort contains no univars or genvars.
 
         CR layout-polymorphism: This function should be deleted once we support
@@ -275,8 +279,9 @@ module type Sort = sig
       this will default to [void] instead. *)
   val default_for_transl_and_get : t -> Const.t
 
-  (** Return a [Const.t] if the sort has no unset variables, or [None] *)
-  val to_const_opt : t -> Const.t option
+  (** Assert the given sort is constant, failing if the sort contains
+      non-generic variables. *)
+  val unwrap_const : t -> Const.t
 
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
@@ -297,10 +302,6 @@ module type Sort = sig
   val is_genvar : var -> bool
 
   val reset_cmi_sort_id : unit -> unit
-
-  (** [subst s t] applies the variable substitution [s] to [t], replacing each
-      [Var v] where [(v, t')] is in [s] with [t']. *)
-  val subst : (var * t) list -> t -> t
 
   (** [instance_with ~level vars f] creates a fresh sort var at [level] for each
       var in [vars], calls [f] with {!instance} configured to replace each var
