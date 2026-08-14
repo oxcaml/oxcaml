@@ -540,7 +540,7 @@ dev_direct_command = $(dune) build $(ws_boot) $(dev_build_flag) \
 .PHONY: dev-expect-runners
 .PHONY: dev-status dev-log dev-stop dev-errors dev-diff
 .PHONY: dev-stdlib-check dev-refresh-stdlib dev-configure dev-selftest
-.PHONY: dev-runners-needed
+.PHONY: dev-runners-needed dev-report-skips
 
 dev-start: _build/_bootinstall
 	@if [ -n "$(NOWATCH)" ]; then exit 0; fi; \
@@ -629,6 +629,12 @@ dev-check: dev-setup dev-runtime dev-start
 # mtimes would rebuild the stdlib on nearly every edit, so detect it instead --
 # compiling one line against the installed stdlib is enough to provoke it.
 DEV_SKIP_STDLIB_CHECK ?=
+
+# The dev test root cannot supply a runnable bytecode compiler, so ocamlc.byte and
+# ocamlopt.byte actions skip rather than fail (see design-docs). Clear this to run
+# them for real and find out whether any of them has started working:
+#   make dev-test DIR=... DEV_SKIP_BYTECODE_COMPILERS=
+DEV_SKIP_BYTECODE_COMPILERS ?= 1
 
 dev-stdlib-check:
 	@set -eu; \
@@ -751,14 +757,43 @@ dev-test: dev-check
 	  export CAML_LD_LIBRARY_PATH=$$(pwd)/_build/dev/runtest/stdlib/stublibs; \
 	  export TMPDIR="$${TMPDIR:-$$(pwd)/_build/dev/tmp}"; \
 	  mkdir -p "$$TMPDIR"; \
-	  export OCAMLTEST_SKIP_BYTECODE_COMPILERS=1; \
+	  if [ -n "$(DEV_SKIP_BYTECODE_COMPILERS)" ]; then \
+	    export OCAMLTEST_SKIP_BYTECODE_COMPILERS=1; \
+	  fi; \
 	  if $$(which gfortran > /dev/null 2>&1); then \
 	    export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	  fi; \
+	  log=$$(pwd)/_build/dev/test.$$$$.log; \
+	  marker=$$(pwd)/_build/dev/test.$$$$.status; \
+	  trap 'rm -f "$$log" "$$marker"' EXIT; \
 	  cd _build/dev/runtest/testsuite; \
-	  $(MAKE) $(if $(PROMOTE),promote,$(if $(DIR),files-parallel,one)) \
-	    $(if $(TEST),TEST=$(call locate_test,$(TEST))) \
-	    $(if $(DIR),DIR=$(call locate_test,$(DIR)))
+	  { $(MAKE) $(if $(PROMOTE),promote,$(if $(DIR),files-parallel,one)) \
+	      $(if $(TEST),TEST=$(call locate_test,$(TEST))) \
+	      $(if $(DIR),DIR=$(call locate_test,$(DIR))); \
+	    echo $$? >$$marker; } 2>&1 | tee $$log; \
+	  status=$$(cat $$marker); \
+	  $(MAKE) -C $$(pwd)/../../../.. --no-print-directory \
+	    dev-report-skips DEV_SKIP_LOG=$$log; \
+	  exit $$status
+
+# A skipped action inside a multi-action test does not make the test fail, so a
+# test can be reported as passed with one of its branches never run. Say so: the
+# whole point of skipping rather than failing is lost if the gap is invisible in a
+# green run.
+DEV_SKIP_LOG ?=
+dev-report-skips:
+	@set -eu; \
+	  test -n "$(DEV_SKIP_LOG)" || exit 0; \
+	  test -f "$(DEV_SKIP_LOG)" || exit 0; \
+	  skipped=$$(grep -c 'is not runnable under this harness' \
+	    "$(DEV_SKIP_LOG)" || true); \
+	  test "$$skipped" -gt 0 || exit 0; \
+	  echo "dev: $$skipped action(s) skipped: the bytecode compiler"; \
+	  echo "dev: (ocamlc.byte / ocamlopt.byte) cannot run under the dev harness,"; \
+	  echo "dev: so those parts of those tests were not exercised -- including in"; \
+	  echo "dev: any test above that is reported as passed."; \
+	  echo "dev: \`make dev-test-all\` does exercise them, via _runtest."; \
+	  echo "dev: to run them here anyway, add DEV_SKIP_BYTECODE_COMPILERS= ."
 
 # The explicit ocamltest build below matters: install_for_test copies ocamltest
 # from the default build dir, but `-o boot-compiler` tells make that dir is up to
