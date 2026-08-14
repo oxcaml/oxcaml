@@ -729,6 +729,12 @@ dev-test: dev-check
 	    $(if $(TEST),TEST=$(call locate_test,$(TEST))) \
 	    $(if $(DIR),DIR=$(call locate_test,$(DIR)))
 
+# The explicit ocamltest build below matters: install_for_test copies ocamltest
+# from the default build dir, but `-o boot-compiler` tells make that dir is up to
+# date, so a change to ocamltest would silently run the whole suite against the
+# previous harness. The watcher builds ocamltest into _build/dev-dune, which
+# install_for_test does not read. Building that one target takes seconds, unlike
+# the boot compiler that `-o` is there to skip.
 dev-test-all: dev-check
 	+@set -eu; \
 	  if ! parallel --version 2>/dev/null | grep -q 'GNU parallel'; then \
@@ -744,13 +750,30 @@ dev-test-all: dev-check
 	  export TMPDIR="$${TMPDIR:-$$(pwd)/_build/dev/tmp}"; \
 	  mkdir -p "$$TMPDIR"; \
 	  echo "dev: building the final compiler for the full test suite"; \
+	  $(dune) build $(ws_boot) ocamltest/ocamltest.native; \
 	  $(MAKE) --no-print-directory \
 	    -o boot-compiler -o runtime-stdlib install_for_test; \
-	  status=0; \
-	  $(MAKE) --no-print-directory test-files-parallel || status=$$?; \
+	  mkdir -p _build/dev; \
+	  log=_build/dev/test-all.log; \
+	  marker=_build/dev/test-all.status; \
+	  rm -f $$marker; \
+	  { $(MAKE) --no-print-directory test-files-parallel; \
+	    echo $$? >$$marker; } 2>&1 | tee $$log; \
+	  status=$$(cat $$marker); \
 	  echo "dev: corrected outputs are under _runtest/testsuite/_ocamltest/,"; \
 	  echo "dev: not the _build/dev root the rest of the loop uses."; \
 	  echo "dev: \`make dev-diff TEST=...\` searches both."; \
+	  if grep -q 'inconsistent assumptions over interface Stdlib' $$log; then \
+	    echo "dev: Those \"inconsistent assumptions over interface Stdlib\"" >&2; \
+	    echo "dev: failures are almost certainly not real. The main build finds" >&2; \
+	    echo "dev: the stdlib through OCAMLLIB, outside dune's dependency" >&2; \
+	    echo "dev: tracking, so a stdlib *interface* change leaves compiler-libs" >&2; \
+	    echo "dev: compiled against the old Stdlib digest, and install_for_test" >&2; \
+	    echo "dev: exits 0 without fixing it." >&2; \
+	    echo "dev: The known-working recovery is a full \`rm -rf _build\` and" >&2; \
+	    echo "dev: rebuild (~25 minutes). Do not \`rm -rf _build/main\` alone:" >&2; \
+	    echo "dev: that corrupts dune's incremental state and does not heal." >&2; \
+	  fi; \
 	  exit $$status
 
 # A promoting run fails the action it promoted, which aborts the test, so a test
