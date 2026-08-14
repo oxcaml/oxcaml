@@ -883,11 +883,12 @@ dev-promote:
 	    echo "dev: test with more reference files than passes: promotion stops at" >&2; \
 	    echo "dev: the first one it updates. Raise DEV_PROMOTE_PASSES and retry." >&2; \
 	  else \
-	    echo "dev: the last pass promoted nothing, so the output is unstable" >&2; \
-	    echo "dev: rather than merely stale. The usual cause is output that" >&2; \
-	    echo "dev: differs between the plain and -principal runs, which promotion" >&2; \
-	    echo "dev: cannot settle: the test needs a Principal{| ... |} block" >&2; \
-	    echo "dev: written by hand." >&2; \
+	    echo "dev: the last pass promoted nothing, so this is not stale output:" >&2; \
+	    echo "dev: the test is failing for a reason promotion cannot fix. Read the" >&2; \
+	    echo "dev: failure above -- a compile or setup error looks like this too." >&2; \
+	    echo "dev: If the output itself differs between the plain and -principal" >&2; \
+	    echo "dev: runs, promotion cannot settle that either: the test needs a" >&2; \
+	    echo "dev: Principal{| ... |} block written by hand." >&2; \
 	  fi; \
 	  echo "dev: run \`make dev-diff TEST=...\` to see the difference." >&2; \
 	  exit 1
