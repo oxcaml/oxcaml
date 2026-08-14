@@ -21,42 +21,7 @@ module Switch = Switch_expr
 
 let fprintf = Format.fprintf
 
-(* This signature ensures absolutely that the insides of an expression cannot be
-   accessed before any necessary delayed renaming has been applied. *)
-module With_delayed_renaming : sig
-  type 'descr t
-
-  val create : 'descr -> 'descr t
-
-  val apply_renaming : 'descr t -> Renaming.t -> 'descr t
-
-  val descr :
-    'descr t -> apply_renaming_descr:('descr -> Renaming.t -> 'descr) -> 'descr
-end = struct
-  type 'descr t =
-    { mutable descr : 'descr;
-      mutable delayed_renaming : Renaming.t
-    }
-
-  let create descr = { descr; delayed_renaming = Renaming.empty }
-
-  let apply_renaming t renaming =
-    let delayed_renaming =
-      Renaming.compose ~second:renaming ~first:t.delayed_renaming
-    in
-    { t with delayed_renaming }
-
-  let[@inline always] descr t ~apply_renaming_descr =
-    if Renaming.is_identity t.delayed_renaming
-    then t.descr
-    else
-      let descr = apply_renaming_descr t.descr t.delayed_renaming in
-      t.descr <- descr;
-      t.delayed_renaming <- Renaming.empty;
-      descr
-end
-
-type expr = expr_descr With_delayed_renaming.t
+type expr = expr_descr
 
 and expr_descr =
   | Let of let_expr
@@ -142,11 +107,9 @@ and static_const_or_code =
 
 and static_const_group = static_const_or_code list
 
-let rec descr expr =
-  With_delayed_renaming.descr expr
-    ~apply_renaming_descr:apply_renaming_expr_descr
+let rec descr expr = expr
 
-and apply_renaming = With_delayed_renaming.apply_renaming
+and apply_renaming t renaming = apply_renaming_expr_descr t renaming
 
 and apply_renaming_expr_descr t renaming =
   match t with
@@ -355,11 +318,13 @@ and ids_for_export_continuation_handler
     (module Bound_parameters)
     cont_handler_abst
     ~ids_for_export_of_term:ids_for_export_continuation_handler_t0
+    ~apply_renaming_to_term:apply_renaming_continuation_handler_t0
 
 and ids_for_export_continuation_handlers t =
   Name_abstraction.ids_for_export
     (module Bound_parameters)
     t ~ids_for_export_of_term:ids_for_export_continuation_handlers_t0
+    ~apply_renaming_to_term:apply_renaming_continuations_handlers_t0
 
 and ids_for_export_continuation_handlers_t0 t =
   Continuation.Lmap.fold
@@ -389,6 +354,7 @@ and ids_for_export_let_expr { let_abst; defining_expr } =
     Name_abstraction.ids_for_export
       (module Bound_pattern)
       let_abst ~ids_for_export_of_term:ids_for_export_let_expr_t0
+      ~apply_renaming_to_term:apply_renaming_let_expr_t0
   in
   Ids_for_export.union defining_expr_ids let_abst_ids
 
@@ -421,6 +387,7 @@ and ids_for_export_non_recursive_let_cont_handler
     Name_abstraction.ids_for_export
       (module Bound_continuation)
       continuation_and_body ~ids_for_export_of_term:ids_for_export
+      ~apply_renaming_to_term:apply_renaming
   in
   Ids_for_export.union handler_ids continuation_and_body_ids
 
@@ -433,6 +400,7 @@ and ids_for_export_recursive_let_cont_handlers t =
   Name_abstraction.ids_for_export
     (module Bound_continuations)
     t ~ids_for_export_of_term:ids_for_export_recursive_let_cont_handlers_t0
+    ~apply_renaming_to_term:apply_renaming_recursive_let_cont_handlers_t0
 
 and ids_for_export_function_params_and_body_base { expr; free_names = _ } =
   ids_for_export expr
@@ -441,6 +409,7 @@ and ids_for_export_function_params_and_body { abst; is_my_closure_used = _ } =
   Name_abstraction.ids_for_export
     (module Bound_for_function)
     abst ~ids_for_export_of_term:ids_for_export_function_params_and_body_base
+    ~apply_renaming_to_term:apply_renaming_function_params_and_body_base
 
 and ids_for_export_static_const_or_code t =
   match t with
@@ -1610,7 +1579,7 @@ module Expr = struct
 
   type descr = expr_descr
 
-  let create = With_delayed_renaming.create
+  let create expr = expr
 
   let descr = descr
 

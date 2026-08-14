@@ -44,4 +44,19 @@ end) : sig
   val add : t -> E.t -> Id.t
 
   val find : t -> Id.t -> E.t
+
+  type serializable
+
+  val export : t -> iter:((Id.t -> unit) -> unit) -> serializable
+
+  exception Not_exported
+
+  val import : serializable -> Id.t -> E.t
+
+  (* Returns the original identifier associated with a given [E.t]. This is
+     useful to implement delayed maps, where we don't rename the keys in the map
+     until they are looked up.
+
+     Raises [Not_exported] if there was the data was not exported. *)
+  val import_backwards_exn : serializable -> E.t -> Id.t
 end

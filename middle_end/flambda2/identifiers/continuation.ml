@@ -102,8 +102,6 @@ end
 
 type t = Id.t
 
-type exported = Data.t
-
 module Table = Table_by_int_id.Make (Data)
 
 let grand_table_of_continuations = ref (Table.create ())
@@ -172,6 +170,16 @@ module Set = Tree.Set
 module Map = Tree.Map
 module Lmap = Lmap.Make (T)
 
-let export t = find_data t
+type importer = Table.serializable
 
-let import data = Table.add !grand_table_of_continuations data
+let export conts =
+  Table.export !grand_table_of_continuations ~iter:(fun f -> Set.iter f conts)
+
+let import importer t =
+  Table.add !grand_table_of_continuations (Table.import importer t)
+
+let import_and_rename importer t =
+  let { Data.name; sort; name_stamp = _; compilation_unit = _ } =
+    Table.import importer t
+  in
+  create ~sort ~name ()
