@@ -616,6 +616,48 @@ module type S = sig
     val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.is_eq
   end
 
+  module Reported_mode : sig
+    type t
+
+    type described =
+      { semantic : t;
+        displayed : t;
+        suffix : string option
+      }
+
+    val name : t -> string
+
+    val equal : t -> t -> bool
+
+    val describe : [`Actual | `Expected] -> t -> described list
+  end
+
+  module Reported_hint : sig
+    type t =
+      | Morph : ('l * 'r) Mode_hint.morph -> t
+      | Const : ('l * 'r) Mode_hint.const -> t
+  end
+
+  type 'a folded_axis =
+    { actual : 'a;
+      expected : 'a;
+      actual_mode : Reported_mode.t;
+      expected_mode : Reported_mode.t;
+      actual_loosened : bool;
+      expected_loosened : bool
+    }
+
+  val fold_error_exn :
+    init:'a ->
+    step:
+      (mode:Reported_mode.t ->
+      pinpoint:Hint.pinpoint ->
+      hint:Reported_hint.t ->
+      'a ->
+      'a) ->
+    exn ->
+    'a folded_axis list option
+
   module type Mode := sig
     module Areality : Common_axis_pos
 
@@ -770,6 +812,18 @@ module type S = sig
          and type simple_error := simple_error
          and type 'd t := 'd t
 
+    val fold_error :
+      init:'a ->
+      step:
+        (mode:Reported_mode.t ->
+        pinpoint:Hint.pinpoint ->
+        hint:Reported_hint.t ->
+        'a ->
+        'a) ->
+      Mode_hint.pinpoint ->
+      error ->
+      'a folded_axis list
+
     (* CR-soon zqian: take [?hint:(_, _) monadic_comonadic] instead. *)
     val of_const :
       ?hint_monadic:('l * 'r) neg Hint.const ->
@@ -843,6 +897,8 @@ module type S = sig
       axis instead of [Regionality] axis, as arrow types are exposed to users
       and would be hard to understand if it involves [Regionality]. *)
   module Alloc : Mode with module Areality := Locality
+
+  val reported_mode_as_alloc_atom : Reported_mode.t -> Alloc.atom option
 
   module Const : sig
     val alloc_as_value : Alloc.Const.t -> Value.Const.t
