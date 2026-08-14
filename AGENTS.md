@@ -46,6 +46,8 @@ When the user asks you to review loop, that means that you launch several claude
 It is very important that review agents have their own worktree to build and run experiments and develop tests.
 Once you have the review reports, try to ground claims in experimental reality as much as possible. Reproduce suggested issues. Try out suggested refactorings. Only accept if grounded reality shows that it is a real issue or real improvement.
 
+Try to get the deliverable in the best shape of the highest quality. Use of subagents is almost free compared to human software engineering time, so use them well. The biggest danger is not bugs: the biggest danger is is wrong design decisions. Significant agent effort should be spent on evaluating whether the design decisions are optimal, because otherwise we end up in a morass of slop and progress will slowly grind to a halt. We want to keep the project maximally healthy. If you need human help, don't hesitate to ask for it.
+
 ## Worktree structure
 
 Set up a directory named after the change/branch, and in that directory make a worktree called dev, and a subfolder called review where the worktrees of review agents live.
@@ -55,3 +57,7 @@ Set up a directory named after the change/branch, and in that directory make a w
 Each change has a design doc, specified by the human. These live in the repo itself, in the design-docs folder. If that folder doesn't exist yet, make it. The design doc should be named after the branch.
 
 If, during development, you come across a decision point where the design doc is ambiguous or simply doesn't specify which route to take, then first decide (1) is there an arguably best route (2) does the decision actually matter much. Only if there is no clear best route, note at the end of the design doc in concise style which route you took and why, and which alternatives you considered, and also notify me so that I can help check if that's the right decision.
+
+## Friction
+
+If you notice friction or other problems that could be fixed by going up a meta level and fixing the setup or tooling or appraoch, try to fix that!
