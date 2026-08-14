@@ -130,29 +130,13 @@ Error: This expression is not allowed in a "let poly_" definition;
        it must be a function.
 |}]
 
-(* layout-polymorphic id is not included in regular id,
-   even though the former can be instantiated to the latter *)
+(* layout-polymorphic id can be instatiated to value id *)
 module _ : sig
   val id : 'a -> 'a
 end = struct
   let poly_ id x = x
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   let poly_ id x = x
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ id : 'a -> 'a end
-       is not included in
-         sig val id : 'a -> 'a end
-       Values do not match:
-         val poly_ id : 'a -> 'a
-       is not included in
-         val id : 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
 |}]
 
 (* The RHS has to be a syntactic value *)

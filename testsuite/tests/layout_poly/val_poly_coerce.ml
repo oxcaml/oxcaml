@@ -41,17 +41,7 @@ end = Fst;;
 Line 3, characters 6-9:
 3 | end = Fst;;
           ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig val poly_ fst : ('a : float64). 'a -> 'b -> 'a end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val poly_ fst : ('a : float64). 'a -> 'b -> 'a
-       The layout parameter at position 1 in the first
-       is instantiated with layout "float64",
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -63,16 +53,7 @@ end = Fst;;
 Line 3, characters 6-9:
 3 | end = Fst;;
           ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig val poly_ fst : ('b : bits32). 'a -> 'b -> 'a end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val poly_ fst : ('b : bits32). 'a -> 'b -> 'a
-       the first has 1 more layout parameter that is not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -81,20 +62,8 @@ module M12 : sig
 end = Fst;;
 (M12.fst #3.14 #1337l |> to_float)
 [%%expect {|
-Line 3, characters 6-9:
-3 | end = Fst;;
-          ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig val fst : ('a : float64) ('b : bits32). 'a -> 'b -> 'a end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : ('a : float64) ('b : bits32). 'a -> 'b -> 'a
-       the first has 2 more layout parameters that are not used,
-       which is not supported yet.
+module M12 : sig val fst : ('a : float64) ('b : bits32). 'a -> 'b -> 'a end
+- : float = 3.14
 |}];;
 
 (* eta-expanding coercions *)
@@ -107,19 +76,7 @@ end = Fst;;
 Line 3, characters 6-9:
 3 | end = Fst;;
           ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 2 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -131,19 +88,7 @@ end = Fst;;
 Line 3, characters 6-9:
 3 | end = Fst;;
           ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l) ('b : l1). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l) ('b : l1). 'a -> 'b -> 'a
-       The layout parameter at position 2 in the first
-       corresponds to the parameter at position 3 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -155,18 +100,7 @@ end = Fst;;
 Line 3, characters 6-9:
 3 | end = Fst;;
           ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-       the second has 1 more layout parameter that is not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -180,19 +114,7 @@ end = Fst;;
 Line 3, characters 6-9:
 3 | end = Fst;;
           ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l. ('a : float64) ('b : bits32). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l. ('a : float64) ('b : bits32). 'a -> 'b -> 'a
-       The layout parameter at position 1 in the first
-       is instantiated with layout "float64",
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -205,21 +127,8 @@ end) : sig
 end);;
 (M12.fst #3.14 #1337l |> to_float)
 [%%expect {|
-Line 1, characters 15-18:
-1 | module M12 = ((Fst : sig
-                   ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig val poly_ fst : ('a : float64). 'a -> 'b -> 'a end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val poly_ fst : ('a : float64). 'a -> 'b -> 'a
-       The layout parameter at position 1 in the first
-       is instantiated with layout "float64",
-       which is not supported yet.
+module M12 : sig val fst : ('a : float64) ('b : bits32). 'a -> 'b -> 'a end
+- : float = 3.14
 |}];;
 
 module M21 = ((Fst : sig
@@ -229,20 +138,8 @@ end) : sig
 end);;
 (M21.fst #3.14 #1337l |> to_float)
 [%%expect {|
-Line 1, characters 15-18:
-1 | module M21 = ((Fst : sig
-                   ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig val poly_ fst : ('b : bits32). 'a -> 'b -> 'a end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val poly_ fst : ('b : bits32). 'a -> 'b -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+module M21 : sig val fst : ('a : float64) ('b : bits32). 'a -> 'b -> 'a end
+- : float = 3.14
 |}];;
 
 (* chaining eta-expanding coercions *)
@@ -257,18 +154,7 @@ end);;
 Line 1, characters 15-18:
 1 | module M23 = ((Fst : sig
                    ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-       the second has 1 more layout parameter that is not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -282,18 +168,7 @@ end);;
 Line 1, characters 15-18:
 1 | module M20 = ((Fst : sig
                    ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-       the second has 1 more layout parameter that is not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -307,19 +182,7 @@ end);;
 Line 1, characters 15-18:
 1 | module M02 = ((Fst : sig
                    ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 2 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -333,19 +196,7 @@ end);;
 Line 1, characters 15-18:
 1 | module M00 = ((Fst : sig
                    ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 2 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -361,18 +212,7 @@ end);;
 Line 1, characters 14-17:
 1 | module M2 = ((Fst : sig
                   ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-       the second has 1 more layout parameter that is not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -386,19 +226,7 @@ end);;
 Line 1, characters 14-17:
 1 | module M0 = ((Fst : sig
                   ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 2 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -411,22 +239,8 @@ end) : sig
 end);;
 (M2.fst #3.14 #1337l |> to_float)
 [%%expect {|
-Line 1, characters 14-17:
-1 | module M2 = ((Fst : sig
-                  ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-       the second has 1 more layout parameter that is not used,
-       which is not supported yet.
+module M2 : sig val fst : ('a : float64) ('b : bits32). 'a -> 'b -> 'a end
+- : float = 3.14
 |}];;
 
 module M0 = ((Fst : sig
@@ -436,23 +250,8 @@ end) : sig
 end);;
 (M0.fst #3.14 #1337l |> to_float)
 [%%expect {|
-Line 1, characters 14-17:
-1 | module M0 = ((Fst : sig
-                  ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 2 in the second,
-       which is not supported yet.
+module M0 : sig val fst : ('a : float64) ('b : bits32). 'a -> 'b -> 'a end
+- : float = 3.14
 |}];;
 
 (* chaining eta-expanding and eta-reducing coercions (= identity) *)
@@ -467,19 +266,7 @@ end);;
 Line 1, characters 14-17:
 1 | module M0 = ((Fst : sig
                   ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l0) ('b : l1). 'a -> 'b -> 'a
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 2 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -493,19 +280,7 @@ end);;
 Line 1, characters 14-17:
 1 | module M1 = ((Fst : sig
                   ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l) ('b : l1). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l) ('b : l1). 'a -> 'b -> 'a
-       The layout parameter at position 2 in the first
-       corresponds to the parameter at position 3 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -519,18 +294,7 @@ end);;
 Line 1, characters 14-17:
 1 | module M2 = ((Fst : sig
                   ^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ fst : 'a -> 'b -> 'a end
-       is not included in
-         sig
-           val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-         end
-       Values do not match:
-         val poly_ fst : 'a -> 'b -> 'a
-       is not included in
-         val fst : layout_ l l0 l1. ('a : l) ('b : l0). 'a -> 'b -> 'a
-       the second has 1 more layout parameter that is not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -573,24 +337,7 @@ end = Triple;;
 Line 4, characters 6-12:
 4 | end = Triple;;
           ^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
-       is not included in
-         sig
-           val triple :
-             layout_ l l0 l1.
-               ('a : l) ('b : l1) ('c : l0).
-                 'a -> 'b -> 'c -> #('a * 'b * 'c)
-         end
-       Values do not match:
-         val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       is not included in
-         val triple :
-           layout_ l l0 l1.
-             ('a : l) ('b : l1) ('c : l0). 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       The layout parameter at position 2 in the first
-       corresponds to the parameter at position 3 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -603,24 +350,7 @@ end = Triple;;
 Line 4, characters 6-12:
 4 | end = Triple;;
           ^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
-       is not included in
-         sig
-           val triple :
-             layout_ l l0 l1.
-               ('a : l0) ('b : l) ('c : l1).
-                 'a -> 'b -> 'c -> #('a * 'b * 'c)
-         end
-       Values do not match:
-         val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       is not included in
-         val triple :
-           layout_ l l0 l1.
-             ('a : l0) ('b : l) ('c : l1). 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 2 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -633,24 +363,7 @@ end = Triple;;
 Line 4, characters 6-12:
 4 | end = Triple;;
           ^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
-       is not included in
-         sig
-           val triple :
-             layout_ l l0 l1.
-               ('a : l0) ('b : l1) ('c : l).
-                 'a -> 'b -> 'c -> #('a * 'b * 'c)
-         end
-       Values do not match:
-         val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       is not included in
-         val triple :
-           layout_ l l0 l1.
-             ('a : l0) ('b : l1) ('c : l). 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 2 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -663,24 +376,7 @@ end = Triple;;
 Line 4, characters 6-12:
 4 | end = Triple;;
           ^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
-       is not included in
-         sig
-           val triple :
-             layout_ l l0 l1.
-               ('a : l1) ('b : l) ('c : l0).
-                 'a -> 'b -> 'c -> #('a * 'b * 'c)
-         end
-       Values do not match:
-         val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       is not included in
-         val triple :
-           layout_ l l0 l1.
-             ('a : l1) ('b : l) ('c : l0). 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 3 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -693,24 +389,7 @@ end = Triple;;
 Line 4, characters 6-12:
 4 | end = Triple;;
           ^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
-       is not included in
-         sig
-           val triple :
-             layout_ l l0 l1.
-               ('a : l1) ('b : l0) ('c : l).
-                 'a -> 'b -> 'c -> #('a * 'b * 'c)
-         end
-       Values do not match:
-         val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       is not included in
-         val triple :
-           layout_ l l0 l1.
-             ('a : l1) ('b : l0) ('c : l). 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 3 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -728,24 +407,7 @@ end);;
 Line 1, characters 21-27:
 1 | module M_132_132 = ((Triple : sig
                          ^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
-       is not included in
-         sig
-           val triple :
-             layout_ l l0 l1.
-               ('a : l) ('b : l1) ('c : l0).
-                 'a -> 'b -> 'c -> #('a * 'b * 'c)
-         end
-       Values do not match:
-         val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       is not included in
-         val triple :
-           layout_ l l0 l1.
-             ('a : l) ('b : l1) ('c : l0). 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       The layout parameter at position 2 in the first
-       corresponds to the parameter at position 3 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -761,24 +423,7 @@ end);;
 Line 1, characters 21-27:
 1 | module M_321_321 = ((Triple : sig
                          ^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
-       is not included in
-         sig
-           val triple :
-             layout_ l l0 l1.
-               ('a : l1) ('b : l0) ('c : l).
-                 'a -> 'b -> 'c -> #('a * 'b * 'c)
-         end
-       Values do not match:
-         val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       is not included in
-         val triple :
-           layout_ l l0 l1.
-             ('a : l1) ('b : l0) ('c : l). 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 3 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -794,24 +439,7 @@ end);;
 Line 1, characters 21-27:
 1 | module M_312_312 = ((Triple : sig
                          ^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
-       is not included in
-         sig
-           val triple :
-             layout_ l l0 l1.
-               ('a : l1) ('b : l) ('c : l0).
-                 'a -> 'b -> 'c -> #('a * 'b * 'c)
-         end
-       Values do not match:
-         val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       is not included in
-         val triple :
-           layout_ l l0 l1.
-             ('a : l1) ('b : l) ('c : l0). 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 3 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -827,24 +455,7 @@ end);;
 Line 1, characters 21-27:
 1 | module M_312_321 = ((Triple : sig
                          ^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
-       is not included in
-         sig
-           val triple :
-             layout_ l l0 l1.
-               ('a : l1) ('b : l) ('c : l0).
-                 'a -> 'b -> 'c -> #('a * 'b * 'c)
-         end
-       Values do not match:
-         val poly_ triple : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       is not included in
-         val triple :
-           layout_ l l0 l1.
-             ('a : l1) ('b : l) ('c : l0). 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       The layout parameter at position 1 in the first
-       corresponds to the parameter at position 3 in the second,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -868,7 +479,7 @@ module M : sig val id : ('a : float64). 'a -> 'a end
 - : float = 3.14
 |}];;
 
-(* no coercion *)
+(* layout-poly coercion *)
 module M : sig
   val poly_ id : 'a -> 'a
 end = Id;;
@@ -962,18 +573,7 @@ end = Id;;
 Line 3, characters 6-8:
 3 | end = Id;;
           ^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-         end
-       is not included in
-         sig val id : layout_ l. ('a : bits64). 'a -> 'a end
-       Values do not match:
-         external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-       is not included in
-         val id : layout_ l. ('a : bits64). 'a -> 'a
-       the second has 1 more layout parameter that is not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 module M : sig
@@ -984,18 +584,7 @@ end = Id;;
 Line 3, characters 6-8:
 3 | end = Id;;
           ^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-         end
-       is not included in
-         sig val id : layout_ l l0. ('a : bits64). 'a -> 'a end
-       Values do not match:
-         external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-       is not included in
-         val id : layout_ l l0. ('a : bits64). 'a -> 'a
-       the second has 2 more layout parameters that are not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -1038,20 +627,10 @@ end) : sig
 end);;
 (M.id #42L |> to_int64)
 [%%expect {|
-Lines 1-3, characters 12-4:
-1 | ............(Id : sig
-2 |   val id : ('a : bits64). 'a -> 'a
-3 | end)......
-Error: Signature mismatch:
-       Modules do not match:
-         sig val id : ('a : bits64). 'a -> 'a end
-       is not included in
-         sig val id : layout_ l. ('a : bits64). 'a -> 'a end
-       Values do not match:
-         val id : ('a : bits64). 'a -> 'a
-       is not included in
-         val id : layout_ l. ('a : bits64). 'a -> 'a
-       the second has 1 more layout parameter that is not used,
+Line 1, characters 13-15:
+1 | module M = ((Id : sig
+                 ^^
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -1129,24 +708,7 @@ module type M_ab = sig val poly_ f : 'a -> 'b end
 module type M_aa = sig val poly_ f : 'a -> 'a end
 module type M_aF = sig val poly_ f : ('b : float64). 'a -> 'b end
 module type M_FF = sig val f : ('a : float64). 'a -> 'a end
-Line 1:
-Error: Module type declarations do not match:
-         module type M_aa' = sig val f : layout_ l l0. ('a : l). 'a -> 'a end
-       does not match
-         module type M_aa' = sig val f : layout_ l l0. ('a : l). 'a -> 'a end
-       At position "module type M_aa' = <here>"
-       Module types do not match:
-         sig val f : layout_ l l0. ('a : l). 'a -> 'a end
-       is not equal to
-         sig val f : layout_ l l0. ('a : l). 'a -> 'a end
-       At position "module type M_aa' = <here>"
-       Values do not match:
-         val f : layout_ l l0. ('a : l). 'a -> 'a
-       is not included in
-         val f : layout_ l l0. ('a : l). 'a -> 'a
-       The layout parameter at position 2 in the first
-       is instantiated with an unconstrained layout variable,
-       which is not supported yet.
+module type M_aa' = sig val f : layout_ l l0. ('a : l). 'a -> 'a end
 |}];;
 
 let f x = (x : (module M_ab) :> (module M_ab))
@@ -1160,13 +722,8 @@ Line 1, characters 10-46:
 1 | let f x = (x : (module M_ab) :> (module M_aa))
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "(module M_ab)" is not a subtype of "(module M_aa)"
-       Modules do not match: M_ab is not included in M_aa
-       Values do not match:
-         val poly_ f : 'a -> 'b
-       is not included in
-         val poly_ f : 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+       The two first-class module types differ by a coercion of
+       kind templates.
 |}];;
 
 let f x = (x : (module M_ab) :> (module M_aF))
@@ -1175,13 +732,8 @@ Line 1, characters 10-46:
 1 | let f x = (x : (module M_ab) :> (module M_aF))
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "(module M_ab)" is not a subtype of "(module M_aF)"
-       Modules do not match: M_ab is not included in M_aF
-       Values do not match:
-         val poly_ f : 'a -> 'b
-       is not included in
-         val poly_ f : ('b : float64). 'a -> 'b
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+       The two first-class module types differ by a coercion of
+       kind templates.
 |}];;
 
 let f x = (x : (module M_aF) :> (module M_FF))
@@ -1190,13 +742,8 @@ Line 1, characters 10-46:
 1 | let f x = (x : (module M_aF) :> (module M_FF))
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "(module M_aF)" is not a subtype of "(module M_FF)"
-       Modules do not match: M_aF is not included in M_FF
-       Values do not match:
-         val poly_ f : ('b : float64). 'a -> 'b
-       is not included in
-         val f : ('a : float64). 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+       The two first-class module types differ by a coercion of
+       kind templates.
 |}];;
 
 let f x = (x : (module M_aa) :> (module M_FF))
@@ -1205,22 +752,8 @@ Line 1, characters 10-46:
 1 | let f x = (x : (module M_aa) :> (module M_FF))
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Type "(module M_aa)" is not a subtype of "(module M_FF)"
-       Modules do not match: M_aa is not included in M_FF
-       Values do not match:
-         val poly_ f : 'a -> 'a
-       is not included in
-         val f : ('a : float64). 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
-|}];;
-
-let f x = (x : (module M_aa) :> (module M_aa'))
-[%%expect {|
-Line 1, characters 40-45:
-1 | let f x = (x : (module M_aa) :> (module M_aa'))
-                                            ^^^^^
-Error: Unbound module type "M_aa'"
-Hint:         Did you mean "M_aa"?
+       The two first-class module types differ by a coercion of
+       kind templates.
 |}];;
 
 
@@ -1235,41 +768,20 @@ end = M
 Line 7, characters 6-7:
 7 | end = M
           ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ id : 'a -> 'a end
-       is not included in
-         sig val id : 'a -> 'a end
-       Values do not match:
-         val poly_ id : 'a -> 'a
-       is not included in
-         val id : 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+Error: The module is "dynamic"
+       but is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
 |}];;
 
-(* CR jbachurski: This needs translation of static functors to work,
-   but importantly type-checking succeeds. *)
 module F_inst_static (M : sig
   val poly_ id : 'a -> 'a
 end @ static) : sig
   val id : 'a -> 'a
 end = M
 [%%expect {|
-Line 5, characters 6-7:
-5 | end = M
-          ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ id : 'a -> 'a end
-       is not included in
-         sig val id : 'a -> 'a end
-       Values do not match:
-         val poly_ id : 'a -> 'a
-       is not included in
-         val id : 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+module F_inst_static :
+  functor (M : sig val poly_ id : 'a -> 'a end @ static) ->
+    sig val id : 'a -> 'a end
 |}];;
 
 module F_eta_dynamic (M : sig
@@ -1281,16 +793,7 @@ end = M
 Line 5, characters 6-7:
 5 | end = M
           ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val id : 'a -> 'a end
-       is not included in
-         sig val id : layout_ l. 'a -> 'a end
-       Values do not match:
-         val id : 'a -> 'a
-       is not included in
-         val id : layout_ l. 'a -> 'a
-       the second has 1 more layout parameter that is not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -1303,16 +806,7 @@ end = M
 Line 5, characters 6-7:
 5 | end = M
           ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val id : 'a -> 'a end
-       is not included in
-         sig val id : layout_ l. 'a -> 'a end
-       Values do not match:
-         val id : 'a -> 'a
-       is not included in
-         val id : layout_ l. 'a -> 'a
-       the second has 1 more layout parameter that is not used,
+Error: Coercing this module constructs a new layout-polymorphic value,
        which is not supported yet.
 |}];;
 
@@ -1324,20 +818,10 @@ end @ static) : sig
   val id : 'a -> 'a
 end = M
 [%%expect {|
-Line 6, characters 6-7:
-6 | end = M
-          ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ id : 'a -> 'a @@ dynamic val x : int @@ dynamic end
-       is not included in
-         sig val id : 'a -> 'a end
-       Values do not match:
-         val poly_ id : 'a -> 'a @@ dynamic
-       is not included in
-         val id : 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+module F_inst_static_but_item_dynamic :
+  functor
+    (M : sig val poly_ id : 'a -> 'a @@ dynamic val x : int @@ dynamic end @ static)
+    -> sig val id : 'a -> 'a end
 |}];;
 
 module F_inst_static_but_other_dynamic (M : sig
@@ -1347,18 +831,8 @@ end @ static) : sig
   val id : 'a -> 'a
 end = M
 [%%expect {|
-Line 6, characters 6-7:
-6 | end = M
-          ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ id : 'a -> 'a val x : int @@ dynamic end
-       is not included in
-         sig val id : 'a -> 'a end
-       Values do not match:
-         val poly_ id : 'a -> 'a
-       is not included in
-         val id : 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+module F_inst_static_but_other_dynamic :
+  functor
+    (M : sig val poly_ id : 'a -> 'a val x : int @@ dynamic end @ static) ->
+    sig val id : 'a -> 'a end
 |}];;
