@@ -455,6 +455,25 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
   Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
 
 and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
+  if List.exists
+       (function (Texp_erased, _, _) -> true | _ -> false)
+       e.exp_extra
+  then transl_erased ~scopes layout e
+  else transl_exp0_desc ~in_new_scope ~scopes layout e
+
+(* [erased_ e] is deleted from compilation: [e] is not evaluated. We emit a
+   placeholder of the right layout; it is only ever consumed by other erased
+   positions, which are themselves deleted or zero-width. *)
+and transl_erased ~scopes (layout : Lambda.layout) e =
+  match layout with
+  | Pvalue _ -> dummy_constant
+  | Punboxed_product [] ->
+      Lprim (Pmake_unboxed_product [], [], of_location ~scopes e.exp_loc)
+  | _ ->
+      Misc.fatal_errorf "erased_ is not yet supported at layout %a"
+        Printlambda.layout layout
+
+and transl_exp0_desc ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)

@@ -418,6 +418,8 @@ and exp_extra =
         them here, as the cost of tracking this additional information is minimal. *)
   | Texp_stack
         (** stack_ E *)
+  | Texp_erased
+        (** erased_ E: the expression is deleted from compilation *)
   | Texp_mode of Mode.Alloc.Const.Option.t modes
         (** E : _ @@ M  *)
   | Texp_inspected_type of [ `exp ] type_inspection

@@ -179,6 +179,9 @@ type lock =
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
+  | Erased_lock
+      (* the context is erased: it is deleted from compilation, so values of
+         any erasure may be used inside it *)
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
 type lock_or_stage =
@@ -3115,6 +3118,8 @@ let add_exclave_lock env = add_lock Exclave_lock env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
+let add_erased_lock env = add_lock Erased_lock env
+
 let enter_quote env =
   add_stage_lock Quote_lock {env with stage = env.stage + 1}
 
@@ -3705,8 +3710,13 @@ let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   let hint_comonadic : _ Mode.Hint.morph =
     Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
   in
+  (* Erasure is excluded from the closure lock: capturing an erased value
+     constrains the closure not at all, because nothing is stored for it.
+     Uses of the capture inside the body still see its true erasure. *)
   Mode.Value.Comonadic.submode_err pp
-    comonadic (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0);
+    (Mode.Value.meet_const_with Erasure Mode.Erasure.Const.Retained
+       {Mode.monadic; comonadic}).comonadic
+    (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0);
   let hint_monadic : _ Mode.Hint.morph =
     Is_closed_by (Monadic, {closure = closure_context; closed = pp})
   in
@@ -3719,7 +3729,10 @@ let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
 
 let const_closure_mode pp {Mode.monadic; comonadic}
   closure_context comonadic0 =
-  Mode.Value.Comonadic.(submode_err pp comonadic
+  (* Erasure is excluded from the closure lock; see [closure_mode]. *)
+  Mode.Value.Comonadic.(submode_err pp
+    (Mode.Value.meet_const_with Erasure Mode.Erasure.Const.Retained
+       {Mode.monadic; comonadic}).Mode.comonadic
     (of_const ~hint:(Is_used_in closure_context) comonadic0));
   let monadic =
     Mode.Value.(Monadic.join
@@ -3781,6 +3794,12 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           closure_mode pp vmode closure_context comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~pp vmode
+      | Erased_lock ->
+          (* Inside an erased context every value appears retained: the
+             context is deleted, so the value's absence at run time cannot be
+             observed. *)
+          Mode.Value.meet_const_with Erasure
+            Mode.Erasure.Const.Retained vmode
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
@@ -3847,6 +3866,10 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
+      | Erased_lock ->
+          (* A write inside an erased context is deleted together with the
+             context, so it constrains the new value's mode no further. *)
+          mode
       | Unboxed_lock -> mode
     ) mode locks
 

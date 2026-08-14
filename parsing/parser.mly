@@ -1028,6 +1028,7 @@ let maybe_pmod_constraint mode expr =
 %token EOF                    ""
 %token EQUAL                  "="
 %token EXCEPTION              "exception"
+%token ERASED                 "erased_"
 %token EXCLAVE                "exclave_"
 %token EXTERNAL               "external"
 %token FALSE                  "false"
@@ -2893,6 +2894,8 @@ fun_expr:
      { mkexp_constraint ~loc:$sloc ~exp ~cty:None ~modes:[mode] }
   | EXCLAVE seq_expr
      { mkexp_exclave ~loc:$sloc ~kwd_loc:($loc($1)) $2 }
+  | ERASED seq_expr
+     { mkexp ~loc:$sloc (Pexp_erased $2) }
 ;
 %inline expr:
   | or_function(fun_expr) { $1 }

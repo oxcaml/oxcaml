@@ -3381,6 +3381,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
     in
     Exp_desc.constraint_ loc (mk_exp_noattr loc lambda) coerce |> Exp_desc.wrap
   | Texp_stack -> Exp_desc.stack loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
+  | Texp_erased ->
+    fatal_errorf "Translquote [at %a]: erased_ not supported in quotations"
+      Location.print_loc (to_location loc)
   | Texp_poly _ ->
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
@@ -3456,7 +3459,7 @@ and update_env_with_extra ~loc extra =
   let extra, _, _ = extra in
   match extra with
   | Texp_newtype (id, _, _, _) -> with_new_idents_types_constr [id]
-  | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
+  | Texp_constraint _ | Texp_coerce _ | Texp_stack | Texp_erased -> ()
   | Texp_poly _ ->
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)
@@ -3469,7 +3472,7 @@ and update_env_without_extra ~loc extra =
   let extra, _, _ = extra in
   match extra with
   | Texp_newtype (id, _, _, _) -> without_idents_types_constr [id]
-  | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
+  | Texp_constraint _ | Texp_coerce _ | Texp_stack | Texp_erased -> ()
   | Texp_poly _ ->
     fatal_errorf "Translquote [at %a]: Texp_poly not implemented"
       Location.print_loc (to_location loc)

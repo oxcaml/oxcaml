@@ -64,6 +64,7 @@ let all_keywords =
     "else", ELSE, always;
     "end", END, always;
     "exception", EXCEPTION, always;
+    "erased_", ERASED, oxcaml;
     "exclave_", EXCLAVE, oxcaml;
     "external", EXTERNAL, always;
     "false", FALSE, always;

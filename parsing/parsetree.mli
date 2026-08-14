@@ -571,6 +571,7 @@ and expression_desc =
   | Pexp_extension of extension  (** [[%id]] *)
   | Pexp_unreachable  (** [.] *)
   | Pexp_stack of expression (** stack_ exp *)
+  | Pexp_erased of expression (** erased_ exp *)
   | Pexp_comprehension of comprehension_expression
     (** [[? BODY ...CLAUSES... ?]], where:
           - [?] is either [""] (list), [:] (immutable array), or [|] (array).

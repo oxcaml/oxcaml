@@ -457,6 +457,7 @@ let exp_extra sub (extra, loc, attrs) sexp =
     | Texp_newtype (_, label_loc, jkind, _) ->
         Pexp_newtype (label_loc, jkind, sexp)
     | Texp_stack -> Pexp_stack sexp
+    | Texp_erased -> Pexp_erased sexp
     | Texp_mode modes ->
         Pexp_constraint (sexp, None, Typemode.untransl_mode modes)
     | Texp_inspected_type _ ->
@@ -584,6 +585,7 @@ let expression sub exp =
                         let modes = Typemode.untransl_mode modes in
                         [], modes
                       | Texp_poly _ | Texp_newtype _ | Texp_stack
+                      | Texp_erased
                       | Texp_inspected_type _ -> [], []
                       | Texp_ghost_region | Texp_borrowed -> [], []
                     in

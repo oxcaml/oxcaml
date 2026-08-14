@@ -1137,6 +1137,8 @@ and expression ctxt f x =
     | Pexp_stack e ->
         (* Similar to the common case of [Pexp_apply] *)
         pp f "@[<hov2>stack_@ %a@]" (expression2 reset_ctxt)  e
+    | Pexp_erased e ->
+        pp f "@[<hov2>erased_@ %a@]" (expression2 reset_ctxt)  e
     | Pexp_construct (li, Some eo)
       when not (is_simple_construct (view_expr x))-> (* Not efficient FIXME*)
         (match view_expr x with

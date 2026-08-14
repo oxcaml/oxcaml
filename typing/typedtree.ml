@@ -265,6 +265,7 @@ and exp_extra =
   | Texp_newtype of Ident.t * string loc *
                     Parsetree.jkind_annotation option * Uid.t
   | Texp_stack
+  | Texp_erased
   | Texp_mode of Mode.Alloc.Const.Option.t modes
   | Texp_inspected_type of [ `exp ] type_inspection
   | Texp_borrowed
