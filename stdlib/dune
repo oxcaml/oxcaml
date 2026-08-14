@@ -76,6 +76,8 @@
   effect.mli
   bigarray.ml
   bigarray.mli
+  bigint.ml
+  bigint.mli
   bool.ml
   bool.mli
   buffer.ml
@@ -258,6 +260,11 @@
   .stdlib.objs/byte/stdlib__Bigarray.cmsi
   .stdlib.objs/byte/stdlib__Bigarray.cmt
   .stdlib.objs/byte/stdlib__Bigarray.cmti
+  .stdlib.objs/byte/stdlib__Bigint.cmi
+  .stdlib.objs/byte/stdlib__Bigint.cms
+  .stdlib.objs/byte/stdlib__Bigint.cmsi
+  .stdlib.objs/byte/stdlib__Bigint.cmt
+  .stdlib.objs/byte/stdlib__Bigint.cmti
   .stdlib.objs/byte/stdlib__Bool.cmi
   .stdlib.objs/byte/stdlib__Bool.cms
   .stdlib.objs/byte/stdlib__Bool.cmsi
@@ -624,6 +631,7 @@
   .stdlib.objs/native/stdlib__Float.cmx
   .stdlib.objs/native/stdlib__Fun.cmx
   .stdlib.objs/native/stdlib__Bigarray.cmx
+  .stdlib.objs/native/stdlib__Bigint.cmx
   .stdlib.objs/native/stdlib__Array.cmx
   .stdlib.objs/native/stdlib__Iarray.cmx
   .stdlib.objs/native/stdlib__Int32.cmx

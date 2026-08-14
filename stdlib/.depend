@@ -67,6 +67,28 @@ stdlib__Bigarray.cmx : bigarray.ml \
 stdlib__Bigarray.cmi : bigarray.mli \
     stdlib.cmi \
     stdlib__Complex.cmi
+stdlib__Bigint.cmo : bigint.ml \
+    stdlib__Sys.cmi \
+    stdlib__String.cmi \
+    stdlib.cmi \
+    stdlib__List.cmi \
+    stdlib__Iarray.cmi \
+    stdlib__Char.cmi \
+    stdlib__Buffer.cmi \
+    stdlib__Array.cmi \
+    stdlib__Bigint.cmi
+stdlib__Bigint.cmx : bigint.ml \
+    stdlib__Sys.cmx \
+    stdlib__String.cmx \
+    stdlib.cmx \
+    stdlib__List.cmx \
+    stdlib__Iarray.cmx \
+    stdlib__Char.cmx \
+    stdlib__Buffer.cmx \
+    stdlib__Array.cmx \
+    stdlib__Bigint.cmi
+stdlib__Bigint.cmi : bigint.mli \
+    stdlib.cmi
 stdlib__Bool.cmo : bool.ml \
     stdlib.cmi \
     stdlib__Bool.cmi

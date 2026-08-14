@@ -1390,6 +1390,7 @@ module ArrayLabels    = ArrayLabels
 module Atomic         = Atomic
 module Backoff        = Backoff
 module Bigarray       = Bigarray
+module Bigint         = Bigint
 module Bool           = Bool
 module Buffer         = Buffer
 module Bytes          = Bytes
