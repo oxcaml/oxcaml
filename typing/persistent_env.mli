@@ -16,18 +16,9 @@
 
 open Misc
 
-module Consistbl_data = Import_info.Intf.Nonalias.Kind
-
-module Consistbl : module type of struct
-  include Consistbl.Make (Compilation_unit.Name) (Consistbl_data)
-end
-
 type error =
   | Illegal_renaming of Compilation_unit.Name.t * Compilation_unit.Name.t * filepath
-  | Inconsistent_import of Compilation_unit.Name.t * filepath * filepath
   | Need_recursive_types of Compilation_unit.Name.t
-  | Inconsistent_package_declaration_between_imports of
-      filepath * Compilation_unit.t * Compilation_unit.t
   | Direct_reference_from_wrong_package of
       Compilation_unit.t * filepath * Compilation_unit.Prefix.t
   | Illegal_import_of_parameter of Global_module.Name.t * filepath
@@ -180,10 +171,6 @@ val set_can_load_cmis : 'a t -> can_load_cmis -> unit
 val without_cmis : 'a t -> ('b -> 'c) -> 'b -> 'c
 (* [without_cmis penv f arg] applies [f] to [arg], but does not
     allow [penv] to openi cmis during its execution *)
-
-(* may raise Consistbl.Inconsistency *)
-val import_crcs : 'a t -> source:filepath ->
-  Import_info.Intf.t array -> unit
 
 (* Return the set of compilation units imported, with their CRC *)
 val imports : 'a t -> Import_info.Intf.t list
