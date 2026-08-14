@@ -554,6 +554,8 @@ module Variable = struct
   let export vars =
     Table.export !grand_table_of_variables ~iter:(fun f -> Set.iter f vars)
 
+  exception Not_exported = Table.Not_exported
+
   let import importer t =
     Table.add !grand_table_of_variables (Table.import importer t)
 
@@ -562,8 +564,8 @@ module Variable = struct
     let user_visible = if data.user_visible then Some () else None in
     create ?user_visible data.name data.kind
 
-  let import_backwards importer t =
-    Table.import_backwards importer (find_data t)
+  let import_backwards_exn importer t =
+    Table.import_backwards_exn importer (find_data t)
 end
 
 module Symbol = struct
@@ -641,11 +643,13 @@ module Symbol = struct
   let export symbols =
     Table.export !grand_table_of_symbols ~iter:(fun f -> Set.iter f symbols)
 
+  exception Not_exported = Table.Not_exported
+
   let import importer t =
     Table.add !grand_table_of_symbols (Table.import importer t)
 
-  let import_backwards importer t =
-    Table.import_backwards importer (find_data t)
+  let import_backwards_exn importer t =
+    Table.import_backwards_exn importer (find_data t)
 end
 
 module Name = struct
