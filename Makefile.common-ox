@@ -512,25 +512,72 @@ hacking: _build/_bootinstall
 # background process. All public dev commands renew its idle lease and wait
 # for the latest compiler build before using its outputs.
 DEV_IDLE_TIMEOUT ?= 1800
+# How long to wait for a single watcher build before deciding it is wedged.
+# Generous: a cold world-rebuild of the compiler is legitimately many minutes.
+DEV_RPC_TIMEOUT ?= 1800
+# How often to report that a build is still running.
+DEV_HEARTBEAT ?= 30
+# Set NOWATCH=1 to bypass the watcher entirely. Slower, but works where dune's
+# RPC socket cannot be created at all, such as a restricted sandbox.
+NOWATCH ?=
 ARGS ?=
 dev_watcher = python3 tools/dev-watcher.py
 dev_build = _build/dev-dune
 dev_build_flag = --build-dir=$(CURDIR)/$(dev_build)
 dev_boot_targets = $(boot_targets) main.bc
+dev_stdlib = _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib
+dev_compiler = $(dev_build)/default/main_native.exe
+dev_watch_command = $(dune) build $(ws_boot) $(dev_build_flag) -w \
+  --display=short @merlin-support $(dev_boot_targets)
+# The same build, without the watcher: the NOWATCH path and the recovery path
+# taken when the watcher cannot be used.
+dev_direct_command = $(dune) build $(ws_boot) $(dev_build_flag) \
+  --display=short @merlin-support $(dev_boot_targets)
 
 .PHONY: dev dev-start dev-setup dev-runtime dev-check
 .PHONY: dev-test dev-test-all dev-promote
 .PHONY: dev-ocamlc dev-ocamlopt
 .PHONY: dev-expect-runners
-.PHONY: dev-status dev-log dev-stop
+.PHONY: dev-status dev-log dev-stop dev-errors dev-diff
+.PHONY: dev-stdlib-check dev-refresh-stdlib dev-configure
 
 dev-start: _build/_bootinstall
-	@$(dev_watcher) start --idle-timeout $(DEV_IDLE_TIMEOUT) -- \
-	  $(dune) build $(ws_boot) $(dev_build_flag) -w --display=short \
-	  @merlin-support $(dev_boot_targets)
+	@if [ -n "$(NOWATCH)" ]; then exit 0; fi; \
+	 $(dev_watcher) start --idle-timeout $(DEV_IDLE_TIMEOUT) -- \
+	   $(dev_watch_command)
+
+# configure is not tracked in git and configure.ac needs autoconf >= 2.71, which
+# is newer than the autoconf on many systems, so a fresh worktree reliably fails
+# here. Without this check the failure surfaces from the Makefile.config
+# prerequisite of _build/_bootinstall, which says nothing about autoconf.
+dev-configure:
+	@set -eu; \
+	  for candidate in autoconf27 autoconf-2.71 autoconf2.71 autoconf; do \
+	    if command -v $$candidate >/dev/null 2>&1 && \
+	       $$candidate --version 2>/dev/null | head -n 1 | \
+	         awk '{ split($$NF, v, "."); \
+	                exit !(v[1] > 2 || (v[1] == 2 && v[2] >= 71)) }'; then \
+	      found=$$candidate; \
+	      break; \
+	    fi; \
+	  done; \
+	  if [ -z "$${found:-}" ]; then \
+	    echo "dev: no autoconf >= 2.71 on PATH, which configure.ac requires." >&2; \
+	    echo "dev: on these boxes the one to use is usually autoconf27." >&2; \
+	    exit 2; \
+	  fi; \
+	  echo "dev: generating configure with $$found"; \
+	  $$found; \
+	  ./configure --prefix="$$(pwd)/_install"
 
 dev-setup:
 	+@set -eu; \
+	  if [ ! -f Makefile.config ]; then \
+	    echo "dev: Makefile.config is missing, so this worktree is not" >&2; \
+	    echo "dev: configured. Run \`make dev-configure\` (which finds a" >&2; \
+	    echo "dev: suitable autoconf and configures with --prefix=_install)." >&2; \
+	    exit 2; \
+	  fi; \
 	  if [ ! -x _install/bin/ocamlopt.opt ] || \
 	     [ ! -f _runtest/testsuite/Makefile ]; then \
 	    echo "dev: preparing the initial compiler and test installation"; \
@@ -554,21 +601,67 @@ dev-runtime:
 
 dev-check: dev-setup dev-runtime dev-start
 	@set -eu; \
-	  $(dev_watcher) wait-ready --timeout 300 -- \
-	    $(dune) rpc ping --root=. $(dev_build_flag); \
-	  if result="$$( \
-	    $(dune) rpc build $(ws_boot) $(dev_build_flag) \
-	      $(dev_boot_targets) 2>&1 \
-	  )"; then :; else \
-	    printf '%s\n' "$$result"; \
-	    exit 1; \
+	  if [ -n "$(NOWATCH)" ]; then \
+	    echo "dev: building directly (NOWATCH is set; no watcher, no rpc)"; \
+	    $(dev_direct_command); \
+	  else \
+	    $(dev_watcher) build \
+	      --timeout $(DEV_RPC_TIMEOUT) \
+	      --heartbeat $(DEV_HEARTBEAT) \
+	      --ping "$(dune) rpc ping --root=. $(dev_build_flag)" \
+	      --fallback "$(dev_direct_command)" \
+	      --diagnostics "$(dune) diagnostics --root=. $(dev_build_flag)" \
+	      -- $(dune) rpc build $(ws_boot) $(dev_build_flag) \
+	           $(dev_boot_targets); \
+	  fi
+	@$(MAKE) --no-print-directory dev-stdlib-check
+
+# A compiler change can alter the shape of marshaled .cmi files without a magic
+# number bump, which leaves the previously built stdlib unreadable by the
+# compiler that must read it. Nothing in the loop notices, because no stdlib
+# *source* changed: the reader changed. The observed failure is a SIGSEGV in the
+# built compiler, which points nowhere. Predicting this from compiler-source
+# mtimes would rebuild the stdlib on nearly every edit, so detect it instead --
+# compiling one line against the installed stdlib is enough to provoke it.
+dev-stdlib-check:
+	@set -eu; \
+	  if [ ! -x $(dev_compiler) ] || \
+	     [ ! -f $(dev_stdlib)/stdlib.cmi ]; then exit 0; fi; \
+	  scratch=_build/dev/stdlib-check; \
+	  rm -rf $$scratch; mkdir -p $$scratch; \
+	  echo 'let () = Printf.printf "%d" (List.length [Sys.opaque_identity 0])' \
+	    > $$scratch/probe.ml; \
+	  status=0; \
+	  ( ulimit -c 0; \
+	    OCAMLLIB="$$(pwd)/$(dev_stdlib)" TMPDIR="$$(pwd)/$$scratch" \
+	      $(dev_compiler) -c -o $$scratch/probe.cmo $$scratch/probe.ml \
+	      >$$scratch/probe.log 2>&1 \
+	  ) 2>/dev/null || status=$$?; \
+	  if [ $$status = 0 ]; then rm -rf $$scratch; exit 0; fi; \
+	  echo "dev: the compiler cannot read the installed standard library," >&2; \
+	  echo "dev: so a compiler change may have altered .cmi shapes." >&2; \
+	  if [ $$status -gt 128 ]; then \
+	    echo "dev: (it died on signal $$(($$status - 128)), which is what a" >&2; \
+	    echo "dev: stale marshaled .cmi looks like)" >&2; \
 	  fi; \
-	  printf '%s\n' "$$result"; \
-	  if printf '%s\n' "$$result" | grep -qx 'Success'; then \
-	    exit 0; \
-	  fi; \
-	  $(dune) diagnostics --root=. $(dev_build_flag); \
+	  echo "dev: run \`make dev-refresh-stdlib\` to rebuild it." >&2; \
+	  sed 's/^/dev: /' $$scratch/probe.log >&2; \
 	  exit 1
+
+dev-refresh-stdlib:
+	+@$(dev_watcher) stop; \
+	  $(MAKE) --no-print-directory runtime-stdlib
+
+# Check the watcher's own recovery logic against a stub dune. Needs no compiler,
+# so it runs in seconds and does not touch this worktree's watcher.
+dev-selftest:
+	@sh tools/dev-watcher-test.sh
+
+# Fresh diagnostics straight from the running watcher, without a build round
+# trip. This is the tightest error loop the watcher supports.
+dev-errors:
+	@$(dune) diagnostics --root=. $(dev_build_flag) 2>&1 \
+	  | $(dev_watcher) filter-notices
 
 dev: dev-check
 
@@ -617,6 +710,8 @@ dev-test: dev-check
 	  echo "dev: stdlib   = _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib"; \
 	  export OCAMLSRCDIR=$$(pwd)/_build/dev/runtest; \
 	  export CAML_LD_LIBRARY_PATH=$$(pwd)/_build/dev/runtest/stdlib/stublibs; \
+	  export TMPDIR="$${TMPDIR:-$$(pwd)/_build/dev/tmp}"; \
+	  mkdir -p "$$TMPDIR"; \
 	  if $$(which gfortran > /dev/null 2>&1); then \
 	    export LIBRARY_PATH=$$(dirname $$(gfortran -print-file-name=libgfortran.a)); \
 	  fi; \
@@ -640,27 +735,79 @@ dev-test-all: dev-check
 	  echo "dev: building the final compiler for the full test suite"; \
 	  $(MAKE) --no-print-directory \
 	    -o boot-compiler -o runtime-stdlib install_for_test; \
-	  $(MAKE) --no-print-directory test-files-parallel
+	  status=0; \
+	  $(MAKE) --no-print-directory test-files-parallel || status=$$?; \
+	  echo "dev: corrected outputs are under _runtest/testsuite/_ocamltest/,"; \
+	  echo "dev: not the _build/dev root the rest of the loop uses."; \
+	  echo "dev: \`make dev-diff TEST=...\` searches both."; \
+	  exit $$status
+
+# A promoting run fails the action it promoted, which aborts the test, so a test
+# with several reference files converges only after several passes. Bounded,
+# because output that is genuinely unstable between the plain and -principal runs
+# never converges and should be reported rather than looped on.
+DEV_PROMOTE_PASSES ?= 3
 
 dev-promote:
 	+@set -eu; \
-	  promote_log=$$(mktemp "$${TMPDIR:-/tmp}/oxcaml-dev-promote.XXXXXX"); \
-	  trap 'rm -f "$$promote_log"' EXIT; \
-	  if $(MAKE) --no-print-directory dev-test PROMOTE=1 \
-	      DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
-	      $(if $(TEST),TEST=$(TEST)) $(if $(DIR),DIR=$(DIR)) \
-	      >"$$promote_log" 2>&1; then \
+	  scratch=_build/dev/promote; \
+	  mkdir -p $$scratch; \
+	  promote_log=$$scratch/promote.log; \
+	  pass=1; \
+	  while [ $$pass -le $(DEV_PROMOTE_PASSES) ]; do \
+	    if $(MAKE) --no-print-directory dev-test PROMOTE=1 \
+	        DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
+	        $(if $(TEST),TEST=$(TEST)) $(if $(DIR),DIR=$(DIR)) \
+	        >"$$promote_log" 2>&1; then \
+	      cat "$$promote_log"; \
+	      exit 0; \
+	    fi; \
 	    cat "$$promote_log"; \
-	    exit 0; \
-	  fi; \
-	  if $(MAKE) --no-print-directory dev-test \
-	      DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
-	      $(if $(TEST),TEST=$(TEST)) $(if $(DIR),DIR=$(DIR)); then \
-	    echo "dev: promoted test output"; \
-	    exit 0; \
-	  fi; \
-	  cat "$$promote_log" >&2; \
+	    if $(MAKE) --no-print-directory dev-test \
+	        DEV_IDLE_TIMEOUT=$(DEV_IDLE_TIMEOUT) \
+	        $(if $(TEST),TEST=$(TEST)) $(if $(DIR),DIR=$(DIR)); then \
+	      echo "dev: promoted test output (converged after $$pass pass(es))"; \
+	      exit 0; \
+	    fi; \
+	    pass=$$((pass + 1)); \
+	  done; \
+	  echo "dev: promotion did not converge in $(DEV_PROMOTE_PASSES) passes." >&2; \
+	  echo "dev: the usual cause is output that differs between the plain and" >&2; \
+	  echo "dev: -principal runs, which promotion cannot settle: the test needs a" >&2; \
+	  echo "dev: Principal{| ... |} block written by hand." >&2; \
+	  echo "dev: run \`make dev-diff TEST=...\` to see the difference." >&2; \
 	  exit 1
+
+# Show the newest corrected output for a test against its source. Corrected
+# artifacts land in three different places depending on how the test was run, and
+# the -principal pass writes .corrected.corrected, which supersedes .corrected --
+# promoting the latter by hand silently drops the principal updates.
+dev-diff:
+	@set -eu; \
+	  if [ -z "$(TEST)" ]; then \
+	    echo "Usage: make dev-diff TEST=path/to/test.ml" >&2; \
+	    exit 2; \
+	  fi; \
+	  source="testsuite/$(call locate_test,$(TEST))"; \
+	  name=$$(basename "$$source"); \
+	  roots=""; \
+	  for root in _build/dev/runtest/testsuite _runtest/testsuite testsuite; do \
+	    if [ -d $$root ]; then roots="$$roots $$root"; fi; \
+	  done; \
+	  candidates=$$(find $$roots -name "$$name.corrected.corrected" 2>/dev/null); \
+	  if [ -z "$$candidates" ]; then \
+	    candidates=$$(find $$roots -name "$$name.corrected" 2>/dev/null); \
+	  fi; \
+	  if [ -z "$$candidates" ]; then \
+	    echo "dev: no corrected output for $$source." >&2; \
+	    echo "dev: run \`make dev-test TEST=$(TEST)\` first; note that" >&2; \
+	    echo "dev: prepare-test-root discards the previous run's artifacts." >&2; \
+	    exit 1; \
+	  fi; \
+	  newest=$$(ls -t $$candidates | head -1); \
+	  echo "dev: corrected output $$newest"; \
+	  echo "dev: promote it with \`make dev-promote TEST=$(TEST)\`, not by copying."; \
+	  diff -u "$$source" "$$newest" || true
 
 dev-ocamlc: dev-check
 	@echo "dev: compiler = $(dev_build)/default/main_native.exe"

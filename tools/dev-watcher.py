@@ -2,13 +2,23 @@
 
 import argparse
 import fcntl
+import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import signal
 import subprocess
 import sys
 import time
+
+
+if sys.version_info < (3, 7):
+    raise SystemExit(
+        "dev watcher: python 3.7 or newer is required "
+        f"(running {sys.version.split()[0]} from {sys.executable}); "
+        "put a newer python3 first on PATH"
+    )
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -19,6 +29,19 @@ LEASE_FILE = STATE / "last-used"
 TIMEOUT_FILE = STATE / "idle-timeout"
 LOG_FILE = STATE / "watcher.log"
 LOCK_FILE = STATE / "lock"
+WATCHER_COMMAND_FILE = STATE / "watcher-command"
+BUILD_LOG_FILE = STATE / "rpc-build.log"
+
+# Dune prints a three-line warning on every rpc-forwarded command, which is
+# noise once known. There is no dune flag to suppress it (checked against 3.23),
+# so match its body and the bare "Warning:" that introduces it.
+FORWARDING_NOTICE = (
+    "build request is being forwarded",
+    "certain command line arguments may be ignored",
+)
+
+# What a dune rpc client says when the watcher's RPC server has gone away.
+CONNECTION_FAILURES = ("Connection_dead", "Connection terminated")
 
 
 def read_pid(path):
@@ -60,31 +83,50 @@ def clean_stale_state():
         CHILD_PID_FILE.unlink(missing_ok=True)
 
 
-def start(args):
-    if not args.command:
+def save_watcher_command(command, idle_timeout):
+    STATE.mkdir(parents=True, exist_ok=True)
+    WATCHER_COMMAND_FILE.write_text(
+        json.dumps({"command": list(command), "idle_timeout": idle_timeout})
+        + "\n"
+    )
+
+
+def load_watcher_command():
+    try:
+        saved = json.loads(WATCHER_COMMAND_FILE.read_text())
+    except (FileNotFoundError, ValueError):
+        return None
+    if not saved.get("command"):
+        return None
+    return saved["command"], saved.get("idle_timeout", 1800)
+
+
+def start_watcher(command, idle_timeout):
+    if not command:
         raise SystemExit("dev watcher: missing watcher command")
     with locked():
         clean_stale_state()
+        save_watcher_command(command, idle_timeout)
         pid = read_pid(PID_FILE)
         if alive(pid):
-            touch_lease(args.idle_timeout)
+            touch_lease(idle_timeout)
             return
 
-        touch_lease(args.idle_timeout)
+        touch_lease(idle_timeout)
         if LOG_FILE.exists() and LOG_FILE.stat().st_size > 1_000_000:
             LOG_FILE.write_bytes(b"")
         log = LOG_FILE.open("ab", buffering=0)
-        command = [
+        supervisor_command = [
             sys.executable,
             str(Path(__file__).resolve()),
             "supervise",
             "--idle-timeout",
-            str(args.idle_timeout),
+            str(idle_timeout),
             "--",
-            *args.command,
+            *command,
         ]
         supervisor = subprocess.Popen(
-            command,
+            supervisor_command,
             cwd=ROOT,
             stdin=subprocess.DEVNULL,
             stdout=log,
@@ -97,12 +139,16 @@ def start(args):
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         if alive(read_pid(CHILD_PID_FILE)):
-            print(f"dev: watcher started (idle timeout {args.idle_timeout}s)")
+            print(f"dev: watcher started (idle timeout {idle_timeout}s)")
             return
         if not alive(supervisor.pid):
             break
         time.sleep(0.05)
     raise SystemExit(f"dev watcher failed to start; see {LOG_FILE}")
+
+
+def start(args):
+    start_watcher(args.command, args.idle_timeout)
 
 
 def terminate_process_group(child):
@@ -166,7 +212,7 @@ def supervise(args):
                 CHILD_PID_FILE.unlink(missing_ok=True)
 
 
-def stop(_args):
+def stop_watcher():
     with locked():
         clean_stale_state()
         pid = read_pid(PID_FILE)
@@ -186,6 +232,10 @@ def stop(_args):
     print("dev: watcher stopped")
 
 
+def stop(_args):
+    stop_watcher()
+
+
 def status(_args):
     clean_stale_state()
     pid = read_pid(PID_FILE)
@@ -197,11 +247,11 @@ def status(_args):
     return 0
 
 
-def wait_ready(args):
-    deadline = time.monotonic() + args.timeout
+def await_ready(command, timeout):
+    deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         result = subprocess.run(
-            args.command,
+            command,
             cwd=ROOT,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -213,6 +263,147 @@ def wait_ready(args):
             raise SystemExit(f"dev watcher exited; see {LOG_FILE}")
         time.sleep(0.1)
     raise SystemExit(f"dev watcher did not become ready; see {LOG_FILE}")
+
+
+def wait_ready(args):
+    return await_ready(args.command, args.timeout)
+
+
+def announce(message):
+    print(f"dev: {message}", flush=True)
+
+
+def run_with_heartbeat(command, timeout, heartbeat):
+    """Run [command], capturing its combined output into BUILD_LOG_FILE while
+    printing a heartbeat so a long build is distinguishable from a wedged one.
+    Returns (exit status, output), with a status of None on timeout."""
+    BUILD_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with BUILD_LOG_FILE.open("wb") as sink:
+        child = subprocess.Popen(
+            command,
+            cwd=ROOT,
+            stdin=subprocess.DEVNULL,
+            stdout=sink,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        start_time = time.monotonic()
+        next_heartbeat = start_time + heartbeat
+        timed_out = False
+        while child.poll() is None:
+            now = time.monotonic()
+            if timeout and now - start_time >= timeout:
+                announce(f"the build exceeded {timeout}s; stopping it")
+                terminate_process_group(child)
+                child.wait()
+                timed_out = True
+                break
+            if heartbeat and now >= next_heartbeat:
+                announce(
+                    f"still building ({int(now - start_time)}s elapsed; "
+                    "progress: make dev-log)"
+                )
+                next_heartbeat = now + heartbeat
+            time.sleep(0.2)
+    output = BUILD_LOG_FILE.read_text(errors="replace")
+    return (None if timed_out else child.returncode), output
+
+
+def emit(output):
+    lines = output.splitlines()
+    noise = [
+        any(fragment in line for fragment in FORWARDING_NOTICE)
+        for line in lines
+    ]
+    for index, line in enumerate(lines):
+        introduces_noise = (
+            line.strip() == "Warning:"
+            and index + 1 < len(lines)
+            and noise[index + 1]
+        )
+        if introduces_noise:
+            noise[index] = True
+    for line, is_noise in zip(lines, noise):
+        if not is_noise:
+            print(line, flush=True)
+
+
+def filter_notices(_args):
+    emit(sys.stdin.read())
+
+
+def lost_connection(output):
+    return any(failure in output for failure in CONNECTION_FAILURES)
+
+
+def restart_watcher(ping, ready_timeout):
+    saved = load_watcher_command()
+    if saved is None:
+        announce("no saved watcher command, so the watcher cannot be restarted")
+        return False
+    command, idle_timeout = saved
+    try:
+        stop_watcher()
+        start_watcher(command, idle_timeout)
+        if ping:
+            await_ready(ping, ready_timeout)
+    except SystemExit as failure:
+        announce(f"restarting the watcher failed: {failure}")
+        return False
+    return True
+
+
+def attempt_rpc_build(args):
+    status, output = run_with_heartbeat(
+        args.command, args.timeout, args.heartbeat
+    )
+    if status is None:
+        return None, output, f"timed out after {args.timeout}s"
+    if lost_connection(output):
+        return None, output, "lost its connection to the watcher"
+    return status, output, None
+
+
+def build(args):
+    """Build through the watcher's RPC, recovering from a wedged watcher.
+
+    The observed failure is an rpc client that waits forever against a watcher
+    that is alive and answers pings but never starts the build. So: bound the
+    wait, bounce the watcher and retry exactly once, and if that also fails
+    build directly. Retrying without a bound would just be a new silent hang.
+    """
+    touch_lease()
+    if args.ping:
+        await_ready(args.ping, args.ready_timeout)
+    announce("building via the watcher (progress: make dev-log)")
+    status, output, failure = attempt_rpc_build(args)
+
+    if failure is not None:
+        announce(f"the build {failure}; restarting the watcher and retrying")
+        emit(output)
+        if restart_watcher(args.ping, args.ready_timeout):
+            status, output, failure = attempt_rpc_build(args)
+        else:
+            failure = "could not restart the watcher"
+        if failure is not None:
+            announce(f"the build {failure}; building directly instead")
+            emit(output)
+            return build_directly(args.fallback)
+
+    emit(output)
+    if status == 0 and "Success" in output.splitlines():
+        return 0
+    if args.diagnostics:
+        subprocess.run(args.diagnostics, cwd=ROOT)
+    return 1
+
+
+def build_directly(fallback):
+    if not fallback:
+        announce("no direct build command was given")
+        return 1
+    announce("building directly (no watcher, no rpc; slower)")
+    return subprocess.run(fallback, cwd=ROOT).returncode
 
 
 def link(source, destination):
@@ -266,6 +457,14 @@ def prepare_test_root_locked():
         ROOT / "_build/dev-dune/default/boot_ocamlopt.exe",
         temporary / "ocamlopt.opt",
     )
+    # ocamltest resolves its "ocamlopt.byte" action to $srcdir/ocamlopt
+    # (ocamltest/ocaml_files.ml), so without these the whole flavour fails with
+    # "cannot find file .../ocamlopt" rather than running against the dev build.
+    link(
+        ROOT / "_build/dev-dune/default/boot_ocamlopt.exe",
+        temporary / "ocamlopt.byte",
+    )
+    (temporary / "ocamlopt").symlink_to("ocamlopt.byte")
     for name in ("ocamlrun", "ocamlrund", "ocamlruni"):
         link(
             ROOT / f"_build/runtime_stdlib_install/bin/{name}",
@@ -373,8 +572,21 @@ def parser():
     ready_parser.add_argument("command", nargs=argparse.REMAINDER)
     ready_parser.set_defaults(function=wait_ready)
 
+    build_parser = commands.add_parser("build")
+    build_parser.add_argument("--timeout", type=int, default=1800)
+    build_parser.add_argument("--heartbeat", type=int, default=30)
+    build_parser.add_argument("--ready-timeout", type=int, default=300)
+    build_parser.add_argument("--ping", type=shlex.split, default=[])
+    build_parser.add_argument("--fallback", type=shlex.split, default=[])
+    build_parser.add_argument("--diagnostics", type=shlex.split, default=[])
+    build_parser.add_argument("command", nargs=argparse.REMAINDER)
+    build_parser.set_defaults(function=build)
+
     touch_parser = commands.add_parser("touch")
     touch_parser.set_defaults(function=lambda _args: touch_lease())
+
+    filter_parser = commands.add_parser("filter-notices")
+    filter_parser.set_defaults(function=filter_notices)
 
     test_root_parser = commands.add_parser("prepare-test-root")
     test_root_parser.set_defaults(function=prepare_test_root)
@@ -384,7 +596,7 @@ def parser():
 def main():
     args = parser().parse_args()
     has_separator = (
-        args.action in {"start", "supervise", "wait-ready"}
+        args.action in {"start", "supervise", "wait-ready", "build"}
         and args.command[:1] == ["--"]
     )
     if has_separator:
