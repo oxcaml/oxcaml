@@ -1303,6 +1303,97 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
   | Optional l -> Optional l
   | Position l -> Position l
 
+(* Dependent-arrow binders in scope during conversion: the ident and the
+   name chosen for printing.  A positional binder is renamed when its name
+   collides with an enclosing binder still in scope. *)
+let refinement_binders : (Ident.t * string) list ref = ref []
+
+let refinement_binder_name id =
+  match List.assq_opt id !refinement_binders with
+  | Some name -> name
+  | None -> Ident.name id
+
+let choose_refinement_binder_name id =
+  let taken name =
+    List.exists (fun (_, n) -> String.equal n name) !refinement_binders
+  in
+  let base = Ident.name id in
+  if not (taken base) then base
+  else
+    let rec pick i =
+      let candidate = base ^ string_of_int i in
+      if taken candidate then pick (i + 1) else candidate
+    in
+    pick 1
+
+(* Does some refinement predicate reachable from [tys] satisfy [f]?  The
+   walk goes through payloads, predicates' interior types and ordinary
+   structure, and is guarded against cycles. *)
+let exists_refinement_pred f tys =
+  let exception Found in
+  let visited = Hashtbl.create 8 in
+  let rec walk ty =
+    let id = get_id ty in
+    if not (Hashtbl.mem visited id) then begin
+      Hashtbl.add visited id ();
+      (match get_desc ty with
+       | Trefine { ref_pred; _ } -> if f ref_pred then raise Found
+       | _ -> ());
+      Btype.iter_type_expr walk ty
+    end
+  in
+  match List.iter walk tys with () -> false | exception Found -> true
+
+(* Would the bare label [name] capture an occurrence on re-parse?  This
+   runs on the converted output — the artifact that will actually be
+   re-parsed — and mirrors the occurrence test's scoping: an arrow whose
+   printed name slot is [name] shadows it below (bare slots capture,
+   [~name] shadows its domain only), and predicate-local binders shadow
+   inside predicates ([Vox_binding.name_used_in_predicate]). *)
+let out_label_needs_escape name t1 t2 =
+  let exception Found in
+  let rec walk (t : Outcometree.out_type) =
+    match t with
+    | Otyp_refine (payload, pred) ->
+        if Vox_binding.name_used_in_predicate name pred then raise Found;
+        walk payload
+    | Otyp_arrow (slot, _, dom, ret) ->
+        let shadows s = String.equal s name in
+        (match slot with
+         | Labelled s when shadows s ->
+             (* a bare slot [name:] re-binds occurrences below it *)
+             ()
+         | Labelled s
+           when String.length s > 0 && s.[0] = '~'
+                && shadows (String.sub s 1 (String.length s - 1)) ->
+             (* [~name:] shadows its own domain only *)
+             walk ret
+         | Position s when shadows s -> ()
+         | Nolabel | Labelled _ | Optional _ | Position _ ->
+             walk dom; walk ret)
+    | Otyp_ret (_, t) | Otyp_alias { aliased = t; _ } | Otyp_mod (t, _)
+    | Otyp_poly (_, t) | Otyp_newlayout (_, t) | Otyp_repr (_, t)
+    | Otyp_attribute (t, _) | Otyp_quote t | Otyp_splice t
+    | Otyp_jkind_annot (t, _) ->
+        walk t
+    | Otyp_tuple lts | Otyp_unboxed_tuple lts ->
+        List.iter (fun (_, t) -> walk t) lts
+    | Otyp_constr (_, ts) | Otyp_class (_, ts) -> List.iter walk ts
+    | Otyp_manifest (ta, tb) -> walk ta; walk tb
+    | Otyp_object { fields; _ } -> List.iter (fun (_, t) -> walk t) fields
+    | Otyp_variant (var, _, _) ->
+        (match var with
+         | Ovar_fields fields ->
+             List.iter (fun (_, _, ts) -> List.iter walk ts) fields
+         | Ovar_typ t -> walk t)
+    | Otyp_module { opack_cstrs; _ } ->
+        List.iter (fun (_, t) -> walk t) opack_cstrs
+    | Otyp_stuff _ | Otyp_var _ | Otyp_abstract | Otyp_open | Otyp_sum _
+    | Otyp_record _ | Otyp_record_unboxed_product _
+    | Otyp_of_kind _ -> ()
+  in
+  match walk t1; walk t2 with () -> false | exception Found -> true
+
 (** Un-interpret modalities back to outcome tree. Takes the mutability and
     attributes on the field and removes mutable-implied modalities
     accordingly. *)
@@ -1428,11 +1519,46 @@ let rec tree_of_modal_typexp mode modal ty =
         let non_gen = is_non_gen mode ty in
         let name_gen = Variable_names.new_var_name ~non_gen ty in
         Otyp_var (non_gen, Variable_names.name_of_type name_gen tty)
-    | Tarrow ((l, marg, mret), ty1, ty2, _) ->
-        let lab =
-          if !print_labels || is_omittable l then outcome_label l
-          else Nolabel
+    | Tarrow ((l, binder, marg, mret), ty1, ty2, _) ->
+        (* The label slot of the outcome arrow is the printed name slot: a
+           dependent-arrow binder prints as [x:], and a label that would
+           re-parse as a binder is escaped as [~x:]. *)
+        let binder_scope =
+          match l with Nolabel -> [ty1; ty2] | _ -> [ty1]
         in
+        let binder =
+          match binder with
+          | Some id
+            when exists_refinement_pred (Vox_rexp.mentions_ident id)
+                   binder_scope ->
+              Some id
+          | Some _ | None -> None
+        in
+        let pre_lab, bound_name =
+          match l, binder with
+          | Nolabel, Some id ->
+              let name = choose_refinement_binder_name id in
+              Some (Outcometree.Labelled name), Some (id, name)
+          | Labelled lbl, Some id ->
+              (* The name of a [~x:] binder is the label itself; it cannot
+                 collide, because its scope is the argument's own
+                 refinements, where the label shadows everything else. *)
+              Some (Outcometree.Labelled ("~" ^ lbl)), Some (id, lbl)
+          | (Optional _ | Position _), Some _ ->
+              Misc.fatal_error
+                "Out_type.tree_of_typexp: binder on an optional or position \
+                 argument"
+          | _, None ->
+              (* For a plain label the spelling is decided below, on the
+                 converted output. *)
+              None, None
+        in
+        protect_refs
+          [ R (refinement_binders,
+               (match bound_name with
+                | Some binding -> binding :: !refinement_binders
+                | None -> !refinement_binders)) ]
+        @@ fun () ->
         (* [marg] will contain undetermined axes. It would be imprecise if we
            don't print anything for those axes, since user would interpret that
            as legacy. The best we can do is to zap to legacy and if they do land
@@ -1453,7 +1579,43 @@ let rec tree_of_modal_typexp mode modal ty =
         let acc_mode = curry_mode alloc_mode arg_mode in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
+        let lab =
+          match pre_lab with
+          | Some lab -> lab
+          | None ->
+              let lab =
+                if !print_labels || is_omittable l then outcome_label l
+                else Nolabel
+              in
+              (* Escape a label whose bare spelling would re-parse as a
+                 binder. *)
+              match lab with
+              | Labelled lbl when out_label_needs_escape lbl t1 t2 ->
+                  Labelled ("~" ^ lbl)
+              | lab -> lab
+        in
         Otyp_arrow (lab, tree_of_modes arg_mode, t1, t2)
+    | Trefine { ref_payload; ref_pred } ->
+        let payload = tree_of_typexp mode Alloc.Const.legacy ref_payload in
+        let core_type ty =
+          (* Render an interior type through the printer and re-parse it as
+             source syntax, so that paths, variable names and nested
+             refinements are printed consistently with the enclosing
+             output. *)
+          let rendered =
+            Format_doc.asprintf "%t"
+              (fun ppf ->
+                !Oprint.out_type ppf
+                  (tree_of_typexp mode Alloc.Const.legacy ty))
+          in
+          match Parse.core_type (Lexing.from_string rendered) with
+          | ct -> ct
+          | exception _ -> Ast_helper.Typ.any None
+        in
+        Otyp_refine
+          (payload,
+           Vox_rexp.untype ~var_name:refinement_binder_name ~core_type
+             ref_pred)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->

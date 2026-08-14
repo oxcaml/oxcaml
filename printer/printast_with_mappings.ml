@@ -167,6 +167,13 @@ let arg_label i ppf = function
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
 ;;
 
+let arrow_arg_name i ppf = function
+  | Pan_nolabel -> line i ppf "Pan_nolabel\n"
+  | Pan_name s -> line i ppf "Pan_name \"%s\"\n" s.txt
+  | Pan_tilde s -> line i ppf "Pan_tilde \"%s\"\n" s.txt
+  | Pan_optional s -> line i ppf "Pan_optional \"%s\"\n" s.txt
+;;
+
 let modality i ppf modality =
   line i ppf "modality %a\n" fmt_string_loc
     (Location.map (fun (Modality x) -> x) modality)
@@ -203,7 +210,7 @@ let rec core_type i ppf x =
       jkind_annotation_opt (i+1) ppf jkind
   | Ptyp_arrow (l, ct1, ct2, m1, m2) ->
       line i ppf "Ptyp_arrow\n";
-      arg_label i ppf l;
+      arrow_arg_name i ppf l;
       core_type i ppf ct1;
       core_type i ppf ct2;
       modes i ppf m1;
@@ -261,6 +268,10 @@ let rec core_type i ppf x =
   | Ptyp_splice t ->
       line i ppf "Ptyp_splice\n";
       core_type i ppf t
+  | Ptyp_refine (ct, predicate) ->
+      line i ppf "Ptyp_refine\n";
+      core_type i ppf ct;
+      expression i ppf predicate
   | Ptyp_repr (lv, ct) ->
       line i ppf "Ptyp_repr\n";
       list i reprvar ppf lv;

@@ -196,7 +196,7 @@ let rec constructor_type constr cty =
   | Cty_signature _ ->
       constr
   | Cty_arrow (l, ty, cty) ->
-      let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
+      let arrow_desc = l, None, Mode.Alloc.legacy, Mode.Alloc.legacy in
       let ty = Ctype.newmono ty in
       Ctype.newty
         (Tarrow (arrow_desc, ty, constructor_type constr cty, commu_ok))
@@ -962,7 +962,7 @@ and class_field_second_pass cl_num sign met_env field =
         (fun () ->
            let ty = Btype.method_type label.txt sign in
            let self_type = sign.Types.csig_self in
-           let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
+           let arrow_desc = Nolabel, None, Mode.Alloc.legacy, Mode.Alloc.legacy in
            let self_param_type = Btype.newgenty (Tpoly(self_type, [])) in
            let meth_type =
              Typecore.mk_expected (Btype.newgenty
@@ -982,7 +982,7 @@ and class_field_second_pass cl_num sign met_env field =
         (fun () ->
            let unit_type = Ctype.instance Predef.type_unit in
            let self_param_type = Ctype.newmono sign.Types.csig_self in
-           let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
+           let arrow_desc = Nolabel, None, Mode.Alloc.legacy, Mode.Alloc.legacy in
            let meth_type =
              Typecore.mk_expected (Ctype.newty
                (Tarrow (arrow_desc, self_param_type, unit_type, commu_ok)))
@@ -1592,7 +1592,7 @@ let rec approx_declaration cl =
            classes to work with jkinds *)
       in
       let arg = Ctype.newmono arg in
-      let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
+      let arrow_desc = l, None, Mode.Alloc.legacy, Mode.Alloc.legacy in
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_declaration cl, commu_ok))
   | Pcl_let (_, _, cl) ->
@@ -1612,7 +1612,7 @@ let rec approx_description ct =
            relax jkinds in classes *)
       in
       let arg = Ctype.newmono arg in
-      let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
+      let arrow_desc = l, None, Mode.Alloc.legacy, Mode.Alloc.legacy in
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_description ct, commu_ok))
   | _ -> Ctype.newvar (Jkind.Builtin.value ~why:Object)

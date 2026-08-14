@@ -738,7 +738,7 @@ let remove_mode_and_jkind_variables ty =
       match get_desc ty with
       | Tvar { jkind } -> Jkind.default_to_scannable jkind
       | Tunivar { jkind } -> Jkind.default_to_scannable jkind
-      | Tarrow ((_,marg,mret),targ,tret,_) ->
+      | Tarrow ((_,_,marg,mret),targ,tret,_) ->
          let _ = Alloc.zap_to_legacy marg in
          let _ = Alloc.zap_to_legacy mret in
          go targ; go tret
@@ -1040,7 +1040,8 @@ let rec copy_spine copy_scope ty =
   | Tsplice _
   | Tquote_eval _
   | Tof_kind _
-  | Tbox _ -> ty
+  | Tbox _
+  | Trefine _ -> ty
   | ( Tarrow _ | Tpoly _ | Trepr _ | Ttuple _ | Tunboxed_tuple _ | Tpackage _
     | Tconstr _ | Tmod _ ) as desc ->
       let level = get_level ty in
@@ -2031,7 +2032,7 @@ let curry_mode alloc arg : Alloc.Const.t =
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
-  | l :: locals, Tarrow ((lbl,marg,mret),arg,ret,commu) ->
+  | l :: locals, Tarrow ((lbl,binder,marg,mret),arg,ret,commu) ->
      let marg = with_locality_and_forkable_yielding
       (prim_mode' (Some (mvar_l, mvar_y)) l) marg
      in
@@ -2050,7 +2051,7 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
           mret'
      in
      let ret = instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ret in
-     newty2 ~level:(get_level ty) (Tarrow ((lbl,marg,mret),arg,ret, commu))
+     newty2 ~level:(get_level ty) (Tarrow ((lbl,binder,marg,mret),arg,ret, commu))
   | _ :: _, _ -> assert false
   | [], _ ->
      ty
@@ -2464,6 +2465,8 @@ and try_reduce_quote_eval env t =
   let try_reduce_poly env t = if is_Tpoly t then try_reduce_once env t else t in
   match get_desc t with
   | Tvar _ | Tunivar _ -> raise Cannot_expand
+  (* Refinements are rigid; quoted refined types do not reduce further. *)
+  | Trefine _ -> raise Cannot_expand
   (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
   | Tarrow (a, t1, t2, c) ->
     (* Reduce the parameter type's [Tpoly] immediately *)
@@ -2666,7 +2669,7 @@ let rec extract_concrete_typedecl env ty =
   | Tquote_eval ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tbox ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-  | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
+  | Tvariant _ | Tpackage _ | Tof_kind _ | Trefine _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
   | Tlink _ | Tsubst _ -> assert false
 
@@ -2703,7 +2706,7 @@ let prim_params_yielding env ty ~arity =
     if n <= 0 then Some acc
     else
       match get_desc (expand_head_opt env ty) with
-      | Tarrow ((_, marg, _), _, ret, _) ->
+      | Tarrow ((_, _, marg, _), _, ret, _) ->
         let yielding =
           Yielding.disallow_right (Alloc.proj_comonadic Yielding marg)
         in
@@ -2863,6 +2866,9 @@ let contained_without_boxing env ty =
   | Tpoly (ty, _) -> [ty]
   | Tmod (ty, _) -> [ty]
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
+  | Trefine { ref_payload; _ } ->
+    (* The payload determines the runtime representation. *)
+    [ref_payload]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _
   | Tquote _ | Tsplice _ | Tquote_eval _ -> []
@@ -3125,6 +3131,9 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
     |> estimate_type_jkind ~expand_components ~ignore_mod_bounds env
   | Trepr (ty, _sort_vars) ->
     estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty
+  | Trefine { ref_payload; _ } ->
+    (* The payload determines layout, jkind and runtime representation. *)
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds env ref_payload
   | Tof_kind jkind ->
     (* A [Tof_kind] is substitued for existential [Tvar]s or [Tunivar]s bound in
        a [Tpoly] that would escape their scope. In both cases, we can never
@@ -4039,6 +4048,24 @@ let univars_escape env univar_pairs vl ty =
 
 let univar_pairs = ref []
 
+(* Pairing of dependent-arrow binders, for alpha-equivalence of refinement
+   predicates below them.  Mirrors [univar_pairs]: the comparison functions
+   push a pair while they descend under two arrows whose binders are being
+   identified, and [Vox_rexp.equal] consults the stack. *)
+let arrow_binder_pairs : (Ident.t * Ident.t) list ref = ref []
+
+let with_arrow_binder_pair b1 b2 f =
+  match b1, b2 with
+  | Some id1, Some id2 ->
+      let old = !arrow_binder_pairs in
+      arrow_binder_pairs := (id1, id2) :: old;
+      Misc.try_finally f ~always:(fun () -> arrow_binder_pairs := old)
+  | (Some _ | None), (Some _ | None) ->
+      (* A binder exists only if some predicate mentions it, so a one-sided
+         binder can only be followed by a predicate mismatch; nothing to
+         record. *)
+      f ()
+
 let with_univar_pairs pairs f =
   let old = !univar_pairs in
   univar_pairs := pairs;
@@ -4430,10 +4457,15 @@ let rec mcomp type_pairs env t1 t2 =
             with Not_found -> ()
             end
         (* Rigid cases -- neither side is flexible nor aliasable *)
-        | (Tarrow ((l1,_,_), t1, u1, _), Tarrow ((l2,_,_), t2, u2, _), _, _)
+        | (Tarrow ((l1,_,_,_), t1, u1, _), Tarrow ((l2,_,_,_), t2, u2, _), _, _)
           when compatible_labels ~in_pattern_mode:true l1 l2 ->
             mcomp type_pairs env t1 t2;
             mcomp type_pairs env u1 u2;
+        | (Trefine r1, Trefine r2, _, _) ->
+            (* Only the payloads are compared: returning without raising
+               means "possibly compatible", which is always sound, and the
+               predicates carry no head structure to refute. *)
+            mcomp type_pairs env r1.ref_payload r2.ref_payload
         | (Ttuple tl1, Ttuple tl2, _, _) ->
             mcomp_labeled_list type_pairs env tl1 tl2
         (*
@@ -5131,17 +5163,27 @@ and unify3 uenv t1 t1' t2 t2' =
     end;
     try
       begin match (d1, d2) with
-        (Tarrow ((l1,a1,r1), t1, u1, c1), Tarrow ((l2,a2,r2), t2, u2, c2)) ->
+        (Tarrow ((l1,b1,a1,r1), t1, u1, c1), Tarrow ((l2,b2,a2,r2), t2, u2, c2)) ->
           eq_labels Unify ~in_pattern_mode:(in_pattern_mode uenv) l1 l2;
           unify_alloc_mode_for Unify a1 a2;
           unify_alloc_mode_for Unify r1 r2;
-          unify uenv t1 t2; unify uenv u1 u2;
+          with_arrow_binder_pair b1 b2
+            (fun () -> unify uenv t1 t2; unify uenv u1 u2);
           begin match is_commu_ok c1, is_commu_ok c2 with
           | false, true -> set_commu_ok c1
           | true, false -> set_commu_ok c2
           | false, false -> link_commu ~inside:c1 c2
           | true, true -> ()
           end
+      | (Trefine r1, Trefine r2) ->
+          (* Refinements are rigid: payloads unify, predicates must be
+             syntactically alpha-equivalent.  One-sided refinement falls
+             into the mismatch case below. *)
+          unify uenv r1.ref_payload r2.ref_payload;
+          let type_eq ty1 ty2 = unify uenv ty1 ty2; true in
+          if not (Vox_rexp.equal ~type_eq ~pairs:!arrow_binder_pairs
+                    r1.ref_pred r2.ref_pred)
+          then raise_unexplained_for Unify
       | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
           unify_labeled_list uenv labeled_tl1 labeled_tl2
       | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
@@ -5764,7 +5806,7 @@ let filter_arrow env t l ~force_tpoly =
     let arg_mode = Alloc.newvar () in
     let ret_mode = Alloc.newvar () in
     let t' =
-      newty2 ~level (Tarrow ((l, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok))
+      newty2 ~level (Tarrow ((l, None, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok))
     in
     t', { ty_arg; arg_mode; ty_ret; ret_mode }
   in
@@ -5792,7 +5834,7 @@ let filter_arrow env t l ~force_tpoly =
       end;
       link_type t t';
       arrow_desc
-  | Tarrow((l', arg_mode, ret_mode), ty_arg, ty_ret, _) ->
+  | Tarrow((l', _, arg_mode, ret_mode), ty_arg, ty_ret, _) ->
       if l = l' || !Clflags.classic && l = Nolabel &&
         equivalent_with_nolabels l l'
       then
@@ -6423,9 +6465,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               instantiating [t2], which we do not wish to do *)
               check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
               link_type t1' t2
-          | (Tarrow ((l1,a1,r1), t1, u1, _),
-             Tarrow ((l2,a2,r2), t2, u2, _)) ->
+          | (Tarrow ((l1,b1,a1,r1), t1, u1, _),
+             Tarrow ((l2,b2,a2,r2), t2, u2, _)) ->
               eq_labels Moregen ~in_pattern_mode:false l1 l2;
+              with_arrow_binder_pair b1 b2 @@ fun () ->
               moregen inst_nongen (neg_variance variance) type_pairs env t1 t2;
               moregen inst_nongen variance type_pairs env u1 u2;
               (* [t2] and [u2] is the user-written interface, which we deem as
@@ -6435,6 +6478,19 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               crossing. Similar for [u1] and [u2]. *)
               moregen_alloc_mode env t2 ~is_ret:false (neg_variance variance) a1 a2;
               moregen_alloc_mode env u2 ~is_ret:true variance r1 r2
+          | (Trefine r1, Trefine r2) ->
+              (* Refinements are rigid: the payloads are compared and the
+                 predicates must be syntactically alpha-equivalent.  There
+                 is no weakening — that is a later piece. *)
+              moregen inst_nongen variance type_pairs env
+                r1.ref_payload r2.ref_payload;
+              let type_eq ty1 ty2 =
+                moregen inst_nongen variance type_pairs env ty1 ty2;
+                true
+              in
+              if not (Vox_rexp.equal ~type_eq ~pairs:!arrow_binder_pairs
+                        r1.ref_pred r2.ref_pred)
+              then raise_unexplained_for Moregen
           | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
               moregen_labeled_list inst_nongen variance type_pairs env
                 labeled_tl1 labeled_tl2
@@ -6948,13 +7004,25 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           match (get_desc t1', get_desc t2') with
             (Tvar { jkind = k1 }, Tvar { jkind = k2 }) when rename ->
               eqtype_subst env type_pairs subst t1' k1 t2' k2 ~do_jkind_check
-          | (Tarrow ((l1,a1,r1), t1, u1, _),
-             Tarrow ((l2,a2,r2), t2, u2, _)) ->
+          | (Tarrow ((l1,b1,a1,r1), t1, u1, _),
+             Tarrow ((l2,b2,a2,r2), t2, u2, _)) ->
               eq_labels Equality ~in_pattern_mode:false l1 l2;
+              with_arrow_binder_pair b1 b2 @@ fun () ->
               eqtype rename type_pairs subst env t1 t2 ~do_jkind_check:true;
               eqtype rename type_pairs subst env u1 u2 ~do_jkind_check:true;
               eqtype_alloc_mode a1 a2;
               eqtype_alloc_mode r1 r2
+          | (Trefine r1, Trefine r2) ->
+              eqtype rename type_pairs subst env
+                r1.ref_payload r2.ref_payload ~do_jkind_check:true;
+              let type_eq ty1 ty2 =
+                eqtype rename type_pairs subst env ty1 ty2
+                  ~do_jkind_check:true;
+                true
+              in
+              if not (Vox_rexp.equal ~type_eq ~pairs:!arrow_binder_pairs
+                        r1.ref_pred r2.ref_pred)
+              then raise_unexplained_for Equality
           | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
               eqtype_labeled_list rename type_pairs subst env labeled_tl1
                 labeled_tl2
@@ -7555,7 +7623,10 @@ let rec build_subtype env (visited : transient_expr list)
           (t, Unchanged)
       else
         (t, Unchanged)
-  | Tarrow((l,a,r), t1, t2, _) ->
+  | Trefine _ ->
+      (* Subtyping rules for refinements belong to a later piece. *)
+      (t, Unchanged)
+  | Tarrow((l,binder,a,r), t1, t2, _) ->
       let tt = Transient_expr.repr t in
       if memq_warn tt visited then (t, Unchanged) else
       let visited = tt :: visited in
@@ -7592,7 +7663,7 @@ let rec build_subtype env (visited : transient_expr list)
       in
       let c = max_change c1 (max_change c2 (max_change c3 c4)) in
       if c > Unchanged
-      then (newty (Tarrow((l,a',r'), t1', t2', commu_ok)), c)
+      then (newty (Tarrow((l,binder,a',r'), t1', t2', commu_ok)), c)
       else (t, Unchanged)
   | Ttuple labeled_tlist ->
       build_subtype_tuple env visited loops posi level t labeled_tlist
@@ -7831,8 +7902,8 @@ let rec subtype_rec env trace t1 t2 cstrs =
     match (get_desc t1, get_desc t2) with
       (Tvar _, _) | (_, Tvar _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
-    | (Tarrow((l1,a1,r1), t1, u1, _),
-       Tarrow((l2,a2,r2), t2, u2, _))
+    | (Tarrow((l1,_,a1,r1), t1, u1, _),
+       Tarrow((l2,_,a2,r2), t2, u2, _))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
         let cstrs =
           subtype_rec

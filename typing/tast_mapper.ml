@@ -1054,9 +1054,13 @@ let typ sub x =
     | (Ttyp_var (_,None) | Ttyp_call_pos) as d -> d
     | Ttyp_var (s, Some jkind) ->
         Ttyp_var (s, Some (sub.jkind_annotation sub jkind))
-    | Ttyp_arrow (label, ct1, ma1, ct2, ma2) ->
-        Ttyp_arrow (label, sub.typ sub ct1, sub.modes sub ma1,
+    | Ttyp_arrow (label, binder, ct1, ma1, ct2, ma2) ->
+        Ttyp_arrow (label, binder, sub.typ sub ct1, sub.modes sub ma1,
                     sub.typ sub ct2, sub.modes sub ma2)
+    | Ttyp_refine (payload, pred) ->
+        (* The predicate is resolved syntax shared with the type graph, not
+           a typedtree fragment. *)
+        Ttyp_refine (sub.typ sub payload, pred)
     | Ttyp_tuple list ->
         Ttyp_tuple (List.map (fun (label, t) -> label, sub.typ sub t) list)
     | Ttyp_unboxed_tuple list ->

@@ -111,6 +111,8 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
   | Val_poly_and_layout
+  | Refinement_predicate_not_total of string
+  | Refinement_predicate_unsupported of string
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -875,9 +877,63 @@ let get_type_param_name styp =
   | Ptyp_var (name, _) -> Some name
   | _ -> Misc.fatal_error "non-type-variable in get_type_param_name"
 
+(* Dependent-arrow binders currently in scope, for resolving names inside
+   refinement predicates.  The dynamic extent of translating an arrow's
+   domain and codomain is exactly the binder's lexical scope, so a
+   [protect_refs]-managed reference suffices; compare [TyVarEnv]. *)
+let refinement_scope : Ident.t Misc.Stdlib.String.Map.t ref =
+  ref Misc.Stdlib.String.Map.empty
+
+let with_refinement_binder binder f =
+  match binder with
+  | None -> f ()
+  | Some (name, id) ->
+      Misc.protect_refs
+        [ Misc.R (refinement_scope,
+                  Misc.Stdlib.String.Map.add name id !refinement_scope) ]
+        f
+
+(* The decided form of the name slot of one arrow. *)
+type arrow_argument_name =
+  { aan_label : Parsetree.arg_label;  (* before [%call_pos] resolution *)
+    aan_binder : (string * [ `Domain_and_codomain | `Domain_only ]) option;
+    aan_bare_label : bool
+    (* a bare [x:T] that the occurrence test decided is a label *) }
+
+let decide_arrow_arg_name (arg : Parsetree.arrow_arg_name)
+    ~(domain : Parsetree.core_type) ~(codomain : Parsetree.core_type) =
+  match arg with
+  | Pan_nolabel ->
+      { aan_label = Nolabel; aan_binder = None; aan_bare_label = false }
+  | Pan_optional name ->
+      (* Optional parameters never bind: the argument may be absent, so
+         "the value of this parameter" is not defined. *)
+      { aan_label = Optional name.txt; aan_binder = None;
+        aan_bare_label = false }
+  | Pan_tilde name ->
+      (* Always the label; the name is additionally available as the value
+         of the argument inside the argument's own refinements. *)
+      let binder =
+        if Vox_binding.name_used_in_refinement name.txt [domain]
+        then Some (name.txt, `Domain_only)
+        else None
+      in
+      { aan_label = Labelled name.txt; aan_binder = binder;
+        aan_bare_label = false }
+  | Pan_name name ->
+      match Vox_binding.classify_bare_name name.txt ~domain ~codomain with
+      | Positional_binder ->
+          { aan_label = Nolabel;
+            aan_binder = Some (name.txt, `Domain_and_codomain);
+            aan_bare_label = false }
+      | Ordinary_label ->
+          { aan_label = Labelled name.txt; aan_binder = None;
+            aan_bare_label = true }
+
 let rec extract_params styp =
   match styp.ptyp_desc with
-  | Ptyp_arrow (l, a, r, ma, mr) ->
+  | Ptyp_arrow (arg, a, r, ma, mr) ->
+      let arg = decide_arrow_arg_name arg ~domain:a ~codomain:r in
       let arg_mode = Typemode.transl_alloc_mode ma in
       let ret_mode = Typemode.transl_alloc_mode mr in
       let params, ret, ret_mode =
@@ -886,7 +942,7 @@ let rec extract_params styp =
           extract_params r
         | _ -> [], r, ret_mode
       in
-      (l, arg_mode, a) :: params, ret, ret_mode
+      (arg, arg_mode, a) :: params, ret, ret_mode
   | _ -> assert false
 
 let check_arg_type styp =
@@ -908,6 +964,12 @@ let transl_label (label : Parsetree.arg_label)
   | Labelled l, _ -> Labelled l
   | Optional l, _ -> Optional l
   | Nolabel, _ -> Nolabel
+
+(* The label of an arrow, for callers that do not translate the arrow
+   itself (e.g. type approximation in [Typecore]). *)
+let transl_arrow_arg_label arg ~domain ~codomain arg_opt =
+  let decided = decide_arrow_arg_name arg ~domain ~codomain in
+  transl_label decided.aan_label arg_opt
 
 (* Parallel to [transl_label_from_expr]. *)
 let transl_label_from_pat (label : Parsetree.arg_label)
@@ -989,15 +1051,38 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       ctyp desc typ
   | Ptyp_arrow _ ->
       let args, ret, ret_mode = extract_params styp in
+      (* Reading a mixed arrow requires scanning the whole type to tell
+         binders from labels; warn once per chain. *)
+      let has_positional_binder =
+        List.exists
+          (fun (arg, _, _) ->
+            match arg.aan_binder with
+            | Some (_, `Domain_and_codomain) -> true
+            | Some (_, `Domain_only) | None -> false)
+          args
+      and has_bare_label =
+        List.exists (fun (arg, _, _) -> arg.aan_bare_label) args
+      in
+      if has_positional_binder && has_bare_label then
+        Location.prerr_warning styp.ptyp_loc
+          Warnings.Vox_mixed_arrow_conventions;
       let rec loop acc_mode args =
         match args with
-        | (l, arg_mode, arg) :: rest ->
-          check_arg_type arg;
-          let l = transl_label l (Some arg) in
+        | (arg, arg_mode, sarg) :: rest ->
+          check_arg_type sarg;
+          let l = transl_label arg.aan_label (Some sarg) in
+          let binder =
+            Option.map
+              (fun (name, scope) -> name, Ident.create_local name, scope)
+              arg.aan_binder
+          in
+          let binder_ident = Option.map (fun (_, id, _) -> id) binder in
+          let in_scope = Option.map (fun (name, id, _) -> name, id) binder in
           let arg_cty =
+            with_refinement_binder in_scope @@ fun () ->
             if Btype.is_position l then
               ctyp Ttyp_call_pos (newconstr Predef.path_lexing_position [])
-            else transl_type env ~policy ~row_context arg_mode.mode_modes arg
+            else transl_type env ~policy ~row_context arg_mode.mode_modes sarg
           in
           let acc_mode = curry_mode acc_mode arg_mode.mode_modes in
           let ret_mode =
@@ -1006,7 +1091,15 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             | _ :: _ ->
               { mode_modes = acc_mode; mode_desc = [] }
           in
-          let ret_cty = loop acc_mode rest in
+          let in_scope_of_rest =
+            match binder with
+            | Some (name, id, `Domain_and_codomain) -> Some (name, id)
+            | Some (_, _, `Domain_only) | None -> None
+          in
+          let ret_cty =
+            with_refinement_binder in_scope_of_rest @@ fun () ->
+            loop acc_mode rest
+          in
           let arg_ty = arg_cty.ctyp_type in
           let arg_ty =
             if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
@@ -1015,19 +1108,20 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             if not (Btype.is_optional l) then arg_ty
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
-                raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
+                raise (Error (sarg.ptyp_loc, env, Polymorphic_optional_param));
               newmono
                 (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
             end
           in
           let arg_mode_desc = Alloc.of_const arg_mode.mode_modes in
           let ret_mode_desc = Alloc.of_const ret_mode.mode_modes in
-          let arrow_desc = (l, arg_mode_desc, ret_mode_desc) in
+          let arrow_desc = (l, binder_ident, arg_mode_desc, ret_mode_desc) in
           let ty =
             newty (Tarrow(arrow_desc, arg_ty, ret_cty.ctyp_type, commu_ok))
           in
           ctyp
-            (Ttyp_arrow (l, arg_cty, arg_mode, ret_cty, ret_mode))
+            (Ttyp_arrow (l, binder_ident, arg_cty, arg_mode, ret_cty,
+                         ret_mode))
             ty
         | [] -> transl_type env ~policy ~row_context ret_mode.mode_modes ret
       in
@@ -1339,8 +1433,211 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let new_env = Env.enter_splice ~loc env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_splice cty) (newty (Tsplice cty.ctyp_type))
+  | Ptyp_refine (spayload, spred) ->
+      let payload_cty = transl_type env ~policy ~row_context mode spayload in
+      let pred =
+        transl_refinement_predicate env ~policy ~row_context
+          Misc.Stdlib.String.Map.empty spred
+      in
+      let ty =
+        newty (Trefine { ref_payload = payload_cty.ctyp_type;
+                         ref_pred = pred })
+      in
+      ctyp (Ttyp_refine (payload_cty, pred)) ty
   | Ptyp_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
+
+(* Translation of refinement predicates.  The predicate keeps the shape of
+   the source expression; the sublanguage is the total subset, enforced
+   here by construction.  Value names are resolved: [locals] are the
+   predicate's own binders, [refinement_scope] the dependent-arrow binders,
+   and everything else is looked up in the environment.  Beyond name
+   resolution, nothing is checked: the typing rules for refinements belong
+   to a later piece. *)
+and transl_refinement_predicate env ~policy ~row_context locals sexp
+    : refinement_expression =
+  let loc = sexp.pexp_loc in
+  let mk rexp_desc = { rexp_desc; rexp_loc = loc } in
+  let not_total form =
+    raise (Error (loc, env, Refinement_predicate_not_total form))
+  in
+  let unsupported what =
+    raise (Error (loc, env, Refinement_predicate_unsupported what))
+  in
+  let transl locals sexp =
+    transl_refinement_predicate env ~policy ~row_context locals sexp
+  in
+  match sexp.pexp_desc with
+  | Pexp_hole -> mk Rexp_hole
+  | Pexp_ident { txt = Longident.Lident name; _ }
+    when Misc.Stdlib.String.Map.mem name locals ->
+      mk (Rexp_var (Misc.Stdlib.String.Map.find name locals))
+  | Pexp_ident { txt = Longident.Lident name; _ }
+    when Misc.Stdlib.String.Map.mem name !refinement_scope ->
+      mk (Rexp_var (Misc.Stdlib.String.Map.find name !refinement_scope))
+  | Pexp_ident { txt = Longident.Lident "ref"; _ } ->
+      not_total "References are"
+  | Pexp_ident { txt = Longident.Lident ":="; _ } ->
+      not_total "Assignments are"
+  | Pexp_ident { txt = Longident.Lident "!"; _ } ->
+      not_total "Dereferences are"
+  | Pexp_ident lid ->
+      let path, _, _ = Env.lookup_value ~loc:lid.loc lid.txt env in
+      mk (Rexp_ident (path, lid))
+  | Pexp_constant const -> mk (Rexp_constant const)
+  | Pexp_apply (fn, args) ->
+      mk (Rexp_apply
+            (transl locals fn,
+             List.map (fun (lbl, arg) -> lbl, transl locals arg) args))
+  | Pexp_tuple components ->
+      mk (Rexp_tuple
+            (List.map (fun (lbl, c) -> lbl, transl locals c) components))
+  | Pexp_construct (lid, arg) ->
+      (* Resolve, to reject unbound names here rather than in a later
+         piece; the predicate keeps the source name. *)
+      ignore
+        (Env.lookup_constructor ~loc:lid.loc Env.Positive lid.txt env
+         : _ * _);
+      mk (Rexp_construct (lid, Option.map (transl locals) arg))
+  | Pexp_field (e, lid) ->
+      ignore
+        (Env.lookup_label ~record_form:Legacy ~loc:lid.loc Env.Projection
+           lid.txt env
+         : _ Data_types.gen_label_description);
+      mk (Rexp_field (transl locals e, lid))
+  | Pexp_ifthenelse (cond, ifso, ifnot) ->
+      mk (Rexp_ifthenelse
+            (transl locals cond,
+             transl locals ifso,
+             Option.map (transl locals) ifnot))
+  | Pexp_let (Mutable, _, _, _) -> not_total "Mutable bindings are"
+  | Pexp_let (Immutable, Recursive, _, _) ->
+      unsupported "A recursive binding"
+  | Pexp_let (Immutable, Nonrecursive, [ vb ], body) -> begin
+      match vb.pvb_pat.ppat_desc with
+      | Ppat_var name ->
+          let rb_expr = transl locals vb.pvb_expr in
+          let id = Ident.create_local name.txt in
+          let locals = Misc.Stdlib.String.Map.add name.txt id locals in
+          mk (Rexp_let ({ rb_ident = id; rb_expr }, transl locals body))
+      | _ -> unsupported "This binding pattern"
+    end
+  | Pexp_let (Immutable, Nonrecursive, _, _) ->
+      unsupported "A multiple binding"
+  | Pexp_function (params, constraint_, body) ->
+      let locals, params =
+        List.fold_left_map
+          (fun locals param ->
+            match param.pparam_desc with
+            | Pparam_val (Nolabel, None, { ppat_desc = Ppat_var name; _ }) ->
+                let id = Ident.create_local name.txt in
+                Misc.Stdlib.String.Map.add name.txt id locals, id
+            | Pparam_val _ | Pparam_newtype _ ->
+                raise (Error (param.pparam_loc, env,
+                              Refinement_predicate_unsupported
+                                "This function parameter")))
+          locals params
+      in
+      let body =
+        match body with
+        | Pfunction_body body -> transl locals body
+        | Pfunction_cases _ ->
+            unsupported "A function defined by cases"
+      in
+      let body =
+        match constraint_ with
+        | { mode_annotations = []; ret_mode_annotations = [];
+            ret_type_constraint = None } -> body
+        | { ret_type_constraint = Some (Pconstraint ty);
+            mode_annotations = []; ret_mode_annotations = [] } ->
+            let cty =
+              transl_type env ~policy ~row_context Alloc.Const.legacy ty
+            in
+            { rexp_desc = Rexp_constraint (body, cty.ctyp_type);
+              rexp_loc = loc }
+        | _ -> unsupported "This function constraint"
+      in
+      List.fold_right (fun id body -> mk (Rexp_fun (id, body))) params body
+  | Pexp_match (scrutinee, cases) ->
+      mk (Rexp_match
+            (transl locals scrutinee,
+             List.map
+               (transl_refinement_case env ~policy ~row_context locals)
+               cases))
+  | Pexp_constraint (e, Some ty, []) ->
+      let cty = transl_type env ~policy ~row_context Alloc.Const.legacy ty in
+      mk (Rexp_constraint (transl locals e, cty.ctyp_type))
+  | Pexp_constraint _ -> unsupported "This form of constraint"
+  | Pexp_while _ -> not_total "While loops are"
+  | Pexp_for _ -> not_total "For loops are"
+  | Pexp_sequence _ -> not_total "Sequencing is"
+  | Pexp_setfield _ | Pexp_setvar _ -> not_total "Assignment is"
+  | Pexp_array _ -> not_total "Arrays are"
+  | Pexp_try _ -> not_total "Exception handlers are"
+  | Pexp_assert _ -> not_total "Assertions are"
+  | Pexp_lazy _ -> not_total "Lazy expressions are"
+  | Pexp_letexception _ -> not_total "Exception declarations are"
+  | Pexp_record _ | Pexp_record_unboxed_product _ ->
+      unsupported "A record expression"
+  | _ -> unsupported "This expression form"
+
+and transl_refinement_case env ~policy ~row_context locals case =
+  (match case.pc_lhs.ppat_desc with
+   | _ -> ());
+  let locals, rc_lhs =
+    transl_refinement_pattern env locals case.pc_lhs
+  in
+  { rc_lhs;
+    rc_guard =
+      Option.map
+        (transl_refinement_predicate env ~policy ~row_context locals)
+        case.pc_guard;
+    rc_rhs =
+      transl_refinement_predicate env ~policy ~row_context locals
+        case.pc_rhs }
+
+and transl_refinement_pattern env locals pat =
+  let loc = pat.ppat_loc in
+  let mk rpat_desc = { rpat_desc; rpat_loc = loc } in
+  let unsupported what =
+    raise (Error (loc, env, Refinement_predicate_unsupported what))
+  in
+  match pat.ppat_desc with
+  | Ppat_any -> locals, mk Rpat_any
+  | Ppat_var name ->
+      let id = Ident.create_local name.txt in
+      Misc.Stdlib.String.Map.add name.txt id locals, mk (Rpat_var id)
+  | Ppat_constant const -> locals, mk (Rpat_constant const)
+  | Ppat_tuple (components, Closed) ->
+      let locals, components =
+        List.fold_left_map
+          (fun locals (lbl, p) ->
+            let locals, p = transl_refinement_pattern env locals p in
+            locals, (lbl, p))
+          locals components
+      in
+      locals, mk (Rpat_tuple components)
+  | Ppat_tuple (_, Open) -> unsupported "A partial tuple pattern"
+  | Ppat_construct (lid, arg) ->
+      ignore
+        (Env.lookup_constructor ~loc:lid.loc Env.Pattern lid.txt env
+         : _ * _);
+      let locals, arg =
+        match arg with
+        | None -> locals, None
+        | Some ([], p) ->
+            let locals, p = transl_refinement_pattern env locals p in
+            locals, Some p
+        | Some (_ :: _, _) -> unsupported "An existential type binding"
+      in
+      locals, mk (Rpat_construct (lid, arg))
+  | Ppat_alias (p, name) ->
+      let locals, p = transl_refinement_pattern env locals p in
+      let id = Ident.create_local name.txt in
+      Misc.Stdlib.String.Map.add name.txt id locals,
+      mk (Rpat_alias (p, id))
+  | Ppat_or _ -> unsupported "An or-pattern"
+  | _ -> unsupported "This pattern form"
 
 and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
   let print_name = "'" ^ name in
@@ -2102,6 +2399,15 @@ let report_error_doc loc env = function
          value descriptions introduced using %a.@]"
         Style.inline_code "layout_"
         Style.inline_code "val poly_"
+  | Refinement_predicate_not_total form ->
+      Location.errorf ~loc
+        "@[%s not allowed in a refinement predicate:@ predicates must be \
+         total.@]"
+        form
+  | Refinement_predicate_unsupported what ->
+      Location.errorf ~loc
+        "@[%s is not supported in refinement predicates.@]"
+        what
 
 let () =
   Location.register_error_of_exn

@@ -286,6 +286,82 @@ and type_desc =
   | Tbox of type_expr
   (** [Tbox ty] ==> [ty box] *)
 
+  | Trefine of refinement_desc
+  (** [Trefine { ref_payload; ref_pred }] ==> [ref_payload{ ref_pred }]
+
+      A refinement type.  The payload determines the layout, jkind and
+      runtime representation; refinements never reach lambda.  Refinements
+      are rigid: they are never inferred and never solved for, [t{p}] and
+      [t] do not unify, and two refined types are equal iff their payloads
+      are equal and their predicates are syntactically alpha-equivalent. *)
+
+(** A refinement type: the payload type and the predicate over the refined
+    value. *)
+and refinement_desc =
+  { ref_payload : type_expr;
+    ref_pred : refinement_expression }
+
+(** A refinement predicate.  This is a second version of the type of
+    expressions for inside the type language: the same shape as ordinary
+    expressions, restricted by construction to the total sublanguage (no
+    loops, no references, no assignment, no sequencing).  Value names are
+    resolved — bound names ([Rexp_var]) are the arrow binders and the
+    predicate's own binders, free names ([Rexp_ident]) are looked up in the
+    environment when the type is translated — but the predicate is not
+    typechecked in any other way; the typing rules for refinements belong
+    to a later piece.  The interior types ([Rexp_constraint]) are ordinary
+    types in the type graph: generic traversals ([Btype], [Subst]) descend
+    into them. *)
+and refinement_expression =
+  { rexp_desc : refinement_expression_desc;
+    rexp_loc : Location.t }
+
+and refinement_expression_desc =
+  | Rexp_hole
+  (** [_]: the value of the innermost enclosing refinement. *)
+  | Rexp_var of Ident.t
+  (** A bound name: an arrow binder, or a binder introduced inside the
+      predicate by [Rexp_let], [Rexp_fun] or [Rexp_match]. *)
+  | Rexp_ident of Path.t * Longident.t loc
+  (** A free name, resolved when the type was translated.  The longident
+      is kept for printing. *)
+  | Rexp_constant of Parsetree.constant
+  | Rexp_apply of
+      refinement_expression * (Asttypes.arg_label * refinement_expression) list
+  | Rexp_tuple of (string option * refinement_expression) list
+  | Rexp_construct of Longident.t loc * refinement_expression option
+  | Rexp_field of refinement_expression * Longident.t loc
+  | Rexp_ifthenelse of
+      refinement_expression * refinement_expression
+      * refinement_expression option
+  | Rexp_let of refinement_binding * refinement_expression
+  (** [let x = e1 in e2]; only single, non-recursive variable bindings. *)
+  | Rexp_fun of Ident.t * refinement_expression
+  (** [fun x -> e]; only single, unlabelled variable parameters. *)
+  | Rexp_match of refinement_expression * refinement_case list
+  | Rexp_constraint of refinement_expression * type_expr
+
+and refinement_binding =
+  { rb_ident : Ident.t;
+    rb_expr : refinement_expression }
+
+and refinement_case =
+  { rc_lhs : refinement_pattern;
+    rc_guard : refinement_expression option;
+    rc_rhs : refinement_expression }
+
+and refinement_pattern =
+  { rpat_desc : refinement_pattern_desc;
+    rpat_loc : Location.t }
+
+and refinement_pattern_desc =
+  | Rpat_any
+  | Rpat_var of Ident.t
+  | Rpat_constant of Parsetree.constant
+  | Rpat_tuple of (string option * refinement_pattern) list
+  | Rpat_construct of Longident.t loc * refinement_pattern option
+  | Rpat_alias of refinement_pattern * Ident.t
+
 (** This is used in the Typedtree. It is distinct from
     {{!Asttypes.arg_label}[arg_label]} because Position argument labels are
     discovered through typechecking. *)
@@ -295,8 +371,16 @@ and arg_label =
   | Optional of string (** [?label:T -> ...] *)
   | Position of string (** [label:[%call_pos] -> ...] *)
 
+(** The second component is the optional value binder of a dependent arrow:
+    in [x:T -> U] where [x] occurs in a refinement in [T] or [U], the ident
+    binds [x] over the refinement predicates of both [T] and [U]; in
+    [~x:T -> U] where [x] occurs in a refinement in [T], the label is kept
+    and the ident binds [x] over the refinement predicates of [T] only.
+    The binder is [Some] only when it is referenced by some predicate.
+    Binder names are not part of type identity: equality is up to
+    alpha-conversion. *)
 and arrow_desc =
-  arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+  arg_label * Ident.t option * Mode.Alloc.lr * Mode.Alloc.lr
 
 (** [package] corresponds to the type of a first-class module *)
 and package =

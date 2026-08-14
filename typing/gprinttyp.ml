@@ -677,8 +677,10 @@ module Digraph = struct
     let std_edge = edge std in
     match desc with
     | Types.Tvar { name; _ } -> mk "%a" Pp.pretty_var name
-    | Types.Tarrow ((l,_,_),t1,t2,_) ->
+    | Types.Tarrow ((l,_,_,_),t1,t2,_) ->
        mk "→%a" Pp.exponent_of_label l |> numbered [t1; t2]
+    | Types.Trefine r ->
+        mk "{...}" |> numbered [r.ref_payload]
     | Types.Ttuple tl ->
         mk "*" |> labeled_edges params id tl
     | Types.Tunboxed_tuple tl ->

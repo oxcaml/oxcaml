@@ -440,6 +440,10 @@ and print_simple_out_type ppf =
   function
     Otyp_class (id, tyl) ->
       fprintf ppf "@[%a#%a@]" print_typargs tyl print_ident id
+  | Otyp_refine (payload, predicate) ->
+      fprintf ppf "@[<hov 2>%a{ %a }@]"
+        print_simple_out_type payload
+        (Format_doc.deprecated Pprintast.expression) predicate
   | Otyp_constr (id, tyl) ->
       pp_open_box ppf 0;
       print_typargs ppf tyl;

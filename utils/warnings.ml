@@ -170,6 +170,7 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
+  | Vox_mixed_arrow_conventions             (* 230 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -273,6 +274,7 @@ let number = function
   | Useless_valpoly -> 219
   | Redundant_modality -> 220
   | Unused_alert_disable _ -> 221
+  | Vox_mixed_arrow_conventions -> 230
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -714,6 +716,11 @@ let descriptions = [
     names = ["unused-alert-disable"];
     description = "An attribute disabling an alert did not suppress any\n\
     \    occurrence of that alert.";
+    since = since 5 4 };
+  { number = 230;
+    names = ["vox-mixed-arrow-conventions"];
+    description = "An arrow type mixes positional value binders and\n\
+    \    bare-spelled labels.";
     since = since 5 4 };
 ]
 
@@ -1618,6 +1625,11 @@ let message = function
       msg "This attribute disables alert %a,@ \
            but it did not suppress any occurrence of the alert."
         Style.inline_code name
+  | Vox_mixed_arrow_conventions ->
+      msg "This arrow type mixes positional value binders and bare-spelled@ \
+           labels; reading it requires scanning the whole type.@ Spell the \
+           labels with a tilde (%a) to make the convention explicit."
+        Style.inline_code "~x:"
 ;;
 
 let nerrors = ref 0

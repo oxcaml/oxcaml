@@ -372,9 +372,12 @@ let rec core_type i ppf x =
   | Ttyp_var (s, jkind) ->
       line i ppf "Ttyp_var %s\n" (Option.value ~default:"_" s);
       option i jkind_annotation ppf jkind
-  | Ttyp_arrow (l, ct1, m1, ct2, m2) ->
+  | Ttyp_arrow (l, binder, ct1, m1, ct2, m2) ->
       line i ppf "Ttyp_arrow\n";
       arg_label i ppf l;
+      (match binder with
+       | None -> ()
+       | Some id -> line (i+1) ppf "binder %a\n" fmt_ident id);
       core_type i ppf ct1;
       alloc_modes i ppf m1;
       core_type i ppf ct2;
@@ -431,6 +434,17 @@ let rec core_type i ppf x =
   | Ttyp_splice t ->
       line i ppf "Ttyp_splice\n";
       core_type i ppf t
+  | Ttyp_refine (ct, pred) ->
+      line i ppf "Ttyp_refine\n";
+      core_type i ppf ct;
+      (* The predicate is resolved syntax shared with the type graph; print
+         it back as source. *)
+      line (i+1) ppf "predicate %a\n"
+        (fun ppf pred ->
+          Pprintast.expression ppf
+            (Vox_rexp.untype ~var_name:Ident.name
+               ~core_type:(fun _ -> Ast_helper.Typ.any None) pred))
+        pred
   | Ttyp_repr (lv, ct) ->
       line i ppf "Ttyp_repr%a\n"
         (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;

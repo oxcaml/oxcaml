@@ -246,6 +246,9 @@ module Type_shape = struct
             (* CR layout-polymorphism aivaskovic: sort variables do not
                influence the type shape. *)
             of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
+          | Trefine { ref_payload; _ } ->
+            (* The payload determines the runtime representation. *)
+            of_type_expr_go ~depth ~visited ref_payload subst shape_for_constr
           | Tunboxed_tuple exprs ->
             Shape.unboxed_tuple (of_expr_list (List.map snd exprs))
           | Tobject _ | Tnil | Tfield _ ->
@@ -269,7 +272,7 @@ module Type_shape = struct
                 | Tpoly (_, _)
                 | Trepr (_, _)
                 | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
-                | Tbox _ ->
+                | Tbox _ | Trefine _ ->
                   assert false
               in
               Misc.fatal_errorf

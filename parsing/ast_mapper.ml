@@ -183,6 +183,13 @@ module T = struct
         let jkind = map_opt (sub.jkind_annotation sub) jkind in
         var ~loc ~attrs s jkind
     | Ptyp_arrow (lab, t1, t2, m1, m2) ->
+        let lab =
+          match lab with
+          | Pan_nolabel -> Pan_nolabel
+          | Pan_name name -> Pan_name (map_loc sub name)
+          | Pan_tilde name -> Pan_tilde (map_loc sub name)
+          | Pan_optional name -> Pan_optional (map_loc sub name)
+        in
         arrow ~loc ~attrs lab (sub.typ sub t1) (sub.typ sub t2) (sub.modes sub m1) (sub.modes sub m2)
     | Ptyp_tuple tyl ->
         tuple ~loc ~attrs (List.map (fun (l, t) -> l, sub.typ sub t) tyl)
@@ -224,6 +231,8 @@ module T = struct
         repr ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
     | Ptyp_newlayout (lvars, t) ->
         newlayout ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
+    | Ptyp_refine (t, predicate) ->
+        refine ~loc ~attrs (sub.typ sub t) (sub.expr sub predicate)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
 
   let map_type_declaration sub

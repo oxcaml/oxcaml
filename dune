@@ -185,6 +185,7 @@
   ast_helper
   camlinternalMenhirLib
   ast_iterator
+  vox_binding
   parser
   lexer
   parse
@@ -248,6 +249,7 @@
   shape_reduce
   zero_alloc
   types
+  vox_rexp
   btype
   oprint
   subst

@@ -747,11 +747,15 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   match ctyp_desc with
   | Ttyp_var (_, jkind) ->
       Option.iter (sub.jkind_annotation sub) jkind
-  | Ttyp_arrow (_, ct1, ma1, ct2, ma2) ->
+  | Ttyp_arrow (_, _, ct1, ma1, ct2, ma2) ->
       sub.typ sub ct1;
       sub.modes sub ma1;
       sub.typ sub ct2;
       sub.modes sub ma2
+  | Ttyp_refine (payload, _pred) ->
+      (* The predicate is resolved syntax shared with the type graph, not a
+         typedtree fragment; there is nothing typedtree-shaped to visit. *)
+      sub.typ sub payload
   | Ttyp_tuple list -> List.iter (fun (_, t) -> sub.typ sub t) list
   | Ttyp_unboxed_tuple list -> List.iter (fun (_, t) -> sub.typ sub t) list
   | Ttyp_constr (_, lid, list) ->

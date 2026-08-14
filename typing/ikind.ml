@@ -450,6 +450,9 @@ module Solver = struct
       | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
       | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
       | Types.Trepr (ty, _sort_vars) -> kind ~use_tables:true ctx ty
+      | Types.Trefine { ref_payload; _ } ->
+        (* The payload determines the kind. *)
+        kind ~use_tables:true ctx ref_payload
       | Types.Tpoly (ty, univars) ->
         (* CR ikinds: this is sound but not fully precise.
           Internal ticket 5746. *)

@@ -76,6 +76,15 @@ val valid_tyvar_name : string -> bool
 val transl_label :
         Parsetree.arg_label -> Parsetree.core_type option -> Types.arg_label
 
+(** The label of an arrow type, for callers that do not translate the
+    arrow itself: decides bare names by the occurrence test
+    ({!Vox_binding.classify_bare_name}) and then behaves as
+    {!transl_label}. *)
+val transl_arrow_arg_label :
+        Parsetree.arrow_arg_name ->
+        domain:Parsetree.core_type -> codomain:Parsetree.core_type ->
+        Parsetree.core_type option -> Types.arg_label
+
 (** Produces a Typedtree argument label, as well as the pattern corresponding
     to the argument. [transl_label lbl pat] is equal to:
 
@@ -203,6 +212,8 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
   | Val_poly_and_layout
+  | Refinement_predicate_not_total of string
+  | Refinement_predicate_unsupported of string
 
 exception Error of Location.t * Env.t * error
 

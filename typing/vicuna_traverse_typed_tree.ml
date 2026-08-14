@@ -155,6 +155,8 @@ let classify env ty : classification =
       raise (Vicuna_unsupported (Other "Unexpected type constructor Trepr"))
     | Tbox _ ->
       raise (Vicuna_unsupported (Other "Unexpected type constructor Tbox"))
+    | Trefine _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Trefine"))
 
 type can_be_float_array =
   | YesFloatArray
@@ -182,6 +184,9 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
   in
   let scty = scrape_ty env ty in
   match get_desc scty with
+  | Trefine _ ->
+    Misc.fatal_error
+      "Vicuna_traverse_typed_tree.value_kind: Trefine after scrape_ty"
   | Tmod _ ->
     Misc.fatal_error "Vicuna_traverse_typed_tree.value_kind: unexpected Tmod"
   | Tconstr (p, _, _) when Path.same p Predef.path_int -> Imm
@@ -423,7 +428,7 @@ let rec split_external_type (ct : core_type) :
     (core_type * bool) list * core_type =
   match ct.ctyp_desc with
   | Ttyp_poly (_, ct) -> split_external_type ct
-  | Ttyp_arrow (lab, arg, _, cont, _) -> (
+  | Ttyp_arrow (lab, _, arg, _, cont, _) -> (
     let args, ret = split_external_type cont in
     match lab with
     | Nolabel | Labelled _ -> (arg, false) :: args, ret

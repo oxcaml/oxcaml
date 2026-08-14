@@ -166,6 +166,54 @@ and type_desc =
   | Tpackage of package
   | Tof_kind of jkind_lr
   | Tbox of type_expr
+  | Trefine of refinement_desc
+
+and refinement_desc =
+  { ref_payload : type_expr;
+    ref_pred : refinement_expression }
+
+and refinement_expression =
+  { rexp_desc : refinement_expression_desc;
+    rexp_loc : Location.t }
+
+and refinement_expression_desc =
+  | Rexp_hole
+  | Rexp_var of Ident.t
+  | Rexp_ident of Path.t * Longident.t loc
+  | Rexp_constant of Parsetree.constant
+  | Rexp_apply of
+      refinement_expression * (Asttypes.arg_label * refinement_expression) list
+  | Rexp_tuple of (string option * refinement_expression) list
+  | Rexp_construct of Longident.t loc * refinement_expression option
+  | Rexp_field of refinement_expression * Longident.t loc
+  | Rexp_ifthenelse of
+      refinement_expression * refinement_expression
+      * refinement_expression option
+  | Rexp_let of refinement_binding * refinement_expression
+  | Rexp_fun of Ident.t * refinement_expression
+  | Rexp_match of refinement_expression * refinement_case list
+  | Rexp_constraint of refinement_expression * type_expr
+
+and refinement_binding =
+  { rb_ident : Ident.t;
+    rb_expr : refinement_expression }
+
+and refinement_case =
+  { rc_lhs : refinement_pattern;
+    rc_guard : refinement_expression option;
+    rc_rhs : refinement_expression }
+
+and refinement_pattern =
+  { rpat_desc : refinement_pattern_desc;
+    rpat_loc : Location.t }
+
+and refinement_pattern_desc =
+  | Rpat_any
+  | Rpat_var of Ident.t
+  | Rpat_constant of Parsetree.constant
+  | Rpat_tuple of (string option * refinement_pattern) list
+  | Rpat_construct of Longident.t loc * refinement_pattern option
+  | Rpat_alias of refinement_pattern * Ident.t
 
 and arg_label =
   | Nolabel
@@ -174,7 +222,7 @@ and arg_label =
   | Position of string
 
 and arrow_desc =
-  arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+  arg_label * Ident.t option * Mode.Alloc.lr * Mode.Alloc.lr
 
 and package =
     { pack_path : Path.t;
@@ -1361,6 +1409,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tsplice _
         | Tquote_eval _
         | Tbox _
+        | Trefine _
         (* CR layouts v2.8: we can actually see Tsubst here in certain cases, eg during
            [Ctype.copy] when copying the types inside of with_bounds. We also can't
            compare Tsubst structurally, because the Tsubsts that are created in

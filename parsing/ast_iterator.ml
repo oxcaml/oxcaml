@@ -144,7 +144,11 @@ module T = struct
     match desc with
     | Ptyp_any jkind
     | Ptyp_var (_, jkind) -> Option.iter (sub.jkind_annotation sub) jkind
-    | Ptyp_arrow (_lab, t1, t2, m1, m2) ->
+    | Ptyp_arrow (lab, t1, t2, m1, m2) ->
+        (match lab with
+         | Pan_nolabel -> ()
+         | Pan_name name | Pan_tilde name | Pan_optional name ->
+             iter_loc sub name);
         sub.typ sub t1; sub.typ sub t2;
         sub.modes sub m1; sub.modes sub m2
     | Ptyp_tuple tyl -> List.iter (fun (_, e) -> sub.typ sub e) tyl
@@ -174,6 +178,7 @@ module T = struct
         sub.jkind_annotation sub jkind
     | Ptyp_repr (_, t) -> sub.typ sub t
     | Ptyp_newlayout (_, t) -> sub.typ sub t
+    | Ptyp_refine (t, predicate) -> sub.typ sub t; sub.expr sub predicate
     | Ptyp_extension x -> sub.extension sub x
 
   let iter_type_declaration sub

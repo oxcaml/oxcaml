@@ -393,6 +393,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Oval_stuff "<poly>"
           | Tarrow _ ->
               Oval_stuff "<fun>"
+          | Trefine { ref_payload; _ } ->
+              (* The payload determines the runtime representation. *)
+              tree_of_val depth obj ref_payload
           | Ttuple(labeled_tys) ->
               Oval_tuple (tree_of_labeled_val_list 0 depth obj labeled_tys)
           | Tunboxed_tuple(labeled_tys) ->

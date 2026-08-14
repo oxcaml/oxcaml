@@ -1,0 +1,4 @@
+File "empty_predicate.ml", line 9, characters 16-17:
+9 | type bad = int{ }
+                    ^
+Error: Syntax error

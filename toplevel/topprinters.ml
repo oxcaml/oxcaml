@@ -17,7 +17,7 @@
 
 let type_arrow ta tb =
   let arrow_desc =
-    Types.Nolabel,Mode.Alloc.legacy,Mode.Alloc.legacy
+    Types.Nolabel,None,Mode.Alloc.legacy,Mode.Alloc.legacy
   in
   Ctype.newty
     (Tarrow (arrow_desc, Ctype.newmono ta, tb, Types.commu_var ()))
@@ -84,7 +84,7 @@ let match_simple_printer_type env ty ~is_old_style =
 let filter_arrow env ty =
   let ty = Ctype.expand_head env ty in
   match Types.get_desc ty with
-  | Tarrow ((lbl,_,_), l, r, _) when not (Btype.is_omittable lbl) -> Some (l, r)
+  | Tarrow ((lbl,_,_,_), l, r, _) when not (Btype.is_omittable lbl) -> Some (l, r)
   | _ -> None
 
 let extract_last_arrow env ty =

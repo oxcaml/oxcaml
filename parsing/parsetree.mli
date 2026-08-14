@@ -115,14 +115,16 @@ and core_type_desc =
   | Ptyp_any of jkind_annotation option (** [_] or [_ : k] *)
   | Ptyp_var of string * jkind_annotation option
     (** A type variable such as ['a] or ['a : k] *)
-  | Ptyp_arrow of arg_label * core_type * core_type * modes * modes
-      (** [Ptyp_arrow(lbl, T1, T2, M1, M2)] represents:
-            - [T1 @ M1 -> T2 @ M2]    when [lbl] is
-                                     {{!arg_label.Nolabel}[Nolabel]},
-            - [~l:(T1 @ M1) -> (T2 @ M2)] when [lbl] is
-                                     {{!arg_label.Labelled}[Labelled]},
-            - [?l:(T1 @ M1) -> (T2 @ M2)] when [lbl] is
-                                     {{!arg_label.Optional}[Optional]}.
+  | Ptyp_arrow of arrow_arg_name * core_type * core_type * modes * modes
+      (** [Ptyp_arrow(arg, T1, T2, M1, M2)] represents:
+            - [T1 @ M1 -> T2 @ M2]    when [arg] is
+                                     {{!arrow_arg_name.Pan_nolabel}[Pan_nolabel]},
+            - [l:(T1 @ M1) -> (T2 @ M2)] when [arg] is
+                                     {{!arrow_arg_name.Pan_name}[Pan_name]},
+            - [~l:(T1 @ M1) -> (T2 @ M2)] when [arg] is
+                                     {{!arrow_arg_name.Pan_tilde}[Pan_tilde]},
+            - [?l:(T1 @ M1) -> (T2 @ M2)] when [arg] is
+                                     {{!arrow_arg_name.Pan_optional}[Pan_optional]}.
          *)
   | Ptyp_tuple of (string option * core_type) list
       (** [Ptyp_tuple(tl)] represents a product type:
@@ -224,7 +226,24 @@ and core_type_desc =
   | Ptyp_splice of core_type (** [$T] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
   | Ptyp_repr of string loc list * core_type
+  | Ptyp_refine of core_type * expression
+      (** [T{ P }]: the refinement of the payload type [T] by the predicate
+          [P].  The predicate is an ordinary expression; the restriction to
+          total forms is enforced at translation, not here.  Within [P], the
+          hole [_] denotes the refined value. *)
   | Ptyp_extension of extension  (** [[%id]]. *)
+
+(** The name slot of an arrow type, [Ptyp_arrow].  A bare name [x:T -> U] is
+    a positional binder if [x] occurs free in a refinement predicate in [T]
+    or [U] (see {!Vox_binding.classify}), and the ordinary label [x]
+    otherwise.  [~x:T -> U] is always the label [x]; the spelling is new and
+    the tilde must be preserved for re-parsing.  [?x:T -> U] is always the
+    optional label [x] and never binds. *)
+and arrow_arg_name =
+  | Pan_nolabel  (** [T -> U] *)
+  | Pan_name of string loc  (** [x:T -> U]: binder or label by occurrence *)
+  | Pan_tilde of string loc  (** [~x:T -> U]: always the label [x] *)
+  | Pan_optional of string loc  (** [?x:T -> U] *)
 
 and arg_label = Asttypes.arg_label =
     Nolabel

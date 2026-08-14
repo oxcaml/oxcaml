@@ -73,8 +73,8 @@ module Typ :
     val any: ?loc:loc -> ?attrs:attrs -> jkind_annotation option -> core_type
     val var: ?loc:loc -> ?attrs:attrs -> string -> jkind_annotation option
       -> core_type
-    val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type -> core_type ->
-      mode with_loc list -> mode with_loc list -> core_type
+    val arrow: ?loc:loc -> ?attrs:attrs -> arrow_arg_name -> core_type
+      -> core_type -> mode with_loc list -> mode with_loc list -> core_type
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * core_type) list
                -> core_type
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
@@ -96,6 +96,7 @@ module Typ :
     val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
     val repr: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
+    val refine: ?loc:loc -> ?attrs:attrs -> core_type -> expression -> core_type
     val newlayout:
       ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type

@@ -489,6 +489,21 @@ and core_type1_with_optional_modes pty ctxt f (c, m) =
   | _ :: _ ->
     pp f "%a%a" (core_type1 ctxt) c optional_at_modes m
 
+and type_with_arrow_arg_name ctxt f (name, c, mode) =
+  match name with
+  | Pan_nolabel ->
+    core_type1_with_optional_modes core_type1 ctxt f (c, mode)
+    (* otherwise parenthesize *)
+  | Pan_name s ->
+    pp f "%a:%a" ident_of_name s.txt
+      (core_type1_with_optional_modes core_type1 ctxt) (c, mode)
+  | Pan_tilde s ->
+    pp f "~%a:%a" ident_of_name s.txt
+      (core_type1_with_optional_modes core_type1 ctxt) (c, mode)
+  | Pan_optional s ->
+    pp f "?%a:%a" ident_of_name s.txt
+      (core_type1_with_optional_modes core_type1 ctxt) (c, mode)
+
 and type_with_label ctxt f (label, c, mode) =
   match label with
   | Nolabel    ->
@@ -565,7 +580,7 @@ and core_type ctxt f x =
   else match x.ptyp_desc with
     | Ptyp_arrow (l, ct1, ct2, m1, m2) ->
         pp f "@[<2>%a@;->@;%a@]" (* FIXME remove parens later *)
-          (type_with_label ctxt) (l,ct1,m1) (return_type ctxt) (ct2,m2)
+          (type_with_arrow_arg_name ctxt) (l,ct1,m1) (return_type ctxt) (ct2,m2)
     | Ptyp_alias (ct, s, j) ->
         pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct
           tyvar_loc_option_jkind (s, j)
@@ -685,6 +700,9 @@ and core_type1 ctxt f x =
         pp f "@[<hov2><[%a]>@]" (core_type ctxt) t
     | Ptyp_splice t ->
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
+    | Ptyp_refine (payload, predicate) ->
+        pp f "@[<hov2>%a{ %a }@]" (core_type1 ctxt) payload
+          (expression reset_ctxt) predicate
     | Ptyp_extension e -> extension ctxt f e
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
       | Ptyp_newlayout _ | Ptyp_of_kind _) ->
@@ -1235,6 +1253,7 @@ and simple_expr ctxt f x =
                (list (expression (under_semi ctxt)) ~sep:";@;") xs
          | `simple x -> constr f x
          | _ -> assert false)
+    | Pexp_hole -> pp f "_"
     | Pexp_ident li ->
         value_longident_loc f li
     (* (match view_fixity_of_exp x with *)

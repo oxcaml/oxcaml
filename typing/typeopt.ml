@@ -51,17 +51,22 @@ exception Error of Location.t * error
 (* CR external-mode: Don't disregard modalities when using [scrape_ty] to reason
    about the runtime properties of a type - in particular, in
    [maybe_pointer_ty], when checking whether a type crosses externality. *)
-let scrape_ty env ty =
+let rec scrape_ty env ty =
   let ty =
     match get_desc ty with
     | Tpoly(ty, _) -> ty
     | _ -> ty
   in
   match get_desc ty with
+  | Trefine { ref_payload; _ } ->
+      (* The payload of a refinement determines its runtime
+         representation. *)
+      scrape_ty env ref_payload
   | Tconstr _
   | Tquote _ | Tsplice _ | Tquote_eval _ ->
       let ty = Ctype.expand_head_opt env ty in
       begin match get_desc ty with
+      | Trefine { ref_payload; _ } -> scrape_ty env ref_payload
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
           | Some _ -> begin
@@ -275,6 +280,8 @@ let classify ~classify_product env ty layout : _ classification =
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
   | Trepr _ ->
       assert false
+  | Trefine _ ->
+      Misc.fatal_error "Typeopt.classify: Trefine after scrape_ty"
   end
   | Base (Float64, _) -> Unboxed_float Unboxed_float64
   | Base (Float32, _) -> Unboxed_float Unboxed_float32
@@ -888,6 +895,8 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ | Tbox _ ->
           unknown ()
         | Trepr _ -> Misc.fatal_error "value_kind_mixed_block_field: Trepr"
+        | Trefine _ ->
+          Misc.fatal_error "value_kind_mixed_block_field: Trefine after scrape_ty"
         end
     in
     let (_, num_nodes_visited), kinds =

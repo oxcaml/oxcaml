@@ -83,6 +83,7 @@ module Typ = struct
   let quote ?loc ?attrs t = mk ?loc ?attrs (Ptyp_quote t)
   let splice ?loc ?attrs t = mk ?loc ?attrs (Ptyp_splice t)
   let repr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_repr (a, b))
+  let refine ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_refine (a, b))
   let newlayout ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_newlayout (a, b))
   let of_kind ?loc ?attrs a = mk ?loc ?attrs (Ptyp_of_kind a)
 
@@ -153,6 +154,11 @@ module Typ = struct
             Ptyp_repr (var_lst, loop core_type)
         | Ptyp_newlayout (var_lst, core_type) ->
             Ptyp_newlayout (var_lst, loop core_type)
+        | Ptyp_refine (core_type, predicate) ->
+            (* The predicate is untouched: refinements are rigid and the
+               types appearing inside predicates are not subject to
+               varification. *)
+            Ptyp_refine (loop core_type, predicate)
         | Ptyp_extension (s, arg) ->
             Ptyp_extension (s, arg)
       in

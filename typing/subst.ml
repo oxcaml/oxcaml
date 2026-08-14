@@ -618,7 +618,7 @@ let jkind_const_desc s
   | Layout _ -> jkind
 
 (* Similar to [Ctype.nondep_type_rec]. *)
-let rec typexp copy_scope s ty =
+let rec typexp copy_scope s rename ty =
   let should_duplicate_vars =
     match s.additional_action with
     | Duplicate_variables | Prepare_for_saving _ -> true
@@ -678,7 +678,7 @@ let rec typexp copy_scope s ty =
         | _ -> assert false
       else match desc with
       | Tconstr (p, args, _abbrev) ->
-         let args = List.map (typexp copy_scope s) args in
+         let args = List.map (typexp copy_scope s rename) args in
          begin match Path.Map.find p s.types with
          | exception Not_found -> Tconstr(type_path s p, args, ref Mnil)
          | Path _ -> Tconstr(type_path s p, args, ref Mnil)
@@ -689,17 +689,17 @@ let rec typexp copy_scope s ty =
           Tpackage {
             pack_path = modtype_path s pack_path;
             pack_cstrs =
-              List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) pack_cstrs;
+              List.map (fun (n, ty) -> (n, typexp copy_scope s rename ty)) pack_cstrs;
           }
       | Tobject (t1, name) ->
-          let t1' = typexp copy_scope s t1 in
+          let t1' = typexp copy_scope s rename t1 in
           let name' =
             match !name with
             | None -> None
             | Some (p, tl) ->
                 if to_subst_by_type_function s p
                 then None
-                else Some (type_path s p, List.map (typexp copy_scope s) tl)
+                else Some (type_path s p, List.map (typexp copy_scope s rename) tl)
           in
           Tobject (t1', ref name')
       | Tvariant row ->
@@ -722,7 +722,7 @@ let rec typexp copy_scope s ty =
                 match mored with
                   Tsubst (ty, None) -> ty
                 | Tconstr _ | Tquote _ | Tsplice _ | Tnil | Tof_kind _ ->
-                    typexp copy_scope s more
+                    typexp copy_scope s rename more
                 | Tunivar _ | Tvar _ ->
                     if should_duplicate_vars then newpersty mored
                     else if dup && is_Tvar more then newgenty mored
@@ -735,7 +735,7 @@ let rec typexp copy_scope s ty =
               (* TODO: check if more' can be eliminated *)
               (* Return a new copy *)
               let row =
-                copy_row (typexp copy_scope s) true row (not dup) more' in
+                copy_row (typexp copy_scope s rename) true row (not dup) more' in
               match row_name row with
               | Some (p, tl) ->
                   let name =
@@ -747,22 +747,38 @@ let rec typexp copy_scope s ty =
                   Tvariant row
           end
       | Tfield(_label, kind, _t1, t2) when field_kind_repr kind = Fabsent ->
-          Tlink (typexp copy_scope s t2)
-      | Tarrow ((label, marg, mret), arg, ret, comm) ->
+          Tlink (typexp copy_scope s rename t2)
+      | Tarrow ((label, binder, marg, mret), arg, ret, comm) ->
           let marg, mret =
             match s.additional_action with
             | Prepare_for_saving { prepare_mode; _ } ->
               prepare_mode marg, prepare_mode mret
             | _ -> marg, mret
           in
-          let arg = typexp copy_scope s arg in
-          let ret = typexp copy_scope s ret in
+          (* Freshen the binder stamp; the references in the refinement
+             predicates below are rewritten through [rename]. *)
+          let rename, binder =
+            match binder with
+            | None -> rename, None
+            | Some id ->
+                let id' = Ident.rename id in
+                Ident.Map.add id id' rename, Some id'
+          in
+          let arg = typexp copy_scope s rename arg in
+          let ret = typexp copy_scope s rename ret in
           let comm = copy_commu comm in
-          Tarrow ((label, marg, mret), arg, ret, comm)
+          Tarrow ((label, binder, marg, mret), arg, ret, comm)
+      | Trefine { ref_payload; ref_pred } ->
+          Trefine
+            { ref_payload = typexp copy_scope s rename ref_payload;
+              ref_pred =
+                Vox_rexp.map ~rename ~freshen:true
+                  ~value_path:(value_path s)
+                  ~type_expr:(typexp copy_scope s rename) ref_pred }
       | Tof_kind jk -> Tof_kind (jkind copy_scope s jk)
       | Tmod (ty, mod_bounds) ->
-          Tmod (typexp copy_scope s ty, mod_bounds)
-      | _ -> copy_type_desc (typexp copy_scope s) desc
+          Tmod (typexp copy_scope s rename ty, mod_bounds)
+      | _ -> copy_type_desc (typexp copy_scope s rename) desc
     in
     Transient_expr.set_stub_desc ty' desc;
     ty'
@@ -776,7 +792,7 @@ and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
     | Duplicate_variables | No_action -> jkind
   in
   (* CR-soon layouts aivaskovic: get rid of map_type_expr *)
-  let jkind = Jkind.map_type_expr (typexp copy_scope s) jkind in
+  let jkind = Jkind.map_type_expr (typexp copy_scope s Ident.Map.empty) jkind in
   let jkind_desc = jkind_desc s jkind.jkind in
   if jkind_desc == jkind.jkind then jkind
   else { jkind with jkind = jkind_desc }
@@ -789,7 +805,7 @@ and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
 *)
 let typexp copy_scope s loc ty =
   location_for_jkind_check_errors := loc;
-  typexp copy_scope s ty
+  typexp copy_scope s Ident.Map.empty ty
 
 let jkind copy_scope s loc jk =
   location_for_jkind_check_errors := loc;

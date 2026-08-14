@@ -863,8 +863,14 @@ and core_type =
 
 and core_type_desc =
   | Ttyp_var of string option * Parsetree.jkind_annotation option
-  | Ttyp_arrow of arg_label * core_type * Mode.Alloc.Const.t modes *
-                  core_type * Mode.Alloc.Const.t modes
+  | Ttyp_arrow of arg_label * Ident.t option * core_type *
+                  Mode.Alloc.Const.t modes * core_type *
+                  Mode.Alloc.Const.t modes
+      (** The [Ident.t option] is the value binder of a dependent arrow;
+          see {!Types.arrow_desc}.  When the label is [Nolabel] it was
+          spelled [x:T -> U] and binds over both sides; when the label is
+          [Labelled x] it was spelled [~x:T -> U] and binds over the domain
+          only. *)
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list
@@ -879,6 +885,10 @@ and core_type_desc =
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
+  | Ttyp_refine of core_type * Types.refinement_expression
+      (** [T{ P }].  The predicate is the resolved form shared with the
+          type graph; there is no separately-typed predicate because
+          refinements are inert in this piece. *)
   | Ttyp_newlayout of string loc list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos

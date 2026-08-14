@@ -118,6 +118,13 @@ let compute_variance env visited vari ty =
         compute_same (row_more row)
     | Tpoly (ty, _) | Trepr (ty, _) ->
         compute_same ty
+    | Trefine { ref_payload; ref_pred } ->
+        (* Refinements are rigid — they only ever equal alpha-equivalent
+           refinements — so occurrences under them are treated like package
+           constraints, i.e. invariantly. *)
+        let v = Variance.(compose vari full) in
+        compute_variance_rec env v ref_payload;
+        Vox_rexp.iter_types (compute_variance_rec env v) ref_pred
     | Tvar _ | Tnil | Tlink _ | Tunivar _ | Tof_kind _ -> ()
     | Tpackage pack ->
         let v = Variance.(compose vari full) in

@@ -93,6 +93,11 @@ let handle_extension ext =
   | _ ->
     ()
 
+(* Forward declaration: refinement predicates [T{P}] are expressions, and
+   [add_type] is defined before [add_expr]. *)
+let add_expr_fwd : (bound_map -> Parsetree.expression -> unit) ref =
+  ref (fun _ _ -> assert false)
+
 let rec add_type bv ty =
   match ty.ptyp_desc with
     Ptyp_any jkind
@@ -128,6 +133,7 @@ let rec add_type bv ty =
   | Ptyp_of_kind jkind -> add_jkind bv jkind
   | Ptyp_repr(_, t) -> add_type bv t
   | Ptyp_newlayout(_, t) -> add_type bv t
+  | Ptyp_refine(t, p) -> add_type bv t; !add_expr_fwd bv p
   | Ptyp_extension e -> handle_extension e
 
 and add_package_type bv ptyp =
@@ -765,3 +771,5 @@ and add_class_field bv pcf =
 
 and add_class_declaration bv decl =
   add_class_expr bv decl.pci_expr
+
+let () = add_expr_fwd := add_expr
