@@ -398,3 +398,121 @@ than only that it compiles:
 
 Requiring `e @ total` in `erased_ e`. Erased array elements. Interaction with
 refinement predicates, which is what erasure exists for.
+
+## Decisions taken during implementation
+
+Recorded per AGENTS.md: choices at points the doc left open or where reality
+disagreed with the doc, with alternatives considered.
+
+### The ambient rule is an environment lock
+
+"Checked at ambient Erased" is implemented as `Env.Erased_lock`: a value
+looked up through the lock has its erasure strengthened to Retained, because
+the context that uses it is deleted. This puts the rule at the single point
+where values meet contexts, instead of threading a flag through every
+expected-mode constructor. Consequences that fall out for free:
+
+- the closure body rule for `erased_ (fun ...)` (the lambda's body is typed
+  under the lock);
+- nested erased contexts need no special casing.
+
+Alternative considered: a field on `expected_mode`. Rejected because expected
+modes are constructed in dozens of places and each would need to propagate
+the flag; the lock reaches all of them via the environment.
+
+### Reads require retained; binds do not
+
+There is no existing analogue of "usable only in erased contexts", so the
+following read positions constrain the value to Retained on the erasure axis:
+`if`/`while` conditions, `assert`, `when` guards, comprehension conditions
+and bounds (via a new `mode_read`), and every *destructuring* pattern
+(constants, tuples, constructors, records, arrays, lazy, unpack, intervals).
+Patterns that bind without reading — variables, wildcards, aliases — do not,
+so `let x = erased_ e in ...` works. Statement position (`e; ...`) is left
+unconstrained; nothing is read there that survives compilation.
+
+The function position of an application always requires Retained (there is
+no closure to jump to); inside `erased_` the lock has already lowered the
+function's apparent erasure, so `erased_ (f x)` with `f @ erased` passes.
+
+### Closures: carve-outs in three places
+
+- `Env.closure_mode` / `const_closure_mode` (captures): the capture check
+  meets the captured value's erasure down to Retained; body uses still see
+  the true erasure.
+- `close_over` (partial application, both the mode and const versions): an
+  erased argument is not stored in the wrapper closure, so its erasure does
+  not join into the closure's mode. Without this, `use x` with an erased `x`
+  incorrectly made the result erased.
+
+The doc offered a modality-based framing for captures; the machinery applies
+locks uniformly across captures, so the carve-out was the available route
+(as the doc anticipated).
+
+### Erasure is fixed top-down: current approximation
+
+A lambda's body is an erased context exactly when the lambda is syntactically
+under `erased_`. A lambda written directly at an `@ erased` arg position
+without `erased_` is checked with a retained body — stricter than the doc's
+rule, sound (retained-checked bodies are usable as erased), and expressible
+by wrapping in `erased_`. Reading "the expectation's erasure is constantly
+Erased" off a right-mode without zapping it needs solver support that
+doesn't exist; deferred.
+
+### Codegen realized via the void layout
+
+Erased occurrences translate at `Punboxed_product []`:
+
+- function parameters whose arrow arg mode is erased (including
+  function-cases), marked before body translation;
+- variables let-bound to erased expressions (`erased_ e` or an alias of an
+  erased variable), including through `Matching.for_let` via a Void sort;
+- application arguments at erased arrow positions: erased arguments pass
+  zero-width; retained arguments are evaluated for effects and dropped
+  (`Lsequence`), pinning the doc's boundary semantics;
+- the eta-wrapper parameter for out-of-order partial applications.
+
+Measured results match the doc's void experiments: erased params are absent
+from native functions, a function whose only param is erased compiles to a
+nullary symbol, and a closure whose only capture is erased becomes a static
+closure (no allocation at all).
+
+`erased_ e` at a retained-layout position (an erased value smuggled through
+a value binding whose erasure the analysis doesn't see) emits
+`Lambda.dummy_constant` — a recognizable placeholder that only other erased
+positions consume.
+
+### Deferred beyond the doc's deferred list
+
+- **Erased record fields**: the doc's `@@ erased` mechanism does not exist.
+  Comonadic modalities are `Meet_const` only — they can strengthen a field
+  relative to the record (`@@ global` in a local record) but not weaken one,
+  and an erased field in a retained record is a weakening. `@@ erased`
+  today parses and is correctly reported as redundant (warning 220). Options
+  are a comonadic `Join_const` modality (touches modality composition,
+  zapping, inclusion, cmi) or a special-cased representation-bearing marker;
+  both are big enough to be their own piece. **The doc's analogy to
+  `@@ global` is wrong in direction; this needs a design decision.**
+- **Erased returns**: typed correctly (`int -> int @ erased` infers and
+  round-trips) but represented as a value-layout placeholder, not
+  zero-width. Making them void requires translation-time knowledge of every
+  application's return erasure; the placeholder is correct, just one word.
+- **Structure-level erased bindings** (`let x = erased_ 5` at toplevel) are
+  rejected: the structure's mode is the join of its items' modes, and
+  compilation units are legacy. Insulating them needs the same missing
+  modality direction as record fields.
+- **Erased optional parameters** are not given the void representation.
+- **`erased_` in quotations** is rejected.
+- **Erased args to external primitives** keep the retained calling
+  convention (no `%`-primitive has erased params today).
+
+### Erasure and mode crossing
+
+No type crosses erasure, ever: an erased value does not exist, so treating
+it as retained is unsound regardless of the type. Enforced at every place a
+crossing is built: the jkind axis (index 10, Chain2) is pinned to its top in
+`Axis_lattice.create`; `mod erased` / `mod retained` are rejected as kind
+modifiers; `mod everything` excludes erasure (precedent: staticity);
+`Crossing.always_constructed_at` pins erasure; the builtin data-kind
+crossings pass `~erasure:false`. Zero-width types could in principle cross
+erasure soundly; not exploited.
