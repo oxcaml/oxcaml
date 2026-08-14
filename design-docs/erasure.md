@@ -557,13 +557,20 @@ attempt; flagged for a decision.
 ### Erasure and mode crossing
 
 No type crosses erasure, ever: an erased value does not exist, so treating
-it as retained is unsound regardless of the type. Rather than pinning every
-construction site (the first attempt; review found it scattered across five
-sites and still missed one), the axis is pinned at the two points where
-stored bounds are *read* as crossings: `Btype.Jkind0.Mod_bounds.crossing`
-and `Axis_lattice.to_mode_crossing` (the ikind path). Construction sites may
-pass through `min` freely; `mod erased` / `mod retained` are rejected as
-kind modifiers, `mod everything` excludes erasure (precedent: staticity),
-and the typecore/ctype crossings that do not pass through a reader take
-`~erasure:false`. Zero-width types could in principle cross erasure soundly;
-not exploited.
+it as retained is unsound regardless of the type. Enforced at the places
+crossings are built: `Mod_bounds.min_crossable` for bounds stored as actual
+kinds (unboxed products, abbreviations), the pinned `cross_all_crossable`
+for the builtin data kinds, `Crossing.always_constructed_at`,
+`Axis_lattice.create` (the ikind constants), and `~erasure:false` at the
+bool-created crossings. `mod erased` / `mod retained` are rejected as kind
+modifiers and `mod everything` excludes erasure (precedent: staticity).
+
+A review suggestion to replace the construction-site pins with pins at the
+two readers of stored bounds was tried and *reverted*: the kind machinery
+mixes readers (`Mod_bounds.crossing`, the raw lattice bits in ldd, raw
+equality) and pinning only some views made ordinary kind subsumption fail —
+672 testsuite failures, e.g. format strings no longer subkinds of value.
+The construction-site pins keep every view consistent. Verified by the full
+suite; the reviewer's version had only been checked against four test
+directories. Zero-width types could in principle cross erasure soundly; not
+exploited.

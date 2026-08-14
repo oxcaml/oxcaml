@@ -80,15 +80,7 @@ let ok () =
   let _q = p in
   ()
 [%%expect{|
-Line 3, characters 11-12:
-3 |   let _q = p in
-               ^
-Error: The value "p" has type "int * int" but an expression was expected of type
-         "('a : value_or_null)"
-       The kind of int * int is immutable_data with int
-         because it's a tuple type.
-       But the kind of int * int must be a subkind of value_or_null
-         because it's the type of a variable bound by a `let`.
+val ok : unit -> unit = <fun>
 |}]
 
 let bad () =
@@ -445,16 +437,15 @@ let use (p : (int * int) @ erased) = 0
 let ok (y : int @ erased) = use (y, 1)
 let bad (y : int @ erased) = fst (y, 1)
 [%%expect{|
-Line 1, characters 9-33:
-1 | let use (p : (int * int) @ erased) = 0
-             ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This pattern matches values of type "int * int"
-       but a pattern was expected which matches values of type
-         "('a : value_or_null)"
-       The kind of int * int is immutable_data with int
-         because it's a tuple type.
-       But the kind of int * int must be a subkind of value_or_null
-         because we must know concretely how to pass a function argument.
+val use : int * int @ erased -> int = <fun>
+val ok : int @ erased -> int = <fun>
+Line 3, characters 34-35:
+3 | let bad (y : int @ erased) = fst (y, 1)
+                                      ^
+Error: This value is "erased"
+       but is expected to be "retained"
+         because it is an element of the tuple at line 3, characters 33-39
+         which is expected to be "retained".
 |}]
 
 (* Argument invariance also holds for arrows nested in argument position,
