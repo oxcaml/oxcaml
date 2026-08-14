@@ -398,6 +398,9 @@ end
 (* After the migration to extension universes, this will be an empty list. *)
 let legacy_default_extensions : extn_pair list =
   Universe.allowed_extensions_in Stable
+  |> List.map (function
+    | Pair (Mode_polymorphism, _) -> Pair (Mode_polymorphism, Alpha)
+    | pair -> pair)
 
 let extensions : extn_pair list ref = ref legacy_default_extensions
 
