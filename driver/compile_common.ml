@@ -88,17 +88,18 @@ let parse_intf i =
 let typecheck_intf info ast =
   Profile.(
     record_call_with_counters
-      ~counter_f:(fun (_alerts, signature) ->
+      ~counter_f:(fun (_alerts, signature, _argument_interface) ->
         Profile_counters_functions.(
           count_language_extensions (Typedtree_signature_output signature)))
       typing)
   @@ fun () ->
+  let tsg, argument_interface =
+    Typemod.type_interface
+      ~sourcefile:(Unit_info.original_source_file info.target)
+      info.module_name info.env ast
+  in
   let tsg =
-    ast
-    |> Typemod.type_interface
-         ~sourcefile:(Unit_info.original_source_file info.target)
-         info.module_name info.env
-    |> print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
+    print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface tsg
   in
   let alerts = Builtin_attributes.alerts_of_sig ~mark:true ast in
   let sg = tsg.Typedtree.sig_type in
@@ -118,9 +119,9 @@ let typecheck_intf info ast =
   Typecore.force_delayed_checks ();
   Builtin_attributes.warn_unused ();
   Warnings.check_fatal ();
-  alerts, tsg
+  alerts, tsg, argument_interface
 
-let emit_signature info alerts tsg =
+let emit_signature info alerts ?argument_interface tsg =
   let sg =
     let kind : Cmi_format.kind =
       if !Clflags.as_parameter then
@@ -140,7 +141,8 @@ let emit_signature info alerts tsg =
       (Compilation_unit.name info.module_name) kind
       (Unit_info.cmi info.target)
   in
-  Typemod.save_signature info.target info.module_name tsg info.env sg
+  Typemod.save_signature ?argument_interface info.target info.module_name tsg
+    info.env sg
 
 let interface ~hook_parse_tree ~hook_typed_tree info =
   Profile.(record_call (annotate_file_name (
@@ -148,10 +150,10 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
   let { ast; info } : _ Parse_result.t = parse_intf info in
   hook_parse_tree ast;
   if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
-    let alerts, tsg = typecheck_intf info ast in
+    let alerts, tsg, argument_interface = typecheck_intf info ast in
     hook_typed_tree tsg;
     if not !Clflags.print_types then begin
-      emit_signature info alerts tsg
+      emit_signature info alerts ?argument_interface tsg
     end
   end
 

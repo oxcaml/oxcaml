@@ -2720,7 +2720,7 @@ let rec tree_of_modtype ?abbrev = function
 and tree_of_functor_parameter ?abbrev = function
   | Unit ->
       None, fun k -> k
-  | Named (param, ty_arg, m_arg) ->
+  | Named (param, ty_arg, _, m_arg) ->
       let name, env =
         match param with
         | None -> None, fun env -> env

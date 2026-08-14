@@ -176,7 +176,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             Typedtree.implementation) =
         let argument_coercion =
           match argument_interface with
-          | Some { ai_coercion_from_primary; ai_signature = _ } ->
+          | Some
+              { ai_coercion_from_primary; ai_signature = _; ai_expectation = _ }
+            ->
             Some ai_coercion_from_primary
           | None -> None
         in

@@ -33,12 +33,12 @@ module F (X : sig type t end) = X
 module F' = F
 [%%expect{|
 {
- "F"[module] -> Abs<.6>(X, X<.5>);
+ "F"[module] -> Abs<.7>(X, X<.6>);
  }
 module F : functor (X : sig type t end) -> sig type t = X.t end
 {
- "F'"[module] -> Alias(<.7>
-                       Abs<.6>(X, X<.5>));
+ "F'"[module] -> Alias(<.8>
+                       Abs<.7>(X, X<.6>));
  }
 module F' = F
 |}]
@@ -46,7 +46,7 @@ module F' = F
 module C = F'(A)
 [%%expect{|
 {
- "C"[module] -> {<.8>
+ "C"[module] -> {<.9>
                  "t"[type] -> <.0>;
                  };
  }
@@ -58,7 +58,7 @@ module C = F(B)
 
 [%%expect{|
 {
- "C"[module] -> Alias(<.9>
+ "C"[module] -> Alias(<.10>
                       {<.1>
                        "t"[type] -> <.0>;
                        });
@@ -70,8 +70,8 @@ module D = C
 
 [%%expect{|
 {
- "D"[module] -> Alias(<.10>
-                      Alias(<.9>
+ "D"[module] -> Alias(<.11>
+                      Alias(<.10>
                             {<.1>
                              "t"[type] -> <.0>;
                              }));
@@ -82,8 +82,8 @@ module D = C
 module G (X : sig type t end) = struct include X end
 [%%expect{|
 {
- "G"[module] -> Abs<.13>(X, {
-                             "t"[type] -> X<.12> . "t"[type];
+ "G"[module] -> Abs<.15>(X, {
+                             "t"[type] -> X<.14> . "t"[type];
                              });
  }
 module G : functor (X : sig type t end) -> sig type t = X.t end
@@ -92,7 +92,7 @@ module G : functor (X : sig type t end) -> sig type t = X.t end
 module E = G(B)
 [%%expect{|
 {
- "E"[module] -> {<.14>
+ "E"[module] -> {<.16>
                  "t"[type] -> <.0>;
                  };
  }
@@ -104,22 +104,22 @@ module N : sig type t end = M
 module O = N
 [%%expect{|
 {
- "M"[module] -> {<.17>
-                 "t"[type] -> <.15>;
-                 "x"[value] -> <.16>;
+ "M"[module] -> {<.19>
+                 "t"[type] -> <.17>;
+                 "x"[value] -> <.18>;
                  };
  }
 module M : sig type t val x : int end
 {
- "N"[module] -> {<.19>
-                 "t"[type] -> <.15>;
+ "N"[module] -> {<.22>
+                 "t"[type] -> <.17>;
                  };
  }
 module N : sig type t end
 {
- "O"[module] -> Alias(<.20>
-                      {<.19>
-                       "t"[type] -> <.15>;
+ "O"[module] -> Alias(<.23>
+                      {<.22>
+                       "t"[type] -> <.17>;
                        });
  }
 module O = N

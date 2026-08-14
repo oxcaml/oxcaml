@@ -344,6 +344,7 @@ let to_module_binding { name; implementation; interface } : module_binding =
         Tmodtype_explicit
           ( { mty_desc = Tmty_signature annots;
               mty_type = Mty_signature annots.sig_type;
+              mty_uid = Shape.Uid.internal_not_actually_unique;
               mty_env = annots.sig_final_env;
               mty_loc = annots.sig_sloc;
               mty_attributes = []

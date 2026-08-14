@@ -1220,7 +1220,7 @@ module type Wrapped = sig
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type * Mode.Alloc.lr
+  | Named of Ident.t option * module_type * Uid.t option * Mode.Alloc.lr
 
   and signature = signature_item list wrapped
 

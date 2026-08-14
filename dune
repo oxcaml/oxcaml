@@ -276,6 +276,7 @@
   tast_iterator
   tast_mapper
   signature_group
+  module_implementation_facts
   cmt_format
   cms_format
   untypeast

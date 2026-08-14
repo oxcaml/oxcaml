@@ -1262,12 +1262,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                             (Lvar cpy) (Lvar id) expr, rem))
              modifs
              (Lvar cpy))
-  | Texp_letmodule(None, loc, Mp_present, modl, body) ->
+  | Texp_letmodule(None, loc, Mp_present, _, modl, body) ->
       let mod_scopes = enter_anonymous_module ~scopes ~loc:loc.loc in
       let lam = !transl_module ~scopes:mod_scopes Tcoerce_none None modl in
       Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc),
                 transl_exp ~scopes layout body)
-  | Texp_letmodule(Some id, _loc, Mp_present, modl, body) ->
+  | Texp_letmodule(Some id, _loc, Mp_present, _, modl, body) ->
       let defining_expr =
         let mod_scopes = enter_module_definition ~scopes id in
         !transl_module ~scopes:mod_scopes Tcoerce_none None modl
@@ -1275,7 +1275,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       (* CR sspies: Add a debug uid to [Texp_letmodule] for the binder. *)
       Llet(Strict, Lambda.layout_module, id, Lambda.debug_uid_none,
           defining_expr, transl_exp ~scopes layout body)
-  | Texp_letmodule(_, _, Mp_absent, _, body) ->
+  | Texp_letmodule(_, _, Mp_absent, _, _, body) ->
       transl_exp ~scopes layout body
   | Texp_letexception(cd, body) ->
       Llet(Strict, Lambda.layout_block,

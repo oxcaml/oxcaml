@@ -1323,8 +1323,8 @@ let modtype_of_functor_appl fcomp p1 p2 =
           let subst =
             match fcomp.fcomp_arg with
             | Unit
-            | Named (None, _, _) -> Subst.identity
-            | Named (Some param, _, _) ->
+            | Named (None, _, _, _) -> Subst.identity
+            | Named (Some param, _, _, _) ->
                 Subst.add_module param p2 Subst.identity
           in
           Subst.modtype (Rescope scope) subst mty
@@ -2526,8 +2526,10 @@ let rec components_of_module_maker
           fcomp_arg =
             (match arg with
             | Unit -> Unit
-            | Named (param, ty_arg, m_arg) ->
-              Named (param, force_modtype (modtype scoping sub ty_arg), m_arg));
+            | Named (param, ty_arg, expectation, m_arg) ->
+              Named
+                (param, force_modtype (modtype scoping sub ty_arg),
+                 expectation, m_arg));
           fcomp_res = force_modtype (modtype scoping sub ty_res);
           fcomp_shape = cm_shape;
           fcomp_cache = Hashtbl.create 17;
@@ -2872,8 +2874,8 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
     let sub =
       match f_comp.fcomp_arg with
       | Unit
-      | Named (None, _, _) -> Subst.identity
-      | Named (Some param, _, _) -> Subst.add_module param arg Subst.identity
+      | Named (None, _, _, _) -> Subst.identity
+      | Named (Some param, _, _, _) -> Subst.add_module param arg Subst.identity
     in
     (* we have to apply eagerly instead of passing sub to [components_of_module]
        because of the call to [check_well_formed_module]. *)
@@ -4006,7 +4008,7 @@ and get_functor_components ~errors ~loc lid env comps =
       match fcomps.fcomp_arg with
       | Unit -> (* PR#7611 *)
           may_lookup_error errors loc env (Generative_used_as_applicative lid)
-      | Named (_, arg, _) -> fcomps, arg
+      | Named (_, arg, _, _) -> fcomps, arg
     end
   | Ok (Structure_comps _) ->
       may_lookup_error errors loc env (Structure_used_as_functor lid)

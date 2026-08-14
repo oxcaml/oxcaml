@@ -837,7 +837,7 @@ and expression i ppf x =
   | Texp_override (_, l) ->
       line i ppf "Texp_override\n";
       list i string_x_expression ppf l;
-  | Texp_letmodule (s, _, _, me, e) ->
+  | Texp_letmodule (s, _, _, _, me, e) ->
       line i ppf "Texp_letmodule \"%a\"\n" fmt_modname s;
       module_expr i ppf me;
       expression i ppf e;
@@ -1320,7 +1320,8 @@ and module_expr i ppf x =
       module_expr i ppf me;
       module_type i ppf mt;
       value_modes_var i ppf modes;
-  | Tmod_constraint (me, _, Tmodtype_implicit, _) -> module_expr i ppf me
+  | Tmod_constraint (me, _, (Tmodtype_implicit | Tmodtype_package _), _) ->
+      module_expr i ppf me
   | Tmod_unpack (e, _) ->
       line i ppf "Tmod_unpack\n";
       expression i ppf e;

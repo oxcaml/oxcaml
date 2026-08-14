@@ -761,7 +761,7 @@ let expression sub exp =
         Pexp_override (List.map (fun (_path, lid, exp) ->
               (map_loc sub lid, sub.expr sub exp)
           ) list)
-    | Texp_letmodule (_id, name, _pres, mexpr, exp) ->
+    | Texp_letmodule (_id, name, _pres, _uid, mexpr, exp) ->
         Pexp_letmodule (name, sub.module_expr sub mexpr,
           sub.expr sub exp)
     | Texp_letexception (ext, exp) ->
@@ -1008,7 +1008,7 @@ let module_expr (sub : mapper) mexpr =
   let loc = sub.location sub mexpr.mod_loc in
   let attrs = sub.attributes sub mexpr.mod_attributes in
   match mexpr.mod_desc with
-      Tmod_constraint (m, _, Tmodtype_implicit, _ ) ->
+      Tmod_constraint (m, _, (Tmodtype_implicit | Tmodtype_package _), _ ) ->
         sub.module_expr sub m
     | _ ->
         let desc = match mexpr.mod_desc with
@@ -1026,7 +1026,8 @@ let module_expr (sub : mapper) mexpr =
               let modes = Typemode.untransl_mode modes in
               Pmod_constraint (sub.module_expr sub mexpr,
                 Some (sub.module_type sub mtype), modes)
-          | Tmod_constraint (_mexpr, _, Tmodtype_implicit, _) ->
+          | Tmod_constraint
+              (_mexpr, _, (Tmodtype_implicit | Tmodtype_package _), _) ->
               assert false
           | Tmod_unpack (exp, _pack) ->
               Pmod_unpack (sub.expr sub exp)
