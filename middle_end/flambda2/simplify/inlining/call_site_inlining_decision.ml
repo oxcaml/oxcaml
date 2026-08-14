@@ -167,7 +167,7 @@ let argument_types_useful =
   Oxcaml_args.Extra_options.symbol __LOC__ "argument-types-useful" Coarse
     ["coarse", Coarse; "fine", Fine]
 
-let argument_types_useful dacc ~apply ~code_or_metadata =
+let argument_types_useful dacc ~apply ~code_metadata =
   if
     not
       (Flambda_features.Inlining.speculative_inlining_only_if_arguments_useful
@@ -186,7 +186,6 @@ let argument_types_useful dacc ~apply ~code_or_metadata =
             ~const:(fun _ -> true))
         (Apply.args apply)
     | Fine ->
-      let code_metadata = Code_or_metadata.code_metadata code_or_metadata in
       let arity = Code_metadata.params_arity code_metadata in
       List.exists2
         (fun full_kind simple ->
@@ -281,7 +280,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               "Unexpected call site inlinine decision for speculative inlining";
           counters)
       (fun () : Call_site_inlining_decision_type.t ->
-        if not (argument_types_useful dacc ~apply ~code_or_metadata)
+        if not (argument_types_useful dacc ~apply ~code_metadata)
         then Argument_types_not_useful
         else if not (code_present ())
         then Missing_code
