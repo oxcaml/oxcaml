@@ -110,7 +110,7 @@ type t = int
 
 let bot : t = 0
 
-(* For this layout top happens to be all 20 bits set: 0xF_FFFF. *)
+(* For this layout top happens to be all 19 bits set: 0x7_FFFF. *)
 let top : t = Array.fold_left ( lor ) 0 axis_mask
 
 let join (a : t) (b : t) : t = a lor b
@@ -193,16 +193,14 @@ let co_sub (a : t) (b : t) : t =
 
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
+  (* Not hot: derive from the layout tables so that adding an axis needs no
+     recomputed constants. *)
   let set : int = Obj.magic set in
-  let lo =
-    set land 0x001
-    lor ((set land 0x00E) lsl 1)
-    lor ((set land 0x030) lsl 2)
-    lor ((set land 0x3C0) lsl 3)
-    lor ((set land 0x400) lsl 4)
-    lor ((set land 0x1800) lsl 5)
-  in
-  lo lor ((lo land 0x25091) lsl 1)
+  let acc = ref 0 in
+  for i = 0 to num_axes - 1 do
+    if set land (1 lsl i) <> 0 then acc := !acc lor axis_mask.(i)
+  done;
+  !acc
 
 (* IK-only: compute relevant axes of a constant modality, mirroring
    Jkind.relevant_axes_of_modality. *)

@@ -704,7 +704,8 @@ let total_primitive_mode mode =
    enclosing closure to partial by walking the closure locks, in the same way
    [Env.walk_locks_for_legacy_construct] does for effect handlers. *)
 let constrain_enclosing_totality ~loc env =
-  Env.constrain_enclosing_totality_partial ~env (loc, Function)
+  Env.walk_locks_for_totality ~env (loc, Function)
+    (Totality.of_const Totality.Const.Partial)
 
 let mode_lazy expected_mode =
   let mode =
@@ -6390,9 +6391,8 @@ let split_function_ty
            reaches let-bound literals that the expected-mode edge (return, if
            and argument position) misses.  [env] here still holds only the
            enclosing closure locks; this literal's own lock is added below. *)
-        Env.constrain_enclosing_totality_at_least ~env (loc_fun, Function)
-          (Alloc.proj_comonadic Totality alloc_mode
-           |> Totality.disallow_right);
+        Env.walk_locks_for_totality ~env (loc_fun, Function)
+          (Alloc.proj_comonadic Totality alloc_mode);
         let env =
           Env.add_closure_lock
             (loc, Function)
@@ -6623,32 +6623,24 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
     if force_toplevel
     then begin
       (* Toplevel bindings are pinned to legacy, except that a [total] or
-         [logical] annotation raises the floor on its axis (so the binding is
-         usable at that mode later), and an unannotated binding's logicality is
-         left free between [physical] and [logical] so that rebinding a logical
-         value stays possible. *)
+         [logical] annotation moves the binding to that end of its axis, so
+         the binding is usable at that mode later in the unit.  Unannotated
+         bindings stay at legacy exactly, as before. *)
       let mode_annots = mode_annots_from_pat spat in
-      let lower = Value.Const.legacy in
-      let lower =
+      let pinned = Value.Const.legacy in
+      let pinned =
         match mode_annots.mode_modes.totality with
         | Some Totality.Const.Total ->
-            { lower with totality = Totality.Const.Total }
-        | Some Partial | None -> lower
+            { pinned with totality = Totality.Const.Total }
+        | Some Partial | None -> pinned
       in
-      let lower =
+      let pinned =
         match mode_annots.mode_modes.logicality with
         | Some Logicality.Const.Logical ->
-            { lower with logicality = Logicality.Const.Logical }
-        | Some Physical | None -> lower
+            { pinned with logicality = Logicality.Const.Logical }
+        | Some Physical | None -> pinned
       in
-      let upper =
-        match mode_annots.mode_modes.logicality with
-        | None -> { lower with logicality = Logicality.Const.Logical }
-        | Some _ -> lower
-      in
-      let mode = Value.newvar () in
-      Value.submode_exn (Value.of_const lower) mode;
-      Value.submode_exn mode (Value.of_const upper);
+      let mode = Value.of_const pinned in
       simple_pat_mode mode, mode_default mode
     end
     else match rec_mode_var with

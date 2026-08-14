@@ -299,7 +299,10 @@ let uses_while @ total = fun () -> while false do () done
 Line 1, characters 35-57:
 1 | let uses_while @ total = fun () -> while false do () done
                                        ^^^^^^^^^^^^^^^^^^^^^^
-Error: The function is "partial" but is expected to be "total".
+Error: The function is "partial"
+       but is expected to be "total"
+         because it is used inside the function at line 1, characters 25-57
+         which is expected to be "total".
 |}]
 let uses_while = fun () -> while false do () done
 [%%expect{|
@@ -311,7 +314,10 @@ let uses_for @ total = fun () -> for _i = 0 to 10 do () done
 Line 1, characters 33-60:
 1 | let uses_for @ total = fun () -> for _i = 0 to 10 do () done
                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The function is "partial" but is expected to be "total".
+Error: The function is "partial"
+       but is expected to be "total"
+         because it is used inside the function at line 1, characters 23-60
+         which is expected to be "total".
 |}]
 let uses_for = fun () -> for _i = 0 to 10 do () done
 [%%expect{|
@@ -325,7 +331,10 @@ type mrec = { mutable x : int; }
 Line 2, characters 46-54:
 2 | let uses_setfield @ total = fun (r : mrec) -> r.x <- 1
                                                   ^^^^^^^^
-Error: The function is "partial" but is expected to be "total".
+Error: The function is "partial"
+       but is expected to be "total"
+         because it is used inside the function at line 2, characters 28-54
+         which is expected to be "total".
 |}]
 let uses_setfield = fun (r : mrec) -> r.x <- 1
 [%%expect{|
@@ -364,7 +373,10 @@ let uses_assert @ total = fun x -> assert (x > 0)
 Line 1, characters 35-49:
 1 | let uses_assert @ total = fun x -> assert (x > 0)
                                        ^^^^^^^^^^^^^^
-Error: The function is "partial" but is expected to be "total".
+Error: The function is "partial"
+       but is expected to be "total"
+         because it is used inside the function at line 1, characters 26-49
+         which is expected to be "total".
 |}]
 let uses_assert = fun x -> assert (x > 0)
 [%%expect{|
@@ -383,7 +395,10 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
 Line 1, characters 52-76:
 1 | let partial_match @ total = fun (x : int option) -> match x with Some y -> y
                                                         ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The function is "partial" but is expected to be "total".
+Error: The function is "partial"
+       but is expected to be "total"
+         because it is used inside the function at line 1, characters 28-76
+         which is expected to be "total".
 |}]
 let exhaustive_match @ total = fun (x : int option) ->
   match x with Some y -> y | None -> 0
@@ -433,7 +448,19 @@ end
 Line 3, characters 51-57:
 3 |   method set_via_total = let f @ total = fun () -> v <- 1 in f ()
                                                        ^^^^^^
-Error: The function is "partial" but is expected to be "total".
+Error: The function is "partial"
+       but is expected to be "total"
+         because it is used inside the function at line 3, characters 41-57
+         which is expected to be "total".
+|}]
+
+(* [try] itself is not an effect form: catching does not diverge, and a body
+   that could raise is already partial. *)
+exception E
+let uses_try @ total = fun () -> try 1 with E -> 2
+[%%expect{|
+exception E
+val uses_try : unit -> int = <fun>
 |}]
 
 (* ------------------------------------------------------------------ *)
@@ -474,6 +501,8 @@ Line 2, characters 17-19:
 Error: The value "go" is "partial"
        but is expected to be "total"
          because it is used inside the function at line 2, characters 13-21
+         which is expected to be "total"
+         because it is used inside the function at lines 1-3, characters 24-6
          which is expected to be "total".
 |}]
 
@@ -528,6 +557,8 @@ Line 2, characters 49-52:
 Error: The value "odd" is "partial"
        but is expected to be "total"
          because it is used inside the function at line 2, characters 15-60
+         which is expected to be "total"
+         because it is used inside the function at lines 1-4, characters 21-9
          which is expected to be "total".
 |}]
 

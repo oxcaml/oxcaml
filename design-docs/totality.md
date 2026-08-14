@@ -224,8 +224,11 @@ the route taken and why.
 - **`assert` and non-exhaustive matches are partial.** Both can raise
   (`Assert_failure`, `Match_failure`), both are syntactic with no partial
   value to capture, so both walk the closure locks like `while` and `for`.
-  Non-exhaustive `let` patterns too. Exception handlers were already forced
-  legacy (hence partial) by `walk_locks_for_legacy_construct`.
+  Non-exhaustive `let` patterns too. Effect handlers were already forced
+  legacy (hence partial) by `walk_locks_for_legacy_construct`. `try`/`with`
+  itself is not constrained: catching does not diverge, and anything that can
+  raise inside the body is already partial by the rules above (pinned by a
+  fixture).
 
 - **Reading or writing a mutable field through a `logical` value is rejected
   in the projection/mutation rule** (`mode_project_mutable`,
@@ -258,12 +261,14 @@ the route taken and why.
   were not ported.
 
 - **Toplevel bindings** stay pinned to legacy except that a `total` or
-  `logical` annotation raises the floor on its axis, and an unannotated
-  binding's logicality is left free upward (so rebinding a logical value
-  works). This mirrors how toplevel bindings interact with `portable` today:
-  the annotation is enforced on the right-hand side, and the printed
-  signature does not show the axis (`val f : int -> int`), but the binding is
-  usable at `total` later in the same unit.
+  `logical` annotation pins the binding at that end of its axis instead.
+  Unannotated bindings are pinned at legacy exactly, as before, so rebinding
+  a logical value at toplevel is rejected — the same treatment `contended`
+  gets today (a review round removed an earlier version that left unannotated
+  logicality free upward, a privilege no other monadic axis has). The
+  annotation is enforced on the right-hand side; the toplevel printout does
+  not show `total` (matching `portable` today), though it does show
+  `@@ logical`, whose zap direction is monadic.
 
 - **Two latent vox2 defects fixed rather than ported**: `Mod_bounds.
   less_or_equal` and `get_max_axes` in `jkind.ml` enumerate axes by hand and
@@ -316,3 +321,20 @@ the route taken and why.
   named module-type expansion — deferred to a follow-up and pinned by a
   fixture in the test file. Without an explicit `@@ total` claim, recursive
   module values correctly stay partial.
+
+- **Alternatives raised in review, considered and not taken.**
+  (a) *Application-site totality* (constrain the applied function's totality
+  into the enclosing locks at `Pexp_apply`, instead of the hereditary literal
+  walk): stronger on higher-order calls and would admit building-and-
+  returning a partial closure from a total function, but this doc's own test
+  list requires "a recursive function that is only returned, never applied"
+  to be rejected, and the hereditary rule is what delivers that; switching is
+  a doc-level decision, not piece-level.
+  (b) *Allowing `@@ physical` / dropping `nonlogical`*: the twin axes accept
+  their identity modality with a redundancy warning (`@@ uncontended`,
+  `mod partial` parse today), so the `nonlogical` spelling is a convention
+  break; kept because this doc specifies it, flagged for reconsideration.
+  (c) *Declaring primitive totality in stdlib interfaces* (`@@ total` on the
+  `external`) instead of a compiler allowlist: better long-term (extends to
+  user externals, survives abstraction), deferred to keep this piece free of
+  stdlib churn.

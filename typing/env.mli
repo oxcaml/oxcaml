@@ -322,17 +322,18 @@ val walk_locks : env:t -> loc:Location.t -> Longident.t ->
     stateful. *)
 val walk_locks_for_legacy_construct : env:t -> Mode.Hint.pinpoint -> unit
 
-(** Constrains the totality of every enclosing closure to be at least the given
-    totality (i.e. submodes [totality] into each enclosing closure lock).  Used
-    for the (Hereditary) discipline: a nested function literal's totality must be
-    below every enclosing closure's totality, so a partial nested closure forces
-    its enclosing closures partial. *)
-val constrain_enclosing_totality_at_least :
-  env:t -> Mode.Hint.pinpoint -> Mode.Totality.l -> unit
-
-(** Constrains the totality of every enclosing closure to be partial. *)
-val constrain_enclosing_totality_partial :
-  env:t -> Mode.Hint.pinpoint -> unit
+(** Registers a use of a construct whose totality is [totality] (a loop, a
+    mutable assignment, or a nested function literal), constraining every
+    enclosing closure lock as if a value at that totality — and otherwise at
+    the bottom of every axis — were used at the pinpoint.  This is the
+    (Hereditary) discipline: a nested literal's totality must be below every
+    enclosing closure's totality, and a partial construct forces every
+    enclosing closure partial. *)
+val walk_locks_for_totality :
+  env:t ->
+  Mode.Hint.pinpoint ->
+  (Allowance.allowed * 'r) Mode.Totality.t ->
+  unit
 
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
