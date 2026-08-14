@@ -179,9 +179,6 @@ type lock =
   | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
   | Region_lock
   | Exclave_lock
-  | Erased_lock
-      (* the context is erased: it is deleted from compilation, so values of
-         any erasure may be used inside it *)
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
 
 type lock_or_stage =
@@ -665,6 +662,7 @@ type type_descr_kind =
 type type_descriptions = type_descr_kind
 
 let in_signature_flag = 0x01
+let erased_context_flag = 0x02
 
 type t = {
   values: (lock_or_stage, value_entry, value_data) IdTbl.t;
@@ -1004,6 +1002,13 @@ let in_signature b env =
   {env with flags}
 
 let is_in_signature env = env.flags land in_signature_flag <> 0
+
+(* An erased context is deleted from compilation, so nothing is checked on
+   the erasure axis inside it; see [Typecore.submode]. *)
+let enter_erased_context env =
+  { env with flags = env.flags lor erased_context_flag }
+
+let in_erased_context env = env.flags land erased_context_flag <> 0
 
 let has_local_constraints env =
   not (StagedPath.Map.is_empty env.local_constraints)
@@ -3118,8 +3123,6 @@ let add_exclave_lock env = add_lock Exclave_lock env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
-let add_erased_lock env = add_lock Erased_lock env
-
 let enter_quote env =
   add_stage_lock Quote_lock {env with stage = env.stage + 1}
 
@@ -3794,12 +3797,6 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           closure_mode pp vmode closure_context comonadic
       | Exclave_lock ->
           exclave_mode ~errors ~env ~pp vmode
-      | Erased_lock ->
-          (* Inside an erased context every value appears retained: the
-             context is deleted, so the value's absence at run time cannot be
-             observed. *)
-          Mode.Value.meet_const_with Erasure
-            Mode.Erasure.Const.Retained vmode
       | Unboxed_lock ->
           unboxed_type ~errors ~env ~loc:(fst pp) ty_and_lid;
           vmode
@@ -3866,10 +3863,6 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
-      | Erased_lock ->
-          (* A write inside an erased context is deleted together with the
-             context, so it constrains the new value's mode no further. *)
-          mode
       | Unboxed_lock -> mode
     ) mode locks
 

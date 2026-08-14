@@ -639,6 +639,7 @@ and expression_extra i ppf (extra, loc, attrs) =
       line i ppf "Texp_ghost_region\n"
   | Texp_erased ->
       line i ppf "Texp_erased\n";
+      attributes i ppf attrs
   | Texp_stack ->
       line i ppf "Texp_stack\n";
       attributes i ppf attrs

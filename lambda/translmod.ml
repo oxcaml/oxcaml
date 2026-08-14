@@ -1149,6 +1149,9 @@ let transl_implementation compilation_unit impl ~loc =
   reset_labels ();
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
+  (* Ident stamps restart per unit, so the table must not leak into the next
+     unit of a multi-file invocation. *)
+  Translcore.reset_erased_ids ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
   let body, (repr, arg_block_idx) =
     Translobj.transl_label_init (fun () ->
@@ -1580,4 +1583,5 @@ let reset () =
   primitive_declarations := [];
   aliased_idents := Ident.empty;
   Env.reset_required_globals ();
-  Translprim.clear_used_primitives ()
+  Translprim.clear_used_primitives ();
+  Translcore.reset_erased_ids ()

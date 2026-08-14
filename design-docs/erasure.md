@@ -404,36 +404,42 @@ refinement predicates, which is what erasure exists for.
 Recorded per AGENTS.md: choices at points the doc left open or where reality
 disagreed with the doc, with alternatives considered.
 
-### The ambient rule is an environment lock
+### The ambient rule is an environment flag checked at the submode funnel
 
-"Checked at ambient Erased" is implemented as `Env.Erased_lock`: a value
-looked up through the lock has its erasure strengthened to Retained, because
-the context that uses it is deleted. This puts the rule at the single point
-where values meet contexts, instead of threading a flag through every
-expected-mode constructor. Consequences that fall out for free:
+"Checked at ambient Erased" is implemented as a flag on the typing
+environment (`Env.enter_erased_context`), consulted at the single point
+where every expression's mode meets its expectation (`Typecore.submode`):
+inside an erased context, the erasure axis simply is not checked, because
+the context is deleted from compilation. This is compositional — it covers
+variables, results of applications, nested `erased_`, everything — and it
+gives the closure body rule for `erased_ (fun ...)` for free (the flag is
+in the environment when the body is typed).
 
-- the closure body rule for `erased_ (fun ...)` (the lambda's body is typed
-  under the lock);
-- nested erased contexts need no special casing.
+History: the first implementation was an environment *lock* that lowered
+the erasure of looked-up identifiers. Review found it non-compositional
+(an erased application result in a read position inside `erased_` was still
+rejected); the funnel formulation subsumes it and is smaller.
 
-Alternative considered: a field on `expected_mode`. Rejected because expected
-modes are constructed in dozens of places and each would need to propagate
-the flag; the lock reaches all of them via the environment.
+### The default expectation requires retained; erased-tolerant positions are
+the exception
 
-### Reads require retained; binds do not
+`Erased` is the top of the axis, so an *unconstrained* expected mode would
+accept erased values — and "read position" is a semantic notion nobody can
+grep for. Review found exactly this hole (`while` and `for` used a raw
+`Value.max`). So the polarity is flipped: the permissive expected mode
+(`mode_max`) requires Retained on the erasure axis, and the erased-tolerant
+positions are the closed, spelled-out set:
 
-There is no existing analogue of "usable only in erased contexts", so the
-following read positions constrain the value to Retained on the erasure axis:
-`if`/`while` conditions, `assert`, `when` guards, comprehension conditions
-and bounds (via a new `mode_read`), and every *destructuring* pattern
-(constants, tuples, constructors, records, arrays, lazy, unpack, intervals).
-Patterns that bind without reading — variables, wildcards, aliases — do not,
-so `let x = erased_ e in ...` works. Statement position (`e; ...`) is left
-unconstrained; nothing is read there that survives compilation.
+- type-driven positions (an `@ erased` arrow argument, an erased return);
+- erased contexts (the ambient rule above);
+- statement position (`e; ...`), which discards the value.
 
-The function position of an application always requires Retained (there is
-no closure to jump to); inside `erased_` the lock has already lowered the
-function's apparent erasure, so `erased_ (f x)` with `f @ erased` passes.
+Positions built from fresh mode variables still need an explicit constraint
+where they read: destructuring patterns (constants, tuples, constructors,
+records, arrays, lazy, unpack, intervals — variables, wildcards and aliases
+bind without reading, so `let x = erased_ e in ...` works), record field
+access and mutation (`type_label_access`), and the function position of an
+application (there is no closure to jump to).
 
 ### Closures: carve-outs in three places
 
@@ -444,6 +450,12 @@ function's apparent erasure, so `erased_ (f x)` with `f @ erased` passes.
   erased argument is not stored in the wrapper closure, so its erasure does
   not join into the closure's mode. Without this, `use x` with an erased `x`
   incorrectly made the result erased.
+- moregen (`moregen_alloc_mode`): erasure is equated in argument position in
+  *both* directions there, not one direction plus the ambient variance —
+  the ambient direction flips at each arrow nesting, and review produced a
+  sealed module whose callback ABI mismatched at run time through a doubly
+  nested arrow. The coercion path (`subtype_rec`) recurses with swapped
+  sides, so its single check per level already yields invariance.
 
 The doc offered a modality-based framing for captures; the machinery applies
 locks uniformly across captures, so the carve-out was the available route
@@ -470,7 +482,21 @@ Erased occurrences translate at `Punboxed_product []`:
 - application arguments at erased arrow positions: erased arguments pass
   zero-width; retained arguments are evaluated for effects and dropped
   (`Lsequence`), pinning the doc's boundary semantics;
-- the eta-wrapper parameter for out-of-order partial applications.
+- the eta-wrapper parameter for out-of-order partial applications;
+- over-applications of primitives thread the same per-position flags.
+
+The per-unit table of erased identifiers is reset from `Translmod.reset`:
+`Ident` stamps restart for every unit, so review showed a stale table giving
+*another unit's* like-named parameter the void layout.
+
+An erased expression at any other position translates to a placeholder of
+whatever layout the context requests (`dummy_constant` for values, zeros
+for unboxed numbers, recursively for unboxed products). This is what makes
+structural erasure total: a tuple with an erased component builds with a
+placeholder word and is then dropped at its erased boundary, instead of
+putting a void operand inside a value-layout block (review found a dozen
+compiler aborts of that shape). Vector layouts have no placeholder and
+remain a compiler error.
 
 Measured results match the doc's void experiments: erased params are absent
 from native functions, a function whose only param is erased compiles to a
@@ -501,18 +527,43 @@ positions consume.
   rejected: the structure's mode is the join of its items' modes, and
   compilation units are legacy. Insulating them needs the same missing
   modality direction as record fields.
-- **Erased optional parameters** are not given the void representation.
+- **Erased optional parameters** are not given the void representation, on
+  both sides of a call: `function_arg_erasures` reads optional labels as
+  retained, so caller and callee agree.
+- **Externals cannot take erased parameters** (rejected at declaration):
+  there is no erased calling convention across the FFI.
 - **`erased_` in quotations** is rejected.
 - **Erased args to external primitives** keep the retained calling
   convention (no `%`-primitive has erased params today).
 
+### Known gap: instantiation treats arrow erasure as implicitly polymorphic
+
+`instance` copies a generic arrow's modes into fresh, *independent*
+variables. For locality this loses only precision; for erasure it changes
+the ABI: `let id2 : ('a -> 'b) -> ('a -> 'b) = fun g -> g` applied to
+`f : int @ erased -> int` gives an application whose visible arrow reads
+retained while the underlying closure has the erased ABI, and the program
+aborts at run time (review finding, repro in the report). Relatedly, an
+unannotated function's parameter erasure can be inferred from a call site
+(`let f x = 42` + `f (erased_ 5)` gives `f : 'a @ erased -> int`), against
+this doc's "never inferred" rule — self-consistent per unit and across
+`.cmi`s, but a silent ABI change.
+
+Both have one root: arrow-mode instantiation must either preserve the
+erasure component's identity (no fresh copy) or fix it to Retained unless
+annotated. Each option needs mode-solver work that this piece does not
+attempt; flagged for a decision.
+
 ### Erasure and mode crossing
 
 No type crosses erasure, ever: an erased value does not exist, so treating
-it as retained is unsound regardless of the type. Enforced at every place a
-crossing is built: the jkind axis (index 10, Chain2) is pinned to its top in
-`Axis_lattice.create`; `mod erased` / `mod retained` are rejected as kind
-modifiers; `mod everything` excludes erasure (precedent: staticity);
-`Crossing.always_constructed_at` pins erasure; the builtin data-kind
-crossings pass `~erasure:false`. Zero-width types could in principle cross
-erasure soundly; not exploited.
+it as retained is unsound regardless of the type. Rather than pinning every
+construction site (the first attempt; review found it scattered across five
+sites and still missed one), the axis is pinned at the two points where
+stored bounds are *read* as crossings: `Btype.Jkind0.Mod_bounds.crossing`
+and `Axis_lattice.to_mode_crossing` (the ikind path). Construction sites may
+pass through `min` freely; `mod erased` / `mod retained` are rejected as
+kind modifiers, `mod everything` excludes erasure (precedent: staticity),
+and the typecore/ctype crossings that do not pass through a reader take
+`~erasure:false`. Zero-width types could in principle cross erasure soundly;
+not exploited.

@@ -121,6 +121,12 @@ module Modality_axis_pair = struct
       match[@warning "-18"]
         Mode_axis_pair.to_value (Mode_axis_pair.of_string s)
       with
+      | Atom (Comonadic Erasure, _) ->
+        (* Erasure is not expressible as a modality or kind modifier: a
+           modality that weakens (an erased field in a retained record) would
+           have to be a comonadic join, and comonadic modalities are meets;
+           and no type crosses erasure. Deferred; fail closed. *)
+        raise Not_found
       | Atom (Monadic ax, mode) -> Atom (Monadic ax, Join_const mode)
       | Atom (Comonadic ax, mode) -> Atom (Comonadic ax, Meet_const mode))
 end
@@ -639,9 +645,6 @@ let transl_mod_bounds ?(warn = true) annots =
     List.fold_left
       (fun (nonmodal, base, atoms, seen_ev) { txt = Parsetree.Mode txt; loc } ->
         match Modality_axis_pair.of_string txt with
-        | Atom (Comonadic Erasure, _) ->
-          (* Types never cross erasure; see [everything_modality]. *)
-          raise (Error (loc, Unrecognized_modifier (Modifier, txt)))
         | Atom (_, _) as atom ->
           if (seen_ev && not (is_staticity atom)) || has_modal_axis atom atoms
           then raise_dup_modal loc atom;

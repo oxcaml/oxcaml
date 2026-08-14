@@ -436,9 +436,11 @@ let zero_alloc_of_application
 
 (* Identifiers bound to erased values: erased function parameters and
    variables bound to erased expressions. Uses of these variables translate
-   at the void layout. Per-unit state like [Translprim]'s; idents are unique
-   within a unit, so entries never conflict and stale ones are harmless. *)
+   as erased. Per-unit state like [Translprim]'s; reset per unit from
+   [Translmod.reset] because [Ident] stamps restart for each unit. *)
 let erased_ids = ref Ident.Set.empty
+
+let reset_erased_ids () = erased_ids := Ident.Set.empty
 
 let layout_erased = Lambda.layout_unboxed_unit
 
@@ -449,19 +451,24 @@ let mark_erased_ident id = erased_ids := Ident.Set.add id !erased_ids
 let mark_erased_pat pat =
   List.iter mark_erased_ident (Typedtree.pat_bound_idents pat)
 
+(* Whether an expression is erased, i.e. translates to a placeholder of
+   whatever layout the context requests: [erased_ e] itself, or a variable
+   bound to an erased value. *)
+let is_erased_exp e =
+  List.exists
+    (function (Texp_erased, _, _) -> true | _ -> false)
+    e.exp_extra
+  || (match e.exp_desc with
+      | Texp_ident { path = Path.Pident id; _ } ->
+          Ident.Set.mem id !erased_ids
+      | _ -> false)
+
 (* Must run before the let's body is translated: uses of the bound variables
    inside the body consult [erased_ids]. *)
 let mark_erased_bindings pat_expr_list =
   List.iter
     (fun { vb_pat; vb_expr; _ } ->
-       if List.exists
-            (function (Texp_erased, _, _) -> true | _ -> false)
-            vb_expr.exp_extra
-          || (match vb_expr.exp_desc with
-              | Texp_ident { path = Path.Pident id; _ } ->
-                  Ident.Set.mem id !erased_ids
-              | _ -> false)
-       then mark_erased_pat vb_pat)
+       if is_erased_exp vb_expr then mark_erased_pat vb_pat)
     pat_expr_list
 
 let rec transl_exp ~scopes layout e =
@@ -485,34 +492,43 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
   Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
 
 and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
-  if List.exists
-       (function (Texp_erased, _, _) -> true | _ -> false)
-       e.exp_extra
+  if is_erased_exp e
   then transl_erased ~scopes layout e
   else transl_exp0_desc ~in_new_scope ~scopes layout e
 
-(* [erased_ e] is deleted from compilation: [e] is not evaluated. We emit a
-   placeholder of the right layout; it is only ever consumed by other erased
-   positions, which are themselves deleted or zero-width. *)
+(* An erased expression is deleted from compilation: it is not evaluated.
+   We emit a placeholder of the layout the context requests; a placeholder
+   is only ever consumed by positions the type checker has verified to be
+   erased themselves, which are in turn deleted or zero-width. *)
 and transl_erased ~scopes (layout : Lambda.layout) e =
-  match layout with
-  | Pvalue _ -> dummy_constant
-  | Punboxed_product [] -> void_value (of_location ~scopes e.exp_loc)
-  | _ ->
-      Misc.fatal_errorf "erased_ is not yet supported at layout %a"
-        Printlambda.layout layout
-
-(* Whether an expression is erased, i.e. translates to a zero-width value:
-   [erased_ e] itself, or a variable bound to an erased value. The layout of
-   such an expression is [layout_erased] rather than what its sort says. *)
-and is_erased_exp e =
-  List.exists
-    (function (Texp_erased, _, _) -> true | _ -> false)
-    e.exp_extra
-  || (match e.exp_desc with
-      | Texp_ident { path = Path.Pident id; _ } ->
-          Ident.Set.mem id !erased_ids
-      | _ -> false)
+  let loc () = of_location ~scopes e.exp_loc in
+  let rec placeholder (layout : Lambda.layout) =
+    match layout with
+    | Pvalue _ -> dummy_constant
+    | Punboxed_product layouts ->
+        Lprim (Pmake_unboxed_product layouts,
+               List.map placeholder layouts, loc ())
+    | Punboxed_float Unboxed_float64 ->
+        Lconst (Const_base (Const_unboxed_float "0."))
+    | Punboxed_float Unboxed_float32 ->
+        Lconst (Const_base (Const_unboxed_float32 "0."))
+    | Punboxed_or_untagged_integer Untagged_int ->
+        Lconst (Const_base (Const_untagged_int 0))
+    | Punboxed_or_untagged_integer Untagged_int8 ->
+        Lconst (Const_base (Const_untagged_int8 0))
+    | Punboxed_or_untagged_integer Untagged_int16 ->
+        Lconst (Const_base (Const_untagged_int16 0))
+    | Punboxed_or_untagged_integer Unboxed_int32 ->
+        Lconst (Const_base (Const_unboxed_int32 0l))
+    | Punboxed_or_untagged_integer Unboxed_int64 ->
+        Lconst (Const_base (Const_unboxed_int64 0L))
+    | Punboxed_or_untagged_integer Unboxed_nativeint ->
+        Lconst (Const_base (Const_unboxed_nativeint 0n))
+    | Punboxed_vector _ | Punboxed_mask | Ptop | Pbottom | Psplicevar _ ->
+        Misc.fatal_errorf "erased_ is not supported at layout %a"
+          Printlambda.layout layout
+  in
+  placeholder layout
 
 and transl_exp0_desc ~in_new_scope ~scopes (layout : Lambda.layout) e =
   match e.exp_desc with
@@ -566,6 +582,17 @@ and transl_exp0_desc ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | _, ((_, Omitted _) :: _) -> assert false
       in
       let arg_exps, extra_args = cut_args p.prim_native_repr_args oargs in
+      let extra_erased_args =
+        (* The primitive's own parameters cannot be erased (rejected at
+           declaration); over-applied positions follow the result arrows. *)
+        let rec drop n l =
+          if n <= 0 then l
+          else match l with [] -> [] | _ :: tl -> drop (n - 1) tl
+        in
+        drop (List.length arg_exps)
+          (Typeopt.function_arg_erasures e.exp_env prim_type
+             (List.length oargs))
+      in
       let args = transl_list ~scopes arg_exps in
       let prim_exp = if extra_args = [] then Some e else None in
       let position =
@@ -603,7 +630,7 @@ and transl_exp0_desc ~in_new_scope ~scopes (layout : Lambda.layout) e =
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
              ~assume_zero_alloc
-             ~position ~mode ~yielding
+             ~position ~mode ~yielding ~erased_args:extra_erased_args
              ~result_layout:layout lam extra_args
              (of_location ~scopes e.exp_loc))
       end
@@ -1873,10 +1900,9 @@ and transl_apply ~scopes
   in
   let args =
     let erased_args =
-      (* Positions beyond the known arrows are retained. *)
-      let missing = List.length sargs - List.length erased_args in
-      if missing <= 0 then erased_args
-      else erased_args @ List.init missing (fun _ -> false)
+      match erased_args with
+      | [] -> List.map (fun _ -> false) sargs
+      | _ -> erased_args
     in
     List.map2
       (fun (_, arg) erased ->
@@ -2423,6 +2449,8 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
           let sort = Jkind.Sort.default_for_transl_and_get sort in
           let erased = is_erased_exp expr in
           if erased then mark_erased_pat pat;
+          (* also done in [transl_exp0_desc]'s [Texp_let] case, which must
+             mark before this function's [body] argument is evaluated *)
           let sort = if erased then Jkind.Sort.Const.(Base Void) else sort in
           let layout = if erased then layout_erased else layout_exp sort expr in
           let lam =

@@ -1377,15 +1377,21 @@ let rec function_arg_erasures env ty n =
   if n = 0 then []
   else
     match scrape env ty with
-    | Some (Tarrow ((_, _, marg, _), _, rhs, _)) ->
+    | Some (Tarrow ((label, _, marg, _), _, rhs, _)) ->
       let erased =
-        match Mode.Erasure.zap_to_floor
-                (Mode.Alloc.proj_comonadic Erasure marg) with
-        | Mode.Erasure.Const.Erased -> true
-        | Mode.Erasure.Const.Retained -> false
+        (* Optional parameters keep the retained calling convention: the
+           erased representation for them is deferred, and the callee side
+           agrees (see [Translcore]). *)
+        (match label with
+         | Optional _ -> false
+         | Nolabel | Labelled _ | Position _ -> true)
+        && (match Mode.Erasure.zap_to_floor
+                    (Mode.Alloc.proj_comonadic Erasure marg) with
+            | Mode.Erasure.Const.Erased -> true
+            | Mode.Erasure.Const.Retained -> false)
       in
       erased :: function_arg_erasures env rhs (n - 1)
-    | _ -> []
+    | _ -> List.init n (fun _ -> false)
 
 let function_arg_layout env loc sort ty =
   match is_function_type env ty with

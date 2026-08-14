@@ -31,7 +31,8 @@
    9. Statefulness: Stateless -> Writing / Reading -> Stateful
    10. Visibility (monadic): Immutable -> Read / Write -> Read_write
    11. Staticity (monadic): Dynamic -> Static
-   12. Erasure: Retained -> Erased
+   12. Erasure: Retained -> Erased (stored but never consulted: the erasure
+       crossing is pinned to no-crossing in [to_mode_crossing])
    13. Externality: External -> External64 -> Internal
 
    Axes 0-12 are modal axes (affect mode-crossing).
@@ -297,9 +298,6 @@ module Levels = struct
   let level_of_externality (x : Jkind_axis.Externality.t) : int =
     match x with External -> 0 | External64 -> 1 | Internal -> 2
 
-  let level_of_erasure (x : Mode.Erasure.Const.t) : int =
-    match x with Mode.Erasure.Const.Retained -> 0 | Mode.Erasure.Const.Erased -> 1
-
   let areality_of_level = function
     | 0 -> Mode.Regionality.Const.Global
     | 1 -> Mode.Regionality.Const.Regional
@@ -369,11 +367,6 @@ module Levels = struct
     | 1 -> Mode.Staticity.Static
     | _ -> invalid_arg "Axis_lattice.staticity_of_level_monadic"
 
-  let erasure_of_level = function
-    | 0 -> Mode.Erasure.Const.Retained
-    | 1 -> Mode.Erasure.Const.Erased
-    | _ -> invalid_arg "Axis_lattice.erasure_of_level"
-
   let externality_of_level = function
     | 0 -> Jkind_axis.Externality.External
     | 1 -> Jkind_axis.Externality.External64
@@ -417,9 +410,6 @@ let visibility (x : t) : Mode.Visibility.Const.t =
 let staticity (x : t) : Mode.Staticity.const =
   Levels.staticity_of_level_monadic (get_axis x ~axis:11)
 
-let erasure (x : t) : Mode.Erasure.Const.t =
-  Levels.erasure_of_level (get_axis x ~axis:12)
-
 let externality (x : t) : Jkind_axis.Externality.t =
   Levels.externality_of_level (get_axis x ~axis:13)
 
@@ -458,9 +448,6 @@ let set_visibility (v : Mode.Visibility.Const.t) (x : t) : t =
 
 let set_staticity (s : Mode.Staticity.const) (x : t) : t =
   set_axis x ~axis:11 ~level:(Levels.level_of_staticity_monadic s)
-
-let set_erasure (e : Mode.Erasure.Const.t) (x : t) : t =
-  set_axis x ~axis:12 ~level:(Levels.level_of_erasure e)
 
 let set_externality (e : Jkind_axis.Externality.t) (x : t) : t =
   set_axis x ~axis:13 ~level:(Levels.level_of_externality e)
@@ -509,16 +496,16 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const (statefulness x)))
       ~erasure:
+        (* No type crosses erasure; see [Btype.Jkind0.Mod_bounds.crossing].
+           This is the reader used by ikinds. *)
         (Comonadic.Atom.Modality
-           (Mode.Modality.Comonadic.Atom.Meet_const (erasure x)))
+           (Mode.Modality.Comonadic.Atom.Meet_const Mode.Erasure.Const.max))
   in
   { monadic; comonadic }
 
 let create ~areality ~linearity ~uniqueness ~portability ~contention ~totality
     ~logicality ~forkable ~yielding ~statefulness ~visibility ~staticity
     ~externality =
-  (* Erasure is always at its top: no type crosses erasure, because an erased
-     value has no runtime representation. *)
   bot |> set_areality areality |> set_uniqueness uniqueness
   |> set_linearity linearity |> set_contention contention
   |> set_portability portability
@@ -526,7 +513,6 @@ let create ~areality ~linearity ~uniqueness ~portability ~contention ~totality
   |> set_yielding yielding
   |> set_statefulness statefulness
   |> set_visibility visibility |> set_staticity staticity
-  |> set_erasure Mode.Erasure.Const.Erased
   |> set_externality externality
 
 (* Canonical lattice constants used by ikinds. *)

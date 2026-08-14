@@ -113,6 +113,7 @@ type error =
   | Unbound_type_var_ext of type_expr * extension_constructor
   | Val_in_structure
   | Multiple_native_repr_attributes
+  | Erased_external_parameter
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
   | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
@@ -4514,6 +4515,14 @@ let rec parse_native_repr_attributes env core_type ty rmode
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type kind))
   | Ptyp_arrow (_, ct1, ct2, _, _), Tarrow ((_,_,marg,mret), t1, t2, _), _
     when not (Builtin_attributes.has_curry core_type.ptyp_attributes) ->
+    (match
+       Mode.Erasure.zap_to_floor (Mode.Alloc.proj_comonadic Erasure marg)
+     with
+     | Erased ->
+       (* An external's parameters cross the FFI: there is no erased calling
+          convention on the C side. Fail closed. *)
+       raise (Error (ct1.ptyp_loc, Erased_external_parameter))
+     | Retained -> ());
     let t1, _ = Btype.tpoly_get_poly t1 in
     let repr_arg =
       make_native_repr
@@ -5721,6 +5730,10 @@ let report_error ~loc = function
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
         Style.inline_code "[@@unpacked]"
+  | Erased_external_parameter ->
+      Location.errorf ~loc
+        "External declarations cannot have erased parameters:@ \
+         nothing would be passed for them across the FFI."
   | Cannot_unbox_or_untag_type Unboxed ->
       Location.errorf ~loc
         "Don't know how to unbox this type.@ \

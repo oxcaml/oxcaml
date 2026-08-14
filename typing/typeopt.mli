@@ -85,8 +85,9 @@ val function_arg_layout :
   Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
 
 (* For each of the first [n] arguments of a function type, whether that
-   argument is erased and therefore has no runtime representation. Positions
-   past the function's visible arrows are omitted. *)
+   argument is erased and therefore has no runtime representation. Always
+   returns [n] entries; positions past the function's visible arrows and
+   optional parameters read as retained. *)
 val function_arg_erasures : Env.t -> Types.type_expr -> int -> bool list
 
 val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind

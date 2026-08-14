@@ -37,4 +37,21 @@ let () =
   (* a retained closure capturing an erased value is an ordinary closure *)
   let clo = fun u -> g u x in
   clo ();
+  (* an alias of an erased variable is itself erased *)
+  let x' = x in
+  g () x';
+  (* erased values may flow through branches and closures; the results are
+     only usable at erased positions *)
+  let w = if Sys.opaque_identity true then x else x' in
+  g () w;
+  let k = fun () -> x in
+  g () (k ());
+  (* labelled and out-of-order application across an erased parameter *)
+  let lab ~(a : int @ erased) ~(b : int) = b + 1 in
+  print_int (lab ~b:1 ~a:x);
+  print_newline ();
+  (* an erased parameter of a function-cases function *)
+  let fc : int @ erased -> int = function _ -> 3 in
+  print_int (fc x);
+  print_newline ();
   print_string "done\n"

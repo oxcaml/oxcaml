@@ -608,7 +608,12 @@ val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
   Mode.Value.Comonadic.Const.t -> t -> t
 
 val add_region_lock : t -> t
-val add_erased_lock : t -> t
+
+(** Mark the environment as an erased context: the context is deleted from
+    compilation, so nothing is checked on the erasure axis inside it. *)
+val enter_erased_context : t -> t
+
+val in_erased_context : t -> bool
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
 val enter_quote : t -> t

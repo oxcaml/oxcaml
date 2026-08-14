@@ -80,7 +80,15 @@ let ok () =
   let _q = p in
   ()
 [%%expect{|
-val ok : unit -> unit = <fun>
+Line 3, characters 11-12:
+3 |   let _q = p in
+               ^
+Error: The value "p" has type "int * int" but an expression was expected of type
+         "('a : value_or_null)"
+       The kind of int * int is immutable_data with int
+         because it's a tuple type.
+       But the kind of int * int must be a subkind of value_or_null
+         because it's the type of a variable bound by a `let`.
 |}]
 
 let bad () =
@@ -350,4 +358,173 @@ Line 1, characters 38-55:
 1 | let bad (f : (int -> int @ erased)) = (f :> int -> int)
                                           ^^^^^^^^^^^^^^^^^
 Error: Type "int -> int @ erased" is not a subtype of "int -> int"
+|}]
+
+(* All read positions require retained: while and for (found in review), and
+   the ones below pin assert, guards and comprehensions against reverting
+   mode_max's erasure component. *)
+let bad () = let b = erased_ true in while b do () done
+[%%expect{|
+Line 1, characters 43-44:
+1 | let bad () = let b = erased_ true in while b do () done
+                                               ^
+Error: This value is "erased" but is expected to be "retained".
+|}]
+
+let bad () = let lo = erased_ 0 in for _i = lo to 1 do () done
+[%%expect{|
+Line 1, characters 44-46:
+1 | let bad () = let lo = erased_ 0 in for _i = lo to 1 do () done
+                                                ^^
+Error: This value is "erased" but is expected to be "retained".
+|}]
+
+let bad () = let b = erased_ true in assert b
+[%%expect{|
+Line 1, characters 44-45:
+1 | let bad () = let b = erased_ true in assert b
+                                                ^
+Error: This value is "erased" but is expected to be "retained".
+|}]
+
+let bad x = let b = erased_ true in match x with _ when b -> 0 | _ -> 1
+[%%expect{|
+Line 1, characters 56-57:
+1 | let bad x = let b = erased_ true in match x with _ when b -> 0 | _ -> 1
+                                                            ^
+Error: This value is "erased" but is expected to be "retained".
+|}]
+
+let bad () = let hi = erased_ 3 in [| x for x = 0 to hi |]
+[%%expect{|
+Line 1, characters 35-58:
+1 | let bad () = let hi = erased_ 3 in [| x for x = 0 to hi |]
+                                       ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The extension "comprehensions" is disabled and cannot be used
+|}]
+
+(* Reading or writing a field is a runtime access of the record. *)
+type m = { mutable v : int }
+let bad () = let r = erased_ { v = 1 } in r.v
+[%%expect{|
+type m = { mutable v : int; }
+Line 2, characters 42-43:
+2 | let bad () = let r = erased_ { v = 1 } in r.v
+                                              ^
+Error: This value is "erased" but is expected to be "retained".
+|}]
+
+let bad () = let r = erased_ { v = 1 } in r.v <- 2
+[%%expect{|
+Line 1, characters 42-43:
+1 | let bad () = let r = erased_ { v = 1 } in r.v <- 2
+                                              ^
+Error: This value is "erased" but is expected to be "retained".
+|}]
+
+(* Statement position discards the value, so erased is fine there. *)
+let ok () = (erased_ (print_string "gone")); 1
+[%%expect{|
+val ok : unit -> int = <fun>
+|}]
+
+(* The erased context is compositional: any erased expression may be read
+   inside erased_, not just variables. *)
+let ret (_x : int) : bool @ erased = erased_ true
+let a () = erased_ (if ret 1 then 1 else 2)
+let b () = erased_ (if (erased_ true) then 1 else 2)
+[%%expect{|
+val ret : int -> bool @ erased = <fun>
+val a : unit -> int @ erased = <fun>
+val b : unit -> int @ erased = <fun>
+|}]
+
+(* Structural erasure: a tuple with an erased component is itself erased, so
+   it is usable at an erased position and rejected at a retained one. *)
+let use (p : (int * int) @ erased) = 0
+let ok (y : int @ erased) = use (y, 1)
+let bad (y : int @ erased) = fst (y, 1)
+[%%expect{|
+Line 1, characters 9-33:
+1 | let use (p : (int * int) @ erased) = 0
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "int * int"
+       but a pattern was expected which matches values of type
+         "('a : value_or_null)"
+       The kind of int * int is immutable_data with int
+         because it's a tuple type.
+       But the kind of int * int must be a subkind of value_or_null
+         because we must know concretely how to pass a function argument.
+|}]
+
+(* Argument invariance also holds for arrows nested in argument position,
+   where the ambient variance has been negated: accepting either direction
+   would change the callback's ABI. *)
+module Bad_nested : sig
+  val g : (int @ erased -> unit) -> unit
+end = struct
+  let g (f : int -> unit) = f 1
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let g (f : int -> unit) = f 1
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : (int -> unit) -> unit end
+       is not included in
+         sig val g : (int @ erased -> unit) -> unit end
+       Values do not match:
+         val g : (int -> unit) -> unit
+       is not included in
+         val g : (int @ erased -> unit) -> unit
+       The type "(int -> unit) -> unit" is not compatible with the type
+         "(int @ erased -> unit) -> unit"
+       Type "int -> unit" is not compatible with type "int @ erased -> unit"
+|}]
+
+module Bad_nested_rev : sig
+  val g : (int -> unit) -> unit
+end = struct
+  let g (f : int @ erased -> unit) = ()
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let g (f : int @ erased -> unit) = ()
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : (int @ erased -> unit) -> unit end
+       is not included in
+         sig val g : (int -> unit) -> unit end
+       Values do not match:
+         val g : (int @ erased -> unit) -> unit
+       is not included in
+         val g : (int -> unit) -> unit
+       The type "(int @ erased -> unit) -> unit"
+       is not compatible with the type "(int -> unit) -> unit"
+       Type "int @ erased -> unit" is not compatible with type "int -> unit"
+|}]
+
+(* Externals cannot have erased parameters: nothing would be passed across
+   the FFI. *)
+external sink : int @ erased -> unit = "sink"
+[%%expect{|
+Line 1, characters 16-19:
+1 | external sink : int @ erased -> unit = "sink"
+                    ^^^
+Error: External declarations cannot have erased parameters:
+       nothing would be passed for them across the FFI.
+|}]
+
+(* The @@ erased modality is not supported yet (it would have to weaken,
+   and comonadic modalities strengthen); it is rejected, not ignored. *)
+type r = { x : int @@ erased; y : int }
+[%%expect{|
+Line 1, characters 22-28:
+1 | type r = { x : int @@ erased; y : int }
+                          ^^^^^^
+Error: Unrecognized modality erased.
 |}]

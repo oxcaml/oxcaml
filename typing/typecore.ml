@@ -645,21 +645,23 @@ let enter_region_if cond ?region env expected_mode =
   else
     env, expected_mode, []
 
-let mode_max =
-  mode_default Value.max
+(* The most permissive expected mode. It still requires the value to be
+   retained on the erasure axis: an erased value does not exist at run time,
+   so the positions that accept one are spelled out explicitly (erased
+   contexts, and statement position, which discards the value). *)
+let value_max_retained =
+  Value.of_const { Value.Const.max with erasure = Retained }
 
-(* The expected mode of a value that is read at run time but otherwise
-   unconstrained: conditions, guards, destructuring scrutinees. Reading
-   requires the value to be retained, because an erased value does not exist
-   at run time. Every other axis is unconstrained. *)
-let mode_read =
-  mode_default (Value.of_const { Value.Const.max with erasure = Retained })
+let mode_max =
+  mode_default value_max_retained
 
 let mode_with_position mode position =
   { (mode_default mode) with position }
 
-let mode_max_with_position position =
-  { mode_max with position }
+(* Statement position discards the value, so even an erased one is
+   admissible: nothing of it survives compilation. *)
+let mode_statement_with_position position =
+  { (mode_default Value.max) with position }
 
 (** Take the expected mode of [exclave_ exp], return the expected mode of [exp].
     [expected_mode] must be higher than [regional]. *)
@@ -810,6 +812,14 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
 (* expected_mode.locality_context explains why expected_mode.mode is low;
    shared_context explains why mode.uniqueness is high *)
 let submode ~loc ~env ?(reason = Other) mode expected_mode =
+  let mode =
+    (* Inside an erased context nothing is checked on the erasure axis: the
+       context is deleted from compilation, so a value's absence at run time
+       cannot be observed. This is the ambient rule. *)
+    if Env.in_erased_context env
+    then Value.meet_const_with Erasure Erasure.Const.Retained mode
+    else Value.disallow_right mode
+  in
   let res =
     Value.submode ~pp:(loc, Expression) mode (as_single_mode expected_mode)
   in
@@ -3578,7 +3588,7 @@ and type_pat_aux
    | Ppat_variant _ | Ppat_record _ | Ppat_record_unboxed_product _
    | Ppat_array _ | Ppat_lazy _ | Ppat_unpack _ | Ppat_type _
    | Ppat_unboxed_tuple _ | Ppat_unboxed_unit | Ppat_unboxed_bool _ ->
-     submode ~loc ~env:!!penv alloc_mode.mode mode_read);
+     submode ~loc ~env:!!penv alloc_mode.mode mode_max);
   match sp.ppat_desc with
     Ppat_any ->
       rvp {
@@ -7425,6 +7435,9 @@ and type_expect_
       check_dynamic (loc, Expression) (Always_dynamic Application)
         expected_mode;
       let pm = position_and_mode env expected_mode sexp in
+      (* The function position requires a retained function: an erased
+         function has no closure to jump to. (Inside an erased context
+         [submode] does not check the erasure axis.) *)
       let funct_mode =
         match pm.apply_position with
         | Tail ->
@@ -7433,15 +7446,14 @@ and type_expect_
               (of_const ~hint_comonadic:Tailcall_function
                 { Const.max with areality = Regional }))
           in
+          (* Separate and unhinted, so the error reads the same in tail and
+             non-tail positions. *)
+          Value.submode_exn mode value_max_retained;
           mode
-        | Nontail | Default -> Value.newvar ()
+        | Nontail | Default ->
+          let mode, _ = Value.newvar_below value_max_retained in
+          mode
       in
-      (* An erased function cannot be called: there is no closure to jump to.
-         The ambient rule is folded into variable lookups (see
-         [Env.Erased_lock]), so the function position always requires a
-         retained function. *)
-      Value.submode_exn funct_mode
-        (Value.of_const { Value.Const.max with erasure = Retained });
       let funct_expected_mode = mode_default funct_mode in
       let outer_level = get_current_level () in
       let outer_level_var () =
@@ -8038,7 +8050,7 @@ and type_expect_
   | Pexp_ifthenelse(scond, sifso, sifnot) ->
       check_dynamic (loc, Expression) Branching expected_mode;
       let cond =
-        type_expect env mode_read scond
+        type_expect env mode_max scond
           (mk_expected ~explanation:If_conditional Predef.type_bool)
       in
       begin match sifnot with
@@ -8086,7 +8098,8 @@ and type_expect_
           {Value.Comonadic.Const.max with linearity = Many} env
       in
       let cond_env = Env.add_region_lock env in
-      let mode = mode_region Value.max in
+      (* The condition is read at run time, so it must be retained. *)
+      let mode = mode_region value_max_retained in
       let wh_cond =
         type_expect cond_env mode scond
           (mk_expected ~explanation:While_loop_conditional Predef.type_bool)
@@ -8112,11 +8125,11 @@ and type_expect_
   | Pexp_for(param, slow, shigh, dir, sbody) ->
       constrain_enclosing_totality ~loc env;
       let for_from =
-        type_expect env (mode_region Value.max) slow
+        type_expect env (mode_region value_max_retained) slow
           (mk_expected ~explanation:For_loop_start_index Predef.type_int)
       in
       let for_to =
-        type_expect env (mode_region Value.max) shigh
+        type_expect env (mode_region value_max_retained) shigh
           (mk_expected ~explanation:For_loop_stop_index Predef.type_int)
       in
       let env =
@@ -8417,7 +8430,7 @@ and type_expect_
       (* [assert] can raise [Assert_failure]. *)
       constrain_enclosing_totality ~loc env;
       let cond =
-        type_expect env mode_read e
+        type_expect env mode_max e
           (mk_expected ~explanation:Assert_condition Predef.type_bool)
       in
       let exp_type =
@@ -8879,11 +8892,12 @@ and type_expect_
       (* [erased_ e] deletes [e] from compilation. The expression itself is
          erased, so the context must expect an erased value: only the erasure
          axis is constrained here. Inside, every value appears retained (the
-         ambient rule), implemented by [Env.add_erased_lock]. *)
+         ambient rule), implemented by [Env.enter_erased_context] and the
+         erasure carve-out in [submode]. *)
       submode ~loc ~env
         (Value.of_const { Value.Const.min with erasure = Erased })
         expected_mode;
-      let env = Env.add_erased_lock env in
+      let env = Env.enter_erased_context env in
       let exp = type_expect env expected_mode e ty_expected_explained in
       let exp_extra = (Texp_erased, loc, []) :: exp.exp_extra in
       {exp with exp_extra}
@@ -9902,6 +9916,10 @@ and type_label_access
     _ * _ * _ * 'rep gen_label_description * _ * _
   = fun record_form env srecord usage lid ->
   let mode = Value.newvar () in
+  (* Reading or writing a field is a runtime access of the record, so it
+     must be retained. (Inside an erased context [submode] does not check
+     the erasure axis.) *)
+  Value.submode_exn mode value_max_retained;
   let record_jkind, record_sort =
     Jkind.of_new_sort_var ~why:Record_projection
       ~level:(Ctype.get_current_level ())
@@ -11086,7 +11104,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
   in
   (* Raise the current level to detect non-returning functions *)
   with_local_level_generalize
-    (fun () -> type_exp env (mode_max_with_position position) sexp, sort)
+    (fun () -> type_exp env (mode_statement_with_position position) sexp, sort)
   ~before_generalize: begin fun (exp, _sort) ->
     let subexp = final_subexpression exp in
     let ty = expand_head env exp.exp_type in
@@ -11432,7 +11450,7 @@ and type_cases
                environment `ext_env' which does not bind the
                continuation variable. *)
             Some
-              (type_expect when_env mode_read scond
+              (type_expect when_env mode_max scond
                 (mk_expected ~explanation:When_guard Predef.type_bool))
         in
         let exp =
@@ -12390,7 +12408,7 @@ and type_comprehension_clause ~loc ~comprehension_type ~container_type env
            [type_comprehension_expr]*)
         type_expect
           env
-          mode_read
+          mode_max
           cond
           (mk_expected ~explanation:Comprehension_when Predef.type_bool)
       in
@@ -12422,7 +12440,7 @@ and type_comprehension_iterator
            use?" in [type_comprehension_expr]*)
         type_expect
           env
-          mode_read
+          mode_max
           bound
           (mk_expected ~explanation Predef.type_int)
       in

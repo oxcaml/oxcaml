@@ -8349,11 +8349,7 @@ module Crossing = struct
              erasure
            })
 
-    let always_constructed_at c =
-      (* Even if all values of a type are constructed retained, the type must
-         not cross erasure: [erased_ e] produces no value at all, so an erased
-         value can never be used as retained. *)
-      Modality (Meet_const { c with erasure = C.Erasure.max })
+    let always_constructed_at c = Modality (Meet_const c)
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Meet_const c)) : a Atom.t
         =

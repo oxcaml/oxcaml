@@ -6430,13 +6430,16 @@ let moregen_alloc_mode env ~is_ret ty v a1 a2 =
      is ABI, so the two sides must agree exactly. Contravariance would allow
      an erased-parameter implementation behind a retained-parameter
      signature, and callers would pass an argument the callee has no
-     parameter for. Return position keeps the ordinary rule. *)
+     parameter for. Both directions are checked here because the ambient
+     variance only supplies one, and which one flips at every nesting depth.
+     Return position keeps the ordinary rule. *)
   let erasure_invariant () =
     if is_ret then Ok ()
     else
-      Mode.Erasure.submode
-        (Alloc.proj_comonadic Erasure a1)
-        (Alloc.proj_comonadic Erasure a2)
+      let e1 = Alloc.proj_comonadic Erasure a1 in
+      let e2 = Alloc.proj_comonadic Erasure a2 in
+      Result.bind (Mode.Erasure.submode e1 e2) (fun () ->
+          Mode.Erasure.submode e2 e1)
       |> Result.map_error ignore
   in
   match
