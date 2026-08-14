@@ -17,7 +17,8 @@
 module Config : sig
   type t =
     { timeout_seconds : float option
-          (** budget per obligation; [None] means no limit *)
+          (** budget per solver query — an obligation may take two queries,
+              so up to twice this long; [None] means no limit *)
     ; z3_command : string option
           (** how to run z3, e.g. ["z3"] or an absolute path; [None] means
               no solver is configured *)

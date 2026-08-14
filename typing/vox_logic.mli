@@ -195,10 +195,18 @@ module Signature : sig
       (see {!Sort.key}), and its constructors and selectors are suffixed the
       same way; a nullary instantiation keeps its names unchanged.
 
+      Declaration, constructor and selector names must be globally unique
+      before mangling: instances of two declarations (or two constructors)
+      whose suffixed names coincide are rejected, not merged.
+
       Rejected, as errors:
       - non-regular recursion ([t] used at different arguments inside its
-        own definition), which would need infinitely many instances;
-      - function-valued fields. *)
+        own definition).  The test is conservative, as in vox2: it also
+        rejects some instantiation patterns whose reachable instance set is
+        finite (e.g. a recursive use at constant arguments), not only the
+        genuinely infinite ones;
+      - function-valued fields;
+      - two instantiations mangling to one instance name. *)
   val instantiate :
     Datatype.decl list ->
     (string * Datatype.ty list) list ->
@@ -207,7 +215,9 @@ end
 
 module Obligation : sig
   type hypothesis =
-    { id : int  (** stable; how a backend names hypotheses in an unsat core *)
+    { id : int
+          (** stable and non-negative; how a backend names hypotheses in an
+              unsat core *)
     ; term : Term.t
     ; origin : Origin.t
     }

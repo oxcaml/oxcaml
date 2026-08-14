@@ -37,8 +37,13 @@ type query =
 (** [render query obligation] is the SMT-LIB script for [query], or an
     error if the obligation is ill-formed: an undeclared variable, symbol,
     sort or constructor, an arity or field-index mismatch, a malformed
-    literal, or a duplicate declaration.  (Sorts of well-declared terms are
-    not re-checked here; the solver reports those.)
+    literal, a duplicate declaration, a negative or duplicate hypothesis
+    id, or a name the script could not carry faithfully — a symbol spelling
+    an interpreted operator, [true]/[false]/[ite], a builtin sort name, a
+    hypothesis label [h<id>], or a symbol containing [|] or [\\].  (Quoting
+    cannot rescue the builtin collisions: [|not|] is the same symbol as
+    [not].  Sorts of well-declared terms are not re-checked here; a solver
+    rejection surfaces as a backend failure.)
 
     [timeout_ms] becomes [(set-option :timeout ...)].
 

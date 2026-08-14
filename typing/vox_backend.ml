@@ -121,6 +121,12 @@ module Solver_output : sig
   type t =
     { status : string  (** "sat", "unsat" or "unknown" *)
     ; sexps : sexp list  (** everything after the status line *)
+    ; rejected : bool
+          (** an [(error ...)] appeared {e before} the status line: the
+              solver rejected part of the script, so the status answers a
+              different question and must not become a verdict.  Errors
+              after the status are the inapplicable directives and stay
+              ignorable. *)
     }
 
   val parse : string -> t option
@@ -147,6 +153,11 @@ end = struct
   type t =
     { status : string
     ; sexps : sexp list
+    ; rejected : bool
+        (* an [(error ...)] appeared before the status line: the solver
+           rejected part of the script and the status answers a different
+           question.  Errors after the status are the inapplicable
+           directives ([get-model] after [unsat], ...) and stay ignorable. *)
     }
 
   (* A lexer for the sexps z3 prints: parentheses, atoms, [|...|] quoted
@@ -208,13 +219,25 @@ end = struct
       | [] -> None
       | line :: rest ->
         (match String.trim line with
-         | ("sat" | "unsat" | "unknown") as status -> Some (status, rest)
+         | ("sat" | "unsat" | "unknown") as status ->
+           Some (List.rev before, status, rest)
          | _ -> split_at_status (line :: before) rest)
     in
     match split_at_status [] lines with
     | None -> None
-    | Some (status, rest) ->
-      Some { status; sexps = parse_sexps (tokenize (String.concat "\n" rest)) }
+    | Some (before, status, rest) ->
+      let rejected =
+        List.exists
+          (fun line ->
+             String.length (String.trim line) >= 6
+             && String.equal (String.sub (String.trim line) 0 6) "(error")
+          before
+      in
+      Some
+        { status
+        ; sexps = parse_sexps (tokenize (String.concat "\n" rest))
+        ; rejected
+        }
 
   let hypothesis_id = function
     | List _ -> None
@@ -256,7 +279,9 @@ end = struct
     | Atom "true" -> Const (Bool true)
     | Atom "false" -> Const (Bool false)
     | Atom atom
-      when String.for_all (function '0' .. '9' -> true | _ -> false) atom ->
+      when atom <> ""
+           && String.for_all (function '0' .. '9' -> true | _ -> false) atom
+      ->
       Const (Int atom)
     | Atom atom when String.length atom > 2 && atom.[0] = '#' ->
       let digits = String.sub atom 2 (String.length atom - 2) in
@@ -369,6 +394,9 @@ module Z3 : BACKEND = struct
       then Ok None (* killed by the wall clock *)
       else
         match Solver_output.parse output with
+        | Some parsed when parsed.rejected ->
+          Result.Error
+            (Error { cause = "the solver rejected the query"; raw = output })
         | Some parsed ->
           if String.equal parsed.status "unknown"
              && Solver_output.timed_out parsed
@@ -390,49 +418,58 @@ module Z3 : BACKEND = struct
       let render query =
         Vox_smtlib.render ?timeout_ms:(timeout_ms config) query obligation
       in
+      let run_query script k =
+        match run config command script with
+        | Result.Error failure -> Result.Error failure
+        | Ok None -> Ok (Unknown Timeout)
+        | Ok (Some (output : Solver_output.t)) -> k output
+      in
       (match render Prove with
        | Result.Error message -> ill_formed message
        | Ok prove_script ->
-         (match run config command prove_script with
-          | Result.Error failure -> Result.Error failure
-          | Ok None -> Ok (Unknown Timeout)
-          | Ok (Some prove) ->
-            (match prove.status with
-             | "unsat" ->
-               let unused_hypotheses =
-                 Option.map
-                   (fun used ->
-                      List.filter_map
-                        (fun (hypothesis : Obligation.hypothesis) ->
-                           if List.mem hypothesis.id used
-                           then None
-                           else Some hypothesis.id)
-                        obligation.hypotheses)
-                   (Solver_output.core_ids prove)
-               in
-               Ok (Proved { unused_hypotheses })
-             | _ ->
-               (match render Disprove with
-                | Result.Error message -> ill_formed message
-                | Ok disprove_script ->
-                  (match run config command disprove_script with
-                   | Result.Error failure -> Result.Error failure
-                   | Ok None -> Ok (Unknown Timeout)
-                   | Ok (Some disprove) ->
-                     (match disprove.status with
-                      | "unsat" ->
-                        Ok
-                          (Refuted
-                             (Solver_output.model
-                                ~signature:obligation.signature prove))
-                      | _ ->
-                        Ok
-                          (Unknown
-                             (Incomplete
-                                (Printf.sprintf
-                                   "prove query: %s; disprove query: %s"
-                                   prove.status disprove.status)))))))))
-  [@@warning "-4"]
+         run_query prove_script (fun prove ->
+           match prove.status with
+           | "unsat" ->
+             let unused_hypotheses =
+               Option.map
+                 (fun used ->
+                    List.filter_map
+                      (fun (hypothesis : Obligation.hypothesis) ->
+                         if List.mem hypothesis.id used
+                         then None
+                         else Some hypothesis.id)
+                      obligation.hypotheses)
+                 (Solver_output.core_ids prove)
+             in
+             Ok (Proved { unused_hypotheses })
+           | "sat" ->
+             (match render Disprove with
+              | Result.Error message -> ill_formed message
+              | Ok disprove_script ->
+                run_query disprove_script (fun disprove ->
+                  match disprove.status with
+                  | "unsat" ->
+                    Ok
+                      (Refuted
+                         (Solver_output.model ~signature:obligation.signature
+                            prove))
+                  | _ ->
+                    Ok
+                      (Unknown
+                         (Incomplete
+                            (Printf.sprintf
+                               "prove query: %s; disprove query: %s"
+                               prove.status disprove.status)))))
+           | _ ->
+             (* "unknown", and not by timeout.  The disprove query is not
+                run: hypothesis satisfiability was not established, and
+                contradictory hypotheses make [hyps AND goal] unsat while
+                the correct verdict is Proved, so a refutation cannot be
+                claimed. *)
+             Ok
+               (Unknown
+                  (Incomplete
+                     (Printf.sprintf "prove query: %s" prove.status)))))
 end
 
 let backends : (module BACKEND) list = [(module Printing); (module Z3)]

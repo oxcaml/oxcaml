@@ -426,7 +426,7 @@ let () =
        (Const (Bool true)))
 
 [%%expect{|
-ill-formed: duplicate hypothesis id
+ill-formed: duplicate symbol h3 (as hypothesis label)
 |}]
 
 (* A symbol SMT-LIB cannot spell simply is quoted; one it cannot spell at
@@ -472,14 +472,7 @@ let () =
        (Const (Bool false)))
 
 [%%expect{|
-(set-option :produce-unsat-cores true)
-(declare-const h0 Bool)
-(assert (! false :named h0))
-(assert (not false))
-(check-sat)
-(get-unsat-core)
-(get-model)
-(get-info :reason-unknown)
+ill-formed: duplicate symbol h0 (as hypothesis label)
 |}]
 
 (* A negative hypothesis id would render as a label the core reader cannot
@@ -490,13 +483,7 @@ let () =
     (obligation ~hypotheses:[hyp (-1) (Const (Bool true))] (Const (Bool true)))
 
 [%%expect{|
-(set-option :produce-unsat-cores true)
-(assert (! true :named h-1))
-(assert (not true))
-(check-sat)
-(get-unsat-core)
-(get-model)
-(get-info :reason-unknown)
+ill-formed: negative hypothesis id -1
 |}]
 
 (* A declared nullary function application is an atom in SMT-LIB, not [(f)]. *)
@@ -510,7 +497,7 @@ let () =
 [%%expect{|
 (set-option :produce-unsat-cores true)
 (declare-fun f () Bool)
-(assert (not (f)))
+(assert (not f))
 (check-sat)
 (get-unsat-core)
 (get-model)
@@ -545,7 +532,7 @@ let () =
 
 [%%expect{|
 ill-formed: constructor P has no field 2
-Exception: Invalid_argument "List.nth".
+ill-formed: constructor P has no field -1
 |}]
 
 (* Duplicate declarations are ill-formed, in each namespace. *)
@@ -567,12 +554,7 @@ ill-formed: duplicate symbol x (as variable)
 let () = render Prove (obligation (App (Eq, [Const (Int "007"); Const (Int "7")])))
 
 [%%expect{|
-(set-option :produce-unsat-cores true)
-(assert (not (= 007 7)))
-(check-sat)
-(get-unsat-core)
-(get-model)
-(get-info :reason-unknown)
+ill-formed: integer literal "007" has leading zeros
 |}]
 
 (* Two different instantiations may not share a mangled instance name: a
@@ -595,7 +577,7 @@ let () =
          datatypes)
 
 [%%expect{|
-instance: box<Int>
+rejected: two distinct instantiations produce the same instance name box<Int>
 |}]
 
 (* A symbol that spells an operator the renderer itself emits.  Quoting does
@@ -610,13 +592,7 @@ let () =
        (Var "not"))
 
 [%%expect{|
-(set-option :produce-unsat-cores true)
-(declare-const not Bool)
-(assert (not not))
-(check-sat)
-(get-unsat-core)
-(get-model)
-(get-info :reason-unknown)
+ill-formed: symbol not collides with an SMT-LIB builtin
 |}]
 
 let () =
@@ -630,14 +606,7 @@ let () =
        (App (Eq, [Var "a"; Var "a"])))
 
 [%%expect{|
-(set-option :produce-unsat-cores true)
-(declare-sort Int 0)
-(declare-const a Int)
-(assert (not (= a a)))
-(check-sat)
-(get-unsat-core)
-(get-model)
-(get-info :reason-unknown)
+ill-formed: sort name Int collides with an SMT-LIB builtin sort
 |}]
 
 (* Bitvector literals at the width boundaries: 1, 63, and 64 bits (the

@@ -25,11 +25,20 @@ let error fmt = Format.kasprintf (fun message -> raise (Ill_formed message)) fmt
 (* SMT-LIB symbols.  A simple symbol is a nonempty sequence of letters,
    digits and [~ ! @ $ % ^ & * _ - + = < > . ? /] that does not start with a
    digit; anything else must be written [|quoted|], which cannot contain [|]
-   or [\].  Reserved words are legal only when quoted. *)
+   or [\].  Reserved words are legal only when quoted.
+
+   Quoting is purely lexical — [|not|] is the same symbol as [not] — so a
+   name that collides with a builtin this renderer itself emits cannot be
+   rescued by quoting (verified against z3 4.8.5, where a declared [|not|]
+   shadows the boolean operator).  Such names are rejected instead: the
+   operator spellings and [true]/[false]/[ite] in the term namespace, and
+   the interpreted sort names in the sort namespace. *)
 
 let reserved =
   [ "BINARY"; "DECIMAL"; "HEXADECIMAL"; "NUMERAL"; "STRING"
   ; "_"; "!"; "as"; "exists"; "forall"; "let"; "match"; "par" ]
+
+let builtin_sorts = ["Bool"; "Int"; "BitVec"]
 
 let simple_symbol_char = function
   | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9'
@@ -58,109 +67,6 @@ let sort = function
     if width < 1 then error "bitvector sort must have positive width";
     Printf.sprintf "(_ BitVec %d)" width
   | Sort.Uninterpreted name | Sort.Datatype name -> symbol name
-
-(* What the signature declares, in checkable form. *)
-type tables =
-  { sorts : (string, unit) Hashtbl.t  (* uninterpreted and datatype *)
-  ; variables : (string, unit) Hashtbl.t
-  ; functions : (string, int) Hashtbl.t  (* arity *)
-  ; constructors : (string, Signature.constructor) Hashtbl.t
-  }
-
-let check_signature (signature : Signature.t) =
-  let tables =
-    { sorts = Hashtbl.create 16
-    ; variables = Hashtbl.create 16
-    ; functions = Hashtbl.create 16
-    ; constructors = Hashtbl.create 16
-    }
-  in
-  let declare_sort name =
-    if Hashtbl.mem tables.sorts name then error "duplicate sort %s" name;
-    Hashtbl.add tables.sorts name ()
-  in
-  List.iter declare_sort signature.sorts;
-  List.iter
-    (fun (datatype : Signature.datatype) ->
-       declare_sort datatype.datatype_name)
-    signature.datatypes;
-  let check_sort_declared s =
-    ignore (sort s);
-    match s with
-    | Sort.Uninterpreted name | Sort.Datatype name ->
-      if not (Hashtbl.mem tables.sorts name)
-      then error "undeclared sort %s" name
-    | Sort.Bool | Sort.Int | Sort.Bitvec _ -> ()
-  in
-  (* Variables, functions, constructors and selectors are all function
-     symbols to the solver: one namespace. *)
-  let symbols = Hashtbl.create 16 in
-  let declare_symbol kind name =
-    if Hashtbl.mem symbols name
-    then error "duplicate symbol %s (as %s)" name kind;
-    Hashtbl.add symbols name ()
-  in
-  List.iter
-    (fun (name, s) ->
-       declare_symbol "variable" name;
-       check_sort_declared s;
-       Hashtbl.add tables.variables name ())
-    signature.variables;
-  List.iter
-    (fun (name, argument_sorts, result_sort) ->
-       declare_symbol "function" name;
-       List.iter check_sort_declared argument_sorts;
-       check_sort_declared result_sort;
-       Hashtbl.add tables.functions name (List.length argument_sorts))
-    signature.functions;
-  List.iter
-    (fun (datatype : Signature.datatype) ->
-       if datatype.constructors = []
-       then error "datatype %s has no constructors" datatype.datatype_name;
-       List.iter
-         (fun (constructor : Signature.constructor) ->
-            declare_symbol "constructor" constructor.constructor_name;
-            Hashtbl.add tables.constructors constructor.constructor_name
-              constructor;
-            List.iter
-              (fun (selector, field_sort) ->
-                 declare_symbol "selector" selector;
-                 check_sort_declared field_sort)
-              constructor.fields)
-         datatype.constructors)
-    signature.datatypes;
-  tables
-
-let literal = function
-  | Literal.Bool true -> "true"
-  | Literal.Bool false -> "false"
-  | Literal.Int digits ->
-    let body =
-      match String.length digits with
-      | 0 -> error "empty integer literal"
-      | length when digits.[0] = '-' && length > 1 ->
-        Some (String.sub digits 1 (length - 1))
-      | _ when digits.[0] = '-' -> error "empty integer literal"
-      | _ -> None
-    in
-    let check s =
-      if not (String.for_all (function '0' .. '9' -> true | _ -> false) s)
-      then error "malformed integer literal %S" digits
-    in
-    (match body with
-     | None -> check digits; digits
-     | Some magnitude ->
-       check magnitude;
-       Printf.sprintf "(- %s)" magnitude)
-  | Literal.Bitvec { width; value } ->
-    if width < 1 || width > 64
-    then error "bitvector literal width %d not between 1 and 64" width;
-    let masked =
-      if width = 64
-      then value
-      else Int64.logand value (Int64.sub (Int64.shift_left 1L width) 1L)
-    in
-    Printf.sprintf "(_ bv%Lu %d)" masked width
 
 let op_name : Op.t -> string = function
   | Not -> "not"
@@ -197,6 +103,139 @@ let op_name : Op.t -> string = function
   | Bv_sgt -> "bvsgt"
   | Bv_sge -> "bvsge"
 
+
+(* Everything the term renderer can emit as an interpreted head symbol.  A
+   signature symbol with one of these names would shadow the builtin (see
+   the note on quoting above), so they are rejected.  Keep in sync with
+   [Op.t]. *)
+let builtin_terms =
+  "true" :: "false" :: "ite"
+  :: List.sort_uniq String.compare
+       (List.map op_name
+          ([ Not; And; Or; Implies; Eq; Distinct; Neg; Add; Sub; Mul; Div
+           ; Mod; Lt; Le; Gt; Ge; Bv_neg; Bv_add; Bv_sub; Bv_mul; Bv_sdiv
+           ; Bv_srem; Bv_not; Bv_and; Bv_or; Bv_xor; Bv_shl; Bv_lshr
+           ; Bv_ashr; Bv_slt; Bv_sle; Bv_sgt; Bv_sge ]
+            : Op.t list))
+
+(* What the signature declares, in checkable form. *)
+type tables =
+  { sorts : (string, unit) Hashtbl.t  (* uninterpreted and datatype *)
+  ; variables : (string, unit) Hashtbl.t
+  ; functions : (string, int) Hashtbl.t  (* arity *)
+  ; constructors : (string, Signature.constructor) Hashtbl.t
+  }
+
+let check_signature (signature : Signature.t) ~hypothesis_ids =
+  let tables =
+    { sorts = Hashtbl.create 16
+    ; variables = Hashtbl.create 16
+    ; functions = Hashtbl.create 16
+    ; constructors = Hashtbl.create 16
+    }
+  in
+  let declare_sort name =
+    if List.mem name builtin_sorts
+    then error "sort name %s collides with an SMT-LIB builtin sort" name;
+    if Hashtbl.mem tables.sorts name then error "duplicate sort %s" name;
+    Hashtbl.add tables.sorts name ()
+  in
+  List.iter declare_sort signature.sorts;
+  List.iter
+    (fun (datatype : Signature.datatype) ->
+       declare_sort datatype.datatype_name)
+    signature.datatypes;
+  let check_sort_declared s =
+    ignore (sort s);
+    match s with
+    | Sort.Uninterpreted name | Sort.Datatype name ->
+      if not (Hashtbl.mem tables.sorts name)
+      then error "undeclared sort %s" name
+    | Sort.Bool | Sort.Int | Sort.Bitvec _ -> ()
+  in
+  (* Variables, functions, constructors and selectors are all function
+     symbols to the solver: one namespace. *)
+  let symbols = Hashtbl.create 16 in
+  let declare_symbol kind name =
+    if List.mem name builtin_terms
+    then error "symbol %s collides with an SMT-LIB builtin" name;
+    if Hashtbl.mem symbols name
+    then error "duplicate symbol %s (as %s)" name kind;
+    Hashtbl.add symbols name ()
+  in
+  List.iter
+    (fun (name, s) ->
+       declare_symbol "variable" name;
+       check_sort_declared s;
+       Hashtbl.add tables.variables name ())
+    signature.variables;
+  List.iter
+    (fun (name, argument_sorts, result_sort) ->
+       declare_symbol "function" name;
+       List.iter check_sort_declared argument_sorts;
+       check_sort_declared result_sort;
+       Hashtbl.add tables.functions name (List.length argument_sorts))
+    signature.functions;
+  List.iter
+    (fun (datatype : Signature.datatype) ->
+       if datatype.constructors = []
+       then error "datatype %s has no constructors" datatype.datatype_name;
+       List.iter
+         (fun (constructor : Signature.constructor) ->
+            declare_symbol "constructor" constructor.constructor_name;
+            Hashtbl.add tables.constructors constructor.constructor_name
+              constructor;
+            List.iter
+              (fun (selector, field_sort) ->
+                 declare_symbol "selector" selector;
+                 check_sort_declared field_sort)
+              constructor.fields)
+         datatype.constructors)
+    signature.datatypes;
+  (* The renderer's own hypothesis labels live in the same namespace: a
+     variable named [h0] would otherwise collide with hypothesis id 0, and
+     z3 answers the remains of a script after dropping a colliding
+     assertion (see the z3 test).  This also catches duplicate ids. *)
+  List.iter
+    (fun id ->
+       if id < 0 then error "negative hypothesis id %d" id;
+       declare_symbol "hypothesis label" (Printf.sprintf "h%d" id))
+    hypothesis_ids;
+  tables
+
+let literal = function
+  | Literal.Bool true -> "true"
+  | Literal.Bool false -> "false"
+  | Literal.Int digits ->
+    let body =
+      match String.length digits with
+      | 0 -> error "empty integer literal"
+      | length when digits.[0] = '-' && length > 1 ->
+        Some (String.sub digits 1 (length - 1))
+      | _ when digits.[0] = '-' -> error "empty integer literal"
+      | _ -> None
+    in
+    let check s =
+      if not (String.for_all (function '0' .. '9' -> true | _ -> false) s)
+      then error "malformed integer literal %S" digits;
+      if String.length s > 1 && s.[0] = '0'
+      then error "integer literal %S has leading zeros" digits
+    in
+    (match body with
+     | None -> check digits; digits
+     | Some magnitude ->
+       check magnitude;
+       Printf.sprintf "(- %s)" magnitude)
+  | Literal.Bitvec { width; value } ->
+    if width < 1 || width > 64
+    then error "bitvector literal width %d not between 1 and 64" width;
+    let masked =
+      if width = 64
+      then value
+      else Int64.logand value (Int64.sub (Int64.shift_left 1L width) 1L)
+    in
+    Printf.sprintf "(_ bv%Lu %d)" masked width
+
 (* [None] means any arity of at least two. *)
 let op_arity : Op.t -> int option = function
   | Not | Neg | Bv_neg | Bv_not -> Some 1
@@ -231,7 +270,9 @@ let rec term tables : Term.t -> string = function
        then
          error "function %s expects %d argument(s) but was given %d" name
            arity (List.length arguments));
-    application tables (symbol name) arguments
+    if arguments = []
+    then symbol name
+    else application tables (symbol name) arguments
   | Ite (condition, if_true, if_false) ->
     application tables "ite" [condition; if_true; if_false]
   | Construct (constructor, arguments) ->
@@ -249,7 +290,7 @@ let rec term tables : Term.t -> string = function
     let { Signature.constructor_name = _; fields } =
       find_constructor tables constructor
     in
-    (match List.nth_opt fields index with
+    (match if index < 0 then None else List.nth_opt fields index with
      | None ->
        error "constructor %s has no field %d" constructor index
      | Some (selector, _) -> application tables (symbol selector) [argument])
@@ -363,16 +404,13 @@ let render_datatype_group buffer (group : Signature.datatype list) =
 let render ?timeout_ms query (obligation : Obligation.t) =
   match
     let signature = obligation.signature in
-    let tables = check_signature signature in
-    (match
-       List.sort_uniq Int.compare
-         (List.map
-            (fun (hypothesis : Obligation.hypothesis) -> hypothesis.id)
-            obligation.hypotheses)
-     with
-     | ids when List.length ids <> List.length obligation.hypotheses ->
-       error "duplicate hypothesis id"
-     | _ -> ());
+    let tables =
+      check_signature signature
+        ~hypothesis_ids:
+          (List.map
+             (fun (hypothesis : Obligation.hypothesis) -> hypothesis.id)
+             obligation.hypotheses)
+    in
     let buffer = Buffer.create 1024 in
     let line fmt = Format.kasprintf
       (fun s -> Buffer.add_string buffer s; Buffer.add_char buffer '\n') fmt

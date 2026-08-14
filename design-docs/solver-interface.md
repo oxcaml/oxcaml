@@ -283,6 +283,9 @@ under these types.
 Lean and in-process oxsmt backends. A persistent solver session. Translation
 from refinement expressions into these terms. Recursive functions over
 datatypes, which are uninterpreted symbols plus definitional-equation axioms.
+Conversions between `Int` and `Bitvec` (vox2 needs `bv2int`/`int2bv` for
+`Bigint.of_int`; the operators are added when the translation fixes their
+semantics). A model payload on `Unknown` for near-counterexamples.
 
 ## Decisions taken
 
@@ -295,6 +298,23 @@ datatypes, which are uninterpreted symbols plus definitional-equation axioms.
   table is the pattern this rebuild is trying to leave behind.
 
 ## Decisions taken during implementation
+
+Two protocol refinements from the review loop, stated here because they
+sharpen rulings made above:
+
+- **`Refuted` additionally requires the prove query to answer `sat`.** The
+  protocol above runs the disprove query whenever the prove query "does not
+  settle it"; but after a prove-query `unknown`, hypothesis satisfiability is
+  unestablished, and `hyps AND goal` unsat can simply mean the hypotheses are
+  contradictory — whose correct verdict is `Proved`, not `Refuted`. So an
+  `unknown` prove query is reported as `Unknown` without running the disprove
+  query. (vox2 ran it anyway; this is a deliberate hardening.)
+
+- **"A prove-query model is at most payload for `Unknown`"** describes what a
+  prove-query model may ever be used for; under the types above `Unknown`
+  carries no model, so today it is simply dropped. Carrying it (the common
+  unproved case has a useful near-counterexample sitting in the prove output)
+  is deferred to the diagnostics work, noted below.
 
 Recorded per AGENTS.md: points the spec above left open, with the route taken.
 
@@ -312,13 +332,27 @@ Recorded per AGENTS.md: points the spec above left open, with the route taken.
   parametric signature with instantiation in the renderer — would make every
   backend deal with instances. Non-regularity is detected exactly as in vox2:
   a recursive use at different arguments while the datatype's own definition
-  is being expanded.
+  is being expanded. The test is conservative — it also rejects some patterns
+  whose reachable instance set is finite (a recursive use at constant
+  arguments, say), not only the genuinely infinite ones; kept as-is for vox2
+  parity, and the interface says so.
 
 - **Instance naming.** `t` at `Int` is `t<Int>`; constructors and selectors get
   the same suffix (`Cons<Int>`, `head<Int>`); nullary instantiations keep their
   names. `<` and `>` are legal in SMT-LIB simple symbols (verified against
-  z3 4.8.5); anything else is `|quoted|` by the renderer, and a symbol
-  containing `|` or `\` is an error.
+  z3 4.8.5); anything else is `|quoted|` by the renderer (multi-argument
+  instances contain `,`, so they render quoted), and a symbol containing `|`
+  or `\` is an error. `instantiate` rejects two instantiations that mangle to
+  one name (`Sort.key` is not injective — an uninterpreted sort literally
+  named `Int` would otherwise alias the builtin) and requires declaration,
+  constructor and selector names to be globally unique before suffixing.
+
+- **Builtin names are rejected, not quoted** (review-loop finding). Quoting is
+  purely lexical — verified that in z3 4.8.5 a declared `|not|` shadows the
+  boolean operator and `(|+| n n)` is `(+ n n)` — so a signature symbol
+  spelling an interpreted operator, `true`/`false`/`ite`, a builtin sort
+  name, or a hypothesis label `h<id>` is an ill-formed obligation. The
+  translation piece owns name generation and can avoid these spellings.
 
 - **One-shot scripts, directives included.** A `Prove` script always ends with
   `(get-unsat-core)`, `(get-model)`, `(get-info :reason-unknown)`; both query
@@ -329,9 +363,20 @@ Recorded per AGENTS.md: points the spec above left open, with the route taken.
   with extra directives once the status is known) costs a second process on
   every proof.
 
+  Position matters, though (review-loop finding): an `(error ...)` printed
+  *before* the status line means z3 rejected part of the script and answered
+  a different question — verified that a dropped ill-sorted hypothesis turns
+  into a spurious "refuted", and a dropped colliding `:named` assertion can
+  invert a verdict. Pre-status errors are therefore a backend failure
+  (`Error { cause; raw }`), never a verdict; only post-status errors are the
+  ignorable inapplicable directives. This is what turns every future encoding
+  defect into a loud failure rather than a silent wrong answer, which matters
+  doubly because the renderer deliberately does not sort-check.
+
 - **Timeout classification.** z3-side `(set-option :timeout)` is the primary
   budget; `(get-info :reason-unknown)` answering `timeout`/`canceled` maps to
-  `Unknown Timeout` (verified shape: `(:reason-unknown "timeout")`). The
+  `Unknown Timeout` (both shapes observed from 4.8.5, engine-dependent). The
+  budget is per query, so an obligation may take two budgets of wall clock. The
   wall-clock kill is a `timeout(1)` wrapper with one second of grace — the
   compiler cannot depend on the unix library, and vox2's alternative was C
   stubs, which this piece does not need. Exit 124 also maps to

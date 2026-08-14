@@ -161,7 +161,12 @@ module Signature = struct
     (* Ground instances already produced, keyed by mangled name, in
        discovery order (the renderer reorders anyway). *)
     let completed : datatype list ref = ref [] in
-    let started = Hashtbl.create 16 in
+    (* Instance names must be injective: [Sort.key] gives [Int] and an
+       uninterpreted sort named "Int" the same key, so two different
+       instantiations could otherwise silently alias one instance. *)
+    let started : (string, string * Sort.t list) Hashtbl.t =
+      Hashtbl.create 16
+    in
     (* Instances whose fields are being expanded.  A recursive use at
        different arguments while expanding would demand infinitely many
        instances: that is non-regular recursion. *)
@@ -179,9 +184,18 @@ module Signature = struct
          error "non-regular recursive datatype %s is not supported" name
        | Some _ | None -> ());
       let instance_name = mangle name arguments in
+      (match Hashtbl.find_opt started instance_name with
+       | Some (started_name, started_arguments)
+         when not
+                (String.equal started_name name
+                 && List.equal Sort.equal started_arguments arguments) ->
+         error
+           "two distinct instantiations produce the same instance name %s"
+           instance_name
+       | Some _ | None -> ());
       if not (Hashtbl.mem started instance_name)
       then begin
-        Hashtbl.add started instance_name ();
+        Hashtbl.add started instance_name (name, arguments);
         in_progress := (name, arguments) :: !in_progress;
         let subst = List.combine decl.params arguments in
         let constructors =
