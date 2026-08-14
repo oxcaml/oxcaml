@@ -81,7 +81,8 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
 let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
   let argument_coercion =
     match argument_interface with
-    | Some { ai_coercion_from_primary; ai_signature = _ } ->
+    | Some { ai_coercion_from_primary; ai_signature = _; ai_expectation = _ }
+      ->
         Some ai_coercion_from_primary
     | None -> None
   in

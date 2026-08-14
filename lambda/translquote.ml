@@ -3162,8 +3162,8 @@ and fun_param_binding ~scopes ~transl stage loc param frest =
   let pat_quoted = quote_value_pattern ~scopes pat in
   let fun_ =
     if is_module pat
-    then
-      begin match idents with
+    then begin
+      match idents with
       | [] ->
         Function.param_module_nonbinding loc
           (quote_arg_label loc param.fp_arg_label)
@@ -3183,7 +3183,7 @@ and fun_param_binding ~scopes ~transl stage loc param frest =
           "Translquote [at %a]: expected only one module variable in parameter \
            binding."
           Location.print_loc (to_location loc)
-      end
+    end
     else
       let fun_rem =
         Lam.list_param_binding ~loc Var_value
@@ -3713,7 +3713,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
     | Texp_open _ ->
       fatal_errorf "Translquote [at %a]: non-trivial Texp_open not implemented"
         Location.print_loc (to_location loc)
-    | Texp_letmodule (ident, _, _, mod_exp, body) -> (
+    | Texp_letmodule (ident, _, _, _, mod_exp, body) -> (
       let mod_exp = quote_module_exp ~transl stage loc env mod_exp in
       match ident with
       | None ->

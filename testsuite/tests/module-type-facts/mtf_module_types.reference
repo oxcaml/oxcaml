@@ -1,0 +1,102 @@
+== ascription of a structure against a named module type
+digest: checks 1 (ascription 1) deps 1 (interface 1) equalities 0 omissions 0
+check ascription M : S ascription.ml:3:15-3:38
+dep <M> -interface-> S
+== the check is directional: only the implementation is checked
+digest: checks 2 (ascription 2) deps 2 (interface 2) equalities 0 omissions 0
+check ascription M : S directional.ml:4:15-4:38
+check ascription N : T directional.ml:5:15-5:38
+dep <M> -interface-> S
+dep <N> -interface-> T
+== aliases, includes, with constraints and module type of
+digest: checks 4 (ascription 4) deps 12 (definition 3 alias 1 include 1 with 1 typeof 2 interface 4) equalities 0 omissions 0
+check ascription M : S edges.ml:5:15-5:39
+check ascription MA : A edges.ml:13:16-13:40
+check ascription MW : W edges.ml:11:16-11:39
+check ascription MK : K edges.ml:12:16-12:50
+dep A -alias-> S
+dep W -definition-> <#1>
+dep G -definition-> <#2>
+dep K -definition-> <#3>
+dep <#1> -with-> S
+dep <M> -interface-> S
+dep <#2> -typeof-> S
+dep <#2> -typeof-> <M>
+dep <#3> -include-> S
+dep <MW> -interface-> W
+dep <MK> -interface-> K
+dep <MA> -interface-> A
+== composed destructive substitutions of types
+digest: checks 1 (ascription 1) deps 7 (definition 2 include 2 with 2 interface 1) equalities 0 omissions 0
+check ascription M : U subst.ml:10:15-10:38
+dep T -definition-> <#1>
+dep U -definition-> <#2>
+dep <#1> -include-> S1
+dep <#1> -include-> S2
+dep <#3> -with-> T
+dep <#2> -with-> <#3>
+dep <M> -interface-> U
+== destructive substitution of a module type
+digest: checks 1 (ascription 1) deps 6 (definition 2 with 1 subst 1 interface 2) equalities 0 omissions 0
+check ascription M : U mtsubst.ml:5:15-5:38
+dep T -definition-> <#1>
+dep U -definition-> <#2>
+dep <#1> -interface-> T.X@body(T)
+dep <#2> -subst-> S2
+dep <#2> -with-> T
+dep <M> -interface-> U
+== with module and with module := check the substituted module
+digest: checks 5 (ascription 5) deps 11 (definition 3 with 4 interface 4) equalities 1 omissions 0
+check ascription MU : U withmod.ml:7:16-7:53
+check ascription MV : V withmod.ml:8:16-8:40
+check ascription N : <T.M> withmod.ml:5:30-5:31
+check ascription N : <T.M> withmod.ml:6:30-6:31
+check ascription MU.M : <N> withmod.ml:7:16-7:53
+dep T -definition-> <#1>
+dep U -definition-> <#2>
+dep V -definition-> <#3>
+dep <T.M> -interface-> S
+dep <#1> -interface-> <T.M>
+dep <#2> -with-> T
+dep <#2> -with-> <N>
+dep <#3> -with-> T
+dep <#3> -with-> <N>
+dep <MU> -interface-> U
+dep <MV> -interface-> V
+equal N = MU.M
+== strengthening depends on the subject's own expectation
+digest: checks 3 (ascription 3) deps 6 (definition 1 strengthen 3 interface 2) equalities 0 omissions 0
+check ascription M : S strength.ml:4:15-4:38
+check ascription M : Base strength.ml:5:16-5:27
+check ascription N : K strength.ml:6:15-6:16
+dep K -definition-> <#1>
+dep <M> -interface-> S
+dep <#1> -strengthen-> S
+dep <#1> -strengthen-> Base
+dep <#1> -strengthen-> <M>
+dep <N> -interface-> K
+== module type of a structure that is not a path is omitted
+digest: checks 2 (ascription 2) deps 3 (definition 1 interface 2) equalities 0 omissions 1 (unresolved-module 1)
+check ascription M : S typeofanon.ml:4:15-4:39
+check ascription N : T typeofanon.ml:5:15-5:38
+dep T -definition-> <#1>
+dep <M> -interface-> S
+dep <N> -interface-> T
+omission: affected=<#1> source=none reason=unresolved-module
+== packages and first-class module types
+digest: checks 2 (package 2) deps 0 equalities 0 omissions 0
+check package package.ml:4:21-4:22 : S package.ml:4:21-4:22
+check package package.ml:5:36-5:37 : S package.ml:5:36-5:37
+== an interface source records the same dependency facts
+digest: checks 0 deps 11 (definition 2 alias 1 include 1 with 1 interface 6) equalities 0 omissions 0
+dep A -alias-> S
+dep W -definition-> <#1>
+dep K -definition-> <#2>
+dep <Edgesintf> -interface-> S
+dep <Edgesintf> -interface-> A
+dep <Edgesintf> -interface-> W
+dep <Edgesintf> -interface-> K
+dep <Edgesintf> -interface-> <M>
+dep <#1> -with-> S
+dep <M> -interface-> S
+dep <#2> -include-> S
