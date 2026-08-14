@@ -941,6 +941,7 @@ module Jkind0 = struct
     let statefulness = Crossing.Axis.Comonadic Statefulness
     let visibility = Crossing.Axis.Monadic Visibility
     let staticity = Crossing.Axis.Monadic Staticity
+    let erasure = Crossing.Axis.Comonadic Erasure
     let[@inline] externality t = t.externality
 
     let[@inline] create
@@ -975,6 +976,7 @@ module Jkind0 = struct
       let statefulness = modal statefulness in
       let visibility = modal visibility in
       let staticity = modal staticity in
+      let erasure = modal erasure in
       let externality =
         if mem max_axes (Nonmodal Externality)
         then Externality.max
@@ -986,7 +988,7 @@ module Jkind0 = struct
       in
       let comonadic =
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~totality
-          ~yielding ~forkable ~statefulness
+          ~yielding ~forkable ~statefulness ~erasure
       in
       let crossing : Mode.Crossing.t = { monadic; comonadic } in
       {
@@ -1015,6 +1017,7 @@ module Jkind0 = struct
       let statefulness = modal statefulness in
       let visibility = modal visibility in
       let staticity = modal staticity in
+      let erasure = modal erasure in
       let externality =
         if mem min_axes (Nonmodal Externality)
         then Externality.min
@@ -1026,7 +1029,7 @@ module Jkind0 = struct
       in
       let comonadic =
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~totality
-          ~yielding ~forkable ~statefulness
+          ~yielding ~forkable ~statefulness ~erasure
       in
       let crossing : Mode.Crossing.t = { monadic; comonadic } in
       {
@@ -1053,6 +1056,7 @@ module Jkind0 = struct
       modal statefulness &&
       modal visibility &&
       modal staticity &&
+      modal erasure &&
       (not (mem axes (Nonmodal Externality)) ||
        Externality.(le max (externality t)))
 
@@ -1067,7 +1071,7 @@ module Jkind0 = struct
         Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
           ~portability:false ~totality:false ~contention:true ~logicality:true
           ~forkable:false ~yielding:false ~statefulness:false ~visibility:true
-          ~staticity:false
+          ~staticity:false ~erasure:false
       in
       create crossing ~externality:Externality.max
 
@@ -1374,10 +1378,13 @@ module Jkind0 = struct
           name : string
         }
 
-      (* Mode crossing that crosses everything except staticity *)
-      let cross_all_except_staticity =
-        let ax : _ Mode.Crossing.Axis.t = Monadic Staticity in
-        Mode.Crossing.(set ax (Per_axis.max ax) min)
+      (* Mode crossing that crosses everything crossable: everything except
+         staticity and erasure. Erasure is never crossed: an erased value has
+         no runtime representation, so it can never be used as retained. *)
+      let cross_all_crossable =
+        let st : _ Mode.Crossing.Axis.t = Monadic Staticity in
+        let er : _ Mode.Crossing.Axis.t = Comonadic Erasure in
+        Mode.Crossing.(set er (Per_axis.max er) (set st (Per_axis.max st) min))
 
       let mk_jkind ~crossing ~externality (layout : Layout.Const.t) =
         let mod_bounds = Mod_bounds.create crossing ~externality in
@@ -1393,7 +1400,7 @@ module Jkind0 = struct
       let any_mod_everything =
         { jkind =
             mk_jkind (Any Scannable_axes.max)
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "any mod everything"
         }
@@ -1447,7 +1454,7 @@ module Jkind0 = struct
                 (Scannable,
                   { nullability = Maybe_null;
                     separability = Maybe_separable }))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "value_or_null mod everything"
         }
@@ -1463,7 +1470,7 @@ module Jkind0 = struct
       let value_mod_everything =
         { jkind =
             mk_jkind (Base (Scannable, Scannable_axes.value_axes))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "value mod everything"
         }
@@ -1474,7 +1481,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~totality:true ~forkable:true ~yielding:true ~uniqueness:false
             ~contention:true ~logicality:true ~statefulness:true
-            ~visibility:true ~staticity:false
+            ~visibility:true ~staticity:false ~erasure:false
         in
         create crossing ~externality:Externality.max
 
@@ -1518,7 +1525,7 @@ module Jkind0 = struct
                      ~portability:true ~totality:true ~forkable:false
                      ~yielding:false ~uniqueness:false ~contention:true
                      ~logicality:true ~statefulness:true ~visibility:true
-                     ~staticity:false
+                     ~staticity:false ~erasure:false
                  in
                  create crossing ~externality:Externality.max);
               with_bounds = No_with_bounds
@@ -1532,7 +1539,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~totality:true ~forkable:true ~yielding:true ~uniqueness:false
             ~contention:true ~logicality:false ~statefulness:true
-            ~visibility:false ~staticity:false
+            ~visibility:false ~staticity:false ~erasure:false
         in
         create crossing ~externality:Externality.max
 
@@ -1568,7 +1575,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~totality:true ~forkable:true ~yielding:true ~contention:false
             ~logicality:false ~uniqueness:false ~statefulness:true
-            ~visibility:false ~staticity:false
+            ~visibility:false ~staticity:false ~erasure:false
         in
         create crossing ~externality:Externality.max
 
@@ -1609,7 +1616,7 @@ module Jkind0 = struct
       let void_mod_everything =
         { jkind =
             mk_jkind (Base (Void, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "void mod everything"
         }
@@ -1624,7 +1631,7 @@ module Jkind0 = struct
                   { nullability = Non_null;
                     separability = Non_pointer
                   }))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "immediate"
         }
@@ -1635,7 +1642,7 @@ module Jkind0 = struct
               (Base
                 (Scannable,
                   { nullability = Maybe_null; separability = Non_pointer }))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "immediate_or_null"
         }
@@ -1679,7 +1686,7 @@ module Jkind0 = struct
                   { nullability = Non_null;
                     separability = Non_pointer64
                   }))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:External64;
           name = "immediate64"
         }
@@ -1690,7 +1697,7 @@ module Jkind0 = struct
               (Base
                 (Scannable,
                   { nullability = Maybe_null; separability = Non_pointer64 }))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:External64;
           name = "immediate64_or_null"
         }
@@ -1706,7 +1713,7 @@ module Jkind0 = struct
       let kind_of_unboxed_float =
         { jkind =
             mk_jkind (Base (Float64, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "float64 mod everything"
         }
@@ -1722,7 +1729,7 @@ module Jkind0 = struct
       let kind_of_unboxed_float32 =
         { jkind =
             mk_jkind (Base (Float32, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "float32 mod everything"
         }
@@ -1738,7 +1745,7 @@ module Jkind0 = struct
       let kind_of_unboxed_nativeint =
         { jkind =
             mk_jkind (Base (Word, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "word mod everything"
         }
@@ -1754,7 +1761,7 @@ module Jkind0 = struct
       let kind_of_untagged_int =
         { jkind =
             mk_jkind (Base (Untagged_immediate, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "untagged_immediate mod everything"
         }
@@ -1770,7 +1777,7 @@ module Jkind0 = struct
       let kind_of_unboxed_int8 =
         { jkind =
             mk_jkind (Base (Bits8, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "bits8 mod everything"
         }
@@ -1788,7 +1795,7 @@ module Jkind0 = struct
       let kind_of_unboxed_int16 =
         { jkind =
             mk_jkind (Base (Bits16, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "bits16 mod everything"
         }
@@ -1804,7 +1811,7 @@ module Jkind0 = struct
       let kind_of_unboxed_int32 =
         { jkind =
             mk_jkind (Base (Bits32, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "bits32 mod everything"
         }
@@ -1820,7 +1827,7 @@ module Jkind0 = struct
       let kind_of_unboxed_int64 =
         { jkind =
             mk_jkind (Base (Bits64, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "bits64 mod everything"
         }
@@ -1828,7 +1835,7 @@ module Jkind0 = struct
       let kind_of_idx =
         { jkind =
             mk_jkind (Base (Bits64, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "bits64 mod everything"
         }
@@ -1868,7 +1875,7 @@ module Jkind0 = struct
       let kind_of_unboxed_128bit_vectors =
         { jkind =
             mk_jkind (Base (Vec128, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "vec128 mod everything"
         }
@@ -1876,7 +1883,7 @@ module Jkind0 = struct
       let kind_of_unboxed_256bit_vectors =
         { jkind =
             mk_jkind (Base (Vec256, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "vec256 mod everything"
         }
@@ -1884,7 +1891,7 @@ module Jkind0 = struct
       let kind_of_unboxed_512bit_vectors =
         { jkind =
             mk_jkind (Base (Vec512, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "vec512 mod everything"
         }
@@ -1892,7 +1899,7 @@ module Jkind0 = struct
       let kind_of_unboxed_mask =
         { jkind =
             mk_jkind (Base (Mask, Scannable_axes.max))
-              ~crossing:cross_all_except_staticity
+              ~crossing:cross_all_crossable
               ~externality:Mod_bounds.Externality.min;
           name = "mask mod everything"
         }
@@ -2603,7 +2610,7 @@ module Jkind0 = struct
         Mode.Crossing.create ~regionality:false ~linearity:true
           ~portability:true ~totality:true ~forkable:true ~yielding:true
           ~uniqueness:false ~contention:true ~logicality:true ~statefulness:true
-          ~visibility:true ~staticity:false
+          ~visibility:true ~staticity:false ~erasure:false
       in
       let mod_bounds =
         Mod_bounds.create crossing ~externality:Mod_bounds.Externality.max

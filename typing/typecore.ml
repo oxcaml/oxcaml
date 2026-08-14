@@ -728,6 +728,7 @@ let mode_lazy expected_mode =
       ~totality:false ~logicality:false
       ~regionality:false ~uniqueness:false ~contention:false ~statefulness:false
       ~visibility:false ~forkable:false ~yielding:false ~staticity:false
+      ~erasure:false
   in
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing

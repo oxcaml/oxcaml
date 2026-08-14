@@ -148,6 +148,7 @@ module Axis = struct
       Pack (Modal (Comonadic Statefulness));
       Pack (Modal (Monadic Visibility));
       Pack (Modal (Monadic Staticity));
+      Pack (Modal (Comonadic Erasure));
       (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
       Pack (Nonmodal Externality) ]
 
@@ -268,8 +269,9 @@ module Axis_set = struct
     | Modal (Comonadic Statefulness) -> 9
     | Modal (Monadic Visibility) -> 10
     | Modal (Monadic Staticity) -> 11
+    | Modal (Comonadic Erasure) -> 12
     (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
-    | Nonmodal Externality -> 12
+    | Nonmodal Externality -> 13
 
   let[@inline] axis_mask ax = 1 lsl axis_index ax
 
@@ -301,6 +303,7 @@ module Axis_set = struct
     |> set_axis (Modal (Comonadic Statefulness))
     |> set_axis (Modal (Monadic Visibility))
     |> set_axis (Modal (Monadic Staticity))
+    |> set_axis (Modal (Comonadic Erasure))
     |> set_axis (Nonmodal Externality)
 
   let all = create ~f:(fun ~axis:_ -> true)

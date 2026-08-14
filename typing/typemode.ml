@@ -102,6 +102,8 @@ module Mode_axis_pair = struct
     | "read_write" -> monadic Visibility Read_write
     | "static" -> monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
+    | "retained" -> comonadic Erasure Retained
+    | "erased" -> comonadic Erasure Erased
     | _ -> raise Not_found
 end
 
@@ -550,6 +552,10 @@ let everything_modality =
   List.fold_left
     (fun acc -> function
       | Value.Axis.P (Monadic Staticity) -> acc
+      | Value.Axis.P (Comonadic Erasure) ->
+        (* Types never cross erasure: an erased value has no runtime
+           representation, so it can never be used as retained. *)
+        acc
       | Value.Axis.P (Comonadic axis) -> (
         match Per_axis.min (Modal (Comonadic axis)) with
         | Modality value -> Modality.Const.set (Comonadic axis) value acc)
@@ -633,6 +639,9 @@ let transl_mod_bounds ?(warn = true) annots =
     List.fold_left
       (fun (nonmodal, base, atoms, seen_ev) { txt = Parsetree.Mode txt; loc } ->
         match Modality_axis_pair.of_string txt with
+        | Atom (Comonadic Erasure, _) ->
+          (* Types never cross erasure; see [everything_modality]. *)
+          raise (Error (loc, Unrecognized_modifier (Modifier, txt)))
         | Atom (_, _) as atom ->
           if (seen_ev && not (is_staticity atom)) || has_modal_axis atom atoms
           then raise_dup_modal loc atom;
