@@ -379,6 +379,14 @@ let compare_files kind_of_output output_filename reference_filename log
     } in
   let tool =
     Filecompare.make_cmp_tool ~ignore:ignore_header_conf in
+  let promote_if_requested () =
+    if Environments.lookup_as_bool Builtin_variables.promote env = Some true
+    then begin
+      Printf.fprintf log "Promoting %s output %s to reference %s\n%!"
+        kind_of_output output_filename reference_filename;
+      Filecompare.promote files ignore_header_conf;
+    end
+  in
   match Filecompare.check_file ~tool files with
     | Filecompare.Same -> (Result.pass, env)
     | Filecompare.Different ->
@@ -389,12 +397,7 @@ let compare_files kind_of_output output_filename reference_filename log
       let reason =
         Printf.sprintf "%s output %s differs from reference %s: \n%s\n"
         kind_of_output output_filename reference_filename diffstr in
-      if Environments.lookup_as_bool Builtin_variables.promote env = Some true
-      then begin
-        Printf.fprintf log "Promoting %s output %s to reference %s\n%!"
-          kind_of_output output_filename reference_filename;
-        Filecompare.promote files ignore_header_conf;
-      end;
+      promote_if_requested ();
       (Result.fail_with_reason reason, env)
     | Filecompare.Unexpected_output ->
       let banner = String.make 40 '=' in
@@ -405,6 +408,9 @@ let compare_files kind_of_output output_filename reference_filename log
         "The file %s was expected to be empty because there is no \
           reference file %s but it is not:\n%s\n"
         output_filename reference_filename unexpected_output_with_banners in
+      (* A missing reference is what a brand-new test looks like, so promotion
+         should create it rather than making the author write it by hand. *)
+      promote_if_requested ();
       (Result.fail_with_reason reason, env)
     | Filecompare.Error (commandline, exitcode) ->
       let reason = Printf.sprintf "The command %s failed with status %d"

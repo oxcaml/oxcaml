@@ -1,2 +1,4 @@
 child ocamltest exit: 0
-reference not created
+reference created, contents:
+promoted line one
+promoted line two
