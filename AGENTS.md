@@ -69,9 +69,14 @@ below.
   cannot be created, e.g. `bind(): Operation not permitted` in a sandbox): use
   `make dev NOWATCH=1`, which skips the watcher and rpc entirely. Slower per
   invocation, works anywhere, and applies to the other `dev-*` targets too.
-- **`ocamlc.byte`-flavoured tests.** The dev test root's `ocamlc.byte` is the boot
-  `main.bc`, built by the host compiler, so it cannot run under the in-tree
-  `ocamlrun`. See `design-docs/dev-loop-improvements.md`.
+- **A test reported as `skipped` under `make dev-test` that runs elsewhere.** The
+  dev test root's `ocamlc.byte` is the boot `main.bc`, built by the host compiler,
+  so the in-tree `ocamlrun` cannot execute it. Rather than failing, those actions
+  skip with a reason naming the compiler they therefore do not cover. The tests
+  are real and do run under `make dev-test-all`, which uses `_runtest` and the
+  installed bytecode compiler — so a change to bytecode-compiler behaviour needs
+  the full suite, not the fast loop. See
+  `design-docs/dev-loop-improvements-final.md`.
 
 ## Release builds
 

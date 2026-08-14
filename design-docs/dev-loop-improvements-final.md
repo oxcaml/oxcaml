@@ -7,14 +7,25 @@ Branch `jujacobs/vox/dev-loop-improvements`, based on `jujacobs/optimize-dev-loo
 
 | sha | what |
 | --- | --- |
-| `878ec4ed0b` | the design doc: ranking, verification pass over the reports' claims, scope |
-| `8c461894d0` | the tooling: wedge recovery, heartbeat, stale-stdlib detection, NOWATCH, dev-configure, promote fixpoint, dev-diff, dev-errors, ocamlopt links, python guard |
-| `4105336709` | `AGENTS.md`: setup, new targets, failure modes |
-| `88a1362396` | RED: ocamltest `-promote` cannot create a missing reference file |
-| `6b3f460c20` | GREEN: it can, and the expectation diff shows exactly that |
-| `bb21e087d5` | `dev-diff` handles program-output tests |
-| `e7159b3af9` | fixes from the review loop |
-| `e95dc422b7` | `dev-test-all` refreshes the test harness; stdlib-digest diagnosis |
+| `6edb813a48` | the design doc: ranking, verification pass over the reports' claims, scope |
+| `8433611e25` | the tooling: wedge recovery, heartbeat, stale-stdlib detection, NOWATCH, dev-configure, promote fixpoint, dev-diff, dev-errors, ocamlopt links, python guard |
+| `a14da1dabf` | `AGENTS.md`: setup, new targets, failure modes |
+| `d08e0c4d1f` / `de47bdb8d8` | RED / GREEN: ocamltest `-promote` creates a missing reference file |
+| `b87de5e4fe` | `dev-diff` handles program-output tests |
+| `a7bd9f2024` | fixes from the review loop |
+| `fa727a341c` | `dev-test-all` refreshes the test harness; stdlib-digest diagnosis |
+| `daab428772` / `48892bda89` | RED / GREEN: `ocamlc.byte` tests skip, naming the compiler |
+
+Plus this report and its amendments.
+
+Rebased onto **`6f4374f24b`** (`Use autoconf27 in development setup`), so these shas
+supersede the pre-rebase ones; the tree content was verified identical across the
+rebase. The base already changes `AGENTS.md` from `autoconf` to `autoconf27`, so the
+one conflict was resolved in favour of `make dev-configure` with the by-hand form
+kept as a trailing comment — this branch does not duplicate the base's fix. The rest
+of item 6a is still needed, because the doc fix alone does not help a fresh
+worktree: `make dev-configure` and the `Makefile.config` precondition are what turn
+the failure into an instruction.
 
 ## What landed, and whether it was exercised
 
@@ -26,7 +37,7 @@ Branch `jujacobs/vox/dev-loop-improvements`, based on `jujacobs/optimize-dev-loo
 | 1. rpc wedge: heartbeat, timeout, watcher restart + one retry, direct fallback | 5/5 | **Exercised, including a real wedge** |
 | 2. stale `_runtest` stdlib detector + `dev-refresh-stdlib` | 2/5 | **Exercised against a real SIGSEGV**; cure verified |
 | 3a. `ocamlopt`/`ocamlopt.byte` missing from the dev test root | 4/5 | Landed, **not exercised** |
-| 3b. `ocamlc.byte` magic mismatch | 4/5 | **Not done** — see below |
+| 3b. `ocamlc.byte` magic mismatch | 4/5 | **Measured, then landed** — red-green, see below |
 | 4a. `-promote` cannot create a missing reference | 1/5 | **Exercised**, red-green |
 | 4b. promote iterates to a fixpoint | 1/5 | Partly exercised |
 | 4c. `/tmp` scratch → `_build/dev`, `TMPDIR` exported | 1/5 + found | **Exercised** |
@@ -169,9 +180,9 @@ simpler and more correct than what I wrote.
 
 ## Deliberately not done
 
-- **Item 3b, the `ocamlc.byte` magic mismatch (4/5 reports) — measured, and the
-  measurement rules out both candidate fixes.** No code landed for it, but the
-  question is now answered rather than open.
+### Item 3b, resolved by measurement and then landed
+
+**Measured first, and the measurement ruled out the fix I expected to make.**
 
   Baseline, three affected directories: under the dev harness 12 tests fail
   (`formatting` 1, `typing-ocamlc-i` 6, `tool-ocamlc-stop-after` 5); under
@@ -195,14 +206,34 @@ simpler and more correct than what I wrote.
   in-tree runtime, i.e. building the bytecode compiler in a context that uses it —
   a build-system change, out of scope here.
 
-  So the answer to the design doc's open question is the skip-list, now on evidence
-  rather than as a default. ocamltest already has the mechanism:
-  `OCAMLTEST_SKIP_TESTS` (`ocamltest/main.ml:254`), matched against the test
-  filename. I did not implement it, because deciding what the dev harness declares
-  it does not cover is a scoping decision I would rather you make (open question 1).
-  Consequence meanwhile: `dev-test-all` cannot be green, and these tests present as
-  regressions. 3a (the missing `ocamlopt`/`ocamlopt.byte` links) did land, and is a
-  genuinely separate defect from this one.
+  **Landed** in `daab428772` (RED) and `48892bda89` (GREEN):
+  `OCAMLTEST_SKIP_BYTECODE_COMPILERS` makes the `ocamlc.byte` and `ocamlopt.byte`
+  actions skip rather than fail, with a reason naming the compiler —
+  `ocamlc.byte is not runnable under this harness, so this test does not cover it`.
+  It mirrors the existing `native_action`/`no_native_compilers` pattern a few lines
+  above, which already skips actions for a capability the harness lacks, so it is
+  no new mechanism. Implemented per action rather than as a list of test files, so
+  there is no list to go stale and the coverage is the whole suite at once.
+  `dev-test` exports it; `dev-test-all` deliberately does not.
+
+  Measured effect on the three directories: `formatting` 2 passed / 1 skipped / 0
+  failed (was 2/0/1), `typing-ocamlc-i` 0/6/0 (was 0/0/6), `tool-ocamlc-stop-after`
+  0/5/0 (was 0/0/5). So `make dev-test DIR=...` can now be green where it could
+  not be. Scoping verified in both directions: the same tests still run and pass
+  under `_runtest` (`make test-one-no-rebuild DIR=typing-ocamlc-i` → 6 passed, 0
+  skipped).
+
+  **A sixth correction to the reports** came out of this. They say `dev-test-all`
+  "can never be green" on these tests. That is false: `dev-test-all` uses
+  `_runtest`, where `ocamlc.byte` is the real installed bytecode compiler. The
+  full-suite run on this branch had **zero** failures in all three directories, and
+  the affected tests pass there. Only `dev-test` was ever affected. The consequence
+  is worth stating positively: bytecode-compiler behaviour is still covered, by the
+  full suite, and the skip message says so rather than implying the coverage is
+  gone.
+
+  3a (the missing `ocamlopt`/`ocamlopt.byte` links) is a genuinely separate defect
+  and landed earlier.
 - **Item 9's stdlib fingerprinting** stays out of scope for the reasons in the
   design doc. The *detection* the doc promised was initially missing — the claude
   reviewer caught the discrepancy — and is now in `e95dc422b7`: when `dev-test-all`
@@ -213,13 +244,57 @@ simpler and more correct than what I wrote.
 - **Item 7, a single-instance lock** (2/5, not 3/5 as the synthesis said).
   Deferred as planned: `dev-test-all` legitimately holds the loop for 30-40
   minutes, so a naive exclusive lock serialises a reviewer behind it and creates a
-  *new* silent wait. Note that findings 3 above means this branch made the
-  concurrency story better in one way (per-invocation logs) without addressing the
-  underlying absence of a lock.
-- **Item 8** (stale `_runtest` compilerlibs), **item 10** (the expect runner as a
-  second full compiler build — the largest remaining throughput cost, 8-10 min per
-  iteration), **item 11** (a shared dune cache). Reasons in the design doc; item
-  10 is the strongest candidate for the next piece.
+  *new* silent wait. This branch improved the concurrency story in one respect
+  (per-invocation build logs, review finding 3) without addressing the absent lock.
+
+  I was offered a cheap partial win — an advisory notice that prints "another dev
+  command is running (pid N), started Xm ago" and then proceeds — if it fell out of
+  item 1's work. It does not: `build` has no way to know about a sibling dev
+  command, because nothing records one. The watcher lease is renewed by every
+  command and so cannot distinguish one caller from two, and scanning the process
+  table for sibling `dev-watcher.py` processes is the kind of guess that
+  misidentifies a reviewer's worktree. Doing it properly means recording running
+  commands in `_build/dev/`, which is the lock's bookkeeping minus the lock — so it
+  belongs with item 7, not bolted on here.
+
+  Worth recording as evidence for whoever takes it: I hit this myself during this
+  work. Two overlapping `make dev-test` runs interleaved their heartbeats into one
+  log, so the output read as a single build reporting two different elapsed times
+  (`still building (300s...)` next to `still building (330s...)`). I diagnosed it
+  with `ps`, which is exactly what the reports describe. So the notice would have
+  paid for itself even for me, on this branch, with the heartbeat already in place.
+- **Item 8** (stale `_runtest` compilerlibs) and **item 11** (a shared dune cache
+  across worktrees). Reasons in the design doc; item 11 is a measurement task
+  before it is an implementation task.
+
+## Proposed next piece: the expect runner's build cost (item 10)
+
+This is the largest remaining throughput cost in the corpus and the strongest
+candidate for a follow-up, so recording it as a candidate with evidence rather
+than a leftover.
+
+**Evidence.** `feedback-type-formers.md:39-46`: after any compiler change,
+`dev-test` on an expect test pays the fast watcher build *plus* a `main.ws` build
+of `expect.exe` — **~8-10 minutes per iteration** when iterating on parser or
+typing changes together with expectations. That session calls it "the dominant cost
+of the test loop all session" and "the gap between 'fast loop' and 'fast loop
+except for tests'". 1/5 reports, but from the session that did the most
+expectation-heavy work, and it is a throughput cost paid on every iteration rather
+than an incident.
+
+**Where it comes from.** `dev-test` refreshes the runner through
+`dev-expect-runners`, which stops the watcher and runs
+`dune build $(ws_main) oxcaml/testsuite/tools/<runner>.exe`. The staleness check is
+correct and fires when it should; the cost is that the runner is built in the main
+workspace, against the main compiler, not in the boot/dev context the watcher
+already maintains.
+
+**Why it is not a friction fix.** Building the runner in the dev context would make
+it fast, but it changes what the runner links against, and therefore what expect
+tests actually exercise. That is a question about the harness's meaning, not its
+speed, and it deserves its own design doc and its own review — which is why it was
+kept out of this branch. Whoever picks it up should start by establishing what the
+runner is supposed to be built against and why, not by making the build faster.
 
 ## The full suite found a defect nobody had listed
 
@@ -248,6 +323,39 @@ for running the suite at all: `Makefile.config_if_required` (the configuration g
 for every target) and `ocamltest/actions_helpers.ml` (promotion for every test).
 Neither caused a failure. The whole `tool-ocamltest` directory also passes, 7/7.
 
+## The `/tmp` rule: what was leaking, and what was left behind
+
+The exposure was wider than the one `mktemp` in `dev-promote`: ocamltest itself
+calls `Filename.temp_file` at `ocamltest/filecompare.ml:231` — on **every** failing
+test comparison, to hold the diff — and at `ocamltest/actions_helpers.ml:267,309`
+for response files. `Filename.temp_file` honours `TMPDIR` and falls back to `/tmp`,
+so every failing test run under a caller without `TMPDIR` set was writing there.
+Fixed by defaulting `TMPDIR` inside the worktree from `dev-test` and `dev-test-all`,
+and by moving `dev-promote`'s own scratch to `_build/dev`.
+
+**Residue check, since files a service user leaves in a sticky directory cannot be
+removed afterwards.** I audited both directories rather than assuming a cleanup
+fired:
+
+- `/var/tmp` — every entry is root-owned system state (`abrt`, `krb5_0.rcache2`,
+  systemd private dirs, `metrics-config.tar.gz`, `Velociraptor_Buffer.bin`).
+  Nothing of ours, nothing to remove.
+- `/tmp` — no `ocamltest*`, `oxcaml*` or `*dev-promote*` entries at all, confirmed
+  by explicit glob rather than by eye. The `jujacobs`-owned entries there belong to
+  unrelated tooling (`blueprint-worker.log`, `jira_fields_cache.sexp`,
+  `.vscode.all-feature-names-cache.txt`, `exe-server-40358`, `tmux-40358`, krb5
+  credential caches) and the agent-tooling directories `.agents`, `.codex`, `.git`,
+  `dhp.tmp.*` are all **empty**.
+
+So nothing needed cleaning up. The reason is visible in the source and is worth
+recording so the fix is not mistaken for having been urgent in the wrong way:
+ocamltest removes these files on the normal path (`Sys.force_remove` at
+`filecompare.ml:251` and `actions_helpers.ml:304,358`). The leak is therefore
+transient — it only survives when a run is *killed*, which the reports describe
+happening repeatedly to wedged runs, and which happened several times during this
+work. The rule violation was real and is fixed; the accumulation had not yet
+happened.
+
 ## Verification I did not do
 
 - I did run the full suite, and it earned its keep — see below. What is *not*
@@ -262,14 +370,10 @@ Neither caused a failure. The whole `tool-ocamltest` directory also passes, 7/7.
 
 ## Open questions for the owner
 
-1. **Item 3b.** The measurement above removes the choice I thought I had: the
-   `main_native.exe` redirect cannot work, so it is a skip-list or nothing. What I
-   want a ruling on is the scope — skip-list the ~12 tests in the three directories
-   I measured, or sweep the whole suite for `ocamlc.byte`/`ocamlopt.byte` actions
-   first so `dev-test-all` can actually be asserted green? I would do the sweep,
-   since a partial list leaves the full suite red and therefore ignored, which is
-   the status quo. Either way the marker text should name what the dev harness does
-   not cover, so nobody re-does this forensics.
+1. ~~Item 3b~~ — **resolved and landed.** Implementing the skip per *action* rather
+   than as a list of test files made the scope question moot: there is no list to
+   go stale, and the coverage is the whole suite at once. The marker names the
+   compiler, as asked.
 2. **Promotion of a missing reference file.** A missing reference is also how
    ocamltest spells "this output must be empty", and the claude reviewer counted
    **290** tests under `testsuite/tests/` that run an output check with no
