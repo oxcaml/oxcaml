@@ -811,7 +811,18 @@ module type S = sig
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
-    (** [arg] determines co-/contravariance. *)
+    (** [arg] determines co-/contravariance, and is used to infer
+        the most general mode for implied middle values on monadic axes.\
+
+        Consider:
+
+        {[
+          (* Implies [read shared]. *)
+          let zap_arg_read (x @ read) = ()
+
+          (* Implies [read uncontended]. *)
+          let zap_ret_read x : _ @ read = ()
+        ]} *)
     val zap_to_legacy : arg:bool -> lr -> Const.t
 
     val comonadic_to_monadic_min :

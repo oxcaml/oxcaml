@@ -363,3 +363,174 @@ let curried (x @ local) (y @ local) =
 [%%expect{|
 val curried : 'a @ local -> 'b @ local unyielding -> unit = <fun>
 |}]
+
+(* Misc tests *)
+
+external use_local_unyielding : 'a @ local unyielding -> unit = "%ignore"
+[%%expect{|
+external use_local_unyielding : 'a @ local unyielding -> unit = "%ignore"
+|}]
+
+module Sig_forces_yielding : sig
+  val f : 'a @ local -> 'b @ local -> unit
+end = struct
+  let f x y = use_local_unyielding x; use_local_unyielding y
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f x y = use_local_unyielding x; use_local_unyielding y
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b -> unit end
+       is not included in
+         sig val f : 'a @ local -> 'b @ local -> unit end
+       Values do not match:
+         val f : 'a -> 'b -> unit
+       is not included in
+         val f : 'a @ local -> 'b @ local -> unit
+       The type "'a -> 'b -> unit" is not compatible with the type
+         "'a @ local -> 'b @ local -> unit"
+       Type "'b -> unit" is not compatible with type "'b @ local -> unit"
+|}]
+
+module Zap_before = struct
+  module M = struct
+    let f x : _ @ local = fun () -> x
+  end
+
+  let () = let r = M.f 1 in requires_unyielding r
+end
+[%%expect{|
+module Zap_before :
+  sig module M : sig val f : 'a -> (unit -> 'a) @ local unyielding end end
+|}]
+
+(* [module type of] forces the variables. *)
+
+module Zap_after = struct
+  module M = struct
+    let f x : _ @ local = fun () -> x
+  end
+
+  module type S = module type of M
+
+  let () = let r = M.f 1 in requires_unyielding r
+end
+[%%expect{|
+Line 8, characters 48-49:
+8 |   let () = let r = M.f 1 in requires_unyielding r
+                                                    ^
+Error: This value is "yielding" but is expected to be "unyielding".
+|}]
+
+module Self = struct
+  let f (x @ local) = use_local_unyielding x
+  let g x : _ @ local = fun () -> x
+end
+
+module Self_check : module type of Self = Self
+[%%expect{|
+module Self :
+  sig
+    val f : 'a @ local unyielding -> unit
+    val g : 'a -> (unit -> 'a) @ local
+  end
+module Self_check :
+  sig
+    val f : 'a @ local unyielding -> unit
+    val g : 'a -> (unit -> 'a) @ local @@ stateless
+  end
+|}]
+
+module Functor_arg_stateless (M : Runnable @ stateless) = struct
+  let () = requires_portable M.run
+end
+[%%expect{|
+module Functor_arg_stateless : functor (M : Runnable @ stateless) -> sig end
+|}]
+
+module Functor_arg_unused (M : Runnable @ stateless) = struct end
+
+module Stateless_nonportable : Runnable @ stateless nonportable = struct
+  let run () = ()
+end
+
+module _ = Functor_arg_unused (Stateless_nonportable)
+[%%expect{|
+module Functor_arg_unused : functor (M : Runnable @ stateless) -> sig end
+module Stateless_nonportable : Runnable
+Line 7, characters 11-53:
+7 | module _ = Functor_arg_unused (Stateless_nonportable)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Modules do not match: sig val run : unit -> unit end @ nonportable
+     is not included in Runnable @ portable
+     Values do not match:
+       val run : unit -> unit (* in a structure at nonportable *)
+     is not included in
+       val run : unit -> unit (* in a structure at portable *)
+     The first is "nonportable"
+     but the second is "portable".
+|}]
+
+module Functor_ret_stateless : sig end -> Runnable @ stateless =
+  functor (M : sig end) -> struct
+    let run () = ()
+  end
+
+module Functor_ret_applied = Functor_ret_stateless (struct end)
+
+let () = requires_portable Functor_ret_applied.run
+[%%expect{|
+module Functor_ret_stateless : sig end -> Runnable @ stateless
+module Functor_ret_applied : Runnable
+|}]
+
+let partial_app_arg_local (g1 : (int @ local -> int -> unit)) =
+  let _ = requires_unyielding (g1 1) in ()
+[%%expect{|
+Line 2, characters 30-36:
+2 |   let _ = requires_unyielding (g1 1) in ()
+                                  ^^^^^^
+Error: This value is "yielding" but is expected to be "unyielding".
+|}]
+
+let partial_app_fn_local (g2 : (int -> int -> unit) @ local) =
+  let _ = requires_unyielding (g2 1) in ()
+[%%expect{|
+Line 2, characters 30-36:
+2 |   let _ = requires_unyielding (g2 1) in ()
+                                  ^^^^^^
+Error: This value is "yielding" but is expected to be "unyielding".
+|}]
+
+(* Middle comonadic modes infer the best implied mode for the position. *)
+
+let zap_arg_read (x @ read) = ()
+[%%expect{|
+val zap_arg_read : 'a @ read -> unit = <fun>
+|}]
+
+let zap_ret_read x : _ @ read = ()
+[%%expect{|
+val zap_ret_read : 'a -> unit @ read uncontended = <fun>
+|}]
+
+module Zap_clamp_accepts_shared = struct
+  module M = struct
+    let f (x @ read) = ()
+  end
+
+  module type S = module type of M
+
+  let g (y @ read shared) = M.f y
+end
+[%%expect{|
+module Zap_clamp_accepts_shared :
+  sig
+    module M : sig val f : 'a @ read -> unit @@ stateless end
+    module type S = sig val f : 'a @ read -> unit @@ stateless end
+    val g : 'a @ read -> unit
+  end
+|}]
