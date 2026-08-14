@@ -701,11 +701,12 @@ let expr sub x =
           path,
           List.map (tuple3 id (map_loc sub) (sub.expr sub)) list
         )
-    | Texp_letmodule (id, s, pres, mexpr, exp) ->
+    | Texp_letmodule (id, s, pres, uid, mexpr, exp) ->
         Texp_letmodule (
           id,
           map_loc sub s,
           pres,
+          uid,
           sub.module_expr sub mexpr,
           sub.expr sub exp
         )
@@ -926,6 +927,9 @@ let module_expr sub x =
         Tmod_apply_unit (sub.module_expr sub mexp1, yielding)
     | Tmod_constraint (mexpr, mt, Tmodtype_implicit, c) ->
         Tmod_constraint (sub.module_expr sub mexpr, mt, Tmodtype_implicit,
+                         sub.module_coercion sub c)
+    | Tmod_constraint (mexpr, mt, Tmodtype_package uid, c) ->
+        Tmod_constraint (sub.module_expr sub mexpr, mt, Tmodtype_package uid,
                          sub.module_coercion sub c)
     | Tmod_constraint (mexpr, mt, Tmodtype_explicit (mtype, ma), c) ->
         Tmod_constraint (

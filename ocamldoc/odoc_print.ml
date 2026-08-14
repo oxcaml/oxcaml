@@ -64,8 +64,8 @@ let simpl_module_type ?code t =
          | Some s -> raise (Use_code s)
         )
     | Mty_functor (Unit, mt, mm) -> Mty_functor (Unit, iter mt, mm)
-    | Mty_functor (Named (name, mt1, mm1), mt2, mm2) ->
-      Mty_functor (Named (name, iter mt1, mm1), iter mt2, mm2)
+    | Mty_functor (Named (name, mt1, uid, mm1), mt2, mm2) ->
+      Mty_functor (Named (name, iter mt1, uid, mm1), iter mt2, mm2)
   in
   iter t
 

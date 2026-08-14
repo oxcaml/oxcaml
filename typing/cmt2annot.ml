@@ -108,7 +108,7 @@ let rec iterator ~scope rebuild_env =
         bind_cases f2
     | Texp_function { params; _ } ->
         List.iter (bind_function_param exp.exp_loc) params
-    | Texp_letmodule (_, modname, _, _, body ) ->
+    | Texp_letmodule (_, modname, _, _, _, body ) ->
         Stypes.record (Stypes.An_ident
                          (modname.loc,Option.value ~default:"_" modname.txt,
                           Annot.Idef body.exp_loc))
