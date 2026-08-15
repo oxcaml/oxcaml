@@ -785,3 +785,17 @@ Error:
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
 |}]
+
+(**************************************)
+(* Occurs check prevents cyclic sorts *)
+
+(* At applications of this function, ['a] and ['b] share a sort variable *)
+(* CR rtjoa: This crashes the compiler with a stack overflow, by constructing
+   a cyclic sort. *)
+external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity"
+[@@layout_poly]
+
+(* The return type would need sort ['s1 = 's1 & value] *)
+let bad (x : 'c) : #('c * string) = magic_any x
+[%%expect{|
+|}]
