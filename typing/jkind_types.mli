@@ -189,8 +189,7 @@ module Layout : sig
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
       | Addressable of t
-          (** See the [Addressable] constructor of [Jkind.Layout.t] for what
-              addressability means.
+          (** See Note [Addressable kinds].
 
               Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)]. *)
