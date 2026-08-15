@@ -255,7 +255,7 @@ let target_to_string (target : Symbol.target) : string =
   | Symbol sym -> Asm_targets.Asm_symbol.encode sym
 
 let compute_value (r : t) ~target_addr ~place_address ~read_instruction
-    ~lookup_target =
+    ~read_int64 ~lookup_target =
   match r.kind with
   | R_AARCH64_ADR_PREL_LO21 _ ->
     let offset = Int64.sub target_addr place_address in
@@ -280,7 +280,13 @@ let compute_value (r : t) ~target_addr ~place_address ~read_instruction
     let offset = Int64.sub target_addr place_address in
     let insn = read_instruction () in
     Ok (patch_branch26 insn offset)
-  | R_AARCH64_ABS64 _ -> Ok target_addr
+  | R_AARCH64_ABS64 _ ->
+    (* On Mach-O (REL), references to local labels are rewritten by the emitter
+       to point at the nearest global symbol, with the original offset
+       (target_offset - nearest_sym_offset, plus any source addend) stored in
+       the 8-byte data slot. We must therefore add that existing slot value to
+       [target_addr]. On RELA platforms the slot is 0, so this is a no-op. *)
+    Ok (Int64.add target_addr (read_int64 ()))
   | R_AARCH64_PREL32_PAIR { plus_target = _; minus_target } -> (
     match lookup_target minus_target with
     | None ->

@@ -96,6 +96,7 @@ let main () =
   let ppf = Format.err_formatter in
   Clflags.native_code := true;
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+  Opttoploop.use_existing_compilerlibs_state_for_artifacts ();
   let list = ref Options.list in
   begin
     try

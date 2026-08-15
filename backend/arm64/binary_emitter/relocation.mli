@@ -95,5 +95,6 @@ val compute_value :
   target_addr:int64 ->
   place_address:int64 ->
   read_instruction:(unit -> int32) ->
+  read_int64:(unit -> int64) ->
   lookup_target:(Arm64_ast.Ast.Symbol.target -> int64 option) ->
   (int64, string) result
