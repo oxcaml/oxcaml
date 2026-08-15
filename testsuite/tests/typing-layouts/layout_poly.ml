@@ -790,12 +790,26 @@ Error:
 (* Occurs check prevents cyclic sorts *)
 
 (* At applications of this function, ['a] and ['b] share a sort variable *)
-(* CR rtjoa: This crashes the compiler with a stack overflow, by constructing
-   a cyclic sort. *)
 external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity"
 [@@layout_poly]
 
+(* CR layouts: Improve this error message *)
 (* The return type would need sort ['s1 = 's1 & value] *)
 let bad (x : 'c) : #('c * string) = magic_any x
 [%%expect{|
+external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity"
+  [@@layout_poly]
+Line 6, characters 36-47:
+6 | let bad (x : 'c) : #('c * string) = magic_any x
+                                        ^^^^^^^^^^^
+Error: This expression has type
+         "('a : '_representable_layout_2 & value_or_null)"
+       but an expression was expected of type "#('c * string)"
+       The layout of #('c * string) is
+           '_representable_layout_3 & value & value non_float
+         because it is an unboxed tuple.
+       But the layout of #('c * string) must be representable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
 |}]
