@@ -23,10 +23,6 @@ ocamldir = .
 #toplevels_installed = top opttop
 toplevels_installed = top
 
-
-dune-project: dune-project.ox
-	cp $^ $@
-
 duneconf/ox-extra.inc:
 	echo '(include ../ox.dune)' > $@
 
