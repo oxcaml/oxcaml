@@ -12,7 +12,12 @@
    A declaration [X] of the signature ascribed to [M] is named [M.X'], to
    tell it apart from the declaration [M.X] of the implementation it is
    checked against, and the module type expected of the parameter [X] of a
-   functor [F] is named [param(F.X)]. *)
+   functor [F] is named [param(F.X)].
+
+   Source locations are never printed: which declarations a fact relates is
+   the contract the readers of the facts rely on, whereas the span a fact was
+   recorded at is not, and printing spans would tie the expected output to the
+   layout of the sources below. *)
 
 module Facts = Module_implementation_facts
 module Uid = Shape.Uid
@@ -53,17 +58,6 @@ let unit_name uid =
   | Uid.Compilation_unit name -> Some name
   | Uid.Item _ | Uid.Internal | Uid.Predef _ | Uid.Unboxed_version _ -> None
 
-(* [Filename.basename] keeps the output independent of the directory the test
-   runs in. *)
-let string_of_location (location : Location.t) =
-  let start = location.loc_start and finish = location.loc_end in
-  Printf.sprintf "%s:%d:%d-%d:%d"
-    (Filename.basename start.pos_fname)
-    start.pos_lnum
-    (start.pos_cnum - start.pos_bol)
-    finish.pos_lnum
-    (finish.pos_cnum - finish.pos_bol)
-
 let rec string_of_context t (context : Facts.Context.t) =
   match context with
   | Def uid -> uid_name t uid
@@ -91,14 +85,13 @@ let string_of_key t (key : Facts.Key.t) =
   | Named (context, uid) -> uid_name t uid ^ "@" ^ string_of_context t context
   | Anon uid -> "<" ^ uid_name t uid ^ ">"
 
-(* When locations are hidden, a node that is only a location prints as
-   [<location>], so that output stays comparable across sources that differ
-   only in layout. *)
-let string_of_node ?(locations = true) t (node : Facts.Node.t) =
+(* The implementation of a check that is not a declaration is only a location;
+   it prints as [<location>], so that the output stays independent of the
+   layout of the source. *)
+let string_of_node t (node : Facts.Node.t) =
   match node with
   | Uid uid -> uid_name t uid
-  | Location (_, location) ->
-      if locations then string_of_location location else "<location>"
+  | Location (_, _) -> "<location>"
 
 let string_of_check_kind : Facts.Check.Kind.t -> string = function
   | Ascription -> "ascription"
@@ -128,24 +121,11 @@ let string_of_omission_reason : Facts.Omission.Reason.t -> string = function
 
 (* Printing of facts *)
 
-let check_kinds : Facts.Check.Kind.t list =
-  [ Ascription; Argument; Package; Interface ]
-
-let dependency_reasons : Facts.Dependency.Reason.t list =
-  [ Definition; Alias; Include; With_constraint; Destructive_substitution;
-    Module_type_of; Strengthening; Functor_type; Instance; Argument_member;
-    Interface ]
-
-let omission_reasons : Facts.Omission.Reason.t list =
-  [ Unresolved_module_type; Unresolved_module; Unsupported_path;
-    Missing_parameter_expectation ]
-
-let check_line ?(sites = true) t
-    ({ implementation; expectation; kind; site } : Facts.Check.t) =
-  Printf.sprintf "check %s %s : %s%s" (string_of_check_kind kind)
-    (string_of_node ~locations:sites t implementation)
+let check_line t
+    ({ implementation; expectation; kind; site = _ } : Facts.Check.t) =
+  Printf.sprintf "check %s %s : %s" (string_of_check_kind kind)
+    (string_of_node t implementation)
     (string_of_key t expectation)
-    (if sites then " " ^ string_of_location site else "")
 
 let dependency_line t ({ derived; source; reason } : Facts.Dependency.t) =
   Printf.sprintf "dep %s -%s-> %s" (string_of_key t derived)
@@ -162,20 +142,27 @@ let omission_line t ({ affected; source; reason } : Facts.Omission.t) =
     (string_of_omission_reason reason)
 
 (* The facts of a unit, one per line, in the order they are stored. *)
-let fact_lines ?sites t (facts : Facts.t) =
-  List.map (check_line ?sites t) facts.checks
+let fact_lines t (facts : Facts.t) =
+  List.map (check_line t) facts.checks
   @ List.map (dependency_line t) facts.dependencies
   @ List.map (equality_line t) facts.equalities
   @ List.map (omission_line t) facts.omissions
 
-let print_checks ?sites t (facts : Facts.t) =
-  List.iter (fun check -> print_endline (check_line ?sites t check))
-    facts.checks
+let print_checks t (facts : Facts.t) =
+  List.iter (fun check -> print_endline (check_line t check)) facts.checks
 
-let print_dependencies t (facts : Facts.t) =
-  List.iter
-    (fun dependency -> print_endline (dependency_line t dependency))
-    facts.dependencies
+(* How many facts of each kind were extracted, so that a test that prints only
+   some of them still pins down the size of the whole set. *)
+let print_counts (facts : Facts.t) =
+  Printf.printf "counts: checks %d deps %d equalities %d omissions %d\n"
+    (List.length facts.checks)
+    (List.length facts.dependencies)
+    (List.length facts.equalities)
+    (List.length facts.omissions)
+
+let print_facts t facts =
+  print_counts facts;
+  List.iter print_endline (fact_lines t facts)
 
 (* The checks of kind [Interface], and the [Interface] dependencies of a named
    declaration on a named declaration of an interface, pair a declaration of
@@ -215,59 +202,6 @@ let print_interface_pairs t facts =
       Printf.printf "pair %s <- %s\n" (string_of_key t derived)
         (string_of_key t source))
     (interface_pairs facts)
-
-let print_equalities t (facts : Facts.t) =
-  List.iter (fun equality -> print_endline (equality_line t equality))
-    facts.equalities
-
-let print_omissions t (facts : Facts.t) =
-  List.iter (fun omission -> print_endline (omission_line t omission))
-    facts.omissions
-
-(* The digest records how many facts of each kind and reason were extracted,
-   so that a test can pin down the shape of the whole fact set without
-   spelling out every identity. *)
-let print_digest (facts : Facts.t) =
-  let counts to_string values members =
-    let count value =
-      List.length (List.filter (fun member -> member = value) members)
-    in
-    String.concat " "
-      (List.filter_map
-         (fun value ->
-           match count value with
-           | 0 -> None
-           | count -> Some (Printf.sprintf "%s %d" (to_string value) count))
-         values)
-  in
-  let relation name members breakdown =
-    match breakdown with
-    | "" -> Printf.sprintf "%s %d" name (List.length members)
-    | breakdown ->
-        Printf.sprintf "%s %d (%s)" name (List.length members) breakdown
-  in
-  Printf.printf "digest: %s %s %s %s\n"
-    (relation "checks" facts.checks
-       (counts string_of_check_kind check_kinds
-          (List.map (fun (check : Facts.Check.t) -> check.kind) facts.checks)))
-    (relation "deps" facts.dependencies
-       (counts string_of_dependency_reason dependency_reasons
-          (List.map
-             (fun (dependency : Facts.Dependency.t) -> dependency.reason)
-             facts.dependencies)))
-    (relation "equalities" facts.equalities "")
-    (relation "omissions" facts.omissions
-       (counts string_of_omission_reason omission_reasons
-          (List.map
-             (fun (omission : Facts.Omission.t) -> omission.reason)
-             facts.omissions)))
-
-let print_facts ?(sites = true) t facts =
-  print_digest facts;
-  print_checks ~sites t facts;
-  print_dependencies t facts;
-  print_equalities t facts;
-  print_omissions t facts
 
 (* Names of the module and module type declarations of a typedtree, used as
    labels for the uids appearing in its facts. *)
@@ -409,46 +343,24 @@ let compilation_unit_of_filename filename =
   Compilation_unit.of_string
     (String.capitalize_ascii (Filename.remove_extension filename))
 
-let set_current_unit filename =
+let structure_of_source ~filename source =
   Env.set_current_unit
     (Unit_info.make_dummy ~input_name:filename
-       (compilation_unit_of_filename filename))
-
-let lexbuf_of_source ~filename source =
+       (compilation_unit_of_filename filename));
   let lexbuf = Lexing.from_string source in
   Location.init lexbuf filename;
   Location.input_name := filename;
-  lexbuf
-
-let structure_of_source ~filename source =
-  set_current_unit filename;
-  let ast = Parse.implementation (lexbuf_of_source ~filename source) in
+  let ast = Parse.implementation lexbuf in
   let structure, _, _, _, _, _ =
     Typemod.type_structure (Lazy.force Env.initial) ast
   in
   structure
 
-let signature_of_source ~filename source =
-  set_current_unit filename;
-  let ast = Parse.interface (lexbuf_of_source ~filename source) in
-  let signature, (_ : Typedtree.argument_interface option) =
-    Typemod.type_interface ~sourcefile:filename
-      (compilation_unit_of_filename filename)
-      (Lazy.force Env.initial) ast
-  in
-  signature
-
-let facts_of_structure ?(module_pairs = []) ?(modtype_pairs = []) ~filename
-    structure =
+let facts_of_structure ~filename structure =
   Facts.of_implementation
     (compilation_unit_of_filename filename)
-    ~module_pairs ~modtype_pairs ~unit_interface_check:false
+    ~module_pairs:[] ~modtype_pairs:[] ~unit_interface_check:false
     ~argument_interface:None structure
-
-let facts_of_signature ~filename signature =
-  Facts.of_interface
-    (compilation_unit_of_filename filename)
-    ~argument_interface:None signature
 
 (* Facts stored in artifacts *)
 
@@ -461,17 +373,10 @@ let labels_of_annots ?prefix (annots : Cmt_format.binary_annots) =
 
 (* Report the facts of one implementation source, naming the uids after the
    declarations of the unit. *)
-let report_implementation ?sites ~filename source =
+let report_implementation ~filename source =
   let structure = structure_of_source ~filename source in
   let facts = facts_of_structure ~filename structure in
   let labels = declaration_labels (`Implementation structure) in
-  print_facts ?sites (printer labels) facts
-
-(* Report the facts of one interface source. *)
-let report_interface ?sites ~filename source =
-  let signature = signature_of_source ~filename source in
-  let facts = facts_of_signature ~filename signature in
-  let labels = declaration_labels (`Interface signature) in
-  print_facts ?sites (printer labels) facts
+  print_facts (printer labels) facts
 
 let heading title = Printf.printf "== %s\n" title
