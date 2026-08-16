@@ -162,6 +162,7 @@ let dump (type a) : a t -> json =
       [ ("start", mk_position pos_start); ("end", mk_position pos_end) ]
   | Holes -> mk "holes" []
   | Module_type_impls -> mk "module-type-impls" []
+  | Intf_weaknesses -> mk "intf-weaknesses" []
   | Construct (pos, with_values, depth) ->
     let depth = Option.value ~default:1 depth in
     mk "construct"
@@ -697,6 +698,19 @@ let json_of_response (type a) (query : a t) (response : a) : json =
         ( "implementations",
           `List (List.map response.implementations ~f:json_of_implementation) )
       ]
+  | Intf_weaknesses, actions ->
+    let json_of_edit (e : Query_protocol.Intf_weakness.text_edit) =
+      with_location ~with_file:true e.edit_loc
+        [ ("new_text", `String e.edit_text) ]
+    in
+    `List
+      (List.map actions
+         ~f:(fun ({ intf_file; edits }
+                   : Query_protocol.Intf_weakness.code_action) ->
+           `Assoc
+             [ ("intf_file", `String intf_file);
+               ("edits", `List (List.map edits ~f:json_of_edit))
+             ]))
   | Construct _, ({ Location.loc_start; loc_end; _ }, strs) ->
     let assoc =
       `Assoc

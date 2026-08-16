@@ -175,6 +175,40 @@ let all_commands =
       ~default:() begin fun buffer () ->
         run buffer Query_protocol.Module_type_impls
       end;
+    command "intf-weaknesses" ~spec:[]
+      ~doc:
+        "Returns at most one code action per interface, strengthening its \
+         declarations with stronger mode, modality, or kind annotations. The \
+         unit's own interface is strengthened against the unit; a module type \
+         declared in the buffer is strengthened against every unit the \
+         configured indexes record a check against it, keeping only what all \
+         of them support. The action's shape:\n\n\
+         ```javascript\n\
+         {\n\
+         'intf_file' : string,  // the interface all edits target\n\
+         'edits' : [\n\
+         {\n\
+         'start' : position,\n\
+         'end'   : position,\n\
+         'file'  : string,\n\
+         'new_text' : string\n\
+         }\n\
+         ]\n\
+         }\n\
+         ```\n\n\
+         Each edit replaces its [start, end] range with [new_text] (an empty \
+         range is an insertion). The edits must be applied atomically — all \
+         or none: a hoisted signature-level clause is only sound together \
+         with its per-item exemptions.\n\n\
+         Nothing is suggested for a declaration unless the set of checks \
+         against it is known to be complete and every one of them could be \
+         analyzed: a partial discovery suggests nothing.\n\n\
+         Implementations other than the queried buffer are read from disk, so \
+         unsaved edits to them are not seen; with no index configured, only \
+         the queried unit's own interface is answered for."
+      ~default:() begin fun buffer () ->
+        run buffer Query_protocol.Intf_weaknesses
+      end;
     command "construct"
       ~spec:
         [ arg "-position" "<position> Position where construct should happen"
