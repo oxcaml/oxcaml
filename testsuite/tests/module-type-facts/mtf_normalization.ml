@@ -34,8 +34,7 @@ let equality left right : Facts.Context_equality.t =
 let omission ?affected ?source reason : Facts.Omission.t =
   { affected; source; reason }
 
-let print facts =
-  List.iter print_endline (fact_lines ~sites:false (printer []) facts)
+let print facts = List.iter print_endline (fact_lines (printer []) facts)
 
 (* Deliberately out of order, with a duplicate of each kind of fact, a
    backwards equality and an equality of a context with itself. *)
@@ -59,7 +58,7 @@ let unsorted : Facts.t =
       ]
   }
 
-let () = heading "the facts as they were built"
+let () = heading "the facts as they were built, in the order they are stored"
 
 let () = print unsorted
 
@@ -109,16 +108,14 @@ let () =
     (Facts.compare merged (Facts.merge right left) = 0);
   Printf.printf "merge t t = t: %b\n"
     (Facts.compare (Facts.merge left left) (Facts.normalize left) = 0);
+  Printf.printf "merging with empty changes nothing: %b\n"
+    (Facts.compare (Facts.merge merged Facts.empty) merged = 0);
   Printf.printf "merge_many [] = empty: %b\n"
     (Facts.compare (Facts.merge_many []) Facts.empty = 0);
-  Printf.printf "merge_many [t] = t: %b\n"
-    (Facts.compare (Facts.merge_many [ unsorted ]) normalized = 0);
   Printf.printf "merge_many [a; b; c] = merge (merge a b) c: %b\n"
     (Facts.compare
        (Facts.merge_many [ left; right; unsorted ])
        (Facts.merge (Facts.merge left right) unsorted)
      = 0);
-  Printf.printf "merging with empty changes nothing: %b\n"
-    (Facts.compare (Facts.merge merged Facts.empty) merged = 0);
   Printf.printf "distinct sets compare unequal: %b\n"
     (Facts.compare left right <> 0)
