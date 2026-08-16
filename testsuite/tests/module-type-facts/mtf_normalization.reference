@@ -1,4 +1,4 @@
-== the facts as they were built
+== the facts as they were built, in the order they are stored
 check ascription Impl : B@B
 check interface Impl : A@A
 check ascription Impl : A@A
@@ -37,8 +37,7 @@ omission: affected=C@C source=none reason=unresolved-module-type
 == merging is commutative and merge_many folds it
 merge left right = merge right left: true
 merge t t = t: true
-merge_many [] = empty: true
-merge_many [t] = t: true
-merge_many [a; b; c] = merge (merge a b) c: true
 merging with empty changes nothing: true
+merge_many [] = empty: true
+merge_many [a; b; c] = merge (merge a b) c: true
 distinct sets compare unequal: true
