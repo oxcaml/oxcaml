@@ -1,0 +1,11 @@
+== a module bound in an expression is a declaration of its own
+module bindings declared: M Local
+counts: checks 1 deps 1 equalities 0 omissions 0
+check ascription Local : S
+dep <Local> -interface-> S
+== a first-class module records the path of its package type
+package constraint: S
+package constraint: S
+check package <location> : S
+check package <location> : S
+same facts after untyping: true

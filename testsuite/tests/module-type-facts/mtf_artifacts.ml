@@ -59,23 +59,16 @@ let aux_labels () =
   labels_of_annots implementation.cmt_annots
   @ labels_of_annots ~prefix:"[intf]" interface.cmt_annots
 
-let () = heading "facts of an implementation, read back from its .cmt"
+let () = heading "facts read back from the .cmt and the .cmti of a unit"
 
 let () =
   let cmt = read_cmt "mtf_aux.cmt" in
-  Printf.printf "present: %b\n" cmt.cmt_module_implementation_facts_present;
-  print_facts ~sites:false
-    (printer (aux_labels ()))
-    cmt.cmt_module_implementation_facts
-
-let () = heading "facts of an interface, read back from its .cmti"
-
-let () =
   let cmti = read_cmt "mtf_aux.cmti" in
-  Printf.printf "present: %b\n" cmti.cmt_module_implementation_facts_present;
-  print_facts ~sites:false
-    (printer (labels_of_annots cmti.cmt_annots))
-    cmti.cmt_module_implementation_facts
+  Printf.printf "present: cmt %b cmti %b\n"
+    cmt.cmt_module_implementation_facts_present
+    cmti.cmt_module_implementation_facts_present;
+  print_counts cmt.cmt_module_implementation_facts;
+  print_counts cmti.cmt_module_implementation_facts
 
 let () = heading "the interface pairs of the unit are directional"
 
@@ -84,11 +77,14 @@ let () = heading "the interface pairs of the unit are directional"
    direction only. *)
 let () =
   let cmt = read_cmt "mtf_aux.cmt" in
-  let labels = aux_labels () in
-  print_interface_pairs (printer labels) cmt.cmt_module_implementation_facts
+  print_interface_pairs (printer (aux_labels ()))
+    cmt.cmt_module_implementation_facts
 
 let () = heading ".cms and .cmsi hold the same facts as .cmt and .cmti"
 
+(* Comparing the whole fact sets covers all four lists: [Mtf_aux] has checks,
+   dependencies, an equality and an omission, so a list dropped or reordered
+   by the serialization of either artifact would show up here. *)
 let () =
   let cms = Cms_format.read "mtf_aux.cms" in
   let cmsi = Cms_format.read "mtf_aux.cmsi" in
@@ -103,13 +99,7 @@ let () =
      = 0)
     (Facts.compare cmsi.cms_module_implementation_facts
        cmti.cmt_module_implementation_facts
-     = 0);
-  (* All four lists are printed from the [.cms] itself, so that the test would
-     notice a list that is dropped or reordered by the serialization of either
-     artifact. *)
-  print_facts ~sites:false
-    (printer (aux_labels ()))
-    cms.cms_module_implementation_facts
+     = 0)
 
 let () = heading "facts of a unit whose expectations come from a .cmi"
 
@@ -122,9 +112,8 @@ let () =
     labels_of_annots cmt.cmt_annots
     @ signature_labels ~prefix:"Mtf_aux." signature
   in
-  Printf.printf "present: %b\n" cmt.cmt_module_implementation_facts_present;
-  print_facts ~sites:false (printer labels)
-    cmt.cmt_module_implementation_facts
+  print_counts cmt.cmt_module_implementation_facts;
+  print_checks (printer labels) cmt.cmt_module_implementation_facts
 
 let () = heading "an ascription against another unit's signature is no pair"
 
@@ -134,7 +123,7 @@ let () = heading "an ascription against another unit's signature is no pair"
    in [mtf_aux.mli]; pairing them with the client's own declarations would
    claim an interface the client does not have.  Those members are still
    checked, as [Ascription] checks against the foreign expectation, in the
-   facts printed above. *)
+   checks printed above. *)
 let () =
   let report description file =
     let facts = (read_cmt file).cmt_module_implementation_facts in
@@ -188,24 +177,14 @@ let () = heading "the interface a unit is an argument for"
    check is the parameter unit itself. *)
 let () =
   let cmt = read_cmt "mtf_argument.cmt" in
-  print_facts ~sites:false
+  print_facts
     (printer (labels_of_annots cmt.cmt_annots))
     cmt.cmt_module_implementation_facts
 
-let () = heading "a partial artifact carries no facts"
-
-let () =
-  let cmt = read_cmt "mtf_broken.cmt" in
-  Printf.printf "partial implementation: %b\n"
-    (match cmt.cmt_annots with
-     | Partial_implementation _ -> true
-     | Implementation _ | Interface _ | Packed _ | Partial_interface _ ->
-         false);
-  Printf.printf "present: %b\n" cmt.cmt_module_implementation_facts_present;
-  print_digest cmt.cmt_module_implementation_facts
-
 let () = heading "facts are only extracted for the artifacts that are written"
 
+(* Each artifact is written, and hence carries facts, only if the flag that
+   asks for it was passed. *)
 let () =
   let report unit_ =
     let exists extension = Sys.file_exists (unit_ ^ extension) in
@@ -223,3 +202,18 @@ let () =
   report "mtf_gate_cmt";
   report "mtf_gate_cms";
   report "mtf_gate_none"
+
+let () = heading "a partial artifact carries no facts"
+
+(* The facts of a unit that failed to typecheck are not extracted at all; the
+   [present] flag tells a reader that the empty fact set of this [.cmt] is not
+   the fact set of the unit. *)
+let () =
+  let cmt = read_cmt "mtf_broken.cmt" in
+  Printf.printf "partial implementation: %b\n"
+    (match cmt.cmt_annots with
+     | Partial_implementation _ -> true
+     | Implementation _ | Interface _ | Packed _ | Partial_interface _ ->
+         false);
+  Printf.printf "present: %b\n" cmt.cmt_module_implementation_facts_present;
+  print_counts cmt.cmt_module_implementation_facts
