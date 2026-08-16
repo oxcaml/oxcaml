@@ -806,7 +806,7 @@ Error: This expression has type
          "('a : '_representable_layout_2 & value_or_null)"
        but an expression was expected of type "#('c * string)"
        The layout of #('c * string) is
-           '_representable_layout_3 & value & value non_float
+           ('_representable_layout_3 & value) & value non_float
          because it is an unboxed tuple.
        But the layout of #('c * string) must be representable
          because it's the layout polymorphic type in an external declaration
