@@ -428,6 +428,7 @@ module Layout = struct
         | Var _ ->
           let sort_var_str = Fmt.asprintf "%a" Sort.format s in
           pp_string_list ppf (sort_var_str :: Scannable_axes.to_string_list sa)
+        | Product _ when nested -> Fmt.fprintf ppf "(%a)" Sort.format s
         (* definitely never scannable *)
         | Base _ | Product _ | Univar _ -> Fmt.fprintf ppf "%a" Sort.format s)
       | Product ts ->
