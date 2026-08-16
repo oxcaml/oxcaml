@@ -684,31 +684,56 @@ let facts_of_tree compilation_unit artifact iterate =
       (site:Location.t -> Env.t -> Path.t -> Path.t -> unit) ref =
     ref (fun ~site:_ _ _ _ -> ())
   in
+  (* Naming another compilation unit must not read that unit's interface:
+     [Env.find_module] loads the .cmi to recover [md_uid], which would make the
+     facts of a unit depend on which interfaces happen to sit on the load path
+     rather than on its source (see
+     [testsuite/tests/reproducibility/cmis_on_file_system.ml]). Name persistent
+     units the way [Env.find_shape] does, from the module name alone, so that
+     the same source always produces the same facts. *)
+  let persistent_unit_uid (path : Path.t) =
+    match path with
+    | Path.Pident id
+      when Ident.is_global id && not (Current_unit.Name.is_ident id) ->
+      (Shape.for_persistent_unit (Ident.name id)).Shape.uid
+    | Path.Pident _ | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ -> None
+  in
   let rec context_of_path ?site env (path : Path.t) : Context.t option =
-    match find_module env path with
-    | None -> None
-    | Some declaration -> (
-      let uid = declaration.Types.md_uid in
-      match path with
-      | Path.Pident _ -> Some (module_context uid)
-      | Path.Pdot (prefix, _) ->
-        Option.map
-          (fun prefix -> Context.Proj (prefix, uid))
-          (context_of_path ?site env prefix)
-      | Path.Papply (functor_, argument) -> (
-        (match site with
-        | Some site -> !path_application_hook ~site env functor_ argument
-        | None -> ());
-        match
-          context_of_path ?site env functor_, context_of_path ?site env argument
-        with
-        | Some functor_, Some argument ->
-          Some (Context.App (functor_, argument))
-        | (Some _ | None), _ -> None)
-      | Path.Pextra_ty _ -> None)
+    match persistent_unit_uid path with
+    | Some uid -> Some (module_context uid)
+    | None -> (
+      match find_module env path with
+      | None -> None
+      | Some declaration -> (
+        let uid = declaration.Types.md_uid in
+        match path with
+        | Path.Pident _ -> Some (module_context uid)
+        | Path.Pdot (prefix, _) ->
+          Option.map
+            (fun prefix -> Context.Proj (prefix, uid))
+            (context_of_path ?site env prefix)
+        | Path.Papply (functor_, argument) -> (
+          (match site with
+          | Some site -> !path_application_hook ~site env functor_ argument
+          | None -> ());
+          match
+            ( context_of_path ?site env functor_,
+              context_of_path ?site env argument )
+          with
+          | Some functor_, Some argument ->
+            Some (Context.App (functor_, argument))
+          | (Some _ | None), _ -> None)
+        | Path.Pextra_ty _ -> None))
   in
   let context_of_path ?site env path =
-    context_of_path ?site env (normalize_module_path env path)
+    let path =
+      (* Normalizing would load the interface too, for no gain: a compilation
+         unit is never an alias. *)
+      match persistent_unit_uid path with
+      | Some _ -> path
+      | None -> normalize_module_path env path
+    in
+    context_of_path ?site env path
   in
   let rec report_path_applications ~site env (path : Path.t) =
     match path with
