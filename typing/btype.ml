@@ -243,7 +243,17 @@ let tvariant_not_immediate row =
       | _ -> false)
     (row_fields row)
 
-let hash_variant = Misc.hash_variant
+(* This function is now in Obj upstream, but cannot be removed from here until
+   the system compiler is OCaml 5.6+ *)
+let hash_variant s =
+  let accu = ref 0 in
+  for i = 0 to String.length s - 1 do
+    accu := 223 * !accu + Char.code s.[i]
+  done;
+  (* reduce to 31 bits *)
+  accu := !accu land (1 lsl 31 - 1);
+  (* make it signed for 64 bits architectures *)
+  if !accu > 0x3FFFFFFF then !accu - (1 lsl 31) else !accu
 
 let proxy ty =
   match get_desc ty with
