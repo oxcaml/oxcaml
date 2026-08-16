@@ -362,12 +362,9 @@ let idx_expected_modalities ~(mut : bool) =
       "Typemode.idx_expected_modalities: mismatch with mutable implied \
        modalities"
 
-let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
-  let baseline =
-    mutable_implied_modalities ~for_mutable_variable:false
-      (Types.is_mutable mut)
-  in
-  let annotated = Modality.Const.(diff baseline t) in
+let least_modalities_with_default ~include_implied ~default
+    (t : Modality.Const.t) =
+  let annotated = Modality.Const.(diff default t) in
   let implied = List.concat_map implied_modalities annotated in
   let exclude_implied =
     List.filter (fun x -> not @@ List.mem x implied) annotated
@@ -388,6 +385,13 @@ let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
       implied
   in
   exclude_implied @ overridden
+
+let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
+  let default =
+    mutable_implied_modalities ~for_mutable_variable:false
+      (Types.is_mutable mut)
+  in
+  least_modalities_with_default ~include_implied ~default t
 
 let sort_dedup_modalities_with_locs l =
   let open Modality in

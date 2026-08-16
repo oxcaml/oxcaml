@@ -389,7 +389,27 @@ val filter_method: Env.t -> string -> type_expr -> type_expr
         (* A special case of unification (with {m : 'a; 'b}).  Raises
            [Filter_method_failed] instead of [Unify]. *)
 val occur_in: Env.t -> type_expr -> type_expr -> bool
-val moregeneral: Env.t -> bool ->
+val submode_with_cross
+  :  Env.t
+  -> is_ret:bool
+  -> type_expr
+  -> (allowed * 'a) Mode.Alloc.t
+  -> ('b * allowed) Alloc.t
+  -> (unit, Alloc.error) result
+        (* [submode_with_cross env ~is_ret ty l r] checks that [l] is a submode
+           of [r], constraining mode variables as necessary. [ty] is the type of
+           the value whose modes are being checked, which is used to determine
+           the mode-crossing behavior. [is_ret] says whether this check is being
+           done in the return position for a function, which also affects
+           mode-crossing behavior. *)
+
+type moregen_ret_modes =
+  | Constrain_all_ret_modes
+        (* Default: constrain the alloc modes of every arrow position. *)
+  | Skip_intermediate_ret_modes
+        (* Skip intermediate arrows when constraining alloc modes *)
+
+val moregeneral: ?ret_modes:moregen_ret_modes -> Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
   type_expr -> type_expr -> Jkind_types.Sort.t option list
         (* Check if the first type scheme is more general than the second.

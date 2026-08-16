@@ -1423,6 +1423,15 @@ let tree_of_modalities mut t =
   |> List.map (fun (Atom (ax, m) : Modality.atom) ->
       Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
 
+(** Like [tree_of_modalities], but relative to an explicit [default] modality
+    instead of the mutability-implied one. *)
+let tree_of_modalities_with_default ~default t =
+  t
+  |> Typemode.least_modalities_with_default ~include_implied:false ~default
+  |> Typemode.sort_dedup_modalities
+  |> List.map (fun (Atom (ax, m) : Modality.atom) ->
+      Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
+
 let out_modalities_of_mod_bounds mod_bounds =
   Typemode.untransl_mod_bounds mod_bounds
   |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)

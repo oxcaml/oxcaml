@@ -108,6 +108,10 @@ val tree_of_type_scheme: type_expr -> out_type
 val tree_of_modalities:
   Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
 
+val tree_of_modalities_with_default:
+  default:Mode.Modality.Const.t -> Mode.Modality.Const.t ->
+  Outcometree.out_mode list
+
 val tree_of_modes:
   Mode.Alloc.Const.t -> Outcometree.out_mode list
 
