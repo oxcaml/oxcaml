@@ -47,8 +47,8 @@ val pin :
   <fun>
 |}, Principal{|
 val pin :
-  (int -> int) arr @ [< 'm @@ past & global] ->
-  ((int -> int) @ [< 'n] -> (int -> int) @ [> 'n]) @ [> 'm] = <fun>
+  (int -> int) arr @ [< past('m) & global] ->
+  ((int -> int) @ [< 'n] -> (int -> int) @ [> 'n]) @ [> past('m)] = <fun>
 |}]
 
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
@@ -61,8 +61,8 @@ let local_arg_ok (type a) (w : a dom) (g : a) (s : string @ local) =
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
 val local_arg_ok :
   'a dom @ 'o ->
-  ('a @ [< 'n @@ past & global] ->
-   (string @ [> local unforkable yielding] -> int @ [> dynamic]) @ [> 'n]) @ 'm =
+  ('a @ [< past('n) & global] ->
+   (string @ [> local unforkable yielding] -> int @ [> dynamic]) @ [> past('n)]) @ 'm =
   <fun>
 |}, Principal{|
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
@@ -101,9 +101,9 @@ val crosses :
 |}, Principal{|
 type _ cross = Int : int cross | Str : string cross
 val crosses :
-  'a cross @ [< 'm @@ past & global] ->
+  'a cross @ [< past('m) & global] ->
   ('a @ [> local unforkable yielding] ->
-   'a @ [< global forkable unyielding > dynamic]) @ [> 'm] =
+   'a @ [< global forkable unyielding > dynamic]) @ [> past('m)] =
   <fun>
 |}]
 

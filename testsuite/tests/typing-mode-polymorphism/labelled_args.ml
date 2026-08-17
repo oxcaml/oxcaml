@@ -88,8 +88,8 @@ Error: This value is "local" but is expected to be "global".
 let snd ~label1 ~label2 = label2
 [%%expect{|
 val snd :
-  label1:'a @ [< 'm @@ past & global] ->
-  (label2:'b @ [< 'n] -> 'b @ [> 'n]) @ [> 'm] = <fun>
+  label1:'a @ [< past('m) & global] ->
+  (label2:'b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)] = <fun>
 |}]
 
 let () =
@@ -135,8 +135,8 @@ val foo :
 let foo ?label1 x = x
 [%%expect{|
 val foo :
-  ?label1:'a @ [< 'm @@ past & global] ->
-  ('b @ [< 'n] -> 'b @ [> 'n]) @ [> 'm] = <fun>
+  ?label1:'a @ [< past('m) & global] ->
+  ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)] = <fun>
 |}]
 
 let () =
