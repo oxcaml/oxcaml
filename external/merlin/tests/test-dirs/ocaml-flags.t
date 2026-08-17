@@ -254,7 +254,6 @@ logic.
   -flambda2-join-points
   -flambda2-kind-checks
   -flambda2-match-in-match
-  -flambda2-no-simplify-stubs
   -flambda2-reaper
   -flambda2-result-types-all-functions
   -flambda2-result-types-functors-only
@@ -398,6 +397,7 @@ logic.
   -no-flambda2-match-in-match
   -no-flambda2-reaper
   -no-flambda2-result-types
+  -no-flambda2-simplify-stubs
   -no-flambda2-speculative-inlining-only-if-arguments-useful
   -no-flambda2-speculative-inlining-track-lifted-constants
   -no-flambda2-unbox-along-intra-function-control-flow
