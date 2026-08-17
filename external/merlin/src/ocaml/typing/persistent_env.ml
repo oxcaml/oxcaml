@@ -291,6 +291,10 @@ let fold {persistent_structures; _} f x =
     persistent_structures x
 
 let register_pers_for_short_paths penv modname ps components =
+  (* The unit itself no longer appears in its own import table (the self CRC
+     is a separate cmi field), so add it to the basis explicitly. *)
+  Short_paths.Basis.add (short_paths_basis penv)
+    modname.Global_module.Name.head;
   let old_style_crcs =
     ps.ps_name_info.pn_import.imp_crcs
     |> Array.to_list
