@@ -1376,8 +1376,7 @@ end = struct
     paths from one visible mode variable to another.
   *)
 
-  type memoized = (boxedpath list) VarTbl.t
-  type visited = unit VarTbl.t
+  type stack = unit VarTbl.t
 
   (* Find the [b -> Paths.src_obj table] morphism
     associated with some visible variable [v] of object
@@ -1428,45 +1427,40 @@ end = struct
       paths. This will require a lattice of morphisms,
       so we can calculate the fixed point of cycle *)
   let rec paths_to_visible :
-      type b. memoized:memoized -> visited:visited
+      type b. stack:stack
       -> b C.obj -> b Desc.Var.Head.t
       -> boxedpath list =
-    fun ~memoized ~visited dst v ->
+    fun ~stack dst v ->
       if visible dst v then [P { dst; var = v; path = C.id }]
-      else paths_from_vlowers ~memoized ~visited dst v
+      else paths_from_vlowers ~stack dst v
 
   and paths_from_vlowers :
-      type b. memoized:memoized -> visited:visited
+      type b. stack:stack
       -> b C.obj -> b Desc.Var.Head.t
       -> boxedpath list =
-    fun ~memoized ~visited dst v ->
-      if VarTbl.mem visited (K (dst, v)) then [] else begin
-        VarTbl.add visited (K (dst, v)) ();
-        match VarTbl.find_opt memoized (K (dst, v)) with
-        | Some paths -> paths
-        | None ->
-          let paths =
-            List.concat_map (fun (Desc.Var.Amorphvar (w, f)) ->
-              let fsrc = C.src dst f in
-              let w = Desc.Var.force fsrc w in
-              if w.desc_level <> generic_level then []
-              else
-                List.map (fun (P { dst = gdst; var = u; path = g }) ->
-                  match C.equal_obj fsrc gdst with
-                  | Is_eq -> P { dst; var = u; path = C.compose dst f g }
-                  | Is_not_eq -> fatal_error "Out_type.paths_from_vlowers")
-                  (paths_to_visible ~memoized ~visited fsrc w))
-              v.desc_vlower
-          in
-          VarTbl.add memoized (K (dst, v)) paths;
-          paths
+    fun ~stack dst v ->
+      if VarTbl.mem stack (K (dst, v)) then [] else begin
+        VarTbl.add stack (K (dst, v)) ();
+        let paths =
+          List.concat_map (fun (Desc.Var.Amorphvar (w, f)) ->
+            let fsrc = C.src dst f in
+            let w = Desc.Var.force fsrc w in
+            if w.desc_level <> generic_level then []
+            else
+              List.map (fun (P { dst = gdst; var = u; path = g }) ->
+                match C.equal_obj fsrc gdst with
+                | Is_eq -> P { dst; var = u; path = C.compose dst f g }
+                | Is_not_eq -> fatal_error "Out_type.paths_from_vlowers")
+                (paths_to_visible ~stack fsrc w))
+            v.desc_vlower
+        in
+        VarTbl.remove stack (K (dst, v));
+        paths
       end
 
-  let find_paths :
-      memoized:memoized -> visited:visited
-      -> boxedvar -> boxedpath list =
-    fun ~memoized ~visited (K (dst, v)) ->
-      paths_from_vlowers ~memoized ~visited dst v
+  let find_paths : boxedvar -> boxedpath list =
+    fun (K (dst, v)) ->
+      paths_from_vlowers ~stack:(VarTbl.create 17) dst v
 
   (** [find_path_from_description] constructs all morphisms
     from one visible mode variable to another, and records
@@ -1486,11 +1480,11 @@ end = struct
     See [Paths.Monadic] for an explanation
     why this is the morphism we want *)
   let find_path_from_description :
-      type s d. memoized:memoized
-      -> (d, (allowed * allowed)) Desc.t
+      type s d.
+      (d, (allowed * allowed)) Desc.t
       -> (s, d) Paths.table
       -> unit =
-    fun ~memoized desc table ->
+    fun desc table ->
       let dst = Paths.dst_obj table in
       let bobj = Paths.src_obj table in
       match desc with
@@ -1498,8 +1492,7 @@ end = struct
       | Amodevar (Amorphvar (v, f)) ->
         let fsrc = C.src dst f in
         let v = K (fsrc, v) in
-        let visited = VarTbl.create 17 in
-        let paths = find_paths ~memoized ~visited v in
+        let paths = find_paths v in
         List.iter (fun (P { dst = gdst; var = u; path = g }) ->
           match C.equal_obj fsrc gdst with
             | Is_eq ->
@@ -1521,12 +1514,11 @@ end = struct
   another visible monadic/comonadic variable, and records
   them in their respective tables *)
   let add_visible_paths () =
-    let memoized = VarTbl.create 17 in
     List.iter
       (fun { monadic; comonadic } ->
-        find_path_from_description ~memoized monadic Paths.Monadic;
-        find_path_from_description ~memoized comonadic Paths.Comonadic;
-        find_path_from_description ~memoized comonadic Paths.Closing_over
+        find_path_from_description monadic Paths.Monadic;
+        find_path_from_description comonadic Paths.Comonadic;
+        find_path_from_description comonadic Paths.Closing_over
       ) !visible_pairs
 
   type simple_edge =
