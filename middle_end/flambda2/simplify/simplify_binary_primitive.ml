@@ -1166,7 +1166,8 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
         ~original_prim
     | Bigarray_get_alignment align ->
       simplify_bigarray_get_alignment align ~original_prim
-    | Atomic_load_field _ -> simplify_atomic_load_field ~original_prim
+    | Atomic_load_field _ | Atomic_load_offset _ ->
+      simplify_atomic_load_field ~original_prim
     | Poke _ -> simplify_poke
     | Read_offset _ -> simplify_read_offset ~original_prim
   in
@@ -1202,7 +1203,8 @@ let recover_comparison_primitive dacc (prim : P.binary_primitive) ~arg1 ~arg2 =
   | Block_set _ | Array_load _ | Int_arith _ | Int_shift _
   | Int_comp (_, Yielding_int_like_compare_functions _)
   | Float_arith _ | Float_comp _ | String_or_bigstring_load _ | Bigarray_load _
-  | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _ | Read_offset _ ->
+  | Bigarray_get_alignment _ | Atomic_load_field _ | Atomic_load_offset _
+  | Poke _ | Read_offset _ ->
     None
   | Phys_equal op ->
     (* Integer (in)equality reaches Flambda2 as [Phys_equal] (cf.

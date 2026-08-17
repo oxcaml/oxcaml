@@ -1,66 +1,130 @@
 (data global "camlCmm__gc_roots": int 0)
 (data
- int 6912
+ int 13056
  global "camlCmm":
- addr G:"camlCmm__standard_atomic_get_8"
- addr G:"camlCmm__get_9"
- addr G:"camlCmm__set_10"
- addr G:"camlCmm__get_imm_11"
- addr G:"camlCmm__set_imm_12"
- addr G:"camlCmm__cas_13")
+ addr G:"camlCmm__standard_atomic_get_14"
+ addr G:"camlCmm__get_15"
+ addr G:"camlCmm__set_16"
+ addr G:"camlCmm__get_imm_17"
+ addr G:"camlCmm__set_imm_18"
+ addr G:"camlCmm__cas_19"
+ addr G:"camlCmm__idx_get_20"
+ addr G:"camlCmm__idx_set_21"
+ addr G:"camlCmm__idx_exchange_22"
+ addr G:"camlCmm__idx_compare_and_set_23"
+ addr G:"camlCmm__idx_compare_exchange_24"
+ addr G:"camlCmm__idx_fetch_and_add_25")
 (data
  int 4087
- global "camlCmm__cas_13":
+ global "camlCmm__idx_fetch_and_add_25":
+ addr G:"caml_curryV_I_V"
+ int 252201579132747783
+ addr G:"camlCmm__idx_fetch_and_add_12_25_code")
+(data
+ int 4087
+ global "camlCmm__idx_compare_exchange_24":
+ addr G:"caml_curryV_I_V_V"
+ int 324259173170675719
+ addr G:"camlCmm__idx_compare_exchange_11_24_code")
+(data
+ int 4087
+ global "camlCmm__idx_compare_and_set_23":
+ addr G:"caml_curryV_I_V_V"
+ int 324259173170675719
+ addr G:"camlCmm__idx_compare_and_set_10_23_code")
+(data
+ int 4087
+ global "camlCmm__idx_exchange_22":
+ addr G:"caml_curryV_I_V"
+ int 252201579132747783
+ addr G:"camlCmm__idx_exchange_9_22_code")
+(data
+ int 4087
+ global "camlCmm__idx_set_21":
+ addr G:"caml_curryV_I_V"
+ int 252201579132747783
+ addr G:"camlCmm__idx_set_8_21_code")
+(data
+ int 4087
+ global "camlCmm__idx_get_20":
+ addr G:"caml_curryV_I"
+ int 180143985094819847
+ addr G:"camlCmm__idx_get_7_20_code")
+(data
+ int 4087
+ global "camlCmm__cas_19":
  addr G:"caml_curry3"
  int 252201579132747783
- addr G:"camlCmm__cas_6_13_code")
+ addr G:"camlCmm__cas_6_19_code")
 (data
  int 4087
- global "camlCmm__set_imm_12":
+ global "camlCmm__set_imm_18":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__set_imm_5_12_code")
+ addr G:"camlCmm__set_imm_5_18_code")
 (data
  int 3063
- global "camlCmm__get_imm_11":
- addr G:"camlCmm__get_imm_4_11_code"
+ global "camlCmm__get_imm_17":
+ addr G:"camlCmm__get_imm_4_17_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlCmm__set_10":
+ global "camlCmm__set_16":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__set_3_10_code")
+ addr G:"camlCmm__set_3_16_code")
 (data
  int 3063
- global "camlCmm__get_9":
- addr G:"camlCmm__get_2_9_code"
+ global "camlCmm__get_15":
+ addr G:"camlCmm__get_2_15_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlCmm__standard_atomic_get_8":
+ global "camlCmm__standard_atomic_get_14":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__standard_atomic_get_1_8_code")
-(function camlCmm__standard_atomic_get_1_8_code (r: val v: val) : int
+ addr G:"camlCmm__standard_atomic_get_1_14_code")
+(function camlCmm__standard_atomic_get_1_14_code (r: val v: val) : int
  (extcall "caml_atomic_exchange_field" r 1 v ->val) 1 )
 
-(function camlCmm__get_2_9_code (r: val) : val
+(function camlCmm__get_2_15_code (r: val) : val
  (load_mut_atomic val (+a r 8)) )
 
-(function camlCmm__set_3_10_code (r: val v: val) : int
+(function camlCmm__set_3_16_code (r: val v: val) : int
  (extcall "caml_atomic_exchange_field" r 3 v ->val) 1 )
 
-(function camlCmm__get_imm_4_11_code (r: val) : int
+(function camlCmm__get_imm_4_17_code (r: val) : int
  (load_mut_atomic int (+a r 8)) )
 
-(function camlCmm__set_imm_5_12_code (r: val v: int) : int
+(function camlCmm__set_imm_5_18_code (r: val v: int) : int
  (atomic exchange v (+a r 8)) 1 )
 
-(function camlCmm__cas_6_13_code (r: val oldv: val newv: val) : int
+(function camlCmm__cas_6_19_code (r: val oldv: val newv: val) : int
  (extcall "caml_atomic_cas_field_local" r 3 oldv newv ->int) )
 
+(function camlCmm__idx_get_7_20_code (r: val idx: int) : int
+ (load_mut_atomic val (+a r idx)) )
+
+(function camlCmm__idx_set_8_21_code (r: val idx: int value: int) : int
+ (atomic exchange value (+a r idx)) 1 )
+
+(function camlCmm__idx_exchange_9_22_code (r: val idx: int value: int) : int
+ (atomic exchange value (+a r idx)) )
+
+(function camlCmm__idx_compare_and_set_10_23_code
+     (r: val idx: int old_value: int new_value: int) : int
+ (let res (atomic compare_set old_value new_value (+a r idx))
+   (+ (<< res 1) 1)) )
+
+(function camlCmm__idx_compare_exchange_11_24_code
+     (r: val idx: int old_value: int new_value: int) : int
+ (atomic compare_exchange old_value new_value (+a r idx)) )
+
+(function camlCmm__idx_fetch_and_add_12_25_code
+     (r: val idx: int value: int) : int
+ (atomic xadd (+ value -1) (+a r idx)) )
+
 (function no_cse reduce_code_size linscan camlCmm__entry () : val
- (catch (exit 13 G:"camlCmm") with(13 *ret*: val) 1) )
+ (catch (exit 32 G:"camlCmm") with(32 *ret*: val) 1) )
 
 (data)

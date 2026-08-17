@@ -1733,56 +1733,60 @@ end
 
 (* Atomics *)
 
-val atomic_load_field :
+type atomic_location =
+  | Field_index of expression * Scalar_type.Integral.t
+  | Byte_offset of expression * Scalar_type.Integral.t
+
+val atomic_load :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   expression ->
-  field:expression ->
+  atomic_location ->
   expression
 
-val atomic_exchange_field :
+val atomic_exchange :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   mode:Lambda.modify_mode ->
   expression ->
-  field:expression ->
+  atomic_location ->
   new_value:expression ->
   expression
 
-val atomic_fetch_and_add_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
+val atomic_fetch_and_add :
+  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
 
-val atomic_add_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
+val atomic_add :
+  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
 
-val atomic_sub_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
+val atomic_sub :
+  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
 
-val atomic_land_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
+val atomic_land :
+  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
 
-val atomic_lor_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
+val atomic_lor :
+  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
 
-val atomic_lxor_field :
-  dbg:Debuginfo.t -> expression -> field:expression -> expression -> expression
+val atomic_lxor :
+  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
 
-val atomic_compare_and_set_field :
+val atomic_compare_and_set :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   mode:Lambda.modify_mode ->
   expression ->
-  field:expression ->
+  atomic_location ->
   old_value:expression ->
   new_value:expression ->
   expression
 
-val atomic_compare_exchange_field :
+val atomic_compare_exchange :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   mode:Lambda.modify_mode ->
   expression ->
-  field:expression ->
+  atomic_location ->
   old_value:expression ->
   new_value:expression ->
   expression

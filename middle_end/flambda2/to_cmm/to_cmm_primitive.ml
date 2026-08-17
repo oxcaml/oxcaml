@@ -1169,6 +1169,10 @@ let imm_or_ptr : P.Block_access_field_kind.t -> Lambda.immediate_or_pointer =
  fun block_access_kind ->
   match block_access_kind with Any_value -> Pointer | Immediate -> Immediate
 
+let atomic_field_index field = C.Field_index (field, tagged_immediate)
+
+let atomic_byte_offset offset = C.Byte_offset (offset, naked_int64)
+
 let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     (arg : Cmm.expression) =
   match (f : P.unary_primitive) with
@@ -1335,7 +1339,9 @@ let binary_primitive env dbg f (_x_simple : Simple.t option)
     binary_float_comp_primitive_yielding_int env dbg width x y
   | Bigarray_get_alignment align -> C.bigstring_get_alignment x y align dbg
   | Atomic_load_field block_access_kind ->
-    C.atomic_load_field ~dbg (imm_or_ptr block_access_kind) x ~field:y
+    C.atomic_load ~dbg (imm_or_ptr block_access_kind) x (atomic_field_index y)
+  | Atomic_load_offset block_access_kind ->
+    C.atomic_load ~dbg (imm_or_ptr block_access_kind) x (atomic_byte_offset y)
   | Poke kind ->
     let memory_chunk =
       K.Standard_int_or_float.to_kind_with_subkind kind
@@ -1360,23 +1366,42 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
     bigarray_store ~dbg kind ~bigarray:x ~index:y ~new_value:z
   | Atomic_field_int_arith op -> (
     match op with
-    | Fetch_add -> C.atomic_fetch_and_add_field ~dbg x ~field:y z
-    | Add -> C.atomic_add_field ~dbg x ~field:y z |> C.return_unit dbg
-    | Sub -> C.atomic_sub_field ~dbg x ~field:y z |> C.return_unit dbg
-    | And -> C.atomic_land_field ~dbg x ~field:y z |> C.return_unit dbg
-    | Or -> C.atomic_lor_field ~dbg x ~field:y z |> C.return_unit dbg
-    | Xor -> C.atomic_lxor_field ~dbg x ~field:y z |> C.return_unit dbg)
+    | Fetch_add -> C.atomic_fetch_and_add ~dbg x (atomic_field_index y) z
+    | Add -> C.atomic_add ~dbg x (atomic_field_index y) z |> C.return_unit dbg
+    | Sub -> C.atomic_sub ~dbg x (atomic_field_index y) z |> C.return_unit dbg
+    | And -> C.atomic_land ~dbg x (atomic_field_index y) z |> C.return_unit dbg
+    | Or -> C.atomic_lor ~dbg x (atomic_field_index y) z |> C.return_unit dbg
+    | Xor -> C.atomic_lxor ~dbg x (atomic_field_index y) z |> C.return_unit dbg)
+  | Atomic_offset_int_arith op -> (
+    match op with
+    | Fetch_add -> C.atomic_fetch_and_add ~dbg x (atomic_byte_offset y) z
+    | Add -> C.atomic_add ~dbg x (atomic_byte_offset y) z |> C.return_unit dbg
+    | Sub -> C.atomic_sub ~dbg x (atomic_byte_offset y) z |> C.return_unit dbg
+    | And -> C.atomic_land ~dbg x (atomic_byte_offset y) z |> C.return_unit dbg
+    | Or -> C.atomic_lor ~dbg x (atomic_byte_offset y) z |> C.return_unit dbg
+    | Xor -> C.atomic_lxor ~dbg x (atomic_byte_offset y) z |> C.return_unit dbg)
   | Atomic_set_field (block_access_kind, mode) ->
-    C.atomic_exchange_field ~dbg
+    C.atomic_exchange ~dbg
       (imm_or_ptr block_access_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
-      x ~field:y ~new_value:z
+      x (atomic_field_index y) ~new_value:z
+    |> C.return_unit dbg
+  | Atomic_set_offset (block_access_kind, mode) ->
+    C.atomic_exchange ~dbg
+      (imm_or_ptr block_access_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
+      x (atomic_byte_offset y) ~new_value:z
     |> C.return_unit dbg
   | Atomic_exchange_field (block_access_kind, mode) ->
-    C.atomic_exchange_field ~dbg
+    C.atomic_exchange ~dbg
       (imm_or_ptr block_access_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
-      x ~field:y ~new_value:z
+      x (atomic_field_index y) ~new_value:z
+  | Atomic_exchange_offset (block_access_kind, mode) ->
+    C.atomic_exchange ~dbg
+      (imm_or_ptr block_access_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
+      x (atomic_byte_offset y) ~new_value:z
   | Write_offset (write_offset_kind, kind, mode) ->
     let memory_chunk = C.memory_chunk_of_kind kind in
     let store =
@@ -1416,14 +1441,23 @@ let quaternary_primitive _env dbg f (_x_simple : Simple.t option)
     (z : Cmm.expression) (w : Cmm.expression) =
   match (f : P.quaternary_primitive) with
   | Atomic_compare_and_set_field (block_access_kind, mode) ->
-    C.atomic_compare_and_set_field ~dbg
+    C.atomic_compare_and_set ~dbg
       (imm_or_ptr block_access_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
-      x ~field:y ~old_value:z ~new_value:w
-  | Atomic_compare_exchange_field { atomic_kind = _; args_kind; mode } ->
-    C.atomic_compare_exchange_field ~dbg (imm_or_ptr args_kind)
+      x (atomic_field_index y) ~old_value:z ~new_value:w
+  | Atomic_compare_and_set_offset (block_access_kind, mode) ->
+    C.atomic_compare_and_set ~dbg
+      (imm_or_ptr block_access_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
-      x ~field:y ~old_value:z ~new_value:w
+      x (atomic_byte_offset y) ~old_value:z ~new_value:w
+  | Atomic_compare_exchange_field { atomic_kind = _; args_kind; mode } ->
+    C.atomic_compare_exchange ~dbg (imm_or_ptr args_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
+      x (atomic_field_index y) ~old_value:z ~new_value:w
+  | Atomic_compare_exchange_offset { atomic_kind = _; args_kind; mode } ->
+    C.atomic_compare_exchange ~dbg (imm_or_ptr args_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
+      x (atomic_byte_offset y) ~old_value:z ~new_value:w
 
 let variadic_primitive _env dbg f args =
   match (f : P.variadic_primitive) with

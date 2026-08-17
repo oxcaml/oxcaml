@@ -5923,20 +5923,51 @@ end
 
 (* Atomics *)
 
-let atomic_load_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block
-    ~field =
+type atomic_location =
+  | Field_index of expression * Scalar_type.Integral.t
+  | Byte_offset of expression * Scalar_type.Integral.t
+
+let tagged_immediate =
+  Scalar_type.Integral.Tagged Scalar_type.Tagged_integer.immediate
+
+let untagged_nativeint = Scalar_type.Integral.nativeint
+
+let atomic_field_index_for_extcall location dbg =
+  match location with
+  | Field_index (field, src) ->
+    Scalar_type.Integral.static_cast field ~dbg ~src ~dst:tagged_immediate
+  | Byte_offset (offset, src) ->
+    let offset =
+      Scalar_type.Integral.static_cast offset ~dbg ~src ~dst:untagged_nativeint
+    in
+    (* can use lsr because byte offset is nonnegative *)
+    tag_int (lsr_int offset (Cconst_int (log2_size_addr, dbg)) dbg) dbg
+
+let atomic_address block location dbg =
+  match location with
+  | Field_index (field, src) ->
+    let index =
+      Scalar_type.Integral.static_cast field ~dbg ~src ~dst:tagged_immediate
+    in
+    field_address_computed block index dbg
+  | Byte_offset (offset, src) ->
+    let offset =
+      Scalar_type.Integral.static_cast offset ~dbg ~src ~dst:untagged_nativeint
+    in
+    add_int_addr block offset dbg
+
+let atomic_load ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block location =
   let memory_chunk =
     match imm_or_ptr with Immediate -> Word_int | Pointer -> Word_val
   in
-  Cop
-    (mk_load_atomic memory_chunk, [field_address_computed block field dbg], dbg)
+  Cop (mk_load_atomic memory_chunk, [atomic_address block location dbg], dbg)
 
 let atomic_extcall_name base_name (mode : Lambda.modify_mode) =
   match mode with
   | Modify_heap -> base_name
   | Modify_maybe_stack -> base_name ^ "_local"
 
-let atomic_exchange_extcall ~dbg ~mode block ~field ~new_value =
+let atomic_exchange_extcall ~dbg ~mode block location ~new_value =
   Cop
     ( Cextcall
         { func = atomic_extcall_name "caml_atomic_exchange_field" mode;
@@ -5948,26 +5979,26 @@ let atomic_exchange_extcall ~dbg ~mode block ~field ~new_value =
           ty_args = [];
           alloc = false
         },
-      [block; field; new_value],
+      [block; atomic_field_index_for_extcall location dbg; new_value],
       dbg )
 
-let atomic_exchange_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode
-    block ~field ~new_value =
+let atomic_exchange ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode block
+    location ~new_value =
   match imm_or_ptr with
   | Immediate ->
     let op = Catomic { op = Exchange; size = Word } in
     if Proc.operation_supported op
-    then Cop (op, [new_value; field_address_computed block field dbg], dbg)
-    else atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
-  | Pointer -> atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
+    then Cop (op, [new_value; atomic_address block location dbg], dbg)
+    else atomic_exchange_extcall ~dbg ~mode block location ~new_value
+  | Pointer -> atomic_exchange_extcall ~dbg ~mode block location ~new_value
 
-let atomic_arith ~dbg ~op ~untag ~ext_name block ~field i =
+let atomic_arith ~dbg ~op ~untag ~ext_name block location i =
   let i = if untag then decr_int i dbg else i in
   let op = Catomic { op; size = Word } in
   if Proc.operation_supported op
   then
     (* input is a tagged integer *)
-    Cop (op, [i; field_address_computed block field dbg], dbg)
+    Cop (op, [i; atomic_address block location dbg], dbg)
   else
     Cop
       ( Cextcall
@@ -5980,40 +6011,40 @@ let atomic_arith ~dbg ~op ~untag ~ext_name block ~field i =
             ty_args = [];
             alloc = false
           },
-        [block; field; i],
+        [block; atomic_field_index_for_extcall location dbg; i],
         dbg )
 
-let atomic_fetch_and_add_field ~dbg atomic ~field i =
+let atomic_fetch_and_add ~dbg atomic location i =
   atomic_arith ~dbg ~untag:true ~op:Fetch_and_add
-    ~ext_name:"caml_atomic_fetch_add_field" atomic ~field i
+    ~ext_name:"caml_atomic_fetch_add_field" atomic location i
 
-let atomic_add_field ~dbg atomic ~field i =
+let atomic_add ~dbg atomic location i =
   atomic_arith ~dbg ~untag:true ~op:Add ~ext_name:"caml_atomic_add_field" atomic
-    ~field i
+    location i
   |> return_unit dbg
 
-let atomic_sub_field ~dbg atomic ~field i =
+let atomic_sub ~dbg atomic location i =
   atomic_arith ~dbg ~untag:true ~op:Sub ~ext_name:"caml_atomic_sub_field" atomic
-    ~field i
+    location i
   |> return_unit dbg
 
-let atomic_land_field ~dbg atomic ~field i =
+let atomic_land ~dbg atomic location i =
   atomic_arith ~dbg ~untag:false ~op:Land ~ext_name:"caml_atomic_land_field"
-    atomic ~field i
+    atomic location i
   |> return_unit dbg
 
-let atomic_lor_field ~dbg atomic ~field i =
+let atomic_lor ~dbg atomic location i =
   atomic_arith ~dbg ~untag:false ~op:Lor ~ext_name:"caml_atomic_lor_field"
-    atomic ~field i
+    atomic location i
   |> return_unit dbg
 
-let atomic_lxor_field ~dbg atomic ~field i =
+let atomic_lxor ~dbg atomic location i =
   atomic_arith ~dbg ~untag:true ~op:Lxor ~ext_name:"caml_atomic_lxor_field"
-    atomic ~field i
+    atomic location i
   |> return_unit dbg
 
-let atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
-    =
+let atomic_compare_and_set_extcall ~dbg ~mode block location ~old_value
+    ~new_value =
   Cop
     ( Cextcall
         { func = atomic_extcall_name "caml_atomic_cas_field" mode;
@@ -6025,11 +6056,11 @@ let atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
           ty_args = [];
           alloc = false
         },
-      [block; field; old_value; new_value],
+      [block; atomic_field_index_for_extcall location dbg; old_value; new_value],
       dbg )
 
-let atomic_compare_and_set_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
-    ~mode block ~field ~old_value ~new_value =
+let atomic_compare_and_set ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode
+    block location ~old_value ~new_value =
   match imm_or_ptr with
   | Immediate ->
     let op = Catomic { op = Compare_set; size = Word } in
@@ -6037,18 +6068,16 @@ let atomic_compare_and_set_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
     then
       (* Use a bind to ensure [tag_int] gets optimised. *)
       bind "res"
-        (Cop
-           ( op,
-             [old_value; new_value; field_address_computed block field dbg],
-             dbg ))
+        (Cop (op, [old_value; new_value; atomic_address block location dbg], dbg))
         (fun a2 -> tag_int a2 dbg)
     else
-      atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value
+      atomic_compare_and_set_extcall ~dbg ~mode block location ~old_value
         ~new_value
   | Pointer ->
-    atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
+    atomic_compare_and_set_extcall ~dbg ~mode block location ~old_value
+      ~new_value
 
-let atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+let atomic_compare_exchange_extcall ~dbg ~mode block location ~old_value
     ~new_value =
   Cop
     ( Cextcall
@@ -6061,22 +6090,19 @@ let atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
           ty_args = [];
           alloc = false
         },
-      [block; field; old_value; new_value],
+      [block; atomic_field_index_for_extcall location dbg; old_value; new_value],
       dbg )
 
-let atomic_compare_exchange_field ~dbg
-    (imm_or_ptr : Lambda.immediate_or_pointer) ~mode block ~field ~old_value
-    ~new_value =
+let atomic_compare_exchange ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
+    ~mode block location ~old_value ~new_value =
   match imm_or_ptr with
   | Immediate ->
     let op = Catomic { op = Compare_exchange; size = Word } in
     if Proc.operation_supported op
-    then
-      Cop
-        (op, [old_value; new_value; field_address_computed block field dbg], dbg)
+    then Cop (op, [old_value; new_value; atomic_address block location dbg], dbg)
     else
-      atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+      atomic_compare_exchange_extcall ~dbg ~mode block location ~old_value
         ~new_value
   | Pointer ->
-    atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+    atomic_compare_exchange_extcall ~dbg ~mode block location ~old_value
       ~new_value
