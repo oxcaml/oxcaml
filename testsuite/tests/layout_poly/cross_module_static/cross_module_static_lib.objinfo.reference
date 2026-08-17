@@ -18,23 +18,21 @@ Force link: no
 Static data:
   [
     (closure ⟨env⟩ layout_2 ->
-      { c = (missing)
+      { c = x/334.c
       ; r =
-        ⟪(function {nlocal = 1} closure/349[L]
-           (function {nlocal = 0} x/334[$layout_2] : $layout_2 x/334))⟫ });
+        ⟪(function {nlocal = 0} closure/349[L] x/334[$layout_2] : $layout_2
+           x/334)⟫ });
     (closure ⟨env⟩ layout_11 layout_12 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 1} closure/350[L]
-           (function {nlocal = 0} x/337[$layout_11] y/338[$layout_12]
-             : #($layout_11, $layout_12)
-             (make_unboxed_product #($layout_11, $layout_12) x/337 y/338)))⟫ });
+        ⟪(function {nlocal = 0} closure/350[L] x/337[$layout_11]
+           y/338[$layout_12] : #($layout_11, $layout_12)
+           (make_unboxed_product #($layout_11, $layout_12) x/337 y/338))⟫ });
     [ (missing); ];
     (closure ⟨env⟩ layout_16 ->
-      { c = (missing)
+      { c = x/342.c
       ; r =
-        ⟪(function {nlocal = 1} closure/351[L]
+        ⟪(function {nlocal = 0} closure/351[L] x/342[$layout_16] : $layout_16
            (let (calls/348 =a (mixedfield 0  (*) closure/351))
-             (function {nlocal = 0} x/342[$layout_16] : $layout_16
-               (seq (+:=1 calls/348) x/342))))⟫ });
+             (seq (+:=1 calls/348) x/342)))⟫ });
     ]

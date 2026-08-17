@@ -21,23 +21,21 @@ Static data:
   [
     (closure ⟨env⟩ layout_6 ->
       (let (#body/3 =
-         { c = (missing)
-         ; r =
-           ⟪(function {nlocal = 0} x/334[$layout_6] : $layout_6
-              $(let (#body/2 =
-                  { c = (missing)
-                  ; r =
-                    ⟪(applytail
-                       $(let (#app/1 =
-                           ((global Cross_module_static_lib).0
-                              ⟪layout $layout_6⟫))
-                          { c = #app/1.c
-                          ; r =
-                            ⟪(apply[L] $#app/1
-                               (field_imm 0
-                                 (global static Cross_module_static_lib!)))⟫ })
-                       x/334)⟫ })
-                 { c = #body/2.c; r = ⟪(region $#body/2)⟫ }))⟫ })
+         (let (#body/2 =
+            { c = (missing)
+            ; r =
+              ⟪(applytail
+                 $(let (#app/1 =
+                     ((global Cross_module_static_lib).0 ⟪layout $layout_6⟫))
+                    { c = #app/1.c
+                    ; r =
+                      ⟪(apply[L] $#app/1
+                         (field_imm 0
+                           (global static Cross_module_static_lib!)))⟫ })
+                 x/334)⟫ })
+           { c = #body/2.c; r = ⟪(region $#body/2)⟫ }))
         { c = #body/3.c
-        ; r = ⟪(function {nlocal = 1} closure/341[L] $#body/3)⟫ }));
+        ; r =
+          ⟪(function {nlocal = 0} closure/341[L] x/334[$layout_6] : $layout_6
+             $#body/3)⟫ }));
     ]
