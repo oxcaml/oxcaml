@@ -1061,9 +1061,11 @@ end = struct
   type boxedvar =
   | K : 'a C.obj * 'a Desc.Var.Head.t -> boxedvar
   type boxedpath =
-  | P : 'b C.obj
-        * 'a Desc.Var.Head.t
-        * ('a, 'b, (allowed * disallowed)) C.morph
+  | P :
+      { dst : 'b C.obj;
+        var : 'a Desc.Var.Head.t;
+        path : ('a, 'b, (allowed * disallowed)) C.morph
+      }
       -> boxedpath
 
   (** The name of polymorphic mode variables will be
@@ -1071,11 +1073,13 @@ end = struct
   types are irrelevant, and are thus forgotten. See [edge]
   for more explanation *)
   type boxedname =
-  | N : 'c Desc.Var.Head.t
-        * 'd Desc.Var.Head.t
-        * 'a C.obj
-        * 'b C.obj
-        * ('a, 'b, ('l * 'r)) C.morph
+  | N :
+      { target : 'c Desc.Var.Head.t;
+        src : 'd Desc.Var.Head.t;
+        morph_src : 'a C.obj;
+        morph_dst : 'b C.obj;
+        morph : ('a, 'b, ('l * 'r)) C.morph
+      }
       -> boxedname
 
   module VarTbl = Hashtbl.Make (struct
@@ -1102,19 +1106,51 @@ end = struct
     (Alloc.Monadic.Const.t, Alloc.Comonadic.Const.t) morphl
 
   module Paths = struct
-    module Monadic_path_set = Std_set.Make (struct
-      type t = monadic_morph
-      let compare m1 m2 = C.compare_morph Alloc.obj_monadic m1 m2
+    module Store (X : sig
+      type s
+      type d
+      val dst : d C.obj
+    end) =
+    struct
+      module Morph_set = Std_set.Make (struct
+        type t = (X.s, X.d) morphl
+        let compare m1 m2 = C.compare_morph X.dst m1 m2
+      end)
+
+      type t = Morph_set.t VarPairMap.t
+
+      let empty : t = VarPairMap.empty
+
+      let add key path t =
+        let set =
+          match VarPairMap.find_opt key t with
+          | None -> Morph_set.singleton path
+          | Some set -> Morph_set.add path set
+        in
+        VarPairMap.add key set t
+
+      let find key t =
+        match VarPairMap.find_opt key t with
+        | None -> []
+        | Some set -> Morph_set.elements set
+    end
+
+    module Monadic_paths = Store (struct
+      type s = Alloc.Monadic.Const.t
+      type d = Alloc.Monadic.Const.t
+      let dst = Alloc.obj_monadic
     end)
 
-    module Comonadic_path_set = Std_set.Make (struct
-      type t = comonadic_morph
-      let compare m1 m2 = C.compare_morph Alloc.obj_comonadic m1 m2
+    module Comonadic_paths = Store (struct
+      type s = Alloc.Comonadic.Const.t
+      type d = Alloc.Comonadic.Const.t
+      let dst = Alloc.obj_comonadic
     end)
 
-    module Closing_over_path_set = Std_set.Make (struct
-      type t = closing_over_morph
-      let compare m1 m2 = C.compare_morph Alloc.obj_comonadic m1 m2
+    module Closing_over_paths = Store (struct
+      type s = Alloc.Monadic.Const.t
+      type d = Alloc.Comonadic.Const.t
+      let dst = Alloc.obj_comonadic
     end)
 
     type ('s, 'd) table =
@@ -1145,21 +1181,21 @@ end = struct
           a path *)
 
     type t =
-      { mutable monadic : Monadic_path_set.t VarPairMap.t;
-        mutable comonadic : Comonadic_path_set.t VarPairMap.t;
-        mutable closing_over : Closing_over_path_set.t VarPairMap.t
+      { mutable monadic : Monadic_paths.t;
+        mutable comonadic : Comonadic_paths.t;
+        mutable closing_over : Closing_over_paths.t
       }
 
     let create () =
-      { monadic = VarPairMap.empty;
-        comonadic = VarPairMap.empty;
-        closing_over = VarPairMap.empty
+      { monadic = Monadic_paths.empty;
+        comonadic = Comonadic_paths.empty;
+        closing_over = Closing_over_paths.empty
       }
 
     let reset t =
-      t.monadic <- VarPairMap.empty;
-      t.comonadic <- VarPairMap.empty;
-      t.closing_over <- VarPairMap.empty
+      t.monadic <- Monadic_paths.empty;
+      t.comonadic <- Comonadic_paths.empty;
+      t.closing_over <- Closing_over_paths.empty
 
     let src_obj : type s d. (s, d) table -> s C.obj =
       function
@@ -1177,44 +1213,18 @@ end = struct
         t -> (s, d) table -> boxedvar * boxedvar -> (s, d) morphl -> unit =
       fun t table key path ->
       match table with
-      | Monadic ->
-        let set =
-          match VarPairMap.find_opt key t.monadic with
-          | None -> Monadic_path_set.singleton path
-          | Some set -> Monadic_path_set.add path set
-        in
-        t.monadic <- VarPairMap.add key set t.monadic
-      | Comonadic ->
-        let set =
-          match VarPairMap.find_opt key t.comonadic with
-          | None -> Comonadic_path_set.singleton path
-          | Some set -> Comonadic_path_set.add path set
-        in
-        t.comonadic <- VarPairMap.add key set t.comonadic
+      | Monadic -> t.monadic <- Monadic_paths.add key path t.monadic
+      | Comonadic -> t.comonadic <- Comonadic_paths.add key path t.comonadic
       | Closing_over ->
-        let set =
-          match VarPairMap.find_opt key t.closing_over with
-          | None -> Closing_over_path_set.singleton path
-          | Some set -> Closing_over_path_set.add path set
-        in
-        t.closing_over <- VarPairMap.add key set t.closing_over
+        t.closing_over <- Closing_over_paths.add key path t.closing_over
 
     let find : type s d.
         t -> (s, d) table -> boxedvar * boxedvar -> ((s, d) morphl) list =
       fun t table key ->
       match table with
-      | Monadic ->
-        (match VarPairMap.find_opt key t.monadic with
-         | None -> []
-         | Some set -> Monadic_path_set.elements set)
-      | Comonadic ->
-        (match VarPairMap.find_opt key t.comonadic with
-         | None -> []
-         | Some set -> Comonadic_path_set.elements set)
-      | Closing_over ->
-        (match VarPairMap.find_opt key t.closing_over with
-         | None -> []
-         | Some set -> Closing_over_path_set.elements set)
+      | Monadic -> Monadic_paths.find key t.monadic
+      | Comonadic -> Comonadic_paths.find key t.comonadic
+      | Closing_over -> Closing_over_paths.find key t.closing_over
   end
 
   (** Tracks the mapping of monadic and comonadic mode
@@ -1369,8 +1379,6 @@ end = struct
   type memoized = (boxedpath list) VarTbl.t
   type visited = unit VarTbl.t
 
-  exception Cannot_unwrap
-
   (* Find the [b -> Paths.src_obj table] morphism
     associated with some visible variable [v] of object
     type [b] *)
@@ -1395,7 +1403,8 @@ end = struct
                 | Is_eq ->
                   let (f : ((b, s, (allowed * allowed)) C.morph)) = f in
                   Some f
-                | Is_not_eq -> raise Cannot_unwrap
+                | Is_not_eq ->
+                  fatal_error "Out_type.find_visible_morph_opt"
             end
         | Desc.Amode _ -> None
       in
@@ -1418,42 +1427,46 @@ end = struct
       In the future, we might want to register all
       paths. This will require a lattice of morphisms,
       so we can calculate the fixed point of cycle *)
-  let rec find_paths :
+  let rec paths_to_visible :
       type b. memoized:memoized -> visited:visited
-      -> bool -> b C.obj -> b Desc.Var.Head.t
+      -> b C.obj -> b Desc.Var.Head.t
       -> boxedpath list =
-    fun ~memoized ~visited first dst v ->
-      if visible dst v && not first then [P (dst, v, C.id)] else begin
-        if VarTbl.mem visited (K (dst, v)) then [] else begin
-          VarTbl.add visited (K (dst, v)) ();
-          match VarTbl.find_opt memoized (K (dst, v)) with
-          | Some paths -> paths
-          | None ->
-            let paths =
-              List.filter_map (fun (Desc.Var.Amorphvar (w, f)) ->
-                let fsrc = C.src dst f in
-                let w = Desc.Var.force fsrc w in
-                if w.desc_level <> generic_level then None else begin
-                let wpaths = find_paths ~memoized ~visited false fsrc w in
-                Some (List.map (fun (P (gdst, u, g)) ->
+    fun ~memoized ~visited dst v ->
+      if visible dst v then [P { dst; var = v; path = C.id }]
+      else paths_from_vlowers ~memoized ~visited dst v
+
+  and paths_from_vlowers :
+      type b. memoized:memoized -> visited:visited
+      -> b C.obj -> b Desc.Var.Head.t
+      -> boxedpath list =
+    fun ~memoized ~visited dst v ->
+      if VarTbl.mem visited (K (dst, v)) then [] else begin
+        VarTbl.add visited (K (dst, v)) ();
+        match VarTbl.find_opt memoized (K (dst, v)) with
+        | Some paths -> paths
+        | None ->
+          let paths =
+            List.concat_map (fun (Desc.Var.Amorphvar (w, f)) ->
+              let fsrc = C.src dst f in
+              let w = Desc.Var.force fsrc w in
+              if w.desc_level <> generic_level then []
+              else
+                List.map (fun (P { dst = gdst; var = u; path = g }) ->
                   match C.equal_obj fsrc gdst with
-                  | Is_eq ->
-                    let fg = C.compose dst f g in
-                    P (dst, u, fg)
-                  | Is_not_eq -> raise Cannot_unwrap) wpaths)
-              end) v.desc_vlower
-            in
-            let paths = List.flatten paths in
-            VarTbl.add memoized (K (dst,v)) paths;
-            paths
-          end
+                  | Is_eq -> P { dst; var = u; path = C.compose dst f g }
+                  | Is_not_eq -> fatal_error "Out_type.paths_from_vlowers")
+                  (paths_to_visible ~memoized ~visited fsrc w))
+              v.desc_vlower
+          in
+          VarTbl.add memoized (K (dst, v)) paths;
+          paths
       end
 
   let find_paths :
       memoized:memoized -> visited:visited
       -> boxedvar -> boxedpath list =
     fun ~memoized ~visited (K (dst, v)) ->
-      find_paths ~memoized ~visited true dst v
+      paths_from_vlowers ~memoized ~visited dst v
 
   (** [find_path_from_description] constructs all morphisms
     from one visible mode variable to another, and records
@@ -1487,7 +1500,7 @@ end = struct
         let v = K (fsrc, v) in
         let visited = VarTbl.create 17 in
         let paths = find_paths ~memoized ~visited v in
-        List.iter (fun (P (gdst, u, g)) ->
+        List.iter (fun (P { dst = gdst; var = u; path = g }) ->
           match C.equal_obj fsrc gdst with
             | Is_eq ->
               let gsrc = C.src gdst g in
@@ -1497,7 +1510,8 @@ end = struct
                 let fgh' = C.compose dst fg h' in
                 Paths.add visible_paths table (v, (K (gsrc, u))) fgh'
               ) (find_visible_morph_opt table gsrc u)
-            | Is_not_eq -> raise Cannot_unwrap
+            | Is_not_eq ->
+              fatal_error "Out_type.find_path_from_description"
           ) paths
 
 
@@ -1696,8 +1710,7 @@ end = struct
       let pairs_ne = not (eq_pair pair0 pair1) in
       compare_dec && check_signature && pairs_ne
 
-  exception Invalid_edge
-  let construct_name_exn :
+  let construct_name :
       visible_pair
       -> (monadic_morph, comonadic_morph) monadic_comonadic
       -> visible_pair
@@ -1707,16 +1720,22 @@ end = struct
         { monadic = mon1; comonadic = com1 } ->
       match com0, com1 with
       | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
-        N (u, v, Alloc.obj_comonadic, Alloc.obj_comonadic, com_morph)
+        N { target = u; src = v;
+            morph_src = Alloc.obj_comonadic;
+            morph_dst = Alloc.obj_comonadic;
+            morph = com_morph }
       | _, _ ->
         match mon0, mon1 with
         | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
-          N (u, v, Alloc.obj_monadic, Alloc.obj_monadic, mon_morph)
-        | _, _ -> raise Invalid_edge
-                  (* edges are only created when one of the morphism
-                  goes from a variable to a variable*)
+          N { target = u; src = v;
+              morph_src = Alloc.obj_monadic;
+              morph_dst = Alloc.obj_monadic;
+              morph = mon_morph }
+        | _, _ ->
+          fatal_error
+            "Out_type.construct_name: edge without variable endpoints"
 
-  let construct_comonadic_name_exn :
+  let construct_comonadic_name :
       visible_pair
       -> comonadic_morph
       -> visible_pair
@@ -1726,140 +1745,113 @@ end = struct
         { comonadic = com1 } ->
       match com0, com1 with
       | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
-        N (u, v, Alloc.obj_comonadic, Alloc.obj_comonadic, com_morph)
-      | _, _ -> raise Invalid_edge
-          (* comonadic edges are only created when one of the morphism
-          goes from a variable to a variable*)
+        N { target = u; src = v;
+            morph_src = Alloc.obj_comonadic;
+            morph_dst = Alloc.obj_comonadic;
+            morph = com_morph }
+      | _, _ ->
+        fatal_error
+          "Out_type.construct_comonadic_name: edge without variable endpoints"
 
-  let construct_simple_between =
-    fun pair0 pair1 ->
-
-      let mon_morphs =
-        construct_monadic_morphs
-          pair0.monadic pair1.monadic
-      in
-      let com_morphs =
-        construct_comonadic_morphs
-          pair1.comonadic pair0.comonadic
-      in
-      let edges =
-        List.fold_left (fun acc com_morph ->
-          List.fold_left (fun acc mon_morph ->
-          let via =
-            { monadic = mon_morph;
-              comonadic = com_morph }
-          in
-          let name =
-            construct_name_exn pair0 via pair1
-          in
-          let edge = { via; name } in
-          edge :: acc )
-          acc mon_morphs)
-        [] com_morphs
-      in
-      edges
+  let construct_simple_between pair0 pair1 =
+    let mon_morphs =
+      construct_monadic_morphs pair0.monadic pair1.monadic
+    in
+    let com_morphs =
+      construct_comonadic_morphs pair1.comonadic pair0.comonadic
+    in
+    List.concat_map (fun com_morph ->
+      List.map (fun mon_morph ->
+        let via = { monadic = mon_morph; comonadic = com_morph } in
+        { via; name = construct_name pair0 via pair1 })
+        mon_morphs)
+      com_morphs
 
   let check_closing_over_candidate pair0 pair1 =
     List.exists
       (fun pair2 ->
         let closing_over_morphs =
-          construct_closing_over_morphs
-            pair1.comonadic pair2.monadic
+          construct_closing_over_morphs pair1.comonadic pair2.monadic
         in
         let edges =
           if construct_edge_condition pair0 pair2
           then construct_simple_between pair0 pair2
-          else [] in
-        edges <> [] && closing_over_morphs <> []
-      ) !visible_pairs
+          else []
+        in
+        not (List.is_empty edges)
+        && not (List.is_empty closing_over_morphs))
+      !visible_pairs
 
-  let construct_comonadic_between =
-    fun pair0 pair1 ->
-      let mon_morphs =
-        construct_monadic_morphs
-          pair0.monadic pair1.monadic
-      in
+  let construct_comonadic_between pair0 pair1 =
+    let mon_morphs =
+      construct_monadic_morphs pair0.monadic pair1.monadic
+    in
+    let com_morphs =
+      construct_comonadic_morphs pair1.comonadic pair0.comonadic
+    in
+    if List.is_empty mon_morphs
+       && not (check_closing_over_candidate pair0 pair1)
+    then
+      List.map (fun com_morph ->
+        let c_name = construct_comonadic_name pair0 com_morph pair1 in
+        Comonadic { c_via = com_morph; c_name })
+        com_morphs
+    else []
+
+  let construct_closing_over_to pair1 =
+    List.concat_map (fun pair0 ->
       let com_morphs =
-        construct_comonadic_morphs
-          pair1.comonadic pair0.comonadic
+        construct_comonadic_morphs pair1.comonadic pair0.comonadic
       in
-      if not (check_closing_over_candidate pair0 pair1) && mon_morphs = [] then
-        List.map (fun com_morph ->
-          let c_name = construct_comonadic_name_exn pair0 com_morph pair1 in
-          Comonadic { c_via = com_morph; c_name }) com_morphs
-      else []
+      List.concat_map (fun pair2 ->
+        let closing_over_morphs =
+          construct_closing_over_morphs pair1.comonadic pair2.monadic
+        in
+        let simple_edges =
+          if construct_edge_condition pair0 pair2
+          then construct_simple_between pair0 pair2
+          else []
+        in
+        List.concat_map (fun edge ->
+          List.concat_map (fun cls_morph ->
+            List.map (fun com_morph ->
+              ClosingOver
+                { cls_target = cls_morph;
+                  cls_src = com_morph;
+                  cls_edge = edge
+                })
+              com_morphs)
+            closing_over_morphs)
+          simple_edges)
+        !visible_pairs)
+      !visible_pairs
 
-  let construct_closing_over_to =
-    fun pair1 ->
-      List.fold_left (fun acc pair0 ->
-        List.fold_left (fun acc pair2 ->
-            let com_morphs =
-              construct_comonadic_morphs
-                pair1.comonadic pair0.comonadic
-            in
-            let closing_over_morphs =
-              construct_closing_over_morphs
-                pair1.comonadic pair2.monadic
-            in
-            let simple_edges =
-              if (construct_edge_condition pair0 pair2)
-              then construct_simple_between pair0 pair2
-              else []
-            in
-            List.fold_left (fun acc edge ->
-              List.fold_left (fun acc cls_morph ->
-                List.fold_left (fun acc com_morph ->
-                  ClosingOver {
-                    cls_target = cls_morph;
-                    cls_src = com_morph;
-                    cls_edge = edge
-                  } :: acc
-                ) acc com_morphs
-              ) acc closing_over_morphs
-            ) acc simple_edges
-          )
-        acc !visible_pairs)
-      [] !visible_pairs
+  let construct_edges_between pair0 pair1 =
+    if not (construct_edge_condition pair0 pair1) then []
+    else begin
+      let simple = construct_simple_between pair0 pair1 in
+      let comonadic = construct_comonadic_between pair0 pair1 in
+      List.map (fun edge -> Simple edge) simple @ comonadic
+    end
 
   let construct_edges_to :
       visible_pair -> edge list =
     fun pair1 ->
-      let find_edges pair0 =
-        if not (construct_edge_condition pair0 pair1)
-        then []
-        else begin
-          let edges = construct_simple_between pair0 pair1 in
-          let com_morphs = construct_comonadic_between pair0 pair1 in
-          let edges = List.map (fun edge -> Simple edge) edges in
-          edges @ com_morphs
-        end
-      in
       let edges =
-        List.map find_edges !visible_pairs
+        List.concat_map (fun pair0 -> construct_edges_between pair0 pair1)
+          !visible_pairs
       in
-      let close_over = construct_closing_over_to pair1 in
-      close_over @ List.flatten edges
+      construct_closing_over_to pair1 @ edges
 
   let construct_edges_from :
       visible_pair -> edge list =
     fun pair0 ->
-      let find_edges pair1 =
-        if not (construct_edge_condition pair0 pair1)
-        then []
-        else begin
-          let edges = construct_simple_between pair0 pair1 in
-          let com_morphs = construct_comonadic_between pair0 pair1 in
-          let edges = List.map (fun edge -> Simple edge) edges in
-          edges @ com_morphs
-        end
-      in
-      let edges =
-        List.map find_edges !visible_pairs
-      in
-      List.flatten edges
+      List.concat_map (fun pair1 -> construct_edges_between pair0 pair1)
+        !visible_pairs
 
   let eq_boxedname
-      (N (v, v', _, dstf, f)) (N (u, u', _, dstg, g)) =
+      (N { target = v; src = v'; morph_dst = dstf; morph = f; _ })
+      (N { target = u; src = u'; morph_dst = dstg; morph = g; _ }) =
     match C.equal_obj dstf dstg with
     | Is_eq ->
       Desc.Var.Head.equal v u
@@ -1985,11 +1977,11 @@ end = struct
     let edges_lower, edges_upper =
       partition_edges_into_bounds ~edges_from ~edges_to
     in
-    if edges_lower = [] && edges_upper = []
+    if List.is_empty edges_lower && List.is_empty edges_upper
        && lo = "" && hi = ""
     then begin
       let name =
-        construct_name_exn pair
+        construct_name pair
           { monadic = C.id; comonadic = C.id }
           pair
       in
@@ -2013,10 +2005,10 @@ end = struct
             l sep s
       in
       let has_upper =
-        edges_upper <> [] || hi <> ""
+        not (List.is_empty edges_upper) || hi <> ""
       in
       let has_lower =
-        edges_lower <> [] || lo <> ""
+        not (List.is_empty edges_lower) || lo <> ""
       in
       Fmt.fprintf ppf "[%s%a%s%s%a]"
         (if has_upper then "< " else "")
