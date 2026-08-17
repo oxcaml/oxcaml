@@ -28,7 +28,12 @@ let
     [
       "--cache-file=/dev/null"
       "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
-      "--enable-assembler-suitable-for-dissector=${pkgs.llvm}/bin/llvm-mc"
+      (
+        if pkgs.stdenv.isDarwin then
+          "--disable-assembler-suitable-for-dissector"
+        else
+          "--enable-assembler-suitable-for-dissector=${pkgs.llvm}/bin/llvm-mc"
+      )
       (mkFlag addressSanitizer "address-sanitizer")
       (mkFlag dev "dev")
       (mkFlag flambdaInvariants "flambda-invariants")
