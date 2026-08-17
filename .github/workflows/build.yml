@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: read
       actions: read # the "Print diff artifact URL" step reads workflow artifacts via `gh api`
+      pull-requests: read # the merlin emergency-skip check reads PR labels via `gh pr view`
 
     strategy:
       fail-fast: false
@@ -239,11 +240,38 @@ jobs:
             disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/basic-modules/recursive_module_init.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l'
             sysdeps: gdb
 
+          # Build and test Merlin.
+          - name: merlin (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            merlin_only: true
+            sysdeps: jq
+
     env:
       J: "8"
       run_testsuite: "true"
+      EMERGENCY_SKIP_LABEL: merlin-emergency-skip
 
     steps:
+      - name: 'Check for the "merlin-emergency-skip" PR label'
+        if: matrix.merlin_only == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          pr_number="$PR_NUMBER"
+          # In the merge queue, HEAD_REF looks like
+          # refs/heads/gh-readonly-queue/main/pr-<N>-<sha>
+          if [ -z "$pr_number" ] && [[ "$HEAD_REF" =~ /pr-([0-9]+)- ]]; then
+            pr_number="${BASH_REMATCH[1]}"
+          fi
+          if [ -z "$pr_number" ]; then
+            echo "Could not determine the PR number; not skipping the merlin check."
+          elif gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" \
+               --json labels --jq '.labels[].name' | grep -qxF "$EMERGENCY_SKIP_LABEL"; then
+            echo MERLIN_EMERGENCY_SKIP=y >> "$GITHUB_ENV"
+          fi
+
       - name: Checkout the OxCaml repo
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -386,7 +414,7 @@ jobs:
           codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
 
       - name: Build OxCaml
-        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+        if: matrix.merlin_only != true && matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
         id: build
         run: |
           if [ "$COLLECT_METRICS" = "true" ]; then
@@ -405,7 +433,7 @@ jobs:
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Run OxCaml testsuite
-        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        if: matrix.merlin_only != true && matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |
           if [ "$COLLECT_METRICS" = "true" ]; then
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
@@ -422,7 +450,7 @@ jobs:
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Run upstream testsuite
-        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        if: matrix.merlin_only != true && matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |
           if [ "$COLLECT_METRICS" = "true" ]; then
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
@@ -439,7 +467,7 @@ jobs:
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
       - name: Run minimizer
-        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        if: matrix.merlin_only != true && matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
         run: |
           if [ "$COLLECT_METRICS" = "true" ]; then
             BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
@@ -473,6 +501,64 @@ jobs:
         run: |
           export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
           make promote-failed
+          if ! git diff --quiet; then
+            git diff > $GITHUB_WORKSPACE/test-diffs.patch
+            echo "Test output differences detected and saved to artifact"
+            echo "DIFF_CREATED=true" >> $GITHUB_ENV
+          else
+            echo "No test output differences found"
+            echo "DIFF_CREATED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Assert Merlin is in sync with the compiler
+        if: matrix.merlin_only == true && env.MERLIN_EMERGENCY_SKIP != 'y'
+        run: external/merlin/scripts/assert-in-sync.sh
+
+      # Merlin has additional dependencies that the compiler does not.
+      - name: Install Merlin's dependencies
+        if: matrix.merlin_only == true && env.MERLIN_EMERGENCY_SKIP != 'y'
+        working-directory: external/merlin
+        run: opam install . --deps-only --with-test --yes
+
+      - name: Build merlin
+        if: matrix.merlin_only == true && env.MERLIN_EMERGENCY_SKIP != 'y'
+        run: make merlin-build
+
+      - name: Test merlin
+        id: merlin_test
+        if: matrix.merlin_only == true && env.MERLIN_EMERGENCY_SKIP != 'y'
+        env:
+          MERLIN_TESTS: all
+        run: make merlin-test
+
+      - name: Check that building Merlin did not modify any files
+        if: matrix.merlin_only == true && env.MERLIN_EMERGENCY_SKIP != 'y'
+        run: |
+          if ! git diff --quiet; then
+            echo "The following files were modified by dune:" >&2
+            git diff --name-only >&2
+            echo "" >&2
+            echo "Hint: the likely culprit is that you compiled with the wrong" >&2
+            echo "menhir version. Cross-check your opam switch's menhir version" >&2
+            echo "with the one in merlin-lib.opam." >&2
+            git diff > $GITHUB_WORKSPACE/test-diffs.patch
+            echo "DIFF_CREATED=true" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: Note that the merlin check was skipped
+        if: matrix.merlin_only == true && env.MERLIN_EMERGENCY_SKIP == 'y'
+        run: echo "The merlin steps were skipped because the PR has the $EMERGENCY_SKIP_LABEL label."
+
+      # Only worth doing if the tests themselves failed: promoting rebuilds and
+      # reinstalls the compiler, which is pointless if we failed earlier.
+      - name: Promote failed Merlin tests and capture diffs
+        if: failure() && matrix.merlin_only == true && steps.merlin_test.conclusion == 'failure'
+        continue-on-error: true
+        env:
+          MERLIN_TESTS: all
+        run: |
+          make merlin-promote
           if ! git diff --quiet; then
             git diff > $GITHUB_WORKSPACE/test-diffs.patch
             echo "Test output differences detected and saved to artifact"
