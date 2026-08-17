@@ -415,7 +415,7 @@ module Inlining = struct
               Not_inlinable )
           | Always_inlined _ | Hint_inlined ->
             Call_site_inlining_decision_type.Attribute_always, Inlinable code
-          | Default_inlined | Unroll _ ->
+          | Default_inlined | Forward_inlined | Unroll _ ->
             (* Closure ignores completely [@unrolled] attributes, so it seems
                safe to do the same. *)
             ( Call_site_inlining_decision_type.Definition_says_inline
@@ -428,10 +428,11 @@ module Inlining = struct
           ~are_rebuilding_terms decision;
         res
 
-  let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into ~params
-      ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
-      ~exn_continuation ~return_continuation ~apply_exn_continuation
-      ~apply_return_continuation ~apply_depth ~apply_dbg =
+  let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into
+      ~inlined_attribute ~params ~args ~my_closure ~my_alloc_mode ~my_depth
+      ~body ~free_names_of_body ~exn_continuation ~return_continuation
+      ~apply_exn_continuation ~apply_return_continuation ~apply_depth ~apply_dbg
+      =
     let my_depth_duid = Flambda_debug_uid.none in
     let my_closure_duid = Flambda_debug_uid.none in
     let rec_info =
@@ -481,7 +482,8 @@ module Inlining = struct
       (Bound_pattern.singleton
          (VB.create inlined_dbg_var inlined_dbg_var_duid Name_mode.normal))
       (Named.create_prim
-         (Nullary (Enter_inlined_apply { dbg = inlined_debuginfo }))
+         (Nullary
+            (Enter_inlined_apply { dbg = inlined_debuginfo; inlined_attribute }))
          Debuginfo.none)
       ~body
 
@@ -515,6 +517,7 @@ module Inlining = struct
            function call."
     in
     let region_inlined_into = Apply.return_mode apply in
+    let inlined_attribute = Apply.inlined apply in
     let args = Apply.args apply in
     let apply_return_continuation = Apply.continuation apply in
     let apply_exn_continuation = Apply.exn_continuation apply in
@@ -541,7 +544,7 @@ module Inlining = struct
         in
         let make_inlined_body =
           make_inlined_body ~callee ~called_code_id:(Code.code_id code)
-            ~region_inlined_into
+            ~region_inlined_into ~inlined_attribute
             ~params:(Bound_parameters.vars_and_uids params)
             ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
             ~exn_continuation ~return_continuation ~apply_depth ~apply_dbg
@@ -2400,7 +2403,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              (Function_decl.result_mode decl)
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
-        Debuginfo.none ~inlined:Inlined_attribute.Default_inlined
+        Debuginfo.none
+        ~inlined:(Inlined_attribute.forward_inlined ())
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
         ~relative_history:(Env.relative_history_from_scoped ~loc external_env)
@@ -3459,7 +3463,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         args_arity = arity;
         continuation = return_continuation;
         exn_continuation;
-        inlined = Lambda.Default_inlined;
+        inlined = Lambda.forward_inlined_attribute ();
         mode = result_mode;
         return_arity = result_arity;
         region = my_region;
@@ -3814,7 +3818,7 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
           (Warnings.Inlining_impossible
              Inlining_helpers.(
                inlined_attribute_on_partial_application_msg Inlined))
-      | Never_inlined | Hint_inlined | Default_inlined -> ());
+      | Never_inlined | Hint_inlined | Forward_inlined | Default_inlined -> ());
       wrap_partial_application acc env apply.continuation apply approx ~provided
         ~provided_arity ~missing_arity ~missing_param_modes ~result_arity
         ~arity:params_arity ~first_complex_local_param ~result_mode

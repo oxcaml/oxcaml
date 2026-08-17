@@ -55,6 +55,7 @@ type t =
     inlined_debuginfo : Inlined_debuginfo.t;
     disable_inlining : Disable_inlining.t;
     disable_partial_application_stub_generation : bool;
+    inlined_attribute_to_forward : Inlined_attribute.t option;
     inlining_state : Inlining_state.t;
     propagating_float_consts : bool;
     at_unit_toplevel : bool;
@@ -107,6 +108,7 @@ type t =
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 inlined_debuginfo; disable_inlining;
                 disable_partial_application_stub_generation;
+                inlined_attribute_to_forward;
                 inlining_state; propagating_float_consts;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
                 variables_defined_at_toplevel; cse; comparison_results;
@@ -124,6 +126,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
       @[<hov 1>(inlined_debuginfo@ %a)@]@ \
       @[<hov 1>(disable_inlining@ %a)@]@ \
       @[<hov 1>(disable_partial_application_stub_generation@ %b)@]@ \
+      %a\
       @[<hov 1>(inlining_state@ %a)@]@ \
       @[<hov 1>(propagating_float_consts@ %b)@]@ \
       @[<hov 1>(at_unit_toplevel@ %b)@]@ \
@@ -150,6 +153,10 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     Inlined_debuginfo.print inlined_debuginfo
     Disable_inlining.print disable_inlining
     disable_partial_application_stub_generation
+    (Format.pp_print_option (fun ppf attribute ->
+      Format.fprintf ppf "@[<hov 1>(inlined_attribute_to_forward@ %a)@]@ "
+        Inlined_attribute.print attribute))
+    inlined_attribute_to_forward
     Inlining_state.print inlining_state
     propagating_float_consts
     at_unit_toplevel
@@ -233,6 +240,7 @@ let create ~round ~machine_width ~(resolver : resolver)
       inlined_debuginfo = Inlined_debuginfo.none;
       disable_inlining = Do_not_disable_inlining;
       disable_partial_application_stub_generation = false;
+      inlined_attribute_to_forward = None;
       inlining_state = Inlining_state.default ~round;
       propagating_float_consts;
       at_unit_toplevel = true;
@@ -285,6 +293,8 @@ let disable_inlining t = t.disable_inlining
 let disable_partial_application_stub_generation t =
   t.disable_partial_application_stub_generation
 
+let inlined_attribute_to_forward t = t.inlined_attribute_to_forward
+
 let propagating_float_consts t = t.propagating_float_consts
 
 let unit_toplevel_exn_continuation t = t.unit_toplevel_exn_continuation
@@ -335,6 +345,7 @@ let enter_set_of_closures
       inlined_debuginfo = _;
       disable_inlining;
       disable_partial_application_stub_generation;
+      inlined_attribute_to_forward = _;
       inlining_state;
       propagating_float_consts;
       at_unit_toplevel = _;
@@ -364,6 +375,7 @@ let enter_set_of_closures
     inlined_debuginfo = Inlined_debuginfo.none;
     disable_inlining;
     disable_partial_application_stub_generation;
+    inlined_attribute_to_forward = None;
     inlining_state;
     propagating_float_consts;
     at_unit_toplevel = false;
@@ -657,8 +669,18 @@ let set_inlining_arguments arguments t =
 let set_inlined_debuginfo t ~from =
   { t with inlined_debuginfo = from.inlined_debuginfo }
 
-let merge_inlined_debuginfo t ~from_apply_expr =
+let merge_inlined_debuginfo_and_forward_inlined_attribute t ~from_apply_expr
+    ~inlined_attribute =
+  let inlined_attribute_to_forward =
+    match (inlined_attribute : Inlined_attribute.t) with
+    | Forward_inlined -> t.inlined_attribute_to_forward
+    | ( Always_inlined _ | Hint_inlined | Never_inlined
+      | Unroll (_, _)
+      | Default_inlined ) as inlined ->
+      Some inlined
+  in
   { t with
+    inlined_attribute_to_forward;
     inlined_debuginfo =
       Inlined_debuginfo.merge t.inlined_debuginfo ~from_apply_expr
   }
@@ -700,8 +722,17 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)
       ~apply_dbg:(Apply.dbg apply)
   in
+  let inlined_attribute_to_forward =
+    match Apply.inlined apply with
+    | Forward_inlined -> t.inlined_attribute_to_forward
+    | ( Always_inlined _ | Hint_inlined | Never_inlined
+      | Unroll (_, _)
+      | Default_inlined ) as inlined ->
+      Some inlined
+  in
   { t with
     inlined_debuginfo;
+    inlined_attribute_to_forward;
     inlining_state;
     inlining_history_tracker =
       Inlining_history.Tracker.enter_inlined_apply
@@ -818,6 +849,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     disable_inlining = denv.disable_inlining;
     disable_partial_application_stub_generation =
       denv.disable_partial_application_stub_generation;
+    inlined_attribute_to_forward = denv.inlined_attribute_to_forward;
     inlining_state = denv.inlining_state;
     inlining_history_tracker = denv.inlining_history_tracker;
     (* denv_for_join *)

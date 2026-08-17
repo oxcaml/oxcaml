@@ -780,11 +780,14 @@ type inlined_attribute =
   | Always_inlined (* [@inlined] or [@inlined always] *)
   | Never_inlined (* [@inlined never] *)
   | Hint_inlined (* [@inlined hint] *)
+  | Forward_inlined (* [@inlined forward] *)
   | Unroll of int (* [@unroll x] *)
   | Default_inlined (* no [@inlined] attribute *)
 
 val equal_inline_attribute : inline_attribute -> inline_attribute -> bool
 val equal_inlined_attribute : inlined_attribute -> inlined_attribute -> bool
+
+val forward_inlined_attribute : unit -> inlined_attribute
 
 type probe_desc = { name: string; enabled_at_init: bool; }
 type probe = probe_desc option

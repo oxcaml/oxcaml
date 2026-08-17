@@ -982,6 +982,7 @@ type inlined_attribute =
   | Always_inlined (* [@inlined] or [@inlined always] *)
   | Never_inlined (* [@inlined never] *)
   | Hint_inlined (* [@inlined hint] *)
+  | Forward_inlined (* [@inlined forward] *)
   | Unroll of int (* [@unroll x] *)
   | Default_inlined (* no [@inlined] attribute *)
 
@@ -1004,14 +1005,20 @@ let equal_inlined_attribute (x : inlined_attribute) (y : inlined_attribute) =
   | Always_inlined, Always_inlined
   | Never_inlined, Never_inlined
   | Hint_inlined, Hint_inlined
+  | Forward_inlined, Forward_inlined
   | Default_inlined, Default_inlined
     ->
     true
   | Unroll u, Unroll v ->
     u = v
   | (Always_inlined | Never_inlined
-    | Hint_inlined | Unroll _ | Default_inlined), _ ->
+    | Hint_inlined | Forward_inlined | Unroll _ | Default_inlined), _ ->
     false
+
+let forward_inlined_attribute () =
+  if !Clflags.native_code && !Clflags.stubs_forward_inlining
+  then Forward_inlined
+  else Default_inlined
 
 type probe_desc = { name: string; enabled_at_init: bool; }
 type probe = probe_desc option
