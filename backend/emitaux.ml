@@ -176,18 +176,45 @@ let emit_frames a =
       Hashtbl.add defnames (filename, defname, loc) (file_lbl, def_lbl);
       def_lbl
   in
+  (* Partially applied once, so that the memoisation inside [string_of_scopes]
+     is shared between all the calls below: it then returns physically equal
+     strings for equal scopes, which makes the [equal] function of [Label_table]
+     cheap. *)
+  let string_of_scopes =
+    Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
+  in
+  let defnames_of_dbg dbg =
+    List.map
+      (fun (d : Debuginfo.item) -> string_of_scopes d.dinfo_scopes)
+      (Debuginfo.Dbg.to_list dbg)
+  in
   let module Label_table = Hashtbl.Make (struct
-    type t = bool * Debuginfo.Dbg.t
+    (* The key includes the defnames, not just the debuginfo itself:
+       [Debuginfo.Dbg.compare] and [Debuginfo.Dbg.hash] deliberately ignore the
+       [dinfo_scopes] field, but the defnames emitted by [emit_debuginfo] are
+       derived from it. Two chains which agree on everything else but have
+       different defnames -- for example two specialisations of one function,
+       which necessarily share a source location -- must not share a record,
+       otherwise the frames of all but one of them are attributed to the wrong
+       function. Everything else emitted for a record (the packed info words and
+       the file names) is covered by [Debuginfo.Dbg.compare]. *)
+    type t = bool * Debuginfo.Dbg.t * string list
 
-    let equal ((rs1 : bool), dbg1) (rs2, dbg2) =
-      Bool.equal rs1 rs2 && Debuginfo.Dbg.compare dbg1 dbg2 = 0
+    let equal ((rs1 : bool), dbg1, defnames1) (rs2, dbg2, defnames2) =
+      Bool.equal rs1 rs2
+      && Debuginfo.Dbg.compare dbg1 dbg2 = 0
+      && List.equal String.equal defnames1 defnames2
 
-    let hash (rs, dbg) = Hashtbl.hash (rs, Debuginfo.Dbg.hash dbg)
+    let hash (rs, dbg, defnames) =
+      List.fold_left
+        (fun hash defname -> Hashtbl.hash (hash, defname))
+        (Hashtbl.hash (rs, Debuginfo.Dbg.hash dbg))
+        defnames
   end) in
   let debuginfos = Label_table.create 7 in
   let label_debuginfos rs dbg =
     let dbg = Debuginfo.get_dbg dbg in
-    let key = rs, dbg in
+    let key = rs, dbg, defnames_of_dbg dbg in
     try Label_table.find debuginfos key
     with Not_found ->
       let lbl = Cmm.new_label () in
@@ -300,7 +327,7 @@ let emit_frames a =
               (shift_left (of_int end_line) 26)
               (add (shift_left (of_int kind) 1) (of_int has_next)))))
   in
-  let emit_debuginfo (rs, dbg) lbl =
+  let emit_debuginfo (rs, dbg, _defnames) lbl =
     let rdbg = dbg |> Debuginfo.Dbg.to_list |> List.rev in
     (* Due to inlined functions, a single debuginfo may have multiple locations.
        These are represented sequentially in memory (innermost frame first),
@@ -309,10 +336,7 @@ let emit_frames a =
     a.efa_def_label lbl;
     let rec emit rs d rest =
       let open Debuginfo in
-      let defname =
-        Scoped_location.string_of_scopes ~include_zero_alloc:false
-          d.dinfo_scopes
-      in
+      let defname = string_of_scopes d.dinfo_scopes in
       let char_end = d.dinfo_char_end + d.dinfo_start_bol - d.dinfo_end_bol in
       let is_fully_packable =
         d.dinfo_line <= 0xFFF

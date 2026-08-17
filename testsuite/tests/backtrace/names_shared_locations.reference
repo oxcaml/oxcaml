@@ -1,0 +1,6 @@
+Raised at Names_shared_locations.raiser in file "names_shared_locations.ml", line 27, characters 30-41
+Called from Names_shared_locations.caller in file "names_shared_locations.ml", line 29, characters 32-48
+Called from Names_shared_locations.show in file "names_shared_locations.ml", line 32, characters 8-12
+Raised at Names_shared_locations.raiser_copy in file "names_shared_locations.ml", line 27, characters 30-41
+Called from Names_shared_locations.caller_copy in file "names_shared_locations.ml", line 29, characters 32-48
+Called from Names_shared_locations.show in file "names_shared_locations.ml", line 32, characters 8-12
