@@ -194,6 +194,8 @@ let
           ];
           nativeCheckInputs = [
             dot-merlin-reader
+            pkgs.python3
+            pkgs.which
             testOcaml
           ];
           checkInputs = [ ocamlPackages.alcotest ];
@@ -204,8 +206,9 @@ let
               tests/merlin-wrapper \
               tests/ocamlc-wrapper \
               tests/dune-wrapper \
+              scripts/combine-merge-conflicts.py \
               src/ocaml-index/tests/ocamlobjinfo-wrapper
-            MERLIN_TEST_OCAML_PATH=${testOcaml} \
+            DUNE_CACHE=disabled MERLIN_TEST_OCAML_PATH=${testOcaml} \
               dune build @check @runtest
             runHook postCheck
           '';
@@ -222,6 +225,8 @@ let
             devNativeBuildInputs = [
               ocamlPackages.menhir
               pkgs.jq
+              pkgs.python3
+              pkgs.which
             ];
           };
         };
