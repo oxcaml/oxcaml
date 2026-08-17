@@ -200,7 +200,11 @@ let
           doCheck = true;
           checkPhase = ''
             runHook preCheck
-            patchShebangs tests/merlin-wrapper
+            patchShebangs \
+              tests/merlin-wrapper \
+              tests/ocamlc-wrapper \
+              tests/dune-wrapper \
+              src/ocaml-index/tests/ocamlobjinfo-wrapper
             MERLIN_TEST_OCAML_PATH=${testOcaml} \
               dune build @check @runtest
             runHook postCheck
