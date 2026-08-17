@@ -22,12 +22,11 @@ let code loopify(never) size(43) newer_version_of(f_0)
       | 0 -> k3
       | 1 -> k4 (int_sub))
      where k4 (int_sub_1) =
-       let int_sub_2 = int_sub_1 in
-       let Parrayrefs = %array_load.mut (table_1, int_sub_2) in
+       let Parrayrefs = %array_load.mut (table_1, int_sub_1) in
        let prim = %phys_eq (Parrayrefs, 0) in
        switch prim
          | 0 -> k1 pop(regular k1) ($camlCse_minus__Pmakeblock33)
-         | 1 -> k2 (int_sub_2)
+         | 1 -> k2 (int_sub_1)
      where k3 =
        cont k1 pop(regular k1) ($camlCse_minus__block21))
     where k2 (int_sub) =
