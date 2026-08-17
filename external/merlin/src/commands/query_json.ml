@@ -61,6 +61,8 @@ let dump (type a) : a t -> json =
   | Type_expr (expr, pos) ->
     mk "type-expression"
       [ ("expression", `String expr); ("position", mk_position pos) ]
+  | Structured_errors { pronouns } ->
+    mk "structured-errors" [ ("pronouns", `Bool pronouns) ]
   | Stack_or_heap_enclosing (pos, lsp_compat, index) ->
     mk "stack-or-heap-enclosing"
       [ ( "index",
@@ -526,9 +528,93 @@ let json_of_search_result list =
   in
   `List list
 
+module Structured_errors = struct
+  module Protocol = Structured_diagnostic_protocol
+  module Generic = Protocol.Generic
+
+  let position (position : Protocol.Raw.Position.t) =
+    `Assoc [ ("line", `Int position.line); ("col", `Int position.col) ]
+
+  let location (loc : Protocol.Raw.Location.t) =
+    `Assoc
+      [ ("file", `String loc.file);
+        ("start", position loc.start);
+        ("end", position loc.end_)
+      ]
+
+  let annotation (annotation : Protocol.Raw.Location.t Generic.annotation) =
+    match annotation with
+    | Code -> `Assoc [ ("kind", `String "code") ]
+    | Source loc -> `Assoc [ ("kind", `String "source"); ("loc", location loc) ]
+    | Mention { entity; form } ->
+      `Assoc
+        [ ("kind", `String "mention");
+          ("entity", `Int entity);
+          ("form", `String (Protocol.Form.to_string form))
+        ]
+    | Term term -> `Assoc [ ("kind", `String "term"); ("term", `Int term) ]
+
+  let rec inline (segment : Protocol.Raw.Location.t Generic.inline) =
+    match segment with
+    | Text text -> `Assoc [ ("kind", `String "text"); ("text", `String text) ]
+    | Annotated segment ->
+      `Assoc
+        [ ("kind", `String "annotated");
+          ("annotation", annotation segment.annotation);
+          ("content", `List (List.map ~f:inline segment.content))
+        ]
+
+  let rec block (block : Protocol.Raw.Location.t Generic.block) =
+    `Assoc
+      [ ("kind", `String (Protocol.Kind.to_string block.kind));
+        ("content", `List (List.map ~f:inline block.content));
+        ("children", `List (List.map ~f:child block.children))
+      ]
+
+  and child (child : Protocol.Raw.Location.t Generic.child) =
+    `Assoc
+      [ ("relation", `String (Protocol.Relation.to_string child.relation));
+        ("block", block child.block)
+      ]
+
+  let entity (entity : Protocol.Raw.Location.t Generic.entity) =
+    `Assoc [ ("id", `Int entity.id); ("loc", location entity.loc) ]
+
+  let glossary_entry (entry : Generic.glossary_entry) =
+    let url =
+      match entry.url with
+      | None -> []
+      | Some url -> [ ("url", `String url) ]
+    in
+    `Assoc
+      ([ ("id", `Int entry.id);
+         ("term", `String entry.term);
+         ("category", `String entry.category);
+         ("description", `String entry.description)
+       ]
+      @ url)
+
+  let diagnostic (diagnostic : Protocol.Raw.diagnostic) =
+    `Assoc
+      [ ("loc", location diagnostic.loc);
+        ("title", `String diagnostic.title);
+        ("entities", `List (List.map ~f:entity diagnostic.entities));
+        ("glossary", `List (List.map ~f:glossary_entry diagnostic.glossary));
+        ("body", `List (List.map ~f:block diagnostic.body))
+      ]
+
+  let response (response : Protocol.Raw.response) : json =
+    `Assoc
+      [ ("version", `Int response.version);
+        ("diagnostics", `List (List.map ~f:diagnostic response.diagnostics))
+      ]
+end
+
 let json_of_response (type a) (query : a t) (response : a) : json =
   match (query, response) with
   | Type_expr _, str -> `String str
+  | Structured_errors _, diagnostics ->
+    Structured_errors.response (Structured_diagnostic.raw_response diagnostics)
   | Stack_or_heap_enclosing _, results ->
     `List (List.map ~f:json_of_stack_or_heap results)
   | Mode_enclosing _, results -> `List (List.map ~f:json_of_mode results)

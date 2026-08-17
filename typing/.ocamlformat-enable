@@ -40,3 +40,5 @@ signature_with_global_bindings.mli
 zero_alloc.ml
 zero_alloc.mli
 ikinds/*
+mode_diagnostics.ml
+mode_diagnostics.mli
