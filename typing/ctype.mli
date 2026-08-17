@@ -293,6 +293,10 @@ val apply:
            set to true.
            Exception [Cannot_apply] is raised in case of failure. *)
 
+val apply_list:
+        Env.t -> type_expr list -> type_expr list -> type_expr list ->
+        type_expr list
+
 val reduce_head:
   expand_reducible_abbrevs:bool -> Env.t -> type_expr -> type_expr
 (** Exhaustively beta-reduce head-position quotes, splices, quote-evals, and
