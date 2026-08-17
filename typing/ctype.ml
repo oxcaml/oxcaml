@@ -2153,7 +2153,11 @@ let unify_var' = (* Forward declaration *)
 
 let subst env level priv abbrev oty params args body =
   if List.length params <> List.length args then raise Cannot_subst;
-  with_level ~level begin fun () ->
+  match get_desc body with
+  | Tconstr (path, params', _abbrev) when params' == params && false ->
+     (* FIXME abbrev? *)
+     newty3 ~level ~scope:(get_scope body) (Tconstr (path, args, ref Mnil))
+  | _ -> with_level ~level begin fun () ->
     let body0 = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in        (* Stub *)
     let undo_abbrev =
       match oty with
@@ -2166,13 +2170,32 @@ let subst env level priv abbrev oty params args body =
               fun () -> forget_abbrev abbrev path
           | _ -> assert false
     in
-    abbreviations := abbrev;
-    let (params', body') = instance_parameterized_type params body in
-    abbreviations := ref Mnil;
+    let difficult_params, body' =
+      For_copy.with_scope (fun copy_scope ->
+        abbreviations := abbrev;
+        let try_subst param arg =
+          (* Mostly, params are distinct Tvars, and the subst is done by copy *)
+          match get_desc param with
+          | Tvar _ when get_level param = generic_level &&
+                        get_scope param = lowest_level ->
+             For_copy.redirect_desc copy_scope param (Tsubst (arg, None));
+             None
+          | _ ->
+             (* Some cases are more difficult, and left for unify_var below *)
+             Some (copy copy_scope param, arg)
+        in
+        let difficult_params =
+          List.map2 try_subst params args
+          |> List.filter_map Fun.id
+        in
+        let body = copy copy_scope body in
+        abbreviations := ref Mnil;
+        difficult_params, body)
+    in
     let uenv = Expression {env; in_subst = true} in
     try
       !unify_var' uenv body0 body';
-      List.iter2 (!unify_var' uenv) params' args;
+      List.iter (fun (param, arg) -> !unify_var' uenv param arg) difficult_params;
       body'
     with Unify _ ->
       undo_abbrev ();
