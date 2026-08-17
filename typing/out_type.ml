@@ -1247,22 +1247,6 @@ end = struct
   let weak_var_map = ref TypeMap.empty
   let named_weak_vars = ref String.Set.empty
 
-  let reset_names () =
-    names := [];
-    name_subst := [];
-    name_counter := 0;
-    named_vars := [];
-    visited_for_named_vars := [];
-    visited_for_modes := [];
-    visited_for_named_modevars := [];
-    visible_pairs := [];
-    aliased_visible_pairs := [];
-    printed_aliased_visible_pairs := [];
-    modenames := [];
-    Paths.reset visible_paths;
-    VarTbl.reset visible_vars;
-    modename_counter := 0
-
   let add_named_var tty =
     match tty.desc with
       Tvar { name = Some name } | Tunivar { name = Some name } ->
@@ -1963,12 +1947,50 @@ end = struct
     let lower = List.map into_lower_to edges_to in
     lower, upper
 
+  type edges =
+    { lower : edge_as_lower list;
+      upper : edge_as_upper list
+    }
+
+  let edge_table = ref ([] : (visible_pair * edges) list)
+
+  let reset_names () =
+    names := [];
+    name_subst := [];
+    name_counter := 0;
+    named_vars := [];
+    visited_for_named_vars := [];
+    visited_for_modes := [];
+    visited_for_named_modevars := [];
+    visible_pairs := [];
+    aliased_visible_pairs := [];
+    printed_aliased_visible_pairs := [];
+    modenames := [];
+    edge_table := [];
+    Paths.reset visible_paths;
+    VarTbl.reset visible_vars;
+    modename_counter := 0
+
+  let add_visible_edges () =
+    edge_table :=
+      List.map (fun pair ->
+        let lower, upper =
+          partition_edges_into_bounds
+            ~edges_from:(construct_edges_from pair)
+            ~edges_to:(construct_edges_to pair)
+        in
+        pair, { lower; upper })
+        !visible_pairs
+
+  let find_edges pair =
+    match
+      List.find_opt (fun (pair', _) -> eq_pair pair pair') !edge_table
+    with
+    | Some (_, edges) -> edges
+    | None -> { lower = []; upper = [] }
+
   let print_raw_constraints { lo; hi } ppf pair =
-    let edges_to = construct_edges_to pair in
-    let edges_from = construct_edges_from pair in
-    let edges_lower, edges_upper =
-      partition_edges_into_bounds ~edges_from ~edges_to
-    in
+    let { lower = edges_lower; upper = edges_upper } = find_edges pair in
     if List.is_empty edges_lower && List.is_empty edges_upper
        && lo = "" && hi = ""
     then begin
@@ -2150,6 +2172,7 @@ end = struct
       zap_non_generic_modes ty;
       add_named_modevars ty;
       add_visible_paths ();
+      add_visible_edges ();
       Btype.backtrack snap
     end
 end
