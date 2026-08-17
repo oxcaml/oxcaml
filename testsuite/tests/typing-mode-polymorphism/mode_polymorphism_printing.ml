@@ -123,8 +123,8 @@ type 'a myref = { mutable x : 'a; }
 let create a = { x = a }
 [%%expect{|
 val create :
-  'a @ [< global many forkable unyielding > past('m)] ->
-  'a myref @ [< past('m) > nonportable stateful] = <fun>
+  'a @ [< 'm . aliased dynamic & global many forkable unyielding] ->
+  'a myref @ [> 'm | nonportable stateful] = <fun>
 |}]
 
 let read r = r.x
@@ -230,16 +230,16 @@ val snd : 'a @ 'o -> ('b @ [< 'n] -> 'b @ [> 'n]) @ 'm = <fun>
 let foo x y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many uncontended forkable unyielding read_write > past('m)] ->
-  ('b @ 'n -> 'a ref @ [> aliased nonportable stateful dynamic]) @ [< past('m) > nonportable stateful] =
+  'a @ [< past('m) & global many uncontended forkable unyielding read_write] ->
+  ('b @ 'n -> 'a ref @ [> aliased nonportable stateful dynamic]) @ [> past('m) | nonportable stateful] =
   <fun>
 |}]
 
 let foo (x @ aliased) y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many uncontended forkable unyielding read_write > past('m)] ->
-  ('b @ 'n -> 'a ref @ [> aliased nonportable stateful dynamic]) @ [< past('m) > nonportable stateful] =
+  'a @ [< past('m) & global many uncontended forkable unyielding read_write] ->
+  ('b @ 'n -> 'a ref @ [> aliased nonportable stateful dynamic]) @ [> past('m) | nonportable stateful] =
   <fun>
 |}]
 
@@ -373,27 +373,27 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 let map f l = List.map f l
 [%%expect{|
 val map :
-  ('a @ [< past('m) > aliased nonportable stateful dynamic] ->
-   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('n) & global many forkable unyielding > past('o) | past('m)] ->
+  ('a @ [> past('m) | aliased nonportable stateful dynamic] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('o) & past('m) & past('n) & global many forkable unyielding] ->
   ('a list @ [< global many uncontended forkable unyielding read_write] ->
-   'b list @ [< past('o) > aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
+   'b list @ [> past('o) | aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
   <fun>
 |}, Principal{|
 val map :
-  ('a @ [< past('m) > aliased nonportable stateful dynamic] ->
-   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('n) & global many forkable unyielding > past('o) | past('m)] ->
+  ('a @ [> past('m) | aliased nonportable stateful dynamic] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('o) & past('m) & past('n) & global many forkable unyielding] ->
   ('a list @ [< global many uncontended forkable unyielding read_write] ->
-   'b list @ [< past('o) > aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
+   'b list @ [> past('o) | aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
   <fun>
 |}]
 
 let map_eta f = fun l -> List.map f l
 [%%expect{|
 val map_eta :
-  ('a @ [< past('m) > aliased nonportable stateful dynamic] ->
-   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('n) & global many forkable unyielding > past('o) | past('m)] ->
+  ('a @ [> past('m) | aliased nonportable stateful dynamic] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('o) & past('m) & past('n) & global many forkable unyielding] ->
   ('a list @ [< global many uncontended forkable unyielding read_write] ->
-   'b list @ [< past('o) > aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
+   'b list @ [> past('o) | aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
   <fun>
 |}]
 

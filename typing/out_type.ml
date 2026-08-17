@@ -1621,17 +1621,17 @@ end = struct
       | Amodevar (Amorphvar (v, f)), Amodevar (Amorphvar (u, g)) ->
         let vobj = C.src dst f in
         let uobj = C.src dst g in
-        let l = C.apply dst f v.desc_upper in
-        let r = C.apply dst g u.desc_lower in
-        if C.le dst l r
-        then [C.id]
+        let src_lower = C.apply dst f v.desc_lower in
+        let target_upper = C.apply dst g u.desc_upper in
+        if C.le dst target_upper src_lower
+        then [C.id] (* [target <= src] already holds by bounds *)
         else Paths.find visible_paths table (K (vobj, v), K (uobj, u))
       | _, _ ->
-        let l = dupper_lr dst src_descr in
-        let r = dlower_lr dst target_descr in
-        if C.le dst l r
-        then [C.id]
-        else [Alloc.meet_const_morph r]
+        let src_lower = dlower_lr dst src_descr in
+        let target_upper = dupper_lr dst target_descr in
+        if C.le dst target_upper src_lower
+        then [C.id] (* [target <= src] already holds by bounds *)
+        else [Alloc.meet_const_morph src_lower]
 
   let construct_closing_over_morphs :
       (Alloc.Comonadic.Const.t, allowed * allowed) Desc.t
