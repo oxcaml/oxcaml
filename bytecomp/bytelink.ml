@@ -246,11 +246,14 @@ let link_compunit output_fun currpos_fun inchan file_name offset compunit =
 
 (* Link in a .cmo file *)
 
-let link_object output_fun currpos_fun file_name compunit =
+let link_object ?(dir="") output_fun currpos_fun file_name compunit =
   let file, offset =
     match compunit.cu_pos with
     | Pos_internal offset -> file_name, offset
-    | Pos_external { filename; offset } -> find_file filename, offset
+    | Pos_external { filename; offset } ->
+       match Misc.find_in_path [dir] filename with
+       | fn -> fn, offset
+       | exception Not_found -> find_file filename, offset
   in
   let inchan = open_in_bin file in
   try
@@ -266,6 +269,7 @@ let link_object output_fun currpos_fun file_name compunit =
 
 let link_archive output_fun currpos_fun file_name units_required =
   let inchan = open_in_bin file_name in
+  let dir = Filename.dirname file_name in
   try
     List.iter
       (fun cu ->
@@ -277,7 +281,7 @@ let link_archive output_fun currpos_fun file_name units_required =
            | Pos_internal offset ->
              link_compunit output_fun currpos_fun inchan name offset cu
            | Pos_external _ ->
-             link_object output_fun currpos_fun file_name cu
+             link_object ~dir output_fun currpos_fun file_name cu
          with Symtable.Error msg ->
            raise(Error(Symbol_error(name, msg))))
       units_required;
