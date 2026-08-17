@@ -223,24 +223,18 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
       ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
         | Bigarray_load _ | Phys_equal _ | Int_arith _ | Int_shift _
         | Int_comp _ | Float_arith _ | Float_comp _ | Bigarray_get_alignment _
-        | Atomic_load_field _ | Atomic_load_offset _ | Poke _ | Read_offset _ ),
+        | Atomic_load _ | Poke _ | Read_offset _ ),
         _,
         _ )
   | Ternary
       ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
-        | Atomic_field_int_arith _ | Atomic_offset_int_arith _
-        | Atomic_set_field _ | Atomic_set_offset _ | Atomic_exchange_field _
-        | Atomic_exchange_offset _ | Write_offset _ ),
+        | Atomic_int_arith _ | Atomic_set _ | Atomic_exchange _ | Write_offset _
+          ),
         _,
         _,
         _ )
   | Quaternary
-      ( ( Atomic_compare_and_set_field _ | Atomic_compare_and_set_offset _
-        | Atomic_compare_exchange_field _ | Atomic_compare_exchange_offset _ ),
-        _,
-        _,
-        _,
-        _ )
+      ((Atomic_compare_and_set _ | Atomic_compare_exchange _), _, _, _, _)
   | Variadic ((Begin_region _ | Begin_try_region _ | Make_array _), _) ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with
