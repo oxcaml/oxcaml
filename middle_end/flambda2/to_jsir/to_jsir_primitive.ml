@@ -515,7 +515,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   | Poke _ ->
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
-  | Read_offset _ ->
+  | Atomic_load_offset _ | Read_offset _ ->
     (* CR selee: This is for block indices, which likely requires changes to
        JSOO to support. We will leave this for now. *)
     raise Primitive_not_supported
@@ -584,6 +584,7 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     let _var, env, res = use_prim' (Extern "caml_atomic_exchange_field") in
     unit ~env ~res
   | Atomic_exchange_field _ -> use_prim' (Extern "caml_atomic_exchange_field")
+  | Atomic_set_offset _ | Atomic_offset_int_arith _ | Atomic_exchange_offset _
   | Write_offset _ ->
     (* CR selee: This is for block indices, which likely requires changes to
        JSOO to support. We will leave this for now. *)
@@ -596,6 +597,8 @@ let quaternary_exn ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y
   | Atomic_compare_and_set_field _ -> use_prim' (Extern "caml_atomic_cas_field")
   | Atomic_compare_exchange_field _ ->
     use_prim' (Extern "caml_atomic_compare_exchange_field")
+  | Atomic_compare_and_set_offset _ | Atomic_compare_exchange_offset _ ->
+    raise Primitive_not_supported
 
 let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   match f with

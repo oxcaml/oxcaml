@@ -477,7 +477,7 @@ let binary_prim_size ~machine_width prim =
     binary_float_comp_primitive width cmp
   | Float_comp (_width, Yielding_int_like_compare_functions ()) -> 8
   | Bigarray_get_alignment _ -> 3 (* load data + add index + and *)
-  | Atomic_load_field _ -> 1
+  | Atomic_load_field _ | Atomic_load_offset _ -> 1
   | Poke _ -> 1
   | Read_offset _ -> 1
 
@@ -490,21 +490,31 @@ let ternary_prim_size ~machine_width prim =
     5 (* ~ 3 block_load + 2 block_set *)
   | Bigarray_set (_dims, _kind, _layout) -> 2
   (* ~ 1 block_load + 1 block_set *)
-  | Atomic_field_int_arith _ -> 1
-  | Atomic_set_field _ -> 1
-  | Atomic_exchange_field (Immediate, (Heap | Local)) -> 1
-  | Atomic_exchange_field (Any_value, (Heap | Local)) ->
+  | Atomic_field_int_arith _ | Atomic_offset_int_arith _ -> 1
+  | Atomic_set_field _ | Atomic_set_offset _ -> 1
+  | Atomic_exchange_field (Immediate, (Heap | Local))
+  | Atomic_exchange_offset (Immediate, (Heap | Local)) ->
+    1
+  | Atomic_exchange_field (Any_value, (Heap | Local))
+  | Atomic_exchange_offset (Any_value, (Heap | Local)) ->
     does_not_need_caml_c_call_extcall_size
   | Write_offset _ -> 1
 
 let quaternary_prim_size prim =
   match (prim : Flambda_primitive.quaternary_primitive) with
-  | Atomic_compare_and_set_field (Immediate, (Heap | Local)) -> 3
+  | Atomic_compare_and_set_field (Immediate, (Heap | Local))
+  | Atomic_compare_and_set_offset (Immediate, (Heap | Local)) ->
+    3
   | Atomic_compare_exchange_field
+      { atomic_kind = _; args_kind = Immediate; mode = Heap | Local }
+  | Atomic_compare_exchange_offset
       { atomic_kind = _; args_kind = Immediate; mode = Heap | Local } ->
     1
   | Atomic_compare_and_set_field (Any_value, (Heap | Local))
+  | Atomic_compare_and_set_offset (Any_value, (Heap | Local))
   | Atomic_compare_exchange_field
+      { atomic_kind = _; args_kind = Any_value; mode = Heap | Local }
+  | Atomic_compare_exchange_offset
       { atomic_kind = _; args_kind = Any_value; mode = Heap | Local } ->
     does_not_need_caml_c_call_extcall_size
 

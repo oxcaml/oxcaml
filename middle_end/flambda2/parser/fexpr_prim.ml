@@ -958,6 +958,11 @@ let atomic_load_field =
     binary "%atomic_load_field" ~params:block_access_field_kind (fun _ kind ->
         P.Atomic_load_field kind))
 
+let atomic_load_offset =
+  D.(
+    binary "%atomic_load_offset" ~params:block_access_field_kind (fun _ kind ->
+        P.Atomic_load_offset kind))
+
 let block_set =
   D.(
     binary "%block_set"
@@ -1226,16 +1231,33 @@ let atomic_exchange_field =
       ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
       (fun _ (a, mode) -> P.Atomic_exchange_field (a, mode)))
 
+let atomic_exchange_offset =
+  D.(
+    ternary "%atomic_exchange_offset"
+      ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
+      (fun _ (a, mode) -> P.Atomic_exchange_offset (a, mode)))
+
 let atomic_field_int_arith =
   D.(
     ternary "%atomic_field_int_arith" ~params:int_atomic_op (fun _ o ->
         P.Atomic_field_int_arith o))
+
+let atomic_offset_int_arith =
+  D.(
+    ternary "%atomic_offset_int_arith" ~params:int_atomic_op (fun _ o ->
+        P.Atomic_offset_int_arith o))
 
 let atomic_set_field =
   D.(
     ternary "%atomic_set_field"
       ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
       (fun _ (a, mode) -> P.Atomic_set_field (a, mode)))
+
+let atomic_set_offset =
+  D.(
+    ternary "%atomic_set_offset"
+      ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
+      (fun _ (a, mode) -> P.Atomic_set_offset (a, mode)))
 
 let bigarray_set =
   D.(
@@ -1272,6 +1294,12 @@ let atomic_compare_and_set_field =
       ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
       (fun _ (a, mode) -> P.Atomic_compare_and_set_field (a, mode)))
 
+let atomic_compare_and_set_offset =
+  D.(
+    quaternary "%atomic_compare_and_set_offset"
+      ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
+      (fun _ (a, mode) -> P.Atomic_compare_and_set_offset (a, mode)))
+
 let atomic_compare_exchange_field =
   D.(
     quaternary "%atomic_compare_exchange_field"
@@ -1279,6 +1307,14 @@ let atomic_compare_exchange_field =
         (param3 block_access_field_kind block_access_field_kind
            alloc_mode_for_assignments) (fun _ (atomic_kind, args_kind, mode) ->
         P.Atomic_compare_exchange_field { atomic_kind; args_kind; mode }))
+
+let atomic_compare_exchange_offset =
+  D.(
+    quaternary "%atomic_compare_exchange_offset"
+      ~params:
+        (param3 block_access_field_kind block_access_field_kind
+           alloc_mode_for_assignments) (fun _ (atomic_kind, args_kind, mode) ->
+        P.Atomic_compare_exchange_offset { atomic_kind; args_kind; mode }))
 
 (* Variadics *)
 let begin_region =
@@ -1383,6 +1419,7 @@ module OfFlambda = struct
   let binop env (op : P.binary_primitive) =
     match op with
     | Atomic_load_field ak -> atomic_load_field env ak
+    | Atomic_load_offset ak -> atomic_load_offset env ak
     | Block_set { kind; init; field } -> block_set env (kind, init, field)
     | Array_load (ak, width, mut) -> array_load env (ak, width, mut)
     | Bigarray_load (d, k, l) -> bigarray_load env (d, k, l)
@@ -1404,8 +1441,11 @@ module OfFlambda = struct
     match op with
     | Array_set (k, sk) -> array_set env (k, sk)
     | Atomic_exchange_field (a, mode) -> atomic_exchange_field env (a, mode)
+    | Atomic_exchange_offset (a, mode) -> atomic_exchange_offset env (a, mode)
     | Atomic_field_int_arith o -> atomic_field_int_arith env o
+    | Atomic_offset_int_arith o -> atomic_offset_int_arith env o
     | Atomic_set_field (a, mode) -> atomic_set_field env (a, mode)
+    | Atomic_set_offset (a, mode) -> atomic_set_offset env (a, mode)
     | Bytes_or_bigstring_set (blv, saw) -> bytes_or_bigstring_set env (blv, saw)
     | Bigarray_set (d, k, l) -> bigarray_set env (d, k, l)
     | Write_offset (wok, kind, alloc_mode) ->
@@ -1415,8 +1455,12 @@ module OfFlambda = struct
     match op with
     | Atomic_compare_and_set_field (a, mode) ->
       atomic_compare_and_set_field env (a, mode)
+    | Atomic_compare_and_set_offset (a, mode) ->
+      atomic_compare_and_set_offset env (a, mode)
     | Atomic_compare_exchange_field { atomic_kind; args_kind; mode } ->
       atomic_compare_exchange_field env (atomic_kind, args_kind, mode)
+    | Atomic_compare_exchange_offset { atomic_kind; args_kind; mode } ->
+      atomic_compare_exchange_offset env (atomic_kind, args_kind, mode)
 
   let varop env (op : P.variadic_primitive) =
     match op with

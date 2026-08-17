@@ -570,6 +570,7 @@ type binary_primitive =
   | Float_comp of float_bitwidth * unit comparison_behaviour
   | Bigarray_get_alignment of int
   | Atomic_load_field of Block_access_field_kind.t
+  | Atomic_load_offset of Block_access_field_kind.t
   (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
      deleting [Atomic_load_field] *)
   | Poke of Flambda_kind.Standard_int_or_float.t
@@ -600,8 +601,13 @@ type ternary_primitive =
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
   | Bigarray_set of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
   | Atomic_field_int_arith of int_atomic_op
+  | Atomic_offset_int_arith of int_atomic_op
   | Atomic_set_field of Block_access_field_kind.t * Alloc_mode.For_assignments.t
+  | Atomic_set_offset of
+      Block_access_field_kind.t * Alloc_mode.For_assignments.t
   | Atomic_exchange_field of
+      Block_access_field_kind.t * Alloc_mode.For_assignments.t
+  | Atomic_exchange_offset of
       Block_access_field_kind.t * Alloc_mode.For_assignments.t
   | Write_offset of
       Write_offset_kind.t
@@ -621,6 +627,8 @@ type ternary_primitive =
 type quaternary_primitive =
   | Atomic_compare_and_set_field of
       Block_access_field_kind.t * Alloc_mode.For_assignments.t
+  | Atomic_compare_and_set_offset of
+      Block_access_field_kind.t * Alloc_mode.For_assignments.t
   | Atomic_compare_exchange_field of
       { atomic_kind : Block_access_field_kind.t;
             (** The kind of values which the atomic can hold. *)
@@ -629,6 +637,11 @@ type quaternary_primitive =
                 used with on this particular occasion. Note that this might be
                 [Immediate] even though the atomic is marked as [Any_value], for
                 example. *)
+        mode : Alloc_mode.For_assignments.t
+      }
+  | Atomic_compare_exchange_offset of
+      { atomic_kind : Block_access_field_kind.t;
+        args_kind : Block_access_field_kind.t;
         mode : Alloc_mode.For_assignments.t
       }
 
