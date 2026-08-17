@@ -967,6 +967,10 @@ let ocaml_flags =
     ( "-strict-sequence",
       Marg.unit (fun ocaml -> { ocaml with strict_sequence = true }),
       " Left-hand part of a sequence must have type unit" );
+    ( "-structured-diagnostics",
+      Marg.unit (fun ocaml -> ocaml),
+      " Ignored; structured diagnostics are served by the structured-errors \
+       query" );
     ( "-no-app-funct",
       Marg.unit (fun ocaml -> { ocaml with applicative_functors = false }),
       " Deactivate applicative functors" );

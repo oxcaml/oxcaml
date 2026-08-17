@@ -626,6 +626,8 @@ let error_style_reader = {
   env_var = "OCAML_ERROR_STYLE";
 }
 
+let structured_diagnostics = ref false
+
 let unboxed_types = ref false
 
 let dump_debug_uids = ref false         (* -ddebug-uids *)

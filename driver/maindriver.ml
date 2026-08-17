@@ -20,6 +20,7 @@ module Options = Main_args.Make_bytecomp_options (Main_args.Default.Main)
 
 let main argv ppf =
   let program = "ocamlc" in
+  Structured_diagnostic_reporting.setup argv;
   Clflags.add_arguments __LOC__ Options.list;
   Clflags.add_arguments __LOC__
     ["-depend", Arg.Unit Makedepend.main_from_option,
@@ -40,8 +41,8 @@ let main argv ppf =
          ".cma");
     with Arg.Bad msg ->
       begin
-        prerr_endline msg;
-        Clflags.print_arguments program;
+        Structured_diagnostic_reporting.report_message msg
+          ~usage:(fun () -> Clflags.print_arguments program);
         exit 2
       end
     end;
@@ -155,5 +156,5 @@ let main argv ppf =
     end;
     0
   | exception x ->
-    Location.report_exception ppf x;
+    Structured_diagnostic_reporting.report_exception ppf x;
     2

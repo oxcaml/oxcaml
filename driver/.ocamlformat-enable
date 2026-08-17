@@ -10,3 +10,5 @@ functorizer.ml
 functorizer.mli
 oxcaml_args.ml
 oxcaml_args.mli
+structured_diagnostic_reporting.ml
+structured_diagnostic_reporting.mli

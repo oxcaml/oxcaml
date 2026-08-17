@@ -40,7 +40,7 @@ let print_standard_library () =
   raise (Exit_with_status 0)
 
 let fatal err =
-  prerr_endline err;
+  Structured_diagnostic_reporting.report_message err;
   raise (Exit_with_status 2)
 
 let extract_output = function
@@ -882,7 +882,8 @@ let parse_arguments ?(current=ref 0) argv f program =
       |> String.split_on_char '\000'
       |> List.hd
       |> String.trim in
-      Printf.eprintf "%s\n%s\n" err_msg usage_msg;
+      Structured_diagnostic_reporting.report_message err_msg
+        ~usage:(fun () -> prerr_string (usage_msg ^ "\n"));
       raise (Exit_with_status 2)
     | Arg.Help msg ->
       let err_msg =

@@ -21,6 +21,7 @@ module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
 let main unix argv ppf ~flambda2 =
+  Structured_diagnostic_reporting.setup argv;
   native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -94,8 +95,8 @@ let main unix argv ppf ~flambda2 =
          Compiler.ext_flambda_lib);
     with Arg.Bad msg ->
       begin
-        prerr_endline msg;
-        Clflags.print_arguments usage;
+        Structured_diagnostic_reporting.report_message msg
+          ~usage:(fun () -> Clflags.print_arguments usage);
         exit 2
       end
     end;
@@ -200,7 +201,7 @@ let main unix argv ppf ~flambda2 =
   | exception (Compenv.Exit_with_status n) ->
     n
   | exception x ->
-    Location.report_exception ppf x;
+    Structured_diagnostic_reporting.report_exception ppf x;
     2
   | () ->
     let output_profile_csv ppf_file = Profile.output_to_csv
