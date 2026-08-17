@@ -1733,7 +1733,7 @@ end
 
 (* Atomics *)
 
-type atomic_location =
+type atomic_offset =
   | Field_index of expression * Scalar_type.Integral.t
   | Byte_offset of expression * Scalar_type.Integral.t
 
@@ -1741,7 +1741,7 @@ val atomic_load :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   expression ->
-  atomic_location ->
+  atomic_offset ->
   expression
 
 val atomic_exchange :
@@ -1749,34 +1749,34 @@ val atomic_exchange :
   Lambda.immediate_or_pointer ->
   mode:Lambda.modify_mode ->
   expression ->
-  atomic_location ->
+  atomic_offset ->
   new_value:expression ->
   expression
 
 val atomic_fetch_and_add :
-  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
 
 val atomic_add :
-  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
 
 val atomic_sub :
-  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
 
 val atomic_land :
-  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
 
 val atomic_lor :
-  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
 
 val atomic_lxor :
-  dbg:Debuginfo.t -> expression -> atomic_location -> expression -> expression
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
 
 val atomic_compare_and_set :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
   mode:Lambda.modify_mode ->
   expression ->
-  atomic_location ->
+  atomic_offset ->
   old_value:expression ->
   new_value:expression ->
   expression
@@ -1786,7 +1786,7 @@ val atomic_compare_exchange :
   Lambda.immediate_or_pointer ->
   mode:Lambda.modify_mode ->
   expression ->
-  atomic_location ->
+  atomic_offset ->
   old_value:expression ->
   new_value:expression ->
   expression
