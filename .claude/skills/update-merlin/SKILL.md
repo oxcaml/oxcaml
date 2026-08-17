@@ -1,7 +1,7 @@
 ---
 name: update-merlin
 description: Update/merge the vendored Merlin after a compiler frontend change (parsing/, typing/, file_formats/, utils/), fix a failing Merlin-sync CI check, or teach Merlin about a new compiler flag.
-allowed-tools: Bash(external/merlin/scripts/import-ocaml-source.sh)
+allowed-tools: Bash(external/merlin/scripts/import-ocaml-source.sh), Bash(make merlin-build), Bash(external/merlin/scripts/assert-in-sync.sh), Bash(make merlin-test), Bash(make merlin-promote)
 ---
 
 # Updating Merlin After Compiler Frontend Changes
