@@ -901,6 +901,52 @@ let unary_float_arith_primitive _env dbg width op arg =
   | Float32, Abs -> C.float32_abs ~dbg arg
   | Float32, Neg -> C.float32_neg ~dbg arg
 
+let unary_int_bit_counting_primitive _env dbg (kind : K.Standard_int.t) op arg =
+  (* CR-someday bclement: It is a bit weird that we are converting back these
+     primitives to C calls. These were initially lowered to primitives in
+     cmm_builtins.ml, but we now do the recognition earlier (in
+     closure_conversion.ml) and it is easier to not change the cmm code paths
+     too much, but we should get rid of the extcalls and simply lower the
+     primitives here instead of in cmm_builtins.ml
+
+     While it looks like this could create external calls to C functions that
+     were not mentioned by the user, the primitives can only come from the
+     corresponding C extcall in the first place (see closure_conversion.ml). *)
+  let prim_name =
+    match (op : P.unary_int_bit_counting_op) with
+    | Leading_zeros -> "clz"
+    | Trailing_zeros -> "ctz"
+    | Popcount -> "popcnt"
+  in
+  let pf fmt = Format.asprintf fmt prim_name in
+  let ext_name =
+    match kind with
+    | Tagged_immediate -> pf "caml_int_%s_tagged_to_untagged"
+    | Naked_immediate -> pf "caml_int_%s_untagged_to_untagged"
+    | Naked_int8 -> pf "caml_int8_%s_untagged_to_untagged"
+    | Naked_int16 -> pf "caml_int16_%s_untagged_to_untagged"
+    | Naked_int32 -> pf "caml_int32_%s_unboxed_to_untagged"
+    | Naked_int64 -> pf "caml_int64_%s_unboxed_to_untagged"
+    | Naked_nativeint -> pf "caml_nativeint_%s_unboxed_to_untagged"
+  in
+  let { C.extcall; builtin_sign_extends } =
+    C.extcall ~dbg ~alloc:false ~returns:true ~is_c_builtin:true
+      ~effects:No_effects ~coeffects:No_coeffects
+      ~ty_args:[C.exttype_of_kind (K.Standard_int.to_kind kind)]
+      ext_name Cmm.typ_int [arg]
+  in
+  (* Small integer primitives return small integers and might need sign
+     extension. See also comment in [To_cmm_expr]. *)
+  if builtin_sign_extends
+  then extcall
+  else
+    match kind with
+    | Naked_int8 -> C.sign_extend ~bits:8 ~dbg extcall
+    | Naked_int16 -> C.sign_extend ~bits:16 ~dbg extcall
+    | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+    | Naked_nativeint ->
+      extcall
+
 let arithmetic_conversion dbg src dst arg =
   if K.Standard_int_or_float.equal src dst
   then None, arg
@@ -1207,6 +1253,8 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     None, res, unary_int_arith_primitive env dbg kind op arg
   | Float_arith (width, op) ->
     None, res, unary_float_arith_primitive env dbg width op arg
+  | Int_bit_counting (kind, op) ->
+    None, res, unary_int_bit_counting_primitive env dbg kind op arg
   | Num_conv { src; dst } ->
     let extra, expr = arithmetic_conversion dbg src dst arg in
     extra, res, expr

@@ -571,6 +571,165 @@ module Stdlib = struct
     include Int
     let min (a : int) (b : int) = min a b
     let max (a : int) (b : int) = max a b
+
+    (* Number of leading zeros.  Hacker's Delight (2 ed.), algorithm 5.12 *)
+
+    let leading_zeros x =
+      let x = ref x and n = ref Sys.int_size in
+      if Sys.int_size > 32 then begin
+        let y = shift_right_logical !x 32 in
+        if y <> 0 then (n := !n - 32; x := y)
+      end;
+      let y = shift_right_logical !x 16 in
+      if y <> 0 then (n := !n - 16; x := y);
+      let y = shift_right_logical !x  8 in
+      if y <> 0 then (n := !n -  8; x := y);
+      let y = shift_right_logical !x  4 in
+      if y <> 0 then (n := !n -  4; x := y);
+      let y = shift_right_logical !x 2 in
+      if y <> 0 then (n := !n -  2; x := y);
+      let y = shift_right_logical !x 1 in
+      if y <> 0 then !n - 2 else !n - !x
+
+    (* Number of trailing zeros.  Hacker's Delight (2 ed.), algorithm 5.21 *)
+
+    let trailing_zeros x =
+      if x = 0 then Sys.int_size else begin
+        let x = ref x and n = ref (Sys.int_size - 1) in
+        if Sys.int_size > 32 then begin
+          let y = shift_left !x 32 in
+          if y <> 0 then (n := !n - 32; x := y)
+        end;
+        let y = shift_left !x 16 in
+        if y <> 0 then (n := !n - 16; x := y);
+        let y = shift_left !x  8 in
+        if y <> 0 then (n := !n -  8; x := y);
+        let y = shift_left !x  4 in
+        if y <> 0 then (n := !n -  4; x := y);
+        let y = shift_left !x  2 in
+        if y <> 0 then (n := !n -  2; x := y);
+        let y = shift_left !x  1 in
+        if y <> 0 then !n - 1 else !n
+      end
+
+    (* Population count.  Hacker's Delight (2 ed.), algorithm 5.2 *)
+
+    external int64_to_int : int64 -> int = "%int64_to_int"
+    let cst1 = int64_to_int 0x5555_5555_5555_5555L
+    let cst2 = int64_to_int 0x3333_3333_3333_3333L
+    let cst3 = int64_to_int 0x0F0F_0F0F_0F0F_0F0FL
+
+    let popcount x =
+      let x = sub x (logand (shift_right_logical x 1) cst1) in
+      let x = add (logand x cst2)
+                  (logand (shift_right_logical x 2) cst2) in
+      let x = logand (add x (shift_right_logical x 4)) cst3 in
+      let x = add x (shift_right_logical x 8) in
+      let x = add x (shift_right_logical x 16) in
+      if Sys.int_size > 32 then begin
+        let x = add x (shift_right_logical x 32) in
+        x land 0x7F
+      end else
+        x land 0x3F
+  end
+
+  module Int32 = struct
+    include Int32
+
+    (* Number of leading zeros.  Hacker's Delight (2 ed.), algorithm 5.12 *)
+
+    let leading_zeros x =
+      let x = ref x and n = ref 32 in
+      let y = shift_right_logical !x 16 in
+      if y <> 0l then (n := !n - 16; x := y);
+      let y = shift_right_logical !x  8 in
+      if y <> 0l then (n := !n -  8; x := y);
+      let y = shift_right_logical !x  4 in
+      if y <> 0l then (n := !n -  4; x := y);
+      let y = shift_right_logical !x 2 in
+      if y <> 0l then (n := !n -  2; x := y);
+      let y = shift_right_logical !x 1 in
+      if y <> 0l then !n - 2 else !n - to_int !x
+
+    (* Number of trailing zeros.  Hacker's Delight (2 ed.), algorithm 5.21 *)
+
+    let trailing_zeros x =
+      if x = 0l then 32 else begin
+        let x = ref x and n = ref 31 in
+        let y = shift_left !x 16 in
+        if y <> 0l then (n := !n - 16; x := y);
+        let y = shift_left !x  8 in
+        if y <> 0l then (n := !n -  8; x := y);
+        let y = shift_left !x  4 in
+        if y <> 0l then (n := !n -  4; x := y);
+        let y = shift_left !x  2 in
+        if y <> 0l then (n := !n -  2; x := y);
+        let y = shift_left !x  1 in
+        if y <> 0l then !n - 1 else !n
+      end
+
+    (* Population count.  Hacker's Delight (2 ed.), algorithm 5.2 *)
+
+    let popcount x =
+      let x = sub x (logand (shift_right_logical x 1) 0x5555_5555l) in
+      let x = add (logand x 0x3333_3333l)
+                  (logand (shift_right_logical x 2) 0x3333_3333l) in
+      let x = logand (add x (shift_right_logical x 4)) 0x0F0F_0F0Fl in
+      let x = add x (shift_right_logical x 8) in
+      let x = add x (shift_right_logical x 16) in
+      to_int x land 0x3F
+  end
+
+  module Int64 = struct
+    include Int64
+
+    (* Number of leading zeros.  Hacker's Delight (2 ed.), algorithm 5.12 *)
+
+    let leading_zeros x =
+      let x = ref x and n = ref 64 in
+      let y = shift_right_logical !x 32 in
+      if y <> 0L then (n := !n - 32; x := y);
+      let y = shift_right_logical !x 16 in
+      if y <> 0L then (n := !n - 16; x := y);
+      let y = shift_right_logical !x  8 in
+      if y <> 0L then (n := !n -  8; x := y);
+      let y = shift_right_logical !x  4 in
+      if y <> 0L then (n := !n -  4; x := y);
+      let y = shift_right_logical !x 2 in
+      if y <> 0L then (n := !n -  2; x := y);
+      let y = shift_right_logical !x 1 in
+      if y <> 0L then !n - 2 else !n - to_int !x
+
+    (* Number of trailing zeros.  Hacker's Delight (2 ed.), algorithm 5.21 *)
+
+    let trailing_zeros x =
+      if x = 0L then 64 else begin
+        let x = ref x and n = ref 63 in
+        let y = shift_left !x 32 in
+        if y <> 0L then (n := !n - 32; x := y);
+        let y = shift_left !x 16 in
+        if y <> 0L then (n := !n - 16; x := y);
+        let y = shift_left !x  8 in
+        if y <> 0L then (n := !n -  8; x := y);
+        let y = shift_left !x  4 in
+        if y <> 0L then (n := !n -  4; x := y);
+        let y = shift_left !x  2 in
+        if y <> 0L then (n := !n -  2; x := y);
+        let y = shift_left !x  1 in
+        if y <> 0L then !n - 1 else !n
+      end
+
+    (* Population count.  Hacker's Delight (2 ed.), algorithm 5.2 *)
+
+    let popcount x =
+      let x = sub x (logand (shift_right_logical x 1) 0x5555_5555_5555_5555L) in
+      let x = add (logand x 0x3333_3333_3333_3333L)
+                  (logand (shift_right_logical x 2) 0x3333_3333_3333_3333L) in
+      let x = logand (add x (shift_right_logical x 4)) 0x0F0F_0F0F_0F0F_0F0FL in
+      let x = add x (shift_right_logical x 8) in
+      let x = add x (shift_right_logical x 16) in
+      let x = add x (shift_right_logical x 32) in
+      to_int x land 0x7F
   end
 
   external compare : 'a -> 'a -> int = "%compare"
