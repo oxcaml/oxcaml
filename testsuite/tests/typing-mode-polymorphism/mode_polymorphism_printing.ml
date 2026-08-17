@@ -317,7 +317,7 @@ val foo :
   'a @ [< 'm > local unforkable yielding] ->
   ('b @ [< 'n & unique] ->
    ('c @ [< 'o & portable] ->
-    'a * 'b * 'c @ [> 'o | 'n | 'm | local unforkable yielding]) @ [> close('m) | close('n) | local unforkable yielding]) @ [> close('m) | local unforkable yielding] =
+    'a * 'b * 'c @ [> 'o | 'n | 'm | local unforkable yielding]) @ [> close('n) | close('m) | local unforkable yielding]) @ [> close('m) | local unforkable yielding] =
   <fun>
 |}]
 
@@ -626,7 +626,7 @@ let triple x y z = (x, y, z)
 val triple :
   'a @ [< 'm & global] ->
   ('b @ [< 'n & global] ->
-   ('c @ [< 'o & global] -> 'a * 'b * 'c @ [> 'o | 'n | 'm]) @ [> close('m) | close('n)]) @ [> close('m)] =
+   ('c @ [< 'o & global] -> 'a * 'b * 'c @ [> 'o | 'n | 'm]) @ [> close('n) | close('m)]) @ [> close('m)] =
   <fun>
 |}]
 
