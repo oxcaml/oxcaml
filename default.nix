@@ -95,17 +95,21 @@ let
     };
   });
 
+  menhirVersion = "20231231";
+
+  menhirSrc = pkgs.fetchFromGitLab {
+    domain = "gitlab.inria.fr";
+    owner = "fpottier";
+    repo = "menhir";
+    tag = menhirVersion;
+    sha256 = "sha256-veB0ORHp6jdRwCyDDAfc7a7ov8sOeHUmiELdOFf/QYk=";
+  };
+
   menhirLib = pkgs.ocaml-ng.ocamlPackages_4_14.menhirLib.overrideAttrs (
-    new: old: rec {
-      version = "20231231";
+    new: old: {
+      version = menhirVersion;
       patches = [ ];
-      src = pkgs.fetchFromGitLab {
-        domain = "gitlab.inria.fr";
-        owner = "fpottier";
-        repo = "menhir";
-        tag = version;
-        sha256 = "sha256-veB0ORHp6jdRwCyDDAfc7a7ov8sOeHUmiELdOFf/QYk=";
-      };
+      src = menhirSrc;
     }
   );
 
@@ -125,6 +129,85 @@ let
         '';
       }
     );
+
+  mkMerlinPackages =
+    testOcaml:
+    let
+      # nixpkgs does not yet provide an OCaml 5.4 package set at the pinned
+      # revision, so construct one around the compiler used to bootstrap
+      # OxCaml.
+      ocamlPackages =
+        (pkgs.ocaml-ng.mkOcamlPackages ocaml_5_4_0).overrideScope (
+          _: osuper: {
+            dune_3 = dune;
+
+            # Merlin relies on generated parser sources matching this version.
+            menhirLib = osuper.menhirLib.overrideAttrs (_: {
+              version = menhirVersion;
+              src = menhirSrc;
+            });
+
+            inherit (packages) merlin-lib dot-merlin-reader merlin;
+          }
+        );
+
+      inherit (ocamlPackages) buildDunePackage;
+      merlinSrc = "${src}/external/merlin";
+
+      packages = rec {
+        merlin-lib = buildDunePackage {
+          pname = "merlin-lib";
+          version = "dev";
+          src = merlinSrc;
+          duneVersion = "3";
+          propagatedBuildInputs = [ ocamlPackages.csexp ];
+          checkInputs = [ ocamlPackages.alcotest ];
+          doCheck = true;
+        };
+
+        dot-merlin-reader = buildDunePackage {
+          pname = "dot-merlin-reader";
+          version = "dev";
+          src = merlinSrc;
+          duneVersion = "3";
+          propagatedBuildInputs = [ ocamlPackages.findlib ];
+          buildInputs = [ merlin-lib ];
+          doCheck = true;
+        };
+
+        merlin = buildDunePackage {
+          pname = "merlin";
+          version = "dev";
+          src = merlinSrc;
+          duneVersion = "3";
+          buildInputs = [
+            merlin-lib
+            dot-merlin-reader
+            ocamlPackages.menhirLib
+            ocamlPackages.menhirSdk
+            ocamlPackages.yojson
+          ];
+          nativeBuildInputs = [
+            ocamlPackages.menhir
+            pkgs.jq
+          ];
+          nativeCheckInputs = [
+            dot-merlin-reader
+            testOcaml
+          ];
+          doCheck = true;
+          checkPhase = ''
+            runHook preCheck
+            patchShebangs tests/merlin-wrapper
+            MERLIN_TEST_OCAML_PATH=${testOcaml} \
+              dune build @check @runtest
+            runHook postCheck
+          '';
+          meta.mainProgram = "ocamlmerlin";
+        };
+      };
+    in
+    packages;
 
   gfortran =
     # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
@@ -304,6 +387,8 @@ stdenv.mkDerivation {
       make install             - Install
       make test                - Run all tests
       make test-one TEST=...   - Run a single test
+      make merlin-build        - Build Merlin
+      make merlin-test         - Run the Merlin tests
     EOF
   '';
 
@@ -311,7 +396,13 @@ stdenv.mkDerivation {
     { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
 
   passthru = {
-    inherit ocaml_4_14_2 ocaml_5_4_0 ocamlformat lldb;
+    inherit
+      ocaml_4_14_2
+      ocaml_5_4_0
+      ocamlformat
+      lldb
+      mkMerlinPackages
+      ;
   };
 
 }

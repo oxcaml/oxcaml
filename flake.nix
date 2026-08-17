@@ -23,10 +23,12 @@
         pkgs = nixpkgs.legacyPackages.${system};
         lib = pkgs.lib;
         oxcaml = pkgs.callPackage ./default.nix { src = self; };
+        merlinPackages = oxcaml.mkMerlinPackages oxcaml;
       in
       {
         packages = {
           inherit oxcaml;
+          inherit (merlinPackages) merlin-lib dot-merlin-reader merlin;
           oxcaml-fp = oxcaml.override { framePointers = true; };
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           default = oxcaml;
@@ -37,12 +39,16 @@
             oxcaml
             oxcaml-fp
             oxcaml-asan
+            merlin
             ;
         };
 
         formatter = pkgs.nixfmt-tree;
 
-        devShells.default = self.packages.${system}.oxcaml;
+        devShells.default = pkgs.mkShell {
+          inputsFrom = [ oxcaml ] ++ lib.attrValues merlinPackages;
+          packages = [ merlinPackages.merlin ];
+        };
 
       }
     )
