@@ -245,8 +245,8 @@ let foo (x : int @ portable) (y : int @ nonportable) =
   use_portable y
 [%%expect{|
 val foo :
-  int @ [< 'm @@ past & global portable] ->
-  (int @ [> nonportable] -> unit @ [> dynamic]) @ [> 'm | nonportable stateful] =
+  int @ [< past('m) & global portable] ->
+  (int @ [> nonportable] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
   <fun>
 |}]
 

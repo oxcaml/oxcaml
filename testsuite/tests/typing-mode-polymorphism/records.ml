@@ -21,25 +21,25 @@ let alloc x = { i = x }
 [%%expect{|
 type 'a myref = { mutable i : 'a; }
 val alloc :
-  'a @ [< global many forkable unyielding > 'm] ->
-  'a myref @ [< 'm @@ past > nonportable stateful] = <fun>
+  'a @ [< global many forkable unyielding > past('m)] ->
+  'a myref @ [< past('m) > nonportable stateful] = <fun>
 |}]
 
 let store_local (x @ local) y = x.i <- y
 [%%expect{|
 val store_local :
-  'a myref @ [< 'm @@ past & corrupted write > local unforkable yielding] ->
+  'a myref @ [< past('m) & corrupted write > local unforkable yielding] ->
   ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> 'm | local corruptible unforkable yielding writing] =
+   unit @ 'n) @ [> past('m) | local corruptible unforkable yielding writing] =
   <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
 [%%expect{|
 val store_global :
-  'a myref @ [< 'm @@ past & global corrupted forkable unyielding write] ->
+  'a myref @ [< past('m) & global corrupted forkable unyielding write] ->
   ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> 'm | corruptible writing] =
+   unit @ 'n) @ [> past('m) | corruptible writing] =
   <fun>
 |}]
 
@@ -127,6 +127,6 @@ Error: This value is "once" but is expected to be "many".
 let foo (x @ contended) = alloc x
 [%%expect{|
 val foo :
-  'a @ [< global many forkable unyielding > 'm | contended] ->
-  'a myref @ [< 'm @@ past > nonportable contended stateful dynamic] = <fun>
+  'a @ [< global many forkable unyielding > past('m) | contended] ->
+  'a myref @ [< past('m) > nonportable contended stateful dynamic] = <fun>
 |}]

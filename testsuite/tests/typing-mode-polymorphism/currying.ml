@@ -83,9 +83,9 @@ let check_tuple x y z =
 [%%expect{|
 type box = { mutable x : int; }
 val check_tuple :
-  'a @ [< 'o @@ past & 'm @@ past & global unique] ->
+  'a @ [< past('o) & past('m) & global unique] ->
   ('b @ [< 'n & global many] ->
-   ('c @ 'p -> unit * 'b * 'b @ [> 'n | aliased dynamic]) @ [> close('n) | 'o | once nonportable stateful]) @ [> 'm | once nonportable stateful] =
+   ('c @ 'p -> unit * 'b * 'b @ [> 'n | aliased dynamic]) @ [> close('n) | past('o) | once nonportable stateful]) @ [> past('m) | once nonportable stateful] =
   <fun>
 |}]
 
@@ -126,11 +126,11 @@ Error: The value "bar1" is "nonportable"
 let many_arguments x y z s t = y
 [%%expect{|
 val many_arguments :
-  'a @ [< 'mm2 @@ past & 'q @@ past & 'o @@ past & 'm @@ past & global] ->
+  'a @ [< past('mm2) & past('q) & past('o) & past('m) & global] ->
   ('b @ [< 'n & global] ->
-   ('c @ [< 'mm1 @@ past & 'p @@ past & global] ->
-    ('d @ [< 'mm0 @@ past & global] ->
-     ('e @ 'mm3 -> 'b @ [> 'n]) @ [> close('n) | 'mm0 | 'mm1 | 'mm2]) @ [> close('n) | 'p | 'q]) @ [> close('n) | 'o]) @ [> 'm] =
+   ('c @ [< past('mm1) & past('p) & global] ->
+    ('d @ [< past('mm0) & global] ->
+     ('e @ 'mm3 -> 'b @ [> 'n]) @ [> close('n) | past('mm0) | past('mm1) | past('mm2)]) @ [> close('n) | past('p) | past('q)]) @ [> close('n) | past('o)]) @ [> past('m)] =
   <fun>
 |}]
 
@@ -139,8 +139,8 @@ let foo (x @ portable) (y @ uncontended) =
   use_uncontended y
 [%%expect{|
 val foo :
-  'a @ [< 'm @@ past & global portable] ->
-  ('b @ [< global uncontended] -> unit @ [> dynamic]) @ [> 'm | nonportable stateful] =
+  'a @ [< past('m) & global portable] ->
+  ('b @ [< global uncontended] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
   <fun>
 |}]
 
@@ -149,8 +149,8 @@ let foo (x @ portable) (y @ uncontended) =
   use_portable f
 [%%expect{|
 val foo :
-  'a @ [< 'm @@ past & global portable] ->
-  ('b @ [< global portable uncontended] -> unit @ [> dynamic]) @ [> 'm | nonportable stateful] =
+  'a @ [< past('m) & global portable] ->
+  ('b @ [< global portable uncontended] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
   <fun>
 |}]
 

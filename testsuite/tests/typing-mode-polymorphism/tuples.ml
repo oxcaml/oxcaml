@@ -41,8 +41,8 @@ let foo (x @ portable) (y @ portable) =
   use_portable a
 [%%expect{|
 val foo :
-  'a @ [< 'm @@ past & global portable] ->
-  ('b @ [< global portable] -> unit @ [> dynamic]) @ [> 'm | nonportable stateful] =
+  'a @ [< past('m) & global portable] ->
+  ('b @ [< global portable] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
   <fun>
 |}]
 
@@ -132,8 +132,8 @@ let foo (x @ portable) (y @ portable) =
   use_portable p
 [%%expect{|
 val foo :
-  'a @ [< 'm @@ past & global portable] ->
-  ('b @ [< global portable] -> unit @ [> dynamic]) @ [> 'm | nonportable stateful] =
+  'a @ [< past('m) & global portable] ->
+  ('b @ [< global portable] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
   <fun>
 |}]
 

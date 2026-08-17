@@ -26,12 +26,12 @@ val foo : 'a @ [< 'm & global] -> 'a @ [> 'm | dynamic] = <fun>
 let foo f x = f x
 [%%expect{|
 val foo :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
-  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> 'o] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}, Principal{|
 val foo :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
-  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> 'o] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}]
 
 let foo =
@@ -46,8 +46,8 @@ let foo a b = a + b
 val foo : int @ 'n -> (int @ 'm -> int @ [> dynamic]) @ [> stateful] = <fun>
 |}, Principal{|
 val foo :
-  int @ [< 'm @@ past & global] ->
-  (int @ 'n -> int @ [> dynamic]) @ [> 'm | stateful] = <fun>
+  int @ [< past('m) & global] ->
+  (int @ 'n -> int @ [> dynamic]) @ [> past('m) | stateful] = <fun>
 |}]
 
 
@@ -123,8 +123,8 @@ type 'a myref = { mutable x : 'a; }
 let create a = { x = a }
 [%%expect{|
 val create :
-  'a @ [< global many forkable unyielding > 'm] ->
-  'a myref @ [< 'm @@ past > nonportable stateful] = <fun>
+  'a @ [< global many forkable unyielding > past('m)] ->
+  'a myref @ [< past('m) > nonportable stateful] = <fun>
 |}]
 
 let read r = r.x
@@ -137,9 +137,9 @@ val read :
 let store r = fun a -> r.x <- a
 [%%expect{|
 val store :
-  'a myref @ [< 'm @@ past & global corrupted write] ->
+  'a myref @ [< past('m) & global corrupted write] ->
   ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> 'm | corruptible writing] =
+   unit @ 'n) @ [> past('m) | corruptible writing] =
   <fun>
 |}]
 
@@ -193,7 +193,7 @@ val foo : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
 let foo x y = y
 [%%expect{|
 val foo :
-  'a @ [< 'm @@ past & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> 'm] =
+  'a @ [< past('m) & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)] =
   <fun>
 |}]
 
@@ -210,10 +210,10 @@ val foo :
 let foo f = fun x -> fun y -> f x y
 [%%expect{|
 val foo :
-  ('a @ [< 'm @@ past > 'q] ->
-   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> 'm | 'n]) @ [< 'mm1 @@ past & 'n @@ past & 'mm0 @@ past & global] ->
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
   ('a @ [< 'q & global] ->
-   ('b @ [< 'p] -> 'c @ [> 'o | dynamic]) @ [> close('q) | 'mm1]) @ [> 'mm0] =
+   ('b @ [< 'p] -> 'c @ [> 'o | dynamic]) @ [> close('q) | past('mm1)]) @ [> past('mm0)] =
   <fun>
 |}]
 
@@ -230,16 +230,16 @@ val snd : 'a @ 'o -> ('b @ [< 'n] -> 'b @ [> 'n]) @ 'm = <fun>
 let foo x y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many uncontended forkable unyielding read_write > 'm] ->
-  ('b @ 'n -> 'a ref @ [> aliased nonportable stateful dynamic]) @ [< 'm @@ past > nonportable stateful] =
+  'a @ [< global many uncontended forkable unyielding read_write > past('m)] ->
+  ('b @ 'n -> 'a ref @ [> aliased nonportable stateful dynamic]) @ [< past('m) > nonportable stateful] =
   <fun>
 |}]
 
 let foo (x @ aliased) y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many uncontended forkable unyielding read_write > 'm | aliased] ->
-  ('b @ 'n -> 'a ref @ [> aliased nonportable stateful dynamic]) @ [< 'm @@ past > nonportable stateful] =
+  'a @ [< global many uncontended forkable unyielding read_write > past('m) | aliased] ->
+  ('b @ 'n -> 'a ref @ [> aliased nonportable stateful dynamic]) @ [< past('m) > nonportable stateful] =
   <fun>
 |}]
 
@@ -253,8 +253,9 @@ val foo :
 let foo x y z = 42
 [%%expect{|
 val foo :
-  'a @ [< 'o @@ past & 'm @@ past & global] ->
-  ('b @ [< 'n @@ past & global] -> ('c @ 'q -> int @ 'p) @ [> 'n | 'o]) @ [> 'm] =
+  'a @ [< past('o) & past('m) & global] ->
+  ('b @ [< past('n) & global] ->
+   ('c @ 'q -> int @ 'p) @ [> past('n) | past('o)]) @ [> past('m)] =
   <fun>
 |}]
 
@@ -268,9 +269,9 @@ val foo :
 let foo x y z = (y,z)
 [%%expect{|
 val foo :
-  'a @ [< 'o @@ past & 'm @@ past & global] ->
+  'a @ [< past('o) & past('m) & global] ->
   ('b @ [< 'n & global] ->
-   ('c @ [< 'p & global] -> 'b * 'c @ [> 'p | 'n]) @ [> close('n) | 'o]) @ [> 'm] =
+   ('c @ [< 'p & global] -> 'b * 'c @ [> 'p | 'n]) @ [> close('n) | past('o)]) @ [> past('m)] =
   <fun>
 |}]
 
@@ -307,8 +308,8 @@ val foo : unit -> unit = <fun>
 let foo (y @ unique) (z @ portable) = z
 [%%expect{|
 val foo :
-  'a @ [< 'm @@ past & global unique] ->
-  ('b @ [< 'n & portable] -> 'b @ [> 'n]) @ [> 'm] = <fun>
+  'a @ [< past('m) & global unique] ->
+  ('b @ [< 'n & portable] -> 'b @ [> 'n]) @ [> past('m)] = <fun>
 |}]
 
 let foo (x @ local) (y @ unique) (z @ portable) = exclave_ (x, y, z)
@@ -329,38 +330,38 @@ let foo (x : intref) (f : intref @ local -> int) = f x
 [%%expect{|
 type intref = { mutable v : int; }
 val foo :
-  intref @ [< 'm @@ past & global uncontended read_write] ->
-  ((intref @ local -> int) @ 'n -> int @ [> dynamic]) @ [> 'm | nonportable stateful] =
+  intref @ [< past('m) & global uncontended read_write] ->
+  ((intref @ local -> int) @ 'n -> int @ [> dynamic]) @ [> past('m) | nonportable stateful] =
   <fun>
 |}]
 
 let foo (f : int -> int) x y = f
 [%%expect{|
 val foo :
-  (int -> int) @ [< 'p . aliased contended immutable & 'o @@ past & 'm @@ past & global] ->
-  ('a @ [< 'n @@ past & global] ->
-   ('b @ 'q -> (int -> int) @ [> 'p]) @ [> 'n | 'o]) @ [> 'm] =
+  (int -> int) @ [< 'p . aliased contended immutable & past('o) & past('m) & global] ->
+  ('a @ [< past('n) & global] ->
+   ('b @ 'q -> (int -> int) @ [> 'p]) @ [> past('n) | past('o)]) @ [> past('m)] =
   <fun>
 |}, Principal{|
 val foo :
   (int -> int) @ [< 'm . aliased contended immutable & global] ->
-  ('a @ [< 'n @@ past & global] ->
-   ('b @ 'o -> (int -> int) @ [> 'm]) @ [> close('m) @@ many portable stateless | 'n]) @ [> close('m) @@ many portable stateless] =
+  ('a @ [< past('n) & global] ->
+   ('b @ 'o -> (int -> int) @ [> 'm]) @ [> close('m) @@ many portable stateless | past('n)]) @ [> close('m) @@ many portable stateless] =
   <fun>
 |}]
 
 let foo (f : intref @ local -> int) (x : intref) (y : intref) = f x
 [%%expect{|
 val foo :
-  (intref @ local -> int) @ [< 'o @@ past & 'm @@ past & global] ->
-  (intref @ [< 'n @@ past & global uncontended read_write] ->
-   (intref @ 'p -> int @ [> dynamic]) @ [> 'n @@ many portable forkable unyielding stateless | 'o | nonportable stateful]) @ [> 'm] =
+  (intref @ local -> int) @ [< past('o) & past('m) & global] ->
+  (intref @ [< past('n) & global uncontended read_write] ->
+   (intref @ 'p -> int @ [> dynamic]) @ [> past('n @@ many portable forkable unyielding stateless) | past('o) | nonportable stateful]) @ [> past('m)] =
   <fun>
 |}, Principal{|
 val foo :
-  (intref @ local -> int) @ [< 'o @@ past & 'm @@ past & global] ->
-  (intref @ [< 'n @@ past & global uncontended read_write] ->
-   (intref @ 'p -> int @ [> dynamic]) @ [> 'n | 'o | nonportable stateful]) @ [> 'm] =
+  (intref @ local -> int) @ [< past('o) & past('m) & global] ->
+  (intref @ [< past('n) & global uncontended read_write] ->
+   (intref @ 'p -> int @ [> dynamic]) @ [> past('n) | past('o) | nonportable stateful]) @ [> past('m)] =
   <fun>
 |}]
 
@@ -374,27 +375,27 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 let map f l = List.map f l
 [%%expect{|
 val map :
-  ('a @ [< 'm @@ past > aliased nonportable stateful dynamic] ->
-   'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n @@ past & global many forkable unyielding > 'o | 'm] ->
+  ('a @ [< past('m) > aliased nonportable stateful dynamic] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('n) & global many forkable unyielding > past('o) | past('m)] ->
   ('a list @ [< global many uncontended forkable unyielding read_write] ->
-   'b list @ [< 'o @@ past > aliased nonportable stateful dynamic]) @ [> 'n | stateful] =
+   'b list @ [< past('o) > aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
   <fun>
 |}, Principal{|
 val map :
-  ('a @ [< 'm @@ past > aliased nonportable stateful dynamic] ->
-   'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n @@ past & global many forkable unyielding > 'o | 'm] ->
+  ('a @ [< past('m) > aliased nonportable stateful dynamic] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('n) & global many forkable unyielding > past('o) | past('m)] ->
   ('a list @ [< global many uncontended forkable unyielding read_write] ->
-   'b list @ [< 'o @@ past > aliased nonportable stateful dynamic]) @ [> 'n | stateful] =
+   'b list @ [< past('o) > aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
   <fun>
 |}]
 
 let map_eta f = fun l -> List.map f l
 [%%expect{|
 val map_eta :
-  ('a @ [< 'm @@ past > aliased nonportable stateful dynamic] ->
-   'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n @@ past & global many forkable unyielding > 'o | 'm] ->
+  ('a @ [< past('m) > aliased nonportable stateful dynamic] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('n) & global many forkable unyielding > past('o) | past('m)] ->
   ('a list @ [< global many uncontended forkable unyielding read_write] ->
-   'b list @ [< 'o @@ past > aliased nonportable stateful dynamic]) @ [> 'n | stateful] =
+   'b list @ [< past('o) > aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
   <fun>
 |}]
 
@@ -527,9 +528,9 @@ let map_left f = function
 [%%expect{|
 type ('a, 'b) either = Left of 'a | Right of 'b
 val map_left :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
   (('a, 'c) either @ [< 'p & 'n & global] ->
-   ('b, 'c) either @ [> 'p | 'm | dynamic]) @ [> 'o] =
+   ('b, 'c) either @ [> 'p | 'm | dynamic]) @ [> past('o)] =
   <fun>
 |}]
 
@@ -547,8 +548,8 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< 'o @@ past & 'p @@ past & global many > aliased] ->
-  ('a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic]) @ [> 'o | 'p | nonportable stateful] =
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & past('p) & global many > aliased] ->
+  ('a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic]) @ [> past('o) | past('p) | nonportable stateful] =
   <fun>
 |}]
 
@@ -557,9 +558,9 @@ val map :
 let choose b x y = if b then x else y
 [%%expect{|
 val choose :
-  bool @ [< 'o @@ past & 'm @@ past & global] ->
+  bool @ [< past('o) & past('m) & global] ->
   ('a @ [< 'n & global] ->
-   ('a @ [< 'p] -> 'a @ [> 'p | 'n | dynamic]) @ [> close('n) | 'o]) @ [> 'm] =
+   ('a @ [< 'p] -> 'a @ [> 'p | 'n | dynamic]) @ [> close('n) | past('o)]) @ [> past('m)] =
   <fun>
 |}]
 
@@ -615,8 +616,8 @@ let map_option f = function
   | Some x -> Some (f x)
 [%%expect{|
 val map_option :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
-  ('a option @ [< 'n] -> 'b option @ [> 'm | dynamic]) @ [> 'o] = <fun>
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a option @ [< 'n] -> 'b option @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}]
 
 (* Currying over three arguments *)
@@ -633,17 +634,17 @@ val triple :
 let flip f (x, y) = f (y, x)
 [%%expect{|
 val flip :
-  ('a * 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< 'o @@ past & global] ->
-  ('b * 'a @ [< 'n & global] -> 'c @ [> 'm | dynamic]) @ [> 'o] = <fun>
+  ('a * 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< past('o) & global] ->
+  ('b * 'a @ [< 'n & global] -> 'c @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}]
 
 let flip f x y = f y x
 [%%expect{|
 val flip :
-  ('a @ [< 'm @@ past > 'q] ->
-   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> 'm | 'n]) @ [< 'mm1 @@ past & 'n @@ past & 'mm0 @@ past & global] ->
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
   ('b @ [< 'p & global] ->
-   ('a @ [< 'q] -> 'c @ [> 'o | dynamic]) @ [> close('p) | 'mm1]) @ [> 'mm0] =
+   ('a @ [< 'q] -> 'c @ [> 'o | dynamic]) @ [> close('p) | past('mm1)]) @ [> past('mm0)] =
   <fun>
 |}]
 
@@ -651,9 +652,9 @@ val flip :
 let flip f = fun x -> fun y -> f y x
 [%%expect{|
 val flip :
-  ('a @ [< 'm @@ past > 'q] ->
-   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> 'm | 'n]) @ [< 'mm1 @@ past & 'n @@ past & 'mm0 @@ past & global] ->
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
   ('b @ [< 'p & global] ->
-   ('a @ [< 'q] -> 'c @ [> 'o | dynamic]) @ [> close('p) | 'mm1]) @ [> 'mm0] =
+   ('a @ [< 'q] -> 'c @ [> 'o | dynamic]) @ [> close('p) | past('mm1)]) @ [> past('mm0)] =
   <fun>
 |}]

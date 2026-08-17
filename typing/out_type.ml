@@ -1905,7 +1905,7 @@ end = struct
         m ppf via.monadic
     | Upper_comonadic { c_name } ->
       let m = add_named_modevar c_name in
-      Fmt.fprintf ppf "%s @@@@ past" m
+      Fmt.fprintf ppf "past(%s)" m
 
   let print_raw_lower_bound ppf edge =
     match edge with
@@ -1916,9 +1916,11 @@ end = struct
         m ppf via.comonadic
     | Lower_comonadic { c_via; c_name } ->
       let m = add_named_modevar c_name in
-      Alloc.pretty_print_comonadic_morph
-        (fun ppf s -> Fmt.fprintf ppf "%s" s)
-        m ppf c_via
+      Fmt.fprintf ppf "past(%a)"
+        (Alloc.pretty_print_comonadic_morph
+           (fun ppf s -> Fmt.fprintf ppf "%s" s)
+           m)
+        c_via
     | Lower_closing_over_to { cls_target; cls_src; cls_edge } ->
       let m = add_named_modevar cls_edge.name in
       Alloc.pretty_print_comonadic_morph
