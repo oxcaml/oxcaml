@@ -994,14 +994,23 @@ end
 
 let zap_to_legacy : arg:bool -> Alloc.lr -> Alloc.Const.t =
   fun ~arg m ->
-    Option.value (Alloc.zap_to_legacy ~arg m)
-      ~default:(Alloc.Guts.get_legacy ~arg m)
+    match Alloc.zap_to_legacy ~arg m with
+    | Some c -> c
+    | None ->
+      if mode_polymorphism_printing_enabled ()
+      then Alloc.Guts.get_legacy ~arg m
+      else Alloc.zap_to_legacy_force ~arg m
 
 let curry_mode_const : Alloc.Const.t -> Alloc.lr -> Alloc.Const.t =
   fun alloc_mode marg ->
     let arg_mode =
-      Option.value (Alloc.zap_to_legacy ~arg:true marg)
-      ~default:(Alloc.Guts.get_ceil marg) in
+      match Alloc.zap_to_legacy ~arg:true marg with
+      | Some c -> c
+      | None ->
+        if mode_polymorphism_printing_enabled ()
+        then Alloc.Guts.get_ceil marg
+        else Alloc.zap_to_legacy_force ~arg:true marg
+    in
     curry_mode_const alloc_mode arg_mode
 
 let equate_with_const : Alloc.lr -> Alloc.Const.t -> bool =

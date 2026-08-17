@@ -6405,7 +6405,8 @@ module Monadic = struct
       proj Visibility m |> Visibility.zap_to_legacy_force ?commit
     in
     let contention =
-      proj Contention m |> Contention.zap_to_legacy_force ?commit ~visibility ~arg
+      proj Contention m
+      |> Contention.zap_to_legacy_force ?commit ~visibility ~arg
     in
     let staticity = proj Staticity m |> Staticity.zap_to_legacy_force ?commit in
     { uniqueness; contention; visibility; staticity }
