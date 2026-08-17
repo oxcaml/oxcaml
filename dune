@@ -311,6 +311,7 @@
   cmt2annot
   out_type
   data_types
+  diagnostic_nlg
   ; manual update: mli only files
   annot
   outcometree
