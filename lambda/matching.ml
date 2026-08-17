@@ -2963,7 +2963,34 @@ let rec do_tests_nofail value_kind loc tst arg = function
           do_tests_nofail value_kind loc tst arg rem,
           act, value_kind )
 
+type table_dispatch =
+  | Use_heuristics
+  | Force_table
+
+(* Scoped via [Misc.protect_refs] by the entry points accepting a
+   [?table_dispatch] argument, so that the request reaches every switch
+   generated while compiling the corresponding match expression. *)
+let table_dispatch_ref = ref Use_heuristics
+
+let force_table_requested () =
+  match !table_dispatch_ref with
+  | Use_heuristics -> false
+  | Force_table -> true
+
+(* Bound on the size of a table generated for [@table]: beyond this, the
+   attribute is not honored and a warning is emitted. *)
+let max_forced_table_size = 1 lsl 16
+
+let warn_table_unsupported loc reason =
+  Location.prerr_warning
+    (Debuginfo.Scoped_location.to_location loc)
+    (Warnings.Match_table_unsupported reason)
+
 let make_test_sequence value_kind loc fail size arg const_lambda_list =
+  if force_table_requested ()
+  then
+    warn_table_unsupported loc
+      "this kind of scrutinee cannot be dispatched through a table";
   let icmp size cmp = Pscalar (Binary (Icmp (size, cmp))) in
   let fcmp size cmp = Pscalar (Binary (Fcmp (size, cmp))) in
   let cmp cmp_if_i cmp_if_f =
@@ -3301,8 +3328,33 @@ let as_interval fail ?(low = min_int) ?(high = max_int) l =
     | Some act -> as_interval_canfail act ~low ~high l )
 
 let call_switcher kind loc fail arg ?low ?high int_lambda_list =
+  let force_table =
+    if not (force_table_requested ())
+    then None
+    else
+      match int_lambda_list with
+      | [] -> None
+      | (first, _) :: rest ->
+        let lo, hi =
+          List.fold_left
+            (fun (lo, hi) (n, _) -> (min lo n, max hi n))
+            (first, first) rest
+        in
+        let span = hi - lo + 1 in
+        (* [span] overflows to a negative value when the constants sit at the
+           two ends of the integer range; the bound check rejects that case
+           too. *)
+        if span > 0 && span <= max_forced_table_size
+        then Some (lo, hi)
+        else begin
+          warn_table_unsupported loc
+            (Printf.sprintf
+               "the range of the constants is too large (%d to %d)" lo hi);
+          None
+        end
+  in
   let edges, (cases, actions) = as_interval fail ?low ?high int_lambda_list in
-  Switcher.zyva loc kind edges arg cases actions
+  Switcher.zyva ?force_table loc kind edges arg cases actions
 
 let rec list_as_pat = function
   | [] -> fatal_error "Matching.list_as_pat"
@@ -3557,6 +3609,10 @@ let combine_constant value_kind loc arg cst partial ctx def
         in
         call_switcher value_kind loc fail arg ~low:0 ~high:255 int_lambda_list
     | Const_string _ ->
+        if force_table_requested ()
+        then
+          warn_table_unsupported loc
+            "a match on string constants cannot be dispatched through a table";
         (* Note as the bytecode compiler may resort to dichotomic search,
    the clauses of stringswitch  are sorted with duplicates removed.
    This partly applies to the native code compiler, which requires
@@ -4634,8 +4690,10 @@ let compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer
       ~scopes return_layout repr partial (Context.start 1) pm
   )
 
-let for_function ~scopes ~arg_sort ~arg_layout ~return_layout loc repr param
-      pat_act_list partial =
+let for_function ?(table_dispatch = Use_heuristics) ~scopes ~arg_sort
+      ~arg_layout ~return_layout loc repr param pat_act_list partial =
+  Misc.protect_refs [Misc.R (table_dispatch_ref, table_dispatch)]
+  @@ fun () ->
   compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc
     ~failer:Raise_match_failure repr param pat_act_list partial
 
@@ -5053,7 +5111,10 @@ let bind_opt (v, v_duid, _, layout, eo) k =
   | Some e ->
     Lambda.bind_with_layout Strict (v, v_duid, layout) e k
 
-let for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list partial =
+let for_multiple_match ?(table_dispatch = Use_heuristics) ~scopes
+      ~return_layout loc paraml mode pat_act_list partial =
+  Misc.protect_refs [Misc.R (table_dispatch_ref, table_dispatch)]
+  @@ fun () ->
   let v_paraml = List.map param_to_var paraml in
   let vl =
     List.map (fun (v, _, sort, layout, _) -> (v, sort, layout)) v_paraml

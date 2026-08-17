@@ -2863,6 +2863,11 @@ and transl_atomic_loc ~scopes arg arg_layout lbl repres =
   (arg, lbl)
 
 and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
+  let table_dispatch : Matching.table_dispatch =
+    if Builtin_attributes.has_attribute "table" e.exp_attributes
+    then Force_table
+    else Use_heuristics
+  in
   let rewrite_case (val_cases, exn_cases, static_handlers as acc)
         ({ c_lhs; c_guard; c_rhs } as case) =
     if c_rhs.exp_desc = Texp_unreachable then acc else
@@ -2958,8 +2963,9 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
       let argl =
         List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
       in
-      Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
-        (transl_list_with_layout ~scopes argl) mode val_cases partial
+      Matching.for_multiple_match ~table_dispatch ~scopes ~return_layout
+        e.exp_loc (transl_list_with_layout ~scopes argl) mode
+        val_cases partial
     | {exp_desc = Texp_tuple (argl, alloc_mode)}, _ :: _ ->
         let argl =
           List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
@@ -2978,13 +2984,14 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
         in
         let mode = transl_alloc_mode alloc_mode in
         static_catch (transl_list ~scopes argl) val_ids
-          (Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
-             lvars mode val_cases partial)
+          (Matching.for_multiple_match ~table_dispatch ~scopes ~return_layout
+             e.exp_loc lvars mode val_cases partial)
     | arg, [] ->
       assert (static_handlers = []);
       let arg_layout = layout_exp arg_sort arg in
-      Matching.for_function ~scopes ~arg_sort ~arg_layout ~return_layout
-        e.exp_loc None (transl_exp ~scopes arg_layout arg) val_cases partial
+      Matching.for_function ~table_dispatch ~scopes ~arg_sort ~arg_layout
+        ~return_layout e.exp_loc None (transl_exp ~scopes arg_layout arg)
+        val_cases partial
     | arg, _ :: _ ->
         let val_id, val_id_duid =
           Typecore.name_pattern ~pattern_kind:Value_pattern_in_match "val"
@@ -2994,8 +3001,9 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
         static_catch
           [transl_exp ~scopes arg_layout arg]
           [val_id, val_id_duid, arg_layout]
-          (Matching.for_function ~scopes ~arg_sort ~arg_layout ~return_layout
-             e.exp_loc None (Lvar val_id) val_cases partial)
+          (Matching.for_function ~table_dispatch ~scopes ~arg_sort
+             ~arg_layout ~return_layout e.exp_loc None (Lvar val_id)
+             val_cases partial)
   in
   List.fold_left (fun body (static_exception_id, val_ids, handler) ->
     Lstaticcatch
