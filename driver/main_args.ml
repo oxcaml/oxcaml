@@ -775,6 +775,11 @@ let mk_error_style f =
     \  If the option is not specified, these setting can alternatively\n\
     \  be set through the OCAML_ERROR_STYLE environment variable."
 
+let mk_structured_diagnostics f =
+  Structured_diagnostic_reporting.flag, Arg.Unit f,
+  " Report errors, warnings and alerts as one JSON object per line on\n\
+  \    standard error, instead of the usual messages"
+
 let mk_where f =
   "-where", Arg.Unit f, " Print location of standard library and exit"
 
@@ -1293,6 +1298,7 @@ module type Compiler_options = sig
   val _with_runtime : unit -> unit
   val _without_runtime : unit -> unit
   val _short_paths : unit -> unit
+  val _structured_diagnostics : unit -> unit
   val _thread : unit -> unit
   val _v : unit -> unit
   val _verbose : unit -> unit
@@ -1593,6 +1599,7 @@ struct
     mk_safe_string;
     mk_safer_matching F._safer_matching;
     mk_short_paths F._short_paths;
+    mk_structured_diagnostics F._structured_diagnostics;
     mk_strict_sequence F._strict_sequence;
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
@@ -1889,6 +1896,7 @@ struct
     mk_safer_matching F._safer_matching;
     mk_shared F._shared;
     mk_short_paths F._short_paths;
+    mk_structured_diagnostics F._structured_diagnostics;
     mk_strict_sequence F._strict_sequence;
     mk_no_strict_sequence F._no_strict_sequence;
     mk_strict_formats F._strict_formats;
@@ -2685,6 +2693,7 @@ module Default = struct
         | Some pass ->
           set_save_ir_before pass true
 
+    let _structured_diagnostics = set structured_diagnostics
     let _thread = set use_threads
     let _verbose = set verbose
     let _version () = Compenv.print_version_string ()
