@@ -63,7 +63,7 @@ let bar (x @ once) =
   fst x
 [%%expect{|
 val bar :
-  'a @ [< 'm & global > once] ->
+  'a @ [< 'm & global] ->
   ('b @ 'n -> 'a @ [> 'm | once]) @ [> close('m) | once dynamic] = <fun>
 |}]
 

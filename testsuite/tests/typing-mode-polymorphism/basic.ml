@@ -72,7 +72,7 @@ let bar (c @ local) =
   let _ = use_unique (id c) in
   ()
 [%%expect{|
-val bar : 'a @ [< unique > local unforkable yielding] -> unit @ 'm = <fun>
+val bar : 'a @ [< unique] -> unit @ 'm = <fun>
 |}]
 
 let bar (x @ aliased) =
@@ -246,7 +246,7 @@ let foo (x : int @ portable) (y : int @ nonportable) =
 [%%expect{|
 val foo :
   int @ [< past('m) & global portable] ->
-  (int @ [> nonportable] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
+  (int @ 'n -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
   <fun>
 |}]
 
@@ -301,9 +301,7 @@ let foo (x @ local) =
   let y = id_local x in
   y
 [%%expect{|
-val id_local :
-  'a @ [< 'm > local unforkable yielding] ->
-  'a @ [> 'm | local unforkable yielding] = <fun>
+val id_local : 'a @ [< 'm] -> 'a @ [> 'm | local unforkable yielding] = <fun>
 Line 5, characters 2-3:
 5 |   y
       ^
@@ -318,9 +316,8 @@ let foo (local_ x) = exclave_
   let y = id_local x in
   y
 [%%expect{|
-val foo :
-  'a @ [< 'm > local unforkable yielding] ->
-  'a @ [> 'm | local unforkable yielding dynamic] = <fun>
+val foo : 'a @ [< 'm] -> 'a @ [> 'm | local unforkable yielding dynamic] =
+  <fun>
 |}]
 
 (* MULTIPLE MODE AXES *)

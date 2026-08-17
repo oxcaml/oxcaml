@@ -238,7 +238,7 @@ val foo :
 let foo (x @ aliased) y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many uncontended forkable unyielding read_write > past('m) | aliased] ->
+  'a @ [< global many uncontended forkable unyielding read_write > past('m)] ->
   ('b @ 'n -> 'a ref @ [> aliased nonportable stateful dynamic]) @ [< past('m) > nonportable stateful] =
   <fun>
 |}]
@@ -246,7 +246,7 @@ val foo :
 let foo (x @ contended) y = x
 [%%expect{|
 val foo :
-  'a @ [< 'm & global > contended] ->
+  'a @ [< 'm & global] ->
   ('b @ 'n -> 'a @ [> 'm | contended]) @ [> close('m)] = <fun>
 |}]
 
@@ -285,9 +285,7 @@ val legacy_id : 'a -> 'a = <fun>
 (* CR mode-poly-printing: apply "X mode implies Y mode" logic to bounds *)
 let foo (x @ local) = x
 [%%expect{|
-val foo :
-  'a @ [< 'm > local unforkable yielding] ->
-  'a @ [> 'm | local unforkable yielding] = <fun>
+val foo : 'a @ [< 'm] -> 'a @ [> 'm | local unforkable yielding] = <fun>
 |}]
 
 let foo x = exclave_ x
@@ -315,7 +313,7 @@ val foo :
 let foo (x @ local) (y @ unique) (z @ portable) = exclave_ (x, y, z)
 [%%expect{|
 val foo :
-  'a @ [< 'm > local unforkable yielding] ->
+  'a @ [< 'm] ->
   ('b @ [< 'n & unique] ->
    ('c @ [< 'o & portable] ->
     'a * 'b * 'c @ [> 'o | 'n | 'm | local unforkable yielding]) @ [> close('n) | close('m) | local unforkable yielding]) @ [> close('m) | local unforkable yielding] =
@@ -495,9 +493,7 @@ Error: Signature mismatch:
          val illegal : 'a @ [< 'm] -> 'a @ [> 'm]
        is not included in
          val illegal : t -> t @ portable
-       The type
-         "t @ [< 'm > nonportable stateful dynamic] ->
-         t @ [> 'm | nonportable stateful dynamic]"
+       The type "t @ [< 'm] -> t @ [> 'm | nonportable stateful dynamic]"
        is not compatible with the type "t -> t @ portable"
 |}]
 
@@ -540,7 +536,7 @@ let rec length = function
   | [] -> 0
   | _ :: tl -> 1 + length tl
 [%%expect{|
-val length : 'a list @ [> dynamic] -> int @ [> dynamic] = <fun>
+val length : 'a list @ 'm -> int @ [> dynamic] = <fun>
 |}]
 
 let rec map f = function
@@ -548,8 +544,8 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & past('p) & global many > aliased] ->
-  ('a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic]) @ [> past('o) | past('p) | nonportable stateful] =
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & past('p) & global many] ->
+  ('a list @ [< 'n] -> 'b list @ [> 'm | dynamic]) @ [> past('o) | past('p) | nonportable stateful] =
   <fun>
 |}]
 

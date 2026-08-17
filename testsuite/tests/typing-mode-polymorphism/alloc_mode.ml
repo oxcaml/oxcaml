@@ -38,7 +38,7 @@ let foo (r @ local) x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/336 x/337)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/335))
 val foo :
-  'a myref @ [< past('m) & corrupted write > local unforkable yielding] ->
+  'a myref @ [< past('m) & corrupted write] ->
   ('a @ [< global many uncontended forkable unyielding read_write] ->
    unit @ 'n) @ [> past('m) | local corruptible unforkable yielding writing] =
   <fun>
@@ -159,7 +159,7 @@ let fst_local (x @ local) = exclave_ fun y -> x
        (function[L] {nlocal = 1} y/374[L]? x/373)))
   (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/371))
 val fst_local :
-  'a @ [< 'm > local unforkable yielding] ->
+  'a @ [< 'm] ->
   ('b @ 'n -> 'a @ [> 'm | local unforkable yielding]) @ [> close('m) | local unforkable yielding] =
   <fun>
 |}]
@@ -201,7 +201,7 @@ let id x = x
 [%%expect{|
 (let (use_yield/378 = (function {nlocal = 1} param/380[L]? : int 0))
   (apply (field_imm 1 (global Toploop!)) "use_yield" use_yield/378))
-val use_yield : 'a @ [> yielding] -> unit @ 'm = <fun>
+val use_yield : 'a @ 'n -> unit @ 'm = <fun>
 (let (use_unyielding/381 = (function {nlocal = 1} param/383[L]? : int 0))
   (apply (field_imm 1 (global Toploop!)) "use_unyielding" use_unyielding/381))
 val use_unyielding : 'a @ [< unyielding] -> unit @ 'm = <fun>
@@ -231,8 +231,8 @@ let apply_yielding (x @ yielding) = id x
    apply_yielding/390 =
      (function {nlocal = 0} x/392? (apply[yielding] id/384 x/392)))
   (apply (field_imm 1 (global Toploop!)) "apply_yielding" apply_yielding/390))
-val apply_yielding :
-  'a @ [< 'm & global > yielding] -> 'a @ [> 'm | yielding dynamic] = <fun>
+val apply_yielding : 'a @ [< 'm & global] -> 'a @ [> 'm | yielding dynamic] =
+  <fun>
 |}]
 
 (* [f] and [x] have polymorphic modes, so either may be yielding: must be
@@ -258,8 +258,8 @@ let app_yielding (f @ yielding) (x @ yielding) = app f x
        (apply[yielding] app/393 f/399 x/400)))
   (apply (field_imm 1 (global Toploop!)) "app_yielding" app_yielding/397))
 val app_yielding :
-  ('a @ [> 'n | yielding] -> 'b @ [< 'm & global]) @ [< past('o) & global > yielding] ->
-  ('a @ [< 'n > yielding] -> 'b @ [> 'm | dynamic]) @ [> past('o) | nonportable yielding stateful] =
+  ('a @ [> 'n | yielding] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o) | nonportable yielding stateful] =
   <fun>
 |}]
 
@@ -284,9 +284,8 @@ let rec forward =
                  (apply forward/401 (%int_sub x/404 1)))))
           (makeblock 0 g/402)))
       (apply (field_imm 1 (global Toploop!)) "forward" forward/401))))
-val forward :
-  int @ [< many uncontended read_write > dynamic] ->
-  int @ [< global > dynamic] = <fun>
+val forward : int @ [< many uncontended read_write] -> int @ [> dynamic] =
+  <fun>
 |}]
 
 (* Same wrapper, but closing over the yielding [y]: all calls must be
@@ -321,9 +320,8 @@ let forward_yielding (y @ yielding) =
   (apply (field_imm 1 (global Toploop!)) "forward_yielding"
     forward_yielding/407))
 val forward_yielding :
-  'a @ [< past('m) & global many > yielding] ->
-  (int @ [< many uncontended read_write > dynamic] ->
-   int @ [< global > dynamic]) @ [> past('m) | nonportable yielding stateful] =
+  'a @ [< past('m) & global many] ->
+  (int @ [< many uncontended read_write] -> int @ [> dynamic]) @ [> past('m) | nonportable yielding stateful] =
   <fun>
 |}]
 

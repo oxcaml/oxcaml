@@ -28,9 +28,8 @@ val prod :
 let prod_local (x @ local) (y @ local) = exclave_ (x, y)
 [%%expect{|
 val prod_local :
-  'a @ [< 'm > local unforkable yielding] ->
-  ('b @ [< 'n > local unforkable yielding] ->
-   'a * 'b @ [> 'n | 'm | local unforkable yielding]) @ [> close('m) | local unforkable yielding] =
+  'a @ [< 'm] ->
+  ('b @ [< 'n] -> 'a * 'b @ [> 'n | 'm | local unforkable yielding]) @ [> close('m) | local unforkable yielding] =
   <fun>
 |}]
 

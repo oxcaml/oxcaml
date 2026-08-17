@@ -60,9 +60,9 @@ let local_arg_ok (type a) (w : a dom) (g : a) (s : string @ local) =
 [%%expect{|
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
 val local_arg_ok :
-  'a dom @ 'o ->
+  'a dom @ 'p ->
   ('a @ [< past('n) & global] ->
-   (string @ [> local unforkable yielding] -> int @ [> dynamic]) @ [> past('n)]) @ 'm =
+   (string @ 'o -> int @ [> dynamic]) @ [> past('n)]) @ 'm =
   <fun>
 |}, Principal{|
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
@@ -93,18 +93,12 @@ let crosses (type a) (w : a cross) (x : a @ local) : a @ global =
   | Str -> assert false
 [%%expect{|
 type _ cross = Int : int cross | Str : string cross
-val crosses :
-  'a cross @ 'n ->
-  ('a @ [> local unforkable yielding] ->
-   'a @ [< global forkable unyielding > dynamic]) @ 'm =
-  <fun>
+val crosses : 'a cross @ 'o -> ('a @ 'n -> 'a @ [> dynamic]) @ 'm = <fun>
 |}, Principal{|
 type _ cross = Int : int cross | Str : string cross
 val crosses :
   'a cross @ [< past('m) & global] ->
-  ('a @ [> local unforkable yielding] ->
-   'a @ [< global forkable unyielding > dynamic]) @ [> past('m)] =
-  <fun>
+  ('a @ 'n -> 'a @ [> dynamic]) @ [> past('m)] = <fun>
 |}]
 
 let escapes (type a) (w : a cross) (x : a @ local) : a @ global =

@@ -928,6 +928,12 @@ let mode_polymorphism_printing_enabled () =
     is_at_least Mode_polymorphism Alpha
     && is_enabled Mode_polymorphism_printing)
 
+type variance = [ `Covariant | `Contravariant ]
+
+let neg_variance : variance -> variance = function
+  | `Covariant -> `Contravariant
+  | `Contravariant -> `Covariant
+
 module Internal_names : sig
 
   val reset : unit -> unit
@@ -1021,7 +1027,7 @@ module Variable_names : sig
   val new_var_name : non_gen:bool -> type_expr -> unit -> string
 
   val name_of_type : (unit -> string) -> transient_expr -> string
-  val name_of_mode : Alloc.lr -> string
+  val name_of_mode : variance -> Alloc.lr -> string
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
@@ -1862,30 +1868,35 @@ end = struct
       m
 
   type 'a interval = { lo: 'a; hi: 'a }
-  let construct_raw_bounds { monadic; comonadic } :
+  let construct_raw_bounds variance { monadic; comonadic } :
       string interval =
-    let mupper = dupper_lr Alloc.obj_monadic monadic in
-    let mlower = dlower_lr Alloc.obj_monadic monadic in
-    let cupper = dupper_lr Alloc.obj_comonadic comonadic in
-    let clower = dlower_lr Alloc.obj_comonadic comonadic in
-    let lower =
-      Alloc.Const.merge
-        { monadic = mupper; comonadic = clower }
-    in
-    let upper =
-      Alloc.Const.merge
-        { monadic = mlower; comonadic = cupper }
-    in
-    let lower =
-      Alloc.Const.diff lower Alloc.Const.min
-    in
-    let upper =
-      Alloc.Const.diff upper Alloc.Const.max
-    in
-    { lo = Fmt.asprintf "%a"
-             Alloc.Const.Option.partial_print lower;
-      hi = Fmt.asprintf "%a"
-             Alloc.Const.Option.partial_print upper}
+    match (variance : variance) with
+    | `Covariant ->
+      let mupper = dupper_lr Alloc.obj_monadic monadic in
+      let clower = dlower_lr Alloc.obj_comonadic comonadic in
+      let lower =
+        Alloc.Const.merge
+          { monadic = mupper; comonadic = clower }
+      in
+      let lower =
+        Alloc.Const.diff lower Alloc.Const.min
+      in
+      { lo = Fmt.asprintf "%a"
+               Alloc.Const.Option.partial_print lower;
+        hi = "" }
+    | `Contravariant ->
+      let mlower = dlower_lr Alloc.obj_monadic monadic in
+      let cupper = dupper_lr Alloc.obj_comonadic comonadic in
+      let upper =
+        Alloc.Const.merge
+          { monadic = mlower; comonadic = cupper }
+      in
+      let upper =
+        Alloc.Const.diff upper Alloc.Const.max
+      in
+      { lo = "";
+        hi = Fmt.asprintf "%a"
+               Alloc.Const.Option.partial_print upper }
 
   type edge_as_lower =
   | Lower_simple : simple_edge -> edge_as_lower
@@ -2057,14 +2068,14 @@ end = struct
       Fmt.fprintf ppf "as %s" m
     end
 
-  let name_of_mode (modes : Alloc.lr) =
+  let name_of_mode variance (modes : Alloc.lr) =
     let monadic = Alloc.get_monadic_desc modes.monadic in
     let comonadic = Alloc.get_comonadic_desc modes.comonadic in
     let pair = { monadic; comonadic } in
     match find_mode_already_printed pair with
     | Some m -> Fmt.asprintf "%s" m
     | None ->
-        let bounds = construct_raw_bounds pair in
+        let bounds = construct_raw_bounds variance pair in
         Fmt.asprintf "%a%a"
           (print_raw_constraints bounds) pair
           mode_print_alias pair
@@ -2399,12 +2410,13 @@ let tree_of_modes_const (modes : Mode.Alloc.Const.t) =
       |> Option.map (Fmt.asprintf "%a" (Mode.Alloc.Const.print_axis ax)))
     Mode.Alloc.Axis.all
 
-let tree_of_modes : Alloc.lr -> zapped:Alloc.Const.t -> string list =
-  fun modes ~zapped ->
+let tree_of_modes :
+    variance -> Alloc.lr -> zapped:Alloc.Const.t -> string list =
+  fun variance modes ~zapped ->
     if Alloc.check_generic modes &&
       mode_polymorphism_printing_enabled () then
       [ (Fmt.asprintf "%s"
-            (Variable_names.name_of_mode modes))]
+            (Variable_names.name_of_mode variance modes))]
     else
       tree_of_modes_const zapped
 
@@ -2445,7 +2457,7 @@ type typvariant_repr = {
   tags : string list option
 }
 
-let rec tree_of_modal_typexp mode modal ty =
+let rec tree_of_modal_typexp variance mode modal ty =
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
@@ -2487,27 +2499,33 @@ let rec tree_of_modal_typexp mode modal ty =
             with
             | Tconstr(path, [ty], _)
               when Path.same path Predef.path_option ->
-                tree_of_typexp mode arg_mode ty
+                tree_of_typexp (neg_variance variance) mode arg_mode ty
             | _ -> Otyp_stuff "<hidden>"
           else
-            tree_of_typexp mode arg_mode ty1
+            tree_of_typexp (neg_variance variance) mode arg_mode ty1
         in
         let acc_mode = curry_mode_const alloc_mode marg in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
-        let t2 = tree_of_modal_typexp mode modal ty2 in
-        Otyp_arrow (lab, tree_of_modes marg ~zapped:arg_mode, t1, t2)
+        let t2 = tree_of_modal_typexp variance mode modal ty2 in
+        Otyp_arrow
+          ( lab,
+            tree_of_modes (neg_variance variance) marg ~zapped:arg_mode,
+            t1,
+            t2 )
     | Ttuple labeled_tyl ->
-        Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
+        Otyp_tuple (tree_of_labeled_typlist variance mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
-        Otyp_unboxed_tuple (tree_of_labeled_typlist mode labeled_tyl)
+        Otyp_unboxed_tuple (tree_of_labeled_typlist variance mode labeled_tyl)
     | Tconstr(p, tyl, _abbrev) ->
         let p', s = best_type_path p in
         let tyl' = apply_subst s tyl in
         if is_nth s && not (tyl'=[])
-        then tree_of_typexp mode Alloc.Const.legacy (List.hd tyl')
+        then tree_of_typexp variance mode Alloc.Const.legacy (List.hd tyl')
         else begin
           Internal_names.add p';
-          Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+          Otyp_constr
+            (tree_of_path (Some Type) p',
+             tree_of_typlist variance mode tyl')
         end
     | Tvariant row ->
         let { fields; name; closed; present; all_present; tags } =
@@ -2517,7 +2535,7 @@ let rec tree_of_modal_typexp mode modal ty =
         | Some(p, tyl) when nameable_row row ->
             let (p', s) = best_type_path p in
             let id = tree_of_path (Some Type) p' in
-            let args = tree_of_typlist mode (apply_subst s tyl) in
+            let args = tree_of_typlist variance mode (apply_subst s tyl) in
             let out_variant =
               if is_nth s then List.hd args else Otyp_constr (id, args) in
             if closed && all_present then
@@ -2529,24 +2547,26 @@ let rec tree_of_modal_typexp mode modal ty =
         | _ ->
             let fields =
               List.map
-                (fun (l, c, tyl) -> (l, c, tree_of_typlist mode tyl)) fields
+                (fun (l, c, tyl) ->
+                  (l, c, tree_of_typlist variance mode tyl))
+                fields
             in
             Otyp_variant (Ovar_fields fields, closed, tags)
         end
     | Tobject (fi, nm) ->
-        tree_of_typobject mode fi !nm
+        tree_of_typobject variance mode fi !nm
     | Tmod (ty, mod_bounds) ->
         Otyp_mod
-          ( tree_of_typexp mode alloc_mode ty,
+          ( tree_of_typexp variance mode alloc_mode ty,
             out_modalities_of_mod_bounds mod_bounds )
     | Tquote ty ->
         wrap_printing_env_unguarded
           (Env.enter_quote !printing_env)
-          (fun () -> Otyp_quote (tree_of_typexp mode alloc_mode ty))
+          (fun () -> Otyp_quote (tree_of_typexp variance mode alloc_mode ty))
     | Tsplice ty ->
         wrap_printing_env_unguarded
           (Env.enter_splice ~loc:Location.none !printing_env)
-          (fun () -> Otyp_splice (tree_of_typexp mode alloc_mode ty))
+          (fun () -> Otyp_splice (tree_of_typexp variance mode alloc_mode ty))
     | Tquote_eval ty ->
         (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
         let ty = newgenty (Tquote ty) in
@@ -2556,18 +2576,18 @@ let rec tree_of_modal_typexp mode modal ty =
         let tyl =
           wrap_printing_env_unguarded
             (Env.enter_quote !printing_env)
-            (fun () -> tree_of_typlist mode tyl)
+            (fun () -> tree_of_typlist variance mode tyl)
         in
         Otyp_constr (tree_of_path (Some Type) p', tyl)
     | Tnil | Tfield _ ->
-        tree_of_typobject mode ty None
+        tree_of_typobject variance mode ty None
     | Tsubst _ ->
         (* This case should only happen when debugging the compiler *)
         Otyp_stuff "<Tsubst>"
     | Tlink _ ->
         fatal_error "Out_type.tree_of_typexp"
     | Tpoly (ty, []) | Trepr (ty, []) ->
-        tree_of_typexp mode alloc_mode ty
+        tree_of_typexp variance mode alloc_mode ty
     | Tpoly (ty, tyl) ->
         (*let print_names () =
           List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
@@ -2578,7 +2598,7 @@ let rec tree_of_modal_typexp mode modal ty =
            printed once when used as proxy *)
         List.iter Aliases.add_delayed tyl;
         let tl = tree_of_univars tyl in
-        let tr = Otyp_poly (tl, tree_of_typexp mode alloc_mode ty) in
+        let tr = Otyp_poly (tl, tree_of_typexp variance mode alloc_mode ty) in
         (* Forget names when we leave scope *)
         Variable_names.remove_names tyl;
         Aliases.delayed := old_delayed; tr
@@ -2613,21 +2633,23 @@ let rec tree_of_modal_typexp mode modal ty =
                List.iter Aliases.add_delayed tyl;
                let sort_names = tree_of_qsvs tyl in
                let tr =
-                Otyp_repr (sort_names, tree_of_typexp mode alloc_mode inner_ty)
+                Otyp_repr
+                  ( sort_names,
+                    tree_of_typexp variance mode alloc_mode inner_ty )
               in
                Variable_names.remove_names tyl;
                Aliases.delayed := old_delayed;
                tr
              end else
                (* Mismatch: print Trepr and Tpoly separately *)
-               tree_of_typexp mode alloc_mode ty
+               tree_of_typexp variance mode alloc_mode ty
          | _ ->
              (* No type variables, just print the body *)
-             tree_of_typexp mode alloc_mode ty)
+             tree_of_typexp variance mode alloc_mode ty)
     | Tunivar _ ->
         Otyp_var (false, Variable_names.(name_of_type new_name) tty)
     | Tpackage pack ->
-        let pack = tree_of_package mode pack in
+        let pack = tree_of_package variance mode pack in
         Otyp_module pack
     | Tof_kind jkind ->
       Otyp_of_kind (out_jkind_of_desc !printing_env (Jkind.get jkind))
@@ -2637,7 +2659,8 @@ let rec tree_of_modal_typexp mode modal ty =
       let p', s = best_type_path Predef.path_box in
       let tyl' = apply_subst s [ty] in
       Internal_names.add p';
-      Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
+      Otyp_constr
+        (tree_of_path (Some Type) p', tree_of_typlist variance mode tyl')
   in
   Aliases.remove_delay px;
   alias_nongen_row mode px ty;
@@ -2654,13 +2677,13 @@ let rec tree_of_modal_typexp mode modal ty =
   else
     match modal with
     | Arrow_return {acc; mode} ->
-        let rm, alloc_mode = tree_of_ret_typ_mutating acc mode ty in
+        let rm, alloc_mode = tree_of_ret_typ_mutating variance acc mode ty in
         let ty = pr_typ alloc_mode in
         Otyp_ret (rm, ty)
     | Other m -> pr_typ m
 
-and tree_of_typexp mode alloc_mode ty =
-  tree_of_modal_typexp mode (Other alloc_mode) ty
+and tree_of_typexp variance mode alloc_mode ty =
+  tree_of_modal_typexp variance mode (Other alloc_mode) ty
 
 and tree_of_qtv v jkind =
     (* CR layouts: We ignore nullability here to avoid needlessly printing
@@ -2721,21 +2744,22 @@ and tree_of_typvariant_repr row =
     if all_present then None else Some (List.map fst present) in
   { fields; name; closed; present; all_present; tags }
 
-and tree_of_typlist mode tyl =
-  List.map (tree_of_typexp mode Alloc.Const.legacy) tyl
+and tree_of_typlist variance mode tyl =
+  List.map (tree_of_typexp variance mode Alloc.Const.legacy) tyl
 
-and tree_of_labeled_typlist mode tyl =
+and tree_of_labeled_typlist variance mode tyl =
   List.map
-    (fun (label, ty) -> label, tree_of_typexp mode Alloc.Const.legacy ty)
+    (fun (label, ty) ->
+      label, tree_of_typexp variance mode Alloc.Const.legacy ty)
     tyl
 
 and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
-  (tree_of_typexp Type Alloc.Const.legacy ty,
+  (tree_of_typexp `Covariant Type Alloc.Const.legacy ty,
    tree_of_modalities Immutable gf)
 
 (** NB: This function might mutate states; the caller is responsible for
     reverting them. *)
-and tree_of_ret_typ_mutating (acc_mode : Alloc.Const.t) m ty=
+and tree_of_ret_typ_mutating variance (acc_mode : Alloc.Const.t) m ty=
   match get_desc ty with
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
@@ -2746,12 +2770,12 @@ and tree_of_ret_typ_mutating (acc_mode : Alloc.Const.t) m ty=
         (* In this branch we need to print parens. [m] might have undetermined
         axes and we adopt a similar logic to the [marg] above. *)
         let zapped = zap_to_legacy m in
-        (Orm_parens (tree_of_modes m ~zapped), zapped)
+        (Orm_parens (tree_of_modes variance m ~zapped), zapped)
       end
     end
   | _ ->
     let acc = zap_to_legacy m in
-    (Orm_any (tree_of_modes m ~zapped:acc), acc)
+    (Orm_any (tree_of_modes variance m ~zapped:acc), acc)
 
 and tree_of_typobject_repr fi =
   let (fields, rest) = flatten_fields fi in
@@ -2768,18 +2792,19 @@ and tree_of_typobject_repr fi =
   let fields, open_row = tree_of_typfields rest sorted_fields in
   { fields; open_row }
 
-and tree_of_typobject mode fi nm =
+and tree_of_typobject variance mode fi nm =
   match nm with
   | None ->
       let { fields; open_row } = tree_of_typobject_repr fi in
       let fields =
         List.map
-          (fun (s, t) -> (s, tree_of_typexp mode Alloc.Const.legacy t))
+          (fun (s, t) ->
+            (s, tree_of_typexp variance mode Alloc.Const.legacy t))
           fields
       in
       Otyp_object {fields; open_row}
   | Some (p, _ty :: tyl) ->
-      let args = tree_of_typlist mode tyl in
+      let args = tree_of_typlist variance mode tyl in
       let (p', s) = best_type_path p in
       assert (s = Id);
       Otyp_class (tree_of_path (Some Type) p', args)
@@ -2798,17 +2823,19 @@ and tree_of_typfields rest = function
       let (fields, rest) = tree_of_typfields rest l in
       (field :: fields, rest)
 
-and tree_of_package mode {pack_path; pack_cstrs} =
+and tree_of_package variance mode {pack_path; pack_cstrs} =
   { opack_path = tree_of_path (Some Module_type) pack_path;
     opack_cstrs =
       List.map
         (fun (li, ty) ->
-           (String.concat "." li, tree_of_typexp mode Alloc.Const.legacy ty))
+           (String.concat "." li,
+            tree_of_typexp variance mode Alloc.Const.legacy ty))
         pack_cstrs }
 
 let tree_of_typexp mode ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  wrap_mutation (fun () -> tree_of_typexp mode Alloc.Const.legacy ty)
+  wrap_mutation (fun () ->
+    tree_of_typexp `Covariant mode Alloc.Const.legacy ty)
 
 let tree_of_typexp mode ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
@@ -3452,7 +3479,9 @@ let rec tree_of_class_type mode params =
         tree_of_class_type mode params cty
       else
         let namespace = Namespace.best_class_namespace p' in
-        Octy_constr (tree_of_path namespace p', tree_of_typlist Type_scheme tyl)
+        Octy_constr
+          (tree_of_path namespace p',
+           tree_of_typlist `Covariant Type_scheme tyl)
   | Cty_signature sign ->
       let px = proxy sign.csig_self_row in
       let self_ty =

@@ -148,8 +148,7 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  (int @ [< many uncontended read_write > dynamic] ->
-   'a @ [< global > 'm | dynamic]) @ [> close('m) | close('m) | nonportable stateful] =
+  (int @ [< many uncontended read_write] -> 'a @ [> 'm | dynamic]) @ [> close('m) | close('m) | nonportable stateful] =
   <fun>
 |}]
 
@@ -164,8 +163,7 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  (int @ [< many uncontended read_write > dynamic] ->
-   'a @ [< global > 'm | dynamic]) @ [> close('m) | close('m) | nonportable stateful] =
+  (int @ [< many uncontended read_write] -> 'a @ [> 'm | dynamic]) @ [> close('m) | close('m) | nonportable stateful] =
   <fun>
 |}]
 
@@ -184,8 +182,8 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & past('p) & global many > aliased] ->
-  ('a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic]) @ [> past('o) | past('p) | nonportable stateful] =
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & past('p) & global many] ->
+  ('a list @ [< 'n] -> 'b list @ [> 'm | dynamic]) @ [> past('o) | past('p) | nonportable stateful] =
   <fun>
 |}]
 
