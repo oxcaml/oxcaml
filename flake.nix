@@ -47,7 +47,10 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = [ oxcaml ] ++ lib.attrValues merlinPackages;
-          packages = [ merlinPackages.merlin ];
+          buildInputs = merlinPackages.merlin.devBuildInputs;
+          packages =
+            [ merlinPackages.merlin ]
+            ++ merlinPackages.merlin.devNativeBuildInputs;
         };
 
       }

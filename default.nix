@@ -206,6 +206,20 @@ let
             runHook postCheck
           '';
           meta.mainProgram = "ocamlmerlin";
+          passthru = {
+            devBuildInputs = [
+              ocamlPackages.alcotest
+              ocamlPackages.csexp
+              ocamlPackages.findlib
+              ocamlPackages.menhirLib
+              ocamlPackages.menhirSdk
+              ocamlPackages.yojson
+            ];
+            devNativeBuildInputs = [
+              ocamlPackages.menhir
+              pkgs.jq
+            ];
+          };
         };
       };
     in
