@@ -443,21 +443,11 @@ let index_occurrences binary_annots =
 
 exception Error of error
 
-let input_cmt ic : cmt_infos =
-  (* CR ocaml 5 compressed-marshal mshinwell:
-     (Compression.input_value ic : cmt_infos)
-  *)
-  Marshal.from_channel ic
+let input_cmt ic = (Compression.input_value ic : cmt_infos)
 
 let output_cmt oc cmt =
   output_string oc Config.cmt_magic_number;
-  (* BACKPORT BEGIN *)
-  (* CR ocaml 5 compressed-marshal mshinwell:
-     upstream uses [Compression] here:
-     Compression.output_value oc (cmt : cmt_infos)
-  *)
-  Marshal.(to_channel oc (cmt : cmt_infos) [])
-  (* BACKPORT END *)
+  Compression.output_value oc (cmt : cmt_infos)
 
 let read filename =
 (*  Printf.fprintf stderr "Cmt_format.read %s\n%!" filename; *)
