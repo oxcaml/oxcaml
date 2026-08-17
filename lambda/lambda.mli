@@ -1091,9 +1091,7 @@ and lfunction = private
 
 and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
-    ktmpl_return: layout;
-    ktmpl_body: lambda;
-    ktmpl_ret_mode: return_mode;
+    ktmpl_body: lfunction;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
@@ -1466,6 +1464,9 @@ val subst:
 val rename : Ident.t Ident.Map.t -> lambda -> lambda
 (** A version of [subst] specialized for the case where we're just renaming
     idents. *)
+
+val rename_lfun : Ident.t Ident.Map.t -> lfunction -> lfunction
+(** Identical to [rename] but operates on [lfunction] rather than [lambda]. *)
 
 val duplicate_function : lfunction -> lfunction
 (** Duplicate a term, freshening all locally-bound identifiers. *)
