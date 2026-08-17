@@ -178,6 +178,8 @@
   lru
   ;; PARSING
   location
+  structured_diagnostic_protocol
+  structured_diagnostic
   longident
   docstrings
   printast
