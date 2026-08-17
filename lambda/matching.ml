@@ -4812,14 +4812,9 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_fun_layout { id; uid = duid; sort; mode; lpoly; env_alloc_mode; _ }
+  | Tpat_fun_layout { id; uid = duid; mode = _; lpoly; env_alloc_mode; _ }
       when not (List.is_empty (Lpoly.get_exn lpoly)) ->
     assert (mutable_flag == Asttypes.Immutable);
-    let sort = Jkind.Sort.default_for_transl_and_get sort in
-    let return = Typeopt.layout pat.pat_env pat.pat_loc sort pat.pat_type in
-    let mode = Mode.value_to_alloc_r2l mode in
-    let locality = Mode.Alloc.proj_comonadic Areality mode in
-    let ret_mode = Translmode.transl_return_mode_l locality in
     let kind_params =
       List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in
@@ -4842,12 +4837,15 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
         (Ident.Map.empty, Ident.Map.empty)
         free_vars
     in
+    let param =
+      match param with
+      | Lfunction lfun -> lfun
+      | _ -> Misc.fatal_error "let poly_ definitions must be functions"
+    in
     let f =
       Lkindtemplate
         { ktmpl_params = kind_params;
-          ktmpl_return = return;
-          ktmpl_body = Lambda.rename fresh_vars param;
-          ktmpl_ret_mode = ret_mode;
+          ktmpl_body = Lambda.rename_lfun fresh_vars param;
           ktmpl_env = env;
           ktmpl_env_mode = env_alloc_mode;
           ktmpl_loc = Scoped_location.of_location ~scopes loc;
