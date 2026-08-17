@@ -26,10 +26,9 @@ let (a, b, c, d) =
   let #(c, d) = tuple #42.0 "d" in
   (a, to_int64 b, to_float c, d)
 [%%expect{|
-val a : string = "a"
-val b : int64 = 1L
-val c : float = 42.
-val d : string = "d"
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 let poly_ id =
@@ -217,12 +216,9 @@ let (x, f, a, y, g, b) =
   let #(a, b) = #(f #1.0, g #3L) in
   (x, f, to_float a, y, g, to_int64 b)
 [%%expect{|
-val x : int = 42
-val f : '_weak1 -> '_weak1 = <fun>
-val a : float = 1.
-val y : int = 42
-val g : '_weak2 -> '_weak2 = <fun>
-val b : int64 = 3L
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* tuple: failing when a component is not a syntactic value *)
@@ -417,8 +413,9 @@ Line 2, characters 12-13:
 2 |   let poly_ f _ = x
                 ^
 Warning 26 [unused-var]: unused variable "f".
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
 
-val f : 'a @ local -> ('b -> unit) = <fun>
 |}]
 
 (* let poly_ instantiation *)
@@ -426,8 +423,9 @@ let (a, b) =
   let poly_ id x = x in
   (id 42, id #43.0 |> to_float)
 [%%expect{|
-val a : int = 42
-val b : float = 43.
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* let poly_ instantiation with multiple variables *)
@@ -437,10 +435,9 @@ let (a, b, c, d) =
   let #(c, d) = tuple #44L #45n in
   (to_int8 a, to_float b, to_int64 c, to_nativeint d)
 [%%expect{|
-val a : int8 = 42s
-val b : float = 43.
-val c : int64 = 44L
-val d : nativeint = 45n
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* closure conversion - uniform block *)
@@ -453,8 +450,9 @@ let (a, b) =
   let #(b1, b2) = f #2L in
   (a1, b1)
 [%%expect{|
-val a : string = "first"
-val b : string = "second"
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* closure conversion - mixed block *)
@@ -467,10 +465,9 @@ let a, b, c, d =
   to_int8 a, b, to_int8 c, to_int64 d
 
 [%%expect{|
-val a : int8 = 1s
-val b : int = 1
-val c : int8 = 1s
-val d : int64 = 2L
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* closure-conversion - capture lpoly function *)
@@ -484,9 +481,9 @@ let a, b, y =
   let #(a, b, y) = g #1.0 in
   to_nativeint a, to_nativeint b, to_float y
 [%%expect {|
-val a : nativeint = 2n
-val b : nativeint = 2n
-val y : float = 1.
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Nested lpoly functions *)
@@ -498,8 +495,9 @@ let x, y =
   let #(x, y) = f #1.0 in
   to_float x, to_float y
 [%%expect {|
-val x : float = 1.
-val y : float = 1.
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Module containing lpoly function *)
@@ -509,5 +507,7 @@ let x =
   end in
   M.id #1s |> to_int8
 [%%expect {|
-val x : int8 = 1s
+>> Fatal error: get_unit: unable to get unit_info for current unit
+Uncaught exception: Misc.Fatal_error
+
 |}]

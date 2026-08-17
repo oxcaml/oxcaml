@@ -52,6 +52,45 @@ end
 
 open Or_missing.Syntax
 
+module Template_id = struct
+  type t =
+    { owner : Compilation_unit.t option;
+      stamp : int;
+      name : Slambdaident.t option
+    }
+
+  let stamp = ref 0
+
+  let create ~owner ~name =
+    let t = { owner; stamp = !stamp; name } in
+    incr stamp;
+    t
+
+  let print ppf t =
+    Fmt.fprintf ppf "%a/%a/%i"
+      (Fmt.pp_print_option Compilation_unit.print)
+      t.owner
+      (Fmt.pp_print_option (fun ppf id ->
+           Fmt.pp_print_string ppf (Slambdaident.name id)))
+      t.name t.stamp
+
+  let equal t1 t2 =
+    t1.stamp = t2.stamp && Option.equal Compilation_unit.equal t1.owner t2.owner
+
+  let hash t =
+    match t.owner with
+    | Some owner -> Hashtbl.hash (Compilation_unit.hash owner, t.stamp)
+    | None -> t.stamp
+
+  module Tbl = Hashtbl.Make (struct
+    type nonrec t = t
+
+    let equal = equal
+
+    let hash = hash
+  end)
+end
+
 module rec Types : sig
   type closure =
     { clo_params : Slambdaident.t array;
@@ -68,7 +107,7 @@ module rec Types : sig
     | SLVhalves of halves
     | SLVlayout of layout
     | SLVrecord of value Or_missing.t array
-    | SLVclosure of Template_store.id
+    | SLVclosure of Template_id.t
 
   val print_closure : Fmt.formatter -> closure -> unit
 
@@ -89,7 +128,7 @@ end = struct
     | SLVhalves of halves
     | SLVlayout of layout
     | SLVrecord of value Or_missing.t array
-    | SLVclosure of Template_store.id
+    | SLVclosure of Template_id.t
 
   let print_closure ppf { clo_params; clo_body; clo_env = _ } =
     let print_params ppf =
@@ -117,7 +156,7 @@ end = struct
           fields
       in
       Fmt.fprintf ppf "@[<hv 2>[%t@;<1 -2>]@]" print_fields
-    | SLVclosure id -> Template_store.print_id ppf id
+    | SLVclosure id -> Template_id.print ppf id
 
   and print_value_or_missing ppf = function
     | Or_missing.Missing -> Fmt.fprintf ppf "(missing)"
@@ -151,87 +190,57 @@ end = struct
   let find t id = Map.find_opt id t |> Or_missing.of_option
 end
 
-and Template_store : sig
-  type id
-
-  type templates
-
-  type t
-
-  val empty : unit -> t
-
-  val empty_templates : unit -> templates
-
-  val add :
-    t ->
-    cu:Compilation_unit.t option ->
-    name:Slambdaident.t option ->
-    Types.closure ->
-    id
-
-  val add_foreign_templates : t -> templates -> unit
-
-  val instantiate :
-    t ->
-    id ->
-    Types.value array ->
-    (Types.closure -> Types.value array -> lambda) ->
-    Types.value Or_missing.t
-
-  val templates : t -> templates
-
-  val instantiations : t -> (Ident.t * lambda) list
-
-  val print_id : Fmt.formatter -> id -> unit
-
-  val print_templates : Fmt.formatter -> templates -> unit
-end = struct
-  type id = string
-
-  type templates = Types.closure Misc.Stdlib.String.Tbl.t
+module Template_store = struct
+  type templates = Types.closure Template_id.Tbl.t
 
   type t =
     { templates : templates;
-      foreign_templates : templates;
-      instantiations : lambda Ident.Tbl.t
+      foreign_templates : templates
     }
-
-  let stamp = ref 0
 
   let empty () =
-    { templates = Misc.Stdlib.String.Tbl.create 10;
-      foreign_templates = Misc.Stdlib.String.Tbl.create 10;
-      instantiations = Ident.Tbl.create 10
+    { templates = Template_id.Tbl.create 10;
+      foreign_templates = Template_id.Tbl.create 10
     }
 
-  let empty_templates () = Misc.Stdlib.String.Tbl.create 0
+  let empty_templates () = Template_id.Tbl.create 0
 
   let add t ~cu ~name closure =
-    let id =
-      Fmt.asprintf "%a_%a_%i"
-        (Fmt.pp_print_option Compilation_unit.print)
-        cu
-        (Fmt.pp_print_option (Fmt.deprecated Slambdaident.print))
-        name !stamp
-    in
-    incr stamp;
-    Misc.Stdlib.String.Tbl.add t.templates id closure;
+    let id = Template_id.create ~owner:cu ~name in
+    Template_id.Tbl.add t.templates id closure;
     id
 
   let add_foreign_templates t templates =
-    Misc.Stdlib.String.Tbl.iter
+    Template_id.Tbl.iter
       (fun id closure ->
-        if Misc.Stdlib.String.Tbl.mem t.foreign_templates id
-        then Misc.fatal_errorf "duplicate template id: %s" id;
-        Misc.Stdlib.String.Tbl.add t.foreign_templates id closure)
+        if Template_id.Tbl.mem t.foreign_templates id
+        then
+          Misc.fatal_errorf_doc "duplicate template id: %a" Template_id.print id;
+        Template_id.Tbl.add t.foreign_templates id closure)
       templates
 
   let find_template t id =
-    try Misc.Stdlib.String.Tbl.find t.templates id
+    try Template_id.Tbl.find t.templates id
     with Not_found -> (
-      try Misc.Stdlib.String.Tbl.find t.foreign_templates id
-      with Not_found -> Misc.fatal_error ("Template not found: " ^ id))
+      try Template_id.Tbl.find t.foreign_templates id
+      with Not_found ->
+        Misc.fatal_errorf_doc "Template not found: %a" Template_id.print id)
 
+  let templates t = t.templates
+
+  let print_templates ppf templates =
+    if Template_id.Tbl.length templates = 0
+    then ()
+    else begin
+      Template_id.Tbl.iter
+        (fun id closure ->
+          Fmt.fprintf ppf "@ @[<2>(%a@ %a)@]" Template_id.print id
+            Types.print_closure closure)
+        templates
+    end
+end
+
+module Mangling = struct
   let symbol_arg_of_value_kind_non_null = function
     | Pintval -> "immediate"
     | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _ | Parrayval _
@@ -282,39 +291,12 @@ end = struct
     | SLVlayout l -> symbol_arg_of_layout l
     | SLVhalves _ | SLVrecord _ | SLVclosure _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected value"
-
-  let instantiate t id args f : Types.value Or_missing.t =
-    let closure = find_template t id in
-    let arg_names = Array.map symbol_arg_of_value args |> Array.to_list in
-    let name = Ident.create_persistent (String.concat "_" (id :: arg_names)) in
-    let _ = Ident.Tbl.memoize t.instantiations (fun _ -> f closure args) name in
-    Present (SLVhalves { slv_comptime = Missing; slv_runtime = Lvar name })
-
-  let templates t = t.templates
-
-  let instantiations t = Ident.Tbl.to_list t.instantiations
-
-  let print_id = Fmt.pp_print_string
-
-  let print_templates ppf templates =
-    if Misc.Stdlib.String.Tbl.length templates = 0
-    then ()
-    else begin
-      Misc.Stdlib.String.Tbl.iter
-        (fun id closure ->
-          Fmt.fprintf ppf "@ @[<2>(%s@ %a)@]" id Types.print_closure closure)
-        templates
-    end
 end
-
-include Types
-
-type closure = Template_store.id
 
 module CU_data = struct
   type t =
     { templates : Template_store.templates;
-      cu : value Or_missing.t
+      cu : Types.value Or_missing.t
     }
 
   type raw = File_sections.Idx.t
@@ -326,21 +308,25 @@ module CU_data = struct
   let write t ~sections = File_sections.Builder.add sections (Obj.repr t)
 
   let print ppf { templates; cu } =
-    Fmt.fprintf ppf "@[<v 0>%a%a@]" print_value_or_missing cu
+    Fmt.fprintf ppf "@[<v 0>%a%a@]" Types.print_value_or_missing cu
       Template_store.print_templates templates
 end
 
 module Ctx = struct
   type t =
     { cu_static_data_getter : Compilation_unit.t -> CU_data.t option;
-      cu_static_data : value Or_missing.t Compilation_unit.Tbl.t;
-      store : Template_store.t
+      cu_static_data : Types.value Or_missing.t Compilation_unit.Tbl.t;
+      store : Template_store.t;
+      instantiations : lambda Ident.Tbl.t;
+      mutable instantiation_order : Ident.t list
     }
 
   let create ~cu_static_data =
     { cu_static_data_getter = cu_static_data;
       cu_static_data = Compilation_unit.Tbl.create 0;
-      store = Template_store.empty ()
+      store = Template_store.empty ();
+      instantiations = Ident.Tbl.create 10;
+      instantiation_order = []
     }
 
   let cu_static_data t cu =
@@ -352,7 +338,46 @@ module Ctx = struct
           cu
         | None -> Or_missing.Missing)
       cu
+
+  let instantiate t (id : Template_id.t) args f : Types.value Or_missing.t =
+    begin match id.owner with
+    | Some owner ->
+      if not (Compilation_unit.Tbl.mem t.cu_static_data owner)
+      then ignore (cu_static_data t owner)
+    | None -> ()
+    end;
+    let closure = Template_store.find_template t.store id in
+    let arg_names =
+      Array.map Mangling.symbol_arg_of_value args |> Array.to_list
+    in
+    let name =
+      Fmt.asprintf "%a_%a" Template_id.print id
+        (Fmt.pp_print_list
+           ~pp_sep:(fun ppf () -> Fmt.pp_print_string ppf "_")
+           Fmt.pp_print_string)
+        arg_names
+      |> Ident.create_persistent
+    in
+    if not (Ident.Tbl.mem t.instantiations name)
+    then begin
+      (* f might recursively call this function so make sure to mark this name
+         as visited before calling it. *)
+      Ident.Tbl.replace t.instantiations name Lambda.dummy_constant;
+      let lam = f closure args in
+      Ident.Tbl.replace t.instantiations name lam;
+      t.instantiation_order <- name :: t.instantiation_order
+    end;
+    Present (SLVhalves { slv_comptime = Missing; slv_runtime = Lvar name })
+
+  let instantiations t =
+    List.map
+      (fun id -> id, Ident.Tbl.find t.instantiations id)
+      t.instantiation_order
 end
+
+include Types
+
+type closure = Template_id.t
 
 let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
@@ -360,7 +385,7 @@ type _ value_type =
   | Thalves : halves value_type
   | Tlayout : layout value_type
   | Trecord : value Or_missing.t array value_type
-  | Tclosure : Template_store.id value_type
+  | Tclosure : Template_id.t value_type
 
 let describe_value_type (type a) : a value_type -> string = function
   | Thalves -> "program"
@@ -436,7 +461,7 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
     in
     let eval_arg arg = eval_slam ctx env arg |> expect_not_missing in
     let args = Array.map eval_arg sapp_args in
-    Template_store.instantiate ctx.store closure args
+    Ctx.instantiate ctx closure args
       (fun { clo_params; clo_body; clo_env } args ->
         let env_body =
           Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
@@ -874,8 +899,7 @@ let do_eval (ctx : Ctx.t) slam =
     List.fold_left
       (fun lam (id, def) ->
         Llet (Strict, layout_function, id, debug_uid_none, def, lam))
-      slv_runtime
-      (Template_store.instantiations ctx.store)
+      slv_runtime (Ctx.instantiations ctx)
   in
   { slv_comptime; slv_runtime = lambda }
 
