@@ -419,6 +419,7 @@ stdenv.mkDerivation {
       make test-one TEST=...   - Run a single test
       make merlin-build        - Build Merlin
       make merlin-test         - Run the Merlin tests
+      make merlin-promote      - Promote Merlin test output
     EOF
   '';
 
