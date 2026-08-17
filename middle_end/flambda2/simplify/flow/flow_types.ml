@@ -194,6 +194,12 @@ module Acc = struct
       map : Continuation_info.t Continuation.Map.t;
       extra : Continuation_extra_params_and_args.t Continuation.Map.t;
       lifted_constants : Lifted_constant_state.t;
+      recorded_symbols : (Lifted_constant.t * Continuation.t list) Symbol.Map.t;
+      (* Diagnostic tracking: for each symbol defined by a recorded lifted
+         constant, the constant and the continuation stack (innermost first) at
+         the time it was recorded. Used to report duplicate definitions of the
+         same symbol at recording time, rather than failing later during
+         [normalize_acc]. *)
       dummy_toplevel_cont : Continuation.t
     }
 
@@ -209,18 +215,21 @@ module Acc = struct
     Continuation.Map.print Continuation_extra_params_and_args.print ppf extra
 
   let [@ocamlformat "disable"] print ppf
-      { stack; map; extra; lifted_constants; dummy_toplevel_cont = _ } =
+      { stack; map; extra; lifted_constants; recorded_symbols;
+        dummy_toplevel_cont = _ } =
     Format.fprintf ppf
       "@[<hov 1>(\
        @[<hov 1>(stack %a)@]@ \
        @[<hov 1>(map %a)@]@ \
        @[<hov 1>(extra %a)@]@ \
-       @[<hov 1>(lifted_constants %a)@]\
+       @[<hov 1>(lifted_constants %a)@]@ \
+       @[<hov 1>(recorded_symbols %a)@]\
        )@]"
       print_stack stack
       print_map map
       print_extra extra
       Lifted_constant_state.print lifted_constants
+      Symbol.Set.print (Symbol.Map.keys recorded_symbols)
 end
 
 (* Result of the flow analysis: reachable code ids *)

@@ -114,6 +114,10 @@ module Acc : sig
       map : Continuation_info.t Continuation.Map.t;
       extra : Continuation_extra_params_and_args.t Continuation.Map.t;
       lifted_constants : Lifted_constant_state.t;
+      recorded_symbols : (Lifted_constant.t * Continuation.t list) Symbol.Map.t;
+      (* Diagnostic tracking: for each symbol defined by a recorded lifted
+         constant, the constant and the continuation stack (innermost first) at
+         the time it was recorded. *)
       dummy_toplevel_cont : Continuation.t
     }
 
