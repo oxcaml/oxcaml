@@ -172,6 +172,7 @@ let
           duneVersion = "3";
           propagatedBuildInputs = [ ocamlPackages.findlib ];
           buildInputs = [ merlin-lib ];
+          checkInputs = [ ocamlPackages.alcotest ];
           doCheck = true;
         };
 
@@ -195,6 +196,7 @@ let
             dot-merlin-reader
             testOcaml
           ];
+          checkInputs = [ ocamlPackages.alcotest ];
           doCheck = true;
           checkPhase = ''
             runHook preCheck
