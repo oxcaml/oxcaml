@@ -43,6 +43,9 @@ module Acc : sig
       continuation handler. *)
   val exit_continuation : Continuation.t -> t -> t
 
+  (** The continuations currently on the stack, innermost first. *)
+  val continuations_on_stack : t -> Continuation.t list
+
   (** Record that the current expression defines some lifted constants; this is
       not liked to the current continuation. Note: this should only be called at
       top-level, where the constants will be placed, and not from the fonction

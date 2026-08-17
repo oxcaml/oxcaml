@@ -35,10 +35,14 @@ let empty () =
       map = Continuation.Map.empty;
       extra = Continuation.Map.empty;
       lifted_constants = Lifted_constant_state.empty;
+      recorded_symbols = Symbol.Map.empty;
       dummy_toplevel_cont = wrong_dummy_toplevel_cont
     }
   in
   res
+
+let continuations_on_stack (t : t) =
+  List.map (fun (info : cont_info) -> info.continuation) t.stack
 
 (* Updates *)
 (* ******* *)
@@ -485,8 +489,47 @@ let normalize_lifted_constants_aux lifted_constants elt =
     ~f:(fun elt lifted_constant ->
       normalize_lifted_constant_aux lifted_constant elt)
 
+let print_continuation_stack ppf stack =
+  match stack with
+  | [] -> Format.pp_print_string ppf "<empty>"
+  | _ :: _ ->
+    Format.pp_print_list ~pp_sep:Format.pp_print_space Continuation.print ppf
+      stack
+
 let record_lifted_constants lifted_constants (t : t) =
+  (* Check at recording time that no symbol is defined by two recorded lifted
+     constants. Such a duplicate would otherwise only be detected later, in
+     [normalize_acc], with much less context available. *)
+  let stack_continuations = continuations_on_stack t in
+  let recorded_symbols =
+    Lifted_constant_state.fold lifted_constants ~init:t.recorded_symbols
+      ~f:(fun recorded_symbols lifted_constant ->
+        Symbol.Set.fold
+          (fun symbol recorded_symbols ->
+            match Symbol.Map.find_opt symbol recorded_symbols with
+            | None ->
+              Symbol.Map.add symbol
+                (lifted_constant, stack_continuations)
+                recorded_symbols
+            | Some (prev_constant, prev_stack) ->
+              Misc.fatal_errorf
+                "@[<v>@[<hov>Two lifted constants recorded in the flow \
+                 accumulator both define the symbol@ %a.@]@ @[<hov 1>First \
+                 definition@ (continuation stack at recording time, innermost \
+                 first:@ %a):@ %a@]@ @[<hov 1>Second definition@ (continuation \
+                 stack at recording time, innermost first:@ %a):@ %a@]@ @[<hov \
+                 1>(continuations in accumulator map@ %a)@]@]"
+                Symbol.print symbol print_continuation_stack prev_stack
+                Lifted_constant.print prev_constant print_continuation_stack
+                stack_continuations Lifted_constant.print lifted_constant
+                Continuation.Set.print
+                (Continuation.Map.keys t.map))
+          (Bound_static.symbols_being_defined
+             (Lifted_constant.bound_static lifted_constant))
+          recorded_symbols)
+  in
   { t with
+    recorded_symbols;
     lifted_constants =
       Lifted_constant_state.union lifted_constants t.lifted_constants
   }

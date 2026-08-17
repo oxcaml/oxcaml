@@ -25,6 +25,12 @@ type t =
     shareable_constants : Symbol.t Static_const.Map.t;
     used_value_slots : Name_occurrences.t;
     lifted_constants : LCS.t;
+    lifted_constant_symbols : Symbol.Set.t;
+    (* Diagnostic mirror of the symbols defined by the constants in
+       [lifted_constants]. The accumulator should never contain two definitions
+       of the same symbol; [add_to_lifted_constant_accumulator] checks this and
+       fails early with contextual information, rather than failing much later
+       during [Flow_acc.normalize_acc]. *)
     flow_acc : Flow.Acc.t;
     demoted_exn_handlers : Continuation.Set.t;
     code_ids_to_remember : Code_id.Set.t;
@@ -49,7 +55,8 @@ let print_lifted_cont ppf (denv, original_handlers) =
 
 let [@ocamlformat "disable"] print ppf
       { denv; continuation_uses_env; shareable_constants; used_value_slots;
-        lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
+        lifted_constants; lifted_constant_symbols = _; flow_acc;
+        demoted_exn_handlers; code_ids_to_remember;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
         are_lifting_conts; lifted_continuations; continuation_lifting_budget;
         continuations_to_specialize; specialization_map; } =
@@ -98,6 +105,7 @@ let create denv slot_offsets continuation_uses_env =
     shareable_constants = Static_const.Map.empty;
     used_value_slots = Name_occurrences.empty;
     lifted_constants = LCS.empty;
+    lifted_constant_symbols = Symbol.Set.empty;
     flow_acc = Flow.Acc.empty ();
     demoted_exn_handlers = Continuation.Set.empty;
     code_ids_to_remember = Code_id.Set.empty;
@@ -163,15 +171,46 @@ let add_to_lifted_constant_accumulator ?also_add_to_env t constants =
   let also_add_to_env =
     match also_add_to_env with None -> false | Some () -> true
   in
+  let lifted_constant_symbols =
+    (* Diagnostic check: see the comment on [lifted_constant_symbols] in the
+       definition of [t], above. *)
+    LCS.fold constants ~init:t.lifted_constant_symbols
+      ~f:(fun lifted_constant_symbols const ->
+        let symbols =
+          Bound_static.symbols_being_defined
+            (Lifted_constant.bound_static const)
+        in
+        let duplicated = Symbol.Set.inter symbols lifted_constant_symbols in
+        if not (Symbol.Set.is_empty duplicated)
+        then
+          Misc.fatal_errorf
+            "@[<v>@[<hov>Symbol(s)@ %a@ are already defined by a lifted \
+             constant in the lifted-constant accumulator, but a new lifted \
+             constant defining them is being added.@]@ @[<hov 1>New constant:@ \
+             %a@]@ @[<hov 1>(closure_context@ %a)@]@ @[<hov \
+             1>(inlined_debuginfo@ %a)@]@ @[<hov 1>(continuation_stack@ \
+             %a)@]@]"
+            Symbol.Set.print duplicated Lifted_constant.print const
+            Closure_info.print (DE.closure_info t.denv) Debuginfo.print_compact
+            (DE.add_inlined_debuginfo t.denv Debuginfo.none)
+            (Format.pp_print_list ~pp_sep:Format.pp_print_space
+               Continuation.print)
+            (Flow.Acc.continuations_on_stack t.flow_acc)
+        else Symbol.Set.union symbols lifted_constant_symbols)
+  in
   let lifted_constants = LCS.union t.lifted_constants constants in
   let denv =
     if also_add_to_env then LCS.add_to_denv t.denv constants else t.denv
   in
-  { t with lifted_constants; denv }
+  { t with lifted_constants; lifted_constant_symbols; denv }
 
 let get_lifted_constants t = t.lifted_constants
 
-let clear_lifted_constants t = { t with lifted_constants = LCS.empty }
+let clear_lifted_constants t =
+  { t with
+    lifted_constants = LCS.empty;
+    lifted_constant_symbols = Symbol.Set.empty
+  }
 
 let no_lifted_constants t = LCS.is_empty t.lifted_constants
 
@@ -180,7 +219,14 @@ let get_and_clear_lifted_constants t =
   let t = clear_lifted_constants t in
   t, constants
 
-let set_lifted_constants t consts = { t with lifted_constants = consts }
+let set_lifted_constants t consts =
+  let lifted_constant_symbols =
+    LCS.fold consts ~init:Symbol.Set.empty ~f:(fun symbols const ->
+        Symbol.Set.union symbols
+          (Bound_static.symbols_being_defined
+             (Lifted_constant.bound_static const)))
+  in
+  { t with lifted_constants = consts; lifted_constant_symbols }
 
 let find_shareable_constant t static_const =
   Static_const.Map.find_opt static_const t.shareable_constants

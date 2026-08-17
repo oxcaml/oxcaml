@@ -598,12 +598,12 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         ~body:handler
   in
   (* The [lets_to_introduce] rebind parameters that the alias analysis has
-     removed from the continuation. These lets must be placed outside any
-     lifted constants placed above, since such constants can reference the
-     removed parameters, which are not bound anywhere else. Conversely, each
-     let's defining expression is the parameter's canonical dominator, which
-     must be in scope at the continuation's use sites, so it cannot be bound
-     by the lifted constants placed inside. *)
+     removed from the continuation. These lets must be placed outside any lifted
+     constants placed above, since such constants can reference the removed
+     parameters, which are not bound anywhere else. Conversely, each let's
+     defining expression is the parameter's canonical dominator, which must be
+     in scope at the continuation's use sites, so it cannot be bound by the
+     lifted constants placed inside. *)
   let handler, uacc =
     Variable.Lmap.fold
       (fun var bound_to (handler, uacc) ->

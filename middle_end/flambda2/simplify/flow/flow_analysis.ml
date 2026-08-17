@@ -64,6 +64,7 @@ let analyze ?(speculative = false) ?print_name ~machine_width
              map;
              extra = _;
              lifted_constants = _;
+             recorded_symbols = _;
              dummy_toplevel_cont
            } as t) =
         Flow_acc.normalize_acc ~specialization_map t
@@ -137,12 +138,12 @@ let analyze ?(speculative = false) ?print_name ~machine_width
          still be referenced in the term being rebuilt (for example when
          choosing aliases for the arguments of merged [Switch] arms, or when
          patching unused exception buckets). The mutable unboxing pass deletes
-         the bindings of unboxed blocks; in addition the alias analysis
-         removes, without introducing any rebinding, any continuation
-         parameter whose canonical dominator is such a block (see
-         [Control_flow_graph.minimize_extra_args_for_one_continuation]). None
-         of these names will be bound in the rebuilt term, so they must not
-         stay in [required_names]. *)
+         the bindings of unboxed blocks; in addition the alias analysis removes,
+         without introducing any rebinding, any continuation parameter whose
+         canonical dominator is such a block (see
+         [Control_flow_graph.minimize_extra_args_for_one_continuation]). None of
+         these names will be bound in the rebuilt term, so they must not stay in
+         [required_names]. *)
       let vars_deleted_by_mutable_unboxing =
         let unboxed_block_vars =
           Simple.Set.fold
