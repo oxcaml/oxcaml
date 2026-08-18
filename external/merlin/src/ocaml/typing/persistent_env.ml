@@ -150,7 +150,8 @@ type 'a t = {
   persistent_structures :
     (Global_module.Name.t, 'a pers_struct_info) Hashtbl.t;
   locals_bound_to_runtime_parameters : unit Ident.Tbl.t;
-  imported_units: CU.Name.Set.t ref;
+  (* Maps to [false] when recorded only for the warning check *)
+  imported_units: bool CU.Name.Map.t ref;
   imported_opaque_units: CU.Name.Set.t ref;
   quoted_intfs: CU.Name.Set.t ref;
   quoted_impls: CU.Set.t ref;
@@ -165,7 +166,7 @@ let empty () = {
   persistent_names = Hashtbl.create 17;
   persistent_structures = Hashtbl.create 17;
   locals_bound_to_runtime_parameters = Ident.Tbl.create 17;
-  imported_units = ref CU.Name.Set.empty;
+  imported_units = ref CU.Name.Map.empty;
   imported_opaque_units = ref CU.Name.Set.empty;
   quoted_intfs = ref CU.Name.Set.empty;
   quoted_impls = ref CU.Set.empty;
@@ -194,7 +195,7 @@ let clear penv =
   Hashtbl.clear persistent_names;
   Hashtbl.clear persistent_structures;
   Ident.Tbl.clear locals_bound_to_runtime_parameters;
-  imported_units := CU.Name.Set.empty;
+  imported_units := CU.Name.Map.empty;
   imported_opaque_units := CU.Name.Set.empty;
   quoted_intfs := CU.Name.Set.empty;
   quoted_impls := CU.Set.empty;
@@ -214,12 +215,19 @@ let clear_missing {imports; _} =
   List.iter (Hashtbl.remove imports) missing_entries
 
 let add_import {imported_units; _} s =
-  imported_units := CU.Name.Set.add s !imported_units
+  imported_units := CU.Name.Map.add s true !imported_units
+
+let add_import_for_warning {imported_units; _} name =
+  (* Keep [true] if the unit was also really imported *)
+  imported_units :=
+    CU.Name.Map.update name
+      (function None -> Some false | Some _ as x -> x)
+      !imported_units
 
 let rec add_imports_in_name penv (g : Global_module.Name.t) =
-  add_import penv (g |> CU.Name.of_head_of_global_name);
+  add_import_for_warning penv (g |> CU.Name.of_head_of_global_name);
   let add_in_arg ({ param; value } : Global_module.Name.argument) =
-    add_import penv (param |> CU.Name.of_parameter_name);
+    add_import_for_warning penv (param |> CU.Name.of_parameter_name);
     add_imports_in_name penv value
   in
   List.iter add_in_arg g.args
@@ -338,7 +346,7 @@ let register_pers_for_short_paths penv modname ps components =
 (* Add an import to the hash table. Checks that we are allowed to access
    this .cmi. *)
 
-let acknowledge_import penv modname pers_sig =
+let acknowledge_import penv ~check modname pers_sig =
   let { Persistent_signature.filename; cmi; visibility } = pers_sig in
   let found_name = cmi.cmi_name in
   let kind = cmi.cmi_kind in
@@ -402,11 +410,11 @@ let acknowledge_import penv modname pers_sig =
       imp_flags = flags;
     }
   in
-  add_import penv modname;
+  if check then add_import penv modname;
   Hashtbl.add imports modname (Found import);
   import
 
-let read_import penv modname cmi =
+let read_import penv ~check modname cmi =
   let filename = Unit_info.Artifact.filename cmi in
   add_import penv modname;
   let cmi = read_cmi_lazy filename in
@@ -414,14 +422,14 @@ let read_import penv modname cmi =
     { Persistent_signature.filename; cmi;
       visibility = Visible { cmx_guaranteed = false } }
   in
-  acknowledge_import penv modname pers_sig
+  acknowledge_import penv ~check modname pers_sig
 
 let check_visibility ~allow_hidden imp =
   match imp.imp_visibility with
   | Hidden when not allow_hidden -> raise Not_found
   | Hidden | Visible _ -> ()
 
-let find_import ~allow_hidden penv modname =
+let find_import ~allow_hidden penv ~check modname =
   let {imports; _} = penv in
   if CU.Name.equal modname CU.Name.predef_exn then raise Not_found;
   match Hashtbl.find imports modname with
@@ -440,8 +448,7 @@ let find_import ~allow_hidden penv modname =
                   (Missing { hidden_were_allowed = allow_hidden });
                 raise Not_found
           in
-          add_import penv modname;
-          acknowledge_import penv modname psig
+          acknowledge_import penv ~check modname psig
 
 let remember_global { globals; _ } global ~precision ~mentioned_by =
   let global_name = Global_module.to_name global in
@@ -744,12 +751,12 @@ and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
   | pn -> pn
   | exception Not_found ->
       let unit_name = CU.Name.of_head_of_global_name name in
-      let import = find_import ~allow_hidden penv unit_name in
+      let import = find_import ~allow_hidden penv ~check unit_name in
       acknowledge_pers_name penv check name import ~allow_excess_args
 
 let read_pers_name penv check name filename =
   let unit_name = CU.Name.of_head_of_global_name name in
-  let import = read_import penv unit_name filename in
+  let import = read_import penv ~check unit_name filename in
   acknowledge_pers_name penv check name import
 
 let normalize_global_name penv modname =
@@ -1007,7 +1014,7 @@ let read_cmi_file penv filename =
   let pers_sig =
     { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
   in
-  let import = acknowledge_import penv unit_name pers_sig in
+  let import = acknowledge_import penv ~check:true unit_name pers_sig in
   let pers_name =
     acknowledge_pers_name penv true modname import ~allow_excess_args:false
   in
@@ -1032,8 +1039,8 @@ let check ~allow_hidden penv f1 f2 ~loc name =
     | exception Not_found -> false
   in
   if not persistent_structure_visible then begin
-    (* PR#6843: record the weak dependency ([add_import]) regardless of
-       whether the check succeeds, to help make builds more
+    (* PR#6843: record the weak dependency ([add_import_for_warning])
+       regardless of whether the check succeeds, to help make builds more
        deterministic. *)
     add_imports_in_name penv name;
     let _ : Global_module.t =
@@ -1048,26 +1055,28 @@ let check ~allow_hidden penv f1 f2 ~loc name =
   end
 
 let crc_of_unit penv name =
-  (find_import ~allow_hidden:true penv name).imp_self_crc
+  (find_import ~allow_hidden:true penv ~check:true name).imp_self_crc
 
 let imports penv =
   (* Reversed to match the historical order of import tables *)
-  let names = List.rev (CU.Name.Set.elements !(penv.imported_units)) in
+  let names = List.rev (CU.Name.Map.bindings !(penv.imported_units)) in
   (* Direct dependencies only: for each imported unit record just its own
-     CRC. Names referenced but never loaded (e.g. weak dependencies) become
-     alias-only entries. *)
+     CRC. Names recorded only for the warning check become alias-only
+     entries. *)
   List.map
-    (fun name ->
+    (fun (name, imported) ->
        let spec =
-         match find_import_info_in_cache penv name with
-         | Some imp ->
-           let kind : Import_info.Intf.Nonalias.Kind.t =
-             match imp.imp_impl with
-             | Some cu -> Normal cu
-             | None -> Parameter
-           in
-           Some (kind, imp.imp_self_crc)
-         | None -> None
+         if not imported then None
+         else
+           match find_import_info_in_cache penv name with
+           | Some imp ->
+             let kind : Import_info.Intf.Nonalias.Kind.t =
+               match imp.imp_impl with
+               | Some cu -> Normal cu
+               | None -> Parameter
+             in
+             Some (kind, imp.imp_self_crc)
+           | None -> None
        in
        Import_info.Intf.create name spec)
     names
@@ -1201,7 +1210,7 @@ let save_cmi penv psig =
          crc_of_unit() will also return its crc *)
       let cmi = { cmi with cmi_self_crc = crc } in
       let psig = { psig with Persistent_signature.cmi } in
-      ignore (acknowledge_import penv cmi.cmi_name psig : import)
+      ignore (acknowledge_import penv ~check:true cmi.cmi_name psig : import)
     )
     ~exceptionally:(fun () -> remove_file filename)
 
