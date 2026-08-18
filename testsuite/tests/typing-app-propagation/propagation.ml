@@ -78,7 +78,9 @@ Error: The value "xs" has type "int list" but an expression was expected of type
        Type "int" is not compatible with type "string"
 |}]
 
-(* Record field disambiguation. *)
+(* Record field disambiguation: arguments are still typed left to right, so
+   [r.x] is resolved before [l] is seen and the propagated [int] can only
+   move the error onto the field access. *)
 
 type t1 = {x: int}
 type t2 = {x: bool}
@@ -152,7 +154,8 @@ Line 3, characters 14-27:
 Error: This expression has type "t2" but an expression was expected of type "t1"
 |}]
 
-(* Object-typed arguments (let-def's js_of_ocaml-style example): the error
+(* Object-typed arguments (let-def's js_of_ocaml-style example): the method
+   is resolved through the propagated type, and when it is missing the error
    should point at the argument rather than the whole application. *)
 
 type 'a signal = Signal of 'a
@@ -167,27 +170,28 @@ class type container = object
 end
 
 let f (c : container) =
-  c#on_update (signal (fun x -> print_endline x#to_string))
+  c#on_update (signal (fun x -> print_endline x#show))
 [%%expect{|
 type 'a signal = Signal of 'a
 val signal : 'a -> 'a signal = <fun>
 class type showable = object method show : string end
 class type container =
   object method on_update : (showable -> unit) signal -> unit end
-Line 13, characters 46-47:
-13 |   c#on_update (signal (fun x -> print_endline x#to_string))
-                                                   ^
+val f : container -> unit = <fun>
+|}]
+
+let f (c : container) =
+  c#on_update (signal (fun x -> print_endline x#to_string))
+[%%expect{|
+Line 2, characters 46-47:
+2 |   c#on_update (signal (fun x -> print_endline x#to_string))
+                                                  ^
 Error: This expression has type "showable"
        It has no method "to_string"
 |}, Principal{|
-type 'a signal = Signal of 'a
-val signal : 'a -> 'a signal = <fun>
-class type showable = object method show : string end
-class type container =
-  object method on_update : (showable -> unit) signal -> unit end
-Line 13, characters 14-59:
-13 |   c#on_update (signal (fun x -> print_endline x#to_string))
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 2, characters 14-59:
+2 |   c#on_update (signal (fun x -> print_endline x#to_string))
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "(< to_string : string; .. > -> unit) signal"
        but an expression was expected of type "(showable -> unit) signal"
        Type "< to_string : string; .. >" is not compatible with type
