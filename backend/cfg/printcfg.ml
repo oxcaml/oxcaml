@@ -39,6 +39,19 @@ let with_arg_colour print_reg ppf r =
   print_reg ppf r;
   Cfg_colours.pop ppf
 
+let phantom_availability : type a. Format.formatter -> a Cfg.instruction -> unit
+    =
+ fun ppf instr ->
+  if !Oxcaml_flags.davail || !Dwarf_flags.debug_avail_sets
+  then
+    match instr.phantom_available_before with
+    | None -> ()
+    | Some phantom_vars ->
+      if not (Backend_var.Set.is_empty phantom_vars)
+      then
+        Format.fprintf ppf "@[<1>PAB={%a}@]@," Backend_var.Set.print
+          phantom_vars
+
 let basic_desc ppf (basic : Cfg.basic) =
   let open Format in
   match basic with
@@ -193,6 +206,7 @@ let instruction_with_colours ~outer_colour ~print_reg ~res ~print_body ppf =
   Cfg_colours.pop ppf
 
 let basic_with_print_reg ~print_reg ppf (instr : Cfg.basic Cfg.instruction) =
+  phantom_availability ppf instr;
   instruction_with_colours ~outer_colour:Cfg_colours.basic ~print_reg
     ~res:instr.res
     ~print_body:(fun ~print_reg ppf -> basic_body ~print_reg ppf instr)
@@ -205,6 +219,7 @@ let basic ppf instr = basic_with_print_reg ~print_reg:Printreg.reg ppf instr
    "]). *)
 let terminator_full ~print_reg ?(sep = "") ppf
     (ti : Cfg.terminator Cfg.instruction) =
+  phantom_availability ppf ti;
   instruction_with_colours ~outer_colour:Cfg_colours.terminator ~print_reg
     ~res:ti.res
     ~print_body:(fun ~print_reg ppf -> terminator_body ~print_reg ~sep ppf ti)
