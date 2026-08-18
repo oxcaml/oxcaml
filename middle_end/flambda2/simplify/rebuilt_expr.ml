@@ -19,6 +19,8 @@ type t = Expr.t
 
 type rebuilt_expr = t
 
+let apply_renaming = Expr.apply_renaming
+
 let to_expr t are_rebuilding =
   if ART.do_not_rebuild_terms are_rebuilding
   then
