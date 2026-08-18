@@ -46,11 +46,9 @@
         formatter = pkgs.nixfmt-tree;
 
         devShells.default = pkgs.mkShell {
-          inputsFrom = [ oxcaml ] ++ lib.attrValues merlinPackages;
+          inputsFrom = [ oxcaml ];
           buildInputs = merlinPackages.merlin.devBuildInputs;
-          packages =
-            [ merlinPackages.merlin ]
-            ++ merlinPackages.merlin.devNativeBuildInputs;
+          nativeBuildInputs = merlinPackages.merlin.devNativeBuildInputs;
         };
 
       }
