@@ -9,10 +9,17 @@ end
 module Context : sig
   type t =
     | Def of Shape.Uid.t
-    | App of t * t
+        (** A root module/signature instance identified directly by its UID *)
+    | App of t * t  (** An applicative functor instance, e.g., [F(A)] *)
     | Proj of t * Shape.Uid.t
+        (** A module member projected from another context, e.g., [M.N] *)
     | Body of Shape.Uid.t
+        (** The interior associated with a named module-type or functor
+            declaration *)
     | Site of Compilation_unit.t * Artifact.t * int
+        (** An instance with no stable module path, e.g., anonymous module
+            instances *)
+  (** A path-like identity for a module/signature instance *)
 
   val compare : t -> t -> int
 
@@ -23,8 +30,12 @@ end
 
 module Key : sig
   type t =
-    | Named of Context.t * Shape.Uid.t
-    | Anon of Shape.Uid.t
+    | Named of
+        { context : Context.t;
+          family_uid : Shape.Uid.t
+        }
+    | Anon of { key_uid : Shape.Uid.t }
+  (** Uniquely identifies a module-type node *)
 
   val compare : t -> t -> int
 
@@ -39,6 +50,7 @@ module Node : sig
   type t =
     | Uid of Shape.Uid.t
     | Location of Compilation_unit.t * Location.t
+  (** Identifies the implemntation module of a check *)
 
   val compare : t -> t -> int
 end
@@ -58,6 +70,7 @@ module Check : sig
       kind : Kind.t;
       site : Location.t
     }
+  (** An [implementation] was checked against [expectation] *)
 
   val compare : t -> t -> int
 end
@@ -92,6 +105,7 @@ module Context_equality : sig
     { left : Context.t;
       right : Context.t
     }
+  (** A fact that the contexts denote the same module instance *)
 
   val compare : t -> t -> int
 end
@@ -110,28 +124,18 @@ module Omission : sig
       source : Shape.Uid.t option;
       reason : Reason.t
     }
+  (** Incompleteness marker, used to identify that a missing dependency isn't
+      proof that no dependency exists *)
 
   val compare : t -> t -> int
 end
 
-type t =
+type t = private
   { checks : Check.t list;
     dependencies : Dependency.t list;
     equalities : Context_equality.t list;
     omissions : Omission.t list
   }
-
-val empty : t
-
-val normalize : t -> t
-
-val ensure_normalized : t -> t
-
-val merge : t -> t -> t
-
-val merge_many : t list -> t
-
-val compare : t -> t -> int
 
 val of_implementation :
   Compilation_unit.t ->
