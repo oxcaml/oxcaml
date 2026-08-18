@@ -24,9 +24,8 @@ let foo r x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/0 x/0)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/0))
 val foo :
-  'a myref @ [< past('m) & global corrupted write] ->
-  ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> past('m) | corruptible writing] =
+  'a myref @ [< past('m) & global write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | writing] =
   <fun>
 |}]
 
@@ -38,9 +37,8 @@ let foo (r @ local) x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/1 x/1)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/1))
 val foo :
-  'a myref @ [< past('m) & corrupted write > local unforkable yielding] ->
-  ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> past('m) | local corruptible unforkable yielding writing] =
+  'a myref @ [< past('m) & write > local] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | local writing] =
   <fun>
 |}]
 
@@ -50,9 +48,8 @@ let foo (r @ global) x = r.i <- x
 (let (foo/2 = (function {nlocal = 0} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/2))
 val foo :
-  'a myref @ [< past('m) & global corrupted forkable unyielding write] ->
-  ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> past('m) | corruptible writing] =
+  'a myref @ [< past('m) & global write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | writing] =
   <fun>
 |}]
 
@@ -71,8 +68,7 @@ let foo () =
          (function {nlocal = 1} param/1[L][value<int>] : int
            (apply store/0 r/3)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/3))
-val foo :
-  unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> corruptible writing] =
+val foo : unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> writing] =
   <fun>
 |}]
 
@@ -94,8 +90,7 @@ Warning 26 [unused-var]: unused variable "r".
              (setfield_ptr(maybe-stack) 0 r/6 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/4))
 
-val foo : unit @ 'o -> (string myref @ [< corrupted write] -> unit @ 'n) @ 'm =
-  <fun>
+val foo : unit @ 'o -> (string myref @ [< write] -> unit @ 'n) @ 'm = <fun>
 |}]
 
 let foo () =
@@ -113,8 +108,7 @@ let foo () =
          (function {nlocal = 1} param/4[L][value<int>] : int
            (apply store/1 r/7)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/5))
-val foo :
-  unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> corruptible writing] =
+val foo : unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> writing] =
   <fun>
 |}]
 
@@ -154,9 +148,8 @@ let fst_local (x @ local) = exclave_ fun y -> x
        (function[L] {nlocal = 1} y/2[L]? x/5)))
   (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/0))
 val fst_local :
-  'a @ [< 'm > local unforkable yielding] ->
-  ('b @ 'n -> 'a @ [> 'm | local unforkable yielding]) @ [> close('m) | local unforkable yielding] =
-  <fun>
+  'a @ [< 'm > local] ->
+  ('b @ 'n -> 'a @ [> 'm | local]) @ [> close('m) | local] = <fun>
 |}]
 
 let foo = fst 42
@@ -177,9 +170,7 @@ let foo () =
      (function {nlocal = 1} param/5[L][value<int>] : stack
        (apply[L] fst_local/0 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/7))
-val foo :
-  unit @ 'n ->
-  ('a @ 'm -> int @ [> local unforkable yielding]) @ [> local unforkable yielding dynamic] =
+val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local dynamic] =
   <fun>
 |}]
 
@@ -251,7 +242,7 @@ let app_yielding (f @ yielding) (x @ yielding) = app f x
   (apply (field_imm 1 (global Toploop!)) "app_yielding" app_yielding/0))
 val app_yielding :
   ('a @ [> 'n | yielding] -> 'b @ [< 'm & global]) @ [< past('o) & global > yielding] ->
-  ('a @ [< 'n > yielding] -> 'b @ [> 'm | dynamic]) @ [> past('o) | nonportable yielding stateful] =
+  ('a @ [< 'n > yielding] -> 'b @ [> 'm | dynamic]) @ [> past('o) | yielding stateful] =
   <fun>
 |}]
 
@@ -277,8 +268,7 @@ let rec forward =
           (makeblock 0 g/0)))
       (apply (field_imm 1 (global Toploop!)) "forward" forward/0))))
 val forward :
-  int @ [< many uncontended read_write > dynamic] ->
-  int @ [< global > dynamic] = <fun>
+  int @ [< many read_write > dynamic] -> int @ [< global > dynamic] = <fun>
 |}]
 
 (* Same wrapper, but closing over the yielding [y]: all calls must be
@@ -314,8 +304,7 @@ let forward_yielding (y @ yielding) =
     forward_yielding/0))
 val forward_yielding :
   'a @ [< past('m) & global many > yielding] ->
-  (int @ [< many uncontended read_write > dynamic] ->
-   int @ [< global > dynamic]) @ [> past('m) | nonportable yielding stateful] =
+  (int @ [< many read_write > dynamic] -> int @ [< global > dynamic]) @ [> past('m) | yielding stateful] =
   <fun>
 |}]
 

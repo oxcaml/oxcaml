@@ -13,8 +13,7 @@ let refine (type output) (w : output t) =
 [%%expect{|
 type _ t = A : bool t
 val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
-val refine :
-  'output t @ 'm -> (bool -> 'output) @ [> nonportable stateful dynamic] =
+val refine : 'output t @ 'm -> (bool -> 'output) @ [> stateful dynamic] =
   <fun>
 |}]
 
@@ -62,7 +61,7 @@ type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
 val local_arg_ok :
   'a dom @ 'o ->
   ('a @ [< past('n) & global] ->
-   (string @ [> local unforkable yielding] -> int @ [> dynamic]) @ [> past('n)]) @ 'm =
+   (string @ [> local] -> int @ [> dynamic]) @ [> past('n)]) @ 'm =
   <fun>
 |}, Principal{|
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
@@ -94,17 +93,12 @@ let crosses (type a) (w : a cross) (x : a @ local) : a @ global =
 [%%expect{|
 type _ cross = Int : int cross | Str : string cross
 val crosses :
-  'a cross @ 'n ->
-  ('a @ [> local unforkable yielding] ->
-   'a @ [< global forkable unyielding > dynamic]) @ 'm =
-  <fun>
+  'a cross @ 'n -> ('a @ [> local] -> 'a @ [< global > dynamic]) @ 'm = <fun>
 |}, Principal{|
 type _ cross = Int : int cross | Str : string cross
 val crosses :
   'a cross @ [< past('m) & global] ->
-  ('a @ [> local unforkable yielding] ->
-   'a @ [< global forkable unyielding > dynamic]) @ [> past('m)] =
-  <fun>
+  ('a @ [> local] -> 'a @ [< global > dynamic]) @ [> past('m)] = <fun>
 |}]
 
 let escapes (type a) (w : a cross) (x : a @ local) : a @ global =

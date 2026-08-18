@@ -13,7 +13,7 @@ val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
 val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
 val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
 val use_static : 'a @ [< static] -> unit @ 'm = <fun>
-val use_global : 'a @ [< global forkable unyielding] -> unit @ 'm = <fun>
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 |}]
 
 (* BASIC POLYMORPHISM *)
@@ -26,8 +26,7 @@ let foo =
   let _ = foo y in
   foo
 [%%expect{|
-val foo : '_weak1 -> '_weak1 @ [> aliased nonportable stateful dynamic] =
-  <fun>
+val foo : '_weak1 -> '_weak1 @ [> aliased stateful dynamic] = <fun>
 |}]
 
 let id x = x
@@ -72,7 +71,7 @@ let bar (c @ local) =
   let _ = use_unique (id c) in
   ()
 [%%expect{|
-val bar : 'a @ [< unique > local unforkable yielding] -> unit @ 'm = <fun>
+val bar : 'a @ [< unique > local] -> unit @ 'm = <fun>
 |}]
 
 let bar (x @ aliased) =
@@ -132,7 +131,7 @@ val g :
 val which :
   bool @ 'n ->
   (string @ [< 'm . contended immutable & portable] ->
-   string @ [> 'm @@ many portable forkable unyielding stateless]) @ [> aliased nonportable stateful dynamic] =
+   string @ [> 'm @@ many portable forkable unyielding stateless]) @ [> aliased stateful dynamic] =
   <fun>
 |}]
 
@@ -246,7 +245,7 @@ let foo (x : int @ portable) (y : int @ nonportable) =
 [%%expect{|
 val foo :
   int @ [< past('m) & global portable] ->
-  (int @ [> nonportable] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
+  (int @ [> nonportable] -> unit @ [> dynamic]) @ [> past('m) | stateful] =
   <fun>
 |}]
 
@@ -301,9 +300,7 @@ let foo (x @ local) =
   let y = id_local x in
   y
 [%%expect{|
-val id_local :
-  'a @ [< 'm > local unforkable yielding] ->
-  'a @ [> 'm | local unforkable yielding] = <fun>
+val id_local : 'a @ [< 'm > local] -> 'a @ [> 'm | local] = <fun>
 Line 5, characters 2-3:
 5 |   y
       ^
@@ -318,9 +315,7 @@ let foo (local_ x) = exclave_
   let y = id_local x in
   y
 [%%expect{|
-val foo :
-  'a @ [< 'm > local unforkable yielding] ->
-  'a @ [> 'm | local unforkable yielding dynamic] = <fun>
+val foo : 'a @ [< 'm > local] -> 'a @ [> 'm | local dynamic] = <fun>
 |}]
 
 (* MULTIPLE MODE AXES *)

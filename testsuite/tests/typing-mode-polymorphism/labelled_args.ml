@@ -13,7 +13,7 @@ val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
 val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
 val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
 val use_static : 'a @ [< static] -> unit @ 'm = <fun>
-val use_global : 'a @ [< global forkable unyielding] -> unit @ 'm = <fun>
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 |}]
 
 let id ~label1 = label1
