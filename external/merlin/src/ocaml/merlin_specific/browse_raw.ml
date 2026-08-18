@@ -522,7 +522,7 @@ let rec of_expression_desc loc = function
   | Texp_send (e, meth, _) ->
     of_expression e ** of_method_call e meth loc (* TODO ulysse CHECK*)
   | Texp_override (_, ls) -> list_fold (fun (_, _, e) -> of_expression e) ls
-  | Texp_letmodule (mb_id, mb_name, mb_presence, mb_expr, e) ->
+  | Texp_letmodule (mb_id, mb_name, mb_presence, mb_uid, mb_expr, e) ->
     let mb =
       { mb_id;
         mb_name;
@@ -530,7 +530,7 @@ let rec of_expression_desc loc = function
         mb_loc = Location.none;
         mb_attributes = [];
         mb_presence;
-        mb_uid = Shape.Uid.internal_not_actually_unique
+        mb_uid
       }
     in
     app (Module_binding mb) ** of_expression e
@@ -819,7 +819,7 @@ let of_node node =
     | Class_field_kind (Tcfk_virtual ct) -> of_core_type ct
     | Class_field_kind (Tcfk_concrete (_, e)) -> of_expression e
     | Module_expr { mod_desc } -> of_module_expr_desc mod_desc
-    | Module_type_constraint Tmodtype_implicit -> id_fold
+    | Module_type_constraint (Tmodtype_implicit | Tmodtype_package _) -> id_fold
     | Module_type_constraint (Tmodtype_explicit (mt, modes)) ->
       of_module_type mt ** of_modes modes
     | Structure { str_items; str_final_env } ->
@@ -1053,7 +1053,7 @@ let expression_paths { Typedtree.exp_desc; exp_extra; _ } =
         ~f:(fun (id, loc, _) ->
           (reloc (Path.Pident id) loc, Some (Longident.Lident loc.txt)))
         ps
-    | Texp_letmodule (Some id, loc, _, _, _) ->
+    | Texp_letmodule (Some id, loc, _, _, _, _) ->
       [ (reloc (Path.Pident id) loc, Option.map ~f:mk_lident loc.txt) ]
     | Texp_for
         { for_id = id; for_pat = { Parsetree.ppat_loc = loc; ppat_desc }; _ } ->
