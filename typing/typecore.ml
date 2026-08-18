@@ -10546,15 +10546,13 @@ and type_application env app_loc expected_mode position_and_mode
                    | Arg _ -> ty_ret)
                 ty_ret (List.rev untyped_args)
             in
-            let ty_expected = instance ty_expected in
-            if not (is_Tvar (expand_head env ty_expected)) then
-              (* This extra unification might trigger incompleteness in the
-                 type checker (like due to lack of [Tquote_eval]-constraints).
-                 Backtracking might be expensive, but will only happen in cases
-                 we'll fail anyway or when type inference is incomplete. *)
-              let snap = snapshot () in
-              try Ctype.unify env ty_res ty_expected
-              with Unify _ | Tags _ -> backtrack snap
+            (* This extra unification might trigger incompleteness in the
+               type checker (like due to lack of [Tquote_eval]-constraints).
+               Backtracking might be expensive, but will only happen in cases
+               we'll fail anyway or when type inference is incomplete. *)
+            let snap = snapshot () in
+            try Ctype.unify env ty_res (instance ty_expected)
+            with Unify _ | Tags _ -> backtrack snap
           end;
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =

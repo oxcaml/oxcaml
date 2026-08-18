@@ -3199,7 +3199,7 @@ let mk_jkind_context_always_principal env =
 (* The ~fixed argument controls what effects this may have on `ty`.  If false,
    then we will update the jkind of type variables to make the check true, if
    possible.  If true, we won't (but will still instantiate sort variables). *)
-let constrain_type_jkind ~fixed env ty jkind =
+let constrain_type_jkind ~fixed ~through_with_bounds env ty jkind =
   (* The [expanded] argument says whether we've already tried [expand_head_opt].
 
      The "fuel" argument is used because we're duplicating the loop of
@@ -3367,6 +3367,30 @@ let constrain_type_jkind ~fixed env ty jkind =
                jkind.jkind.with_bounds;
            end;
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
+           let not_a_subjkind () =
+             Error (Jkind.Violation.of_ ~context env
+                      (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+           in
+           let constrain_with_bound_vars ~fuel =
+             match
+               if through_with_bounds
+               then Jkind.split_with_bound_vars ~context env ty's_jkind jkind
+               else None
+             with
+             | None -> not_a_subjkind ()
+             | Some (vars, residual) ->
+               (match
+                  Ikind.sub_or_intersect ~type_equal ~context env residual jkind
+                with
+                | Disjoint _ | May_have_intersection _ -> not_a_subjkind ()
+                | Sub ->
+                  Misc.Stdlib.List.mapi_result
+                    (fun _ (var, var_jkind) ->
+                       estimate_jkind_and_loop ~fuel ~expanded:false env
+                         var var_jkind)
+                    vars
+                  |> Result.map ignore)
+           in
            let product ~fuel unwrapped_tys =
              let num_components = List.length unwrapped_tys in
              let recur ty's_jkinds jkinds =
@@ -3504,10 +3528,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                  Error (Jkind.Violation.of_ ~context ~missing_cmi:path env
                           (Not_a_subjkind (ty's_jkind, jkind,
                                            sub_failure_reasons)))
-               | Final_result ->
-                 Error
-                   (Jkind.Violation.of_ ~context env
-                      (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+               | Final_result -> constrain_with_bound_vars ~fuel
                | Stepped { ty; modality; or_null = None } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
                  estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
@@ -3524,9 +3545,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
-          | _ ->
-            Error (Jkind.Violation.of_ ~context env
-                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+          | _ -> constrain_with_bound_vars ~fuel
   and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
@@ -3546,7 +3565,9 @@ let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
 
 let type_jkind_and_sort ~why ~fixed env ty =
   let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
-  match constrain_type_jkind ~fixed env ty jkind with
+  match
+    constrain_type_jkind ~fixed ~through_with_bounds:false env ty jkind
+  with
   | Ok _ -> Ok (Jkind.allow_left jkind, sort)
   | Error _ as e -> e
 
@@ -3555,10 +3576,13 @@ let type_sort ~why ~fixed env ty =
   |> Result.map snd
 
 let check_type_jkind env ty jkind =
-  constrain_type_jkind ~fixed:true env ty jkind
+  constrain_type_jkind ~fixed:true ~through_with_bounds:false env ty jkind
+
+let constrain_type_jkind_through_with_bounds env ty jkind =
+  constrain_type_jkind ~fixed:false ~through_with_bounds:true env ty jkind
 
 let constrain_type_jkind env ty jkind =
-  constrain_type_jkind ~fixed:false env ty jkind
+  constrain_type_jkind ~fixed:false ~through_with_bounds:false env ty jkind
 
 let () =
   Env.constrain_type_jkind := constrain_type_jkind
@@ -3623,7 +3647,7 @@ let check_type_jkind_exn env texn ty jkind =
   | Error err -> raise_for texn (Bad_jkind (ty,err))
 
 let constrain_type_jkind_exn env texn ty jkind =
-  match constrain_type_jkind env ty jkind with
+  match constrain_type_jkind_through_with_bounds env ty jkind with
   | Ok _ -> ()
   | Error err -> raise_for texn (Bad_jkind (ty,err))
 

@@ -878,19 +878,8 @@ type ('a : immutable_data) t : value mod contended with 'a
 |}]
 
 type 'a t_test = 'a t require_contended
-(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t_test = 'a t require_contended
-|}, Principal{|
-Line 1, characters 17-21:
-1 | type 'a t_test = 'a t require_contended
-                     ^^^^
-Error: This type "'a t" should be an instance of type
-         "('b : value mod contended)"
-       The kind of 'a t is value mod contended with 'a
-         because of the definition of t at line 1, characters 0-58.
-       But the kind of 'a t must be a subkind of value mod contended
-         because of the definition of require_contended at line 6, characters 0-49.
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
@@ -935,15 +924,8 @@ Error: This type "(int, int) t" should be an instance of type
 
 type ('a, 'b) t_test = ('a, 'b) t require_contended
 [%%expect {|
-Line 1, characters 23-33:
-1 | type ('a, 'b) t_test = ('a, 'b) t require_contended
-                           ^^^^^^^^^^
-Error: This type "('a, 'b) t" should be an instance of type
-         "('c : value mod contended)"
-       The kind of ('a, 'b) t is value mod contended with 'a with 'b
-         because of the definition of t at line 1, characters 0-53.
-       But the kind of ('a, 'b) t must be a subkind of value mod contended
-         because of the definition of require_contended at line 6, characters 0-49.
+type ('a : value mod contended, 'b : value mod contended) t_test =
+    ('a, 'b) t require_contended
 |}]
 
 let foo (t : (int, int) t @ contended) = use_uncontended t
