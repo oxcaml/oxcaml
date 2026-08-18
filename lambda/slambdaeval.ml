@@ -53,6 +53,8 @@ end
 open Or_missing.Syntax
 
 module Template_id = struct
+  (* The owner+stamp combination is globally unique (at least within one linked
+     unit). This fact is used to guarantee that the symbol names are unique. *)
   type t =
     { owner : Compilation_unit.t option;
       stamp : int;
@@ -191,56 +193,32 @@ end = struct
 end
 
 module Template_store = struct
-  type templates = Types.closure Template_id.Tbl.t
+  type t = Types.closure Template_id.Tbl.t
 
-  type t =
-    { templates : templates;
-      foreign_templates : templates
-    }
-
-  let empty () =
-    { templates = Template_id.Tbl.create 10;
-      foreign_templates = Template_id.Tbl.create 10
-    }
-
-  let empty_templates () = Template_id.Tbl.create 0
+  let empty () = Template_id.Tbl.create 10
 
   let add t ~cu ~name closure =
     let id = Template_id.create ~owner:cu ~name in
-    Template_id.Tbl.add t.templates id closure;
+    Template_id.Tbl.add t id closure;
     id
 
-  let add_foreign_templates t templates =
-    Template_id.Tbl.iter
-      (fun id closure ->
-        if Template_id.Tbl.mem t.foreign_templates id
-        then
-          Misc.fatal_errorf_doc "duplicate template id: %a" Template_id.print id;
-        Template_id.Tbl.add t.foreign_templates id closure)
-      templates
+  let find_template t id = Template_id.Tbl.find_opt t id
 
-  let find_template t id =
-    try Template_id.Tbl.find t.templates id
-    with Not_found -> (
-      try Template_id.Tbl.find t.foreign_templates id
-      with Not_found ->
-        Misc.fatal_errorf_doc "Template not found: %a" Template_id.print id)
-
-  let templates t = t.templates
-
-  let print_templates ppf templates =
-    if Template_id.Tbl.length templates = 0
+  let print ppf t =
+    if Template_id.Tbl.length t = 0
     then ()
     else begin
       Template_id.Tbl.iter
         (fun id closure ->
           Fmt.fprintf ppf "@ @[<2>(%a@ %a)@]" Template_id.print id
             Types.print_closure closure)
-        templates
+        t
     end
 end
 
-module Mangling = struct
+module Mangling : sig
+  val symbol_arg_of_value : Types.value -> string
+end = struct
   let symbol_arg_of_value_kind_non_null = function
     | Pintval -> "immediate"
     | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _ | Parrayval _
@@ -295,13 +273,13 @@ end
 
 module CU_data = struct
   type t =
-    { templates : Template_store.templates;
+    { templates : Template_store.t;
       cu : Types.value Or_missing.t
     }
 
   type raw = File_sections.Idx.t
 
-  let empty () = { templates = Template_store.empty_templates (); cu = Missing }
+  let empty () = { templates = Template_store.empty (); cu = Missing }
 
   let read raw ~sections = Obj.obj (File_sections.get sections raw)
 
@@ -309,44 +287,46 @@ module CU_data = struct
 
   let print ppf { templates; cu } =
     Fmt.fprintf ppf "@[<v 0>%a%a@]" Types.print_value_or_missing cu
-      Template_store.print_templates templates
+      Template_store.print templates
 end
 
 module Ctx = struct
   type t =
-    { cu_static_data_getter : Compilation_unit.t -> CU_data.t option;
-      cu_static_data : Types.value Or_missing.t Compilation_unit.Tbl.t;
+    { cu_static_data : Compilation_unit.t -> CU_data.t option;
       store : Template_store.t;
       instantiations : lambda Ident.Tbl.t;
       mutable instantiation_order : Ident.t list
     }
 
   let create ~cu_static_data =
-    { cu_static_data_getter = cu_static_data;
-      cu_static_data = Compilation_unit.Tbl.create 0;
+    let cu_data_cache = Compilation_unit.Tbl.create 0 in
+    { cu_static_data =
+        (fun cu -> Compilation_unit.Tbl.memoize cu_data_cache cu_static_data cu);
       store = Template_store.empty ();
       instantiations = Ident.Tbl.create 10;
       instantiation_order = []
     }
 
   let cu_static_data t cu =
-    Compilation_unit.Tbl.memoize t.cu_static_data
-      (fun cu ->
-        match t.cu_static_data_getter cu with
-        | Some { CU_data.templates; cu } ->
-          Template_store.add_foreign_templates t.store templates;
-          cu
-        | None -> Or_missing.Missing)
-      cu
+    match t.cu_static_data cu with
+    | Some { cu; _ } -> cu
+    | None -> Or_missing.Missing
 
   let instantiate t (id : Template_id.t) args f : Types.value Or_missing.t =
-    begin match id.owner with
-    | Some owner ->
-      if not (Compilation_unit.Tbl.mem t.cu_static_data owner)
-      then ignore (cu_static_data t owner)
-    | None -> ()
-    end;
-    let closure = Template_store.find_template t.store id in
+    let closure =
+      match Template_store.find_template t.store id with
+      | Some closure -> closure
+      | None -> (
+        let cu_data = Option.bind id.owner t.cu_static_data in
+        let closure =
+          Option.bind cu_data (fun { CU_data.templates; _ } ->
+              Template_store.find_template templates id)
+        in
+        match closure with
+        | Some closure -> closure
+        | None ->
+          Misc.fatal_errorf_doc "Template not found: %a" Template_id.print id)
+    in
     let arg_names =
       Array.map Mangling.symbol_arg_of_value args |> Array.to_list
     in
@@ -911,7 +891,4 @@ let eval ~cu_static_data slam =
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      ( { CU_data.templates = Template_store.templates ctx.store;
-          cu = slv_comptime
-        },
-        slv_runtime ))
+      { CU_data.templates = ctx.store; cu = slv_comptime }, slv_runtime)
