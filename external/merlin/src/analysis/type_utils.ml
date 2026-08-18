@@ -195,7 +195,7 @@ let rec mod_smallerthan n (m : Subst.Lazy.module_type) =
       begin match (mod_smallerthan n m2, m1) with
       | None, _ -> None
       | result, Unit -> result
-      | Some n1, Named (_, mt, _) -> (
+      | Some n1, Named (_, mt, _, _) -> (
         match mod_smallerthan (n - n1) mt with
         | None -> None
         | Some n2 -> Some (n1 + n2))
