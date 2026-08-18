@@ -155,4 +155,5 @@ let clear_caches () =
 let flush_caches ?older_than () =
   Cmi_cache.flush ?older_than ();
   Cmt_cache.flush ?older_than ();
-  Merlin_index_format.Index_cache.flush ?older_than ()
+  Merlin_index_format.Index_cache.flush ?older_than ();
+  Merlin_index_format.Module_facts_reader.flush ?older_than ()
