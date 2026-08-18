@@ -1351,6 +1351,9 @@ val equal_record_unboxed_product_representation_up_to_scannable_axes :
 val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool
 
+val equal_constructor_representation_up_to_scannable_axes :
+  constructor_representation -> constructor_representation -> bool
+
 (** Whether the constructor is represented as a constant rather than a block:
     it is nullary, or its shape is [Constructor_immediate_all_void]. *)
 val cstr_layout_is_constant : cstr_layout -> bool
