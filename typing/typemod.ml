@@ -4546,7 +4546,7 @@ let module_implementation_facts ~unit_interface ~argument_interface
     declaration_dependencies =
   match annots with
   | Cmt_format.Packed _ | Partial_implementation _ | Partial_interface _ ->
-    Module_implementation_facts.empty, false
+    None
   | Interface signature ->
     let argument_interface =
       Option.map
@@ -4554,9 +4554,9 @@ let module_implementation_facts ~unit_interface ~argument_interface
           ai_parameter_uid)
         argument_interface
     in
-    ( Module_implementation_facts.of_interface compilation_unit
-        ~argument_interface signature,
-      true )
+    Some
+      (Module_implementation_facts.of_interface compilation_unit
+         ~argument_interface signature)
   | Implementation structure ->
     let module_uids = ref Uid.Set.empty in
     let modtype_uids = ref Uid.Set.empty in
@@ -4599,11 +4599,11 @@ let module_implementation_facts ~unit_interface ~argument_interface
           ai_parameter_uid)
         argument_interface
     in
-    ( Module_implementation_facts.of_implementation compilation_unit
-        ~module_pairs:(interface_pairs !module_uids)
-        ~modtype_pairs:(interface_pairs !modtype_uids)
-        ~unit_interface_check:unit_interface ~argument_interface structure,
-      true )
+    Some
+      (Module_implementation_facts.of_implementation compilation_unit
+         ~module_pairs:(interface_pairs !module_uids)
+         ~modtype_pairs:(interface_pairs !modtype_uids)
+         ~unit_interface_check:unit_interface ~argument_interface structure)
 
 (* [Cmt_format.save_cmt] and [Cms_format.save_cms] drop the facts unless they
    actually write their artifact, so don't traverse the typedtree when neither
@@ -4615,7 +4615,7 @@ let module_implementation_facts_if_saved ~unit_interface ~argument_interface
   then
     module_implementation_facts ~unit_interface ~argument_interface
       compilation_unit annots declaration_dependencies
-  else Module_implementation_facts.empty, false
+  else None
 
 let type_implementation target modulename initial_env ast =
   let sourcefile = Unit_info.original_source_file target in
@@ -4628,14 +4628,14 @@ let type_implementation target modulename initial_env ast =
         (* This is cleared after saving the cmt so we have to save is before *)
         Cmt_format.get_declaration_dependencies ()
       in
-    let facts, facts_present =
+    let facts =
       module_implementation_facts_if_saved ~unit_interface ~argument_interface
         modulename annots decl_deps
     in
     Cmt_format.save_cmt (Unit_info.cmt target) modulename
-      annots initial_env cmi shape facts facts_present;
+      annots initial_env cmi shape facts;
     Cms_format.save_cms (Unit_info.cms target) modulename
-      annots initial_env shape decl_deps facts facts_present;
+      annots initial_env shape decl_deps facts;
     gen_annot target annots;
   in
   Cmt_format.clear ();
@@ -4850,14 +4850,14 @@ let save_signature ?argument_interface target modname tsg initial_env cmi =
     Cmt_format.get_declaration_dependencies ()
   in
   let annots = Cmt_format.Interface tsg in
-  let facts, facts_present =
+  let facts =
     module_implementation_facts_if_saved ~unit_interface:false
       ~argument_interface modname annots decl_deps
   in
   Cmt_format.save_cmt (Unit_info.cmti target) modname
-    annots initial_env (Some cmi) None facts facts_present;
+    annots initial_env (Some cmi) None facts;
   Cms_format.save_cms (Unit_info.cmsi target) modname
-    annots initial_env None decl_deps facts facts_present
+    annots initial_env None decl_deps facts
 
 let cms_register_toplevel_signature_attributes ~sourcefile ~uid ast =
   cms_register_toplevel_attributes ~sourcefile ~uid ast.psg_items
@@ -4987,14 +4987,14 @@ let package_units initial_env objfiles target_cmi modulename =
       Cmt_format.get_declaration_dependencies ()
     in
     let annots = Cmt_format.Packed (sg, objfiles) in
-    let facts, facts_present =
+    let facts =
       module_implementation_facts_if_saved ~unit_interface:true
         ~argument_interface:None modulename annots decl_deps
     in
     Cmt_format.save_cmt (Unit_info.companion_cmt target_cmi) modulename
-      annots initial_env None (Some shape) facts facts_present;
+      annots initial_env None (Some shape) facts;
     Cms_format.save_cms (Unit_info.companion_cms target_cmi) modulename
-      annots initial_env (Some shape) decl_deps facts facts_present;
+      annots initial_env (Some shape) decl_deps facts;
     cc
   end else begin
     (* Determine imports *)
@@ -5026,14 +5026,14 @@ let package_units initial_env objfiles target_cmi modulename =
         Cmt_format.get_declaration_dependencies ()
       in
       let annots = Cmt_format.Packed (sign, objfiles) in
-      let facts, facts_present =
+      let facts =
         module_implementation_facts_if_saved ~unit_interface:false
           ~argument_interface:None modulename annots decl_deps
       in
       Cmt_format.save_cmt (Unit_info.companion_cmt target_cmi) modulename
-        annots initial_env (Some cmi) (Some shape) facts facts_present;
+        annots initial_env (Some cmi) (Some shape) facts;
       Cms_format.save_cms (Unit_info.companion_cms target_cmi) modulename
-        annots initial_env (Some shape) decl_deps facts facts_present;
+        annots initial_env (Some shape) decl_deps facts;
     end;
     Tcoerce_none
   end
