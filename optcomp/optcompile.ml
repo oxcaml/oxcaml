@@ -177,7 +177,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         let argument_coercion =
           match argument_interface with
           | Some
-              { ai_coercion_from_primary; ai_signature = _; ai_expectation = _ }
+              { ai_coercion_from_primary; ai_signature = _; ai_parameter_uid = _ }
             ->
             Some ai_coercion_from_primary
           | None -> None
