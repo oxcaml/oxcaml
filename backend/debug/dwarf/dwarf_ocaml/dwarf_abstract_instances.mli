@@ -32,6 +32,17 @@ open! Asm_targets
 open! Dwarf_low
 open! Dwarf_high
 
+(** Add an empty abstract instance DIE for the given function symbol (which may
+    correspond to a function in another compilation unit), to be filled in later
+    by [add_root] should the function turn out to be defined in the current
+    unit. *)
+val add_empty :
+  Dwarf_state.t ->
+  compilation_unit_proto_die:Proto_die.t ->
+  fun_symbol:Asm_symbol.t ->
+  demangled_name:string ->
+  Proto_die.t * Asm_symbol.t
+
 (** Add an abstract instance root. *)
 val add_root :
   Dwarf_state.t ->

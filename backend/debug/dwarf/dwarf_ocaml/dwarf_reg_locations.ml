@@ -74,3 +74,19 @@ let reg_location_description (reg : Reg.t) ~(offset : Stack_reg_offset.t option)
                  ~domainstate_ptr_dwarf_register_number)))
   in
   SLDL.compile sldl
+
+let address_of_cmm_symbol_rvalue (sym : Cmm.symbol) =
+  match sym.sym_global with
+  | Global ->
+    SLDL.Rvalue.const_symbol (Asm_targets.Asm_symbol.create_global sym.sym_name)
+  | Local ->
+    (* Local symbols are defined as assembler-temporary labels rather than
+       linker symbols, and must be referenced as such. (In particular, any
+       relocation against such a symbol arising in a debug section would never
+       be applied: the symbol is absent from the object file's symbol table, and
+       on macOS the linker does not process debug sections in any event.) The
+       assembler resolves label references itself, causing the relevant
+       addresses to be quoted directly in the DWARF. *)
+    SLDL.Rvalue.address_of_label
+      (Asm_targets.Asm_label.create_label_for_local_symbol Data
+         (Asm_targets.Asm_symbol.create_local sym.sym_name))
