@@ -26,6 +26,7 @@
  ******************************************************************************)
 
 open Lambda
+module Fmt = Format_doc
 
 module Or_missing = struct
   type 'a t =
@@ -51,6 +52,47 @@ end
 
 open Or_missing.Syntax
 
+module Template_id = struct
+  (* The owner+stamp combination is globally unique (at least within one linked
+     unit). This fact is used to guarantee that the symbol names are unique. *)
+  type t =
+    { owner : Compilation_unit.t option;
+      stamp : int;
+      name : Slambdaident.t option
+    }
+
+  let stamp = ref 0
+
+  let create ~owner ~name =
+    let t = { owner; stamp = !stamp; name } in
+    incr stamp;
+    t
+
+  let print ppf t =
+    Fmt.fprintf ppf "%a/%a/%i"
+      (Fmt.pp_print_option Compilation_unit.print)
+      t.owner
+      (Fmt.pp_print_option (fun ppf id ->
+           Fmt.pp_print_string ppf (Slambdaident.name id)))
+      t.name t.stamp
+
+  let equal t1 t2 =
+    t1.stamp = t2.stamp && Option.equal Compilation_unit.equal t1.owner t2.owner
+
+  let hash t =
+    match t.owner with
+    | Some owner -> Hashtbl.hash (Compilation_unit.hash owner, t.stamp)
+    | None -> t.stamp
+
+  module Tbl = Hashtbl.Make (struct
+    type nonrec t = t
+
+    let equal = equal
+
+    let hash = hash
+  end)
+end
+
 module rec Types : sig
   type closure =
     { clo_params : Slambdaident.t array;
@@ -67,9 +109,61 @@ module rec Types : sig
     | SLVhalves of halves
     | SLVlayout of layout
     | SLVrecord of value Or_missing.t array
-    | SLVclosure of closure
-end =
-  Types
+    | SLVclosure of Template_id.t
+
+  val print_closure : Fmt.formatter -> closure -> unit
+
+  val print_value_or_missing : Fmt.formatter -> value Or_missing.t -> unit
+end = struct
+  type closure =
+    { clo_params : Slambdaident.t array;
+      clo_body : slambda;
+      clo_env : Env.t
+    }
+
+  type halves =
+    { slv_comptime : value Or_missing.t;
+      slv_runtime : lambda
+    }
+
+  and value =
+    | SLVhalves of halves
+    | SLVlayout of layout
+    | SLVrecord of value Or_missing.t array
+    | SLVclosure of Template_id.t
+
+  let print_closure ppf { clo_params; clo_body; clo_env = _ } =
+    let print_params ppf =
+      Array.iter
+        (fun id ->
+          Fmt.fprintf ppf "%a@ " (Fmt.deprecated Slambdaident.print) id)
+        clo_params
+    in
+    Fmt.fprintf ppf "@[<2>(closure ⟨env⟩@ @[<2>%t->@]@ %a)@]" print_params
+      (Fmt.deprecated Printlambda.slambda)
+      clo_body
+
+  let rec print_value ppf = function
+    | SLVhalves { slv_comptime; slv_runtime } ->
+      Fmt.fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]" print_value_or_missing
+        slv_comptime
+        (Fmt.deprecated Printlambda.lambda)
+        slv_runtime
+    | SLVlayout layout ->
+      Fmt.fprintf ppf "⟪%a⟫" (Fmt.deprecated Printlambda.layout) layout
+    | SLVrecord fields ->
+      let print_fields ppf =
+        Array.iter
+          (fun field -> Fmt.fprintf ppf "@ %a;" print_value_or_missing field)
+          fields
+      in
+      Fmt.fprintf ppf "@[<hv 2>[%t@;<1 -2>]@]" print_fields
+    | SLVclosure id -> Template_id.print ppf id
+
+  and print_value_or_missing ppf = function
+    | Or_missing.Missing -> Fmt.fprintf ppf "(missing)"
+    | Or_missing.Present v -> print_value ppf v
+end
 
 and Env : sig
   type t
@@ -98,74 +192,172 @@ end = struct
   let find t id = Map.find_opt id t |> Or_missing.of_option
 end
 
-include Types
-module Fmt = Format_doc
+module Template_store = struct
+  type t = Types.closure Template_id.Tbl.t
 
-let rec print_value ppf = function
-  | SLVhalves { slv_comptime; slv_runtime } ->
-    Fmt.fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]" print_value_or_missing
-      slv_comptime
-      (Fmt.deprecated Printlambda.lambda)
-      slv_runtime
-  | SLVlayout layout ->
-    Fmt.fprintf ppf "⟪%a⟫" (Fmt.deprecated Printlambda.layout) layout
-  | SLVrecord fields ->
-    let print_fields ppf =
-      Array.iter
-        (fun field -> Fmt.fprintf ppf "%a;@ " print_value_or_missing field)
-        fields
+  let empty () = Template_id.Tbl.create 10
+
+  let add t ~cu ~name closure =
+    let id = Template_id.create ~owner:cu ~name in
+    Template_id.Tbl.add t id closure;
+    id
+
+  let find_template t id = Template_id.Tbl.find_opt t id
+
+  let print ppf t =
+    if Template_id.Tbl.length t = 0
+    then ()
+    else begin
+      Template_id.Tbl.iter
+        (fun id closure ->
+          Fmt.fprintf ppf "@ @[<2>(%a@ %a)@]" Template_id.print id
+            Types.print_closure closure)
+        t
+    end
+end
+
+module Mangling : sig
+  val symbol_arg_of_value : Types.value -> string
+end = struct
+  let symbol_arg_of_value_kind_non_null = function
+    | Pintval -> "immediate"
+    | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _ | Parrayval _
+    | Pboxedvectorval _ | Pboxedmaskval ->
+      "value"
+
+  let rec symbol_arg_of_value_kind { raw_kind; nullable } =
+    let kind = symbol_arg_of_value_kind_non_null raw_kind in
+    let nullable =
+      match nullable with Nullable -> "_or_null" | Non_nullable -> ""
     in
-    Fmt.fprintf ppf "@[<hv 2>[@ %t]@]" print_fields
-  | SLVclosure { clo_params; clo_body; clo_env = _ } ->
-    let print_params ppf =
-      Array.iter
-        (fun id ->
-          Fmt.fprintf ppf "%a@ " (Fmt.deprecated Slambdaident.print) id)
-        clo_params
-    in
-    Fmt.fprintf ppf "@[<2>(closure ⟨env⟩@ @[<2>%t->@]@ %a)@]" print_params
-      (Fmt.deprecated Printlambda.slambda)
-      clo_body
+    kind ^ nullable
 
-and print_value_or_missing ppf = function
-  | Or_missing.Missing -> Fmt.fprintf ppf "(missing)"
-  | Or_missing.Present v -> print_value ppf v
+  and symbol_arg_of_unboxed_float = function
+    | Unboxed_float64 -> "float64"
+    | Unboxed_float32 -> "float32"
 
-let print = print_value_or_missing
+  and symbol_arg_of_unboxed_or_untagged_integer = function
+    | Unboxed_int64 -> "int64"
+    | Unboxed_nativeint -> "nativeint"
+    | Unboxed_int32 -> "int32"
+    | Untagged_int16 -> "int16"
+    | Untagged_int8 -> "int8"
+    | Untagged_int -> "int"
+
+  and symbol_arg_of_unboxed_vector = function
+    | Unboxed_vec128 -> "vec128"
+    | Unboxed_vec256 -> "vec256"
+    | Unboxed_vec512 -> "vec512"
+
+  and symbol_arg_of_unboxed_product layouts =
+    (* CR layout poly: this should be synced up with unarize. *)
+    "(" ^ String.concat "_" (List.map symbol_arg_of_layout layouts) ^ ")"
+
+  and symbol_arg_of_layout = function
+    | Pvalue vk -> symbol_arg_of_value_kind vk
+    | Punboxed_float uf -> symbol_arg_of_unboxed_float uf
+    | Punboxed_or_untagged_integer ui ->
+      symbol_arg_of_unboxed_or_untagged_integer ui
+    | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
+    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
+    | Punboxed_mask -> "mask"
+    | Ptop | Pbottom | Psplicevar _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
+
+  let symbol_arg_of_value (v : Types.value) =
+    match v with
+    | SLVlayout l -> symbol_arg_of_layout l
+    | SLVhalves _ | SLVrecord _ | SLVclosure _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected value"
+end
 
 module CU_data = struct
-  type t = value Or_missing.t
+  type t =
+    { templates : Template_store.t;
+      cu : Types.value Or_missing.t
+    }
 
   type raw = File_sections.Idx.t
 
-  let empty = Or_missing.Missing
+  let empty () = { templates = Template_store.empty (); cu = Missing }
 
   let read raw ~sections = Obj.obj (File_sections.get sections raw)
 
   let write t ~sections = File_sections.Builder.add sections (Obj.repr t)
 
-  let print = print
+  let print ppf { templates; cu } =
+    Fmt.fprintf ppf "@[<v 0>%a%a@]" Types.print_value_or_missing cu
+      Template_store.print templates
 end
 
 module Ctx = struct
   type t =
-    { cu_static_data_getter : Compilation_unit.t -> CU_data.t option;
-      cu_static_data : value Or_missing.t Compilation_unit.Tbl.t
+    { cu_static_data : Compilation_unit.t -> CU_data.t option;
+      store : Template_store.t;
+      instantiations : lambda Ident.Tbl.t;
+      mutable instantiation_order : Ident.t list
     }
 
   let create ~cu_static_data =
-    { cu_static_data_getter = cu_static_data;
-      cu_static_data = Compilation_unit.Tbl.create 0
+    let cu_data_cache = Compilation_unit.Tbl.create 0 in
+    { cu_static_data =
+        (fun cu -> Compilation_unit.Tbl.memoize cu_data_cache cu_static_data cu);
+      store = Template_store.empty ();
+      instantiations = Ident.Tbl.create 10;
+      instantiation_order = []
     }
 
   let cu_static_data t cu =
-    Compilation_unit.Tbl.memoize t.cu_static_data
-      (fun cu ->
-        match t.cu_static_data_getter cu with
-        | Some cu -> cu
-        | None -> Or_missing.Missing)
-      cu
+    match t.cu_static_data cu with
+    | Some { cu; _ } -> cu
+    | None -> Or_missing.Missing
+
+  let instantiate t (id : Template_id.t) args f : Types.value Or_missing.t =
+    let closure =
+      match Template_store.find_template t.store id with
+      | Some closure -> closure
+      | None -> (
+        let cu_data = Option.bind id.owner t.cu_static_data in
+        let closure =
+          Option.bind cu_data (fun { CU_data.templates; _ } ->
+              Template_store.find_template templates id)
+        in
+        match closure with
+        | Some closure -> closure
+        | None ->
+          Misc.fatal_errorf_doc "Template not found: %a" Template_id.print id)
+    in
+    let arg_names =
+      Array.map Mangling.symbol_arg_of_value args |> Array.to_list
+    in
+    let name =
+      Fmt.asprintf "%a_%a" Template_id.print id
+        (Fmt.pp_print_list
+           ~pp_sep:(fun ppf () -> Fmt.pp_print_string ppf "_")
+           Fmt.pp_print_string)
+        arg_names
+      |> Ident.create_persistent
+    in
+    if not (Ident.Tbl.mem t.instantiations name)
+    then begin
+      (* f might recursively call this function so make sure to mark this name
+         as visited before calling it. *)
+      Ident.Tbl.replace t.instantiations name Lambda.dummy_constant;
+      let lam = f closure args in
+      Ident.Tbl.replace t.instantiations name lam;
+      t.instantiation_order <- name :: t.instantiation_order
+    end;
+    Present (SLVhalves { slv_comptime = Missing; slv_runtime = Lvar name })
+
+  let instantiations t =
+    List.map
+      (fun id -> id, Ident.Tbl.find t.instantiations id)
+      t.instantiation_order
 end
+
+include Types
+
+type closure = Template_id.t
 
 let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
@@ -173,7 +365,7 @@ type _ value_type =
   | Thalves : halves value_type
   | Tlayout : layout value_type
   | Trecord : value Or_missing.t array value_type
-  | Tclosure : closure value_type
+  | Tclosure : Template_id.t value_type
 
 let describe_value_type (type a) : a value_type -> string = function
   | Thalves -> "program"
@@ -213,19 +405,19 @@ let expect (type a) ?reason (vty : a value_type) (v : value) : a =
 let expect_not_missing (a : 'a Or_missing.t) : 'a =
   match a with Present a -> a | Missing -> errf "unexpected missing value"
 
-let rec eval_slam ctx env slam : value Or_missing.t =
+let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
   match slam with
   | SLhalves { sval_comptime; sval_runtime } ->
-    let slv_comptime = eval_slam ctx env sval_comptime in
+    let slv_comptime = eval_slam ?name ctx env sval_comptime in
     let slv_runtime = eval_lam ctx env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout (eval_layout env layout))
   | SLglobal cu -> Ctx.cu_static_data ctx cu
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
-    let value = eval_slam ctx env slet_value in
+    let value = eval_slam ~name:slet_name ctx env slet_value in
     let env_body = Env.add env slet_name value in
-    eval_slam ctx env_body slet_body
+    eval_slam ?name ctx env_body slet_body
   | SLmissing -> Missing
   | SLrecord slams ->
     let values = Array.map (eval_slam ctx env) (Array.of_list slams) in
@@ -234,23 +426,31 @@ let rec eval_slam ctx env slam : value Or_missing.t =
     let* fields = eval_slam ctx env slam |>> expect Trecord in
     fields.(i)
   | SLproj_comptime slam ->
-    let* halves = eval_slam ctx env slam |>> expect Thalves in
+    let* halves = eval_slam ?name ctx env slam |>> expect Thalves in
     halves.slv_comptime
   | SLtemplate { sfun_params; sfun_body } ->
-    Present
-      (SLVclosure
-         { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
+    let closure =
+      { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
+    in
+    let cu = Current_unit.get_cu () in
+    let closure_id = Template_store.add ctx.store ~cu ~name closure in
+    Present (SLVclosure closure_id)
   | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
       eval_slam ctx env sapp_func |> expect_not_missing |> expect Tclosure
     in
     let eval_arg arg = eval_slam ctx env arg |> expect_not_missing in
     let args = Array.map eval_arg sapp_args in
-    let { clo_params; clo_body; clo_env } = closure in
-    let env_body =
-      Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
-    in
-    eval_slam ctx env_body clo_body
+    Ctx.instantiate ctx closure args
+      (fun { clo_params; clo_body; clo_env } args ->
+        let env_body =
+          Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+        in
+        let { slv_comptime = _; slv_runtime } =
+          eval_slam ctx env_body clo_body
+          |> expect_not_missing |> expect Thalves
+        in
+        slv_runtime)
 
 and eval_var env id = Env.find env id
 
@@ -669,10 +869,19 @@ let rec assert_no_splices (lam : Lambda.lambda) =
     Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
-let do_eval ctx slam =
-  eval_slam ctx Env.empty slam
-  |> expect_not_missing
-  |> expect Thalves ~reason:"toplevel module"
+let do_eval (ctx : Ctx.t) slam =
+  let { slv_comptime; slv_runtime } =
+    eval_slam ctx Env.empty slam
+    |> expect_not_missing
+    |> expect Thalves ~reason:"toplevel module"
+  in
+  let lambda =
+    List.fold_left
+      (fun lam (id, def) ->
+        Llet (Strict, layout_function, id, debug_uid_none, def, lam))
+      slv_runtime (Ctx.instantiations ctx)
+  in
+  { slv_comptime; slv_runtime = lambda }
 
 let eval ~cu_static_data slam =
   Profile.record_call "static_eval" (fun () ->
@@ -682,4 +891,4 @@ let eval ~cu_static_data slam =
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      slv_comptime, slv_runtime)
+      { CU_data.templates = ctx.store; cu = slv_comptime }, slv_runtime)
