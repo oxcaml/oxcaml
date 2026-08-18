@@ -46,7 +46,14 @@ type environment =
     static_exceptions : static_handler Static_label.Map.t;
     trap_stack : Operation.trap_stack;
     tailrec_label : Label.t;
-    phantom_lets : V.Set.t
+    phantom_lets : V.Set.t;
+    all_phantom_lets :
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
+        (** Accumulates every phantom let encountered in the current function
+            (unlike [phantom_lets], which is scoped). The [ref] is created
+            afresh by [env_create], once per function, and shared between all
+            environments derived from that environment; it is read at the end of
+            function construction by [phantom_lets_for_fundecl]. *)
   }
 
 val env_create : tailrec_label:Label.t -> environment
@@ -58,7 +65,12 @@ val env_add :
   environment ->
   environment
 
-val env_add_phantom_let : VP.t -> environment -> environment
+val env_add_phantom_let :
+  VP.t -> Cmm.phantom_defining_expr option -> environment -> environment
+
+val phantom_lets_for_fundecl :
+  environment ->
+  (V.Provenance.t option * Cfg.phantom_defining_expr) Backend_var.Map.t
 
 val env_add_static_exception :
   Static_label.t ->

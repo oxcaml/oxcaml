@@ -282,7 +282,6 @@ val make_instruction_from_copy :
   id:InstructionId.t ->
   ?arg:Reg.t array ->
   ?res:Reg.t array ->
-  ?dbg:Debuginfo.t ->
   unit ->
   'b instruction
 
