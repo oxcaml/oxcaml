@@ -35,4 +35,3 @@ mtf_gate_none: cmt no artifact, cms no artifact
 == a partial artifact carries no facts
 partial implementation: true
 present: false
-counts: checks 0 deps 0 equalities 0 omissions 0
