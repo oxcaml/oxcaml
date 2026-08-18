@@ -198,7 +198,7 @@ let split_direct_over_application apply ~callee's_code_id
               Variable.create ("result" ^ string_of_int i) (KS.kind kind)
             in
             let result_var_duid = Flambda_debug_uid.none in
-            BP.create result_var kind result_var_duid)
+            BP.create result_var kind result_var_duid ~dbg:Debuginfo.none)
           (Flambda_arity.unarized_components (Apply.return_arity apply))
       in
       let call_return_continuation, call_return_continuation_free_names =
@@ -220,7 +220,8 @@ let split_direct_over_application apply ~callee's_code_id
           (Bound_pattern.singleton
              (Bound_var.create
                 (Variable.create "unit" K.value)
-                Flambda_debug_uid.none Name_mode.normal))
+                Flambda_debug_uid.none Name_mode.normal ~dbg:Debuginfo.none
+                ~is_parameter:Bound_var.Is_parameter.local_var))
           (Named.create_prim
              (Unary (End_region { ghost = false }, Simple.var region))
              (Apply.dbg apply))
@@ -229,7 +230,8 @@ let split_direct_over_application apply ~callee's_code_id
                (Bound_pattern.singleton
                   (Bound_var.create
                      (Variable.create "unit" K.value)
-                     Flambda_debug_uid.none Name_mode.normal))
+                     Flambda_debug_uid.none Name_mode.normal ~dbg:Debuginfo.none
+                     ~is_parameter:Bound_var.Is_parameter.local_var))
                (Named.create_prim
                   (Unary (End_region { ghost = true }, Simple.var ghost_region))
                   (Apply.dbg apply))
@@ -270,7 +272,7 @@ let split_direct_over_application apply ~callee's_code_id
              (fun kind ->
                Bound_parameter.create
                  (Variable.create "over_app_result" (KS.kind kind))
-                 kind Flambda_debug_uid.none)
+                 kind Flambda_debug_uid.none ~dbg:Debuginfo.none)
              (Flambda_arity.unarized_components full_apply_result_arity))
       in
       Continuation_handler.create params
@@ -280,6 +282,7 @@ let split_direct_over_application apply ~callee's_code_id
     else
       let func_param =
         BP.create func_var K.With_subkind.any_value func_var_duid
+          ~dbg:Debuginfo.none
       in
       Continuation_handler.create
         (Bound_parameters.create [func_param])
@@ -316,14 +319,18 @@ let split_direct_over_application apply ~callee's_code_id
     let ghost_region_duid = Flambda_debug_uid.none in
     Let.create
       (Bound_pattern.singleton
-         (Bound_var.create region region_duid Name_mode.normal))
+         (Bound_var.create region region_duid Name_mode.normal
+            ~dbg:Debuginfo.none
+            ~is_parameter:Bound_var.Is_parameter.implicit_parameter))
       (Named.create_prim
          (Variadic (Begin_region { ghost = false }, []))
          (Apply.dbg apply))
       ~body:
         (Let.create
            (Bound_pattern.singleton
-              (Bound_var.create ghost_region ghost_region_duid Name_mode.normal))
+              (Bound_var.create ghost_region ghost_region_duid Name_mode.normal
+                 ~dbg:Debuginfo.none
+                 ~is_parameter:Bound_var.Is_parameter.implicit_parameter))
            (Named.create_prim
               (Variadic (Begin_region { ghost = false }, []))
               (Apply.dbg apply))

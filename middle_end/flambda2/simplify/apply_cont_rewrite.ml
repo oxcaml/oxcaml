@@ -178,7 +178,9 @@ let make_rewrite rewrite ~machine_width ~ctx id args : _ Or_invalid.t =
             | New_let_binding (temp, prim) ->
               let temp_duid = Flambda_debug_uid.none in
               let extra_let =
-                ( Bound_var.create temp temp_duid Name_mode.normal,
+                ( Bound_var.create temp temp_duid Name_mode.normal
+                    ~dbg:Debuginfo.none
+                    ~is_parameter:Bound_var.Is_parameter.local_var,
                   Code_size.prim ~machine_width prim,
                   Flambda.Named.create_prim prim Debuginfo.none )
               in
@@ -198,7 +200,9 @@ let make_rewrite rewrite ~machine_width ~ctx id args : _ Or_invalid.t =
                      since they are already named."
               in
               let extra_let =
-                ( Bound_var.create temp temp_duid Name_mode.normal,
+                ( Bound_var.create temp temp_duid Name_mode.normal
+                    ~dbg:Debuginfo.none
+                    ~is_parameter:Bound_var.Is_parameter.local_var,
                   Code_size.prim ~machine_width prim,
                   Flambda.Named.create_prim prim Debuginfo.none )
               in

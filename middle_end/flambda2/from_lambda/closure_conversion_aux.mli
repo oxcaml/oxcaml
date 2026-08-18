@@ -132,6 +132,8 @@ module Env : sig
 
   val add_var : t -> Ident.t -> Variable.t -> Flambda_kind.With_subkind.t -> t
 
+  val add_var_debug_uid : t -> Ident.t -> Flambda_debug_uid.t -> t
+
   val add_vars :
     t -> Ident.t list -> (Variable.t * Flambda_kind.With_subkind.t) list -> t
 
@@ -142,6 +144,7 @@ module Env : sig
     t ->
     Ident.t ->
     IR.user_visible ->
+    ?debug_uid:Flambda_debug_uid.t ->
     Flambda_kind.With_subkind.t ->
     t * Variable.t
 
@@ -159,6 +162,8 @@ module Env : sig
   val find_name_exn : t -> Ident.t -> Name.t
 
   val find_var : t -> Ident.t -> Variable.t * Flambda_kind.With_subkind.t
+
+  val find_var_debug_uid : t -> Ident.t -> Flambda_debug_uid.t
 
   val find_var_exn : t -> Ident.t -> Variable.t * Flambda_kind.With_subkind.t
 

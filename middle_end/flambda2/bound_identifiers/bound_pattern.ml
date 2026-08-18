@@ -169,6 +169,21 @@ let with_name_mode t name_mode =
          bound_vars)
   | Static _ -> t
 
+let add_inlined_debuginfo t inlined_debuginfo =
+  if Inlined_debuginfo.is_none inlined_debuginfo
+  then t
+  else
+    match t with
+    | Singleton bound_var ->
+      Singleton (Bound_var.add_inlined_debuginfo bound_var inlined_debuginfo)
+    | Set_of_closures bound_vars ->
+      Set_of_closures
+        (List.map
+           (fun bound_var ->
+             Bound_var.add_inlined_debuginfo bound_var inlined_debuginfo)
+           bound_vars)
+    | Static _ -> t
+
 let must_be_singleton t =
   match t with
   | Singleton bound_var -> bound_var

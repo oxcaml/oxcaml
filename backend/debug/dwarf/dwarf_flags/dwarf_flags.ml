@@ -102,7 +102,12 @@ let restrict_to_upstream_dwarf = ref (not Config.oxcaml_dwarf)
 (* Currently the maximum number of stack slots, see asmgen.ml *)
 let dwarf_max_function_complexity = ref 50
 
-let dwarf_for_startup_file = ref false
+(* As for [restrict_to_upstream_dwarf], the default tracks whether OxCaml DWARF
+   support is enabled at configure time. DWARF information for the startup file
+   notably covers the [caml_apply] and [caml_curry] functions, which debuggers
+   need in order to see through generically-applied calls (e.g. for call site
+   resolution and entry value computation). *)
+let dwarf_for_startup_file = ref Config.oxcaml_dwarf
 
 let debug_thing thing = List.mem thing !current_debug_settings
 

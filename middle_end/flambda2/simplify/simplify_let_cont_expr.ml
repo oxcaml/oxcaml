@@ -338,7 +338,8 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
         Flambda_kind.With_subkind.anything (Variable.Map.find var aliases_kind)
       in
       EPA.add
-        ~extra_param:(Bound_parameter.create var var_kind var_duid)
+        ~extra_param:
+          (Bound_parameter.create var var_kind var_duid ~dbg:Debuginfo.none)
         ~extra_args epa ~invalids:Apply_cont_rewrite_id.Set.empty)
     EPA.empty extra_args_for_aliases_sorted_by_stamp
 
@@ -590,7 +591,8 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
            UIDs) here in the future. For now, we make due without. See #3967 *)
         let bound_pattern =
           Bound_pattern.singleton
-            (Bound_var.create var var_duid Name_mode.normal)
+            (Bound_var.create var var_duid Name_mode.normal ~dbg:Debuginfo.none
+               ~is_parameter:Bound_var.Is_parameter.local_var)
         in
         let named = Named.create_simple bound_to in
         let handler, uacc =
@@ -628,7 +630,10 @@ let add_phantom_params_bindings uacc handler new_phantom_params =
       (fun param ->
         let param_var, param_uid = BP.var_and_uid param in
         let kind = K.With_subkind.kind (BP.kind param) in
-        let var = Bound_var.create param_var param_uid Name_mode.phantom in
+        let var =
+          Bound_var.create param_var param_uid Name_mode.phantom
+            ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+        in
         let let_bound = Bound_pattern.singleton var in
         let prim = Flambda_primitive.(Nullary (Optimised_out kind)) in
         let named = Named.create_prim prim Debuginfo.none in

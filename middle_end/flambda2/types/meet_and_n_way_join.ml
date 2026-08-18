@@ -258,7 +258,8 @@ let add_defined_vars env level =
               (* Variables with [Name_mode.in_types] do not exist at runtime, so
                  we do not equip them with a [Flambda_debug_uid.t]. See
                  #3967. *)
-              Name_mode.in_types))
+              Name_mode.in_types ~dbg:Debuginfo.none
+              ~is_parameter:Bound_var.Is_parameter.local_var))
         kind)
     level env
 
@@ -455,7 +456,9 @@ let[@inline] meet_row_like :
           (Bound_name.create_var
              (* Variables with [Name_mode.in_types] do not exist at runtime, so
                 we do not equip them with a [Flambda_debug_uid.t]. See #3967. *)
-             (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types))
+             (Bound_var.create var Flambda_debug_uid.none Name_mode.in_types
+                ~dbg:Debuginfo.none
+                ~is_parameter:Bound_var.Is_parameter.local_var))
           kind)
       !extra_variables result_env
   in
