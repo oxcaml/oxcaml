@@ -1087,7 +1087,7 @@ and jkind_declaration =
 type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;
-  ai_expectation : Shape.Uid.t;
+  ai_parameter_uid : Shape.Uid.t;
 }
 
 type implementation = {
