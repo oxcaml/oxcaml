@@ -152,15 +152,9 @@ module Axis = struct
   let equal (Pack axis1) (Pack axis2) =
     match axis1, axis2 with
     | Modal axis1, Modal axis2 ->
-      let axis1 =
-        Mode.Crossing.Axis.to_modality (Mode.Crossing.Axis.P axis1)
-      in
-      let axis2 =
-        Mode.Crossing.Axis.to_modality (Mode.Crossing.Axis.P axis2)
-      in
-      Int.equal
-        (Mode.Modality.Axis.compare axis1 axis2)
-        0
+      let axis1 = Mode.Crossing.Axis.to_modality (Mode.Crossing.Axis.P axis1) in
+      let axis2 = Mode.Crossing.Axis.to_modality (Mode.Crossing.Axis.P axis2) in
+      Int.equal (Mode.Modality.Axis.compare axis1 axis2) 0
     | Nonmodal Externality, Nonmodal Externality -> true
     | Modal _, Nonmodal _ | Nonmodal _, Modal _ -> false
 

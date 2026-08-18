@@ -691,15 +691,11 @@ let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
      to omit the implied modes when printing, so close the bounds first. *)
   let crossing = Jkind.Mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
-  let annotated =
-    Modality.Const.diff Modality.Const.id modality
-  in
+  let annotated = Modality.Const.diff Modality.Const.id modality in
   let implied = List.concat_map implied_modalities annotated in
   let axis_is_explicit ax =
     let projected =
-      Modality.Const.set ax
-        (Modality.Const.proj ax modality)
-        Modality.Const.id
+      Modality.Const.set ax (Modality.Const.proj ax modality) Modality.Const.id
     in
     match Modality.Const.equate projected Modality.Const.id with
     | Ok () -> false

@@ -151,9 +151,7 @@ module Solver = struct
 
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
     match ctx.mode, name with
-    | Normal, _
-    | Round_up, Provenance _ ->
-      Ldd.node_of_var (Ldd.rigid name)
+    | Normal, _ | Round_up, Provenance _ -> Ldd.node_of_var (Ldd.rigid name)
     | Round_up, _ -> Ldd.const Axis_lattice.top
 
   (** A rigid variable corresponding to a type parameter [t]. *)
@@ -744,7 +742,7 @@ let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
     |> List.filter_map (fun (name, coeff) ->
         match (name : Ldd.Name.t) with
         | Atom _ | KAtom _ | Param _ | Unknown _ -> None
-        | Provenance { ty; plural; _ } ->
+        | Provenance { ty; plural; _ } -> (
           if is_bot_poly coeff
           then None
           else
@@ -765,7 +763,7 @@ let provenance_residuals ~provenance_names ~violating_axes ~sub_poly ~super_poly
                  axes left to report. *)
               match axes with
               | [] -> None
-              | _ :: _ -> Some { ty; plural; mode_bounds; axes })
+              | _ :: _ -> Some { ty; plural; mode_bounds; axes }))
     |> List.fold_left add_provenance_residual []
     |> Option.some
 
@@ -1347,8 +1345,7 @@ let subjkind_error_has_provenance_residuals = function
 let same_axis_set axes1 axes2 =
   let of_list =
     List.fold_left
-      (fun set (Jkind_axis.Axis.Pack axis) ->
-        Jkind_axis.Axis_set.add set axis)
+      (fun set (Jkind_axis.Axis.Pack axis) -> Jkind_axis.Axis_set.add set axis)
       Jkind_axis.Axis_set.empty
   in
   Jkind_axis.Axis_set.equal (of_list axes1) (of_list axes2)
