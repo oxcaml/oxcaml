@@ -104,7 +104,8 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     ~as_arg_for =
   let argument_coercion =
     match argument_interface with
-    | Some { ai_coercion_from_primary; ai_signature = _; ai_parameter_uid = _ } ->
+    | Some { ai_coercion_from_primary; ai_signature = _; ai_parameter_uid = _ }
+      ->
         Some ai_coercion_from_primary
     | None -> None
   in
