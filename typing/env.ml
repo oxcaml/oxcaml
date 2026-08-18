@@ -1218,6 +1218,7 @@ let read_sign_of_cmi (sign, mda_mode) name uid ~shape ~address:addr ~flags =
       empty Subst.identity
       path mda_address mty mda_mode mda_shape
   in
+  id,
   {
     mda_declaration;
     mda_components;
@@ -1226,7 +1227,7 @@ let read_sign_of_cmi (sign, mda_mode) name uid ~shape ~address:addr ~flags =
     mda_shape;
   }
 
-let persistent_env : module_data Persistent_env.t ref =
+let persistent_env : (Ident.t * module_data) Persistent_env.t ref =
   s_table Persistent_env.empty ()
 
 let without_cmis f x =
@@ -1252,6 +1253,10 @@ let find_pers_mod ~allow_hidden name ~allow_excess_args =
   Persistent_env.find ~allow_hidden !persistent_env read_sign_of_cmi name
     ~allow_excess_args
 
+let lookup_pers_mod ~allow_hidden name ~allow_excess_args =
+  Persistent_env.lookup ~allow_hidden !persistent_env read_sign_of_cmi name
+    ~allow_excess_args
+
 let check_pers_mod ~allow_hidden ~loc name =
   Persistent_env.check ~allow_hidden !persistent_env read_sign_of_cmi ~loc name
 
@@ -1264,8 +1269,13 @@ let is_imported_opaque modname =
 let register_import_as_opaque modname =
   Persistent_env.register_import_as_opaque !persistent_env modname
 
-let is_parameter_unit modname =
-  Persistent_env.is_parameter_import !persistent_env modname
+let is_parameter_unit (modname : Global_module.Name.t) =
+  match modname with
+  | Without_prefix name ->
+      Persistent_env.is_parameter_import !persistent_env name
+  | With_prefix _ ->
+      (* Packed units are never parameters *)
+      false
 
 let is_imported_parameter modname =
   Persistent_env.is_imported_parameter !persistent_env modname
@@ -1368,7 +1378,10 @@ let find_ident_module id env =
                actually typed in addition to the approximation. *)
             true
           in
-          find_pers_mod ~allow_hidden:true ~allow_excess_args global_name
+          let _id, mda =
+            find_pers_mod ~allow_hidden:true ~allow_excess_args global_name
+          in
+          mda
       | None -> Misc.fatal_errorf "Not global: %a" Ident.print id
 
 let rec find_module_components path env =
@@ -1759,14 +1772,15 @@ let find_implicit_jkind name env =
   | None -> None
 
 let global_of_instance_compilation_unit cu =
-  let global_name = Compilation_unit.to_global_name_exn cu in
+  let global_name = Compilation_unit.to_global_name cu in
   (* Must be a complete instantiation, meaning that its [Global_module.t] form has no
      hidden arguments anywhere. *)
   let global =
     (* We could just convert the global name ourselves by filling in empty lists
        of hidden arguments, but this doubles as a typecheck of the instance. *)
-    Persistent_env.global_of_global_name !persistent_env global_name ~check:true
-      ~allow_excess_args:false
+    Persistent_env.global_of_global_name !persistent_env
+      (Global_module.Name.to_name_exn global_name)
+      ~check:true ~allow_excess_args:false
   in
   let rec check (global : Global_module.t) =
     match global.hidden_args with
@@ -1862,7 +1876,9 @@ let add_required_global_for_quote path env =
   begin match Ident.to_global (Path.head path) with
   | None -> ()
   | Some global ->
-    let name = Compilation_unit.Name.of_head_of_global_name global in
+    let name =
+      Compilation_unit.Name.of_string (Global_module.Name.head global)
+    in
     if Current_unit.Name.is (Compilation_unit.Name.to_string name)
     then begin
       (* The current compilation unit appears in quotes.
@@ -2037,8 +2053,9 @@ let find_modtype_expansion path env =
 
 let is_parameter_module_ident id =
   match Ident.to_global id with
-  | Some global -> Persistent_env.is_parameter_import !persistent_env global
-  | None -> false
+  | Some (Without_prefix global) ->
+      Persistent_env.is_registered_parameter_import !persistent_env global
+  | Some (With_prefix _) | None -> false
 
 let rec is_functor_arg path env =
   match path with
@@ -2143,8 +2160,7 @@ let iter_env wrap proj1 proj2 f env () =
            iter_components (Pident id) path data.mda_components
        | Mod_persistent -> ())
     env.modules;
-  Persistent_env.fold !persistent_env (fun name data () ->
-    let id = Ident.create_global name in
+  Persistent_env.fold !persistent_env (fun _name (id, data) () ->
     let path = Pident id in
     iter_components path path data.mda_components) ()
 
@@ -2171,7 +2187,7 @@ let used_persistent () =
   Persistent_env.fold !persistent_env
     (fun s _m r ->
        Compilation_unit.Name.Set.add
-         (s |> Compilation_unit.Name.of_head_of_global_name)
+         (s |> Global_module.Name.head |> Compilation_unit.Name.of_string)
          r)
     Compilation_unit.Name.Set.empty
 
@@ -3296,7 +3312,7 @@ let persistent_structures_of_dir dir =
   |> persistent_structures_of_basenames
 
 (* Save a signature to a file *)
-let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
+let save_signature_with_transform cmi_transform ~alerts (sg, staticity)
       kind cmi_info =
   Btype.cleanup_abbrev ();
   Subst.reset_additional_action_id ();
@@ -3305,7 +3321,7 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
         (Subst.with_additional_action Prepare_for_saving Subst.identity)
   in
   let cmi =
-    Persistent_env.make_cmi !persistent_env modname kind (sg, staticity) alerts
+    Persistent_env.make_cmi !persistent_env kind (sg, staticity) alerts
     |> cmi_transform in
   let filename = Unit_info.Artifact.filename cmi_info in
   let pers_sig =
@@ -3317,12 +3333,12 @@ let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
   Persistent_env.save_cmi !persistent_env pers_sig;
   cmi
 
-let save_signature ~alerts sg modname cu cmi =
-  save_signature_with_transform (fun cmi -> cmi) ~alerts sg modname cu cmi
+let save_signature ~alerts sg cu cmi =
+  save_signature_with_transform (fun cmi -> cmi) ~alerts sg cu cmi
 
-let save_signature_with_imports ~alerts sg modname cu cmi imports =
+let save_signature_with_imports ~alerts sg cu cmi imports =
   let with_imports cmi = { cmi with cmi_crcs = imports } in
-  save_signature_with_transform with_imports ~alerts sg modname cu cmi
+  save_signature_with_transform with_imports ~alerts sg cu cmi
 
 (* Make the initial environment. *)
 let initial () =
@@ -3638,18 +3654,23 @@ type _ load =
 
 let lookup_global_name_module_no_locks
       (type a) (load : a load) ~errors ~use ~loc name env =
-  let path = Pident(Ident.create_global name) in
   match load with
   | Don't_load ->
       check_pers_mod ~allow_hidden:false ~loc name;
+      let path =
+        Pident (Ident.create_global (Global_module.Name.Without_prefix name))
+      in
       path, (() : a)
   | Load -> begin
-      match find_pers_mod ~allow_hidden:false name ~allow_excess_args:false with
-      | mda ->
+      match
+        lookup_pers_mod ~allow_hidden:false name ~allow_excess_args:false
+      with
+      | id, mda ->
+          let path = Pident id in
           use_module ~use ~loc path mda;
           path, (mda : a)
       | exception Not_found ->
-          let s = Global_module.Name.to_string name in
+          let s = Global_module.Name_unprefixed.to_string name in
           may_lookup_error errors loc env (Unbound_module (Lident s))
       | exception Persistent_env.Error err ->
           may_lookup_error errors loc env (Error_from_persistent_env err)
@@ -3683,7 +3704,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   | Mod_persistent -> begin
       (* This is only used when processing [Longident.t]s, which never have
          instance arguments *)
-      let name = Global_module.Name.create_no_args s in
+      let name = Global_module.Name_unprefixed.create_no_args s in
       let path, a =
         lookup_global_name_module_no_locks load ~errors ~use ~loc name env
       in
@@ -4341,10 +4362,10 @@ let open_pers_signature_cmi filename env =
   let global_name, _sign =
     Persistent_env.read_cmi_file !persistent_env filename
   in
-  let mda =
+  let id, mda =
     find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
   in
-  let path = Pident (Ident.create_global global_name) in
+  let path = Pident id in
   use_module ~use:true ~loc:Location.none path mda;
   let comps = find_structure_components path env in
   let locks =
@@ -4789,9 +4810,10 @@ let bound_module name env =
       else begin
         match
           find_pers_mod ~allow_hidden:false ~allow_excess_args:false
-            (Global_module.Name.create_no_args name)
+            (Global_module.Name.Without_prefix
+               (Global_module.Name_unprefixed.create_no_args name))
         with
-        | (_ : module_data) -> true
+        | (_, (_ : module_data)) -> true
         | exception Not_found -> false
       end
 
@@ -4875,10 +4897,12 @@ let fold_modules f lid env acc =
                   rather than just the name. It looks like the only immediate
                   consequence of this is that spellcheck won't suggest
                   instance names (which is good!). *)
-               let modname = Global_module.Name.create_no_args name in
+               let modname =
+                 Global_module.Name_unprefixed.create_no_args name
+               in
                match Persistent_env.find_in_cache !persistent_env modname with
                | None -> acc
-               | Some mda ->
+               | Some (_id, mda) ->
                    f name p mda.mda_declaration acc)
         env.modules
         acc
@@ -4950,7 +4974,9 @@ let filter_non_loaded_persistent f env =
          | Mod_persistent ->
              (* CR lmaurer: Again, setting args to [] here is weird but fine
                 for the moment *)
-             let modname = Global_module.Name.create_no_args name in
+             let modname =
+               Global_module.Name_unprefixed.create_no_args name
+             in
              match Persistent_env.find_in_cache !persistent_env modname with
              | Some _ -> acc
              | None ->

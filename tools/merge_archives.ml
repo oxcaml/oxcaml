@@ -68,11 +68,16 @@ let merge_cmxa0 ~archives =
   let cmx_table = Hashtbl.create 42 in
   let quoted_cmi_table = Hashtbl.create 42 in
   let quoted_cmx_table = Hashtbl.create 42 in
+  let cmi_key import : (Compilation_unit.t, Compilation_unit.Intf.t) Either.t =
+    match Import_info.Intf.view import with
+    | Normal (cu, _) | Alias cu -> Left cu
+    | Parameter (intf, _) -> Right intf
+  in
   cmxa_list
   |> List.iter (fun (lib : Cmx_format.library_infos) ->
          lib.lib_imports_cmi
          |> Array.iter (fun import ->
-                let name = Import_info.name import in
+                let name = cmi_key import in
                 if not (Hashtbl.mem cmi_table name)
                 then begin
                   Hashtbl.add cmi_table name (import, !ncmis);
@@ -106,7 +111,7 @@ let merge_cmxa0 ~archives =
   Hashtbl.iter (fun _name (import, i) -> cmis.(i) <- import) cmi_table;
   let cmxs = Array.make !ncmxs Import_info.dummy in
   Hashtbl.iter (fun _name (import, i) -> cmxs.(i) <- import) cmx_table;
-  let quoted_cmis = Array.make !nquoted_cmi Compilation_unit.Name.dummy in
+  let quoted_cmis = Array.make !nquoted_cmi Compilation_unit.dummy in
   Hashtbl.iter
     (fun quoted_cmi (_, i) -> quoted_cmis.(i) <- quoted_cmi)
     quoted_cmi_table;
@@ -148,7 +153,7 @@ let merge_cmxa0 ~archives =
               { li with
                 li_imports_cmi =
                   remap cmxa.lib_imports_cmi cmis cmi_table li.li_imports_cmi
-                    ~get_key:Import_info.name;
+                    ~get_key:cmi_key;
                 li_imports_cmx =
                   remap cmxa.lib_imports_cmx cmxs cmx_table li.li_imports_cmx
                     ~get_key:Import_info.cu;

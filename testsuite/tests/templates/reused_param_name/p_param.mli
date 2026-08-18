@@ -1,0 +1,1 @@
+val frob : unit -> string

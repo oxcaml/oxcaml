@@ -186,7 +186,7 @@ let get_unit comp_unit =
   then
     Misc.fatal_error
       "get_unit: unable to get unit_info for current unit";
-  let name = CU.to_global_name_without_prefix comp_unit in
+  let name = CU.to_global_name comp_unit in
   try
     Infos_table.find global_infos_table name
   with Not_found ->
@@ -240,7 +240,7 @@ let get_global_export_info comp_unit =
 let cache_unit_info ui =
   cache_zero_alloc_info ui.ui_zero_alloc_info;
   Infos_table.add global_infos_table
-    (ui.ui_unit |> CU.to_global_name_without_prefix) (Some ui)
+    (ui.ui_unit |> CU.to_global_name) (Some ui)
 
 (* Exporting cross-module information *)
 
@@ -341,7 +341,7 @@ let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
     ui_arg_descr = arg_descr;
     ui_imports_cmi = Env.imports();
     ui_imports_cmx = current_unit.uib_imports_cmx;
-    ui_quoted_cmi = CU.Name.Set.to_list quoted_intfs_and_deps;
+    ui_quoted_cmi = CU.Set.to_list quoted_intfs_and_deps;
     ui_quoted_cmx = CU.Set.to_list (Env.quoted_impls ());
     ui_format = main_module_block_format;
     ui_generic_fns = current_unit.uib_generic_fns;

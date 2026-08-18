@@ -16,45 +16,48 @@
 
 open Misc
 
-module Consistbl_data = Import_info.Intf.Nonalias.Kind
+module Consistbl_intf : module type of struct
+  include Consistbl.Make (Compilation_unit.Intf) (Unit)
+end
 
 module Consistbl : module type of struct
-  include Consistbl.Make (Compilation_unit.Name) (Consistbl_data)
+  include Consistbl.Make (Compilation_unit) (Unit)
 end
 
 type error =
-  | Illegal_renaming of Compilation_unit.Name.t * Compilation_unit.Name.t * filepath
-  | Inconsistent_import of Compilation_unit.Name.t * filepath * filepath
+  | Illegal_renaming of Global_module.Name.t * Global_module.Name.t * filepath
+  | Inconsistent_import of Compilation_unit.t * filepath * filepath
+  | Inconsistent_import_intf of Compilation_unit.Intf.t * filepath * filepath
   | Need_recursive_types of Compilation_unit.Name.t
-  | Inconsistent_package_declaration_between_imports of
-      filepath * Compilation_unit.t * Compilation_unit.t
   | Direct_reference_from_wrong_package of
       Compilation_unit.t * filepath * Compilation_unit.Prefix.t
-  | Illegal_import_of_parameter of Global_module.Name.t * filepath
-  | Not_compiled_as_parameter of Global_module.Name.t
+  | Illegal_import_of_parameter of Global_module.Name_unprefixed.t * filepath
+  | Not_compiled_as_parameter of Global_module.Name_unprefixed.t
   | Imported_module_has_unset_parameter of
-      { imported : Global_module.Name.t;
+      { imported : Global_module.Name_unprefixed.t;
         parameter : Global_module.Parameter_name.t;
       }
   | Imported_module_has_no_such_parameter of
       { imported : Compilation_unit.Name.t;
         valid_parameters : Global_module.Parameter_name.t list;
         parameter : Global_module.Parameter_name.t;
-        value : Global_module.Name.t;
+        value : Global_module.Name_unprefixed.t;
       }
   | Not_compiled_as_argument of
       { param : Global_module.Parameter_name.t;
-        value : Global_module.Name.t;
+        value : Global_module.Name_unprefixed.t;
         filename : filepath;
       }
   | Argument_type_mismatch of
-      { value : Global_module.Name.t;
+      { value : Global_module.Name_unprefixed.t;
         filename : filepath;
         expected : Global_module.Parameter_name.t;
         actual : Global_module.Parameter_name.t;
       }
   | Unbound_module_as_argument_value of
-      { instance : Global_module.Name.t; value : Global_module.Name.t; }
+      { instance : Global_module.Name_unprefixed.t;
+        value : Global_module.Name_unprefixed.t;
+      }
 
 
 
@@ -74,7 +77,7 @@ module Persistent_signature : sig
       the .cmi file in the load path. This function can be overridden to load
       it from memory, for instance to build a self-contained toplevel. *)
   val load :
-    (allow_hidden:bool -> unit_name:Compilation_unit.Name.t -> t option) ref
+    (allow_hidden:bool -> unit_name:Compilation_unit.t -> t option) ref
 end
 
 type can_load_cmis =
@@ -124,10 +127,15 @@ val read_cmi_file :
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
 
-val find_in_cache : 'a t -> Global_module.Name.t -> 'a option
+(* Like [find], but takes a user-written name, which makes no claim about the
+   pack prefix. *)
+val lookup : allow_hidden:bool -> 'a t -> 'a sig_reader
+  -> Global_module.Name_unprefixed.t -> allow_excess_args:bool -> 'a
+
+val find_in_cache : 'a t -> Global_module.Name_unprefixed.t -> 'a option
 
 val check : allow_hidden:bool -> 'a t -> 'a sig_reader
-  -> loc:Location.t -> Global_module.Name.t -> unit
+  -> loc:Location.t -> Global_module.Name_unprefixed.t -> unit
 
 (* Lets it be known that the given module is a parameter to this module and thus is
    expected to have been compiled as such. Raises an exception if the module has already
@@ -136,7 +144,12 @@ val register_parameter : 'a t -> Global_module.Parameter_name.t -> unit
 
 (* [is_parameter_import penv md] checks if [md] is a loaded parameter or has
    been registered as a parameter. *)
-val is_parameter_import : 'a t -> Global_module.Name.t -> bool
+val is_parameter_import : 'a t -> Global_module.Name_unprefixed.t -> bool
+
+(* [is_registered_parameter_import penv md] checks if [md] has been registered
+   as a parameter to this module. *)
+val is_registered_parameter_import :
+  'a t -> Global_module.Name_unprefixed.t -> bool
 
 (* [looked_up penv md] checks if one has already tried
    to read the signature for [md] in the environment
@@ -158,7 +171,7 @@ val implemented_parameter : 'a t
 
 val global_of_global_name : 'a t
   -> check:bool
-  -> Global_module.Name.t
+  -> Global_module.Name_unprefixed.t
   -> allow_excess_args:bool
   -> Global_module.t
 
@@ -167,7 +180,6 @@ val global_of_global_name : 'a t
 val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 
 val make_cmi : 'a t
-  -> Compilation_unit.Name.t
   -> Cmi_format.kind
   -> Subst.Lazy.signature * Mode.Staticity.Const.t
   -> alerts
@@ -193,13 +205,13 @@ val imports : 'a t -> Import_info.Intf.t list
 val require_intf_for_quote: 'a t -> Compilation_unit.Name.t -> unit
 
 (* Return the set of interfaces referenced by quotes *)
-val quoted_intfs: 'a t -> Compilation_unit.Name.Set.t
+val quoted_intfs: 'a t -> Compilation_unit.Set.t
 
 (* Compute the transitive closure of the dependencies of these interfaces that
    have been loaded by typing. Always includes the input interfaces. *)
 val loaded_transitive_dependencies : 'a t
-  -> Compilation_unit.Name.Set.t
-  -> Compilation_unit.Name.Set.t
+  -> Compilation_unit.Set.t
+  -> Compilation_unit.Set.t
 
 (* Require that the provided implementation will be available at quotation
    compile time. *)
@@ -235,7 +247,7 @@ val is_imported_parameter : 'a t -> Global_module.Name.t -> bool
 val parameters : 'a t -> Global_module.Parameter_name.t list
 
 (* Return the CRC of the interface of the given compilation unit *)
-val crc_of_unit: 'a t -> Compilation_unit.Name.t -> Digest.t
+val crc_of_unit: 'a t -> Compilation_unit.t -> Digest.t
 
 (* Forward declaration to break mutual recursion with Typecore. *)
 val add_delayed_check_forward: ((unit -> unit) -> unit) ref

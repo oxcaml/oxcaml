@@ -49,16 +49,16 @@ let find_bundle_in_exe ~ext get_this_exe =
      ^ " bundle and [use_existing_compilerlibs_state_for_artifacts]"
      ^ " has not been called")
 
-let cmis = ref Compilation_unit.Name.Map.empty
+let cmis = ref Compilation_unit.Map.empty
 
 let cmxs = ref []
 
 let read_bundles ~marshalled_cmi_bundle ~marshalled_cmx_bundle =
-  let bundled_cmis : Cmi_format.cmi_infos Compilation_unit.Name.Map.t =
+  let bundled_cmis : Cmi_format.cmi_infos Compilation_unit.Map.t =
     Marshal.from_string marshalled_cmi_bundle 0
   in
   let new_cmis =
-    Compilation_unit.Name.Map.map
+    Compilation_unit.Map.map
       (fun (cmi : Cmi_format.cmi_infos) : Cmi_format.cmi_infos_lazy ->
         let sign, staticity = cmi.cmi_sign in
         { cmi with cmi_sign = Subst.Lazy.of_signature sign, staticity })
@@ -178,11 +178,11 @@ let eval (expr : 'a expr) =
             Option.map
               (fun cmi ->
                 { Persistent_env.Persistent_signature.filename =
-                    Compilation_unit.Name.to_string unit_name;
+                    Compilation_unit.full_path_as_string unit_name;
                   cmi;
                   visibility = Visible { cmx_guaranteed = false }
                 })
-              (Compilation_unit.Name.Map.find_opt unit_name !cmis));
+              (Compilation_unit.Map.find_opt unit_name !cmis));
   let env = Compmisc.initial_env () in
   let typed_impl =
     Typemod.type_implementation unit_info compilation_unit env ast

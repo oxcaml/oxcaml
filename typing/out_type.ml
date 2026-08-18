@@ -459,10 +459,10 @@ let instance_name global =
   let rec string_of_global global =
     (* We can avoid calling [ident_name_simple] here because instance names are
        always global (which is bad - but the syntax is currently bad anyway) *)
-    let ({ head; args } : Global_module.Name.t) = global in
+    let ({ head; args } : Global_module.Name_unprefixed.t) = global in
     String.concat "" (head :: List.map string_of_arg args)
   and string_of_arg arg =
-    let ({ param; value } : Global_module.Name.argument) = arg in
+    let ({ param; value } : Global_module.Name_unprefixed.argument) = arg in
     Printf.sprintf "(%s)(%s)"
       (Global_module.Parameter_name.to_string param) (string_of_global value)
   in
@@ -603,7 +603,11 @@ let tree_of_path namespace = function
     (* Only when the instance name is the entire path (which is the only place
        a human could write it) is it worth printing the human-writable stopgap
        syntax for instance names *)
-    Oide_ident (instance_name (Ident.to_global_exn id))
+    Oide_ident
+      (match Ident.to_global_exn id with
+       | Without_prefix name -> instance_name name
+       | With_prefix _ as global ->
+           { printed_name = Global_module.Name.to_string global })
   | p -> tree_of_path namespace p
 
 let tree_of_path namespace p =

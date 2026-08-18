@@ -538,8 +538,8 @@ let save_cmt target cu binary_annots initial_env cmi shape =
          let cmt_uid_to_decl = index_declarations cmt_annots in
          let source_digest = Option.map Digest.file sourcefile in
          let compare_imports import1 import2 =
-           let modname1 = Import_info.name import1 in
-           let modname2 = Import_info.name import2 in
+           let modname1 = Import_info.Intf.basename import1 in
+           let modname2 = Import_info.Intf.basename import2 in
            Compilation_unit.Name.compare modname1 modname2
          in
          let get_imports () =

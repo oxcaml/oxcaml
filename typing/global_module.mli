@@ -24,7 +24,7 @@ module Argument : sig
     }
 end
 
-module Name : sig
+module Name_unprefixed : sig
   type t = private
     { head : string;
       args : argument list
@@ -51,6 +51,27 @@ module Name : sig
   val find_in_parameter_map : t -> 'a Parameter_name.Map.t -> 'a option
 
   val mem_parameter_set : t -> Parameter_name.Set.t -> bool
+end
+
+module Name : sig
+  type t =
+    | With_prefix of string list * string
+    | Without_prefix of Name_unprefixed.t
+
+  (** The head of the name, excluding any pack prefix and arguments. *)
+  val head : t -> string
+
+  (** The unprefixed form of a name assumed to have no prefix; fails on a
+      prefixed name. *)
+  val to_name_exn : t -> Name_unprefixed.t
+
+  val of_parameter_name : Parameter_name.t -> t
+
+  val to_string : t -> string
+
+  include Identifiable.S with type t := t
+
+  val print : Format_doc.formatter -> t -> unit
 end
 
 (** An elaborated form of name in which all arguments are expressed, including
@@ -109,11 +130,16 @@ val print : Format_doc.formatter -> t -> unit
 
 val to_name : t -> Name.t
 
+(** Like [to_name], without the [Without_prefix] wrapper. (An elaborated
+    global never carries a pack prefix.) *)
+val unprefixed_name : t -> Name_unprefixed.t
+
 (** A map from parameter names to their values. *)
 type subst = t Parameter_name.Map.t
 
 (** Apply a substitution to the given global. If it appears in the substitution
-    directly (that is, its [Name.t] form is a key in the map), this simply
+    directly (that is, its [Name_unprefixed.t] form is a key in the map), this
+    simply
     performs a lookup. Otherwise, we perform a _revealing substitution_: if the
     value of a hidden argument is a key in the substitution, the argument
     becomes visible. Otherwise, substitution recurses into arguments (both
@@ -175,7 +201,8 @@ module With_precision : sig
 
   (** Given two elaborated forms of the same name and their precision, reconcile
       them. In any case, if the visible parts of the globals disagree, raise
-      [Inconsistent] (because they don't in fact elaborate the same [Name.t]).
+      [Inconsistent] (because they don't in fact elaborate the same
+      [Name_unprefixed.t]).
       For the hidden parts, we treat an exact [t] as requiring equality and an
       approximate [t] as specifying an upper bound. Thus exact vs. exact checks
       for equality, exact vs. approximate checks the upper bound, and
