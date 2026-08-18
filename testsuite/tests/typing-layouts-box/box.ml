@@ -279,6 +279,16 @@ type r64 = { i64 : int64_u; }
 val test_bits64 : r64# -> r64 -> unit = <fun>
 |}]
 
+(* [int64] is not the boxed version of [int64_u] *)
+let bad_bits64 (u : int64_u) (b : int64) = check_bits64 u b;;
+[%%expect{|
+Line 1, characters 58-59:
+1 | let bad_bits64 (u : int64_u) (b : int64) = check_bits64 u b;;
+                                                              ^
+Error: The value "b" has type "int64" but an expression was expected of type
+         "int64_u box"
+|}]
+
 let check_word : type (a : word). a -> a box -> unit =
   fun _ _ -> ();;
 [%%expect{|
