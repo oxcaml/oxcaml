@@ -1400,11 +1400,19 @@ CAMLexport value caml_get_preemption_effect(void) {
 */
 caml_result caml_tick_fiber_res(struct stack_info *stack) {
   caml_result res;
+  /* The tick handlers below run as callbacks on the current stack: if one
+     grows it, [caml_try_realloc_stack] frees its [stack_info]. Only the
+     current stack can move, so reload it after running the parents'
+     handlers. */
+  int is_current = stack == Caml_state->current_stack;
 
   if (Stack_parent(stack)) {
     res = caml_tick_fiber_res(Stack_parent(stack));
     if (caml_result_is_exception(res) || res.data == Val_true) {
       return res;
+    }
+    if (is_current) {
+      stack = Caml_state->current_stack;
     }
   }
 
