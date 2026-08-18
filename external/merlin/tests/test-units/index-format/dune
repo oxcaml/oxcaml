@@ -1,0 +1,9 @@
+(test
+ (name index_format_test)
+ (flags
+  :standard
+  -open Ocaml_typing
+  -open Ocaml_parsing
+  -open Ocaml_utils)
+ (libraries alcotest ocaml_parsing ocaml_typing ocaml_utils
+  merlin-lib.index_format))

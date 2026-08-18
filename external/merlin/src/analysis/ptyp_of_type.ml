@@ -21,7 +21,7 @@ let rec module_type =
     let param =
       match param with
       | Unit -> Parsetree.Unit
-      | Named (id, type_in, param_mode) ->
+      | Named (id, type_in, _, param_mode) ->
         Parsetree.Named
           ( Location.mknoloc (Option.map ~f:Ident.name id),
             module_type type_in,
