@@ -463,11 +463,11 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
   }
 
 let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
-    ?(res = [||]) ?dbg () =
+    ?(res = [||]) () =
   { desc;
     arg;
     res;
-    dbg = (match dbg with None -> copy.dbg | Some dbg -> dbg);
+    dbg = copy.dbg;
     fdo = copy.fdo;
     live = copy.live;
     stack_offset = copy.stack_offset;

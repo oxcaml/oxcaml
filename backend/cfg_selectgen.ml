@@ -1072,8 +1072,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           term)
 
   and emit_expr_ifthenelse env sub_cfg bound_name econd _ifso_dbg eif
-      (_ifnot_dbg : Debuginfo.t) eelse (dbg : Debuginfo.t) :
+      (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) :
       _ Or_never_returns.t =
+    (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
     match emit_expr env sub_cfg earg ~bound_name:None with
     | Never_returns -> Never_returns
@@ -1087,12 +1088,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ~label_true:(Sub_cfg.start_label sub_if)
           ~label_false:(Sub_cfg.start_label sub_else)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg;
       Sub_cfg.join ~from:[sub_if; sub_else] ~to_:sub_cfg;
       r
 
   and emit_expr_switch env sub_cfg bound_name esel index ecases
-      (dbg : Debuginfo.t) : _ Or_never_returns.t =
+      (_dbg : Debuginfo.t) : _ Or_never_returns.t =
+    (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     match emit_expr env sub_cfg esel ~bound_name:None with
     | Never_returns -> Never_returns
     | Ok rsel ->
@@ -1107,7 +1109,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let term_desc : Cfg.terminator =
         Switch (Array.map (fun idx -> Sub_cfg.start_label subs.(idx)) index)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel;
       Sub_cfg.join ~from:(Array.to_list subs) ~to_:sub_cfg;
       r
 
@@ -1365,7 +1367,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | _ -> Misc.fatal_error "Cfg_selectgen.emit_tail")
 
   and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) eif
-      (_ifnot_dbg : Debuginfo.t) eelse (dbg : Debuginfo.t) =
+      (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) =
+    (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     let cond, earg = select_condition econd in
     match emit_expr env sub_cfg earg ~bound_name:None with
     | Never_returns -> ()
@@ -1378,10 +1381,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ~label_true:(Sub_cfg.start_label sub_if)
           ~label_false:(Sub_cfg.start_label sub_else)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg;
       Sub_cfg.join_tail ~from:[sub_if; sub_else] ~to_:sub_cfg
 
-  and emit_tail_switch env sub_cfg esel index ecases (dbg : Debuginfo.t) =
+  and emit_tail_switch env sub_cfg esel index ecases (_dbg : Debuginfo.t) =
+    (* CR-someday xclerc for xclerc: use the `_dbg` parameter *)
     match emit_expr env sub_cfg esel ~bound_name:None with
     | Never_returns -> ()
     | Ok rsel ->
@@ -1393,7 +1397,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Switch
           (Array.map (fun idx -> Sub_cfg.start_label sub_cases.(idx)) index)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel;
       Sub_cfg.join_tail ~from:(Array.to_list sub_cases) ~to_:sub_cfg
 
   and emit_tail_catch env sub_cfg (flag : Cmm.ccatch_flag) handlers e1 =
