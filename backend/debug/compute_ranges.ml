@@ -228,6 +228,9 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
      (d) [key] is in [S.available_before insn] and it is also in it is in
      [S.available_across insn]. The existing range remains open. *)
 
+  (* CR mshinwell: can cases such as 2(b) actually happen - it seems like
+     [available_across] should be a subset of [available_before]? *)
+
   type action =
     | Open_one_byte_subrange
     | Open_subrange
@@ -309,10 +312,11 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
     |> handle case_2b Close_subrange
     |> handle case_2c Close_subrange_one_byte_after
 
-  let actions_at_instruction ~ppf_dump ~(insn : L.instruction)
-      ~(prev_insn : L.instruction option) ~known_available_after_prev_insn =
-    let available_before = S.available_before insn in
-    let available_across = S.available_across insn in
+  let actions_at_instruction ~ppf_dump ~(fundecl : L.fundecl)
+      ~(insn : L.instruction) ~(prev_insn : L.instruction option)
+      ~known_available_after_prev_insn =
+    let available_before = S.available_before fundecl insn in
+    let available_across = S.available_across fundecl insn in
     if !Oxcaml_flags.dranges
     then
       Format.fprintf ppf_dump "canonicalised available_before:@ %a\n"
@@ -425,7 +429,7 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
         let known_available_after_prev_insn =
           KM.bindings currently_open_subranges |> List.map fst |> KS.of_list
         in
-        actions_at_instruction ~ppf_dump ~insn ~prev_insn
+        actions_at_instruction ~ppf_dump ~fundecl ~insn ~prev_insn
           ~known_available_after_prev_insn
     in
     (* Apply actions *)
@@ -499,7 +503,7 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
               (fun (key, _datum) -> key)
               (KM.bindings currently_open_subranges))
        in
-       match S.available_across insn with
+       match S.available_across fundecl insn with
        | None | Some Unreachable -> ()
        | Some (Ok _ as should_be_open) -> (
          match KS.diff should_be_open currently_open_subranges with

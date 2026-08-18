@@ -159,27 +159,71 @@ module Inlined_frames = struct
     let print ppf () = Format.pp_print_string ppf "()"
   end
 
-  let available_before (insn : L.instruction) =
-    let get_parents (dbg : Debuginfo.item list) : Debuginfo.t list =
-      match List.rev dbg with
-      | [] | [_] -> []
-      | _ :: parents ->
-        let rec loop (t : Debuginfo.item list) =
-          match t with
-          | [] -> []
-          | _ :: tl -> Debuginfo.of_items (List.rev t) :: loop tl
-        in
-        loop parents
-    in
-    let insn_dbg = Debuginfo.to_items insn.dbg in
-    match insn_dbg with
-    | [] -> None
+  (* Given a non-empty Debuginfo.t, return the list of all non-empty prefixes:
+     the value itself and each of its parents (the path with progressively fewer
+     deeper frames). *)
+  let dbg_and_parents dbg =
+    let items = Debuginfo.to_items dbg in
+    match items with
+    | [] -> []
     | _ :: _ ->
-      Some (Key.Set.Ok (Key.Raw_set.of_list (insn.dbg :: get_parents insn_dbg)))
+      let rec parents (t : Debuginfo.item list) =
+        match List.rev t with
+        | [] | [_] -> []
+        | _ :: rest ->
+          let prefix = List.rev rest in
+          Debuginfo.of_items prefix :: parents prefix
+      in
+      dbg :: parents items
 
-  let available_across insn =
+  let is_spill_or_reload (insn : L.instruction) =
+    match insn.desc with
+    | Lop (Spill | Reload) -> true
+    | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lop _ | Lcall_op _
+    | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
+    | Lcondbranch3 _ | Lswitch _ | Lentertrap | Ladjust_stack_offset _
+    | Lpushtrap _ | Lpoptrap _ | Lraise _ | Lstackcheck _ ->
+      false
+  [@@ocaml.warning "-4"]
+
+  let available_before (_fundecl : L.fundecl) (insn : L.instruction) =
+    (* Inlined-frame keys are derived solely from the instruction's own [dbg]
+       (and all of its parents): an instruction physically located inside an
+       inlined frame keeps that frame alive. Since each instruction identifies
+       exactly one frame at each inlining depth, the ranges of sibling frames
+       may interleave but can never overlap, as required by the DWARF
+       specification for DW_TAG_inlined_subroutine DIEs.
+
+       In particular, the ranges are _not_ extended to cover the scopes of
+       phantom variables bound in inlined frames: such scopes extend to the end
+       of the enclosing function's body and would cause sibling frames' ranges
+       to overlap. (The consequence is that a fully optimized-out inlined
+       function, none of whose instructions remain, gets no
+       DW_TAG_inlined_subroutine DIE; the phantom lets corresponding to its
+       parameters are correspondingly restricted -- see
+       [Available_ranges_phantom_vars].)
+
+       Spill and reload instructions are register-allocator bookkeeping, not
+       code lowered from any inlined body; typically they preserve the
+       _enclosing_ function's state across a call to which the surrounding
+       debuginfo relates. They are treated as belonging to no inlined frame (an
+       empty key set, closing any open ranges), so that the address ranges of
+       inlined frames never cover them. This matters in particular for reloads
+       of the enclosing function's variables after a call within an inlined
+       body: such reloads must not be attributed to the inlined function (e.g.
+       by a profiler). Note that returning [None] would not suffice, since that
+       would leave existing open ranges untouched. *)
+    if is_spill_or_reload insn
+    then Some (Key.Set.Ok Key.Raw_set.empty)
+    else
+      match Debuginfo.to_items insn.dbg with
+      | [] -> None
+      | _ :: _ ->
+        Some (Key.Set.Ok (Key.Raw_set.of_list (dbg_and_parents insn.dbg)))
+
+  let available_across fundecl insn =
     (* A single [Linear] instruction never spans inlined frames. *)
-    available_before insn
+    available_before fundecl insn
 
   let must_restart_ranges_upon_any_change () = false
 end
