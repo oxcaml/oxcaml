@@ -1,0 +1,14 @@
+let code f_0 deleted in
+let code loopify(never) size(10) newer_version_of(f_0)
+      f_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %string_length (s) in
+  let Pstringlength = %tag_imm (prim) in
+  let int_add = %int_barith.add (Pstringlength, Pstringlength) in
+  cont k (int_add)
+in
+let $camlCse__f_1 = closure f_0_1 @f in
+let $camlCse = Block 0 ($camlCse__f_1) in
+cont done ($camlCse)
