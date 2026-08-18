@@ -45,31 +45,6 @@ exception Error of error * Debuginfo.t
    twice with the same [Target] (see [Asmgen] and [Peephole_utils] to avoid
    dependency cycles. *)
 module Make (Target : Cfg_selectgen_target_intf.S) = struct
-  (* Global accumulator for phantom lets in the current function *)
-  (* CR mshinwell: work out how to remove this mutable state *)
-  let accumulated_phantom_lets :
-      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref =
-    ref V.Map.empty
-
-  let accumulate_phantom_let var defining_expr =
-    (* A [None] defining expression means the variable has been optimised out;
-       it is still recorded (as [Cphantom_optimised_out]) so that it remains
-       consistent with [phantom_available_before] and other phantom lets may
-       refer to it. *)
-    let cfg_defining_expr : Cfg.phantom_defining_expr =
-      match defining_expr with
-      | None -> Cfg.phantom_optimised_out
-      | Some defining_expr -> Cfg.phantom_defining_expr_of_cmm defining_expr
-    in
-    if V.Map.mem (VP.var var) !accumulated_phantom_lets
-    then
-      Misc.fatal_errorf "Duplicate phantom let for variable %a" V.print
-        (VP.var var);
-    accumulated_phantom_lets
-      := V.Map.add (VP.var var)
-           (VP.provenance var, cfg_defining_expr)
-           !accumulated_phantom_lets
-
   (* A syntactic criterion used in addition to judgements about (co)effects as
      to whether the evaluation of a given expression may be deferred by
      [emit_parts]. This criterion is a property of the instruction selection
@@ -548,7 +523,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     Sub_cfg.add_instruction' sub_cfg instr;
     instr.id
 
-  let setup_catch_handler (flag : Cmm.ccatch_flag) rs sub_cfg =
+  let setup_catch_handler (flag : Cmm.ccatch_flag) rs sub_cfg ~dbg
+      ~phantom_available_before =
     match flag with
     | Normal | Recursive -> ()
     | Exn_handler ->
@@ -558,10 +534,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | [] -> Misc.fatal_error "Exception handler with no parameters"
         | r :: _ -> r
       in
-      (* CR mshinwell/gyorsh: fix Debuginfo.t + phantom_available_before *)
       Sub_cfg.add_instruction_at_start sub_cfg (Cfg.Op Move)
-        [| Proc.loc_exn_bucket |] exn_bucket_in_handler Debuginfo.none
-        ~phantom_available_before:None
+        [| Proc.loc_exn_bucket |] exn_bucket_in_handler dbg
+        ~phantom_available_before
 
   let unreachable_handler : (Operation.trap_stack * Cmm.expression) Lazy.t =
     lazy
@@ -850,10 +825,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> Never_returns
       | Ok r1 -> emit_expr (bind_let env sub_cfg v r1) sub_cfg e2 ~bound_name)
     | Cphantom_let (var, defining_expr, body) ->
-      (* Add to global accumulator for this function *)
-      accumulate_phantom_let var defining_expr;
       ensure_referenced_vars_named env sub_cfg defining_expr;
-      let env = SU.env_add_phantom_let var env in
+      let env = SU.env_add_phantom_let var defining_expr env in
       emit_expr env sub_cfg body ~bound_name
     | Cname_for_debugger (var, body) -> (
       match emit_expr env sub_cfg body ~bound_name with
@@ -924,9 +897,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
     | Cphantom_let (var, defining_expr, body) ->
-      accumulate_phantom_let var defining_expr;
       ensure_referenced_vars_named env sub_cfg defining_expr;
-      let env = SU.env_add_phantom_let var env in
+      let env = SU.env_add_phantom_let var defining_expr env in
       emit_tail env sub_cfg body
     | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
     | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
@@ -1205,7 +1177,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let r_body, sub_body = emit_new_sub_cfg env body ~bound_name in
     let translate_one_handler _nfail
-        (trap_info, (ids, rs, e2, _dbg, _is_cold, label)) =
+        (trap_info, (ids, rs, e2, dbg, _is_cold, label)) =
       assert (List.length ids = List.length rs);
       let trap_stack, e2 =
         match (!trap_info : SU.trap_stack_info) with
@@ -1240,7 +1212,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                     [||] [||])
               ids_and_rs)
       in
-      (rs, label), (r, sub)
+      (rs, label, dbg, SU.phantom_vars_from_env new_env), (r, sub)
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
@@ -1279,9 +1251,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let sub_handlers =
       List.map
-        (fun ((rs, label), (_, sub_handler)) ->
+        (fun ((rs, label, dbg, phantom_available_before), (_, sub_handler)) ->
           Sub_cfg.add_empty_block_at_start sub_handler ~label;
-          setup_catch_handler flag rs sub_handler;
+          setup_catch_handler flag rs sub_handler ~dbg ~phantom_available_before;
           sub_handler)
         l
     in
@@ -1488,7 +1460,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let s_body = emit_tail_new_sub_cfg env e1 in
     let translate_one_handler _nfail
-        (trap_info, (ids, rs, e2, _dbg, _is_cold, label)) =
+        (trap_info, (ids, rs, e2, dbg, _is_cold, label)) =
       assert (List.length ids = List.length rs);
       let trap_stack, e2 =
         match (!trap_info : SU.trap_stack_info) with
@@ -1524,7 +1496,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               ids_and_rs)
       in
       Sub_cfg.add_empty_block_at_start seq ~label;
-      rs, seq
+      rs, seq, dbg, SU.phantom_vars_from_env new_env
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
@@ -1544,7 +1516,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         in
         build_all_reachable_handlers ~already_built ~not_built
     in
-    let new_handlers : (Reg.t array list * Sub_cfg.t) list =
+    let new_handlers :
+        (Reg.t array list * Sub_cfg.t * Debuginfo.t * V.Set.t option) list =
       match flag with
       | Normal | Recursive ->
         build_all_reachable_handlers ~already_built:[] ~not_built:handlers_map
@@ -1563,8 +1536,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     Sub_cfg.update_exit_terminator sub_cfg term_desc;
     let s_handlers =
       List.map
-        (fun (rs, s) ->
-          setup_catch_handler flag rs s;
+        (fun (rs, s, dbg, phantom_available_before) ->
+          setup_catch_handler flag rs s ~dbg ~phantom_available_before;
           s)
         new_handlers
     in
@@ -1576,7 +1549,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     emit_tail env sub_cfg exp;
     sub_cfg
 
-  let insert_param_name_for_debugger block fun_args loc_arg num_regs_per_arg =
+  let insert_param_name_for_debugger env block fun_args loc_arg num_regs_per_arg
+      =
+    (* No phantom lets are in scope at the start of the function, so the phantom
+       availability comes from the initial environment. *)
+    let phantom_available_before = SU.phantom_vars_from_env env in
     let loc_arg_index = ref 0 in
     List.iteri
       (fun param_index (var, _ty) ->
@@ -1604,16 +1581,13 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             }
         in
         DLL.add_end block.Cfg.body
-          (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||]
-             (* CR mshinwell: is [None] correct? *)
-             Debuginfo.none ~phantom_available_before:None))
+          (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||] Debuginfo.none
+             ~phantom_available_before))
       fun_args
 
   (* Sequentialization of a function definition *)
 
   let emit_fundecl ~future_funcnames f =
-    (* Clear phantom lets accumulator for this function *)
-    accumulated_phantom_lets := V.Map.empty;
     SU.current_function_name := f.Cmm.fun_name.sym_name;
     SU.current_function_is_check_enabled
       := Zero_alloc_checker.is_check_enabled f.Cmm.fun_codegen_options
@@ -1655,7 +1629,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:f.Cmm.fun_poll
         ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:f.Cmm.fun_ret_type
-        ~fun_phantom_lets:!accumulated_phantom_lets
+        ~fun_phantom_lets:(SU.phantom_lets_for_fundecl env)
         ~allowed_to_be_irreducible:false
     in
     let layout = DLL.make_empty () in
@@ -1664,7 +1638,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none
            ~phantom_available_before:None)
     in
-    insert_param_name_for_debugger entry_block f.Cmm.fun_args loc_arg
+    insert_param_name_for_debugger env entry_block f.Cmm.fun_args loc_arg
       num_regs_per_arg;
     Cfg.add_block_exn cfg entry_block;
     DLL.add_end layout entry_block.start;
@@ -1674,7 +1648,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
            (Cfg.Always (Sub_cfg.start_label body))
            [||] [||] Debuginfo.none ~phantom_available_before:None)
     in
-    insert_param_name_for_debugger tailrec_block f.Cmm.fun_args loc_arg
+    insert_param_name_for_debugger env tailrec_block f.Cmm.fun_args loc_arg
       num_regs_per_arg;
     Cfg.add_block_exn cfg tailrec_block;
     DLL.add_end layout tailrec_block.start;
