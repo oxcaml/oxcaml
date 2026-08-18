@@ -14,7 +14,7 @@
 
 [@@@ocaml.flambda_o3]
 
-type ('a : value_or_null, 'b : value_or_null) t =
+type ('a : value_or_null, 'b : any) t =
   #('a * ('a, 'b) idx_atomic)
 
 external get :

@@ -12,8 +12,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(*
+   Like [idx_atomic], [ptr_atomic] uses kind [any] for its element type.
+   See the comment in [./idx_atomic.mli] for more details.
+*)
+
 (** An alias for the type of atomic pointers into blocks. *)
-type ('a : value_or_null, 'b : value_or_null) t =
+type ('a : value_or_null, 'b : any) t =
   #('a * ('a, 'b) idx_atomic)
 
 (** [get p] gets the value pointed to by [p] atomically.

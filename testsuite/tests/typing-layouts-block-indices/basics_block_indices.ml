@@ -624,17 +624,24 @@ let g t = Idx_atomic.set t idx_atomic_i 42
 val g : atomic -> unit = <fun>
 |}]
 
+(* Can declare idx_atomic with a non-value element type *)
+type 'a nonvalue_elt_type = ('a, float#) idx_atomic
+[%%expect{|
+type 'a nonvalue_elt_type = ('a, float#) idx_atomic
+|}]
+
 (* Cannot access an element whose layout is not value *)
 let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
 [%%expect{|
-Line 1, characters 27-33:
+Line 1, characters 66-69:
 1 | let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
-                               ^^^^^^
-Error: This type "float#" should be an instance of type "('a : value_or_null)"
+                                                                      ^^^
+Error: The value "idx" has type "('a, float#) idx_atomic"
+       but an expression was expected of type
+         "('a, 'b) Stdlib_stable.Idx_atomic.t" = "('a, 'b) idx_atomic"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because the 2nd type argument of idx_atomic has layout value_or_null.
+       But the layout of float# must be a value layout.
 |}]
 
 (* Cannot access an atomic field non-atomically *)
