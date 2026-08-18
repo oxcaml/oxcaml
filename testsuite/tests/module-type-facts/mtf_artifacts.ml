@@ -50,6 +50,10 @@ open Mtf_facts
 
 let read_cmt file = Cmt_format.read_cmt file
 
+let facts_exn = function
+  | Some facts -> facts
+  | None -> failwith "expected module implementation facts"
+
 (* The uids of [Mtf_aux] appear in the facts of both its own artifacts and
    those of [Mtf_client]; the interface ones are marked [[intf]], as
    [ocamlobjinfo -uid-deps] does. *)
@@ -65,10 +69,10 @@ let () =
   let cmt = read_cmt "mtf_aux.cmt" in
   let cmti = read_cmt "mtf_aux.cmti" in
   Printf.printf "present: cmt %b cmti %b\n"
-    cmt.cmt_module_implementation_facts_present
-    cmti.cmt_module_implementation_facts_present;
-  print_counts cmt.cmt_module_implementation_facts;
-  print_counts cmti.cmt_module_implementation_facts
+    (Option.is_some cmt.cmt_module_implementation_facts)
+    (Option.is_some cmti.cmt_module_implementation_facts);
+  print_counts (facts_exn cmt.cmt_module_implementation_facts);
+  print_counts (facts_exn cmti.cmt_module_implementation_facts)
 
 let () = heading "the interface pairs of the unit are directional"
 
@@ -78,7 +82,7 @@ let () = heading "the interface pairs of the unit are directional"
 let () =
   let cmt = read_cmt "mtf_aux.cmt" in
   print_interface_pairs (printer (aux_labels ()))
-    cmt.cmt_module_implementation_facts
+    (facts_exn cmt.cmt_module_implementation_facts)
 
 let () = heading ".cms and .cmsi hold the same facts as .cmt and .cmti"
 
@@ -91,15 +95,13 @@ let () =
   let cmt = read_cmt "mtf_aux.cmt" in
   let cmti = read_cmt "mtf_aux.cmti" in
   Printf.printf "present: cms %b cmsi %b\n"
-    cms.cms_module_implementation_facts_present
-    cmsi.cms_module_implementation_facts_present;
+    (Option.is_some cms.cms_module_implementation_facts)
+    (Option.is_some cmsi.cms_module_implementation_facts);
   Printf.printf "cms = cmt: %b\ncmsi = cmti: %b\n"
-    (Facts.compare cms.cms_module_implementation_facts
-       cmt.cmt_module_implementation_facts
-     = 0)
-    (Facts.compare cmsi.cms_module_implementation_facts
-       cmti.cmt_module_implementation_facts
-     = 0)
+    (Option.equal equal_facts cms.cms_module_implementation_facts
+       cmt.cmt_module_implementation_facts)
+    (Option.equal equal_facts cmsi.cms_module_implementation_facts
+       cmti.cmt_module_implementation_facts)
 
 let () = heading "facts of a unit whose expectations come from a .cmi"
 
@@ -112,8 +114,9 @@ let () =
     labels_of_annots cmt.cmt_annots
     @ signature_labels ~prefix:"Mtf_aux." signature
   in
-  print_counts cmt.cmt_module_implementation_facts;
-  print_checks (printer labels) cmt.cmt_module_implementation_facts
+  let facts = facts_exn cmt.cmt_module_implementation_facts in
+  print_counts facts;
+  print_checks (printer labels) facts
 
 let () = heading "an ascription against another unit's signature is no pair"
 
@@ -126,7 +129,7 @@ let () = heading "an ascription against another unit's signature is no pair"
    checks printed above. *)
 let () =
   let report description file =
-    let facts = (read_cmt file).cmt_module_implementation_facts in
+    let facts = facts_exn (read_cmt file).cmt_module_implementation_facts in
     Printf.printf "%s: interface checks %d, interface pairs %d\n" description
       (List.length (interface_checks facts))
       (List.length (interface_pairs facts))
@@ -179,7 +182,7 @@ let () =
   let cmt = read_cmt "mtf_argument.cmt" in
   print_facts
     (printer (labels_of_annots cmt.cmt_annots))
-    cmt.cmt_module_implementation_facts
+    (facts_exn cmt.cmt_module_implementation_facts)
 
 let () = heading "facts are only extracted for the artifacts that are written"
 
@@ -195,9 +198,9 @@ let () =
     in
     Printf.printf "%s: cmt %s, cms %s\n" unit_
       (facts_present ".cmt" read_cmt (fun cmt ->
-           cmt.Cmt_format.cmt_module_implementation_facts_present))
+           Option.is_some cmt.Cmt_format.cmt_module_implementation_facts))
       (facts_present ".cms" Cms_format.read (fun cms ->
-           cms.Cms_format.cms_module_implementation_facts_present))
+           Option.is_some cms.Cms_format.cms_module_implementation_facts))
   in
   report "mtf_gate_cmt";
   report "mtf_gate_cms";
@@ -205,9 +208,7 @@ let () =
 
 let () = heading "a partial artifact carries no facts"
 
-(* The facts of a unit that failed to typecheck are not extracted at all; the
-   [present] flag tells a reader that the empty fact set of this [.cmt] is not
-   the fact set of the unit. *)
+(* The facts of a unit that failed to typecheck are not extracted at all. *)
 let () =
   let cmt = read_cmt "mtf_broken.cmt" in
   Printf.printf "partial implementation: %b\n"
@@ -215,5 +216,5 @@ let () =
      | Partial_implementation _ -> true
      | Implementation _ | Interface _ | Packed _ | Partial_interface _ ->
          false);
-  Printf.printf "present: %b\n" cmt.cmt_module_implementation_facts_present;
-  print_counts cmt.cmt_module_implementation_facts
+  Printf.printf "present: %b\n"
+    (Option.is_some cmt.cmt_module_implementation_facts)
