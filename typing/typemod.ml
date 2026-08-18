@@ -4566,7 +4566,7 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
       Some
         { ai_signature = arg_sig;
           ai_coercion_from_primary = coercion;
-          ai_expectation =
+          ai_parameter_uid =
             Uid.of_compilation_unit_id (Unit_info.Artifact.modname arg_cmi)
         }
 
@@ -4579,8 +4579,8 @@ let module_implementation_facts ~unit_interface ~argument_interface
   | Interface signature ->
     let argument_interface =
       Option.map
-        (fun ({ ai_expectation; _ } : Typedtree.argument_interface) ->
-          ai_expectation)
+        (fun ({ ai_parameter_uid; _ } : Typedtree.argument_interface) ->
+          ai_parameter_uid)
         argument_interface
     in
     ( Module_implementation_facts.of_interface compilation_unit
@@ -4624,8 +4624,8 @@ let module_implementation_facts ~unit_interface ~argument_interface
     in
     let argument_interface =
       Option.map
-        (fun ({ ai_expectation; _ } : Typedtree.argument_interface) ->
-          ai_expectation)
+        (fun ({ ai_parameter_uid; _ } : Typedtree.argument_interface) ->
+          ai_parameter_uid)
         argument_interface
     in
     ( Module_implementation_facts.of_implementation compilation_unit
