@@ -227,7 +227,7 @@ module Gen = struct
       let param =
         match param with
         | Unit -> Parsetree.Unit
-        | Named (id, in_, _) ->
+        | Named (id, in_, _, _) ->
           Parsetree.Named
             ( Location.mknoloc (Option.map ~f:Ident.name id),
               Ptyp_of_type.module_type in_,
