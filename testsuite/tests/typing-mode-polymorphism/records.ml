@@ -13,7 +13,7 @@ val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
 val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
 val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
 val use_static : 'a @ [< static] -> unit @ 'm = <fun>
-val use_global : 'a @ [< global forkable unyielding] -> unit @ 'm = <fun>
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 |}]
 
 type 'a myref = { mutable i : 'a }
@@ -21,25 +21,23 @@ let alloc x = { i = x }
 [%%expect{|
 type 'a myref = { mutable i : 'a; }
 val alloc :
-  'a @ [< 'm . aliased dynamic & global many forkable unyielding] ->
-  'a myref @ [> 'm | nonportable stateful] = <fun>
+  'a @ [< 'm . aliased dynamic & global many] -> 'a myref @ [> 'm | stateful] =
+  <fun>
 |}]
 
 let store_local (x @ local) y = x.i <- y
 [%%expect{|
 val store_local :
-  'a myref @ [< past('m) & corrupted write] ->
-  ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> past('m) | local corruptible unforkable yielding writing] =
+  'a myref @ [< past('m) & write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | local writing] =
   <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
 [%%expect{|
 val store_global :
-  'a myref @ [< past('m) & global corrupted forkable unyielding write] ->
-  ('a @ [< global many uncontended forkable unyielding read_write] ->
-   unit @ 'n) @ [> past('m) | corruptible writing] =
+  'a myref @ [< past('m) & global write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | writing] =
   <fun>
 |}]
 
@@ -127,6 +125,6 @@ Error: This value is "once" but is expected to be "many".
 let foo (x @ contended) = alloc x
 [%%expect{|
 val foo :
-  'a @ [< 'm . aliased dynamic & global many forkable unyielding] ->
-  'a myref @ [> 'm | nonportable contended stateful dynamic] = <fun>
+  'a @ [< 'm . aliased dynamic & global many] ->
+  'a myref @ [> 'm | contended stateful dynamic] = <fun>
 |}]

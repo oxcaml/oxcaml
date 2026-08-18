@@ -13,7 +13,7 @@ val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
 val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
 val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
 val use_static : 'a @ [< static] -> unit @ 'm = <fun>
-val use_global : 'a @ [< global forkable unyielding] -> unit @ 'm = <fun>
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 |}]
 
 (* Since a tuple is returned in tail-position, its allocation will be global *)
@@ -29,7 +29,7 @@ let prod_local (x @ local) (y @ local) = exclave_ (x, y)
 [%%expect{|
 val prod_local :
   'a @ [< 'm] ->
-  ('b @ [< 'n] -> 'a * 'b @ [> 'n | 'm | local unforkable yielding]) @ [> close('m) | local unforkable yielding] =
+  ('b @ [< 'n] -> 'a * 'b @ [> 'n | 'm | local]) @ [> close('m) | local] =
   <fun>
 |}]
 
@@ -41,7 +41,7 @@ let foo (x @ portable) (y @ portable) =
 [%%expect{|
 val foo :
   'a @ [< past('m) & global portable] ->
-  ('b @ [< global portable] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
+  ('b @ [< global portable] -> unit @ [> dynamic]) @ [> past('m) | stateful] =
   <fun>
 |}]
 
@@ -132,7 +132,7 @@ let foo (x @ portable) (y @ portable) =
 [%%expect{|
 val foo :
   'a @ [< past('m) & global portable] ->
-  ('b @ [< global portable] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
+  ('b @ [< global portable] -> unit @ [> dynamic]) @ [> past('m) | stateful] =
   <fun>
 |}]
 

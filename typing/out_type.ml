@@ -1028,6 +1028,54 @@ let equate_with_const : Alloc.lr -> Alloc.Const.t -> bool =
     else
       Alloc.Guts.in_bounds c m
 
+let erase_implied_axes (modes : Mode.Alloc.Const.t) :
+    Mode.Alloc.Const.Option.t =
+  (* [forkable] has implied defaults depending on [areality]: *)
+  let forkable =
+    match modes.areality, modes.forkable with
+    | Local, Unforkable | Global, Forkable -> None
+    | _, _ -> Some modes.forkable
+  in
+
+  (* [yielding] has implied defaults depending on [areality]: *)
+  let yielding =
+    match modes.areality, modes.yielding with
+    | Local, Yielding | Global, Unyielding -> None
+    | _, _ -> Some modes.yielding
+  in
+
+  (* [contention] has implied defaults based on [visibility]: *)
+  let contention =
+    match modes.visibility, modes.contention with
+    | Immutable, Contended
+    | Read, Shared
+    | Write, Corrupted
+    | Read_write, Uncontended -> None
+    | _, _ -> Some modes.contention
+  in
+
+  (* [portability] has implied defaults based on [statefulness]: *)
+  let portability =
+    match modes.statefulness, modes.portability with
+    | Stateless, Portable
+    | Reading, Shareable
+    | Writing, Corruptible
+    | Stateful, Nonportable -> None
+    | _, _ -> Some modes.portability
+  in
+
+  { areality = Some modes.areality;
+    linearity = Some modes.linearity;
+    uniqueness = Some modes.uniqueness;
+    portability;
+    contention;
+    forkable;
+    yielding;
+    statefulness = Some modes.statefulness;
+    visibility = Some modes.visibility;
+    staticity = Some modes.staticity
+  }
+
 module Variable_names : sig
   val reset_names : unit -> unit
 
@@ -1880,6 +1928,11 @@ end = struct
   type 'a interval = { lo: 'a; hi: 'a }
   let construct_raw_bounds variance { monadic; comonadic } :
       string interval =
+    let bound_diff bound trivial =
+      erase_implied_axes bound
+      |> Alloc.Const.Option.value ~default:trivial
+      |> fun bound -> Alloc.Const.diff bound trivial
+    in
     match (variance : variance) with
     | `Covariant ->
       let mupper = dupper_lr Alloc.obj_monadic monadic in
@@ -1888,9 +1941,7 @@ end = struct
         Alloc.Const.merge
           { monadic = mupper; comonadic = clower }
       in
-      let lower =
-        Alloc.Const.diff lower Alloc.Const.min
-      in
+      let lower = bound_diff lower Alloc.Const.min in
       { lo = Fmt.asprintf "%a"
                Alloc.Const.Option.partial_print lower;
         hi = "" }
@@ -1901,9 +1952,7 @@ end = struct
         Alloc.Const.merge
           { monadic = mlower; comonadic = cupper }
       in
-      let upper =
-        Alloc.Const.diff upper Alloc.Const.max
-      in
+      let upper = bound_diff upper Alloc.Const.max in
       { lo = "";
         hi = Fmt.asprintf "%a"
                Alloc.Const.Option.partial_print upper }
@@ -2374,43 +2423,13 @@ let out_modalities_of_mod_bounds mod_bounds =
 let tree_of_modes_const (modes : Mode.Alloc.Const.t) =
   (* Step 1: Compute the modes to print *)
   let diff =
-
-    (* [forkable] has implied defaults depending on [areality]: *)
-    let forkable =
-      match modes.areality, modes.forkable with
-      | Local, Unforkable | Global, Forkable -> None
-      | _, _ -> Some modes.forkable
-    in
-
-    (* [yielding] has implied defaults depending on [areality]: *)
-    let yielding =
-      match modes.areality, modes.yielding with
-      | Local, Yielding | Global, Unyielding -> None
-      | _, _ -> Some modes.yielding
-    in
-
-    (* [contention] has implied defaults based on [visibility]: *)
-    let contention =
-      match modes.visibility, modes.contention with
-      | Immutable, Contended
-      | Read, Shared
-      | Write, Corrupted
-      | Read_write, Uncontended -> None
-      | _, _ -> Some modes.contention
-    in
-
-    (* [portability] has implied defaults based on [statefulness]: *)
-    let portability =
-      match modes.statefulness, modes.portability with
-      | Stateless, Portable
-      | Reading, Shareable
-      | Writing, Corruptible
-      | Stateful, Nonportable -> None
-      | _, _ -> Some modes.portability
-    in
-
+    let implied = erase_implied_axes modes in
     let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
-    { diff with forkable; yielding; contention; portability }
+    { diff with
+      forkable = implied.forkable;
+      yielding = implied.yielding;
+      contention = implied.contention;
+      portability = implied.portability }
   in
   (* Step 2: Print the modes *)
   List.filter_map

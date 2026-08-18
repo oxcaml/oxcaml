@@ -13,7 +13,7 @@ val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
 val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
 val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
 val use_static : 'a @ [< static] -> unit @ 'm = <fun>
-val use_global : 'a @ [< global forkable unyielding] -> unit @ 'm = <fun>
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 |}]
 
 (* [fst] is the K-combinator and displays an interesting bi-directional dependency
@@ -85,7 +85,7 @@ type box = { mutable x : int; }
 val check_tuple :
   'a @ [< past('o) & past('m) & global unique] ->
   ('b @ [< 'n & global many] ->
-   ('c @ 'p -> unit * 'b * 'b @ [> 'n | aliased dynamic]) @ [> close('n) | past('o) | once nonportable stateful]) @ [> past('m) | once nonportable stateful] =
+   ('c @ 'p -> unit * 'b * 'b @ [> 'n | aliased dynamic]) @ [> close('n) | past('o) | once stateful]) @ [> past('m) | once stateful] =
   <fun>
 |}]
 
@@ -140,7 +140,7 @@ let foo (x @ portable) (y @ uncontended) =
 [%%expect{|
 val foo :
   'a @ [< past('m) & global portable] ->
-  ('b @ [< global uncontended] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
+  ('b @ [< global uncontended] -> unit @ [> dynamic]) @ [> past('m) | stateful] =
   <fun>
 |}]
 
@@ -150,7 +150,7 @@ let foo (x @ portable) (y @ uncontended) =
 [%%expect{|
 val foo :
   'a @ [< past('m) & global portable] ->
-  ('b @ [< global portable uncontended] -> unit @ [> dynamic]) @ [> past('m) | nonportable stateful] =
+  ('b @ [< global portable uncontended] -> unit @ [> dynamic]) @ [> past('m) | stateful] =
   <fun>
 |}]
 

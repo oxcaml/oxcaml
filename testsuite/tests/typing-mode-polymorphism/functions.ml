@@ -13,7 +13,7 @@ val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
 val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
 val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
 val use_static : 'a @ [< static] -> unit @ 'm = <fun>
-val use_global : 'a @ [< global forkable unyielding] -> unit @ 'm = <fun>
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 |}]
 
 (* FUNCTION APPLICATION *)
@@ -148,7 +148,7 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  (int @ [< many uncontended read_write] -> 'a @ [> 'm | dynamic]) @ [> close('m) | close('m) | nonportable stateful] =
+  (int @ [< many read_write] -> 'a @ [> 'm | dynamic]) @ [> close('m) | close('m) | stateful] =
   <fun>
 |}]
 
@@ -163,7 +163,7 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  (int @ [< many uncontended read_write] -> 'a @ [> 'm | dynamic]) @ [> close('m) | close('m) | nonportable stateful] =
+  (int @ [< many read_write] -> 'a @ [> 'm | dynamic]) @ [> close('m) | close('m) | stateful] =
   <fun>
 |}]
 
@@ -183,7 +183,7 @@ let rec map f = function
 [%%expect{|
 val map :
   ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & past('p) & global many] ->
-  ('a list @ [< 'n] -> 'b list @ [> 'm | dynamic]) @ [> past('o) | past('p) | nonportable stateful] =
+  ('a list @ [< 'n] -> 'b list @ [> 'm | dynamic]) @ [> past('o) | past('p) | stateful] =
   <fun>
 |}]
 
@@ -235,8 +235,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 let use_and_return x = ignore x; x
 [%%expect{|
 val use_and_return :
-  'a @ [< 'm & global many uncontended forkable unyielding read_write] ->
-  'a @ [> 'm | aliased] = <fun>
+  'a @ [< 'm & global many read_write] -> 'a @ [> 'm | aliased] = <fun>
 |}]
 
 (* contended values cannot be use_and_returned due to uncontended bound *)
