@@ -80,10 +80,12 @@ let rec string_of_context t (context : Facts.Context.t) =
 
 let string_of_key t (key : Facts.Key.t) =
   match key with
-  | Named (Def unit_, uid) when unit_name unit_ <> None && is_named t uid ->
-      uid_name t uid
-  | Named (context, uid) -> uid_name t uid ^ "@" ^ string_of_context t context
-  | Anon uid -> "<" ^ uid_name t uid ^ ">"
+  | Named { context = Def unit_; family_uid }
+    when unit_name unit_ <> None && is_named t family_uid ->
+      uid_name t family_uid
+  | Named { context; family_uid } ->
+      uid_name t family_uid ^ "@" ^ string_of_context t context
+  | Anon { key_uid } -> "<" ^ uid_name t key_uid ^ ">"
 
 (* The implementation of a check that is not a declaration is only a location;
    it prints as [<location>], so that the output stays independent of the
@@ -164,6 +166,20 @@ let print_facts t facts =
   print_counts facts;
   List.iter print_endline (fact_lines t facts)
 
+let equal_facts (left : Facts.t) (right : Facts.t) =
+  List.equal
+    (fun left right -> Facts.Check.compare left right = 0)
+    left.checks right.checks
+  && List.equal
+       (fun left right -> Facts.Dependency.compare left right = 0)
+       left.dependencies right.dependencies
+  && List.equal
+       (fun left right -> Facts.Context_equality.compare left right = 0)
+       left.equalities right.equalities
+  && List.equal
+       (fun left right -> Facts.Omission.compare left right = 0)
+       left.omissions right.omissions
+
 (* The checks of kind [Interface], and the [Interface] dependencies of a named
    declaration on a named declaration of an interface, pair a declaration of
    the [.ml] of a unit with the corresponding declaration of its [.mli]. *)
@@ -187,7 +203,8 @@ let interface_pairs (facts : Facts.t) =
   List.filter
     (fun ({ derived; source; reason } : Facts.Dependency.t) ->
       match reason, derived, source with
-      | Interface, Named _, Named (_, uid) -> from_interface uid
+      | Interface, Named _, Named { family_uid; _ } ->
+          from_interface family_uid
       | ( ( Interface | Definition | Alias | Include | With_constraint
           | Destructive_substitution | Module_type_of | Strengthening
           | Functor_type | Instance | Argument_member ),

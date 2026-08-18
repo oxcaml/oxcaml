@@ -57,7 +57,7 @@ val module_implementation_facts:
   Compilation_unit.t ->
   Cmt_format.binary_annots ->
   (Cmt_format.dependency_kind * Shape.Uid.t * Shape.Uid.t) list ->
-  Module_implementation_facts.t * bool
+  Module_implementation_facts.t option
 
 (* If the [.mli] file has any file-level staticity modality (whether
    [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].
