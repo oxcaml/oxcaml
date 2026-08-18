@@ -633,6 +633,31 @@ AC_DEFUN([OCAML_CC_SUPPORTS_LABELS_AS_VALUES], [
   fi
 ])
 
+# Detects whether the C compiler supports requesting the initial-exec TLS
+# model for a thread-local variable. The __has_attribute test mirrors the
+# one guarding CAMLthread_local_initial_exec in runtime/caml/misc.h, so that
+# a compiler accepted here is one that will honour the attribute.
+AC_DEFUN([OCAML_CC_SUPPORTS_INITIAL_EXEC_TLS], [
+  AC_CACHE_CHECK(m4_normalize([whether $CC supports
+    __attribute__((__tls_model__("initial-exec")))]),
+    [ocaml_cv_prog_cc_initial_exec_tls],
+    [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#if !defined(__has_attribute) || !__has_attribute(__tls_model__)
+#error the __tls_model__ attribute is not supported
+#endif
+static __attribute__((__tls_model__("initial-exec")))
+  _Thread_local int tls_var = 0;
+      ]], [[
+  return tls_var;
+      ]])],
+       [ocaml_cv_prog_cc_initial_exec_tls=yes],
+       [ocaml_cv_prog_cc_initial_exec_tls=no])
+  ])
+  AS_IF([test x"$ocaml_cv_prog_cc_initial_exec_tls" = "xyes"],
+    [cc_supports_initial_exec_tls=true],
+    [cc_supports_initial_exec_tls=false])
+])
+
 AC_DEFUN([OCAML_CHECK_LN_ON_WINDOWS], [
   AC_MSG_CHECKING([for a workable solution for ln -sf])
   AS_IF([m4_normalize(MSYS=winsymlinks:nativestrict

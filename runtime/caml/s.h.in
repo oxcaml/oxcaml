@@ -48,6 +48,12 @@
    including across DLLs. This is not the case with macOS and with Windows +
    MinGW-w64. */
 
+#undef CAML_INITIAL_EXEC_TLS
+
+/* Define CAML_INITIAL_EXEC_TLS to request the initial-exec TLS model for the
+   runtime's hot thread-local variables, see CAMLthread_local_initial_exec in
+   misc.h. Only supported on Linux. */
+
 #undef HAS_C99_FLOAT_OPS
 
 /* Define HAS_C99_FLOAT_OPS if <math.h> conforms to ISO C99.

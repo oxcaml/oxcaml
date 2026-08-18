@@ -183,6 +183,28 @@ CAMLdeprecated_typedef(addr, char *);
 #define CAMLthread_local _Thread_local
 #endif
 
+/* CAMLthread_local_initial_exec is used for the thread-local variables that
+   sit on hot paths of the runtime. In position-independent code, the default
+   (general-dynamic) TLS model makes every access to such a variable go
+   through a call to __tls_get_addr, which is costly when the runtime ends up
+   in a shared object. The initial-exec model gets rid of these calls, but
+   requires the variable to live in the static TLS block, which restricts how
+   late the module defining it can be dlopen'd. It is therefore opt-in, via
+   the --enable-initial-exec-tls configure option.
+
+   The static TLS block is a finite resource shared with every other module
+   the process may dlopen, so use this sparingly: it is meant for variables
+   read on essentially every allocation, OCaml/C transition or I/O
+   operation. Variables only touched at startup, at GC-scan granularity, or
+   under DEBUG should stay plain CAMLthread_local. */
+#if defined(CAML_INITIAL_EXEC_TLS) && defined(__PIC__) \
+    && __has_attribute(__tls_model__)
+#define CAMLthread_local_initial_exec \
+  CAMLthread_local __attribute__((__tls_model__("initial-exec")))
+#else
+#define CAMLthread_local_initial_exec CAMLthread_local
+#endif
+
 /* Prefetching */
 
 #ifdef CAML_INTERNALS
