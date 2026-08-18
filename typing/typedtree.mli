@@ -831,7 +831,7 @@ and function_cases =
 and ident_kind =
   | Id_value
   | Id_prim of
-      Mode.Locality.l option * Jkind.Sort.t option * Mode.Yielding.l
+      Mode.Locality.lr option * Jkind.Sort.t option * Mode.Yielding.l
       (** The [Mode.Yielding.l] is the join of the yielding modes of the
           primitive's parameters, for when the primitive is closed over rather
           than directly applied. *)

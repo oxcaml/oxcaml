@@ -43,9 +43,9 @@ external float_of_bits : int64 -> float @@ portable
   = "caml_int64_float_of_bits" "caml_int64_float_of_bits_unboxed"
   [@@unboxed] [@@noalloc]
 let signaling_nan = float_of_bits 0x7F_F0_00_00_00_00_00_01L
-let is_finite (x: float) = x -. x = 0.
-let is_infinite (x: float) = 1. /. x = 0.
-let is_nan (x: float) = x <> x
+let (is_finite @ noalloc_strict) (x: float) = x -. x = 0.
+let (is_infinite @ noalloc_strict) (x: float) = 1. /. x = 0.
+let (is_nan @ noalloc_strict) (x: float) = x <> x
 
 let pi = 0x1.921fb54442d18p+1
 let max_float = Stdlib.max_float
@@ -120,7 +120,7 @@ external ceil : float -> float @@ portable = "caml_ceil_float" "ceil"
 external floor : float -> float @@ portable = "caml_floor_float" "floor"
 [@@unboxed] [@@noalloc]
 
-let is_integer x = x = trunc x && is_finite x
+let (is_integer @ noalloc_strict) x = x = trunc x && is_finite x
 
 external next_after : float -> float -> float @@ portable
   = "caml_nextafter_float" "caml_nextafter" [@@unboxed] [@@noalloc]
@@ -177,7 +177,7 @@ let[@inline] min_max_num (x: float) (y: float) =
 external seeded_hash_param :
   int -> int -> int -> float -> int @@ portable = "caml_hash_exn" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
-let hash x = seeded_hash_param 10 100 0 x
+let (hash @ noalloc_strict) x = seeded_hash_param 10 100 0 x
 
 module Array = struct
 

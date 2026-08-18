@@ -3761,8 +3761,8 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
         (Non_value_used_in_object (lid, ty, err))
 
 (** Takes the [mode] and [ty] of a value at definition site, walks through the
-    list of locks and constrains [mode] and [ty]. Return the access mode of the
-    value allowed by the locks.
+    list of locks and constrains [mode] and [ty]. Returns the access mode of
+    the value allowed by the locks.
 
     [ty_and_lid] is the type of the value paired with its identifier; it is
     [None] when the function is used on modules and classes.
@@ -3784,18 +3784,57 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
           vmode
     ) mode locks
 
+(** Constrains every enclosing closure lock with the given minimum mode. *)
+let walk_locks_with_mode_constraint ~env pp ~mode =
+  let locks = IdTbl.get_all_locks env.values in
+  let _stage_locks, locks = partition_locks locks in
+  ignore (walk_locks ~errors:true ~env ~pp
+      (Mode.Value.disallow_right mode) None locks)
+
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
     toplevel were used at the pinpoint's location. Used for constructs (e.g.
     effect handlers) that force enclosing functions to be nonportable and
     stateful. *)
 let walk_locks_for_legacy_construct ~env pp =
+  walk_locks_with_mode_constraint ~env pp ~mode:Mode.Value.legacy
+
+(** Re-walks the enclosing locks with an application's return [mode] on the
+    allocation axis (forcing every closure to be [>= mode] there). Used to stop
+    an [alloc] value from being laundered out of a fully-applied zero_alloc
+    function through a [noalloc] closure. *)
+let walk_locks_for_zero_alloc_return ~env ~loc mode =
+  let pp : Mode.Hint.pinpoint = (loc, Zero_alloc_func_appl) in
+  walk_locks_with_mode_constraint ~env pp
+    ~mode:
+      (Mode.Value.min_with_comonadic Allocation
+         (Mode.Value.proj_comonadic Allocation mode))
+
+(** Registers a use of an allocation at the given pinpoint.
+
+    Returns the pinpoint and allocation mode of every enclosing closure.
+    The list is ordered from the innermost closure to the outermost one,
+    so that error messages blame the closure nearest to the allocation. *)
+(* CR shsong: currently it only considers noalloc_strict and alloc,
+    need to customize this to support noalloc later *)
+let walk_locks_for_allocation ~env pp =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
-  ignore
-    (walk_locks ~errors:true ~env ~pp
-       (Mode.Value.disallow_right Mode.Value.legacy) None locks
-      : Mode.Value.l)
+  List.fold_left
+    (fun acc lock ->
+      match lock with
+      | Closure_lock (closure, comonadic) ->
+          let comonadic =
+            Mode.Value.Comonadic.apply_hint
+              (Is_closed_by (Comonadic, {closure; closed = pp}))
+              comonadic
+          in
+          (closure, Mode.Value.Comonadic.proj Allocation comonadic) :: acc
+      (* A [Const_closure_lock] is at a constant mode which is always [alloc]
+         on the allocation axis, so there is nothing to constrain. *)
+      | Region_lock | Const_closure_lock _ | Exclave_lock
+      | Unboxed_lock -> acc
+    ) [] locks
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either
@@ -3826,8 +3865,7 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
           mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
-      | Const_closure_lock (true, _, _) ->
-          mode
+      | Const_closure_lock (true, _, _) -> mode
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)

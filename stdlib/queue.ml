@@ -37,7 +37,7 @@ let create () = {
   last = Nil
 }
 
-let clear q =
+let (clear @ noalloc_strict) q =
   q.length <- 0;
   q.first <- Nil;
   q.last <- Nil
@@ -60,7 +60,7 @@ let add x q =
 let push =
   add
 
-let peek q =
+let[@zero_alloc strict] peek q =
   match q.first with
   | Nil -> raise Empty
   | Cons { content } -> content
@@ -73,7 +73,7 @@ let peek_opt q =
 let top =
   peek
 
-let take q =
+let[@zero_alloc strict] take q =
   match q.first with
   | Nil -> raise Empty
   | Cons { content; next = Nil } ->
@@ -98,7 +98,7 @@ let take_opt q =
 let pop =
   take
 
-let drop q =
+let[@zero_alloc strict] drop q =
   match q.first with
   | Nil -> raise Empty
   | Cons { content = _; next = Nil } ->
@@ -121,10 +121,10 @@ let copy =
   in
   fun q -> copy { length = q.length; first = Nil; last = Nil } Nil q.first
 
-let is_empty q =
+let (is_empty @ noalloc_strict) q =
   q.length = 0
 
-let length q =
+let (length @ noalloc_strict) q =
   q.length
 
 let iter =
@@ -147,7 +147,7 @@ let fold =
   in
   fun f accu q -> fold f accu q.first
 
-let transfer q1 q2 =
+let (transfer @ noalloc_strict) q1 q2 =
   if q1.length > 0 then
     match q2.last with
     | Nil ->

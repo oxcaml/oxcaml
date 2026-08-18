@@ -23,11 +23,11 @@ type ('a : value_or_null) t = 'a list = [] | (::) of 'a * 'a list
 
 (* List operations *)
 
-let rec length_aux len = function
+let rec (length_aux @ noalloc_strict) len = function
     [] -> len
   | _::l -> length_aux (len + 1) l
 
-let length l = length_aux 0 l
+let (length @ noalloc_strict) l = length_aux 0 l
 
 let cons a l = a::l
 
@@ -198,7 +198,7 @@ let rec mem x = function
     [] -> false
   | a::l -> compare a x = 0 || mem x l
 
-let rec memq x = function
+let rec (memq @ noalloc_strict) x = function
     [] -> false
   | a::l -> a == x || memq x l
 
@@ -210,7 +210,7 @@ let rec assoc_opt x = function
     [] -> None
   | (a,b)::l -> if compare a x = 0 then Some b else assoc_opt x l
 
-let rec assq x = function
+let[@zero_alloc strict] rec assq x = function
     [] -> raise Not_found
   | (a,b)::l -> if a == x then b else assq x l
 
@@ -222,7 +222,7 @@ let rec mem_assoc x = function
   | [] -> false
   | (a, _) :: l -> compare a x = 0 || mem_assoc x l
 
-let rec mem_assq x = function
+let rec (mem_assq @ noalloc_strict) x = function
   | [] -> false
   | (a, _) :: l -> a == x || mem_assq x l
 
@@ -304,7 +304,7 @@ let take n l =
   in
   if n <= 0 then [] else aux n l
 
-let drop n l =
+let[@zero_alloc strict] drop n l =
   let rec aux i = function
     | _x::l when i < n -> aux (i + 1) l
     | rest -> rest
@@ -557,14 +557,14 @@ let sort_uniq cmp l =
   if len < 2 then l else fst (sort len l)
 
 
-let rec compare_lengths l1 l2 =
+let rec (compare_lengths @ noalloc_strict) l1 l2 =
   match l1, l2 with
   | [], [] -> 0
   | [], _ -> -1
   | _, [] -> 1
   | _ :: l1, _ :: l2 -> compare_lengths l1 l2
 
-let rec compare_length_with l n =
+let rec (compare_length_with @ noalloc_strict) l n =
   match l with
   | [] ->
     if n = 0 then 0 else

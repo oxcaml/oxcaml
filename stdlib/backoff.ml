@@ -36,11 +36,11 @@ let create ?(lower_wait_log = 4) ?(upper_wait_log = 17) () =
   (upper_wait_log lsl (bits * 2))
   lor (lower_wait_log lsl bits) lor lower_wait_log
 
-let get_upper_wait_log backoff = backoff lsr (bits * 2)
-let get_lower_wait_log backoff = (backoff lsr bits) land mask
-let get_wait_log backoff = backoff land mask
+let (get_upper_wait_log @ noalloc_strict) backoff = backoff lsr (bits * 2)
+let (get_lower_wait_log @ noalloc_strict) backoff = (backoff lsr bits) land mask
+let (get_wait_log @ noalloc_strict) backoff = backoff land mask
 
-let reset backoff =
+let (reset @ noalloc_strict) backoff =
   let lower_wait_log = get_lower_wait_log backoff in
   backoff land lnot mask lor lower_wait_log
 

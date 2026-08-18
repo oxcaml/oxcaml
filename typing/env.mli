@@ -322,6 +322,19 @@ val walk_locks : env:t -> loc:Location.t -> Longident.t ->
     stateful. *)
 val walk_locks_for_legacy_construct : env:t -> Mode.Hint.pinpoint -> unit
 
+(** Registers the return mode of a fully-applied zero_alloc function,
+    preventing it from leaking an [alloc] return value. *)
+val walk_locks_for_zero_alloc_return :
+  env:t -> loc:Location.t -> Mode.Value.l -> unit
+
+(** Registers a use of an allocation at the given pinpoint.
+
+    Returns the pinpoint and allocation mode of every enclosing closure.
+    The list is ordered from the innermost closure to the outermost one,
+    so that error messages blame the closure nearest to the allocation. *)
+val walk_locks_for_allocation :
+  env:t -> Mode.Hint.pinpoint -> (Mode.Hint.pinpoint * Mode.Allocation.r) list
+
 val lookup_value:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * value_description * mode_with_locks

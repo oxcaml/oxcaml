@@ -50,21 +50,21 @@ kind_ immediate = immediate
 
 kind_ immutable_data =
   value mod many contended portable forkable unyielding immutable stateless
-            non_float
+            noalloc_strict non_float
 
 [%%expect{|
 kind_ immutable_data = immutable_data
 |}]
 
 kind_ sync_data = value mod many contended portable forkable unyielding
-                            stateless non_float
+            stateless noalloc_strict non_float
 
 [%%expect{|
 kind_ sync_data = sync_data
 |}]
 
 kind_ mutable_data = value mod many portable forkable unyielding stateless
-                               non_float
+            noalloc_strict non_float
 
 [%%expect{|
 kind_ mutable_data = mutable_data
@@ -219,7 +219,7 @@ Error: The layout of type "a" is value
          because of the definition of b at line 2, characters 0-20.
 |}]
 
-type a : value non_pointer mod global many immutable stateless external_
+type a : value non_pointer mod global many immutable stateless noalloc_strict external_
 type b : value mod contended = a
 [%%expect{|
 type a : immediate
@@ -277,8 +277,8 @@ type d = c
 |}]
 
 type a : immediate
-type b : value non_pointer mod global many immutable stateless external_ = a
-type c : value non_pointer mod global many immutable stateless external_
+type b : value non_pointer mod global many immutable stateless noalloc_strict external_ = a
+type c : value non_pointer mod global many immutable stateless noalloc_strict external_
 type d : immediate = c
 [%%expect{|
 type a : immediate
@@ -288,8 +288,8 @@ type d = c
 |}]
 
 type a : immediate64
-type b : value non_pointer64 mod global many immutable stateless external64 = a
-type c : value non_pointer64 mod global many immutable stateless external64
+type b : value non_pointer64 mod global many immutable stateless noalloc_strict external64 = a
+type c : value non_pointer64 mod global many immutable stateless noalloc_strict external64
 type d : immediate64 = c
 [%%expect{|
 type a : immediate64
@@ -299,8 +299,8 @@ type d = c
 |}]
 
 type a : float64 = float#
-type b : float64 mod global many immutable stateless external_ = a
-type c : float64 mod global many immutable stateless external_
+type b : float64 mod global many immutable stateless noalloc_strict external_ = a
+type c : float64 mod global many immutable stateless noalloc_strict external_
 type d : float64 = c
 [%%expect{|
 type a = float#
@@ -310,8 +310,8 @@ type d = c
 |}]
 
 type a : float32 = float32#
-type b : float32 mod global many immutable stateless external_ = a
-type c : float32 mod global many immutable stateless external_
+type b : float32 mod global many immutable stateless noalloc_strict external_ = a
+type c : float32 mod global many immutable stateless noalloc_strict external_
 type d : float32 = c
 [%%expect{|
 type a = float32#
@@ -356,68 +356,68 @@ type d = c
 (****************************************)
 (* Test 4: Appropriate types mode cross *)
 
-type t : any mod global many immutable stateless external_ = int
+type t : any mod global many immutable stateless noalloc_strict external_ = int
 [%%expect{|
 type t = int
 |}]
 
-type t : any mod global many immutable stateless external_ = float#
+type t : any mod global many immutable stateless noalloc_strict external_ = float#
 [%%expect{|
 type t = float#
 |}]
 
-type t : any mod global many immutable stateless external_ = float32#
+type t : any mod global many immutable stateless noalloc_strict external_ = float32#
 [%%expect{|
 type t = float32#
 |}]
 
-type t : any mod global many immutable stateless external_ = int64#
+type t : any mod global many immutable stateless noalloc_strict external_ = int64#
 [%%expect{|
 type t = int64#
 |}]
 
-type t : any mod global many immutable stateless external_ = int32#
+type t : any mod global many immutable stateless noalloc_strict external_ = int32#
 [%%expect{|
 type t = int32#
 |}]
 
-type t : any mod global many immutable stateless external_ = nativeint#
+type t : any mod global many immutable stateless noalloc_strict external_ = nativeint#
 [%%expect{|
 type t = nativeint#
 |}]
 
-type t : any mod global many immutable stateless external_ = int8x16#
+type t : any mod global many immutable stateless noalloc_strict external_ = int8x16#
 [%%expect{|
 type t = int8x16#
 |}]
 
-type t : any mod global many immutable stateless external_ = int16x8#
+type t : any mod global many immutable stateless noalloc_strict external_ = int16x8#
 [%%expect{|
 type t = int16x8#
 |}]
 
-type t : any mod global many immutable stateless external_ = int32x4#
+type t : any mod global many immutable stateless noalloc_strict external_ = int32x4#
 [%%expect{|
 type t = int32x4#
 |}]
 
-type t : any mod global many immutable stateless external_ = int64x2#
+type t : any mod global many immutable stateless noalloc_strict external_ = int64x2#
 [%%expect{|
 type t = int64x2#
 |}]
 
-type t : any mod global many immutable stateless external_ = float32x4#
+type t : any mod global many immutable stateless noalloc_strict external_ = float32x4#
 [%%expect{|
 type t = float32x4#
 |}]
 
-type t : any mod global many immutable stateless external_ = float64x2#
+type t : any mod global many immutable stateless noalloc_strict external_ = float64x2#
 [%%expect{|
 type t = float64x2#
 |}]
 
 type indirect_int = int
-type t : any mod global many immutable stateless external_ = indirect_int
+type t : any mod global many immutable stateless noalloc_strict external_ = indirect_int
 [%%expect{|
 type indirect_int = int
 type t = indirect_int
@@ -1164,12 +1164,12 @@ type 'a t : value mod global portable contended many =
 type 'a t = { x : 'a @@ global many portable contended; } [@@unboxed]
 |}]
 
-type 'a t : value mod global immutable stateless many non_float =
-  Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
+type 'a t : value mod global immutable stateless noalloc_strict many non_float =
+  Foo of 'a @@ global immutable stateless noalloc_strict many aliased [@@unboxed]
 [%%expect {|
-Lines 1-2, characters 0-66:
-1 | type 'a t : value mod global immutable stateless many non_float =
-2 |   Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
+Lines 1-2, characters 0-81:
+1 | type 'a t : value mod global immutable stateless noalloc_strict many non_float =
+2 |   Foo of 'a @@ global immutable stateless noalloc_strict many aliased [@@unboxed]
 Error: The layout of type "t" is value
          because it instantiates an unannotated type parameter of t,
          chosen to have layout value.
@@ -1278,7 +1278,7 @@ Error: The kind of type "t" is immutable_data with 'a @@ forkable unyielding
 type ('a : value mod aliased) t = ('a : value mod global)
 type ('a : immediate) t = ('a : value)
 type ('a : value) t = ('a : immediate)
-type ('a : value mod external_ stateless many unyielding non_float) t = ('a : value mod immutable global)
+type ('a : value mod external_ stateless noalloc_strict many unyielding non_float) t = ('a : value mod immutable global)
 type ('a : value) t = ('a : any)
 type ('a : value) t = ('a : value)
 type ('a : bits32 mod aliased) t = ('a : any mod global)

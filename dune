@@ -296,6 +296,8 @@
   typedecl
   typeopt
   value_rec_check
+  type_zero_alloc
+  typeallocation
   typecore
   solver_intf
   solver

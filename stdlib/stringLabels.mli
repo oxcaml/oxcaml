@@ -168,6 +168,7 @@ external compare : (t[@local_opt]) -> (t[@local_opt]) -> int = "%compare"
 
 val starts_with :
   prefix (* comment thwarts tools/sync_stdlib_docs *) :string -> string -> bool
+[@@zero_alloc strict]
 (** [starts_with ][~prefix s] is [true] if and only if [s] starts with
     [prefix].
 
@@ -175,6 +176,7 @@ val starts_with :
 
 val ends_with :
   suffix (* comment thwarts tools/sync_stdlib_docs *) :string -> string -> bool
+[@@zero_alloc strict]
 (** [ends_with ][~suffix s] is [true] if and only if [s] ends with [suffix].
 
     @since 4.13 *)
@@ -193,6 +195,7 @@ val rcontains_from : string -> int -> char -> bool
     position in [s]. *)
 
 val contains : string -> char -> bool
+[@@zero_alloc strict]
 (** [contains s c] is {!String.contains_from}[ s 0 c]. *)
 
 (** {1:extract Extracting substrings} *)
@@ -343,6 +346,7 @@ val rindex_from_opt : string @ local -> int -> char -> int option
     @since 4.05 *)
 
 val index : string -> char -> int
+[@@zero_alloc strict]
 (** [index s c] is {!String.index_from}[ s 0 c]. *)
 
 val index_opt : string -> char -> int option
@@ -351,6 +355,7 @@ val index_opt : string -> char -> int option
     @since 4.05 *)
 
 val rindex : string -> char -> int
+[@@zero_alloc strict]
 (** [rindex s c] is {!String.rindex_from}[ s (length s - 1) c]. *)
 
 val rindex_opt : string -> char -> int option
@@ -383,30 +388,36 @@ val of_seq : char Seq.t -> t
 (** {2:utf_8 UTF-8} *)
 
 val get_utf_8_uchar : t -> int -> Uchar.utf_decode
+[@@zero_alloc strict]
 (** [get_utf_8_uchar b i] decodes an UTF-8 character at index [i] in
     [b]. *)
 
 val is_valid_utf_8 : t -> bool
+[@@zero_alloc strict]
 (** [is_valid_utf_8 b] is [true] if and only if [b] contains valid
     UTF-8 data. *)
 
 (** {2:utf_16be UTF-16BE} *)
 
 val get_utf_16be_uchar : t -> int -> Uchar.utf_decode
+[@@zero_alloc strict]
 (** [get_utf_16be_uchar b i] decodes an UTF-16BE character at index
     [i] in [b]. *)
 
 val is_valid_utf_16be : t -> bool
+[@@zero_alloc strict]
 (** [is_valid_utf_16be b] is [true] if and only if [b] contains valid
     UTF-16BE data. *)
 
 (** {2:utf_16le UTF-16LE} *)
 
 val get_utf_16le_uchar : t -> int -> Uchar.utf_decode
+[@@zero_alloc strict]
 (** [get_utf_16le_uchar b i] decodes an UTF-16LE character at index
     [i] in [b]. *)
 
 val is_valid_utf_16le : t -> bool
+[@@zero_alloc strict]
 (** [is_valid_utf_16le b] is [true] if and only if [b] contains valid
     UTF-16LE data. *)
 
@@ -487,6 +498,7 @@ val get_uint8 : string -> int -> int
 *)
 
 val get_int8 : string -> int -> int
+[@@zero_alloc strict]
 (** [get_int8 b i] is [b]'s signed 8-bit integer starting at character
     index [i].
 
@@ -501,6 +513,7 @@ val get_uint16_ne : string -> int -> int
 *)
 
 val get_uint16_be : string -> int -> int
+[@@zero_alloc strict]
 (** [get_uint16_be b i] is [b]'s big-endian unsigned 16-bit integer
     starting at character index [i].
 
@@ -508,6 +521,7 @@ val get_uint16_be : string -> int -> int
 *)
 
 val get_uint16_le : string -> int -> int
+[@@zero_alloc strict]
 (** [get_uint16_le b i] is [b]'s little-endian unsigned 16-bit integer
     starting at character index [i].
 
@@ -515,6 +529,7 @@ val get_uint16_le : string -> int -> int
 *)
 
 val get_int16_ne : string -> int -> int
+[@@zero_alloc strict]
 (** [get_int16_ne b i] is [b]'s native-endian signed 16-bit integer
     starting at character index [i].
 
@@ -522,6 +537,7 @@ val get_int16_ne : string -> int -> int
 *)
 
 val get_int16_be : string -> int -> int
+[@@zero_alloc strict]
 (** [get_int16_be b i] is [b]'s big-endian signed 16-bit integer
     starting at character index [i].
 
@@ -529,6 +545,7 @@ val get_int16_be : string -> int -> int
 *)
 
 val get_int16_le : string -> int -> int
+[@@zero_alloc strict]
 (** [get_int16_le b i] is [b]'s little-endian signed 16-bit integer
     starting at character index [i].
 

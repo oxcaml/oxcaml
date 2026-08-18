@@ -22,7 +22,8 @@ type ('a : value_or_null) t = 'a option = None | Some of 'a
 
 let none = None
 let some v = Some v
-let value o ~default = match o with Some v -> v | None -> default
+let (value @ noalloc_strict) o ~default =
+  match o with Some v -> v | None -> default
 let get = function Some v -> v | None -> invalid_arg "option is None"
 let bind o f = match o with None -> None | Some v -> f v
 let join = function Some o -> o | None -> None

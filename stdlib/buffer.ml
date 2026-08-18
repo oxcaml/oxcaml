@@ -75,9 +75,9 @@ let nth b ofs =
   else Bytes.unsafe_get buffer ofs
 
 
-let length b = b.position
+let (length @ noalloc_strict) b = b.position
 
-let clear b = b.position <- 0
+let (clear @ noalloc_strict) b = b.position <- 0
 
 let reset b =
   b.position <- 0;
@@ -241,7 +241,7 @@ let closing = function
    k: balance of opening and closing chars
    s: the string where we are searching
    start: the index where we start the search. *)
-let advance_to_closing opening closing k s start =
+let[@zero_alloc strict] advance_to_closing opening closing k s start =
   let rec advance k i lim =
     if i >= lim then raise Not_found else
     if s.[i] = opening then advance (k + 1) (i + 1) lim else

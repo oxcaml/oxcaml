@@ -122,7 +122,7 @@ let rec call_alarm arec =
     Fun.protect ~finally arec.f
   end
 
-let delete_alarm a = Atomic.set a false
+let (delete_alarm @ noalloc_strict) a = Atomic.set a false
 
 (* We use [@inline never] to ensure [arec] is never statically allocated
    (which would prevent installation of the finaliser). *)

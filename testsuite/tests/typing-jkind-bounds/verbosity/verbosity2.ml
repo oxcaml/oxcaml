@@ -21,6 +21,7 @@ type t
           many
           stateless
           immutable
+          noalloc_strict
           portable
           contended
           local
@@ -37,6 +38,7 @@ type t
           many
           stateless
           immutable
+          noalloc_strict
           forkable
           unyielding
           aliased
@@ -61,6 +63,7 @@ type t
           nonportable
           uncontended
           static
+          alloc
 |}]
 
 type t : any
@@ -77,6 +80,7 @@ type t
           nonportable
           uncontended
           static
+          alloc
           internal
 |}]
 
@@ -94,6 +98,7 @@ type t
           read_write
           uncontended
           static
+          alloc
           internal
 |}]
 
@@ -111,6 +116,7 @@ type t
           read_write
           uncontended
           static
+          alloc
           internal
 |}]
 
@@ -123,6 +129,7 @@ type 'a t
           many
           stateless
           immutable
+          noalloc_strict
           portable
           contended
           local
@@ -141,6 +148,7 @@ type ('a
              many
              stateless
              immutable
+             noalloc_strict
              portable
              contended
              local
@@ -164,6 +172,7 @@ type ('a
              read_write
              uncontended
              static
+             alloc
              internal)
      t
 |}]
@@ -183,6 +192,7 @@ type 'a t
           read_write
           uncontended
           static
+          alloc
       with 'a @@ external_
 |}]
 
@@ -201,6 +211,7 @@ type 'a t
           nonportable
           uncontended
           static
+          alloc
 |}]
 
 type 'a t : immutable_data with 'a @@ external_
@@ -212,6 +223,7 @@ type 'a t
           many
           stateless
           immutable
+          noalloc_strict
           portable
           contended
           local

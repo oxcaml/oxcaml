@@ -98,6 +98,9 @@ module Mode_axis_pair = struct
     | "read_write" -> monadic Visibility Read_write
     | "static" -> monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
+    | "noalloc_strict" -> comonadic Allocation Noalloc_strict
+    | "noalloc" -> comonadic Allocation Noalloc
+    | "alloc" -> comonadic Allocation Alloc
     | _ -> raise Not_found
 end
 
