@@ -118,18 +118,5 @@ type n = { flt : float#; n : n option }
 let rec n = let rec inner = { flt = #0.; n = Some n } in inner;;
 [%%expect {|
 type n = { flt : float#; n : n option; }
->> Fatal error: letrec: No size found for Static binding:
-(let (inner/379 =? (caml_alloc_dummy_mixed 2 2))
-  (seq
-    (caml_update_dummy inner/379
-      (makeblock 0 (float64,?) #0.
-        (makeblock 0 (value<
-                       (consts ())
-                        (non_consts ([0: float64,
-                                      value<
-                                       (consts (0)) (non_consts ([0: ?]))>]))>)
-          n/378)))
-    inner/379))
-Uncaught exception: Misc.Fatal_error
-
+val n : n = {flt = <abstr>; n = Some <cycle>}
 |}];;
