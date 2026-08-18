@@ -2341,7 +2341,8 @@ Lines 1-6, characters 0-30:
 4 |     c : #(int64# * #(float# * (bool -> bool) * 'b ));
 5 |     d : char }
 6 |   constraint 'b = int * string
-Error: This type definition does not satisfy its kind annotation value mod portable,
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
        because functions are not mod portable.
 |}]
 

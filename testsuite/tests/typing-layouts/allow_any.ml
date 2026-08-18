@@ -14,7 +14,8 @@ val use_uncontended : 'a -> 'a = <fun>
 Line 5, characters 0-60:
 5 | type t : value mod contended = { mutable contents : string }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod contended,
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
        because mutable fields are not mod contended.
 |}]
 

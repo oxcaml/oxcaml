@@ -845,7 +845,8 @@ type t : value mod contended = { x : int ref @@ shared }
 Line 1, characters 0-56:
 1 | type t : value mod contended = { x : int ref @@ shared }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation value mod contended,
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
        because ref is not mod contended.
 |}]
 

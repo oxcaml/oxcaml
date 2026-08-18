@@ -115,7 +115,8 @@ Lines 1-3, characters 0-59:
 1 | type bad : immediate with v1 =
 2 |   | A of v1 [@immediate_all_void_constructor]
 3 |   | B of #(unit_u * v2 r) [@immediate_all_void_constructor]
-Error: This type definition does not satisfy its kind annotation immediate with v1,
+Error: This type definition does not satisfy its kind annotation
+         immediate with v1,
        because v2 is not mod global many stateless immutable.
 |}]
 
