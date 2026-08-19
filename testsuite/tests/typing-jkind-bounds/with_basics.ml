@@ -745,6 +745,42 @@ Error: The kind of type "c" is
          portability: mod portable with 'a with t ≰ mod portable
 |}]
 
+(* Ancestor and descendant requirements can differ in VALUE on the same
+   axis: [outer]'s own portability requirement is only [corruptible],
+   while the nested [bad] must be fully [portable]. Portability is a
+   diamond (portable < {shareable, corruptible} < nonportable), so
+   neither requirement covers the other and both must be reported. *)
+type 'a outer : value mod shareable with 'a
+type bad : value
+type t : value mod portable = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shareable with 'a
+type bad
+Line 3, characters 0-47:
+3 | type t : value mod portable = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Same on the contention diamond. *)
+type 'a outer : value mod shared with 'a
+type bad : value
+type t : value mod contended = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shared with 'a
+type bad
+Line 3, characters 0-48:
+3 | type t : value mod contended = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t

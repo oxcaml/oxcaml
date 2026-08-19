@@ -727,6 +727,40 @@ Error: This type definition does not satisfy its kind annotation
        - ref is not mod contended
 |}]
 
+(* Ancestor and descendant requirements can differ in VALUE on the same
+   axis: [outer]'s own portability requirement is only [corruptible],
+   while the nested [bad] must be fully [portable]. Portability is a
+   diamond (portable < {shareable, corruptible} < nonportable), so
+   neither requirement covers the other and both must be reported. *)
+type 'a outer : value mod shareable with 'a
+type bad : value
+type t : value mod portable = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shareable with 'a
+type bad
+Line 3, characters 0-47:
+3 | type t : value mod portable = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because outer is not mod corruptible.
+|}]
+
+(* Same on the contention diamond. *)
+type 'a outer : value mod shared with 'a
+type bad : value
+type t : value mod contended = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shared with 'a
+type bad
+Line 3, characters 0-48:
+3 | type t : value mod contended = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
+       because outer is not mod corrupted.
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t
