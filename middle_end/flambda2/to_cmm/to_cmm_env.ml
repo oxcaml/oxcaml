@@ -348,7 +348,12 @@ let exported_offsets t = t.offsets
 (* Variables *)
 
 let gen_variable ~debug_uid v =
-  let user_visible = Variable.user_visible v in
+  (* Variables that are [Not_user_visible_but_needed_by_phantom_let] are treated
+     like user-visible ones here: the provenance causes [Name_for_debugger]
+     operations to be emitted during instruction selection (including via
+     [Cname_for_debugger]), without which the phantom lets' references to such
+     variables could not be resolved by the debugger. *)
+  let user_visible = Variable.user_visible_or_needed_by_phantom_let v in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
   let provenance =
