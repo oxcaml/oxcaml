@@ -1,0 +1,9 @@
+File "layout_any_return_try_unknown_result.ml", line 20, characters 14-37:
+20 |   fun f () -> try f () with _ -> f ()
+                   ^^^^^^^^^^^^^^^^^^^^^^^
+Error: The result of a try expression must have a representable layout.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the result of a try expression or of a match with
+         exception patterns or effect handlers.

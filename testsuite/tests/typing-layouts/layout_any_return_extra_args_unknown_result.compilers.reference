@@ -1,0 +1,9 @@
+File "layout_any_return_extra_args_unknown_result.ml", line 24, characters 17-29:
+24 |     let result = forward f () in
+                      ^^^^^^^^^^^^
+Error: This expression has type a but an expression was expected of type
+         ('a : '_representable_layout_1)
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the type of a variable bound by a `let`.

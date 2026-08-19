@@ -1,0 +1,10 @@
+File "layout_any_return_effect_unknown_result.ml", lines 24-26, characters 4-34:
+24 | ....match f () with
+25 |     | x -> x
+26 |     | effect E, k -> continue k ()
+Error: The result of a match or try expression with effect handlers
+       must have a value layout.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be a value layout
+         because it's the result of a match or try expression with effect handlers.

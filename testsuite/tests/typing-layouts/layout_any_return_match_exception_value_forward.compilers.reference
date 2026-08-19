@@ -1,0 +1,10 @@
+File "layout_any_return_match_exception_value_forward.ml", lines 18-20, characters 4-41:
+18 | ....match Sys.opaque_identity () with
+19 |     | () -> g ()
+20 |     | exception Not_found -> assert false
+Error: The result of a match with exception patterns must have a representable layout.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the result of a try expression or of a match with
+         exception patterns or effect handlers.

@@ -1,0 +1,10 @@
+File "layout_any_return_join_shapes.ml", line 24, characters 24-28:
+24 |     | Direct_float64 -> #1.5
+                             ^^^^
+Error: A function may have at most one direct-return layout:
+       this return site has layout float64,
+       but another return site of the same function has layout value.
+File "layout_any_return_join_shapes.ml", line 23, characters 20-22:
+23 |     | Direct_int -> 42
+                         ^^
+  This is the location of a conflicting return site.

@@ -1,0 +1,48 @@
+(data
+ global "camlRaise_any_first_class_wrapper__gc_roots":
+ addr G:"camlRaise_any_first_class_wrapper__E36"
+ int 0)
+(data
+ int 3840
+ global "camlRaise_any_first_class_wrapper":
+ addr G:"camlRaise_any_first_class_wrapper__E36"
+ addr G:"camlRaise_any_first_class_wrapper__first_class_2"
+ addr G:"camlRaise_any_first_class_wrapper__use_3")
+(data
+ int 3063
+ global "camlRaise_any_first_class_wrapper__use_3":
+ addr G:"camlRaise_any_first_class_wrapper__use_1_2_code"
+ int 108086391056891909)
+(data
+ int 3063
+ global "camlRaise_any_first_class_wrapper__first_class_2":
+ addr G:"camlRaise_any_first_class_wrapper__first_class_0_0_code"
+ int 108086391056891909)
+(data
+ int 3064
+ global "camlRaise_any_first_class_wrapper__E36":
+ addr G:"camlRaise_any_first_class_wrapper__immstring7"
+ int 1)
+(data
+ int 5116
+ global "camlRaise_any_first_class_wrapper__immstring7":
+ string "Raise_any_first_class_wrapper.E"
+ skip 0
+ byte 0)
+(function camlRaise_any_first_class_wrapper__first_class_0_0_code
+     (prim: val) : unit
+ (raise_notrace prim) )
+
+(function camlRaise_any_first_class_wrapper__use_1_2_code (b: int) : int
+ (if (== 1 b) (raise_notrace G:"camlRaise_any_first_class_wrapper__E36") 3) )
+
+(function no_cse reduce_code_size linscan
+ camlRaise_any_first_class_wrapper__entry () : val
+ (catch
+   (let Pccall (extcall "caml_fresh_oo_id" 1 int->val)
+     (extcall "caml_initialize"
+       (+a G:"camlRaise_any_first_class_wrapper__E36" 8) Pccall ->unit)
+     1 (exit 3 G:"camlRaise_any_first_class_wrapper"))
+ with(3 *ret*: val) 1) )
+
+(data)

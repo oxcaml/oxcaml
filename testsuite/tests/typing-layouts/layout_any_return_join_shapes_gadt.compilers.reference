@@ -1,0 +1,10 @@
+File "layout_any_return_join_shapes_gadt.ml", line 28, characters 25-29:
+28 |     | Refined_float64 -> #2.0
+                              ^^^^
+Error: A function may have at most one direct-return layout:
+       this return site has layout float64,
+       but another return site of the same function has layout value.
+File "layout_any_return_join_shapes_gadt.ml", line 27, characters 26-27:
+27 |     | Refined_int Refl -> 0
+                               ^
+  This is the location of a conflicting return site.

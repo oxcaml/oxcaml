@@ -1,0 +1,11 @@
+File "layout_any_return_try_region_unknown_result.ml", lines 24-27, characters 4-18:
+24 | ....try
+25 |       let local_ _x = ref 0 in
+26 |       f ()
+27 |     with _ -> f ()
+Error: The result of a try expression must have a representable layout.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the result of a try expression or of a match with
+         exception patterns or effect handlers.
