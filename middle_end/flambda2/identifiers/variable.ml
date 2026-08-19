@@ -30,6 +30,15 @@ let is_renamed_version_of t t' =
 
 let raw_name = name
 
-let unique_name t = name t ^ string_of_int (name_stamp t)
+(* The separator is required for uniqueness: without it, [unique_name] is
+   ambiguous for any name ending in a digit (e.g. variable "date1" with stamp
+   69644 and variable "date" with stamp 169644 would both produce
+   "date169644"). Since stamps are canonical decimal integers containing no
+   underscore, the rightmost underscore unambiguously separates the name from
+   the stamp. Symbol linkage names are derived from [unique_name] (e.g. when
+   lifting constants), and [Symbol.create] hash-conses by linkage name, so a
+   collision here silently identifies two distinct symbols, leading to
+   duplicate definitions of the same symbol. *)
+let unique_name t = name t ^ "_" ^ string_of_int (name_stamp t)
 
 let canonical_name t = if !Clflags.canonical_ids then name t else unique_name t

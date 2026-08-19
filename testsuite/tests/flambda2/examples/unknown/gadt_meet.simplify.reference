@@ -1,12 +1,12 @@
 let code with_y_0 deleted in
-let $camlGadt_meet__const_block21 = Block 0 (0) in
-let $camlGadt_meet__const_block23 = Block 0 ($camlGadt_meet__const_block21)
+let $camlGadt_meet__const_block_21 = Block 0 (0) in
+let $camlGadt_meet__const_block_23 = Block 0 ($camlGadt_meet__const_block_21)
 in
 let code f_1 deleted in
 let code get_2 deleted in
-let $camlGadt_meet__const_block44 = Block 0 (1) in
+let $camlGadt_meet__const_block_44 = Block 0 (1) in
 let code test_3 deleted in
-let $camlGadt_meet__immstring65 = "Error" in
+let $camlGadt_meet__immstring_65 = "Error" in
 let code foo_4 deleted in
 let code loopify(never) size(10) newer_version_of(with_y_0)
       with_y_0_1 (b : [ 0 of imm tagged ], y : imm tagged)
@@ -26,7 +26,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(f_1)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : [ 0 of [ 0 of imm tagged ] |1 of imm tagged ] =
-  cont k ($camlGadt_meet__const_block23)
+  cont k ($camlGadt_meet__const_block_23)
 in
 let $camlGadt_meet__f_6 = closure f_1_1 @f &toplevel.alloc_region in
 let code loopify(never) size(2) newer_version_of(get_2)
@@ -57,7 +57,7 @@ let code loopify(never) size(44) newer_version_of(test_3)
          where k2 (apply_result : [ 0 of imm tagged ]) =
            (apply ccall
               ($`*extern*`.caml_equal : val * val -> val)
-                (apply_result, $camlGadt_meet__const_block44)
+                (apply_result, $camlGadt_meet__const_block_44)
                 -> k2 * k1
               where k2 (Pccall) =
                 ((let untagged = %untag_imm (Pccall) in
@@ -72,8 +72,8 @@ let code loopify(never) size(44) newer_version_of(test_3)
                      cont k (Pmakeblock_1))))
 in
 let $camlGadt_meet__test_8 = closure test_3_1 @test &toplevel.alloc_region in
-let $camlGadt_meet__Pmakeblock159 =
-  Block 0 ($`*predef*`.caml_exn_Failure, $camlGadt_meet__immstring65)
+let $camlGadt_meet__Pmakeblock_159 =
+  Block 0 ($`*predef*`.caml_exn_Failure, $camlGadt_meet__immstring_65)
 in
 let code loopify(never) size(17) newer_version_of(foo_4)
       foo_4_1 (param : imm tagged)
@@ -86,7 +86,7 @@ let code loopify(never) size(17) newer_version_of(foo_4)
       let prim = %is_int (`*match*`) in
       (switch prim
          | 0 -> k2
-         | 1 -> k1 pop(reraise k1) ($camlGadt_meet__Pmakeblock159)
+         | 1 -> k1 pop(reraise k1) ($camlGadt_meet__Pmakeblock_159)
          where k2 =
            let Pfield = %block_load.[`0`] (`*match*`) in
            cont k (Pfield))

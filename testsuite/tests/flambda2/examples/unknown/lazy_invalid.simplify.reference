@@ -1,9 +1,9 @@
 let code foo_0 deleted in
 let code `fn[lazy_invalid.ml:13,13--29]_1` deleted in
-let $camlLazy_invalid__immstring11 = "" in
+let $camlLazy_invalid__immstring_11 = "" in
 apply ccall noalloc
   ($`*extern*`.caml_obj_tag : val -> val)
-    ($camlLazy_invalid__immstring11)
+    ($camlLazy_invalid__immstring_11)
     -> k1 * error
   where k1 (tag) =
     let prim = %int_comp.eq (tag, 250) in
@@ -11,7 +11,7 @@ apply ccall noalloc
        | 0 -> k1
        | 1 -> k2
        where k2 =
-         let Pfield = %block_load.mut.[`0`] ($camlLazy_invalid__immstring11)
+         let Pfield = %block_load.mut.[`0`] ($camlLazy_invalid__immstring_11)
          in
          cont k (Pfield)
        where k1 =
@@ -22,10 +22,10 @@ apply ccall noalloc
              where k2 =
                let prim_2 = %int_comp.eq (tag, 244) in
                switch prim_2
-                 | 0 -> k ($camlLazy_invalid__immstring11)
+                 | 0 -> k ($camlLazy_invalid__immstring_11)
                  | 1 -> k1)
             where k1 =
-              let Popaque = %opaque ($camlLazy_invalid__immstring11) in
+              let Popaque = %opaque ($camlLazy_invalid__immstring_11) in
               apply direct(force_lazy_block_4 &toplevel.alloc_region)
                      inlined(never)
                 $CamlinternalLazy.camlCamlinternalLazy__force_lazy_block_11

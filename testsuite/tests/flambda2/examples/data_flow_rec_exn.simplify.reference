@@ -1,17 +1,17 @@
-let $camlData_flow_rec_exn__immstring12 = "data_flow_rec_exn.ml" in
-let $camlData_flow_rec_exn__const_block14 =
-  Block 0 ($camlData_flow_rec_exn__immstring12, 9, 19)
+let $camlData_flow_rec_exn__immstring_12 = "data_flow_rec_exn.ml" in
+let $camlData_flow_rec_exn__const_block_14 =
+  Block 0 ($camlData_flow_rec_exn__immstring_12, 9, 19)
 in
-let $camlData_flow_rec_exn__Pmakeblock17 =
+let $camlData_flow_rec_exn__Pmakeblock_17 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlData_flow_rec_exn__const_block14)
+           $camlData_flow_rec_exn__const_block_14)
 in
 let code do_stuff_0 deleted in
-let $camlData_flow_rec_exn__const_block58 = Block 0 (12) in
+let $camlData_flow_rec_exn__const_block_58 = Block 0 (12) in
 let code stuff_1 deleted in
 let code loopify(never) size(3) newer_version_of(do_stuff_0)
       do_stuff_0_1 (env) my_closure &my_alloc_region my_depth -> k * k1 =
-  cont k1 pop(regular k1) ($camlData_flow_rec_exn__Pmakeblock17)
+  cont k1 pop(regular k1) ($camlData_flow_rec_exn__Pmakeblock_17)
 in
 let $camlData_flow_rec_exn__do_stuff_2 =
   closure do_stuff_0_1 @do_stuff &toplevel.alloc_region
@@ -35,7 +35,7 @@ let code loopify(never) size(35) newer_version_of(stuff_1)
                 cont k6
               where k6 =
                 let Popaque_1 =
-                  %opaque ($camlData_flow_rec_exn__const_block58)
+                  %opaque ($camlData_flow_rec_exn__const_block_58)
                 in
                 cont k4 pop(k5))
          where k5 exn (`exn` : val) =

@@ -1,30 +1,31 @@
-let $camlAlt_ergo__immstring45 = "alt_ergo.ml" in
-let $camlAlt_ergo__const_block47 =
-  Block 0 ($camlAlt_ergo__immstring45, 23, 4)
+let $camlAlt_ergo__immstring_45 = "alt_ergo.ml" in
+let $camlAlt_ergo__const_block_47 =
+  Block 0 ($camlAlt_ergo__immstring_45, 23, 4)
 in
-let $camlAlt_ergo__Pmakeblock50 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block47)
+let $camlAlt_ergo__Pmakeblock_50 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block_47)
 in
-let $camlAlt_ergo__const_block53 =
-  Block 0 ($camlAlt_ergo__immstring45, 21, 14)
+let $camlAlt_ergo__const_block_53 =
+  Block 0 ($camlAlt_ergo__immstring_45, 21, 14)
 in
-let $camlAlt_ergo__Pmakeblock56 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block53)
+let $camlAlt_ergo__Pmakeblock_56 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block_53)
 in
 let code inv_borne_sup_1 deleted in
 let code inv_bornes_2 deleted in
-let $camlAlt_ergo__const_block94 =
-  Block 0 ($camlAlt_ergo__immstring45, 35, 24)
+let $camlAlt_ergo__const_block_94 =
+  Block 0 ($camlAlt_ergo__immstring_45, 35, 24)
 in
-let $camlAlt_ergo__Pmakeblock97 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block94)
+let $camlAlt_ergo__Pmakeblock_97 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block_94)
 in
 let code inv_3 deleted in
-let $camlAlt_ergo__const_block109 =
-  Block 0 ($camlAlt_ergo__immstring45, 40, 2)
+let $camlAlt_ergo__const_block_109 =
+  Block 0 ($camlAlt_ergo__immstring_45, 40, 2)
 in
-let $camlAlt_ergo__Pmakeblock112 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block109)
+let $camlAlt_ergo__Pmakeblock_112 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlAlt_ergo__const_block_109)
 in
 let code div_4 deleted in
 let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
@@ -45,8 +46,8 @@ let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
     where k3 =
       let untagged = %untag_imm (b) in
       switch untagged
-        | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock50)
-        | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock56)
+        | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_50)
+        | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_56)
     where k2 =
       ((let Pfield = %block_load.[`0`] (b) in
         let Pfield_1 = %block_load.[`0`] (Pfield) in
@@ -129,12 +130,12 @@ let code loopify(never) size(45) newer_version_of(inv_3) tupled
   let prim = %is_int (param) in
   switch prim
     | 0 -> k2
-    | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock97)
+    | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_97)
     where k2 =
       let Pfield = %block_load.[`1`] (param) in
       let prim_1 = %is_int (Pfield) in
       (switch prim_1
-         | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock97)
+         | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_97)
          | 1 -> k2
          where k2 =
            let `*match*` = %block_load.[`0`] (param) in
@@ -175,7 +176,7 @@ let code loopify(never) size(11) newer_version_of(div_4)
      where k3 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
        cont k2)
     where k2 =
-      cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock112)
+      cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock_112)
 in
 let $camlAlt_ergo__div_9 = closure div_4_1 @div &toplevel.alloc_region in
 let $camlAlt_ergo = Block 0 ($camlAlt_ergo__div_9) in

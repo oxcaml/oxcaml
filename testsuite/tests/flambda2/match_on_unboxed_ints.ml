@@ -62,7 +62,7 @@ let map_tagged_ints_to_float_constants = function
 ;;
 [%%expect_fexpr Simplify{|
 let code map_tagged_ints_to_float_constants_2 deleted in
-let $camlTOP2__switch_block111 =
+let $camlTOP2__switch_block_111 =
   Float_array [|0x0p+0;
   0x1p+0;
   0x1p+1;
@@ -78,7 +78,7 @@ let code loopify(never) size(14) newer_version_of(map_tagged_ints_to_float_const
     | 0 -> k2
     | 1 -> k (0x1p+2)
     where k2 =
-      let arg = %array_load.`float` ($camlTOP2__switch_block111, param) in
+      let arg = %array_load.`float` ($camlTOP2__switch_block_111, param) in
       cont k (arg)
 in
 let $camlTOP2__map_tagged_ints_to_float_constants_3 =
