@@ -87,6 +87,9 @@ CAMLexport void caml_raise_async(value v)
   Caml_state->local_top = Caml_state->current_stack->local_top;
   Caml_state->local_limit = Caml_state->current_stack->local_limit;
 
+  /* Fiber switch: flush dynamic binding cache */
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+
   *Caml_state->external_raise_async->exn_bucket = v;
 
   Caml_state->local_roots = Caml_state->external_raise_async->local_roots;

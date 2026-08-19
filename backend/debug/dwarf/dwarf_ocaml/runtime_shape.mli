@@ -28,6 +28,37 @@
 
 module Sort = Jkind_types.Sort
 
+(** De Bruijn indices for recursive binders in runtime shapes. *)
+module DeBruijn_index : sig
+  type t
+
+  (** The top-level index. *)
+  val zero : t
+
+  val move_under_binder : t -> t
+
+  val equal : t -> t -> bool
+
+  val hash : t -> int
+
+  val print : Format.formatter -> t -> unit
+end
+
+(** De Bruijn environment for working with recursive binders. *)
+module DeBruijn_env : sig
+  type 'a t
+
+  val empty : 'a t
+
+  val push : 'a t -> 'a -> 'a t
+
+  val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
+
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+  val hash : ('a -> int) -> 'a t -> int
+end
+
 module Or_void : sig
   type 'a t =
     | Other of 'a
@@ -57,6 +88,7 @@ module Runtime_layout : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 
@@ -121,9 +153,7 @@ and desc = private
       }
   | Func
   | Mu of t
-  | Rec_var of Shape.DeBruijn_index.t * Runtime_layout.t
-(* CR sspies: Use regular identifiers beforehand and only switch to DeBruijn at
-   this level. *)
+  | Rec_var of DeBruijn_index.t * Runtime_layout.t
 
 and tuple_kind = private
   | Tuple_boxed
@@ -170,6 +200,7 @@ and predef =
   | Int32
   | Int64
   | Lazy_t of t
+  | Mask
   | Nativeint
   | String
   | Simd of simd_vec_split
@@ -188,6 +219,7 @@ and unboxed =
   | Unboxed_int32
   | Unboxed_int16
   | Unboxed_int8
+  | Unboxed_mask
   | Unboxed_simd of simd_vec_split
 
 and simd_vec_split =
@@ -290,8 +322,8 @@ val func : t
 *)
 val mu : t -> t
 
-(** Create a reference to a recursive binding using de Bruijn indexing. *)
-val rec_var : Shape.DeBruijn_index.t -> Runtime_layout.t -> t
+(** Create a reference to a recursive binding. *)
+val rec_var : DeBruijn_index.t -> Runtime_layout.t -> t
 
 (** Project the runtime layout of a shape. *)
 val runtime_layout : t -> Runtime_layout.t
@@ -301,5 +333,3 @@ val print : Format.formatter -> t -> unit
 val equal : t -> t -> bool
 
 val hash : t -> int
-
-module Cache : Hashtbl.S with type key = t

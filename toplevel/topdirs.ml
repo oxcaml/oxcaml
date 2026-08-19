@@ -184,9 +184,9 @@ let _ = add_directive "mod_use" (Directive_string (with_error_fmt dir_mod_use))
              wraps the contents in a module.";
     }
 
-let _ = add_directive "mark_toplevel_in_quotations"
+let _ = add_directive "mark_persistent_in_quotations"
     (Directive_none (fun () ->
-      toplevel_env := Ctype.mark_toplevel_in_quotations !toplevel_env))
+      toplevel_env := Ctype.mark_persistent_in_quotations !toplevel_env))
     {
       section = section_meta;
       doc = "Mark all names in the current environment as available \
@@ -381,16 +381,11 @@ let () =
            if desc.cstr_generalized then Some desc.cstr_res
            else None
          in
-         let cstr_shape =
-           match desc.cstr_shape with
-           | Some shape -> shape
-           | None -> Misc.fatal_error "extension constructor must have shape"
-         in
          let ext =
            { ext_type_path = path;
              ext_type_params = type_decl.type_params;
              ext_args = Cstr_tuple desc.cstr_args;
-             ext_shape = cstr_shape;
+             ext_shape = desc.cstr_shape ;
              ext_constant = desc.cstr_constant;
              ext_ret_type = ret_type;
              ext_private = Asttypes.Public;
@@ -419,16 +414,11 @@ let () =
          if desc.cstr_generalized then Some Predef.type_exn
          else None
        in
-       let cstr_shape =
-         match desc.cstr_shape with
-         | Some shape -> shape
-         | None -> Misc.fatal_error "exception constructor must have shape"
-       in
        let ext =
          { ext_type_path = Predef.path_exn;
            ext_type_params = [];
            ext_args = Cstr_tuple desc.cstr_args;
-           ext_shape = cstr_shape;
+           ext_shape = desc.cstr_shape;
            ext_constant = desc.cstr_constant;
            ext_ret_type = ret_type;
            ext_private = Asttypes.Public;

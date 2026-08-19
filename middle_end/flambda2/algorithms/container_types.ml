@@ -259,6 +259,9 @@ module Make_map (T : Thing) (Set : Set_plus_stdlib with type elt = T.t) = struct
         t
     in
     if not !changed then t else t'
+
+  let find_or_null k t =
+    match find_opt k t with None -> Or_null.null | Some v -> Or_null.this v
 end
 [@@inline always]
 

@@ -66,6 +66,14 @@ end) : sig
     Module_name.Set.t -> t -> (Data.t * Digest.t) option Module_name.Map.t
         (* Like [extract] but with a more sophisticated type. *)
 
+  val fold_map :
+    Module_name.Set.t -> init:'a
+      -> f:('a -> Module_name.t -> (Data.t * Digest.t) option -> 'a)
+      -> t -> 'a
+        (* Like [extract_map], but can be used to avoid constructing an
+           intermediate [Map] for the result, when it feeds directly into
+           something else. *)
+
   val filter: (Module_name.t -> bool) -> t -> unit
         (* [filter pred tbl] removes from [tbl] table all (name, CRC) pairs
            such that [pred name] is [false]. *)

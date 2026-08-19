@@ -159,3 +159,121 @@ val test : (int * int) any_list =
    {head = (2, 4);
     tail = Cons {head = (4, 6); tail = Cons {head = (6, 8); tail = Nil}}}
 |}]
+
+(* Test that an inline record is built with its constructor's tag rather than
+   tag 0, when other non-constant constructors precede it *)
+type ('a : any) tagged = Ia of 'a | Ib of { x : 'a; y : int }
+[%%expect{|
+type ('a : any) tagged = Ia of 'a | Ib of { x : 'a; y : int; }
+|}]
+
+let v = Ib { x = 5; y = 7 }
+[%%expect{|
+val v : int tagged = Ib {x = 5; y = 7}
+|}]
+
+let classify (t : int tagged) =
+  match t with
+  | Ia _ -> "Ia"
+  | Ib { x; y } -> Printf.sprintf "Ib x=%d y=%d" x y
+[%%expect{|
+val classify : int tagged -> string = <fun>
+|}]
+
+let test = classify (Ib { x = 5; y = 7 })
+[%%expect{|
+val test : string = "Ib x=5 y=7"
+|}]
+
+let test = classify (Ia 3)
+[%%expect{|
+val test : string = "Ia"
+|}]
+
+(* ... including when the inline record is mixed *)
+let v = Ib { x = #2.5; y = 7 }
+[%%expect{|
+val v : float# tagged = Ib {x = <abstr>; y = 7}
+|}]
+
+let test (t : float# tagged) =
+  match t with
+  | Ia _ -> "Ia"
+  | Ib { y; _ } -> Printf.sprintf "Ib y=%d" y
+[%%expect{|
+val test : float# tagged -> string = <fun>
+|}]
+
+let test = test (Ib { x = #2.5; y = 7 })
+[%%expect{|
+val test : string = "Ib y=7"
+|}]
+
+(* Field projection and mutation on inline records with [any] *)
+type ('a : any) mut = Skip of 'a | Mut of { mutable m : 'a; k : int }
+[%%expect{|
+type ('a : any) mut = Skip of 'a | Mut of { mutable m : 'a; k : int; }
+|}]
+
+let test =
+  let v : int mut = Mut { m = 1; k = 2 } in
+  (match v with Mut r -> r.m <- r.m + 10 | Skip _ -> ());
+  v
+[%%expect{|
+val test : int mut = Mut {m = 11; k = 2}
+|}]
+
+(* Functional update of an inline record with [any] *)
+let test (t : int tagged) =
+  match t with
+  | Ia _ -> t
+  | Ib r -> Ib { r with x = r.x + 100 }
+[%%expect{|
+val test : int tagged -> int tagged = <fun>
+|}]
+
+let test = test (Ib { x = 5; y = 7 })
+[%%expect{|
+val test : int tagged = Ib {x = 105; y = 7}
+|}]
+
+(* An [@@unboxed] inline record with an [any] field is still represented by
+   its field *)
+type ('a : any) ubx = U of { u : 'a } [@@unboxed]
+[%%expect{|
+type ('a : any) ubx = U of { u : 'a; } [@@unboxed]
+|}]
+
+let test = U { u = 42 }
+[%%expect{|
+val test : int ubx = <unknown constructor>
+|}]
+
+let test = match U { u = 42 } with U { u } -> u
+[%%expect{|
+val test : int = 42
+|}]
+
+(* Existential [any] fields: construction grounds the existential, but
+   projection is rejected *)
+type ebox = E : ('a : any). { v : 'a; k : int } -> ebox
+[%%expect{|
+type ebox = E : ('a : any). { v : 'a; k : int; } -> ebox
+|}]
+
+let b = E { v = 5; k = 1 }
+[%%expect{|
+val b : ebox = E {v = <poly>; k = 1}
+|}]
+
+let k = match b with E { k; _ } -> k
+[%%expect{|
+Line 1, characters 23-31:
+1 | let k = match b with E { k; _ } -> k
+                           ^^^^^^^^
+Error: Record element types must have a representable layout.
+       The layout of $a is any
+         because of the definition of ebox at line 1, characters 0-55.
+       But the layout of $a must be representable
+         because it's the type of a field in a record being projected from.
+|}]

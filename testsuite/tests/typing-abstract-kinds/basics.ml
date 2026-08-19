@@ -786,32 +786,25 @@ Error: This type "t1" should be an instance of type "('a : any separable)"
          because it's the type argument to the array type.
 |}]
 
-(* CR layouts-scannable: support scannable axes on abstract kinds *)
 type t2 : k mod separable
 type s2 = t2 array
 [%%expect{|
-Line 1, characters 16-25:
-1 | type t2 : k mod separable
-                    ^^^^^^^^^
-Error: Abstract kinds with kind modifiers are not yet supported.
+type t2 : k separable
+type s2 = t2 array
 |}]
 
 type ('a : k mod separable) s3 = 'a array
 [%%expect{|
-Line 1, characters 17-26:
-1 | type ('a : k mod separable) s3 = 'a array
-                     ^^^^^^^^^
-Error: Abstract kinds with kind modifiers are not yet supported.
+type ('a : k separable) s3 = 'a array
 |}]
 
 kind_ k' = k mod separable
 type t4 : k'
 type s4 = t4 array
 [%%expect{|
-Line 1, characters 17-26:
-1 | kind_ k' = k mod separable
-                     ^^^^^^^^^
-Error: Abstract kinds with kind modifiers are not yet supported.
+kind_ k' = k separable
+type t4 : k separable
+type s4 = t4 array
 |}]
 
 (******************************)
@@ -1858,4 +1851,86 @@ Line 2, characters 16-39:
 Error: This expression has type "bool id option"
        but an expression was expected of type "int id option"
        Type "bool" is not compatible with type "int"
+|}]
+
+(*****************************************************)
+(* Test: Paths are substituted in [(type : k)] types *)
+
+module rec Rec : sig
+  kind_ k
+  type a = (type : k)
+end = Rec
+[%%expect{|
+module rec Rec : sig kind_ k type a = (type : k) end
+|}]
+
+module Use_rec : sig
+  type t : Rec.k
+end = struct
+  type t = Rec.a
+end
+[%%expect{|
+module Use_rec : sig type t : Rec.k end
+|}]
+
+module Plain = struct
+  kind_ k
+  type a = (type : k)
+end
+[%%expect{|
+module Plain : sig kind_ k type a = (type : k) end
+|}]
+
+module Use_plain : sig
+  type t : Plain.k
+end = struct
+  type t = Plain.a
+end
+[%%expect{|
+module Use_plain : sig type t : Plain.k end
+|}]
+
+(**************************************************************)
+(* Test: nondep handles abstract kinds in [(type : k)] types *)
+
+module F2 (X : sig kind_ k end) = struct
+  type t = (type : X.k)
+end
+[%%expect{|
+module F2 : functor (X : sig kind_ k end) -> sig type t = (type : X.k) end
+|}]
+
+module App = F2 (struct kind_ k end)
+[%%expect{|
+Line 1, characters 13-36:
+1 | module App = F2 (struct kind_ k end)
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This functor has type
+       "functor (X : sig kind_ k end) -> sig type t = (type : X.k) end"
+       The parameter cannot be eliminated in the result type.
+       Please bind the argument to a module identifier.
+|}]
+
+(* Here the [(type : X.k)] only occurs nested inside the manifest, not in the
+   kind of [t] itself, so nondep must erase it from the manifest. *)
+
+type ('a : any) box : value
+
+module G2 (X : sig kind_ k end) = struct
+  type t = (type : X.k) box
+end
+[%%expect{|
+type ('a : any) box
+module G2 :
+  functor (X : sig kind_ k end) -> sig type t = (type : X.k) box end
+|}]
+
+module AppG = G2 (struct kind_ k end)
+[%%expect{|
+module AppG : sig type t end
+|}]
+
+type u = AppG.t
+[%%expect{|
+type u = AppG.t
 |}]

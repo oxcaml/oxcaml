@@ -1,0 +1,53 @@
+let $camlTests3__string16 = "index out of bounds" in
+let $camlTests3__block18 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTests3__string16)
+in
+let code foo_0 deleted in
+let code f_1 deleted in
+let code loopify(never) size(29) newer_version_of(foo_0)
+      foo_0_1 (arr : val array, f : val, i : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %array_length (arr) in
+   let prim_1 = %int_comp.unsigned.lt (i, prim) in
+   switch prim_1
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let Parrayrefs = %array_load.mut (arr, i) in
+      apply &my_alloc_region f (Parrayrefs) -> k2 * k1
+    where k3 =
+      cont k1 pop(regular k1) ($camlTests3__block18)
+    where k2 (apply_result : val) =
+      let Parraysets = %array_set (arr, i, apply_result) in
+      cont k (0)
+in
+let $camlTests3__foo_2 = closure foo_0_1 @foo &toplevel.alloc_region in
+let code loopify(never) size(33) newer_version_of(f_1)
+      f_1_1 (c : imm tagged, m, n, x' : imm tagged, y' : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %int_comp.lt (c, 0) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k2 (x')
+     where k3 =
+       let int_add = %int_barith.add (x', 10) in
+       cont k2 (int_add))
+    where k2 (x : imm tagged) =
+      ((let prim = %int_comp.lt (c, 0) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k2 (y')
+          where k3 =
+            let int_add = %int_barith.add (y', 20) in
+            cont k2 (int_add))
+         where k2 (y : imm tagged) =
+           let int_add = %int_barith.add (x, y) in
+           cont k (int_add))
+in
+let $camlTests3__f_3 = closure f_1_1 @f &toplevel.alloc_region in
+let $camlTests3 = Block 0 ($camlTests3__foo_2, $camlTests3__f_3) in
+cont done ($camlTests3)

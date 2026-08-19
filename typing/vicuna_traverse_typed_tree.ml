@@ -105,6 +105,8 @@ let classify env ty : classification =
   else
     match get_desc ty with
     | Tvar _ | Tunivar _ -> Any
+    | Tmod _ ->
+      Misc.fatal_error "Vicuna_traverse_typed_tree.classify: unexpected Tmod"
     | Tconstr (p, _args, _abbrev) -> (
       if Path.same p Predef.path_float
       then Float
@@ -180,6 +182,8 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
   in
   let scty = scrape_ty env ty in
   match get_desc scty with
+  | Tmod _ ->
+    Misc.fatal_error "Vicuna_traverse_typed_tree.value_kind: unexpected Tmod"
   | Tconstr (p, _, _) when Path.same p Predef.path_int -> Imm
   | Tconstr (p, _, _) when Path.same p Predef.path_char -> Imm
   | Tconstr (p, _, _) when Path.same p Predef.path_unit -> Imm
@@ -367,7 +371,8 @@ and value_kind_record env subst ~visited ~depth
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
   | Record_inlined (Null, _, _) -> raise (Vicuna_unsupported With_null_variants)
-  | Record_variable -> raise (Vicuna_unsupported Field_of_kind_any)
+  | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+    raise (Vicuna_unsupported Field_of_kind_any)
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> (
     match labels with
     | [{ ld_type; _ }] -> value_kind env subst ~visited ~depth ld_type

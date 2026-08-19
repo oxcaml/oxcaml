@@ -139,13 +139,13 @@ G(name):
 #define Handler_effect(REG)     16(REG)
 #define Handler_parent          32
 
-/* struct dynamic_thread_s */
+/* struct dynamic_cache_s */
 
 /* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
-#define Dynamic_cache            0 /* offset of cache in dynamic_thread_t */
+#define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
 #define Dynamic_binding_size     (2*8) /* dyn, val */
 #define Dynamic_binding_var      0 /* offset of var within a single binding */
-#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in fiber.c */
+#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in dynamic.c */
 
 /* struct c_stack_link */
 #if defined(SYS_mingw64) || defined (SYS_cygwin)
@@ -381,7 +381,8 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(28) X(
    including stack_info and stack_handler structures.
    caml_try_realloc_stack will not be able to update the linked list of
    frame-pointers if it has been split (ie, in a continuation).
-   caml_resume and caml_reperform use this macro to update the oldest saved rbp
+   the resume primitives and caml_reperform use this macro to update the oldest
+   saved rbp
    (highest one in the stack) in case the fiber was reallocated to reattach the
    frame-pointer linked list.
 
@@ -559,10 +560,30 @@ G(caml_system__code_begin):
 #define RESTORE_YMM_REGS DO_0_15(RESTORE_YMM)
 
 #define SAVE_ZMM(i) vmovupd %zmm##i, (i*64 + SIMD_REGS_OFFSET)(%r15);
-#define SAVE_ZMM_REGS DO_0_31(SAVE_ZMM)
-
 #define RESTORE_ZMM(i) vmovupd (i*64 + SIMD_REGS_OFFSET)(%r15), %zmm##i;
-#define RESTORE_ZMM_REGS DO_0_31(RESTORE_ZMM)
+
+#define K_REGS_OFFSET (SIMD_REGS_OFFSET + 32*64)
+
+#define SAVE_K_REGS                                  \
+        kmovq   %k1, (0*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k2, (1*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k3, (2*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k4, (3*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k5, (4*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k6, (5*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k7, (6*8 + K_REGS_OFFSET)(%r15);
+
+#define RESTORE_K_REGS                               \
+        kmovq   (0*8 + K_REGS_OFFSET)(%r15), %k1;    \
+        kmovq   (1*8 + K_REGS_OFFSET)(%r15), %k2;    \
+        kmovq   (2*8 + K_REGS_OFFSET)(%r15), %k3;    \
+        kmovq   (3*8 + K_REGS_OFFSET)(%r15), %k4;    \
+        kmovq   (4*8 + K_REGS_OFFSET)(%r15), %k5;    \
+        kmovq   (5*8 + K_REGS_OFFSET)(%r15), %k6;    \
+        kmovq   (6*8 + K_REGS_OFFSET)(%r15), %k7;
+
+#define SAVE_ZMM_REGS DO_0_31(SAVE_ZMM) SAVE_K_REGS
+#define RESTORE_ZMM_REGS DO_0_31(RESTORE_ZMM) RESTORE_K_REGS
 
 /* Save all of the registers that may be in use to a free gc_regs bucket.
    Returns: bucket in %r15. Clobbers %r11 (after saving it) */
@@ -683,7 +704,7 @@ G(caml_system__code_begin):
 #endif
 
 #define Make_call_realloc_stack(suffix, simd)        \
-    FUNCTION(G(caml_call_realloc_stack ## suffix))   \
+    FUNCTION(caml_call_realloc_stack ## suffix)      \
     CFI_STARTPROC                                  ; \
         CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
@@ -714,9 +735,8 @@ Make_call_realloc_stack(_avx, YMM)
 Make_call_realloc_stack(_avx512, ZMM)
 
 #define Make_call_gc(suffix, simd)                   \
-    FUNCTION(G(caml_call_gc##suffix)) ;              \
+    FUNCTION(caml_call_gc##suffix) ;                 \
     CFI_STARTPROC                     ;              \
-        CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
 LBL(caml_call_gc ## suffix):                         \
         SAVE_ALL_REGS(simd);                         \
@@ -730,8 +750,9 @@ Make_call_gc(_sse, XMM)
 Make_call_gc(_avx, YMM)
 Make_call_gc(_avx512, ZMM)
 
-FUNCTION(G(caml_do_call_gc))
+FUNCTION(caml_do_call_gc)
 CFI_STARTPROC
+        CFI_SIGNAL_FRAME
         ENTER_FUNCTION
         movq    %r15, Caml_state(gc_regs)
         TSAN_ENTER_FUNCTION(0)
@@ -773,7 +794,7 @@ LBL(restore_regs_and_ret):
 CFI_ENDPROC
 END_FUNCTION(caml_do_call_gc)
 
-FUNCTION(G(caml_raise_stack_overflow_nat))
+FUNCTION(caml_raise_stack_overflow_nat)
 CFI_STARTPROC
         CFI_SIGNAL_FRAME
         /* We assume that we are always on the OCaml stack at this point.
@@ -794,7 +815,7 @@ END_FUNCTION(caml_raise_stack_overflow_nat)
 #define r15_sub_N        /* do nothing */
 
 #define Make_alloc_fun(base_name, words, simd) \
-FUNCTION(G(base_name ## simd))                 \
+FUNCTION(base_name ## simd)                    \
 CFI_STARTPROC;                                 \
         ENTER_FUNCTION;                        \
         r15_sub_ ## words ;                    \
@@ -817,7 +838,7 @@ Make_alloc_funs(3) /* caml_alloc3* */
 Make_alloc_funs(N) /* caml_allocN* */
 
 #define Make_call_local_realloc(suffix, simd)        \
-    FUNCTION(G(caml_call_local_realloc ## suffix)) ; \
+    FUNCTION(caml_call_local_realloc ## suffix) ;    \
     CFI_STARTPROC               ;                    \
         CFI_SIGNAL_FRAME;                            \
         ENTER_FUNCTION;                              \
@@ -922,7 +943,7 @@ END_FUNCTION(caml_c_call)
    of arguments is done by these separate functions */
 
 #define Make_c_call_stack_args(suffix) \
-    FUNCTION(G(caml_c_call_copy_stack_args ## suffix)) ;                \
+    FUNCTION(caml_c_call_copy_stack_args ## suffix) ;                   \
     CFI_STARTPROC                                      ;                \
     /* Set up a frame pointer even without WITH_FRAME_POINTERS,         \
        which we use to pop an unknown number of arguments later */      \
@@ -951,7 +972,7 @@ END_FUNCTION(caml_c_call)
     CFI_ENDPROC                 ;                                       \
     END_FUNCTION(caml_c_call_copy_stack_args ## suffix)    ;            \
                                                                         \
-    FUNCTION(G(caml_c_call_stack_args ## suffix)) ;                     \
+    FUNCTION(caml_c_call_stack_args ## suffix) ;                        \
     CFI_STARTPROC                       ;                               \
         CFI_SIGNAL_FRAME;                                               \
         ENTER_FUNCTION;                                                 \
@@ -1344,13 +1365,13 @@ LBL(do_perform):
         LEAVE_FUNCTION
 #endif
     /* Record fiber id */
-        cmpb    $0, caml_cpu_ptwrite(%rip)
+        cmpb    $0, G(caml_cpu_ptwrite)(%rip)
         je      1f
         ptwriteq Stack_id(%rsi)
 1:      movq    %rdi, 8(%rbx) /* Set the last fiber field in the continuation */
         movq    Stack_handler(%rsi), %r11  /* %r11 := old stack -> handler */
         movq    Handler_parent(%r11), %r10 /* %r10 := parent stack */
-        cmpq    $0, %r10                   /* parent is NULL? */
+        cmpq    $1, Handler_effect(%r11)   /* handler is Val_unit? */
         je      LBL(112)
 #if defined(WITH_THREAD_SANITIZER)
      /* Save non-callee-saved registers %rax, %rdi, %rsi, %r10, %r11 before C
@@ -1374,6 +1395,7 @@ LBL(do_perform):
         movq    $0, Handler_parent(%r11) /* Set parent of performer to NULL */
         movq    Handler_effect(%r11), %rsi  /* %rsi := effect handler */
         FLUSH_DYNAMIC_CACHE(%r11)
+LBL(caml_perform_enter):
         jmp     GCALL(caml_apply3)
 LBL(112):
     /* Switch back to original performer before raising Effect.Unhandled
@@ -1430,9 +1452,9 @@ LBL(preemption_unhandled):
         SWITCH_OCAML_TO_C
         C_call (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
         SWITCH_C_TO_OCAML
-    /* jump into the end of caml_resume, which will handle redoing the
-       interrupted allocation, restoring registers, and returning to user
-       code */
+    /* jump into the preemption-resume path (in caml_continue), which will
+       handle redoing the interrupted allocation, restoring registers, and
+       returning to user code */
         movq   Cont_gc_regs(%rbx), %rdx
         jmp    LBL(resume_preemption)
 LBL(113):
@@ -1468,6 +1490,7 @@ END_FUNCTION(caml_reperform)
 */
 FUNCTION(caml_preempt)
 CFI_STARTPROC
+        CFI_SIGNAL_FRAME
         /* Restore the young_ptr that was saved at the beginning of
            SAVE_ALL_REGS, in caml_call_gc */
         movq Caml_state(young_ptr), %r15
@@ -1504,68 +1527,84 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_preempt)
 
-FUNCTION(caml_resume)
-CFI_STARTPROC
-    /* %rax -> continuation, %rbx -> fun, %rdi -> arg */
-        movq   %rdi, %r12                    /* %r12 := arg */
-        movq   Cont_last_fiber(%rax),  %r13  /* %r13 := last_fiber */
-        WOSIZE_BLOCK_VAL(%rax, %rcx)
-        cmpq   $3, %rcx                      /* Wosize_hd(%rax) == 3 ? */
-        je     1f
-        pushq  $0                            /* no gc_regs, push NULL */
-        jmp    2f
-1:      pushq  Cont_gc_regs(%rax)            /* we have a gc_regs, push it */
-        CFI_ADJUST(8)                        /* for either push */
-2:      movq   %rax, C_ARG_1
-        SWITCH_OCAML_TO_C
-        C_call (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
-        SWITCH_C_TO_OCAML
-        leaq    -1(%rax), %r10  /* %r10 (new stack) = Ptr_val(%rax) */
-        movq    %r12, %rax      /* %rax := argument to the function in %rbx */
-    /*  check if stack null, then already used */
-        testq   %r10, %r10
-        jz      LBL(continuation_already_resumed)
+/* The TSan instrumentation shared by the resume primitives */
 #if defined(WITH_THREAD_SANITIZER)
-    /* Save non-callee-saved registers %rax, %rsi and %r10 before C call */
-        ENTER_FUNCTION
-        pushq   %rax; CFI_ADJUST(8);
-        pushq   %rsi; CFI_ADJUST(8);
-        pushq   %r10; CFI_ADJUST(8);
-    /* Necessary to include the caller of caml_resume in the TSan backtrace */
-        TSAN_ENTER_FUNCTION(24)
-        popq    %r10; CFI_ADJUST(-8);
-        popq    %rsi; CFI_ADJUST(-8);
-        popq    %rax; CFI_ADJUST(-8);
-        TSAN_SAVE_CALLER_REGS
-    /* Signal to TSan all stack frames exited by the perform. */
-        movq    Stack_sp(%r10), %r11
-        movq    STACK_RETADDR(%r11), C_ARG_1  /* arg 1: pc of perform */
-        leaq    STACK_ARG_1(%r11), C_ARG_2    /* arg 2: sp at perform */
-        movq    %r10, C_ARG_3                 /* arg 3: fiber */
-        SWITCH_OCAML_TO_C
-        C_call  (GCALL(caml_tsan_entry_on_resume))
-        SWITCH_C_TO_OCAML
-        TSAN_RESTORE_CALLER_REGS
+#define RESUME_SWITCH_TSAN \
+    /* Save non-callee-saved registers %rax, %rsi and %r10 before C call */ \
+        ENTER_FUNCTION ; \
+        pushq   %rax; CFI_ADJUST(8); \
+        pushq   %rsi; CFI_ADJUST(8); \
+        pushq   %r10; CFI_ADJUST(8); \
+    /* Necessary to include the caller in the TSan backtrace */ \
+        TSAN_ENTER_FUNCTION(24) ; \
+        popq    %r10; CFI_ADJUST(-8); \
+        popq    %rsi; CFI_ADJUST(-8); \
+        popq    %rax; CFI_ADJUST(-8); \
+        TSAN_SAVE_CALLER_REGS ; \
+    /* Signal to TSan all stack frames exited by the perform. */ \
+        movq    Stack_sp(%r10), %r11 ; \
+        movq    STACK_RETADDR(%r11), C_ARG_1 ; /* arg 1: pc of perform */ \
+        leaq    STACK_ARG_1(%r11), C_ARG_2 ;   /* arg 2: sp at perform */ \
+        movq    %r10, C_ARG_3 ;                /* arg 3: fiber */ \
+        SWITCH_OCAML_TO_C ; \
+        C_call  (GCALL(caml_tsan_entry_on_resume)) ; \
+        SWITCH_C_TO_OCAML ; \
+        TSAN_RESTORE_CALLER_REGS ; \
         LEAVE_FUNCTION
+#else
+#define RESUME_SWITCH_TSAN
 #endif
-    /* Record fiber id */
-        cmpb    $0, caml_cpu_ptwrite(%rip)
-        je      1f
-        ptwriteq Stack_id(%r10)
-    /* Add current stack to the last fiber */
-1:      popq    %rdx; CFI_ADJUST(-8)
-        movq    (Stack_handler-1)(%r13), %rdi
-        movq    Caml_state(current_stack), %rsi
-        movq    %rsi, Handler_parent(%rdi)
-     /* Need to update the oldest saved frame pointer here as the current fiber
-        stack may have been reallocated or we may be resuming a computation
-        that was not originally run here. */
-        UPDATE_BASE_POINTER(%rdi)
-        SWITCH_OCAML_STACKS
-        FLUSH_DYNAMIC_CACHE(%r13)
-        testq   %rdx, %rdx /* Do we have a gc_regs? */
+
+/* Consume the continuation in %rax, make the current stack its parent, and
+   switch to it. The payload register %rbx (and, for the backtrace variant,
+   the restored backtrace) is preserved across the switch. On a preemption
+   continuation this jumps to LBL(resume_preemption); otherwise it falls
+   through to the caller's tail. Shared by caml_continue / caml_discontinue /
+   caml_discontinue_with_backtrace. */
+#define DO_RESUME_SWITCH \
+        movq   Cont_last_fiber(%rax),  %r13 ; /* %r13 := last_fiber */ \
+        WOSIZE_BLOCK_VAL(%rax, %rcx) ; \
+        cmpq   $3, %rcx ;                    /* Wosize_hd(%rax) == 3 ? */ \
+        je     1f ; \
+        pushq  $0 ;                          /* no gc_regs, push NULL */ \
+        jmp    2f ; \
+1:      pushq  Cont_gc_regs(%rax) ;      /* we have a gc_regs, push it */ \
+        CFI_ADJUST(8) ;                          /* for either push */ \
+2:      movq   %rax, C_ARG_1 ; \
+        SWITCH_OCAML_TO_C ; \
+        C_call (GCALL(caml_continuation_use_noexc)) ; /* %rax := stack */ \
+        SWITCH_C_TO_OCAML ; \
+        leaq    -1(%rax), %r10 ;  /* %r10 (new stack) = Ptr_val(%rax) */ \
+    /* check if stack null, then already used */ \
+        testq   %r10, %r10 ; \
+        jz      LBL(continuation_already_resumed) ; \
+        RESUME_SWITCH_TSAN ; \
+    /* Record fiber id */ \
+        cmpb    $0, G(caml_cpu_ptwrite)(%rip) ; \
+        je      1f ; \
+        ptwriteq Stack_id(%r10) ; \
+    /* Add current stack to the last fiber */ \
+1:      popq    %rdx; CFI_ADJUST(-8) ; \
+        movq    (Stack_handler-1)(%r13), %rdi ; \
+        movq    Caml_state(current_stack), %rsi ; \
+        movq    %rsi, Handler_parent(%rdi) ; \
+    /* Need to update the oldest saved frame pointer here as the current \
+       fiber stack may have been reallocated or we may be resuming a \
+       computation that was not originally run here. */ \
+        UPDATE_BASE_POINTER(%rdi) ; \
+        SWITCH_OCAML_STACKS ; \
+        FLUSH_DYNAMIC_CACHE(%r13) ; \
+        testq   %rdx, %rdx ;               /* Do we have a gc_regs? */ \
         jnz     LBL(resume_preemption)
-        jmpq    *(%rbx)    /* no, just jump into the continuation */
+
+FUNCTION(caml_continue)
+CFI_STARTPROC
+    /* %rax -> continuation, %rbx -> value */
+        DO_RESUME_SWITCH
+LBL(caml_continue_enter):
+    /* Return the value to the perform site on the resumed stack. */
+        movq    %rbx, %rax
+        ret
 LBL(resume_preemption): /* %rdx -> gc_regs */
         /* This continuation represents a preemption, meaning we have to restore
            its gc_regs before resuming */
@@ -1582,15 +1621,49 @@ LBL(resume_preemption): /* %rdx -> gc_regs */
         SWITCH_C_TO_OCAML
         /* Jump into the second half of caml_do_call_gc, which will restore the
            registers and `ret` to resume */
+LBL(caml_continue_preempted):
         jmp     LBL(restore_regs_and_ret)
 LBL(continuation_already_resumed):
         ENTER_FUNCTION
-        TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller of caml_resume
-                                  in the TSan backtrace */
+        TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller in the TSan
+                                  backtrace */
         LEA_VAR(caml_raise_continuation_already_resumed, %rax)
         jmp LBL(caml_c_call)
 CFI_ENDPROC
-END_FUNCTION(caml_resume)
+END_FUNCTION(caml_continue)
+
+FUNCTION(caml_discontinue)
+CFI_STARTPROC
+    /* %rax -> continuation, %rbx -> exn */
+        DO_RESUME_SWITCH
+LBL(caml_discontinue_enter):
+    /* Raise the exception within the resumed computation. */
+        movq    %rbx, %rax
+        jmp     G(caml_raise_exn)
+CFI_ENDPROC
+END_FUNCTION(caml_discontinue)
+
+FUNCTION(caml_discontinue_with_backtrace)
+CFI_STARTPROC
+    /* %rax -> continuation, %rbx -> exn, %rdi -> backtrace */
+    /* Restore the provided backtrace before switching and reraising. The
+       backtrace buffer lives in the domain state, so restoring it before the
+       stack switch is fine. The continuation is carried in %r12 and the
+       exception in %rbx across the C call; both are C-callee-saved. */
+        movq    %rdi, C_ARG_2                 /* arg 2: backtrace */
+        movq    %rbx, C_ARG_1                 /* arg 1: exn */
+        movq    %rax, %r12                    /* save continuation */
+        SWITCH_OCAML_TO_C
+        C_call  (GCALL(caml_restore_raw_backtrace))
+        SWITCH_C_TO_OCAML
+        movq    %r12, %rax                    /* restore continuation */
+        DO_RESUME_SWITCH
+LBL(caml_discontinue_with_backtrace_enter):
+    /* Reraise the exception within the resumed computation. */
+        movq    %rbx, %rax
+        jmp     G(caml_reraise_exn)
+CFI_ENDPROC
+END_FUNCTION(caml_discontinue_with_backtrace)
 
 /* Run a function on a new stack,
    then invoke either the value or exception handler */
@@ -1660,6 +1733,7 @@ CFI_STARTPROC
 #endif
         movq    %rdi, %rax /* first argument */
         CHECK_STACK_ALIGNMENT;
+LBL(caml_runstack_enter):
         callq   *(%rbx) /* closure in %rbx (second argument) */
 LBL(frame_runstack):
         leaq    32(%rsp), %r11 /* SP with exn handler popped */
@@ -1701,7 +1775,9 @@ LBL(frame_runstack):
         movq    %r12, %rax
     /* Invoke handle_value (or handle_exn) */
         LEAVE_FUNCTION
+LBL(caml_runstack_exit):
         jmp     *(%rbx)
+LBL(caml_runstack_exn):
 LBL(fiber_exn_handler):
         leaq    16(%rsp), %r11
 #if Stack_padding_word
@@ -1724,7 +1800,7 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_ml_array_bound_error)
 
-FUNCTION(G(caml_ml_array_align_error))
+FUNCTION(caml_ml_array_align_error)
 CFI_STARTPROC
         ENTER_FUNCTION
         LEA_VAR(caml_array_align_error_asm, %rax)
@@ -1732,7 +1808,7 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_ml_array_align_error)
 
-FUNCTION(G(caml_assert_stack_invariants))
+FUNCTION(caml_assert_stack_invariants)
 CFI_STARTPROC
         movq    Caml_state(current_stack), %r11
         movq    %rsp, %r10
@@ -1756,10 +1832,15 @@ G(caml_system__code_end):
         .align  EIGHT_ALIGN
 G(caml_system__frametable):
         .quad   2            /* two descriptors */
+        /* Each descriptor is preceded by a "delta" byte. These return-to-C
+           descriptors do not fit the "short" format, so each escapes: a 0
+           delta byte followed by a descriptor in the medium format (which
+           carries its own relative return address). See frame_descriptors.h. */
+        .byte   0            /* escape: medium descriptor follows */
         .4byte  LBL(108) - . /* return address into callback */
         .value  -1           /* negative frame size => use callback link */
         .value  0            /* no roots here */
-        .align  EIGHT_ALIGN
+        .byte   0            /* escape: medium descriptor follows */
         .4byte  LBL(frame_runstack) - . /* return address into fiber_val_handler */
         .value  -1                      /* negative frame size => use callback link */
         .value  0                       /* no roots here */
@@ -1789,3 +1870,27 @@ G(caml_absf32_mask):
         .quad   0xFFFFFFFF7FFFFFFFL, 0xFFFFFFFFFFFFFFFF
 
         NONEXECSTACK_NOTE
+
+/* Record effect machinery branch offsets for magic trace */
+.pushsection .note.ocaml_eff,"?",%note
+.balign 4
+        .long   LBL(ocaml_eff_owner_end) - LBL(ocaml_eff_owner)
+        .long   LBL(ocaml_eff_desc_end) - LBL(ocaml_eff_desc)
+        .long   2
+LBL(ocaml_eff_owner):
+        .asciz  "OCaml"
+LBL(ocaml_eff_owner_end):
+        .balign 4
+LBL(ocaml_eff_desc):
+        .quad   LBL(caml_runstack_enter) - G(caml_runstack)
+        .quad   LBL(caml_runstack_exit) - G(caml_runstack)
+        .quad   LBL(caml_runstack_exn) - G(caml_runstack)
+        .quad   LBL(caml_perform_enter) - G(caml_perform)
+        .quad   LBL(caml_continue_enter) - G(caml_continue)
+        .quad   LBL(caml_continue_preempted) - G(caml_continue)
+        .quad   LBL(caml_discontinue_enter) - G(caml_discontinue)
+        .quad   LBL(caml_discontinue_with_backtrace_enter) - G(caml_discontinue_with_backtrace)
+        .quad   0
+LBL(ocaml_eff_desc_end):
+        .balign 4
+.popsection

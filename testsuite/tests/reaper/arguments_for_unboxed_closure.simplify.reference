@@ -4,19 +4,21 @@ let code unused_3 deleted in
 let code u_4 deleted in
 let code f_0 deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(id_2)
-      id_2_1 (z) my_closure _region _ghost_region my_depth -> k * k1 =
+      id_2_1 (z) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (z)
 in
-let $camlArguments_for_unboxed_closure__id_6 = closure id_2_1 @`id` in
+let $camlArguments_for_unboxed_closure__id_6 =
+  closure id_2_1 @`id` &toplevel.alloc_region
+in
 let code inline(never) loopify(never) size(10) newer_version_of(u_4)
       u_4_1 (param : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let g = %project_value_slot.[u].[g] (my_closure) in
   let x = %project_value_slot.[g].[x] (g) in
   let y = %project_value_slot.[g].[y] (g) in
-  apply direct(id_2_1) inlining_state(depth(1))
+  apply direct(id_2_1 &my_alloc_region) inlining_state(depth(1))
     ($camlArguments_for_unboxed_closure__id_6 : _ -> imm tagged)
       (y)
       -> k2 * k1
@@ -26,38 +28,41 @@ let code inline(never) loopify(never) size(10) newer_version_of(u_4)
 in
 let code inline(never) loopify(never) size(1) newer_version_of(unused_3)
       unused_3_1 (param)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   cont k (0)
 in
-let $camlArguments_for_unboxed_closure__unused_7 = closure unused_3_1 @unused
+let $camlArguments_for_unboxed_closure__unused_7 =
+  closure unused_3_1 @unused &toplevel.alloc_region
 in
 let code loopify(never) size(11) newer_version_of(g_1)
       g_1_1 (h : val)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let x = %project_value_slot.[g].[x] (my_closure) in
   let y = %project_value_slot.[g].[y] (my_closure) in
-  apply h (y) -> k2 * k1
+  apply &my_alloc_region h (y) -> k2 * k1
     where k2 (apply_result : imm tagged) =
       let int_add = %int_barith.add (x, apply_result) in
       cont k (int_add)
 in
 let code loopify(never) size(52) newer_version_of(f_0)
       f_0_1 (x : imm tagged, y : imm tagged)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let `region` = %begin_region () in
-  let g = closure g_1_1 @g with { x = x; y = y } in
-  let u = closure u_4_1 @u
+  let g = closure g_1_1 @g &my_alloc_region &`region`
+  with { x = x; y = y }
+  in
+  let u = closure u_4_1 @u &my_alloc_region &`region`
   with { g = g; `id` = $camlArguments_for_unboxed_closure__id_6 }
   in
-  apply direct(u_4_1) (u : _ -> imm tagged) (0) -> k2 * k1
+  apply direct(u_4_1 &my_alloc_region) (u : _ -> imm tagged) (0) -> k2 * k1
     where k2 (apply_result : imm tagged) =
-      (apply direct(g_1_1) inlined(never)
+      (apply direct(g_1_1 &my_alloc_region) inlined(never)
          (g : _ -> imm tagged)
            ($camlArguments_for_unboxed_closure__unused_7)
            -> k2 * k1
@@ -66,7 +71,9 @@ let code loopify(never) size(52) newer_version_of(f_0)
            let `unit` = %end_region (`region`) in
            cont k (int_add))
 in
-let $camlArguments_for_unboxed_closure__f_5 = closure f_0_1 @f in
+let $camlArguments_for_unboxed_closure__f_5 =
+  closure f_0_1 @f &toplevel.alloc_region
+in
 let $camlArguments_for_unboxed_closure =
   Block 0 ($camlArguments_for_unboxed_closure__f_5)
 in

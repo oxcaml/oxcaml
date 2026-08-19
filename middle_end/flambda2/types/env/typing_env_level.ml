@@ -128,9 +128,9 @@ let add_definition t var kind binding_time =
       Variable.print var print t;
   let binding_times =
     let vars =
-      match Binding_time.Map.find binding_time t.binding_times with
-      | exception Not_found -> Variable.Set.singleton var
-      | prev_vars -> Variable.Set.add var prev_vars
+      match Binding_time.Map.find_or_null binding_time t.binding_times with
+      | Null -> Variable.Set.singleton var
+      | This prev_vars -> Variable.Set.add var prev_vars
     in
     Binding_time.Map.add binding_time vars t.binding_times
   in

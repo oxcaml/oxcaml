@@ -170,7 +170,7 @@ type module_unbound_reason =
       { container : string option; unbound : string }
 
 type stage_lock =
-  | Quotation_lock
+  | Quote_lock
   | Splice_lock
 
 type lock =
@@ -230,7 +230,7 @@ let map_summary f = function
   | Env_jkind (s, id, d) -> Env_jkind (f s, id, d)
 
 type address = Persistent_env.address =
-  | Aunit of Compilation_unit.t
+  | Aunit of Compilation_unit.t * Mode.Value.l
   | Alocal of Ident.t
   | Adot of address * module_representation * int
 
@@ -473,13 +473,14 @@ module IdTbl =
       }
 
     let rec find_same_without_locks id tbl =
-      try Ident.find_same id tbl.current
-      with Not_found as exn ->
+      match Ident.find_same_or_null id tbl.current with
+      | This data -> data
+      | Null ->
         begin match tbl.layer with
         | Open {next; _} -> find_same_without_locks id next
         | Map {f; next} -> f (find_same_without_locks id next)
         | Lock {lock=_; next} -> find_same_without_locks id next
-        | Nothing -> raise exn
+        | Nothing -> raise Not_found
         end
 
     let find_same id (tbl : (empty, _, _) t) =
@@ -677,10 +678,11 @@ type t = {
   jkinds : (empty, jkind_data, jkind_data) IdTbl.t;
   summary: summary;
   local_constraints: type_declaration StagedPath.Map.t;
+  local_constraints_update_count: int;
   implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
-  toplevel_scope: int
+  persistent_scope: int
 }
 
 and module_components =
@@ -763,7 +765,8 @@ and type_data =
   { tda_declaration : type_declaration;
     tda_descriptions : type_descriptions;
     tda_shape : Shape.t;
-    tda_unboxed_version_descriptions : type_descriptions option }
+    tda_unboxed_version_descriptions : type_descriptions option;
+    tda_hidden : bool }
 
 and module_data =
   { mda_declaration : Subst.Lazy.module_declaration;
@@ -897,7 +900,7 @@ type error =
   | Illegal_value_name of Location.t * string
   | Lookup_error of Location.t * t * lookup_error
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t }
-  | Toplevel_splice of Location.t
+  | Initial_stage_splice of Location.t
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
 
 exception Error of error
@@ -979,12 +982,13 @@ let empty = {
   modules = IdTbl.empty; modtypes = IdTbl.empty;
   classes = IdTbl.empty; cltypes = IdTbl.empty;
   summary = Env_empty; local_constraints = StagedPath.Map.empty;
+  local_constraints_update_count = 0;
   implicit_jkinds = String.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
   jkinds = IdTbl.empty;
   stage = 0;
-  toplevel_scope = Ident.lowest_scope
+  persistent_scope = Ident.lowest_scope
  }
 
 let path_at_current_stage env path = { StagedPath.stage = env.stage; path }
@@ -1106,7 +1110,8 @@ end
 (* Print addresses *)
 
 let rec print_address ppf = function
-  | Aunit cu -> Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
+  | Aunit (cu, _) ->
+    Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
   | Alocal id -> Format.fprintf ppf "%s" (Ident.name id)
   | Adot(a, _, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
 
@@ -1115,51 +1120,9 @@ type address_head =
   | AHlocal of Ident.t
 
 let rec address_head = function
-  | Aunit cu -> AHunit cu
+  | Aunit (cu, _) -> AHunit cu
   | Alocal id -> AHlocal id
   | Adot (a, _, _) -> address_head a
-
-(* The name of the compilation unit currently compiled. *)
-module Current_unit : sig
-  val get : unit -> Unit_info.t option
-  val get_cu : unit -> Compilation_unit.t option
-  val set : Unit_info.t -> unit
-  val unset : unit -> unit
-
-  module Name : sig
-    val get : unit -> string
-    val is : string -> bool
-    val is_ident : Ident.t -> bool
-    val is_path : Path.t -> bool
-  end
-end = struct
-  let current_unit : Unit_info.t option ref =
-    ref None
-  let get () =
-    !current_unit
-  let get_cu () =
-    Option.map Unit_info.modname (get ())
-  let set cu =
-    current_unit := Some cu
-  let unset () =
-    current_unit := None
-
-  module Name = struct
-    let get () =
-      match !current_unit with
-      | None -> ""
-      | Some cu ->
-        Compilation_unit.Name.to_string
-          (Compilation_unit.name (Unit_info.modname cu))
-    let is name =
-      get () = name
-    let is_ident id =
-      Ident.is_global id && is (Ident.name id)
-    let is_path = function
-    | Pident id -> is_ident id
-    | Pdot _ | Papply _ | Pextra_ty _ -> false
-  end
-end
 
 let set_current_unit = Current_unit.set
 let get_current_unit = Current_unit.get
@@ -1230,23 +1193,7 @@ let components_of_module ~alerts ~uid env ps path addr mty mode shape =
     }
   }
 
-let mode_unit ~staticity =
-  let hint : _ Mode.Hint.const = Legacy Compilation_unit in
-  Mode.Value.of_const
-    { areality = Global;
-      linearity = Many;
-      uniqueness = Aliased;
-      portability = Nonportable;
-      contention = Uncontended;
-      forkable = Forkable;
-      yielding = Unyielding;
-      statefulness = Stateful;
-      visibility = Read_write;
-      staticity;
-    }
-    ~hint_monadic:hint ~hint_comonadic:hint
-
-let read_sign_of_cmi (sign, staticity) name uid ~shape ~address:addr ~flags =
+let read_sign_of_cmi (sign, mda_mode) name uid ~shape ~address:addr ~flags =
   let id = Ident.create_global name in
   let path = Pident id in
   let alerts =
@@ -1264,7 +1211,6 @@ let read_sign_of_cmi (sign, staticity) name uid ~shape ~address:addr ~flags =
   in
   let mda_address = Lazy_backtrack.create_forced addr in
   let mda_declaration = md in
-  let mda_mode = Mode.Value.disallow_right (mode_unit ~staticity) in
   let mda_shape = shape in
   let mda_components =
     let mty = md.md_type in
@@ -1516,6 +1462,7 @@ let type_of_cstr path = function
           tda_descriptions = Type_record (labels, repr, umc);
           tda_shape = Shape.leaf decl.type_uid;
           tda_unboxed_version_descriptions = None;
+          tda_hidden = false;
         }
       | _ -> assert false
       end
@@ -1559,6 +1506,7 @@ let rec find_type_data path env seen =
       tda_descriptions = Type_abstract (Btype.type_origin decl);
       tda_shape = Shape.leaf decl.type_uid;
       tda_unboxed_version_descriptions = None;
+      tda_hidden = false;
     }
   | exception Not_found -> begin
       match path with
@@ -1682,7 +1630,8 @@ and find_type_unboxed_version_data path env seen =
     tda_declaration;
     tda_descriptions = descrs;
     tda_shape = Shape.leaf tda_declaration.type_uid;
-    tda_unboxed_version_descriptions = None
+    tda_unboxed_version_descriptions = None;
+    tda_hidden = false;
   }
 
 let find_modtype_lazy path env =
@@ -2471,7 +2420,8 @@ let rec components_of_module_maker
               { tda_declaration = final_decl;
                 tda_descriptions = descrs;
                 tda_shape = shape;
-                tda_unboxed_version_descriptions = unboxed_descrs }
+                tda_unboxed_version_descriptions = unboxed_descrs;
+                tda_hidden = false }
             in
             c.comp_types <- NameMap.add (Ident.name id) tda c.comp_types;
             env := store_type_infos ~tda_shape:shape id decl !env
@@ -2721,7 +2671,7 @@ and store_label
   end;
   add_label record_form env lbl_id lbl
 
-and store_type ~check id info shape env =
+and store_type ~check ~hidden id info shape env =
   let loc = info.type_loc in
   if check then
     check_usage loc id info.type_uid
@@ -2770,7 +2720,8 @@ and store_type ~check id info shape env =
     { tda_declaration = info;
       tda_descriptions = descrs;
       tda_shape = shape;
-      tda_unboxed_version_descriptions = unboxed_descrs }
+      tda_unboxed_version_descriptions = unboxed_descrs;
+      tda_hidden = hidden }
   in
   Builtin_attributes.mark_alerts_used info.type_attributes;
   { env with
@@ -2791,6 +2742,7 @@ and store_type_infos ~tda_shape id info env =
       tda_unboxed_version_descriptions =
         Option.map (fun uinfo -> Type_abstract (Btype.type_origin uinfo))
           info.type_unboxed_version;
+      tda_hidden = false;
     }
   in
   { env with
@@ -2927,8 +2879,18 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
        because of the call to [check_well_formed_module]. *)
     let mty = Subst.modtype (Rescope (Path.scope p)) sub f_comp.fcomp_res in
     let addr = Lazy_backtrack.create_failed Not_found in
-    !check_well_formed_module env loc
-      ("the signature of " ^ Path.name p) mty;
+    let can_load_cmis =
+      match Persistent_env.can_load_cmis !persistent_env with
+      | Persistent_env.Can_load_cmis -> true
+      | Persistent_env.Cannot_load_cmis _ -> false
+    in
+    (* If cmis cannot be loaded (e.g. when the printer of another error forces
+       this application), lookups made by the well-formedness check can fail
+       spuriously. In that case, we skip the check and don't cache the
+       components so that the check runs on a later forcing. *)
+    if can_load_cmis then
+      !check_well_formed_module env loc
+        ("the signature of " ^ Path.name p) mty;
     let shape_arg =
       shape_of_path ~namespace:Shape.Sig_component_kind.Module env arg
     in
@@ -2940,7 +2902,7 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
         env Subst.identity p addr (Subst.Lazy.of_modtype mty)
         fcomp_res_mode shape
     in
-    Hashtbl.add f_comp.fcomp_cache arg comps;
+    if can_load_cmis then Hashtbl.add f_comp.fcomp_cache arg comps;
     comps
 
 (* Define forward functions *)
@@ -2962,9 +2924,11 @@ let add_value_lazy ?check ?shape ~mode id desc env =
   let mode = Mode.Value.disallow_right mode in
   store_value ?check ~mode id addr desc shape env
 
-let add_type ~check ?shape id info env =
+let add_type_maybe_hidden ~check ~hidden ?shape id info env =
   let shape = shape_or_leaf info.type_uid shape in
-  store_type ~check id info shape env
+  store_type ~check ~hidden id info shape env
+
+let add_type = add_type_maybe_hidden ~hidden:false
 
 and add_extension ~check ?shape ~rebind id ext env =
   let addr = extension_declaration_address env id ext in
@@ -3032,7 +2996,18 @@ let add_module ?arg ?shape id presence mty ?mode env =
 let add_local_constraint ~stage path info env =
   { env with
     local_constraints =
-      StagedPath.Map.add { stage; path } info env.local_constraints }
+      StagedPath.Map.add { stage; path } info env.local_constraints;
+    local_constraints_update_count = env.local_constraints_update_count + 1 }
+
+let local_constraints_have_been_added ~since env =
+  (* As this function assumes [env] derives from [since], constraints have been
+     added iff the count differs. *)
+  since.local_constraints_update_count <> env.local_constraints_update_count
+
+let revert_local_constraints ~since env =
+  { env with
+    local_constraints = since.local_constraints;
+    local_constraints_update_count = since.local_constraints_update_count }
 
 let add_implicit_jkind ~loc name jkind env =
   { env with
@@ -3057,7 +3032,9 @@ let enter_value ?check ~mode name desc env =
 
 let enter_type ~scope name info env =
   let id = Ident.create_scoped ~scope name in
-  let env = store_type ~check:true id info (Shape.leaf info.type_uid) env in
+  let env =
+    store_type ~check:true ~hidden:false id info (Shape.leaf info.type_uid) env
+  in
   (id, env)
 
 let enter_extension ~scope ~rebind name ext env =
@@ -3136,20 +3113,20 @@ let add_exclave_lock env = add_lock Exclave_lock env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
-let enter_quotation env =
-  add_stage_lock Quotation_lock {env with stage = env.stage + 1}
+let enter_quote env =
+  add_stage_lock Quote_lock {env with stage = env.stage + 1}
 
 let enter_splice ~loc env =
   if env.stage = 0 then
-    raise (Error (Toplevel_splice loc));
+    raise (Error (Initial_stage_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
 
 let enter_future env =
   (* Reuse a very large number *)
   { env with stage = Ident.highest_scope }
 
-let mark_toplevel_in_quotations ~scope env =
-  { env with toplevel_scope = scope }
+let mark_persistent_in_quotations ~scope env =
+  { env with persistent_scope = scope }
 
 let check_no_open_quotations loc env context =
   if env.stage = 0
@@ -3162,7 +3139,7 @@ let stage_locks_offset locks =
   List.fold_right
     (fun lock rel_stage ->
        match lock with
-       | Quotation_lock -> rel_stage + 1
+       | Quote_lock -> rel_stage + 1
        | Splice_lock -> rel_stage - 1)
     locks 0
 
@@ -3291,8 +3268,9 @@ let enter_unbound_module name reason env =
 
 (* Read a signature from a file *)
 let read_signature modname cmi =
-  let mty, staticity = read_pers_mod modname cmi in
-  Subst.Lazy.force_signature mty, staticity
+  let mty, mode = read_pers_mod modname cmi in
+  (* [mode] read from the cmi is always a constant *)
+  Subst.Lazy.force_signature mty, (Mode.Value.zap_to_floor mode).staticity
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -3375,12 +3353,19 @@ let add_language_extension_types env =
       f (add_type ?shape:None ~check:false) env
     | false -> env
   in
+  let add_or_hide ext lvl f env =
+    let hidden = not (Language_extension.is_at_least ext lvl) in
+    f (add_type_maybe_hidden ?shape:None ~check:false ~hidden) env
+  in
+  (* Small number types are hidden when [Small_numbers] is disabled since they
+     can easily be shimmed and emulated upstream. This could be done for other
+     extension types if desired. *)
   lazy
     Language_extension.(env ()
     |> add SIMD Stable Predef.add_simd_stable_extension_types
     |> add SIMD Beta Predef.add_simd_beta_extension_types
     |> add SIMD Alpha Predef.add_simd_alpha_extension_types
-    |> add Small_numbers Stable Predef.add_small_number_extension_types
+    |> add_or_hide Small_numbers Stable Predef.add_small_number_extension_types
     |> add Small_numbers Beta Predef.add_small_number_beta_extension_types
     |> add Layouts Stable Predef.add_or_null
     |> add Runtime_metaprogramming () Predef.add_runtime_metaprogramming_types)
@@ -3499,11 +3484,11 @@ let may_lookup_error report_errors loc env err =
   if report_errors then lookup_error loc env err
   else raise Not_found
 
-let path_is_toplevel_in_quotations env path =
-  Path.scope path <= env.toplevel_scope
+let path_is_persistent_in_quotations env path =
+  Path.scope path <= env.persistent_scope
 
 let does_not_cross_quotation env path locks =
-  if path_is_toplevel_in_quotations env path
+  if path_is_persistent_in_quotations env path
   then Ok ()
   else
     (match stage_locks_offset locks with
@@ -3532,8 +3517,7 @@ let locks_for_pers_mod ~loc_use ~loc_def env path =
   let stage_locks, locks =
     partition_locks (IdTbl.get_all_locks env.modules)
   in
-  (* Tripwire: persistent paths are toplevel-scoped, so this should never
-     fire. *)
+  (* This should never fire -- [path] points to a persistent module. *)
   assert_does_not_cross_quotation env ~loc_use ~loc_def path stage_locks;
   locks
 
@@ -3710,7 +3694,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
           (* The cmi is not loaded, so [cmi_staticity] is unknown.
              Conservatively fall back to [Dynamic]. *)
           Mode.Value.disallow_right
-            (mode_unit ~staticity:Mode.Staticity.Dynamic)
+            (Persistent_env.mode_pers_mod Dynamic)
       in
       path, (mode, locks), a
     end
@@ -3871,12 +3855,12 @@ let lookup_ident_value ~errors ~use ~loc name env =
 
 let lookup_ident_type ~errors ~use ~loc s env =
   match IdTbl.find_name_and_locks wrap_identity ~mark:use s env.types with
-  | Ok (path, locks, tda) ->
+  | Ok (path, locks, ({ tda_hidden = false; _ } as tda)) ->
       check_cross_quotation ~errors ~loc_use:loc
         ~loc_def:tda.tda_declaration.type_loc env path (Lident s) locks;
       use_type ~use ~loc path tda;
       path, tda
-  | Error _ ->
+  | Ok (_, _, { tda_hidden = true; _ }) | Error _ ->
       may_lookup_error errors loc env (Unbound_type (Lident s))
 
 let lookup_ident_modtype ~errors ~use ~loc s env =
@@ -4140,11 +4124,11 @@ let lookup_dot_type ~errors ~use ~loc l s env =
     lookup_structure_components ~errors ~use l env
   in
   match NameMap.find s.txt comps.comp_types with
-  | tda ->
+  | { tda_hidden = false; _ } as tda ->
       let path = Pdot(p, s.txt) in
       use_type ~use ~loc path tda;
       (path, tda)
-  | exception Not_found ->
+  | { tda_hidden = true; _ } | exception Not_found ->
       may_lookup_error errors loc env (Unbound_type (Ldot(l, s)))
 
 let lookup_dot_modtype ~errors ~use ~loc l s env =
@@ -4288,10 +4272,11 @@ let add_components slot root env0 comps (locks : locks) =
     jkinds;
     summary = Env_open(env0.summary, root);
     local_constraints = env0.local_constraints;
+    local_constraints_update_count = env0.local_constraints_update_count;
     implicit_jkinds = env0.implicit_jkinds;
     flags = env0.flags;
     stage = env0.stage;
-    toplevel_scope = env0.toplevel_scope;
+    persistent_scope = env0.persistent_scope;
   }
 
 let open_signature_by_path path env0 =
@@ -4454,7 +4439,7 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
          fall back to [Dynamic]. *)
       path, Location.none,
         Mode.Value.disallow_right
-          (mode_unit ~staticity:Mode.Staticity.Dynamic)
+          (Persistent_env.mode_pers_mod Dynamic)
     else
       let path, (mda : module_data) =
         lookup_global_name_module_no_locks Load ~errors ~use ~loc name env
@@ -4934,6 +4919,11 @@ and fold_types f =
   find_all wrap_identity
     (fun env -> env.types) (fun sc -> sc.comp_types)
     (fun k p tda acc -> f k p tda.tda_declaration acc)
+and fold_visible_types f =
+  find_all wrap_identity
+    (fun env -> env.types) (fun sc -> sc.comp_types)
+    (fun k p tda acc ->
+       if tda.tda_hidden then acc else f k p tda.tda_declaration acc)
 and fold_modtypes f =
   find_all wrap_identity
     (fun env -> env.modtypes) (fun sc -> sc.comp_modtypes)
@@ -5024,6 +5014,7 @@ let keep_only_summary env =
        empty with
        summary = env.summary;
        local_constraints = env.local_constraints;
+       local_constraints_update_count = env.local_constraints_update_count;
        flags = env.flags;
       }
     in
@@ -5037,6 +5028,7 @@ let env_of_only_summary env_from_summary env =
   let new_env = env_from_summary env.summary Subst.identity in
   { new_env with
     local_constraints = env.local_constraints;
+    local_constraints_update_count = env.local_constraints_update_count;
     flags = env.flags;
   }
 
@@ -5080,8 +5072,8 @@ let spellcheck_name extract env name =
 
 let extract_values path env =
   fold_values (fun name _ _ _ acc -> name :: acc) path env []
-let extract_types path env =
-  fold_types (fun name _ _ acc -> name :: acc) path env []
+let extract_visible_types path env =
+  fold_visible_types (fun name _ _ acc -> name :: acc) path env []
 let extract_modules path env =
   fold_modules (fun name _ _ acc -> name :: acc) path env []
 let extract_constructors path env =
@@ -5181,7 +5173,7 @@ let report_lookup_error_doc loc env = function
      Location.aligned_error_hint ~loc
        "@{<ralign>Unbound type constructor @}%a"
        quoted_longident lid
-       (spellcheck extract_types env lid)
+       (spellcheck extract_visible_types env lid)
   | Unbound_module lid -> begin
       let main ppf =
         fprintf ppf "@{<ralign>Unbound module @}%a" quoted_longident lid in
@@ -5491,7 +5483,7 @@ let report_error_doc = function
         "@[<hov>Not enough instance arguments: \
            the parameter@ %a@ is required.@]"
         Global_module.Parameter_name.print unset_param
-  | Toplevel_splice loc ->
+  | Initial_stage_splice loc ->
       Location.errorf ~loc
         "@[<hov>Splices ($) are not allowed in the initial stage,@ \
          as encountered at %a.@,\
@@ -5512,9 +5504,3 @@ let () =
       | _ ->
           None
     )
-
-let () =
-  let get_current_compilation_unit () =
-    Option.map Unit_info.modname (get_current_unit ())
-  in
-  Compilation_unit.Private.fwd_get_current := get_current_compilation_unit

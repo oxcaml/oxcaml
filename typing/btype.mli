@@ -425,6 +425,11 @@ module Jkind0 : sig
       ('a -> 'b option) -> ('a, 'd) base_and_axes ->
       ('b, 'd) base_and_axes option
 
+    val meet_scannable_axes :
+      Jkind_types.Layout.Const.t jkind_base ->
+      Jkind_types.Scannable_axes.t ->
+      Jkind_types.Layout.Const.t jkind_base
+
     val try_allow_l :
       ('layout, 'l * 'r) base_and_axes ->
       ('layout, allowed * 'r) base_and_axes option
@@ -575,6 +580,9 @@ module Jkind0 : sig
       (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
       val vec512 : t
 
+      (** The jkind of unboxed 64-bit masks with no mode crossing. *)
+      val mask : t
+
       (** The jkind of unboxed 128-bit vectors with mode crossing. *)
       val kind_of_unboxed_128bit_vectors : t
 
@@ -583,6 +591,9 @@ module Jkind0 : sig
 
       (** The jkind of unboxed 512-bit vectors with mode crossing. *)
       val kind_of_unboxed_512bit_vectors : t
+
+      (** The jkind of unboxed 64-bit masks with mode crossing. *)
+      val kind_of_unboxed_mask : t
 
       (** A list of the core builtin jkinds exposed by predef. *)
       val builtins : t list
@@ -671,6 +682,14 @@ module Jkind0 : sig
 
     module Builtin : sig
       val any : why:Jkind_intf.History.any_creation_reason -> 'd jkind
+      val any_with_nullability :
+        Jkind_axis.Nullability.t ->
+        why:Jkind_intf.History.any_creation_reason ->
+        'd jkind
+      val any_with_separability :
+        Jkind_axis.Separability.t ->
+        why:Jkind_intf.History.any_creation_reason ->
+        'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
       val scannable :
@@ -739,7 +758,7 @@ module Jkind0 : sig
     val for_or_null_argument : Ident.t -> 'd jkind
     val for_or_null_payload : Path.t -> 'd jkind
     val for_variant_with_null_result :
-      Path.t -> modality:Mode.Modality.Const.t -> type_expr -> jkind_l
+      Path.t -> (Mode.Modality.Const.t * type_expr) list -> jkind_l
 
     val for_effect_arg : Ident.t -> 'd jkind
 

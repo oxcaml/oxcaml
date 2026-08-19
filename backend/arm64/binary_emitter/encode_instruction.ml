@@ -1019,6 +1019,10 @@ let encode_instruction : type num operands.
     let sf = Reg.gp_sf rd in
     Data_proc_helpers.encode_data_proc_2_source ~sf ~s:0 ~opcode:0b000011 ~rm
       ~rn ~rd
+  | Triple (Reg rd, Reg rn, Reg rm), UDIV ->
+    let sf = Reg.gp_sf rd in
+    Data_proc_helpers.encode_data_proc_2_source ~sf ~s:0 ~opcode:0b000010 ~rm
+      ~rn ~rd
   | ( Triple
         ( Reg { reg_name = Neon (Vector vec); index = rd },
           Reg { index = rn; _ },

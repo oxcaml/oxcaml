@@ -30,6 +30,17 @@ open Config
 
 module CU = Compilation_unit
 
+(* Eta-expansion gives [create_process] and [waitpid] the unannotated types
+   required by [Compiler_owee.Unix_intf.S]. *)
+module Unix_for_owee = struct
+  include Unix
+
+  let create_process prog args stdin stdout stderr =
+    Unix.create_process prog args stdin stdout stderr
+
+  let waitpid flags pid = Unix.waitpid flags pid
+end
+
 let make_cached_generic_functions unix ~ppf_dump ~id genfns =
   let name = Generic_fns.Partition.name id in
   Location.input_name := name; (* set name of "current" input *)
@@ -62,7 +73,7 @@ let cached_generic_functions unix ~ppf_dump ~id output_name genfns =
   )
 
 let main filename =
-  let unix = (module Unix : Compiler_owee.Unix_intf.S) in
+  let unix = (module Unix_for_owee : Compiler_owee.Unix_intf.S) in
   Clflags.native_code := true;
   Clflags.use_linscan := true;
   Clflags.function_sections := Config.function_sections;

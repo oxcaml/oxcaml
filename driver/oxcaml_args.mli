@@ -47,7 +47,9 @@ module type Oxcaml_options = sig
   val no_x86_peephole_optimize : unit -> unit
   val no_x86_peephole_remove_mov_to_dead_register : unit -> unit
   val no_x86_peephole_remove_redundant_cmp : unit -> unit
+  val no_x86_peephole_remove_redundant_extension : unit -> unit
   val no_x86_peephole_combine_add_rsp : unit -> unit
+  val no_x86_peephole_remove_redundant_test : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
@@ -58,6 +60,8 @@ module type Oxcaml_options = sig
   val cfg_prologue_shrink_wrap : unit -> unit
   val no_cfg_prologue_shrink_wrap : unit -> unit
   val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val omit_leaf_frame_pointers : unit -> unit
+  val no_omit_leaf_frame_pointers : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
   val cfg_value_propagation : unit -> unit
@@ -72,8 +76,6 @@ module type Oxcaml_options = sig
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
-  val frametables_in_rodata : unit -> unit
-  val no_frametables_in_rodata : unit -> unit
   val heap_reduction_threshold : int -> unit
   val zero_alloc_check : string -> unit
   val zero_alloc_assert : string -> unit
@@ -94,11 +96,13 @@ module type Oxcaml_options = sig
   val long_frames : unit -> unit
   val no_long_frames : unit -> unit
   val long_frames_threshold : int -> unit
+  val dbranch_relaxation_max_displacement : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
   val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
+  val dissector_max_linker_parallelism : int -> unit
   val ddissector : unit -> unit
   val ddissector_sizes : unit -> unit
   val ddissector_verbose : unit -> unit
@@ -143,6 +147,8 @@ module type Oxcaml_options = sig
   val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
+  val simplify_stubs : unit -> unit
+  val no_simplify_stubs : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -207,6 +213,7 @@ module type Debugging_options = sig
   val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
   val gdwarf_may_alter_codegen : unit -> unit

@@ -3,7 +3,15 @@
  flambda2;
  setup-ocamlopt.byte-build-env;
  ocamlopt.byte with dump-simplify;
- check-fexpr-dump;
+ {
+   flat-float-array;
+   check-fexpr-dump;
+ }{
+   no-flat-float-array;
+   fexpr_reference_suffix = "no-flat-float-array.reference";
+   check-fexpr-dump;
+ }
+
 *)
 
 (* This test was extracted from the hdf5 package. It tests the case where the

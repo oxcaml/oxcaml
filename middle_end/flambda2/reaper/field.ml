@@ -47,6 +47,7 @@ type view =
   | Call_witness of closure_entry_point
   | Is_int
   | Get_tag
+  | Boxed_number of Flambda_kind.Boxable_number.t
   | Return_of_call of return_kind
   | Code_id_of_call_witness
 
@@ -60,6 +61,7 @@ let hash_view = function
   | Return_of_call Exn -> 6
   | Return_of_call (Normal i) -> hash2 7 i
   | Code_id_of_call_witness -> 8
+  | Boxed_number bn -> hash2 9 (Flambda_kind.Boxable_number.hash bn)
 
 let equal_view v1 v2 =
   match v1, v2 with
@@ -73,10 +75,12 @@ let equal_view v1 v2 =
   | Get_tag, Get_tag
   | Code_id_of_call_witness, Code_id_of_call_witness ->
     true
+  | Boxed_number bn1, Boxed_number bn2 ->
+    Flambda_kind.Boxable_number.equal bn1 bn2
   | Return_of_call Exn, Return_of_call Exn -> true
   | Return_of_call (Normal i1), Return_of_call (Normal i2) -> i1 = i2
   | ( ( Block _ | Value_slot _ | Function_slot _ | Call_witness _ | Is_int
-      | Get_tag
+      | Get_tag | Boxed_number _
       | Return_of_call Exn
       | Return_of_call (Normal _)
       | Code_id_of_call_witness ),
@@ -91,6 +95,8 @@ let print_view ppf = function
     Format.fprintf ppf "Code %s" (closure_entry_point_to_string ep)
   | Is_int -> Format.fprintf ppf "Is_int"
   | Get_tag -> Format.fprintf ppf "Get_tag"
+  | Boxed_number bn ->
+    Format.fprintf ppf "Boxed_%a" Flambda_kind.Boxable_number.print_lowercase bn
   | Return_of_call (Normal i) -> Format.fprintf ppf "Apply (Normal %i)" i
   | Return_of_call Exn -> Format.fprintf ppf "Apply Exn"
   | Code_id_of_call_witness -> Format.fprintf ppf "Code_id_of_call_witness"
@@ -131,6 +137,8 @@ let is_int = create Is_int
 
 let get_tag = create Get_tag
 
+let boxed_number bn = create (Boxed_number bn)
+
 let normal_return_of_call n = create (Return_of_call (Normal n))
 
 let exn_return_of_call = create (Return_of_call Exn)
@@ -152,35 +160,38 @@ let kind t =
   | Value_slot vs -> Value_slot.kind vs
   | Function_slot _ -> Flambda_kind.value
   | Is_int | Get_tag -> Flambda_kind.naked_immediate
+  | Boxed_number bn -> Flambda_kind.Boxable_number.unboxed_kind bn
   | (Call_witness _ | Return_of_call _ | Code_id_of_call_witness) as view ->
     Misc.fatal_errorf "[field_kind] for virtual field %a" print_view view
 
 let is_value_slot t =
   match view t with
   | Value_slot _ -> true
-  | Block _ | Function_slot _ | Is_int | Get_tag | Call_witness _
-  | Return_of_call _ | Code_id_of_call_witness ->
+  | Block _ | Function_slot _ | Is_int | Get_tag | Boxed_number _
+  | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
     false
 
 let is_function_slot t =
   match view t with
   | Function_slot _ -> true
-  | Block _ | Value_slot _ | Is_int | Get_tag | Call_witness _
+  | Block _ | Value_slot _ | Is_int | Get_tag | Boxed_number _ | Call_witness _
   | Return_of_call _ | Code_id_of_call_witness ->
     false
 
 let is_real_field t =
   match view t with
   | Call_witness _ | Return_of_call _ | Code_id_of_call_witness -> false
-  | Is_int | Get_tag | Block _ | Value_slot _ | Function_slot _ -> true
+  | Is_int | Get_tag | Boxed_number _ | Block _ | Value_slot _ | Function_slot _
+    ->
+    true
 
 let is_virtual_field t = not (is_real_field t)
 
 let must_be_function_slot t =
   match view t with
   | Function_slot fs -> fs
-  | ( Block _ | Value_slot _ | Is_int | Get_tag | Call_witness _
-    | Return_of_call _ | Code_id_of_call_witness ) as view ->
+  | ( Block _ | Value_slot _ | Is_int | Get_tag | Boxed_number _
+    | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ) as view ->
     Misc.fatal_errorf "[must_be_function_slot] got %a instead" print_view view
 
 let is_local f =
@@ -188,11 +199,11 @@ let is_local f =
   &&
   match view f with
   | Value_slot vs ->
-    Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
+    Current_unit.is_current (Value_slot.get_compilation_unit vs)
   | Function_slot fs ->
-    Compilation_unit.is_current (Function_slot.get_compilation_unit fs)
+    Current_unit.is_current (Function_slot.get_compilation_unit fs)
   | Block _ | Call_witness _ | Return_of_call _ | Code_id_of_call_witness
-  | Is_int | Get_tag ->
+  | Is_int | Get_tag | Boxed_number _ ->
     false
 
 let debug_nostamps = lazy (Flambda_features.debug_reaper "nostamps")
@@ -207,6 +218,9 @@ let print_for_variable_name ppf x =
     | Value_slot s -> Format.fprintf ppf "%s" (Value_slot.name s)
     | Is_int -> Format.fprintf ppf "is_int"
     | Get_tag -> Format.fprintf ppf "tag"
+    | Boxed_number bn ->
+      Format.fprintf ppf "unboxed_%a"
+        Flambda_kind.Boxable_number.print_lowercase_short bn
     | Function_slot _ | Return_of_call _ | Code_id_of_call_witness
     | Call_witness _ ->
       Misc.fatal_errorf

@@ -12,8 +12,12 @@ open Effect.Deep
 
 let () =
   Domain.Tick.with_ ~interval_usec:1_000 (fun _ ->
+    let raised = Atomic.make false in
     Preemptible.try_with
-      ~on_tick:(fun () -> failwith "Raise from on_tick")
+      ~on_tick:(fun () ->
+        if Atomic.compare_and_set raised false true
+        then failwith "Raise from on_tick"
+        else Continue)
       (fun () ->
          let start_at = Sys.time () in
          while true do

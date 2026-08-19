@@ -22,7 +22,7 @@ open Config
 open Clflags
 open Misc
 open Cmm
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module String = Misc.Stdlib.String
 
 type error =
@@ -104,19 +104,18 @@ let reset () =
     (fun pass (cfg_unit_info : Cfg_format.cfg_unit_info) ->
       if should_save_ir_after pass || should_save_ir_before pass
       then (
-        cfg_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+        cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
         cfg_unit_info.items <- [];
-        cfg_before_regalloc_unit_info.unit
-          <- Compilation_unit.get_current_or_dummy ();
+        cfg_before_regalloc_unit_info.unit <- Current_unit.get_cu_or_dummy ();
         cfg_before_regalloc_unit_info.items <- []))
     pass_to_cfg;
   if should_save_before_emit ()
   then (
-    linear_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+    linear_unit_info.unit <- Current_unit.get_cu_or_dummy ();
     linear_unit_info.items <- []);
   if should_save_cfg_before_emit ()
   then (
-    cfg_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+    cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
     cfg_unit_info.items <- [])
 
 let save_data dl =
@@ -567,7 +566,7 @@ let compile_genfuns ~ppf_dump f =
         compile_phrase ~ppf_dump ph
       | _ -> ())
     (Generic_fns.compile ~cache:false ~shared:true
-       (Generic_fns.Tbl.of_fns (Compilenv.current_unit_infos ()).ui_generic_fns))
+       (Generic_fns.Tbl.of_fns (Compilenv.current_generic_fns ())))
 
 let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
     ~may_reduce_heap ~ppf_dump gen =
@@ -666,8 +665,6 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
     ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
-  ++ (fun x ->
-  if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cmm
   ++ Profile.record "compile_phrases" (compile_phrases ~ppf_dump)
   ++ fun () -> () );
@@ -711,8 +708,11 @@ let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
       match pipeline with
       | Direct_to_cmm direct_to_cmm ->
         let cmm_phrases = direct_to_cmm ~ppf_dump ~prefixname program in
-        end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
-            cmm_phrases))
+        if Clflags.should_stop_after Compiler_pass.Middle_end
+        then ()
+        else
+          end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
+              cmm_phrases))
 
 let linear_gen_implementation ~ppf_dump unix filename =
   let open Linear_format in

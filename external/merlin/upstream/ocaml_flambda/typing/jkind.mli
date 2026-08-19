@@ -112,9 +112,19 @@ module Layout : sig
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
+
+    (** Whether the layout mentions a genvar anywhere (including inside a
+        product). *)
+    val has_genvar : t -> bool
   end
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
+
+  (** Updates the nullability on the layout's scannable axis. *)
+  val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
+
+  (** Updates the separability on the layout's scannable axis. *)
+  val set_root_separability : Sort.t t -> Jkind_axis.Separability.t -> Sort.t t
 
   module Debug_printers : sig
     val t :
@@ -293,6 +303,7 @@ module Const : sig
      as uses of them for unused abstract kind warnings. *)
   val of_annotation :
     ?use_abstract_jkinds:bool ->
+    ?warn:bool ->
     context:('l * allowed) History.annotation_context ->
     Env.t ->
     Parsetree.jkind_annotation ->
@@ -306,6 +317,18 @@ module Builtin : sig
       But we cannot compile run-time manipulations of values of types with jkind
       [any]. *)
   val any : why:History.any_creation_reason -> 'd Types.jkind
+
+  (** Like [any], but with the given nullability on the scannable axis. *)
+  val any_with_nullability :
+    Jkind_axis.Nullability.t ->
+    why:History.any_creation_reason ->
+    'd Types.jkind
+
+  (** Like [any], but with the given separability on the scannable axis. *)
+  val any_with_separability :
+    Jkind_axis.Separability.t ->
+    why:History.any_creation_reason ->
+    'd Types.jkind
 
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
@@ -411,9 +434,13 @@ val of_sort_univar :
   'd Types.jkind
 
 (* [use_abstract_jkinds] controls whether references to other kinds here count
-   as uses of them for unused abstract kind warnings. *)
+   as uses of them for unused abstract kind warnings.
+
+   [warn] (default: true) controls whether redundant/ignored kind modifier
+   warnings are emitted. *)
 val of_annotation :
   ?use_abstract_jkinds:bool ->
+  ?warn:bool ->
   context:('l * allowed) History.annotation_context ->
   Env.t ->
   Parsetree.jkind_annotation ->
@@ -440,9 +467,13 @@ val of_annotation_option_default :
     Raises if a disallowed or unknown jkind is present.
 
     [use_abstract_jkinds] controls whether references to other kinds here count
-    as uses of them for unused abstract kind warnings. *)
+    as uses of them for unused abstract kind warnings.
+
+    [warn] controls whether redundant-modifier and redundant-kind-modifier
+    warnings are emitted while parsing the annotation. *)
 val of_type_decl :
   ?use_abstract_jkinds:bool ->
+  ?warn:bool ->
   context:History.annotation_context_l ->
   transl_type:(Parsetree.core_type -> Types.type_expr) ->
   Env.t ->
@@ -450,8 +481,10 @@ val of_type_decl :
   (Types.jkind_l * Parsetree.jkind_annotation option) option
 
 (** Find a jkind from a type declaration in the same way as [of_type_decl], but
-    avoiding translating types in with-bounds. Overapproximates kinds containing
-    with-bounds as [any].
+    avoiding translating types in with-bounds. Over-approximates each
+    [with]-bound by raising the bounds of its base to top, keeping the layout
+    precise (except in the case of a truly-abstract kind, which is approximated
+    as [any]).
 
     Returns the jkind (at quality [Not_best]). *)
 val of_type_decl_overapproximate_unknown :
@@ -493,6 +526,23 @@ val for_boxed_variant :
   get_free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
   Types.constructor_declaration list ->
   Types.jkind_l
+
+(** Choose an appropriate jkind for a user-defined [@@or_null] variant (a
+    [Variant_with_null]), given [payload_jkind], the inferred jkind of its
+    payload [payload_type]. Like the builtin ['a or_null], the result has the
+    builtin's mod-bounds (crossing everything except staticity) with the payload
+    added as a with-bound under [modality]; its layout is the payload's layout
+    adjusted by [apply_or_null_l]. Both the input and the output are [jkind_l]
+    because both are inferred, actual kinds of types (the payload's and the
+    declaration's), not requirements imposed on them. The result is marked best.
+    Returns [Error ()] if the payload's kind is maybe-null or has no known
+    scannable layout. *)
+val for_or_null_variant :
+  Env.t ->
+  payload_type:Types.type_expr ->
+  modality:Mode.Modality.Const.t ->
+  payload_jkind:Types.jkind_l ->
+  (Types.jkind_l, unit) result
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
@@ -609,16 +659,6 @@ val set_externality_upper_bound :
 (** Gets the nullability from a jkind. Expands abstract kinds if needed. *)
 val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
 
-(** Computes a jkind that is the same as the input but with an updated
-    nullability on the layout's scannable axis *)
-val set_root_nullability :
-  Types.jkind_r -> Jkind_axis.Nullability.t -> Types.jkind_r
-
-(** Computes a jkind that is the same as the input but with an updated
-    separability on the layout's scannable axis *)
-val set_root_separability :
-  Types.jkind_r -> Jkind_axis.Separability.t -> Types.jkind_r
-
 (** Sets the layout in a jkind. *)
 val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
 
@@ -639,13 +679,13 @@ val apply_modality_r :
     Adjusts nullability to be [Maybe_null], and separability to be
     [Maybe_separable] if it is already [Separable]. If the jkind is already
     [Maybe_null], fails. *)
-val apply_or_null_l : Types.jkind_l -> (Types.jkind_l, unit) result
+val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
 
 (** Change a jkind to be appropriate for an expectation of a type passed to the
     [or_null] constructor. Adjusts nullability to be [Non_null], and
     separability to be [Non_float] if it is demanded to be [Separable]. If the
     jkind is already [Non_null], fails. *)
-val apply_or_null_r : Types.jkind_r -> (Types.jkind_r, unit) result
+val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
 (** Extract out component jkinds from the product. Because there are no product
     jkinds, this is a bit of a lie: instead, this decomposes the layout but just

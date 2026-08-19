@@ -10,7 +10,7 @@
    output = "e2e_oxcaml.plain.table";
    script = "sh ${test_source_directory}/e2e_table.sh \
              ${test_build_directory}/e2e_oxcaml.o \
-             'camlStdlib|camlCamlinternal'";
+             '(caml|U[0-9]+)(Stdlib|Camlinternal)'";
    script;
    reference = "${test_source_directory}/e2e_oxcaml.plain.reference";
    check-program-output;
@@ -28,7 +28,7 @@
    output = "e2e_oxcaml.packed.table";
    script = "sh ${test_source_directory}/e2e_table.sh \
              ${test_build_directory}/e2e_oxcaml.o \
-             'camlStdlib|camlCamlinternal'";
+             '(caml|U[0-9]+)(Stdlib|Camlinternal)'";
    script;
    reference = "${test_source_directory}/e2e_oxcaml.packed.reference";
    check-program-output;

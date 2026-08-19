@@ -40,6 +40,14 @@ type unit_link_info =
     dynunit : Cmxs_format.dynunit option
   }
 
+(** An object file or archive to pass to the linker, together with the
+    compilation units it contributes to the link (for an archive, only the units
+    of its required members). *)
+type objfile_to_link =
+  { path : string;
+    units : Compilation_unit.t list
+  }
+
 (** Values of type [t] are mutable structures. *)
 type t
 
@@ -85,6 +93,14 @@ val check_consistency :
 
 type error =
   | File_not_found of filepath
+    (* The link input [requested_filename] (a [.cmx] or [.cmxa]) was resolved
+       through a manifest entry (see [-I-manifest]), but its accompanying object
+       file [object_filename] has no manifest entry and was not found in the
+       load path. *)
+  | Companion_object_file_not_found_via_manifest of
+      { object_filename : filepath;
+        requested_filename : filepath
+      }
   | Not_an_object_file of filepath
   | Missing_implementations of (Compilation_unit.t * string list) list
   | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath

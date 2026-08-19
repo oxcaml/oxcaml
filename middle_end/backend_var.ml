@@ -35,7 +35,8 @@ module Provenance = struct
     module_path : Path.t;
     location : Debuginfo.t;
     original_ident : Ident.t;
-    debug_uid : Flambda2_identifiers.Flambda_debug_uid.t
+    debug_uid : Flambda2_identifiers.Flambda_debug_uid.t;
+    is_parameter : Is_parameter.t;
   }
 
   let print_debug_uid ppf duid =
@@ -43,7 +44,8 @@ module Provenance = struct
       Format.fprintf ppf "%@{%a}"
         Flambda2_identifiers.Flambda_debug_uid.print duid
 
-  let print ppf { module_path; location; original_ident; debug_uid } =
+  let print ppf
+        { module_path; location; original_ident; debug_uid; is_parameter } =
     let printf fmt = Format.fprintf ppf fmt in
     printf "@[<hov 1>(";
     printf "@[<hov 1>(module_path@ %a)@]@ "
@@ -51,35 +53,41 @@ module Provenance = struct
     if !Clflags.locations then
       printf "@[<hov 1>(location@ %a)@]@ "
         Debuginfo.print_compact location;
-    printf "@[<hov 1>(original_ident@ %a%a)@]"
+    printf "@[<hov 1>(original_ident@ %a%a)@]@ "
       Ident.print original_ident
       print_debug_uid debug_uid;
+    printf "@[<hov 1>(is_parameter@ %a)@]"
+      Is_parameter.print is_parameter;
     printf ")@]"
 
-  let create ~module_path ~location ~original_ident ~debug_uid =
+  let create ~module_path ~location ~original_ident ~debug_uid ~is_parameter =
     { module_path;
       location;
       original_ident;
-      debug_uid
+      debug_uid;
+      is_parameter
     }
 
   let module_path t = t.module_path
   let location t = t.location
   let original_ident t = t.original_ident
   let debug_uid t = t.debug_uid
+  let is_parameter t = t.is_parameter
 
   let compare t1 t2 =
     let { module_path = module_path1;
           location = location1;
           original_ident = original_ident1;
-          debug_uid = debug_uid1
+          debug_uid = debug_uid1;
+          is_parameter = is_parameter1
         } =
       t1
     in
     let { module_path = module_path2;
           location = location2;
           original_ident = original_ident2;
-          debug_uid = debug_uid2
+          debug_uid = debug_uid2;
+          is_parameter = is_parameter2
         } =
       t2
     in
@@ -95,8 +103,12 @@ module Provenance = struct
         if c <> 0
         then c
         else
-          Flambda2_identifiers.Flambda_debug_uid.compare debug_uid1
-            debug_uid2
+          let c =
+            Flambda2_identifiers.Flambda_debug_uid.compare debug_uid1 debug_uid2
+          in
+          if c <> 0
+          then c
+          else Is_parameter.compare is_parameter1 is_parameter2
 
   let equal t1 t2 = compare t1 t2 = 0
 end
@@ -123,6 +135,12 @@ module With_provenance = struct
     match t with
     | Without_provenance _ -> None
     | With_provenance { var = _; provenance; } -> Some provenance
+
+  let is_parameter t =
+    match t with
+    | Without_provenance _ -> Is_parameter.local
+    | With_provenance { var = _; provenance; } ->
+      Provenance.is_parameter provenance
 
   let name t = name (var t)
 

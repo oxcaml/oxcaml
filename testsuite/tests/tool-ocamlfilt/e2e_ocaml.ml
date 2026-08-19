@@ -10,7 +10,7 @@
    output = "e2e_ocaml.structured.table";
    script = "sh ${test_source_directory}/e2e_table.sh \
              ${test_build_directory}/e2e_ocaml.o \
-             'camlStdlib|camlCamlinternal'";
+             '(caml|U[0-9]+)(Stdlib|Camlinternal)'";
    script;
    reference = "${test_source_directory}/e2e_ocaml.structured.reference";
    check-program-output;
@@ -24,7 +24,7 @@
    output = "e2e_ocaml.flat.table";
    script = "sh ${test_source_directory}/e2e_table.sh \
              ${test_build_directory}/e2e_ocaml.o \
-             'camlStdlib|camlCamlinternal'";
+             '(caml|U[0-9]+)(Stdlib|Camlinternal)'";
    script;
    reference = "${test_source_directory}/e2e_ocaml.flat.reference";
    check-program-output;
