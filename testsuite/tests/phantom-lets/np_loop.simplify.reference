@@ -1,0 +1,46 @@
+let code test_0 deleted in
+let code loopify(never) size(34) newer_version_of(test_0)
+      test_0_1 (n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  (let prim = %int_comp.le (1, n) in
+   switch prim
+     | 0 -> k2 (1)
+     | 1 -> k3
+     where k3 =
+       let prim_1 = %untag_imm (n) in
+       let for_stop_naked = %num_conv.[`imm`].[`int64`] (prim_1) in
+       (cont k3 (1L, 1)
+          where rec k3
+                      (np for_counter_naked : int64,
+                       np acc_unboxed0 : imm tagged) =
+            let phantom prim_2 =
+              %num_conv.[`int64`].[`imm`] (for_counter_naked)
+            in
+            let phantom _i = %tag_imm (prim_2) in
+            let region_1 = %begin_region (`region`) in
+            let phantom pair =
+              %block.[`0`].my_alloc_region.local[region_1]
+                (acc_unboxed0, acc_unboxed0)
+            in
+            let int_add = %int_barith.add (acc_unboxed0, acc_unboxed0) in
+            let `unit` = %end_region (region_1) in
+            let for_next_naked =
+              %int_barith.`int64`.add (for_counter_naked, 1L)
+            in
+            let prim_3 =
+              %int_comp.`int64`.le (for_next_naked, for_stop_naked)
+            in
+            switch prim_3
+              | 0 -> k2 (int_add)
+              | 1 -> k3 (for_next_naked, int_add)))
+    where k2 (acc_unboxed0 : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      cont k (acc_unboxed0)
+in
+let $camlNp_loop__test_1 = closure test_0_1 @test &toplevel.alloc_region in
+let phantom test = $camlNp_loop__test_1 in
+let $camlNp_loop = Block 0 ($camlNp_loop__test_1) in
+cont done ($camlNp_loop)
