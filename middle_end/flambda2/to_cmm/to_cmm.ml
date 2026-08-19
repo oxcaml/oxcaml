@@ -62,7 +62,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   (* If someone wants to add 32-bit support in the future there will be a
      (merged) PR on oxcaml/oxcaml which can be used as a guide:
      https://github.com/oxcaml/oxcaml/pull/685 *)
-  if Target_system.is_32_bit ()
+  if Target_system.Architecture.is_32_bit ()
   then
     Misc.fatal_error
       "Flambda 2 to Cmm conversion does not support 32-bit targets";

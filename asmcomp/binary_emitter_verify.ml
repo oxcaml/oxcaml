@@ -110,7 +110,7 @@ let is_text_section name =
   String.equal name "text" || String.starts_with ~prefix:".text" name
 
 let align_to_instruction offset =
-  match Target_system.architecture () with
+  match Target_system.Architecture.get () with
   | AArch64 -> offset / 4 * 4
   | X86_64 | _ -> offset
 
