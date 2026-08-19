@@ -1964,7 +1964,7 @@ and transl_tupled_function
 *)
 
 and add_type_shapes_of_pattern ~env pattern =
-  if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
+  if Type_shape.enabled () then
     let var_list = Typedtree.pat_bound_idents_full pattern in
     List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
       let type_name =
@@ -2018,8 +2018,7 @@ and add_type_shapes_of_patterns patterns =
     parameter of [fun (x, y) -> ...]. *)
 and add_type_shapes_of_param ~env ~uid ~sort ~type_expr =
   if
-    !Clflags.debug
-    && !Clflags.shape_format = Clflags.Debugging_shapes
+    Type_shape.enabled ()
     && not (Shape.Uid.equal uid Shape.Uid.internal_not_actually_unique)
     && not (Type_shape.has_type_shape uid)
   then

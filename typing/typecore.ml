@@ -6099,7 +6099,7 @@ type binder_pattern_kind =
    argument patterns. *)
 let create_uid_for_pattern_kind = function
   | Value_pattern_in_argument ->
-      if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes
+      if Type_shape.enabled ()
       then Uid.mk ~current_unit:(Env.get_current_unit ())
       else Shape.Uid.internal_not_actually_unique
   | Synthetic_eta_expansion | Value_pattern_in_match | Exception_pattern

@@ -133,6 +133,11 @@ val add_to_type_shapes :
 
 val has_type_shape : Uid.t -> bool
 
+(** Whether the compiler should compute and record type shapes for debug
+    information. All call sites that record type shapes for debug information
+    must be guarded by this predicate. *)
+val enabled : unit -> bool
+
 val print_table_all_type_decls : Format.formatter -> unit
 
 val print_table_all_type_shapes : Format.formatter -> unit
