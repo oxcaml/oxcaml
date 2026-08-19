@@ -353,6 +353,43 @@ module Make (V : Ordered) = struct
     then meet_with_leaf b a
     else meet' a b
 
+  let top_var (node : node) : var option =
+    if is_leaf node then None else Some (Unsafe.node_block node).v
+
+  let min_top_var (a : node) (b : node) : var =
+    match top_var a, top_var b with
+    | None, None -> invalid_arg "Ldd.imply: expected a non-leaf node"
+    | Some v, None | None, Some v -> v
+    | Some v1, Some v2 -> if compare_var v1 v2 <= 0 then v1 else v2
+
+  let rec split_on_var (v : var) (node0 : node) : node * node =
+    if is_leaf node0
+    then node0, node0
+    else
+      let block = Unsafe.node_block node0 in
+      let order = compare_var v block.v in
+      if order < 0
+      then node0, node0
+      else if order = 0
+      then block.lo, join block.lo block.hi
+      else
+        let lo_bot, lo_top = split_on_var v block.lo in
+        let hi_bot, hi_top = split_on_var v block.hi in
+        node block.v ~lo:lo_bot ~hi:hi_bot, node block.v ~lo:lo_top ~hi:hi_top
+
+  let rec imply_rec (a : node) (b : node) : node =
+    if a == b || a == bot || b == top
+    then top
+    else if is_leaf a && is_leaf b
+    then leaf (Axis_lattice.imply (Unsafe.leaf_value a) (Unsafe.leaf_value b))
+    else
+      let v = min_top_var a b in
+      let a_bot, a_top = split_on_var v a in
+      let b_bot, b_top = split_on_var v b in
+      let h_top = imply_rec a_top b_top in
+      let h_bot = meet (imply_rec a_bot b_bot) h_top in
+      node v ~lo:h_bot ~hi:h_top
+
   (* --------- public constructors --------- *)
   let[@inline] const (c : Axis_lattice.t) = leaf c
 
@@ -466,7 +503,7 @@ module Make (V : Ordered) = struct
     canonicalize ~hi:(inline_solved_vars a) ~lo:(inline_solved_vars b)
 
   let solve_lfp (var : var) (rhs_raw : node) : unit =
-    (* Solve the least fixpoint equation var := rhs_raw. 
+    (* Solve the least fixpoint equation var := rhs_raw.
        The rhs in general contains the var itself, and the
        fixpoint solution is var := rhs_raw[var := bot].
        We must also inline solved vars, because var itself
@@ -476,12 +513,12 @@ module Make (V : Ordered) = struct
     | Rigid _ -> invalid_arg "solve_lfp: rigid variable"
     | Solved _ -> invalid_arg "solve_lfp: solved variable"
     | Unsolved ->
-      (* For efficiency, we use assign_bot_inline to 
+      (* For efficiency, we use assign_bot_inline to
          simultaneously inline solved vars and assign bot. *)
       var.state <- Solved (assign_bot_inline ~var rhs_raw)
 
   let solve_gfp (var : var) (rhs_raw : node) : unit =
-    (* Solve the greatest fixpoint equation var := rhs_raw. 
+    (* Solve the greatest fixpoint equation var := rhs_raw.
        The rhs in general contains the var itself, and the
        fixpoint solution is var := rhs_raw[var := top].
        We must also inline solved vars, because var itself
@@ -491,7 +528,7 @@ module Make (V : Ordered) = struct
     | Rigid _ -> invalid_arg "solve_gfp: rigid variable"
     | Solved _ -> invalid_arg "solve_gfp: solved variable"
     | Unsolved ->
-      (* gfp's are less performance critical, so we use two 
+      (* gfp's are less performance critical, so we use two
          separate steps to inline solved vars and assign top. *)
       let rhs_forced = inline_solved_vars rhs_raw in
       var.state <- Solved (assign_top ~var rhs_forced)
@@ -507,6 +544,10 @@ module Make (V : Ordered) = struct
     List.iter (fun (var, rhs_raw) -> solve_gfp var rhs_raw) pending
 
   let solve_pending () : unit = solve_pending_gfps ()
+
+  let imply (a : node) (b : node) : node =
+    solve_pending ();
+    imply_rec (inline_solved_vars a) (inline_solved_vars b)
 
   (** Decompose into linear terms over [universe]. *)
   let decompose_into_linear_terms ~(universe : var list) (n : node) =
@@ -529,6 +570,11 @@ module Make (V : Ordered) = struct
     solve_pending ();
     let node = inline_solved_vars node in
     up0 node
+
+  let round_down (node : node) =
+    solve_pending ();
+    let node = inline_solved_vars node in
+    down0 node
 
   let is_const (node : node) : bool =
     let node = inline_solved_vars node in
