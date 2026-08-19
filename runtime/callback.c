@@ -577,34 +577,13 @@ CAMLexport void caml_iterate_named_values(caml_named_action f)
 
 CAMLprim value caml_with_async_exns(value body_callback)
 {
-  // Save and restore the current dynamic binding state so that local bindings
-  // are not leaked upon raising an async exception.
-  dynamic_table_s tbl;
+  // Freeze the current dynamic binding state: bindings the body pushes are
+  // discarded if an async exception exits the body without popping them.
+  dynamic_table_t snapshot = caml_dynamic_state_snapshot();
 
-  dynamic_node_t node = Caml_state->current_stack->dyn_node;
-  if(node != NULL) {
-    if(!caml_dynamic_table_copy(/*dst=*/&tbl, /*src=*/&node->table)) {
-      caml_raise_out_of_memory();
-    }
-  } else {
-    caml_dynamic_table_init(&tbl);
-  }
-
-  // The saved table must be updated if its contents are promoted.
-  caml_dynamic_table_register_roots(&tbl);
   caml_result res = Result_encoded(caml_callback_exn(body_callback, Val_unit));
-  caml_dynamic_table_unregister_roots(&tbl);
 
-  // The body may have created the node. Only the table is restored; lexical
-  // edges belong to the fiber, not to the unwound bindings.
-  node = Caml_state->current_stack->dyn_node;
-  if(node != NULL) {
-    caml_dynamic_table_free(&node->table);
-    node->table = tbl;
-  } else {
-    CAMLassert(tbl.bindings == NULL);
-  }
-  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+  caml_dynamic_state_restore(snapshot);
 
   /* raised as a normal exn, even if it was asynchronous */
   if (caml_result_is_exception(res)) {
