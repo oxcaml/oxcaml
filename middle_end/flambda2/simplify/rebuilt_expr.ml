@@ -175,8 +175,3 @@ let bind_no_simplification are_rebuilding ~bindings ~body ~cost_metrics_of_body
              ~cost_metrics_of_defining_expr)
       in
       expr, cost_metrics, free_names)
-
-let apply_renaming t are_rebuilding renaming =
-  if ART.do_not_rebuild_terms are_rebuilding
-  then t
-  else Expr.apply_renaming t renaming
