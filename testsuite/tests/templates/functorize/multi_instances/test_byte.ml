@@ -119,10 +119,12 @@
  module = "util_transparent/util_transparent.ml";
  ocamlc.byte;
 
- (* Bundle the two flavours. *)
+ (* Bundle the two flavours.  The opaque inputs are deliberately listed
+    in reverse dependency order ([Util_opaque] depends on
+    [Basic_opaque]): [-functorize] re-orders them topologically. *)
 
  flags = "$flg -functorize -I p -I basic_opaque -I util_opaque \
-   Basic_opaque Util_opaque";
+   Util_opaque Basic_opaque";
  module = "";
  program = "bundle_opaque/bundle_opaque.cmo";
  all_modules = "";
