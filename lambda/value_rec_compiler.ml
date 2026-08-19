@@ -986,14 +986,9 @@ let compile_alloc size =
             no_loc)
   | Mixed_record shape ->
       if !Clflags.native_code then
-        let shape =
-          Mixed_block_shape.of_mixed_block_elements
-            ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-            shape
-        in
-        let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
-        let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
-        let size = value_prefix_len + flat_suffix_len in
+        let bytes = Mixed_product_bytes.count (Product shape) in
+        let value_prefix_len = Mixed_product_bytes.value_prefix_len bytes in
+        let size = Mixed_product_bytes.size_in_words bytes in
         alloc alloc_mixed_record_prim [size; value_prefix_len]
       else
         let size = Array.length shape in
