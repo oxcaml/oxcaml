@@ -48,7 +48,7 @@ type 'a param_type =
   | Skip_param
 
 type cont =
-  | Return of { param_types : Cmm.machtype list }
+  | Return of { param_types : Cmm.machtype list Or_unknown.t }
   | Jump of
       { cont : Lambda.static_label;
         param_types : Cmm.machtype param_type list
