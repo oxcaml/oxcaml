@@ -173,6 +173,12 @@ let find_size_of_alloc_prim prim args =
     Option.map (fun n -> Float_record n) int_arg
   else if same_as alloc_lazy_prim then
     Some Lazy_block
+  else if same_as alloc_mixed_record_prim then
+    match args with
+    | [Lconst (Const_base (Const_int size));
+       Lconst (Const_base (Const_int value_prefix_len))] ->
+      Some (Mixed_block { size; value_prefix_len })
+    | _ -> None
   else None
 
 let compute_mixed_block_size shape =
