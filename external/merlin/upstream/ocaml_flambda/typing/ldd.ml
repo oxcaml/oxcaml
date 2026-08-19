@@ -129,8 +129,9 @@ module Make (V : Ordered) = struct
     (* Keep rigid ids strictly above any non-rigid ids. We choose the top half
        of the *positive* int range, so rigid ids stay positive and satisfy the
        invariant used by [inline_solved_vars] to avoid descending under
-       rigids. *)
-    let rigid_var_start = 1 lsl (Sys.word_size - 3)
+       rigids. 
+       We use 29 here rather than 61 in order to support 32 bit platforms. *)
+    let rigid_var_start = 1 lsl 29
 
     let[@inline] rigid_id (name : V.t) : int =
       let h = stable_hash name land (rigid_var_start - 1) in
