@@ -112,11 +112,16 @@ let set_terminator sub_cfg desc arg res dbg ~phantom_available_before =
   sub_cfg.exit.terminator
     <- make_instr desc arg res dbg ~phantom_available_before
 
-let link_if_needed ~(from : Cfg.basic_block) ~(to_ : Cfg.basic_block) () =
+let link_if_needed ~(from : Cfg.basic_block) ~(to_ : Cfg.basic_block)
+    ~phantom_available_before () =
   if Cfg.is_never_terminator from.terminator.desc
   then
     from.terminator
-      <- { from.terminator with desc = Always to_.start; id = next_instr_id () }
+      <- { from.terminator with
+           desc = Always to_.start;
+           id = next_instr_id ();
+           phantom_available_before
+         }
 
 let iter_basic_blocks sub_cfg ~f = DLL.iter sub_cfg.layout ~f
 
@@ -124,22 +129,27 @@ let exists_basic_blocks sub_cfg ~f = DLL.exists sub_cfg.layout ~f
 
 let transfer ~from ~to_ = DLL.transfer ~from:from.layout ~to_:to_.layout ()
 
-let join ~from ~to_ =
+let join ~from ~to_ ~phantom_available_before =
   List.iter (fun from -> transfer ~from ~to_) from;
   let join_block = make_never_block () in
-  List.iter (fun from -> link_if_needed ~from:from.exit ~to_:join_block ()) from;
+  List.iter
+    (fun from ->
+      link_if_needed ~from:from.exit ~to_:join_block ~phantom_available_before
+        ())
+    from;
   add_block to_ join_block
 
 let join_tail ~from ~to_ =
   List.iter (fun from -> transfer ~from ~to_) from;
   add_never_block to_ ~label:(Cmm.new_label ())
 
-let update_exit_terminator ?arg sub_cfg desc =
+let update_exit_terminator ?arg sub_cfg desc ~phantom_available_before =
   sub_cfg.exit.terminator
     <- { sub_cfg.exit.terminator with
          desc;
          id = next_instr_id ();
-         arg = Option.value arg ~default:sub_cfg.exit.terminator.arg
+         arg = Option.value arg ~default:sub_cfg.exit.terminator.arg;
+         phantom_available_before
        }
 
 let mark_as_trap_handler sub_cfg = sub_cfg.entry.is_trap_handler <- true
