@@ -175,6 +175,36 @@ let remove_destroyed_at_basic (known_values : known_value Loc_map.t)
     known_values
     (Proc.destroyed_at_basic instr.desc)
 
+(* Returns the statically-known result of the passed instruction, when it is a
+   (pure) integer operation whose operands are statically known. *)
+(* CR-someday xclerc for xclerc: some results are determined by a single known
+   operand (e.g. `and` with 0, or `or` with -1); such cases are currently not
+   folded, since the result is only computed when all the operands are
+   known. *)
+let known_int_op_result (known_values : known_value Loc_map.t)
+    (instr : Cfg.basic Cfg.instruction) : nativeint option =
+  let known_int (reg : Reg.t) : nativeint option =
+    match Loc_map.find_opt reg known_values with
+    | Some (Const_int v) -> Some v
+    | Some (Const_float32 _ | Const_float _) | None -> None
+  in
+  begin[@ocaml.warning "-4"] match instr.desc with
+  | Op (Intop_imm (op, imm)) ->
+    begin match known_int instr.arg.(0) with
+    | Some left -> eval_int_op op left (Nativeint.of_int imm)
+    | None -> None
+    end
+  | Op (Intop op) ->
+    if Operation.is_unary_integer_operation op
+    then None
+    else
+      begin match known_int instr.arg.(0), known_int instr.arg.(1) with
+      | Some left, Some right -> eval_int_op op left right
+      | (Some _ | None), (Some _ | None) -> None
+      end
+  | _ -> None
+  end
+
 (* Returns the known values after the execution of the passed (basic)
    instruction, given the known values before it. Currently only tracks constant
    values, moves between registers, basic integer arithmetic, and basic float64
@@ -193,22 +223,6 @@ let interpret_basic (known_values : known_value Loc_map.t)
       Loc_map.remove reg known_values
     | Stack (Local _ | Incoming _ | Outgoing _) | Reg _ ->
       Loc_map.add reg value known_values
-  in
-  let apply_int_op op right_opt =
-    let result_opt =
-      match Loc_map.find_opt instr.arg.(0) known_values with
-      | Some (Const_int left) -> (
-        match right_opt with
-        | Some right -> eval_int_op op left right
-        | None -> None)
-      | Some (Const_float32 _ | Const_float _) | None -> None
-    in
-    let known_values =
-      match result_opt with
-      | Some result -> replace instr.res.(0) (Const_int result) known_values
-      | None -> Loc_map.remove instr.res.(0) known_values
-    in
-    remove_destroyed_at_basic known_values instr
   in
   let apply_float_op op right_opt =
     let result_opt =
@@ -249,17 +263,13 @@ let interpret_basic (known_values : known_value Loc_map.t)
       when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ ->
       replace instr.res.(0) value known_values
     | Some _ | None -> Loc_map.remove instr.res.(0) known_values)
-  | Op (Intop_imm (op, imm)) -> apply_int_op op (Some (Nativeint.of_int imm))
-  | Op (Intop op) ->
-    let right_opt =
-      if Operation.is_unary_integer_operation op
-      then None
-      else
-        match Loc_map.find_opt instr.arg.(1) known_values with
-        | Some (Const_int v) -> Some v
-        | Some (Const_float32 _ | Const_float _) | None -> None
+  | Op (Intop_imm _ | Intop _) ->
+    let known_values =
+      match known_int_op_result known_values instr with
+      | Some result -> replace instr.res.(0) (Const_int result) known_values
+      | None -> Loc_map.remove instr.res.(0) known_values
     in
-    apply_int_op op right_opt
+    remove_destroyed_at_basic known_values instr
   | Op (Floatop (Float64, op)) ->
     if !Oxcaml_flags.cfg_value_propagation_float
     then
@@ -429,7 +439,9 @@ end
    dataflow analysis above). Deletes moves deemed to be useless given the
    information in `known_values`, and rewrites the materialization of a constant
    into a register-to-register move when the constant is statically known to be
-   already available in another register. *)
+   already available in another register; integer operations whose result is
+   statically known are similarly deleted or rewritten (into a materialization
+   of the result, or a register-to-register move). *)
 let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block)
     ~(init : known_value Loc_map.t) : known_value Loc_map.t =
   let known_values = ref init in
@@ -589,6 +601,41 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block)
                    instr.arg.(0).typ ->
             delete_if_redundant cell instr.res.(0) value
           | Some (Const_int _ | Const_float32 _ | Const_float _) | None -> false
+          end
+        | Op (Intop _ | Intop_imm _) ->
+          begin match known_int_op_result !known_values instr with
+          | Some result ->
+            (* Only pure operations have their result computed statically, so
+               the operation is subject to the same treatment as a
+               materialization of its result: it is deleted when the destination
+               register already holds the result (safe for the reasons given on
+               `delete_if_redundant`); otherwise it is rewritten into a
+               materialization of the result when the constant is not expensive,
+               or into a register-to-register move when it is expensive but
+               statically known to be available in another register (safe for
+               the reasons given on the rewrite of constant materializations
+               above) -- materializing an expensive constant in place of the
+               operation could otherwise be a regression. Dropping the uses of
+               the argument registers makes the (unchanged) `live` fields an
+               over-approximation of actual liveness for these registers, which
+               is always safe. *)
+            if delete_if_redundant cell instr.res.(0) (Const_int result)
+            then true
+            else begin
+              if not (is_expensive_constant result)
+              then
+                Dll.set_value cell
+                  { instr with desc = Cfg.Op (Const_int result); arg = [||] }
+              else
+                begin match find_move_source result ~dst:instr.res.(0) with
+                | Some src ->
+                  Dll.set_value cell
+                    { instr with desc = Cfg.Op Move; arg = [| src |] }
+                | None -> ()
+                end;
+              false
+            end
+          | None -> false
           end
         | _ -> false
         end
@@ -860,7 +907,10 @@ let run (cfg : C.t) =
      paths that includes the former), and the transfer functions are monotone,
      so the states along the new edges are supersets of the states along the
      paths through the empty successor and the facts recorded at the new targets
-     remain true. *)
+     remain true. The remaining rewrites (of materializations or operations into
+     constants or moves, and the deletions of redundant operations) keep the
+     value written to the destination and only drop uses and clobbers, so the
+     states likewise remain true. *)
   let dataflow_values =
     if
       !Oxcaml_flags.cfg_value_propagation
