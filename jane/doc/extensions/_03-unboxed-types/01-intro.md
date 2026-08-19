@@ -628,7 +628,7 @@ To ensure that your C code will need to be updated when the layout changes, use
 the `Assert_mixed_block_layout_v#` family of macros. For example,
 
 ```
-Assert_mixed_block_layout_v6;
+Assert_mixed_block_layout_v7;
 ```
 
 Write the above in statement context, i.e. either at the top-level of a file or
@@ -658,7 +658,7 @@ type t =
 Here is the recommend way to access fields:
 
 ```c
-Assert_mixed_block_layout_v6;
+Assert_mixed_block_layout_v7;
 #define Foo_t_x(foo) (*(int32_t*)&Field(foo, 0))
 #define Foo_t_y(foo) (*(int32_t*)&Field(foo, 1))
 ```
@@ -685,3 +685,6 @@ Version history:
 - `v5`: block indices to mixed products now use 52-bit offsets and 12-bit gaps.
 - `v6`: all value/void records are now uniform blocks, and (by default)
   represent all-`float64` records as mixed blocks instead of float array blocks.
+- `v7`: all-void variant constructors without
+  `[@immediate_all_void_constructor]` are now blocks rather than tagged
+  immediates.
