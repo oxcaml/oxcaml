@@ -129,7 +129,6 @@ let save_cms target modname binary_annots initial_env shape
             cms_ident_occurrences, Some cms_initial_env
           else
             [| |], None
-<<<<<<< Merlin:ggray/mti/dev
          in
          let cms_uid_to_loc, cms_uid_to_attributes =
            uid_tables_of_binary_annots binary_annots
@@ -154,59 +153,10 @@ let save_cms target modname binary_annots initial_env shape
            cms_impl_shape = shape;
            cms_ident_occurrences;
            cms_declaration_dependencies;
+           cms_module_implementation_facts;
            cms_externals;
          } in
          output_cms oc cms)
-||||||| Compiler:last-imported
-        in
-        let cms_uid_to_loc, cms_uid_to_attributes =
-          uid_tables_of_binary_annots binary_annots
-        in
-        let cms_externals = externals_of_binary_annots binary_annots in
-        let cms =
-          {
-            cms_modname = modname;
-            cms_comments = Lexer.comments ();
-            cms_sourcefile = sourcefile;
-            cms_builddir = Location.rewrite_absolute_path (Sys.getcwd ());
-            cms_source_digest = source_digest;
-            cms_initial_env;
-            cms_uid_to_loc;
-            cms_uid_to_attributes;
-            cms_shape_format = !Clflags.shape_format;
-            cms_impl_shape = shape;
-            cms_ident_occurrences;
-            cms_declaration_dependencies;
-            cms_externals;
-          }
-        in
-        output_cms oc cms)
-=======
-        in
-        let cms_uid_to_loc, cms_uid_to_attributes =
-          uid_tables_of_binary_annots binary_annots
-        in
-        let cms_externals = externals_of_binary_annots binary_annots in
-        let cms =
-          {
-            cms_modname = modname;
-            cms_comments = Lexer.comments ();
-            cms_sourcefile = sourcefile;
-            cms_builddir = Location.rewrite_absolute_path (Sys.getcwd ());
-            cms_source_digest = source_digest;
-            cms_initial_env;
-            cms_uid_to_loc;
-            cms_uid_to_attributes;
-            cms_shape_format = !Clflags.shape_format;
-            cms_impl_shape = shape;
-            cms_ident_occurrences;
-            cms_declaration_dependencies;
-            cms_module_implementation_facts;
-            cms_externals;
-          }
-        in
-        output_cms oc cms)
->>>>>>> Compiler:HEAD
   end
 
 let clear () = ()

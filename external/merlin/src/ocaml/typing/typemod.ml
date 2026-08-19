@@ -4755,15 +4755,7 @@ let type_implementation target modulename initial_env ast =
     Cmt_format.save_cmt (Unit_info.cmt target) modulename
       annots initial_env cmi shape facts;
     Cms_format.save_cms (Unit_info.cms target) modulename
-<<<<<<< Merlin:ggray/mti/dev
-      annots initial_env shape decl_deps;
-||||||| Compiler:last-imported
-      annots initial_env shape decl_deps;
-    gen_annot target annots;
-=======
       annots initial_env shape decl_deps facts;
-    gen_annot target annots;
->>>>>>> Compiler:HEAD
   in
   Cmt_format.clear ();
   Cms_format.clear ();
@@ -4885,22 +4877,11 @@ let type_implementation target modulename initial_env ast =
           (* It is important to run these checks after the inclusion test above,
              so that value declarations which are not used internally but
              exported are not reported as being unused. *)
-<<<<<<< Merlin:ggray/mti/dev
-          let shape = Shape_reduce.local_reduce Env.empty shape in
-          let annots = Cmt_format.Implementation str in
-          save_cmt_and_cms target annots initial_env None (Some shape);
-||||||| Compiler:last-imported
-          Profile.record_call "save_cmt" (fun () ->
-            let shape = Shape_reduce.local_reduce Env.empty shape in
-            let annots = Cmt_format.Implementation str in
-            save_cmt_and_cms target annots initial_env None (Some shape));
-=======
           Profile.record_call "save_cmt" (fun () ->
             let shape = Shape_reduce.local_reduce Env.empty shape in
             let annots = Cmt_format.Implementation str in
             save_cmt_and_cms ~unit_interface:true ?argument_interface
               target annots initial_env None (Some shape));
->>>>>>> Compiler:HEAD
           { structure = str;
             coercion;
             shape;
@@ -4974,20 +4955,6 @@ let type_implementation target modulename initial_env ast =
       end
     )
     ~exceptionally:(fun () ->
-<<<<<<< Merlin:ggray/mti/dev
-        let annots =
-          Cmt_format.Partial_implementation
-            (Array.of_list (Cmt_format.get_saved_types ()))
-        in
-        save_cmt_and_cms target annots initial_env None None
-||||||| Compiler:last-imported
-        Profile.record_call "save_cmt" (fun () ->
-          let annots =
-            Cmt_format.Partial_implementation
-              (Array.of_list (Cmt_format.get_saved_types ()))
-          in
-          save_cmt_and_cms target annots initial_env None None)
-=======
         Profile.record_call "save_cmt" (fun () ->
           let annots =
             Cmt_format.Partial_implementation
@@ -4995,7 +4962,6 @@ let type_implementation target modulename initial_env ast =
           in
           save_cmt_and_cms ~unit_interface:false target annots initial_env
             None None)
->>>>>>> Compiler:HEAD
       )
 
 let save_signature ?argument_interface target modname tsg initial_env cmi =
