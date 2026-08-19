@@ -34,7 +34,7 @@
 static caml_plat_mutex roots_mutex = CAML_PLAT_MUTEX_INITIALIZER;
 
 /* Greater than zero when the current thread is scanning the roots */
-static CAMLthread_local int iterating_roots = 0;
+static CAMLthread_local_initial_exec int iterating_roots = 0;
 
 enum { ROOT_PRESENT = 0, ROOT_DELETED = 1 };
 
