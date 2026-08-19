@@ -536,6 +536,28 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
          my_region_var)
       fun_params
   in
+  let fun_body, fun_free_vars =
+    (* A residual free variable at [Phantom] mode arises when a pure,
+       duplicatable binding whose inlined uses are wrapped in
+       [Cname_for_debugger] (or which is referenced by a phantom defining
+       expression) is dropped, as unused, by the flush of a branch of the
+       delayed-let environment: the phantom occurrence sits in a different
+       delayed binding, so no single flush necessarily sees the occurrence and
+       the binding together. Such variables are bound here as empty phantom
+       lets: the variable is thereby presented to the debugger as optimised out,
+       except where a naming operation provides availability. Residual free
+       variables at [Normal] mode still indicate a genuine translation bug. *)
+    To_cmm_free_vars.fold
+      (fun v (mode : To_cmm_free_vars.Mode.t) (fun_body, fun_free_vars) ->
+        match mode with
+        | Normal -> fun_body, fun_free_vars
+        | Phantom ->
+          ( Cmm_helpers.make_phantom_let
+              (Backend_var.With_provenance.create v)
+              None fun_body,
+            To_cmm_free_vars.remove v fun_free_vars ))
+      fun_free_vars (fun_body, fun_free_vars)
+  in
   if not (To_cmm_free_vars.is_empty fun_free_vars)
   then
     Misc.fatal_errorf
