@@ -55,6 +55,8 @@ end) : sig
 
   val count_normal : t -> N.t -> Num_occurrences.t
 
+  val count_phantom : t -> N.t -> Num_occurrences.t
+
   val greatest_name_mode : t -> N.t -> Name_mode.Or_absent.t
 
   val downgrade_occurrences_at_strictly_greater_name_mode :
@@ -84,6 +86,8 @@ end = struct
     val num_occurrences : t -> int
 
     val num_occurrences_normal : t -> int
+
+    val num_occurrences_phantom : t -> int
 
     val downgrade_occurrences_at_strictly_greater_name_mode :
       t -> Name_mode.t -> t
@@ -280,6 +284,18 @@ end = struct
       then One
       else More_than_one
 
+  let count_phantom t name : Num_occurrences.t =
+    match N.Map.find name t with
+    | exception Not_found -> Zero
+    | for_one_name ->
+      let num_occurrences = For_one_name.num_occurrences_phantom for_one_name in
+      assert (num_occurrences >= 0);
+      if num_occurrences = 0
+      then Zero
+      else if num_occurrences = 1
+      then One
+      else More_than_one
+
   let greatest_name_mode t name : Name_mode.Or_absent.t =
     match N.Map.find name t with
     | exception Not_found -> Name_mode.Or_absent.absent
@@ -420,6 +436,9 @@ let count_variable t var = For_names.count t.names (Name.var var)
 
 let count_variable_normal_mode t var =
   For_names.count_normal t.names (Name.var var)
+
+let count_variable_phantom_mode t var =
+  For_names.count_phantom t.names (Name.var var)
 
 let singleton_variable var name_mode =
   { empty with names = For_names.singleton (Name.var var) name_mode }
