@@ -570,6 +570,20 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
   in
   rebuild_body uacc ~after_rebuild:(rebuild_let_cont data ~after_rebuild)
 
+(* Parameters referenced by phantom lets within the handler must remain
+   locatable by the debugger: mark their binders (printed as "NP"). *)
+let promote_params_needed_by_phantom_lets uacc params ~free_names =
+  if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
+  then params
+  else
+    Bound_parameters.create
+      (List.map
+         (fun param ->
+           if Expr_builder.variable_needs_np_promotion free_names (BP.var param)
+           then BP.with_needed_by_phantom_let param
+           else param)
+         (Bound_parameters.to_list params))
+
 let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let Flow_types.Alias_result.{ continuation_parameters; _ } =
     UA.continuation_param_aliases uacc
@@ -717,6 +731,9 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
         add_phantom_params_bindings uacc handler new_phantom_params
       in
       let free_names = remove_params new_phantom_params free_names in
+      let params =
+        promote_params_needed_by_phantom_lets uacc params ~free_names
+      in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
@@ -780,13 +797,6 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
               ~handler:(if is_cold then Unknown else Known handler)
       in
       let uacc = UA.with_uenv uacc uenv in
-      (* Parameters referenced by phantom lets within the handler must remain
-         locatable by the debugger. *)
-      Bound_parameters.iter
-        (fun param ->
-          Simplify_common.promote_var_if_needed_by_phantom_lets free_names
-            (BP.var param))
-        params;
       (* The parameters are removed from the free name information as they are
          no longer in scope. *)
       let free_names = remove_params params free_names in
@@ -828,19 +838,22 @@ let rebuild_single_recursive_handler cont
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
       in
+      (* Invariant parameters are not marked: they are shared between the
+         handlers of a recursive group, so any marking would have to happen at
+         the point where the whole group is rebuilt; and no case is currently
+         known where a non-user-visible invariant parameter is referenced by a
+         phantom let (the parameter-alias machinery removes invariant parameters
+         of single-entry loops, and phantom defining expressions reference boxed
+         carriers rather than unboxing extras). *)
+      let variant_params =
+        promote_params_needed_by_phantom_lets uacc variant_params ~free_names
+      in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
           variant_params ~handler ~free_names_of_handler:free_names
           ~is_exn_handler:false ~is_cold:handler_to_rebuild.is_cold
       in
-      (* Parameters referenced by phantom lets within the handler must remain
-         locatable by the debugger. *)
-      Bound_parameters.iter
-        (fun param ->
-          Simplify_common.promote_var_if_needed_by_phantom_lets free_names
-            (BP.var param))
-        (Bound_parameters.append invariant_params variant_params);
       let free_names =
         remove_params invariant_params (remove_params variant_params free_names)
       in

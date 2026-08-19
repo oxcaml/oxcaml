@@ -381,13 +381,13 @@ let exported_offsets t = t.offsets
 
 (* Variables *)
 
-let gen_variable t ~debug_uid ~dbg ~bv_is_parameter v =
-  (* Variables that are [Not_user_visible_but_needed_by_phantom_let] are treated
-     like user-visible ones here: the provenance causes [Name_for_debugger]
-     operations to be emitted during instruction selection (including via
-     [Cname_for_debugger]), without which the phantom lets' references to such
-     variables could not be resolved by the debugger. *)
-  let user_visible = Variable.user_visible_or_needed_by_phantom_let v in
+let gen_variable t ~debug_uid ~dbg ~bv_is_parameter ~needed_by_phantom_let v =
+  (* Binders marked as needed by phantom lets are treated like user-visible ones
+     here: the provenance causes [Name_for_debugger] operations to be emitted
+     during instruction selection (including via [Cname_for_debugger]), without
+     which the phantom lets' references to such variables could not be resolved
+     by the debugger. *)
+  let user_visible = Variable.user_visible v || needed_by_phantom_let in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
   let provenance =
@@ -429,14 +429,14 @@ let add_bound_param env v v' =
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
   { env with vars }
 
-let create_bound_parameter env (v, debug_uid, dbg) =
+let create_bound_parameter env (v, debug_uid, dbg, needed_by_phantom_let) =
   if Variable.Map.mem v env.vars
   then
     Misc.fatal_errorf "Cannot rebind variable %a in To_cmm environment"
       Variable.print v;
   let v' =
     gen_variable env v ~debug_uid ~dbg
-      ~bv_is_parameter:Bound_var.Is_parameter.local_var
+      ~bv_is_parameter:Bound_var.Is_parameter.local_var ~needed_by_phantom_let
   in
   let env = add_bound_param env v v' in
   env, v'
@@ -570,11 +570,13 @@ let create_binding_aux (type a) env effs (var : Bound_var.t)
     gen_variable env ~debug_uid:(Bound_var.debug_uid var)
       ~dbg:(Bound_var.dbg var)
       ~bv_is_parameter:(Bound_var.is_parameter var)
+      ~needed_by_phantom_let:(Bound_var.needed_by_phantom_let var)
       (Bound_var.var var)
   in
   let phantomize =
     Flambda_features.Expert.phantom_lets ()
-    && Variable.user_visible_or_needed_by_phantom_let (Bound_var.var var)
+    && (Variable.user_visible (Bound_var.var var)
+       || Bound_var.needed_by_phantom_let var)
   in
   let binding =
     Binding { order; inline; phantomize; effs; cmm_var; bound_expr }

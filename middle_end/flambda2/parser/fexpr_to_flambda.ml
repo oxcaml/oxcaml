@@ -343,7 +343,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
   | Let
       { bindings = { defining_expr = Closure { alloc; _ }; _ } :: _ as bindings;
         value_slots;
-        body
+        body;
+        is_phantom = _
       } ->
     let binding_to_var_and_closure_binding : Fexpr.let_binding -> _ = function
       | { var; defining_expr = Closure binding; _ } -> var, binding
@@ -391,7 +392,14 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
       "Multiple let bindings only allowed when defining closures"
   | Let { value_slots = Some _; _ } ->
     Misc.fatal_errorf "'with' clause only allowed when defining closures"
-  | Let { bindings = [{ var; defining_expr = d }]; body; value_slots = None } ->
+  (* The parser does not currently support phantom lets or NP markers, so
+     [is_phantom] and [needed_by_phantom_let] are always [false] here. *)
+  | Let
+      { bindings = [{ var; defining_expr = d; needed_by_phantom_let = _ }];
+        body;
+        value_slots = None;
+        is_phantom = _
+      } ->
     let named = defining_expr env d in
     let id, id_duid, env = fresh_var env var (Flambda.Named.kind named) in
     let acc, body = expr env acc body in
@@ -429,7 +437,8 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     let create_params env params =
       let env, parameters =
         List.fold_right
-          (fun ({ param; kind } : Fexpr.kinded_parameter) (env, args) ->
+          (fun ({ param; kind; needed_by_phantom_let = _ } :
+                 Fexpr.kinded_parameter) (env, args) ->
             let kind = value_kind_with_subkind_opt kind in
             let var, var_duid, env =
               fresh_var env param (Flambda_kind.With_subkind.kind kind)
@@ -723,7 +732,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           in
           let params, env =
             map_accum_left
-              (fun env ({ param; kind } : Fexpr.kinded_parameter) ->
+              (fun env
+                   ({ param; kind; needed_by_phantom_let = _ } :
+                     Fexpr.kinded_parameter) ->
                 let kind = value_kind_with_subkind_opt kind in
                 let var, var_duid, env =
                   fresh_var env param (Flambda_kind.With_subkind.kind kind)

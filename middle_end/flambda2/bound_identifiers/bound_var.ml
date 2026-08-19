@@ -66,7 +66,8 @@ type t =
     debug_uid : Flambda_debug_uid.t;
     name_mode : Name_mode.t;
     dbg : Debuginfo.t;
-    is_parameter : Is_parameter.t
+    is_parameter : Is_parameter.t;
+    needed_by_phantom_let : bool
   }
 
 let print_debug_uid ppf duid =
@@ -83,14 +84,31 @@ let print_is_parameter ppf (dbg, (is_parameter : Is_parameter.t)) =
         Debuginfo.print_compact dbg
     | Local_var | Implicit_parameter -> ()
 
-let print ppf { var; debug_uid; name_mode = _; dbg; is_parameter } =
-  Format.fprintf ppf "%a%a%a" Variable.print var print_is_parameter
+let print ppf
+    { var; debug_uid; name_mode = _; dbg; is_parameter; needed_by_phantom_let }
+    =
+  let print_var =
+    if needed_by_phantom_let
+    then Int_ids.Variable.print_as_needed_by_phantom_let
+    else Variable.print
+  in
+  Format.fprintf ppf "%a%a%a" print_var var print_is_parameter
     (dbg, is_parameter) print_debug_uid debug_uid
 
 let create var debug_uid name_mode ~dbg ~is_parameter =
   (* Note that [name_mode] might be [In_types], e.g. when dealing with function
      return types and also using [Typing_env.add_definition]. *)
-  { var; debug_uid; name_mode; dbg; is_parameter }
+  { var;
+    debug_uid;
+    name_mode;
+    dbg;
+    is_parameter;
+    needed_by_phantom_let = false
+  }
+
+let needed_by_phantom_let t = t.needed_by_phantom_let
+
+let with_needed_by_phantom_let t = { t with needed_by_phantom_let = true }
 
 let var t = t.var
 
@@ -123,16 +141,29 @@ let apply_renaming t renaming =
 let free_names t = Name_occurrences.singleton_variable t.var t.name_mode
 
 let ids_for_export
-    { var; debug_uid = _; name_mode = _; dbg = _; is_parameter = _ } =
+    { var;
+      debug_uid = _;
+      name_mode = _;
+      dbg = _;
+      is_parameter = _;
+      needed_by_phantom_let = _
+    } =
   Ids_for_export.add_variable Ids_for_export.empty var
 
-let renaming { var; debug_uid = _; name_mode = _; dbg = _; is_parameter = _ }
-    ~guaranteed_fresh =
+let renaming
+    { var;
+      debug_uid = _;
+      name_mode = _;
+      dbg = _;
+      is_parameter = _;
+      needed_by_phantom_let = _
+    } ~guaranteed_fresh =
   let { var = guaranteed_fresh;
         debug_uid = _;
         name_mode = _;
         dbg = _;
-        is_parameter = _
+        is_parameter = _;
+        needed_by_phantom_let = _
       } =
     guaranteed_fresh
   in

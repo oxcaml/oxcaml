@@ -357,7 +357,13 @@ let simple_list ?consider_inlining_effectful_expressions ~dbg env res l =
   List.rev args, free_vars, env, res, effs
 
 let bound_parameters_aux ~f env l =
-  let flambda_vars = Bound_parameters.vars_and_uids_and_debuginfo l in
+  let flambda_vars =
+    List.map
+      (fun bp ->
+        let var, uid, dbg = Bound_parameter.var_and_uid_and_debuginfo bp in
+        var, uid, dbg, Bound_parameter.needed_by_phantom_let bp)
+      (Bound_parameters.to_list l)
+  in
   let env, cmm_vars = To_cmm_env.create_bound_parameters env flambda_vars in
   let vars =
     List.map2 (fun v v' -> v, f v') cmm_vars (Bound_parameters.to_list l)

@@ -95,7 +95,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     Env.create_bound_parameter env
       ( Flambda_unit.toplevel_my_region flambda_unit,
         Flambda_debug_uid.none,
-        Debuginfo.none )
+        Debuginfo.none,
+        false )
   in
   let r =
     R.create ~reachable_names

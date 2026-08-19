@@ -510,12 +510,12 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
       let my_region_duid = Flambda_debug_uid.none in
       let env, region =
         Env.create_bound_parameter env
-          (my_region, my_region_duid, Debuginfo.none)
+          (my_region, my_region_duid, Debuginfo.none, false)
       in
       let my_ghost_region_duid = Flambda_debug_uid.none in
       let env, ghost_region =
         Env.create_bound_parameter env
-          (my_ghost_region, my_ghost_region_duid, Debuginfo.none)
+          (my_ghost_region, my_ghost_region_duid, Debuginfo.none, false)
       in
       env, Some region, Some ghost_region
   in
