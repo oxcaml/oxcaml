@@ -3048,7 +3048,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts ->
-    (* XCR rtjoa: What if we return [any box], and then, say
+    (* CR rtjoa: What if we return [any box], and then, say
        [constrain_type_jkind] will dig deeper if it needs to? Worried about the
        performance implications
 
@@ -3080,7 +3080,10 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
        aide: Added as "Add need_layout to skip tuple layouts for bounds-only
        uses": it threads from [type_jkind] down to this estimate, and the
        normalize contexts ([mk_jkind_context_check_principal] and friends)
-       pass [false], since their one consumer reads only the bounds. *)
+       pass [false], since their one consumer reads only the bounds.
+
+       rtjoa: need_layout shouldn't be oaptional. Is it ever the case that
+       expand_components is true but need_layout is false? *)
     let component_layouts =
       if expand_components && need_layout
       then
@@ -3176,7 +3179,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
       (incr_stage env) ty
     |> Jkind.map_type_expr new_quote_ty
   | Tbox payload ->
-    (* XCR rtjoa: What happens if we just use [any box] here?
+    (* CR rtjoa: What happens if we just use [any box] here?
 
        aide: Checks of a box type against a box kind with a real payload
        fail: [box] is free, so [any box <= value box] does not hold, and
@@ -3187,7 +3190,10 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
        eagerly; the estimate is shallow (one level, no recursion into
        nested tuples), so it stays cheap. A lazy [any box] plus a
        Box-vs-Box constrain step that revisits the type would be a
-       coherent alternative - see the sibling CR on [Ttuple]. *)
+       coherent alternative - see the sibling CR on [Ttuple].
+
+       rtjoa: should we add a box-vs-box-constrain step? draft this on the tip
+       and see if we can simplify both this and ttuple *)
     Jkind.for_box
       ~payload_layout:
         (estimate_type_layout ~expand_components env ~visited:[get_id ty]
@@ -3666,6 +3672,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
+          (* CR rtjoa: why no Tbox case? *)
           | Ttuple ltys ->
             (* The cheap tuple estimate is [any box] (see
                [estimate_type_jkind]); estimate the component layouts and

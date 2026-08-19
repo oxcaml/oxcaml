@@ -2477,6 +2477,11 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
           let lbls_with_sorts =
             List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
           in
+          (* CR rtjoa: create a temporary commit before the box commits (but
+             after addressable) that contains the changes from PR 6496. That
+             should make this simpler. Once either addressable or transl delay
+             merges, we'll rebase the other and be able to properly stack things
+          *)
           let jkind = Jkind.for_boxed_record_with_updates lbls_with_sorts in
           if record_gets_unboxed_version (List.map fst lbls) rep
           then
