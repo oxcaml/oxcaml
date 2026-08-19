@@ -56,6 +56,8 @@ let is_empty = M.is_empty
 
 let mode v t = M.find_opt v t
 
+let fold f (t : t) init = M.fold f t init
+
 let mem ~mode v (t : t) =
   match M.find_opt v t with
   | None -> false
