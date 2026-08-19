@@ -146,11 +146,6 @@ module Variable : sig
       [Not_user_visible_but_needed_by_phantom_let]. *)
   val user_visible_or_needed_by_phantom_let : t -> bool
 
-  (** Promote [Not_user_visible] to
-      [Not_user_visible_but_needed_by_phantom_let]; no-op on the other states.
-  *)
-  val make_needed_by_phantom_let : t -> unit
-
   val export : t -> exported
 
   val import : exported -> t

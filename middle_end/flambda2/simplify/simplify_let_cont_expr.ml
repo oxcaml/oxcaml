@@ -569,6 +569,45 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
   in
   rebuild_body uacc ~after_rebuild:(rebuild_let_cont data ~after_rebuild)
 
+(* Parameters referenced by phantom lets within the handler must remain
+   locatable by the debugger. Since the user-visibility of a variable is
+   immutable, any such parameter that is not user visible is replaced by a fresh
+   variable marked [Not_user_visible_but_needed_by_phantom_let] (printed as
+   "NP"), the handler being renamed accordingly (constant time, via the
+   delayed-renaming mechanism on terms). This must happen before the handler or
+   its parameters are registered in the upwards environment, so that everything
+   (including e.g. continuation shortcuts) sees a consistent view. *)
+let promote_params_needed_by_phantom_lets uacc params ~handler ~free_names =
+  if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
+  then params, handler, free_names
+  else
+    let renaming = ref Renaming.empty in
+    let params' =
+      List.map
+        (fun param ->
+          let var = BP.var param in
+          if Simplify_common.variable_needs_np_promotion free_names var
+          then (
+            let var' =
+              Variable.with_user_visibility var
+                Not_user_visible_but_needed_by_phantom_let
+            in
+            renaming
+              := Renaming.add_fresh_variable !renaming var
+                   ~guaranteed_fresh:var';
+            let _, debug_uid = BP.var_and_uid param in
+            BP.create var' (BP.kind param) debug_uid)
+          else param)
+        (Bound_parameters.to_list params)
+    in
+    let renaming = !renaming in
+    if Renaming.is_identity renaming
+    then params, handler, free_names
+    else
+      ( Bound_parameters.create params',
+        RE.apply_renaming handler (UA.are_rebuilding_terms uacc) renaming,
+        NO.apply_renaming free_names renaming )
+
 let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let Flow_types.Alias_result.{ continuation_parameters; _ } =
     UA.continuation_param_aliases uacc
@@ -712,6 +751,9 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
         add_phantom_params_bindings uacc handler new_phantom_params
       in
       let free_names = remove_params new_phantom_params free_names in
+      let params, handler, free_names =
+        promote_params_needed_by_phantom_lets uacc params ~handler ~free_names
+      in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
@@ -775,13 +817,6 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
               ~handler:(if is_cold then Unknown else Known handler)
       in
       let uacc = UA.with_uenv uacc uenv in
-      (* Parameters referenced by phantom lets within the handler must remain
-         locatable by the debugger. *)
-      Bound_parameters.iter
-        (fun param ->
-          Simplify_common.promote_var_if_needed_by_phantom_lets free_names
-            (BP.var param))
-        params;
       (* The parameters are removed from the free name information as they are
          no longer in scope. *)
       let free_names = remove_params params free_names in
@@ -823,19 +858,20 @@ let rebuild_single_recursive_handler cont
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
       in
+      (* Only the variant parameters are considered for promotion: invariant
+         parameters are shared between the handlers of a recursive group, so
+         renaming them here would leave the other handlers of the group
+         referring to the old variables. *)
+      let variant_params, handler, free_names =
+        promote_params_needed_by_phantom_lets uacc variant_params ~handler
+          ~free_names
+      in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
           variant_params ~handler ~free_names_of_handler:free_names
           ~is_exn_handler:false ~is_cold:handler_to_rebuild.is_cold
       in
-      (* Parameters referenced by phantom lets within the handler must remain
-         locatable by the debugger. *)
-      Bound_parameters.iter
-        (fun param ->
-          Simplify_common.promote_var_if_needed_by_phantom_lets free_names
-            (BP.var param))
-        (Bound_parameters.append invariant_params variant_params);
       let free_names =
         remove_params invariant_params (remove_params variant_params free_names)
       in

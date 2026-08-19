@@ -128,11 +128,17 @@ let arity (a : [`Unarized] Flambda_arity.t) : Fexpr.arity =
 let arity_opt (a : [`Unarized] Flambda_arity.t) : Fexpr.arity option =
   if is_default_arity a then None else Some (arity a)
 
+let needed_by_phantom_let var =
+  match Variable.user_visibility var with
+  | Not_user_visible_but_needed_by_phantom_let -> true
+  | User_visible | Not_user_visible -> false
+
 let kinded_parameter env (kp : Bound_parameter.t) :
     Fexpr.kinded_parameter * Env.t =
   let k = Bound_parameter.kind kp |> kind_with_subkind_opt in
+  let needed_by_phantom_let = needed_by_phantom_let (Bound_parameter.var kp) in
   let param, env = Env.bind_var env (Bound_parameter.var kp) in
-  { param; kind = k }, env
+  { param; kind = k; needed_by_phantom_let }, env
 
 let const c : Fexpr.const =
   match Reg_width_const.descr c with
@@ -347,6 +353,14 @@ and let_expr env le =
 
 and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
     Fexpr.expr =
+  let is_phantom =
+    match vars with
+    | [] -> false
+    | var :: _ -> Name_mode.is_phantom (Bound_var.name_mode var)
+  in
+  let vars_needed_by_phantom_let =
+    List.map (fun var -> needed_by_phantom_let (Bound_var.var var)) vars
+  in
   let vars, body_env = map_accum_left Env.bind_bound_var env vars in
   let body = expr body_env body in
   let defining_exprs, value_slots =
@@ -366,11 +380,12 @@ and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
   if List.compare_lengths vars defining_exprs <> 0
   then Misc.fatal_error "Mismatched vars vs. values";
   let bindings =
-    List.map2
-      (fun var defining_expr -> { Fexpr.var; defining_expr })
-      vars defining_exprs
+    Misc.Stdlib.List.map3
+      (fun var defining_expr needed_by_phantom_let ->
+        { Fexpr.var; defining_expr; needed_by_phantom_let })
+      vars defining_exprs vars_needed_by_phantom_let
   in
-  Let { bindings; value_slots; body }
+  Let { bindings; value_slots; body; is_phantom }
 
 and static_let_expr env bound_static defining_expr body : Fexpr.expr =
   let static_consts =

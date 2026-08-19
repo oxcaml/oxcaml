@@ -273,9 +273,7 @@ module Variable_data = struct
       name : string;
       name_stamp : int;
       kind : Flambda_kind.t;
-      mutable user_visible : user_visibility
-          (* [mutable] for [Variable.make_needed_by_phantom_let]. This field
-             does not participate in [hash] or [equal]. *)
+      user_visible : user_visibility
     }
 
   let flags = var_flags
@@ -526,13 +524,6 @@ module Variable = struct
     match user_visibility t with
     | User_visible | Not_user_visible_but_needed_by_phantom_let -> true
     | Not_user_visible -> false
-
-  let make_needed_by_phantom_let t =
-    let data = find_data t in
-    match data.user_visible with
-    | Not_user_visible ->
-      data.user_visible <- Not_user_visible_but_needed_by_phantom_let
-    | User_visible | Not_user_visible_but_needed_by_phantom_let -> ()
 
   let previous_name_stamp = ref (-1)
 
