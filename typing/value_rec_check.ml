@@ -803,9 +803,15 @@ let rec expression : Typedtree.expression -> term_judg =
                   | Addressable e -> arg_mode_of_element e
                 in
                 arg_mode_of_element mixed_shape.(i)
-            | Constructor_variable ->
+            | Constructor_undetermined ->
                 Misc.fatal_error
-                  "value_rec_check: variable constructor representation")
+                  "value_rec_check: unexpected undetermined representation"
+            | Constructor_variable _ ->
+                if Misc.Stdlib.Option.exists
+                     Jkind.Sort.Const.(equal scannable)
+                     (List.nth desc.cstr_args i).ca_sort
+                then Guard
+                else Dereference)
       in
       let arg i (_sort, e) = expression e << arg_mode i in
       join [
@@ -821,7 +827,8 @@ let rec expression : Typedtree.expression -> term_judg =
       option (fun (e, _) -> expression e) eo << Guard
     | Texp_record { fields = es; extended_expression = eo;
                     representation = rep } ->
-        let field_mode i = match rep with
+        let field_mode (label : Data_types.label_description) =
+          match rep with
           | Record_float | Record_ufloat -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
           | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
@@ -837,13 +844,19 @@ let rec expression : Typedtree.expression -> term_judg =
                 Dereference
               | Addressable e -> field_mode_of_element e
             in
-            field_mode_of_element mixed_shape.(i)
+            field_mode_of_element mixed_shape.(label.lbl_pos)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
-          | Record_inlined (_, Constructor_variable, _)
-          | Record_variable ->
+          | Record_inlined (_, Constructor_undetermined, _)
+          | Record_undetermined ->
             Misc.fatal_error
-              "value_rec_check: unexpected unknown representation"
+              "value_rec_check: unexpected undetermined representation"
+          | Record_inlined (_, Constructor_variable _, _)
+          | Record_variable _ ->
+            if Misc.Stdlib.Option.exists
+                 Jkind.Sort.Const.(equal scannable) label.lbl_sort
+            then Guard
+            else Dereference
         in
         let field ((label : Data_types.label_description), _sort, field_def) =
           let env =
@@ -851,7 +864,7 @@ let rec expression : Typedtree.expression -> term_judg =
             | Kept _ -> empty
             | Overridden (_, e) -> expression e
           in
-          env << field_mode label.lbl_pos
+          env << field_mode label
         in
         join [
           array field es;
@@ -860,7 +873,9 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_record_unboxed_product { fields = es; extended_expression = eo;
                                     representation = rep } ->
       begin match rep with
-      | Record_unboxed_product ->
+      | Record_unboxed_product
+      | Record_unboxed_product_undetermined
+      | Record_unboxed_product_variable _ ->
         let field (_, _, field_def) =
           let env =
             match field_def with
@@ -873,9 +888,6 @@ let rec expression : Typedtree.expression -> term_judg =
           array field es;
           option expression (Option.map fst eo) << Dereference
         ]
-      | Record_unboxed_product_variable ->
-        Misc.fatal_error
-          "value_rec_check: unexpected unknown unboxed-product representation"
       end
     | Texp_ifthenelse (cond, ifso, ifnot) ->
       (*
