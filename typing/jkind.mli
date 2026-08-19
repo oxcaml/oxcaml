@@ -103,6 +103,7 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t  (** See Note [Addressable kinds] *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -119,6 +120,8 @@ module Layout : sig
   end
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
+
+  val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t

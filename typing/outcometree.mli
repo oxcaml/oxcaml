@@ -110,6 +110,7 @@ and out_jkind =
   | Ojkind_var of string * string list
   (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
+  | Ojkind_addressable of out_jkind
 
 (* should be empty if all the jkind annotations are missing *)
 and out_vars_jkinds = (string * out_jkind option) list

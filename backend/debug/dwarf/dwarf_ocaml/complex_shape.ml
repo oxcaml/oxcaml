@@ -76,14 +76,14 @@ let hash { hash; _ } = hash
 let runtime t =
   let desc = Runtime t in
   let layout =
-    Layout.Base (RS.Runtime_layout.to_base_layout (RS.runtime_layout t))
+    Layout.base (RS.Runtime_layout.to_base_layout (RS.runtime_layout t))
   in
   { desc; layout; hash = Hashtbl.hash (hash_runtime, RS.hash t) }
 
 let unboxed_tuple args =
   let desc = Unboxed_product { components = args; kind = Unboxed_tuple } in
   { desc;
-    layout = Layout.Product (List.map to_layout args);
+    layout = Layout.product (List.map to_layout args);
     hash =
       Hashtbl.hash
         ( hash_unboxed_product,
@@ -97,7 +97,7 @@ let record_unboxed args =
     Unboxed_product { components; kind = Unboxed_record field_names }
   in
   { desc;
-    layout = Layout.Product (List.map to_layout components);
+    layout = Layout.product (List.map to_layout components);
     hash =
       Hashtbl.hash
         ( hash_unboxed_product,
@@ -107,7 +107,7 @@ let record_unboxed args =
 
 let void =
   let desc = Void in
-  { desc; layout = Layout.Base Sort.Void; hash = Hashtbl.hash hash_void }
+  { desc; layout = Layout.base Sort.Void; hash = Hashtbl.hash hash_void }
 
 let rec print fmt { desc } =
   match desc with
@@ -202,6 +202,18 @@ let err_exn f =
 let force_runtime_shape_exn cs =
   match runtime_shape cs with Some s -> s | None -> raise Layout_missing
 
+(* CR box: This function should be deleted once addressability affects boxed
+   representations, as addressability will be preserved in shapes and we'll be
+   able to check actual equality *)
+let rec erase_addressable (ly : Layout.t) : Layout.t =
+  match ly with
+  | Base _ | Univar _ | Genvar _ -> ly
+  | Product lys -> Layout.product (List.map erase_addressable lys)
+  | Addressable ly -> erase_addressable ly
+
+let equal_layouts_erasing_addressable ly1 ly2 =
+  Layout.equal (erase_addressable ly1) (erase_addressable ly2)
+
 (* CR mshinwell: it seems like this should move to the frontend *)
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
@@ -231,6 +243,10 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   | Univar _ -> Misc.fatal_error "layout_to_types_layout: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_types_layout: Genvar"
   | Product lys -> Product (Array.of_list (List.map layout_to_types_layout lys))
+  | Addressable ly ->
+    (* CR box: Addressability should be preserved here once it affects boxed
+       representations *)
+    Addressable (layout_to_types_layout ly)
 
 let to_runtime_layout (e : _ Mixed_block_shape.Singleton_mixed_block_element.t)
     : RS.Runtime_layout.t =
@@ -443,7 +459,8 @@ end = struct
     | None -> Unbound
     | Some (idx, bound_layout) -> (
       match bound_layout, use_layout with
-      | Some bound, Some use when not (Layout.equal bound use) ->
+      | Some bound, Some use
+        when not (equal_layouts_erasing_addressable bound use) ->
         Layout_mismatch { bound; use }
       | (Some _ as layout), _ | None, layout -> Bound (idx, layout))
 end
@@ -542,6 +559,7 @@ let rec layout_to_unknown_shape (ly : Layout.t) : t =
     match RS.Runtime_layout.of_base_layout b with
     | Other runtime_layout -> runtime (RS.unknown runtime_layout)
     | Void -> void)
+  | Addressable ly -> layout_to_unknown_shape ly
   | Univar _ -> Misc.fatal_error "layout_to_unknown_shape: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_unknown_shape: Genvar"
 
@@ -558,13 +576,17 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     else unknown_shape_exn ()
   in
   match type_shape.desc, type_layout with
+  | _, Some (Addressable ly) ->
+    (* CR box: Addressability should be preserved here once it affects boxed
+       representations *)
+    type_shape_to_complex_shape_exn ~cache ~rec_env type_shape (Some ly)
   | Leaf, _ -> unknown_shape_exn ()
   | Unknown_type, _ -> unknown_shape_exn ()
   | Tuple args, (None | Some (Base Scannable)) -> (
     let args =
       List.map
         (fun sh ->
-          type_shape_to_complex_shape ~cache ~rec_env sh (Layout.Base Scannable))
+          type_shape_to_complex_shape ~cache ~rec_env sh Layout.scannable)
         (* CR sspies: In the future, we cannot assume that these are always
            values. This means we may need to use
            [type_shape_to_complex_shape_exn] and catch the exception on the
@@ -582,7 +604,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
         f "tuple must have value layout, but got: %a" pp_layout type_layout)
   | At_layout (shape, ly), None ->
     type_shape_to_complex_shape ~cache ~rec_env shape ly
-  | At_layout (shape, ly1), Some ly2 when Layout.equal ly1 ly2 ->
+  | At_layout (shape, ly1), Some ly2
+    when equal_layouts_erasing_addressable ly1 ly2 ->
     type_shape_to_complex_shape ~cache ~rec_env shape ly1
   | At_layout (shape, layout), Some type_layout ->
     err_or_unknown_exn (fun f ->
@@ -613,18 +636,20 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     |> force_runtime_shape_exn |> RS.mu |> runtime
   | Rec_var rv, use_layout -> (
     match Rec_binder_env.lookup rec_env rv ~use_layout with
-    | Bound (i, Some (Layout.Base base)) -> (
-      match RS.Runtime_layout.of_base_layout base with
-      | Void -> void
-      | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
-    | Bound (_, Some (Layout.Product _ as ly)) ->
-      (* We currently do not support unboxed recursive types; fall back to an
-         unknown shape for the layout. *)
-      layout_to_unknown_shape ly
-    | Bound (_, Some (Univar _)) ->
-      Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
-    | Bound (_, Some (Genvar _)) ->
-      Misc.fatal_error "type_shape_to_complex_shape_exn: Genvar"
+    | Bound (i, Some bound_layout) -> (
+      (* CR box: Addressability should be preserved here once it affects boxed
+         representations *)
+      match erase_addressable bound_layout with
+      | Layout.Base base -> (
+        match RS.Runtime_layout.of_base_layout base with
+        | Void -> void
+        | Other runtime_layout -> runtime (RS.rec_var i runtime_layout))
+      | Layout.(Product _ | Addressable _) as ly ->
+        (* We currently do not support unboxed recursive types; fall back to an
+           unknown shape for the layout. *)
+        layout_to_unknown_shape ly
+      | Univar _ -> Misc.fatal_error "type_shape_to_complex_shape_exn: Univar"
+      | Genvar _ -> Misc.fatal_error "type_shape_to_complex_shape_exn: Genvar")
     | Bound (_, None) -> raise Layout_missing
     | Layout_mismatch { bound; use } ->
       err_or_unknown_exn (fun f ->
@@ -651,7 +676,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | Unboxed_tuple _, Some (Base b) ->
     err_or_unknown_exn (fun f ->
         f "unboxed tuple must have product layout, but got: %a" pp_layout
-          (Layout.Base b))
+          (Layout.base b))
   | Unboxed_tuple fields, Some (Product _ as type_layout) ->
     err_or_unknown_exn (fun f ->
         f
@@ -716,7 +741,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
                 (fun arg ->
                   ( None,
                     type_shape_to_complex_shape ~cache ~rec_env arg
-                      (Layout.Base Scannable) ))
+                      Layout.scannable ))
                 pv_constr_args
             in
             (* Currently, all arguments here are values, but sooner or later
@@ -760,7 +785,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | ( Record { fields; kind = Record_unboxed_product },
       Some ((Base _ | Product _) as ly) ) ->
     let layout_from_shapes =
-      Layout.Product (List.map (fun (_, _, _, ly) -> ly) fields)
+      Layout.product (List.map (fun (_, _, _, ly) -> ly) fields)
     in
     err_or_unknown_exn (fun f ->
         f "unboxed record expected to be of layout %a, but got: %a" pp_layout
@@ -799,7 +824,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           kind = Record_unboxed
         },
       ly2 )
-    when Option.value ~default:true (Option.map (Layout.equal field_layout) ly2)
+    when Option.value ~default:true
+           (Option.map (equal_layouts_erasing_addressable field_layout) ly2)
     -> (
     let shape =
       type_shape_to_complex_shape ~cache ~rec_env field_type field_layout
@@ -842,8 +868,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
   | ( Variant_unboxed
         { name; variant_uid = _; arg_name; arg_uid = _; arg_shape; arg_layout },
       ly2 )
-    when Option.value ~default:true (Option.map (Layout.equal arg_layout) ly2)
-    -> (
+    when Option.value ~default:true
+           (Option.map (equal_layouts_erasing_addressable arg_layout) ly2) -> (
     let shape =
       type_shape_to_complex_shape ~cache ~rec_env arg_shape arg_layout
     in
@@ -904,7 +930,7 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
   | Lazy_t, [elem_shape] ->
     let elem_shape =
       type_shape_to_complex_shape_exn ~cache ~rec_env elem_shape
-        (Some (Layout.Base Scannable))
+        (Some Layout.scannable)
     in
     let elem_shape =
       match runtime_shape elem_shape with
