@@ -67,7 +67,21 @@ type location_stack = Location.t list
 type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
 
-type mode = | Mode of string [@@unboxed]
+type mode =
+  | Mode of string loc list
+  | Mode_var of string loc
+  | Mode_bounds of mode_bounds
+
+and mode_bounds =
+  { upper : mode_bound;
+    lower : mode_bound;
+  }
+
+and mode_bound =
+  { bound_vars : string loc list;
+    bound_const : string loc list;
+  }
+
 type modes = mode loc list
 
 type include_kind = Structure | Functor

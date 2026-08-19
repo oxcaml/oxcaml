@@ -1,0 +1,25 @@
+Line 9, characters 23-24:
+9 |   val bad : 'a @ [< 'm | portable] -> 'a @ [> 'm]
+                           ^
+Error: Syntax error
+Line 5, characters 23-24:
+5 |   val bad : 'a @ [> 'm & dynamic] -> 'a @ [< 'm]
+                           ^
+Error: Syntax error
+Line 5, characters 19-20:
+5 |   val bad : 'a @ [<] -> 'a @ [>]
+                       ^
+Error: Syntax error
+Line 5, characters 29-30:
+5 |   val bad : 'a @ [< portable & 'm] -> 'a @ [> 'm]
+                                 ^
+Error: Syntax error
+Line 5, characters 34-35:
+5 |   val bad : 'a @ [< 'm & portable & local] -> 'a @ [> 'm]
+                                      ^
+Error: Syntax error
+Line 5, characters 23-24:
+5 |   val bad : 'a @ [> 'n < 'm] -> 'a @ [> 'm]
+                           ^
+Error: Syntax error
+
