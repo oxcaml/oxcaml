@@ -1,0 +1,10 @@
+File "layout_any_return_direct_literals.ml", line 21, characters 48-52:
+21 |   fun w () -> match w with Int -> 42 | Float -> #1.5
+                                                     ^^^^
+Error: A function may have at most one direct-return layout:
+       this return site has layout float64,
+       but another return site of the same function has layout value.
+File "layout_any_return_direct_literals.ml", line 21, characters 34-36:
+21 |   fun w () -> match w with Int -> 42 | Float -> #1.5
+                                       ^^
+  This is the location of a conflicting return site.

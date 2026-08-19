@@ -4,6 +4,20 @@
 20
 Printing a float#: 1.000000
 Printing a int: 1
+raised int
+raised float#
+forwarded int
+forwarded float#
+recursive int
+recursive float#
+branch int
+branch float#
+switch int
+switch float#
+composed concrete int: 5
+composed concrete float#: 5.000000
+composed int
+composed float#
 a
 b
 c

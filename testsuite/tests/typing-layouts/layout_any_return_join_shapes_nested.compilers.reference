@@ -1,0 +1,10 @@
+File "layout_any_return_join_shapes_nested.ml", line 31, characters 26-30:
+31 |       | Direct_float64 -> #1.5
+                               ^^^^
+Error: A function may have at most one direct-return layout:
+       this return site has layout float64,
+       but another return site of the same function has layout value.
+File "layout_any_return_join_shapes_nested.ml", line 27, characters 18-20:
+27 |     | Leaf_int -> 42
+                       ^^
+  This is the location of a conflicting return site.

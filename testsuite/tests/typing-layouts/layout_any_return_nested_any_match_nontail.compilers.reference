@@ -1,0 +1,10 @@
+File "layout_any_return_nested_any_match_nontail.ml", line 31, characters 8-11:
+31 |         f x [@nontail]
+             ^^^
+Error: This expression is in return position, so its layout must be
+       representable. Only tail calls, whose result is returned directly,
+       and expressions that never return normally, such as raise, are exempt.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because we must know concretely how to return a function result.
