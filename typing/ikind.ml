@@ -869,47 +869,76 @@ let provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly =
               | [] -> None
               | _ :: _ -> Some { provenance; mode_bounds; axes })
     in
-    let raw_axes_by_id = Hashtbl.create (List.length entries) in
+    (* [raw_bounds_by_id] holds, per surviving raw entry, its requirement
+       restricted to its reported axes (top elsewhere): the exact per-axis
+       VALUES the entry's message will demand of its subject. *)
+    let raw_bounds_by_id = Hashtbl.create (List.length entries) in
     List.iter
       (fun entry ->
-        Hashtbl.add raw_axes_by_id entry.provenance.id
-          (axis_set_of_axes entry.axes))
+        Hashtbl.add raw_bounds_by_id entry.provenance.id
+          (restrict_mode_bounds_to_axes entry.mode_bounds entry.axes))
       entries;
     let provenances_by_id = Hashtbl.create (List.length provenances) in
     List.iter
       (fun (provenance : Provenance.t) ->
         Hashtbl.add provenances_by_id provenance.id provenance)
       provenances;
-    let covered_axes_by_id = Hashtbl.create (List.length provenances) in
-    let rec covered_axes (provenance : Provenance.t) =
-      match Hashtbl.find_opt covered_axes_by_id provenance.id with
-      | Some axes -> axes
+    (* An enclosing entry only explains a nested requirement it ENTAILS:
+       same axis and an at-least-as-strong required value. Requirements
+       are kept as a list per ancestor rather than meet-collapsed into a
+       single lattice element: on the diamond axes (portability,
+       contention) the meet of two incomparable ancestor requirements
+       (e.g. shareable and corruptible) would wrongly claim to cover a
+       strictly stronger nested one (portable) that neither ancestor
+       explains. The [parent] links form an acyclic forest, so the walk
+       terminates. *)
+    let covered_bounds_by_id = Hashtbl.create (List.length provenances) in
+    let rec covered_bounds (provenance : Provenance.t) =
+      match Hashtbl.find_opt covered_bounds_by_id provenance.id with
+      | Some bounds -> bounds
       | None ->
-        let parent_axes =
+        let parent_bounds =
           match provenance.parent with
-          | None -> Jkind_axis.Axis_set.empty
-          | Some parent -> covered_axes (Hashtbl.find provenances_by_id parent)
+          | None -> []
+          | Some parent ->
+            covered_bounds (Hashtbl.find provenances_by_id parent)
         in
-        let own_axes =
-          Option.value
-            (Hashtbl.find_opt raw_axes_by_id provenance.id)
-            ~default:Jkind_axis.Axis_set.empty
+        let bounds =
+          match Hashtbl.find_opt raw_bounds_by_id provenance.id with
+          | None -> parent_bounds
+          | Some own -> own :: parent_bounds
         in
-        let axes = Jkind_axis.Axis_set.union parent_axes own_axes in
-        Hashtbl.add covered_axes_by_id provenance.id axes;
-        axes
+        Hashtbl.add covered_bounds_by_id provenance.id bounds;
+        bounds
+    in
+    (* [ancestor] entails [entry] on an axis iff its required value there
+       is below (at least as strong as) the entry's: [co_sub] is bot
+       exactly on those axes. Axes where [ancestor] reports nothing are
+       top after restriction and thus never entail a reported axis. *)
+    let entailed_axes ~ancestor entry =
+      Axis_lattice.co_sub ancestor entry.mode_bounds
+      |> Axis_lattice.non_bot_axes
+      |> List.map Axis_lattice.axis_number_to_axis_packed
+      |> axis_set_of_axes |> Jkind_axis.Axis_set.complement
     in
     entries
     |> List.filter_map (fun entry ->
-        let parent_axes =
+        let parent_bounds =
           match entry.provenance.parent with
-          | None -> Jkind_axis.Axis_set.empty
-          | Some parent -> covered_axes (Hashtbl.find provenances_by_id parent)
+          | None -> []
+          | Some parent ->
+            covered_bounds (Hashtbl.find provenances_by_id parent)
+        in
+        let covered =
+          List.fold_left
+            (fun covered ancestor ->
+              Jkind_axis.Axis_set.union covered (entailed_axes ~ancestor entry))
+            Jkind_axis.Axis_set.empty parent_bounds
         in
         let axes =
           List.filter
             (fun (Jkind_axis.Axis.Pack axis) ->
-              not (Jkind_axis.Axis_set.mem parent_axes axis))
+              not (Jkind_axis.Axis_set.mem covered axis))
             entry.axes
         in
         match axes with

@@ -743,7 +743,9 @@ Line 3, characters 0-47:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value mod portable,
-       because outer is not mod corruptible.
+       because
+       - outer is not mod corruptible
+       - bad is not mod portable
 |}]
 
 (* Same on the contention diamond. *)
@@ -758,7 +760,9 @@ Line 3, characters 0-48:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value mod contended,
-       because outer is not mod corrupted.
+       because
+       - outer is not mod corrupted
+       - bad is not mod contended
 |}]
 
 (* GADTs: only the offending constructor's payload is reported. *)
