@@ -347,13 +347,13 @@ let exported_offsets t = t.offsets
 
 (* Variables *)
 
-let gen_variable ~debug_uid v =
-  (* Variables that are [Not_user_visible_but_needed_by_phantom_let] are treated
-     like user-visible ones here: the provenance causes [Name_for_debugger]
-     operations to be emitted during instruction selection (including via
-     [Cname_for_debugger]), without which the phantom lets' references to such
-     variables could not be resolved by the debugger. *)
-  let user_visible = Variable.user_visible_or_needed_by_phantom_let v in
+let gen_variable ~debug_uid ~needed_by_phantom_let v =
+  (* Binders marked as needed by phantom lets are treated like user-visible ones
+     here: the provenance causes [Name_for_debugger] operations to be emitted
+     during instruction selection (including via [Cname_for_debugger]), without
+     which the phantom lets' references to such variables could not be resolved
+     by the debugger. *)
+  let user_visible = Variable.user_visible v || needed_by_phantom_let in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
   let provenance =
@@ -377,12 +377,12 @@ let add_bound_param env v v' =
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
   { env with vars }
 
-let create_bound_parameter env (v, debug_uid) =
+let create_bound_parameter env (v, debug_uid, needed_by_phantom_let) =
   if Variable.Map.mem v env.vars
   then
     Misc.fatal_errorf "Cannot rebind variable %a in To_cmm environment"
       Variable.print v;
-  let v' = gen_variable v ~debug_uid in
+  let v' = gen_variable v ~debug_uid ~needed_by_phantom_let in
   let env = add_bound_param env v v' in
   env, v'
 
@@ -506,7 +506,9 @@ let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
     !next_order
   in
   let cmm_var =
-    gen_variable ~debug_uid:(Bound_var.debug_uid var) (Bound_var.var var)
+    gen_variable ~debug_uid:(Bound_var.debug_uid var)
+      ~needed_by_phantom_let:(Bound_var.needed_by_phantom_let var)
+      (Bound_var.var var)
   in
   let binding = Binding { order; inline; effs; cmm_var; bound_expr } in
   binding

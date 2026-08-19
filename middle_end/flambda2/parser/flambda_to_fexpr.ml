@@ -128,15 +128,10 @@ let arity (a : [`Unarized] Flambda_arity.t) : Fexpr.arity =
 let arity_opt (a : [`Unarized] Flambda_arity.t) : Fexpr.arity option =
   if is_default_arity a then None else Some (arity a)
 
-let needed_by_phantom_let var =
-  match Variable.user_visibility var with
-  | Not_user_visible_but_needed_by_phantom_let -> true
-  | User_visible | Not_user_visible -> false
-
 let kinded_parameter env (kp : Bound_parameter.t) :
     Fexpr.kinded_parameter * Env.t =
   let k = Bound_parameter.kind kp |> kind_with_subkind_opt in
-  let needed_by_phantom_let = needed_by_phantom_let (Bound_parameter.var kp) in
+  let needed_by_phantom_let = Bound_parameter.needed_by_phantom_let kp in
   let param, env = Env.bind_var env (Bound_parameter.var kp) in
   { param; kind = k; needed_by_phantom_let }, env
 
@@ -359,7 +354,7 @@ and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
     | var :: _ -> Name_mode.is_phantom (Bound_var.name_mode var)
   in
   let vars_needed_by_phantom_let =
-    List.map (fun var -> needed_by_phantom_let (Bound_var.var var)) vars
+    List.map Bound_var.needed_by_phantom_let vars
   in
   let vars, body_env = map_accum_left Env.bind_bound_var env vars in
   let body = expr body_env body in

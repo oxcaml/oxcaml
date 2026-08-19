@@ -65,6 +65,24 @@ let add_set_of_closures_offsets ~is_phantom named uacc =
   Named.fold_code_and_sets_of_closures named ~init:uacc
     ~f_code:add_offsets_from_code ~f_set:add_offsets_from_set
 
+(* Whether [var], bound at normal mode, also has phantom-mode occurrences in
+   [free_names] (i.e. it is referenced by the defining expression of at least
+   one phantom let) and its binder should therefore be marked as needed by
+   phantom lets, so that the variable remains locatable by the debugger. [false]
+   for user-visible variables (no marking is needed) and for kinds that cannot
+   be referenced by phantom defining expressions once translated to Cmm (for
+   example the region of a local allocation whose [Make_block] has been
+   phantomised). *)
+let variable_needs_np_promotion free_names var =
+  (not (Variable.user_visible var))
+  && (match Variable.kind var with
+    | Region | Rec_info -> false
+    | Value | Naked_number _ -> true)
+  &&
+  match Name_occurrences.count_variable_phantom_mode free_names var with
+  | Zero -> false
+  | One | More_than_one -> true
+
 let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
     ~free_names_of_defining_expr ~body ~cost_metrics_of_defining_expr =
   (* The name occurrences component of [uacc] is expected to be in the state
@@ -72,6 +90,27 @@ let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
   let name_mode = Bound_pattern.name_mode bound_vars in
   let is_phantom = Name_mode.is_phantom name_mode in
   let free_names_of_body = UA.name_occurrences uacc in
+  (* A variable bound at normal mode may additionally be referenced by the
+     defining expressions of phantom lets in the body. Mark the binders of any
+     such variables (see [Bound_var.needed_by_phantom_let], printed as "NP"). *)
+  let bound_vars =
+    if
+      (not (Name_mode.is_normal name_mode))
+      || Are_rebuilding_terms.do_not_rebuild_terms
+           (UA.are_rebuilding_terms uacc)
+    then bound_vars
+    else
+      let promote bound_var =
+        if variable_needs_np_promotion free_names_of_body (VB.var bound_var)
+        then VB.with_needed_by_phantom_let bound_var
+        else bound_var
+      in
+      match (bound_vars : Bound_pattern.t) with
+      | Static _ -> bound_vars
+      | Singleton bound_var -> Bound_pattern.singleton (promote bound_var)
+      | Set_of_closures bvs ->
+        Bound_pattern.set_of_closures (List.map promote bvs)
+  in
   let free_names_of_defining_expr =
     if not is_phantom
     then free_names_of_defining_expr
