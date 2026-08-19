@@ -1274,6 +1274,22 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
       out_jkind_of_desc env { desc with base = Layout lay }
     else
       Ojkind_addressable (out_jkind_of_desc env { desc with base = Layout lay })
+  (* XCR rtjoa: is this comment necessary?
+
+     aide: I'd keep it: without it the [when] guard reads as dead
+     defensiveness, but it is load-bearing - a constant box must reach
+     [to_out_jkind_const] so its bounds are placed relative to the layout
+     (this arm would print them inside the [box]).
+
+     rtjoa: Why is this not symmetric with products?
+
+     aide: Because bounds distribute over products and not into boxes:
+     [(k1 & k2) mod m] denotes the same kind as [(k1 mod m & k2 mod m)]
+     (the components' bounds join, and join is idempotent), so the
+     [Product] arm may carry [desc]'s bounds into every component and
+     print them there. Bounds written inside a box describe the payload,
+     not the box, so a constant box has to take the [to_out_jkind_const]
+     path, which prints them outside. *)
   (* A constant [Box] is printed by [Jkind.Const.to_out_jkind_const], which
      puts the kind's mod- and with-bounds outside the layout *)
   | Layout (Box (lay, sa)) when Option.is_none (Jkind.Desc.get_const desc) ->

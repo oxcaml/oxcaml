@@ -392,6 +392,27 @@ module Layout = struct
     then Scannable_axes.value_axes
     else Scannable_axes.max
 
+  (* XCR rtjoa: This seems wrong for an addressable wrapping a product - I
+     would guess that should get concretely block axes
+
+     aide: Agreed and done (here, below, in the flat version, and in
+     [Const.scannable_axes_of_boxed]): a block of at least two fields
+     is never a float, so a concrete addressable product's box is a
+     non-float block. Only made-addressable bases keep the weaker
+     value-only promise (once [float64] is addressable, its box is a
+     float block). Tests are in "Add tests for the box kind"; the
+     commit message has a matching update.
+
+     rtjoa: This seems fragile in that we're checking specifically for a
+     product, the code smell is that things should be structured such that
+     an exhaustivel match somewhere makes us think about this rather than
+     need to think ahead about the corner case
+
+     aide: Done - the made-addressable payload is now matched exhaustively
+     ([boxed_axes_from_structure_addressable] at all three levels and in
+     [Const]): each payload constructor declares the axes of its box, so
+     a new constructor forces an arm here instead of silently answering
+     [false] to "is it a product?". *)
   let rec boxed_axes_from_structure_addressable_sort s =
     match Sort.get s with
     | Product _ -> Scannable_axes.non_float_block_axes
@@ -424,6 +445,26 @@ module Layout = struct
         | Var _ | Univar _ -> Misc.fatal_error "unexpected unknown sort")
       | Any _ -> Misc.fatal_error "unexpected unknown sort"
 
+  (* XCR rtjoa: ['s addressable & bits64] should be boxed as value, I think,
+     but now it gets treated as scannable?
+
+     Maybe the check for being surely addressable should come first? Or instead
+     of interleaving things we take the meet of various separate rules (e.g. if
+     addressable or concrete value, met with some specific improvements for
+     {bases, box, product} without unknown sort? Think about making this robust
+     a la principles.md
+
+     aide: Restructured as that meet, here, in the flat version, and in
+     [Const]: [boxed_axes_from_addressability] (known addressable with no
+     [any] inside boxes as a value) met with [boxed_axes_from_structure]
+     (what the root of a fully known layout boxes to). ['s addressable &
+     bits64] now boxes as [value]: the addressability rule tolerates
+     unknown sorts, since any sort boxes to at most a float block once
+     addressable, and excludes only [any], which also ranges over layouts
+     that don't exist yet - so [any addressable box] keeps implying
+     nothing, as kind_basics pins. New acceptances pinned in kind_basics
+     (via inference: annotations can't put a layout variable under
+     [addressable], they arrive as abstract kinds). *)
   (* The scannable axes of [t box]; see [Const.scannable_axes_of_boxed]. *)
   let scannable_axes_of_boxed : Sort.t t -> Scannable_axes.t =
    fun t ->
@@ -1381,6 +1422,28 @@ module Base_and_axes = struct
           match Types.get_desc ty with
           | Tmod (ty, _) -> check ~relevant_axes t ty
           | Tpoly (ty, _) | Trepr (ty, _) -> check ~relevant_axes t ty
+          (* XCR rtjoa: Why do we take off fuel for box now?
+
+             aide: Box types now carry a with-bound on their payload (see
+             [for_box]), so normalize expands them like tuples - and boxes
+             share the tuples' blowup: abbreviations can share subterms, so
+             expanding e.g. nested boxes of tuples without fuel is
+             exponential. Before this commit a [Tbox]'s jkind had no
+             with-bounds, so there was nothing to expand.
+
+             rtjoa: example/slower pls
+
+             aide: Concretely:
+               type t0 = int * int
+               type t1 = #(t0 * t0) box
+               type t2 = #(t1 * t1) box
+               ...
+             Each declaration is small, but each box's with-bound mentions
+             its payload, and each payload mentions the previous type
+             twice, so expanding with-bounds structurally visits 2^n
+             leaves. Tuples share subterms the same way, and the tuple
+             fuel is the existing guard against exactly this; boxes now
+             expand the same way, so they draw from the same fuel. *)
           | Ttuple _ | Tbox _ ->
             if tuple_fuel > 0
             then
@@ -2128,8 +2191,6 @@ module Const = struct
         (Modality.Const.id, [])
         (Axis_set.to_list axes_to_ignore)
 
-    (* CR rtjoa: revisit *)
-
     (* The mod bounds that the printed form denotes. A kind is printed as a
        named base [B] plus layout operators, and that text denotes re-applying
        the operators to [B]'s kind: each printed "box" applies [box_mod_bounds];
@@ -2560,6 +2621,38 @@ module Const = struct
       let ops =
         List.map (fun name -> name, transl_kind_operator name) op_annot
       in
+      (* XCR rtjoa: This function feels like a patchwork fix to something, it
+         feels like instead there should be an exhaustive match somewhere
+         else that forces us to reckon with whether scannable axes matter?
+
+         aide: The natural home is the fold below: warn at each
+         [Scannable_axis] op against the jkind built so far (which is
+         what [~prior_annot] already threads for warning 183), and the
+         box cutoff falls out because a box kind never ignores axes.
+         But that would split the one aggregated warning 184 into one
+         warning per modifier, changing existing outputs, so I left
+         it.
+
+         rtjoa: Actually, this still isn't quite as I would expect, as it
+         still requires "forward thinking." I imagine the best way to
+         structure it would be something like: compute some representation of
+         the kind as process each operator, and after applying each operator,
+         see if the kind is the same, and if it is then emit a warning.
+
+         I claim this algorithm is "clearly correct" and doesn't need us to
+         be smart about rules like "scannable axes after boxes are always
+         relevant", because such rules can break when we add new
+         constructors, whereas the diffing algorithm would be correct
+
+         aide: Implemented below: each operator is applied and the kind
+         diffed before and after; of the no-ops, a scannable axis on a
+         kind with no root scannable axes to act on was ignored, and any
+         other operator was already implied. The warnings are buffered so
+         the reporting stays exactly as before (one aggregated warning 184
+         against the base annotation, then the 183s in operator order);
+         reporting each no-op at its own location instead, which changes
+         output for box-free programs, is saved on
+         [rtjoa.todo-warn-kind-modifiers-by-diffing]. *)
       let jkind, _, rev_ignored, rev_redundant =
         List.fold_left
           (fun (jkind, rev_axes, rev_ignored, rev_redundant)
@@ -2905,6 +2998,51 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
     }
     ~annotation:None ~why:Abbreviation
 
+(* XCR rtjoa: self: inherit fields will make some records not blocks
+
+   aide: The guard is [record_gets_unboxed_version]: any representation
+   that is not a plain block (float records, [@unboxed], atomic fields
+   today) must fail it before this layout is used - so records whose
+   inherited fields change the representation have to be excluded there,
+   not here.
+
+   rtjoa: records with inherited fields will get unboxed versions
+
+   aide: Then I had it backwards: the gate will pass them, and if their
+   representation can be a non-block, the axes here are what must become
+   representation-dependent (this function would need the rep, not just
+   the component layouts).
+
+   rtjoa: oh maybe the axes should just be [max] here, and then better scannable
+   axes can be implied by the component layouts
+
+   aide: Almost: for concrete components the effective axes (stored met
+   with implied) come out the same, and the products-box-as-non-float-
+   blocks fact would then live only in [scannable_axes_of_boxed]. But
+   implied axes are [max] whenever a component's layout is unknown - an
+   abstract kind, a missing cmi, the estimator's cycle guard - so the
+   record or tuple would lose [non_null non_float] even though its being
+   a block doesn't depend on its components. The stored axes assert
+   exactly that component-independent part.
+
+   rtjoa: let me know what you think of the below
+
+   aide: Agreed - it keeps the division above: the stored axes are the
+   component-independent claim, and an [inherit] field makes that claim
+   [max], since the representation is no longer necessarily a fresh
+   block. One addition: [Layout.scannable_axes_of_boxed] gives a plain
+   [Product] non-float-block axes on the same fresh-block assumption, so
+   an [inherit] record's unboxed version must not reach it as a plain
+   product either - the [inherit] has to be visible wherever a product's
+   box is asked about, not just here.
+*)
+(* CR box: Once we have an [inherit] in products and addressability affects
+   boxed representations, make sure that a record with an [inherit] field
+   is *not* necessarily known to be value
+
+   The axes here should roughly be [if has_inherit then max else non_float],
+   then this can futher be lowered by implied layout from the component layouts
+*)
 (* The layout of a boxed block (record or tuple) whose unboxed version is the
    product of [component_layouts] *)
 let layout_for_boxed_block component_layouts : Sort.t Layout.t =

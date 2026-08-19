@@ -1320,6 +1320,10 @@ module Layout = struct
       | Product cs -> List.exists has_unknown_sort cs
       | Addressable c -> has_unknown_sort c
 
+    (* XCR rtjoa: revisit
+
+       aide: Restructured, with the discussion: see the thread at
+       [Layout.scannable_axes_of_boxed] in jkind.ml. *)
     (* The two rules below are independently sound upper bounds on the
        scannable axes of [t box]; [scannable_axes_of_boxed] is their meet.
 
@@ -1365,6 +1369,10 @@ module Layout = struct
           | Any _ | Univar _ | Genvar _ ->
             Misc.fatal_error "unexpected unknown sort")
 
+    (* XCR rtjoa: Now see comment elsewhere
+
+       aide: Restructured, with the discussion: see the thread at
+       [Layout.scannable_axes_of_boxed] in jkind.ml. *)
     let scannable_axes_of_boxed t =
       Scannable_axes.meet
         (boxed_axes_from_addressability t)

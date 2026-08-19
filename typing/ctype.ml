@@ -3048,6 +3048,39 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts ->
+    (* XCR rtjoa: What if we return [any box], and then, say
+       [constrain_type_jkind] will dig deeper if it needs to? Worried about the
+       performance implications
+
+       aide: It needs a new constrain step first: [constrain_type_jkind]
+       decomposes products and or_null, but never digs into a tuple's
+       component types against a box kind, so [any box] would break e.g.
+       [int or_null * string <= (value_or_null & value) box]
+       (records_and_tuples.ml). What we build eagerly is cheap, though:
+       one shallow [estimate_type_layout] per component, no recursion
+       into nested tuples, so O(components) per tuple kind. Lazy [any
+       box] plus a Box-vs-Box constrain step that revisits the type would
+       be a coherent alternative; happy to explore as a follow-up.
+
+       aide: Prototyped in this commit, with [any box] (carrying a block's
+       axes, which hold whatever the components are). On the cheap
+       (non-[expand_components]) path the estimate here is free, and the
+       [Ttuple] case of [constrain_type_jkind] re-estimates the component
+       layouts and retries when a check needs them. Declarations use
+       [type_jkind] ([expand_components:true]) and keep precise component
+       layouts, since inclusion checks compare stored jkinds without
+       revisiting the type.
+
+       rtjoa: self: still think about perf cost. might be able to return [any
+       box] here if we use constrain-like algorithm in inclusion check. claude
+       suggests ~needs_layout flag
+
+       rtjoa: let's add [need_layout] as a new commit
+
+       aide: Added as "Add need_layout to skip tuple layouts for bounds-only
+       uses": it threads from [type_jkind] down to this estimate, and the
+       normalize contexts ([mk_jkind_context_check_principal] and friends)
+       pass [false], since their one consumer reads only the bounds. *)
     let component_layouts =
       if expand_components && need_layout
       then
@@ -3143,6 +3176,18 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
       (incr_stage env) ty
     |> Jkind.map_type_expr new_quote_ty
   | Tbox payload ->
+    (* XCR rtjoa: What happens if we just use [any box] here?
+
+       aide: Checks of a box type against a box kind with a real payload
+       fail: [box] is free, so [any box <= value box] does not hold, and
+       e.g. box.ml's [('a : value box)] parameters and the [value box]
+       sealing tests stop accepting concrete box types.
+       [constrain_type_jkind] has no step that digs into a [Tbox]'s
+       payload type today, so the payload layout must be estimated
+       eagerly; the estimate is shallow (one level, no recursion into
+       nested tuples), so it stays cheap. A lazy [any box] plus a
+       Box-vs-Box constrain step that revisits the type would be a
+       coherent alternative - see the sibling CR on [Ttuple]. *)
     Jkind.for_box
       ~payload_layout:
         (estimate_type_layout ~expand_components env ~visited:[get_id ty]
@@ -3198,6 +3243,20 @@ and estimate_type_layout ~expand_components env ~visited ty
          not recurse into its elements: type abbreviations can share tuple
          subterms, making structural recursion (and downstream traversals of
          the resulting layout) exponential. *)
+      (* XCR rtjoa: what about in the future when tuples can contain non-values?
+
+         aide: Still sound: this is the layout of the tuple type itself,
+         which stays a pointer to its block. A block of two or more fields
+         is never a [float] - even an all-[float64] tuple stored flat
+         would be a float-array block, not a boxed float - so [non_null]
+         and [non_float] survive those futures.
+
+         rtjoa: gotcha. is there a simpler way to say this layout? maybe there
+         should be layout_for_tuple somewhere?
+
+         aide: Added [Jkind.Layout.non_float_block] and used it here. Named
+         for what the layout is: rows and arrows have the same value
+         layout, so a tuple-specific name would be too narrow. *)
       Jkind.Layout.non_float_block
     | Tbox payload ->
       Jkind.Layout.Box
@@ -3255,7 +3314,7 @@ let type_jkind_purely_if_principal ?need_layout env ty =
   | false -> None
 let () =
   type_jkind_purely_if_principal'
-    := fun env ty -> type_jkind_purely_if_principal env ty
+    := fun env ty -> type_jkind_purely_if_principal ~need_layout:true env ty
 
 let estimate_type_jkind =
   estimate_type_jkind ~expand_components:false ~need_layout:true
