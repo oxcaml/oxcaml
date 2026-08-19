@@ -221,9 +221,10 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
       cu_shape;
       stats;
       related_uids;
-      module_facts = into.module_facts;
-      module_facts_present =
-        into.module_facts_present && module_implementation_facts_present;
+      module_facts =
+        if module_implementation_facts_present then
+          Some (link_module_facts Module_facts_compact.empty)
+        else into.module_facts;
       root_directory = into.root_directory
     },
     facts_run )
@@ -237,8 +238,7 @@ let shape_of_artifact ~impl_shape ~modname =
     stats = Stats.empty;
     root_directory = None;
     related_uids = Uid_map.empty ();
-    module_facts = empty_module_facts ();
-    module_facts_present = true
+    module_facts = None
   }
 
 let shape_of_cmt { Cmt_format.cmt_impl_shape; cmt_modname; _ } =
@@ -310,17 +310,18 @@ let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~module_implementation_facts_present:cms_module_implementation_facts_present
 
 let facts_of_index_input ~file (index : index) =
-  match
-    Module_facts_compact.to_facts (module_facts_block index.module_facts)
-  with
-  | Ok facts -> (facts, true)
-  | Error message ->
-    Log.error "Cannot read the module facts of %s: %s" file message;
-    (Module_implementation_facts.empty, false)
-  | exception exn ->
-    Log.error "Cannot read the module facts of %s: %s" file
-      (Printexc.to_string exn);
-    (Module_implementation_facts.empty, false)
+  match index.module_facts with
+  | None -> (Module_implementation_facts.empty, false)
+  | Some module_facts -> (
+    match Module_facts_compact.to_facts (module_facts_block module_facts) with
+    | Ok facts -> (facts, true)
+    | Error message ->
+      Log.error "Cannot read the module facts of %s: %s" file message;
+      (Module_implementation_facts.empty, false)
+    | exception exn ->
+      Log.error "Cannot read the module facts of %s: %s" file
+        (Printexc.to_string exn);
+      (Module_implementation_facts.empty, false))
 
 let read_index_input_uncached ~file =
   match read ~file with
@@ -346,8 +347,10 @@ let merge_index ~store_shapes ~into index =
     approximated;
     stats;
     related_uids;
-    module_facts_present =
-      into.module_facts_present && index.module_facts_present
+    module_facts =
+      (match into.module_facts with
+      | Some _ -> into.module_facts
+      | None -> index.module_facts)
   }
 
 let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
@@ -360,8 +363,7 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
       stats = Stats.empty;
       root_directory = root;
       related_uids = Uid_map.empty ();
-      module_facts = empty_module_facts ();
-      module_facts_present = true
+      module_facts = None
     }
   in
   let final_index, facts_runs =
@@ -403,7 +405,7 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
               let facts_run, decoded = facts_of_index_input ~file index in
               ( merge_index ~store_shapes
                   { index with
-                    module_facts_present = index.module_facts_present && decoded
+                    module_facts = if decoded then index.module_facts else None
                   }
                   ~into,
                 facts_run :: facts_runs )
@@ -417,8 +419,11 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
   let final_index =
     { final_index with
       module_facts =
-        inline_module_facts
-          (Module_implementation_facts.merge_many (List.rev facts_runs))
+        Option.map
+          (fun _ ->
+            inline_module_facts
+              (Module_implementation_facts.merge_many (List.rev facts_runs)))
+          final_index.module_facts
     }
   in
   let final_index =
@@ -436,8 +441,7 @@ let gather_shapes ~output_file files =
       stats = Stats.empty;
       root_directory = None;
       related_uids = Uid_map.empty ();
-      module_facts = empty_module_facts ();
-      module_facts_present = true
+      module_facts = None
     }
   in
   let final_index, facts_runs =
@@ -458,7 +462,7 @@ let gather_shapes ~output_file files =
             let facts_run, decoded = facts_of_index_input ~file index in
             ( merge_index ~store_shapes:true
                 { index with
-                  module_facts_present = index.module_facts_present && decoded
+                  module_facts = if decoded then index.module_facts else None
                 }
                 ~into,
               facts_run :: facts_runs )
@@ -473,8 +477,11 @@ let gather_shapes ~output_file files =
   let final_index =
     { final_index with
       module_facts =
-        inline_module_facts
-          (Module_implementation_facts.merge_many (List.rev facts_runs))
+        Option.map
+          (fun _ ->
+            inline_module_facts
+              (Module_implementation_facts.merge_many (List.rev facts_runs)))
+          final_index.module_facts
     }
   in
   write ~file:output_file final_index
