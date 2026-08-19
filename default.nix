@@ -13,7 +13,7 @@
   oxcamlClang ? false,
   oxcamlLldb ? false,
   syntaxQuotations ? false,
-  withMerlin ? false,
+  withMerlin ? true,
 }:
 let
   inherit (pkgs) lib fetchpatch;
