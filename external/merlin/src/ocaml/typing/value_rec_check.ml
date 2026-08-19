@@ -280,9 +280,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_try _
     | Texp_override _
     | Texp_letop _
-    (* CR metaprogramming aivaskovic: verify for quotations and splices *)
-    | Texp_quotation _
-    | Texp_antiquotation _ ->
+    | Texp_quote _
+    | Texp_splice _ ->
         Dynamic
     | Texp_typed_hole -> Static
   and classify_value_bindings rec_flag env bindings =
@@ -1115,10 +1114,10 @@ let rec expression : Typedtree.expression -> term_judg =
         expression exp2
       ]
     | Texp_hole _ -> empty
-    | Texp_quotation e ->
+    | Texp_quote e ->
         (* The quoted code may be spliced into a dereferencing context. *)
         expression e << Dereference
-    | Texp_antiquotation e ->
+    | Texp_splice e ->
         expression e << Dereference
 
 (* Function bodies.
@@ -1200,9 +1199,9 @@ and modexp : Typedtree.module_expr -> term_judg =
       path pth
     | Tmod_structure s ->
       structure s
-    | Tmod_functor (_, e) ->
+    | Tmod_functor (_, e, _) ->
       modexp e << Delay
-    | Tmod_apply (f, p, _, _) ->
+    | Tmod_apply (f, p, _, _, _) ->
       join [
         modexp f << Dereference;
         modexp p << Dereference;

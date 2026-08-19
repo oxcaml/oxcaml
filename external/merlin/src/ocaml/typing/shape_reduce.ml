@@ -140,8 +140,8 @@ end) = struct
     | NLeaf
     | NComp_unit of string
     | NError of string
-    | NMu of nf
-    | NRec_var of Shape.DeBruijn_index.t
+    | NMu of Shape.Rec_var_ident.t * nf
+    | NRec_var of Shape.Rec_var_ident.t
     | NMutrec of nf Ident.Map.t
     | NProj_decl of nf * Ident.t
     | NConstr of Ident.t * nf list
@@ -226,17 +226,18 @@ end) = struct
       else false
     | NLeaf, NLeaf -> true
     | NStruct t1, NStruct t2 ->
-      Item.Map.equal equal_delayed_nf t1 t2
+      t1 == t2 || Item.Map.equal equal_delayed_nf t1 t2
     | NProj (t1, i1), NProj (t2, i2) ->
       if Item.compare i1 i2 <> 0 then false
       else equal_nf t1 t2
     | NComp_unit c1, NComp_unit c2 -> String.equal c1 c2
     | NAlias a1, NAlias a2 -> equal_delayed_nf a1 a2
     | NError e1, NError e2 -> String.equal e1 e2
-    | NMu (nf1), NMu (nf2) -> equal_nf nf1 nf2
-    | NRec_var i1, NRec_var i2 -> DeBruijn_index.equal i1 i2
+    | NMu (rv1, nf1), NMu (rv2, nf2) ->
+      Shape.Rec_var_ident.equal rv1 rv2 && equal_nf nf1 nf2
+    | NRec_var rv1, NRec_var rv2 -> Shape.Rec_var_ident.equal rv1 rv2
     | NMutrec defs1, NMutrec defs2 ->
-      Ident.Map.equal equal_nf defs1 defs2
+      defs1 == defs2 || Ident.Map.equal equal_nf defs1 defs2
     | NProj_decl (nf1, id1), NProj_decl (nf2, id2) ->
       Ident.equal id1 id2 && equal_nf nf1 nf2
     | NConstr (id1, args1), NConstr (id2, args2) ->
@@ -567,8 +568,8 @@ end) = struct
               reduce env res
           end
       | Leaf -> return NLeaf
-      | Mu t_body -> return (NMu (reduce env t_body))
-      | Rec_var n -> return (NRec_var n)
+      | Mu (rv, t_body) -> return (NMu (rv, reduce env t_body))
+      | Rec_var rv -> return (NRec_var rv)
       | Struct m ->
           let mnf = Item.Map.map (delay_reduce env) m in
           return (NStruct mnf)
@@ -656,10 +657,10 @@ end) = struct
     | NComp_unit s -> comp_unit ?uid s
     | NAlias nf -> alias ?uid (read_back_force nf)
     | NError t -> error ?uid t
-    | NMu (t_body) ->
-      mu ?uid (read_back t_body)
-    | NRec_var n ->
-      rec_var ?uid n
+    | NMu (rv, t_body) ->
+      mu ?uid rv (read_back t_body)
+    | NRec_var rv ->
+      rec_var ?uid rv
     | NMutrec defs ->
       let t_defs = Ident.Map.map read_back defs in
       mutrec ?uid t_defs

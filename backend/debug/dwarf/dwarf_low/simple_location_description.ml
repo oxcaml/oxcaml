@@ -19,10 +19,7 @@ module Operator = Dwarf_operator
 
 type t = Dwarf_operator.t list
 
-let size t =
-  List.fold_left
-    (fun size op -> Dwarf_int.add size (Operator.size op))
-    (Dwarf_int.zero ()) t
+let size t = Operator.size_of_expression t
 
 let emit ~asm_directives t =
   List.iter (fun op -> Operator.emit ~asm_directives op) t

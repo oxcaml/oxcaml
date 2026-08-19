@@ -749,10 +749,10 @@ let expr sub x =
     | Texp_overwrite (exp1, exp2) ->
         Texp_overwrite (sub.expr sub exp1, sub.expr sub exp2)
     | Texp_hole use -> Texp_hole use
-    | Texp_quotation exp ->
-        Texp_quotation (sub.expr sub exp)
-    | Texp_antiquotation exp ->
-        Texp_antiquotation (sub.expr sub exp)
+    | Texp_quote exp ->
+        Texp_quote (sub.expr sub exp)
+    | Texp_splice exp ->
+        Texp_splice (sub.expr sub exp)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}
@@ -911,14 +911,16 @@ let module_expr sub x =
     match x.mod_desc with
     | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc_lid sub lid)
     | Tmod_structure st -> Tmod_structure (sub.structure sub st)
-    | Tmod_functor (arg, mexpr) ->
-        Tmod_functor (functor_parameter sub arg, sub.module_expr sub mexpr)
-    | Tmod_apply (mexp1, mexp2, c, yielding) ->
+    | Tmod_functor (arg, mexpr, staticity) ->
+        Tmod_functor
+          (functor_parameter sub arg, sub.module_expr sub mexpr, staticity)
+    | Tmod_apply (mexp1, mexp2, c, yielding, staticity) ->
         Tmod_apply (
           sub.module_expr sub mexp1,
           sub.module_expr sub mexp2,
           sub.module_coercion sub c,
-          yielding
+          yielding,
+          staticity
         )
     | Tmod_apply_unit (mexp1, yielding) ->
         Tmod_apply_unit (sub.module_expr sub mexp1, yielding)

@@ -138,6 +138,7 @@
   config
   build_path_prefix_map
   misc
+  hash_consed
   identifiable
   numbers
   arg_helper
@@ -556,7 +557,12 @@
  ; We should change the code so this "-open" can be removed.
  ; Likewise fix occurrences of warnings 9, 27, 32, 33, 34, 37, 39, and 60.
  (flags
-  (:standard -w -27-32-33-34-37-39-60-69-70))
+  (:standard
+   -strict-sequence
+   -bin-annot
+   -safe-string
+   -strict-formats
+   -w -27-32-33-34-37-39-60-69-70))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (instrumentation

@@ -570,8 +570,8 @@ let rec of_expression_desc loc = function
         alloc_mode = _
       } -> of_expression record
   | Texp_hole _ -> id_fold
-  | Texp_quotation exp -> of_expression exp
-  | Texp_antiquotation exp -> of_expression exp
+  | Texp_quote exp -> of_expression exp
+  | Texp_splice exp -> of_expression exp
   | Texp_apply_layout (exp, _) -> of_expression exp
 
 (* We should consider taking into account param.fp_loc at some point, as it
@@ -628,10 +628,10 @@ and of_class_field_desc = function
 and of_module_expr_desc = function
   | Tmod_ident _ -> id_fold
   | Tmod_structure str -> app (Structure str)
-  | Tmod_functor (Unit, me) -> of_module_expr me
-  | Tmod_functor (Named (_, _, mt, modes), me) ->
+  | Tmod_functor (Unit, me, _) -> of_module_expr me
+  | Tmod_functor (Named (_, _, mt, modes), me, _) ->
     of_module_type mt ** of_module_expr me ** of_modes modes
-  | Tmod_apply (me1, me2, _, _) -> of_module_expr me1 ** of_module_expr me2
+  | Tmod_apply (me1, me2, _, _, _) -> of_module_expr me1 ** of_module_expr me2
   | Tmod_apply_unit (me1, _) -> of_module_expr me1
   | Tmod_constraint (me, _, mtc, _) ->
     of_module_expr me ** app (Module_type_constraint mtc)
@@ -1029,7 +1029,7 @@ let pattern_paths (type k) { Typedtree.pat_desc; pat_extra; _ } =
 let module_expr_paths { Typedtree.mod_desc } =
   match mod_desc with
   | Tmod_ident (path, loc) -> [ (reloc path loc, Some loc.txt) ]
-  | Tmod_functor (Named (Some id, loc, _, _), _) ->
+  | Tmod_functor (Named (Some id, loc, _, _), _, _) ->
     [ (reloc (Path.Pident id) loc, Option.map ~f:mk_lident loc.txt) ]
   | _ -> []
 

@@ -51,6 +51,76 @@ module Diagnostics : sig
   type t = { mutable variables : variable_reduction list }
 end
 
+(** Context threaded through the translation of runtime shapes to DWARF DIEs. *)
+module Die_gen_ctx : sig
+  (** The recursive-variable environment used when translating runtime shapes to
+      DWARF DIEs. *)
+  module Rec_var_env : sig
+    type t
+
+    include Hashtbl.HashedType with type t := t
+
+    val get_opt :
+      t ->
+      de_bruijn_index:Runtime_shape.DeBruijn_index.t ->
+      Proto_die.reference option
+  end
+
+  (** Cache memoizing [runtime_shape_to_dwarf_die] results. *)
+  module Cache : sig
+    type t
+
+    val create : initial_size:int -> t
+
+    val find :
+      t ->
+      inp:Runtime_shape.t ->
+      rec_env:Rec_var_env.t ->
+      Proto_die.reference option
+
+    val add :
+      t ->
+      inp:Runtime_shape.t ->
+      rec_env:Rec_var_env.t ->
+      outp:Proto_die.reference ->
+      unit
+  end
+
+  (** DWARF DIE cache for named type shapes. *)
+  module Name_cache : sig
+    type t
+
+    val create : initial_size:int -> t
+
+    (** [find_unused_name_or_cached t name runtime_shape] returns
+        [Left reference] if a (possibly suffix-numbered) version of [name] is
+        already associated with [runtime_shape], or [Right name'] with the first
+        unused suffix-numbered version of [name] otherwise. *)
+    val find_unused_name_or_cached :
+      t -> string -> Runtime_shape.t -> (Proto_die.reference, string) Either.t
+
+    val add : t -> string -> Runtime_shape.t -> Proto_die.reference -> unit
+  end
+
+  type t
+
+  val create : initial_size:int -> t
+
+  val cache : t -> Cache.t
+
+  val name_cache : t -> Name_cache.t
+
+  (** The empty recursive-variable environment, interned in this context's table
+      so that it can be used as part of a cache key. *)
+  val empty_rec_env : t -> Rec_var_env.t
+
+  (** [push_rec_binder t rec_env ref] extends [rec_env] with a binding for
+      [ref]. The result is interned in this context's table for use as part of a
+      cache key. *)
+  val push_rec_binder :
+    t -> Rec_var_env.t -> Proto_die.reference -> Rec_var_env.t
+end
+
 type t
 
 val create :
@@ -89,6 +159,10 @@ val sourcefile : t -> string
 val diagnostics : t -> Diagnostics.t
 
 val complex_shape_cache : t -> Complex_shape.Shape_cache.t
+
+val eval_context : t -> Type_shape.Evaluated_shape.Eval_context.t
+
+val die_gen_ctx : t -> Die_gen_ctx.t
 
 val add_variable_reduction_diagnostic :
   t -> Diagnostics.variable_reduction -> unit
