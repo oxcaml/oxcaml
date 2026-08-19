@@ -13,6 +13,20 @@ type modalities =
     moda_desc : Mode.Modality.atom Location.loc list
   }
 
+type modepoly_bound =
+  { bound_vars : string Location.loc list;
+    bound_const : Mode.Alloc.Const.Option.t modes
+  }
+
+type modepoly_bounds =
+  { upper : modepoly_bound;
+    lower : modepoly_bound
+  }
+
+type modepoly_annot =
+  | Pmode_var of string Location.loc
+  | Pmode_bounds of modepoly_bounds Location.loc
+
 type 'ax annot_type =
   | Modifier : 'a Axis.t annot_type
   | Mode : 'a Alloc.Axis.t annot_type
@@ -48,8 +62,16 @@ type error =
   | Forbidden_modality : 'a annot_type * forbidden_modality_kind -> error
   | Duplicated_axis : 'a annot_type * 'a -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
+  | Mode_variable_not_allowed : error
+  | Mixed_mode_annotation : error
+  | Conflicting_mode_annotations : error
 
 exception Error of Location.t * error
+
+let mode_variable_error ~loc =
+  Language_extension.assert_enabled ~loc Mode_polymorphism
+    Language_extension.Alpha;
+  raise (Error (loc, Mode_variable_not_allowed))
 
 module Mode_axis_pair = struct
   type t = Mode.Alloc.atom
@@ -242,15 +264,23 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
-let transl_mode_annots annots =
+let mode_consts annots =
+  List.concat_map
+    (fun { txt; loc } ->
+      match (txt : Parsetree.mode) with
+      | Mode consts -> consts
+      | Mode_var _ | Mode_bounds _ -> mode_variable_error ~loc)
+    annots
+
+let transl_mode_atoms atoms =
   let annots =
     List.map
-      (fun { txt = Parsetree.Mode txt; loc } ->
+      (fun { txt; loc } ->
         Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
         try { txt = Mode_axis_pair.of_string txt; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
-      annots
+      atoms
   in
   let step modes_so_far { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } =
     if Option.is_some (Alloc.Const.Option.proj ax modes_so_far)
@@ -262,10 +292,16 @@ let transl_mode_annots annots =
   in
   { mode_modes = modes; mode_desc = annots }
 
+let transl_mode_annots annots = transl_mode_atoms (mode_consts annots)
+
+let untransl_const_mode s ~loc : Parsetree.mode Location.loc =
+  { txt = Parsetree.Mode [{ txt = s; loc }]; loc }
+
 let untransl_mode modes =
-  let untransl_annot =
-    Location.map (fun (Atom (ax, mode) : Mode.Alloc.atom) : Parsetree.mode ->
-        Mode (Format_doc.asprintf "%a" (Mode.Alloc.Const.print_axis ax) mode))
+  let untransl_annot { txt = (Atom (ax, mode) : Mode.Alloc.atom); loc } =
+    untransl_const_mode
+      (Format_doc.asprintf "%a" (Mode.Alloc.Const.print_axis ax) mode)
+      ~loc
   in
   List.map untransl_annot modes.mode_desc
 
@@ -545,6 +581,44 @@ let transl_alloc_mode annots =
   let modes = Alloc.Const.Option.value opt_modes ~default:Alloc.Const.legacy in
   { mode_modes = modes; mode_desc = annots }
 
+let transl_modepoly_bound (bound : Parsetree.mode_bound) : modepoly_bound =
+  { bound_vars = bound.bound_vars;
+    bound_const = transl_mode_atoms bound.bound_const
+  }
+
+let has_mode_variables annots =
+  List.exists
+    (fun { Location.txt; _ } ->
+      match (txt : Parsetree.mode) with
+      | Mode _ -> false
+      | Mode_var _ | Mode_bounds _ -> true)
+    annots
+
+let transl_modepoly_annot annots : modepoly_annot =
+  let transl_annot { Location.txt; loc } =
+    Language_extension.assert_enabled ~loc Mode_polymorphism
+      Language_extension.Alpha;
+    match (txt : Parsetree.mode) with
+    | Mode _ -> raise (Error (loc, Mixed_mode_annotation))
+    | Mode_var name -> Pmode_var name
+    | Mode_bounds { upper; lower } ->
+      Pmode_bounds
+        { txt =
+            { upper = transl_modepoly_bound upper;
+              lower = transl_modepoly_bound lower
+            };
+          loc
+        }
+  in
+  match List.map transl_annot annots with
+  | [annot] -> annot
+  | annot :: _ ->
+    let loc =
+      match annot with Pmode_var { loc; _ } | Pmode_bounds { loc; _ } -> loc
+    in
+    raise (Error (loc, Conflicting_mode_annotations))
+  | [] -> Misc.fatal_error "transl_modepoly_annot: empty mode annotation"
+
 let everything_modality =
   List.fold_left
     (fun acc -> function
@@ -630,7 +704,7 @@ let transl_mod_bounds ?(warn = true) annots =
   in
   let nonmodal, base_modality, modal_atoms =
     List.fold_left
-      (fun (nonmodal, base, atoms, seen_ev) { txt = Parsetree.Mode txt; loc } ->
+      (fun (nonmodal, base, atoms, seen_ev) { txt; loc } ->
         match Modality_axis_pair.of_string txt with
         | Atom (_, _) as atom ->
           if (seen_ev && not (is_staticity atom)) || has_modal_axis atom atoms
@@ -653,7 +727,7 @@ let transl_mod_bounds ?(warn = true) annots =
           in
           nonmodal, base, atoms, seen_ev)
       (Nonmodal_bounds.empty, Modality.Const.id, [], false)
-      annots
+      (mode_consts annots)
     |> fun (nm, base, atoms, _) ->
     (* axes listed in the order of implication. *)
     nm, base, sort_dedup_modalities_with_locs (List.rev atoms)
@@ -688,7 +762,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     List.map
       (fun (Atom (ax, m) : Modality.atom) ->
         let s = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m in
-        { Location.txt = Parsetree.Mode s; loc = Location.none })
+        untransl_const_mode s ~loc:Location.none)
       least_modalities
   in
   (* These mod-bounds are top ones, which are redundant to print. But we
@@ -711,7 +785,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
               (Modality.Per_axis.print ax)
               (Modality.Const.proj ax modality)
           in
-          Some { Location.txt = Parsetree.Mode s; loc = Location.none })
+          Some (untransl_const_mode s ~loc:Location.none))
       Value.Axis.all
   in
   let nonmodal_annots, top_nonmodal_annots =
@@ -719,8 +793,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     let mk_annot top print value =
       let only_when_verbose = value = top in
       let s = Format_doc.asprintf "%a" print value in
-      ( { Location.txt = Parsetree.Mode s; loc = Location.none },
-        only_when_verbose )
+      untransl_const_mode s ~loc:Location.none, only_when_verbose
     in
     [mk_annot Externality.max Externality.print (externality bounds)]
     |> List.partition_map (fun (annot, only_when_verbose) ->
@@ -747,6 +820,16 @@ let report_error ppf =
       annot_type Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
   | Unrecognized_modifier (annot_type, modifier) ->
     fprintf ppf "Unrecognized %a %s." print_annot_type annot_type modifier
+  | Mode_variable_not_allowed ->
+    fprintf ppf
+      "Mode variables and mode bounds are only allowed on function types."
+  | Mixed_mode_annotation ->
+    fprintf ppf
+      "Constant modes and mode variables cannot be mixed in a mode annotation."
+  | Conflicting_mode_annotations ->
+    fprintf ppf
+      "A mode annotation must be a single mode variable or a single bounds \
+       annotation."
 
 let () =
   Location.register_error_of_exn (function

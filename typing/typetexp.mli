@@ -203,6 +203,9 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
   | Val_poly_and_layout
+  | Unsatisfiable_mode_bound
+  | Unsatisfiable_mode_variable of string
+  | Mode_variables_not_allowed
 
 exception Error of Location.t * Env.t * error
 

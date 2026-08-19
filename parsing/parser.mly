@@ -4119,7 +4119,7 @@ jkind_desc_gen(self):
       (* LIDENTs here are for modes *)
       let modes =
         List.map
-          (fun {txt; loc} -> {txt = Mode txt; loc})
+          (fun {txt; loc} -> {txt = Mode [{txt; loc}]; loc})
           $3
       in
       Pjk_mod ($1, modes)
@@ -4744,7 +4744,7 @@ strict_function_or_labeled_tuple_type:
 /* Legacy mode annotations */
 %inline mode_legacy:
    | LOCAL
-       { mkloc (Mode "local") (make_loc $sloc) }
+       { mkloc (Mode [mkloc "local" (make_loc $sloc)]) (make_loc $sloc) }
 ;
 
 %inline mode_expr_legacy:
@@ -4757,12 +4757,53 @@ strict_function_or_labeled_tuple_type:
 ;
 
 /* New mode annotation, introduced by AT or ATAT */
-%inline mode:
-  | LIDENT { mkloc (Mode $1) (make_loc $sloc) }
+%inline mode_const:
+  | LIDENT { mkloc $1 (make_loc $sloc) }
 ;
 
-%inline mode_expr:
-  | mode+ { $1 }
+%inline mode_bound_var:
+  | QUOTE ident { mkloc $2 (make_loc $sloc) }
+;
+
+mode_bound(SEP):
+  | consts = mode_const+
+      { { bound_vars = []; bound_const = consts } }
+  | v = mode_bound_var
+      { { bound_vars = [v]; bound_const = [] } }
+  | v = mode_bound_var SEP rest = mode_bound(SEP)
+      { { rest with bound_vars = v :: rest.bound_vars } }
+;
+
+%inline empty_mode_bound:
+  | { { bound_vars = []; bound_const = [] } }
+;
+
+%inline nonconst_mode:
+  | v = mode_bound_var { mkloc (Mode_var v) (make_loc $sloc) }
+  | LBRACKETLESS upper = mode_bound(AMPERSAND) lower = empty_mode_bound
+    RBRACKET
+      { mkloc (Mode_bounds { upper; lower }) (make_loc $sloc) }
+  | LBRACKETLESS upper = mode_bound(AMPERSAND) GREATER
+    lower = mode_bound(BAR) RBRACKET
+      { mkloc (Mode_bounds { upper; lower }) (make_loc $sloc) }
+  | LBRACKETGREATER upper = empty_mode_bound lower = mode_bound(BAR) RBRACKET
+      { mkloc (Mode_bounds { upper; lower }) (make_loc $sloc) }
+;
+
+mode_expr:
+  | consts = mode_const+
+      { [mkloc (Mode consts) (make_loc $sloc)] }
+  | consts = mode_const+ rest = nonconst_mode_expr
+      { mkloc (Mode consts) (make_loc $loc(consts)) :: rest }
+  | rest = nonconst_mode_expr
+      { rest }
+;
+
+nonconst_mode_expr:
+  | m = nonconst_mode
+      { [m] }
+  | m = nonconst_mode rest = mode_expr
+      { m :: rest }
 ;
 
 at_mode_expr:
