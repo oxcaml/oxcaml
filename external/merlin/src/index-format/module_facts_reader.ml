@@ -35,15 +35,21 @@ module Decoded_cache = File_cache.Make (struct
     match Index_format.read ~file with
     | Cmt _ | Cms _ | Unknown -> raise Not_an_index_file
     | Index index -> (
-      let facts_present = index.module_facts_present in
-      let block = Index_format.module_facts_block index.module_facts in
-      match Module_facts_compact.to_facts block with
-      | Ok facts -> { facts; facts_present; malformed = None }
-      | Error message ->
+      match index.module_facts with
+      | None ->
         { facts = Module_implementation_facts.empty;
-          facts_present;
-          malformed = Some message
-        })
+          facts_present = false;
+          malformed = None
+        }
+      | Some module_facts ->
+        let block = Index_format.module_facts_block module_facts in
+        match Module_facts_compact.to_facts block with
+        | Ok facts -> { facts; facts_present = true; malformed = None }
+        | Error message ->
+          { facts = Module_implementation_facts.empty;
+            facts_present = true;
+            malformed = Some message
+          })
 
   let cache_name = "Module_facts_reader"
 end)
