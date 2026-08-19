@@ -683,6 +683,22 @@ Error: This type definition does not satisfy its kind annotation
        - 'a is not mod contended
 |}]
 
+(* Same as above with ['a := int]: even with a fully-crossing parameter,
+   [c] still fails portability via [t] inside [b], so [b] must be blamed. *)
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type c : value mod portable contended = { b : int b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-53:
+3 | type c : value mod portable contended = { b : int b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because b is not mod portable.
+|}]
+
 type bad : value
 type t : value mod contended = { x : (bad * int) ref }
 [%%expect {|

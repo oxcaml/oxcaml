@@ -657,6 +657,94 @@ Error: The kind of type "c" is mutable_data with 'a
          because of the annotation on the declaration of the type c.
 |}]
 
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-73:
+3 | type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with 'a with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type 'a c : value mod portable contended = { b : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-55:
+3 | type 'a c : value mod portable contended = { b : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with 'a with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+(* Same as above with ['a := int]: even with a fully-crossing parameter,
+   [c] still fails portability via [t] inside [b], so [b] must be blamed. *)
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type c : value mod portable contended = { b : int b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-53:
+3 | type c : value mod portable contended = { b : int b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+type bad : value
+type t : value mod contended = { x : (bad * int) ref }
+[%%expect {|
+type bad
+Line 2, characters 0-54:
+2 | type t : value mod contended = { x : (bad * int) ref }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is
+           mutable_data with bad @@ forkable unyielding many
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+|}]
+
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { x : ('a ref * int) b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-67:
+3 | type 'a c : value mod portable contended = { x : ('a ref * int) b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is
+           mutable_data with 'a @@ forkable unyielding many with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+         portability: mod portable with 'a with t ≰ mod portable
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t
