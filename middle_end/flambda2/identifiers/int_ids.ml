@@ -253,27 +253,12 @@ module Const_data = struct
 end
 
 module Variable_data = struct
-  type user_visibility =
-    | User_visible
-    | Not_user_visible
-    | Not_user_visible_but_needed_by_phantom_let
-
-  let print_user_visibility ppf (visibility : user_visibility) =
-    let str =
-      match visibility with
-      | User_visible -> "User_visible"
-      | Not_user_visible -> "Not_user_visible"
-      | Not_user_visible_but_needed_by_phantom_let ->
-        "Not_user_visible_but_needed_by_phantom_let"
-    in
-    Format.pp_print_string ppf str
-
   type t =
     { compilation_unit : Compilation_unit.t;
       name : string;
       name_stamp : int;
       kind : Flambda_kind.t;
-      user_visible : user_visibility
+      user_visible : bool
     }
 
   let flags = var_flags
@@ -285,13 +270,13 @@ module Variable_data = struct
         @[<hov 1>(name@ %s)@]@ \
         @[<hov 1>(name_stamp@ %d)@]@ \
         @[<hov 1>(kind@ %a)@]@ \
-        @[<hov 1>(user_visible@ %a)@]\
+        @[<hov 1>(user_visible@ %b)@]\
         )@]"
       (Format_doc.compat Compilation_unit.print_debug) compilation_unit
       name
       name_stamp
       Flambda_kind.print kind
-      print_user_visibility user_visible
+      user_visible
 
   let hash
       { compilation_unit; name = _; name_stamp; kind = _; user_visible = _ } =
@@ -508,26 +493,11 @@ module Variable = struct
 
   let kind t = (find_data t).kind
 
-  type user_visibility = Variable_data.user_visibility =
-    | User_visible
-    | Not_user_visible
-    | Not_user_visible_but_needed_by_phantom_let
-
-  let user_visibility t = (find_data t).user_visible
-
-  let user_visible t =
-    match user_visibility t with
-    | User_visible -> true
-    | Not_user_visible | Not_user_visible_but_needed_by_phantom_let -> false
-
-  let user_visible_or_needed_by_phantom_let t =
-    match user_visibility t with
-    | User_visible | Not_user_visible_but_needed_by_phantom_let -> true
-    | Not_user_visible -> false
+  let user_visible t = (find_data t).user_visible
 
   let previous_name_stamp = ref (-1)
 
-  let create_with_user_visibility user_visible name kind =
+  let create ?user_visible name kind =
     let name_stamp =
       (* CR mshinwell: check for overflow on 32 bit *)
       incr previous_name_stamp;
@@ -538,18 +508,10 @@ module Variable = struct
         name;
         name_stamp;
         kind;
-        user_visible
+        user_visible = Option.is_some user_visible
       }
     in
     Table.add !grand_table_of_variables data
-
-  let create ?user_visible name kind =
-    let user_visible : user_visibility =
-      match user_visible with
-      | Some () -> User_visible
-      | None -> Not_user_visible
-    in
-    create_with_user_visibility user_visible name kind
 
   module T0 = struct
     let compare = Id.compare
@@ -558,23 +520,24 @@ module Variable = struct
 
     let hash = Id.hash
 
-    let visibility_suffix t =
-      match user_visibility t with
-      | User_visible -> "UV"
-      | Not_user_visible -> "N"
-      | Not_user_visible_but_needed_by_phantom_let -> "NP"
-
-    let print ppf t =
+    let print_with_visibility_suffix suffix ppf t =
       let cu = compilation_unit t in
       if Compilation_unit.equal cu (Current_unit.get_cu_exn ())
-      then
-        Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
-          (visibility_suffix t)
+      then Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t) suffix
       else
         Format.fprintf ppf "%a.%s/%d%s"
           (Format_doc.compat Compilation_unit.print)
-          cu (name t) (name_stamp t) (visibility_suffix t)
+          cu (name t) (name_stamp t) suffix
+
+    let print ppf t =
+      print_with_visibility_suffix (if user_visible t then "UV" else "N") ppf t
   end
+
+  (* For the use of [Bound_var] and [Bound_parameter], whose binders can be
+     marked as needed by phantom lets; such variables print as "NP" instead of
+     "N". *)
+  let print_as_needed_by_phantom_let ppf t =
+    T0.print_with_visibility_suffix "NP" ppf t
 
   include T0
 

@@ -170,11 +170,3 @@ val add_symbol_projection :
   projection_bound_to:Bound_var.t ->
   kind:Flambda_kind.With_subkind.t ->
   Downwards_acc.t
-
-(** Whether [var], bound at normal mode, also has phantom-mode occurrences in
-    [free_names] (i.e. it is referenced by the defining expression of at least
-    one phantom let) and should therefore be replaced by a fresh variable marked
-    [Not_user_visible_but_needed_by_phantom_let], so that it remains locatable
-    by the debugger. [false] for user-visible variables (no marking is needed)
-    and for kinds that cannot be referenced by phantom defining expressions. *)
-val variable_needs_np_promotion : Name_occurrences.t -> Variable.t -> bool

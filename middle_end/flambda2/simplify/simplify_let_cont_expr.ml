@@ -570,43 +570,18 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
   rebuild_body uacc ~after_rebuild:(rebuild_let_cont data ~after_rebuild)
 
 (* Parameters referenced by phantom lets within the handler must remain
-   locatable by the debugger. Since the user-visibility of a variable is
-   immutable, any such parameter that is not user visible is replaced by a fresh
-   variable marked [Not_user_visible_but_needed_by_phantom_let] (printed as
-   "NP"), the handler being renamed accordingly (constant time, via the
-   delayed-renaming mechanism on terms). This must happen before the handler or
-   its parameters are registered in the upwards environment, so that everything
-   (including e.g. continuation shortcuts) sees a consistent view. *)
-let promote_params_needed_by_phantom_lets uacc params ~handler ~free_names =
+   locatable by the debugger: mark their binders (printed as "NP"). *)
+let promote_params_needed_by_phantom_lets uacc params ~free_names =
   if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
-  then params, handler, free_names
+  then params
   else
-    let renaming = ref Renaming.empty in
-    let params' =
-      List.map
-        (fun param ->
-          let var = BP.var param in
-          if Simplify_common.variable_needs_np_promotion free_names var
-          then (
-            let var' =
-              Variable.with_user_visibility var
-                Not_user_visible_but_needed_by_phantom_let
-            in
-            renaming
-              := Renaming.add_fresh_variable !renaming var
-                   ~guaranteed_fresh:var';
-            let _, debug_uid = BP.var_and_uid param in
-            BP.create var' (BP.kind param) debug_uid)
-          else param)
-        (Bound_parameters.to_list params)
-    in
-    let renaming = !renaming in
-    if Renaming.is_identity renaming
-    then params, handler, free_names
-    else
-      ( Bound_parameters.create params',
-        RE.apply_renaming handler (UA.are_rebuilding_terms uacc) renaming,
-        NO.apply_renaming free_names renaming )
+    Bound_parameters.create
+      (List.map
+         (fun param ->
+           if Expr_builder.variable_needs_np_promotion free_names (BP.var param)
+           then BP.with_needed_by_phantom_let param
+           else param)
+         (Bound_parameters.to_list params))
 
 let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let Flow_types.Alias_result.{ continuation_parameters; _ } =
@@ -751,8 +726,8 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
         add_phantom_params_bindings uacc handler new_phantom_params
       in
       let free_names = remove_params new_phantom_params free_names in
-      let params, handler, free_names =
-        promote_params_needed_by_phantom_lets uacc params ~handler ~free_names
+      let params =
+        promote_params_needed_by_phantom_lets uacc params ~free_names
       in
       let cont_handler =
         RE.Continuation_handler.create
@@ -858,13 +833,15 @@ let rebuild_single_recursive_handler cont
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
       in
-      (* Only the variant parameters are considered for promotion: invariant
-         parameters are shared between the handlers of a recursive group, so
-         renaming them here would leave the other handlers of the group
-         referring to the old variables. *)
-      let variant_params, handler, free_names =
-        promote_params_needed_by_phantom_lets uacc variant_params ~handler
-          ~free_names
+      (* Invariant parameters are not marked: they are shared between the
+         handlers of a recursive group, so any marking would have to happen at
+         the point where the whole group is rebuilt; and no case is currently
+         known where a non-user-visible invariant parameter is referenced by a
+         phantom let (the parameter-alias machinery removes invariant parameters
+         of single-entry loops, and phantom defining expressions reference boxed
+         carriers rather than unboxing extras). *)
+      let variant_params =
+        promote_params_needed_by_phantom_lets uacc variant_params ~free_names
       in
       let cont_handler =
         RE.Continuation_handler.create

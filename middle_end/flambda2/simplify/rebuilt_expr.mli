@@ -34,11 +34,6 @@ val print : Are_rebuilding_terms.t -> Format.formatter -> t -> unit
 (** This function may only be used when rebuilding terms. *)
 val to_expr : t -> Are_rebuilding_terms.t -> Expr.t
 
-(** Apply a renaming to the rebuilt expression (constant time, via the
-    delayed-renaming mechanism on terms). A no-op when terms are not being
-    rebuilt. *)
-val apply_renaming : t -> Are_rebuilding_terms.t -> Renaming.t -> t
-
 val to_apply_cont : t -> Apply_cont.t option
 
 val can_be_removed_as_invalid : t -> Are_rebuilding_terms.t -> bool
