@@ -317,7 +317,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     match Apply.probe apply with
     | None ->
       ( C.direct_call ~dbg
-          (C.Extended_machtype.to_machtype return_ty)
+          (Cmm.Known (C.Extended_machtype.to_machtype return_ty))
           pos code_sym args,
         free_vars,
         env,
@@ -341,7 +341,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg return_ty pos
+    ( C.indirect_call ~dbg (C.Extended_result_type.Known return_ty) pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
@@ -375,7 +375,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg return_ty pos callee ~callees args_ty args,
+      ( C.indirect_full_call ~dbg
+          (C.Extended_result_type.Known return_ty)
+          pos callee ~callees args_ty args,
         free_vars,
         env,
         res,

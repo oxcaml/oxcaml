@@ -184,7 +184,7 @@ fundecl:
          fun_dbg = debuginfo ();
          (* CR yusumez: Adding return types to the parser might require a lot
             of changes, so we assume this for now. *)
-         fun_ret_type = Cmm.typ_val } }
+         fun_ret_type = Known Cmm.typ_val } }
 ;
 fun_name:
     STRING              { Cmm.global_symbol $1 }
@@ -222,7 +222,7 @@ expr:
   | LPAREN LET letdef sequence RPAREN { make_letdef $3 $4 }
   | LPAREN APPLY location expr exprlist machtype RPAREN
                 { Cop(Capply {
-                        result_type = $6;
+                        result_type = Known $6;
                         region = Lambda.Rc_normal;
                         callees = None
                       },

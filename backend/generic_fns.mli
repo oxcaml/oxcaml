@@ -46,13 +46,13 @@ module Cache : sig
 
   type apply =
     Cmm.machtype_component array list
-    * Cmm.machtype_component array
+    * Cmx_format.generic_result_type
     * Cmx_format.return_mode
 
   type curry =
     Lambda.function_kind
     * Cmm.machtype_component array list
-    * Cmm.machtype_component array
+    * Cmx_format.generic_result_type
 
   val mem_send : send -> bool
 

@@ -87,11 +87,15 @@ end
 module Tbl0 = struct
   type t =
     { curry :
-        ( Lambda.function_kind * Cmm.machtype list * Cmm.machtype,
+        ( Lambda.function_kind
+          * Cmm.machtype list
+          * Cmx_format.generic_result_type,
           unit )
         Hashtbl.t;
       apply :
-        ( Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode,
+        ( Cmm.machtype list
+          * Cmx_format.generic_result_type
+          * Cmx_format.return_mode,
           unit )
         Hashtbl.t;
       send :
@@ -136,21 +140,28 @@ module Cache = struct
 
   type apply =
     Cmm.machtype_component array list
-    * Cmm.machtype_component array
+    * Cmx_format.generic_result_type
     * Cmx_format.return_mode
 
   type curry =
     Lambda.function_kind
     * Cmm.machtype_component array list
-    * Cmm.machtype_component array
+    * Cmx_format.generic_result_type
 
   let has_singleton_layout_value = function[@warning "-4"]
     | [| Cmm.Val |] -> true
     | _ -> false
 
-  let only_concerns_values ~arity ~result =
+  let only_concerns_concrete_values ~arity ~result =
     has_singleton_layout_value result
     && List.for_all has_singleton_layout_value arity
+
+  let only_concerns_values ~arity ~result =
+    match result with
+    | Cmx_format.Known result -> only_concerns_concrete_values ~arity ~result
+    (* Unknown-result generic functions are never cached: they are emitted into
+       the startup object of each program that needs them. *)
+    | Cmx_format.Unknown -> false
 
   let len_arity arity =
     List.fold_left
@@ -186,7 +197,7 @@ module Cache = struct
 
   let mem_send (arity, result, alloc) =
     (* For now we don't cache generic functions involving unboxed types *)
-    if not (only_concerns_values ~arity ~result)
+    if not (only_concerns_concrete_values ~arity ~result)
     then false
     else
       match alloc with
@@ -214,7 +225,9 @@ module Cache = struct
 
   let arity n = List.init n (fun _ -> [| Cmm.Val |])
 
-  let result = [| Cmm.Val |]
+  let value_result = [| Cmm.Val |]
+
+  let result = Cmx_format.Known value_result
 
   let all_curry () =
     let tuplify =
@@ -239,8 +252,8 @@ module Cache = struct
     let send =
       Seq.init (max_send + 1) (fun n ->
           Seq.cons
-            (arity n, result, Cmx_format.Maybe_alloc_stack)
-            (Seq.return (arity n, result, Cmx_format.Not_alloc_stack)))
+            (arity n, value_result, Cmx_format.Maybe_alloc_stack)
+            (Seq.return (arity n, value_result, Cmx_format.Not_alloc_stack)))
       |> Seq.concat
     in
     Seq.filter mem_send send
@@ -344,10 +357,16 @@ let default_generic_fns : Cmx_format.generic_fns =
   let open Cmm in
   { curry_fun = [];
     apply_fun =
-      [ [typ_val; typ_val], typ_val, Cmx_format.Not_alloc_stack;
-        [typ_val; typ_val], typ_val, Cmx_format.Maybe_alloc_stack;
-        [typ_val; typ_val; typ_val], typ_val, Cmx_format.Not_alloc_stack;
-        [typ_val; typ_val; typ_val], typ_val, Cmx_format.Maybe_alloc_stack ];
+      [ [typ_val; typ_val], Cmx_format.Known typ_val, Cmx_format.Not_alloc_stack;
+        ( [typ_val; typ_val],
+          Cmx_format.Known typ_val,
+          Cmx_format.Maybe_alloc_stack );
+        ( [typ_val; typ_val; typ_val],
+          Cmx_format.Known typ_val,
+          Cmx_format.Not_alloc_stack );
+        ( [typ_val; typ_val; typ_val],
+          Cmx_format.Known typ_val,
+          Cmx_format.Maybe_alloc_stack ) ];
     send_fun = []
   }
 

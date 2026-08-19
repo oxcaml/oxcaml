@@ -1297,12 +1297,17 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match emit_parts_list env sub_cfg args with
     | Never_returns -> ()
     | Ok (simple_args, env) -> (
+      let result_regs_type =
+        match (ty : Cmm.result_type) with
+        | Known ty -> ty
+        | Unknown -> Cmm.typ_void
+      in
       let label_after = Cmm.new_label () in
       let new_op, new_args = select_operation op simple_args dbg ~label_after in
       match new_op with
       | Terminator (Call { op = Indirect callees; label_after } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
-        let rd = Reg.createv ty in
+        let rd = Reg.createv result_regs_type in
         let rarg = Array.sub r1 1 (Array.length r1 - 1) in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv rarg) in
         let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
@@ -1325,7 +1330,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
       | Terminator (Call { op = Direct func; label_after } as term) ->
         let** r1 = emit_tuple env sub_cfg new_args in
-        let rd = Reg.createv ty in
+        let rd = Reg.createv result_regs_type in
         let loc_arg, stack_ofs_args = Proc.loc_arguments (Reg.typv r1) in
         let loc_res, stack_ofs_res = Proc.loc_results_call (Reg.typv rd) in
         let stack_ofs = Stdlib.Int.max stack_ofs_args stack_ofs_res in

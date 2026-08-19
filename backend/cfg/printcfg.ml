@@ -298,7 +298,7 @@ let format :
   Format.fprintf fmt "cfg for %t%s%t\n" Cfg_colours.function_name cfg.fun_name
     Cfg_colours.pop;
   Format.fprintf fmt "  args: %a\n" Printreg.regs cfg.fun_args;
-  Format.fprintf fmt "  ret_type: %a\n" Printcmm.machtype cfg.fun_ret_type;
+  Format.fprintf fmt "  ret_type: %a\n" Printcmm.result_type cfg.fun_ret_type;
   Format.fprintf fmt "  entry_label: %a\n" Label.format cfg.entry_label;
   let regalloc =
     List.find_map cfg.fun_codegen_options ~f:(function[@ocaml.warning "-4"]

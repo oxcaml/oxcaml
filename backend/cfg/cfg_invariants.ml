@@ -235,13 +235,19 @@ end = struct
     | Switch _ -> check ~expected_args:[1] ~expected_res:[0]
     | Return ->
       (* Return carries the registers holding the function result in calling
-         convention order. Some generated helpers (e.g. curry wrappers) may have
-         a declared return type with more components than they actually return;
-         those are identified by the [caml_curry] prefix and are exempted. *)
+         convention order. An [Unknown] return type fixes no convention (each
+         return point supplies its own), so there is nothing to check against.
+         Some generated helpers (e.g. curry wrappers) may have a declared return
+         type with more components than they actually return; those are
+         identified by the [caml_curry] prefix and are exempted. *)
       let expected_args =
         if String.starts_with t.cfg.fun_name ~prefix:"caml_curry"
         then []
-        else [Proc.loc_results_return t.cfg.fun_ret_type |> Array.length]
+        else
+          match t.cfg.fun_ret_type with
+          | Cmm.Known fun_ret_type ->
+            [Proc.loc_results_return fun_ret_type |> Array.length]
+          | Cmm.Unknown -> []
       in
       check ~expected_args ~expected_res:[0]
     | Raise _ -> check ~expected_args:[1] ~expected_res:[0]

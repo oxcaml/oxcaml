@@ -31,6 +31,10 @@ type machtype_component = Cmx_format.machtype_component =
 
 type machtype = machtype_component array
 
+type result_type = Cmx_format.generic_result_type =
+  | Known of machtype
+  | Unknown
+
 (* Note: To_cmm_expr.translate_apply0 relies on non-void [machtype_component]s
    being singleton arrays. *)
 (* CR mshinwell/xclerc: Maybe this should be a variant type instead, or an
@@ -554,7 +558,7 @@ let equal_alloc_dbginfo left right =
 
 type operation =
   | Capply of
-      { result_type : machtype;
+      { result_type : result_type;
         region : Lambda.region_close;
         callees : symbol list option
       }
@@ -734,7 +738,7 @@ type fundecl =
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
     fun_dbg : Debuginfo.t;
-    fun_ret_type : machtype
+    fun_ret_type : result_type
   }
 
 type data_item =

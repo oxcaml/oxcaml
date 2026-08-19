@@ -261,6 +261,17 @@ let filter_ds_and_make_ret_type ret_machtype =
   let actual_ret_types = reg_list_for_call cc_regs |> List.map T.of_reg in
   make_ret_type actual_ret_types
 
+(* CR dkalinichenko: support unknown (layout [any]) return types. A function
+   whose exits are all tail calls has no [Return] blocks, so choosing an
+   arbitrary return type may be needed for the usual shape. *)
+let llvm_fun_ret_type (fun_ret_type : Cmm.result_type) =
+  match fun_ret_type with
+  | Cmm.Known machtype -> filter_ds_and_make_ret_type machtype
+  | Cmm.Unknown ->
+    Misc.fatal_error
+      "The LLVM backend does not yet support functions with an unknown (layout \
+       [any]) return type"
+
 let make_arg_types arg_types =
   List.map (fun _ -> T.i64) runtime_regs @ arg_types
 
@@ -1513,7 +1524,7 @@ let prepare_fun_info t (cfg : Cfg.t) =
     Array.to_list fun_args |> List.filter reg_listed_in_signature
   in
   let arg_types = List.map T.of_reg arg_regs |> make_arg_types in
-  let res_type = filter_ds_and_make_ret_type fun_ret_type in
+  let res_type = llvm_fun_ret_type fun_ret_type in
   let attrs = fun_attrs ~has_try fun_codegen_options in
   let emitter =
     E.create ~name:fun_name ~args:arg_types ~res:(Some res_type) ~cc:Oxcaml
