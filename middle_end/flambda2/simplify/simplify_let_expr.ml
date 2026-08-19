@@ -129,17 +129,6 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
       | Static _ -> assert false
       (* see below *)
     in
-    (* A variable bound at normal mode may additionally be referenced by the
-       defining expressions of phantom lets in the body. Such a variable must
-       remain locatable by the debugger, even if it is not user visible, so that
-       those references can be resolved; mark it accordingly (printed as
-       "NP"). *)
-    let promote_vars_needed_by_phantom_lets (bound_vars : Bound_pattern.t) =
-      Bound_pattern.fold_all_bound_vars bound_vars ~init:()
-        ~f:(fun () bound_var ->
-          Simplify_common.promote_var_if_needed_by_phantom_lets
-            free_names_of_body (VB.var bound_var))
-    in
     let bindings =
       List.map
         (fun (binding_to_place : Expr_builder.binding_to_place) ->
@@ -205,7 +194,6 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                   "Cannot [Let]-bind non-normal variable(s) to a [Named] that \
                    has more than generative effects:@ %a@ =@ %a"
                   Bound_pattern.print bound_vars Named.print defining_expr;
-              promote_vars_needed_by_phantom_lets bound_vars;
               binding_to_place)
             else
               let is_depth =
@@ -249,8 +237,6 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                   | Present name_mode -> name_mode
                 in
                 assert (Name_mode.can_be_in_terms name_mode);
-                if Name_mode.is_normal name_mode
-                then promote_vars_needed_by_phantom_lets bound_vars;
                 let bound_vars =
                   Bound_pattern.with_name_mode bound_vars name_mode
                 in
