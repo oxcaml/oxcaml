@@ -2514,6 +2514,8 @@ module Extended_result_type = struct
     | Known result ->
       Cmm.Known (Extended_machtype.change_tagged_int_to_val result)
     | Unknown -> Cmm.Unknown
+
+  let is_unknown = function Known _ -> false | Unknown -> true
 end
 
 let machtype_of_layout layout =
@@ -2764,6 +2766,13 @@ let apply_function_name arity result (mode : Cmx_format.return_mode) =
 
 let apply_function_sym arity result mode =
   let arity = List.map Extended_machtype.change_tagged_int_to_val arity in
+  let mode =
+    (* An unknown-result application function opens no region, so both modes
+       would produce the same code. *)
+    if Extended_result_type.is_unknown result
+    then Cmx_format.Not_alloc_stack
+    else mode
+  in
   let result = Extended_result_type.change_tagged_int_to_val result in
   assert (List.length arity > 0);
   Compilenv.need_apply_fun arity result mode;
@@ -3678,11 +3687,15 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
              Cmx_format.Maybe_alloc_stack dbg)
         old_region)
   | (arity, args), Some (arity', args') -> (
+    let intermediate_mode =
+      if Extended_result_type.is_unknown result
+      then Cmx_format.Not_alloc_stack
+      else Cmx_format.Maybe_alloc_stack
+    in
     let body old_region =
       bind "result"
         (call_caml_apply (Extended_result_type.Known Extended_machtype.typ_val)
-           arity mut clos args Rc_normal Cmx_format.Maybe_alloc_stack dbg)
-        (fun clos ->
+           arity mut clos args Rc_normal intermediate_mode dbg) (fun clos ->
           might_split_call_caml_apply ?old_region result arity' mut clos args'
             pos mode dbg)
     in
@@ -3694,9 +3707,16 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
        To avoid doing that, when splitting a [caml_apply], we check before
        calling the last [caml_apply] if we allocated on the local stack; and if
        so, we close the region ourselves afterwards, as is already done inside
-       [caml_apply]. *)
+       [caml_apply].
+
+       This is only needed for concrete results: the unknown-result split cannot
+       open a region (the final call must stay a genuine tail call), so unknown
+       results force the intermediate applications to [Not_alloc_stack] above
+       and never allocate locally here. *)
     match old_region, mode with
-    | None, Cmx_format.Not_alloc_stack when Config.stack_allocation ->
+    | None, Cmx_format.Not_alloc_stack
+      when Config.stack_allocation
+           && not (Extended_result_type.is_unknown result) ->
       let dbg = placeholder_dbg in
       bind "region"
         (Cop (Cbeginregion, [], dbg ()))
@@ -3862,7 +3882,7 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
   (* In the slowpath, a region is necessary in case the initial applications do
      local allocations *)
   let region =
-    if not Config.stack_allocation
+    if Extended_result_type.is_unknown result || not Config.stack_allocation
     then None
     else
       match mode with

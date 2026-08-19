@@ -83,6 +83,78 @@ let fail_if_probe apply =
        always be direct applications of an OCaml function:@ %a"
       Apply.print apply
 
+let fatal_unknown_return_arity apply ~what =
+  Misc.fatal_errorf "Cannot compile unknown- or bottom-result %s to Cmm:@ %a"
+    what Apply.print apply
+
+let return_arity_exn apply ~what =
+  match Apply.return_arity apply with
+  | Ok arity -> arity
+  | Unknown | Bottom -> fatal_unknown_return_arity apply ~what
+
+let check_return_arity_known apply ~what =
+  match Apply.return_arity apply with
+  | Ok _ -> ()
+  | Unknown | Bottom -> fatal_unknown_return_arity apply ~what
+
+(* A [Return] continuation with [Unknown] parameter types belongs to a function
+   whose result is forwarded to the caller: exactly one value flows through
+   it. *)
+let return_param_types_match (param_types : Cmm.machtype list Or_unknown.t)
+    ~num_args =
+  match param_types with
+  | Known param_types -> List.compare_length_with param_types num_args = 0
+  | Unknown -> num_args = 1
+
+let print_return_param_types ppf param_types =
+  Or_unknown.print
+    (Format.pp_print_list ~pp_sep:Format.pp_print_space Printcmm.machtype)
+    ppf param_types
+
+let fatal_forwarding_to_jump apply =
+  Misc.fatal_errorf
+    "An application whose result is forwarded to the caller must return \
+     directly from the current function:@ %a"
+    Apply.print apply
+
+let fatal_forwarding_several_values apply =
+  Misc.fatal_errorf
+    "An application whose result is forwarded must pass exactly one value to \
+     its destination:@ %a"
+    Apply.print apply
+
+let extended_result_type_of_apply env apply : C.Extended_result_type.t =
+  match Apply.return apply with
+  | Returns_to { cont = _; arity } ->
+    Known (C.extended_machtype_of_return_arity arity)
+  | Never_returns { arity } -> (
+    (* A call that does not return still has to be lowered with the result type
+       its callee declares, and [Bottom] declares a void result. *)
+    match arity with
+    | Ok arity -> Known (C.extended_machtype_of_return_arity arity)
+    | Unknown ->
+      (* No result is ever forwarded from a call that never returns, so an
+         unknown-result apply with no destination is deliberately lowered as an
+         ordinary void call rather than a mandatory tail call. *)
+      Known C.Extended_machtype.typ_void
+    | Bottom -> Known C.Extended_machtype.typ_void)
+  | Tail_forwards_to_caller cont -> (
+    (* A forwarded result has no layout of its own, so the call is compiled with
+       the convention of the destination it is forwarded to. Only the current
+       function's own return convention can be unknown: a destination inside the
+       function binds the result to parameters, which have concrete layouts. *)
+    match Env.get_continuation env cont with
+    | Return { param_types = Unknown } -> Unknown
+    | Return { param_types = Known [param_type] } ->
+      Known (C.Extended_machtype.of_machtype param_type)
+    | Return { param_types = Known ([] | _ :: _ :: _) } ->
+      fatal_forwarding_several_values apply
+    | Inline { handler_params; _ } ->
+      Known
+        (C.extended_machtype_of_return_arity
+           (Bound_parameters.arity handler_params))
+    | Jump _ -> fatal_forwarding_to_jump apply)
+
 let translate_external_call env res ~free_vars apply ~callee_simple ~args
     ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
     ~coeffects =
@@ -261,12 +333,9 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
   let args_arity =
     Apply.args_arity apply |> Flambda_arity.unarize_per_parameter
   in
-  let return_arity =
-    match Apply.return_arity apply with
-    | Ok arity -> arity
-    | Unknown | Bottom ->
-      Misc.fatal_errorf "Cannot compile apply with result arity %a to Cmm:@ %a"
-        Result_arity.print (Apply.return_arity apply) Apply.print apply
+  let extended_result_type = extended_result_type_of_apply env apply in
+  let result_type =
+    C.Extended_result_type.to_result_type extended_result_type
   in
   let args_ty =
     List.map
@@ -288,7 +357,6 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     aux args args_arity
   in
-  let return_ty = C.extended_machtype_of_return_arity return_arity in
   match Apply.call_kind apply with
   | Function { function_call = Direct code_id } -> (
     let code_metadata = Env.get_code_metadata env code_id in
@@ -316,9 +384,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     in
     match Apply.probe apply with
     | None ->
-      ( C.direct_call ~dbg
-          (Cmm.Known (C.Extended_machtype.to_machtype return_ty))
-          pos code_sym args,
+      ( C.direct_call ~dbg result_type pos code_sym args,
         free_vars,
         env,
         res,
@@ -341,7 +407,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
-    ( C.indirect_call ~dbg (C.Extended_result_type.Known return_ty) pos
+    ( C.indirect_call ~dbg extended_result_type pos
         (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
@@ -375,18 +441,23 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg
-          (C.Extended_result_type.Known return_ty)
-          pos callee ~callees args_ty args,
+      ( C.indirect_full_call ~dbg extended_result_type pos callee ~callees
+          args_ty args,
         free_vars,
         env,
         res,
         Ece.all )
   | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
+    let return_arity = return_arity_exn apply ~what:"external call" in
     translate_external_call env res ~free_vars apply ~callee_simple ~args
-      ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-      ~coeffects
+      ~return_arity
+      ~return_ty:(C.extended_machtype_of_return_arity return_arity)
+      dbg ~needs_caml_c_call ~is_c_builtin ~effects ~coeffects
   | Method { kind; obj } ->
+    let return_ty =
+      C.extended_machtype_of_return_arity
+        (return_arity_exn apply ~what:"method call")
+    in
     fail_if_probe apply;
     let callee =
       match callee with
@@ -415,6 +486,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       res,
       Ece.all )
   | Effect op -> (
+    check_return_arity_known apply ~what:"effect operation";
     let module BV = Backend_var in
     let open To_cmm_env in
     let[@inline] simple s = C.simple ~dbg s in
@@ -564,15 +636,9 @@ let translate_apply env res apply =
     let exn_var = Backend_var.create_local "*exn*" in
     let result_var = Backend_var.create_local "*res*" in
     let result_type =
-      match Apply.return_arity apply with
-      | Ok arity ->
-        C.extended_machtype_of_return_arity arity
-        |> C.Extended_machtype.to_machtype
-      | Unknown | Bottom ->
-        Misc.fatal_errorf
-          "Cannot compile call with result arity %a and exception continuation \
-           extra arguments to Cmm:@ %a"
-          Result_arity.print (Apply.return_arity apply) Apply.print apply
+      C.extended_machtype_of_return_arity
+        (return_arity_exn apply ~what:"call with extra exception arguments")
+      |> C.Extended_machtype.to_machtype
     in
     let pop_handler_params =
       [Backend_var.With_provenance.create result_var, result_type]
@@ -678,7 +744,10 @@ let translate_jump_to_continuation ~dbg_with_inlined:dbg env res apply types
    value for the current block being translated. *)
 let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
     return_cont types args =
-  if List.compare_lengths types args = 0
+  let arities_match =
+    return_param_types_match types ~num_args:(List.length args)
+  in
+  if arities_match
   then
     let return_values, free_vars, env, res, _ =
       C.simple_list ~dbg env res args
@@ -705,8 +774,7 @@ let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
         Continuation.print return_cont
   else
     Misc.fatal_errorf "Types (%a) do not match arguments of@ %a"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space Printcmm.machtype)
-      types Apply_cont.print apply
+      print_return_param_types types Apply_cont.print apply
 
 (* Invalid expressions *)
 let invalid env res ~message =
@@ -1090,36 +1158,66 @@ and apply_expr env res apply =
      In case 3 we can avoid flushing the environment due to the linearity of the
      control flow. We know that flushing will eventually happen by virtue of the
      recursive call to [expr]. *)
-  match Apply.continuation apply with
-  | Never_returns ->
-    (* Case 1 *)
+  let flush_everything_and_call () =
     let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm, free_vars, symbol_inits =
       wrap call free_vars Env.Symbol_inits.empty
     in
     cmm, free_vars, symbol_inits, res
-  | Return k -> (
+  in
+  let bind_result_and_continue ~param ~handler_params_occurrences
+      ~handler_body_inlined_debuginfo ~handler_body =
+    let param_var, param_uid = Bound_parameter.var_and_uid param in
+    let var = Bound_var.create param_var param_uid Name_mode.normal in
+    let env, res =
+      Env.bind_variable env res var ~effects_and_coeffects_of_defining_expr:effs
+        ~defining_expr:call ~free_vars_of_defining_expr:free_vars
+        ~num_normal_occurrences_of_bound_vars:handler_params_occurrences
+    in
+    let env = Env.set_inlined_debuginfo env handler_body_inlined_debuginfo in
+    expr env res handler_body
+  in
+  match Apply.return apply with
+  | Never_returns _ ->
+    (* Case 1 *)
+    flush_everything_and_call ()
+  | Tail_forwards_to_caller cont -> (
+    (* Jump destinations were rejected when the call's result type was
+       computed. *)
+    match Env.get_continuation env cont with
+    | Return _ ->
+      (* Case 1: the result is handed straight back to the caller. *)
+      flush_everything_and_call ()
+    | Jump _ -> fatal_forwarding_to_jump apply
+    | Inline
+        { handler_params;
+          handler_body;
+          handler_params_occurrences;
+          handler_body_inlined_debuginfo
+        } -> (
+      (* Case 3. Closure conversion's classic-mode inlining produces this shape
+         by renaming a forwarder's return continuation to the call site's: the
+         result then has the handler's concrete parameter type, which
+         [extended_result_type_of_apply] used as the call's result type. *)
+      match Bound_parameters.to_list handler_params with
+      | [param] ->
+        bind_result_and_continue ~param ~handler_params_occurrences
+          ~handler_body_inlined_debuginfo ~handler_body
+      | [] | _ :: _ -> fatal_forwarding_several_values apply))
+  | Returns_to { cont = k; arity } -> (
     match Env.get_continuation env k with
     | Return { param_types } ->
       (* Case 1 *)
-      let apply_result_arity =
-        Flambda_arity.unarized_components
-          (Result_arity.to_arity_with_placeholder (Apply.return_arity apply))
+      let arities_match =
+        return_param_types_match param_types
+          ~num_args:(Flambda_arity.cardinal_unarized arity)
       in
-      if List.compare_lengths apply_result_arity param_types = 0
-      then
-        let wrap, _, res =
-          Env.flush_delayed_lets ~mode:Flush_everything env res
-        in
-        let cmm, free_vars, symbol_inits =
-          wrap call free_vars Env.Symbol_inits.empty
-        in
-        cmm, free_vars, symbol_inits, res
+      if arities_match
+      then flush_everything_and_call ()
       else
         Misc.fatal_errorf
           "Types (%a) do not match arguments for the return cont of@ %a"
-          (Format.pp_print_list ~pp_sep:Format.pp_print_space Printcmm.machtype)
-          param_types Apply.print apply
+          print_return_param_types param_types Apply.print apply
     | Jump { param_types = _; cont } ->
       (* Case 2 *)
       let wrap, _, res =
@@ -1131,26 +1229,15 @@ and apply_expr env res apply =
       cmm, free_vars, symbol_inits, res
     | Inline
         { handler_params;
-          handler_body = body;
+          handler_body;
           handler_params_occurrences;
           handler_body_inlined_debuginfo
         } -> (
       (* Case 3 *)
-      let handler_params = Bound_parameters.to_list handler_params in
-      match handler_params with
+      match Bound_parameters.to_list handler_params with
       | [param] ->
-        let param_var, param_uid = Bound_parameter.var_and_uid param in
-        let var = Bound_var.create param_var param_uid Name_mode.normal in
-        let env, res =
-          Env.bind_variable env res var
-            ~effects_and_coeffects_of_defining_expr:effs ~defining_expr:call
-            ~free_vars_of_defining_expr:free_vars
-            ~num_normal_occurrences_of_bound_vars:handler_params_occurrences
-        in
-        let env =
-          Env.set_inlined_debuginfo env handler_body_inlined_debuginfo
-        in
-        expr env res body
+        bind_result_and_continue ~param ~handler_params_occurrences
+          ~handler_body_inlined_debuginfo ~handler_body
       | params ->
         (* CR ncourant: we create a cexit/ccatch pair here, to be able to
            destruct the output which is a tuple. When we get a way to
@@ -1173,7 +1260,7 @@ and apply_expr env res apply =
           Env.set_inlined_debuginfo env handler_body_inlined_debuginfo
         in
         let expr, free_vars_of_handler, handler_symbol_inits, res =
-          expr env res body
+          expr env res handler_body
         in
         let expr, free_vars_of_handler, symbol_inits =
           Env.place_symbol_inits ~params:params_with_machtype expr

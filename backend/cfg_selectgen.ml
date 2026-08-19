@@ -934,6 +934,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     Never_returns
 
   and emit_expr_op env sub_cfg bound_name op args dbg : _ Or_never_returns.t =
+    (match (op : Cmm.operation) with
+    | Capply { result_type = Unknown; _ } ->
+      Misc.fatal_errorf
+        "Unknown-result call in %s was not emitted in tail position (%a)"
+        !SU.current_function_name Debuginfo.print_compact dbg
+    | _ -> ());
     match emit_parts_list env sub_cfg args with
     | Never_returns -> Never_returns
     | Ok (simple_args, env) -> (
@@ -1297,6 +1303,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match emit_parts_list env sub_cfg args with
     | Never_returns -> ()
     | Ok (simple_args, env) -> (
+      let reject_unknown_result_fallback call_kind =
+        match (ty : Cmm.result_type) with
+        | Known _ -> ()
+        | Unknown ->
+          Misc.fatal_errorf
+            "Cannot compile unknown-result %s call in %s as a non-tail call \
+             (%a)"
+            call_kind !SU.current_function_name Debuginfo.print_compact dbg
+      in
+      (* The result registers of an unknown-result call are never read: the
+         tail-call path hands the callee's results to the caller and the
+         fallback is rejected above. *)
       let result_regs_type =
         match (ty : Cmm.result_type) with
         | Known ty -> ty
@@ -1320,6 +1338,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             (Array.append [| r1.(0) |] loc_arg)
             [||])
         else (
+          reject_unknown_result_fallback "indirect";
           SU.insert_move_args env sub_cfg rarg loc_arg stack_ofs;
           SU.insert_debug' env sub_cfg term dbg
             (Array.append [| r1.(0) |] loc_arg)
@@ -1351,6 +1370,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.insert_moves env sub_cfg r1 loc_arg;
           SU.insert_debug' env sub_cfg call dbg loc_arg [||])
         else (
+          reject_unknown_result_fallback "direct";
           SU.insert_move_args env sub_cfg r1 loc_arg stack_ofs;
           SU.insert_debug' env sub_cfg term dbg loc_arg loc_res;
           Sub_cfg.add_never_block sub_cfg ~label:label_after;
