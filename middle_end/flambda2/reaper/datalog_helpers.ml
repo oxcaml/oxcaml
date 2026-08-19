@@ -85,6 +85,141 @@ module Cols = struct
   let cf = Cofield.datalog_column_id
 end
 
+module Maps = struct
+  let add_id = Ids_for_export.add_code_id_or_name
+
+  module N = struct
+    type t = unit Code_id_or_name.Map.t
+
+    let add_ids t ids =
+      Code_id_or_name.Map.fold (fun id () ids -> add_id ids id) t ids
+
+    let rename old_t ~rename_id =
+      Code_id_or_name.Map.fold
+        (fun id () new_t -> Code_id_or_name.Map.add (rename_id id) () new_t)
+        old_t Code_id_or_name.Map.empty
+  end
+
+  module Nn = struct
+    type t = N.t Code_id_or_name.Map.t
+
+    let add_ids t ids =
+      Code_id_or_name.Map.fold
+        (fun id n ids -> N.add_ids n (add_id ids id))
+        t ids
+
+    let rename old_t ~rename_id =
+      Code_id_or_name.Map.fold
+        (fun id old_n new_t ->
+          Code_id_or_name.Map.add (rename_id id)
+            (N.rename old_n ~rename_id)
+            new_t)
+        old_t Code_id_or_name.Map.empty
+  end
+
+  module Nnn = struct
+    type t = Nn.t Code_id_or_name.Map.t
+
+    let add_ids t ids =
+      Code_id_or_name.Map.fold
+        (fun id nn ids -> Nn.add_ids nn (add_id ids id))
+        t ids
+
+    let rename old_t ~rename_id =
+      Code_id_or_name.Map.fold
+        (fun id old_nn new_t ->
+          Code_id_or_name.Map.add (rename_id id)
+            (Nn.rename old_nn ~rename_id)
+            new_t)
+        old_t Code_id_or_name.Map.empty
+  end
+
+  module Nf = struct
+    type t = unit Field.Map.t Code_id_or_name.Map.t
+
+    let add_ids t ids =
+      Code_id_or_name.Map.fold
+        (fun id (_ : unit Field.Map.t) ids -> add_id ids id)
+        t ids
+
+    let add_fields t fields =
+      Code_id_or_name.Map.fold
+        (fun (_ : Code_id_or_name.t) f fields ->
+          Field.Map.fold
+            (fun field () fields -> Field.Set.add field fields)
+            f fields)
+        t fields
+
+    let rename old_t ~rename_id ~rename_field =
+      Code_id_or_name.Map.fold
+        (fun id old_f new_t ->
+          let new_f =
+            Field.Map.fold
+              (fun field () new_f ->
+                Field.Map.add (rename_field field) () new_f)
+              old_f Field.Map.empty
+          in
+          Code_id_or_name.Map.add (rename_id id) new_f new_t)
+        old_t Code_id_or_name.Map.empty
+  end
+
+  module Nfn = struct
+    type t = N.t Field.Map.t Code_id_or_name.Map.t
+
+    let add_ids t ids =
+      Code_id_or_name.Map.fold
+        (fun id fn ids ->
+          Field.Map.fold
+            (fun (_ : Field.t) n ids -> N.add_ids n ids)
+            fn (add_id ids id))
+        t ids
+
+    let add_fields t fields =
+      Code_id_or_name.Map.fold
+        (fun (_ : Code_id_or_name.t) fn fields ->
+          Field.Map.fold
+            (fun field (_ : N.t) fields -> Field.Set.add field fields)
+            fn fields)
+        t fields
+
+    let rename old_t ~rename_id ~rename_field =
+      Code_id_or_name.Map.fold
+        (fun id old_fn new_t ->
+          let new_fn =
+            Field.Map.fold
+              (fun field old_n new_fn ->
+                Field.Map.add (rename_field field)
+                  (N.rename old_n ~rename_id)
+                  new_fn)
+              old_fn Field.Map.empty
+          in
+          Code_id_or_name.Map.add (rename_id id) new_fn new_t)
+        old_t Code_id_or_name.Map.empty
+  end
+
+  module Ncn = struct
+    type t = N.t Cofield.Map.t Code_id_or_name.Map.t
+
+    let add_ids t ids =
+      Code_id_or_name.Map.fold
+        (fun id cn ids ->
+          Cofield.Map.fold
+            (fun (_ : Cofield.t) n ids -> N.add_ids n ids)
+            cn (add_id ids id))
+        t ids
+
+    let rename old_t ~rename_id =
+      (* Cofields are stable across processes, so they are not renamed. *)
+      Code_id_or_name.Map.fold
+        (fun id old_cn new_t ->
+          let new_cn =
+            Cofield.Map.map (fun n -> N.rename n ~rename_id) old_cn
+          in
+          Code_id_or_name.Map.add (rename_id id) new_cn new_t)
+        old_t Code_id_or_name.Map.empty
+  end
+end
+
 open! Syntax
 
 let nrel name schema = Datalog.create_relation ~provenance:false ~name schema

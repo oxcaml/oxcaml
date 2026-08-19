@@ -227,3 +227,19 @@ let print_for_variable_name ppf x =
         "[Field.print_for_variable_name] got field %a but this field was not \
          expected to be possible to occur in unboxed blocks"
         print_view view
+
+let export_views set =
+  Set.fold (fun field views -> (field, view field) :: views) set []
+
+let import_views views =
+  let map =
+    List.fold_left
+      (fun map (field, view) -> Map.add field (create view) map)
+      Map.empty views
+  in
+  fun field ->
+    match Map.find_opt field map with
+    | Some field -> field
+    | None ->
+      Misc.fatal_errorf "Field %a has no view stored in the serialised data"
+        print field

@@ -105,3 +105,7 @@ val must_be_function_slot : t -> Function_slot.t
 val is_local : t -> bool
 
 val print_for_variable_name : Format.formatter -> t -> unit
+
+val export_views : Set.t -> (t * view) list
+
+val import_views : (t * view) list -> t -> t
