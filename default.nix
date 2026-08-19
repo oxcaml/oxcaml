@@ -13,6 +13,7 @@
   oxcamlClang ? false,
   oxcamlLldb ? false,
   syntaxQuotations ? false,
+  withMerlin ? false,
 }:
 let
   inherit (pkgs) lib fetchpatch;
@@ -156,6 +157,14 @@ let
               src = menhirSrc;
             });
 
+            # menhirGLR inherits menhirLib's pinned src, which predates the
+            # menhirGLR package; menhir builds fine without it.
+            menhirGLR = null;
+
+            # nixpkgs' suggest-menhirLib patch doesn't apply to the pinned
+            # menhir source (same reason the 4.14 menhir above drops it).
+            menhir = osuper.menhir.overrideAttrs (_: { patches = [ ]; });
+
             inherit (packages) merlin-lib dot-merlin-reader merlin;
           }
         );
@@ -242,6 +251,10 @@ let
       };
     in
     packages;
+
+  # Only the passthru dev-input lists are used here, which don't depend on the
+  # testOcaml argument (it only feeds the merlin package's check phase).
+  merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
   gfortran =
     # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
@@ -360,11 +373,13 @@ stdenv.mkDerivation {
     pkgs.removeReferencesTo
   ]
   ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
-  ++ lib.optional oxcamlLldb pkgs.python312;
+  ++ lib.optional oxcamlLldb pkgs.python312
+  ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs;
 
   buildInputs = [
     pkgs.llvm # llvm-objcopy is used for debuginfo
-  ];
+  ]
+  ++ lib.optionals withMerlin merlinDev.devBuildInputs;
 
   preConfigure = ''
     rm -rf _build _install _runtest
@@ -405,27 +420,35 @@ stdenv.mkDerivation {
     remove-references-to -t ${dune} $out/lib/ocaml/Makefile.config
   '';
 
-  shellHook = ''
-    prefix="$(pwd)/_install"
+  shellHook =
+    let
+      merlinCommands =
+        if withMerlin then
+          "  make merlin-build        - Build Merlin\n"
+          + "  make merlin-test         - Run the Merlin tests\n"
+          + "  make merlin-promote      - Promote Merlin test output\n"
+        else
+          "  (make merlin-* targets need this shell built with withMerlin=true,\n"
+          + "   as the flake's devShell does)\n";
+    in
+    ''
+      prefix="$(pwd)/_install"
 
-    cat >&2 << EOF
-    OxCaml $version Development Environment
-    ===============================''${version//?/=}
+      cat >&2 << EOF
+      OxCaml $version Development Environment
+      ===============================''${version//?/=}
 
-    Available commands:
-      configurePhase           - Pre-build setup
-      make boot-compiler       - Quick build (recommended for development)
-      make boot-_install       - Quick install (recommended for development)
-      make fmt                 - Auto-format code
-      make                     - Full build
-      make install             - Install
-      make test                - Run all tests
-      make test-one TEST=...   - Run a single test
-      make merlin-build        - Build Merlin
-      make merlin-test         - Run the Merlin tests
-      make merlin-promote      - Promote Merlin test output
-    EOF
-  '';
+      Available commands:
+        configurePhase           - Pre-build setup
+        make boot-compiler       - Quick build (recommended for development)
+        make boot-_install       - Quick install (recommended for development)
+        make fmt                 - Auto-format code
+        make                     - Full build
+        make install             - Install
+        make test                - Run all tests
+        make test-one TEST=...   - Run a single test
+      ${merlinCommands}EOF
+    '';
 
   meta =
     { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
