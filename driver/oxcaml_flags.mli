@@ -50,6 +50,8 @@ val omit_leaf_frame_pointers : bool ref
 
 val cfg_merge_blocks : bool ref
 
+val cfg_cse_join_points : bool ref
+
 val cfg_value_propagation : bool ref
 val cfg_value_propagation_float : bool ref
 val cfg_value_propagation_flow : bool ref
