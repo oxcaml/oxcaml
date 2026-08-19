@@ -129,17 +129,6 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
       | Static _ -> assert false
       (* see below *)
     in
-    (* A variable bound at normal mode may additionally be referenced by the
-       defining expressions of phantom lets in the body. Such a variable must
-       remain locatable by the debugger, even if it is not user visible, so that
-       those references can be resolved; mark it accordingly (printed as
-       "NP"). *)
-    let promote_vars_needed_by_phantom_lets (bound_vars : Bound_pattern.t) =
-      Bound_pattern.fold_all_bound_vars bound_vars ~init:()
-        ~f:(fun () bound_var ->
-          Simplify_common.promote_var_if_needed_by_phantom_lets
-            free_names_of_body (VB.var bound_var))
-    in
     let bindings =
       List.map
         (fun (binding_to_place : Expr_builder.binding_to_place) ->
@@ -205,7 +194,6 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                   "Cannot [Let]-bind non-normal variable(s) to a [Named] that \
                    has more than generative effects:@ %a@ =@ %a"
                   Bound_pattern.print bound_vars Named.print defining_expr;
-              promote_vars_needed_by_phantom_lets bound_vars;
               binding_to_place)
             else
               let is_depth =
@@ -249,8 +237,6 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                   | Present name_mode -> name_mode
                 in
                 assert (Name_mode.can_be_in_terms name_mode);
-                if Name_mode.is_normal name_mode
-                then promote_vars_needed_by_phantom_lets bound_vars;
                 let bound_vars =
                   Bound_pattern.with_name_mode bound_vars name_mode
                 in
@@ -328,6 +314,80 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                   (Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _)
                 ) ) ->
             Misc.fatal_errorf "Prim_rewrite applied to a non-prim Named.t"))
+    in
+    (* A variable bound at normal mode may additionally be referenced by the
+       defining expressions of phantom lets in the body. Such a variable must
+       remain locatable by the debugger, even if it is not user visible, so that
+       those references can be resolved. Since the user-visibility of a variable
+       is immutable, this is done by creating a fresh variable marked as
+       [Not_user_visible_but_needed_by_phantom_let] (printed as "NP") and
+       swapping it for the existing variable in the body, which takes constant
+       time by virtue of the delayed-renaming mechanism on terms. Nothing else
+       needs renaming: the variable's scope ends at this binder. *)
+    let bindings, body, uacc =
+      if
+        Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
+      then bindings, body, uacc
+      else
+        let free_names_of_body = UA.name_occurrences uacc in
+        let renaming = ref Renaming.empty in
+        let promote_bound_var bound_var =
+          let var = VB.var bound_var in
+          if Simplify_common.variable_needs_np_promotion free_names_of_body var
+          then (
+            let var' =
+              Variable.with_user_visibility var
+                Not_user_visible_but_needed_by_phantom_let
+            in
+            renaming
+              := Renaming.add_fresh_variable !renaming var
+                   ~guaranteed_fresh:var';
+            VB.create var' (VB.debug_uid bound_var) (VB.name_mode bound_var))
+          else bound_var
+        in
+        let bindings =
+          List.map
+            (fun (binding_to_place : Expr_builder.binding_to_place) ->
+              match binding_to_place with
+              | Delete_binding _ -> binding_to_place
+              | Keep_binding binding -> (
+                match (binding.let_bound : Bound_pattern.t) with
+                | Static _ -> binding_to_place
+                | Singleton bound_var ->
+                  if Name_mode.is_normal (VB.name_mode bound_var)
+                  then
+                    let let_bound =
+                      Bound_pattern.singleton (promote_bound_var bound_var)
+                    in
+                    Expr_builder.Keep_binding { binding with let_bound }
+                  else binding_to_place
+                | Set_of_closures bound_vars ->
+                  if
+                    List.for_all
+                      (fun bv -> Name_mode.is_normal (VB.name_mode bv))
+                      bound_vars
+                  then
+                    let let_bound =
+                      Bound_pattern.set_of_closures
+                        (List.map promote_bound_var bound_vars)
+                    in
+                    Expr_builder.Keep_binding { binding with let_bound }
+                  else binding_to_place))
+            bindings
+        in
+        let renaming = !renaming in
+        if Renaming.is_identity renaming
+        then bindings, body, uacc
+        else
+          let body =
+            RE.apply_renaming body (UA.are_rebuilding_terms uacc) renaming
+          in
+          let uacc =
+            UA.with_name_occurrences uacc
+              ~name_occurrences:
+                (Name_occurrences.apply_renaming free_names_of_body renaming)
+          in
+          bindings, body, uacc
     in
     EB.make_new_let_bindings uacc ~bindings_outermost_first:bindings ~body
   in

@@ -28,3 +28,6 @@ let raw_name = name
 let unique_name t = name t ^ string_of_int (name_stamp t)
 
 let canonical_name t = if !Clflags.canonical_ids then name t else unique_name t
+
+let with_user_visibility t visibility =
+  create_with_user_visibility visibility (name t) (kind t)
