@@ -10,29 +10,30 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type _ pass =
-  | Parse_tree_intf : Parsetree.signature pass
-  | Parse_tree_impl : Parsetree.structure pass
-  | Typed_tree_intf : Typedtree.signature pass
-  | Typed_tree_impl : Typedtree.implementation pass
-  | Raw_lambda : Lambda.program pass
-  | Lambda : Lambda.program pass
-  | Raw_flambda2 : Flambda2_terms.Flambda_unit.t pass
-  | Flambda2 : Flambda2_terms.Flambda_unit.t pass
-  | Reaped_flambda2 : Flambda2_terms.Flambda_unit.t pass
+type (_,_) pass =
+  | Parse_tree_intf : (Parsetree.signature, Parsetree.signature) pass
+  | Parse_tree_impl : (Parsetree.structure, Parsetree.structure) pass
+  | Typed_tree_intf : (Typedtree.signature,unit) pass
+  | Typed_tree_impl : (Typedtree.implementation,unit) pass
+  | Raw_lambda : (Lambda.program,unit) pass
+  | Lambda : (Lambda.program,unit) pass
+  | Raw_flambda2 : (Flambda2_terms.Flambda_unit.t,unit) pass
+  | Flambda2 : (Flambda2_terms.Flambda_unit.t,unit) pass
+  | Reaped_flambda2 : (Flambda2_terms.Flambda_unit.t,unit) pass
 
-  | Linear : Linear.fundecl pass
-  | Cfg_combine : Cfg_with_layout.t pass
-  | Cfg_cse : Cfg_with_layout.t pass
-  | Cfg : Cfg_with_layout.t pass
-  | Cmm : Cmm.phrase list pass
+  | Linear : (Linear.fundecl,unit) pass
+  | Cfg_combine : (Cfg_with_layout.t,unit) pass
+  | Cfg_cse : (Cfg_with_layout.t,unit) pass
+  | Cfg : (Cfg_with_layout.t,unit) pass
+  | Cmm : (Cmm.phrase list,unit) pass
 
-  | Inlining_tree : Flambda2_simplify_shared.Inlining_report.Inlining_tree.t pass
-  | Check_allocations : Zero_alloc_checker.iter_witnesses pass
+  | Inlining_tree :
+      (Flambda2_simplify_shared.Inlining_report.Inlining_tree.t,unit) pass
+  | Check_allocations : (Zero_alloc_checker.iter_witnesses,unit) pass
 
 type t = {
-  mutable parse_tree_intf : (Parsetree.signature -> unit) list;
-  mutable parse_tree_impl : (Parsetree.structure -> unit) list;
+  mutable parse_tree_intf : (Parsetree.signature -> Parsetree.signature) list;
+  mutable parse_tree_impl : (Parsetree.structure -> Parsetree.structure) list;
   mutable typed_tree_intf : (Typedtree.signature -> unit) list;
   mutable typed_tree_impl : (Typedtree.implementation -> unit) list;
   mutable raw_lambda : (Lambda.program -> unit) list;
@@ -45,7 +46,8 @@ type t = {
   mutable cfg_cse : (Cfg_with_layout.t -> unit) list;
   mutable cfg : (Cfg_with_layout.t -> unit) list;
   mutable cmm : (Cmm.phrase list -> unit) list;
-  mutable inlining_tree : (Flambda2_simplify_shared.Inlining_report.Inlining_tree.t -> unit) list;
+  mutable inlining_tree :
+    (Flambda2_simplify_shared.Inlining_report.Inlining_tree.t -> unit) list;
   mutable check_allocations : (Zero_alloc_checker.iter_witnesses -> unit) list
 }
 let hooks : t = {
@@ -70,7 +72,10 @@ let hooks : t = {
 let execute_hooks : type a. (a -> unit) list -> a -> unit = fun hooks arg ->
   List.iter (fun f -> f arg) hooks
 
-let register : type a. a pass -> (a -> unit) -> unit =
+let fold_hooks : type a. (a -> a) list -> a -> a = fun hooks arg ->
+  List.fold_left (|>) arg hooks
+
+let register : type a out. (a,out) pass -> (a -> out) -> unit =
   fun representation f ->
   match representation with
   | Parse_tree_intf -> hooks.parse_tree_intf <- f :: hooks.parse_tree_intf
@@ -92,11 +97,11 @@ let register : type a. a pass -> (a -> unit) -> unit =
   | Check_allocations ->
     hooks.check_allocations <- f :: hooks.check_allocations
 
-let execute : type a. a pass -> a -> unit =
+let execute : type a out. (a,out) pass -> a -> out =
   fun representation arg ->
   match representation with
-  | Parse_tree_intf -> execute_hooks hooks.parse_tree_intf arg
-  | Parse_tree_impl -> execute_hooks hooks.parse_tree_impl arg
+  | Parse_tree_intf -> fold_hooks hooks.parse_tree_intf arg
+  | Parse_tree_impl -> fold_hooks hooks.parse_tree_impl arg
   | Typed_tree_intf -> execute_hooks hooks.typed_tree_intf arg
   | Typed_tree_impl -> execute_hooks hooks.typed_tree_impl arg
   | Raw_lambda -> execute_hooks hooks.raw_lambda arg
@@ -114,7 +119,7 @@ let execute : type a. a pass -> a -> unit =
 
 let execute_and_pipe r a = execute r a; a
 
-let clear : type a. a pass -> unit =
+let clear : type a out. (a,out) pass -> unit =
   function
   | Parse_tree_intf -> hooks.parse_tree_intf <- []
   | Parse_tree_impl -> hooks.parse_tree_impl <- []
