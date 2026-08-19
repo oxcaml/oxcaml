@@ -479,3 +479,19 @@ let add_symbol_projection dacc ~projected_from projection ~projection_bound_to
         let var = Bound_var.var projection_bound_to in
         DA.map_denv dacc ~f:(fun denv -> DE.add_symbol_projection denv var proj))
       ~var:(fun _ ~coercion:_ -> dacc)
+
+let promote_var_if_needed_by_phantom_lets free_names var =
+  match Variable.user_visibility var with
+  | User_visible | Not_user_visible_but_needed_by_phantom_let -> ()
+  | Not_user_visible -> (
+    match Variable.kind var with
+    | Region | Rec_info ->
+      (* Variables of these kinds cannot be referenced by phantom defining
+         expressions once translated to Cmm (for example the region of a local
+         allocation whose [Make_block] has been phantomised), so there is no
+         point keeping them visible to the debugger. *)
+      ()
+    | Value | Naked_number _ -> (
+      match Name_occurrences.count_variable_phantom_mode free_names var with
+      | Zero -> ()
+      | One | More_than_one -> Variable.make_needed_by_phantom_let var))
