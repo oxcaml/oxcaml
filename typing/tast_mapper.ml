@@ -928,9 +928,13 @@ let module_expr sub x =
     | Tmod_constraint (mexpr, mt, Tmodtype_implicit, c) ->
         Tmod_constraint (sub.module_expr sub mexpr, mt, Tmodtype_implicit,
                          sub.module_coercion sub c)
-    | Tmod_constraint (mexpr, mt, Tmodtype_package uid, c) ->
-        Tmod_constraint (sub.module_expr sub mexpr, mt, Tmodtype_package uid,
-                         sub.module_coercion sub c)
+    | Tmod_constraint
+        (mexpr, mt, Tmodtype_package { package_module_type_path }, c) ->
+        Tmod_constraint
+          ( sub.module_expr sub mexpr,
+            mt,
+            Tmodtype_package { package_module_type_path },
+            sub.module_coercion sub c )
     | Tmod_constraint (mexpr, mt, Tmodtype_explicit (mtype, ma), c) ->
         Tmod_constraint (
           sub.module_expr sub mexpr,

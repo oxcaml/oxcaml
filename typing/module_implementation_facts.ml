@@ -1195,7 +1195,11 @@ let facts_of_tree compilation_unit artifact iterate =
         if is_relevant_expectation module_type
         then register (key_of_module_type module_type)
         else None
-      | Tmod_constraint (inner, _, Tmodtype_package path, _) -> (
+      | Tmod_constraint
+          ( inner,
+            _,
+            Tmodtype_package { package_module_type_path = path },
+            _ ) -> (
         match key_of_modtype_path ~site:inner.mod_loc inner.mod_env path with
         | Some expectation -> register expectation
         | None -> None)
@@ -1659,7 +1663,11 @@ let facts_of_tree compilation_unit artifact iterate =
                   expectation Check.Kind.Ascription implementation.mod_loc
               end
             end
-          | Tmod_constraint (implementation, _, Tmodtype_package path, _) -> (
+          | Tmod_constraint
+              ( implementation,
+                _,
+                Tmodtype_package { package_module_type_path = path },
+                _ ) -> (
             match
               key_of_modtype_path ~site:implementation.mod_loc
                 implementation.mod_env path

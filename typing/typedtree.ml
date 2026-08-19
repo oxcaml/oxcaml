@@ -629,7 +629,7 @@ and module_expr =
 
 and module_type_constraint =
   Tmodtype_implicit
-| Tmodtype_package of Path.t
+| Tmodtype_package of { package_module_type_path : Path.t }
 | Tmodtype_explicit of module_type * Mode.Value.lr modes
 
 and functor_parameter =
