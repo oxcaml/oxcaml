@@ -156,10 +156,6 @@ and _ poly_param =
   | Arrow : (arg_label * type_expr option) list -> [`exp] poly_param
   | Method : string loc * type_expr -> [`exp] poly_param
 
-type record_sorts =
-  | Fixed
-  | Variable of Jkind.sort array
-
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -227,12 +223,11 @@ and 'k pattern_desc =
       value pattern_desc
   | Tpat_record :
       (Longident.t loc * label_description * value general_pattern) list *
-        record_sorts * Types.record_representation * closed_flag ->
+        Types.record_representation * closed_flag ->
       value pattern_desc
   | Tpat_record_unboxed_product :
       (Longident.t loc * unboxed_label_description *
         value general_pattern) list
-      * record_sorts
       * Types.record_unboxed_product_representation
       * closed_flag ->
       value pattern_desc
@@ -348,7 +343,6 @@ and expression_desc =
   | Texp_unboxed_field of {
       record : expression;
       record_sort : Jkind.sort;
-      record_sorts : record_sorts;
       record_repres : Types.record_unboxed_product_representation;
       lid : Longident.t loc;
       label : unboxed_label_description;
@@ -357,7 +351,6 @@ and expression_desc =
   | Texp_setfield of {
       record : expression;
       record_repres : Types.record_representation;
-      record_sorts : record_sorts;
       modality : Mode.Locality.l;
       lid : Longident.t loc;
       label : Data_types.label_description;
@@ -439,7 +432,8 @@ and block_access =
 
 and unboxed_access =
   | Uaccess_unboxed_field of
-      Longident.t loc * unboxed_label_description * record_sorts
+      Longident.t loc * unboxed_label_description
+      * Types.record_unboxed_product_representation
 
 and comprehension =
   {
@@ -1171,9 +1165,9 @@ let shallow_iter_pattern_desc
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
   | Tpat_construct(_, _, _, patl, _) -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_variant(_, pat, _) -> Option.iter f.f pat
-  | Tpat_record (lbl_pat_list, _, _, _) ->
+  | Tpat_record (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
-  | Tpat_record_unboxed_product (lbl_pat_list, _, _, _) ->
+  | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
   | Tpat_lazy p -> f.f p
@@ -1200,12 +1194,12 @@ let shallow_map_pattern_desc
   | Tpat_unboxed_tuple pats ->
       Tpat_unboxed_tuple
         (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
-  | Tpat_record (lpats, sorts, repr, closed) ->
+  | Tpat_record (lpats, repr, closed) ->
       Tpat_record (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats,
-                   sorts, repr, closed)
-  | Tpat_record_unboxed_product (lpats, sorts, repr, closed) ->
+                   repr, closed)
+  | Tpat_record_unboxed_product (lpats, repr, closed) ->
       Tpat_record_unboxed_product
-        (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats, sorts, repr, closed)
+        (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats, repr, closed)
   | Tpat_construct (lid, c, r, pats, ty) ->
       Tpat_construct (lid, c, r, List.map (fun (s, p) -> s, f.f p) pats, ty)
   | Tpat_array (am, arg_sort, pats) ->
@@ -1321,10 +1315,10 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
       | Tpat_value p -> loop f p
       | Tpat_construct(_, _, _, patl, _) ->
           List.iter (fun (_, pat) -> loop f pat) patl
-      | Tpat_record (lbl_pat_list, _, _, _) ->
+      | Tpat_record (lbl_pat_list, _, _) ->
           List.iter (fun (_, _, pat) -> loop f pat)
             lbl_pat_list
-      | Tpat_record_unboxed_product (lbl_pat_list, _, _, _) ->
+      | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
           List.iter (fun (_, _, pat) -> loop f pat)
             lbl_pat_list
       | Tpat_variant (_, pat, _) -> Option.iter (loop f) pat
@@ -1529,22 +1523,29 @@ let mode_without_locks_exn = function
 
 let label_sort (type rep)
       (record_form : rep record_form)
-      (label : rep gen_label_description) record_sorts =
-  match record_form, label.lbl_repres with
-  | Legacy, Record_unboxed -> `Same_as_record_sort
+      (label : rep gen_label_description) (repres : rep) =
+  match record_form, repres with
+  | Legacy, (Record_unboxed | Record_inlined (_, _, Variant_unboxed)) ->
+    `Same_as_record_sort
+  | Legacy, Record_variable sorts_and_types ->
+    `Sort (fst sorts_and_types.(label.lbl_pos))
+  | Legacy, Record_inlined (_, Constructor_variable sorts_and_types, _) ->
+    `Sort (fst sorts_and_types.(label.lbl_pos))
+  | Unboxed_product, Record_unboxed_product_variable sorts ->
+    `Sort sorts.(label.lbl_pos)
   | _ ->
-    begin match record_sorts, label.lbl_sort with
-    | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)
-    | Fixed, Some sort -> `Sort (Jkind.Sort.of_const sort)
-    | Fixed, None ->
-      Misc.fatal_errorf "no sort for label %s in fixed-sort record"
+    begin match label.lbl_sort with
+    | Some sort -> `Sort (Jkind.Sort.of_const sort)
+    | None ->
+      Misc.fatal_errorf
+        "no sort for label %s despite non-variable representation"
         label.lbl_name
     end
 
-let unboxed_label_sort label record_sorts =
-  match label_sort Unboxed_product label record_sorts with
+let unboxed_label_sort label repres =
+  match label_sort Unboxed_product label repres with
   | `Same_as_record_sort -> assert false
   | `Sort s -> s
 
-let unboxed_label_all_sorts label record_sorts =
-  Array.map (fun lbl -> unboxed_label_sort lbl record_sorts) label.lbl_all
+let unboxed_label_all_sorts label repres =
+  Array.map (fun lbl -> unboxed_label_sort lbl repres) label.lbl_all

@@ -1063,9 +1063,9 @@ module Record_diffing = struct
       match record_form with
       | Legacy ->
         begin match rep1, rep2 with
-        | Record_variable, Record_variable -> None
-        | Record_variable, _ -> Some (Fixed_representation Second)
-        | _, Record_variable -> Some (Fixed_representation First)
+        | Record_undetermined, Record_undetermined -> None
+        | Record_undetermined, _ -> Some (Fixed_representation Second)
+        | _, Record_undetermined -> Some (Fixed_representation First)
 
         | Record_unboxed, Record_unboxed -> None
         | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
@@ -1106,16 +1106,25 @@ module Record_diffing = struct
         | Record_dummy _, _ | _, Record_dummy _ ->
           Misc.fatal_error
             "compare_with_representation: dummy record representation"
+        | Record_variable _, _
+        | _, Record_variable _ ->
+          Misc.fatal_error
+            "compare_with_representation: typechecked record representation"
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
-        | Record_unboxed_product_variable, Record_unboxed_product_variable
+        | Record_unboxed_product_undetermined,
+          Record_unboxed_product_undetermined
         | Record_unboxed_product, Record_unboxed_product ->
             None
-        | Record_unboxed_product, Record_unboxed_product_variable ->
+        | Record_unboxed_product, Record_unboxed_product_undetermined ->
             Some (Fixed_representation First)
-        | Record_unboxed_product_variable, Record_unboxed_product ->
+        | Record_unboxed_product_undetermined, Record_unboxed_product ->
             Some (Fixed_representation Second)
+        | Record_unboxed_product_variable _, _
+        | _, Record_unboxed_product_variable _ ->
+            Misc.fatal_error
+              "compare_with_representation: typechecked record representation"
         end
 end
 
@@ -1287,7 +1296,7 @@ module Variant_diffing = struct
     =
     let shape_of_layout = function
       | Cstr_layout_known { shape; _ } -> Some shape
-      | Cstr_layout_variable -> None
+      | Cstr_layout_undetermined -> None
     in
     let shapes1, shapes2 =
       match rep1, rep2 with
