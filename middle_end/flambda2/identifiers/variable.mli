@@ -32,3 +32,7 @@ val unique_name : t -> string
 val raw_name : t -> string
 
 val canonical_name : t -> string
+
+(** Create a fresh variable like the given one (same name and kind) but with the
+    given user-visibility. *)
+val with_user_visibility : t -> user_visibility -> t

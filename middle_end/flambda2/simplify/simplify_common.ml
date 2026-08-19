@@ -473,9 +473,9 @@ let add_symbol_projection dacc ~projected_from projection ~projection_bound_to
         DA.map_denv dacc ~f:(fun denv -> DE.add_symbol_projection denv var proj))
       ~var:(fun _ ~coercion:_ -> dacc)
 
-let promote_var_if_needed_by_phantom_lets free_names var =
+let variable_needs_np_promotion free_names var =
   match Variable.user_visibility var with
-  | User_visible | Not_user_visible_but_needed_by_phantom_let -> ()
+  | User_visible | Not_user_visible_but_needed_by_phantom_let -> false
   | Not_user_visible -> (
     match Variable.kind var with
     | Region | Rec_info ->
@@ -483,8 +483,8 @@ let promote_var_if_needed_by_phantom_lets free_names var =
          expressions once translated to Cmm (for example the region of a local
          allocation whose [Make_block] has been phantomised), so there is no
          point keeping them visible to the debugger. *)
-      ()
+      false
     | Value | Naked_number _ -> (
       match Name_occurrences.count_variable_phantom_mode free_names var with
-      | Zero -> ()
-      | One | More_than_one -> Variable.make_needed_by_phantom_let var))
+      | Zero -> false
+      | One | More_than_one -> true))
