@@ -17,6 +17,16 @@ type graph
 
 val to_datalog : graph -> Datalog.database
 
+val constructor : Datalog_helpers.Maps.Nfn.handle
+
+val parameter : Datalog_helpers.Maps.Ncn.handle
+
+val code_id_my_closure : Datalog_helpers.Maps.Nn.handle
+
+val any_usage : Datalog_helpers.Maps.N.handle
+
+val any_source : Datalog_helpers.Maps.N.handle
+
 module Relations : sig
   type 'a atom = [> `Atom of Datalog.atom] as 'a
 
