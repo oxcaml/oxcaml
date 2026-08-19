@@ -19,6 +19,4 @@ let () =
   assert (Static.get_count () = 3);
 
   Inst.Bar_q.bump ();
-  assert (Static.get_count () = 4);
-
-  print_endline "OK"
+  assert (Static.get_count () = 4)

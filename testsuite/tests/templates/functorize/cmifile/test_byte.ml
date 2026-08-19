@@ -3,6 +3,10 @@
 
     1. Two-phase compile (phase 1 emits [.cmi], phase 2 emits [.cmo]
        against it) is runtime-equivalent to the one-step [.cmo] target.
+       Also checks which artifacts each phase emits: with [-bin-annot]
+       and [-bin-annot-cms], the [.cmi] target adds the interface
+       annotations ([.cmti]/[.cmsi]) and the [.cmo] target the
+       implementation ones ([.cmt]/[.cms]).
     2. Negative: a [-cmi-file] declaring [Make] as a plain structure
        fails the inclusion check against the inferred functor. *)
 
@@ -10,6 +14,8 @@
    main_functorize.ml test_functorize.reference \
    bundle_bad.mli \
    bad_cmi_file_struct.reference \
+   bundle.cmi.objinfo.reference \
+   bundle.cms.objinfo_byte.reference \
  ";
 
  setup-ocamlc.byte-build-env;
@@ -93,23 +99,57 @@
  ocamlc.byte;
 
  {
-   (* (1) Positive: phase 1 generates the bundle [.cmi]. *)
+   (* (1) Positive: phase 1 generates the bundle [.cmi].  With
+      [-bin-annot]/[-bin-annot-cms], a [.cmi] target also emits the
+      interface annotations ([.cmti]/[.cmsi]) and nothing else. *)
 
-   flags = "$flg -functorize -I p -I basic -I util Basic Util";
+   flags = "$flg -functorize -bin-annot -bin-annot-cms \
+     -I p -I basic -I util Basic Util";
    module = "";
    program = "bundle_cmifile/bundle.cmi";
    all_modules = "";
    ocamlc.byte;
 
-   (* Phase 2: generate the [.cmo] against the [.cmi] from phase 1.  With
-      [-cmi-file], no [.cmi] is (re)written by this invocation. *)
+   script = "sh -c 'test -f bundle_cmifile/bundle.cmi && \
+                    test -f bundle_cmifile/bundle.cmti && \
+                    test -f bundle_cmifile/bundle.cmsi && \
+                    ! test -f bundle_cmifile/bundle.cmo && \
+                    ! test -f bundle_cmifile/bundle.cmt && \
+                    ! test -f bundle_cmifile/bundle.cms'";
+   script;
 
-   flags = "$flg -functorize -I p -I basic -I util \
+   (* Verify the cmi signature via objinfo. *)
+
+   program = "-no-approx -no-code bundle_cmifile/bundle.cmi";
+   output = "bundle.cmi.objinfo.output";
+   ocamlobjinfo;
+
+   reference = "bundle.cmi.objinfo.reference";
+   check-program-output;
+
+   (* Phase 2: generate the [.cmo] against the [.cmi] from phase 1.  With
+      [-cmi-file], no [.cmi] is (re)written by this invocation; the
+      annotations emitted are the implementation ones ([.cmt]/[.cms]). *)
+
+   flags = "$flg -functorize -bin-annot -bin-annot-cms \
+     -I p -I basic -I util \
      -cmi-file bundle_cmifile/bundle.cmi Basic Util";
    module = "";
    program = "bundle_cmifile/bundle.cmo";
    all_modules = "";
    ocamlc.byte;
+
+   script = "sh -c 'test -f bundle_cmifile/bundle.cmo && \
+                    test -f bundle_cmifile/bundle.cmt && \
+                    test -f bundle_cmifile/bundle.cms'";
+   script;
+
+   program = "bundle_cmifile/bundle.cms";
+   output = "bundle.cms.objinfo.output";
+   ocamlobjinfo;
+
+   reference = "bundle.cms.objinfo_byte.reference";
+   check-program-output;
 
    (* Verify the two-phase bundle is runtime-equivalent to the one-step
       bundle: the consumer program ([main_functorize.ml]) is the one used by

@@ -13,7 +13,7 @@
    pair_pq.mli pair_pq.ml \
    bar_q.mli bar_q.ml \
    q_int.mli q_int.ml \
-   main_stateful.ml test_stateful.reference \
+   main_stateful.ml \
  ";
 
  setup-ocamlc.byte-build-env;
@@ -144,8 +144,6 @@
  stdout = "test_stateful.output";
  stderr = "test_stateful.output";
  output = "test_stateful.output";
+ (* The program asserts; a clean exit is the test. *)
  run;
-
- reference = "test_stateful.reference";
- check-program-output;
 *)
