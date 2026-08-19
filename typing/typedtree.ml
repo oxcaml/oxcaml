@@ -392,9 +392,14 @@ and expression_desc =
   | Texp_setinstvar of Path.t * Path.t * string loc * expression
   | Texp_setmutvar of Ident.t loc * Jkind.sort * expression
   | Texp_override of Path.t * (Ident.t * string loc * expression) list
-  | Texp_letmodule of
-      Ident.t option * string option loc * Types.module_presence * Shape.Uid.t *
-        module_expr * expression
+  | Texp_letmodule of {
+      id : Ident.t option;
+      name : string option loc;
+      presence : Types.module_presence;
+      uid : Shape.Uid.t;
+      module_expr : module_expr;
+      body : expression;
+    }
   | Texp_letexception of extension_constructor * expression
   | Texp_assert of expression * Location.t
   | Texp_lazy of expression

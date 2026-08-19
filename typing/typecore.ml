@@ -4651,7 +4651,7 @@ let rec final_subexpression exp =
   | Texp_try (e, _, _)
   | Texp_ifthenelse (_, e, _)
   | Texp_match (_, _, {c_rhs=e} :: _, _, _)
-  | Texp_letmodule (_, _, _, _, _, e)
+  | Texp_letmodule { body = e; _ }
   | Texp_letexception (_, e)
   | Texp_open (_, e)
     -> final_subexpression e
@@ -5274,7 +5274,7 @@ let rec is_nonexpansive exp =
       Vars.fold (fun _ (mut,_,_) b -> decr count; b && mut = Asttypes.Immutable)
         vars true &&
       !count = 0
-  | Texp_letmodule (_, _, _, _, mexp, e)
+  | Texp_letmodule { module_expr = mexp; body = e; _ }
   | Texp_open ({ open_expr = mexp; _}, e) ->
       is_nonexpansive_mod mexp && is_nonexpansive e
   | Texp_pack mexp ->
@@ -5830,7 +5830,7 @@ let check_statement exp =
         | Texp_let (_, _, e)
         | Texp_sequence (_, _, e)
         | Texp_letexception (_, e)
-        | Texp_letmodule (_, _, _, _, _, e) ->
+        | Texp_letmodule { body = e; _ } ->
             loop e
         | _ ->
             let loc =
@@ -5905,7 +5905,7 @@ let check_partial_application ~statement exp =
             | Texp_apply_layout (e, _) -> check e
             | Texp_let (_, _, e) | Texp_letmutable(_, e)
             | Texp_sequence (_, _, e) | Texp_open (_, e)
-            | Texp_letexception (_, e) | Texp_letmodule (_, _, _, _, _, e)
+            | Texp_letexception (_, e) | Texp_letmodule { body = e; _ }
             | Texp_exclave e ->
                 check e
             | Texp_apply _ | Texp_send _ | Texp_new _ | Texp_letop _ ->
@@ -8268,7 +8268,15 @@ and type_expect_
         end
       in
       re {
-        exp_desc = Texp_letmodule(id, name, pres, md_uid, modl, body);
+        exp_desc =
+          Texp_letmodule
+            { id;
+              name;
+              presence = pres;
+              uid = md_uid;
+              module_expr = modl;
+              body
+            };
         exp_loc = loc; exp_extra = [];
         exp_type = body.exp_type;
         exp_attributes = sexp.pexp_attributes;

@@ -3713,7 +3713,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
     | Texp_open _ ->
       fatal_errorf "Translquote [at %a]: non-trivial Texp_open not implemented"
         Location.print_loc (to_location loc)
-    | Texp_letmodule (ident, _, _, _, mod_exp, body) -> (
+    | Texp_letmodule { id = ident; module_expr = mod_exp; body; _ } -> (
       let mod_exp = quote_module_exp ~transl stage loc env mod_exp in
       match ident with
       | None ->
