@@ -65,10 +65,10 @@ open! Int_replace_polymorphic_compare
     - [finalize_block]: materialise [body] from [pending_body]. Always drops
       Push_trap/Pop_trap pairs whose handler is unreachable. When
       [keep_unused_ops] is false, also drops dead [Op]s ([-1]) and replaces
-      [Continue (Goto _)] args going to params scheduled for removal with the
-      [Undefined] value.
+      [Continue (Goto _)] args going to params scheduled for removal with
+      [Omitted_since_unused].
     - [check_value_invariants]: every use is dominated by its definition, and
-      [Undefined] only feeds block params scheduled for removal. *)
+      [Omitted_since_unused] only feeds block params scheduled for removal. *)
 
 module Block_id = Oxcaml_utils.Id_counter.Make ()
 module Instruction_id = Oxcaml_utils.Id_counter.Make ()
@@ -159,7 +159,10 @@ and 'g instruction =
 and 'g value =
   | Res of 'g op_data * int
   | Block_param of 'g block * int
-  | Undefined
+
+and 'g arg =
+  | Arg of 'g value
+  | Omitted_since_unused
 
 and 'g continuation =
   | Goto of 'g block
@@ -170,7 +173,7 @@ and 'g continuation =
 and 'g terminator =
   | Continue of
       { continuation : 'g continuation;
-        args : 'g value array
+        args : 'g arg array
       }
   | Switch of
       { index : 'g value;
@@ -329,7 +332,7 @@ module Block = struct
   let block_end_trap_stack (block : finished t) : finished t list =
     block.block_end_trap_stack
 
-  let successors (block : finished t) : finished t list =
+  let all_successors (block : finished t) : finished t list =
     let structural = non_exn_successors_of_terminator block.terminator in
     match exn_successor block with
     | None -> structural
@@ -389,8 +392,6 @@ let print_op_id ppf ~id ~(name : string option) =
 module Value = struct
   type nonrec 'g t = 'g value
 
-  let undefined : 'g t = Undefined
-
   let equal (a : 'g t) (b : 'g t) =
     match a, b with
     | Res (op1, n1), Res (op2, n2) ->
@@ -398,14 +399,12 @@ module Value = struct
       op1 == op2 && n1 = n2
     | Block_param (b1, n1), Block_param (b2, n2) ->
       Block.equal b1 b2 && Int.equal n1 n2
-    | Undefined, Undefined -> true
-    | (Res _ | Block_param _ | Undefined), _ -> false
+    | (Res _ | Block_param _), _ -> false
 
   let typ (value : 'g t) : Cmm.machtype_component =
     match value with
     | Res ({ typ; _ }, i) -> typ.(i)
     | Block_param (block, i) -> block.params.(i).typ
-    | Undefined -> Misc.fatal_error "Ssa.Value.typ: Undefined has no type"
 
   (* Print a value as it appears in an argument position: an [Op] result prints
      as [vN] (or [vN.i] when the op produces multiple results), a block param as
@@ -418,7 +417,6 @@ module Value = struct
     | Block_param (block, i) ->
       block.params.(i).name |> Option.iter (Format.fprintf ppf "%s/");
       Format.fprintf ppf "%a.%d" Block.print_id block i
-    | Undefined -> Format.fprintf ppf "undef"
 
   (* Keep an existing name: when a value is reused for another binding (e.g.
      [let y = x] or a reducer substituting an existing value), the original name
@@ -429,25 +427,21 @@ module Value = struct
     | Block_param (block, i) ->
       if Option.is_none block.params.(i).name
       then block.params.(i).name <- Some name
-    | Undefined -> ()
 
   let name (value : 'g t) : string option =
     match value with
     | Res ({ name; _ }, _) -> name
     | Block_param (block, i) -> block.params.(i).name
-    | Undefined -> None
 
   let usage_count (value : finished t) : int =
     match value with
     | Res ({ usage_count; _ }, _) -> visible_usage_count usage_count
     | Block_param (block, i) -> visible_usage_count block.params.(i).usage_count
-    | Undefined -> 0
 
   let scheduled_for_removal (value : finished t) : bool =
     match value with
     | Res ({ usage_count; _ }, _) -> usage_count = removal_sentinel
     | Block_param (block, i) -> block.params.(i).usage_count = removal_sentinel
-    | Undefined -> false
 end
 
 module Instruction = struct
@@ -489,14 +483,13 @@ module Instruction = struct
   type nonrec 'g value = 'g value =
     | Res of 'g op_data * int
     | Block_param of 'g block * int
-    | Undefined
 
   let result_arity (instr : 'g t) =
     match instr with
     | Op { typ; _ } -> Array.length typ
     | Push_trap _ | Pop_trap _ -> 0
 
-  let removable_when_unused (instr : 'g t) : bool =
+  let is_removable_when_unused (instr : 'g t) : bool =
     match instr with
     | Op { op; _ } -> Operation.is_pure op
     | Push_trap _ | Pop_trap _ -> false
@@ -556,10 +549,14 @@ module Instruction = struct
 end
 
 module Terminator = struct
+  type nonrec 'g arg = 'g arg =
+    | Arg of 'g value
+    | Omitted_since_unused
+
   type nonrec 'g t = 'g terminator =
     | Continue of
         { continuation : 'g continuation;
-          args : 'g value array
+          args : 'g arg array
         }
     | Switch of
         { index : 'g value;
@@ -583,16 +580,27 @@ module Terminator = struct
       ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
       Value.print ppf arr
 
+  let print_continue_args ppf arr =
+    let print ppf = function
+      | Arg value -> Value.print ppf value
+      | Omitted_since_unused ->
+        Format.pp_print_string ppf "omitted_since_unused"
+    in
+    Format.pp_print_array
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+      print ppf arr
+
   let print ppf (t : 'g t) =
     match t with
     | Continue { continuation = Goto goto; args } ->
-      Format.fprintf ppf "goto %a(%a)" Block.print_id goto print_args args
+      Format.fprintf ppf "goto %a(%a)" Block.print_id goto print_continue_args
+        args
     | Continue { continuation = Return; args } ->
-      Format.fprintf ppf "return(%a)" print_args args
+      Format.fprintf ppf "return(%a)" print_continue_args args
     | Continue { continuation = Raise _; args } ->
-      Format.fprintf ppf "raise(%a)" print_args args
+      Format.fprintf ppf "raise(%a)" print_continue_args args
     | Continue { continuation = Unreachable; args } ->
-      Format.fprintf ppf "unreachable(%a)" print_args args
+      Format.fprintf ppf "unreachable(%a)" print_continue_args args
     | Switch { index; targets } ->
       Format.fprintf ppf "switch(%a)" Value.print index;
       Array.iteri
@@ -897,12 +905,13 @@ let compute_dominators (graph : finished graph)
    transitively-dead chain stays scheduled for removal. A [Block_param] becoming
    live propagates to its predecessors' [Continue (Goto _)] args. *)
 
+let iter_arg f = function Arg value -> f value | Omitted_since_unused -> ()
+
 let rec increment_use (value : finished value) =
   match value with
   | Res (op, _) ->
     mark_op_live op;
     op.usage_count <- op.usage_count + 1
-  | Undefined -> ()
   | Block_param (block, i) ->
     mark_param_live block i;
     let p = block.params.(i) in
@@ -925,7 +934,8 @@ and mark_param_live (block : finished block) i =
     block.predecessors
     |> List.iter (fun (pred : finished block) ->
         match pred.terminator with
-        | Continue { continuation = Goto _; args } -> increment_use args.(i)
+        | Continue { continuation = Goto _; args } ->
+          iter_arg increment_use args.(i)
         | Continue { continuation = Return | Raise _ | Unreachable; _ }
         | Switch _ | Call _ | Invalid _ ->
           (* The arg feeding this param arrives through an edge whose position
@@ -947,9 +957,9 @@ let increment_uses_in_terminator (block : finished block) =
      corresponding param is marked live (see [mark_param_live]). *)
   | Continue { continuation = Goto _; args = _ } -> ()
   | Continue { continuation = Return | Unreachable; args } ->
-    Array.iter increment_use args
+    Array.iter (iter_arg increment_use) args
   | Continue { continuation = Raise _; args } ->
-    Array.iter increment_use args;
+    Array.iter (iter_arg increment_use) args;
     Block.exn_successor block |> Option.iter keep_successor_params
   | Switch { index; _ } -> increment_use index
   | Call { args; continuation; _ } ->
@@ -963,15 +973,16 @@ let increment_uses_in_terminator (block : finished block) =
     Option.iter keep_successor_params continuation
 
 (** Mark live the values a block must keep — every op that is not
-    [removable_when_unused], plus terminator args; this can lead to transitive
-    marking through [increment_use] and [mark_param_live]/[mark_op_live]. With
-    [keep_unused_ops], mark every op and param live so nothing is pruned. *)
+    [is_removable_when_unused], plus terminator args; this can lead to
+    transitive marking through [increment_use] and
+    [mark_param_live]/[mark_op_live]. With [keep_unused_ops], mark every op and
+    param live so nothing is pruned. *)
 let increment_uses_in_block ~keep_unused_ops (block : finished block) =
   block.pending_body
   |> List.iter (fun (instr : finished instruction) ->
       match instr with
       | Op operation ->
-        if keep_unused_ops || not (Instruction.removable_when_unused instr)
+        if keep_unused_ops || not (Instruction.is_removable_when_unused instr)
         then mark_op_live operation
       | Push_trap _ | Pop_trap _ -> ());
   if keep_unused_ops
@@ -985,9 +996,9 @@ let increment_uses_in_block ~keep_unused_ops (block : finished block) =
       are dropped together, preserving trap-stack balance; the same handlers are
       filtered out of [block_end_trap_stack] so it stays consistent with the
       finalized body; and replace [Continue (Goto _)] args going to params
-      scheduled for removal with [Undefined]. (With [keep_unused_ops] nothing is
-      scheduled for removal, so both rewrites are no-ops; entry params are kept,
-      so a self-tail call's args are never dropped here.) *)
+      scheduled for removal with [Omitted_since_unused]. (With [keep_unused_ops]
+      nothing is scheduled for removal, so both rewrites are no-ops; entry
+      params are kept, so a self-tail call's args are never dropped here.) *)
 let finalize_block (block : finished block) =
   let handler_reachable handler = not (List.is_empty handler.predecessors) in
   block.body
@@ -1007,10 +1018,10 @@ let finalize_block (block : finished block) =
       args
       |> Array.mapi (fun i arg ->
           (* Args feeding a param scheduled for removal may themselves be dead
-             (already pruned from the graph), so replace them with Undefined to
-             avoid dangling uses. *)
+             (already pruned from the graph), so omit them to avoid dangling
+             uses. *)
           if goto.params.(i).usage_count = removal_sentinel
-          then Undefined
+          then Omitted_since_unused
           else arg)
     in
     block.terminator <- Continue { continuation = Goto goto; args }
@@ -1040,12 +1051,12 @@ let order_blocks_dominators_first (blocks : finished block list) :
 
 (* Check the SSA invariants that the construction interface cannot enforce and
    that no other pass checks: every value use must be dominated by its
-   definition, [Undefined] may only appear as a [Goto] argument feeding an
-   unused block parameter, and trap handler arities are consistent ([Raise]
-   argument counts match their handler's parameter count; handlers entered from
-   calls take only the exception bucket). Requires [ordered_blocks] to list
-   every block after its dominators (so that, walking in order, the definitions
-   dominating a use have already been seen). *)
+   definition, [Omitted_since_unused] may only appear as a [Goto] argument
+   feeding an unused block parameter, and trap handler arities are consistent
+   ([Raise] argument counts match their handler's parameter count; handlers
+   entered from calls take only the exception bucket). Requires [ordered_blocks]
+   to list every block after its dominators (so that, walking in order, the
+   definitions dominating a use have already been seen). *)
 let check_value_invariants (graph : finished graph)
     (ordered_blocks : finished block list) : unit =
   let fail fmt =
@@ -1075,10 +1086,13 @@ let check_value_invariants (graph : finished graph)
       then
         fail "block %a: use of %a of non-dominating block %a" Block.print_id
           user Value.print v Block.print_id param_block
-    | Undefined ->
+  in
+  let check_arg user = function
+    | Arg value -> check_use user value
+    | Omitted_since_unused ->
       fail
-        "block %a: Undefined is only allowed as a Goto argument feeding an \
-         unused block parameter"
+        "block %a: Omitted_since_unused is only allowed as a Goto argument \
+         feeding an unused block parameter"
         Block.print_id user
   in
   let check_instr block = function
@@ -1090,16 +1104,16 @@ let check_value_invariants (graph : finished graph)
   let check_terminator block = function
     | Continue { continuation = Goto goto; args } ->
       args
-      |> Array.iteri (fun i (arg : finished value) ->
-          match arg with
-          | Undefined ->
-            if goto.params.(i).usage_count <> removal_sentinel
-            then
-              fail "block %a: Undefined passed to live parameter %d of %a"
-                Block.print_id block i Block.print_id goto
-          | Res _ | Block_param _ -> check_use block arg)
+      |> Array.iteri (fun i -> function
+        | Omitted_since_unused ->
+          if goto.params.(i).usage_count <> removal_sentinel
+          then
+            fail
+              "block %a: Omitted_since_unused passed to live parameter %d of %a"
+              Block.print_id block i Block.print_id goto
+        | Arg arg -> check_use block arg)
     | Continue { continuation = Raise _; args } ->
-      Array.iter (check_use block) args;
+      Array.iter (check_arg block) args;
       (* Extra raise args are passed by moving them into the target handler's
          parameter registers, so their number must match the handler's parameter
          count. A raise that leaves the function (empty trap stack) can only
@@ -1140,9 +1154,9 @@ let check_value_invariants (graph : finished graph)
             Block.print_id block Block.print_id handler
             (Array.length handler.params)
       | None -> ())
-    | Continue { continuation = Return | Unreachable; args }
-    | Invalid { args; _ } ->
-      Array.iter (check_use block) args
+    | Continue { continuation = Return | Unreachable; args } ->
+      Array.iter (check_arg block) args
+    | Invalid { args; _ } -> Array.iter (check_use block) args
     | Switch { index; _ } -> check_use block index
   in
   ordered_blocks

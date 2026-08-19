@@ -93,9 +93,8 @@ module Context = struct
       op_map :
         (finished, under_construction Value.t array) Instruction.Id.Tbl.t;
       (* Per input block, indexed by the original param index: the output value
-         of a kept param, or [Value.undefined] for a param dropped from the
-         output block. *)
-      block_param_values : under_construction Value.t array Block.Tbl.t;
+         of a kept param, or [Omitted_since_unused] for a dropped param. *)
+      block_param_values : under_construction Terminator.arg array Block.Tbl.t;
       emit_op :
         Ssa.Cursor.t ->
         op:Ssa.op ->
@@ -124,11 +123,24 @@ module Context = struct
   let map_value t (value : finished Value.t) : under_construction Value.t =
     match value with
     | Res ({ id; _ }, i) -> (Instruction.Id.Tbl.find t.op_map id).(i)
-    | Block_param (block, i) -> (Block.Tbl.find t.block_param_values block).(i)
-    | Undefined -> Value.undefined
+    | Block_param (block, i) -> (
+      match (Block.Tbl.find t.block_param_values block).(i) with
+      | Terminator.Arg value -> value
+      | Terminator.Omitted_since_unused ->
+        Misc.fatal_errorf
+          "Ssa_reducer.Context.map_value: removed block param %a.%d is live"
+          Block.print_id block i)
 
   let map_values t (args : finished Value.t array) : out Value.t array =
     Array.map (map_value t) args
+
+  let map_args t (args : finished Terminator.arg array) :
+      out Terminator.arg array =
+    Array.map
+      (function
+        | Terminator.Arg value -> Terminator.Arg (map_value t value)
+        | Terminator.Omitted_since_unused -> Terminator.Omitted_since_unused)
+      args
 
   let map_continuation t (cont : finished Ssa.continuation) :
       out Ssa.continuation =
@@ -146,8 +158,10 @@ module Context = struct
       let mapped_args =
         args
         |> Misc.Stdlib.Array.filteri (fun i _ ->
-            not (Value.equal param_values.(i) Value.undefined))
-        |> Array.map (map_value t)
+            match param_values.(i) with
+            | Terminator.Arg _ -> true
+            | Terminator.Omitted_since_unused -> false)
+        |> map_args t
       in
       Continue { continuation = Goto (map_block t goto); args = mapped_args }
     | Continue
@@ -156,7 +170,7 @@ module Context = struct
         } ->
       Continue
         { continuation = map_continuation t continuation;
-          args = map_values t args
+          args = map_args t args
         }
     | Switch { index; targets } ->
       Switch
@@ -264,13 +278,14 @@ module Make_run (R : Reducer) = struct
     in
     (* Map each input block to its output counterpart. *)
     let block_map : under_construction Block.t Block.Tbl.t =
-      Block.Tbl.create 64
+      Block.Tbl.create (2 * (Ssa.blocks in_graph |> List.length))
     in
     let op_map :
         (finished, under_construction Value.t array) Instruction.Id.Tbl.t =
       Instruction.Id.Tbl.create 256
     in
-    let block_param_values : under_construction Value.t array Block.Tbl.t =
+    let block_param_values : under_construction Terminator.arg array Block.Tbl.t
+        =
       Block.Tbl.create 64
     in
     (* Step 1: create an output block for each input block. The entry's params
@@ -282,8 +297,10 @@ module Make_run (R : Reducer) = struct
         let in_params = Block.params block in
         let params =
           in_params |> Array.to_list
-          |> List.filter (fun param -> not (Value.scheduled_for_removal param))
-          |> List.map (fun param -> Value.typ param, Value.name param)
+          |> List.filter_map (fun param ->
+              if Value.scheduled_for_removal param
+              then None
+              else Some (Value.typ param, Value.name param))
           |> Array.of_list
         in
         let out_block =
@@ -293,19 +310,19 @@ module Make_run (R : Reducer) = struct
         in
         Block.Tbl.replace block_map block out_block;
         (* Index the output values by the original param index, with
-           [Value.undefined] in the dropped slots; the kept output params line
-           up with the kept input params in order. *)
+           [Omitted_since_unused] in the dropped slots; the kept output params
+           line up with the kept input params in order. *)
         let out_params = Block.params out_block in
         let next = ref 0 in
         let param_values =
           Array.map
             (fun param ->
               if Value.scheduled_for_removal param
-              then Value.undefined
+              then Terminator.Omitted_since_unused
               else
                 let v = out_params.(!next) in
                 incr next;
-                v)
+                Terminator.Arg v)
             in_params
         in
         Block.Tbl.replace block_param_values block param_values)

@@ -77,6 +77,10 @@ let emit_op_nores env c op dbg args =
 
 let finish_block env c ~dbg term = Cursor.finish_block env.graph c ~dbg term
 
+let continue continuation args =
+  Terminator.Continue
+    { continuation; args = Array.map (fun arg -> Terminator.Arg arg) args }
+
 let new_block env ~params = Block.create env.graph ~params
 
 let bind_let env c v args =
@@ -275,7 +279,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       emit_tuple ext_env c simple_list
     | Cop (Craise k, args, dbg) ->
       let* r = emit_tuple env c args in
-      finish_block env c ~dbg (Continue { continuation = Raise k; args = r });
+      finish_block env c ~dbg (continue (Raise k) r);
       Never_returns
     | Cop (Copaque, args, dbg) ->
       let* simple_args, env = emit_parts_list env c args in
@@ -312,8 +316,7 @@ and emit env c (exp : Cmm.expression) ~tail : result =
   in
   if tail
   then (
-    finish_block env c ~dbg:Debuginfo.none
-      (Continue { continuation = Return; args = r });
+    finish_block env c ~dbg:Debuginfo.none (continue Return r);
     Never_returns)
   else Ok r
 
@@ -530,14 +533,12 @@ and emit_expr_exit env c (lbl : Cmm.exit_label) args traps : result =
     let* src = emit_tuple ext_env c simple_list in
     let handler = find_handler env nfail in
     emit_trap_actions env c traps;
-    finish_block env c ~dbg:Debuginfo.none
-      (Continue { continuation = Goto handler; args = src });
+    finish_block env c ~dbg:Debuginfo.none (continue (Goto handler) src);
     Never_returns
   | Return_lbl ->
     let* src = emit_tuple ext_env c simple_list in
     emit_trap_actions env c traps;
-    finish_block env c ~dbg:Debuginfo.none
-      (Continue { continuation = Return; args = src });
+    finish_block env c ~dbg:Debuginfo.none (continue Return src);
     Never_returns
 
 (* Join a set of branches (each with its own end-cursor) into a fresh block. [c]
@@ -569,7 +570,7 @@ and join env c (results : (result * Cursor.t) array) : result =
         | Never_returns -> ()
         | Ok instrs ->
           finish_block env c_branch ~dbg:Debuginfo.none
-            (Continue { continuation = Goto join_block; args = instrs }));
+            (continue (Goto join_block) instrs));
     Cursor.move c ~new_pos:join_block;
     Ok (Block.params join_block)
 

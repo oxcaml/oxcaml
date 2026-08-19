@@ -107,7 +107,13 @@ let get_reg env (value : value) : Reg.t =
     with Not_found ->
       Misc.fatal_errorf "Cfg_of_ssa: no regs for Block_param %a" Value.print
         value)
-  | Undefined -> Misc.fatal_error "Cfg_of_ssa.get_reg: Undefined value"
+
+let get_reg_of_arg env = function
+  | Terminator.Arg value -> get_reg env value
+  | Terminator.Omitted_since_unused ->
+    Misc.fatal_error
+      "Cfg_of_ssa.get_reg_of_arg: Omitted_since_unused outside a dead Goto \
+       argument"
 
 let get_block_params_regs env (block : block) =
   try Block.Tbl.find env.block_params_regs block
@@ -359,25 +365,24 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
          lower it to [Tailcall_self], passing the args through the ABI parameter
          locations: the entry block's prologue moves them back into the
          parameter registers, so the loop reuses the prologue. *)
-      let virt_args = Array.map (get_reg env) args in
+      let virt_args = Array.map (get_reg_of_arg env) args in
       let loc_arg = Proc.loc_parameters (Reg.typv virt_args) in
       emit_moves body ~src:virt_args ~dst:loc_arg;
       Sub_cfg.make_instr
         (Cfg.Tailcall_self { destination = label_of env start_block })
         loc_arg [||] dbg
     | Continue { continuation = Goto goto; args } ->
-      (* Args going to dead target params are [Undefined] and need no moves. *)
-      let is_defined (arg : value) =
-        match arg with Undefined -> false | Res _ | Block_param _ -> true
+      let block_param_is_kept i =
+        not (Value.scheduled_for_removal (Block.param goto i))
       in
       let dst_regs =
         get_block_params_regs env goto
-        |> Misc.Stdlib.Array.filteri (fun i _ -> is_defined args.(i))
+        |> Misc.Stdlib.Array.filteri (fun i _ -> block_param_is_kept i)
       in
       let src_regs =
         args
-        |> Misc.Stdlib.Array.filteri (fun _ arg -> is_defined arg)
-        |> Array.map (get_reg env)
+        |> Misc.Stdlib.Array.filteri (fun i _ -> block_param_is_kept i)
+        |> Array.map (get_reg_of_arg env)
       in
       emit_parallel_moves body ~src:src_regs ~dst:dst_regs;
       Sub_cfg.make_instr (Cfg.Always (label_of env goto)) [||] [||] dbg
@@ -391,14 +396,14 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
                (Cfg.Poptrap { lbl_handler = label_of env h })
                [||] [||] Debuginfo.none))
         (Block.block_end_trap_stack block);
-      let arg = Array.map (get_reg env) args in
+      let arg = Array.map (get_reg_of_arg env) args in
       let loc_res = Proc.loc_results_return (Reg.typv arg) in
       emit_moves body ~src:arg ~dst:loc_res;
       DLL.add_end body
         (Sub_cfg.make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none);
       Sub_cfg.make_instr Cfg.Return loc_res [||] dbg
     | Continue { continuation = Raise raise_kind; args } ->
-      let exn_val = Array.map (get_reg env) args in
+      let exn_val = Array.map (get_reg_of_arg env) args in
       let exn_bucket = [| Proc.loc_exn_bucket |] in
       let extra_dst =
         match Block.exn_successor block with
@@ -582,7 +587,7 @@ let collect_fused_comparisons env =
               (1
               + (Instruction.Id.Tbl.find_opt env.fused_comparison_ops id
                 |> Option.value ~default:0))
-          | Block_param _ | Undefined -> assert false)
+          | Block_param _ -> assert false)
       | Switch _ | Continue _ | Call _ | Invalid _ -> ())
     (Ssa.blocks env.ssa_graph)
 

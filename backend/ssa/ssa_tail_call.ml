@@ -56,10 +56,17 @@ module Tail_call_reducer : Reducer = struct
       (* Skipping the block must not lose any observable effect; effect-free
          instructions (including debug-info markers) are fine since their
          results are not returned. *)
+      let params = Block.params block in
       Array.for_all
         (fun instr -> not (Instruction.has_side_effect instr))
         (Block.body block)
-      && Array.equal Value.equal args (Block.params block)
+      && Array.length args = Array.length params
+      && Array.for_all2
+           (fun arg param ->
+             match arg with
+             | Terminator.Arg value -> Value.equal value param
+             | Terminator.Omitted_since_unused -> false)
+           args params
     | Continue { continuation = Raise _ | Unreachable | Goto _; _ }
     | Call _ | Switch _ | Invalid _ ->
       false
@@ -99,7 +106,9 @@ module Tail_call_reducer : Reducer = struct
             ( dbg,
               Context.map_terminator ctx
                 (Continue
-                   { continuation = Goto (Ssa.entry (in_graph ctx)); args }) ))
+                   { continuation = Goto (Ssa.entry (in_graph ctx));
+                     args = Array.map (fun arg -> Terminator.Arg arg) args
+                   }) ))
       | (Direct _ | Indirect _)
         when stack_offsets_zero call_op args (Block.params_machtype cont) ->
         Reduce

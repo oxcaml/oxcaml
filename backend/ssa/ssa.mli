@@ -160,14 +160,11 @@ module Instruction : sig
 
   and 'g value = private
     | Res of 'g op_data * int
+        (** A result of an SSA instruction, the [int] is the index of the
+            output, for example [0] for single-output instructions. *)
     | Block_param of 'g block * int
-    | Undefined
-        (** An arbitrary value that is not observed. Currently used as a [Goto]
-            arg when the target block parameter is unused. The existence of an
-            undefined value does *NOT* imply undefined behavior or unreachable
-            control flow. It only means that the optimizer is free to chose any
-            replacement value without changing semantics. For example, writing
-            undefined to memory can be compiled as a no-op. *)
+        (** A block parameter, the [int] is the index of the block parameter
+            starting from [0]. *)
 
   (** The number of results produced by an instruction. *)
   val result_arity : 'g t -> int
@@ -176,11 +173,11 @@ module Instruction : sig
       Implies [not (has_side_effect t)]; additionally [false] for instructions
       that are kept for non-semantic reasons (debug info, emit-time
       constraints). *)
-  val removable_when_unused : 'g t -> bool
+  val is_removable_when_unused : 'g t -> bool
 
   (** Whether the instruction has an effect that is observable without using its
-      results (e.g. writing to memory). Unlike [removable_when_unused], this is
-      [false] for debug-info markers. *)
+      results (e.g. writing to memory). Unlike [is_removable_when_unused], this
+      is [false] for debug-info markers. *)
   val has_side_effect : 'g t -> bool
 
   (** Number of uses of the instruction's results. A finished op that survives
@@ -194,18 +191,13 @@ end
 module Value : sig
   type 'g t = 'g Instruction.value
 
-  (** The [Undefined] value, see the constructor above for more info. *)
-  val undefined : 'g t
-
   val equal : 'g t -> 'g t -> bool
 
-  (** The machtype of a value when used as an argument. [Undefined] has no type
-      and raises. *)
   val typ : 'g t -> Cmm.machtype_component
 
   (** Set the [name] hint on the value's defining [Op] (for a [Res]) or block
-      parameter (for a [Block_param]); a no-op for [Undefined] and for values
-      that already have a name (the first name wins). Construction only. *)
+      parameter (for a [Block_param]); a no-op for values that already have a
+      name (the first name wins). Construction only. *)
   val set_name : under_construction t -> string -> unit
 
   val name : 'g t -> string option
@@ -243,13 +235,17 @@ type 'g continuation =
           can still raise (via [may_raise]). *)
 
 module Terminator : sig
+  type 'g arg =
+    | Arg of 'g Value.t
+    | Omitted_since_unused
+
   type 'g t =
     | Continue of
         { continuation : 'g continuation;
-          args : 'g Value.t array
+          args : 'g arg array
               (** For [Goto b], positional args for [b]'s params (a dead param's
-                  arg can be [Undefined]); for [Return] / [Raise] the returned /
-                  raised values. *)
+                  arg can be [Omitted_since_unused]); for [Return] / [Raise] the
+                  returned / raised values. *)
         }
     | Switch of
         { index : 'g Value.t;
@@ -334,7 +330,7 @@ module Block : sig
   val non_exn_successors : finished t -> finished t list
 
   (** All successors of a block, including [exn_successor]. *)
-  val successors : finished t -> finished t list
+  val all_successors : finished t -> finished t list
 
   (** The implicit exception successor of the block: the topmost handler in
       [block_end_trap_stack], if the terminator can raise. *)

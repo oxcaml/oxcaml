@@ -823,7 +823,7 @@ let compare ~old_cfg ~new_cfg ppf =
         new_cfg.fun_dbg;
     if Stdlib.( <> ) old_cfg.fun_poll new_cfg.fun_poll
     then Format.fprintf ppf_m "fun_poll mismatch@.";
-    if Stdlib.( <> ) old_cfg.fun_ret_type new_cfg.fun_ret_type
+    if Cmm.equal_machtype old_cfg.fun_ret_type new_cfg.fun_ret_type
     then Format.fprintf ppf_m "fun_ret_type mismatch@."
   end;
   (* Report *)
