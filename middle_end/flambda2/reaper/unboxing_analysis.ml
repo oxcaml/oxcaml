@@ -281,8 +281,11 @@ let changed_representation_apply_renaming changed_representation renaming
 let cannot_change_witness_calling_convention =
   rel1 "cannot_change_witness_calling_convention" Cols.[n]
 
-let cannot_change_calling_convention =
-  rel1 "cannot_change_calling_convention" Cols.[n]
+let cannot_change_calling_convention_table =
+  Datalog.create_relation ~name:"cannot_change_calling_convention" Cols.[n]
+
+let cannot_change_calling_convention x =
+  cannot_change_calling_convention_table % [x]
 
 let cannot_change_representation0 = rel1 "cannot_change_representation0" Cols.[n]
 

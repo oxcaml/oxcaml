@@ -98,6 +98,8 @@ module Maps : sig
   module N : sig
     type t = unit Code_id_or_name.Map.t
 
+    type handle = (t, Code_id_or_name.t -> Datalog.nil, unit) Datalog.table
+
     val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
 
     val rename : t -> rename_id:(Code_id_or_name.t -> Code_id_or_name.t) -> t
@@ -105,6 +107,12 @@ module Maps : sig
 
   module Nn : sig
     type t = N.t Code_id_or_name.Map.t
+
+    type handle =
+      ( t,
+        Code_id_or_name.t -> Code_id_or_name.t -> Datalog.nil,
+        unit )
+      Datalog.table
 
     val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
 
@@ -122,6 +130,9 @@ module Maps : sig
   module Nf : sig
     type t = unit Field.Map.t Code_id_or_name.Map.t
 
+    type handle =
+      (t, Code_id_or_name.t -> Field.t -> Datalog.nil, unit) Datalog.table
+
     val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
 
     val add_fields : t -> Field.Set.t -> Field.Set.t
@@ -136,6 +147,12 @@ module Maps : sig
   module Nfn : sig
     type t = N.t Field.Map.t Code_id_or_name.Map.t
 
+    type handle =
+      ( t,
+        Code_id_or_name.t -> Field.t -> Code_id_or_name.t -> Datalog.nil,
+        unit )
+      Datalog.table
+
     val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
 
     val add_fields : t -> Field.Set.t -> Field.Set.t
@@ -149,6 +166,12 @@ module Maps : sig
 
   module Ncn : sig
     type t = N.t Cofield.Map.t Code_id_or_name.Map.t
+
+    type handle =
+      ( t,
+        Code_id_or_name.t -> Cofield.t -> Code_id_or_name.t -> Datalog.nil,
+        unit )
+      Datalog.table
 
     val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
 

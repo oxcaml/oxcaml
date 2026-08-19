@@ -84,6 +84,8 @@ val changed_representation_apply_renaming :
   rename_field:(Field.t -> Field.t) ->
   (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
 
+val cannot_change_calling_convention_table : Datalog_helpers.Maps.N.handle
+
 val cannot_change_calling_convention : result -> Code_id.t -> bool
 
 val perform_analysis :
