@@ -32,24 +32,26 @@
    uid: Main.0; locs:
      "x": File "main.ml", line 2, characters 6-7;
      "N.x": File "main.ml", line 5, characters 23-26
-   uid: [intf]Lib.1; locs: "S": File "lib.mli", line 1, characters 12-13
-   uid: Lib.1; locs:
-     "S": File "lib.ml", line 1, characters 12-13;
-     "S": File "lib.ml", line 5, characters 17-18;
-     "Lib.S": File "main.ml", line 1, characters 11-16
    uid: Main.1; locs:
      "M": File "main.ml", line 1, characters 7-8;
      "M": File "main.ml", line 4, characters 11-12;
      "M": File "main.ml", line 5, characters 18-19
+   uid: [intf]Lib.2; locs: "S": File "lib.mli", line 1, characters 12-13
    uid: Lib.2; locs:
-     "x": File "lib.ml", line 5, characters 32-33;
-     "X.x": File "lib.ml", line 6, characters 2-5
+     "S": File "lib.ml", line 1, characters 12-13;
+     "S": File "lib.ml", line 5, characters 17-18;
+     "Lib.S": File "main.ml", line 1, characters 11-16
    uid: Main.2; locs:
      "N": File "main.ml", line 4, characters 7-8;
      "N": File "main.ml", line 5, characters 23-24
-   uid: Lib.3; locs: "X": File "lib.ml", line 6, characters 2-3 },
-  0 approx shapes: {}, and shapes for CUS .
-  and related uids:{([intf]Lib.1 Lib.1); ([intf]Lib.0 Lib.0 Main.0 Lib.2)}
+   uid: Lib.3; locs:
+     "x": File "lib.ml", line 5, characters 32-33;
+     "X.x": File "lib.ml", line 6, characters 2-5
+   uid: Lib.4; locs:
+     "X": File "lib.ml", line 5, characters 13-14;
+     "X": File "lib.ml", line 6, characters 2-3
+   }, 0 approx shapes: {}, and shapes for CUS .
+  and related uids:{([intf]Lib.2 Lib.2); ([intf]Lib.0 Lib.0 Main.0 Lib.3)}
 
   $ $MERLIN single occurrences -scope renaming -identifier-at 5:25 \
   > -index-file project.ocaml-index \

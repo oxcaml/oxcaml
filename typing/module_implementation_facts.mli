@@ -92,6 +92,8 @@ module Check : sig
     }
 
   val compare : t -> t -> int
+
+  module Set : Set.S with type elt = t
 end
 
 module Dependency : sig
@@ -117,6 +119,8 @@ module Dependency : sig
     }
 
   val compare : t -> t -> int
+
+  module Set : Set.S with type elt = t
 end
 
 module Context_equality : sig
@@ -127,6 +131,8 @@ module Context_equality : sig
     }
 
   val compare : t -> t -> int
+
+  module Set : Set.S with type elt = t
 end
 
 module Omission : sig
@@ -147,14 +153,18 @@ module Omission : sig
     }
 
   val compare : t -> t -> int
+
+  module Set : Set.S with type elt = t
 end
 
 type t = private
-  { checks : Check.t list;
-    dependencies : Dependency.t list;
-    equalities : Context_equality.t list;
-    omissions : Omission.t list
+  { checks : Check.Set.t;
+    dependencies : Dependency.Set.t;
+    equalities : Context_equality.Set.t;
+    omissions : Omission.Set.t
   }
+
+val merge : t -> t -> t
 
 val of_implementation :
   Compilation_unit.t ->

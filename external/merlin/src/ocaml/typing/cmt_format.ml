@@ -566,14 +566,8 @@ let save_cmt target cu binary_annots initial_env cmi shape
            cmt_modname = cu;
            cmt_annots;
            cmt_declaration_dependencies = !uids_deps;
-<<<<<<< Merlin:ggray/mti/dev
-           cmt_comments = [];
-||||||| Compiler:last-imported
-           cmt_comments = Lexer.comments ();
-=======
            cmt_module_implementation_facts;
-           cmt_comments = Lexer.comments ();
->>>>>>> Compiler:HEAD
+           cmt_comments = [];
            cmt_args;
            cmt_sourcefile = sourcefile;
            cmt_builddir = Location.rewrite_absolute_path (Sys.getcwd ());

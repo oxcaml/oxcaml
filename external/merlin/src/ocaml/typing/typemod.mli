@@ -48,15 +48,10 @@ val type_implementation:
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
   sourcefile:string -> Compilation_unit.t -> Env.t ->
-<<<<<<< Merlin:ggray/mti/dev
-  Parsetree.signature -> Typedtree.signature
-val transl_signature:
-  ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
-||||||| Compiler:last-imported
-  Parsetree.signature -> Typedtree.signature
-=======
   Parsetree.signature ->
   Typedtree.signature * Typedtree.argument_interface option
+val transl_signature:
+  ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
 
 val module_implementation_facts:
   unit_interface:bool ->
@@ -65,7 +60,6 @@ val module_implementation_facts:
   Cmt_format.binary_annots ->
   (Cmt_format.dependency_kind * Shape.Uid.t * Shape.Uid.t) list ->
   Module_implementation_facts.t option
->>>>>>> Compiler:HEAD
 
 (* If the [.mli] file has any file-level staticity modality (whether
    [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].

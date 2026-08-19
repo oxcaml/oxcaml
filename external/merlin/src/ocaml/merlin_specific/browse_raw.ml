@@ -522,7 +522,14 @@ let rec of_expression_desc loc = function
   | Texp_send (e, meth, _) ->
     of_expression e ** of_method_call e meth loc (* TODO ulysse CHECK*)
   | Texp_override (_, ls) -> list_fold (fun (_, _, e) -> of_expression e) ls
-  | Texp_letmodule (mb_id, mb_name, mb_presence, mb_uid, mb_expr, e) ->
+  | Texp_letmodule
+      { id = mb_id;
+        name = mb_name;
+        presence = mb_presence;
+        uid = mb_uid;
+        module_expr = mb_expr;
+        body = e
+      } ->
     let mb =
       { mb_id;
         mb_name;
@@ -1053,7 +1060,7 @@ let expression_paths { Typedtree.exp_desc; exp_extra; _ } =
         ~f:(fun (id, loc, _) ->
           (reloc (Path.Pident id) loc, Some (Longident.Lident loc.txt)))
         ps
-    | Texp_letmodule (Some id, loc, _, _, _, _) ->
+    | Texp_letmodule { id = Some id; name = loc; _ } ->
       [ (reloc (Path.Pident id) loc, Option.map ~f:mk_lident loc.txt) ]
     | Texp_for
         { for_id = id; for_pat = { Parsetree.ppat_loc = loc; ppat_desc }; _ } ->

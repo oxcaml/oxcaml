@@ -86,8 +86,8 @@ let () =
 
 let () = heading ".cms and .cmsi hold the same facts as .cmt and .cmti"
 
-(* Comparing the whole fact sets covers all four lists: [Mtf_aux] has checks,
-   dependencies, an equality and an omission, so a list dropped or reordered
+(* Comparing the whole fact sets covers all four sets: [Mtf_aux] has checks,
+   dependencies, an equality and an omission, so a set dropped or changed
    by the serialization of either artifact would show up here. *)
 let () =
   let cms = Cms_format.read "mtf_aux.cms" in
@@ -131,8 +131,8 @@ let () =
   let report description file =
     let facts = facts_exn (read_cmt file).cmt_module_implementation_facts in
     Printf.printf "%s: interface checks %d, interface pairs %d\n" description
-      (List.length (interface_checks facts))
-      (List.length (interface_pairs facts))
+      (Facts.Check.Set.cardinal (interface_checks facts))
+      (Facts.Dependency.Set.cardinal (interface_pairs facts))
   in
   report "mtf_aux, which has an .mli" "mtf_aux.cmt";
   report "mtf_client, which has none" "mtf_client.cmt"
