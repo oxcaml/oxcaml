@@ -113,6 +113,20 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   let free_vars =
     To_cmm_shared.remove_var_with_provenance body_free_vars toplevel_region_var
   in
+  (* See the comment about residual [Phantom]-mode free variables in
+     [To_cmm_set_of_closures]. *)
+  let body, free_vars =
+    To_cmm_free_vars.fold
+      (fun v (mode : To_cmm_free_vars.Mode.t) (body, free_vars) ->
+        match mode with
+        | Normal -> body, free_vars
+        | Phantom ->
+          ( Cmm_helpers.make_phantom_let
+              (Backend_var.With_provenance.create v)
+              None body,
+            To_cmm_free_vars.remove v free_vars ))
+      free_vars (body, free_vars)
+  in
   if not (To_cmm_free_vars.is_empty free_vars)
   then
     Misc.fatal_errorf
