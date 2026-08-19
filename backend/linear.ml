@@ -49,15 +49,27 @@ let lphantom_const_symbol s = Lphantom_const_symbol s
 
 let lphantom_var v = Lphantom_var v
 
+(* Note that [offset_in_words] may legitimately be negative (e.g. for a
+   projection moving between function slots of a closure block). *)
 let lphantom_offset_var ~var ~offset_in_words =
   Lphantom_offset_var { var; offset_in_words }
 
-let lphantom_read_field ~var ~field = Lphantom_read_field { var; field }
+let lphantom_read_field ~var ~field =
+  if field < 0
+  then Misc.fatal_errorf "Lphantom_read_field: negative field index %d" field;
+  Lphantom_read_field { var; field }
 
 let lphantom_read_symbol_field ~sym ~field =
+  if field < 0
+  then
+    Misc.fatal_errorf "Lphantom_read_symbol_field: negative field index %d"
+      field;
   Lphantom_read_symbol_field { sym; field }
 
-let lphantom_block ~tag ~fields = Lphantom_block { tag; fields }
+let lphantom_block ~tag ~fields =
+  if tag < 0 || tag > 255
+  then Misc.fatal_errorf "Lphantom_block: tag %d not in [0, 255]" tag;
+  Lphantom_block { tag; fields }
 
 let lphantom_optimised_out = Lphantom_optimised_out
 

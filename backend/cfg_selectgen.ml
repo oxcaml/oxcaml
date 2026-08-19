@@ -1087,8 +1087,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ~label_true:(Sub_cfg.start_label sub_if)
           ~label_false:(Sub_cfg.start_label sub_else)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg;
-      Sub_cfg.join ~from:[sub_if; sub_else] ~to_:sub_cfg;
+      let phantom_available_before = SU.phantom_vars_from_env env in
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg
+        ~phantom_available_before;
+      Sub_cfg.join ~from:[sub_if; sub_else] ~to_:sub_cfg
+        ~phantom_available_before;
       r
 
   and emit_expr_switch env sub_cfg bound_name esel index ecases
@@ -1107,8 +1110,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let term_desc : Cfg.terminator =
         Switch (Array.map (fun idx -> Sub_cfg.start_label subs.(idx)) index)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg;
-      Sub_cfg.join ~from:(Array.to_list subs) ~to_:sub_cfg;
+      let phantom_available_before = SU.phantom_vars_from_env env in
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg
+        ~phantom_available_before;
+      Sub_cfg.join ~from:(Array.to_list subs) ~to_:sub_cfg
+        ~phantom_available_before;
       r
 
   and emit_expr_catch env sub_cfg bound_name (flag : Cmm.ccatch_flag) handlers
@@ -1223,8 +1229,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         l
     in
     let term_desc = Cfg.Always (Sub_cfg.start_label sub_body) in
-    Sub_cfg.update_exit_terminator sub_cfg term_desc;
-    Sub_cfg.join ~from:(sub_body :: sub_handlers) ~to_:sub_cfg;
+    let phantom_available_before = SU.phantom_vars_from_env env in
+    Sub_cfg.update_exit_terminator sub_cfg term_desc ~phantom_available_before;
+    Sub_cfg.join ~from:(sub_body :: sub_handlers) ~to_:sub_cfg
+      ~phantom_available_before;
     r
 
   and emit_expr_exit env sub_cfg (lbl : Cmm.exit_label) args traps :
@@ -1278,7 +1286,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
             Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
               ~phantom_available_before)
           traps;
-        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label);
+        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label)
+          ~phantom_available_before:(SU.phantom_vars_from_env env);
         SU.set_traps nfail handler.SU.traps_ref env.SU.trap_stack traps;
         Never_returns
       | Return_lbl -> (
@@ -1378,7 +1387,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ~label_true:(Sub_cfg.start_label sub_if)
           ~label_false:(Sub_cfg.start_label sub_else)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg
+        ~phantom_available_before:(SU.phantom_vars_from_env env);
       Sub_cfg.join_tail ~from:[sub_if; sub_else] ~to_:sub_cfg
 
   and emit_tail_switch env sub_cfg esel index ecases (dbg : Debuginfo.t) =
@@ -1393,7 +1403,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Switch
           (Array.map (fun idx -> Sub_cfg.start_label sub_cases.(idx)) index)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg
+        ~phantom_available_before:(SU.phantom_vars_from_env env);
       Sub_cfg.join_tail ~from:(Array.to_list sub_cases) ~to_:sub_cfg
 
   and emit_tail_catch env sub_cfg (flag : Cmm.ccatch_flag) handlers e1 =
@@ -1498,7 +1509,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let term_desc = Cfg.Always (Sub_cfg.start_label s_body) in
-    Sub_cfg.update_exit_terminator sub_cfg term_desc;
+    Sub_cfg.update_exit_terminator sub_cfg term_desc
+      ~phantom_available_before:(SU.phantom_vars_from_env env);
     let s_handlers =
       List.map
         (fun (rs, s, dbg, phantom_available_before) ->

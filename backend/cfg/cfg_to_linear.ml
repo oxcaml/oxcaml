@@ -72,7 +72,9 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
           available_before;
           available_across;
           phantom_available_before;
-          _
+          desc = _;
+          id = _;
+          stack_offset = _
         } ->
       ( arg,
         res,
