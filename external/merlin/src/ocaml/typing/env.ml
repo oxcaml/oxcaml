@@ -5865,8 +5865,9 @@ and short_paths_functor_components_desc env mpath comp path =
             let subst =
               match f.fcomp_arg with
               | Unit
-              | Named (None, _, _) -> Subst.identity
-              | Named (Some id, _, _) -> Subst.add_module id path Subst.identity
+              | Named (None, _, _, _) -> Subst.identity
+              | Named (Some id, _, _, _) ->
+                Subst.add_module id path Subst.identity
             in
             Subst.modtype (Rescope (Path.scope (Papply (mpath, path))))
               subst f.fcomp_res

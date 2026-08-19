@@ -346,7 +346,7 @@ let rec path_of_module_expr (module_expr : module_expr) =
     | Some functor_, Some argument -> Some (Path.Papply (functor_, argument))
     | (Some _ | None), _ -> None)
   | Tmod_structure _ | Tmod_functor _ | Tmod_apply_unit _ | Tmod_constraint _
-  | Tmod_unpack _ ->
+  | Tmod_unpack _ | Tmod_typed_hole ->
     None
 
 let rec unwrap_implicit_constraint (module_expr : module_expr) =
@@ -354,7 +354,7 @@ let rec unwrap_implicit_constraint (module_expr : module_expr) =
   | Tmod_constraint (inner, _, (Tmodtype_implicit | Tmodtype_package _), _) ->
     unwrap_implicit_constraint inner
   | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_apply _
-  | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ ->
+  | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ | Tmod_typed_hole ->
     module_expr
 
 let has_remove_aliases_attribute attributes =
@@ -373,7 +373,7 @@ let single_structure_include (module_expr : module_expr) =
     | Tstr_include _ | Tstr_attribute _ | Tstr_jkind _ ->
       None)
   | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_apply _
-  | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ ->
+  | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ | Tmod_typed_hole ->
     None
 
 let typeof_subject (module_expr : module_expr) =
@@ -396,7 +396,8 @@ let declared_module_type_path env path =
       | Some { Types.md_type = Mty_alias target; _ } ->
         follow (path :: visited) target
       | Some
-          { Types.md_type = Mty_signature _ | Mty_functor _ | Mty_strengthen _;
+          { Types.md_type =
+              Mty_signature _ | Mty_functor _ | Mty_strengthen _ | Mty_for_hole;
             _
           } ->
         None
@@ -433,12 +434,16 @@ let classify_signature_member (item : Types.signature_item) =
 let scraped_signature env (module_type : Types.module_type) =
   match Mtype.scrape env module_type with
   | Mty_signature signature -> Some signature
-  | Mty_ident _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ -> None
+  | Mty_ident _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ | Mty_for_hole
+    ->
+    None
 
 let scraped_alias_signature env (module_type : Types.module_type) =
   match Mtype.scrape_alias env module_type with
   | Mty_signature signature -> Some signature
-  | Mty_ident _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ -> None
+  | Mty_ident _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ | Mty_for_hole
+    ->
+    None
 
 let index_of_signature (signature : Types.signature) =
   List.fold_left
@@ -511,7 +516,7 @@ let named_modtype_uids env (module_type : Types.module_type) =
               (match mty with
               | Types.Mty_ident path -> check_path path
               | Types.Mty_alias _ | Types.Mty_signature _ | Types.Mty_functor _
-              | Types.Mty_strengthen _ ->
+              | Types.Mty_strengthen _ | Types.Mty_for_hole ->
                 ());
               Btype.(type_iterators mark).it_module_type it mty)
         }
@@ -727,12 +732,14 @@ let facts_of_tree compilation_unit artifact iterate =
       match declared_module_type_path env target with
       | Some declared -> owner_of_modtype_path declared
       | None -> None)
-    | Mty_signature _ | Mty_functor _ | Mty_strengthen _ -> None
+    | Mty_signature _ | Mty_functor _ | Mty_strengthen _ | Mty_for_hole -> None
   in
   let functor_result_owner env (functor_type : Types.module_type) =
     match Mtype.scrape_alias env functor_type with
     | Mty_functor (_, result, _) -> named_signature_owner env result
-    | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _ -> None
+    | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _
+    | Mty_for_hole ->
+      None
   in
   let functor_result_family env (functor_ : Types.module_declaration) =
     match functor_result_owner env functor_.md_type with
@@ -846,7 +853,7 @@ let facts_of_tree compilation_unit artifact iterate =
     | Tmod_ident (path, _) ->
       node_of_module_path module_expr.mod_env ~loc:module_expr.mod_loc path
     | Tmod_structure _ | Tmod_functor _ | Tmod_apply _ | Tmod_apply_unit _
-    | Tmod_constraint _ | Tmod_unpack _ ->
+    | Tmod_constraint _ | Tmod_unpack _ | Tmod_typed_hole ->
       Node.Location (compilation_unit, module_expr.mod_loc)
   in
   let module Handled = Set.Make (struct
@@ -894,7 +901,7 @@ let facts_of_tree compilation_unit artifact iterate =
       | Tmod_apply (functor_, _, _, _, _) | Tmod_apply_unit (functor_, _) ->
         path_of_module_expr (unwrap_implicit_constraint functor_)
       | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_constraint _
-      | Tmod_unpack _ ->
+      | Tmod_unpack _ | Tmod_typed_hole ->
         None
     in
     match functor_path with
@@ -1061,7 +1068,8 @@ let facts_of_tree compilation_unit artifact iterate =
           | None ->
             add_omission Omission.Reason.Missing_parameter_expectation;
             None))
-      | Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ -> (
+      | Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _
+      | Mty_for_hole -> (
         match expectation with
         | Some parameter_uid -> Some (instance_scoped parameter_uid)
         | None ->
@@ -1100,7 +1108,8 @@ let facts_of_tree compilation_unit artifact iterate =
                  ~functor_instance:(path_contains_apply functor_path)
                  argument_node (`Path argument_path)
              | Mty_functor (Unit, _, _)
-             | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _ ->
+             | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _
+             | Mty_for_hole ->
                ())
   in
   let register_functor_ascription (inner : module_expr)
@@ -1172,7 +1181,8 @@ let facts_of_tree compilation_unit artifact iterate =
       | Tmod_functor (Unit, body, _), Mty_functor (Unit, result, _) ->
         loop body result
       | ( ( Tmod_functor _ | Tmod_ident _ | Tmod_structure _ | Tmod_apply _
-          | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ ),
+          | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _
+          | Tmod_typed_hole ),
           _ ) ->
         ()
     in
@@ -1204,7 +1214,8 @@ let facts_of_tree compilation_unit artifact iterate =
         | Some expectation -> register expectation
         | None -> None)
       | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_apply _
-      | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ ->
+      | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _
+      | Tmod_typed_hole ->
         None)
   in
   let register_ascription_member_pairs uid (inner : module_expr)
@@ -1236,7 +1247,7 @@ let facts_of_tree compilation_unit artifact iterate =
         match scraped_alias_signature env member_type with
         | Some body -> `Signature (visited, None, body)
         | None -> `Other)
-      | Types.Mty_functor _ -> `Other
+      | Types.Mty_functor _ | Types.Mty_for_hole -> `Other
     in
     let rec pair_members visited env ~body_context ~ascribed_context
         (body_signature : Types.signature) (ascribed : Types.signature) =
@@ -1350,7 +1361,8 @@ let facts_of_tree compilation_unit artifact iterate =
           ~affected:(Key.Anon { key_uid = uid })
           Omission.Reason.Unresolved_module_type)
     | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_apply _
-    | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ -> (
+    | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _
+    | Tmod_typed_hole -> (
       let unwrapped = unwrap_implicit_constraint implementation in
       match path_of_module_expr unwrapped with
       | Some path -> (
@@ -1362,7 +1374,7 @@ let facts_of_tree compilation_unit artifact iterate =
         | Tmod_apply _ | Tmod_apply_unit _ ->
           register_application_members ~root:(module_context uid) unwrapped
         | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_constraint _
-        | Tmod_unpack _ ->
+        | Tmod_unpack _ | Tmod_typed_hole ->
           ()))
   in
   let register_functor_parameter ~body_env ident
@@ -1394,7 +1406,8 @@ let facts_of_tree compilation_unit artifact iterate =
         (Node.Location (compilation_unit, site))
         (`Type (Types.Mty_signature []))
     | Mty_functor (Unit, _, _)
-    | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _ ->
+    | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _
+    | Mty_for_hole ->
       ()
   in
   let register_structure_include (include_ : include_declaration) =
@@ -1466,7 +1479,8 @@ let facts_of_tree compilation_unit artifact iterate =
           register_members ~equalities:false root;
           register_application_members ~root unwrapped
         | Tmod_structure _ -> ()
-        | Tmod_ident _ | Tmod_functor _ | Tmod_constraint _ | Tmod_unpack _ ->
+        | Tmod_ident _ | Tmod_functor _ | Tmod_constraint _ | Tmod_unpack _
+        | Tmod_typed_hole ->
           register_members context))
   in
   let interface_root =
@@ -1485,7 +1499,7 @@ let facts_of_tree compilation_unit artifact iterate =
       | Tmod_functor _ -> true
       | Tmod_constraint (inner, _, _, _) -> is_functor inner
       | Tmod_ident _ | Tmod_structure _ | Tmod_apply _ | Tmod_apply_unit _
-      | Tmod_unpack _ ->
+      | Tmod_unpack _ | Tmod_typed_hole ->
         false
     in
     if is_functor module_expr then Context.Body uid else module_context uid
@@ -1698,7 +1712,7 @@ let facts_of_tree compilation_unit artifact iterate =
                   match (unwrap_implicit_constraint functor_).mod_desc with
                   | Tmod_apply _ | Tmod_apply_unit _ -> true
                   | Tmod_ident _ | Tmod_structure _ | Tmod_functor _
-                  | Tmod_constraint _ | Tmod_unpack _ ->
+                  | Tmod_constraint _ | Tmod_unpack _ | Tmod_typed_hole ->
                     false)
               in
               let argument_source =
@@ -1723,13 +1737,15 @@ let facts_of_tree compilation_unit artifact iterate =
                 (node_of_module_expr argument)
                 argument_source
             | Mty_functor (Unit, _, _)
-            | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _ ->
+            | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _
+            | Mty_for_hole ->
               ())
           | Tmod_ident (path, _) ->
             report_path_applications ~site:module_expr.mod_loc
               module_expr.mod_env path
           | Tmod_constraint (_, _, Tmodtype_implicit, _)
-          | Tmod_structure _ | Tmod_apply_unit _ | Tmod_unpack _ ->
+          | Tmod_structure _ | Tmod_apply_unit _ | Tmod_unpack _
+          | Tmod_typed_hole ->
             ());
           match module_expr.mod_desc with
           | Tmod_functor (parameter, body, _) ->
@@ -1743,7 +1759,7 @@ let facts_of_tree compilation_unit artifact iterate =
                 | Unit -> ());
                 iterator.module_expr iterator body)
           | Tmod_ident _ | Tmod_structure _ | Tmod_apply _ | Tmod_apply_unit _
-          | Tmod_constraint _ | Tmod_unpack _ ->
+          | Tmod_constraint _ | Tmod_unpack _ | Tmod_typed_hole ->
             Tast_iterator.default_iterator.module_expr iterator module_expr);
       module_binding =
         (fun iterator binding ->

@@ -145,46 +145,42 @@ let omission_line t ({ affected; source; reason } : Facts.Omission.t) =
 
 (* The facts of a unit, one per line, in the order they are stored. *)
 let fact_lines t (facts : Facts.t) =
-  List.map (check_line t) facts.checks
-  @ List.map (dependency_line t) facts.dependencies
-  @ List.map (equality_line t) facts.equalities
-  @ List.map (omission_line t) facts.omissions
+  List.map (check_line t) (Facts.Check.Set.elements facts.checks)
+  @ List.map (dependency_line t)
+      (Facts.Dependency.Set.elements facts.dependencies)
+  @ List.map (equality_line t)
+      (Facts.Context_equality.Set.elements facts.equalities)
+  @ List.map (omission_line t) (Facts.Omission.Set.elements facts.omissions)
 
 let print_checks t (facts : Facts.t) =
-  List.iter (fun check -> print_endline (check_line t check)) facts.checks
+  Facts.Check.Set.iter
+    (fun check -> print_endline (check_line t check))
+    facts.checks
 
 (* How many facts of each kind were extracted, so that a test that prints only
    some of them still pins down the size of the whole set. *)
 let print_counts (facts : Facts.t) =
   Printf.printf "counts: checks %d deps %d equalities %d omissions %d\n"
-    (List.length facts.checks)
-    (List.length facts.dependencies)
-    (List.length facts.equalities)
-    (List.length facts.omissions)
+    (Facts.Check.Set.cardinal facts.checks)
+    (Facts.Dependency.Set.cardinal facts.dependencies)
+    (Facts.Context_equality.Set.cardinal facts.equalities)
+    (Facts.Omission.Set.cardinal facts.omissions)
 
 let print_facts t facts =
   print_counts facts;
   List.iter print_endline (fact_lines t facts)
 
 let equal_facts (left : Facts.t) (right : Facts.t) =
-  List.equal
-    (fun left right -> Facts.Check.compare left right = 0)
-    left.checks right.checks
-  && List.equal
-       (fun left right -> Facts.Dependency.compare left right = 0)
-       left.dependencies right.dependencies
-  && List.equal
-       (fun left right -> Facts.Context_equality.compare left right = 0)
-       left.equalities right.equalities
-  && List.equal
-       (fun left right -> Facts.Omission.compare left right = 0)
-       left.omissions right.omissions
+  Facts.Check.Set.equal left.checks right.checks
+  && Facts.Dependency.Set.equal left.dependencies right.dependencies
+  && Facts.Context_equality.Set.equal left.equalities right.equalities
+  && Facts.Omission.Set.equal left.omissions right.omissions
 
 (* The checks of kind [Interface], and the [Interface] dependencies of a named
    declaration on a named declaration of an interface, pair a declaration of
    the [.ml] of a unit with the corresponding declaration of its [.mli]. *)
 let interface_checks (facts : Facts.t) =
-  List.filter
+  Facts.Check.Set.filter
     (fun ({ kind; _ } : Facts.Check.t) ->
       match kind with
       | Interface -> true
@@ -200,7 +196,7 @@ let from_interface (uid : Uid.t) =
       false
 
 let interface_pairs (facts : Facts.t) =
-  List.filter
+  Facts.Dependency.Set.filter
     (fun ({ derived; source; reason } : Facts.Dependency.t) ->
       match reason, derived, source with
       | Interface, Named _, Named { family_uid; _ } ->
@@ -214,7 +210,7 @@ let interface_pairs (facts : Facts.t) =
     facts.dependencies
 
 let print_interface_pairs t facts =
-  List.iter
+  Facts.Dependency.Set.iter
     (fun ({ derived; source; _ } : Facts.Dependency.t) ->
       Printf.printf "pair %s <- %s\n" (string_of_key t derived)
         (string_of_key t source))

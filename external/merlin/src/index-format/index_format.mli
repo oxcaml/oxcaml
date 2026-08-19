@@ -20,13 +20,13 @@ module Union_find : sig
   val union : t -> t -> t
 end
 
-(** The module facts of an index, stored in a channel of its own so that
-    consumers that do not care about them never pay to load them. *)
-type module_facts = Module_facts_compact.t Granular_marshal.link
+(** The module facts of an index, stored separately so consumers that do not
+    use them do not load them. *)
+type module_facts =
+  Module_implementation_facts.t list Granular_marshal.link
 
-val module_facts_block : module_facts -> Module_facts_compact.t
-val link_module_facts : Module_facts_compact.t -> module_facts
-val inline_module_facts : Module_implementation_facts.t -> module_facts
+val module_facts_list : module_facts -> Module_implementation_facts.t list
+val link_module_facts : Module_implementation_facts.t list -> module_facts
 
 type stat = { mtime : float; size : int; source_digest : string option }
 

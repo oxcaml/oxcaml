@@ -106,50 +106,11 @@ let init_load_path_once ~do_not_use_cmt_loadpath =
       Load_path.(init ~auto_include:no_auto_include ~visible ~hidden);
       loaded := true)
 
-let add_root_loc ~root (loc : Location.t) =
-  if Location.is_none loc then loc
-  else
-    match root with
-    | None -> loc
-    | Some root ->
-      let reroot (pos : Lexing.position) =
-        { pos with pos_fname = Filename.concat root pos.pos_fname }
-      in
-      { loc with
-        loc_start = reroot loc.loc_start;
-        loc_end = reroot loc.loc_end
-      }
-
-let rewrite_module_facts ~root ~rewrite_root
-    (facts : Module_implementation_facts.t) =
-  if not rewrite_root then facts
-  else
-    let open Module_implementation_facts in
-    match root with
-    | None -> ensure_normalized facts
-    | Some _ ->
-      let rewrite_node : Node.t -> Node.t = function
-        | Node.Uid _ as node -> node
-        | Node.Location (compilation_unit, loc) ->
-          Node.Location (compilation_unit, add_root_loc ~root loc)
-      in
-      ensure_normalized
-        { facts with
-          checks =
-            List.map
-              (fun (check : Check.t) ->
-                { check with
-                  implementation = rewrite_node check.implementation;
-                  site = add_root_loc ~root check.site
-                })
-              facts.checks
-        }
-
 let index_of_artifact ~into ~root ~rewrite_root ~build_path
     ~do_not_use_cmt_loadpath ~shapes ~store_shapes ~cmt_loadpath ~cmt_impl_shape
     ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
     ~cmt_sourcefile ~cmt_source_digest ~cmt_declaration_dependencies
-    ~module_implementation_facts ~module_implementation_facts_present =
+    ~module_implementation_facts =
   init_load_path_once ~do_not_use_cmt_loadpath ~dirs:build_path cmt_loadpath;
   let module Reduce = Shape_reduce.Make (Reduce_conf (struct
     let shapes = shapes
@@ -175,9 +136,6 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
         | Some uid, true -> (acc_defs, add_one uid lid acc_apx)
         | None, _ -> acc)
       (defs, into.approximated) cmt_ident_occurrences
-  in
-  let facts_run =
-    rewrite_module_facts ~root ~rewrite_root module_implementation_facts
   in
   let cu_shape = into.cu_shape in
   if store_shapes then
@@ -216,18 +174,25 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
         acc |> map_update uid1 |> map_update uid2)
       into.related_uids cmt_declaration_dependencies
   in
-  ( { defs;
-      approximated;
-      cu_shape;
-      stats;
-      related_uids;
-      module_facts =
-        if module_implementation_facts_present then
-          Some (link_module_facts Module_facts_compact.empty)
-        else into.module_facts;
-      root_directory = into.root_directory
-    },
-    facts_run )
+  let module_implementation_facts =
+    Option.get module_implementation_facts
+  in
+  let previous_module_facts =
+    match into.module_facts with
+    | None -> []
+    | Some module_facts -> module_facts_list module_facts
+  in
+  { defs;
+    approximated;
+    cu_shape;
+    stats;
+    related_uids;
+    module_facts =
+      Some
+        (link_module_facts
+           (module_implementation_facts :: previous_module_facts));
+    root_directory = into.root_directory
+  }
 
 let shape_of_artifact ~impl_shape ~modname =
   let cu_shape = Hashtbl.create 1 in
@@ -259,7 +224,6 @@ let index_of_cmt ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
         cmt_source_digest;
         cmt_declaration_dependencies;
         cmt_module_implementation_facts;
-        cmt_module_implementation_facts_present;
         _
       } =
     cmt_infos
@@ -275,7 +239,6 @@ let index_of_cmt ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
     ~cmt_sourcefile ~cmt_source_digest ~cmt_declaration_dependencies
     ~module_implementation_facts:cmt_module_implementation_facts
-    ~module_implementation_facts_present:cmt_module_implementation_facts_present
 
 let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~shapes ~store_shapes cms_infos =
@@ -288,7 +251,6 @@ let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
         cms_initial_env;
         cms_declaration_dependencies;
         cms_module_implementation_facts;
-        cms_module_implementation_facts_present;
         _
       } =
     cms_infos
@@ -307,29 +269,6 @@ let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~cmt_sourcefile:cms_sourcefile ~cmt_source_digest:cms_source_digest
     ~cmt_declaration_dependencies:cms_declaration_dependencies
     ~module_implementation_facts:cms_module_implementation_facts
-    ~module_implementation_facts_present:cms_module_implementation_facts_present
-
-let facts_of_index_input ~file (index : index) =
-  match index.module_facts with
-  | None -> (Module_implementation_facts.empty, false)
-  | Some module_facts -> (
-    match Module_facts_compact.to_facts (module_facts_block module_facts) with
-    | Ok facts -> (facts, true)
-    | Error message ->
-      Log.error "Cannot read the module facts of %s: %s" file message;
-      (Module_implementation_facts.empty, false)
-    | exception exn ->
-      Log.error "Cannot read the module facts of %s: %s" file
-        (Printexc.to_string exn);
-      (Module_implementation_facts.empty, false))
-
-let read_index_input_uncached ~file =
-  match read ~file with
-  | Index index -> Some index
-  | Cmt _ | Cms _ | Unknown -> None
-  | exception exn ->
-    Log.error "Cannot read %s: %s" file (Printexc.to_string exn);
-    None
 
 let merge_index ~store_shapes ~into index =
   let defs = merge index.defs into.defs in
@@ -348,9 +287,14 @@ let merge_index ~store_shapes ~into index =
     stats;
     related_uids;
     module_facts =
-      (match into.module_facts with
-      | Some _ -> into.module_facts
-      | None -> index.module_facts)
+      (match into.module_facts, index.module_facts with
+      | None, facts | facts, None -> facts
+      | Some into_facts, Some index_facts ->
+        Some
+          (link_module_facts
+             (List.rev_append
+                (module_facts_list index_facts)
+                (module_facts_list into_facts))))
   }
 
 let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
@@ -366,11 +310,11 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
       module_facts = None
     }
   in
-  let final_index, facts_runs =
+  let final_index =
     Ocaml_utils.Local_store.with_store (Ocaml_utils.Local_store.fresh ())
     @@ fun () ->
     List.fold_left
-      (fun (into, facts_runs) file ->
+      (fun into file ->
         let store_shapes =
           (* Merlin-jst: We add the shapes into `into` because we need to collect them so
              we can use them for shape reduction, regardless of whether store_shapes is
@@ -385,46 +329,20 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
         Log.debug "Indexing from file: %s" file;
         match Cms_cache.read file with
         | cms_item ->
-          let index, facts_run =
-            index_of_cms ~into ~root ~rewrite_root ~build_path ~store_shapes
-              ~do_not_use_cmt_loadpath ~shapes:into.cu_shape cms_item.cms_infos
-          in
-          (index, facts_run :: facts_runs)
+          index_of_cms ~into ~root ~rewrite_root ~build_path ~store_shapes
+            ~do_not_use_cmt_loadpath ~shapes:into.cu_shape cms_item.cms_infos
         | exception _ -> (
           match Cmt_cache.read file with
           | cmt_item ->
-            let index, facts_run =
-              index_of_cmt ~into ~root ~rewrite_root ~build_path ~store_shapes
-                ~do_not_use_cmt_loadpath ~shapes:into.cu_shape
-                cmt_item.cmt_infos
-            in
-            (index, facts_run :: facts_runs)
+            index_of_cmt ~into ~root ~rewrite_root ~build_path ~store_shapes
+              ~do_not_use_cmt_loadpath ~shapes:into.cu_shape cmt_item.cmt_infos
           | exception _ -> (
-            match read_index_input_uncached ~file with
-            | Some index ->
-              let facts_run, decoded = facts_of_index_input ~file index in
-              ( merge_index ~store_shapes
-                  { index with
-                    module_facts = if decoded then index.module_facts else None
-                  }
-                  ~into,
-                facts_run :: facts_runs )
-            | None ->
+            match read ~file with
+            | Index index -> merge_index ~store_shapes index ~into
+            | Cmt _ | Cms _ | Unknown ->
               Log.error "Unknown file type: %s" file;
               exit 1)))
-      (initial_index, []) files
-  in
-  (* The facts of every input are copied into the output, so that it stands
-     alone even if its inputs are removed. *)
-  let final_index =
-    { final_index with
-      module_facts =
-        Option.map
-          (fun _ ->
-            inline_module_facts
-              (Module_implementation_facts.merge_many (List.rev facts_runs)))
-          final_index.module_facts
-    }
+      initial_index files
   in
   let final_index =
     (* Don't save the collected shapes if store_shapes is false *)
@@ -444,44 +362,18 @@ let gather_shapes ~output_file files =
       module_facts = None
     }
   in
-  let final_index, facts_runs =
+  let final_index =
     List.fold_left
-      (fun ((into, facts_runs) as acc) file ->
+      (fun into file ->
         match Cache.read file with
         | Cmt cmt_infos ->
-          ( merge_index ~store_shapes:true (shape_of_cmt cmt_infos) ~into,
-            facts_runs )
+          merge_index ~store_shapes:true (shape_of_cmt cmt_infos) ~into
         | Cms cms_infos ->
-          ( merge_index ~store_shapes:true (shape_of_cms cms_infos) ~into,
-            facts_runs )
-        | Index _ -> (
-          (* Read the index again without the cache: the facts are a lazy link
-             into the file, so they must be decoded from a live channel. *)
-          match read_index_input_uncached ~file with
-          | Some index ->
-            let facts_run, decoded = facts_of_index_input ~file index in
-            ( merge_index ~store_shapes:true
-                { index with
-                  module_facts = if decoded then index.module_facts else None
-                }
-                ~into,
-              facts_run :: facts_runs )
-          | None ->
-            Log.error "Not a valid file %S" file;
-            acc)
+          merge_index ~store_shapes:true (shape_of_cms cms_infos) ~into
+        | Index index -> merge_index ~store_shapes:true index ~into
         | Unknown | (exception _) ->
           Log.error "Not a valid file %S" file;
-          acc)
-      (initial_index, []) files
-  in
-  let final_index =
-    { final_index with
-      module_facts =
-        Option.map
-          (fun _ ->
-            inline_module_facts
-              (Module_implementation_facts.merge_many (List.rev facts_runs)))
-          final_index.module_facts
-    }
+          into)
+      initial_index files
   in
   write ~file:output_file final_index
