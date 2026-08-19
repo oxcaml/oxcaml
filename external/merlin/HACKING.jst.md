@@ -62,37 +62,40 @@ When you get a merge conflict in the compiler’s frontend, you will likely also
 
 Once you’ve run the import script, you should now resolve any remaining conflicts in `external/merlin/src/ocaml`. If a compiler conflict was in a location where Merlin diverges from the compiler, you will now be met with nested merge conflicts in `external/merlin` that you’ll need to resolve. Here’s an example of one:
 
+<!-- The below examples are indented by a space so that tooling doesn't think they're
+     actual merge conflicts. -->
+
 ```
-<<<<<<<<<<<<<< Merlin:current
-<<<<<<< current
-      let error = Submode_failed(failure_reason, reason) in
-      let new_arg2 = failwith "todo" in
-      raise (error(loc, env, error, new_arg2))
-||||||| merge-base
-      let err = Submode_failed(failure_reason, reason) in
-      raise (error(loc, env, err))
-=======
-      let error = Submode_failed(failure_reason, reason) in
-      let new_arg1 = failwith "todo" in
-      raise (error(loc, env, error, new_arg1))
->>>>>>> incoming
-|||||||||||||| Compiler:last-imported
-      let error = Submode_failed(failure_reason, reason) in
-<<<<<<< current
-      let new_arg2 = failwith "todo" in
-      raise (Error(loc, env, error, new_arg2))
-||||||| merge-base
-      raise (Error(loc, env, error))
-=======
-      let new_arg1 = failwith "todo" in
-      raise (Error(loc, env, error, new_arg1))
->>>>>>> incoming
-==============
-      let error = Submode_failed(failure_reason, reason) in
-      let new_arg1 = failwith "todo" in
-      let new_arg2 = failwith "todo" in
-      raise (Error(loc, env, error, new_arg1, new_arg2))
->>>>>>>>>>>>>> Compiler:incoming
+ <<<<<<<<<<<<<< Merlin:current
+ <<<<<<< current
+       let error = Submode_failed(failure_reason, reason) in
+       let new_arg2 = failwith "todo" in
+       raise (error(loc, env, error, new_arg2))
+ ||||||| merge-base
+       let err = Submode_failed(failure_reason, reason) in
+       raise (error(loc, env, err))
+ =======
+       let error = Submode_failed(failure_reason, reason) in
+       let new_arg1 = failwith "todo" in
+       raise (error(loc, env, error, new_arg1))
+ >>>>>>> incoming
+ |||||||||||||| Compiler:last-imported
+       let error = Submode_failed(failure_reason, reason) in
+ <<<<<<< current
+       let new_arg2 = failwith "todo" in
+       raise (Error(loc, env, error, new_arg2))
+ ||||||| merge-base
+       raise (Error(loc, env, error))
+ =======
+       let new_arg1 = failwith "todo" in
+       raise (Error(loc, env, error, new_arg1))
+ >>>>>>> incoming
+ ==============
+       let error = Submode_failed(failure_reason, reason) in
+       let new_arg1 = failwith "todo" in
+       let new_arg2 = failwith "todo" in
+       raise (Error(loc, env, error, new_arg1, new_arg2))
+ >>>>>>>>>>>>>> Compiler:incoming
 ```
 
 The longer conflict markers (e.g., `<<<<<<<<<<<<<<`) represent conflicts that happen while importing compiler changes into Merlin, while the shorter conflict markers (e.g. `<<<<<<<`) represent git merge conflicts. The top section of the longer markers is the state of the Merlin file before importing compiler changes;the bottom section of the longer markers is the current state of the compiler; and the middle section of the longer markers is their merge base.
@@ -100,16 +103,16 @@ The longer conflict markers (e.g., `<<<<<<<<<<<<<<`) represent conflicts that ha
 In the above example, the middle section is:
 
 ```
-      let error = Submode_failed(failure_reason, reason) in
-<<<<<<< current
-      let new_arg2 = failwith "todo" in
-      raise (Error(loc, env, error, new_arg2))
-||||||| merge-base
-      raise (Error(loc, env, error))
-=======
-      let new_arg1 = failwith "todo" in
-      raise (Error(loc, env, error, new_arg1))
->>>>>>> incoming
+       let error = Submode_failed(failure_reason, reason) in
+ <<<<<<< current
+       let new_arg2 = failwith "todo" in
+       raise (Error(loc, env, error, new_arg2))
+ ||||||| merge-base
+       raise (Error(loc, env, error))
+ =======
+       let new_arg1 = failwith "todo" in
+       raise (Error(loc, env, error, new_arg1))
+ >>>>>>> incoming
 ```
 
 This shows the git conflict that occurred in the compiler.
@@ -117,10 +120,10 @@ This shows the git conflict that occurred in the compiler.
 The bottom section is:
 
 ```
-      let error = Submode_failed(failure_reason, reason) in
-      let new_arg1 = failwith "todo" in
-      let new_arg2 = failwith "todo" in
-      raise (Error(loc, env, error, new_arg1, new_arg2))
+       let error = Submode_failed(failure_reason, reason) in
+       let new_arg1 = failwith "todo" in
+       let new_arg2 = failwith "todo" in
+       raise (Error(loc, env, error, new_arg1, new_arg2))
 ```
 
 This shows how the git conflict was resolved in the compiler.
@@ -128,18 +131,18 @@ This shows how the git conflict was resolved in the compiler.
 The top section is:
 
 ```
-<<<<<<< current
-      let error = Submode_failed(failure_reason, reason) in
-      let new_arg2 = failwith "todo" in
-      raise (error(loc, env, error, new_arg2))
-||||||| merge-base
-      let err = Submode_failed(failure_reason, reason) in
-      raise (error(loc, env, err))
-=======
-      let error = Submode_failed(failure_reason, reason) in
-      let new_arg1 = failwith "todo" in
-      raise (error(loc, env, error, new_arg1))
->>>>>>> incoming
+ <<<<<<< current
+       let error = Submode_failed(failure_reason, reason) in
+       let new_arg2 = failwith "todo" in
+       raise (error(loc, env, error, new_arg2))
+ ||||||| merge-base
+       let err = Submode_failed(failure_reason, reason) in
+       raise (error(loc, env, err))
+ =======
+       let error = Submode_failed(failure_reason, reason) in
+       let new_arg1 = failwith "todo" in
+       raise (error(loc, env, error, new_arg1))
+ >>>>>>> incoming
 ```
 
 This shows the git conflict that occurred in Merlin.

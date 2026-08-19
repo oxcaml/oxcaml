@@ -203,7 +203,7 @@ jobs:
             config: --enable-frame-pointers
             os: warp-ubuntu-latest-x64-8x
             llvmize_tests_only: true
-            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus4
             oxcaml_llvm_source_branch: llvmize-oxcaml
             sysdeps: gdb
 

@@ -16,4 +16,10 @@
     frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_compose(f=test_closures_dwarf.exe`Test_closures_dwarf.double at test_closures_dwarf.ml:108:15 : int -> int @ value, g=test_closures_dwarf.exe`Test_closures_dwarf.add_one at test_closures_dwarf.ml:106:16 : int -> int @ value, x=5 : int @ value)
     frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_compose(f=test_closures_dwarf.exe`Test_closures_dwarf.add_one at test_closures_dwarf.ml:106:16 : int -> int @ value, g=test_closures_dwarf.exe`Test_closures_dwarf.double at test_closures_dwarf.ml:108:15 : int -> int @ value, x=7 : int @ value)
     frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_closure_factory(multiplier=3 : int @ value)
+    frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_captured_var_test(base=100 : int @ value, offset=5 : int @ value)
+    frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_captured_var_test.use_captured(arg=7 : int @ value)
+(int @ value) arg = 7
+    frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_captured_var_test(base=50 : int @ value, offset=3 : int @ value)
+    frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_captured_var_test.use_captured(arg=7 : int @ value)
+(int @ value) arg = 7
 Process <PID> exited with status = 0 (0x00000000)
