@@ -782,6 +782,13 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
               ~handler:(if is_cold then Unknown else Known handler)
       in
       let uacc = UA.with_uenv uacc uenv in
+      (* Parameters referenced by phantom lets within the handler must remain
+         locatable by the debugger. *)
+      Bound_parameters.iter
+        (fun param ->
+          Simplify_common.promote_var_if_needed_by_phantom_lets free_names
+            (BP.var param))
+        params;
       (* The parameters are removed from the free name information as they are
          no longer in scope. *)
       let free_names = remove_params params free_names in
@@ -829,6 +836,13 @@ let rebuild_single_recursive_handler cont
           variant_params ~handler ~free_names_of_handler:free_names
           ~is_exn_handler:false ~is_cold:handler_to_rebuild.is_cold
       in
+      (* Parameters referenced by phantom lets within the handler must remain
+         locatable by the debugger. *)
+      Bound_parameters.iter
+        (fun param ->
+          Simplify_common.promote_var_if_needed_by_phantom_lets free_names
+            (BP.var param))
+        (Bound_parameters.append invariant_params variant_params);
       let free_names =
         remove_params invariant_params (remove_params variant_params free_names)
       in

@@ -137,12 +137,8 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
     let promote_vars_needed_by_phantom_lets (bound_vars : Bound_pattern.t) =
       Bound_pattern.fold_all_bound_vars bound_vars ~init:()
         ~f:(fun () bound_var ->
-          let var = VB.var bound_var in
-          match
-            Name_occurrences.count_variable_phantom_mode free_names_of_body var
-          with
-          | Zero -> ()
-          | One | More_than_one -> Variable.make_needed_by_phantom_let var)
+          Simplify_common.promote_var_if_needed_by_phantom_lets
+            free_names_of_body (VB.var bound_var))
     in
     let bindings =
       List.map
