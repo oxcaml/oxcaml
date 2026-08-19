@@ -147,6 +147,12 @@ module Check = struct
       else
         let c = Kind.compare left.kind right.kind in
         if c <> 0 then c else Location.compare left.site right.site
+
+  module Set = Set.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+  end)
 end
 
 module Dependency = struct
@@ -193,6 +199,12 @@ module Dependency = struct
     else
       let c = Key.compare left.source right.source in
       if c <> 0 then c else Reason.compare left.reason right.reason
+
+  module Set = Set.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+  end)
 end
 
 module Context_equality = struct
@@ -212,6 +224,12 @@ module Context_equality = struct
     else if c > 0
     then Some { left = right; right = left }
     else None
+
+  module Set = Set.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+  end)
 end
 
 module Omission = struct
@@ -244,56 +262,64 @@ module Omission = struct
     else
       let c = Option.compare Uid.compare left.source right.source in
       if c <> 0 then c else Reason.compare left.reason right.reason
+
+  module Set = Set.Make (struct
+    type nonrec t = t
+
+    let compare = compare
+  end)
 end
 
 type t =
-  { checks : Check.t list;
-    dependencies : Dependency.t list;
-    equalities : Context_equality.t list;
-    omissions : Omission.t list
+  { checks : Check.Set.t;
+    dependencies : Dependency.Set.t;
+    equalities : Context_equality.Set.t;
+    omissions : Omission.Set.t
   }
 
 type frozen = t
 
-module Check_set = Set.Make (Check)
-module Dependency_set = Set.Make (Dependency)
-module Context_equality_set = Set.Make (Context_equality)
-module Omission_set = Set.Make (Omission)
+let merge left right =
+  { checks = Check.Set.union left.checks right.checks;
+    dependencies = Dependency.Set.union left.dependencies right.dependencies;
+    equalities = Context_equality.Set.union left.equalities right.equalities;
+    omissions = Omission.Set.union left.omissions right.omissions
+  }
 
 module Builder = struct
   type nonrec t =
-    { mutable checks : Check_set.t;
-      mutable dependencies : Dependency_set.t;
-      mutable equalities : Context_equality_set.t;
-      mutable omissions : Omission_set.t
+    { mutable checks : Check.Set.t;
+      mutable dependencies : Dependency.Set.t;
+      mutable equalities : Context_equality.Set.t;
+      mutable omissions : Omission.Set.t
     }
 
   let create () =
-    { checks = Check_set.empty;
-      dependencies = Dependency_set.empty;
-      equalities = Context_equality_set.empty;
-      omissions = Omission_set.empty
+    { checks = Check.Set.empty;
+      dependencies = Dependency.Set.empty;
+      equalities = Context_equality.Set.empty;
+      omissions = Omission.Set.empty
     }
 
-  let add_check t check = t.checks <- Check_set.add check t.checks
+  let add_check t check = t.checks <- Check.Set.add check t.checks
 
   let add_dependency t dependency =
-    t.dependencies <- Dependency_set.add dependency t.dependencies
+    t.dependencies <- Dependency.Set.add dependency t.dependencies
 
   let add_equality t equality =
     match Context_equality.oriented equality with
     | None -> ()
     | Some equality ->
-      t.equalities <- Context_equality_set.add equality t.equalities
+      t.equalities <- Context_equality.Set.add equality t.equalities
 
   let add_omission t omission =
-    t.omissions <- Omission_set.add omission t.omissions
+    t.omissions <- Omission.Set.add omission t.omissions
 
   let freeze t : frozen =
-    { checks = Check_set.elements t.checks;
-      dependencies = Dependency_set.elements t.dependencies;
-      equalities = Context_equality_set.elements t.equalities;
-      omissions = Omission_set.elements t.omissions
+    { checks = t.checks;
+      dependencies = t.dependencies;
+      equalities = t.equalities;
+      omissions = t.omissions
     }
 end
 
