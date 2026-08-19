@@ -41,8 +41,6 @@ let link_module_facts block = Granular_marshal.link block
 let inline_module_facts facts =
   Granular_marshal.link (Module_facts_compact.of_facts facts)
 
-let empty_module_facts () = Granular_marshal.link Module_facts_compact.empty
-
 type index =
   { defs : Lid_set.t Uid_map.t;
     approximated : Lid_set.t Uid_map.t;
@@ -50,19 +48,7 @@ type index =
     stats : stat Stats.t;
     root_directory : string option;
     related_uids : Union_find.t Uid_map.t;
-    module_facts : module_facts;
-    module_facts_present : bool
-  }
-
-(* The layout of index files that predate the module facts channel. Such files
-   are still readable; they simply carry no facts. *)
-type index_v0 =
-  { v0_defs : Lid_set.t Uid_map.t;
-    v0_approximated : Lid_set.t Uid_map.t;
-    v0_cu_shape : (Compilation_unit.t, Shape.t) Hashtbl.t;
-    v0_stats : stat Stats.t;
-    v0_root_directory : string option;
-    v0_related_uids : Union_find.t Uid_map.t
+    module_facts : module_facts option;
   }
 
 let lidset_schema iter lidset = Lid_set.schema iter Lid.schema lidset
@@ -85,38 +71,7 @@ let index_schema (iter : Granular_marshal.iter) index =
   Uid_map.schema type_ufmap iter
     (fun iter _ v -> Union_find.schema iter v)
     index.related_uids;
-  module_facts_schema iter index.module_facts
-
-let index_v0_schema (iter : Granular_marshal.iter) index =
-  Uid_map.schema type_setmap iter
-    (fun iter _ v -> lidset_schema iter v)
-    index.v0_defs;
-  Uid_map.schema type_setmap iter
-    (fun iter _ v -> lidset_schema iter v)
-    index.v0_approximated;
-  Uid_map.schema type_ufmap iter
-    (fun iter _ v -> Union_find.schema iter v)
-    index.v0_related_uids
-
-let index_of_v0 (v0 : index_v0) : index =
-  { defs = v0.v0_defs;
-    approximated = v0.v0_approximated;
-    cu_shape = v0.v0_cu_shape;
-    stats = v0.v0_stats;
-    root_directory = v0.v0_root_directory;
-    related_uids = v0.v0_related_uids;
-    module_facts = empty_module_facts ();
-    module_facts_present = false
-  }
-
-let v0_of_index (index : index) : index_v0 =
-  { v0_defs = index.defs;
-    v0_approximated = index.approximated;
-    v0_cu_shape = index.cu_shape;
-    v0_stats = index.stats;
-    v0_root_directory = index.root_directory;
-    v0_related_uids = index.related_uids
-  }
+  Option.iter (module_facts_schema iter) index.module_facts
 
 let compress index =
   let cache = Lid.cache () in
@@ -192,12 +147,6 @@ let ext = "ocaml-index"
 
 let magic_number = Config.index_magic_number
 
-(* The last index magic number that predates the module facts channel. Files
-   written with it use the [index_v0] layout, and are still read so that an
-   index left over from the previous magic number version keeps working for
-   everything but facts. *)
-let magic_number_v0 = "Merl2023I584"
-
 let write ~file index =
   let index = compress index in
   Misc.output_to_file_via_temporary ~mode:[ Open_binary ] file
@@ -229,22 +178,9 @@ let read ~file =
         Cms (input_value ic : Cms_format.cms_infos)
       else if String.equal !file_magic_number magic_number then
         Index (Granular_marshal.read file ic index_schema)
-      else if String.equal !file_magic_number magic_number_v0 then
-        Index (index_of_v0 (Granular_marshal.read file ic index_v0_schema))
       else Unknown)
 
 let read_exn ~file =
   match read ~file with
   | Index index -> index
   | _ -> raise (Not_an_index file)
-
-module For_testing = struct
-  let magic_number_v0 = magic_number_v0
-
-  let write_v0 ~file index =
-    let index = compress index in
-    Misc.output_to_file_via_temporary ~mode:[ Open_binary ] file
-      (fun _temp_file_name oc ->
-        output_string oc magic_number_v0;
-        Granular_marshal.write oc index_v0_schema (v0_of_index index))
-end
