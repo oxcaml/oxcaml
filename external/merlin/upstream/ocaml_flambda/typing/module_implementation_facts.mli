@@ -51,9 +51,8 @@ module Key : sig
   type t =
     | Named of
         { context : Context.t;
-            (** The location of this specific module-type occurrence *)
-          family_uid : Shape.Uid.t
-            (** The original module-type declaration *)
+              (** The location of this specific module-type occurrence *)
+          family_uid : Shape.Uid.t  (** The original module-type declaration *)
         }
     | Anon of { key_uid : Shape.Uid.t }
 
