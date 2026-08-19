@@ -1172,6 +1172,14 @@ let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid { type_shape; type_name; type_layout }
 
+(* All call sites that record type shapes for debug information must be guarded
+   by this predicate, so that the conditions for emitting type shapes stay
+   consistent across the compiler. *)
+let enabled () =
+  !Clflags.debug
+  && not !Clflags.restrict_to_upstream_dwarf
+  && !Clflags.shape_format = Clflags.Debugging_shapes
+
 let print_table_all_type_decls ppf =
   let entries = Uid.Tbl.to_list all_type_decls in
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in

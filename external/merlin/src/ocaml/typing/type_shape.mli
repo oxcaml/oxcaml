@@ -131,6 +131,11 @@ val add_to_type_decls :
 val add_to_type_shapes :
   Uid.t -> Types.type_expr -> Layout.t -> name:string -> path_lookup -> unit
 
+(** Whether the compiler should compute and record type shapes for debug
+    information. All call sites that record type shapes for debug information
+    must be guarded by this predicate. *)
+val enabled : unit -> bool
+
 (*
 val print_table_all_type_decls : Format.formatter -> unit
 
