@@ -174,9 +174,7 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
         acc |> map_update uid1 |> map_update uid2)
       into.related_uids cmt_declaration_dependencies
   in
-  let module_implementation_facts =
-    Option.get module_implementation_facts
-  in
+  let module_implementation_facts = Option.get module_implementation_facts in
   let previous_module_facts =
     match into.module_facts with
     | None -> []
@@ -287,7 +285,7 @@ let merge_index ~store_shapes ~into index =
     stats;
     related_uids;
     module_facts =
-      (match into.module_facts, index.module_facts with
+      (match (into.module_facts, index.module_facts) with
       | None, facts | facts, None -> facts
       | Some into_facts, Some index_facts ->
         Some
