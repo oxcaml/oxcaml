@@ -1276,12 +1276,14 @@ and subst_lazy_modtype scoping s = function
       Mty_signature(subst_lazy_signature scoping s sg)
   | Mty_functor(Unit, res, mres) ->
       Mty_functor(Unit, subst_lazy_modtype scoping s res, mres)
-  | Mty_functor(Named (None, arg, marg), res, mres) ->
-      Mty_functor(Named (None, (subst_lazy_modtype scoping s) arg, marg),
+  | Mty_functor(Named (None, arg, expectation, marg), res, mres) ->
+      Mty_functor(Named (None, (subst_lazy_modtype scoping s) arg,
+                         expectation, marg),
                    subst_lazy_modtype scoping s res, mres)
-  | Mty_functor(Named (Some id, arg, marg), res, mres) ->
+  | Mty_functor(Named (Some id, arg, expectation, marg), res, mres) ->
       let id' = rename_ident s id in
-      Mty_functor(Named (Some id', (subst_lazy_modtype scoping s) arg, marg),
+      Mty_functor(Named (Some id', (subst_lazy_modtype scoping s) arg,
+                         expectation, marg),
                   subst_lazy_modtype scoping (add_module id (Pident id') s)
                     res,
                   mres)

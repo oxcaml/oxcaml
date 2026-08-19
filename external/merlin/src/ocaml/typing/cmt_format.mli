@@ -53,6 +53,7 @@ type cmt_infos = {
   cmt_modname : Compilation_unit.t;
   cmt_annots : binary_annots;
   cmt_declaration_dependencies : (dependency_kind * Uid.t * Uid.t) list;
+  cmt_module_implementation_facts : Module_implementation_facts.t option;
   cmt_comments : (string * Location.t) list;
   cmt_args : string array;
     (** {!Sys.argv} from the compiler invocation which created the file.
@@ -98,6 +99,7 @@ val save_cmt :
   Env.t -> (* initial env *)
   Cmi_format.cmi_infos_lazy option -> (* if a .cmi was generated *)
   Shape.t option ->
+  Module_implementation_facts.t option ->
   unit
 
 (* Miscellaneous functions *)

@@ -490,7 +490,7 @@ let type_iterators_without_type_expr =
       ()
   and it_functor_param it = function
     | Unit -> ()
-    | Named (_, mt, _) -> it.it_module_type it mt
+    | Named (_, mt, _, _) -> it.it_module_type it mt
   and it_module_type it = function
       Mty_ident p
     | Mty_alias p -> it.it_path p

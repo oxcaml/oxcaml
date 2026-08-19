@@ -62,8 +62,8 @@ module Context = struct
         Fmt.fprintf ppf " :@ %a" context_mty cxt
   and argname = function
     | Types.Unit -> ""
-    | Types.Named (None, _, _) -> "_"
-    | Types.Named (Some id, _, _) -> Ident.name id
+    | Types.Named (None, _, _, _) -> "_"
+    | Types.Named (Some id, _, _, _) -> Ident.name id
 
   (* Use deprecated_printer to defer path printing until render time.
      This ensures the naming context is queried after reset_naming_context()
@@ -178,7 +178,7 @@ module Runtime_coercion = struct
             find env (Context.Module id :: ctx) q md.md_type
         | _ -> raise Not_found
         end
-    | Mty_functor(Named (_,mt,_) as arg,_,_), InArg :: q ->
+    | Mty_functor(Named (_, mt, _, _) as arg, _, _), InArg :: q ->
         find env (Context.Arg arg :: ctx) q mt
     | Mty_functor(arg, mt,_), InBody :: q ->
         find env (Context.Body arg :: ctx) q mt
@@ -498,7 +498,7 @@ module With_shorthand = struct
 
   let functor_param (ua : _ named) = match ua.item with
     | Types.Unit -> Unit
-    | Types.Named (from, mty, mm) ->
+    | Types.Named (from, mty, _, mm) ->
         Named (from, modtype { ua with item = mty }, mm)
 
   (** Printing of arguments with shorthands *)
@@ -582,8 +582,8 @@ module Functor_suberror = struct
   open Err
 
   let param_id x = match x.With_shorthand.item with
-    | Types.Named (Some _ as x,_,_) -> x
-    | Types.(Unit | Named(None,_,_)) -> None
+    | Types.Named (Some _ as x, _, _, _) -> x
+    | Types.(Unit | Named (None, _, _, _)) -> None
 
 
 (** Print a list of functor parameters with style while adjusting the printing
@@ -753,7 +753,7 @@ module Functor_suberror = struct
       let mty2_with_mode =
         match e.With_shorthand.item with
         | Types.Unit -> Fmt.dprintf "()"
-        | Types.Named(_, mty, mm) ->
+        | Types.Named (_, mty, _, mm) ->
             dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
       in
       Fmt.dprintf

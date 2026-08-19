@@ -154,7 +154,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_letmutable (vb, e) ->
         let env = classify_value_bindings Nonrecursive env [vb] in
         classify_expression env e
-    | Texp_letmodule (Some mid, _, _, mexp, e) ->
+    | Texp_letmodule
+        { id = Some mid; module_expr = mexp; body = e; _ } ->
         (* Note on module presence:
            For absent modules (i.e. module aliases), the module being bound
            does not have a physical representation, but its size can still be
@@ -168,7 +169,7 @@ let classify_expression : Typedtree.expression -> sd =
 
     (* non-binding cases *)
     | Texp_open (_, e)
-    | Texp_letmodule (None, _, _, _, e)
+    | Texp_letmodule { id = None; body = e; _ }
     | Texp_sequence (_, _, e)
     | Texp_letexception (_, e)
     | Texp_exclave e ->
@@ -668,7 +669,7 @@ let rec expression : Typedtree.expression -> term_judg =
          G |- let mutable <bindings> in body : m
       *)
       value_bindings Nonrecursive [binding] >> expression body
-    | Texp_letmodule (x, _, _, mexp, e) ->
+    | Texp_letmodule { id = x; module_expr = mexp; body = e; _ } ->
       module_binding (x, mexp) >> expression e
     | Texp_match (e, _, cases, eff_cases, _) ->
       (* TODO: update comment below for eff_cases

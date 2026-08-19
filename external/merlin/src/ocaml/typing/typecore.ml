@@ -4798,7 +4798,7 @@ let rec final_subexpression exp =
   | Texp_try (e, _, _)
   | Texp_ifthenelse (_, e, _)
   | Texp_match (_, _, {c_rhs=e} :: _, _, _)
-  | Texp_letmodule (_, _, _, _, e)
+  | Texp_letmodule { body = e; _ }
   | Texp_letexception (_, e)
   | Texp_open (_, e)
     -> final_subexpression e
@@ -5429,7 +5429,7 @@ let rec is_nonexpansive exp =
       Vars.fold (fun _ (mut,_,_) b -> decr count; b && mut = Asttypes.Immutable)
         vars true &&
       !count = 0
-  | Texp_letmodule (_, _, _, mexp, e)
+  | Texp_letmodule { module_expr = mexp; body = e; _ }
   | Texp_open ({ open_expr = mexp; _}, e) ->
       is_nonexpansive_mod mexp && is_nonexpansive e
   | Texp_pack mexp ->
@@ -5989,7 +5989,7 @@ let check_statement exp =
         | Texp_let (_, _, e)
         | Texp_sequence (_, _, e)
         | Texp_letexception (_, e)
-        | Texp_letmodule (_, _, _, _, e) ->
+        | Texp_letmodule { body = e; _ } ->
             loop e
         | _ ->
             let loc =
@@ -6064,7 +6064,7 @@ let check_partial_application ~statement exp =
             | Texp_apply_layout (e, _) -> check e
             | Texp_let (_, _, e) | Texp_letmutable(_, e)
             | Texp_sequence (_, _, e) | Texp_open (_, e)
-            | Texp_letexception (_, e) | Texp_letmodule (_, _, _, _, e)
+            | Texp_letexception (_, e) | Texp_letmodule { body = e; _ }
             | Texp_exclave e ->
                 check e
             | Texp_apply _ | Texp_send _ | Texp_new _ | Texp_letop _ ->
@@ -8480,9 +8480,9 @@ and type_expect_
       end
   | Pexp_letmodule(name, smodl, sbody) ->
       let lv = get_current_level () in
-      let (id, pres, modl, _, body) =
+      let (id, pres, md_uid, modl, _, body) =
         with_local_level_generalize begin fun () ->
-          let modl, pres, id, new_env =
+          let modl, pres, id, md_uid, new_env =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
               let modl, md_shape = !type_module env smodl in
               Mtype.lower_nongen lv modl.mod_type;
@@ -8512,7 +8512,7 @@ and type_expect_
                     in
                     Some id, env
               in
-              modl, pres, id, new_env
+              modl, pres, id, md_uid, new_env
             end
           in
           (* Ideally, we should catch Expr_type_clash errors
@@ -8521,16 +8521,25 @@ and type_expect_
              Scoping_let_module errors
            *)
           let body = type_expect new_env expected_mode sbody ty_expected_explained in
-          (id, pres, modl, new_env, body)
+          (id, pres, md_uid, modl, new_env, body)
         end
-        ~before_generalize: begin fun (_id, _pres, _modl, new_env, body) ->
+        ~before_generalize: begin fun
+          (_id, _pres, _md_uid, _modl, new_env, body) ->
           (* Ensure that local definitions do not leak. *)
           (* required for implicit unpack *)
           enforce_current_level new_env body.exp_type
         end
       in
       re {
-        exp_desc = Texp_letmodule(id, name, pres, modl, body);
+        exp_desc =
+          Texp_letmodule
+            { id;
+              name;
+              presence = pres;
+              uid = md_uid;
+              module_expr = modl;
+              body
+            };
         exp_loc = loc; exp_extra = [];
         exp_type = body.exp_type;
         exp_attributes = sexp.pexp_attributes;
