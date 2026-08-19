@@ -176,7 +176,7 @@ let modalities i ppf modalities =
 
 let mode i ppf mode =
   line i ppf "mode %a\n" fmt_string_loc
-    (Location.map (fun (Mode x) -> x) mode)
+    (Location.map Printast.string_of_mode mode)
 
 let modes i ppf modes =
   List.iter (fun m -> mode i ppf m) modes
