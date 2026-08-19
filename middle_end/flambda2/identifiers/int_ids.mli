@@ -115,7 +115,19 @@ module Variable : sig
 
   module Lmap : Lmap.S with type key := t
 
+  type user_visibility =
+    | User_visible
+    | Not_user_visible
+    | Not_user_visible_but_needed_by_phantom_let
+        (** Like [Not_user_visible], but the variable is referenced by the
+            defining expression of at least one phantom let, so it must remain
+            locatable by the debugger (printed as "NP"). See
+            [Simplify_let_expr]. *)
+
   val create : ?user_visible:unit -> string -> Flambda_kind.t -> t
+
+  val create_with_user_visibility :
+    user_visibility -> string -> Flambda_kind.t -> t
 
   val compilation_unit : t -> Compilation_unit.t
 
@@ -125,7 +137,19 @@ module Variable : sig
 
   val kind : t -> Flambda_kind.t
 
+  val user_visibility : t -> user_visibility
+
+  (** [true] only for [User_visible]. *)
   val user_visible : t -> bool
+
+  (** [true] for [User_visible] and
+      [Not_user_visible_but_needed_by_phantom_let]. *)
+  val user_visible_or_needed_by_phantom_let : t -> bool
+
+  (** Promote [Not_user_visible] to
+      [Not_user_visible_but_needed_by_phantom_let]; no-op on the other states.
+  *)
+  val make_needed_by_phantom_let : t -> unit
 
   val export : t -> exported
 
