@@ -496,10 +496,20 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       sub.expr sub exp
   | Texp_override (_, list) ->
       List.iter (fun (_, s, e) -> iter_loc sub s; sub.expr sub e) list
-  | Texp_letmodule (_, s, _, mexpr, exp) ->
-      iter_loc sub s;
-      sub.module_expr sub mexpr;
-      sub.expr sub exp
+  | Texp_letmodule { id; name; presence; uid; module_expr; body } ->
+      iter_loc sub name;
+      sub.item_declaration sub
+        (Module_binding
+           { mb_id = id;
+             mb_name = name;
+             mb_uid = uid;
+             mb_presence = presence;
+             mb_expr = module_expr;
+             mb_attributes = [];
+             mb_loc = name.loc
+           });
+      sub.module_expr sub module_expr;
+      sub.expr sub body
   | Texp_letexception (cd, exp) ->
       sub.extension_constructor sub cd;
       sub.expr sub exp
@@ -661,7 +671,7 @@ let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =
       sub.module_coercion sub c
   | Tmod_apply_unit (mexp1, _) ->
       sub.module_expr sub mexp1;
-  | Tmod_constraint (mexpr, _, Tmodtype_implicit, c) ->
+  | Tmod_constraint (mexpr, _, (Tmodtype_implicit | Tmodtype_package _), c) ->
       sub.module_expr sub mexpr;
       sub.module_coercion sub c
   | Tmod_constraint (mexpr, _, Tmodtype_explicit (mtype, ma), c) ->

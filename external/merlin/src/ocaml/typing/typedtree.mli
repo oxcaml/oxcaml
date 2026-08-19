@@ -708,9 +708,14 @@ and expression_desc =
   | Texp_setinstvar of Path.t * Path.t * string loc * expression
   | Texp_setmutvar of Ident.t loc * Jkind.sort * expression
   | Texp_override of Path.t * (Ident.t * string loc * expression) list
-  | Texp_letmodule of
-      Ident.t option * string option loc * Types.module_presence * module_expr *
-        expression
+  | Texp_letmodule of {
+      id : Ident.t option;
+      name : string option loc;
+      presence : Types.module_presence;
+      uid : Uid.t;
+      module_expr : module_expr;
+      body : expression;
+    }
   | Texp_letexception of extension_constructor * expression
   | Texp_assert of expression * Location.t
   | Texp_lazy of expression
@@ -1003,7 +1008,11 @@ and module_expr =
 (** Annotations for [Tmod_constraint]. *)
 and module_type_constraint =
   | Tmodtype_implicit
-  (** The module type constraint has been synthesized during typechecking. *)
+  | Tmodtype_package of {
+      package_module_type_path : Path.t;
+      (** The module type path named by the package type. This constraint allows
+          consumers to associate the check with the named module type declaration. *)
+    }
   | Tmodtype_explicit of module_type * Mode.Value.lr modes
   (** The module type was in the source file. *)
 
@@ -1141,6 +1150,7 @@ and module_coercion =
 and module_type =
   { mty_desc: module_type_desc;
     mty_type : Types.module_type;
+    mty_uid : Shape.Uid.t;
     mty_env : Env.t;
     mty_loc: Location.t;
     mty_attributes: attributes;
@@ -1540,6 +1550,7 @@ and jkind_declaration =
 type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;
+  ai_parameter_uid : Shape.Uid.t;
 }
 (** For a module [M] compiled with [-as-argument-for P] for some parameter
     module [P], the signature of [P] along with the coercion from [M]'s

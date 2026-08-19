@@ -259,7 +259,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
     Yielding.join [yielding funct_mode; yielding md_mode]
   in
   match Mtype.scrape_alias env mty with
-  | Mty_functor (Named (param, mty_param, mm_param),mty_result,mm_result)
+  | Mty_functor (Named (param, mty_param, _, mm_param),mty_result,mm_result)
     as mty_func ->
       let sg_param =
         match Mtype.scrape env mty_param with
@@ -551,7 +551,7 @@ let iterator_with_env super env =
       let env_before = !env in
       begin match param with
       | Unit -> ()
-      | Named (param, mty_arg, mm_arg) ->
+      | Named (param, mty_arg, _, mm_arg) ->
         self.Btype.it_module_type self mty_arg;
         let mode = Mode.(alloc_as_value mm_arg |> Value.disallow_right) in
         match param with
@@ -572,7 +572,7 @@ let retype_applicative_functor_type ~loc env funct arg =
   let mty_arg = (Env.find_module arg env).md_type in
   let mty_param =
     match Mtype.scrape_alias env mty_functor with
-    | Mty_functor (Named (_, mty_param, _), _, _) -> mty_param
+    | Mty_functor (Named (_, mty_param, _, _), _, _) -> mty_param
     | _ -> assert false (* could trigger due to MPR#7611 *)
   in
   Includemod.check_functor_application ~loc env mty_arg arg mty_param
@@ -789,12 +789,12 @@ and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
   | Mty_functor (param, mty, mm) ->
     let param : Types.functor_parameter =
       match param with
-      | Named (id, mty, mm) ->
+      | Named (id, mty, expectation, mm) ->
           let mty =
             remove_modality_and_zero_alloc_variables_mty env
               ~zap_modality:Mode.Modality.to_const_exn mty
           in
-          Named (id, mty, mm)
+          Named (id, mty, expectation, mm)
       | Unit -> Unit
     in
     let mty =
@@ -1492,7 +1492,7 @@ let rec approx_modtype env smty =
           let marg = Alloc.of_const marg in
           let arg = approx_modtype env sarg in
           match param.txt with
-          | None -> Types.Named (None, arg, marg), env
+          | None -> Types.Named (None, arg, None, marg), env
           | Some name ->
             let rarg = Mtype.scrape_for_functor_arg env arg in
             let mode = alloc_as_value marg in
@@ -1500,7 +1500,7 @@ let rec approx_modtype env smty =
             let (id, newenv) =
               Env.enter_module ~scope ~arg:true name Mp_present rarg ~mode env
             in
-            Types.Named (Some id, arg, marg), newenv
+            Types.Named (Some id, arg, None, marg), newenv
       in
       let res = approx_modtype newenv sres in
       let {mode_modes = mres} = Typemode.transl_alloc_mode mres in
@@ -2037,10 +2037,14 @@ let transl_module_alias loc env lid =
   let path, _ = Env.lookup_module_path ~load:false ~loc lid env in
   path
 
-let mkmty desc typ env loc attrs =
+let mkmty ?uid desc typ env loc attrs =
   let mty = {
     mty_desc = desc;
     mty_type = typ;
+    mty_uid =
+      (match uid with
+       | Some uid -> uid
+       | None -> Uid.mk ~current_unit:(Env.get_current_unit ()));
     mty_loc = loc;
     mty_env = env;
     mty_attributes = attrs;
@@ -2068,7 +2072,14 @@ and transl_modtype_aux env smty =
   match smty.pmty_desc with
     Pmty_ident lid ->
       let path = transl_modtype_longident loc env lid.txt in
-      mkmty (Tmty_ident (path, lid)) (Mty_ident path) env loc
+      (* Read the uid off the lazy declaration: forcing it here would defeat
+         the laziness of module type declarations. *)
+      let uid =
+        match Env.find_modtype_lazy path env with
+        | { mtd_uid; _ } -> Some mtd_uid
+        | exception Not_found -> None
+      in
+      mkmty ?uid (Tmty_ident (path, lid)) (Mty_ident path) env loc
         smty.pmty_attributes
   | Pmty_alias lid ->
       let path = transl_module_alias loc env lid.txt in
@@ -2109,7 +2120,8 @@ and transl_modtype_aux env smty =
               in
               Some id, newenv
           in
-          Named (id, param, arg, tmarg), Types.Named (id, arg.mty_type, marg),
+          Named (id, param, arg, tmarg),
+          Types.Named (id, arg.mty_type, Some arg.mty_uid, marg),
           newenv
       in
       let res = transl_modtype newenv sres in
@@ -2808,8 +2820,8 @@ let rec nongen_modtype env f g = function
       let env =
         match arg_opt with
         | Unit
-        | Named (None, _, _) -> env
-        | Named (Some id, param, mm_param) ->
+        | Named (None, _, _, _) -> env
+        | Named (Some id, param, _, mm_param) ->
             let mode =
               Mode.(mm_param |> alloc_as_value |> Value.disallow_right)
             in
@@ -2866,7 +2878,7 @@ let remove_functor_mode_variables = function
       Mode.Alloc.zap_to_legacy mres |> ignore;
       begin match arg_opt with
       | Unit -> ()
-      | Named (_, _, marg) -> Mode.Alloc.zap_to_legacy marg |> ignore
+      | Named (_, _, _, marg) -> Mode.Alloc.zap_to_legacy marg |> ignore
       end
   | _ -> ()
 
@@ -3321,7 +3333,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
               in
               Some id, newenv, id
           in
-          Named (id, param, mty, tmode), Types.Named (id, mty.mty_type, mode),
+          Named (id, param, mty, tmode),
+          Types.Named (id, mty.mty_type, Some mty.mty_uid, mode),
           newenv, var, true
       in
 
@@ -3337,7 +3350,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
        | Mty_functor _ ->
          (match ty_arg with
           | Unit -> ()
-          | Named (_, _, param_mode) ->
+          | Named (_, _, _, param_mode) ->
             Alloc.submode_exn (Alloc.close_over param_mode) ret_mode);
          Alloc.submode_exn (Alloc.partial_apply alloc_mode) ret_mode
        | _ -> ());
@@ -3607,7 +3620,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         mod_attributes = app_view.attributes;
         mod_loc = funct.mod_loc },
       Shape.app funct_shape ~arg:Shape.dummy_mod
-  | Mty_functor (Named (param, mty_param, mm_param), mty_res, mm_res)
+  | Mty_functor
+      (Named (param, mty_param, _param_uid, mm_param), mty_res, mm_res)
       as mty_functor ->
       let mm_param = alloc_as_value mm_param in
       let mm_res = alloc_as_value mm_res in
@@ -4523,7 +4537,8 @@ let type_package env m pack =
     fl';
   let _, mode = register_allocation modl.mod_loc in
   let modl =
-    wrap_constraint_package env true modl mty mode Tmodtype_implicit
+    wrap_constraint_package env true modl mty mode
+      (Tmodtype_package { package_module_type_path = pack.pack_path })
   in
   modl, {pack with pack_cstrs = fl'}
 
@@ -4637,24 +4652,116 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
         Includemod.compunit_as_argument
           env sourcefile ~modes actual_sig arg_filename arg_sig
       in
-      Some { ai_signature = arg_sig;
-             ai_coercion_from_primary = coercion;
-           }
+      Some
+        { ai_signature = arg_sig;
+          ai_coercion_from_primary = coercion;
+          ai_parameter_uid =
+            Uid.of_compilation_unit_id (Unit_info.Artifact.modname arg_cmi)
+        }
+
+let module_implementation_facts ~unit_interface ~argument_interface
+    compilation_unit (annots : Cmt_format.binary_annots)
+    declaration_dependencies =
+  match annots with
+  | Cmt_format.Packed _ | Partial_implementation _ | Partial_interface _ ->
+    None
+  | Interface signature ->
+    let argument_interface =
+      Option.map
+        (fun ({ ai_parameter_uid; _ } : Typedtree.argument_interface) ->
+          ai_parameter_uid)
+        argument_interface
+    in
+    Some
+      (Module_implementation_facts.of_interface compilation_unit
+         ~argument_interface signature)
+  | Implementation structure ->
+    let module_uids = ref Uid.Set.empty in
+    let modtype_uids = ref Uid.Set.empty in
+    Cmt_format.iter_declarations annots
+      ~f:(fun uid declaration ->
+        match declaration with
+        | Module _ | Module_binding _ ->
+          module_uids := Uid.Set.add uid !module_uids
+        | Module_type _ -> modtype_uids := Uid.Set.add uid !modtype_uids
+        | Value _ | Value_binding _ | Type _ | Constructor _
+        | Extension_constructor _ | Label _ | Module_substitution _ | Class _
+        | Class_type _ | Jkind _ ->
+          ());
+    let current_comp_unit =
+      Compilation_unit.full_path_as_string compilation_unit
+    in
+    (* Only this unit's own [.mli] items: an ascription can mention a module
+       type from another unit's interface. *)
+    let is_interface_item (uid : Uid.t) =
+      match uid with
+      | Item { comp_unit; from = Unit_info.Intf; _ } ->
+        String.equal comp_unit current_comp_unit
+      | Compilation_unit _ | Item _ | Internal | Predef _
+      | Unboxed_version _ -> false
+    in
+    let interface_pairs uids =
+      List.filter_map
+        (fun (kind, implementation, interface) ->
+          match (kind : Cmt_format.dependency_kind) with
+          | Definition_to_declaration
+            when Uid.Set.mem implementation uids
+                 && is_interface_item interface ->
+            Some (implementation, interface)
+          | Definition_to_declaration | Declaration_to_declaration -> None)
+        declaration_dependencies
+    in
+    let argument_interface =
+      Option.map
+        (fun ({ ai_parameter_uid; _ } : Typedtree.argument_interface) ->
+          ai_parameter_uid)
+        argument_interface
+    in
+    Some
+      (Module_implementation_facts.of_implementation compilation_unit
+         ~module_pairs:(interface_pairs !module_uids)
+         ~modtype_pairs:(interface_pairs !modtype_uids)
+         ~unit_interface_check:unit_interface ~argument_interface structure)
+
+(* [Cmt_format.save_cmt] and [Cms_format.save_cms] drop the facts unless they
+   actually write their artifact, so don't traverse the typedtree when neither
+   will. *)
+let module_implementation_facts_if_saved ~unit_interface ~argument_interface
+    compilation_unit annots declaration_dependencies =
+  if (!Clflags.binary_annotations || !Clflags.binary_annotations_cms)
+     && not !Clflags.print_types
+  then
+    module_implementation_facts ~unit_interface ~argument_interface
+      compilation_unit annots declaration_dependencies
+  else None
 
 let type_implementation target modulename initial_env ast =
   let sourcefile = Unit_info.original_source_file target in
   let error e =
     raise (Error (Location.in_file sourcefile, initial_env, e))
   in
-  let save_cmt_and_cms target annots initial_env cmi shape =
+  let save_cmt_and_cms ~unit_interface ?argument_interface
+      target annots initial_env cmi shape =
       let decl_deps =
         (* This is cleared after saving the cmt so we have to save is before *)
         Cmt_format.get_declaration_dependencies ()
       in
+    let facts =
+      module_implementation_facts_if_saved ~unit_interface ~argument_interface
+        modulename annots decl_deps
+    in
     Cmt_format.save_cmt (Unit_info.cmt target) modulename
-      annots initial_env cmi shape;
+      annots initial_env cmi shape facts;
     Cms_format.save_cms (Unit_info.cms target) modulename
+<<<<<<< Merlin:ggray/mti/dev
       annots initial_env shape decl_deps;
+||||||| Compiler:last-imported
+      annots initial_env shape decl_deps;
+    gen_annot target annots;
+=======
+      annots initial_env shape decl_deps facts;
+    gen_annot target annots;
+>>>>>>> Compiler:HEAD
   in
   Cmt_format.clear ();
   Cms_format.clear ();
@@ -4776,9 +4883,22 @@ let type_implementation target modulename initial_env ast =
           (* It is important to run these checks after the inclusion test above,
              so that value declarations which are not used internally but
              exported are not reported as being unused. *)
+<<<<<<< Merlin:ggray/mti/dev
           let shape = Shape_reduce.local_reduce Env.empty shape in
           let annots = Cmt_format.Implementation str in
           save_cmt_and_cms target annots initial_env None (Some shape);
+||||||| Compiler:last-imported
+          Profile.record_call "save_cmt" (fun () ->
+            let shape = Shape_reduce.local_reduce Env.empty shape in
+            let annots = Cmt_format.Implementation str in
+            save_cmt_and_cms target annots initial_env None (Some shape));
+=======
+          Profile.record_call "save_cmt" (fun () ->
+            let shape = Shape_reduce.local_reduce Env.empty shape in
+            let annots = Cmt_format.Implementation str in
+            save_cmt_and_cms ~unit_interface:true ?argument_interface
+              target annots initial_env None (Some shape));
+>>>>>>> Compiler:HEAD
           { structure = str;
             coercion;
             shape;
@@ -4839,7 +4959,8 @@ let type_implementation target modulename initial_env ast =
             in
             Profile.record_call "save_cmt" (fun () ->
               let annots = Cmt_format.Implementation str in
-              save_cmt_and_cms target annots initial_env (Some cmi) (Some shape));
+              save_cmt_and_cms ~unit_interface:false ?argument_interface
+                target annots initial_env (Some cmi) (Some shape));
           end;
           { structure = str;
             coercion;
@@ -4851,22 +4972,44 @@ let type_implementation target modulename initial_env ast =
       end
     )
     ~exceptionally:(fun () ->
+<<<<<<< Merlin:ggray/mti/dev
         let annots =
           Cmt_format.Partial_implementation
             (Array.of_list (Cmt_format.get_saved_types ()))
         in
         save_cmt_and_cms target annots initial_env None None
+||||||| Compiler:last-imported
+        Profile.record_call "save_cmt" (fun () ->
+          let annots =
+            Cmt_format.Partial_implementation
+              (Array.of_list (Cmt_format.get_saved_types ()))
+          in
+          save_cmt_and_cms target annots initial_env None None)
+=======
+        Profile.record_call "save_cmt" (fun () ->
+          let annots =
+            Cmt_format.Partial_implementation
+              (Array.of_list (Cmt_format.get_saved_types ()))
+          in
+          save_cmt_and_cms ~unit_interface:false target annots initial_env
+            None None)
+>>>>>>> Compiler:HEAD
       )
 
-let save_signature target modname tsg initial_env cmi =
+let save_signature ?argument_interface target modname tsg initial_env cmi =
   let decl_deps =
     (* This is cleared after saving the cmt so we have to save is before *)
     Cmt_format.get_declaration_dependencies ()
   in
+  let annots = Cmt_format.Interface tsg in
+  let facts =
+    module_implementation_facts_if_saved ~unit_interface:false
+      ~argument_interface modname annots decl_deps
+  in
   Cmt_format.save_cmt (Unit_info.cmti target) modname
-    (Cmt_format.Interface tsg) initial_env (Some cmi) None;
-  Cms_format.save_cms  (Unit_info.cmsi target) modname
-    (Cmt_format.Interface tsg) initial_env None decl_deps
+    annots initial_env (Some cmi) None facts;
+  Cms_format.save_cms (Unit_info.cmsi target) modname
+    annots initial_env None decl_deps facts
 
 let cms_register_toplevel_signature_attributes ~sourcefile ~uid ast =
   cms_register_toplevel_attributes ~sourcefile ~uid ast.psg_items
@@ -4894,10 +5037,11 @@ let type_interface ~sourcefile modulename env ast =
     |> Option.map Global_module.Parameter_name.of_string
   in
   let actual_staticity = staticity_of_modalities sg.sig_modalities in
-  ignore (check_argument_type_if_given env sourcefile ~actual_staticity
-            sg.sig_type arg_type
-          : Typedtree.argument_interface option);
-  sg
+  let argument_interface =
+    check_argument_type_if_given env sourcefile ~actual_staticity sg.sig_type
+      arg_type
+  in
+  sg, argument_interface
 
 (* "Packaging" of several compilation units into one unit
    having them as sub-modules.  *)
@@ -4994,10 +5138,15 @@ let package_units initial_env objfiles target_cmi modulename =
       (* This is cleared after saving the cmt so we have to save is before *)
       Cmt_format.get_declaration_dependencies ()
     in
-    Cmt_format.save_cmt  (Unit_info.companion_cmt target_cmi) modulename
-      (Cmt_format.Packed (sg, objfiles)) initial_env  None (Some shape);
-    Cms_format.save_cms  (Unit_info.companion_cms target_cmi) modulename
-      (Cmt_format.Packed (sg, objfiles)) initial_env (Some shape) decl_deps;
+    let annots = Cmt_format.Packed (sg, objfiles) in
+    let facts =
+      module_implementation_facts_if_saved ~unit_interface:true
+        ~argument_interface:None modulename annots decl_deps
+    in
+    Cmt_format.save_cmt (Unit_info.companion_cmt target_cmi) modulename
+      annots initial_env None (Some shape) facts;
+    Cms_format.save_cms (Unit_info.companion_cms target_cmi) modulename
+      annots initial_env (Some shape) decl_deps facts;
     cc
   end else begin
     (* Determine imports *)
@@ -5028,10 +5177,15 @@ let package_units initial_env objfiles target_cmi modulename =
         (* This is cleared after saving the cmt so we have to save is before *)
         Cmt_format.get_declaration_dependencies ()
       in
-      Cmt_format.save_cmt (Unit_info.companion_cmt target_cmi)  modulename
-        (Cmt_format.Packed (sign, objfiles)) initial_env (Some cmi) (Some shape);
-      Cms_format.save_cms (Unit_info.companion_cms target_cmi)  modulename
-        (Cmt_format.Packed (sign, objfiles)) initial_env (Some shape) decl_deps;
+      let annots = Cmt_format.Packed (sign, objfiles) in
+      let facts =
+        module_implementation_facts_if_saved ~unit_interface:false
+          ~argument_interface:None modulename annots decl_deps
+      in
+      Cmt_format.save_cmt (Unit_info.companion_cmt target_cmi) modulename
+        annots initial_env (Some cmi) (Some shape) facts;
+      Cms_format.save_cms (Unit_info.companion_cms target_cmi) modulename
+        annots initial_env (Some shape) decl_deps facts;
     end;
     Tcoerce_none
   end
