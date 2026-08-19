@@ -146,6 +146,10 @@ let
           _: osuper: {
             dune_3 = dune;
 
+            # ounit2's own test suite has a flaky threads test that can hit
+            # its 600s timeout on loaded CI runners; skip upstream's tests.
+            ounit2 = osuper.ounit2.overrideAttrs (_: { doCheck = false; });
+
             # Merlin relies on generated parser sources matching this version.
             menhirLib = osuper.menhirLib.overrideAttrs (_: {
               version = menhirVersion;
