@@ -235,10 +235,9 @@ type 'a opaque
 Lines 2-3, characters 0-53:
 2 | type 'a at : value mod portable =
 3 |   | K : ('b : value mod portable). 'b opaque -> 'b at
-Error: The kind of type "at" is immutable_data with ('a @@ portable) opaque
-         because it's a boxed variant type.
-       But the kind of type "at" must be a subkind of value mod portable
-         because of the annotation on the declaration of the type at.
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because opaque is not mod portable.
 |}]
 
 type 'a mbox = { mutable yy : 'a }
@@ -249,14 +248,9 @@ type 'a mbox = { mutable yy : 'a; }
 Lines 2-3, characters 0-52:
 2 | type 'a ct : value mod contended =
 3 |   | K : ('b : value mod contended). 'b mbox -> 'b ct
-Error: The kind of type "ct" is
-           mutable_data with 'a @@ forkable unyielding many
-         because it's a boxed variant type.
-       But the kind of type "ct" must be a subkind of value mod contended
-         because of the annotation on the declaration of the type ct.
-
-       The first mode-crosses less than the second along:
-         contention: mod uncontended ≰ mod contended
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
+       because mbox is not mod contended.
 |}]
 
 type 'a nt2 = Kbox : ('b : value mod portable). 'b box -> 'b nt2
