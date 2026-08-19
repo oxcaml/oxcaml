@@ -3077,10 +3077,11 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
 
        rtjoa: let's add [need_layout] as a new commit
 
-       aide: Added as "Add need_layout to skip tuple layouts for bounds-only
-       uses": it threads from [type_jkind] down to this estimate, and the
-       normalize contexts ([mk_jkind_context_check_principal] and friends)
-       pass [false], since their one consumer reads only the bounds.
+       aide: Added as "Response: Add need_layout to skip tuple layouts for
+       bounds-only uses" at the tip: it threads from [type_jkind] down to
+       this estimate, and the normalize contexts
+       ([mk_jkind_context_check_principal] and friends) pass [false],
+       since their one consumer reads only the bounds.
 
        rtjoa: need_layout shouldn't be oaptional. Is it ever the case that
        expand_components is true but need_layout is false?
@@ -3185,7 +3186,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
       (incr_stage env) ty
     |> Jkind.map_type_expr new_quote_ty
   | Tbox payload ->
-    (* CR rtjoa: What happens if we just use [any box] here?
+    (* XCR rtjoa: What happens if we just use [any box] here?
 
        aide: Checks of a box type against a box kind with a real payload
        fail: [box] is free, so [any box <= value box] does not hold, and
@@ -3199,12 +3200,23 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
        coherent alternative - see the sibling CR on [Ttuple].
 
        rtjoa: should we add a box-vs-box-constrain step? draft this on the tip
-       and see if we can simplify both this and ttuple *)
-    Jkind.for_box
-      ~payload_layout:
-        (estimate_type_layout ~expand_components env ~visited:[get_id ty]
-           payload)
-      payload
+       and see if we can simplify both this and ttuple
+
+       aide: Drafted, in this commit: the cheap path now estimates
+       [any box] like [Ttuple]'s, and a [Tbox] case in
+       [constrain_type_jkind]'s fallback re-estimates the payload layout
+       and retries when a check needs it (guarded against re-firing when
+       the payload's layout really is [any]). Declarations keep the
+       eager estimate for the same reason tuples do: inclusion compares
+       stored decl jkinds without revisiting the type. *)
+    let payload_layout =
+      if expand_components && need_layout
+      then
+        estimate_type_layout ~expand_components env ~visited:[get_id ty]
+          payload
+      else Jkind.Layout.Any Jkind_types.Scannable_axes.max
+    in
+    Jkind.for_box ~payload_layout payload
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -3678,7 +3690,31 @@ let constrain_type_jkind ~fixed env ty jkind =
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
-          (* CR rtjoa: why no Tbox case? *)
+          (* XCR rtjoa: why no Tbox case?
+
+             aide: Added below, making the box type's estimate lazy like the
+             tuple's. *)
+          | Tbox payload ->
+            (* The cheap box estimate is [any box] (see
+               [estimate_type_jkind]); estimate the payload layout and retry
+               when a check needs it. Retry only when that layout is not
+               [any], so this fires at most once. *)
+            let error () =
+              Error (Jkind.Violation.of_ ~context env
+                  (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+            in
+            (match Jkind.extract_layout env ty's_jkind with
+             | Ok (Box (Any _, _)) -> (
+               let payload_layout =
+                 estimate_type_layout ~expand_components:false env
+                   ~visited:[get_id ty] payload
+               in
+               match payload_layout with
+               | Any _ -> error ()
+               | Sort _ | Product _ | Addressable _ | Box _ ->
+                 let ty's_jkind = Jkind.for_box ~payload_layout payload in
+                 loop ~fuel ~expanded env ty ty's_jkind jkind)
+             | _ -> error ())
           | Ttuple ltys ->
             (* The cheap tuple estimate is [any box] (see
                [estimate_type_jkind]); estimate the component layouts and
