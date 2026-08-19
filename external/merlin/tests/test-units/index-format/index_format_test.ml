@@ -1,7 +1,3 @@
-(* Tests for the module facts channel of index files: the compact codec, the
-   reader that folds facts over a set of index files, and the readability of
-   index files written before the channel existed. *)
-
 open Merlin_index_format
 module Facts = Module_implementation_facts
 
@@ -126,18 +122,21 @@ let index_of_facts ~facts ~present : Index_format.index =
     stats = Index_format.Stats.empty;
     root_directory = None;
     related_uids = Index_format.Uid_map.empty ();
-    module_facts = Index_format.inline_module_facts facts;
-    module_facts_present = present
+    module_facts =
+      if present then Some (Index_format.inline_module_facts facts) else None
   }
 
 let facts_of_index (index : Index_format.index) =
-  match
-    Module_facts_compact.to_facts
-      (Index_format.module_facts_block index.module_facts)
-  with
-  | Ok facts -> facts
-  | Error message ->
-    Alcotest.failf "cannot decode the written facts: %s" message
+  match index.module_facts with
+  | None -> Alcotest.fail "the index does not contain module facts"
+  | Some module_facts -> (
+    match
+      Module_facts_compact.to_facts
+        (Index_format.module_facts_block module_facts)
+    with
+    | Ok facts -> facts
+    | Error message ->
+      Alcotest.failf "cannot decode the written facts: %s" message)
 
 let check_facts message expected actual =
   Alcotest.check Alcotest.int message 0 (Facts.compare expected actual)
@@ -230,64 +229,38 @@ let test_writer_roundtrip =
     `Quick (fun () ->
       with_files 2 (fun files ->
           let present_file = List.nth files 0 in
-          let partial_file = List.nth files 1 in
+          let absent_file = List.nth files 1 in
           let facts = sample_facts () in
           write_facts ~file:present_file facts;
-          write_facts ~file:partial_file ~present:false facts;
+          write_facts ~file:absent_file ~present:false facts;
           let present = Index_format.read_exn ~file:present_file in
-          let partial = Index_format.read_exn ~file:partial_file in
-          Alcotest.check Alcotest.bool "complete facts stay complete" true
-            present.module_facts_present;
-          Alcotest.check Alcotest.bool "partial facts stay partial" false
-            partial.module_facts_present;
+          let absent = Index_format.read_exn ~file:absent_file in
+          Alcotest.check Alcotest.bool "present facts stay present" true
+            (Option.is_some present.module_facts);
+          Alcotest.check Alcotest.bool "absent facts stay absent" true
+            (Option.is_none absent.module_facts);
           check_facts "the facts survive the roundtrip" facts
-            (facts_of_index present);
-          check_facts "partiality does not drop the facts" facts
-            (facts_of_index partial)))
-
-let test_v0_compatibility =
-  Alcotest.test_case "index files without a facts channel are still readable"
-    `Quick (fun () ->
-      with_files 1 (fun files ->
-          let file = List.hd files in
-          Index_format.For_testing.write_v0 ~file
-            (index_of_facts ~facts:(sample_facts ()) ~present:true);
-          let channel = open_in_bin file in
-          let magic =
-            Fun.protect
-              ~finally:(fun () -> close_in channel)
-              (fun () ->
-                really_input_string channel
-                  (String.length Index_format.For_testing.magic_number_v0))
-          in
-          Alcotest.check Alcotest.string "the old magic number is used"
-            Index_format.For_testing.magic_number_v0 magic;
-          Alcotest.check Alcotest.bool "the new magic number differs" false
-            (String.equal Index_format.magic_number
-               Index_format.For_testing.magic_number_v0);
-          let index = Index_format.read_exn ~file in
-          Alcotest.check Alcotest.bool "the facts are known to be missing" false
-            index.module_facts_present;
-          check_facts "no facts are invented" Facts.empty (facts_of_index index)))
+            (facts_of_index present)))
 
 let test_reader_status =
   Alcotest.test_case "the reader reports what it could and could not read"
     `Quick (fun () ->
       with_files 4 (fun files ->
           let good = List.nth files 0 in
-          let partial = List.nth files 1 in
+          let absent = List.nth files 1 in
           let missing = List.nth files 2 in
           let malformed = List.nth files 3 in
           let facts = sample_facts () in
           let more_facts = other_facts () in
           write_facts ~file:good facts;
-          write_facts ~file:partial ~present:false more_facts;
+          write_facts ~file:absent ~present:false more_facts;
           Sys.remove missing;
           Index_format.write ~file:malformed
             { (index_of_facts ~facts:Facts.empty ~present:true) with
               module_facts =
-                Index_format.link_module_facts
-                  { Module_facts_compact.empty with version = 99 }
+                Some
+                  (Index_format.link_module_facts
+                     { Module_facts_compact.empty with version = 99 })
             };
           let loaded, status = Module_facts_reader.load ~index_files:[ good ] in
           check_facts "a single index loads its facts" facts loaded;
@@ -300,14 +273,12 @@ let test_reader_status =
           Alcotest.check Alcotest.int "nothing went wrong" 0
             (List.length status.problems);
           let loaded, status =
-            Module_facts_reader.load ~index_files:[ good; partial ]
+            Module_facts_reader.load ~index_files:[ good; absent ]
           in
-          check_facts "partial channels still contribute their facts"
-            (Facts.merge facts more_facts)
-            loaded;
-          Alcotest.check Alcotest.bool "a partial channel taints the answer"
+          check_facts "absent channels do not contribute facts" facts loaded;
+          Alcotest.check Alcotest.bool "an absent channel taints the answer"
             false status.facts_present;
-          Alcotest.check Alcotest.int "both channels were loaded" 2
+          Alcotest.check Alcotest.int "one channel was loaded" 1
             status.channels_loaded;
           let loaded, status =
             Module_facts_reader.load ~index_files:[ good; missing ]
@@ -332,13 +303,13 @@ let test_reader_status =
             Alcotest.failf "expected one malformed file, got %d"
               (List.length problems));
           let paths, status =
-            Module_facts_reader.fold ~index_files:[ good; partial ] ~init:[]
+            Module_facts_reader.fold ~index_files:[ good; absent ] ~init:[]
               ~f:(fun paths ~path (_ : Facts.t) ->
                 Filename.basename path :: paths)
           in
-          Alcotest.check Alcotest.int "every source is visited once" 2
+          Alcotest.check Alcotest.int "the present source is visited once" 1
             (List.length paths);
-          Alcotest.check Alcotest.int "both sources were folded" 2
+          Alcotest.check Alcotest.int "one source was folded" 1
             status.sources_folded;
           let count, status =
             Module_facts_reader.fold ~index_files:[] ~init:0
@@ -356,7 +327,6 @@ let () =
           test_malformed_blocks;
           test_malformed_integers;
           test_writer_roundtrip;
-          test_v0_compatibility;
           test_reader_status
         ] )
     ]

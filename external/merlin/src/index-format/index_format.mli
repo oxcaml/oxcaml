@@ -27,7 +27,6 @@ type module_facts = Module_facts_compact.t Granular_marshal.link
 val module_facts_block : module_facts -> Module_facts_compact.t
 val link_module_facts : Module_facts_compact.t -> module_facts
 val inline_module_facts : Module_implementation_facts.t -> module_facts
-val empty_module_facts : unit -> module_facts
 
 type stat = { mtime : float; size : int; source_digest : string option }
 
@@ -38,10 +37,7 @@ type index =
     stats : stat Stats.t;
     root_directory : string option;
     related_uids : Union_find.t Uid_map.t;
-    module_facts : module_facts;
-    (* [module_facts_present] is [false] when some input that contributed to
-       this index did not carry facts, so the facts are known to be partial. *)
-    module_facts_present : bool
+    module_facts : module_facts option;
   }
 
 val pp : Format.formatter -> index -> unit
@@ -60,13 +56,3 @@ val write : file:string -> index -> unit
 val read : file:string -> file_content
 
 val read_exn : file:string -> index
-
-module For_testing : sig
-  (** The magic number of index files written before the module facts channel
-      was added. *)
-  val magic_number_v0 : string
-
-  (** Write [index] in the pre-facts layout, dropping its facts. Only used to
-      test that such files are still readable. *)
-  val write_v0 : file:string -> index -> unit
-end
