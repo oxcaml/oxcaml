@@ -66,8 +66,10 @@ let repack (module X : S) = (module X : S)
       module_expr =
         (fun iterator (expression : Typedtree.module_expr) ->
           (match expression.mod_desc with
-           | Tmod_constraint (_, _, Tmodtype_package path, _) ->
-               Printf.printf "package constraint: %s\n" (Path.name path)
+           | Tmod_constraint
+               (_, _, Tmodtype_package { package_module_type_path }, _) ->
+               Printf.printf "package constraint: %s\n"
+                 (Path.name package_module_type_path)
            | Tmod_constraint
                (_, _, (Tmodtype_implicit | Tmodtype_explicit _), _)
            | Tmod_structure _ | Tmod_ident _ | Tmod_functor _ | Tmod_apply _
