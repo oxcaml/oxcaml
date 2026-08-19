@@ -4421,7 +4421,7 @@ let type_package env m pack =
   let _, mode = register_allocation modl.mod_loc in
   let modl =
     wrap_constraint_package env true modl mty mode
-      (Tmodtype_package pack.pack_path)
+      (Tmodtype_package { package_module_type_path = pack.pack_path })
   in
   modl, {pack with pack_cstrs = fl'}
 

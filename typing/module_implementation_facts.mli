@@ -28,14 +28,34 @@ module Context : sig
   val print : Format.formatter -> t -> unit
 end
 
+(* [Key]s identify specific instances of module-type nodes. Consider:
+
+   {[module type S = sig
+       module type T
+     end
+
+     module F (_ : sig end) : S = struct
+       module type T = sig end
+     end
+
+     module A = struct end
+     module B = struct end
+
+     module FA = F(A)
+     module FB = F(B)]}
+
+   In this example [FA.T] and [FB.T] are distinct module type
+   instances, but they both are checked as [T], which is their family. *)
 module Key : sig
+  (** Uniquely identifies a module-type node *)
   type t =
     | Named of
         { context : Context.t;
+            (** The location of this specific module-type occurrence *)
           family_uid : Shape.Uid.t
+            (** The original module-type declaration *)
         }
     | Anon of { key_uid : Shape.Uid.t }
-        (** Uniquely identifies a module-type node *)
 
   val compare : t -> t -> int
 
@@ -47,10 +67,10 @@ module Key : sig
 end
 
 module Node : sig
+  (** Identifies the implementation module of a check *)
   type t =
     | Uid of Shape.Uid.t
     | Location of Compilation_unit.t * Location.t
-        (** Identifies the implemntation module of a check *)
 
   val compare : t -> t -> int
 end

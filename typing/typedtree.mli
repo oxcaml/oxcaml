@@ -1004,9 +1004,11 @@ and module_expr =
 (** Annotations for [Tmod_constraint]. *)
 and module_type_constraint =
   | Tmodtype_implicit
-  (** The module type constraint has been synthesized during typechecking. *)
-  | Tmodtype_package of Path.t
-  (** The constraint comes from the module type of a first-class module. *)
+  | Tmodtype_package of {
+      package_module_type_path : Path.t;
+      (** The module type path named by the package type. This constraint allows
+          consumers to associate the check with the named module type declaration. *)
+    }
   | Tmodtype_explicit of module_type * Mode.Value.lr modes
   (** The module type was in the source file. *)
 
