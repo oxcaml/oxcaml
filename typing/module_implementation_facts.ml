@@ -1637,7 +1637,7 @@ let facts_of_tree compilation_unit artifact iterate =
               lid.txt
           | _ -> ());
           match expression.exp_desc with
-          | Texp_letmodule (Some _, _, _, uid, module_expr, _) ->
+          | Texp_letmodule { id = Some _; uid; module_expr; _ } ->
             record_module_context uid (Context.Proj (enclosing_context (), uid));
             add_binding uid module_expr;
             with_enclosing (functor_body_context uid module_expr) (fun () ->

@@ -761,7 +761,7 @@ let expression sub exp =
         Pexp_override (List.map (fun (_path, lid, exp) ->
               (map_loc sub lid, sub.expr sub exp)
           ) list)
-    | Texp_letmodule (_id, name, _pres, _uid, mexpr, exp) ->
+    | Texp_letmodule { name; module_expr = mexpr; body = exp; _ } ->
         Pexp_letmodule (name, sub.module_expr sub mexpr,
           sub.expr sub exp)
     | Texp_letexception (ext, exp) ->
