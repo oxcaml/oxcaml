@@ -94,6 +94,68 @@ module Cols : sig
   val cf : ('a Cofield.Map.t, Cofield.t, 'a) Syntax.Column.id
 end
 
+module Maps : sig
+  module N : sig
+    type t = unit Code_id_or_name.Map.t
+
+    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+
+    val rename : t -> rename_id:(Code_id_or_name.t -> Code_id_or_name.t) -> t
+  end
+
+  module Nn : sig
+    type t = N.t Code_id_or_name.Map.t
+
+    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+
+    val rename : t -> rename_id:(Code_id_or_name.t -> Code_id_or_name.t) -> t
+  end
+
+  module Nnn : sig
+    type t = Nn.t Code_id_or_name.Map.t
+
+    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+
+    val rename : t -> rename_id:(Code_id_or_name.t -> Code_id_or_name.t) -> t
+  end
+
+  module Nf : sig
+    type t = unit Field.Map.t Code_id_or_name.Map.t
+
+    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+
+    val add_fields : t -> Field.Set.t -> Field.Set.t
+
+    val rename :
+      t ->
+      rename_id:(Code_id_or_name.t -> Code_id_or_name.t) ->
+      rename_field:(Field.t -> Field.t) ->
+      t
+  end
+
+  module Nfn : sig
+    type t = N.t Field.Map.t Code_id_or_name.Map.t
+
+    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+
+    val add_fields : t -> Field.Set.t -> Field.Set.t
+
+    val rename :
+      t ->
+      rename_id:(Code_id_or_name.t -> Code_id_or_name.t) ->
+      rename_field:(Field.t -> Field.t) ->
+      t
+  end
+
+  module Ncn : sig
+    type t = N.t Cofield.Map.t Code_id_or_name.Map.t
+
+    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+
+    val rename : t -> rename_id:(Code_id_or_name.t -> Code_id_or_name.t) -> t
+  end
+end
+
 val nrel :
   string -> ('a, 'b, unit) Syntax.Column.hlist -> ('a, 'b) Datalog.relation
 
