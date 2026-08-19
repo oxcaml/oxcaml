@@ -1925,7 +1925,7 @@ and transl_tupled_function
               let debug_uid =
                 Typecore.create_uid_for_pattern_kind Value_pattern_in_argument
               in
-              add_type_shapes_of_param ~env:arg_pat.pat_env
+              add_type_shapes_of_param ~env:first_case.c_lhs.pat_env
                 ~uid:debug_uid ~sort:Jkind.Sort.Const.for_tuple_element
                 ~type_expr:fld_pat.pat_type;
               {
