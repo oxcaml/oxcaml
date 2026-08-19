@@ -178,23 +178,40 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
        infer the tested temporary is equal to zero at the start of the block. *)
     (* CR-someday xclerc for xclerc: that could be extended to multiple
     predecessors, if all lead to the same inference. *)
+    (* A trap handler is entered through exceptional edges, on which the
+       predecessor's terminator has not been executed: no fact can be inferred
+       from that terminator. *)
     begin match Label.Set.cardinal block.predecessors with
-    | 1 ->
+    | 1 when not block.is_trap_handler ->
       let predecessor_block =
         Cfg.get_block_exn cfg (Label.Set.choose block.predecessors)
       in
       let predecessor_terminator = predecessor_block.terminator in
+      (* The terminator may clobber registers after having read its arguments
+         (e.g. `Switch` on amd64 uses rax and rdx as temporaries, and its
+         argument may itself live in one of them): a fact about a register
+         destroyed by the terminator does not hold at the start of the block. *)
+      let replace_unless_destroyed (reg : Reg.t) (value : known_value) =
+        let destroyed =
+          Proc.destroyed_at_terminator predecessor_terminator.desc
+        in
+        if not (Array.exists (fun (r : Reg.t) -> Reg.same_loc r reg) destroyed)
+        then replace reg value
+      in
       begin[@ocaml.warning "-4"] match predecessor_terminator.desc with
       | Truth_test { ifso; ifnot } ->
         if Label.equal ifnot block.start && not (Label.equal ifso ifnot)
-        then replace predecessor_block.terminator.arg.(0) (Const_int 0n)
+        then
+          replace_unless_destroyed
+            predecessor_block.terminator.arg.(0)
+            (Const_int 0n)
       | Int_test { lt; eq; gt; is_signed = Signed; imm = Some const } ->
         if
           Label.equal eq block.start
           && (not (Label.equal eq gt))
           && not (Label.equal eq lt)
         then
-          replace
+          replace_unless_destroyed
             predecessor_terminator.arg.(0)
             (Const_int (Nativeint.of_int const))
       | Switch labels ->
@@ -205,7 +222,7 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         begin match idx with
         | None -> ()
         | Some idx ->
-          replace
+          replace_unless_destroyed
             predecessor_terminator.arg.(0)
             (Const_int (Nativeint.of_int idx))
         end
