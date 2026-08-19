@@ -65,6 +65,17 @@ module Pat = struct
       pat_unique_barrier = Unique_barrier.not_computed ()
     }
 
+  let unboxed_tuple ?(loc = Location.none) pat_env pat_type lst =
+    let pat_desc = Tpat_unboxed_tuple lst in
+    { pat_desc;
+      pat_loc = loc;
+      pat_extra;
+      pat_attributes;
+      pat_type;
+      pat_env;
+      pat_unique_barrier = Unique_barrier.not_computed ()
+    }
+
   let construct ?(loc = Location.none) pat_env pat_type lid cstr_desc args
       locs_coretype =
     let pat_desc =
