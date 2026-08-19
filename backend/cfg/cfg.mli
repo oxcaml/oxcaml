@@ -141,7 +141,7 @@ type t =
         (** Whether the function needs a prologue, set by [Cfg_prologue]. *)
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
     next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
-    fun_ret_type : Cmm.machtype;
+    fun_ret_type : Cmm.result_type;
         (** Function return type. As in [fun_args], this value is not used when
             starting from Linear. *)
     fun_phantom_lets :
@@ -165,7 +165,7 @@ val create :
   fun_num_stack_slots:int Stack_class.Tbl.t ->
   fun_poll:Lambda.poll_attribute ->
   next_instruction_id:InstructionId.sequence ->
-  fun_ret_type:Cmm.machtype ->
+  fun_ret_type:Cmm.result_type ->
   fun_phantom_lets:
     (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t ->
   allowed_to_be_irreducible:bool ->

@@ -53,6 +53,11 @@ let machtype ppf mty =
       fprintf ppf "*%a" machtype_component mty.(i)
     done
 
+let result_type ppf (result_type : result_type) =
+  match result_type with
+  | Known mty -> machtype ppf mty
+  | Unknown -> fprintf ppf "unknown"
+
 let exttype ppf = function
   | XInt -> fprintf ppf "int"
   | XInt8 -> fprintf ppf "int8"
@@ -258,7 +263,7 @@ let static_cast : Cmm.static_cast -> string = function
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
 let operation d = function
-  | Capply { result_type = _ty; region = _; callees = _ } -> "app" ^ location d
+  | Capply { result_type = _; region = _; callees = _ } -> "app" ^ location d
   | Cextcall { func = lbl; _ } ->
     Printf.sprintf "extcall \"%s\"%s" lbl (location d)
   | Cload { memory_chunk; mutability; is_atomic } -> (
@@ -407,7 +412,7 @@ let rec expr ppf = function
         fprintf ppf "@[<2>(%s" (operation dbg op);
         List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
         (match[@warning "-4"] op with
-        | Capply { result_type = mty; _ } -> fprintf ppf "@ %a" machtype mty
+        | Capply { result_type = ty; _ } -> fprintf ppf "@ %a" result_type ty
         | Cextcall
             { ty;
               ty_args;
@@ -512,7 +517,7 @@ let fundecl ppf f =
   with_location_mapping ~label:"Function" ~dbg:f.fun_dbg ppf (fun () ->
       fprintf ppf "@[<1>(function%s%a@ %s@;<1 4>@[<1>(%a) : %a@]@ @[%a@] )@]@."
         (location f.fun_dbg) print_codegen_options f.fun_codegen_options
-        f.fun_name.sym_name print_cases f.fun_args machtype f.fun_ret_type
+        f.fun_name.sym_name print_cases f.fun_args result_type f.fun_ret_type
         sequence f.fun_body)
 
 let data_item ppf = function

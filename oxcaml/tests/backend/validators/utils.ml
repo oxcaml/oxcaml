@@ -96,8 +96,8 @@ module Cfg_desc = struct
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0)
         ~fun_poll:Lambda.Default_poll
         ~next_instruction_id:(InstructionId.make_sequence ())
-        ~fun_ret_type ~fun_phantom_lets:Backend_var.Map.empty
-        ~allowed_to_be_irreducible:false
+        ~fun_ret_type:(Cmm.Known fun_ret_type)
+        ~fun_phantom_lets:Backend_var.Map.empty ~allowed_to_be_irreducible:false
     in
     List.iter
       (fun (block : Block.t) ->

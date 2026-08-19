@@ -58,8 +58,7 @@ let get_func_decl_params_arity t code_id =
   let result_machtype =
     match Code_metadata.result_arity info with
     | Ok arity ->
-      C.extended_machtype_of_return_arity arity
-      |> C.Extended_machtype.change_tagged_int_to_val
+      C.Extended_result_type.Known (C.extended_machtype_of_return_arity arity)
     | Unknown | Bottom ->
       Misc.fatal_errorf "Cannot compile %a, whose result arity is %a, to Cmm"
         Code_id.print code_id Result_arity.print
@@ -579,8 +578,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let fun_ret_type =
     match Code_metadata.result_arity (Env.get_code_metadata env code_id) with
     | Ok arity ->
-      C.extended_machtype_of_return_arity arity
-      |> C.Extended_machtype.to_machtype
+      C.Extended_result_type.Known (C.extended_machtype_of_return_arity arity)
+      |> C.Extended_result_type.to_result_type
     | Unknown | Bottom ->
       Misc.fatal_errorf "Cannot compile %a, whose result arity is %a, to Cmm"
         Code_id.print code_id Result_arity.print
