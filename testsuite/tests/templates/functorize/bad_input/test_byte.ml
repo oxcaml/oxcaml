@@ -1,16 +1,20 @@
 (* TEST
  (* Invalid [-functorize] inputs — each must be a parameterised
-    compunit whose cmi is on the load path.  Three ways this fails:
+    compunit whose cmi is on the load path, given once.  Four ways this
+    fails:
 
     1. Parameter module ([-as-parameter]): cmi's [cu] is [None].
     2. Plain module (no [-parameter]): [params] is empty.
     3. Missing cmi: [Persistent_env.Cmi_not_found] rather than a raw
-       [Not_found]. *)
+       [Not_found].
+    4. Duplicate input, caught by [validate_inputs] before any cmi is
+       loaded. *)
 
  readonly_files = "\
    bad_param_input.reference \
    bad_plain_input.reference \
    bad_input_cmi_not_found.reference \
+   bad_dup_input.reference \
  ";
 
  setup-ocamlc.byte-build-env;
@@ -91,6 +95,19 @@
    ocamlc.byte;
 
    compiler_reference = "bad_input_cmi_not_found.reference";
+   check-ocamlc.byte-output;
+ }{
+   (* Case 4: duplicate input [-functorize Basic Basic]. *)
+
+   flags = "$flg -functorize Basic Basic";
+   module = "";
+   program = "bundle/bundle.cmo";
+   all_modules = "";
+   ocamlc_byte_exit_status = "2";
+   compiler_output = "bad_dup_input.output";
+   ocamlc.byte;
+
+   compiler_reference = "bad_dup_input.reference";
    check-ocamlc.byte-output;
  }
 *)
