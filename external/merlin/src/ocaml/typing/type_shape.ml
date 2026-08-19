@@ -353,8 +353,8 @@ module Type_decl_shape = struct
       Layout.Product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
 
-  let of_complex_constructor type_subst name
-      (cstr_args : Types.constructor_declaration) arg_layout shape_for_constr =
+  let of_constructor type_subst name (cstr_args : Types.constructor_declaration)
+      arg_layout shape_for_constr =
     let args =
       match cstr_args.cd_args with
       | Cstr_tuple list ->
@@ -494,8 +494,7 @@ module Type_decl_shape = struct
             List.map
               (fun ((cstr, arg_layouts) : Types.constructor_declaration * _) ->
                 let name = Ident.name cstr.cd_id in
-                of_complex_constructor type_subst name cstr arg_layouts
-                  shape_for_constr)
+                of_constructor type_subst name cstr arg_layouts shape_for_constr)
               cstrs_with_layouts
           in
           Shape.variant constructors
@@ -1118,7 +1117,7 @@ and unfold_and_evaluate0 ~ctx ~diagnostics ~depth ~steps_remaining ~env
            since it's the default fallback. *)
       | Variant constructors ->
         let constructors =
-          Shape.complex_constructors_map
+          Shape.constructors_map
             (fun (sh, ly) -> unfold_and_eval sh, ly)
             constructors
         in
@@ -1198,18 +1197,7 @@ type shape_with_layout =
     type_name : string
   }
 
-let (all_type_decls : Shape.t Uid.Tbl.t) = Uid.Tbl.create 16
-
 let (all_type_shapes : shape_with_layout Uid.Tbl.t) = Uid.Tbl.create 16
-
-let add_to_type_decls (decls : (Ident.t * Types.type_declaration) list)
-    shape_for_constr =
-  let type_decl_shapes =
-    Type_decl_shape.of_type_declarations decls shape_for_constr
-  in
-  List.iter
-    (fun ((_, decl), sh) -> Uid.Tbl.add all_type_decls decl.Types.type_uid sh)
-    (List.combine decls type_decl_shapes)
 
 let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
     =
@@ -1220,18 +1208,6 @@ let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
 (* Merlin-only: The below functions are only used for printing when the compiler is passed
    the -ddebug-uids flag, which isn't relevant to Merlin *)
 (*
-let print_table_all_type_decls ppf =
-  let entries = Uid.Tbl.to_list all_type_decls in
-  let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
-  let entries =
-    List.map
-      (fun (k, v) ->
-        Format.asprintf "%a" Uid.print k, Format.asprintf "%a" Shape.print v)
-      entries
-  in
-  let uids, decls = List.split entries in
-  Misc.pp_table ppf ["UID", uids; "Type Declaration", decls]
-
 let print_table_all_type_shapes ppf =
   let entries = Uid.Tbl.to_list all_type_shapes in
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
@@ -1251,8 +1227,6 @@ let print_table_all_type_shapes ppf =
 
 (* Print debug uid tables when the command line flag [-ddebug-uids] is set. *)
 let print_debug_uid_tables ppf =
-  Format.fprintf ppf "\n";
-  print_table_all_type_decls ppf;
   Format.fprintf ppf "\n";
   print_table_all_type_shapes ppf
 *)
