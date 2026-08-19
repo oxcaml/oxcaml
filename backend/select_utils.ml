@@ -61,11 +61,6 @@ type environment =
     phantom_lets : V.Set.t;
     all_phantom_lets :
       (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
-        (** Accumulates every phantom let encountered in the current function
-            (unlike [phantom_lets], which is scoped). The [ref] is created
-            afresh by [env_create], once per function, and shared between all
-            environments derived from that environment; it is read at the end of
-            function construction by [phantom_lets_for_fundecl]. *)
   }
 
 let env_add ?(mut = Asttypes.Immutable) var regs env =
@@ -178,30 +173,33 @@ let env_create ~tailrec_label =
   }
 
 let env_add_phantom_let var defining_expr env =
-  (* Information about phantom lets is split at this stage:
+  if !Dwarf_flags.restrict_to_upstream_dwarf
+  then env
+  else
+    (* Information about phantom lets is split at this stage:
 
-     1. The phantom variables in scope are recorded in the environment and
-     subsequently passed through CFG to Linear instructions via the
-     phantom_available_before field.
+       1. The phantom variables in scope are recorded in the environment and
+       subsequently passed through CFG to Linear instructions via the
+       phantom_available_before field.
 
-     2. The defining expressions are accumulated (see [all_phantom_lets]) and
-     eventually stored in the CFG's fun_phantom_lets field. *)
-  (* A [None] defining expression means the variable has been optimised out; it
-     is still recorded (as [Cphantom_optimised_out]) so that it remains
-     consistent with [phantom_available_before] and other phantom lets may refer
-     to it. *)
-  let cfg_defining_expr : Cfg.phantom_defining_expr =
-    match (defining_expr : Cmm.phantom_defining_expr option) with
-    | None -> Cfg.phantom_optimised_out
-    | Some defining_expr -> Cfg.phantom_defining_expr_of_cmm defining_expr
-  in
-  let provenance = VP.provenance var in
-  let var = VP.var var in
-  if V.Map.mem var !(env.all_phantom_lets)
-  then Misc.fatal_errorf "Duplicate phantom let for variable %a" V.print var;
-  env.all_phantom_lets
-    := V.Map.add var (provenance, cfg_defining_expr) !(env.all_phantom_lets);
-  { env with phantom_lets = V.Set.add var env.phantom_lets }
+       2. The defining expressions are accumulated (see [all_phantom_lets]) and
+       eventually stored in the CFG's fun_phantom_lets field. *)
+    (* A [None] defining expression means the variable has been optimised out;
+       it is still recorded (as [Cphantom_optimised_out]) so that it remains
+       consistent with [phantom_available_before] and other phantom lets may
+       refer to it. *)
+    let cfg_defining_expr : Cfg.phantom_defining_expr =
+      match (defining_expr : Cmm.phantom_defining_expr option) with
+      | None -> Cfg.phantom_optimised_out
+      | Some defining_expr -> Cfg.phantom_defining_expr_of_cmm defining_expr
+    in
+    let provenance = VP.provenance var in
+    let var = VP.var var in
+    if V.Map.mem var !(env.all_phantom_lets)
+    then Misc.fatal_errorf "Duplicate phantom let for variable %a" V.print var;
+    env.all_phantom_lets
+      := V.Map.add var (provenance, cfg_defining_expr) !(env.all_phantom_lets);
+    { env with phantom_lets = V.Set.add var env.phantom_lets }
 
 let phantom_lets_for_fundecl env = !(env.all_phantom_lets)
 

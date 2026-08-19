@@ -99,12 +99,21 @@ val iter_basic_blocks : t -> f:(Cfg.basic_block -> unit) -> unit
 
 val exists_basic_blocks : t -> f:(Cfg.basic_block -> bool) -> bool
 
-val join : from:t list -> to_:t -> unit
+val join :
+  from:t list ->
+  to_:t ->
+  phantom_available_before:Backend_var.Set.t option ->
+  unit
 
 val join_tail : from:t list -> to_:t -> unit
 
 val update_exit_terminator :
-  ?arg:Reg.t array -> ?dbg:Debuginfo.t -> t -> Cfg.terminator -> unit
+  ?arg:Reg.t array ->
+  ?dbg:Debuginfo.t ->
+  t ->
+  Cfg.terminator ->
+  phantom_available_before:Backend_var.Set.t option ->
+  unit
 
 val start_label : t -> Label.t
 
