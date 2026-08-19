@@ -1177,7 +1177,7 @@ let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
    consistent across the compiler. *)
 let enabled () =
   !Clflags.debug
-  && not !Clflags.restrict_to_upstream_dwarf
+  && (not !Clflags.restrict_to_upstream_dwarf)
   && !Clflags.shape_format = Clflags.Debugging_shapes
 
 let print_table_all_type_decls ppf =
