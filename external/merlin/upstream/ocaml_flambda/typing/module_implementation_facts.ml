@@ -1222,10 +1222,8 @@ let facts_of_tree compilation_unit artifact iterate =
         then register (key_of_module_type module_type)
         else None
       | Tmod_constraint
-          ( inner,
-            _,
-            Tmodtype_package { package_module_type_path = path },
-            _ ) -> (
+          (inner, _, Tmodtype_package { package_module_type_path = path }, _)
+        -> (
         match key_of_modtype_path ~site:inner.mod_loc inner.mod_env path with
         | Some expectation -> register expectation
         | None -> None)
