@@ -56,14 +56,14 @@ let
     ];
   };
 
-  ocaml_5_4_0 = (pkgs.callPackage (
+  mkBootOcaml_5_4_0 = bootStdenv: (pkgs.callPackage (
     import (pkgs.path + "/pkgs/development/compilers/ocaml/generic.nix") {
       major_version = "5";
       minor_version = "4";
       patch_version = "0";
       sha256 = "sha256-36qKLhHHmbwXZdi+9EkRQG7l9IAwJxkDgqk5+IyRImY=";
     }) {
-      inherit stdenv;
+      stdenv = bootStdenv;
     }).overrideAttrs {
       # This patch fixes an issue in the upstream compiler that we use to
       # bootstrap ourselves on ARM64
@@ -71,14 +71,17 @@ let
         ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.5.4.0+oxcaml/files/ocaml-base-compiler.5.4.0+oxcaml.patch
       ];
 
-      # Skip the upstream testsuite for this bootstrap compiler. Built with
-      # our clang-based stdenv on the 26.05 toolchain, testsuite/tests/unicode
-      # fails: it compiles modules with non-ASCII source filenames and the
-      # UTF-8 bytes of the object filenames reach clang octal-escaped (e.g.
-      # '$350246213.o'), so linking fails. This compiler only exists to
-      # bootstrap oxcaml, which runs its own `make ci` afterwards.
+      # Skip the upstream testsuite for this bootstrap compiler. When built
+      # with our clang-based stdenv on the 26.05 toolchain,
+      # testsuite/tests/unicode fails: it compiles modules with non-ASCII
+      # source filenames and the UTF-8 bytes of the object filenames reach
+      # clang octal-escaped (e.g. '$350246213.o'), so linking fails. This
+      # compiler only exists to bootstrap oxcaml, which runs its own `make ci`
+      # afterwards.
       doCheck = false;
     };
+
+  ocaml_5_4_0 = mkBootOcaml_5_4_0 stdenv;
 
   # CR sspies: For the time being, we use dune built with the vanilla 4.14.2 compiler.
   # Over time, we should probably define something like a "boot environment" and build
@@ -141,9 +144,15 @@ let
     let
       # nixpkgs does not yet provide an OCaml 5.4 package set at the pinned
       # revision, so construct one around the compiler used to bootstrap
-      # OxCaml.
+      # OxCaml. Pin the plain pkgs.stdenv for this compiler rather than the
+      # variant stdenv: a clangStdenv-built compiler records `clang` as its C
+      # compiler, which isn't on PATH when the scope's packages build under
+      # the default gcc stdenv (e.g. findlib's `ocamlc -custom` link of
+      # ocamlfind). Pinning also keeps the dev-tool closure identical across
+      # oxcaml variants, so they share cached builds.
+      merlinBootOcaml = mkBootOcaml_5_4_0 pkgs.stdenv;
       ocamlPackages =
-        (pkgs.ocaml-ng.mkOcamlPackages ocaml_5_4_0).overrideScope (
+        (pkgs.ocaml-ng.mkOcamlPackages merlinBootOcaml).overrideScope (
           _: osuper: {
             dune_3 = dune;
 
