@@ -1490,8 +1490,8 @@ let check_index_not_to_poly_field ~env ba uas =
     (fun (Uaccess_unboxed_field (lid, label, _)) -> check lid label.lbl_arg)
     uas
 
-let check_disambiguation_principality ~loc ~name expected_ty =
-  if not (is_principal expected_ty) then
+let check_disambiguation_principality ~loc ~name ty =
+  if not (is_principal ty) then
     Location.prerr_warning loc
       (not_principal "this type-based %s disambiguation" name)
 
