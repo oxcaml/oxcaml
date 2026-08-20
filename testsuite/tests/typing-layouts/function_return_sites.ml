@@ -12,39 +12,56 @@ type t_any : any
 type ('a : any) t = I : int t | F : float# t
 |}]
 
-(* Case bodies are typed at the result type of the whole match, so a return
-   site refined by a GADT equation is not yet given its concrete layout. *)
+(* Return sites refined by GADT equations get their concrete layouts, so two
+   arms with different layouts conflict. *)
 
 let first_site : type (a : any). a t -> a = function
   | I -> 42
   | F -> #1.0
 [%%expect{|
+Line 3, characters 9-13:
+3 |   | F -> #1.0
+             ^^^^
+Error: A function may have at most one direct-return layout:
+       this return site has layout float64,
+       but another return site of the same function has layout value.
 Line 2, characters 9-11:
 2 |   | I -> 42
              ^^
-Error: This expression is in return position, so its layout must be
-       representable. Only tail calls, whose result is returned directly,
-       and expressions that never return normally, such as raise, are exempt.
-       The layout of a is any
-         because of the annotation on the abstract type declaration for a.
-       But the layout of a must be representable
-         because we must know concretely how to return a function result.
+  This is the location of a conflicting return site.
 |}]
 
 let first_site_rev : type (a : any). a t -> a = function
   | F -> #1.0
   | I -> 42
 [%%expect{|
+Line 3, characters 9-11:
+3 |   | I -> 42
+             ^^
+Error: A function may have at most one direct-return layout:
+       this return site has layout value,
+       but another return site of the same function has layout float64.
 Line 2, characters 9-13:
 2 |   | F -> #1.0
              ^^^^
-Error: This expression is in return position, so its layout must be
-       representable. Only tail calls, whose result is returned directly,
-       and expressions that never return normally, such as raise, are exempt.
-       The layout of a is any
-         because of the annotation on the abstract type declaration for a.
-       But the layout of a must be representable
-         because we must know concretely how to return a function result.
+  This is the location of a conflicting return site.
+|}]
+
+(* Arms that agree, or that do not return, are fine: the refined layout is the
+   function's return layout. *)
+
+let refined_value : type (a : any). a t -> a = function
+  | I -> 42
+  | F -> assert false
+[%%expect{|
+val refined_value : ('a : any). 'a t -> 'a = <fun>
+|}]
+
+let refined_float : type (a : any). a t -> a = function
+  | I -> assert false
+  | F -> #1.0
+[%%expect{|
+val refined_float : ('a : any). 'a t -> 'a = <fun>
 |}]
 
 (* Same, with the conflict nested inside each arm. *)
