@@ -16,6 +16,11 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
+   (@if $portable-int
+   (@then
+      (import "portableint" "bool_val"
+         (func $bool_val (param (ref eq)) (result i32)))
+   ))
    (import "fail" "caml_raise_sys_error"
       (func $caml_raise_sys_error (param (ref eq))))
    (import "fail" "caml_raise_not_found" (func $caml_raise_not_found))
@@ -82,6 +87,11 @@
 ))
    (import "io" "caml_channel_descriptor"
       (func $caml_channel_descriptor (param (ref eq)) (result (ref eq))))
+   (@if $portable-int
+   (@then
+      (import "portableint" "portable_int_val_32"
+         (func $portable_int_val_32 (param (ref eq)) (result i32)))
+   ))
 
    (type $block (array (mut (ref eq))))
    (type $bytes (array (mut i8)))
@@ -91,7 +101,11 @@
 
    (func (export "caml_sys_exit") (export "unix_exit") (export "caml_unix_exit")
       (param $code (ref eq)) (result (ref eq))
+      (@if $portable-int
+      (@then (call $exit (call $portable_int_val_32 (local.get $code))))
+      (@else
       (call $exit (i31.get_s (ref.cast (ref i31) (local.get $code))))
+      ))
       ;; Fallback: try to exit through an exception
       (throw $ocaml_exit))
 
@@ -510,8 +524,14 @@
 
    (func (export "caml_ml_enable_runtime_warnings")
       (param $v (ref eq)) (result (ref eq))
+      (@if $portable-int
+      (@then
+         (global.set $caml_runtime_warnings
+            (call $bool_val (local.get $v))))
+      (@else
       (global.set $caml_runtime_warnings
          (i31.get_u (ref.cast (ref i31) (local.get $v))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_ml_runtime_warnings_enabled")
