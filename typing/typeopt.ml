@@ -135,7 +135,7 @@ let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
 let type_representable_layout ~why env loc ty =
-  let jkind = Ctype.type_jkind env ty in
+  let jkind = Ctype.type_jkind ~need_layout:true env ty in
   let layout =
     match Jkind.get_layout_defaulting_to_scannable env jkind with
     | Some layout -> layout
@@ -161,7 +161,7 @@ let type_representable_layout ~why env loc ty =
        faster, even though it means that [type_jkind] must be called twice. *)
     (match Ctype.type_sort ~why ~fixed:false env ty with
     | Ok _sort ->
-      let jkind = Ctype.type_jkind env ty in
+      let jkind = Ctype.type_jkind ~need_layout:true env ty in
       let layout =
         match Jkind.get_layout_defaulting_to_scannable env jkind with
         | Some layout -> layout

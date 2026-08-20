@@ -445,7 +445,7 @@ module Layout = struct
         | Var _ | Univar _ -> Misc.fatal_error "unexpected unknown sort")
       | Any _ -> Misc.fatal_error "unexpected unknown sort"
 
-  (* CR rtjoa: ['s addressable & bits64] should be boxed as value, I think,
+  (* XCR rtjoa: ['s addressable & bits64] should be boxed as value, I think,
      but now it gets treated as scannable?
 
      Maybe the check for being surely addressable should come first? Or instead
@@ -466,7 +466,15 @@ module Layout = struct
      (via inference: annotations can't put a layout variable under
      [addressable], they arrive as abstract kinds).
 
-     rtjoa: has_unknown_sort is a little sus to call because it's incomplete.  *)
+     rtjoa: has_unknown_sort is a little sus to call because it's incomplete.
+
+     aide: Incomplete in the sense that "unknown" can later flip to known
+     as sort variables fill - but no caller bakes the answer in: the
+     relations and printers recompute the effective axes at each use, and
+     the one place the axes are stored, [Const.box], sees only constants,
+     whose [Univar]/[Genvar] never fill. When a sort does fill, both rules
+     can only lower the axes (a sort's box is at most [max]), so an
+     earlier weaker answer was still an upper bound. *)
   (* The scannable axes of [t box]; see [Const.scannable_axes_of_boxed]. *)
   let scannable_axes_of_boxed : Sort.t t -> Scannable_axes.t =
    fun t ->
@@ -2193,13 +2201,14 @@ module Const = struct
         (Modality.Const.id, [])
         (Axis_set.to_list axes_to_ignore)
 
-    (* CR rtjoa: This comment could still be more straightforward. See the
-       deslop skill *)
-    (* The mod bounds that the printed form denotes. A kind is printed as a
-       named base [B] plus layout operators, and that text denotes re-applying
-       the operators to [B]'s kind: each printed "box" applies [box_mod_bounds];
-       no other layout constructor affects mod bounds. The mod-bounds diff must
-       be taken against this, not against [B]'s bounds. *)
+    (* XCR rtjoa: This comment could still be more straightforward. See the
+       deslop skill
+
+       aide: Rewrote. *)
+    (* Printing "B box" means the box of [B]'s kind, whose mod bounds are
+       [box_mod_bounds] of [B]'s. So when a kind prints as a base [B] under
+       layout [l], the [mod]s to print are its bounds' diff against this,
+       not against [B]'s bounds. *)
     let printed_mod_bounds (l : Layout.Const.t) base_mod_bounds =
       match l with
       | Box _ -> box_mod_bounds base_mod_bounds
@@ -2374,10 +2383,13 @@ module Const = struct
             | Expanded_with_all_mod_bounds -> Layout.Const.to_string_verbose
             | Not_verbose | Expanded -> Layout.Const.to_string
           in
-          (* CR rtjoa: what is the max-bounds lie? Don't coin terms. see deslop
-             skill *)
-          (* A bare box layout name denotes a box of nothing; other layout
-             names take part in the max-bounds lie *)
+          (* XCR rtjoa: what is the max-bounds lie? Don't coin terms. see
+             deslop skill
+
+             aide: Rewrote. *)
+          (* A bare box layout name denotes a box of nothing; any other bare
+             layout name is treated as having all-max mod bounds, as the CR
+             above describes. *)
           let layout_mod_bounds =
             match jkind.base with
             | Layout (Box _ as l) -> printed_mod_bounds l Mod_bounds.min

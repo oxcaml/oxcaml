@@ -3048,7 +3048,7 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts ->
-    (* CR rtjoa: What if we return [any box], and then, say
+    (* XCR rtjoa: What if we return [any box], and then, say
        [constrain_type_jkind] will dig deeper if it needs to? Worried about the
        performance implications
 
@@ -3083,7 +3083,13 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
        pass [false], since their one consumer reads only the bounds.
 
        rtjoa: need_layout shouldn't be oaptional. Is it ever the case that
-       expand_components is true but need_layout is false? *)
+       expand_components is true but need_layout is false?
+
+       aide: Made required. And yes: the normalize contexts
+       ([mk_jkind_context_check_principal] and friends) go through
+       [type_jkind], so [expand_components] is true, and pass
+       [need_layout:false] since their one consumer reads only the bounds -
+       that combination is exactly this optimization. *)
     let component_layouts =
       if expand_components && need_layout
       then
@@ -3293,30 +3299,30 @@ let rec estimate_type_jkind_unwrapped
     estimate_type_jkind_unwrapped level ~expand_components ~need_layout env
       ~unwrapped_ty:prev_unwrapped_ty
 
-let type_jkind ?(need_layout = true) env ty =
+let type_jkind ~need_layout env ty =
   let unwrapped_ty = get_unboxed_type_approximation env ty in
   estimate_type_jkind_unwrapped (get_level ty) ~unwrapped_ty
     ~expand_components:true ~need_layout env
 
 (* CR layouts v2.8: This function is quite suspect. See Jane Street internal
    gdoc titled "Let's kill type_jkind_purely". Internal ticket 3782. *)
-let type_jkind_purely ?need_layout env ty =
+let type_jkind_purely ~need_layout env ty =
   if !Clflags.principal || Env.has_local_constraints env then
     (* We snapshot to keep this pure; see the test in [typing-local/crossing.ml]
        that mentions snapshotting for an example. *)
     let snap = Btype.snapshot () in
-    let jkind = type_jkind ?need_layout env ty in
+    let jkind = type_jkind ~need_layout env ty in
     Btype.backtrack snap;
     jkind
   else
-    type_jkind ?need_layout env ty
+    type_jkind ~need_layout env ty
 
 (* CR layouts v2.8: It's possible we can remove this function if we change
    [jkind_subst] to not substitute non-principal things. Investigate.
    Internal ticket 5111. *)
-let type_jkind_purely_if_principal ?need_layout env ty =
+let type_jkind_purely_if_principal ~need_layout env ty =
   match is_principal ty with
-  | true -> Some (type_jkind_purely ?need_layout env ty)
+  | true -> Some (type_jkind_purely ~need_layout env ty)
   | false -> None
 let () =
   type_jkind_purely_if_principal'
@@ -3567,8 +3573,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                    let layouts =
                      Misc.Stdlib.List.map_option
                        (fun ({ ty; _ } as unwrapped_ty) ->
-                          type_jkind_purely env ty (* Here we recompute the
-                                                      jkind more accurately *)
+                          type_jkind_purely ~need_layout:true env ty
+                          (* Here we recompute the jkind more accurately *)
                           |> apply_layout_wrapping_l ~env ~unwrapped_ty
                           |> Result.to_option)
                        unwrapped_tys
@@ -3812,7 +3818,7 @@ let rec intersect_type_jkind ~reason env ty1 jkind2 =
     (* [intersect_type_jkind] is called rarely, so we don't bother with trying
        to avoid this call as in [constrain_type_jkind] *)
     let type_equal = !type_equal' env in
-    let jkind1 = type_jkind env ty1 in
+    let jkind1 = type_jkind ~need_layout:true env ty1 in
     let context = mk_jkind_context_check_principal env in
     let jkind1 = Jkind.round_up ~context env jkind1 in
     let jkind2 = Jkind.round_up ~context env jkind2 in
@@ -4507,7 +4513,7 @@ let rec expands_to_datatype env ty =
    not matter, so a jkind extracted from a type_declaration does
    not need to be substed *)
 let may_have_jkind_intersection_tk env ty jkind =
-  Jkind.may_have_intersection env (type_jkind env ty) jkind
+  Jkind.may_have_intersection env (type_jkind ~need_layout:true env ty) jkind
 
 (* [mcomp] tests if two types are "compatible" -- i.e., if there could
    exist a witness of their equality. This is distinct from [eqtype],
@@ -6472,7 +6478,8 @@ let crossing_of_ty env ?modalities ty =
     then Crossing.max
     else
       let jkind_crossing () =
-        let jkind = type_jkind_purely env ty in
+        (* Crossing only reads the bounds *)
+        let jkind = type_jkind_purely ~need_layout:false env ty in
         crossing_of_jkind env jkind
       in
       if !Clflags.ikinds
@@ -8897,7 +8904,7 @@ let check_decl_jkind env decl jkind =
      to expand only as much as needed, but the l/l subtype algorithm is tricky,
      and so we leave this optimization for later. Internal ticket 5114. *)
   let type_equal = type_equal env in
-  let type_jkind_purely = type_jkind_purely env in
+  let type_jkind_purely = type_jkind_purely ~need_layout:true env in
   let context = mk_jkind_context_always_principal env in
   (* CR layouts v2.8: When we have [layout_of], this logic should move to the
      place where [type_jkind] is set. But for now, it has to be here, because we
@@ -8942,7 +8949,7 @@ let check_decl_jkind env decl jkind =
     match decl.type_manifest with
     | None -> err
     | Some ty ->
-      let ty_jkind = type_jkind env ty in
+      let ty_jkind = type_jkind ~need_layout:true env ty in
       match
         Ikind.sub_jkind_l
           ~origin:

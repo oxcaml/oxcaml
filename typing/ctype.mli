@@ -705,17 +705,17 @@ val estimate_type_jkind : Env.t ->  type_expr -> jkind_l
 (* Get the jkind of a type, expanding it and looking through [[@@unboxed]]
    types. [need_layout:false] promises that only the jkind's bounds will be
    consumed, allowing the layout to be estimated more cheaply. *)
-val type_jkind : ?need_layout:bool -> Env.t -> type_expr -> jkind_l
+val type_jkind : need_layout:bool -> Env.t -> type_expr -> jkind_l
 
 (* Get the jkind of a type, dropping any changes to types caused by
    expansion. *)
-val type_jkind_purely : ?need_layout:bool -> Env.t -> type_expr -> jkind_l
+val type_jkind_purely : need_layout:bool -> Env.t -> type_expr -> jkind_l
 
 (* Like [type_jkind_purely], but returns [None] if the type is not
    principally known. Useful to instantiate [jkind_of_type] in various
    functions exported by [Jkind]. *)
 val type_jkind_purely_if_principal :
-  ?need_layout:bool -> Env.t -> type_expr -> jkind_l option
+  need_layout:bool -> Env.t -> type_expr -> jkind_l option
 
 (* Helper functions for creating jkind contexts *)
 val mk_jkind_context :

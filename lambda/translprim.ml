@@ -1707,7 +1707,7 @@ let layout_of_ty_for_idx_set env loc ty =
     performance impacts for lots of cases that don't matter, and (b) will
     become obsolete when we do complex values. So for now, the gross
     thing. *)
-  let jkind = Ctype.type_jkind env ty in
+  let jkind = Ctype.type_jkind ~need_layout:true env ty in
   let mbe = Typedecl.mixed_block_element env ty jkind in
   let mbe =
     match mbe with
@@ -1977,7 +1977,7 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
     let ak =
       Typeopt.array_type_kind ~elt_ty:None env loc array_ty
     in
-    let jkind = Ctype.type_jkind env elt_ty in
+    let jkind = Ctype.type_jkind ~need_layout:true env elt_ty in
     let mbe = Typedecl.mixed_block_element env elt_ty jkind in
     let mbe = Option.map (transl_mixed_block_element env loc elt_ty) mbe in
     begin match mbe with

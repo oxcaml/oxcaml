@@ -1711,7 +1711,7 @@ let narrow_to_manifest_jkind env loc path decl =
        removing the "horrible hack" just below, as that horrible hack sometimes
        avoids calling [constrain_type_jkind], which is necessary for the plan
        above to work.  Internal ticket 2912. *)
-    let manifest_jkind = Ctype.type_jkind_purely env ty in
+    let manifest_jkind = Ctype.type_jkind_purely ~need_layout:true env ty in
     (* CR layouts v2.8: Remove this horrible hack. In practice, this
        [try_allow_r] fails in the case of a record re-export, because the jkind
        from the record has been calculated and put in decl.type_jkind at this
@@ -1895,7 +1895,7 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form)
       ~default_to_scannable =
   let sorts_and_jkinds =
     List.map (fun ld_type ->
-      let jkind = Ctype.type_jkind env ld_type in
+      let jkind = Ctype.type_jkind ~need_layout:true env ld_type in
       let sort = Jkind.sort_option_of_jkind env jkind in
       let ld_sort =
         Option.bind sort
@@ -1933,7 +1933,7 @@ let update_constructor_arguments_sorts env loc cd_args =
   | Types.Cstr_tuple args ->
     let args_and_jkinds =
       List.map (fun ({Types.ca_type; _} as arg) ->
-          let jkind = Ctype.type_jkind env ca_type in
+          let jkind = Ctype.type_jkind ~need_layout:true env ca_type in
           let sort = Jkind.sort_option_of_jkind env jkind in
           let ca_sort =
             Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
@@ -2395,7 +2395,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   match form, lbls, rep with
   | Legacy, [(lbl, ld_type)], Record_unboxed ->
     let jkind =
-      Ctype.type_jkind env ld_type |>
+      Ctype.type_jkind ~need_layout:true env ld_type |>
       Jkind.apply_modality_l lbl.Types.ld_modalities
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
@@ -2477,11 +2477,16 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
           let lbls_with_sorts =
             List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
           in
-          (* CR rtjoa: create a temporary commit before the box commits (but
+          (* XCR rtjoa: create a temporary commit before the box commits (but
              after addressable) that contains the changes from PR 6496. That
              should make this simpler. Once either addressable or transl delay
              merges, we'll rebase the other and be able to properly stack things
-          *)
+
+             aide: Done: the stack now sits on "Finalize variable
+             representations at translation (PR #6496)", squashed from
+             rtjoa.fix-any-fatal. With [rep] resolved before the kind is
+             computed ([Record_undetermined] instead of an [Error] the
+             caller defaults), the gate reads it directly. *)
           let jkind = Jkind.for_boxed_record_with_updates lbls_with_sorts in
           if record_gets_unboxed_version (List.map fst lbls) rep
           then
@@ -2602,7 +2607,8 @@ let finalize_typechecked_shape env loc sorts_and_types kind =
     let ts =
       Array.to_list sorts_and_types
       |> List.map (fun (_sort, ty) ->
-           Element_repr.classify env ty (Ctype.type_jkind env ty)
+           Element_repr.classify env ty
+             (Ctype.type_jkind ~need_layout:true env ty)
              ~default_to_scannable:false,
            ty)
     in
@@ -2692,7 +2698,7 @@ let rec update_decl_jkind env dpath decl =
              match cstr.cd_args with
              | Cstr_tuple [] -> cstr
              | Cstr_tuple [({ ca_type; ca_modalities; ca_loc; _ } as arg)] ->
-               let jkind = Ctype.type_jkind env ca_type in
+               let jkind = Ctype.type_jkind ~need_layout:true env ca_type in
                let ca_sort =
                  match sort_of_jkind jkind with
                  | Some sort when Jkind.Sort.Const.all_void sort ->
@@ -2705,7 +2711,7 @@ let rec update_decl_jkind env dpath decl =
                  | _ ->
                    (* The payload constructor. *)
                    constrain_or_null_payload ~env ~path:dpath ca_type ca_loc;
-                   let jkind = Ctype.type_jkind env ca_type in
+                   let jkind = Ctype.type_jkind ~need_layout:true env ca_type in
                    begin match !payload with
                    | None -> payload := Some (jkind, ca_modalities, ca_type)
                    | Some _ -> bad_or_null_payload_count loc
@@ -2748,7 +2754,7 @@ let rec update_decl_jkind env dpath decl =
     | [{Types.cd_args} as cstr], Variant_unboxed -> begin
         match cd_args with
         | Cstr_tuple [{ca_type=ty; _} as arg] -> begin
-            let jkind = Ctype.type_jkind env ty in
+            let jkind = Ctype.type_jkind ~need_layout:true env ty in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ca_sort =
               Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
@@ -2759,7 +2765,7 @@ let rec update_decl_jkind env dpath decl =
             Variant_unboxed, jkind
           end
         | Cstr_record [{ld_type} as lbl] -> begin
-            let jkind = Ctype.type_jkind env ld_type in
+            let jkind = Ctype.type_jkind ~need_layout:true env ld_type in
             let sort = Jkind.sort_option_of_jkind env jkind in
             let ld_sort =
               Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
@@ -3697,7 +3703,8 @@ let normalize_decl_jkinds env decls =
       decl.type_unboxed_version
     in
     let normalization_context =
-      Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
+      Ctype.mk_jkind_context env (fun ty ->
+        Some (Ctype.type_jkind ~need_layout:false env ty))
     in
     let normalized_jkind =
       Jkind.normalize

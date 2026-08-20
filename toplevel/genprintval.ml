@@ -733,7 +733,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                   let sorts_and_types =
                     Array.map
                       (fun (_params, ty) ->
-                         Jkind.sort_of_jkind env (Ctype.type_jkind env ty), ty)
+                         Jkind.sort_of_jkind env
+                           (Ctype.type_jkind ~need_layout:true env ty), ty)
                       label_params_and_types
                   in
                   let rep : Types.record_representation =
