@@ -1,12 +1,12 @@
 module R = Bundle2.Make(P_int)()
 
 let () =
-  (* Type sharing: Basic_transparent and Util_transparent have transparent
+  (* Type sharing: Basic_transparent and Fancy_transparent have transparent
      type t = P.t.  After instantiation with P_int,
-     R.Basic_transparent.t = R.Util_transparent.t = P_int.t = int.  This
-     means a Util_transparent.t value can be used directly as a
+     R.Basic_transparent.t = R.Fancy_transparent.t = P_int.t = int.  This
+     means a Fancy_transparent.t value can be used directly as a
      Basic_transparent.t value. *)
-  let u : R.Util_transparent.t = R.Util_transparent.create () in
+  let u : R.Fancy_transparent.t = R.Fancy_transparent.create () in
   let b : R.Basic_transparent.t = u in
   print_endline (R.Basic_transparent.to_string b)
 

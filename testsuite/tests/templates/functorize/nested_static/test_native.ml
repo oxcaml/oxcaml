@@ -1,14 +1,58 @@
 (* TEST (* DO NOT EDIT. Instead edit nested_static/test_byte.ml and run gen-native.sh. *)
- (* [Bar] is parameterised by [P, Q] and its body uses [Stateful] (which
-    is only parameterised by [P]), so [Stateful] appears as a runtime
-    parameter of [Bar].  [Wrap] references [Bar[P:P_int]{Q}].
+ (* Nested compound reference whose runtime dependency becomes complete
+    ("static") after substitution.
 
-    Functorizing [Wrap] exercises the [Rp_main_module_block] path in
-    [bind_local_instance]: the runtime slot [Stateful[P:P]] is
-    substituted with [visible_arg_map = {P:P_int}] to become
-    [Stateful[P:P_int]] — now complete.  The functorizer resolves it
-    to a [Pgetglobal] of the pre-instantiated [Stateful[P:P_int]]
-    compilation unit, so its counter is a shared global instance. *)
+    (a) Quasi-OCaml, writing parameterised units as functors:
+
+    {[
+      module Stateful (P : P) = struct
+        let counter = ref 0
+        let inc_count () = incr counter
+        let get_count () = !counter
+      end
+      module Bar (P : P) (Q : Q) = struct
+        module Stateful = Stateful (P)         (* runtime dependency *)
+        let foo_count () = Stateful.get_count ()
+        let foo_bump () = Stateful.inc_count ()
+      end
+      module Wrap (Q : Q) = struct
+        module Bar_of_p_int = Bar (P_int) (Q)
+        let foo_count () = Bar_of_p_int.foo_count ()
+        let foo_bump () = Bar_of_p_int.foo_bump ()
+      end
+    ]}
+
+    [Wrap]'s cmi records [Bar[P:P_int]{Q}] in its bound_globals, and
+    [Bar]'s records the runtime dependency [Stateful[P:P]].
+
+    (b) [Bar]'s compiled unit is an instantiating functor over its
+    runtime parameters — the [P] and [Q] argument blocks plus
+    [Stateful[P:P]]'s main module block — roughly:
+
+    {[
+      (setglobal Bar!
+        (makeblock 0
+          (function P Q Stateful -> (makeblock 0 foo_count foo_bump))))
+    ]}
+
+    (c) Functorizing [Wrap] produces [Make : functor (Q) () ->
+    Intf(Q).S].  Inside [Make], [Bar]'s [Stateful[P:P]] runtime slot
+    (the [Rp_main_module_block] path in [bind_local_instance]) is
+    substituted via [visible_arg_map = {P:P_int}] to become
+    [Stateful[P:P_int]] — now complete, so it resolves to a
+    [Pgetglobal] of the pre-instantiated compilation unit rather than
+    a fresh binding inside [Make]:
+
+    {[
+      (function Q ()
+        (let (bar = (apply (field 0 (global Bar!))
+                       (global P_int!) Q
+                       (global Stateful-P_int!)))  ; shared instance
+          (makeblock 0 (* Wrap *) ...)))
+    ]}
+
+    Hence the bundle and the directly-instantiated [Static] in
+    [main_nested.ml] observe one shared counter. *)
 
  readonly_files = "\
    stateful.mli stateful.ml \
