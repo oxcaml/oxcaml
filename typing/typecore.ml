@@ -6161,20 +6161,7 @@ end = struct
         match funct.exp_desc with
         | Texp_ident
             { desc = { val_kind = Val_prim p; _ }; kind = Id_prim _; _ } ->
-            let result_layout_is_any =
-              match snd p.prim_native_repr_res with
-              | Repr_never_returns -> true
-              | Repr_poly | Same_as_ocaml_repr _ | Unboxed_float _
-              | Unboxed_vector _ | Unboxed_mask
-              | Unboxed_or_untagged_integer _
-              | Unpacked_product _ -> false
-            in
-            (match
-               Primitive.classify_return_behavior ~name:p.prim_name
-                 ~result_layout_is_any
-             with
-             | Returns -> false
-             | Never_returns_layout_any | Never_returns_representable -> true)
+            Primitive.prim_name_never_returns p.prim_name
             && List.length args >= p.prim_arity
             && List.for_all
                  (fun (_, arg) ->
@@ -6184,36 +6171,32 @@ end = struct
     | _ -> false
 
   let record_site demand exp =
-    if is_never_returning_prim_apply exp then () else
+    if is_never_returning_prim_apply exp then demand else
     let env = exp.exp_env in
     let loc = proper_exp_loc exp in
     let forwarder = is_return_forwarder_shape exp in
     let type_sort ty =
       Ctype.type_sort ~why:Function_result ~fixed:forwarder env ty
     in
-    match type_sort exp.exp_type with
-    | Error _ when forwarder -> (
-        match !demand with
-        | Never_returns -> demand := Forwards
-        | Forwards | Returns _ -> ())
-    | Error err ->
+    match type_sort exp.exp_type, demand with
+    | Error _, Never_returns when forwarder -> Forwards
+    | Error _, (Forwards | Returns _) when forwarder -> demand
+    | Error err, _ ->
         raise (Error (loc, env, Function_return_not_rep (exp.exp_type, err)))
-    | Ok sort -> (
-        match !demand with
-        | Never_returns | Forwards ->
-            demand := Returns { sort; first_site = loc }
-        | Returns { sort = fun_ret_sort; first_site } ->
-            if not (Jkind.Sort.equate sort fun_ret_sort)
-            then
-              raise
-                (Error
-                   ( loc,
-                     env,
-                     Function_return_sort_conflict
-                       { site_sort = sort;
-                         fun_ret_sort;
-                         first_return_site = first_site
-                       } )))
+    | Ok sort, (Never_returns | Forwards) ->
+        Returns { sort; first_site = loc }
+    | Ok sort, Returns { sort = fun_ret_sort; first_site } ->
+        if Jkind.Sort.equate sort fun_ret_sort then demand
+        else
+          raise
+            (Error
+               ( loc,
+                 env,
+                 Function_return_sort_conflict
+                   { site_sort = sort;
+                     fun_ret_sort;
+                     first_return_site = first_site
+                   } ))
 
   let is_bool_literal ~name exp =
     match exp.exp_desc with
@@ -6230,21 +6213,25 @@ end = struct
     | Texp_match (_, _, cases, _, _) when match_handles_exceptions cases ->
         record_site demand exp
     (* These do not return normally, so they demand nothing. *)
-    | Texp_unreachable -> ()
-    | Texp_assert (cond, _) when is_bool_literal ~name:"false" cond -> ()
-    | Texp_while { wh_cond; _ } when is_bool_literal ~name:"true" wh_cond -> ()
+    | Texp_unreachable -> demand
+    | Texp_assert (cond, _) when is_bool_literal ~name:"false" cond -> demand
+    | Texp_while { wh_cond; _ } when is_bool_literal ~name:"true" wh_cond ->
+        demand
     | _ ->
         match tail_subexpressions exp with
         | [] -> record_site demand exp
-        | subexps -> List.iter (walk demand) subexps
+        | subexps -> List.fold_left walk demand subexps
 
   let classify ~body : Typedtree.function_return_sort =
-    let demand = ref Never_returns in
-    (match body with
-     | Tfunction_body exp -> walk demand exp
-     | Tfunction_cases { fc_cases; _ } ->
-         List.iter (fun { c_rhs; _ } -> walk demand c_rhs) fc_cases);
-    match !demand with
+    let demand =
+      match body with
+      | Tfunction_body exp -> walk Never_returns exp
+      | Tfunction_cases { fc_cases; _ } ->
+          List.fold_left
+            (fun demand { c_rhs; _ } -> walk demand c_rhs)
+            Never_returns fc_cases
+    in
+    match demand with
     | Returns { sort; first_site = _ } -> Function_returns sort
     | Forwards -> Function_forwards
     | Never_returns -> Function_never_returns
@@ -13861,8 +13848,10 @@ let report_error ~loc env =
         how what requirement
   | Function_return_not_rep (ty,violation) ->
       Location.errorf ~loc
-        "@[Expressions in return position must be representable unless they@ \
-          tail-forward the unknown result or do not return normally.@]@ %a"
+        "@[This expression is in return position, so its layout must be@ \
+          representable. Only tail calls, whose result is returned directly,@ \
+          and expressions that never return normally, such as raise, are@ \
+          exempt.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation

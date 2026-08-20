@@ -22,8 +22,9 @@ let first_site : type (a : any). a t -> a = function
 Line 2, characters 9-11:
 2 |   | I -> 42
              ^^
-Error: Expressions in return position must be representable unless they
-       tail-forward the unknown result or do not return normally.
+Error: This expression is in return position, so its layout must be
+       representable. Only tail calls, whose result is returned directly,
+       and expressions that never return normally, such as raise, are exempt.
        The layout of a is any
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be representable
@@ -37,8 +38,9 @@ let first_site_rev : type (a : any). a t -> a = function
 Line 2, characters 9-13:
 2 |   | F -> #1.0
              ^^^^
-Error: Expressions in return position must be representable unless they
-       tail-forward the unknown result or do not return normally.
+Error: This expression is in return position, so its layout must be
+       representable. Only tail calls, whose result is returned directly,
+       and expressions that never return normally, such as raise, are exempt.
        The layout of a is any
          because of the annotation on the abstract type declaration for a.
        But the layout of a must be representable
@@ -110,8 +112,9 @@ let nontail (g : unit -> t_any) () = (g () [@nontail])
 Line 1, characters 37-54:
 1 | let nontail (g : unit -> t_any) () = (g () [@nontail])
                                          ^^^^^^^^^^^^^^^^^
-Error: Expressions in return position must be representable unless they
-       tail-forward the unknown result or do not return normally.
+Error: This expression is in return position, so its layout must be
+       representable. Only tail calls, whose result is returned directly,
+       and expressions that never return normally, such as raise, are exempt.
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
        But the layout of t_any must be representable
@@ -145,7 +148,18 @@ Error: Types in an external must have a representable layout.
          because it's the type of the result of an external declaration.
 |}]
 
-(* The arguments of raise can't be any. *)
+(* The result can't be unpacked, even though it never materializes. *)
+
+external bad_unpacked : ('a : any). exn -> ('a [@unpacked]) = "%raise"
+[%%expect{|
+Line 1, characters 44-46:
+1 | external bad_unpacked : ('a : any). exn -> ('a [@unpacked]) = "%raise"
+                                                ^^
+Error: Don't know how to unpack this type.
+       Only types with product layouts can be marked "unpacked".
+|}]
+
+(* The arguments of raise must be values. *)
 
 external bad_arg : ('a : any). #(int * int) -> 'a = "%raise"
 [%%expect{|
@@ -157,6 +171,20 @@ Error: The primitive [%raise] is used in an invalid declaration.
 Hint: This was expected to be a value-only primitive. You might've
       misspelled the primitive name.
 |}]
+
+external bad_any_arg : ('a : any) ('b : any). 'a -> 'b = "%raise"
+[%%expect{|
+Line 1, characters 46-48:
+1 | external bad_any_arg : ('a : any) ('b : any). 'a -> 'b = "%raise"
+                                                  ^^
+Error: Types in an external must have a representable layout.
+       The layout of 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be representable
+         because it's the type of an argument in an external declaration.
+|}]
+
+(* Layout-any raises can be used at any return layout. *)
 
 let raise_at_float b =
   if b then #1.0 else my_raise Exit
