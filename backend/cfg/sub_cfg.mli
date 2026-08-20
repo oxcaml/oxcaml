@@ -99,8 +99,12 @@ val iter_basic_blocks : t -> f:(Cfg.basic_block -> unit) -> unit
 
 val exists_basic_blocks : t -> f:(Cfg.basic_block -> bool) -> bool
 
+(** The boolean paired with each sub-CFG indicates whether the corresponding
+    branch may fall through to the join point (i.e. whether its emission
+    completed normally, rather than stopping because the code never returns).
+    Only such branches are linked to the join block. *)
 val join :
-  from:t list ->
+  from:(t * bool) list ->
   to_:t ->
   phantom_available_before:Backend_var.Set.t option ->
   unit
