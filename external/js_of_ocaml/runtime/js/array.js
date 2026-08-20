@@ -202,6 +202,16 @@ function caml_array_make(len, init) {
   return b;
 }
 
+// Provides: caml_iarray_of_array const
+function caml_iarray_of_array(a) {
+  return a;
+}
+
+// Provides: caml_array_of_iarray const
+function caml_array_of_iarray(a) {
+  return a;
+}
+
 //Provides: caml_make_vect const (const, mutable)
 //Requires: caml_array_make
 function caml_make_vect(len, init) {
