@@ -48,7 +48,4 @@
  check-ocamlopt.opt-output;
 *)
 
-(* CR mvellacott: currently reaper_lto_solve just prints the unit names it was
-   given, when the solve stage is implemented this test will need updating. *)
-
 let () = assert (Reaper_solve_dependency.used 41 = 42)

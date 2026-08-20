@@ -432,13 +432,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     List.map Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmrs
   in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
-    ~solution;
-  (* CR mvellacott: remove this debug print once we can test useful
-     functionality. *)
-  Format.eprintf "reaper_lto_solve: solved units: [%s]; ltosol output: %s@."
-    (String.concat "; "
-       (List.map Compilation_unit.full_path_as_string participants))
-    ltosol_file
+    ~solution
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables ~ltosol_filename ~cmr_filename ~paused_imports_cmx =
@@ -461,7 +455,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
         all_code;
-        deps;
+        deps = _;
         rebuild_data
       } =
     Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
@@ -494,13 +488,11 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
       (load_transitively Compilation_unit.Set.empty paused_imports_cmx
         : Compilation_unit.Set.t)
   in
-  (* CR mvellacott: use this solution instead of solving again. *)
-  let (_solved_dep : Flambda2_reaper.Unboxing_analysis.result) =
+  (* CR mvellacott: add profiling and debug printing code. *)
+  let solved_dep =
     Flambda2_reaper.Ltosol_format.Serialisable_solution.deserialise
       ltosol_solution
   in
-  (* CR mvellacott: add profiling and debug printing code. *)
-  let solved_dep = Flambda2_reaper.Reaper.Staged.solve deps in
   let flambda, free_names, all_code, slot_offsets, final_typing_env =
     Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
       ~traverse_rebuild:rebuild_data ~solved_dep ~machine_width ~cmx_loader
