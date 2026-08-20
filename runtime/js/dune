@@ -1,0 +1,34 @@
+(install
+ (section lib)
+ (package js_of_ocaml-compiler)
+ (files
+  bigarray.js
+  bigstring.js
+  dynlink.js
+  fs.js
+  fs_fake.js
+  fs_node.js
+  fs_quickjs.js
+  gc.js
+  graphics.js
+  ieee_754.js
+  float32.js
+  int64.js
+  io.js
+  jslib.js
+  jslib_js_of_ocaml.js
+  lexing.js
+  marshal.js
+  md5.js
+  mlBytes.js
+  nat.js
+  parsing.js
+  promise.js
+  stdlib.js
+  toplevel.js
+  unix.js
+  weak.js
+  domain.js
+  prng.js
+  sync.js
+  runtime_events.js))

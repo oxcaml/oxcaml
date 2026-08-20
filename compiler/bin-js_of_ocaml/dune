@@ -1,0 +1,55 @@
+(executable
+ (name js_of_ocaml)
+ (public_name js_of_ocaml)
+ (package js_of_ocaml-compiler)
+ (libraries
+  jsoo_cmdline
+  js_of_ocaml-compiler
+  cmdliner
+  compiler-libs.common
+  js_of_ocaml-compiler.runtime-files
+  (select
+   findlib_support.ml
+   from
+   ;; Only link js_of_ocaml-compiler.findlib-support if it exists
+   (js_of_ocaml-compiler.findlib-support -> findlib_support.empty.ml)
+   (-> findlib_support.empty.ml)))
+ (modes
+  byte
+  (best exe))
+ (flags
+  (:standard -safe-string)))
+
+;; Generate and install runtime.js for compatibility reasons
+
+(rule
+ (target runtime.js)
+ (action
+  (with-stdout-to
+   %{target}
+   (run %{bin:js_of_ocaml} print-standard-runtime))))
+
+(install
+ (section lib)
+ (package js_of_ocaml-compiler)
+ (files runtime.js))
+
+(rule
+ (target
+  (dir cmdliner-support))
+ (deps js_of_ocaml.exe)
+ (action
+  (ignore-stdout
+   (run
+    cmdliner
+    install
+    tool-support
+    ./js_of_ocaml.exe:js_of_ocaml
+    cmdliner-support))))
+
+;; Restore once fixed in dune
+;; (install
+;;  (section share_root)
+;;  (package js_of_ocaml-compiler)
+;; (dirs
+;;  (cmdliner-support/share as .)))

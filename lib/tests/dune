@@ -1,0 +1,26 @@
+; jsoo's lib tests. ppx_expect_light runs each file as its own inline-test
+; partition, so a single library still keeps per-file parallelism.
+
+; These tests depend on the js_of_ocaml library, which is not compatible with
+; WASI. Rather than gate each library with an [enabled_if], disable both backends
+; under the wasi profiles (both set JSOO_TEST_ENGINE=wasi): no inline-test runner
+; is then built there. js_of_ocaml is already disabled under
+; wasi-with-native-effects by the root dune.
+
+(env
+ (wasi
+  (js_of_ocaml
+   (enabled_if false))
+  (wasm_of_ocaml
+   (enabled_if false)))
+ (wasi-with-native-effects
+  (wasm_of_ocaml
+   (enabled_if false))))
+
+(library
+ (name jsoo_lib_expect_tests)
+ (libraries js_of_ocaml unix)
+ (inline_tests
+  (modes js wasm))
+ (preprocess
+  (pps ppx_js_internal ppx_optcomp_light ppx_expect_light)))
