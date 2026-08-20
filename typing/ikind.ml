@@ -884,6 +884,12 @@ let provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly =
       (fun (provenance : Provenance.t) ->
         Hashtbl.add provenances_by_id provenance.id provenance)
       provenances;
+    let exception Missing_provenance_parent of Provenance.id in
+    let find_provenance id =
+      match Hashtbl.find_opt provenances_by_id id with
+      | Some provenance -> provenance
+      | None -> raise (Missing_provenance_parent id)
+    in
     (* An enclosing entry only explains a nested requirement it ENTAILS:
        same axis and an at-least-as-strong required value. Requirements
        are kept as a list per ancestor rather than meet-collapsed into a
@@ -901,8 +907,7 @@ let provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly =
         let parent_bounds =
           match provenance.parent with
           | None -> []
-          | Some parent ->
-            covered_bounds (Hashtbl.find provenances_by_id parent)
+          | Some parent -> covered_bounds (find_provenance parent)
         in
         let bounds =
           match Hashtbl.find_opt raw_bounds_by_id provenance.id with
@@ -927,8 +932,7 @@ let provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly =
         let parent_bounds =
           match entry.provenance.parent with
           | None -> []
-          | Some parent ->
-            covered_bounds (Hashtbl.find provenances_by_id parent)
+          | Some parent -> covered_bounds (find_provenance parent)
         in
         let covered =
           List.fold_left
@@ -1545,27 +1549,30 @@ let best_effort_provenance_error ~fallback_error ~origin ~sub_jkind ~super_jkind
     | None -> Error error
     | Some fallback_error -> Error fallback_error
   in
-  let provenance_check =
-    match make_polys () with
-    | provenance_polys ->
+  let select_provenance_error () =
+    match
       check_mode_crossing_polys ~origin ~sub_jkind ~super_jkind ~printing_env
-        provenance_polys
+        (make_polys ())
+    with
+    | Ok () -> None
+    | Error provenance_error ->
+      if
+        subjkind_errors_have_same_violating_axes actual_error provenance_error
+      then subjkind_error_with_provenance_residuals provenance_error
+      else None
+  in
+  let provenance_error =
+    match select_provenance_error () with
+    | provenance_error -> provenance_error
     | exception
         ((Misc.Fatal_error | Stack_overflow | Out_of_memory | Sys.Break) as exn)
       ->
       raise exn
-    | exception _ -> Ok ()
+    | exception _ -> None
   in
-  match provenance_check with
-  | Ok () -> fallback actual_error
-  | Error provenance_error ->
-    if
-      subjkind_errors_have_same_violating_axes actual_error provenance_error
-    then
-      match subjkind_error_with_provenance_residuals provenance_error with
-      | None -> fallback actual_error
-      | Some provenance_error -> Error provenance_error
-    else fallback actual_error
+  match provenance_error with
+  | None -> fallback actual_error
+  | Some provenance_error -> Error provenance_error
 
 let sub_jkind_l ?(allow_any_crossing = false) ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
