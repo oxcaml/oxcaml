@@ -15,9 +15,7 @@
    substituted into their use sites must remain visible to the debugger:
    the substituted expressions are wrapped in naming constructs
    ([name_for_debugger] in the -dcmm output) and the variables themselves
-   are rebound by empty phantom lets ([let?]).  Inlined parameters must be
-   classified with their parameter index, and provenance locations must
-   carry the inlining stack. *)
+   are rebound by empty phantom lets ([let?]). *)
 
 [@@@ocaml.warning "-26-27-32"]
 

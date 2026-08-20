@@ -530,8 +530,8 @@ let rec is_cmm_simple cmm =
 
 (* Helper function to create bindings *)
 
-let create_binding_aux (type a) env effs (var : Bound_var.t)
-    ~(inline : a inline) (bound_expr : a bound_expr) =
+let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
+    (bound_expr : a bound_expr) =
   let order =
     let incr =
       match bound_expr with
@@ -559,7 +559,7 @@ let create_binding_aux (type a) env effs (var : Bound_var.t)
   in
   binding
 
-let create_binding (type a) env effs var ~(inline : a inline)
+let create_binding (type a) effs var ~(inline : a inline)
     (bound_expr : a bound_expr) =
   (* In order to avoid generating binding of the form: "let x = y in ...", when
      'y' is trivial i.e. is a value that fits in a register, we mark 'x' as a
@@ -570,16 +570,16 @@ let create_binding (type a) env effs var ~(inline : a inline)
     Misc.fatal_errorf
       "[Inlined] bindings should never be created directly; they are only \
        generated when an existing binding is inlined."
-  | Phantom _ -> create_binding_aux env effs var ~inline bound_expr
+  | Phantom _ -> create_binding_aux effs var ~inline bound_expr
   | (Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars })
     when is_cmm_simple cmm_expr ->
     (* trivial/simple cmm expression (as decided by [is_cmm_simple]) do not have
        effects and coeffects *)
     let effs = Ece.pure_can_be_duplicated in
-    create_binding_aux env effs var ~inline:Must_inline_and_duplicate
+    create_binding_aux effs var ~inline:Must_inline_and_duplicate
       (Split { cmm_expr; free_vars })
   | Simple _ | Split _ | Splittable_prim _ ->
-    create_binding_aux env effs var ~inline bound_expr
+    create_binding_aux effs var ~inline bound_expr
 
 (* Binding splitting *)
 
@@ -887,7 +887,7 @@ and split_in_env env res var binding =
 let bind_variable_with_decision (type a) ~mode ?extra env res var ~inline
     ~(defining_expr : a bound_expr) ~effects_and_coeffects_of_defining_expr:effs
     =
-  let binding = create_binding env ~inline effs var defining_expr in
+  let binding = create_binding ~inline effs var defining_expr in
   add_binding_to_env ~mode ?extra env res (Bound_var.var var) binding
 
 let bind_variable ~mode ?extra env res var ~defining_expr
