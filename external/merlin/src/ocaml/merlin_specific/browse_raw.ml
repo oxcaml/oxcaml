@@ -694,7 +694,7 @@ and of_signature_item_desc = function
   | Tsig_modtypesubst _mts ->
     (* TODO. *)
     id_fold
-  | Tsig_jkind jkind -> app (Jkind_declaration jkind)
+  | Tsig_jkind jkind | Tsig_jkindsubst jkind -> app (Jkind_declaration jkind)
 
 and of_core_type_desc = function
   | Ttyp_var (_, jkind) -> of_jkind_annotation_opt jkind
