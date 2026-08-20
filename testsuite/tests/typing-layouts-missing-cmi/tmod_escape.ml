@@ -29,14 +29,5 @@ val f : Tmod_m.s Tmod_defs.t -> Tmod_m.s Tmod_defs.t = <fun>
    satisfied by the declared kind of [Tmod_defs.t]. *)
 let g a = Tmod_defs.mk a.(0);;
 [%%expect {|
-Line 1, characters 23-24:
-1 | let g a = Tmod_defs.mk a.(0);;
-                           ^
-Error: A representable layout is required here.
-       The layout of (Tmod_m.s @@ portable) is any
-         because the .cmi file for Tmod_m.s is missing.
-       But the layout of (Tmod_m.s @@ portable) must be representable
-         because it's the type of an array element.
-       No .cmi file found containing Tmod_m.s.
-       Hint: Adding "tmod_m" to your dependencies might help.
+val g : Tmod_m.s Tmod_defs.t array -> Tmod_m.s Tmod_defs.t = <fun>
 |}]
