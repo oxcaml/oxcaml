@@ -29,3 +29,13 @@ let rec v =
 
 let (_ : int) = Sys.opaque_identity v.i;
 ;;
+
+(* An actually-cyclic value *)
+
+type p = { p : #(p * float#) }
+
+let rec p = { p = #((Gc.full_major (); p), #4.0) }
+
+let () =
+  let #(inner, _) = p.p in
+  assert (inner == p)
