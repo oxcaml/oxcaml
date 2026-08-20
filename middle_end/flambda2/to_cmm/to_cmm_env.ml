@@ -552,7 +552,8 @@ let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
   in
   let phantomize =
     Flambda_features.Expert.phantom_lets ()
-    && Variable.user_visible (Bound_var.var var)
+    && (Variable.user_visible (Bound_var.var var)
+       || Bound_var.needed_by_phantom_let var)
   in
   let binding =
     Binding { order; inline; phantomize; effs; cmm_var; bound_expr }
