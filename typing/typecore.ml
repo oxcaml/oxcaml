@@ -1121,6 +1121,11 @@ let is_iarray_type env ty =
   | Tconstr(path, [_], _) -> Path.same path Predef.path_iarray
   | _ -> false
 
+let is_unboxed_unit_type env ty =
+  match get_desc (expand_head env ty) with
+  | Tconstr(path, [], _) -> Path.same path Predef.path_unboxed_unit
+  | _ -> false
+
 let protect_expansion env ty =
   if Env.has_local_constraints env then generic_instance ty else ty
 
@@ -1369,6 +1374,11 @@ let check_index_not_to_poly_field ~env ba uas =
     (fun (Uaccess_unboxed_field (lid, label, _)) -> check lid label.lbl_arg)
     uas
 
+let check_disambiguation_principality ~loc ~name expected_ty =
+  if not (is_principal expected_ty) then
+    Location.prerr_warning loc
+      (not_principal "this type-based %s disambiguation" name)
+
 (* Represents information about an array type inferred using type-directed
    disambiguation. *)
 type array_info =
@@ -1377,9 +1387,7 @@ type array_info =
 
 let disambiguate_array_literal ~loc env expected_ty =
   let return (ty_elt : (type_expr * Jkind.sort) option) (mut : mutable_flag) =
-    if not (is_principal expected_ty) then
-      Location.prerr_warning loc
-        (not_principal "this type-based array disambiguation");
+    check_disambiguation_principality ~loc ~name:"array" expected_ty;
     { ty_elt; mut }
   in
   if is_floatarray_type env expected_ty then
@@ -10937,15 +10945,11 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
         subexp.exp_loc
         Warnings.Nonreturning_statement;
     if !Clflags.strict_sequence then begin
-      (* XXX jrayman: Factor out into helper *)
       let disambiguated_unit_ty =
-        match get_desc ty with
-        | Tconstr(path, [], _) when Path.same path Predef.path_unboxed_unit ->
-          if not (is_principal ty) then
-            Location.prerr_warning subexp.exp_loc
-              (not_principal "this type-based unit# disambiguation");
+        if is_unboxed_unit_type env ty then begin
+          check_disambiguation_principality ~loc:exp.exp_loc ~name:"unit#" ty;
           instance Predef.type_unboxed_unit
-        | _ ->
+        end else
           instance Predef.type_unit
       in
       unify_var env expected_ty disambiguated_unit_ty;
