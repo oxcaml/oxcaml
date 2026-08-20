@@ -137,6 +137,101 @@ let blackbox_filename = "/builtin/blackbox.ml"
 
 let blackbox_contents = "(* generated code *)"
 
+let gen_position (m : Source_map.map) =
+  match m with
+  | Gen { gen_line; gen_col }
+  | Gen_Ori { gen_line; gen_col; _ }
+  | Gen_Ori_Name { gen_line; gen_col; _ } -> gen_line, gen_col
+
+let compare_gen_position a b =
+  let line_a, col_a = gen_position a in
+  let line_b, col_b = gen_position b in
+  match compare line_a line_b with
+  | 0 ->  compare col_a col_b
+  | other -> other
+
+(* [function_offsets] and [mappings] must be sorted (by position). 
+   For each function start offset with no mapping at exactly
+   that position, returns the offset paired with the source position of
+   the first mapping within the function, if any. *)
+let missing_function_starts ~function_offsets mappings =
+  let col m = snd (gen_position m) in
+  let rec loop acc offsets mappings =
+    match offsets with
+    | [] -> List.rev acc
+    | start :: rest ->
+      (* Drop all mappings that are before our current position *)
+      let mappings = List.drop_while ~f:(fun m -> col m < start) mappings in
+      let acc =
+        match mappings with
+        | m :: _ when col m = start -> acc (* already mapped *)
+        | mappings ->
+          let next_function_start =
+            match rest with
+            | next :: _ -> next
+            | [] -> max_int
+          in
+          let end_ = 
+            List.find_map mappings ~f:(fun m ->
+              if col m < next_function_start
+              then (
+                match m with
+                | Source_map.Gen_Ori { ori_source; ori_line; ori_col; _ }
+                | Source_map.Gen_Ori_Name { ori_source; ori_line; ori_col; _ } ->
+                    Some (ori_source, ori_line, ori_col)
+                | Source_map.Gen _ -> None)
+              else
+                None)
+          in 
+          (start, end_) :: acc
+      in
+      loop acc rest mappings
+  in
+  loop [] function_offsets mappings
+
+(* Add entry to each fn start using first instruction mapped within fn. 
+   Chrome profiler attributes all samples to function start offsets. *)
+let add_function_start_mappings ~function_offsets (sm : Source_map.Standard.t) =
+  let mappings = Source_map.Mappings.decode_exn sm.mappings in
+  (* Wasm sourcemaps use first line + column offset. Lines are 1-based *)
+  let on_first_line = List.filter mappings ~f:(fun m -> fst (gen_position m) = 1) in
+  match missing_function_starts ~function_offsets on_first_line with
+  | [] -> sm
+  | missing ->
+      let blackbox_index, append_blackbox =
+        match List.find_mapi sm.sources ~f:(fun index nm ->
+          if String.equal nm blackbox_filename then Some index else None)
+        with
+        | Some index -> index, false
+        | None ->
+          let needs_blackbox =
+            List.exists missing ~f:(fun (_, ori) -> Option.is_none ori)
+          in
+          List.length sm.sources, needs_blackbox
+      in
+      let sources, sources_content =
+        if append_blackbox
+        then
+          ( sm.sources @ [ blackbox_filename ]
+          , Option.map sm.sources_content ~f:(fun l -> l @ [ None ]) )
+        else sm.sources, sm.sources_content
+      in
+      let extra =
+        List.map missing ~f:(fun (start, ori) ->
+            let ori_source, ori_line, ori_col =
+              Option.value ori ~default:(blackbox_index, 1, 0)
+            in
+            Source_map.Gen_Ori
+              { gen_line = 1; gen_col = start; ori_source; ori_line; ori_col })
+      in
+      { sm with
+        sources
+      ; sources_content
+      ; mappings =
+          Source_map.Mappings.encode
+            (List.sort (mappings @ extra) ~cmp:compare_gen_position)
+      }
+
 let insert_source_contents' (sm : Source_map.Standard.t) i f =
   let l = sm.sources in
   let single = List.length l = 1 in
