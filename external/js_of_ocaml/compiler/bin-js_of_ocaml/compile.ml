@@ -416,10 +416,14 @@ let run
   | (`Stdin | `File _) as bytecode ->
       let kind, ic, close_ic, include_dirs =
         match bytecode with
-        | `Stdin -> Parse_bytecode.from_channel stdin, stdin, (fun () -> ()), include_dirs
+        | `Stdin ->
+            let res = Parse_bytecode.from_channel stdin in
+            Gc.compact ();
+            res, stdin, (fun () -> ()), include_dirs
         | `File fn ->
             let ch = open_in_bin fn in
             let res = Parse_bytecode.from_channel ch in
+            Gc.compact ();
             let include_dirs = Filename.dirname fn :: include_dirs in
             res, ch, (fun () -> close_in ch), include_dirs
       in
@@ -443,6 +447,7 @@ let run
               ~debug:need_debug
               ic
           in
+          Gc.compact ();
           if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
           output_gen
             ~write_shape:false
@@ -483,6 +488,7 @@ let run
               cmo
               ic
           in
+          Gc.compact ();
           if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
           output_gen
             ~write_shape:true
@@ -548,6 +554,7 @@ let run
                   cmo
                   ic
               in
+              Gc.compact ();
               if times ()
               then
                 Format.eprintf
@@ -587,6 +594,7 @@ let run
                       cmo
                       ic
                   in
+                  Gc.compact ();
                   if times ()
                   then
                     Format.eprintf
