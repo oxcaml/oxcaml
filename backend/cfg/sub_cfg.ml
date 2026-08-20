@@ -130,12 +130,20 @@ let exists_basic_blocks sub_cfg ~f = DLL.exists sub_cfg.layout ~f
 let transfer ~from ~to_ = DLL.transfer ~from:from.layout ~to_:to_.layout ()
 
 let join ~from ~to_ ~phantom_available_before =
-  List.iter (fun from -> transfer ~from ~to_) from;
+  List.iter (fun (from, _may_fall_through) -> transfer ~from ~to_) from;
   let join_block = make_never_block () in
   List.iter
-    (fun from ->
-      link_if_needed ~from:from.exit ~to_:join_block ~phantom_available_before
-        ())
+    (fun (from, may_fall_through) ->
+      (* A branch whose emission stopped because the code never returns must not
+         be linked to the join block, even if its exit block still has a [Never]
+         terminator: that can happen when the divergence arose inside a nested
+         construct (e.g. a [Ccatch] all of whose arms diverge), whose own join
+         block was left unfilled. Linking such an exit would create a reference
+         to a block that may never be materialised. *)
+      if may_fall_through
+      then
+        link_if_needed ~from:from.exit ~to_:join_block ~phantom_available_before
+          ())
     from;
   add_block to_ join_block
 
