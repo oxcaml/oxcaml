@@ -23,12 +23,13 @@
    the (inlined-body) parameter bindings, leaving phantom lets whose
    defining expressions reference those temporaries, which are marked
    "needed by phantom let" (see pr15b).  The temporary holding the [trace]
-   component has its own binding inlined into the argument of an extcall
-   inside a continuation handler, so the flush of the delayed-bindings
-   environment that discards the binding never sees the phantom occurrence:
-   the phantom-mode free variable reaches the function boundary, where it
-   must be bound as an empty phantom let rather than causing a fatal error
-   ("Unbound free_vars in function body when translating to cmm").
+   component is sunk past the flush that emits the phantom let and its
+   binding is then inlined into the argument of an extcall inside a
+   continuation handler, so the referenced binder is not in scope where the
+   phantom let is emitted.  The reference must be erased from the emitted
+   phantom let (see [To_cmm_env.flush_delayed_lets]) rather than causing a
+   fatal error ("Unbound free_vars in function body when translating to
+   cmm").
 
    Every ingredient below is load-bearing: the array access, the pair
    inside the option, and both [Printexc] calls (whose inlined bodies
