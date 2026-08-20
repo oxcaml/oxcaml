@@ -1090,12 +1090,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let phantom_available_before = SU.phantom_vars_from_env env in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg
         ~phantom_available_before;
-      let may_fall_through (r : _ Or_never_returns.t) =
-        match r with Ok _ -> true | Never_returns -> false
-      in
-      Sub_cfg.join
-        ~from:[sub_if, may_fall_through rif; sub_else, may_fall_through relse]
-        ~to_:sub_cfg ~phantom_available_before;
+      Sub_cfg.join ~from:[sub_if; sub_else] ~to_:sub_cfg
+        ~phantom_available_before;
       r
 
   and emit_expr_switch env sub_cfg bound_name esel index ecases
@@ -1117,14 +1113,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let phantom_available_before = SU.phantom_vars_from_env env in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg
         ~phantom_available_before;
-      Sub_cfg.join
-        ~from:
-          (Array.to_list
-             (Array.map
-                (fun ((r : _ Or_never_returns.t), sub_cfg) ->
-                  sub_cfg, match r with Ok _ -> true | Never_returns -> false)
-                sub_cases))
-        ~to_:sub_cfg ~phantom_available_before;
+      Sub_cfg.join ~from:(Array.to_list subs) ~to_:sub_cfg
+        ~phantom_available_before;
       r
 
   and emit_expr_catch env sub_cfg bound_name (flag : Cmm.ccatch_flag) handlers
@@ -1230,23 +1220,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let a = Array.of_list ((r_body, sub_body) :: List.map snd l) in
     let r = SU.join_array env a ~bound_name in
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
-    let may_fall_through (r : _ Or_never_returns.t) =
-      match r with Ok _ -> true | Never_returns -> false
-    in
     let sub_handlers =
       List.map
-        (fun ((rs, label, dbg, phantom_available_before), (r, sub_handler)) ->
+        (fun ((rs, label, dbg, phantom_available_before), (_, sub_handler)) ->
           Sub_cfg.add_empty_block_at_start sub_handler ~label;
           setup_catch_handler flag rs sub_handler ~dbg ~phantom_available_before;
-          sub_handler, may_fall_through r)
+          sub_handler)
         l
     in
     let term_desc = Cfg.Always (Sub_cfg.start_label sub_body) in
     let phantom_available_before = SU.phantom_vars_from_env env in
     Sub_cfg.update_exit_terminator sub_cfg term_desc ~phantom_available_before;
-    Sub_cfg.join
-      ~from:((sub_body, may_fall_through r_body) :: sub_handlers)
-      ~to_:sub_cfg ~phantom_available_before;
+    Sub_cfg.join ~from:(sub_body :: sub_handlers) ~to_:sub_cfg
+      ~phantom_available_before;
     r
 
   and emit_expr_exit env sub_cfg (lbl : Cmm.exit_label) args traps :
