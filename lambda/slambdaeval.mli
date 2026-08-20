@@ -35,6 +35,8 @@ end
 
 type closure
 
+type record
+
 type halves =
   { slv_comptime : value Or_missing.t;
     slv_runtime : lambda
@@ -43,7 +45,7 @@ type halves =
 and value =
   | SLVhalves of halves
   | SLVlayout of layout
-  | SLVrecord of value Or_missing.t array
+  | SLVrecord of record
   | SLVclosure of closure
 
 module CU_data : sig
@@ -51,7 +53,7 @@ module CU_data : sig
 
   type raw
 
-  val empty : t
+  val empty : unit -> t
 
   val write : t -> sections:File_sections.Builder.t -> raw
 
@@ -65,4 +67,4 @@ val eval :
   slambda ->
   CU_data.t * lambda
 
-val print : Format_doc.formatter -> value Or_missing.t -> unit
+val print_value_or_missing : Format_doc.formatter -> value Or_missing.t -> unit
