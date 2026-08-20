@@ -61,9 +61,12 @@
             (br_on_cast_fail $not_float_array (ref eq) (ref $float_array)
                (local.get $base)))
          (local.set $pos
+            ;; Field of a runtime-built block index; always an [i31].
+            ;; lint-ignore-start manual-portability-handling-unsafe
             (i31.get_s
                (ref.cast (ref i31)
                   (array.get $block (local.get $idx_block) (i32.const 1)))))
+            ;; lint-ignore-end manual-portability-handling-unsafe
          (return
             (struct.new $float
                (array.get $float_array (local.get $fa) (local.get $pos))))))
@@ -74,10 +77,13 @@
          (if (i32.le_u (local.get $i) (local.get $depth))
             (then
                (local.set $pos
+                  ;; Field of a runtime-built block index; always an [i31].
+                  ;; lint-ignore-start manual-portability-handling-unsafe
                   (i31.get_s
                      (ref.cast (ref i31)
                         (array.get $block (local.get $idx_block)
                            (local.get $i)))))
+                  ;; lint-ignore-end manual-portability-handling-unsafe
                (local.set $res
                   (array.get $block
                      (ref.cast (ref $block) (local.get $res))
@@ -119,9 +125,12 @@
             (br_on_cast_fail $not_float_array (ref eq) (ref $float_array)
                (local.get $base)))
          (local.set $pos
+            ;; Field of a runtime-built block index; always an [i31].
+            ;; lint-ignore-start manual-portability-handling-unsafe
             (i31.get_s
                (ref.cast (ref i31)
                   (array.get $block (local.get $idx_block) (i32.const 1)))))
+            ;; lint-ignore-end manual-portability-handling-unsafe
          (array.set $float_array (local.get $fa) (local.get $pos)
             (struct.get $float 0 (ref.cast (ref $float) (local.get $v))))
          (return (ref.i31 (i32.const 0)))))
@@ -133,10 +142,13 @@
          (if (i32.lt_u (local.get $i) (local.get $depth))
             (then
                (local.set $pos
+                  ;; Field of a runtime-built block index; always an [i31].
+                  ;; lint-ignore-start manual-portability-handling-unsafe
                   (i31.get_s
                      (ref.cast (ref i31)
                         (array.get $block (local.get $idx_block)
                            (local.get $i)))))
+                  ;; lint-ignore-end manual-portability-handling-unsafe
                (local.set $dst
                   (array.get $block
                      (ref.cast (ref $block) (local.get $dst))
@@ -145,10 +157,13 @@
                (br $loop))))
       ;; Set the final field
       (local.set $pos
+         ;; Field of a runtime-built block index; always an [i31].
+         ;; lint-ignore-start manual-portability-handling-unsafe
          (i31.get_s
             (ref.cast (ref i31)
                (array.get $block (local.get $idx_block)
                   (local.get $depth)))))
+         ;; lint-ignore-end manual-portability-handling-unsafe
       (array.set $block
          (ref.cast (ref $block) (local.get $dst))
          (i32.add (local.get $pos) (i32.const 1))
