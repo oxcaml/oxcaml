@@ -61,6 +61,8 @@ let dump (type a) : a t -> json =
   | Type_expr (expr, pos) ->
     mk "type-expression"
       [ ("expression", `String expr); ("position", mk_position pos) ]
+  | Structured_errors { pronouns } ->
+    mk "structured-errors" [ ("pronouns", `Bool pronouns) ]
   | Stack_or_heap_enclosing (pos, lsp_compat, index) ->
     mk "stack-or-heap-enclosing"
       [ ( "index",
@@ -526,9 +528,126 @@ let json_of_search_result list =
   in
   `List list
 
+module Structured_errors = struct
+  module Diagnostic = Structured_diagnostic
+
+  let position (position : Lexing.position) =
+    `Assoc
+      [ ("line", `Int position.pos_lnum);
+        ("col", `Int (position.pos_cnum - position.pos_bol))
+      ]
+
+  let location (loc : Location.t) =
+    `Assoc
+      [ ("file", `String loc.loc_start.pos_fname);
+        ("start", position loc.loc_start);
+        ("end", position loc.loc_end)
+      ]
+
+  let form_to_string (form : Diagnostic.Form.t) =
+    match form with
+    | Name -> "name"
+    | Pronoun -> "pronoun"
+
+  let kind (kind : Diagnostic.Kind.t) =
+    match kind with
+    | Explanation -> "explanation"
+    | Background -> "background"
+    | Suggestion -> "suggestion"
+
+  let relation (relation : Diagnostic.Relation.t) =
+    match relation with
+    | Claim -> "claim"
+    | Elaboration -> "elaboration"
+
+  let annotation (annotation : Diagnostic.Annotation.t) =
+    match annotation with
+    | Code -> `Assoc [ ("kind", `String "code") ]
+    | Source loc -> `Assoc [ ("kind", `String "source"); ("loc", location loc) ]
+    | Mention { entity; form } ->
+      `Assoc
+        [ ("kind", `String "mention");
+          ("entity", `Int (Diagnostic.Entities.Id.to_int entity));
+          ("form", `String (form_to_string form))
+        ]
+    | Term term ->
+      `Assoc
+        [ ("kind", `String "term");
+          ("term", `Int (Diagnostic.Glossary.Id.to_int term))
+        ]
+
+  let rec inline (segment : Diagnostic.Inline.t) =
+    match segment with
+    | Text text -> `Assoc [ ("kind", `String "text"); ("text", `String text) ]
+    | Annotated segment ->
+      `Assoc
+        [ ("kind", `String "annotated");
+          ("annotation", annotation segment.annotation);
+          ("content", `List (List.map ~f:inline segment.content))
+        ]
+
+  let rec block (block : Diagnostic.Block.t) =
+    `Assoc
+      [ ("kind", `String (kind block.kind));
+        ("content", `List (List.map ~f:inline block.content));
+        ("children", `List (List.map ~f:child block.children))
+      ]
+
+  and child ((relation_kind, block_value) :
+      Diagnostic.Relation.t * Diagnostic.Block.t) =
+    `Assoc
+      [ ("relation", `String (relation relation_kind));
+        ("block", block block_value)
+      ]
+
+  let entity (id, loc : Diagnostic.Entities.Id.t * Location.t) =
+    `Assoc
+      [ ("id", `Int (Diagnostic.Entities.Id.to_int id));
+        ("loc", location loc)
+      ]
+
+  let glossary_entry
+      (id, entry : Diagnostic.Glossary.Id.t * Diagnostic.Glossary.Entry.t) =
+    let url =
+      match entry.url with
+      | None -> []
+      | Some url -> [ ("url", `String url) ]
+    in
+    `Assoc
+      ([ ("id", `Int (Diagnostic.Glossary.Id.to_int id));
+         ("term", `String entry.term);
+         ("category", `String entry.category);
+         ("description", `String entry.description)
+       ]
+      @ url)
+
+  let diagnostic (diagnostic : Diagnostic.t) =
+    `Assoc
+      [ ("loc", location diagnostic.loc);
+        ("title", `String diagnostic.title);
+        ( "entities",
+          `List
+            (List.map ~f:entity
+               (Diagnostic.Entities.to_list diagnostic.entities)) );
+        ( "glossary",
+          `List
+            (List.map ~f:glossary_entry
+               (Diagnostic.Glossary.to_list diagnostic.glossary)) );
+        ("body", `List (List.map ~f:block diagnostic.body))
+      ]
+
+  let response diagnostics : json =
+    `Assoc
+      [ ("version", `Int 1);
+        ("diagnostics", `List (List.map ~f:diagnostic diagnostics))
+      ]
+end
+
 let json_of_response (type a) (query : a t) (response : a) : json =
   match (query, response) with
   | Type_expr _, str -> `String str
+  | Structured_errors _, diagnostics ->
+    Structured_errors.response diagnostics
   | Stack_or_heap_enclosing _, results ->
     `List (List.map ~f:json_of_stack_or_heap results)
   | Mode_enclosing _, results -> `List (List.map ~f:json_of_mode results)
