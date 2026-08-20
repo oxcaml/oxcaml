@@ -203,6 +203,16 @@ typedef uint64_t uintnat;
 #define STACK_GUARD_PAGES
 #endif
 
+/* The size in bytes of the guard page below each native-code stack,
+   and the byte offset from a stack_info to Stack_base. */
+#if !defined(STACK_CHECKS_ENABLED) && !defined(USE_MMAP_MAP_STACK)
+#define Stack_guard_size 4096
+#define Stack_base_offset (2 * Stack_guard_size)
+#else
+#define Stack_guard_size 0
+#define Stack_base_offset (Stack_ctx_words * 8)
+#endif
+
 /* Whether to offset Stack_high to preserve alignment. */
 #if defined(TARGET_amd64) && !defined(WITH_FRAME_POINTERS)
 #define Stack_padding_word 1

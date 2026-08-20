@@ -16,6 +16,12 @@
 
 val stack_ctx_words : int
 
+(* Size in bytes of the guard page below each stack when stack checks
+   are disabled (zero otherwise), and byte offset from a stack_info to
+   the lowest usable stack address; see runtime/caml/config.h. *)
+val stack_guard_size : int
+val stack_base_offset : int
+
 type t =
 #define DOMAIN_STATE(type, name) | Domain_##name
 #include "domain_state.tbl"

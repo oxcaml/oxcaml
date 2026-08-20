@@ -81,10 +81,15 @@ let build_cfg_info : Cfg.t -> cfg_info =
       let preproc_stack_check_result =
         block_preproc_stack_check_result block ~frame_size
       in
+      let large_frame_limit =
+        if Config.no_stack_checks
+        then Domainstate.stack_guard_size
+        else Stack_check.stack_threshold_size
+      in
       let block_needs_stack_checks =
-        preproc_stack_check_result.contains_nontail_calls
-        || preproc_stack_check_result.max_frame_size
-           >= Stack_check.stack_threshold_size
+        preproc_stack_check_result.max_frame_size >= large_frame_limit
+        || preproc_stack_check_result.contains_nontail_calls
+           && not Config.no_stack_checks
       in
       let max_frame_size =
         Int.max max_frame_size preproc_stack_check_result.max_frame_size
@@ -223,12 +228,10 @@ let insert_stack_checks (cfg : Cfg.t) ~max_frame_size
    cases, rather than simply pushing it down. *)
 let cfg (cfg_with_layout : Cfg_with_layout.t) =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  (if not Config.no_stack_checks
+  (let { max_frame_size; blocks_needing_stack_checks } = build_cfg_info cfg in
+   if not (Label.Set.is_empty blocks_needing_stack_checks)
    then
-     let { max_frame_size; blocks_needing_stack_checks } = build_cfg_info cfg in
-     if not (Label.Set.is_empty blocks_needing_stack_checks)
-     then
-       if Label.Tbl.length cfg.blocks < !Oxcaml_flags.cfg_stack_checks_threshold
-       then insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
-       else insert_instruction cfg cfg.entry_label ~max_frame_size);
+     if Label.Tbl.length cfg.blocks < !Oxcaml_flags.cfg_stack_checks_threshold
+     then insert_stack_checks cfg ~max_frame_size ~blocks_needing_stack_checks
+     else insert_instruction cfg cfg.entry_label ~max_frame_size);
   cfg_with_layout
