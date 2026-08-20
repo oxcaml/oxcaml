@@ -2871,6 +2871,16 @@ let contained_without_boxing env ty =
    allowing us to return a type for which a definition was found even if
    we eventually bottom out at a missing cmi file, or otherwise. *)
 let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
+  match get_desc ty with
+  | Tmod (ty, _) ->
+    (* Mode bounds do not affect the runtime representation, so [Tmod]
+       wrappers are transparent here, at no fuel cost. In particular a [Tmod]
+       must never be returned from this function: it carries no definition, so
+       it may not become [ty_prev] (the missing-cmi fallback, whose kind could
+       then only be estimated as [any]), and representation-oriented consumers
+       such as [Typeopt.classify] expect never to see one. *)
+    get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel
+  | _ ->
   if fuel < 0 then Error { ty; modality; or_null }
   else
     (* We use expand_head_opt version of expand_head to get access
