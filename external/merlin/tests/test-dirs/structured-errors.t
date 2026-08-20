@@ -70,7 +70,7 @@ in the buffer rather than the one it has on disk
 
   $ cat > edited <<EOF
   > let ok () = ()
-  > 
+  >
   > let test () =
   >   let x = ref 42 in
   >   let foo () = x := 24 in
