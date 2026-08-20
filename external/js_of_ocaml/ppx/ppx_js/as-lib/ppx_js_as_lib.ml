@@ -16,4 +16,6 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-include Ppx_js_as_lib
+include Ppx_js_internal
+
+let () = wrapper := Some "Js_of_ocaml"
