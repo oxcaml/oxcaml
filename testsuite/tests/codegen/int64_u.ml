@@ -466,6 +466,7 @@ of_int32_u:
   ret
 |}]
 
+(* CR ttebbi: could be [cltq] *)
 let to_int32_u x = Int64_u.to_int32_u x
 [%%expect_asm X86_64{|
 to_int32_u:

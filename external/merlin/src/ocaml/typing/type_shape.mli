@@ -97,10 +97,18 @@ end
 module Evaluated_shape : sig
   type t
 
+  (** Holds the hash-consing tables and evaluation cache used by
+      [unfold_and_evaluate]. *)
+  module Eval_context : sig
+    type t
+
+    val create : initial_size:int -> t
+  end
+
   (** Evaluate a shape that has already been reduced via [shape_reduce]. This
       unfolds recursive declarations into recursive types using [Mu]. *)
   val unfold_and_evaluate :
-    ?diagnostics:Evaluation_diagnostics.t -> Shape.t -> t
+    ctx:Eval_context.t -> ?diagnostics:Evaluation_diagnostics.t -> Shape.t -> t
 
   (** Access the underlying shape. *)
   val shape : t -> Shape.t
@@ -112,20 +120,13 @@ type shape_with_layout = private
     type_name : string
   }
 
-val all_type_decls : Shape.t Uid.Tbl.t
-
 val all_type_shapes : shape_with_layout Uid.Tbl.t
 
 (* Passing [Path.t -> Uid.t] instead of [Env.t] to avoid a dependency cycle. *)
-val add_to_type_decls :
-  (Ident.t * Types.type_declaration) list -> path_lookup -> unit
-
 val add_to_type_shapes :
   Uid.t -> Types.type_expr -> Layout.t -> name:string -> path_lookup -> unit
 
 (*
-val print_table_all_type_decls : Format.formatter -> unit
-
 val print_table_all_type_shapes : Format.formatter -> unit
 
 val print_debug_uid_tables : Format.formatter -> unit

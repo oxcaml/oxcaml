@@ -65,7 +65,7 @@ type summary =
   (* CR zqian: track [add_lock] as well *)
 
 type address = Persistent_env.address =
-  | Aunit of Compilation_unit.t
+  | Aunit of Compilation_unit.t * Mode.Value.l
   | Alocal of Ident.t
   | Adot of address * Jkind_types.Sort.t array * int
 
@@ -473,6 +473,17 @@ val add_modtype_lazy: update_summary:bool ->
 val add_class: Ident.t -> class_declaration -> t -> t
 val add_cltype: Ident.t -> class_type_declaration -> t -> t
 val add_local_constraint: stage:stage -> Path.t -> type_declaration -> t -> t
+
+(** Assumes the environment was built by adding to [since] *)
+val local_constraints_have_been_added : since:t -> t -> bool
+
+(** Assumes the environment was built by adding to [since].
+    [revert_local_constraints ~since env] is [env] with its local (GADT)
+    constraints replaced by [since]'s.
+
+    Arbitrary uses of this function may create ill-formed environments *)
+val revert_local_constraints : since:t -> t -> t
+
 val add_implicit_jkind: loc:Location.t -> string -> jkind_lr -> t -> t
 val clear_implicit_jkinds : t -> t
 val add_jkind:
@@ -586,7 +597,7 @@ val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
 val add_unboxed_lock : t -> t
-val enter_quotation : t -> t
+val enter_quote : t -> t
 val enter_splice : loc:Location.t -> t -> t
 
 (** Set the environment's stage to a fixed one in the far future.

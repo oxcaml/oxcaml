@@ -524,8 +524,8 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     sub.expr sub exp1;
     sub.expr sub exp2
   | Texp_hole _ -> ()
-  | Texp_quotation exp -> sub.expr sub exp
-  | Texp_antiquotation exp -> sub.expr sub exp
+  | Texp_quote exp -> sub.expr sub exp
+  | Texp_splice exp -> sub.expr sub exp
 
 let package_type sub {tpt_cstrs; tpt_txt; _} =
   List.iter (fun (lid, p) -> iter_loc_lid sub lid; sub.typ sub p) tpt_cstrs;
@@ -652,10 +652,10 @@ let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =
   match mod_desc with
   | Tmod_ident (_, lid) -> iter_loc_lid sub lid
   | Tmod_structure st -> sub.structure sub st
-  | Tmod_functor (arg, mexpr) ->
+  | Tmod_functor (arg, mexpr, _) ->
       functor_parameter sub arg;
       sub.module_expr sub mexpr
-  | Tmod_apply (mexp1, mexp2, c, _) ->
+  | Tmod_apply (mexp1, mexp2, c, _, _) ->
       sub.module_expr sub mexp1;
       sub.module_expr sub mexp2;
       sub.module_coercion sub c

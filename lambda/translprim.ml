@@ -114,10 +114,10 @@ type atomic_kind =
 
 type atomic_op =
   | Load
-  | Set
-  | Exchange
-  | Compare_exchange
-  | Compare_and_set
+  | Set of modify_mode
+  | Exchange of modify_mode
+  | Compare_exchange of modify_mode
+  | Compare_and_set of modify_mode
   | Fetch_add
   | Add
   | Sub
@@ -1136,19 +1136,27 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%atomic_load" -> Atomic(Load, Ref, Pointer)
     | "%atomic_load_field" -> Atomic(Load, Field, Pointer)
     | "%atomic_load_loc" -> Atomic(Load, Loc, Pointer)
-    | "%atomic_set" -> Atomic(Set, Ref, Pointer)
-    | "%atomic_set_field" -> Atomic(Set, Field, Pointer)
-    | "%atomic_set_loc" -> Atomic(Set, Loc, Pointer)
-    | "%atomic_exchange" -> Atomic(Exchange, Ref, Pointer)
-    | "%atomic_exchange_field" -> Atomic(Exchange, Field, Pointer)
-    | "%atomic_exchange_loc" -> Atomic(Exchange, Loc, Pointer)
-    | "%atomic_compare_exchange" -> Atomic(Compare_exchange, Ref, Pointer)
+    | "%atomic_set" -> Atomic(Set (get_first_arg_mode ()), Ref, Pointer)
+    | "%atomic_set_field" -> Atomic(Set (get_first_arg_mode ()), Field, Pointer)
+    | "%atomic_set_loc" -> Atomic(Set (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_exchange" ->
+      Atomic(Exchange (get_first_arg_mode ()), Ref, Pointer)
+    | "%atomic_exchange_field" ->
+      Atomic(Exchange (get_first_arg_mode ()), Field, Pointer)
+    | "%atomic_exchange_loc" ->
+      Atomic(Exchange (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_compare_exchange" ->
+      Atomic(Compare_exchange (get_first_arg_mode ()), Ref, Pointer)
     | "%atomic_compare_exchange_field" ->
-      Atomic(Compare_exchange, Field, Pointer)
-    | "%atomic_compare_exchange_loc" -> Atomic(Compare_exchange, Loc, Pointer)
-    | "%atomic_cas" -> Atomic(Compare_and_set, Ref, Pointer)
-    | "%atomic_cas_field" -> Atomic(Compare_and_set, Field, Pointer)
-    | "%atomic_cas_loc" -> Atomic(Compare_and_set, Loc, Pointer)
+      Atomic(Compare_exchange (get_first_arg_mode ()), Field, Pointer)
+    | "%atomic_compare_exchange_loc" ->
+      Atomic(Compare_exchange (get_first_arg_mode ()), Loc, Pointer)
+    | "%atomic_cas" ->
+      Atomic(Compare_and_set (get_first_arg_mode ()), Ref, Pointer)
+    | "%atomic_cas_field" ->
+      Atomic(Compare_and_set (get_first_arg_mode ()), Field, Pointer)
+    | "%atomic_cas_loc" ->
+      Atomic(Compare_and_set (get_first_arg_mode ()), Loc, Pointer)
     | "%atomic_fetch_add" -> Atomic(Fetch_add, Ref, Immediate)
     | "%atomic_fetch_add_field" -> Atomic(Fetch_add, Field, Immediate)
     | "%atomic_fetch_add_loc" -> Atomic(Fetch_add, Loc, Immediate)
@@ -1202,15 +1210,21 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%get_idx_imm" ->
       (* This primitive requires the indexed data to be truly immutable,
          which the compiler will rely upon when performing optimizations *)
-      Primitive(Pget_idx (layout, Immutable), 2)
+      Primitive(Pget_idx (layout, Immutable_access), 2)
     | "%get_idx" ->
       (* Whenever it's safe to use the "_imm" counterpart to this primitive
-         (just above), it's also safe to use this one. Marking the primitive as
-         [Mutable] just restricts the optimizations that can be performed. *)
-      Primitive(Pget_idx (layout, Mutable), 2)
+         (just above), it's also safe to use this one. Marking the primitive
+         as [Mutable_access] just restricts the optimizations that can be
+         performed. *)
+      Primitive(Pget_idx (layout, Mutable_access), 2)
+    | "%get_idx_atomic" ->
+      Primitive(Pget_idx (layout, Atomic_access), 2)
     | "%set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
-      Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
+      Primitive(Pset_idx (layout, get_first_arg_mode (), Nonatomic), 3)
+    | "%set_idx_atomic" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Primitive(Pset_idx (layout, get_first_arg_mode (), Atomic), 3)
     | "%unsafe_array_idx" ->
       Primitive(Pmake_idx_array
         (Punspecializedarray, Ptagged_int_index,
@@ -1920,21 +1934,21 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
         match fst (maybe_pointer_type env rhs) with
         | Pointer -> None
         | Immediate -> Some (Atomic (Load, Field, Immediate)))
-  | Atomic (Set as op, (Ref | Loc as kind), Pointer), [_; v]
-  | Atomic (Set as op, (Field as kind), Pointer), [_; _; v]
-  | Atomic (Exchange as op, (Ref | Loc as kind), Pointer), [_; v]
-  | Atomic (Exchange as op, (Field as kind), Pointer), [_; _; v]
-  | Atomic (Compare_and_set as op, (Ref | Loc as kind), Pointer), [_; _; v]
-  | Atomic (Compare_and_set as op, (Field as kind), Pointer), [_; _; _; v]
-  | Atomic (Compare_exchange as op, (Ref | Loc as kind), Pointer), [_; _; v]
-  | Atomic (Compare_exchange as op, (Field as kind), Pointer), [_; _; _; v] ->
+  | Atomic (Set _ as op, (Ref | Loc as kind), Pointer), [_; v]
+  | Atomic (Set _ as op, (Field as kind), Pointer), [_; _; v]
+  | Atomic (Exchange _ as op, (Ref | Loc as kind), Pointer), [_; v]
+  | Atomic (Exchange _ as op, (Field as kind), Pointer), [_; _; v]
+  | Atomic (Compare_and_set _ as op, (Ref | Loc as kind), Pointer), [_; _; v]
+  | Atomic (Compare_and_set _ as op, (Field as kind), Pointer), [_; _; _; v]
+  | Atomic (Compare_exchange _ as op, (Ref | Loc as kind), Pointer), [_; _; v]
+  | Atomic (Compare_exchange _ as op, (Field as kind), Pointer), [_; _; _; v] ->
     (* Checking [v] is sufficient for CAS: we only need the contents' type. *)
     (match fst (maybe_pointer_type env v) with
     | Pointer -> None
     | Immediate -> Some (Atomic (op, kind, Immediate)))
-  | Primitive (Pset_idx (_, m), arity), (_ :: _ :: p3 :: _) ->
+  | Primitive (Pset_idx (_, m, a), arity), (_ :: _ :: p3 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p3 in
-    Some (Primitive (Pset_idx (l, m), arity))
+    Some (Primitive (Pset_idx (l, m, a), arity))
   | Primitive (Pset_ptr (_, m), arity), (_ :: p2 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p2 in
     Some (Primitive (Pset_ptr (l, m), arity))
@@ -2156,10 +2170,10 @@ let atomic_arity op (kind : atomic_kind) =
   let arity_of_op =
     match op with
     | Load -> 1
-    | Set -> 2
-    | Exchange -> 2
-    | Compare_exchange -> 3
-    | Compare_and_set -> 3
+    | Set _ -> 2
+    | Exchange _ -> 2
+    | Compare_exchange _ -> 3
+    | Compare_and_set _ -> 3
     | Fetch_add | Add | Sub | Land | Lor | Lxor -> 2
   in
   let extra_kind_arity =
@@ -2183,12 +2197,12 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
   let prim =
     match op with
     | Load -> Patomic_load_field { immediate_or_pointer }
-    | Set -> Patomic_set_field { immediate_or_pointer }
-    | Exchange -> Patomic_exchange_field { immediate_or_pointer }
-    | Compare_exchange ->
-      Patomic_compare_exchange_field { immediate_or_pointer }
-    | Compare_and_set ->
-      Patomic_compare_set_field { immediate_or_pointer }
+    | Set mode -> Patomic_set_field { immediate_or_pointer; mode }
+    | Exchange mode -> Patomic_exchange_field { immediate_or_pointer; mode }
+    | Compare_exchange mode ->
+      Patomic_compare_exchange_field { immediate_or_pointer; mode }
+    | Compare_and_set mode ->
+      Patomic_compare_set_field { immediate_or_pointer; mode }
     | Fetch_add -> Patomic_fetch_add_field
     | Add -> Patomic_add_field
     | Sub -> Patomic_sub_field
@@ -2431,7 +2445,8 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
   else
     prim
 
-let transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding path =
+let transl_primitive
+      loc p env ty ~poly_mode ~poly_sort ~yielding ~zero_alloc_check path =
   let prim =
     transl_primitive_common loc
       ~poly_mode ~poly_sort Rc_normal p env ty path []
@@ -2527,12 +2542,20 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding path =
        | Alloc_heap :: args -> count_nlocal args
        | (Alloc_local :: _) as args -> List.length args
      in
-     let nlocal = count_nlocal (List.map to_locality p.prim_native_repr_args)
-     in lfunction
+     let nlocal = count_nlocal (List.map to_locality p.prim_native_repr_args) in
+     let zero_alloc : Lambda.zero_alloc_attribute =
+       match (zero_alloc_check : Zero_alloc.check option) with
+       | None -> Default_zero_alloc
+       | Some { strict; opt; arity = _; loc; custom_error_msg } ->
+         if Builtin_attributes.is_zero_alloc_check_enabled ~opt
+         then Check { strict; loc; custom_error_msg }
+         else Default_zero_alloc
+     in
+     lfunction
        ~kind:(Curried {nlocal})
        ~params
        ~return
-       ~attr:default_stub_attribute
+       ~attr:{ default_stub_attribute with zero_alloc }
        ~loc
        ~body
        ~mode:alloc_heap

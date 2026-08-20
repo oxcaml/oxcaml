@@ -39,8 +39,7 @@ select_cmp:
   ret
 |}]
 
-(* CR ttebbi: We shouldn't materialize the bit, and ideally even share the
-   cmp instructions. *)
+(* CR ttebbi: We shouldn't materialize the bit. *)
 let select_cmp_twice (x : int) (y: int) =
   (Builtins.select (x < y) x y) + (Builtins.select (x < y) 10 20)
 [%%expect_asm X86_64{|
@@ -54,7 +53,6 @@ select_cmp_twice:
   movl  $21, %edx
   cmpq  $1, %rax
   cmovne %rdx, %rdi
-  cmpq  $1, %rax
   cmovne %rsi, %rbx
   leaq  -1(%rbx,%rdi), %rax
   ret
@@ -122,12 +120,11 @@ repeated_select_shared:
   cmpq  $1, %r8
   cmovne %rdi, %rax
   movq  %rcx, %rbx
-  cmpq  $1, %r8
   cmovne %rdx, %rbx
   ret
 |}]
 
-(* CR ttebbi: We should not materialize the boolean, ideally even share the cmpq. *)
+(* CR ttebbi: We should not materialize the boolean. *)
 let repeated_select_repeated x y z w  a b =
   let q =
     Builtins.select_int64 ((Int64_u.to_int64 x) < (Int64_u.to_int64 y)) z w
@@ -146,7 +143,6 @@ repeated_select_repeated:
   cmpq  $1, %r8
   cmovne %rdi, %rax
   movq  %rcx, %rbx
-  cmpq  $1, %r8
   cmovne %rdx, %rbx
   ret
 |}]
@@ -181,5 +177,30 @@ unboxing_through_select:
   movq  8(%rdx), %rax
   movq  %rsi, 64(%r14)
   addq  $8, %rsp
+  ret
+|}]
+
+(* Both arms are the same constant, so no csel is needed. *)
+let select_same_constant x = Builtins.select x 0 0
+[%%expect_asm X86_64{|
+select_same_constant:
+  movl  $1, %eax
+  ret
+|}]
+
+(* Both arms are the same value, so no csel is needed. *)
+let select_same_arg x y = Builtins.select x y y
+[%%expect_asm X86_64{|
+select_same_arg:
+  movq  %rbx, %rax
+  ret
+|}]
+
+(* When the condition holds the two arms are equal, so this is the identity
+   on [y]. *)
+let select_equal (x : int) (y : int) = Builtins.select (x = y) x y
+[%%expect_asm X86_64{|
+select_equal:
+  movq  %rbx, %rax
   ret
 |}]

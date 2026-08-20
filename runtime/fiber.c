@@ -290,7 +290,6 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
     ++bucket;
     size_bucket_wsz += size_bucket_wsz;
   }
-  CAMLassert(wosize>=size_bucket_wsz/2);
   return -1;
 }
 
@@ -620,12 +619,35 @@ next_chunk:
     CAMLassert(d);
     if (!frame_return_to_C(d)) {
       /* Scan the roots in this frame */
-      if (frame_is_long(d)) {
-        frame_descr_long *dl = frame_as_long(d);
-        uint32_t *p;
-        uint32_t n;
-        for (p = dl->live_ofs, n = dl->num_live; n > 0; n--, p++) {
-          uint32_t ofs = *p;
+      if (frame_is_short(d)) {
+        /* Short descriptor: live registers come from the hot-register
+         * bitmap, live stack slots from the frame's slot bitmap. */
+        struct frame_descr_decoded dec;
+        caml_decode_frame_descr(d, &dec);
+        if (dec.has_allocs) {
+          unsigned char bitmap = dec.short_reg_bitmap;
+          for (int i = 0; bitmap; i++, bitmap >>= 1) {
+            if (bitmap & 1) {
+              root = regs + caml_frame_hot_regs[i];
+              visit (f, fdata, locals, colors, root);
+            }
+          }
+        }
+        /* Live stack slots: a bitmap of the frame. */
+        for (uint32_t byte = 0; byte < dec.short_live_bytes; byte++) {
+          unsigned char bits = dec.short_live[byte];
+          for (int i = 0; bits != 0; i++, bits >>= 1) {
+            if (bits & 1) {
+              root = (value *)(sp + ((uintnat)byte * 8 + i) * sizeof(value));
+              visit (f, fdata, locals, colors, root);
+            }
+          }
+        }
+      } else if (frame_is_long(d)) {
+        const unsigned char *p = d + Frame_long_live_ofs;
+        uint32_t n = caml_read_unaligned_uint32(d + Frame_long_num_live_ofs);
+        for (; n > 0; n--, p += sizeof(uint32_t)) {
+          uint32_t ofs = caml_read_unaligned_uint32(p);
           if (ofs & 1) {
             root = regs + (ofs >> 1);
           } else {
@@ -634,10 +656,10 @@ next_chunk:
           visit (f, fdata, locals, colors, root);
         }
       } else {
-        uint16_t *p;
-        uint16_t n;
-        for (p = d->live_ofs, n = d->num_live; n > 0; n--, p++) {
-          uint16_t ofs = *p;
+        const unsigned char *p = d + Frame_live_ofs;
+        uint16_t n = caml_read_unaligned_uint16(d + Frame_num_live_ofs);
+        for (; n > 0; n--, p += sizeof(uint16_t)) {
+          uint16_t ofs = caml_read_unaligned_uint16(p);
           if (ofs & 1) {
             root = regs + (ofs >> 1);
           } else {
@@ -834,7 +856,8 @@ CAMLexport void caml_do_local_roots (
   struct caml__roots_block *local_roots,
   struct stack_info *current_stack,
   value * v_gc_regs,
-  dynamic_cache_t dynamic_bindings)
+  dynamic_cache_t dynamic_bindings,
+  struct c_stack_link* c_stack)
 {
 #ifdef NATIVE_CODE
   caml_local_arenas* locals = caml_refresh_locals(current_stack);
@@ -842,6 +865,15 @@ CAMLexport void caml_do_local_roots (
 
   caml_dynamic_cache_scan_roots(dynamic_bindings, f, fflags, fdata);
   for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
+#ifdef NATIVE_CODE
+    /* c_stack marks the boundary between C stack segments. Distinct C stack
+       segments may have distinct ML fiber stacks, so when we change stack
+       segment we need to find the appropriate local arenas. */
+    while (c_stack != NULL && (uintnat)c_stack < (uintnat)lr) {
+      c_stack = c_stack->prev;
+      if (c_stack != NULL) locals = caml_refresh_locals(c_stack->stack);
+    }
+#endif
     for (int i = 0; i < lr->ntables; i++){
       for (int j = 0; j < lr->nitems; j++){
         value *sp = &(lr->tables[i][j]);
@@ -1391,11 +1423,19 @@ CAMLexport value caml_get_preemption_effect(void) {
 */
 caml_result caml_tick_fiber_res(struct stack_info *stack) {
   caml_result res;
+  /* The tick handlers below run as callbacks on the current stack: if one
+     grows it, [caml_try_realloc_stack] frees its [stack_info]. Only the
+     current stack can move, so reload it after running the parents'
+     handlers. */
+  int is_current = stack == Caml_state->current_stack;
 
   if (Stack_parent(stack)) {
     res = caml_tick_fiber_res(Stack_parent(stack));
     if (caml_result_is_exception(res) || res.data == Val_true) {
       return res;
+    }
+    if (is_current) {
+      stack = Caml_state->current_stack;
     }
   }
 

@@ -840,7 +840,7 @@ and block_access =
   | Baccess_field of
       Longident.t loc * Data_types.label_description
       * Types.record_representation
-  | Baccess_block of mutable_flag * expression
+  | Baccess_block of access_flag * expression
 
 and unboxed_access =
   | Uaccess_unboxed_field of
@@ -1010,15 +1010,40 @@ and functor_parameter =
   | Named of Ident.t option * string option loc * module_type *
              Mode.Alloc.Const.t modes
 
+
+(* Note [Staticity of functors]
+
+   There are two kinds of functors, whose machine representations are
+   constructed and consumed differently, making them incompatible:
+   1. regular functors, which take [dynamic] parameters;
+   2. template functors, which take [static] parameters.
+
+   This incompatibility must be reflected in the type system. Differentiating
+   them by the parameter's staticity alone is not sufficient, since the generic
+   mode weakening rule would allow (1) to be used as (2).
+
+   Our workaround is as follows. Upon functor definition, we equate the
+   staticity of the functor and its parameter, giving
+   [module F : (functor (M @ m) -> ...) @ m].
+
+   Upon application of [F : (functor (M @ m0) -> ...) @ m1], where [m0 <= m] and
+   [m1 >= m] due to weakening, we restore the original [m] by requiring
+   [m1 <= m0], which forces [m0 = m1 = m]. *)
+
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
-  | Tmod_functor of functor_parameter * module_expr
+  | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.r
+    (** The [Mode.Staticity.r] specifies which kind of functor is constructed;
+        see Note [Staticity of functors]. *)
   | Tmod_apply of
       module_expr * module_expr * module_coercion * Mode.Yielding.l
+      * Mode.Staticity.r
         (** The [Mode.Yielding.l] is the join of the yielding modes of the
             functor and its argument: if it is [Unyielding], applying the
-            functor can never perform a free effect. *)
+            functor can never perform a free effect. The [Mode.Staticity.r]
+            specifies which kind of functor is applied; see Note [Staticity of
+            functors]. *)
   | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion
@@ -1133,6 +1158,7 @@ and primitive_coercion =
     pc_poly_sort: Jkind.Sort.t option;
     pc_yielding: Mode.Yielding.l;
     (** As the [Mode.Yielding.l] in [Id_prim]. *)
+    pc_zero_alloc_check: Zero_alloc.check option;
     pc_env: Env.t;
     pc_loc : Location.t;
   }

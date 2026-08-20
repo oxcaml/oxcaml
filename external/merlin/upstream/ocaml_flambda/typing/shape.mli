@@ -79,23 +79,42 @@ module Uid : sig
   include Identifiable.S with type t := t
 end
 
-(** We use de Bruijn indices for some binders in [Shape.t] below to increase
-    sharing. That is, de Bruijn indices ensure that alpha-equivalent terms are
-    actually equal. This reduces redundancy when we emit shape information into
-    the debug information in later stages of the compiler (see [dwarf_type.ml]),
-    since equal shapes produce the same debug information. *)
-module DeBruijn_index : sig
+module Rec_var_ident : sig
   type t
 
-  (* Initial index, pick [0] for the top-level index. Cannot be negative. *)
-  val create : int -> t
+  val mk_fresh : unit -> t
 
-  val move_under_binder : t -> t
+  (** Reset the internal identifier counter. *)
+  val reinit : unit -> unit
 
-  val equal: t -> t -> bool
+  val equal : t -> t -> bool
 
-  val print: Format.formatter -> t -> unit
+  val compare : t -> t -> int
 
+  val hash : t -> int
+
+  val print : Format.formatter -> t -> unit
+end
+
+(** Environment for mapping [Rec_var_ident.t] to values. Used to track
+    bindings when converting from named recursive variables to De Bruijn
+    indices. *)
+module Rec_var_env : sig
+  type 'a t
+
+  val empty : 'a t
+
+  val is_empty : 'a t -> bool
+
+  val add : Rec_var_ident.t -> 'a -> 'a t -> 'a t
+
+  val find_opt : Rec_var_ident.t -> 'a t -> 'a option
+
+  val map : ('a -> 'b) -> 'a t -> 'b t
+
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+  val hash : ('a -> int) -> 'a t -> int
 end
 
 module Sig_component_kind : sig
@@ -248,14 +267,13 @@ and desc =
   | Predef of Predef.t * t list (* predef type with arguments *)
   | Arrow
   | Poly_variant of t poly_variant_constructors
-  | Mu of t
-  (** [Mu t] represents a binder for a recursive type with body [t]. Its
-      variables are [Rec_var n] below, where [n] is a DeBruijn-index to maximize
-      sharing between alpha-equivalent shapes.  *)
-  | Rec_var of DeBruijn_index.t
+  | Mu of Rec_var_ident.t * t
+  (** [Mu (rv, t)] represents a binder for a recursive type with body [t],
+      binding the recursive variable [rv]. *)
+  | Rec_var of Rec_var_ident.t
 
   (* constructors for type declarations *)
-  | Variant of (t * Layout.t option) complex_constructors
+  | Variant of (t * Layout.t option) constructors
       (* An [any] field will have a layout of [None]. Each particular value of
          that variant may have a different layout for that field. *)
       (* CR sspies: Rename this just to constructor now that simple constructors
@@ -271,7 +289,7 @@ and desc =
       arg_layout : Layout.t
     }
     (** An unboxed variant corresponds to the [@@unboxed] annotation.
-        It must have a single, complex constructor. *)
+        It must have a single constructor with a single argument. *)
   | Record of
       { fields : (string * Uid.t option * t * Layout.t) list;
         kind : record_kind
@@ -315,16 +333,16 @@ and record_kind =
       (** Basically the same as [Record_mixed], but we don't reorder the
           fields. *)
 
-and 'a complex_constructors = 'a complex_constructor list
+and 'a constructors = 'a constructor list
 
-and 'a complex_constructor =
+and 'a constructor =
   { name : string;
     constr_uid: Uid.t option;
     kind : constructor_representation;
-    args : 'a complex_constructor_argument list
+    args : 'a constructor_argument list
   }
 
-and 'a complex_constructor_argument =
+and 'a constructor_argument =
   { field_name : string option;
     field_uid: Uid.t option;
     field_value : 'a
@@ -347,8 +365,10 @@ val equal : t -> t -> bool
 
 val equal_record_kind : record_kind -> record_kind -> bool
 
-val equal_complex_constructor :
-  ('a -> 'a -> bool) -> 'a complex_constructor -> 'a complex_constructor -> bool
+val equal_constructor :
+  ('a -> 'a -> bool) -> 'a constructor -> 'a constructor -> bool
+
+val hash : t -> int
 
 (* Smart constructors *)
 
@@ -374,12 +394,12 @@ val unboxed_tuple : ?uid:Uid.t -> t list -> t
 val predef : ?uid:Uid.t -> Predef.t -> t list -> t
 val arrow : ?uid:Uid.t -> unit -> t
 val poly_variant : ?uid:Uid.t -> t poly_variant_constructors -> t
-val mu : ?uid:Uid.t -> t -> t
-val rec_var : ?uid:Uid.t -> DeBruijn_index.t -> t
+val mu : ?uid:Uid.t -> Rec_var_ident.t -> t -> t
+val rec_var : ?uid:Uid.t -> Rec_var_ident.t -> t
 
 (* constructors for type declarations *)
 val variant :
-  ?uid:Uid.t -> (t * Layout.t option) complex_constructors -> t
+  ?uid:Uid.t -> (t * Layout.t option) constructors -> t
 val variant_unboxed :
   ?uid:Uid.t -> variant_uid:Uid.t option -> arg_uid:Uid.t option ->
   string -> string option -> t -> Layout.t -> t
@@ -405,11 +425,11 @@ val leaf_for_unpack : t
 val poly_variant_constructors_map :
   ('a -> 'b) -> 'a poly_variant_constructors -> 'b poly_variant_constructors
 
-val complex_constructor_map :
-  ('a -> 'b) -> 'a complex_constructor -> 'b complex_constructor
+val constructor_map :
+  ('a -> 'b) -> 'a constructor -> 'b constructor
 
-val complex_constructors_map :
-  ('a -> 'b) -> 'a complex_constructors -> 'b complex_constructors
+val constructors_map :
+  ('a -> 'b) -> 'a constructors -> 'b constructors
 
 module Map : sig
   type shape = t
@@ -464,18 +484,3 @@ val of_path :
   namespace:Sig_component_kind.t -> Path.t -> t
 
 val set_uid_if_none : t -> Uid.t -> t
-
-module Cache : Hashtbl.S with type key = t
-
-(** DeBruijn Environment for working with the recursive binders. *)
-module DeBruijn_env : sig
-  type 'a t
-
-  val empty : 'a t
-
-  val is_empty : 'a t -> bool
-
-  val push : 'a t -> 'a -> 'a t
-
-  val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
-end

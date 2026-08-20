@@ -111,6 +111,20 @@ module Rigid_name : sig
         (** [Param id] only occurs in formulas for type constructors. Refers to
             a type-parameter of the constructor, where [id] is the
             [Types.get_id] of the type variable representing the parameter. *)
+    | Provenance of
+        { id : int;
+          (** Identifies this provenance occurrence. *)
+
+          ty : Format_doc.doc;
+          (** The type expression or descriptive noun phrase, retained as a
+              formatting document so its line-breaking instructions survive
+              until the diagnostic is printed. *)
+
+          plural : bool
+          (** Whether [ty] is a plural noun phrase rather than a type. *)
+        }
+        (** A diagnostic-only provenance variable. These variables must not
+            appear in stored [type_ikind]s. *)
     | Unknown of unknown_id
         (** An unknown quantity with a given id. Used to model not-best in
             ikinds. This is used when we couldn't compute a precise ikind,
@@ -127,6 +141,8 @@ module Rigid_name : sig
   val katom : Path.t -> t
 
   val param : int -> t
+
+  val provenance : id:int -> ty:Format_doc.doc -> plural:bool -> t
 
   val unknown : Shape.Uid.t -> t
 

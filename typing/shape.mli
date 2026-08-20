@@ -111,6 +111,10 @@ module Rec_var_env : sig
   val find_opt : Rec_var_ident.t -> 'a t -> 'a option
 
   val map : ('a -> 'b) -> 'a t -> 'b t
+
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+  val hash : ('a -> int) -> 'a t -> int
 end
 
 module Sig_component_kind : sig
@@ -269,7 +273,7 @@ and desc =
   | Rec_var of Rec_var_ident.t
 
   (* constructors for type declarations *)
-  | Variant of (t * Layout.t option) complex_constructors
+  | Variant of (t * Layout.t option) constructors
       (* An [any] field will have a layout of [None]. Each particular value of
          that variant may have a different layout for that field. *)
       (* CR sspies: Rename this just to constructor now that simple constructors
@@ -285,7 +289,7 @@ and desc =
       arg_layout : Layout.t
     }
     (** An unboxed variant corresponds to the [@@unboxed] annotation.
-        It must have a single, complex constructor. *)
+        It must have a single constructor with a single argument. *)
   | Record of
       { fields : (string * Uid.t option * t * Layout.t) list;
         kind : record_kind
@@ -329,16 +333,16 @@ and record_kind =
       (** Basically the same as [Record_mixed], but we don't reorder the
           fields. *)
 
-and 'a complex_constructors = 'a complex_constructor list
+and 'a constructors = 'a constructor list
 
-and 'a complex_constructor =
+and 'a constructor =
   { name : string;
     constr_uid: Uid.t option;
     kind : constructor_representation;
-    args : 'a complex_constructor_argument list
+    args : 'a constructor_argument list
   }
 
-and 'a complex_constructor_argument =
+and 'a constructor_argument =
   { field_name : string option;
     field_uid: Uid.t option;
     field_value : 'a
@@ -361,8 +365,10 @@ val equal : t -> t -> bool
 
 val equal_record_kind : record_kind -> record_kind -> bool
 
-val equal_complex_constructor :
-  ('a -> 'a -> bool) -> 'a complex_constructor -> 'a complex_constructor -> bool
+val equal_constructor :
+  ('a -> 'a -> bool) -> 'a constructor -> 'a constructor -> bool
+
+val hash : t -> int
 
 (* Smart constructors *)
 
@@ -393,7 +399,7 @@ val rec_var : ?uid:Uid.t -> Rec_var_ident.t -> t
 
 (* constructors for type declarations *)
 val variant :
-  ?uid:Uid.t -> (t * Layout.t option) complex_constructors -> t
+  ?uid:Uid.t -> (t * Layout.t option) constructors -> t
 val variant_unboxed :
   ?uid:Uid.t -> variant_uid:Uid.t option -> arg_uid:Uid.t option ->
   string -> string option -> t -> Layout.t -> t
@@ -419,11 +425,11 @@ val leaf_for_unpack : t
 val poly_variant_constructors_map :
   ('a -> 'b) -> 'a poly_variant_constructors -> 'b poly_variant_constructors
 
-val complex_constructor_map :
-  ('a -> 'b) -> 'a complex_constructor -> 'b complex_constructor
+val constructor_map :
+  ('a -> 'b) -> 'a constructor -> 'b constructor
 
-val complex_constructors_map :
-  ('a -> 'b) -> 'a complex_constructors -> 'b complex_constructors
+val constructors_map :
+  ('a -> 'b) -> 'a constructors -> 'b constructors
 
 module Map : sig
   type shape = t
@@ -478,5 +484,3 @@ val of_path :
   namespace:Sig_component_kind.t -> Path.t -> t
 
 val set_uid_if_none : t -> Uid.t -> t
-
-module Cache : Hashtbl.S with type key = t

@@ -145,11 +145,12 @@ let rec apply_coercion loc strict restr arg =
           attributes = Lambda.default_param_attribute; mode = alloc_heap}]
         [carg] yielding cc_res
   | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode; pc_poly_sort;
-                        pc_yielding } ->
+                        pc_yielding; pc_zero_alloc_check } ->
       Translprim.transl_primitive loc pc_desc pc_env pc_type
         ~poly_mode:pc_poly_mode
         ~poly_sort:pc_poly_sort
         ~yielding:pc_yielding
+        ~zero_alloc_check:pc_zero_alloc_check
         None
   | Tcoerce_alias (env, path, cc) ->
       let lam = transl_module_path loc env path in
@@ -558,7 +559,7 @@ let merge_functors ~scopes mexp coercion root_path =
   let rec merge ~scopes mexp coercion path acc inline_attribute =
     let finished = acc, mexp, path, coercion, inline_attribute in
     match mexp.mod_desc with
-    | Tmod_functor (param, body) ->
+    | Tmod_functor (param, body, _) ->
       let inline_attribute' =
         Translattribute.get_inline_attribute mexp.mod_attributes
       in
@@ -654,7 +655,7 @@ and transl_module ~scopes cc rootpath mexp =
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
         compile_functor ~scopes mexp cc rootpath loc) ()
-  | Tmod_apply(funct, arg, ccarg, yielding) ->
+  | Tmod_apply(funct, arg, ccarg, yielding, _) ->
       let translated_arg = transl_module ~scopes ccarg None arg in
       transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding translated_arg
   | Tmod_apply_unit (funct, yielding) ->
@@ -741,6 +742,7 @@ and transl_structure ~scopes loc
                             ~poly_mode:p.pc_poly_mode
                             ~poly_sort:p.pc_poly_sort
                             ~yielding:p.pc_yielding
+                            ~zero_alloc_check:p.pc_zero_alloc_check
                             None
                       | _ -> apply_coercion loc Strict cc (get_field pos))
                     pos_cc_list, loc)

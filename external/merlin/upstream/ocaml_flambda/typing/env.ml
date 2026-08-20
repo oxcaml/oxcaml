@@ -170,7 +170,7 @@ type module_unbound_reason =
       { container : string option; unbound : string }
 
 type stage_lock =
-  | Quotation_lock
+  | Quote_lock
   | Splice_lock
 
 type lock =
@@ -230,7 +230,7 @@ let map_summary f = function
   | Env_jkind (s, id, d) -> Env_jkind (f s, id, d)
 
 type address = Persistent_env.address =
-  | Aunit of Compilation_unit.t
+  | Aunit of Compilation_unit.t * Mode.Value.l
   | Alocal of Ident.t
   | Adot of address * module_representation * int
 
@@ -678,6 +678,7 @@ type t = {
   jkinds : (empty, jkind_data, jkind_data) IdTbl.t;
   summary: summary;
   local_constraints: type_declaration StagedPath.Map.t;
+  local_constraints_update_count: int;
   implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
@@ -981,6 +982,7 @@ let empty = {
   modules = IdTbl.empty; modtypes = IdTbl.empty;
   classes = IdTbl.empty; cltypes = IdTbl.empty;
   summary = Env_empty; local_constraints = StagedPath.Map.empty;
+  local_constraints_update_count = 0;
   implicit_jkinds = String.Map.empty;
   flags = 0;
   functor_args = Ident.empty;
@@ -1108,7 +1110,8 @@ end
 (* Print addresses *)
 
 let rec print_address ppf = function
-  | Aunit cu -> Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
+  | Aunit (cu, _) ->
+    Format.fprintf ppf "%s" (Compilation_unit.full_path_as_string cu)
   | Alocal id -> Format.fprintf ppf "%s" (Ident.name id)
   | Adot(a, _, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
 
@@ -1117,7 +1120,7 @@ type address_head =
   | AHlocal of Ident.t
 
 let rec address_head = function
-  | Aunit cu -> AHunit cu
+  | Aunit (cu, _) -> AHunit cu
   | Alocal id -> AHlocal id
   | Adot (a, _, _) -> address_head a
 
@@ -2993,7 +2996,18 @@ let add_module ?arg ?shape id presence mty ?mode env =
 let add_local_constraint ~stage path info env =
   { env with
     local_constraints =
-      StagedPath.Map.add { stage; path } info env.local_constraints }
+      StagedPath.Map.add { stage; path } info env.local_constraints;
+    local_constraints_update_count = env.local_constraints_update_count + 1 }
+
+let local_constraints_have_been_added ~since env =
+  (* As this function assumes [env] derives from [since], constraints have been
+     added iff the count differs. *)
+  since.local_constraints_update_count <> env.local_constraints_update_count
+
+let revert_local_constraints ~since env =
+  { env with
+    local_constraints = since.local_constraints;
+    local_constraints_update_count = since.local_constraints_update_count }
 
 let add_implicit_jkind ~loc name jkind env =
   { env with
@@ -3099,8 +3113,8 @@ let add_exclave_lock env = add_lock Exclave_lock env
 
 let add_unboxed_lock env = add_lock Unboxed_lock env
 
-let enter_quotation env =
-  add_stage_lock Quotation_lock {env with stage = env.stage + 1}
+let enter_quote env =
+  add_stage_lock Quote_lock {env with stage = env.stage + 1}
 
 let enter_splice ~loc env =
   if env.stage = 0 then
@@ -3125,7 +3139,7 @@ let stage_locks_offset locks =
   List.fold_right
     (fun lock rel_stage ->
        match lock with
-       | Quotation_lock -> rel_stage + 1
+       | Quote_lock -> rel_stage + 1
        | Splice_lock -> rel_stage - 1)
     locks 0
 
@@ -3320,7 +3334,6 @@ let initial () =
         Type_shape.Type_decl_shape.of_type_declaration type_ident decl
           (shape_for_constr env)
       in
-      Uid.Tbl.add Type_shape.all_type_decls decl.type_uid shape;
       add_type type_ident ~shape decl env ~check:false
   in
   let initial_env =
@@ -4258,6 +4271,7 @@ let add_components slot root env0 comps (locks : locks) =
     jkinds;
     summary = Env_open(env0.summary, root);
     local_constraints = env0.local_constraints;
+    local_constraints_update_count = env0.local_constraints_update_count;
     implicit_jkinds = env0.implicit_jkinds;
     flags = env0.flags;
     stage = env0.stage;
@@ -4999,6 +5013,7 @@ let keep_only_summary env =
        empty with
        summary = env.summary;
        local_constraints = env.local_constraints;
+       local_constraints_update_count = env.local_constraints_update_count;
        flags = env.flags;
       }
     in
@@ -5012,6 +5027,7 @@ let env_of_only_summary env_from_summary env =
   let new_env = env_from_summary env.summary Subst.identity in
   { new_env with
     local_constraints = env.local_constraints;
+    local_constraints_update_count = env.local_constraints_update_count;
     flags = env.flags;
   }
 

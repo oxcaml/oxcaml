@@ -378,7 +378,7 @@ let transl_ident loc env ty path desc kind =
   match desc.val_kind, kind with
   | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding
-        (Some path)
+        ~zero_alloc_check:None (Some path)
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
   | (Val_reg _ | Val_self _), Id_value ->
@@ -648,7 +648,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             transl_exp ~scopes layout e) args_with_sorts
         in
         match cstr.cstr_tag, cstr.cstr_repr with
-      | Null, Variant_with_null -> Lconst Const_null
+      | Null, Variant_with_null ->
+        List.fold_left
+          (fun (acc : lambda) (e : lambda) -> Lsequence (e, acc))
+          (Lconst Const_null)
+          ll
       | Null, (Variant_boxed _ | Variant_unboxed | Variant_extensible) ->
         assert false
       | Ordinary {runtime_tag},
@@ -952,9 +956,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
          representability on construction, [sort_of_jkind] will be unsafe here.
          Probably we should add a sort to `Texp_setfield` in the typed tree,
          then. *)
-      let mode =
-        Assignment (transl_modify_mode arg_mode)
-      in
+      let modify_mode = transl_modify_mode arg_mode in
+      let mode = Assignment modify_mode in
       let sort_arg =
         (* We know the record is boxed because [@@unboxed] records don't have
            mutable fields, and this is double checked by the assert in [access]
@@ -978,7 +981,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           let immediate_or_pointer, _ = maybe_pointer newval in
           if Types.is_atomic lbl.lbl_mut
           then
-            Patomic_set_field { immediate_or_pointer },
+            Patomic_set_field { immediate_or_pointer; mode = modify_mode },
             [arg_lambda; field_lambda; newval_lambda]
           else
             Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
@@ -995,7 +998,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           let immediate_or_pointer, _ = maybe_pointer newval in
           if Types.is_atomic lbl.lbl_mut
           then
-            Patomic_set_field { immediate_or_pointer },
+            Patomic_set_field { immediate_or_pointer; mode = modify_mode },
             [arg_lambda; field_lambda; newval_lambda]
           else
             Psetfield (lbl.lbl_pos + 1, immediate_or_pointer, mode),
@@ -1017,7 +1020,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           (* Update the shape with details for the modified field. *)
           shape.(lbl.lbl_pos) <- field_shape;
           if Types.is_atomic lbl.lbl_mut then
-            (Patomic_set_mixed_field { index = lbl.lbl_pos; shape },
+            (Patomic_set_mixed_field
+               { index = lbl.lbl_pos; shape; mode = modify_mode },
             [arg_lambda; newval_lambda])
           else
             (Psetmixedfield([lbl.lbl_pos], shape, mode),
