@@ -73,7 +73,7 @@ let load_lambda ppf tlam =
     (* CR layout poly: If this toplevel value is static we should keep the
        comptime part in a separate table so we can use it in later expressions.
     *)
-    Slambda.eval ~target:Slambda_fracture.Bytecode
+    Slambda.eval
       ~cu_static_data:(fun _ ->
         Misc.fatal_errorf_doc
           "Cross-module static evaluation not implemented in the toplevel")

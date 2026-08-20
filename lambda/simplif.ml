@@ -1103,6 +1103,9 @@ let simplify_local_functions lam =
     | Lfunction lf ->
         check_static lf;
         function_definition lf
+    | Lcode { code_fun; _ } ->
+        check_static code_fun;
+        function_definition code_fun
     | Lregion (lam, _) -> region lam
     | Lexclave lam -> exclave lam
     | lam ->

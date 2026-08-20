@@ -39,7 +39,6 @@ open Lambda
     static global from another compilation unit; it should return the
     compile-time value associated with that unit. *)
 val eval :
-  target:Slambda_fracture.target ->
   cu_static_data:(Compilation_unit.t -> Slambdaeval.CU_data.t option) ->
   (slambda -> slambda) ->
   lambda ->

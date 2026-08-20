@@ -192,7 +192,10 @@ type primitive =
         [Psetmixedfield]. *)
   | Pduprecord of Types.record_representation * int
   (* Layout-polymorphism environments (see [Slambda_fracture]); all of these
-     should only exist after slambda evaluation, in native code *)
+     should only exist after slambda evaluation. On native they become real
+     sets of closures in flambda2; on bytecode the environment degenerates to
+     an ordinary block, projections to field reads, and [Pclose_template] to
+     a partial application. *)
   | Pset_of_closures of
       { template : template_ref;
         layouts : layout list;
@@ -1056,9 +1059,11 @@ type lambda =
   (* [Lcode] is the code of a specialized layout-polymorphism template. It is
      not an ordinary closure expression: its closures are created per
      instantiation site by [Pclose_template], which supplies the captured
-     values declared in [code_slots]. It should only exist after slambda
-     evaluation, in native code, as the right-hand side of the [Llet]
-     binding a template instantiation. *)
+     values declared in [code_slots]. (In bytecode, where there are no value
+     slots, it is compiled as a function taking the closure variable as an
+     extra first parameter.) It should only exist after slambda evaluation,
+     as the right-hand side of the [Llet] binding a template
+     instantiation. *)
   | Lcode of lcode
 
 and slambda =

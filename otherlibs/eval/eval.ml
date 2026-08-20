@@ -209,8 +209,8 @@ let eval (expr : 'a expr) =
      }] *)
   let lambda =
     let _static_data, raw_lambda =
-      Slambda.eval ~target:Slambda_fracture.Native
-        ~cu_static_data:Compilenv.get_static_data Fun.id tlambda_program.code
+      Slambda.eval ~cu_static_data:Compilenv.get_static_data Fun.id
+        tlambda_program.code
     in
     Simplif.simplify_lambda
       ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf

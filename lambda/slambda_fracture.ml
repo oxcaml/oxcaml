@@ -35,16 +35,6 @@
 
 open Lambda
 
-type target =
-  | Native
-  | Bytecode
-
-(* Set once at the start of [fracture]; only consulted by the
-   [Lkindtemplate] / [Lkindinstantiate] cases, which produce true closures
-   for flambda2 on native and the legacy block-based representation on
-   bytecode. *)
-let current_target = ref Native
-
 let create_dynamic sval_runtime =
   SLhalves { sval_comptime = SLmissing; sval_runtime }
 
@@ -359,9 +349,9 @@ let rec fracture_lam lambda : slambda =
       ktmpl_body
     in
     let kind =
-      match kind, !current_target with
-      | Tupled, _ -> Tupled
-      | Curried { nlocal }, Native ->
+      match kind with
+      | Tupled -> Tupled
+      | Curried { nlocal } ->
         Curried
           { nlocal =
               begin match ktmpl_env_mode with
@@ -369,102 +359,44 @@ let rec fracture_lam lambda : slambda =
               | Alloc_local -> List.length params
               end
           }
-      | Curried { nlocal }, Bytecode ->
-        Curried
-          { nlocal =
-              begin match ktmpl_env_mode with
-              | Alloc_heap -> nlocal
-              | Alloc_local -> List.length params + 1
-              end
-          }
     in
     let templated_function_body =
-      match !current_target with
-      | Native ->
-        (* The specialized function keeps its original arity and accesses its
-           captures through its own closure ([code_closure_var]), which is
-           supplied per instantiation site by [Pclose_template]. *)
-        slet_local "body" body (fun body_c body_r ->
-            let closure_id = Ident.create_local "closure" in
-            let _, body =
-              List.fold_left
-                (fun (i, lam) (ident, (_, layout)) ->
-                  ( i + 1,
-                    Llet
-                      ( Alias,
-                        layout,
-                        ident,
-                        debug_uid_none,
-                        Lprim
-                          ( Pproject_value_slot { index = i; layout },
-                            [Lvar closure_id],
-                            ktmpl_loc ),
-                        lam ) ))
-                (0, body_r) env
-            in
-            let lf =
-              lfunction' ~kind ~params ~return ~body ~attr ~loc
-                ~mode:alloc_heap
-                  (* No closure is allocated for the [Lcode] itself; this mode
-                     is ignored. *)
-                ~ret_mode
-            in
-            let sval_runtime =
-              Lcode
-                { code_fun = lfunction_with_yielding yielding lf;
-                  code_closure_var = closure_id;
-                  code_slots = List.map (fun (_, (_, layout)) -> layout) env
-                }
-            in
-            SLhalves { sval_comptime = body_c; sval_runtime })
-      | Bytecode ->
-        let free_vars_shape_locality_mode =
-          Misc.Stdlib.Array.of_list_map
-            (fun (_, (_, layout)) ->
-              Lambda.mixed_block_element_of_layout layout)
-            env
-        in
-        slet_local "body" body (fun body_c body_r ->
-            let closure_id = Ident.create_local "closure" in
-            let closure_param =
-              { name = closure_id;
-                debug_uid = debug_uid_none;
-                layout = layout_block;
-                attributes = default_param_attribute;
-                (* The env parameter can be local because we immediately
-                   destructure it. *)
-                mode = alloc_local
+      (* The specialized function keeps its original arity and accesses its
+         captures through its own closure ([code_closure_var]), which is
+         supplied per instantiation site by [Pclose_template]. *)
+      slet_local "body" body (fun body_c body_r ->
+          let closure_id = Ident.create_local "closure" in
+          let _, body =
+            List.fold_left
+              (fun (i, lam) (ident, (_, layout)) ->
+                ( i + 1,
+                  Llet
+                    ( Alias,
+                      layout,
+                      ident,
+                      debug_uid_none,
+                      Lprim
+                        ( Pproject_value_slot { index = i; layout },
+                          [Lvar closure_id],
+                          ktmpl_loc ),
+                      lam ) ))
+              (0, body_r) env
+          in
+          let lf =
+            lfunction' ~kind ~params ~return ~body ~attr ~loc
+              ~mode:alloc_heap
+                (* No closure is allocated for the [Lcode] itself; this mode
+                   is ignored. *)
+              ~ret_mode
+          in
+          let sval_runtime =
+            Lcode
+              { code_fun = lfunction_with_yielding yielding lf;
+                code_closure_var = closure_id;
+                code_slots = List.map (fun (_, (_, layout)) -> layout) env
               }
-            in
-            let _, body =
-              List.fold_left
-                (fun (i, lam) (ident, (_, layout)) ->
-                  ( i + 1,
-                    Llet
-                      ( Alias,
-                        layout,
-                        ident,
-                        debug_uid_none,
-                        Lprim
-                          ( Pmixedfield
-                              ([i], free_vars_shape_locality_mode, Reads_agree),
-                            [Lvar closure_id],
-                            ktmpl_loc ),
-                        lam ) ))
-                (0, body_r) env
-            in
-            let lf =
-              lfunction' ~kind ~params:(closure_param :: params) ~return ~body
-                ~attr ~loc
-                ~mode:alloc_heap
-                  (* This closure has no free variables and will always be
-                     statically allocated. alloc_heap is an safe choice. *)
-                ~ret_mode
-            in
-            let sval_runtime =
-              Lfunction (lfunction_with_yielding yielding lf)
-            in
-            SLhalves { sval_comptime = body_c; sval_runtime })
+          in
+          SLhalves { sval_comptime = body_c; sval_runtime })
     in
     let free_var_capture =
       List.map
@@ -478,46 +410,28 @@ let rec fracture_lam lambda : slambda =
         }
     in
     let kind_function =
-      match !current_target with
-      | Native ->
-        (* The environment block is a set of closures whose value slot
-           identities are derived from the template's id, so bind the
-           template and refer to it from the primitive. *)
-        let template_var = Slambdaident.create_local ktmpl_name in
-        SLlet
-          { slet_name = template_var;
-            slet_value = template;
-            slet_body =
-              SLhalves
-                { sval_comptime = SLvar template_var;
-                  sval_runtime =
-                    Lprim
-                      ( Pset_of_closures
-                          { template = Template_var template_var;
-                            layouts =
-                              List.map (fun (_, (_, layout)) -> layout) env;
-                            mode = ktmpl_env_mode
-                          },
-                        free_var_capture,
-                        ktmpl_loc )
-                }
-          }
-      | Bytecode ->
-        let free_vars_shape_unit =
-          Misc.Stdlib.Array.of_list_map
-            (fun (_, (_, layout)) ->
-              Lambda.mixed_block_element_of_layout layout)
-            env
-        in
-        SLhalves
-          { sval_comptime = template;
-            sval_runtime =
-              Lprim
-                ( Pmakeblock
-                    (0, Immutable, Shape free_vars_shape_unit, ktmpl_env_mode),
-                  free_var_capture,
-                  ktmpl_loc )
-          }
+      (* The environment block is a set of closures whose value slot
+         identities are derived from the template's id, so bind the
+         template and refer to it from the primitive. *)
+      let template_var = Slambdaident.create_local ktmpl_name in
+      SLlet
+        { slet_name = template_var;
+          slet_value = template;
+          slet_body =
+            SLhalves
+              { sval_comptime = SLvar template_var;
+                sval_runtime =
+                  Lprim
+                    ( Pset_of_closures
+                        { template = Template_var template_var;
+                          layouts =
+                            List.map (fun (_, (_, layout)) -> layout) env;
+                          mode = ktmpl_env_mode
+                        },
+                      free_var_capture,
+                      ktmpl_loc )
+              }
+        }
     in
     List.fold_left
       (fun slam (id, (lam, _)) ->
@@ -528,64 +442,39 @@ let rec fracture_lam lambda : slambda =
           })
       kind_function env
   | Lkindinstantiate
-      { kinst_func; kinst_args; kinst_result_layout; kinst_mode; kinst_loc } ->
+      { kinst_func; kinst_args; kinst_result_layout = _; kinst_mode; kinst_loc }
+    ->
     slet_local "fun" kinst_func (fun fun_c fun_r ->
         let app_id = Slambdaident.create_local "app" in
         let app_var = SLvar app_id in
         let sapp_args =
           Misc.Stdlib.Array.of_list_map (fun arg -> SLlayout arg) kinst_args
         in
-        match !current_target with
-        | Native ->
-          (* Build a closure pairing the (per-unit shared) specialized code
-             with the captured values held in the environment block. *)
-          let template_id = Slambdaident.create_local "tmpl" in
-          SLlet
-            { slet_name = template_id;
-              slet_value = fun_c;
-              slet_body =
-                SLlet
-                  { slet_name = app_id;
-                    slet_value =
-                      SLinstantiate { sapp_func = SLvar template_id; sapp_args };
-                    slet_body =
-                      SLhalves
-                        { sval_comptime = SLproj_comptime app_var;
-                          sval_runtime =
-                            Lprim
-                              ( Pclose_template
-                                  { template = Template_var template_id;
-                                    mode =
-                                      return_mode_to_locality_mode kinst_mode
-                                  },
-                                [Lsplice (kinst_loc, app_var); fun_r],
-                                kinst_loc )
-                        }
-                  }
-            }
-        | Bytecode ->
-          SLlet
-            { slet_name = app_id;
-              slet_value = SLinstantiate { sapp_func = fun_c; sapp_args };
-              slet_body =
-                SLhalves
-                  { sval_comptime = SLproj_comptime app_var;
-                    sval_runtime =
-                      Lapply
-                        { ap_func = Lsplice (kinst_loc, app_var);
-                          ap_args = [fun_r];
-                          ap_result_layout = kinst_result_layout;
-                          ap_region_close = Rc_normal;
-                          ap_mode = kinst_mode;
-                          ap_yielding = Unyielding;
-                          ap_loc = kinst_loc;
-                          ap_tailcall = Default_tailcall;
-                          ap_inlined = Default_inlined;
-                          ap_specialised = Default_specialise;
-                          ap_probe = None
-                        }
-                  }
-            })
+        (* Build a closure pairing the (per-unit shared) specialized code
+           with the captured values held in the environment block. *)
+        let template_id = Slambdaident.create_local "tmpl" in
+        SLlet
+          { slet_name = template_id;
+            slet_value = fun_c;
+            slet_body =
+              SLlet
+                { slet_name = app_id;
+                  slet_value =
+                    SLinstantiate { sapp_func = SLvar template_id; sapp_args };
+                  slet_body =
+                    SLhalves
+                      { sval_comptime = SLproj_comptime app_var;
+                        sval_runtime =
+                          Lprim
+                            ( Pclose_template
+                                { template = Template_var template_id;
+                                  mode = return_mode_to_locality_mode kinst_mode
+                                },
+                              [Lsplice (kinst_loc, app_var); fun_r],
+                              kinst_loc )
+                      }
+                }
+          })
 
 (** Fracture an [lfun]. Currently, functions only have a dynamic part so this
     can always return an [lfun]. *)
@@ -773,6 +662,4 @@ and fracture_dynamic_opt lam_opt =
   Misc.Stdlib.Option.map_sharing fracture_dynamic lam_opt
 
 (** This is the only externally accessible entry point to this module. *)
-let fracture ~target lam =
-  current_target := target;
-  Profile.record "slambda_fracture" fracture_lam lam
+let fracture lam = Profile.record "slambda_fracture" fracture_lam lam

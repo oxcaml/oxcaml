@@ -27,15 +27,6 @@
 
 open Lambda
 
-(** Which backend the fractured code is destined for. On [Native],
-    layout-polymorphism templates are compiled to true closures
-    ([Pset_of_closures] / [Pclose_template] / [Lcode]) so that flambda2 can
-    optimize them; on [Bytecode] the legacy block-based representation is used.
-*)
-type target =
-  | Native
-  | Bytecode
-
 (** "Fractures" tlambda (the result of transl) into slambda.
 
     This process conceptually splits ~all constructs into their compile-time and
@@ -44,4 +35,4 @@ type target =
     representation of whatever the initial tlambda evalutaes to and the
     [sval_runtime] half is lambda that evaluates to the runtime representation
     of it. *)
-val fracture : target:target -> lambda -> slambda
+val fracture : lambda -> slambda

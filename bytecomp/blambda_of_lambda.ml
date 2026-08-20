@@ -297,10 +297,25 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Lcode _ ->
-    (* [Lcode] is native-only; bytecode uses the old layout-polymorphism
-       closure representation. *)
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
     Lambda.fatal_error_invalid_constructor exp
+  | Lcode
+      { code_fun = { params; body; loc; _ }; code_closure_var; code_slots = _ }
+    ->
+    (* In bytecode there are no value slots: the closure variable becomes an
+       ordinary extra (first) parameter, supplied by [Pclose_template] as a
+       partial application. Note that [Lambda.free_variables] of an [Lcode]
+       already subtracts the parameters and the closure variable, so it is
+       exactly the free-variable set of this wrapper. *)
+    Pseudo_event
+      ( Function
+          { params =
+              code_closure_var
+              :: List.map (fun (p : Lambda.lparam) -> p.name) params;
+            body = comp_expr body;
+            free_variables = Lambda.free_variables exp
+          },
+        loc )
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
   | Lapply { ap_func; ap_args; ap_region_close; ap_yielding } ->
@@ -738,6 +753,37 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let total_len = Array.length shape in
         pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
     | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
+    | Pset_of_closures { template = _; layouts; mode = _ } -> (
+      (* In bytecode a layout-polymorphism environment block is an ordinary
+         block, one field per capture, as if built by [Pmakeblock] with the
+         corresponding mixed-block shape. *)
+      let shape =
+        Lambda.Shape
+          (Misc.Stdlib.Array.of_list_map Lambda.mixed_block_element_of_layout
+             layouts)
+      in
+      match Lambda.mixed_block_of_block_shape shape with
+      | None -> pseudo_event (variadic (Makeblock { tag = 0 }))
+      | Some shape ->
+        let total_len = Array.length shape in
+        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag = 0 })))
+    | Pproject_value_slot { index; layout } ->
+      copy_mixed_block_element
+        (Lambda.mixed_block_element_of_layout layout)
+        (unary (Getfield index))
+    | Pclose_template { template = _; mode = _ } -> (
+      (* The specialized code ([Lcode]) was compiled with the closure variable
+         as an extra first parameter, so pairing it with an environment block
+         is just a partial application. *)
+      match args with
+      | [code; env] ->
+        Apply
+          { func = comp_expr code;
+            args = [comp_expr env];
+            nontail = is_nontail Rc_normal;
+            yielding = Unyielding
+          }
+      | [] | [_] | _ :: _ :: _ :: _ -> wrong_arity ~expected:2)
     | Pgetglobal (cu, _) -> nullary (Getglobal cu)
     | Pgetpredef id -> nullary (Getpredef id)
     | Pfield (n, _, _) | Punboxed_product_field (n, _) -> unary (Getfield n)
@@ -1131,8 +1177,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punspecializedarray_set _ ->
         Misc.fatal_error "Blambda_of_lambda: Parrayblit Punspecializedarray_set"
       )
-    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ | Pset_of_closures _
-    | Pclose_template _ | Pproject_value_slot _ ->
+    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive
     | Pmakelazyblock Lazy_tag ->

@@ -50,7 +50,7 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
        Builtin_attributes.warn_unused ();
        tlambda
        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
-       |> Slambda.eval ~target:Slambda_fracture.Bytecode
+       |> Slambda.eval
             ~cu_static_data:(fun _ ->
               Misc.fatal_errorf
                 "Cross-module static evaluation not implemented in bytecode")

@@ -25,10 +25,10 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-let eval ~target ~cu_static_data inspect_slambda template_lam =
+let eval ~cu_static_data inspect_slambda template_lam =
   Profile.record_call "slambda_eval" (fun () ->
       let cu_data, lambda =
-        Slambda_fracture.fracture ~target template_lam
+        Slambda_fracture.fracture template_lam
         |> inspect_slambda
         |> Slambdaeval.eval ~cu_static_data
       in

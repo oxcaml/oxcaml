@@ -228,7 +228,7 @@ type primitive =
       * initialization_or_assignment
   | Pduprecord of Types.record_representation * int
   (* Layout-polymorphism environments; should only exist after slambda
-     evaluation, in native code *)
+     evaluation *)
   | Pset_of_closures of
       { template : template_ref;
         layouts : layout list;
