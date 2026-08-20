@@ -1,5 +1,3 @@
-module Protocol = Structured_diagnostic_protocol
-
 module Location_key = struct
   type t =
     { file : string;
@@ -105,20 +103,20 @@ module Glossary = struct
 end
 
 module Form = struct
-  type t = Protocol.Form.t =
+  type t =
     | Name
     | Pronoun
 end
 
 module Kind = struct
-  type t = Protocol.Kind.t =
+  type t =
     | Explanation
     | Background
     | Suggestion
 end
 
 module Relation = struct
-  type t = Protocol.Relation.t =
+  type t =
     | Claim
     | Elaboration
 end
@@ -185,62 +183,190 @@ let locations t content =
   in
   dedup_by_key (List.concat_map collect content)
 
-let to_protocol ~location t : _ Protocol.Generic.diagnostic =
-  let rec protocol_of_inline (inline : Inline.t) : _ Protocol.Generic.inline =
-    match inline with
-    | Text text -> Text text
-    | Annotated { annotation; content } ->
-      Annotated
-        { annotation = protocol_of_annotation annotation;
-          content = List.map protocol_of_inline content
-        }
-  and protocol_of_annotation (annotation : Annotation.t) :
-      _ Protocol.Generic.annotation =
-    match annotation with
-    | Code -> Code
-    | Source loc -> Source (location loc)
-    | Mention { entity; form } ->
-      Mention { entity = Entities.Id.to_int entity; form }
-    | Term id -> Term (Glossary.Id.to_int id)
-  and protocol_of_block (block : Block.t) : _ Protocol.Generic.block =
-    { kind = block.kind;
-      content = List.map protocol_of_inline block.content;
-      children = List.map protocol_of_child block.children
-    }
-  and protocol_of_child ((relation, block) : Relation.t * Block.t) :
-      _ Protocol.Generic.child =
-    { relation; block = protocol_of_block block }
-  in
-  let protocol_of_entity ((id, loc) : Entities.Id.t * Location.t) :
-      _ Protocol.Generic.entity =
-    { id = Entities.Id.to_int id; loc = location loc }
-  in
-  let protocol_of_entry ((id, entry) : Glossary.Id.t * Glossary.Entry.t) :
-      Protocol.Generic.glossary_entry =
-    { id = Glossary.Id.to_int id;
-      term = entry.term;
-      category = entry.category;
-      description = entry.description;
-      url = entry.url
-    }
-  in
-  { loc = location t.loc;
-    title = t.title;
-    entities = List.map protocol_of_entity (Entities.to_list t.entities);
-    glossary = List.map protocol_of_entry (Glossary.to_list t.glossary);
-    body = List.map protocol_of_block t.body
-  }
+type diagnostic = t
 
-let raw_location (loc : Location.t) : Protocol.Raw.Location.t =
-  let position (position : Lexing.position) : Protocol.Raw.Position.t =
-    { line = position.pos_lnum; col = position.pos_cnum - position.pos_bol }
+module Diagnostic = struct
+  type t = diagnostic
+
+  module Entities = Entities
+  module Glossary = Glossary
+  module Form = Form
+  module Kind = Kind
+  module Relation = Relation
+  module Annotation = Annotation
+  module Inline = Inline
+  module Block = Block
+end
+
+let string_to_json value =
+  let escaped = Buffer.create (String.length value + 2) in
+  let width = String.length value in
+  let rec add index =
+    if index < width then
+      match String.get value index with
+      | '"' ->
+          Buffer.add_string escaped "\\\"";
+          add (index + 1)
+      | '\\' ->
+          Buffer.add_string escaped "\\\\";
+          add (index + 1)
+      | '\b' ->
+          Buffer.add_string escaped "\\b";
+          add (index + 1)
+      | '\012' ->
+          Buffer.add_string escaped "\\f";
+          add (index + 1)
+      | '\n' ->
+          Buffer.add_string escaped "\\n";
+          add (index + 1)
+      | '\r' ->
+          Buffer.add_string escaped "\\r";
+          add (index + 1)
+      | '\t' ->
+          Buffer.add_string escaped "\\t";
+          add (index + 1)
+      | '\000' .. '\031' as control ->
+          Buffer.add_string escaped
+            (Printf.sprintf "\\u%04x" (Char.code control));
+          add (index + 1)
+      | ' ' .. '\127' as ascii ->
+          Buffer.add_char escaped ascii;
+          add (index + 1)
+      | _ ->
+          let decoded = String.get_utf_8_uchar value index in
+          let bytes = Uchar.utf_decode_length decoded in
+          if Uchar.utf_decode_is_valid decoded then
+            Buffer.add_substring escaped value index bytes
+          else Buffer.add_utf_8_uchar escaped Uchar.rep;
+          add (index + bytes)
   in
-  { file = loc.loc_start.pos_fname;
-    start = position loc.loc_start;
-    end_ = position loc.loc_end
-  }
+  Buffer.add_char escaped '"';
+  add 0;
+  Buffer.add_char escaped '"';
+  Buffer.contents escaped
 
-let to_raw_diagnostic t = to_protocol ~location:raw_location t
+let kind_field kind = Misc.Json.field "kind" (string_to_json kind)
 
-let raw_response ts =
-  Protocol.Raw.response_of_diagnostics (List.map to_raw_diagnostic ts)
+let position_to_json (position : Lexing.position) =
+  Misc.Json.object_
+    [
+      Misc.Json.field "line" (Misc.Json.int position.pos_lnum);
+      Misc.Json.field "col"
+        (Misc.Json.int (position.pos_cnum - position.pos_bol));
+    ]
+
+let location_to_json (loc : Location.t) =
+  Misc.Json.object_
+    [
+      Misc.Json.field "file" (string_to_json loc.loc_start.pos_fname);
+      Misc.Json.field "start" (position_to_json loc.loc_start);
+      Misc.Json.field "end" (position_to_json loc.loc_end);
+    ]
+
+let form_to_string (form : Diagnostic.Form.t) =
+  match form with Name -> "name" | Pronoun -> "pronoun"
+
+let kind_to_string (kind : Diagnostic.Kind.t) =
+  match kind with
+  | Explanation -> "explanation"
+  | Background -> "background"
+  | Suggestion -> "suggestion"
+
+let relation_to_string (relation : Diagnostic.Relation.t) =
+  match relation with Claim -> "claim" | Elaboration -> "elaboration"
+
+let annotation_to_json (annotation : Diagnostic.Annotation.t) =
+  match annotation with
+  | Code -> Misc.Json.object_ [ kind_field "code" ]
+  | Source loc ->
+      Misc.Json.object_
+        [ kind_field "source"; Misc.Json.field "loc" (location_to_json loc) ]
+  | Mention { entity; form } ->
+      Misc.Json.object_
+        [
+          kind_field "mention";
+          Misc.Json.field "entity"
+            (Misc.Json.int (Diagnostic.Entities.Id.to_int entity));
+          Misc.Json.field "form" (string_to_json (form_to_string form));
+        ]
+  | Term term ->
+      Misc.Json.object_
+        [
+          kind_field "term";
+          Misc.Json.field "term"
+            (Misc.Json.int (Diagnostic.Glossary.Id.to_int term));
+        ]
+
+let rec inline_to_json (inline : Diagnostic.Inline.t) =
+  match inline with
+  | Text text ->
+      Misc.Json.object_
+        [ kind_field "text"; Misc.Json.field "text" (string_to_json text) ]
+  | Annotated { annotation; content } ->
+      Misc.Json.object_
+        [
+          kind_field "annotated";
+          Misc.Json.field "annotation" (annotation_to_json annotation);
+          Misc.Json.field "content" (inlines_to_json content);
+        ]
+
+and inlines_to_json content = Misc.Json.array (List.map inline_to_json content)
+
+let rec block_to_json (block : Diagnostic.Block.t) =
+  Misc.Json.object_
+    [
+      Misc.Json.field "kind" (string_to_json (kind_to_string block.kind));
+      Misc.Json.field "content" (inlines_to_json block.content);
+      Misc.Json.field "children"
+        (Misc.Json.array (List.map child_to_json block.children));
+    ]
+
+and child_to_json
+    ((relation, block) : Diagnostic.Relation.t * Diagnostic.Block.t) =
+  Misc.Json.object_
+    [
+      Misc.Json.field "relation" (string_to_json (relation_to_string relation));
+      Misc.Json.field "block" (block_to_json block);
+    ]
+
+let entity_to_json ((id, loc) : Diagnostic.Entities.Id.t * Location.t) =
+  Misc.Json.object_
+    [
+      Misc.Json.field "id" (Misc.Json.int (Diagnostic.Entities.Id.to_int id));
+      Misc.Json.field "loc" (location_to_json loc);
+    ]
+
+let glossary_entry_to_json
+    ((id, entry) : Diagnostic.Glossary.Id.t * Diagnostic.Glossary.Entry.t) =
+  let url =
+    match entry.url with
+    | None -> []
+    | Some url -> [ Misc.Json.field "url" (string_to_json url) ]
+  in
+  Misc.Json.object_
+    ([
+       Misc.Json.field "id" (Misc.Json.int (Diagnostic.Glossary.Id.to_int id));
+       Misc.Json.field "term" (string_to_json entry.term);
+       Misc.Json.field "category" (string_to_json entry.category);
+       Misc.Json.field "description" (string_to_json entry.description);
+     ]
+    @ url)
+
+let diagnostic_to_json (diagnostic : Diagnostic.t) =
+  Misc.Json.object_
+    [
+      Misc.Json.field "loc" (location_to_json diagnostic.loc);
+      Misc.Json.field "entities"
+        (Misc.Json.array
+           (List.map entity_to_json
+              (Diagnostic.Entities.to_list diagnostic.entities)));
+      Misc.Json.field "glossary"
+        (Misc.Json.array
+           (List.map glossary_entry_to_json
+              (Diagnostic.Glossary.to_list diagnostic.glossary)));
+      Misc.Json.field "body"
+        (Misc.Json.array (List.map block_to_json diagnostic.body));
+    ]
+
+let to_json diagnostic =
+  String.concat "" (String.split_on_char '\n' (diagnostic_to_json diagnostic))

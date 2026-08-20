@@ -202,7 +202,6 @@
   ;; DRIVER
   pparse
   ;; TYPING
-  structured_diagnostic_protocol
   structured_diagnostic
   ident
   global_module))
