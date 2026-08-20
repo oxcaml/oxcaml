@@ -126,7 +126,7 @@
 
    (func (export "caml_continuation_update_handler_noexc")
       (param $continuation (ref eq)) (param $value (ref eq)) (param $exn (ref eq))
-      (param $effect (ref eq)) (result (ref eq))
+      (param $effect (ref eq)) (param $tick (ref eq)) (result (ref eq))
       (local $tail (ref $generic_fiber))
       ;; Peek at the stack without consuming the continuation. If it is null
       ;; the continuation has already been taken, so we leave it untouched.
