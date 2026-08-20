@@ -51,7 +51,7 @@ module CU_data : sig
 
   type raw
 
-  val empty : t
+  val empty : unit -> t
 
   val write : t -> sections:File_sections.Builder.t -> raw
 
@@ -65,4 +65,4 @@ val eval :
   slambda ->
   CU_data.t * lambda
 
-val print : Format_doc.formatter -> value Or_missing.t -> unit
+val print_value_or_missing : Format_doc.formatter -> value Or_missing.t -> unit
