@@ -206,7 +206,7 @@ end = struct
           match ev.ev_kind, ev.ev_repr with
           | Event_pseudo, Event_none -> `Tail
           | Event_pseudo, (Event_parent _ | Event_child _)
-          | (Event_before | Event_after _), _ -> `Non_tail
+          | (Event_before | Event_after _ | Event_after_untyped), _ -> `Non_tail
         in
         Some (call, nargs)
     | Event_function | Event_return _ | Event_other -> None
@@ -1061,7 +1061,7 @@ let string_of_addr debug_data addr =
       let kind =
         match kind with
         | Event_before -> "(before)"
-        | Event_after _ -> "(after)"
+        | Event_after _ | Event_after_untyped -> "(after)"
         | Event_pseudo -> "(pseudo)"
       in
       Printf.sprintf "%s:%s-%s %s" file (pos loc.loc_start) (pos loc.loc_end) kind)
@@ -1196,9 +1196,9 @@ and compile infos pc state (instrs : instr list) =
             (* Ignore allocation events (not very interesting) *)
             if debug_parser () then Format.eprintf "Ignored allocation event@.";
             instrs
-        | ( { ev_kind = Event_pseudo | Event_after _; ev_info = Event_return _; _ }
+        | ( { ev_kind = Event_pseudo | Event_after _ | Event_after_untyped; ev_info = Event_return _; _ }
           , (Let (_, (Apply _ | Prim _)) as i) :: rem )
-        | (( { ev_kind = Event_pseudo | Event_after _
+        | (( { ev_kind = Event_pseudo | Event_after _ | Event_after_untyped
              ; ev_info = Event_unyielding_call _
              ; _
              }
@@ -1215,8 +1215,8 @@ and compile infos pc state (instrs : instr list) =
             (* At beginning of function *)
             if debug_parser () then Format.eprintf "Added event at function start@.";
             push_event Before source event instrs
-        | { ev_kind = Event_after _ | Event_pseudo; ev_info = Event_return _; _ }, _
-        | (( { ev_kind = Event_after _ | Event_pseudo
+        | { ev_kind = Event_after _ | Event_after_untyped | Event_pseudo; ev_info = Event_return _; _ }, _
+        | (( { ev_kind = Event_after _ | Event_after_untyped | Event_pseudo
              ; ev_info = Event_unyielding_call _
              ; _
              }
@@ -1229,7 +1229,7 @@ and compile infos pc state (instrs : instr list) =
             then
               Format.eprintf "Ignored useless event (beginning of a block after a call)@.";
             instrs
-        | { ev_kind = Event_after _; ev_info = Event_other; _ }, _ ->
+        | { ev_kind = Event_after _ | Event_after_untyped; ev_info = Event_other; _ }, _ ->
             if debug_parser ()
             then Format.eprintf "Ignored useless event (before a raise)@.";
             (* We already have an event for the exception. The
@@ -1239,7 +1239,7 @@ and compile infos pc state (instrs : instr list) =
         | { ev_kind = Event_before | Event_pseudo; ev_info = Event_function; _ }, _ ->
             if debug_parser () then Format.eprintf "added event@.";
             push_event Before source event instrs
-        | { ev_kind = Event_after _; ev_info = Event_function; _ }, _
+        | { ev_kind = Event_after _ | Event_after_untyped; ev_info = Event_function; _ }, _
         | { ev_kind = Event_before; ev_info = Event_return _; _ }, _
         | (({ ev_kind = Event_before; ev_info = Event_unyielding_call _; _ }, _)
            [@if oxcaml]) ->
