@@ -1,11 +1,10 @@
 (* TEST
  (* Impl-mode codegen looks up each bundled unit's [.cmo]/[.cmx] on the
-    load path.  With [Basic.cmo] deleted (but its [.cmi] and
-    [Basic__.cmo] intact), the missing-file case must surface as a
-    proper user error, not a raw [Not_found] from
-    [Load_path.auto_include_libs]. *)
+    load path.  With [Basic.cmo] deleted (but its [.cmi] intact), the
+    missing-file case must surface as a proper user error, not a raw
+    [Not_found] from [Load_path.auto_include_libs]. *)
 
- readonly_files = "missing_impl_byte.reference";
+ readonly_files = "basic.mli basic.ml missing_impl_byte.reference";
 
  setup-ocamlc.byte-build-env;
 
@@ -14,46 +13,30 @@
  script = "mkdir p basic bundle";
  script;
 
- src = "${test_source_directory}/../p.mli \
-        ${test_source_directory}/../../dunelike/p__.ml";
+ src = "${test_source_directory}/../p.mli";
  dst = "p/";
  copy;
 
- src = "${test_source_directory}/../../dunelike/basic.mli \
-        ${test_source_directory}/../../dunelike/basic.ml \
-        ${test_source_directory}/../../dunelike/basic__.ml";
+ src = "basic.mli basic.ml";
  dst = "basic/";
  copy;
 
- set flg_base = "-w -53";
- set flg = "$flg_base -no-alias-deps -nocwd";
- set flg_int_iface = "$flg -w -49";
-
- (* dune does not pass [-nocwd] to link *)
- set flg_link = "$flg_base -no-alias-deps";
+ set flg = "-w -53 -no-alias-deps -nocwd";
 
  (* Parameter P. *)
 
- flags = "$flg_int_iface";
- module = "p/p__.ml";
- ocamlc.byte;
-
- flags = "$flg -as-parameter -H p -open-cmi p/p__.cmi";
+ flags = "$flg -as-parameter";
  module = "p/p.mli";
  ocamlc.byte;
 
  (* [Basic], parameterised by P. *)
 
- flags = "$flg_int_iface -parameter P -I p";
- module = "basic/basic__.ml";
- ocamlc.byte;
-
- flags = "$flg -parameter P -I p -H basic -open-cmi basic/basic__.cmi";
+ flags = "$flg -parameter P -I p -I basic";
  module = "basic/basic.mli basic/basic.ml";
  ocamlc.byte;
 
- (* Delete [Basic]'s implementation, keeping its [.cmi] and [Basic__]'s implementation, so
-    that the only implementation missing from the load path is [Basic]'s own. *)
+ (* Delete [Basic]'s implementation, keeping its [.cmi], so the only
+    implementation missing from the load path is [Basic]'s own. *)
  script = "rm basic/basic.cmo";
  script;
 

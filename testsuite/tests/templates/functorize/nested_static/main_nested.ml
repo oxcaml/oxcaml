@@ -1,12 +1,10 @@
-(* [Bar] is parameterised by [P] and [Q]; its body uses [Stateful] (which
-   is parameterised by [P] only), so [Stateful] appears as a runtime
-   parameter of [Bar].  [Wrap] references [Bar[P:P_int]{Q}].  When we
-   functorize [Wrap], the [Rp_main_module_block Stateful[P:P]] slot of
-   [Bar]'s instantiating functor is substituted (via
-   [visible_arg_map = {P:P_int}]) to [Stateful[P:P_int]] — now complete.
-   The functorizer resolves this to a [Pgetglobal] of the
-   pre-instantiated [Stateful[P:P_int]] compilation unit, so its
-   counter is a shared global instance. *)
+(* [Static] is the pre-instantiated [Stateful[P:P_int]] compilation
+   unit.  The bundle's [Wrap] reaches [Stateful] through
+   [Bar[P:P_int]{Q}], whose [Stateful[P:P]] runtime slot specialises
+   to the same complete instance [Stateful[P:P_int]]; the functorizer
+   resolves it to that global unit rather than binding a fresh copy
+   inside [Make] (see the sketch in test_byte.ml).  So both routes
+   below observe one shared counter. *)
 
 module Static = Stateful(P)(P_int) [@jane.non_erasable.instances]
 

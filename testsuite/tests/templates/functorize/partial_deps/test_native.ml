@@ -129,7 +129,36 @@
  ocamlopt.byte;
 
  {
-   (* ===== Case 1: Nested_arg — Foo_q[Q:Q_impl{P}] ===== *)
+   (* ===== Case 1: Nested_arg — Foo_q[Q:Q_impl{P}] =====
+
+      Quasi-OCaml, writing parameterised units as functors:
+
+      {[
+        module Q_impl (P : P) : Q = struct end        (* argument for Q *)
+        module Foo_q (Q : Q) = struct
+          let name = "Foo_q"
+        end
+        module Nested_arg (P : P) = struct
+          module Foo_q_of_q_impl = Foo_q (Q_impl (P))
+          let describe = "Nested_arg > " ^ Foo_q_of_q_impl.name
+        end
+      ]}
+
+      [Nested_arg]'s cmi records the compound reference
+      [Foo_q[Q:Q_impl{P}]] in its bound_globals: [Foo_q]'s [Q] is
+      filled by [Q_impl], whose own [P] is still open.  Functorizing
+      [Nested_arg] pulls [Foo_q] and [Q_impl] in transitively and
+      specialises the compound reference to the bundle's [P]
+      parameter, roughly:
+
+      {[
+        module Make (P : P) () = struct
+          module DEP__Q_impl = Q_impl (P)
+          module DEP__Foo_q = Foo_q (DEP__Q_impl)
+          module Nested_arg = (* body of Nested_arg, with
+             [Foo_q_of_q_impl := DEP__Foo_q] *)
+        end
+      ]} *)
 
    (* Step 1: build [Foo_q], a plain library parameterised by [Q]. *)
 
@@ -200,7 +229,27 @@
    reference = "test_functorize_nested_arg.reference";
    check-program-output;
  }{
-   (* ===== Case 2: Partial_pq — Pair_pq[Q:Q_impl{P}]{P} ===== *)
+   (* ===== Case 2: Partial_pq — Pair_pq[Q:Q_impl{P}]{P} =====
+
+      Like case 1, but the applied library also has an UNFILLED
+      parameter.  Quasi-OCaml:
+
+      {[
+        module Pair_pq (P : P) (Q : Q) = struct
+          let name p = "Pair_pq[P=" ^ P.to_string p ^ "]"
+        end
+        module Partial_pq (P : P) = struct
+          module Pair_pq_q_impl = Pair_pq (P) (Q_impl (P))
+          let describe p = "Partial_pq > " ^ Pair_pq_q_impl.name p
+        end
+      ]}
+
+      [Partial_pq]'s cmi records [Pair_pq[Q:Q_impl{P}]{P}]: [Pair_pq]'s
+      [Q] is filled visibly (by [Q_impl], whose [P] is open) while
+      [Pair_pq]'s own [P] stays a hidden, unfilled argument — a
+      partial application in bound_globals.  The bundle's [Make] must
+      apply [Pair_pq] to both its [P] parameter and the locally-bound
+      [Q_impl(P)]. *)
 
    (* Step 1: build [Pair_pq], a plain library parameterised by both
       [P] and [Q]. *)
@@ -270,15 +319,31 @@
    reference = "test_functorize_partial_pq.reference";
    check-program-output;
  }{
-   (* ===== Case 3: Nested_r — arg-block extraction ===== *)
+   (* ===== Case 3: Nested_r — arg-block extraction =====
 
-   (* Bundle a compound reference [Foo_r(R)(R_impl)] where [R_impl] is
-      parameterised (by [P]) and its primary block has an extra [filler]
-      field before [greeting].  When the bundle runs, [R_impl(P)]'s main
-      block must be projected through [mod_field arg_block_idx main_repr]
-      to yield [R_impl]'s arg block before being passed to [Foo_r]'s
-      functor — otherwise [Foo_r] reads offset 0 (= [filler]) as
-      [R.greeting] and calling [filler] as a function segfaults. *)
+      Quasi-OCaml:
+
+      {[
+        module R_impl (P : P) = struct
+          let filler = 42                    (* not part of [R]'s sig *)
+          let greeting () = "R_impl greeting, P=" ^ ...
+        end
+        module Foo_r (R : R) = struct
+          let describe () = "Foo_r > " ^ R.greeting ()
+        end
+        module Nested_r (P : P) (R : R) = struct
+          module Foo_r_of_r_impl = Foo_r (R_impl (P) :> R)
+          let describe () = Foo_r_of_r_impl.describe ()
+        end
+      ]}
+
+      [R_impl] is parameterised (by [P]) and its primary block has an
+      extra [filler] field before [greeting].  When the bundle runs,
+      [R_impl(P)]'s main block must be projected through
+      [mod_field arg_block_idx main_repr] to yield [R_impl]'s arg block
+      before being passed to [Foo_r]'s functor — otherwise [Foo_r]
+      reads offset 0 (= [filler]) as [R.greeting] and calling [filler]
+      as a function segfaults. *)
 
    (* Parameter R and argument R_int. *)
 

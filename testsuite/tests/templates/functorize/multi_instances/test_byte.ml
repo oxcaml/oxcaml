@@ -2,8 +2,8 @@
  (* Type identity across bundle applications. *)
 
  readonly_files = "\
-   basic_opaque.mli basic_opaque.ml util_opaque.mli util_opaque.ml \
-   basic_transparent.ml util_transparent.ml \
+   basic_opaque.mli basic_opaque.ml fancy_opaque.mli fancy_opaque.ml \
+   basic_transparent.ml fancy_transparent.ml \
    basic_pfree.mli basic_pfree.ml \
    p_int_alt.mli p_int_alt.ml \
    main_functorize_share.ml test_functorize_share.reference \
@@ -18,8 +18,8 @@
 
  set OCAMLPARAM = "";
 
- script = "mkdir p p_int p_int_alt basic_opaque util_opaque \
-                 basic_transparent util_transparent \
+ script = "mkdir p p_int p_int_alt basic_opaque fancy_opaque \
+                 basic_transparent fancy_transparent \
                  basic_pfree bundle_opaque bundle2 bundle_pfree";
  script;
 
@@ -38,16 +38,16 @@
  dst = "basic_opaque/";
  copy;
 
- src = "util_opaque.mli util_opaque.ml";
- dst = "util_opaque/";
+ src = "fancy_opaque.mli fancy_opaque.ml";
+ dst = "fancy_opaque/";
  copy;
 
  src = "basic_transparent.ml";
  dst = "basic_transparent/";
  copy;
 
- src = "util_transparent.ml";
- dst = "util_transparent/";
+ src = "fancy_transparent.ml";
+ dst = "fancy_transparent/";
  copy;
 
  src = "basic_pfree.mli basic_pfree.ml";
@@ -103,35 +103,35 @@
  module = "basic_opaque/basic_opaque.mli basic_opaque/basic_opaque.ml";
  ocamlc.byte;
 
- (* [Util_opaque]: [type t = Basic_opaque.t]. *)
+ (* [Fancy_opaque]: [type t = Basic_opaque.t]. *)
 
- flags = "$flg -parameter P -I p -I basic_opaque -I util_opaque";
- module = "util_opaque/util_opaque.mli util_opaque/util_opaque.ml";
+ flags = "$flg -parameter P -I p -I basic_opaque -I fancy_opaque";
+ module = "fancy_opaque/fancy_opaque.mli fancy_opaque/fancy_opaque.ml";
  ocamlc.byte;
 
- (* [Basic_transparent] and [Util_transparent]: transparent [type t = P.t]. *)
+ (* [Basic_transparent] and [Fancy_transparent]: transparent [type t = P.t]. *)
 
  flags = "$flg -parameter P -I p";
  module = "basic_transparent/basic_transparent.ml";
  ocamlc.byte;
 
  flags = "$flg -parameter P -I p";
- module = "util_transparent/util_transparent.ml";
+ module = "fancy_transparent/fancy_transparent.ml";
  ocamlc.byte;
 
  (* Bundle the two flavours.  The opaque inputs are deliberately listed
-    in reverse dependency order ([Util_opaque] depends on
+    in reverse dependency order ([Fancy_opaque] depends on
     [Basic_opaque]): [-functorize] re-orders them topologically. *)
 
- flags = "$flg -functorize -I p -I basic_opaque -I util_opaque \
-   Util_opaque Basic_opaque";
+ flags = "$flg -functorize -I p -I basic_opaque -I fancy_opaque \
+   Fancy_opaque Basic_opaque";
  module = "";
  program = "bundle_opaque/bundle_opaque.cmo";
  all_modules = "";
  ocamlc.byte;
 
- flags = "$flg -functorize -I p -I basic_transparent -I util_transparent \
-   Basic_transparent Util_transparent";
+ flags = "$flg -functorize -I p -I basic_transparent -I fancy_transparent \
+   Basic_transparent Fancy_transparent";
  module = "";
  program = "bundle2/bundle2.cmo";
  all_modules = "";
@@ -148,7 +148,7 @@
       and also across [R1 = Make(P_int)()], [R2 = Make(P_int)()]. *)
 
    flags = "$flg -I bundle2 -I p -I p_int -I basic_transparent \
-     -I util_transparent";
+     -I fancy_transparent";
    module = "main_functorize_share.ml";
    ocamlc.byte;
 
@@ -157,7 +157,7 @@
    program = "$test_build_directory/test_functorize_share.bc";
    all_modules = "\
      basic_transparent/basic_transparent.cmo \
-     util_transparent/util_transparent.cmo \
+     fancy_transparent/fancy_transparent.cmo \
      p_int/p_int__.cmo \
      p_int/p_int.cmo \
      bundle2/bundle2.cmo \
@@ -175,7 +175,7 @@
  }{
    (* (2) Positive: abstract+eq sharing — within one [R = Make(P_int)()]. *)
 
-   flags = "$flg -I bundle_opaque -I p -I p_int -I basic_opaque -I util_opaque";
+   flags = "$flg -I bundle_opaque -I p -I p_int -I basic_opaque -I fancy_opaque";
    module = "main_functorize_type_share.ml";
    ocamlc.byte;
 
@@ -184,7 +184,7 @@
    program = "$test_build_directory/test_functorize_type_share.bc";
    all_modules = "\
      basic_opaque/basic_opaque.cmo \
-     util_opaque/util_opaque.cmo \
+     fancy_opaque/fancy_opaque.cmo \
      p_int/p_int__.cmo \
      p_int/p_int.cmo \
      bundle_opaque/bundle_opaque.cmo \
@@ -203,7 +203,7 @@
    (* (3) Instance independence — each [Make] application has its own
       counter. *)
 
-   flags = "$flg -I bundle_opaque -I p -I p_int -I basic_opaque -I util_opaque";
+   flags = "$flg -I bundle_opaque -I p -I p_int -I basic_opaque -I fancy_opaque";
    module = "main_instance_state.ml";
    ocamlc.byte;
 
@@ -212,7 +212,7 @@
    program = "$test_build_directory/test_instance_state.bc";
    all_modules = "\
      basic_opaque/basic_opaque.cmo \
-     util_opaque/util_opaque.cmo \
+     fancy_opaque/fancy_opaque.cmo \
      p_int/p_int__.cmo \
      p_int/p_int.cmo \
      bundle_opaque/bundle_opaque.cmo \
@@ -260,7 +260,7 @@
       references [P] (here [Basic_transparent.t = P.t]). *)
 
    flags = "$flg -I bundle2 -I p -I p_int -I p_int_alt \
-     -I basic_transparent -I util_transparent";
+     -I basic_transparent -I fancy_transparent";
    module = "bad_intf_sig_mismatch.ml";
    ocamlc_byte_exit_status = "2";
    compiler_output = "bad_intf_sig_mismatch.output";
@@ -273,7 +273,7 @@
       where an [R2 = Make(P_int)()] value is expected — each [Make]
       application gives fresh abstract types. *)
 
-   flags = "$flg -I bundle_opaque -I p -I p_int -I basic_opaque -I util_opaque";
+   flags = "$flg -I bundle_opaque -I p -I p_int -I basic_opaque -I fancy_opaque";
    module = "bad_mix_share.ml";
    ocamlc_byte_exit_status = "2";
    ocamlc.byte;
