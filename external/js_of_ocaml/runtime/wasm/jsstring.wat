@@ -154,38 +154,10 @@
          (local.get $s) (i32.const 0) (array.len (local.get $s))))
 
    (func (export "bytes_of_jsstring") (param $s anyref) (result (ref $bytes))
-      (local $s' externref)
-      (local $len i32) (local $i i32) (local $c i32)
-      (local $b (ref $bytes))
       (if (global.get $text_converters_available)
          (then
             (return_call $encodeStringToUTF8Array
                (extern.convert_any (local.get $s)))))
-      (if $continue
-         (i32.and (global.get $string_builtins_available)
-            (i32.le_u
-               (local.tee $len
-                  (call $string_length
-                     (local.tee $s' (extern.convert_any (local.get $s)))))
-               (global.get $utf16_buffer_size)))
-         (then
-            (drop
-               (call $intoCharCodeArray
-                  (local.get $s') (global.get $buffer) (i32.const 0)))
-            (local.set $b (array.new_default $bytes (local.get $len)))
-            (loop $loop
-               (if (i32.lt_u (local.get $i) (local.get $len))
-                  (then
-                     (local.set $c
-                        (array.get_u $wstring (global.get $buffer)
-                           (local.get $i)))
-                     (br_if $continue
-                        (i32.ge_u (local.get $c) (i32.const 128)))
-                     (array.set $bytes (local.get $b) (local.get $i)
-                        (local.get $c))
-                     (local.set $i (i32.add (local.get $i) (i32.const 1)))
-                     (br $loop))))
-            (return (local.get $b))))
       (return_call $string_of_jsstring_fallback (local.get $s)))
 
    ;; Fallback implementation of string conversion functions
