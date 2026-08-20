@@ -8216,7 +8216,8 @@ and type_expect_
         | _ -> instance Predef.type_unit
       in
       let wh_body, wh_body_sort =
-        type_statement ~explanation:While_loop_body ~position body_env sbody
+        type_statement ~explanation:While_loop_body
+          ~position body_env sbody
       in
       rue {
         exp_desc =
