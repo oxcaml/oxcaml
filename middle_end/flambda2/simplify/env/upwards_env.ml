@@ -17,6 +17,8 @@
 type t =
   { continuations : Continuation_in_env.t Continuation.Map.t;
     continuation_shortcuts : Continuation_shortcut.t Continuation.Map.t;
+    unique_handlers_map :
+      Continuation.t Rebuilt_expr.Unique_continuation_handlers.t;
     apply_cont_rewrites : Apply_cont_rewrite.t Continuation.Map.t;
     (* this [are_rebuilding_terms] is **only** used for printing *)
     are_rebuilding_terms : Are_rebuilding_terms.t;
@@ -26,6 +28,7 @@ type t =
 let create are_rebuilding_terms ~machine_width =
   { continuations = Continuation.Map.empty;
     continuation_shortcuts = Continuation.Map.empty;
+    unique_handlers_map = Rebuilt_expr.Unique_continuation_handlers.empty;
     apply_cont_rewrites = Continuation.Map.empty;
     are_rebuilding_terms;
     machine_width
@@ -34,7 +37,7 @@ let create are_rebuilding_terms ~machine_width =
 let machine_width t = t.machine_width
 
 let [@ocamlformat "disable"] print ppf
-    { continuations;
+    { continuations; unique_handlers_map = _;
       apply_cont_rewrites; are_rebuilding_terms ;
       continuation_shortcuts; machine_width = _ } =
   Format.fprintf ppf "@[<hov 1>(\
@@ -77,11 +80,37 @@ let find_continuation_shortcut t cont =
       (Continuation_shortcut.continuation shortcut_to);
     Some shortcut_to
 
+let find_unique_continuation_handler are_rebuilding_terms t ~params ~handler
+    ~is_exn_handler ~free_names_without_params =
+  Rebuilt_expr.Unique_continuation_handlers.find_opt are_rebuilding_terms params
+    handler t.unique_handlers_map ~is_exn_handler ~free_names_without_params
+
 let add_continuation0 t cont cont_in_env =
   let continuations = Continuation.Map.add cont cont_in_env t.continuations in
   { t with continuations }
 
-let add_non_inlinable_continuation t cont ~params ~handler =
+let add_unique_continuation_handler are_rebuilding_terms t cont ~params ~handler
+    ~is_exn_handler ~free_names_without_params =
+  if !Dwarf_flags.gdwarf_may_alter_codegen
+  then t
+  else
+    let unique_handlers_map =
+      Rebuilt_expr.Unique_continuation_handlers.add are_rebuilding_terms params
+        handler cont t.unique_handlers_map ~is_exn_handler
+        ~free_names_without_params
+    in
+    { t with unique_handlers_map }
+
+let add_non_inlinable_continuation are_rebuilding_terms t cont ~params ~handler
+    =
+  let t, handler =
+    match (handler : _ Or_unknown.t) with
+    | Known (handler, ~is_exn_handler, ~free_names_without_params) ->
+      ( add_unique_continuation_handler are_rebuilding_terms t cont ~params
+          ~handler ~is_exn_handler ~free_names_without_params,
+        Or_unknown.Known handler )
+    | Unknown -> t, Or_unknown.Unknown
+  in
   if Bound_parameters.is_empty params
   then add_continuation0 t cont (Non_inlinable_zero_arity { handler })
   else

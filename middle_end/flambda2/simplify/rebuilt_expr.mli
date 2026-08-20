@@ -95,14 +95,6 @@ module Continuation_handler : sig
     is_exn_handler:bool ->
     is_cold:bool ->
     t
-
-  val create' :
-    Are_rebuilding_terms.t ->
-    Bound_parameters.t ->
-    handler:rebuilt_expr ->
-    is_exn_handler:bool ->
-    is_cold:bool ->
-    t
 end
 
 val create_non_recursive_let_cont :
@@ -147,3 +139,31 @@ val bind_no_simplification :
   cost_metrics_of_body:Cost_metrics.t ->
   free_names_of_body:Name_occurrences.t ->
   t * Cost_metrics.t * Name_occurrences.t
+
+module Unique_continuation_handlers : sig
+  (* Uses the parameters and handler expression to avoid re-opening the name
+     abstraction *)
+
+  type 'a t
+
+  val empty : 'a t
+
+  val add :
+    Are_rebuilding_terms.t ->
+    Bound_parameters.t ->
+    rebuilt_expr ->
+    is_exn_handler:bool ->
+    free_names_without_params:Name_occurrences.t ->
+    'a ->
+    'a t ->
+    'a t
+
+  val find_opt :
+    Are_rebuilding_terms.t ->
+    Bound_parameters.t ->
+    rebuilt_expr ->
+    is_exn_handler:bool ->
+    free_names_without_params:Name_occurrences.t ->
+    'a t ->
+    ('a * Simple.t list) option
+end
