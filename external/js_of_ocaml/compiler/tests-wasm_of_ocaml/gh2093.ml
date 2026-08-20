@@ -16,26 +16,26 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 (* User-land dynamic wind:
    http://okmij.org/ftp/continuations/implementations.html#dynamic-wind *)
-open Effect
 open Effect.Deep
 
-let dynamic_wind before_thunk thunk after_thunk =
+let dynamic_wind (h @ local yielding) before_thunk thunk after_thunk =
   before_thunk ();
   let res =
-    match_with
-      thunk
+    Safe.With_handler.match_with
+      h
+      (fun h () -> thunk h)
       ()
-      { retc = Fun.id
+      { retc = (fun _h x -> x)
       ; exnc =
-          (fun e ->
+          (fun _h e ->
             after_thunk ();
             raise e)
       ; effc =
-          (fun (type a) (e : a Effect.t) ->
+          (fun (type a) h (e : a Effect.t) -> exclave_
             Some
               (fun (k : (a, _) continuation) ->
                 after_thunk ();
-                let res' = perform e in
+                let res' = Effect.Safe.perform h e in
                 before_thunk ();
                 continue k res'))
       }
@@ -48,15 +48,15 @@ type _ Effect.t += E : unit Effect.t
 let () =
   let bt () = Printf.printf "IN\n" in
   let at () = Printf.printf "OUT\n" in
-  let foo () =
+  let foo h =
     Printf.printf "perform E\n";
-    perform E;
+    Effect.Safe.perform h E;
     Printf.printf "perform E\n";
-    perform E;
+    Effect.Safe.perform h E;
     Printf.printf "done\n"
   in
-  try_with
-    (dynamic_wind bt foo)
+  Safe.try_with
+    (fun h at -> dynamic_wind h bt foo at [@nontail])
     at
     { effc =
         (fun (type a) (e : a Effect.t) ->
