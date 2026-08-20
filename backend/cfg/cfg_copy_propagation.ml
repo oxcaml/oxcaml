@@ -16,7 +16,7 @@ type uses =
   | One_block of
       { label : Label.t;
         reads : int;
-        writes : instr list;
+        writes : (instr * int) list;
         min_index : int;
         max_index : int
       }
@@ -32,7 +32,7 @@ let compute_uses : Cfg.t -> uses Reg.Tbl.t =
     Array.iter regs ~f:(fun reg ->
         match Reg.Tbl.find_opt uses reg with
         | None ->
-          let reads, writes = if read then 1, [] else 0, [instr] in
+          let reads, writes = if read then 1, [] else 0, [instr, idx] in
           Reg.Tbl.replace uses reg
             (One_block
                { label; reads; writes; min_index = idx; max_index = idx })
@@ -43,7 +43,7 @@ let compute_uses : Cfg.t -> uses Reg.Tbl.t =
           then Reg.Tbl.replace uses reg Multiple_blocks
           else begin
             let reads, writes =
-              if read then succ reads, writes else reads, instr :: writes
+              if read then succ reads, writes else reads, (instr, idx) :: writes
             in
             let min_index = Int.min min_index idx in
             let max_index = Int.max max_index idx in
@@ -78,7 +78,7 @@ let compute_subst : uses Reg.Tbl.t -> Subst.t * InstructionId.Set.t Label.Tbl.t
       | Unknown, Multiple_blocks -> ()
       | Unknown, One_block { label; reads; writes; min_index; max_index } ->
         begin match writes with
-        | [write] ->
+        | [(write, write_index)] ->
           begin match[@ocaml.warning "-fragile-match"] write with
           | Basic { id; desc = Op Move; arg; res; _ } ->
             (* On the compiler distribution, linscan and greedy show interesting
@@ -90,9 +90,15 @@ let compute_subst : uses Reg.Tbl.t -> Subst.t * InstructionId.Set.t Label.Tbl.t
                but it looks like we could be a bit more aggressive in terms of
                distance for greedy - maybe even more once the split part
                of greedy is implemented). *)
+            (* With a single read and a single write, the two uses are
+               at `min_index` and `max_index`; requiring the write to be
+               strictly below `max_index` hence means that the write precedes
+               the read. This rules out loop-carried moves (in self-looping
+               blocks), whose reads see the value from a previous iteration
+               and can thus not be rewritten to read the source directly. *)
             if
-              reads = 1
-              && Int.abs (max_index - min_index) < 5
+              reads = 1 && write_index < max_index
+              && max_index - min_index < 5
               && Reg.is_unknown arg.(0)
               && Reg.is_unknown res.(0)
               && (not (Reg.same arg.(0) res.(0)))
