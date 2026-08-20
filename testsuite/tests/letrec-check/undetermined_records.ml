@@ -55,3 +55,15 @@ Line 2, characters 8-19:
             ^^^^^^^^^^^
 Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}];;
+
+type ('a : any) opt = N | S of 'a
+type tree = { left : tree opt; right : tree opt; data : int }
+let rec leaf = { left = S leaf; right = S leaf; data = 42 }
+[%%expect{|
+type ('a : any) opt = N | S of 'a
+type tree = { left : tree opt; right : tree opt; data : int; }
+Line 3, characters 15-59:
+3 | let rec leaf = { left = S leaf; right = S leaf; data = 42 }
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
+|}];;

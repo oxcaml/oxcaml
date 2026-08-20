@@ -113,6 +113,49 @@ let rec good_block = let _ = A { cstr = good_block; flt = #4.0 } in
 val good_block : cstr = A {cstr = <cycle>; flt = <abstr>}
 |}];;
 
+(* OK: the recursive variable is stored in the value prefix of a mixed block,
+   reached through an unboxed product. *)
+
+type t2 = { t2 : #(t2 option * float#); i : int }
+let rec t2 = { t2 = #(Some t2, #4.0); i = 0 };;
+[%%expect {|
+type t2 = { t2 : #(t2 option * float#); i : int; }
+Line 2, characters 13-45:
+2 | let rec t2 = { t2 = #(Some t2, #4.0); i = 0 };;
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
+|}];;
+
+type c2 = B of #(c2 option * float#)
+let rec c2 = B #(Some c2, #4.0);;
+[%%expect {|
+type c2 = B of #(c2 option * float#)
+Line 2, characters 13-31:
+2 | let rec c2 = B #(Some c2, #4.0);;
+                 ^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
+|}];;
+
+type c3 = C of { c3 : #(c3 option * float#); i : int }
+let rec c3 = C { c3 = #(Some c3, #4.0); i = 0 };;
+[%%expect {|
+type c3 = C of { c3 : #(c3 option * float#); i : int; }
+Line 2, characters 13-47:
+2 | let rec c3 = C { c3 = #(Some c3, #4.0); i = 0 };;
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
+|}];;
+
+type v2 = { v2 : #(v2 option * unit#) }
+let rec v2 = { v2 = #(Some v2, #()) };;
+[%%expect {|
+type v2 = { v2 : #(v2 option * unit#); }
+Line 2, characters 13-37:
+2 | let rec v2 = { v2 = #(Some v2, #()) };;
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
+|}];;
+
 (* OK: a nested recursive mixed block *)
 type n = { flt : float#; n : n option }
 let rec n = let rec inner = { flt = #0.; n = Some n } in inner;;
