@@ -255,6 +255,11 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
   CAMLassert((char*) stack + len - (trailer_size + Bsize_wsize(wosize))
     >= Protected_stack_page(stack) + page_size);
 
+  // The compiler's emitted stack checks assume this layout (the
+  // Stack_base_offset and Stack_guard_size exported via domainstate.ml.c).
+  CAMLassert((char*)Stack_base(stack) - (char*)stack == Stack_base_offset);
+  CAMLassert(page_size == Stack_guard_size);
+
   stack->size = len;
   stack->handler = (struct stack_handler*)((char*)stack + len - trailer_size);
   CAMLassert(((uintnat) stack->handler) % stack_alignment == 0);
