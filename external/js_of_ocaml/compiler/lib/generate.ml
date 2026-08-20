@@ -1702,13 +1702,16 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
               , _ )
           , _ ) ->
             assert (not (cps_transform ()));
+            (* TODO: This is a temporary hack for the period when the
+               [Effect] module is in [Stdlib], but no code is actually using it. *)
+(*
             if not !(ctx.effect_warning)
             then (
               Warning.warn
                 `Effect_handlers_without_effect_backend
                 "your program contains effect handlers; you should probably run \
                  js_of_ocaml with option '--effects=cps'@.";
-              ctx.effect_warning := true);
+              ctx.effect_warning := true); *)
             let name = "jsoo_effect_not_supported" in
             let prim = Share.get_prim (runtime_fun ctx) name ctx.Ctx.share in
             let* () = info ~need_loc:true (kind (Primitive.kind name)) in
