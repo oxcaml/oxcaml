@@ -102,12 +102,14 @@ let rec gen_patterns ?(recurse = true) env type_expr =
   | Tunboxed_tuple lst ->
     let patterns =
       List.map lst ~f:(fun (label, ty) ->
-          match
-            Ctype.type_sort ~why:Jkind.History.Unboxed_tuple_element ~fixed:true
-              env ty
-          with
-          | Ok sort -> (label, Patterns.omega, sort)
-          | Error _ -> raise Ill_typed)
+          let sort : Jkind.Sort.t =
+            match
+              Ctype.type_sort ~why:Unboxed_tuple_element ~fixed:true env ty
+            with
+            | Ok sort -> sort
+            | Error _ -> Var (Jkind.Sort.new_genvar ())
+          in
+          (label, Patterns.omega, sort))
     in
     [ Tast_helper.Pat.unboxed_tuple env type_expr patterns ]
   | Tconstr (path, _params, _) ->
