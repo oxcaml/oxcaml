@@ -222,6 +222,7 @@ module Fragment = struct
             match Config.target () with
             | `JavaScript -> false
             | `Wasm -> true )
+      ; "portable-int", Config.Flag.portable_int
       ]
 
   type t =
