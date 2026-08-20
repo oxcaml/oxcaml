@@ -318,8 +318,9 @@ let register_predecessors_for_all_blocks (t : t) =
             | target_block -> target_block
             | exception Not_found ->
               Misc.fatal_errorf
-                "Cfg.register_predecessors_for_all_blocks: block %a not found"
-                Label.format target
+                "Cfg.register_predecessors_for_all_blocks: block %a not found \
+                 (in function %s, target of an edge from block %a)"
+                Label.format target t.fun_name Label.format label
           in
           target_block.predecessors
             <- Label.Set.add label target_block.predecessors)
