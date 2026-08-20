@@ -38,3 +38,8 @@ val insert_source_contents :
 val blackbox_filename : string
 
 val blackbox_contents : string
+
+val add_function_start_mappings :
+  function_offsets:int list -> Source_map.Standard.t -> Source_map.Standard.t
+(** Chrome profiler attributes samples within function to function start offset. Add entry
+    at first instruction within function so source code positions can be mapped *)

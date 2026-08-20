@@ -168,3 +168,22 @@ let%expect_test _ =
     sb:20:20 -> 3:3
     sa2:5:5 -> 23:3
     |}]
+
+let%expect_test "mappings deduplication" =
+  let gen_ori gen_col ori_line : Source_map.map =
+    Gen_Ori { gen_line = 1; gen_col; ori_source = 0; ori_line; ori_col = 0 }
+  in
+  let gen_ori_name gen_col ori_line ori_name : Source_map.map =
+    Gen_Ori_Name { gen_line = 1; gen_col; ori_source = 0; ori_line; ori_col = 0; ori_name }
+  in
+  (* A named and an unnamed mapping at the same generated position: the named
+     mapping is kept, and no leading separator (empty segment) is emitted for
+     the dropped one. *)
+  let mappings = [ gen_ori 16 1; gen_ori_name 16 1 0 ] in
+  let encoded = Source_map.Mappings.encode mappings in
+  print_endline (Source_map.Mappings.to_string encoded);
+  [%expect {| gBAAAA |}];
+  let mappings = [ gen_ori 16 1; gen_ori_name 16 1 0; gen_ori 32 3 ] in
+  let encoded = Source_map.Mappings.encode mappings in
+  print_endline (Source_map.Mappings.to_string encoded);
+  [%expect {| gBAAAA,gBAEA |}]

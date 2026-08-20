@@ -40,6 +40,11 @@ module Wasm_binary : sig
 
   val read_imports : file:string -> import list
 
+  val function_start_offsets : file:string -> int list
+  (** Offset of the start of each function body in the code section of the
+      module, in increasing order. This is the position profilers report
+      for stack frames within a function. *)
+
   val append_source_map_section : file:string -> url:string -> unit
 end
 
