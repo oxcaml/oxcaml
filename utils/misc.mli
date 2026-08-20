@@ -263,6 +263,9 @@ module Stdlib : sig
   module Option : sig
     type 'a t = 'a option
 
+    val exists : ('a -> bool) -> 'a option -> bool
+    (** [exists p o] is [p x] if [o] is [Some x], and [false] otherwise. *)
+
     (* short circuits if the first argument really is a [Some] *)
     val first_some : 'a option -> (unit -> 'a option) -> 'a option
 

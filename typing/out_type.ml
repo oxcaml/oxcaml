@@ -2093,7 +2093,8 @@ let tree_of_type_decl id decl =
         (Option.is_some umc)
     | Type_record_unboxed_product(lbls,
                                   (Record_unboxed_product
-                                  | Record_unboxed_product_variable),
+                                  | Record_unboxed_product_undetermined
+                                  | Record_unboxed_product_variable _),
                                   umc) ->
         tree_of_manifest
           (Otyp_record_unboxed_product (List.map tree_of_label lbls)),

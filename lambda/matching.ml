@@ -156,13 +156,12 @@ let expand_representable_labels lbls =
 let expand_record_head h =
   let open Patterns.Head in
   match h.pat_desc with
-  | Record (lbls, sorts, r) ->
+  | Record (lbls, r) ->
       { h with pat_desc =
-                  Record (expand_representable_labels lbls, sorts, r) }
-  | Record_unboxed_product (lbls, sorts, r) ->
+                  Record (expand_representable_labels lbls, r) }
+  | Record_unboxed_product (lbls, r) ->
       { h with pat_desc =
-                  Record_unboxed_product (expand_representable_labels lbls,
-                                         sorts, r) }
+                  Record_unboxed_product (expand_representable_labels lbls, r) }
   | _ -> h
 
 let bind_alias p id duid ~arg ~arg_sort ~action =
@@ -238,13 +237,13 @@ end = struct
           p1
         else
           { p with pat_desc = Tpat_or (p1, p2, o) }
-    | Tpat_record (lbls, sorts, r, closed) ->
+    | Tpat_record (lbls, r, closed) ->
         let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record (all_lbls, sorts, r, closed) }
-    | Tpat_record_unboxed_product (lbls, sorts, r, closed) ->
+        { p with pat_desc = Tpat_record (all_lbls, r, closed) }
+    | Tpat_record_unboxed_product (lbls, r, closed) ->
         let all_lbls = all_record_args lbls in
         { p with pat_desc =
-                   Tpat_record_unboxed_product (all_lbls, sorts, r, closed) }
+                   Tpat_record_unboxed_product (all_lbls, r, closed) }
     | _ -> p
 
   (* Explode or-patterns and turn aliases into bindings in actions *)
@@ -266,14 +265,14 @@ end = struct
             ( (General.view sub_p, patl),
               bind_alias p id duid ~arg
                 ~arg_sort:(Jkind.Sort.default_for_transl_and_get sort) ~action )
-      | `Record ([], _, _, _) as view -> stop p view
-      | `Record (lbls, sorts, r, closed) ->
-          let full_view = `Record (all_record_args lbls, sorts, r, closed) in
+      | `Record ([], _, _) as view -> stop p view
+      | `Record (lbls, r, closed) ->
+          let full_view = `Record (all_record_args lbls, r, closed) in
           stop p full_view
-      | `Record_unboxed_product ([], _, _, _) as view -> stop p view
-      | `Record_unboxed_product (lbls, sorts, r, closed) ->
+      | `Record_unboxed_product ([], _, _) as view -> stop p view
+      | `Record_unboxed_product (lbls, r, closed) ->
           let full_view =
-            `Record_unboxed_product (all_record_args lbls, sorts, r, closed) in
+            `Record_unboxed_product (all_record_args lbls, r, closed) in
           stop p full_view
       | `Or _ -> (
           let orpat = General.view (simpl_under_orpat (General.erase p)) in
@@ -329,12 +328,12 @@ end = struct
           `Construct (cstr, cst_descr, r, List.map (alpha_arg env) args)
       | `Variant (cstr, argo, row_desc) ->
           `Variant (cstr, Option.map (alpha_pat env) argo, row_desc)
-      | `Record (fields, sorts, r, closed) ->
+      | `Record (fields, r, closed) ->
           let alpha_field env (lid, l, p) = (lid, l, alpha_pat env p) in
-          `Record (List.map (alpha_field env) fields, sorts, r, closed)
-      | `Record_unboxed_product (fields, sorts, r, closed) ->
+          `Record (List.map (alpha_field env) fields, r, closed)
+      | `Record_unboxed_product (fields, r, closed) ->
           let alpha_field env (lid, l, p) = (lid, l, alpha_pat env p) in
-          `Record_unboxed_product (List.map (alpha_field env) fields, sorts, r,
+          `Record_unboxed_product (List.map (alpha_field env) fields, r,
                                    closed)
       | `Array (am, arg_sort, ps) -> `Array (am, arg_sort, List.map (alpha_pat env) ps)
       | `Lazy p -> `Lazy (alpha_pat env p)
@@ -431,11 +430,11 @@ end
 let expand_record_simple : Simple.pattern -> Simple.pattern =
  fun p ->
   match p.pat_desc with
-  | `Record (l, sorts, r, _) ->
-   { p with pat_desc = `Record (all_record_args l, sorts, r, Closed) }
-  | `Record_unboxed_product (l, sorts, r, _) ->
+  | `Record (l, r, _) ->
+   { p with pat_desc = `Record (all_record_args l, r, Closed) }
+  | `Record_unboxed_product (l, r, _) ->
     { p with pat_desc =
-               `Record_unboxed_product (all_record_args l, sorts, r, Closed) }
+               `Record_unboxed_product (all_record_args l, r, Closed) }
   | _ -> p
 
 type initial_clause = pattern list clause
@@ -490,10 +489,10 @@ let matcher discr (p : Simple.pattern) rem =
   | Tuple n1, Tuple n2 -> yesif (n1 = n2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
     yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
-  | Record (l, _, _), Record (l', _, _) ->
+  | Record (l, _), Record (l', _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')
-  | Record_unboxed_product (l, _, _), Record_unboxed_product (l', _, _) ->
+  | Record_unboxed_product (l, _), Record_unboxed_product (l', _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')
   | Lazy, Lazy -> yes ()
@@ -2115,6 +2114,10 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let cstr, cstr_shape, arg_sorts =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
+      let shape =
+        Typedecl.finalize_constructor_representation head.pat_env
+          head.pat_loc shape
+      in
       let arg_sorts =
         List.map Jkind.Sort.default_for_transl_and_get arg_sorts
       in
@@ -2155,7 +2158,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
       { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
-    | Constructor_variable ->
+    | (Constructor_undetermined | Constructor_variable _) ->
       fatal_error "Matching.get_exr_args_constr: variable representation"
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
@@ -2176,7 +2179,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
                 shape
             in
             Pmixedfield ([pos], shape, sem)
-        | Constructor_variable ->
+        | (Constructor_undetermined | Constructor_variable _) ->
             fatal_error "Matching.get_exr_args_constr: variable representation"
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
@@ -2555,26 +2558,30 @@ let record_matching_line num_fields lbl_pat_list =
 let get_pat_args_record num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
-  | { pat_desc = Tpat_record (lbl_pat_list, _, _, _) } ->
+  | { pat_desc = Tpat_record (lbl_pat_list, _, _) } ->
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
 let get_pat_args_record_unboxed_product num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
-  | { pat_desc = Tpat_record_unboxed_product (lbl_pat_list, _, _, _) } ->
+  | { pat_desc = Tpat_record_unboxed_product (lbl_pat_list, _, _) } ->
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
 let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
   let loc = head_loc ~scopes head in
-  let all_labels, all_sorts, lbl_repres =
+  let all_labels, unfinalized_repres =
     let open Patterns.Head in
     match head.pat_desc with
-    | Record (lbl :: _, sorts, rep) -> lbl.lbl_all, sorts, rep
-    | Record ([], _, _)
+    | Record (lbl :: _, rep) -> lbl.lbl_all, rep
+    | Record ([], _)
     | _ ->
         assert false
+  in
+  let lbl_repres =
+    Typedecl.finalize_record_representation head.pat_env head.pat_loc
+      unfinalized_repres
   in
   let rec make_args pos =
     if pos >= Array.length all_labels then
@@ -2583,7 +2590,9 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        match label_sort Legacy lbl all_sorts with
+        (* Computed from the unfinalized representation: a variable
+           representation carries the fields' sorts. *)
+        match label_sort Legacy lbl unfinalized_repres with
         | `Sort s -> Jkind.Sort.default_for_transl_and_get s
         | `Same_as_record_sort -> sort
       in
@@ -2632,8 +2641,10 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "get_expr_args_record: unexpected dummy representation"
-        | Record_inlined (_, Constructor_variable, _)
-        | Record_variable ->
+        | Record_inlined
+            (_, (Constructor_undetermined
+                | Constructor_variable _), _)
+        | Record_undetermined | Record_variable _ ->
           fatal_error "get_expr_args_record: unexpected variable representation"
       in
       let binding_kind =
@@ -2654,12 +2665,12 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
 (* CR lmaurer: This is a vastly not-okay amount of duplicated code. *)
 let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
-  let all_labels, all_sorts =
+  let all_labels, lbl_repres =
     let open Patterns.Head in
     match head.pat_desc with
-    | Record_unboxed_product (lbl :: _, sorts, _) ->
-        lbl.lbl_all, sorts
-    | Record_unboxed_product ([], _, _)
+    | Record_unboxed_product (lbl :: _, rep) ->
+        lbl.lbl_all, rep
+    | Record_unboxed_product ([], _)
     | _ ->
       assert false
   in
@@ -2667,7 +2678,7 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
     Array.map (fun lbl ->
       Typeopt.layout_of_sort lbl.lbl_loc
         (Jkind.Sort.default_for_transl_and_get
-           (unboxed_label_sort lbl all_sorts))
+           (unboxed_label_sort lbl lbl_repres))
     ) all_labels
     |> Array.to_list
   in
@@ -2691,7 +2702,7 @@ let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
       in
       let lbl_sort =
         Jkind.Sort.default_for_transl_and_get
-          (unboxed_label_sort lbl all_sorts)
+          (unboxed_label_sort lbl lbl_repres)
       in
       let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       {
@@ -4474,12 +4485,12 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_no_test
             (divide_unboxed_tuple ~scopes ph shape)
             Context.combine
-      | Record ([], _, _) | Record_unboxed_product ([], _, _) -> assert false
-      | Record ((lbl :: _), _, _) ->
+      | Record ([], _) | Record_unboxed_product ([], _) -> assert false
+      | Record ((lbl :: _), _) ->
           compile_no_test
             (divide_record ~scopes lbl.lbl_all ph)
             Context.combine
-      | Record_unboxed_product ((lbl :: _), _, _) ->
+      | Record_unboxed_product ((lbl :: _), _) ->
           compile_no_test
             (divide_record_unboxed_product ~scopes lbl.lbl_all ph)
             Context.combine
