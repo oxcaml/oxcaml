@@ -63,9 +63,7 @@ let of_cmo (cmo : Ocaml_compiler.Cmo_format.t) =
       | "%reperform"
       | "%perform"
       | "%with_stack"
-      | "%with_stack_bind"
-      | "%with_stack_preemptible"
-      | "%with_stack_bind_preemptible" -> true
+      | "%with_stack_preemptible" -> true
       | _ -> false)
   in
   let force_link = Cmo_format.force_link cmo in
