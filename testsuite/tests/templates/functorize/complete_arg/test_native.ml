@@ -1,10 +1,33 @@
 (* TEST (* DO NOT EDIT. Instead edit complete_arg/test_byte.ml and run gen-native.sh. *)
  (* A compound reference [Pair_pq[P:P_stateful[A:A_impl]]{Q}] where the
     arg value [P_stateful[A:A_impl]] is a complete (fully-instantiated)
-    parameterised module.  Verifies that the functorizer resolves
-    [P_stateful[A:A_impl]] to a [Pgetglobal] of that specific
-    compilation unit — so the counter is shared between direct access
-    (via [Static]) and access via the bundle. *)
+    parameterised module.
+
+    Quasi-OCaml, writing parameterised units as functors:
+
+    {[
+      module A_impl : A = struct let name = "impl" end
+      module P_stateful (A : A) : P = struct
+        let counter = ref 0
+        let inc_count () = incr counter
+        let get_count () = !counter
+      end
+      module Pair_pq (P : P) (Q : Q) = struct
+        let bump () = P.inc_count ()
+      end
+      module Bar_q (Q : Q) = struct
+        module Pair_pq_of_static = Pair_pq (P_stateful (A_impl)) (Q)
+        let bump () = Pair_pq_of_static.bump ()
+      end
+    ]}
+
+    [P_stateful[A:A_impl]] is complete, so it exists as its own
+    pre-instantiated compilation unit (built with [-instantiate]
+    below), with one counter.  Functorizing [Bar_q] must resolve the
+    arg value to a [Pgetglobal] of that unit — NOT re-instantiate
+    [P_stateful] inside [Make] — so the bundle's [Make (Q_int) ()]
+    and a direct [Static = P_stateful(A)(A_impl)] in the consumer
+    observe the same counter (asserted by [main_stateful.ml]). *)
 
  readonly_files = "\
    p.mli a.mli \
