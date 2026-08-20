@@ -3024,28 +3024,32 @@ let unify' = (* Forward declaration *)
    [ignore_mod_bounds] is for an optimization in [constrain_type_jkind]. When
    [true], [constrain_type_jkind] only cares about the layout of the jkind and
    not its mod-bounds, so we don't perform a substitution into the
-   with-bounds. *)
+   with-bounds.
+
+   [need_layout] is [false] when the caller consumes only the jkind's bounds;
+   the [Ttuple] case then skips estimating component layouts. *)
 let rec compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
           unwrapped_ty =
   let jkind =
     (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
         just to throw most of it away will go away once we get [layout_of].
         Internal ticket 2912. *)
-    estimate_type_jkind ~expand_components ~ignore_mod_bounds env
-      unwrapped_ty.ty
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds
+      ~need_layout:true env unwrapped_ty.ty
   in
   match apply_layout_wrapping_l ~env ~unwrapped_ty jkind with
   | Ok layout -> (unwrapped_ty.ty, unwrapped_ty.modality), layout
   | Error prev_unwrapped_ty ->
     compute_ty_modality_layout ~expand_components ~ignore_mod_bounds env
       prev_unwrapped_ty
-and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
+and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
+      ty =
   match get_desc ty with
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts ->
     let component_layouts =
-      if expand_components
+      if expand_components && need_layout
       then
         let visited = [get_id ty] in
         Some
@@ -3110,7 +3114,8 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
     end
   | Tmod (ty, mod_bounds) ->
     let jkind =
-      estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty
+      estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout
+        env ty
     in
     if ignore_mod_bounds
     then jkind
@@ -3126,16 +3131,16 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
    (* CR quoted-kinds jbachurski: These quote/splice the jkind. *)
   | Tquote ty ->
-    estimate_type_jkind ~expand_components ~ignore_mod_bounds (incr_stage env)
-      ty
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout
+      (incr_stage env) ty
     |> Jkind.map_type_expr new_quote_ty
   | Tsplice ty ->
-    estimate_type_jkind ~expand_components ~ignore_mod_bounds (decr_stage env)
-      ty
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout
+      (decr_stage env) ty
     |> Jkind.map_type_expr new_splice_ty
   | Tquote_eval ty ->
-    estimate_type_jkind ~expand_components ~ignore_mod_bounds (incr_stage env)
-      ty
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout
+      (incr_stage env) ty
     |> Jkind.map_type_expr new_quote_ty
   | Tbox payload ->
     Jkind.for_box
@@ -3154,9 +3159,11 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
        to eliminate these variables. We do this by replacing them with
        [Tof_kind]s. *)
     instance_poly_for_jkind univars ty
-    |> estimate_type_jkind ~expand_components ~ignore_mod_bounds env
+    |> estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout
+         env
   | Trepr (ty, _sort_vars) ->
-    estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds ~need_layout env
+      ty
   | Tof_kind jkind ->
     (* A [Tof_kind] is substitued for existential [Tvar]s or [Tunivar]s bound in
        a [Tpoly] that would escape their scope. In both cases, we can never
@@ -3200,7 +3207,8 @@ and estimate_type_layout ~expand_components env ~visited ty
       estimate_type_layout ~expand_components env ~visited inner
     | _ -> (
       let jkind =
-        estimate_type_jkind ~expand_components ~ignore_mod_bounds:true env ty
+        estimate_type_jkind ~expand_components ~ignore_mod_bounds:true
+          ~need_layout:true env ty
       in
       (* [extract_layout] expands kind aliases; only a truly abstract kind
          falls back to [any] *)
@@ -3209,54 +3217,59 @@ and estimate_type_layout ~expand_components env ~visited ty
       | Error _ -> Jkind.Layout.Any Jkind_types.Scannable_axes.max)
 
 let rec estimate_type_jkind_unwrapped
-      level ~expand_components env ~unwrapped_ty =
+      level ~expand_components ~need_layout env ~unwrapped_ty =
   match
-    estimate_type_jkind ~expand_components ~ignore_mod_bounds:false env
-      unwrapped_ty.ty
+    estimate_type_jkind ~expand_components ~ignore_mod_bounds:false
+      ~need_layout env unwrapped_ty.ty
     |> apply_jkind_wrapping_l ~env ~level ~unwrapped_ty
   with
   | Ok jkind -> jkind
   | Error prev_unwrapped_ty ->
-    estimate_type_jkind_unwrapped level ~expand_components env
+    estimate_type_jkind_unwrapped level ~expand_components ~need_layout env
       ~unwrapped_ty:prev_unwrapped_ty
 
-let type_jkind env ty =
+let type_jkind ?(need_layout = true) env ty =
   let unwrapped_ty = get_unboxed_type_approximation env ty in
   estimate_type_jkind_unwrapped (get_level ty) ~unwrapped_ty
-    ~expand_components:true env
+    ~expand_components:true ~need_layout env
 
 (* CR layouts v2.8: This function is quite suspect. See Jane Street internal
    gdoc titled "Let's kill type_jkind_purely". Internal ticket 3782. *)
-let type_jkind_purely env ty =
+let type_jkind_purely ?need_layout env ty =
   if !Clflags.principal || Env.has_local_constraints env then
     (* We snapshot to keep this pure; see the test in [typing-local/crossing.ml]
        that mentions snapshotting for an example. *)
     let snap = Btype.snapshot () in
-    let jkind = type_jkind env ty in
+    let jkind = type_jkind ?need_layout env ty in
     Btype.backtrack snap;
     jkind
   else
-    type_jkind env ty
+    type_jkind ?need_layout env ty
 
 (* CR layouts v2.8: It's possible we can remove this function if we change
    [jkind_subst] to not substitute non-principal things. Investigate.
    Internal ticket 5111. *)
-let type_jkind_purely_if_principal env ty =
+let type_jkind_purely_if_principal ?need_layout env ty =
   match is_principal ty with
-  | true -> Some (type_jkind_purely env ty)
+  | true -> Some (type_jkind_purely ?need_layout env ty)
   | false -> None
-let () = type_jkind_purely_if_principal' := type_jkind_purely_if_principal
+let () =
+  type_jkind_purely_if_principal'
+    := fun env ty -> type_jkind_purely_if_principal env ty
 
 let estimate_type_jkind =
-  estimate_type_jkind ~expand_components:false
+  estimate_type_jkind ~expand_components:false ~need_layout:true
 
-(* After type_jkind_purely_if_principal is defined, we can use it directly *)
+(* After type_jkind_purely_if_principal is defined, we can use it directly.
+   The contexts consume only the bounds of the jkinds they compute, so they
+   don't need the layout. *)
 let mk_jkind_context_check_principal env =
-  mk_jkind_context env (type_jkind_purely_if_principal env)
+  mk_jkind_context env (type_jkind_purely_if_principal ~need_layout:false env)
 
 (* For cases where we always want Some (type_jkind_purely env ty) *)
 let mk_jkind_context_always_principal env =
-  mk_jkind_context env (fun ty -> Some (type_jkind_purely env ty))
+  mk_jkind_context env (fun ty ->
+    Some (type_jkind_purely ~need_layout:false env ty))
 
 (**** checking jkind relationships ****)
 
