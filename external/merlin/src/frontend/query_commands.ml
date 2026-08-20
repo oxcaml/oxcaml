@@ -207,6 +207,180 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     let context = Context.Expr in
     ignore (Type_utils.type_in_env ~verbosity ~context env ppf source : bool);
     to_string ()
+  | Structured_errors { pronouns } ->
+    let typer = Mpipeline.typer_result pipeline in
+    let browse_tree = Mbrowse.of_typedtree (Mtyper.get_typedtree typer) in
+    let errors = Mpipeline.typer_errors pipeline in
+    let config = Mpipeline.input_config pipeline in
+    let source =
+      Mode_diagnostics.Source.create ~file:(Mconfig.filename config)
+        ~text:(Msource.text (Mpipeline.input_source pipeline))
+    in
+    let same_chars left right =
+      Structured_diagnostic.Location_key.equal
+        (Structured_diagnostic.Location_key.of_location left)
+        (Structured_diagnostic.Location_key.of_location right)
+    in
+    let enclosing (loc : Location.t) =
+      Mbrowse.enclosing loc.Location.loc_start [ browse_tree ]
+    in
+    let inclusion_site_at (loc : Location.t) =
+      let enclosing = enclosing loc in
+      let declared =
+        List.find_map_opt enclosing ~f:(fun (_, node) ->
+            match (node : Browse_raw.node) with
+            | Module_binding mb ->
+              Some
+                (Mode_diagnostics.Module
+                   { name = mb.mb_name.Location.txt; body = mb.mb_expr.mod_loc })
+            | Module_type_declaration mtd ->
+              Some
+                (Mode_diagnostics.Module_type
+                   { name = Some mtd.mtd_name.Location.txt;
+                     body =
+                       (match mtd.mtd_type with
+                       | Some mty -> mty.mty_loc
+                       | None -> mtd.mtd_loc)
+                   })
+            | _ -> None)
+      in
+      match declared with
+      | Some _ as site -> site
+      | None ->
+        List.find_map_opt enclosing ~f:(fun (_, node) ->
+            match (node : Browse_raw.node) with
+            | Module_expr me ->
+              Some (Mode_diagnostics.Module { name = None; body = me.mod_loc })
+            | _ -> None)
+    in
+    let declared_modalities_at (loc : Location.t) ~argument :
+        Mode_diagnostics.declared_modalities option =
+      let declared mutability (modalities : Typedtree.modalities) =
+        Some
+          { Mode_diagnostics.written = modalities.moda_desc;
+            mutable_implied = Typemode.mutable_modalities mutability
+          }
+      in
+      enclosing loc
+      |> List.find_map_opt ~f:(fun (_, node) ->
+          match (node : Browse_raw.node) with
+          | Label_declaration ld when same_chars loc ld.ld_loc ->
+            declared ld.ld_mutable ld.ld_modalities
+          | Value_description vd when same_chars loc vd.val_loc ->
+            begin match vd.val_modal_info with
+            | Valmi_sig_value modalities -> declared Types.Immutable modalities
+            | Valmi_str_primitive _ -> None
+            end
+          | Constructor_declaration cd when same_chars loc cd.cd_loc ->
+            begin match (argument, cd.cd_args) with
+            | Some index, Cstr_tuple args ->
+              begin match List.nth_opt args (index - 1) with
+              | Some (arg : Typedtree.constructor_argument) ->
+                declared Types.Immutable arg.ca_modalities
+              | None -> None
+              end
+            | _, (Cstr_tuple _ | Cstr_record _) -> None
+            end
+          | _ -> None)
+    in
+    let rebound_lid_at (loc : Location.t) : Longident.t option =
+      let lid = ref None in
+      let iterator =
+        { Ast_iterator.default_iterator with
+          extension_constructor =
+            (fun self (ec : Parsetree.extension_constructor) ->
+              (match ec.pext_kind with
+              | Pext_rebind l when same_chars loc l.loc -> lid := Some l.txt
+              | _ -> ());
+              Ast_iterator.default_iterator.extension_constructor self ec)
+        }
+      in
+      (match Mpipeline.ppx_parsetree pipeline with
+      | `Implementation str -> iterator.structure iterator str
+      | `Interface sg -> iterator.signature iterator sg);
+      !lid
+    in
+    let constructor_arguments_at (loc : Location.t) (lid : Longident.t option) :
+        Mode_diagnostics.constructor_argument list option =
+      let lid =
+        match lid with
+        | Some _ as lid -> lid
+        | None -> rebound_lid_at loc
+      in
+      match lid with
+      | None -> None
+      | Some lid -> (
+        match enclosing loc with
+        | [] -> None
+        | enclosing -> (
+          let env, _ = Mbrowse.leaf_node enclosing in
+          match Env.find_constructor_by_name lid env with
+          | exception Not_found -> None
+          | cstr ->
+            Some
+              (List.map cstr.cstr_args
+                 ~f:(fun (arg : Types.constructor_argument) ->
+                   let argument_loc =
+                     if
+                       (not arg.ca_loc.loc_ghost)
+                       && String.equal arg.ca_loc.loc_start.pos_fname
+                            loc.loc_start.pos_fname
+                     then Some arg.ca_loc
+                     else None
+                   in
+                   { Mode_diagnostics.argument_type =
+                       Format.asprintf "%a"
+                         (Type_utils.Printtyp.type_scheme env)
+                         arg.ca_type;
+                     argument_loc;
+                     crossing =
+                       Ctype.crossing_of_ty env ~modalities:arg.ca_modalities
+                         arg.ca_type
+                   }))))
+    in
+    let documentation_of_syntax_doc
+        (doc : Query_protocol.Syntax_doc_result.t option) =
+      match doc with
+      | Some { name = _; description; documentation; level = _ } ->
+        Some { Mode_diagnostics.Documentation.description; url = documentation }
+      | None -> None
+    in
+    let context =
+      { Mode_diagnostics.inclusion_site_at;
+        declared_modalities_at;
+        constructor_arguments_at;
+        documentation =
+          { of_mode =
+              (fun atom ->
+                documentation_of_syntax_doc (Syntax_doc.get_mode_doc atom));
+            of_modality =
+              (fun atom ->
+                documentation_of_syntax_doc (Syntax_doc.get_modality_doc atom))
+          }
+      }
+    in
+    let pronouns : Mode_diagnostics.Pronouns.t =
+      if pronouns then Use_pronouns else Names_only
+    in
+    List.filter_map errors ~f:(fun exn ->
+        match Location.error_of_exn exn with
+        | Some (`Ok report) ->
+          let loc = Location.loc_of_report report in
+          let snap = Btype.snapshot () in
+          let result =
+            try Mode_diagnostics.error ~source ~context ~pronouns ~loc exn with
+            | (Out_of_memory | Stack_overflow) as e ->
+              Btype.backtrack snap;
+              raise e
+            | diagnosis_exn ->
+              Logger.log ~section:"structured-errors" ~title:"diagnosis raised"
+                "%a: %s" Logger.exn diagnosis_exn
+                (Printexc.get_backtrace ());
+              None
+          in
+          Btype.backtrack snap;
+          result
+        | Some `Already_displayed | None -> None)
   | Stack_or_heap_enclosing (pos, lsp_compat, index) ->
     let typer = Mpipeline.typer_result pipeline in
 
