@@ -2623,6 +2623,11 @@ void caml_compact_heap(caml_domain_state* domain_state,
 
   caml_global_barrier(participating_count);
   if (participants[0] == Caml_state) {
+#ifdef STACK_GUARD_PAGES
+    /* Globally-cached guarded stacks have gone unused since before the
+       last minor collection: return their mappings to the OS. */
+    caml_stack_cache_free_unused();
+#endif
      /* We are done, increment the compaction count */
     (void)caml_atomic_counter_incr(&caml_compactions_count);
     CAML_GC_MESSAGE(COMPACT,
