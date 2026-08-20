@@ -587,6 +587,7 @@ let run
        in
        let ch = open_in_bin input_file in
        let res = Parse_bytecode.from_channel ch in
+       Gc.compact ();
        let include_dirs = Filename.dirname input_file :: include_dirs in
        res, ch, (fun () -> close_in ch), include_dirs
      in
@@ -601,6 +602,7 @@ let run
            cmo
            ic
        in
+       Gc.compact ();
        let cmi_files =
          if include_cmis
          then
@@ -665,6 +667,7 @@ let run
              ~debug:need_debug
              ic
          in
+         Gc.compact ();
          if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
          let embedded_files =
            let cmi_files =
