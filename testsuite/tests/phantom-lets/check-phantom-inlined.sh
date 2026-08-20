@@ -2,13 +2,14 @@
 # Check the Cmm dump for phantom_inlined.ml.
 file="$1"
 fail() { echo "check failed: $1"; exit ${TEST_FAIL}; }
-# The inlined locals must be rebound by (empty) phantom lets...
-grep -qF "let?" "$file" || fail "no phantom lets"
+# The substituted defining expressions of the inlined locals must carry
+# naming wrappers.  The wrappers are annotations only ("this value used to
+# be called <foo>"): the named variables need no binding, so no phantom
+# lets are required for the inlined locals.
+grep -qF "name_for_debugger" "$file" || fail "no name_for_debugger wrappers"
 for v in sum1 doubled diff; do
   grep -qF "$v" "$file" || fail "no trace of inlined local $v"
 done
-# ...and the substituted defining expressions must carry naming wrappers.
-grep -qF "name_for_debugger" "$file" || fail "no name_for_debugger wrappers"
 # Checks on parameter classification and inlining-stack locations will be
 # added once bound variables carry debuginfo and parameter classifications
 # (later patches in this series).
