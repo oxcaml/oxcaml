@@ -178,8 +178,6 @@
   lru
   ;; PARSING
   location
-  structured_diagnostic_protocol
-  structured_diagnostic
   longident
   docstrings
   printast
@@ -203,8 +201,9 @@
   parsetree ; mli only file
   ;; DRIVER
   pparse
-  ;; TYPING (these depend only on utils/, so live here to let
-  ;; compilation_unit and symbol reference them)
+  ;; TYPING
+  structured_diagnostic_protocol
+  structured_diagnostic
   ident
   global_module))
 
