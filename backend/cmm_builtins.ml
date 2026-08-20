@@ -94,7 +94,7 @@ let shift ~bits make_op arg count dbg =
     | Ccatch (_, _, _)
     | Cexit (_, _, _)
     | Cinvalid _ ->
-      Cop (Cand, [count; Cconst_int (mask, dbg)], dbg)
+      and_int count (Cconst_int (mask, dbg)) dbg
   in
   Some (make_op arg count dbg)
 
