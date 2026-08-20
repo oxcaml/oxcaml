@@ -210,9 +210,25 @@ open Cmo_format
 
 exception Load_failed
 
+(* Consistency between the interfaces loaded so far. *)
+module Consistbl =
+  Consistbl.Make (Compilation_unit.Name) (Import_info.Intf.Nonalias.Kind)
+
+let crc_interfaces = Consistbl.create ()
+
+let import_crcs ~source crcs =
+  Array.iter
+    (fun import ->
+       match Import_info.Intf.info import with
+       | None -> ()
+       | Some (kind, crc) ->
+           Consistbl.check crc_interfaces (Import_info.Intf.name import)
+             kind crc source)
+    crcs
+
 let check_consistency ppf filename cu =
-  try Env.import_crcs ~source:filename cu.cu_imports
-  with Persistent_env.Consistbl.Inconsistency {
+  try import_crcs ~source:filename cu.cu_imports
+  with Consistbl.Inconsistency {
       unit_name = name;
       inconsistent_source = user;
       original_source = auth;
@@ -319,7 +335,6 @@ and really_load_file recursive ppf name filename ic =
   with Load_failed -> false
 
 let init () =
-  let crc_intfs = Symtable.init_toplevel () in
+  let (_ : Import_info.t array) = Symtable.init_toplevel () in
   Compmisc.init_path ();
-  Env.import_crcs ~source:Sys.executable_name crc_intfs;
   ()
