@@ -39,6 +39,18 @@ val create :
 
 val current_unit : t -> Compilation_unit.t
 
+(** Identifiers let-bound to [Lambda.Lcode]. These are not ordinary variables:
+    they may only be referenced by [Lambda.Pclose_template] and must be excluded
+    from free-variable sets of functions (they are resolved through the
+    closure-conversion environment instead). *)
+val register_lcode_ident : t -> Ident.t -> t
+
+val is_lcode_ident : t -> Ident.t -> bool
+
+val lcode_idents : t -> Ident.Set.t
+
+val add_lcode_idents : t -> Ident.Set.t -> t
+
 val machine_width : t -> Target_system.Machine_width.t
 
 val ident_stamp_upon_starting : t -> int

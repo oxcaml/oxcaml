@@ -37,14 +37,21 @@ let[@inline] function_slot_is_used ~used_function_slots v =
   then Function_slot.Set.mem v used_function_slots
   else true
 
+(* Slots with deterministic stamps (layout-polymorphism environments) may have
+   uses that are invisible in this unit, inside templates marshalled into the
+   .cmx; they must always be assigned offsets. *)
 let[@inline] unboxed_slot_is_used ~used_unboxed_slots v =
   if Current_unit.is_current (Value_slot.get_compilation_unit v)
-  then Value_slot.Set.mem v used_unboxed_slots
+  then
+    Value_slot.has_deterministic_stamp v
+    || Value_slot.Set.mem v used_unboxed_slots
   else true
 
 let[@inline] value_slot_is_used ~used_value_slots v =
   if Current_unit.is_current (Value_slot.get_compilation_unit v)
-  then Value_slot.Set.mem v used_value_slots
+  then
+    Value_slot.has_deterministic_stamp v
+    || Value_slot.Set.mem v used_value_slots
   else true
 
 (* Compute offsets of the runtime memory layout of sets of closures. These

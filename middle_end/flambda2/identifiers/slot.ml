@@ -26,6 +26,16 @@ module type S = sig
     Flambda_kind.t ->
     t
 
+  val create_deterministic :
+    Compilation_unit.t ->
+    name:string ->
+    is_always_immediate:bool ->
+    Flambda_kind.t ->
+    stamp:int ->
+    t
+
+  val has_deterministic_stamp : t -> bool
+
   val get_compilation_unit : t -> Compilation_unit.t
 
   val in_compilation_unit : t -> Compilation_unit.t -> bool
@@ -119,6 +129,18 @@ end) : S = struct
       kind;
       is_always_immediate
     }
+
+  let create_deterministic compilation_unit ~name ~is_always_immediate kind
+      ~stamp =
+    if stamp >= 0
+    then
+      Misc.fatal_errorf
+        "Slot.create_deterministic: stamp %d must be negative (non-negative \
+         stamps are reserved for [create])"
+        stamp;
+    { compilation_unit; name; name_stamp = stamp; kind; is_always_immediate }
+
+  let has_deterministic_stamp t = t.name_stamp < 0
 
   let get_compilation_unit t = t.compilation_unit
 

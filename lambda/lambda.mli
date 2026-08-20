@@ -146,6 +146,17 @@ type lazy_block_tag =
   | Lazy_tag
   | Forward_tag
 
+(** A reference to a layout-polymorphism template, used to give stable
+    cross-compilation-unit identities to the slots of its environment block
+    (see [Pset_of_closures]). *)
+type template_ref =
+  | Template_id of Template_id.t
+      (** Should only exist after slambda evaluation. *)
+  | Template_var of Slambdaident.t
+      (** A compile-time binding whose value is the template; should only
+          exist before slambda evaluation, which resolves it to
+          [Template_id]. *)
+
 (* CR layouts v5: When we add more blocks of non-scannable values, consider
    whether some of the primitives specific to ufloat records
    ([Pmakeufloatblock], [Pufloatfield], and [Psetufloatfield]) can/should be
@@ -180,6 +191,32 @@ type primitive =
     (** The same comment about the index as for [Pmixedfield] applies to
         [Psetmixedfield]. *)
   | Pduprecord of Types.record_representation * int
+  (* Layout-polymorphism environments (see [Slambda_fracture]); all of these
+     should only exist after slambda evaluation, in native code *)
+  | Pset_of_closures of
+      { template : template_ref;
+        layouts : layout list;
+        mode : locality_mode
+      }
+    (** Allocates the environment block of a layout-polymorphism template as
+        a set of closures with no functions, only value slots. Takes one
+        argument per captured value; [layouts] gives their layouts. Slot
+        identities are derived from [template]. *)
+  | Pclose_template of
+      { template : template_ref;
+        mode : locality_mode
+      }
+    (** Takes [\[code; env\]] where [code] is a variable let-bound to an
+        [Lcode] and [env] an environment block built by [Pset_of_closures]
+        for the same [template]; allocates a closure running [code] whose
+        value slots are copies of [env]'s. *)
+  | Pproject_value_slot of
+      { index : int;
+        layout : layout
+      }
+    (** Projects the [index]th captured value (of layout [layout]) out of
+        the closure of the enclosing [Lcode]. Must be applied to that
+        [Lcode]'s closure variable. *)
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * (layout list)
@@ -1016,6 +1053,13 @@ type lambda =
   | Lkindtemplate of lkindtemplate
   (* [Lkindinstantiate] should only exist in the tlambda stage. *)
   | Lkindinstantiate of lkindinstantiate
+  (* [Lcode] is the code of a specialized layout-polymorphism template. It is
+     not an ordinary closure expression: its closures are created per
+     instantiation site by [Pclose_template], which supplies the captured
+     values declared in [code_slots]. It should only exist after slambda
+     evaluation, in native code, as the right-hand side of the [Llet]
+     binding a template instantiation. *)
+  | Lcode of lcode
 
 and slambda =
   | SLlayout of layout
@@ -1079,8 +1123,22 @@ and lfunction = private
         conservatively default to [May_yield]. *)
   }
 
+and lcode =
+  { code_fun: lfunction;
+    (** The specialized function. Its [mode] is ignored: no closure is
+        allocated for the [Lcode] itself. *)
+    code_closure_var: Ident.t;
+    (** Binds the function's own closure within [code_fun]'s body, for use
+        with [Pproject_value_slot]. Not a free variable of the [Lcode]. *)
+    code_slots: layout list;
+    (** Layouts of the captured values held in the closure's value slots, in
+        the order of the corresponding [Pset_of_closures] arguments. *)
+  }
+
 and lkindtemplate =
-  { ktmpl_params: Slambdaident.t list;
+  { ktmpl_name: string;
+    (** The name of the [let poly_] binding, for symbol naming. *)
+    ktmpl_params: Slambdaident.t list;
     ktmpl_body: lfunction;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;

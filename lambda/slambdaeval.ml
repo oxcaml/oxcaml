@@ -52,47 +52,6 @@ end
 
 open Or_missing.Syntax
 
-module Template_id = struct
-  (* The owner+stamp combination is globally unique (at least within one linked
-     unit). This fact is used to guarantee that the symbol names are unique. *)
-  type t =
-    { owner : Compilation_unit.t option;
-      stamp : int;
-      name : Slambdaident.t option
-    }
-
-  let stamp = ref 0
-
-  let create ~owner ~name =
-    let t = { owner; stamp = !stamp; name } in
-    incr stamp;
-    t
-
-  let print ppf t =
-    Fmt.fprintf ppf "%a/%a/%i"
-      (Fmt.pp_print_option Compilation_unit.print)
-      t.owner
-      (Fmt.pp_print_option (fun ppf id ->
-           Fmt.pp_print_string ppf (Slambdaident.name id)))
-      t.name t.stamp
-
-  let equal t1 t2 =
-    t1.stamp = t2.stamp && Option.equal Compilation_unit.equal t1.owner t2.owner
-
-  let hash t =
-    match t.owner with
-    | Some owner -> Hashtbl.hash (Compilation_unit.hash owner, t.stamp)
-    | None -> t.stamp
-
-  module Tbl = Hashtbl.Make (struct
-    type nonrec t = t
-
-    let equal = equal
-
-    let hash = hash
-  end)
-end
-
 module rec Types : sig
   type closure =
     { clo_params : Slambdaident.t array;
@@ -317,7 +276,7 @@ module Ctx = struct
       match Template_store.find_template t.store id with
       | Some closure -> closure
       | None -> (
-        let cu_data = Option.bind id.owner t.cu_static_data in
+        let cu_data = Option.bind (Template_id.owner id) t.cu_static_data in
         let closure =
           Option.bind cu_data (fun { CU_data.templates; _ } ->
               Template_store.find_template templates id)
@@ -494,6 +453,12 @@ and eval_lam_shallow ctx env lam =
   | Lfunction old_lfunction ->
     let new_lfunction = eval_lfunction_shallow env old_lfunction in
     if new_lfunction == old_lfunction then lam else Lfunction new_lfunction
+  | Lcode ({ code_fun = old_fun; code_slots = old_slots; _ } as code) ->
+    let new_fun = eval_lfunction_shallow env old_fun in
+    let new_slots = Misc.Stdlib.List.map_sharing (eval_layout env) old_slots in
+    if new_fun == old_fun && new_slots == old_slots
+    then lam
+    else Lcode { code with code_fun = new_fun; code_slots = new_slots }
   | Llet (kind, old_layout, id, uid, rhs, body) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
@@ -671,8 +636,33 @@ and eval_lfunction_shallow env
     lfunction' ~kind ~params:new_params ~return:new_return ~body ~attr ~loc
       ~mode ~ret_mode
 
+and eval_template_ref env (tref : template_ref) =
+  match tref with
+  | Template_id _ -> tref
+  | Template_var id ->
+    Template_id (eval_var env id |> expect_not_missing |> expect Tclosure)
+
 and eval_prim env prim =
   match prim with
+  | Pset_of_closures { template = old_template; layouts = old_layouts; mode } ->
+    let new_template = eval_template_ref env old_template in
+    let new_layouts =
+      Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
+    in
+    if new_template == old_template && new_layouts == old_layouts
+    then prim
+    else
+      Pset_of_closures { template = new_template; layouts = new_layouts; mode }
+  | Pclose_template { template = old_template; mode } ->
+    let new_template = eval_template_ref env old_template in
+    if new_template == old_template
+    then prim
+    else Pclose_template { template = new_template; mode }
+  | Pproject_value_slot { index; layout = old_layout } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Pproject_value_slot { index; layout = new_layout }
   | Pmakeblock (n, mut, old_shape, mode) ->
     let new_shape = eval_block_shape env old_shape in
     if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
@@ -806,8 +796,22 @@ let rec assert_mixed_block_element_contains_no_splices : type a.
 let assert_mixed_block_shape_contains_no_splices shape =
   Array.iter assert_mixed_block_element_contains_no_splices shape
 
+let assert_template_ref_is_resolved (tref : Lambda.template_ref) =
+  match tref with
+  | Template_id _ -> ()
+  | Template_var _ ->
+    (* An unresolved compile-time reference, like a splice. *)
+    raise Found_a_splice
+
 let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   match prim with
+  | Pset_of_closures { template; layouts; mode = _ } ->
+    assert_template_ref_is_resolved template;
+    List.iter assert_layout_contains_no_splices layouts
+  | Pclose_template { template; mode = _ } ->
+    assert_template_ref_is_resolved template
+  | Pproject_value_slot { index = _; layout } ->
+    assert_layout_contains_no_splices layout
   | Popaque layout | Pobj_magic layout ->
     assert_layout_contains_no_splices layout
   | Pget_idx (layout, _)
@@ -865,6 +869,9 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
   | Lsplice _ -> raise Found_a_splice
+  | Lcode { code_fun; code_slots; code_closure_var = _ } ->
+    List.iter assert_layout_contains_no_splices code_slots;
+    assert_function_contains_no_splices code_fun
   | Lkindtemplate _ | Lkindinstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam

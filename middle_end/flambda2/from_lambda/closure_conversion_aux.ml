@@ -156,6 +156,18 @@ end
 module Env = struct
   type value_approximation = Code_or_metadata.t Value_approximation.t
 
+  type lcode_context =
+    { lcode_function_slot : Function_slot.t;
+      lcode_value_slots : Value_slot.t list list
+    }
+
+  type lcode_binding =
+    { lb_code_id : Code_id.t;
+      lb_function_slot : Function_slot.t;
+      lb_value_slots : (Value_slot.t * Flambda_kind.With_subkind.t) list list;
+      lb_slot_layouts : Lambda.layout list
+    }
+
   type t =
     { variables : (Variable.t * Flambda_kind.With_subkind.t) Ident.Map.t;
       globals : Symbol.t Numeric_types.Int.Map.t;
@@ -167,7 +179,9 @@ module Env = struct
       big_endian : bool;
       path_to_root : Debuginfo.Scoped_location.t;
       inlining_history_tracker : Inlining_history.Tracker.t;
-      at_toplevel : bool
+      at_toplevel : bool;
+      lcode_context : lcode_context option;
+      lcode_bindings : lcode_binding Ident.Map.t
     }
 
   let current_unit t = t.current_unit
@@ -187,12 +201,24 @@ module Env = struct
       big_endian;
       path_to_root = Debuginfo.Scoped_location.Loc_unknown;
       inlining_history_tracker = Inlining_history.Tracker.empty current_unit;
-      at_toplevel = true
+      at_toplevel = true;
+      lcode_context = None;
+      lcode_bindings = Ident.Map.empty
     }
 
   let set_not_at_toplevel t = { t with at_toplevel = false }
 
   let at_toplevel t = t.at_toplevel
+
+  let set_lcode_context t lcode_context =
+    { t with lcode_context = Some lcode_context }
+
+  let lcode_context t = t.lcode_context
+
+  let add_lcode_binding t id binding =
+    { t with lcode_bindings = Ident.Map.add id binding t.lcode_bindings }
+
+  let find_lcode_binding t id = Ident.Map.find_opt id t.lcode_bindings
 
   let clear_local_bindings
       { variables = _;
@@ -204,7 +230,9 @@ module Env = struct
         big_endian;
         path_to_root;
         inlining_history_tracker;
-        at_toplevel
+        at_toplevel;
+        lcode_context = _;
+        lcode_bindings
       } =
     let simples_to_substitute =
       Ident.Map.filter
@@ -220,7 +248,14 @@ module Env = struct
       big_endian;
       path_to_root;
       inlining_history_tracker;
-      at_toplevel
+      at_toplevel;
+      (* [Pproject_value_slot] is only valid in the body of the [Lcode] it
+         refers to, not in nested functions, so the context is not inherited. *)
+      lcode_context = None;
+      (* [Lcode] bindings, in contrast, stay visible inside nested functions: an
+         instantiation site ([Pclose_template]) may occur within the body of
+         another instantiation. *)
+      lcode_bindings
     }
 
   let with_depth t depth_var = { t with current_depth = Some depth_var }

@@ -2611,6 +2611,7 @@ let lambda_primitive_needs_event_after = function
   | Pignore
   | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pmakefloatblock _
   | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pset_of_closures _ | Pclose_template _ | Pproject_value_slot _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _

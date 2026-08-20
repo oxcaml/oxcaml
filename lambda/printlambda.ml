@@ -404,6 +404,11 @@ let peek_or_poke ppf (pp : peek_or_poke) =
   | Ppp_unboxed_int64 -> fprintf ppf "unboxed_int64"
   | Ppp_unboxed_nativeint -> fprintf ppf "unboxed_nativeint"
 
+let template_ref ppf (tref : template_ref) =
+  match tref with
+  | Template_id id -> Format_doc.compat Template_id.print ppf id
+  | Template_var v -> Slambdaident.print ppf v
+
 let primitive ppf = function
   | Pphys_equal Eq -> pp_print_string ppf "%eq"
   | Pphys_equal Noteq -> pp_print_string ppf "%noteq"
@@ -541,6 +546,14 @@ let primitive ppf = function
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
         (mixed_block_shape (fun _ _ -> ())) shape
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
+  | Pset_of_closures { template; layouts = _; mode } ->
+      fprintf ppf "set_of_closures[%a]%s" template_ref template
+        (locality_kind mode)
+  | Pclose_template { template; mode } ->
+      fprintf ppf "close_template[%a]%s" template_ref template
+        (locality_kind mode)
+  | Pproject_value_slot { index; layout = _ } ->
+      fprintf ppf "project_value_slot %i" index
   | Pwith_stack -> fprintf ppf "with_stack"
   | Pwith_stack_preemptible -> fprintf ppf "with_stack_preemptible"
   | Pperform -> fprintf ppf "perform"
@@ -1004,6 +1017,9 @@ let name_of_primitive = function
   | Pmixedfield _ -> "Pmixedfield"
   | Psetmixedfield _ -> "Psetmixedfield"
   | Pduprecord _ -> "Pduprecord"
+  | Pset_of_closures _ -> "Pset_of_closures"
+  | Pclose_template _ -> "Pclose_template"
+  | Pproject_value_slot _ -> "Pproject_value_slot"
   | Pmake_unboxed_product _ -> "Pmake_unboxed_product"
   | Punboxed_product_field _ -> "Punboxed_product_field"
   | Pmake_idx_field _ -> "Pmake_idx_field"
@@ -1544,6 +1560,16 @@ let rec lam ppf = function
         List.iter (fun l -> fprintf ppf "@ %a" layout l) largs in
       fprintf ppf "@[<2>(kinstantiate@ %a%a)]"
         lam kinst_func lams kinst_args
+  | Lcode {code_fun; code_closure_var; code_slots} ->
+      let pr_slots ppf slots =
+        List.iteri
+          (fun i l -> fprintf ppf "@,%i%a;" i layout_annotation l)
+          slots
+      in
+      fprintf ppf "@[<2>(code@ %a@ @[{%a}@]@ %a)@]"
+        Ident.print code_closure_var
+        pr_slots code_slots
+        lfunction code_fun
 
 and slam ppf = function
   | SLlayout l -> fprintf ppf "⟪layout %a⟫" layout l

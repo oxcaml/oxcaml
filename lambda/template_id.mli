@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -25,21 +25,28 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-let eval ~target ~cu_static_data inspect_slambda template_lam =
-  Profile.record_call "slambda_eval" (fun () ->
-      let cu_data, lambda =
-        Slambda_fracture.fracture ~target template_lam
-        |> inspect_slambda
-        |> Slambdaeval.eval ~cu_static_data
-      in
-      (* CR layout poly: We can keep this check in the future if
-         [is_enabled Layout_poly] is replaced with whether template_lam contains
-         any templates. (which is cheap to check if it's combined with
-         fracturing) *)
-      if
-        (not Language_extension.(is_at_least Layout_poly Alpha))
-        && not (template_lam == lambda)
-      then
-        Misc.fatal_error
-          "Slambda eval did something non-trivial but layout poly is disabled.";
-      cu_data, lambda)
+(** Identifiers for layout-polymorphism templates.
+
+    A template id is allocated when slambda evaluation registers a template
+    (see [Slambdaeval]); the owner+stamp combination is globally unique, at
+    least within one linked unit. Template ids are also used to give stable,
+    cross-compilation-unit identities to the value slots of the environment
+    block associated with a template (see [Lambda.Pset_of_closures]). *)
+type t
+
+val create :
+  owner:Compilation_unit.t option -> name:Slambdaident.t option -> t
+
+val owner : t -> Compilation_unit.t option
+
+(** Unique within [owner] (a dedicated counter, monotonically increasing per
+    compilation process). *)
+val stamp : t -> int
+
+val print : Format_doc.formatter -> t -> unit
+
+val equal : t -> t -> bool
+
+val hash : t -> int
+
+module Tbl : Hashtbl.S with type key = t

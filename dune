@@ -329,6 +329,7 @@
   slambda
   slambdaeval
   slambdaident
+  template_id
   switch
   value_rec_compiler
   translmode

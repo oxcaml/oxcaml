@@ -586,6 +586,30 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         body bindings
     in
     let_expr acc ccenv
+  | Llet
+      ( (Strict | Alias | StrictOpt),
+        _,
+        code_binding,
+        duid,
+        Lcode { code_fun; code_closure_var; code_slots },
+        body ) ->
+    (* Shared specialized code for a layout-polymorphism template. Only the code
+       is emitted here; closures pairing it with captured values are created per
+       instantiation site by [Pclose_template]. *)
+    let free_idents =
+      Ident.Set.remove code_closure_var
+        (L.free_variables (L.Lfunction code_fun))
+    in
+    let decl =
+      cps_function env ~fid:code_binding
+        ~fuid:(Flambda_debug_uid.of_lambda_debug_uid duid)
+        ~recursive:(Non_recursive : Recursive.t)
+        ~precomputed_free_idents:free_idents code_fun
+    in
+    let env = Env.register_lcode_ident env code_binding in
+    let body acc ccenv = cps acc env ccenv body k k_exn in
+    CC.close_lcode acc ccenv ~code_binding ~closure_var:code_closure_var
+      ~slot_layouts:code_slots decl ~body
   | Llet ((Strict | Alias | StrictOpt), layout, id, duid, Lconst const, body) ->
     (* This case avoids extraneous continuations. *)
     let body acc ccenv = cps acc env ccenv body k k_exn in
@@ -606,7 +630,42 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let env, result =
       Lambda_to_lambda_transforms.transform_primitive env prim args loc
     in
-    match result with
+    match[@ocaml.warning "-4"] result with
+    | Primitive ((Pclose_template _ as prim), [L.Lvar code_ident; env_arg], loc)
+      ->
+      (* The first argument of [Pclose_template] names an [Lcode] binding, which
+         is not an ordinary variable, so it must not be converted. *)
+      cps_non_tail_list acc env ccenv [env_arg]
+        (fun acc env ccenv env_args _arity ->
+          let kind =
+            Flambda_kind.With_subkind
+            .from_lambda_values_and_unboxed_numbers_only layout
+              ~machine_width:(Acc.machine_width acc)
+          in
+          let ids_with_kinds =
+            [id, Flambda_debug_uid.of_lambda_debug_uid duid, kind]
+          in
+          let body acc ccenv = cps acc env ccenv body k k_exn in
+          let current_region = Env.current_region env in
+          let region =
+            Option.map Env.Region_stack_element.region current_region
+          in
+          let ghost_region =
+            Option.map Env.Region_stack_element.ghost_region current_region
+          in
+          let alloc_region = Env.current_alloc_region env in
+          CC.close_let acc ccenv ids_with_kinds (is_user_visible env id)
+            (Prim
+               { prim;
+                 args = [IR.Var code_ident] :: env_args;
+                 loc;
+                 exn_continuation = None;
+                 region;
+                 ghost_region;
+                 alloc_region
+               })
+            ~body)
+        k_exn
     | Primitive (prim, args, loc) ->
       (* This case avoids extraneous continuations. *)
       let exn_continuation : IR.exn_continuation option =
@@ -1209,6 +1268,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
+  | Lcode _ ->
+    (* CR layout poly: to be handled as [Llet]-bound [Lcode] definitions. *)
+    Misc.fatal_error "Lcode is not yet supported by lambda_to_flambda"
   | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam
 
@@ -1540,6 +1602,13 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     | Some ids -> ids
     | None -> Lambda.free_variables body
   in
+  (* [Lcode] bindings are not ordinary variables: they are resolved through the
+     closure-conversion environment, so must not become value slots. *)
+  let free_idents_of_body =
+    Ident.Set.filter
+      (fun id -> not (Env.is_lcode_ident env id))
+      free_idents_of_body
+  in
   let my_region_stack_elt, my_region, my_ghost_region =
     if contains_no_escaping_local_allocs
     then None, None, None
@@ -1559,6 +1628,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
       ~exn_continuation:body_exn_cont ~my_region:my_region_stack_elt
       ~my_alloc_region
   in
+  let new_env = Env.add_lcode_idents new_env (Env.lcode_idents env) in
   let exn_continuation : IR.exn_continuation =
     { exn_handler = body_exn_cont; extra_args = [] }
   in
@@ -1704,8 +1774,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
             :: consts_rev
           in
           consts_rev, wrappers
-        | Lmutvar _ | Lapply _ | Lfunction _ | Llet _ | Lmutlet _ | Lletrec _
-        | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
+        | Lmutvar _ | Lapply _ | Lfunction _ | Lcode _ | Llet _ | Lmutlet _
+        | Lletrec _ | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
         | Lstaticcatch _ | Ltrywith _ | Lifthenelse _ | Lsequence _ | Lwhile _
         | Lfor _ | Lassign _ | Lsend _ | Levent _ | Lifused _ | Lregion _
         | Lexclave _ ->

@@ -871,6 +871,10 @@ let mem_continuation t cont =
 
 let value_slot_is_used_or_imported t value_slot =
   Value_slot.is_imported value_slot
+  (* Slots with deterministic stamps (layout-polymorphism environments) may have
+     uses that are invisible in this unit, inside templates marshalled into the
+     .cmx; they must never be removed as dead. *)
+  || Value_slot.has_deterministic_stamp value_slot
   || For_value_slots.mem t.value_slots_in_projections value_slot
 
 let remove_var t ~var =

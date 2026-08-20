@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -25,21 +25,47 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-let eval ~target ~cu_static_data inspect_slambda template_lam =
-  Profile.record_call "slambda_eval" (fun () ->
-      let cu_data, lambda =
-        Slambda_fracture.fracture ~target template_lam
-        |> inspect_slambda
-        |> Slambdaeval.eval ~cu_static_data
-      in
-      (* CR layout poly: We can keep this check in the future if
-         [is_enabled Layout_poly] is replaced with whether template_lam contains
-         any templates. (which is cheap to check if it's combined with
-         fracturing) *)
-      if
-        (not Language_extension.(is_at_least Layout_poly Alpha))
-        && not (template_lam == lambda)
-      then
-        Misc.fatal_error
-          "Slambda eval did something non-trivial but layout poly is disabled.";
-      cu_data, lambda)
+module Fmt = Format_doc
+
+(* The owner+stamp combination is globally unique (at least within one linked
+   unit). This fact is used to guarantee that the symbol names are unique. *)
+type t =
+  { owner : Compilation_unit.t option;
+    stamp : int;
+    name : Slambdaident.t option
+  }
+
+let stamp_counter = ref 0
+
+let create ~owner ~name =
+  let t = { owner; stamp = !stamp_counter; name } in
+  incr stamp_counter;
+  t
+
+let owner t = t.owner
+
+let stamp t = t.stamp
+
+let print ppf t =
+  Fmt.fprintf ppf "%a/%a/%i"
+    (Fmt.pp_print_option Compilation_unit.print)
+    t.owner
+    (Fmt.pp_print_option (fun ppf id ->
+         Fmt.pp_print_string ppf (Slambdaident.name id)))
+    t.name t.stamp
+
+let equal t1 t2 =
+  t1.stamp = t2.stamp && Option.equal Compilation_unit.equal t1.owner t2.owner
+
+let hash t =
+  match t.owner with
+  | Some owner -> Hashtbl.hash (Compilation_unit.hash owner, t.stamp)
+  | None -> t.stamp
+
+module Tbl = Hashtbl.Make (struct
+  type nonrec t = t
+
+  let equal = equal
+
+  let hash = hash
+end)

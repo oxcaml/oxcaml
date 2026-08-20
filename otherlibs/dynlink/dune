@@ -168,6 +168,7 @@
   debuginfo
   static_label
   slambdaident
+  template_id
   lambda
   mixed_product_bytes
   runtimedef
@@ -399,6 +400,7 @@
 (copy_files ../../lambda/static_label.ml)
 
 (copy_files ../../lambda/slambdaident.ml)
+(copy_files ../../lambda/template_id.ml)
 
 (copy_files ../../lambda/mixed_product_bytes.ml)
 
@@ -601,6 +603,7 @@
 (copy_files ../../lambda/static_label.mli)
 
 (copy_files ../../lambda/slambdaident.mli)
+(copy_files ../../lambda/template_id.mli)
 
 (copy_files ../../lambda/mixed_product_bytes.mli)
 

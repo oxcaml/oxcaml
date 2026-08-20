@@ -2778,6 +2778,10 @@ and remove_unused_value_slots_and_shortcut_aliases_value_slot_indexed_product
           (not
              (Value_slot.in_compilation_unit value_slot
                 (Current_unit.get_cu_exn ())))
+          (* Slots with deterministic stamps (layout-polymorphism environments)
+             may have uses that are invisible in this unit, inside templates
+             marshalled into the .cmx. *)
+          || Value_slot.has_deterministic_stamp value_slot
           || Value_slot.Set.mem value_slot used_value_slots
         then
           Some

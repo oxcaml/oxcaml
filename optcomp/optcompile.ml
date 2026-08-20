@@ -96,7 +96,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         Builtin_attributes.warn_unused ();
         program.code
         |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
-        |> Slambda.eval ~cu_static_data:Compilenv.get_static_data
+        |> Slambda.eval ~target:Slambda_fracture.Native
+             ~cu_static_data:Compilenv.get_static_data
              (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
         |> fun (static_data, lambda) ->
         { program with Lambda.code = lambda }

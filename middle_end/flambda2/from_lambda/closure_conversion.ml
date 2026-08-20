@@ -1202,8 +1202,14 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       let acc, cont = close_exn_continuation acc env exn_continuation in
       acc, Some cont
   in
+  let raw_args = args in
   let acc, args =
-    List.fold_left_map (fun acc arg -> find_simples acc env arg) acc args
+    match[@ocaml.warning "-4"] prim with
+    | Pclose_template _ ->
+      (* Handled below using [raw_args]: the first argument is the [Ident.t] of
+         an [Lcode] binding, which is not an ordinary variable. *)
+      acc, []
+    | _ -> List.fold_left_map (fun acc arg -> find_simples acc env arg) acc args
   in
   let dbg = Debuginfo.from_location loc in
   match prim, args with
@@ -1324,7 +1330,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
-      | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
+      | Pscalar _ | Pphys_equal _ | Pcpu_relax | Pset_of_closures _
+      | Pclose_template _ | Pproject_value_slot _ ->
         (* Inconsistent with outer match *)
         assert false
     in
@@ -1342,6 +1349,164 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     in
     close_effect_primitive acc env ~dbg exn_continuation prim ~args
       ~let_bound_ids_with_kinds ~current_alloc_region k
+  | Pproject_value_slot { index; layout = _ }, [[closure]] ->
+    let ({ lcode_function_slot; lcode_value_slots } : Env.lcode_context) =
+      match Env.lcode_context env with
+      | Some context -> context
+      | None ->
+        Misc.fatal_error
+          "Pproject_value_slot may only occur in the body of the [Lcode] whose \
+           closure it projects from"
+    in
+    let slots =
+      match List.nth_opt lcode_value_slots index with
+      | Some slots -> slots
+      | None ->
+        Misc.fatal_errorf
+          "Pproject_value_slot: capture index %d out of range (%d captures)"
+          index
+          (List.length lcode_value_slots)
+    in
+    let prims =
+      List.map
+        (fun value_slot : Lambda_to_flambda_primitives_helpers.expr_primitive ->
+          Unary
+            ( Project_value_slot
+                { project_from = lcode_function_slot; value_slot },
+              Simple closure ))
+        slots
+    in
+    Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
+      (Lambda_to_flambda_primitives_helpers.maybe_create_unboxed_product prims)
+      dbg k
+  | Pclose_template { template; mode }, _ -> (
+    match raw_args with
+    | [[IR.Var code_ident]; env_arg] ->
+      let ({ lb_code_id; lb_function_slot; lb_value_slots; lb_slot_layouts }
+            : Env.lcode_binding) =
+        match Env.find_lcode_binding env code_ident with
+        | Some binding -> binding
+        | None ->
+          Misc.fatal_errorf
+            "Pclose_template applied to %a, which is not let-bound to an \
+             [Lcode]"
+            Ident.print code_ident
+      in
+      let acc, env_simples = find_simples acc env env_arg in
+      let env_simple =
+        match env_simples with
+        | [simple] -> simple
+        | [] | _ :: _ ->
+          Misc.fatal_error
+            "Pclose_template: environment argument must be a single value"
+      in
+      let env_function_slot = Lpoly_slots.function_slot template in
+      let env_value_slots =
+        Lpoly_slots.value_slots template ~layouts:lb_slot_layouts
+          ~machine_width:(Acc.machine_width acc)
+      in
+      (* For each unarized component of each capture, project it out of the
+         environment block and store the copy in the new closure's corresponding
+         own slot. *)
+      let projections =
+        if List.compare_lengths env_value_slots lb_value_slots <> 0
+        then Misc.fatal_error "Pclose_template: capture count mismatch";
+        List.concat
+          (List.map2
+             (fun own_slots env_slots ->
+               if List.compare_lengths own_slots env_slots <> 0
+               then
+                 Misc.fatal_error
+                   "Pclose_template: unarized capture size mismatch";
+               List.map2
+                 (fun (own_slot, kind) (env_slot, _kind) ->
+                   let var =
+                     Variable.create "lpoly_cap" (K.With_subkind.kind kind)
+                   in
+                   var, own_slot, env_slot)
+                 own_slots env_slots)
+             lb_value_slots env_value_slots)
+      in
+      let value_slots =
+        List.fold_left
+          (fun map (var, own_slot, _env_slot) ->
+            Value_slot.Map.add own_slot (Simple.var var) map)
+          Value_slot.Map.empty projections
+      in
+      let function_decls =
+        Function_declarations.create
+          (Function_slot.Lmap.singleton lb_function_slot
+             (Function_declarations.Code_id
+                { code_id = lb_code_id; only_full_applications = false }))
+      in
+      let set = Set_of_closures.create ~value_slots function_decls in
+      let acc = Acc.add_set_of_closures_offsets ~is_phantom:false acc set in
+      let alloc_mode =
+        Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+          ~current_region
+      in
+      let acc, expr = k acc [Named.create_set_of_closures ~alloc_mode set] in
+      List.fold_left
+        (fun (acc, expr) (var, _own_slot, env_slot) ->
+          let named =
+            Named.create_prim
+              (Unary
+                 ( Project_value_slot
+                     { project_from = env_function_slot; value_slot = env_slot },
+                   env_simple ))
+              dbg
+          in
+          Let_with_acc.create acc
+            (Bound_pattern.singleton
+               (VB.create var Flambda_debug_uid.none Name_mode.normal))
+            named ~body:expr)
+        (acc, expr) projections
+    | _ ->
+      Misc.fatal_errorf
+        "Pclose_template must be applied to exactly [code; env] where [code] \
+         is a variable: %a"
+        IR.print_named named)
+  | Pset_of_closures { template; layouts; mode }, args ->
+    (* The environment block of a layout-polymorphism template: a set of
+       closures with no functions, only value slots. A single [Deleted] function
+       slot is used to satisfy the invariant that every set of closures has a
+       function slot at offset 0. *)
+    let machine_width = Acc.machine_width acc in
+    let function_slot = Lpoly_slots.function_slot template in
+    let slots_per_capture =
+      Lpoly_slots.value_slots template ~layouts ~machine_width
+    in
+    if List.compare_lengths slots_per_capture args <> 0
+    then
+      Misc.fatal_errorf "Pset_of_closures: %d capture layouts but %d arguments"
+        (List.length slots_per_capture)
+        (List.length args);
+    let value_slots =
+      List.fold_left2
+        (fun map slots simples ->
+          if List.compare_lengths slots simples <> 0
+          then
+            Misc.fatal_errorf
+              "Pset_of_closures: capture with %d unarized components bound to \
+               %d arguments"
+              (List.length slots) (List.length simples);
+          List.fold_left2
+            (fun map (slot, _kind) simple -> Value_slot.Map.add slot simple map)
+            map slots simples)
+        Value_slot.Map.empty slots_per_capture args
+    in
+    let function_decls =
+      Function_declarations.create
+        (Function_slot.Lmap.singleton function_slot
+           (Function_declarations.Deleted { function_slot_size = 2; dbg }))
+    in
+    let set = Set_of_closures.create ~value_slots function_decls in
+    let acc = Acc.add_set_of_closures_offsets ~is_phantom:false acc set in
+    let alloc_mode =
+      Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+        ~current_region
+    in
+    k acc [Named.create_set_of_closures ~alloc_mode set]
   | prim, args ->
     Lambda_to_flambda_primitives.convert_and_bind acc exn_continuation
       ~big_endian:(Env.big_endian env) ~register_const0 prim ~args dbg
@@ -1731,6 +1896,15 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
           | Block_but_cannot_simplify approx ->
             let body_env = Env.add_var_approximation body_env var approx in
             bind acc body_env)
+        | Set_of_closures _ ->
+          (* Sets of closures (e.g. layout-polymorphism environment blocks built
+             by [Pset_of_closures]) must be bound with a set-of-closures bound
+             pattern, not a singleton. *)
+          let bound_pattern =
+            Bound_pattern.set_of_closures [VB.create var uid Name_mode.normal]
+          in
+          let acc, body = body acc body_env in
+          Let_with_acc.create acc bound_pattern defining_expr ~body
         | _ -> bind acc body_env))
     | _, _ ->
       Misc.fatal_errorf
@@ -2574,7 +2748,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
     (main_function_slot, main_code_id) :: function_code_ids,
     Acc.add_code ~code_id:main_code_id ~code:main_code ~slot_offsets acc )
 
-let close_one_function acc ~code_id ~external_env ~by_function_slot
+let close_one_function acc ?lcode ~code_id ~external_env ~by_function_slot
     ~function_code_ids decl ~has_lifted_closure ~value_slots_from_idents
     ~function_slots_from_idents ~approx_map function_declarations =
   let acc = Acc.with_free_names Name_occurrences.empty acc in
@@ -2760,6 +2934,19 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         (Inlining_history.Tracker.inside_function absolute),
       absolute,
       relative )
+  in
+  let closure_env =
+    (* For [Lcode], the body accesses its captures via its own closure: bind the
+       closure variable to [my_closure] and record the slot layout for the
+       translation of [Pproject_value_slot]. *)
+    match lcode with
+    | None -> closure_env
+    | Some (closure_var, lcode_value_slots) ->
+      let closure_env =
+        Env.add_var closure_env closure_var my_closure K.With_subkind.any_value
+      in
+      Env.set_lcode_context closure_env
+        { lcode_function_slot = function_slot; lcode_value_slots }
   in
   (* CR-someday pchambart: eta-expansion wrappers for primitives are not marked
      as stubs but certainly should be. *)
@@ -3257,6 +3444,132 @@ let close_functions acc external_env ~current_alloc_region ~current_region
     let acc = Acc.add_lifted_set_of_closures ~symbols ~set_of_closures acc in
     acc, Lifted symbols_with_approx
   else acc, Dynamic (set_of_closures, alloc_mode, approximations)
+
+let close_lcode acc env ~code_binding ~closure_var ~slot_layouts decl
+    ~(body : Acc.t -> Env.t -> Expr_with_acc.t) : Expr_with_acc.t =
+  let compilation_unit = Current_unit.get_cu_exn () in
+  (* The code must be closed: every capture is accessed through the closure's
+     value slots ([Pproject_value_slot]), and any other free identifier must be
+     a constant or symbol substitution. *)
+  Ident.Set.iter
+    (fun id ->
+      let ok =
+        Ident.is_predef id
+        || Option.is_some (Env.find_lcode_binding env id)
+        ||
+        match Env.find_simple_to_substitute_exn env id with
+        | exception Not_found -> false
+        | simple, _kind -> not (Simple.is_var simple)
+      in
+      if not ok
+      then
+        Misc.fatal_errorf
+          "[Lcode] bound to %a has free variable %a; captures must be accessed \
+           via [Pproject_value_slot]"
+          Ident.print code_binding Ident.print id)
+    (Function_decl.free_idents decl);
+  let function_slot = Function_decl.function_slot decl in
+  let function_dbg = Debuginfo.from_location (Function_decl.loc decl) in
+  let code_id =
+    Code_id.create
+      ~name:(Function_slot.to_string function_slot)
+      ~debug:function_dbg compilation_unit
+  in
+  let machine_width = Acc.machine_width acc in
+  let value_slots =
+    List.mapi
+      (fun i layout ->
+        let component =
+          Flambda_arity.Component_for_creation.from_lambda layout ~machine_width
+        in
+        let kinds = Flambda_arity.unarize (Flambda_arity.create [component]) in
+        List.mapi
+          (fun j kind ->
+            let is_always_immediate =
+              match[@ocaml.warning "-4"]
+                K.With_subkind.non_null_value_subkind kind
+              with
+              | Tagged_immediate -> true
+              | _ -> false
+            in
+            ( Value_slot.create compilation_unit
+                ~name:
+                  (Printf.sprintf "%s_cap%d_%d" (Ident.name code_binding) i j)
+                ~is_always_immediate (K.With_subkind.kind kind),
+              kind ))
+          kinds)
+      slot_layouts
+  in
+  let approx_map =
+    (* A metadata-only approximation, as in [close_functions]. *)
+    let params = Function_decl.params decl in
+    let param_modes =
+      List.map
+        (fun (p : Function_decl.param) ->
+          Alloc_mode.For_types.from_lambda p.mode)
+        params
+    in
+    let metadata =
+      Code_metadata.create code_id
+        ~params_arity:(Function_decl.params_arity decl)
+        ~first_complex_local_param:
+          (first_complex_local_param_of_function_decl decl)
+        ~param_modes
+        ~result_arity:(Function_decl.return decl)
+        ~result_types:Unknown
+        ~result_mode:(Function_decl.result_mode decl)
+        ~stub:(Function_decl.stub decl) ~inline:Never_inline
+        ~zero_alloc_attribute:
+          (Zero_alloc_attribute.from_lambda
+             (Function_decl.zero_alloc_attribute decl))
+        ~poll_attribute:
+          (Poll_attribute.from_lambda (Function_decl.poll_attribute decl))
+        ~regalloc_attribute:
+          (Regalloc_attribute.from_lambda
+             (Function_decl.regalloc_attribute decl))
+        ~regalloc_param_attribute:
+          (Regalloc_param_attribute.from_lambda
+             (Function_decl.regalloc_param_attribute decl))
+        ~cold:(Function_decl.cold decl)
+        ~is_a_functor:(Function_decl.is_a_functor decl)
+        ~is_opaque:(Function_decl.is_opaque decl)
+        ~recursive:(Function_decl.recursive decl)
+        ~newer_version_of:None ~cost_metrics:Cost_metrics.zero
+        ~inlining_arguments:(Inlining_arguments.create ~round:0)
+        ~dbg:function_dbg
+        ~is_tupled:
+          (match Function_decl.kind decl with
+          | Curried _ -> false
+          | Tupled -> true)
+        ~is_my_closure_used:true ~inlining_decision:Recursive
+        ~absolute_history:(Inlining_history.Absolute.empty compilation_unit)
+        ~relative_history:Inlining_history.Relative.empty ~loopify:Never_loopify
+    in
+    let code = Code_or_metadata.create_metadata_only metadata in
+    Function_slot.Map.singleton function_slot
+      (Value_approximation.Closure_approximation
+         { code_id; function_slot; code; symbol = None })
+  in
+  let function_declarations = Function_decls.create [decl] Lambda.alloc_heap in
+  let acc, (_by_function_slot, _function_code_ids) =
+    close_one_function acc
+      ~lcode:(closure_var, List.map (List.map fst) value_slots)
+      ~code_id ~external_env:env ~by_function_slot:Function_slot.Map.empty
+      ~function_code_ids:[] decl ~has_lifted_closure:false
+      ~value_slots_from_idents:Ident.Map.empty
+      ~function_slots_from_idents:Ident.Map.empty ~approx_map
+      function_declarations
+  in
+  let acc = Acc.with_free_names Name_occurrences.empty acc in
+  let env =
+    Env.add_lcode_binding env code_binding
+      { lb_code_id = code_id;
+        lb_function_slot = function_slot;
+        lb_value_slots = value_slots;
+        lb_slot_layouts = slot_layouts
+      }
+  in
+  body acc env
 
 let close_let_rec acc env ~function_declarations
     ~(body : Acc.t -> Env.t -> Expr_with_acc.t) ~current_alloc_region

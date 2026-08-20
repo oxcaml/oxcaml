@@ -91,7 +91,8 @@ type t =
     region_closure_continuations :
       region_closure_continuation Region_stack_element.Map.t;
     my_alloc_region : Ident.t;
-    ident_stamp_upon_starting : int
+    ident_stamp_upon_starting : int;
+    lcode_idents : Ident.Set.t
   }
 
 let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
@@ -117,8 +118,19 @@ let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
       Continuation.Map.singleton return_continuation [];
     region_closure_continuations = Region_stack_element.Map.empty;
     my_alloc_region;
-    ident_stamp_upon_starting
+    ident_stamp_upon_starting;
+    lcode_idents = Ident.Set.empty
   }
+
+let register_lcode_ident t id =
+  { t with lcode_idents = Ident.Set.add id t.lcode_idents }
+
+let is_lcode_ident t id = Ident.Set.mem id t.lcode_idents
+
+let lcode_idents t = t.lcode_idents
+
+let add_lcode_idents t idents =
+  { t with lcode_idents = Ident.Set.union idents t.lcode_idents }
 
 let current_unit t = t.current_unit
 

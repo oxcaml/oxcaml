@@ -40,6 +40,19 @@ val close_let_rec :
   current_region:Ident.t option ->
   Expr_with_acc.t
 
+(** Convert a [Lambda.Lcode] binding: emits the code (only; no set of closures
+    is created) and registers [code_binding] for use by [Lambda.Pclose_template]
+    sites within [body]. *)
+val close_lcode :
+  Acc.t ->
+  Env.t ->
+  code_binding:Ident.t ->
+  closure_var:Ident.t ->
+  slot_layouts:Lambda.layout list ->
+  Function_decl.t ->
+  body:(Acc.t -> Env.t -> Expr_with_acc.t) ->
+  Expr_with_acc.t
+
 val close_let_cont :
   Acc.t ->
   Env.t ->

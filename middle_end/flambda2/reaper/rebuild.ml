@@ -436,13 +436,31 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
       let value_slots =
         Value_slot.Map.filter_map
           (fun slot simple ->
-            if not (slot_is_used (Field.value_slot slot))
+            if
+              (* Slots with deterministic stamps (layout-polymorphism
+                 environments) may have uses that are invisible in this unit,
+                 inside templates marshalled into the .cmx. *)
+              (not (Value_slot.has_deterministic_stamp slot))
+              && not (slot_is_used (Field.value_slot slot))
             then None
             else Some (rewrite_simple env simple))
           value_slots
       in
       value_slots, None
     | Some repr ->
+      if
+        Value_slot.Map.exists
+          (fun slot _ -> Value_slot.has_deterministic_stamp slot)
+          value_slots
+      then
+        Misc.fatal_errorf
+          "The reaper must not change the representation of \
+           layout-polymorphism environment sets (bound to [%a]): their slots \
+           may be projected from other compilation units"
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+             Name.print)
+          bound;
       let fields, function_slots =
         match repr with
         | Block_representation _ ->

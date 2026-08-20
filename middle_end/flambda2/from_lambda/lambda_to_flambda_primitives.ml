@@ -3558,6 +3558,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     Misc.fatal_errorf
       "[%a] should have been handled by [Closure_conversion.close_primitive]"
       Printlambda.primitive prim
+  | (Pset_of_closures _ | Pclose_template _ | Pproject_value_slot _), _ ->
+    Misc.fatal_errorf
+      "[%a] should have been handled by [Closure_conversion.close_primitive]"
+      Printlambda.primitive prim
 
 module Acc = Closure_conversion_aux.Acc
 module Expr_with_acc = Closure_conversion_aux.Expr_with_acc

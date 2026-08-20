@@ -249,6 +249,9 @@ let compute_static_size lam =
     | Lkindtemplate _ ->
       Misc.fatal_error "letrec: poly_ not supported"
     | Lkindinstantiate _ -> dynamic_size lam
+    | Lcode _ ->
+      (* Only exists after slambda evaluation; [value_rec] runs before. *)
+      fatal_error_invalid_constructor lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -485,7 +488,10 @@ let compute_static_size lam =
         Constant
 
     | Pmakeufloatblock (_, _)
-    | Pmake_unboxed_product _ ->
+    | Pmake_unboxed_product _
+    | Pset_of_closures _
+    | Pclose_template _
+    | Pproject_value_slot _ ->
         dynamic_size lam (* Not allowed *)
 
     | Pobj_dup
@@ -820,7 +826,8 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lifused _
   | Lexclave _
   | Lkindtemplate _
-  | Lkindinstantiate _ ->
+  | Lkindinstantiate _
+  | Lcode _ ->
     Misc.fatal_errorf
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun

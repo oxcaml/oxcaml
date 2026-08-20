@@ -128,6 +128,35 @@ module Env : sig
 
   val at_toplevel : t -> bool
 
+  (** Information about the enclosing [Lambda.Lcode], if any, needed to
+      translate [Lambda.Pproject_value_slot]: the code's function slot and its
+      value slots (one inner list per captured value, one element per unarized
+      component). *)
+  type lcode_context =
+    { lcode_function_slot : Function_slot.t;
+      lcode_value_slots : Value_slot.t list list
+    }
+
+  val set_lcode_context : t -> lcode_context -> t
+
+  val lcode_context : t -> lcode_context option
+
+  (** A [Lambda.Lcode] binding: shared specialized code for a
+      layout-polymorphism template, paired with a per-site closure by each
+      [Lambda.Pclose_template]. *)
+  type lcode_binding =
+    { lb_code_id : Code_id.t;
+      lb_function_slot : Function_slot.t;
+      lb_value_slots : (Value_slot.t * Flambda_kind.With_subkind.t) list list;
+          (** One inner list per captured value, one element per unarized
+              component. *)
+      lb_slot_layouts : Lambda.layout list
+    }
+
+  val add_lcode_binding : t -> Ident.t -> lcode_binding -> t
+
+  val find_lcode_binding : t -> Ident.t -> lcode_binding option
+
   val clear_local_bindings : t -> t
 
   val add_var : t -> Ident.t -> Variable.t -> Flambda_kind.With_subkind.t -> t

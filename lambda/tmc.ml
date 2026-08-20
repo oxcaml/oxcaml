@@ -594,7 +594,7 @@ let declare_binding ctx (var, def) =
 let rec choice ctx t =
   let rec choice ctx ~tail t =
     match t with
-    | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lsend _
+    | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lcode _ | Lsend _
       | Lassign _ | Lfor _ | Lwhile _) ->
         let t = traverse ctx t in
         Choice.lambda t
@@ -940,6 +940,9 @@ let rec choice ctx t =
     (* nor unboxed products *)
     | Pmake_unboxed_product _ | Punboxed_product_field _
     | Parray_element_size_in_bytes _
+
+    (* nor layout-polymorphism closures *)
+    | Pset_of_closures _ | Pclose_template _ | Pproject_value_slot _
 
     | Pobj_dup
     | Pobj_magic _

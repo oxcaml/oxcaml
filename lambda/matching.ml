@@ -4741,7 +4741,7 @@ let rec map_return f = function
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
     | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lkindtemplate _
-    | Lkindinstantiate _ )
+    | Lkindinstantiate _ | Lcode _ )
     as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
@@ -4844,7 +4844,8 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
     in
     let f =
       Lkindtemplate
-        { ktmpl_params = kind_params;
+        { ktmpl_name = Ident.name id;
+          ktmpl_params = kind_params;
           ktmpl_body = Lambda.rename_lfun fresh_vars param;
           ktmpl_env = env;
           ktmpl_env_mode = env_alloc_mode;

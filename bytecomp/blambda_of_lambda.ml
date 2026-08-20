@@ -297,7 +297,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Lcode _ ->
+    (* [Lcode] is native-only; bytecode uses the old layout-polymorphism
+       closure representation. *)
     Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
@@ -1129,7 +1131,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punspecializedarray_set _ ->
         Misc.fatal_error "Blambda_of_lambda: Parrayblit Punspecializedarray_set"
       )
-    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
+    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ | Pset_of_closures _
+    | Pclose_template _ | Pproject_value_slot _ ->
       Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
         Printlambda.primitive primitive
     | Pmakelazyblock Lazy_tag ->

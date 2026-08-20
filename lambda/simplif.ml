@@ -40,6 +40,9 @@ let rec eliminate_ref id = function
   | Lfunction lfun as lam ->
       check_function_escape id lfun;
       lam
+  | Lcode { code_fun; _ } as lam ->
+      check_function_escape id code_fun;
+      lam
   | Llet(str, kind, v, duid, e1, e2) ->
       Llet(str, kind, v, duid, eliminate_ref id e1, eliminate_ref id e2)
   | Lmutlet(kind, v, duid, e1, e2) ->
@@ -138,7 +141,7 @@ let simplify_exits lam =
   | Lapply ap ->
       count ~try_depth ap.ap_func;
       List.iter (count ~try_depth) ap.ap_args
-  | Lfunction {body} -> count ~try_depth body
+  | Lfunction {body} | Lcode {code_fun = {body}} -> count ~try_depth body
   | Llet(_, _kind, _v, _duid, l1, l2)
   | Lmutlet(_kind, _v, _duid, l1, l2) ->
       count ~try_depth l2; count ~try_depth l1
@@ -251,6 +254,10 @@ let simplify_exits lam =
                      ap_args = List.map (simplif ~layout:None ~try_depth) ap.ap_args}
   | Lfunction lfun ->
       Lfunction (map_lfunction (simplif ~layout:None ~try_depth) lfun)
+  | Lcode ({ code_fun; _ } as code) ->
+      Lcode
+        { code with
+          code_fun = map_lfunction (simplif ~layout:None ~try_depth) code_fun }
   | Llet(str, kind, v, duid, l1, l2) ->
       Llet(str, kind, v, duid, simplif ~layout:None ~try_depth l1,
            simplif ~layout ~try_depth l2)
@@ -493,6 +500,8 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       end
   | Lfunction fn ->
       count_lfunction fn
+  | Lcode { code_fun; _ } ->
+      count_lfunction code_fun
   | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize_except_alias_bindings ->
       (* v will be replaced by w in l2, so each occurrence of v in l2
          increases w's refcount *)
@@ -637,6 +646,10 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       | kind, ret_mode, body ->
           lfunction ~kind ~params ~return:outer_return ~body ~attr:attr1 ~loc ~mode ~ret_mode
       end
+  | Lcode ({ code_fun; _ } as code) ->
+      (* No arity fusion: the arity of an [Lcode] is fixed by its
+         instantiation sites. *)
+      Lcode { code with code_fun = map_lfunction simplif code_fun }
   | Llet(_str, _k, v, _duid, Lvar w, l2) when optimize_except_alias_bindings ->
       Hashtbl.add subst v (simplif (Lvar w));
       simplif l2
@@ -758,6 +771,8 @@ let rec emit_tail_infos is_tail lambda =
       list_emit_tail_infos false ap.ap_args
   | Lfunction lfun ->
       emit_tail_infos_lfunction is_tail lfun
+  | Lcode { code_fun; _ } ->
+      emit_tail_infos_lfunction is_tail code_fun
   | Llet (_, _k, _, _, lam, body)
   | Lmutlet (_k, _, _, lam, body) ->
       emit_tail_infos false lam;

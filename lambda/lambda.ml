@@ -194,6 +194,10 @@ let tag_of_lazy_tag = function
   | Lazy_tag -> Config.lazy_tag
   | Forward_tag -> Obj.forward_tag
 
+type template_ref =
+  | Template_id of Template_id.t
+  | Template_var of Slambdaident.t
+
 type primitive =
   | Pbytes_to_string
   | Pbytes_of_string
@@ -223,6 +227,21 @@ type primitive =
   | Psetmixedfield of int list * mixed_block_shape
       * initialization_or_assignment
   | Pduprecord of Types.record_representation * int
+  (* Layout-polymorphism environments; should only exist after slambda
+     evaluation, in native code *)
+  | Pset_of_closures of
+      { template : template_ref;
+        layouts : layout list;
+        mode : locality_mode
+      }
+  | Pclose_template of
+      { template : template_ref;
+        mode : locality_mode
+      }
+  | Pproject_value_slot of
+      { index : int;
+        layout : layout
+      }
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * layout list
@@ -1173,6 +1192,7 @@ type lambda =
   | Lsplice of scoped_location * slambda
   | Lkindtemplate of lkindtemplate
   | Lkindinstantiate of lkindinstantiate
+  | Lcode of lcode
 
 and slambda =
   | SLlayout of layout
@@ -1230,8 +1250,15 @@ and lfunction =
        conservatively default to [May_yield]. *)
   }
 
+and lcode =
+  { code_fun: lfunction;
+    code_closure_var: Ident.t;
+    code_slots: layout list;
+  }
+
 and lkindtemplate =
-  { ktmpl_params: Slambdaident.t list;
+  { ktmpl_name: string;
+    ktmpl_params: Slambdaident.t list;
     ktmpl_body: lfunction;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
@@ -1309,6 +1336,7 @@ let rec try_to_find_location lam =
   | Lstringswitch (_, _, _, loc, _)
   | Lsend (_, _, _, _, _, _, loc, _, _)
   | Levent (_, { lev_loc = loc; _ })
+  | Lcode { code_fun = { loc; _ }; _ }
   | Lsplice (loc, _) ->
     loc
   | Llet (_, _, _, _, lam, _)
@@ -1362,6 +1390,7 @@ let fatal_error_invalid_constructor lambda =
     | Lsplice _ -> "Lsplice"
     | Lkindtemplate _ -> "Lkindtemplate"
     | Lkindinstantiate _ -> "Lkindinstantiate"
+    | Lcode _ -> "Lcode"
   in
   Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
     name Location.print_loc loc
@@ -1771,7 +1800,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _ | Lkindtemplate _
+    | Lletrec _|Lfunction _ | Lkindtemplate _ | Lcode _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1884,6 +1913,8 @@ let shallow_iter ~tail ~non_tail:f = function
       f body
   | Lkindinstantiate {kinst_func} ->
       f kinst_func
+  | Lcode {code_fun={body}} ->
+      f body
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1983,6 +2014,10 @@ let rec free_variables = function
         ktmpl_env Ident.Set.empty
   | Lkindinstantiate {kinst_func = fn} ->
       free_variables fn
+  | Lcode {code_fun = {body; params}; code_closure_var} ->
+      Ident.Set.diff (free_variables body)
+        (Ident.Set.add code_closure_var
+           (Ident.Set.of_list (List.map (fun p -> p.name) params)))
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -2345,6 +2380,12 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
+    | Lcode ({ code_fun; code_closure_var; code_slots = _ } as code) ->
+        let code_closure_var, _duid, l =
+          bind code_closure_var debug_uid_none l
+        in
+        Lcode { code with code_closure_var;
+                          code_fun = subst_lfun s l code_fun }
     | Lsplice _ -> fatal_error_invalid_constructor lam
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
@@ -2433,7 +2474,10 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
-  | Lkindtemplate { ktmpl_params; ktmpl_body = old_body;
+  | Lcode ({ code_fun = old_fun; _ } as code) ->
+      let new_fun = map_lfunction f old_fun in
+      if old_fun == new_fun then lam else Lcode { code with code_fun = new_fun }
+  | Lkindtemplate { ktmpl_name; ktmpl_params; ktmpl_body = old_body;
                     ktmpl_env = old_env; ktmpl_env_mode;
                     ktmpl_loc } ->
       let new_body = map_lfunction f old_body in
@@ -2450,6 +2494,7 @@ let shallow_map ~tail ~non_tail:f lam =
       then lam
       else
         Lkindtemplate {
+          ktmpl_name;
           ktmpl_params;
           ktmpl_body = new_body;
           ktmpl_env = new_env;
@@ -2785,6 +2830,11 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Psetufloatfield _ -> None
   | Psetmixedfield _ -> None
   | Pduprecord _ -> Some alloc_heap
+  | Pset_of_closures { mode; _ } | Pclose_template { mode; _ } -> Some mode
+  | Pproject_value_slot _ ->
+    (* Value slots store values at their natural kinds, so projection never
+       needs to box. *)
+    None
   | Pmake_unboxed_product _ | Punboxed_product_field _ -> None
   | Pccall p -> locality_mode_of_primitive_description p
   | Praise _ -> None
@@ -3015,6 +3065,7 @@ let primitive_can_raise prim =
   | Pignore | Pgetglobal _ | Pgetpredef _ | Pmakeblock _
   | Pmakefloatblock _ | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Pduprecord _
+  | Pset_of_closures _ | Pclose_template _ | Pproject_value_slot _
   | Pmakeufloatblock _ | Pufloatfield _ | Psetufloatfield _ | Psequand | Psequor
   | Pmakelazyblock _
   | Pmixedfield _ | Psetmixedfield _ | Pnot
@@ -3459,6 +3510,9 @@ let primitive_result_layout (p : primitive) =
   | Pmakeblock _ | Pmakefloatblock _ | Pmakearray _ | Pmakearray_dynamic _
   | Pduprecord _ | Pmakeufloatblock _ | Pmakelazyblock _
   | Pduparray _ | Pbigarraydim _ | Pobj_dup -> layout_block
+  | Pset_of_closures _ -> layout_block
+  | Pclose_template _ -> layout_function
+  | Pproject_value_slot { layout; _ } -> layout
   | Pfield _ | Pfield_computed _ -> layout_value_field
   | Punboxed_product_field (field, layouts) -> (Array.of_list layouts).(field)
   | Pmake_unboxed_product layouts -> layout_unboxed_product layouts
@@ -3701,7 +3755,11 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_env_mode=Alloc_heap} ->
+    | Lfunction {mode=Alloc_heap} | Lkindtemplate {ktmpl_env_mode=Alloc_heap}
+    | Lcode _ ->
+      (* No closure is allocated for an [Lcode] itself; closures are created
+         by [Pclose_template], which is handled via [primitive_may_allocate]
+         below. *)
       ()
     | Lfunction {mode=Alloc_local} | Lkindtemplate {ktmpl_env_mode=Alloc_local}
       ->

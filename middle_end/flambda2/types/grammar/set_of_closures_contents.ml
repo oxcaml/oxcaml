@@ -82,6 +82,10 @@ let remove_unused_value_slots { closures; value_slots } ~used_value_slots =
     Value_slot.Set.filter
       (fun var ->
         (not (Value_slot.in_compilation_unit var (Current_unit.get_cu_exn ())))
+        (* Slots with deterministic stamps (layout-polymorphism environments)
+           may have uses that are invisible in this unit, inside templates
+           marshalled into the .cmx. *)
+        || Value_slot.has_deterministic_stamp var
         || Value_slot.Set.mem var used_value_slots)
       value_slots
   in

@@ -111,7 +111,12 @@ end = struct
 
   let value_slot_is_used t var =
     if Value_slot.in_compilation_unit var t.original_compilation_unit
-    then Value_slot.Set.mem var t.used_value_slots
+    then
+      (* Slots with deterministic stamps (layout-polymorphism environments) may
+         have uses that are invisible in this unit, inside templates marshalled
+         into the .cmx. *)
+      Value_slot.has_deterministic_stamp var
+      || Value_slot.Set.mem var t.used_value_slots
     else (* This value slot might be used in other units *)
       true
 end
