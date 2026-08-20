@@ -19,7 +19,7 @@ let rec rec_t = { rec_t; x1 = #4.0 }
 val rec_t : rec_t = {rec_t = <cycle>; x1 = <abstr>}
 |}];;
 
-(* Error: the recursive use is for a field in the flat suffix *)
+(* Error: the recursive variable itself cannot have a flat layout *)
 let rec x2 = let _ = { t = rec_t; x2 } in #4.0;;
 
 [%%expect {|
@@ -55,7 +55,7 @@ let rec rec_cstr = A (rec_cstr, #4.0)
 val rec_cstr : cstr = A (<cycle>, <abstr>)
 |}];;
 
-(* Error: the recursive use is for a field in the flat suffix *)
+(* Error: the recursive variable itself cannot have a flat layout *)
 let rec bad_flat = let _ = A (rec_cstr, bad_flat) in #4.0;;
 [%%expect {|
 Line 1, characters 40-48:
@@ -90,7 +90,7 @@ let rec rec_cstr = A { cstr = rec_cstr; flt = #4.0 }
 val rec_cstr : cstr = A {cstr = <cycle>; flt = <abstr>}
 |}];;
 
-(* Error: the recursive use is for a field in the flat suffix *)
+(* Error: the recursive variable itself cannot have a flat layout *)
 let rec bad_flat = let _ = A { cstr = rec_cstr; flt = bad_flat } in #4.0;;
 [%%expect {|
 Line 1, characters 54-62:
@@ -120,40 +120,28 @@ type t2 = { t2 : #(t2 option * float#); i : int }
 let rec t2 = { t2 = #(Some t2, #4.0); i = 0 };;
 [%%expect {|
 type t2 = { t2 : #(t2 option * float#); i : int; }
-Line 2, characters 13-45:
-2 | let rec t2 = { t2 = #(Some t2, #4.0); i = 0 };;
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+val t2 : t2 = {t2 = #(Some <cycle>, <abstr>); i = 0}
 |}];;
 
 type c2 = B of #(c2 option * float#)
 let rec c2 = B #(Some c2, #4.0);;
 [%%expect {|
 type c2 = B of #(c2 option * float#)
-Line 2, characters 13-31:
-2 | let rec c2 = B #(Some c2, #4.0);;
-                 ^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+val c2 : c2 = B <unboxed product>
 |}];;
 
 type c3 = C of { c3 : #(c3 option * float#); i : int }
 let rec c3 = C { c3 = #(Some c3, #4.0); i = 0 };;
 [%%expect {|
 type c3 = C of { c3 : #(c3 option * float#); i : int; }
-Line 2, characters 13-47:
-2 | let rec c3 = C { c3 = #(Some c3, #4.0); i = 0 };;
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+val c3 : c3 = C {c3 = #(Some <cycle>, <abstr>); i = 0}
 |}];;
 
 type v2 = { v2 : #(v2 option * unit#) }
 let rec v2 = { v2 = #(Some v2, #()) };;
 [%%expect {|
 type v2 = { v2 : #(v2 option * unit#); }
-Line 2, characters 13-37:
-2 | let rec v2 = { v2 = #(Some v2, #()) };;
-                 ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This kind of expression is not allowed as right-hand side of "let rec"
+val v2 : v2 = {v2 = #(Some <cycle>, <abstr>)}
 |}];;
 
 (* OK: a nested recursive mixed block *)
