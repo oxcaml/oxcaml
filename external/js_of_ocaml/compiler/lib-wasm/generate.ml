@@ -2198,7 +2198,7 @@ module Generate (Target : Target_sig.S) = struct
         | Cond (_, (pc1, _), (pc2, _)) when pc' = pc1 && pc' = pc2 -> true
         | _ -> Structure.is_merge_node g pc'
       in
-      let code ~context =
+      let code ~result_typ ~fall_through ~context =
         let block = Addr.Map.find pc ctx.blocks in
         let* () = translate_instrs ctx context block.body in
         translate_node_within
@@ -2215,8 +2215,20 @@ module Generate (Target : Target_sig.S) = struct
       in
       if Structure.is_loop_header g pc
       then
-        loop { params = []; result = result_typ } (code ~context:(`Block pc :: context))
-      else code ~context
+        loop
+          { params = []; result = result_typ }
+          (if Option.is_none name_opt
+           then
+             wrap_with_handlers
+               p
+               ~dom
+               pc
+               ~result_typ
+               ~fall_through
+               ~context:(`Block pc :: context)
+               code
+           else code ~result_typ ~fall_through ~context:(`Block pc :: context))
+      else code ~result_typ ~fall_through ~context
     and translate_node_within ~result_typ ~fall_through ~pc ~l ~context =
       match l with
       | pc' :: rem ->
@@ -2546,6 +2558,7 @@ module Generate (Target : Target_sig.S) = struct
         functions
     in
     global_context.init_code <- [];
+    let functions = Hoist_loops.f ~toplevel:toplevel_name functions in
     global_context.other_fields <- List.rev_append functions global_context.other_fields;
     let js_code = StringMap.bindings global_context.fragments in
     global_context.fragments <- StringMap.empty;
