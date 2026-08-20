@@ -9,7 +9,7 @@
    script = "sh ${test_source_directory}/check-contains.sh phantom_basics.cmx.dump let? unused_pair";
    script;
  }{
-   flags = "-O3 -g -gno-upstream-dwarf -dcmm -dump-into-file";
+   flags = "-O3 -g -gno-upstream-dwarf -no-flambda2-expert-phantom-lets -dcmm -dump-into-file";
    module = "phantom_basics.ml";
    ocamlopt.byte;
  }{
