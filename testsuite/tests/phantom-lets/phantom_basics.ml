@@ -1,5 +1,9 @@
 (* TEST
  flambda2;
+ (* Insulate the test from OCAMLPARAM settings used by CI configurations
+    (e.g. classic mode, the reaper, or dump-dir redirection), which would
+    perturb the Cmm dump this test greps. *)
+ set OCAMLPARAM = "_,";
  setup-ocamlopt.byte-build-env;
  {
    flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -dcmm -dump-into-file";
