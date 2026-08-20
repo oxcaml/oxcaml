@@ -78,8 +78,14 @@ and mode_bounds =
   }
 
 and mode_bound =
-  { bound_vars : string loc list;
+  { bound_vars : mode_bound_elem list;
     bound_const : string loc list;
+  }
+
+and mode_bound_elem =
+  { elem_morph : string loc option;
+    elem_var : string loc;
+    elem_mod : string loc list;
   }
 
 type modes = mode loc list
