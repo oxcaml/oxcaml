@@ -151,20 +151,30 @@ let compute_subst :
     uses;
   subst, to_delete
 
-(* CR-someday xclerc for xclerc: naive implementation; also, could be moved to
-   `Regalloc_substitution`. *)
-let rec close_subst : Subst.t -> Subst.t =
+(* CR-someday xclerc for xclerc: could be moved to `Regalloc_substitution`. *)
+let close_subst : Subst.t -> Subst.t =
  fun subst ->
-  let changed = ref false in
-  Reg.Tbl.filter_map_inplace
-    (fun _from to_ ->
-      match Reg.Tbl.find_opt subst to_ with
-      | None -> Some to_
-      | Some _ as trans ->
-        changed := true;
-        trans)
+  let max_chain_length = Reg.Tbl.length subst in
+  let closed = Reg.Tbl.create max_chain_length in
+  Reg.Tbl.iter
+    (fun from to_ ->
+      let rec follow to_ ~chain_length =
+        match Reg.Tbl.find_opt subst to_ with
+        | None -> to_
+        | Some next ->
+          (* An acyclic chain cannot be longer than the substitution itself; a
+             longer one would mean the substitution is cyclic, which
+             `compute_subst` cannot produce since each move's write precedes its
+             read. *)
+          if chain_length >= max_chain_length
+          then
+            Misc.fatal_error
+              "Cfg_copy_propagation.close_subst: cyclic substitution"
+          else follow next ~chain_length:(succ chain_length)
+      in
+      Reg.Tbl.replace closed from (follow to_ ~chain_length:0))
     subst;
-  match !changed with false -> subst | true -> close_subst subst
+  closed
 
 let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
