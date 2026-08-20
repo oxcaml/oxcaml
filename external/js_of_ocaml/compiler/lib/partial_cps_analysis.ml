@@ -99,7 +99,9 @@ let block_deps ~info ~vars ~tail_deps ~deps ~blocks ~fun_name pc =
               ( Extern
                   ( ( "%perform"
                     | "%reperform"
-                    | "%resume"
+                    | "%continue"
+                    | "%discontinue"
+                    | "%discontinue_with_backtrace"
                     | "%with_stack"
                     | "%with_stack_preemptible" )
                   , _ )
@@ -170,7 +172,9 @@ let cps_needed ~info ~in_mutual_recursion ~rev_deps st x =
          ( Extern
              ( ( "%perform"
                | "%reperform"
-               | "%resume"
+               | "%continue"
+               | "%discontinue"
+               | "%discontinue_with_backtrace"
                | "%with_stack"
                | "%with_stack_preemptible" )
              , _ )
