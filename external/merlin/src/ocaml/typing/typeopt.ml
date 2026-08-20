@@ -889,6 +889,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
   | Variant_with_null -> begin
     match Datarepr.find_variant_with_null_payload cstrs with
     | Some { payload_arg = { Types.ca_type = ty; _ }; _ } ->
+      (* [ty] is used raw: [params]/[args] are not substituted, and a GADT
+         payload is not projected out of its constructor-local scope. Both
+         lose precision only (an opaque variable yields a generic value
+         kind); the result stays sound because indices not matching the
+         payload constructor's result type are inhabited only by the null
+         value, which every nullable kind admits. *)
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in

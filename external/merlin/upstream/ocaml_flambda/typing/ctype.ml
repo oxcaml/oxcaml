@@ -2804,10 +2804,23 @@ let unbox_once env ty =
         | Type_variant (cstrs, Variant_with_null, _) ->
           begin match Datarepr.find_variant_with_null_payload cstrs with
           | Some
-              { payload_arg = { ca_type; ca_modalities = modality; _ };
-                _ } ->
+              { payload_cstr = { cd_res; _ };
+                payload_arg = { ca_type; ca_modalities = modality; _ } } ->
+            (* A GADT [@@or_null] wrapper needs the same B1-B4 projection as
+               boxed and unboxed GADTs, projected onto the instantiated head
+               arguments of the wrapper type. This keeps the unwrapped
+               payload's jkind honest -- in particular a [float] payload stays
+               [maybe_separable] once wrapped, so it cannot enter a flat float
+               array. A non-GADT payload needs no projection. *)
+            let extra_substs =
+              Btype.Jkind0.variant_constructor_gadt_extra_substs
+                ~projected_params:args
+                ~cstr_res:cd_res
+                ~payload_tys:[ca_type]
+                ~get_free_vars:(free_variable_set_of_list env)
+            in
             Stepped
-              { ty = apply ca_type ~extra_substs:[];
+              { ty = apply ca_type ~extra_substs;
                 modality;
                 or_null = Some { decl; args; prev = ty } }
           | None ->
@@ -2839,15 +2852,37 @@ let contained_without_boxing env ty =
          [update_decl_jkind] has filled in the argument sorts, and the
          callers of this function run before that on the current
          recursive group. Returning the arguments of both constructors
-         does not depend on constructor order or sorts. *)
+         does not depend on constructor order or sorts.
+
+         A GADT constructor's argument types are constructor-local, so
+         they get the same B1-B4 projection onto the instantiated head
+         arguments as in [unbox_once]: without it, edges through a GADT
+         payload variable are invisible to the unboxed-recursion check,
+         which then accepts an unboxed cycle re-entering through the
+         payload of a widened-parameter GADT [@@or_null] that the
+         projected (and non-GADT) form rejects. *)
       List.concat_map
         (fun (cstr : constructor_declaration) ->
            match cstr.cd_args with
            | Cstr_tuple cargs ->
+             let payload_tys =
+               List.map
+                 (fun (carg : constructor_argument) -> carg.ca_type)
+                 cargs
+             in
+             let extra_substs =
+               Btype.Jkind0.variant_constructor_gadt_extra_substs
+                 ~projected_params:args
+                 ~cstr_res:cstr.cd_res
+                 ~payload_tys
+                 ~get_free_vars:(free_variable_set_of_list env)
+             in
+             let extra_params, extra_args = List.split extra_substs in
              List.map
-               (fun (carg : constructor_argument) ->
-                  apply env type_params carg.ca_type args)
-               cargs
+               (fun ty ->
+                  apply env (extra_params @ type_params) ty
+                    (extra_args @ args))
+               payload_tys
            | Cstr_record _ -> [])
         cstrs
     | _ | exception Not_found ->
