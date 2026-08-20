@@ -30,16 +30,19 @@ let debug_wat = Debug.find "wat"
 
 let () = Sys.catch_break true
 
-let update_sourcemap ~sourcemap_root ~sourcemap_don't_inline_content sourcemap_file =
-  if Option.is_some sourcemap_root || not sourcemap_don't_inline_content
-  then (
-    let open Source_map in
+let update_sourcemap ~sourcemap_root ~sourcemap_don't_inline_content ~wasm_file sourcemap_file =
+  (let open Source_map in
     let source_map =
       match Source_map.of_file sourcemap_file with
       | Index _ -> assert false
       | Standard sm -> sm
     in
     assert (List.is_empty (Option.value source_map.sources_content ~default:[]));
+    let source_map =
+      Wasm_source_map.add_function_start_mappings
+        ~function_offsets:(Link.Wasm_binary.function_start_offsets ~file:wasm_file)
+        source_map
+    in
     (* Add source file contents to source map *)
     let sources_content =
       if sourcemap_don't_inline_content
@@ -202,7 +205,11 @@ let link_and_optimize
       ();
     if binaryen_times () then Format.eprintf "  binaryen opt: %a@." Timer.print t;
     Option.iter
-      ~f:(update_sourcemap ~sourcemap_root ~sourcemap_don't_inline_content)
+      ~f:
+        (update_sourcemap
+           ~sourcemap_root
+           ~sourcemap_don't_inline_content
+           ~wasm_file:output_file)
       opt_sourcemap_file;
     primitives
   in
@@ -632,6 +639,17 @@ let run
            ~input_file
            ~output_file:tmp_wasm_file
            ();
+         Option.iter opt_tmp_map_file ~f:(fun map_file ->
+             match Source_map.of_file map_file with
+             | Index _ -> ()
+             | Standard sm ->
+                 let sm =
+                   Wasm_source_map.add_function_start_mappings
+                     ~function_offsets:
+                       (Link.Wasm_binary.function_start_offsets ~file:tmp_wasm_file)
+                     sm
+                 in
+                 Source_map.to_file ~rewrite_paths:false (Standard sm) map_file);
          { Link.unit_name; unit_info; fragments }, shapes
        in
        cont unit_data unit_name tmp_wasm_file opt_tmp_map_file shapes cmi_files

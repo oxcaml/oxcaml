@@ -354,6 +354,27 @@ module Wasm_binary = struct
     close_in ch.ch;
     res
 
+  let function_start_offsets ~file =
+    let ch = open_in file in
+    let rec find_code_section () =
+      match next_section ch with
+      | None -> false
+      | Some s ->
+        s.id = 10 (* [10] is a code section *)
+          ||
+          (skip_section ch s;
+           find_code_section ())
+    in
+    let func ch =
+      let body_size = read_uint ch in
+      let start = pos_in ch in
+      seek_in ch (start + body_size);
+      start
+    in
+    let res = if find_code_section () then vec func ch.ch else [] in
+    close_in ch.ch;
+    res
+
   type interface =
     { imports : import list
     ; exports : string list
