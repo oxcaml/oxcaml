@@ -95,6 +95,7 @@ module Generate (Target : Target_sig.S) = struct
     | Value -> Type.value
     | Float -> F64
     | Float32 -> F32
+    | Nativeint when Config.Flag.portable_int () -> I64
     | Int _ | Int32 | Nativeint -> I32
     | Int64 -> I64
 
@@ -220,6 +221,10 @@ module Generate (Target : Target_sig.S) = struct
   let nativeint_bin_op op f g =
     let* f = f in
     let* g = g in
+    if Config.Flag.portable_int ()
+    then
+      return (W.BinOp (I64 op, f, g))
+    else
     return (W.BinOp (I32 op, f, g))
 
   let get_type ctx p =
@@ -232,9 +237,11 @@ module Generate (Target : Target_sig.S) = struct
     | Int Unnormalized, Int Normalized -> Arith.((e lsl const 1l) asr const 1l)
     | Int (Normalized | Unnormalized), Int (Normalized | Unnormalized) -> e
     (* Dummy value *)
-    | Int (Unnormalized | Normalized), Number ((Int32 | Nativeint), Unboxed) ->
+    | Int (Unnormalized | Normalized), Number (Int32, Unboxed) ->
         return (W.Const (I32 0l))
-    | Int (Unnormalized | Normalized), Number (Int64, Unboxed) ->
+    | Int (Unnormalized | Normalized), Number (Nativeint, Unboxed) when not (Config.Flag.portable_int ()) ->
+        return (W.Const (I32 0l))
+    | Int (Unnormalized | Normalized), Number ((Int64 | Nativeint), Unboxed) ->
         return (W.Const (I64 0L))
     | Int (Unnormalized | Normalized), Number (Float, Unboxed) ->
         return (W.Const (F64 0.))
@@ -455,7 +462,7 @@ module Generate (Target : Target_sig.S) = struct
   let lift_float_bin_op op f g =
     float32_of_float (op (float_of_float32 f) (float_of_float32 g))
 
-  let () =
+  let typed_primitives_registration = lazy (
     register_bin_prim
       "caml_floatarray_unsafe_get"
       `Mutable
@@ -477,6 +484,19 @@ module Generate (Target : Target_sig.S) = struct
           return (W.I32WrapI64 y)
         in
         Memory.gen_array_get x y);
+    if Config.Flag.portable_int ()
+    then
+      register_bin_prim
+        "caml_array_unsafe_get_indexed_by_nativeint"
+        `Mutable
+        ~ty:nativeint_u
+        (fun x y ->
+          let y =
+            let* y = y in
+            return (W.I32WrapI64 y)
+          in
+          Memory.gen_array_get x y)
+    else
     register_bin_prim
       "caml_array_unsafe_get_indexed_by_nativeint"
       `Mutable
@@ -496,6 +516,18 @@ module Generate (Target : Target_sig.S) = struct
           return (W.I32WrapI64 y)
         in
         seq (Memory.gen_array_set x y z) Value.unit);
+    if Config.Flag.portable_int ()
+    then
+      register_tern_prim
+        "caml_array_unsafe_set_indexed_by_nativeint"
+        ~ty:nativeint_u
+        (fun x y z ->
+          let y =
+            let* y = y in
+            return (W.I32WrapI64 y)
+          in
+          seq (Memory.gen_array_set x y z) Value.unit)
+    else
     register_tern_prim
       "caml_array_unsafe_set_indexed_by_nativeint"
       ~ty:nativeint_u
@@ -611,6 +643,30 @@ module Generate (Target : Target_sig.S) = struct
            let* cond = Arith.((load y lsl const 1l) asr const 1l <> load y) in
            instr (W.Br_if (label, cond)))
           (load y));
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim_ctx
+        "caml_checked_nativeint_to_int"
+        ~typ:nativeint_u
+        ~ret_typ:int_n
+        (fun context x ->
+          let y = Code.Var.fresh () in
+          seq
+            (let* () = store y x in
+             let* y = load y in
+             let label = label_index context bound_error_pc in
+             let cond =
+               W.BinOp
+                 ( I64 Ne
+                 , y
+                 , BinOp
+                     (I64 (Shr U), BinOp (I64 Shl, y, Const (I64 33L)), Const (I64 33L))
+                 )
+             in
+             instr (W.Br_if (label, cond)))
+            (let* y = load y in
+             return (W.I32WrapI64 y)))
+    else
     register_un_prim_ctx
       "caml_checked_nativeint_to_int"
       ~typ:nativeint_u
@@ -1157,12 +1213,34 @@ module Generate (Target : Target_sig.S) = struct
       (fun i j -> int32_bin_op (Shr U) i j);
     register_un_prim "caml_int32_to_int" `Pure ~typ:int32_u ~ret_typ:int_u Fun.id;
     register_un_prim "caml_int32_of_int" `Pure ~typ:int_n ~ret_typ:int32_u Fun.id;
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_nativeint_of_int32"
+        `Pure
+        ~typ:int32_u
+        ~ret_typ:nativeint_u
+        (fun i ->
+          let* i = i in
+          return (W.I64ExtendI32 (S, i)))
+    else
     register_un_prim
       "caml_nativeint_of_int32"
       `Pure
       ~typ:int32_u
       ~ret_typ:nativeint_u
       Fun.id;
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_nativeint_to_int32"
+        `Pure
+        ~typ:nativeint_u
+        ~ret_typ:int32_u
+        (fun i ->
+          let* i = i in
+          return (W.I32WrapI64 i))
+    else
     register_un_prim
       "caml_nativeint_to_int32"
       `Pure
@@ -1289,6 +1367,15 @@ module Generate (Target : Target_sig.S) = struct
     register_un_prim "caml_int64_of_int32" `Pure ~typ:int32_u ~ret_typ:int64_u (fun i ->
         let* i = i in
         return (W.I64ExtendI32 (S, i)));
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_int64_to_nativeint"
+        `Pure
+        ~typ:int64_u
+        ~ret_typ:nativeint_u
+        Fun.id
+    else
     register_un_prim
       "caml_int64_to_nativeint"
       `Pure
@@ -1297,6 +1384,15 @@ module Generate (Target : Target_sig.S) = struct
       (fun i ->
         let* i = i in
         return (W.I32WrapI64 i));
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_int64_of_nativeint"
+        `Pure
+        ~typ:nativeint_u
+        ~ret_typ:int64_u
+        Fun.id
+    else
     register_un_prim
       "caml_int64_of_nativeint"
       `Pure
@@ -1305,6 +1401,17 @@ module Generate (Target : Target_sig.S) = struct
       (fun i ->
         let* i = i in
         return (W.I64ExtendI32 (S, i)));
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_nativeint_bits_of_float"
+        `Pure
+        ~typ:float_u
+        ~ret_typ:nativeint_u
+        (fun f ->
+          let* f = f in
+          return (W.UnOp (I64 ReinterpretF, f)))
+    else
     register_un_prim
       "caml_nativeint_bits_of_float"
       `Pure
@@ -1313,6 +1420,17 @@ module Generate (Target : Target_sig.S) = struct
       (fun f ->
         let* f = f in
         return (W.UnOp (I32 ReinterpretF, F32DemoteF64 f)));
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_nativeint_float_of_bits"
+        `Pure
+        ~typ:nativeint_u
+        ~ret_typ:float_u
+        (fun i ->
+          let* i = i in
+          return (W.UnOp (F64 ReinterpretI, i)))
+    else
     register_un_prim
       "caml_nativeint_float_of_bits"
       `Pure
@@ -1321,6 +1439,17 @@ module Generate (Target : Target_sig.S) = struct
       (fun i ->
         let* i = i in
         return (W.F64PromoteF32 (UnOp (I32 ReinterpretF, i))));
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_nativeint_of_float"
+        `Pure
+        ~typ:float_u
+        ~ret_typ:nativeint_u
+        (fun f ->
+          let* f = f in
+          return (W.UnOp (I64 (TruncSat (`F64, S)), f)))
+    else
     register_un_prim
       "caml_nativeint_of_float"
       `Pure
@@ -1329,6 +1458,17 @@ module Generate (Target : Target_sig.S) = struct
       (fun f ->
         let* f = f in
         return (W.UnOp (I32 (TruncSat (`F64, S)), f)));
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_nativeint_to_float"
+        `Pure
+        ~typ:nativeint_u
+        ~ret_typ:float_u
+        (fun n ->
+          let* n = n in
+          return (W.UnOp (F64 (Convert (`I64, S)), n)))
+    else
     register_un_prim
       "caml_nativeint_to_float"
       `Pure
@@ -1337,6 +1477,17 @@ module Generate (Target : Target_sig.S) = struct
       (fun n ->
         let* n = n in
         return (W.UnOp (F64 (Convert (`I32, S)), n)));
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_nativeint_neg"
+        `Pure
+        ~typ:nativeint_u
+        ~ret_typ:nativeint_u
+        (fun i ->
+          let* i = i in
+          return (W.BinOp (I64 Sub, Const (I64 0L), i)))
+    else
     register_un_prim
       "caml_nativeint_neg"
       `Pure
@@ -1357,6 +1508,42 @@ module Generate (Target : Target_sig.S) = struct
         nativeint_bin_op Or i j);
     register_arith_bin_prim "caml_nativeint_xor" `Pure ~typ:nativeint_u (fun i j ->
         nativeint_bin_op Xor i j);
+    if Config.Flag.portable_int ()
+    then
+      register_bin_prim_ctx
+        "caml_nativeint_div"
+        ~tx:nativeint_u
+        ~ty:nativeint_u
+        ~ret_typ:nativeint_u
+        (fun context i j ->
+          let res = Var.fresh () in
+          (*ZZZ Can we do better?*)
+          let i' = Var.fresh () in
+          let j' = Var.fresh () in
+          seq
+            (let* () = store ~typ:I64 j' j in
+             let* () =
+               let* j = load j' in
+               instr (W.Br_if (label_index context zero_divide_pc, W.UnOp (I64 Eqz, j)))
+             in
+             let* () = store ~typ:I64 i' i in
+             if_
+               { params = []; result = [] }
+               Arith.(
+                 (let* j = load j' in
+                  return (W.BinOp (I64 Eq, j, Const (I64 (-1L)))))
+                 land let* i = load i' in
+                      return (W.BinOp (I64 Eq, i, Const (I64 Int64.min_int))))
+               (store ~always:true ~typ:I64 res (return (W.Const (I64 Int64.min_int))))
+               (store
+                  ~always:true
+                  ~typ:I64
+                  res
+                  (let* i = load i' in
+                   let* j = load j' in
+                   return (W.BinOp (I64 (Div S), i, j)))))
+            (load res))
+    else
     register_bin_prim_ctx
       "caml_nativeint_div"
       ~tx:nativeint_u
@@ -1390,6 +1577,23 @@ module Generate (Target : Target_sig.S) = struct
                  let* j = load j' in
                  return (W.BinOp (I32 (Div S), i, j)))))
           (load res));
+    if Config.Flag.portable_int ()
+    then
+      register_bin_prim_ctx
+        "caml_nativeint_mod"
+        ~tx:nativeint_u
+        ~ty:nativeint_u
+        ~ret_typ:nativeint_u
+        (fun context i j ->
+          let j' = Var.fresh () in
+          seq
+            (let* () = store ~typ:I64 j' j in
+             let* j = load j' in
+             instr (W.Br_if (label_index context zero_divide_pc, W.UnOp (I64 Eqz, j))))
+            (let* i = i in
+             let* j = load j' in
+             return (W.BinOp (I64 (Rem S), i, j))))
+    else
     register_bin_prim_ctx
       "caml_nativeint_mod"
       ~tx:nativeint_u
@@ -1404,6 +1608,16 @@ module Generate (Target : Target_sig.S) = struct
           (let* i = i in
            let* j = load j' in
            return (W.BinOp (I32 (Rem S), i, j))));
+    if Config.Flag.portable_int ()
+    then
+      register_bin_prim
+        "caml_nativeint_shift_left"
+        `Pure
+        ~tx:nativeint_u
+        ~ty:int_u
+        ~ret_typ:nativeint_u
+        (fun i j -> int64_shift_op Shl i j)
+    else
     register_bin_prim
       "caml_nativeint_shift_left"
       `Pure
@@ -1411,6 +1625,16 @@ module Generate (Target : Target_sig.S) = struct
       ~ty:int_u
       ~ret_typ:nativeint_u
       (fun i j -> nativeint_bin_op Shl i j);
+    if Config.Flag.portable_int ()
+    then
+      register_bin_prim
+        "caml_nativeint_shift_right"
+        `Pure
+        ~tx:nativeint_u
+        ~ty:int_u
+        ~ret_typ:nativeint_u
+        (fun i j -> int64_shift_op (Shr S) i j)
+    else
     register_bin_prim
       "caml_nativeint_shift_right"
       `Pure
@@ -1418,6 +1642,16 @@ module Generate (Target : Target_sig.S) = struct
       ~ty:int_u
       ~ret_typ:nativeint_u
       (fun i j -> nativeint_bin_op (Shr S) i j);
+    if Config.Flag.portable_int ()
+    then
+      register_bin_prim
+        "caml_nativeint_shift_right_unsigned"
+        `Pure
+        ~tx:nativeint_u
+        ~ty:int_u
+        ~ret_typ:nativeint_u
+        (fun i j -> int64_shift_op (Shr U) i j)
+    else
     register_bin_prim
       "caml_nativeint_shift_right_unsigned"
       `Pure
@@ -1425,7 +1659,29 @@ module Generate (Target : Target_sig.S) = struct
       ~ty:int_u
       ~ret_typ:nativeint_u
       (fun i j -> nativeint_bin_op (Shr U) i j);
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_nativeint_to_int"
+        `Pure
+        ~typ:nativeint_u
+        ~ret_typ:int_u
+        (fun i ->
+          let* i = i in
+          return (W.I32WrapI64 i))
+    else
     register_un_prim "caml_nativeint_to_int" `Pure ~typ:nativeint_u ~ret_typ:int_u Fun.id;
+    if Config.Flag.portable_int ()
+    then
+      register_un_prim
+        "caml_nativeint_of_int"
+        `Pure
+        ~typ:int_n
+        ~ret_typ:nativeint_u
+        (fun i ->
+          let* i = i in
+          return (W.I64ExtendI32 (S, i)))
+    else
     register_un_prim "caml_nativeint_of_int" `Pure ~typ:int_n ~ret_typ:nativeint_u Fun.id;
     register_arith_bin_prim "caml_int_compare" `Pure ~typ:int_n (fun i j ->
         Arith.((j < i) - (i < j)));
@@ -1458,14 +1714,8 @@ module Generate (Target : Target_sig.S) = struct
     register_prim "caml_compare" `Mutator ~ret_typ:int_n (fun ctx _ _ l ->
         match l with
         | [ x; y ] -> (
-            match get_type ctx x, get_type ctx y with
-            | Int _, Int _ ->
-                let x' = transl_prim_arg ctx ~typ:int_n x in
-                let y' = transl_prim_arg ctx ~typ:int_n y in
-                Arith.((y' < x') - (x' < y'))
-            | Number (Int32, _), Number (Int32, _)
-            | Number (Nativeint, _), Number (Nativeint, _) ->
-                let* f =
+            let handle_int32 () =
+              let* f =
                   register_import
                     ~name:"caml_int32_compare"
                     (Fun { W.params = [ I32; I32 ]; result = [ I32 ] })
@@ -1473,7 +1723,18 @@ module Generate (Target : Target_sig.S) = struct
                 let* x' = transl_prim_arg ctx ~typ:int32_u x in
                 let* y' = transl_prim_arg ctx ~typ:int32_u y in
                 return (W.Call (f, [ x'; y' ]))
-            | Number (Int64, _), Number (Int64, _) ->
+            in
+            match get_type ctx x, get_type ctx y with
+            | Int _, Int _ ->
+                let x' = transl_prim_arg ctx ~typ:int_n x in
+                let y' = transl_prim_arg ctx ~typ:int_n y in
+                Arith.((y' < x') - (x' < y'))
+            | Number (Nativeint, _), Number (Nativeint, _) when not (Config.Flag.portable_int ()) ->
+              handle_int32 ()
+            | Number (Int32, _), Number (Int32, _) ->
+              handle_int32 ()
+            | Number (Int64, _), Number (Int64, _)
+            | Number (Nativeint, _), Number (Nativeint, _) ->
                 let* f =
                   register_import
                     ~name:"caml_int64_compare"
@@ -1717,9 +1978,11 @@ module Generate (Target : Target_sig.S) = struct
           register_import ~name:"null" (Global { mut = false; typ = Type.value })
         in
         return (W.RefEq (x, GlobalGet null)))
+    )
 
   let unboxed_type ty : W.value_type option =
     match ty with
+    | Typing.Number (Nativeint, Unboxed) when Config.Flag.portable_int () -> Some I64
     | Typing.Int (Normalized | Unnormalized) | Number ((Int32 | Nativeint), Unboxed) ->
         Some I32
     | Number (Int64, Unboxed) -> Some I64
@@ -2602,6 +2865,7 @@ module Generate (Target : Target_sig.S) = struct
     List.rev_append context.other_fields (imports @ constant_data)
 
   let init () =
+    Lazy.force typed_primitives_registration;
     Typing.reset ();
     Primitive.register "caml_make_array" `Mutable None None;
     Primitive.register "caml_array_of_uniform_array" `Mutable None None;
