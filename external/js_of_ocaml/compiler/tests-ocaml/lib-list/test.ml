@@ -8,11 +8,15 @@ let string_of_even_opt x =
   else
     None
 
+(* OxCaml's stdlib does not yet include these functions: comment out their
+   tests. *)
+(*
 let string_of_add_even_opt i x =
   if is_even ( i + x) then
     Some (string_of_int (i + x))
   else
     None
+*)
 
 let string_of_even_or_int x =
   if is_even x then
@@ -70,7 +74,7 @@ let () =
   let hello = ['H';'e';'l';'l';'o'] in
   let world = ['W';'o';'r';'l';'d';'!'] in
   let hello_world = hello @ [' '] @ world in
-  assert (List.take 5 hello_world = hello);
+  (* assert (List.take 5 hello_world = hello);
   assert (List.take 3 [1; 2; 3; 4; 5] = [1; 2; 3]);
   assert (List.take 3 [1; 2] = [1; 2]);
   assert (List.take 3 [] = []);
@@ -89,7 +93,7 @@ let () =
   assert (List.drop_while (fun x -> x < 3) [1; 2; 3; 4; 5; 1; 2; 3]
           = [3; 4; 5; 1; 2; 3]);
   assert (List.drop_while (fun x -> x < 9) [1; 2; 3] = []);
-  assert (List.drop_while (fun x -> x < 0) [1; 2; 3] = [1; 2; 3]);
+  assert (List.drop_while (fun x -> x < 0) [1; 2; 3] = [1; 2; 3]); *)
   assert (List.partition is_even [1; 2; 3; 4; 5]
           = ([2; 4], [1; 3; 5]));
   assert (List.partition_map string_of_even_or_int [1; 2; 3; 4; 5]
@@ -115,9 +119,11 @@ let () =
   assert (not (List.is_empty [1]));
 
   assert (List.filter_map string_of_even_opt l = ["0";"2";"4";"6";"8"]);
+(*
   assert
     ( List.filter_mapi string_of_add_even_opt l
     = ["0";"2";"4";"6";"8";"10";"12";"14";"16";"18"]);
+*)
   assert (List.concat_map (fun i -> [i; i+1]) [1; 5] = [1; 2; 5; 6]);
   assert (
     let count = ref 0 in

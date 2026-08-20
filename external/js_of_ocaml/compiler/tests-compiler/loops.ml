@@ -81,27 +81,27 @@ let rec fun_with_loop acc = function
   print_fun_decl program (Some "fun_with_loop");
   [%expect
     {|
-    function fun_with_loop(acc$0, _a_){
-     var acc = acc$0;
+    function fun_with_loop(acc$1, _a_){
+     var acc = acc$1;
      for(;;){
       if(! _a_)
        return caml_call1
                (list_rev, caml_call1(list_rev, caml_call1(list_rev, acc)));
       var x = _a_[1];
       if(1 === x && ! _a_[2]) break;
-      var xs = _a_[2], a$2 = acc, i = 0;
+      var xs = _a_[2], a = [0, acc], i = 0;
       for(;;){
-       var a = [0, 1, a$2], _a_ = i + 1 | 0;
-       if(10 === i){acc = [0, x, a]; _a_ = xs; break;}
-       a$2 = a;
+       a[1] = [0, 1, a[1]];
+       _a_ = i + 1 | 0;
+       if(10 === i){var acc$0 = [0, x, a[1]]; acc = acc$0; _a_ = xs; break;}
        i = _a_;
       }
      }
-     var a$1 = acc, i$0 = 0;
+     var a$0 = [0, acc], i$0 = 0;
      for(;;){
-      var a$0 = [0, 1, a$1], _a_ = i$0 + 1 | 0;
-      if(10 === i$0) return a$0;
-      a$1 = a$0;
+      a$0[1] = [0, 1, a$0[1]];
+      _a_ = i$0 + 1 | 0;
+      if(10 === i$0) return a$0[1];
       i$0 = _a_;
      }
     }
@@ -174,7 +174,7 @@ let for_for_while () =
        }
        else{
         try{caml_div(k, j);}
-        catch(exn){throw caml_maybe_attach_backtrace(Stdlib[8], 1);}
+        catch(exn){throw caml_maybe_attach_backtrace(Stdlib[8], 0);}
         id[1]++;
        }
      }
@@ -437,12 +437,12 @@ let add_substitute =
      var lim$1 = caml_ml_string_length(s), previous = 32, i$4 = 0;
      for(;;){
       if(i$4 >= lim$1){
-       var _b_ = 92 === previous ? 1 : 0;
+       var _b_ = previous === 92 ? 1 : 0;
        return _b_ ? caml_call2(add_char, b, previous) : _b_;
       }
       var previous$0 = caml_string_get(s, i$4);
       if(36 === previous$0)
-       if(92 === previous){
+       if(previous === 92){
         caml_call2(add_char, b, previous$0);
         var i$5 = i$4 + 1 | 0;
         previous = 32;
@@ -450,7 +450,7 @@ let add_substitute =
        }
        else{
         var start$0 = i$4 + 1 | 0;
-        if(lim$1 <= start$0) throw caml_maybe_attach_backtrace(Stdlib[8], 1);
+        if(lim$1 <= start$0) throw caml_maybe_attach_backtrace(Stdlib[8], 0);
         var opening = caml_string_get(s, start$0);
         a:
         {
@@ -495,7 +495,7 @@ let add_substitute =
          }
          var lim = caml_ml_string_length(s), k = 0, stop = new_start;
          for(;;){
-          if(lim <= stop) throw caml_maybe_attach_backtrace(Stdlib[8], 1);
+          if(lim <= stop) throw caml_maybe_attach_backtrace(Stdlib[8], 0);
           if(caml_string_get(s, stop) === opening){
            var i = stop + 1 | 0, k$0 = k + 1 | 0;
            k = k$0;
@@ -521,7 +521,7 @@ let add_substitute =
         previous = 32;
         i$4 = next_i;
        }
-      else if(92 === previous){
+      else if(previous === 92){
        caml_call2(add_char, b, 92);
        caml_call2(add_char, b, previous$0);
        var i$6 = i$4 + 1 | 0;
@@ -581,32 +581,34 @@ let () = print_endline (trim " ")
      var
       s$0 = copy(caml_bytes_of_string(x)),
       len = caml_ml_bytes_length(s$0),
-      i = 0;
+      i = [0, 0];
      for(;;){
-      if(i >= len) break;
-      if(! is_space(caml_bytes_unsafe_get(s$0, i))) break;
-      var i$0 = i + 1 | 0;
-      i = i$0;
+      if(i[1] >= len) break;
+      if(! is_space(caml_bytes_unsafe_get(s$0, i[1]))) break;
+      i[1]++;
      }
-     var j = len - 1 | 0;
+     var j = [0, len - 1 | 0];
      for(;;){
-      if(i <= j && is_space(caml_bytes_unsafe_get(s$0, j))){var j$0 = j - 1 | 0; j = j$0; continue;}
-      a:
-      {
-       if(i <= j){
-        var len$0 = (j - i | 0) + 1 | 0;
-        if(0 <= i && 0 <= len$0 && (caml_ml_bytes_length(s$0) - len$0 | 0) >= i){
-         var r = caml_create_bytes(len$0);
-         caml_blit_bytes(s$0, i, r, 0, len$0);
-         var b = r;
-         break a;
-        }
-        throw caml_maybe_attach_backtrace([0, Invalid_argument, s], 1);
+      if(i[1] > j[1]) break;
+      if(! is_space(caml_bytes_unsafe_get(s$0, j[1]))) break;
+      j[1]--;
+     }
+     a:
+     {
+      if(i[1] <= j[1]){
+       var len$0 = (j[1] - i[1] | 0) + 1 | 0, ofs = i[1];
+       if
+        (0 <= ofs && 0 <= len$0 && (caml_ml_bytes_length(s$0) - len$0 | 0) >= ofs){
+        var r = caml_create_bytes(len$0);
+        caml_blit_bytes(s$0, ofs, r, 0, len$0);
+        var b = r;
+        break a;
        }
-       b = empty;
+       throw caml_maybe_attach_backtrace([0, Invalid_argument, s], 0);
       }
-      return caml_string_of_bytes(copy(b));
+      b = empty;
      }
+     return caml_string_of_bytes(copy(b));
     }
     //end
     |}]

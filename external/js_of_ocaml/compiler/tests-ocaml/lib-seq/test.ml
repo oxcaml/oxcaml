@@ -20,6 +20,9 @@ let () =
   ()
 ;;
 
+(* OxCaml's stdlib does not yet include these functions: comment out their
+   tests. *)
+(*
 (* filteri *)
 let () =
   assert
@@ -29,6 +32,7 @@ let () =
      |> List.of_seq));
   ()
 ;;
+*)
 
 (* unfold *)
 let () =
@@ -320,6 +324,9 @@ let () =
   assert (!!(Seq.(take 3 (map head matrix))) = [(0, 0); (0, 1); (0, 2)]);
   ()
 
+(* OxCaml's stdlib does not yet include these functions: comment out their
+   tests. *)
+(*
 (* delay *)
 let () =
   let do_not_force_too_much =
@@ -329,5 +336,6 @@ let () =
   match Seq.concat do_not_force_too_much () with
   | Seq.Nil -> assert false
   | Seq.Cons ((), seq) -> ignore seq
+*)
 
 let () = print_endline "OK";;

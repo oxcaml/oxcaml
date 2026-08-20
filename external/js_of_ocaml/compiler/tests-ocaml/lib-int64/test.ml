@@ -18,6 +18,9 @@ let test_arith () =
   assert (Int64.abs 5L = 5L);
   ()
 
+(* OxCaml's stdlib does not yet include these functions: comment out their
+   tests. *)
+(*
 let test_div () =
   let divzero f x y =
     try ignore (f x y); false with Division_by_zero -> true in
@@ -55,6 +58,7 @@ let test_div () =
   List.iter
     (fun x -> List.iter (check x) interesting_values)
     interesting_values
+*)
 
 let test_logops () =
   assert (Int64.logand 0xF0F0L 0xFFFFL = 0xF0F0L);
@@ -97,6 +101,9 @@ let test_min_max () =
   assert (Int64.max 2L 3L = 3L);
   assert (Int64.min 2L 3L = 2L)
 
+(* OxCaml's stdlib does not yet include these functions: comment out their
+   tests. *)
+(*
 let naive_popcount n =
   let c = ref 0 in
   for i = 0 to 63 do
@@ -157,18 +164,19 @@ let test_bitcounts () =
     check (Int64.shift_left (Random.int64 0xFFL) (Random.int 48));
     check (Random.bits64())
   done
+*)
 
 let tests () =
   test_consts ();
   test_arith ();
-  test_div ();
+  (* test_div (); *)
   test_logops ();
   test_equal ();
   test_compare ();
   test_float_conv ();
   test_string_conv ();
   test_min_max ();
-  test_bitcounts ();
+  (* test_bitcounts (); *)
   ()
 
 let () =

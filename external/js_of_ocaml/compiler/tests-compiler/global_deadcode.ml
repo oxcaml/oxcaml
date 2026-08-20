@@ -80,7 +80,7 @@ let%expect_test "Eliminates unused functions from functor" =
     function singleton(x){return [0, 0, x, 0, 1];}
     function find(x, _e_){
      for(;;){
-      if(! _e_) throw caml_maybe_attach_backtrace(Not_found, 1);
+      if(! _e_) throw caml_maybe_attach_backtrace(Not_found, 0);
       var r = _e_[3], v = _e_[2], l = _e_[1], c = caml_call2(Ord[1], x, v);
       if(0 === c) return v;
       _e_ = 0 <= c ? r : l;

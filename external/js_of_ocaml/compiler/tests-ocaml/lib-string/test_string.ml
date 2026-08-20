@@ -78,6 +78,10 @@ let () =
   assert(not (String.ends_with ~suffix:"obaz" "foobar"));
 ;;
 
+(* OxCaml's stdlib does not yet include these functions: comment out their
+   tests. *)
+(*
+
 
 let () =
   let test ?limit x y d =
@@ -571,3 +575,4 @@ let () =
   assert (String.rsplit_all ~sep:"a" "abaa" = [""; "b"; ""; ""]);
   assert (String.rsplit_all ~drop:(( = ) "") ~sep:"a" "abaa" = ["b"]);
   ()
+*)
