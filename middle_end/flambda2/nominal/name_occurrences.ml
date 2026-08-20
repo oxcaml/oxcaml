@@ -510,8 +510,8 @@ let create_names names name_mode =
   in
   { empty with names }
 
-let binary_conjunction ~for_names ~for_continuations ~for_function_slots
-    ~for_value_slots ~for_code_ids
+let[@inline] binary_conjunction ~for_names ~for_continuations
+    ~for_function_slots ~for_value_slots ~for_code_ids
     { names = names1;
       continuations = continuations1;
       continuations_with_traps = continuations_with_traps1;
@@ -548,8 +548,8 @@ let binary_conjunction ~for_names ~for_continuations ~for_function_slots
   && for_code_ids code_ids1 code_ids2
   && for_code_ids newer_version_of_code_ids1 newer_version_of_code_ids2
 
-let binary_disjunction ~for_names ~for_continuations ~for_function_slots
-    ~for_value_slots ~for_code_ids
+let[@inline] binary_disjunction ~for_names ~for_continuations
+    ~for_function_slots ~for_value_slots ~for_code_ids
     { names = names1;
       continuations = continuations1;
       continuations_with_traps = continuations_with_traps1;
@@ -586,8 +586,8 @@ let binary_disjunction ~for_names ~for_continuations ~for_function_slots
   || for_code_ids code_ids1 code_ids2
   || for_code_ids newer_version_of_code_ids1 newer_version_of_code_ids2
 
-let binary_op ~for_names ~for_continuations ~for_function_slots ~for_value_slots
-    ~for_code_ids
+let[@inline] binary_op ~for_names ~for_continuations ~for_function_slots
+    ~for_value_slots ~for_code_ids
     { names = names1;
       continuations = continuations1;
       continuations_with_traps = continuations_with_traps1;

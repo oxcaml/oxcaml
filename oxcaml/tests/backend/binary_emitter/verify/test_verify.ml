@@ -27,7 +27,18 @@
 
 (* Test harness for Binary_emitter_verify.For_testing *)
 
-let unix = (module Unix : Compiler_owee.Unix_intf.S)
+(* Eta-expansion gives [create_process] and [waitpid] the unannotated types
+   required by [Compiler_owee.Unix_intf.S]. *)
+module Unix_for_owee = struct
+  include Unix
+
+  let create_process prog args stdin stdout stderr =
+    Unix.create_process prog args stdin stdout stderr
+
+  let waitpid flags pid = Unix.waitpid flags pid
+end
+
+let unix = (module Unix_for_owee : Compiler_owee.Unix_intf.S)
 
 let failures = ref 0
 

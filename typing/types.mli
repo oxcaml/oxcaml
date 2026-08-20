@@ -111,6 +111,20 @@ module Rigid_name : sig
         (** [Param id] only occurs in formulas for type constructors. Refers to
             a type-parameter of the constructor, where [id] is the
             [Types.get_id] of the type variable representing the parameter. *)
+    | Provenance of
+        { id : int;
+          (** Identifies this provenance occurrence. *)
+
+          ty : Format_doc.doc;
+          (** The type expression or descriptive noun phrase, retained as a
+              formatting document so its line-breaking instructions survive
+              until the diagnostic is printed. *)
+
+          plural : bool
+          (** Whether [ty] is a plural noun phrase rather than a type. *)
+        }
+        (** A diagnostic-only provenance variable. These variables must not
+            appear in stored [type_ikind]s. *)
     | Unknown of unknown_id
         (** An unknown quantity with a given id. Used to model not-best in
             ikinds. This is used when we couldn't compute a precise ikind,
@@ -127,6 +141,8 @@ module Rigid_name : sig
   val katom : Path.t -> t
 
   val param : int -> t
+
+  val provenance : id:int -> ty:Format_doc.doc -> plural:bool -> t
 
   val unknown : Shape.Uid.t -> t
 
@@ -188,6 +204,15 @@ and type_desc =
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
   (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
       The last parameter keep tracks of known expansions, see [abbrev_memo]. *)
+
+  | Tmod of type_expr * mod_bounds
+  (** [Tmod (t, bounds)] ==> [t @@ bounds]
+      The type [t] with its mode crossing bounded by [bounds]. This is a
+      transparent wrapper: it constrains mode crossing only, and erases at
+      runtime. The unboxing and kind-computation paths look through it to [t],
+      as they do for [Tpoly]; generic structural traversals rebuild it; the
+      leaf consumers that classify a type's runtime representation raise,
+      since a [Tmod] is not expected to reach them. *)
 
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]
@@ -917,6 +942,7 @@ and mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
@@ -1214,7 +1240,9 @@ module type Wrapped = sig
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Staticity.Const.t
+  (** A left mode instead of a constant mode, in order to encode mode hints.
+      Note that cmi record constant modes anyway. *)
+  and persistent_signature = signature * Mode.Value.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility

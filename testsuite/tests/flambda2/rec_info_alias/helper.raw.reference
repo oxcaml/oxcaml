@@ -1,0 +1,45 @@
+(let code rec inline(always) size(8)
+       f_1 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let y = %project_value_slot.[f].[y] (my_closure) in
+   apply direct(f_1 &my_alloc_region)
+     (my_closure ~ depth my_depth -> next_depth : _ -> imm tagged)
+       (x)
+       -> k3 * k2
+     where k3 (apply_result : imm tagged) =
+       let int_add = %int_barith.add (y, apply_result) in
+       cont k1 (int_add)
+ in
+ let code size(9)
+       g_2 (y) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =
+   let f = %project_value_slot.[g].[f] (my_closure) in
+   let inlined_dbg = %inlined_apply () in
+   let my_depth_1 = rec_info my_depth in
+   let x = y in
+   let my_closure_1 = f in
+   let next_depth = rec_info (succ my_depth_1) in
+   let y_1 = %project_value_slot.[f].[y] (my_closure_1) in
+   apply direct(f_1 &my_alloc_region)
+     (my_closure_1 ~ depth my_depth_1 -> next_depth : _ -> imm tagged)
+       (x)
+       -> k3 * k2
+     where k3 (apply_result : imm tagged) =
+       let int_add = %int_barith.add (y_1, apply_result) in
+       cont k1 (int_add)
+ in
+ let code inline(always) size(34)
+       p_0 (y : imm tagged)
+         my_closure &my_alloc_region my_depth
+         -> k1 * k2
+         : val =
+   let f = closure f_1 @f &my_alloc_region with { y = y } in
+   let g = closure g_2 @g &my_alloc_region with { f = f } in
+   cont k1 (g)
+ in
+ let $camlHelper__s0 = closure p_0 @p &toplevel.alloc_region in
+ let $camlHelper__s1 = Block 0 ($camlHelper__s0) in
+ cont k ($camlHelper__s1))
+  where k define_root_symbol (module_block) =
+    let field_0 = $camlHelper__s0 in
+    let $camlHelper = Block 0 (field_0) in
+    cont done ($camlHelper)

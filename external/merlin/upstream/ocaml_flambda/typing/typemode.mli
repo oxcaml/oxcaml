@@ -51,6 +51,7 @@ val mutable_modalities : Types.mutability -> Mode.Modality.Const.t
     instead of computing it from mutability. Used when merging explicit
     modalities with existing signature default modalities. *)
 val transl_modalities_with_default :
+  ?allow_redundant_staticity:bool ->
   maturity:Language_extension.maturity ->
   default:Mode.Modality.Const.t ->
   Parsetree.modalities ->
@@ -74,10 +75,18 @@ val transl_with_bound_modifiers :
 
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds :
+  ?warn:bool ->
   Parsetree.modes ->
   Jkind.Mod_bounds.t
   * (Jkind_axis.Nullability.t Location.loc option
     * Jkind_axis.Separability.t Location.loc option)
+
+(** Close mod-bounds under implied modalities, as [transl_mod_bounds] does for
+    user-written annotations (e.g. a [global] bound also bounds [aliased],
+    [forkable] and [unyielding]). Bounds computed axis-by-axis may lack these
+    implications, which [untransl_mod_bounds] relies on to omit implied modes
+    when printing. *)
+val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
 
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)

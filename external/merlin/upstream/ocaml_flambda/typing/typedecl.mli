@@ -106,16 +106,24 @@ val update_constructor_representation:
     loc:Location.t -> is_extension_constructor:bool ->
     (Types.constructor_representation, unrepresentable_constructor) Result.t
 
+(* Same as above, but also computes sorts of arguments *)
+val update_constructor_representation_and_arg_sorts :
+  Env.t -> Location.t -> Types.constructor_arguments ->
+  is_extension_constructor:bool ->
+  Types.constructor_arguments * constant:bool *
+  (Types.constructor_representation, unrepresentable_constructor) Result.t *
+  Jkind.Sort.Const.t array option
+
 type unrepresentable_record =
   | Unrepresentable_field of string
 
 (* Update the representation of a record whose representation at declaration
-   time was [None] because it has a field of kind [any]. *)
+   time was variable because it has a field of kind [any] *)
 val update_record_representation:
-    why:Jkind_intf.History.concrete_creation_reason ->
+    why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
     Env.t -> Location.t -> 'rep Data_types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
-    (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
+    (Jkind.sort list * 'rep, unrepresentable_record) Result.t
 
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
@@ -205,8 +213,8 @@ type error =
   | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type of native_repr_kind
   | Deep_unbox_or_untag_attribute of native_repr_kind
-  | Jkind_mismatch_of_type of Env.t * type_expr * Jkind.Violation.t
-  | Jkind_mismatch_of_path of Env.t * Path.t * Jkind.Violation.t
+  | Jkind_mismatch_of_type of Env.t * type_expr * Ikind.subjkind_error
+  | Jkind_mismatch_of_path of Env.t * Path.t * Ikind.subjkind_error
   | Jkind_mismatch_due_to_bad_inference of
       Env.t * type_expr * Jkind.Violation.t * bad_jkind_inference_location
   | Jkind_sort of
@@ -242,12 +250,12 @@ type error =
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
   | Constructor_submode_failed of Mode.Value.error
-  | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
+  | Missing_immediate_all_void_constructor_attribute of string
 
 exception Error of Location.t * error
 

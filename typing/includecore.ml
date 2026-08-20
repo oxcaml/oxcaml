@@ -211,6 +211,23 @@ let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
     raise (Dont_match (Layout_poly_coercion
       (Extra_rhs { extra = List.length subj_rest })))
 
+let value_descriptions_zero_alloc
+    (vd1 : Types.value_description)
+    (vd2 : Types.value_description) =
+  let vd1_zero_alloc, prim_coercion_zero_alloc_check =
+    match vd1.val_kind, Zero_alloc.get vd2.val_zero_alloc with
+    | Val_prim p, Check check ->
+      ( Zero_alloc.create_const (Check { check with arity = p.prim_arity }),
+        Some check )
+    | ( (Val_reg _ | Val_mut _ | Val_prim _ | Val_ivar _ | Val_self _ |
+         Val_anc _),
+        (Default_zero_alloc | Ignore_assert_all | Check _ | Assume _) ) ->
+      vd1.val_zero_alloc, None
+  in
+  match Zero_alloc.sub vd1_zero_alloc vd2.val_zero_alloc with
+  | Ok () -> prim_coercion_zero_alloc_check
+  | Error e -> raise (Dont_match (Zero_alloc e))
+
 let value_descriptions ~loc env name
     ~mmodes
     (vd1 : Types.value_description)
@@ -221,10 +238,7 @@ let value_descriptions ~loc env name
     loc
     vd1.val_attributes vd2.val_attributes
     name;
-  begin match Zero_alloc.sub vd1.val_zero_alloc vd2.val_zero_alloc with
-  | Ok () -> ()
-  | Error e -> raise (Dont_match (Zero_alloc e))
-  end;
+  let prim_coercion_zero_alloc_check = value_descriptions_zero_alloc vd1 vd2 in
   let crossing = Ctype.crossing_of_ty env vd2.val_type in
   let modalities = vd1.val_modalities, vd2.val_modalities in
   let modes =
@@ -279,6 +293,10 @@ let value_descriptions ~loc env name
           {pc_desc = p1; pc_type = vd2.Types.val_type;
            pc_poly_mode = Option.map Mode.Locality.disallow_right mode_l1;
            pc_poly_sort = sort1;
+           pc_yielding =
+             Ctype.prim_params_yielding env vd2.Types.val_type
+               ~arity:p1.prim_arity;
+           pc_zero_alloc_check = prim_coercion_zero_alloc_check;
            pc_env = env; pc_loc = vd1.Types.val_loc; } in
         Tcoerce_primitive pc
      end
@@ -416,7 +434,7 @@ type type_mismatch =
   | Extensible_representation of position
   | With_null_representation of position
   | Fixed_representation of position
-  | Jkind of Jkind.Violation.t
+  | Jkind of Ikind.subjkind_error
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
 type jkind_mismatch =
@@ -840,8 +858,13 @@ let report_type_mismatch first second decl env ppf err =
          (choose ord first second) decl
          "has a fixed representation while the other varies"
   | Jkind v ->
-      Jkind.Violation.report_with_name ~name:first
-        env ppf v
+      let report () =
+        Ikind.report_subjkind_error_with_name ~name:first env ppf v
+      in
+      (match Ikind.subjkind_error_printing_env v with
+       | None -> report ()
+       | Some printing_env ->
+         Printtyp.wrap_printing_env ~error:true printing_env report)
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->

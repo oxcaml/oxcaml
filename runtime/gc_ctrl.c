@@ -56,6 +56,7 @@ extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
 extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
 extern uintnat caml_nohugepage_stacks;    /* see fiber.c */
 extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */
+uintnat caml_measure_frametables = 0; /* see frame_descriptors.c */
 
 /* runtime config parameters set with caml_gc_set */
 extern atomic_uintnat caml_major_heap_increment; /* percent or words; see shared_heap.c */
@@ -85,22 +86,28 @@ CAMLprim value caml_gc_quick_stat(value v)
   Store_field (res, 2, caml_copy_double ((double)s.alloc_stats.major_words));
   Store_field (res, 3, Val_long (mincoll));
   Store_field (res, 4, Val_long (majcoll));
-  Store_field (res, 5, Val_long (
-    s.global_stats.chunk_words + s.heap_stats.large_words));
+  Store_field (res, 5, Val_long (s.global_stats.chunk_words
+                                 + s.heap_stats.large_words
+                                 + s.heap_stats.extent_words));
   Store_field (res, 6, Val_long (s.global_stats.chunks));
-  Store_field (res, 7, Val_long (
-    s.heap_stats.pool_live_words + s.heap_stats.large_words));
-  Store_field (res, 8, Val_long (
-    s.heap_stats.pool_live_blocks + s.heap_stats.large_blocks));
-  Store_field (res, 9, Val_long (
-    s.global_stats.chunk_words - s.heap_stats.pool_live_words
-    - s.heap_stats.pool_frag_words));
+  Store_field (res, 7, Val_long (s.heap_stats.pool_live_words
+                                 + s.heap_stats.large_words
+                                 + s.heap_stats.extent_live_words));
+  Store_field (res, 8, Val_long (s.heap_stats.pool_live_blocks
+                                 + s.heap_stats.large_blocks
+                                 + s.heap_stats.extent_blocks));
+  Store_field (res, 9, Val_long (s.global_stats.chunk_words
+                                 - s.heap_stats.pool_live_words
+                                 - s.heap_stats.pool_frag_words
+                                 + s.heap_stats.extent_words
+                                 - s.heap_stats.extent_live_words));
   Store_field (res, 10, Val_long (0)); /* free_blocks */
   Store_field (res, 11, Val_long (0)); /* largest_free */
   Store_field (res, 12, Val_long (s.heap_stats.pool_frag_words));
   Store_field (res, 13, Val_long (compactions));
-  Store_field (res, 14, Val_long (
-    s.heap_stats.pool_max_words + s.heap_stats.large_max_words));
+  Store_field (res, 14, Val_long (s.heap_stats.pool_max_words
+                                  + s.heap_stats.large_max_words
+                                  + s.heap_stats.extent_max_words));
   Store_field (res, 15, Val_long (0)); /* stack_size */
   Store_field (res, 16, Val_long (s.alloc_stats.forced_major_collections));
   CAMLreturn (res);
@@ -461,6 +468,7 @@ static struct gc_tweak gc_tweaks[] = {
   { "enable_segv_handler", &caml_enable_segv_handler, 0 },
   { "cache_stacks_per_class", &caml_cache_stacks_per_class, 0 },
   { "tick_use_usleep", &caml_tick_use_usleep, 0 },
+  { "measure_frametables", &caml_measure_frametables, 0 },
 };
 
 enum {N_GC_TWEAKS = sizeof(gc_tweaks)/sizeof(gc_tweaks[0])};

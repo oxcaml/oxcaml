@@ -15,27 +15,28 @@
 
 (* Command-line parameters *)
 
-module Int_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
+(* Stripped down version of Numbers, as its dependencies are a lot of code *)
+module Numbers = struct
+  module Int = struct
+    type t = int
+    module Map = Map.Make(Stdlib.Int)
     let of_string = int_of_string
   end
-
-  module Value = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-end)
-module Float_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-
-  module Value = struct
-    include Numbers.Float
+  module Float = struct
+    type t = float
     let of_string = float_of_string
   end
+end
+
+module Int_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Int
+end)
+module Float_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Float
 end)
 
 type open_arg =
@@ -54,14 +55,14 @@ type flambda_invariant_checks = No_checks | Light_checks | Heavy_checks
 type dwarf_fission = Fission_none | Fission_objcopy | Fission_dsymutil
 
 module Dwarf_config_defaults = struct
-  let shape_reduce_depth = Some 2
-  let shape_eval_depth = Some 2
-  let max_cms_files_per_unit = Some 20
-  let max_cms_files_per_variable = Some 5
+  let shape_reduce_depth = Some 50
+  let shape_eval_depth = Some 5
+  let max_cms_files_per_unit = Some 1000
+  let max_cms_files_per_variable = Some 50
   let max_type_to_shape_depth = Some 10
-  let max_shape_reduce_steps_per_variable = Some 1000
-  let max_evaluation_steps_per_variable = Some 1_000_000
-  let shape_reduce_fuel = Some 10
+  let max_shape_reduce_steps_per_variable = None
+  let max_evaluation_steps_per_variable = None
+  let shape_reduce_fuel = None
 end
 type shape_format = Old_merlin | Debugging_shapes
 type gdwarf_fidelity =
@@ -86,6 +87,7 @@ and print_types = ref false             (* -i *)
 and print_variance = ref false          (* -i-variance *)
 and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
+and debug_ocamldebug_types = ref true   (* -gno-ocamldebug-types *)
 and debug_full = ref false              (* For full DWARF support *)
 and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
 and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)
@@ -322,14 +324,14 @@ let set_gdwarf_fidelity fidelity =
   gdwarf_fidelity := Some fidelity;
   match fidelity with
   | Fidelity_low ->
-      gdwarf_config_shape_eval_depth := Some 1;
-      gdwarf_config_shape_reduce_depth := Some 2;
-      gdwarf_config_max_cms_files_per_unit := Some 0;
-      gdwarf_config_max_cms_files_per_variable := Some 0;
+      gdwarf_config_shape_eval_depth := Some 3;
+      gdwarf_config_shape_reduce_depth := Some 5;
+      gdwarf_config_max_cms_files_per_unit := Some 100;
+      gdwarf_config_max_cms_files_per_variable := Some 10;
       gdwarf_config_max_type_to_shape_depth := Some 10;
-      gdwarf_config_max_shape_reduce_steps_per_variable := Some 100;
-      gdwarf_config_max_evaluation_steps_per_variable := Some 1000;
-      gdwarf_config_shape_reduce_fuel := Some 10
+      gdwarf_config_max_shape_reduce_steps_per_variable := Some 10_000;
+      gdwarf_config_max_evaluation_steps_per_variable := Some 10_000;
+      gdwarf_config_shape_reduce_fuel := Some 50
   | Fidelity_medium ->
       (* The default. *)
       gdwarf_config_shape_eval_depth :=
@@ -349,29 +351,29 @@ let set_gdwarf_fidelity fidelity =
       gdwarf_config_shape_reduce_fuel :=
         Dwarf_config_defaults.shape_reduce_fuel
   | Fidelity_high ->
-      gdwarf_config_shape_eval_depth := Some 3;
-      gdwarf_config_shape_reduce_depth := Some 3;
-      gdwarf_config_max_cms_files_per_unit := Some 50;
-      gdwarf_config_max_cms_files_per_variable := Some 10;
-      gdwarf_config_max_type_to_shape_depth := Some 10;
-      gdwarf_config_max_shape_reduce_steps_per_variable := Some (10_000);
-      gdwarf_config_max_evaluation_steps_per_variable := Some (1_000_000_000);
-      gdwarf_config_shape_reduce_fuel := Some 20
-  | Fidelity_very_high ->
-      gdwarf_config_shape_eval_depth := Some 4;
-      gdwarf_config_shape_reduce_depth := Some 3;
-      gdwarf_config_max_cms_files_per_unit := Some 100;
-      gdwarf_config_max_cms_files_per_variable := Some 10;
+      gdwarf_config_shape_eval_depth := Some 8;
+      gdwarf_config_shape_reduce_depth := Some 100;
+      gdwarf_config_max_cms_files_per_unit := Some 10_000;
+      gdwarf_config_max_cms_files_per_variable := Some 100;
       gdwarf_config_max_type_to_shape_depth := Some 10;
       gdwarf_config_max_shape_reduce_steps_per_variable := None;
       gdwarf_config_max_evaluation_steps_per_variable := None;
       gdwarf_config_shape_reduce_fuel := None
+  | Fidelity_very_high ->
+      gdwarf_config_shape_eval_depth := Some 8;
+      gdwarf_config_shape_reduce_depth := Some 200;
+      gdwarf_config_max_cms_files_per_unit := None;
+      gdwarf_config_max_cms_files_per_variable := Some 1000;
+      gdwarf_config_max_type_to_shape_depth := Some 12;
+      gdwarf_config_max_shape_reduce_steps_per_variable := None;
+      gdwarf_config_max_evaluation_steps_per_variable := None;
+      gdwarf_config_shape_reduce_fuel := None
   | Fidelity_ultra_high ->
-      gdwarf_config_shape_eval_depth := Some 5;
-      gdwarf_config_shape_reduce_depth := Some 5;
-      gdwarf_config_max_cms_files_per_unit := Some 1000;
-      gdwarf_config_max_cms_files_per_variable := Some 50;
-      gdwarf_config_max_type_to_shape_depth := Some 10;
+      gdwarf_config_shape_eval_depth := Some 10;
+      gdwarf_config_shape_reduce_depth := None;
+      gdwarf_config_max_cms_files_per_unit := None;
+      gdwarf_config_max_cms_files_per_variable := None;
+      gdwarf_config_max_type_to_shape_depth := Some 20;
       gdwarf_config_max_shape_reduce_steps_per_variable := None;
       gdwarf_config_max_evaluation_steps_per_variable := None;
       gdwarf_config_shape_reduce_fuel := None

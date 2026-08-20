@@ -28,6 +28,11 @@ module Rigid_name = struct
         }
     | KAtom of Path.t
     | Param of int
+    | Provenance of
+        { id : int;
+          ty : Format_doc.doc;
+          plural : bool
+        }
     | Unknown of unknown_id
 
   let compare a b =
@@ -40,13 +45,16 @@ module Rigid_name = struct
         if h != 0 then h else Int.compare a1.arg_index a2.arg_index
       | KAtom p1, KAtom p2 -> Path.compare p1 p2
       | Param x, Param y -> Int.compare x y
+      | Provenance x, Provenance y -> Int.compare x.id y.id
       | Atom _, _ -> -1
       | _, Atom _ -> 1
       | KAtom _, _ -> -1
       | _, KAtom _ -> 1
+      | Param _, _ -> -1
+      | _, Param _ -> 1
+      | Provenance _, _ -> -1
+      | _, Provenance _ -> 1
       | Unknown x, Unknown y -> Shape.Uid.compare x y
-      | Unknown _, _ -> 1
-      | _, Unknown _ -> -1
 
   let to_string = function
     | Atom { constr; arg_index } ->
@@ -56,6 +64,8 @@ module Rigid_name = struct
       let path_s = Format_doc.asprintf "%a" Path.print path in
       Printf.sprintf "katom[%s]" path_s
     | Param i -> Printf.sprintf "param[%d]" i
+    | Provenance { id; ty; plural = _ } ->
+      Format_doc.asprintf "provenance[%d:%a]" id Format_doc.pp_doc ty
     | Unknown id ->
       Format.asprintf "unknown[%a]" Shape.Uid.print id
 
@@ -64,6 +74,8 @@ module Rigid_name = struct
   let katom path = KAtom path
 
   let param i = Param i
+
+  let provenance ~id ~ty ~plural = Provenance { id; ty; plural }
 
   let unknown uid = Unknown uid
 end
@@ -150,6 +162,7 @@ and type_desc =
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
+  | Tmod of type_expr * mod_bounds
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   | Tfield of string * field_kind * type_expr * type_expr
   | Tquote of type_expr
@@ -507,6 +520,7 @@ and mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Product of mixed_product_shape
   | Void
@@ -716,7 +730,7 @@ module type Wrapped = sig
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Staticity.Const.t
+  and persistent_signature = signature * Mode.Value.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -873,13 +887,14 @@ let rec equal_mixed_block_element_up_to_scannable_axes e1 e2 =
   | Bits8, Bits8 | Bits16, Bits16
   | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Mask, Mask
   | Void, Void
     -> true
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal
          equal_mixed_block_element_up_to_scannable_axes es1 es2
   | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
-    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512
+    | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
     | Product _ | Void ), _
     -> false
 
@@ -895,6 +910,7 @@ let rec compare_mixed_block_element e1 e2 =
   | Word, Word | Untagged_immediate, Untagged_immediate
   | Bits8, Bits8 | Bits16, Bits16 | Bits32, Bits32 | Bits64, Bits64
   | Vec128, Vec128 | Vec256, Vec256 | Vec512, Vec512
+  | Mask, Mask
   | Void, Void
     -> 0
   | Product es1, Product es2
@@ -925,6 +941,8 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Vec256 -> 1
   | Vec512, _ -> -1
   | _, Vec512 -> 1
+  | Mask, _ -> -1
+  | _, Mask -> 1
   | Void, _ -> -1
   | _, Void -> 1
 
@@ -1011,6 +1029,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Base Vec128 -> Vec128
   | Base Vec256 -> Vec256
   | Base Vec512 -> Vec512
+  | Base Mask -> Mask
   | Base Word -> Word
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
@@ -1093,6 +1112,7 @@ let rec mixed_block_element_to_string = function
   | Vec128 -> "Vec128"
   | Vec256 -> "Vec256"
   | Vec512 -> "Vec512"
+  | Mask -> "Mask"
   | Word -> "Word"
   | Untagged_immediate -> "Untagged_immediate"
   | Product es ->
@@ -1114,6 +1134,7 @@ let mixed_block_element_to_lowercase_string = function
   | Vec128 -> "vec128"
   | Vec256 -> "vec256"
   | Vec512 -> "vec512"
+  | Mask -> "mask"
   | Word -> "word"
   | Untagged_immediate -> "untagged_immediate"
   | Product es ->
@@ -1364,9 +1385,10 @@ let best_effort_compare_type_expr te1 te2 =
         | Ttuple _ -> 2
         | Tunboxed_tuple _ -> 3
         | Tconstr (_, _, _) -> 5
-        | Tpoly (_, _) -> 6
-        | Tof_kind _ -> 7
-        | Trepr (_, _) -> 8
+        | Tmod (_, _) -> 6
+        | Tpoly (_, _) -> 7
+        | Tof_kind _ -> 8
+        | Trepr (_, _) -> 9
         (* Types we should never see *)
         | Tlink _ -> Misc.fatal_error "Tlink encountered in With_bounds_types"
       in
@@ -1385,6 +1407,9 @@ let best_effort_compare_type_expr te1 te2 =
         if p = 0
         then List.compare (aux (depth + 1)) args1 args2
         else p
+      | Tmod (t1, mod_bounds1), Tmod (t2, mod_bounds2) ->
+        let c = aux (depth + 1) t1 t2 in
+        if c = 0 then Stdlib.compare mod_bounds1 mod_bounds2 else c
       | Tpoly (t1, ts1), Tpoly (t2, ts2) ->
         (* NOTE: this is mostly broken according to the semantics of type_expr, but probably
            fine for the particular "best-effort" comparison we want. *)

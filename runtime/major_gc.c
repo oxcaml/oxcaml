@@ -815,6 +815,17 @@ static intnat Sweepwork_markwork(intnat mark_work)
 static atomic_uintnat total_work_incurred;
 static atomic_uintnat total_work_completed;
 
+/* We store the total work incurred when marking last started.
+
+   This is used to avoid some pathological behaviour where far more
+   work is incurred than can be done in a cycle, which can happen with
+   off-heap allocations that vastly exceed the heap size. We know that
+   any work incurred before marking last started is done by the time
+   marking next starts, so we can cancel it if it remains outstanding.
+
+   (Nonatomic: only accessed during STW) */
+static uintnat total_work_incurred_at_mark_start;
+
 static inline intnat max2 (intnat a, intnat b)
 {
   if (a > b){
@@ -949,7 +960,8 @@ update_major_slice_work(intnat howmuch,
   uintnat work_done_between_slices =
     Sweepwork_markwork(mark_work_done_between_slices()) +
     sweep_work_done_between_slices();
-  atomic_fetch_add (&total_work_completed, work_done_between_slices);
+  if (work_done_between_slices > 0)
+    atomic_fetch_add (&total_work_completed, work_done_between_slices);
   dom_st->stat_major_work_done += work_done_between_slices;
 
   uintnat my_alloc_count = dom_st->allocated_words;
@@ -979,7 +991,8 @@ update_major_slice_work(intnat howmuch,
                   my_dependent_count,
                   my_minor_count);
 
-  atomic_fetch_add (&total_work_incurred, new_work);
+  if (new_work > 0)
+    atomic_fetch_add (&total_work_incurred, new_work);
 
   if (howmuch == AUTO_TRIGGERED_MAJOR_SLICE ||
       howmuch == GC_CALCULATE_MAJOR_SLICE) {
@@ -1684,6 +1697,13 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
        orphaned in [Phase_sweep_main], so they must come from last
        cycle, so will have status [UNMARKED] now). */
     adopt_orphaned_work (caml_global_heap_state.UNMARKED);
+
+    /* Any work incurred before the start of the marking phase prior
+       to this one is definitely done by now. */
+    uintnat definitely_done = total_work_incurred_at_mark_start;
+    if (total_work_completed < definitely_done)
+      total_work_completed = definitely_done;
+    total_work_incurred_at_mark_start = total_work_incurred;
   }
 
   caml_domain_state* domain = Caml_state;
@@ -1765,7 +1785,11 @@ static bool should_compact_from_stw_single(int compaction_mode)
   struct gc_stats s;
   caml_compute_gc_stats(&s);
 
-  uintnat heap_words = s.global_stats.chunk_words + s.heap_stats.large_words;
+  /* Don't count extents, as they can't be affected by compaction.
+     TODO: consider omitting large_words, here and for live_words, for
+     the same reason. */
+  uintnat heap_words = (s.global_stats.chunk_words
+                        + s.heap_stats.large_words);
 
   if (Bsize_wsize(heap_words) <= 2 * caml_shared_heap_grow_bsize()) {
     CAML_GC_MESSAGE (POLICY,
@@ -1808,7 +1832,8 @@ static bool should_compact_from_stw_single(int compaction_mode)
     return false;
   }
 
-  uintnat live_words = s.heap_stats.pool_live_words + s.heap_stats.large_words;
+  uintnat live_words = (s.heap_stats.pool_live_words
+                        + s.heap_stats.large_words);
   uintnat free_words = heap_words - live_words;
   double current_overhead = 100.0 * free_words / live_words;
 
@@ -1858,9 +1883,12 @@ static void cycle_major_heap_from_stw_single(
     intnat heap_words, not_garbage_words, swept_words;
 
     caml_compute_gc_stats(&s);
-    heap_words = s.heap_stats.pool_words + s.heap_stats.large_words;
-    not_garbage_words = s.heap_stats.pool_live_words
-      + s.heap_stats.large_words;
+    heap_words = (s.heap_stats.pool_words
+                  + s.heap_stats.large_words
+                  + s.heap_stats.extent_words);
+    not_garbage_words = (s.heap_stats.pool_live_words
+                         + s.heap_stats.large_words
+                         + s.heap_stats.extent_live_words);
     swept_words = domain->swept_words;
     caml_gc_log ("heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d "
                  "not_garbage_words %"ARCH_INTNAT_PRINTF_FORMAT"d "

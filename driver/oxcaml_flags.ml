@@ -33,7 +33,9 @@ let cfg_peephole_optimize = ref true    (* -[no-]cfg-peephole-optimize *)
 let x86_peephole_optimize = ref false   (* -[no-]x86-peephole-optimize *)
 let x86_peephole_remove_mov_to_dead_register = ref true
 let x86_peephole_remove_redundant_cmp = ref true
+let x86_peephole_remove_redundant_extension = ref true
 let x86_peephole_combine_add_rsp = ref true
+let x86_peephole_remove_redundant_test = ref true
 
 let cfg_stack_checks = ref true         (* -[no-]cfg-stack-check *)
 let cfg_stack_checks_threshold = ref 16384 (* -cfg-stack-threshold *)
@@ -45,6 +47,8 @@ let cfg_prologue_validate = ref true     (* -[no-]cfg-prologue-validate *)
 let cfg_prologue_shrink_wrap = ref true     (* -[no-]cfg-prologue-shrink-wrap *)
 let cfg_prologue_shrink_wrap_threshold = ref 16384
                                        (* -cfg-prologue-shrink-wrap-threshold *)
+
+let omit_leaf_frame_pointers = ref false (* -[no-]omit-leaf-frame-pointers *)
 
 let cfg_merge_blocks = ref false        (* -[no]-cfg-merge-blocks *)
 
@@ -60,7 +64,6 @@ let module_entry_functions_section = ref false
 
 let dasm_comments = ref false (* -dasm-comments *)
 
-let frametables_in_rodata = ref true (* -frametables-in-rodata *)
 
 let default_heap_reduction_threshold = 500_000_000 / (Sys.word_size / 8)
 let heap_reduction_threshold = ref default_heap_reduction_threshold (* -heap-reduction-threshold *)
@@ -192,6 +195,9 @@ module Flambda2 = struct
     let reaper_unbox = true
     let reaper_max_unbox_size = 10
     let reaper_change_calling_conventions = true
+    let simplify_stubs =
+      (* CR pchambart: should be changed to true after proper testing *)
+      false
     let unicode = true
     let kind_checks = false
     let match_in_match = false
@@ -212,6 +218,7 @@ module Flambda2 = struct
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
     match_in_match : bool;
@@ -233,6 +240,7 @@ module Flambda2 = struct
     reaper_max_unbox_size = Default.reaper_max_unbox_size;
     reaper_change_calling_conventions =
       Default.reaper_change_calling_conventions;
+    simplify_stubs = Default.simplify_stubs;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
     match_in_match = Default.match_in_match;
@@ -283,6 +291,7 @@ module Flambda2 = struct
   let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
   let match_in_match = ref Default
+  let simplify_stubs = ref Default
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
@@ -587,6 +596,9 @@ let cached_generic_functions_path =
 
 let dissector_assume_lld_without_64_bit_eh_frames = ref true
   (* -[no-]dissector-assume-lld-without-64-bit-eh-frames *)
+
+let dissector_max_linker_parallelism = ref Misc.Maybe_bounded.Unbounded
+  (* -dissector-max-linker-parallelism *)
 
 let manual_module_init = ref false
   (* -[no-]manual-module-init *)

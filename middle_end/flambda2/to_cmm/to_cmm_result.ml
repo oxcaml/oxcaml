@@ -62,7 +62,7 @@ let symbol res sym =
   let sym_name = Linkage_name.to_string (Symbol.linkage_name sym) in
   let sym_global =
     if
-      Compilation_unit.is_current (Symbol.compilation_unit sym)
+      Current_unit.is_current (Symbol.compilation_unit sym)
       && not (Name_occurrences.mem_symbol res.reachable_names sym)
     then Cmm.Local
     else Cmm.Global
@@ -84,7 +84,7 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
   in
   let sym_global =
     if
-      Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
+      Current_unit.is_current (Code_id.get_compilation_unit code_id)
       && not (Name_occurrences.mem_code_id res.reachable_names code_id)
     then Cmm.Local
     else Cmm.Global
@@ -178,14 +178,16 @@ let to_cmm r =
   (* Make sure we do not forget any current data *)
   let r = archive_data r in
   let sorted_functions =
+    let functions = List.rev r.functions in
     match !Oxcaml_flags.function_layout with
-    | Topological -> List.rev r.functions
+    | Topological -> functions
     | Source ->
-      (* Sort functions according to debuginfo, to get a stable ordering *)
+      (* Sort functions according to debuginfo, to get a stable ordering. Use
+         reversed r.functions to preserve order for equal debuginfos *)
       List.sort
         (fun (f1 : Cmm.fundecl) (f2 : Cmm.fundecl) ->
           Debuginfo.compare f1.fun_dbg f2.fun_dbg)
-        r.functions
+        functions
   in
   let function_phrases = List.map (fun f -> C.cfunction f) sorted_functions in
   (* Translate roots to Cmm symbols *)

@@ -1,7 +1,12 @@
 (* TEST
-    flags = "-extension layouts_alpha";
+    flags = "-extension layouts_alpha -w -220";
     expect;
 *)
+
+(* Some tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
 
 module M : sig
   type ('a, 'b) t : immutable_data with 'a
@@ -119,7 +124,7 @@ module M : sig type 'a t : value mod aliased end
 |}]
 
 module M : sig
-  type 'a t : value mod global aliased many portable contended
+  type 'a t : value mod global many portable contended
 end = struct
   type 'a t : immediate with 'a @@ aliased many contended global portable
 end
@@ -359,11 +364,6 @@ end = struct
   type 'a t : immutable_data with 'a @@ portable contended portable
 end
 [%%expect {|
-Line 4, characters 40-48:
-4 |   type 'a t : immutable_data with 'a @@ portable contended portable
-                                            ^^^^^^^^
-Warning 213: This portability is overridden by portable later.
-
 module M : sig type 'a t : immutable_data with 'a @@ portable end
 |}]
 

@@ -14,6 +14,18 @@
 (**************************************************************************)
 
 open Clflags
+
+(* Eta-expansion gives [create_process] and [waitpid] the unannotated types
+   required by [Compiler_owee.Unix_intf.S]. *)
+module Unix_for_owee = struct
+  include Unix
+
+  let create_process prog args stdin stdout stderr =
+    Unix.create_process prog args stdin stdout stderr
+
+  let waitpid flags pid = Unix.waitpid flags pid
+end
+
 let write_asm_file = ref false
 
 let compile_file filename =
@@ -24,7 +36,7 @@ let compile_file filename =
   let compilation_unit = "test" |> Compilation_unit.of_string in
   let unit_info = Unit_info.make_dummy ~input_name:"test" compilation_unit in
   Compilenv.reset unit_info;
-  Emit.begin_assembly (module Unix : Compiler_owee.Unix_intf.S);
+  Emit.begin_assembly (module Unix_for_owee : Compiler_owee.Unix_intf.S);
   let ic = open_in filename in
   let lb = Lexing.from_channel ic in
   lb.Lexing.lex_curr_p <- Lexing.{ lb.lex_curr_p with pos_fname = filename };

@@ -63,6 +63,7 @@ typedef cpuset_t cpu_set_t;
 #include "caml/runtime_events.h"
 #include "caml/fail.h"
 #include "caml/fiber.h"
+#include "caml/dynamic.h"
 #include "caml/finalise.h"
 #include "caml/gc_ctrl.h"
 #include "caml/globroots.h"
@@ -743,8 +744,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   }
 
   CAMLassert(domain_state->dynamic_bindings == NULL);
-  domain_state->dynamic_bindings =
-    caml_dynamic_new_thread(parent ? parent->dynamic_bindings : NULL);
+  domain_state->dynamic_bindings = caml_dynamic_cache_new();
   if (!domain_state->dynamic_bindings) {
     goto fail_dynamic;
   }
@@ -878,7 +878,7 @@ fail_shared_heap:
   caml_free_minor_tables(domain_state->minor_tables);
   domain_state->minor_tables = NULL;
 fail_minor_tables:
-  caml_dynamic_delete_thread(domain_state->dynamic_bindings);
+  caml_dynamic_cache_delete(domain_state->dynamic_bindings);
   domain_state->dynamic_bindings = NULL;
 fail_dynamic:
   caml_memprof_delete_domain(domain_state);
@@ -2290,24 +2290,22 @@ static void tick_thread_wake(void) {}
 
 #endif
 
-value caml_process_tick_exn(void)
+caml_result caml_process_tick_res(void)
 {
-  CAMLparam0();
-  CAMLlocal1(res);
   if (atomic_exchange_explicit(&Caml_state->requested_tick, false,
                                memory_order_acquire)) {
     caml_domain_tick_hook();
 
-    res = caml_tick_fiber_exn(Caml_state->current_stack);
-    if (Is_exception_result(res)) {
-      CAMLreturn(res);
+    caml_result res = caml_tick_fiber_res(Caml_state->current_stack);
+    if (caml_result_is_exception(res)) {
+      return res;
     }
 
-    if (res == Val_true) {
+    if (res.data == Val_true) {
       Caml_state->preemption = Val_long(1);
     }
   }
-  CAMLreturn(Val_unit);
+  return Result_unit;
 }
 
 CAMLextern void caml_stop_tick_thread(void)
@@ -2744,7 +2742,7 @@ void caml_domain_terminate(bool last)
   caml_free_extern_state();
   caml_teardown_major_gc();
 
-  caml_dynamic_delete_thread(domain_state->dynamic_bindings);
+  caml_dynamic_cache_delete(domain_state->dynamic_bindings);
   domain_state->dynamic_bindings = NULL;
 
   /* At this point, we know that the shared heap has been orphaned,

@@ -123,17 +123,11 @@ f:
 |}]
 
 
-(* CR ttebbi: The two branches end up equivalent and could be merged. *)
 let inline_identical x =
   let f () = x + 1 in
   if x > 0 then let _ = f() in f() else f()
 [%%expect_asm X86_64{|
 inline_identical:
-  cmpq  $1, %rax
-  jle   .L0
-  addq  $2, %rax
-  ret
-.L0:
   addq  $2, %rax
   ret
 |}]
