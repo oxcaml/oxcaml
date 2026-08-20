@@ -805,7 +805,9 @@ let emit_stack_realloc () =
 let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
   let overflow = L.create Text and ret = L.create Text in
   let threshold_offset =
-    (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
+    (* [stack_base_offset] is the distance from [Domain_current_stack] to the
+       lowest usable stack address, in both stack-checking modes. *)
+    Domainstate.stack_base_offset + Stack_check.stack_threshold_size
   in
   if save_registers then push r10;
   I.lea (mem64 NONE (-(size_in_bytes + threshold_offset)) (Scalar RSP)) r10;
@@ -3140,8 +3142,13 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
   assert (k mod 8 = 0);
   let padding = if wrapper_frame_size k mod 16 = 0 then 0 else 8 in
   let n = k + padding in
+  let threshold =
+    if Config.no_stack_checks
+    then Domainstate.stack_guard_size
+    else Stack_check.stack_threshold_size
+  in
   (* Allocate stack space *)
-  if (not Config.no_stack_checks) && n >= Stack_check.stack_threshold_size
+  if n >= threshold
   then
     emit_stack_check ~size_in_bytes:n ~save_registers:true
       ~save_simd:(must_save_simd_regs p.probe_insn.live);
