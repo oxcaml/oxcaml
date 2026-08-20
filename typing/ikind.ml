@@ -824,9 +824,10 @@ let provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly =
        satisfy the required bound?
 
      This is the right question because the provenance variable stands for the
-     mode-crossing behavior we need from the source type. It gives the least
-     restrictive bound that would still make the original lattice comparison
-     pass.
+     mode-crossing behavior we need from the source type. Before rounding, its
+     answer is the least restrictive bound that would make this contribution
+     satisfy the required bound. Rounding down may strengthen that answer when
+     converting it to a concrete mode bound for printing.
 
      We answer the question by first decomposing the provenance-annotated
      polynomial into an untracked base plus one coefficient per provenance
