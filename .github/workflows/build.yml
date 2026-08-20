@@ -634,6 +634,27 @@ jobs:
           git commit -m "Add metrics for commit ${COMMIT_HASH}"
           git push || (git pull --rebase && git push)
 
+      - name: Kernel diagnostics (Linux)
+        # Distinguish real crashes from runner-level problems: the kernel's
+        # segfault records include the fault address and instruction pointer,
+        # and MCE/EDAC records indicate hardware memory errors.
+        if: failure() && runner.os == 'Linux'
+        run: |
+          echo '::group::rlimits'
+          ulimit -a
+          echo '::endgroup::'
+          echo '::group::Kernel segfault / trap records'
+          sudo dmesg -T | grep -iE 'segfault|traps:|general protection' \
+            | tail -n 100 || echo 'none found'
+          echo '::endgroup::'
+          echo '::group::Hardware error records (MCE / EDAC)'
+          sudo dmesg -T | grep -iE 'mce:|edac|hardware error|machine check' \
+            || echo 'none found'
+          echo '::endgroup::'
+          echo '::group::Last 100 kernel log lines'
+          sudo dmesg -T | tail -n 100
+          echo '::endgroup::'
+
       - name: Upload core dumps
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
