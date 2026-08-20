@@ -1,3 +1,23 @@
+(* Js_of_ocaml library
+ * http://www.ocsigen.org/js_of_ocaml/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, with linking exception;
+ * either version 2.1 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *)
+
+[@@@ocaml.alert "-unsafe_multidomain"]
+
 module Js = struct
   type t
 
@@ -94,6 +114,11 @@ module Js = struct
 
   external wrap_meth_callback : ('a -> 'b) -> ('a, 'b) meth_callback
     = "caml_js_wrap_meth_callback"
+
+  external runtime_value : string -> 'a = "caml_jsoo_runtime_value"
+  (** [runtime_value "FOO"] returns the JavaScript value FOO provided by the JavaScript runtime (with '//Provides: FOO'). The string argument must be a string literal. *)
+
+  external custom_identifier : Obj.t -> string = "caml_custom_identifier"
 end
 
 module Sys = struct
@@ -131,6 +156,7 @@ module Sys = struct
       [ `Disabled
       | `Cps
       | `Double_translation
+      | `Jspi
       ]
 
     external effects_ : unit -> string = "caml_jsoo_flags_effects"
@@ -140,7 +166,10 @@ module Sys = struct
       | "disabled" -> `Disabled
       | "cps" -> `Cps
       | "double-translation" -> `Double_translation
+      | "jspi" -> `Jspi
       | _ -> assert false
+
+    external build_config : unit -> string = "caml_jsoo_build_config"
   end
 
   let version = Runtime_version.s
@@ -154,16 +183,16 @@ module Error : sig
   val raise_ : t -> 'a
 
   val attach_js_backtrace : exn -> force:bool -> exn
-  (** Attach a JavasScript error to an OCaml exception.  if [force = false] and a
-    JavasScript error is already attached, it will do nothing. This function is useful to
+  (** Attach a JavaScript error to an OCaml exception.  if [force = false] and a
+    JavaScript error is already attached, it will do nothing. This function is useful to
     store and retrieve information about JavaScript stack traces.
 
-    Attaching JavasScript errors will happen automatically when compiling with
+    Attaching JavaScript errors will happen automatically when compiling with
     [--enable with-js-error]. *)
 
   val of_exn : exn -> t option
   (** Extract a JavaScript error attached to an OCaml exception, if any.  This is useful to
-      inspect an eventual stack strace, especially when sourcemap is enabled. *)
+      inspect an eventual stack trace, especially when sourcemap is enabled. *)
 
   exception Exn of t
   (** The [Error] exception wrap javascript exceptions when caught by OCaml code.
@@ -175,10 +204,7 @@ end = struct
 
   exception Exn of t
 
-  let _ =
-    (Callback.register_exception [@ocaml.alert "-unsafe_multidomain"])
-      "jsError"
-      (Exn (Obj.magic [||]))
+  let _ = Callback.register_exception "jsError" (Exn (Obj.magic [||]))
 
   external raise_ : t -> 'a = "caml_throw_js_exception"
 
@@ -191,8 +217,8 @@ end
 
 module For_compatibility_only = struct
   (* Add primitives for compatibility reasons. Existing users might
-     depend on it (e.g. gen_js_api), we dont want the ocaml compiler
-     to complain about theses missing primitives. *)
+     depend on it (e.g. gen_js_api), we don't want the ocaml compiler
+     to complain about these missing primitives. *)
 
   external caml_js_from_string : string -> Js.t = "caml_js_from_string"
 
@@ -239,7 +265,11 @@ module Typed_array = struct
     external of_uint8Array : uint8Array -> t = "bigstring_of_typed_array"
   end
 
-  external of_uint8Array : uint8Array -> string = "caml_string_of_uint8_array"
+  external string_of_uint8Array : uint8Array -> string = "caml_string_of_uint8_array"
+
+  external bytes_of_uint8Array : uint8Array -> bytes = "caml_bytes_of_uint8_array"
+
+  external uint8Array_of_bytes : bytes -> uint8Array = "caml_uint8_array_of_bytes"
 end
 
 module Int64 = struct
@@ -260,4 +290,15 @@ module Effect : sig
       This behaviour is the same when double translation is disabled. *)
 end = struct
   external assume_no_perform : (unit -> 'a) -> 'a = "caml_assume_no_perform"
+end
+
+module Promise = struct
+  (** Low-level wrap/unwrap helpers for the [Js_of_ocaml.Promise] binding.
+      Implemented in [runtime/{js,wasm}/promise.{js,wat}]. Wrapping is
+      conditional on the value being thenable, so non-thenable values are
+      passed through unchanged. *)
+
+  external wrap : 'a -> Js.t = "caml_jsoo_promise_wrap"
+
+  external unwrap : Js.t -> 'a = "caml_jsoo_promise_unwrap"
 end

@@ -19,19 +19,51 @@
  *)
 open! Stdlib
 
+module type SET = sig
+  type elt
+
+  type t
+
+  val empty : t
+
+  val add : elt -> t -> t
+
+  val remove : elt -> t -> t
+
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val mem : elt -> t -> bool
+
+  val equal : t -> t -> bool
+end
+
+module type MAP = sig
+  type key
+
+  type 'a t
+
+  val empty : 'a t
+
+  val find : key -> 'a t -> 'a
+
+  val find_opt : key -> 'a t -> 'a option
+
+  val add : key -> 'a -> 'a t -> 'a t
+end
+
 module Make
     (N : sig
       type t
     end)
-    (NSet : Set.S with type elt = N.t)
-    (NMap : Map.S with type key = N.t) =
+    (NSet : SET with type elt = N.t)
+    (NMap : MAP with type key = N.t) =
 struct
   type t =
     { domain : NSet.t
     ; fold_children : 'a. (N.t -> 'a -> 'a) -> N.t -> 'a -> 'a
     }
 
-  let successors g x = try NMap.find x g with Not_found -> NSet.empty
+  let successors g x = NMap.find_opt x g |> Option.value ~default:NSet.empty
 
   let add_edge g x y =
     let l = successors g x in

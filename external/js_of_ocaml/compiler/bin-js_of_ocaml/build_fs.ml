@@ -51,11 +51,9 @@ let f { files; output_file; include_dirs } =
     {|
 //Provides: jsoo_create_file_extern
 function jsoo_create_file_extern(name,content){
-  if (globalThis.jsoo_create_file) {
+  if(globalThis.jsoo_create_file)
     globalThis.jsoo_create_file(name,content);
-  } else if (globalThis.caml_create_file) {
-    globalThis.caml_create_file(name,content);
-  } else {
+  else {
     if(!globalThis.jsoo_fs_tmp) globalThis.jsoo_fs_tmp = [];
     globalThis.jsoo_fs_tmp.push({name:name,content:content});
   }
@@ -77,7 +75,7 @@ function jsoo_create_file_extern(name,content){
   let code = Code.prepend Code.empty instr in
   Filename.gen_file output_file (fun chan ->
       let pfs_fmt = Pretty_print.to_out_channel chan in
-      let (_ : Source_map.info) =
+      let (_ : Source_map.info * Shape.t StringMap.t) =
         Driver.f
           ~standalone:true
           ~wrap_with_fun:`Iife

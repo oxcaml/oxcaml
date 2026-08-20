@@ -1,0 +1,14 @@
+(alias
+ (name default)
+ (deps
+  index.html
+  (glob_files *.png)
+  (glob_files_rec *.html)))
+
+(env
+ (_
+  (js_of_ocaml
+   (build_runtime_flags
+    (:standard --Werror))
+   (flags
+    (:standard --Werror)))))

@@ -17,6 +17,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
+
+[@@@ocaml.alert "-unsafe_multidomain"]
+
 open! Import
 
 (* This local module [Js] is needed so that the ppx_js extension work within that file. *)
@@ -87,6 +90,8 @@ module Js = struct
     external meth_callback_with_arguments :
       ('b -> any_js_array -> 'a) -> ('b, any_js_array -> 'a) meth_callback
       = "caml_js_wrap_meth_callback_arguments"
+
+    external runtime_value : string -> 'a = "caml_jsoo_runtime_value"
 
     (* DEPRECATED *)
     external variable : string -> 'a = "caml_js_var"
@@ -271,6 +276,8 @@ module Js = struct
 
     method charCodeAt : int -> number t meth
 
+    method codePointAt : int -> number t optdef meth
+
     (* This may return NaN... *)
     method concat : js_string t -> js_string t meth
 
@@ -340,6 +347,8 @@ module Js = struct
     method toString : js_string t meth
 
     method source : js_string t readonly_prop
+
+    method flags : js_string t readonly_prop
 
     method global : bool t readonly_prop
 
@@ -552,10 +561,6 @@ class type date = object
   method setDate : int -> number_t meth
 
   method setUTCDate : int -> number_t meth
-
-  method setDay : int -> number_t meth
-
-  method setUTCDay : int -> number_t meth
 
   method setHours : int -> number_t meth
 
@@ -813,7 +818,7 @@ let parseFloat (s : js_string t) : number_t =
   if isNaN s then failwith "parseFloat" else s
 
 let _ =
-  (Printexc.register_printer [@ocaml.alert "-unsafe_multidomain"]) (fun e ->
+  Printexc.register_printer (fun e ->
       if instanceof (Obj.magic e : < .. > t) error_constr
       then
         let e = Js_error.of_error (Obj.magic e : error t) in

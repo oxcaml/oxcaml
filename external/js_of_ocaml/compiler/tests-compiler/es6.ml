@@ -18,12 +18,12 @@ let f x =
        "use strict";
        var
         runtime = globalThis.jsoo_runtime,
-        f = x=>{var g = y=>(x + y | 0) + 7 | 0; return g;},
-        Test = [0, f];
-       runtime.caml_register_global(0, Test, "Test");
+        f = x=>{var g = y=>(x + y | 0) + 7 | 0; return g;};
+       runtime.caml_register_global([0, f], "Test");
        return;})
      (globalThis);
-    //end |}];
+    //end
+    |}];
   let program = Util.compile_and_parse ?effects:None ~pretty:false ~flags prog in
   Util.print_program program;
   [%expect
@@ -31,10 +31,11 @@ let f x =
     (a=>{
        "use strict";
        var b = a.jsoo_runtime;
-       b.caml_register_global(0, [0, b=>a=>(b + a | 0) + 7 | 0], "Test");
+       b.caml_register_global([0, b=>a=>(b + a | 0) + 7 | 0], "Test");
        return;})
      (globalThis);
-    //end |}]
+    //end
+    |}]
 
 let%expect_test _ =
   let prog =
@@ -54,14 +55,12 @@ let rec odd n' = function
        "use strict";
        var b = a.jsoo_runtime;
        b.caml_register_global
-        (0,
-         [0,
+        ([0,
           (a, b)=>{
-           var d = a, c = b;
            for(;;){
-            if(0 === c) return [0, d, 0];
-            if(1 === c) return [0, d, 1];
-            [d, c] = [(c - 1 | 0) - 1 | 0, (d - 1 | 0) - 1 | 0];
+            if(0 === b) return [0, a, 0];
+            if(1 === b) return [0, a, 1];
+            [a, b] = [(b - 1 | 0) - 1 | 0, (a - 1 | 0) - 1 | 0];
            }}],
          "Test");
        return;})
@@ -76,20 +75,19 @@ let rec odd n' = function
        "use strict";
        var b = a.jsoo_runtime;
        b.caml_register_global
-        (0,
-         [0,
+        ([0,
           function(a, b){
-           var d = a, c = b;
            for(;;){
-            if(0 === c) return [0, d, 0];
-            if(1 === c) return [0, d, 1];
-            var e = (d - 1 | 0) - 1 | 0;
-            d = (c - 1 | 0) - 1 | 0;
-            c = e;
+            if(0 === b) return [0, a, 0];
+            if(1 === b) return [0, a, 1];
+            var c = (a - 1 | 0) - 1 | 0;
+            a = (b - 1 | 0) - 1 | 0;
+            b = c;
            }
           }],
          "Test");
        return;
       }
       (globalThis));
-    //end |}]
+    //end
+    |}]

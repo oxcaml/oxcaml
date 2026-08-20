@@ -41,7 +41,7 @@ end
 class type position = object
   method coords : coordinates Js.t Js.readonly_prop
 
-  method timestamp : Js.date Js.readonly_prop
+  method timestamp : Js.date Js.t Js.readonly_prop
 end
 
 class type positionOptions = object
@@ -84,8 +84,6 @@ let empty_position_options () = Js.Unsafe.obj [||]
 
 let geolocation =
   let x = Js.Unsafe.global##.navigator in
-  if Js.Optdef.test x then x##.geolocation else x
-
-(* undefined *)
+  if Js.Optdef.test x then x##.geolocation else x (* undefined *)
 
 let is_supported () = Js.Optdef.test geolocation

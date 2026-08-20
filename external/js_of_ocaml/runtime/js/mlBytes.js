@@ -79,115 +79,6 @@ function caml_sub_uint8_array_to_jsbytes(a, i, len) {
   return s;
 }
 
-//Provides: caml_utf8_of_utf16
-function caml_utf8_of_utf16(s) {
-  for (var b = "", t = b, c, d, i = 0, l = s.length; i < l; i++) {
-    c = s.charCodeAt(i);
-    if (c < 0x80) {
-      for (var j = i + 1; j < l && (c = s.charCodeAt(j)) < 0x80; j++);
-      if (j - i > 512) {
-        t.slice(0, 1);
-        b += t;
-        t = "";
-        b += s.slice(i, j);
-      } else t += s.slice(i, j);
-      if (j === l) break;
-      i = j;
-    }
-    if (c < 0x800) {
-      t += String.fromCharCode(0xc0 | (c >> 6));
-      t += String.fromCharCode(0x80 | (c & 0x3f));
-    } else if (c < 0xd800 || c >= 0xdfff) {
-      t += String.fromCharCode(
-        0xe0 | (c >> 12),
-        0x80 | ((c >> 6) & 0x3f),
-        0x80 | (c & 0x3f),
-      );
-    } else if (
-      c >= 0xdbff ||
-      i + 1 === l ||
-      (d = s.charCodeAt(i + 1)) < 0xdc00 ||
-      d > 0xdfff
-    ) {
-      // Unmatched surrogate pair, replaced by \ufffd (replacement character)
-      t += "\xef\xbf\xbd";
-    } else {
-      i++;
-      c = (c << 10) + d - 0x35fdc00;
-      t += String.fromCharCode(
-        0xf0 | (c >> 18),
-        0x80 | ((c >> 12) & 0x3f),
-        0x80 | ((c >> 6) & 0x3f),
-        0x80 | (c & 0x3f),
-      );
-    }
-    if (t.length > 1024) {
-      t.slice(0, 1);
-      b += t;
-      t = "";
-    }
-  }
-  return b + t;
-}
-
-//Provides: caml_utf16_of_utf8
-function caml_utf16_of_utf8(s) {
-  for (var b = "", t = "", c, c1, c2, v, i = 0, l = s.length; i < l; i++) {
-    c1 = s.charCodeAt(i);
-    if (c1 < 0x80) {
-      for (var j = i + 1; j < l && (c1 = s.charCodeAt(j)) < 0x80; j++);
-      if (j - i > 512) {
-        t.slice(0, 1);
-        b += t;
-        t = "";
-        b += s.slice(i, j);
-      } else t += s.slice(i, j);
-      if (j === l) break;
-      i = j;
-    }
-    v = 1;
-    if (++i < l && ((c2 = s.charCodeAt(i)) & -64) === 128) {
-      c = c2 + (c1 << 6);
-      if (c1 < 0xe0) {
-        v = c - 0x3080;
-        if (v < 0x80) v = 1;
-      } else {
-        v = 2;
-        if (++i < l && ((c2 = s.charCodeAt(i)) & -64) === 128) {
-          c = c2 + (c << 6);
-          if (c1 < 0xf0) {
-            v = c - 0xe2080;
-            if (v < 0x800 || (v >= 0xd7ff && v < 0xe000)) v = 2;
-          } else {
-            v = 3;
-            if (
-              ++i < l &&
-              ((c2 = s.charCodeAt(i)) & -64) === 128 &&
-              c1 < 0xf5
-            ) {
-              v = c2 - 0x3c82080 + (c << 6);
-              if (v < 0x10000 || v > 0x10ffff) v = 3;
-            }
-          }
-        }
-      }
-    }
-    if (v < 4) {
-      // Invalid sequence
-      i -= v;
-      t += "\ufffd";
-    } else if (v > 0xffff)
-      t += String.fromCharCode(0xd7c0 + (v >> 10), 0xdc00 + (v & 0x3ff));
-    else t += String.fromCharCode(v);
-    if (t.length > 1024) {
-      t.slice(0, 1);
-      b += t;
-      t = "";
-    }
-  }
-  return b + t;
-}
-
 //Provides: jsoo_is_ascii
 function jsoo_is_ascii(s) {
   // The regular expression gets better at around this point for all browsers
@@ -221,7 +112,7 @@ function caml_bytes_unsafe_set(s, i, c) {
   if (s.t !== 4 /* ARRAY */) {
     if (i === s.c.length) {
       s.c += String.fromCharCode(c);
-      if (i + 1 === s.l) s.t = 0; /*BYTES | UNKOWN*/
+      if (i + 1 === s.l) s.t = 0; /*BYTES | UNKNOWN*/
       return 0;
     }
     caml_convert_bytes_to_array(s);
@@ -251,47 +142,50 @@ function caml_string_get(s, i) {
 }
 
 //Provides: caml_string_get16
-//Alias: caml_string_get16_indexed_by_int32
-//Alias: caml_string_get16_indexed_by_nativeint
-//Requires: caml_string_unsafe_get, caml_string_bound_error
+//Requires: caml_string_bound_error
 //Requires: caml_ml_string_length
+//Requires: caml_string_get16u
 function caml_string_get16(s, i) {
   if (i >>> 0 >= caml_ml_string_length(s) - 1) caml_string_bound_error();
+  return caml_string_get16u(s, i);
+}
+
+//Provides: caml_string_get16u
+//Requires: caml_string_unsafe_get
+function caml_string_get16u(s, i) {
   var b1 = caml_string_unsafe_get(s, i),
     b2 = caml_string_unsafe_get(s, i + 1);
   return (b2 << 8) | b1;
 }
 
-//Provides: caml_string_get16_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_string_get16
-function caml_string_get16_indexed_by_int64(s, i) {
-  return caml_string_get16(s, caml_checked_int64_to_int(i))
-}
-
 //Provides: caml_bytes_get16
-//Alias: caml_bytes_get16_indexed_by_int32
-//Alias: caml_bytes_get16_indexed_by_nativeint
-//Requires: caml_bytes_unsafe_get, caml_bytes_bound_error
+//Requires: caml_bytes_bound_error
+//Requires: caml_bytes_get16u
 function caml_bytes_get16(s, i) {
   if (i >>> 0 >= s.l - 1) caml_bytes_bound_error();
+  return caml_bytes_get16u(s, i);
+}
+
+//Provides: caml_bytes_get16u
+//Requires: caml_bytes_unsafe_get
+function caml_bytes_get16u(s, i) {
   var b1 = caml_bytes_unsafe_get(s, i),
     b2 = caml_bytes_unsafe_get(s, i + 1);
   return (b2 << 8) | b1;
 }
 
-//Provides: caml_bytes_get16_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_bytes_get16
-function caml_bytes_get16_indexed_by_int64(s, i) {
-  return caml_bytes_get16(s, caml_checked_int64_to_int(i))
-}
-
 //Provides: caml_string_get32
-//Alias: caml_string_get32_indexed_by_int32
-//Alias: caml_string_get32_indexed_by_nativeint
-//Requires: caml_string_unsafe_get, caml_string_bound_error
+//Requires: caml_string_bound_error
 //Requires: caml_ml_string_length
+//Requires: caml_string_get32u
 function caml_string_get32(s, i) {
   if (i >>> 0 >= caml_ml_string_length(s) - 3) caml_string_bound_error();
+  return caml_string_get32u(s, i);
+}
+
+//Provides: caml_string_get32u
+//Requires: caml_string_unsafe_get
+function caml_string_get32u(s, i) {
   var b1 = caml_string_unsafe_get(s, i),
     b2 = caml_string_unsafe_get(s, i + 1),
     b3 = caml_string_unsafe_get(s, i + 2),
@@ -299,18 +193,17 @@ function caml_string_get32(s, i) {
   return (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
 }
 
-//Provides: caml_string_get32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_string_get32
-function caml_string_get32_indexed_by_int64(s, i) {
-  return caml_string_get32(s, caml_checked_int64_to_int(i))
-}
-
 //Provides: caml_bytes_get32
-//Alias: caml_bytes_get32_indexed_by_int32
-//Alias: caml_bytes_get32_indexed_by_nativeint
-//Requires: caml_bytes_unsafe_get, caml_bytes_bound_error
+//Requires: caml_bytes_bound_error
+//Requires: caml_bytes_get32u
 function caml_bytes_get32(s, i) {
   if (i >>> 0 >= s.l - 3) caml_bytes_bound_error();
+  return caml_bytes_get32u(s, i);
+}
+
+//Provides: caml_bytes_get32u
+//Requires: caml_bytes_unsafe_get
+function caml_bytes_get32u(s, i) {
   var b1 = caml_bytes_unsafe_get(s, i),
     b2 = caml_bytes_unsafe_get(s, i + 1),
     b3 = caml_bytes_unsafe_get(s, i + 2),
@@ -318,20 +211,19 @@ function caml_bytes_get32(s, i) {
   return (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
 }
 
-//Provides: caml_bytes_get32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_bytes_get32
-function caml_bytes_get32_indexed_by_int64(s, i) {
-  return caml_bytes_get32(s, caml_checked_int64_to_int(i))
-}
-
 //Provides: caml_string_get64
-//Alias: caml_string_get64_indexed_by_int32
-//Alias: caml_string_get64_indexed_by_nativeint
-//Requires: caml_string_unsafe_get, caml_string_bound_error
-//Requires: caml_int64_of_bytes
+//Requires: caml_string_bound_error
 //Requires: caml_ml_string_length
+//Requires: caml_string_get64u
 function caml_string_get64(s, i) {
   if (i >>> 0 >= caml_ml_string_length(s) - 7) caml_string_bound_error();
+  return caml_string_get64u(s, i);
+}
+
+//Provides: caml_string_get64u
+//Requires: caml_string_unsafe_get
+//Requires: caml_int64_of_bytes
+function caml_string_get64u(s, i) {
   var a = new Array(8);
   for (var j = 0; j < 8; j++) {
     a[7 - j] = caml_string_unsafe_get(s, i + j);
@@ -339,30 +231,23 @@ function caml_string_get64(s, i) {
   return caml_int64_of_bytes(a);
 }
 
-//Provides: caml_string_get64_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_string_get64
-function caml_string_get64_indexed_by_int64(s, i) {
-  return caml_string_get64(s, caml_checked_int64_to_int(i))
-}
-
 //Provides: caml_bytes_get64
-//Alias: caml_bytes_get64_indexed_by_int32
-//Alias: caml_bytes_get64_indexed_by_nativeint
-//Requires: caml_bytes_unsafe_get, caml_bytes_bound_error
-//Requires: caml_int64_of_bytes
+//Requires: caml_bytes_bound_error
+//Requires: caml_bytes_get64u
 function caml_bytes_get64(s, i) {
   if (i >>> 0 >= s.l - 7) caml_bytes_bound_error();
+  return caml_bytes_get64u(s, i);
+}
+
+//Provides: caml_bytes_get64u
+//Requires: caml_bytes_unsafe_get
+//Requires: caml_int64_of_bytes
+function caml_bytes_get64u(s, i) {
   var a = new Array(8);
   for (var j = 0; j < 8; j++) {
     a[7 - j] = caml_bytes_unsafe_get(s, i + j);
   }
   return caml_int64_of_bytes(a);
-}
-
-//Provides: caml_bytes_get64_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_bytes_get64
-function caml_bytes_get64_indexed_by_int64(s, i) {
-  return caml_bytes_get64(s, caml_checked_int64_to_int(i))
 }
 
 //Provides: caml_bytes_get
@@ -375,7 +260,7 @@ function caml_bytes_get(s, i) {
 //Provides: caml_string_set
 //Requires: caml_failwith
 //If: js-string
-function caml_string_set(s, i, c) {
+function caml_string_set(_s, _i, _c) {
   caml_failwith("caml_string_set");
 }
 
@@ -388,11 +273,16 @@ function caml_string_set(s, i, c) {
 }
 
 //Provides: caml_bytes_set16
-//Alias: caml_bytes_set16_indexed_by_int32
-//Alias: caml_bytes_set16_indexed_by_nativeint
-//Requires: caml_bytes_bound_error, caml_bytes_unsafe_set
+//Requires: caml_bytes_bound_error
+//Requires: caml_bytes_set16u
 function caml_bytes_set16(s, i, i16) {
   if (i >>> 0 >= s.l - 1) caml_bytes_bound_error();
+  return caml_bytes_set16u(s, i, i16);
+}
+
+//Provides: caml_bytes_set16u
+//Requires: caml_bytes_unsafe_set
+function caml_bytes_set16u(s, i, i16) {
   var b2 = 0xff & (i16 >> 8),
     b1 = 0xff & i16;
   caml_bytes_unsafe_set(s, i + 0, b1);
@@ -400,18 +290,17 @@ function caml_bytes_set16(s, i, i16) {
   return 0;
 }
 
-//Provides: caml_bytes_set16_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_bytes_set16
-function caml_bytes_set16_indexed_by_int64(s, i, i16) {
-  return caml_bytes_set16(s, caml_checked_int64_to_int(i), i16)
-}
-
 //Provides: caml_bytes_set32
-//Alias: caml_bytes_set32_indexed_by_int32
-//Alias: caml_bytes_set32_indexed_by_nativeint
-//Requires: caml_bytes_bound_error, caml_bytes_unsafe_set
+//Requires: caml_bytes_bound_error
+//Requires: caml_bytes_set32u
 function caml_bytes_set32(s, i, i32) {
   if (i >>> 0 >= s.l - 3) caml_bytes_bound_error();
+  return caml_bytes_set32u(s, i, i32);
+}
+
+//Provides: caml_bytes_set32u
+//Requires: caml_bytes_unsafe_set
+function caml_bytes_set32u(s, i, i32) {
   var b4 = 0xff & (i32 >> 24),
     b3 = 0xff & (i32 >> 16),
     b2 = 0xff & (i32 >> 8),
@@ -423,30 +312,23 @@ function caml_bytes_set32(s, i, i32) {
   return 0;
 }
 
-//Provides: caml_bytes_set32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_bytes_set32
-function caml_bytes_set32_indexed_by_int64(s, i, i32) {
-  return caml_bytes_set32(s, caml_checked_int64_to_int(i), i32)
-}
-
 //Provides: caml_bytes_set64
-//Alias: caml_bytes_set64_indexed_by_int32
-//Alias: caml_bytes_set64_indexed_by_nativeint
-//Requires: caml_bytes_bound_error, caml_bytes_unsafe_set
-//Requires: caml_int64_to_bytes
+//Requires: caml_bytes_bound_error
+//Requires: caml_bytes_set64u
 function caml_bytes_set64(s, i, i64) {
   if (i >>> 0 >= s.l - 7) caml_bytes_bound_error();
+  return caml_bytes_set64u(s, i, i64);
+}
+
+//Provides: caml_bytes_set64u
+//Requires: caml_bytes_unsafe_set
+//Requires: caml_int64_to_bytes
+function caml_bytes_set64u(s, i, i64) {
   var a = caml_int64_to_bytes(i64);
   for (var j = 0; j < 8; j++) {
     caml_bytes_unsafe_set(s, i + 7 - j, a[j]);
   }
   return 0;
-}
-
-//Provides: caml_bytes_set64_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_bytes_set64
-function caml_bytes_set64_indexed_by_int64(s, i, i64) {
-  return caml_bytes_set64(s, caml_checked_int64_to_int(i), i64)
 }
 
 //Provides: caml_bytes_set
@@ -456,17 +338,169 @@ function caml_bytes_set(s, i, c) {
   return caml_bytes_unsafe_set(s, i, c);
 }
 
+//Provides: jsoo_text_encoder_fallback
+// Small UTF-8 encoder used when the host doesn't provide TextEncoder
+// (e.g. QuickJS). WHATWG-compatible: lone UTF-16 surrogates become the
+// UTF-8 encoding of U+FFFD.
+var jsoo_text_encoder_fallback = {
+  encode: (s) => {
+    var len = s.length;
+    var n = 0;
+    for (var i = 0; i < len; i++) {
+      var c = s.charCodeAt(i);
+      if (c < 0x80) n += 1;
+      else if (c < 0x800) n += 2;
+      else if (c < 0xd800 || c >= 0xe000) n += 3;
+      else if (c < 0xdc00 && i + 1 < len) {
+        var c2 = s.charCodeAt(i + 1);
+        if (c2 >= 0xdc00 && c2 < 0xe000) {
+          n += 4;
+          i++;
+        } else n += 3; /* lone high surrogate -> U+FFFD */
+      } else n += 3; /* lone low surrogate or trailing high -> U+FFFD */
+    }
+    var bytes = new Uint8Array(n);
+    var j = 0;
+    for (var i = 0; i < len; i++) {
+      var c = s.charCodeAt(i);
+      if (c < 0x80) {
+        bytes[j++] = c;
+      } else if (c < 0x800) {
+        bytes[j++] = 0xc0 | (c >> 6);
+        bytes[j++] = 0x80 | (c & 0x3f);
+      } else if (c < 0xd800 || c >= 0xe000) {
+        bytes[j++] = 0xe0 | (c >> 12);
+        bytes[j++] = 0x80 | ((c >> 6) & 0x3f);
+        bytes[j++] = 0x80 | (c & 0x3f);
+      } else if (c < 0xdc00 && i + 1 < len) {
+        var c2 = s.charCodeAt(i + 1);
+        if (c2 >= 0xdc00 && c2 < 0xe000) {
+          var cp = 0x10000 + ((c & 0x3ff) << 10) + (c2 & 0x3ff);
+          bytes[j++] = 0xf0 | (cp >> 18);
+          bytes[j++] = 0x80 | ((cp >> 12) & 0x3f);
+          bytes[j++] = 0x80 | ((cp >> 6) & 0x3f);
+          bytes[j++] = 0x80 | (cp & 0x3f);
+          i++;
+        } else {
+          /* lone high surrogate */
+          bytes[j++] = 0xef;
+          bytes[j++] = 0xbf;
+          bytes[j++] = 0xbd;
+        }
+      } else {
+        /* lone low surrogate or trailing high surrogate */
+        bytes[j++] = 0xef;
+        bytes[j++] = 0xbf;
+        bytes[j++] = 0xbd;
+      }
+    }
+    return bytes;
+  },
+};
+
+//Provides: jsoo_text_encoder
+//Requires: jsoo_text_encoder_fallback
+var jsoo_text_encoder =
+  typeof TextEncoder !== "undefined"
+    ? new TextEncoder()
+    : jsoo_text_encoder_fallback;
+
+//Provides: jsoo_text_decoder_fallback
+// Small UTF-8 decoder used when the host doesn't provide TextDecoder
+// (e.g. QuickJS). Default-only (utf-8, fatal=false) and implements the
+// WHATWG substitution-of-maximal-subpart rule: an invalid sequence is
+// replaced by a single U+FFFD that consumes the longest prefix that
+// could have started a valid sequence (1 byte if no valid prefix).
+var jsoo_text_decoder_fallback = {
+  decode: (a) => {
+    var len = a.length;
+    var s = "";
+    var i = 0;
+    var REPL = 0xfffd;
+    var cont = (b) => (b & 0xc0) === 0x80;
+    while (i < len) {
+      var b1 = a[i++];
+      var cp;
+      if (b1 < 0x80) {
+        cp = b1;
+      } else if (b1 < 0xc2 || b1 > 0xf4) {
+        // 0x80..0xbf: stray continuation; 0xc0/0xc1: overlong;
+        // 0xf5..0xff: out of Unicode range. None start a sequence.
+        cp = REPL;
+      } else if (b1 < 0xe0) {
+        if (i < len && cont(a[i])) cp = ((b1 & 0x1f) << 6) | (a[i++] & 0x3f);
+        else cp = REPL;
+      } else if (b1 < 0xf0) {
+        // Reject UTF-16 surrogates and non-shortest encodings.
+        var lo = b1 === 0xe0 ? 0xa0 : 0x80;
+        var hi = b1 === 0xed ? 0x9f : 0xbf;
+        var b2 = i < len ? a[i] : -1;
+        if (b2 < lo || b2 > hi) cp = REPL;
+        else if (i + 1 < len && cont(a[i + 1])) {
+          cp = ((b1 & 0x0f) << 12) | ((b2 & 0x3f) << 6) | (a[i + 1] & 0x3f);
+          i += 2;
+        } else {
+          /* valid 2-byte prefix, but third byte missing or invalid */
+          cp = REPL;
+          i += 1;
+        }
+      } else {
+        var lo = b1 === 0xf0 ? 0x90 : 0x80;
+        var hi = b1 === 0xf4 ? 0x8f : 0xbf;
+        var b2 = i < len ? a[i] : -1;
+        if (b2 < lo || b2 > hi) cp = REPL;
+        else if (i + 1 < len && cont(a[i + 1])) {
+          if (i + 2 < len && cont(a[i + 2])) {
+            cp =
+              ((b1 & 0x07) << 18) |
+              ((b2 & 0x3f) << 12) |
+              ((a[i + 1] & 0x3f) << 6) |
+              (a[i + 2] & 0x3f);
+            i += 3;
+          } else {
+            /* valid 3-byte prefix, fourth byte missing or invalid */
+            cp = REPL;
+            i += 2;
+          }
+        } else {
+          /* valid 2-byte prefix, third byte missing or invalid */
+          cp = REPL;
+          i += 1;
+        }
+      }
+      if (cp <= 0xffff) s += String.fromCharCode(cp);
+      else {
+        cp -= 0x10000;
+        s += String.fromCharCode(0xd800 | (cp >> 10), 0xdc00 | (cp & 0x3ff));
+      }
+    }
+    return s;
+  },
+};
+
+//Provides: jsoo_text_decoder
+//Requires: jsoo_text_decoder_fallback
+var jsoo_text_decoder =
+  typeof TextDecoder !== "undefined"
+    ? new TextDecoder()
+    : jsoo_text_decoder_fallback;
+
 //Provides: caml_bytes_of_utf16_jsstring
-//Requires: jsoo_is_ascii, caml_utf8_of_utf16, MlBytes
+//Requires: MlBytes, jsoo_text_encoder
+//Requires: jsoo_is_ascii
 function caml_bytes_of_utf16_jsstring(s) {
-  var tag = 9 /* BYTES | ASCII */;
-  if (!jsoo_is_ascii(s))
-    (tag = 8) /* BYTES | NOT_ASCII */, (s = caml_utf8_of_utf16(s));
-  return new MlBytes(tag, s, s.length);
+  if (jsoo_is_ascii(s)) {
+    return new MlBytes(9, s, s.length);
+  } else {
+    var a = jsoo_text_encoder.encode(s);
+    return new MlBytes(4, a, a.length);
+  }
 }
 
 //Provides: MlBytes
-//Requires: caml_convert_string_to_bytes, jsoo_is_ascii, caml_utf16_of_utf8
+//Requires: caml_convert_string_to_bytes, jsoo_is_ascii
+//Requires: caml_uint8_array_of_bytes
+//Requires: jsoo_text_decoder
 class MlBytes {
   constructor(tag, contents, length) {
     this.t = tag;
@@ -480,11 +514,11 @@ class MlBytes {
       case 8 /*BYTES | NOT_ASCII*/:
         return this.c;
       case 4: /* ARRAY */
+      // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
       case 2 /* PARTIAL */:
-        // biome-ignore lint/suspicious/noFallthroughSwitchClause:
         caml_convert_string_to_bytes(this);
-      // fallthrough
-      case 0 /*BYTES | UNKOWN*/:
+      // falls through
+      case 0 /*BYTES | UNKNOWN*/:
         if (jsoo_is_ascii(this.c)) this.t = 9; /*BYTES | ASCII*/
         else this.t = 8; /*BYTES | NOT_ASCII*/
         return this.c;
@@ -492,9 +526,9 @@ class MlBytes {
   }
 
   toUtf16() {
-    var r = this.toString();
-    if (this.t === 9) return r;
-    return caml_utf16_of_utf8(r);
+    if (this.t === 9) return this.c;
+    var a = caml_uint8_array_of_bytes(this);
+    return jsoo_text_decoder.decode(a);
   }
 
   slice() {
@@ -509,7 +543,7 @@ function caml_convert_string_to_bytes(s) {
   /* Assumes not BYTES */
   if (s.t === 2 /* PARTIAL */) s.c += caml_str_repeat(s.l - s.c.length, "\0");
   else s.c = caml_sub_uint8_array_to_jsbytes(s.c, 0, s.c.length);
-  s.t = 0; /*BYTES | UNKOWN*/
+  s.t = 0; /*BYTES | UNKNOWN*/
 }
 
 //Provides: caml_convert_bytes_to_array
@@ -554,13 +588,13 @@ function caml_create_string(len) {
 //Provides: caml_create_string const
 //Requires: caml_invalid_argument
 //If: js-string
-function caml_create_string(len) {
+function caml_create_string(_len) {
   caml_invalid_argument("String.create");
 }
 
 //Provides: caml_create_bytes const
-//Alias: caml_create_local_bytes
 //Requires: MlBytes,caml_invalid_argument
+//Alias: caml_create_local_bytes
 function caml_create_bytes(len) {
   if (len < 0) caml_invalid_argument("Bytes.create");
   return new MlBytes(len ? 2 : 9, "", len);
@@ -680,7 +714,7 @@ function caml_fill_bytes(s, i, l, c) {
         s.t = 2; /* PARTIAL */
       } else {
         s.c = caml_str_repeat(l, String.fromCharCode(c));
-        s.t = l === s.l ? 0 /* BYTES | UNKOWN */ : 2; /* PARTIAL */
+        s.t = l === s.l ? 0 /* BYTES | UNKNOWN */ : 2; /* PARTIAL */
       }
     } else {
       if (s.t !== 4 /* ARRAY */) caml_convert_bytes_to_array(s);
@@ -704,7 +738,7 @@ function caml_blit_bytes(s1, i1, s2, i2, len) {
         : i1 === 0 && s1.c.length === len
           ? s1.c
           : s1.c.slice(i1, i1 + len);
-    s2.t = s2.c.length === s2.l ? 0 /* BYTES | UNKOWN */ : 2; /* PARTIAL */
+    s2.t = s2.c.length === s2.l ? 0 /* BYTES | UNKNOWN */ : 2; /* PARTIAL */
   } else if (s2.t === 2 /* PARTIAL */ && i2 === s2.c.length) {
     s2.c +=
       s1.t === 4 /* ARRAY */
@@ -712,7 +746,7 @@ function caml_blit_bytes(s1, i1, s2, i2, len) {
         : i1 === 0 && s1.c.length === len
           ? s1.c
           : s1.c.slice(i1, i1 + len);
-    s2.t = s2.c.length === s2.l ? 0 /* BYTES | UNKOWN */ : 2; /* PARTIAL */
+    s2.t = s2.c.length === s2.l ? 0 /* BYTES | UNKNOWN */ : 2; /* PARTIAL */
   } else {
     if (s2.t !== 4 /* ARRAY */) caml_convert_bytes_to_array(s2);
     var c1 = s1.c,
@@ -823,20 +857,35 @@ function caml_jsbytes_of_string(x) {
   return x;
 }
 
+//Provides: jsoo_text_decoder_buff
+var jsoo_text_decoder_buff = new ArrayBuffer(1024);
+
 //Provides: caml_jsstring_of_string const
-//Requires: jsoo_is_ascii, caml_utf16_of_utf8
+//Requires: jsoo_is_ascii
+//Requires: jsoo_text_decoder
+//Requires: jsoo_text_decoder_buff
 //If: js-string
 function caml_jsstring_of_string(s) {
   if (jsoo_is_ascii(s)) return s;
-  return caml_utf16_of_utf8(s);
+  var a =
+    s.length <= jsoo_text_decoder_buff.byteLength
+      ? new Uint8Array(jsoo_text_decoder_buff, 0, s.length)
+      : new Uint8Array(s.length);
+  for (var i = 0; i < s.length; i++) {
+    a[i] = s.charCodeAt(i);
+  }
+  return jsoo_text_decoder.decode(a);
 }
 
 //Provides: caml_string_of_jsstring const
-//Requires: jsoo_is_ascii, caml_utf8_of_utf16, caml_string_of_jsbytes
+//Requires: caml_string_of_array
+//Requires: jsoo_text_encoder
+//Requires: jsoo_is_ascii, caml_string_of_jsbytes
 //If: js-string
 function caml_string_of_jsstring(s) {
   if (jsoo_is_ascii(s)) return caml_string_of_jsbytes(s);
-  else return caml_string_of_jsbytes(caml_utf8_of_utf16(s));
+  var a = jsoo_text_encoder.encode(s);
+  return caml_string_of_array(a);
 }
 
 //Provides: caml_bytes_of_jsbytes const
@@ -956,7 +1005,6 @@ function caml_ml_bytes_content(s) {
 }
 
 //Provides: caml_is_ml_string
-//Requires: jsoo_is_ascii
 //If: js-string
 function caml_is_ml_string(s) {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: expected

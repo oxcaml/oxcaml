@@ -1,11 +1,414 @@
 # dev
 
 ## Features/Changes
-* Misc: drop support for OCaml 4.12 and bellow
-* Compiler: use a Wasm text files preprocessor (#1822)
+* Lib: add `WebGL2` — bindings to the WebGL2 rendering context. The context
+  inherits every method and constant of `WebGL`, and adds the WebGL2 objects
+  (vertex array objects, queries, samplers, syncs, transform feedback), 3D and
+  immutable textures, multiple render targets, instanced/range drawing, uniform
+  buffer objects, integer vertex attributes and unsigned-integer uniforms, the
+  pixel-buffer-object and `srcOffset` overloads of the data entry points,
+  introspection (`getIndexedParameter`, `getInternalformatParameter`, the new
+  `getParameter`/uniform-type/framebuffer-attachment enumerations), plus the
+  new sized internal formats. `WebGL.contextAttributes` gains `powerPreference`,
+  `desynchronized` and `xrCompatible`. `WebGL2.getContext` requests a `"webgl2"`
+  context. The `webgl` example now uses WebGL2, and a new `webgl2_particles`
+  example demonstrates a GPU particle system driven by transform feedback
+  (#1226)
+* Lib: add `Crypto` — bindings to the Web Crypto API (`crypto`,
+  `getRandomValues`, `randomUUID`, and the Promise-typed `SubtleCrypto`), with a
+  typed `params` variant (one constructor per algorithm) and
+  `to_algorithm`/`of_algorithm` conversions, typed `Key_type`/`Key_usage`/
+  `Key_format` enums, and overloaded `generateKey`/`generateKey_pair`,
+  `importKey`/`importKey_jwk` and `exportKey`/`exportKey_jwk` methods that
+  resolve the spec's union argument/return types (#2380)
+* Lib: add `Notification` and `Clipboard` — bindings to the Notifications API
+  and the (Promise-typed) async Clipboard API (#2379)
+* Lib: add bindings for the Service Worker API (`ServiceWorker`),
+  channel messaging (`MessageChannel`, `MessagePort`, `MessageEvent`) and the
+  Cache API (`Cache`) (#2381)
+* Lib: consolidate the duplicate `messageEvent` class types into a single
+  polymorphic `('target, 'data) Dom_html.messageEvent`; the old per-module
+  types (`Worker.messageEvent`, `EventSource.messageEvent`) are kept as
+  deprecated aliases (#2390)
+* Lib: add `Lwt_js_events.mutation`/`mutations` — wait for `MutationObserver`
+  mutation records as Lwt threads (#250)
+* Lib: remove `js_of_ocaml-lwt.logger` and the `lwt_log` dependency, as
+  upstream `lwt_log` is deprecated (#2378)
+* Toplevel: new `Wrapped` and `Async` APIs returning errors and warnings as
+  first-class values; adds new `js_of_ocaml-toplevel.protocol`,
+  `js_of_ocaml-toplevel.worker` and `js_of_ocaml-toplevel.worker_lwt_client`
+  sublibraries for running the toplevel in a WebWorker. Revives the
+  asynchronous toplevel originally contributed in the unmerged #435 (#66, #833)
+* Lib: add `FontFace` module — partial binding to the CSS Font Loading
+  API, plus a `fonts` property on `Dom_html.document` (#2255)
+* Lib: `Lwt_js_events` `load`/`error`/`abort` and their `seq_loop` variants now
+  accept any element, not only images (#2404)
+
+## Bug fixes
+* Compiler/Wasm runtime: fix toplevels built on Windows — the embedded cmi
+  paths were built with `Filename.concat`, putting `\` separators in the
+  unix-style virtual filesystem, and its lookups did not normalize the `\`
+  separators the program uses when running on Windows; loading Stdlib then
+  failed with `Env.Error` on OCaml >= 5.4 (#2397)
+* Compiler: only fuse `if (e) var x = e; else var x = e2` into
+  `var x = e || e2` when the condition is effect-free; an effectful
+  condition structurally equal to the branch (e.g. two calls to the same
+  function) was evaluated once instead of twice (#2393)
+* Compiler: when simplification folds an `if` with a constant condition,
+  re-emit the `var` declarations of the dropped branch: they are hoisted,
+  so dropping them could turn later assignments into references to an
+  undeclared variable (a ReferenceError in strict mode) or crash the
+  minifier's name allocator (#2393)
+* Compiler: record variable uses occurring in catch-parameter
+  destructuring defaults (`catch ({x = someVar})`) in the free-variable
+  analysis; the short-name allocator could otherwise reuse the name of
+  the referenced variable, making the default read the wrong one (#2393)
+* Wasm: embed cmis when building a toplevel with separate compilation.
+  `wasm_of_ocaml --toplevel` now reports `toplevel=true` in its build config
+  and honors the flag when it comes through `--apply-build-config`, so dune
+  builds the toplevel variant of library dependencies and their cmis (Stdlib,
+  compiler-libs, ...) end up in `/static/cmis`. Previously only whole-program
+  compilation embedded them, so a separately-compiled wasm toplevel failed to
+  load Stdlib at startup (#1721)
+* Runtime: fix comparison between an immediate and a custom block that
+  provides a compare op (e.g. zarith), broken by #2290 (#2391)
+* Toplevel: keep the `/static/cmis` directory on the load path across
+  `Toploop.initialize_toplevel_env`, so libraries whose cmis are loaded at
+  runtime stay resolvable; previously the directory was registered only while
+  Stdlib was loaded and then dropped, leaving later lookups unresolved (#833)
+* Tyxml: when the same attribute (e.g. multiple `a_class`) is given several
+  times, keep the first one and ignore the rest, matching browser semantics,
+  instead of letting the last one silently overwrite the others (#968)
+
+# 6.4.1 (2026-06-30) - Lille
+
+## Bug fixes
+* Runtime/wasm: derive the wat-module name from the basename of the input
+  path in `runtime/wasm/args.ml`, so dune 3.24's leading-`./` path-form
+  representation (ocaml/dune#15156) keeps producing well-formed
+  `module:path` lines for `wasmoo_link_wasm` (#2371)
+* Tests: pass file paths as literal arguments (with explicit `(deps ...)`)
+  instead of `%{dep:...}` in the `md5`/`md5_nat`, `dump_sourcemap` and
+  `check-prim` tests, which echo the path verbatim, so dune 3.24's leading-`./`
+  path form (ocaml/dune#15156) no longer breaks their expected output (#2384)
+* Lib: add `Element.setPointerCapture`/`releasePointerCapture`/`hasPointerCapture`
+  bindings to `Dom_html.element` (#2403)
+* Lib: add `pointerEvent` bindings `getPredictedEvents`, `altitudeAngle` and
+  `azimuthAngle` (#2403)
+
+# 6.4.0 (2026-06-21) - Lille
+
+## Features/Changes
+* Compiler: initial support for OCaml 5.5.0 (#2197, #2220)
+* Compiler: OxCaml support (#2105, #2225)
+* Compiler: new variable coalescing pass, plus faster variable-naming,
+  free-variable and shape-computation passes (#2166, #2321, #2198)
+* Compiler: add the `--build-config` and `--apply-build-config` flags (#2177)
+* Compiler: put more values into global variables (#2211)
+* Compiler: cosmetic minification in compact mode — `!0`/`!1` booleans,
+  drop the leading `0` in `0.x` fractions, normalise exponents
+  (`1e+05` → `1e5`), and pick backtick strings when they reduce escapes;
+  `--pretty` output is unchanged (#1117)
+* Wasm: dynlink and toplevel support (#2186)
+* Compiler/wasm: WASI 0.1 support (#1831)
+* Wasm_of_ocaml: alternative effect implementation based on the Stack
+  Switching proposal (#2189)
+* Runtime/wasm: implement the legacy `num` library `nat` primitives
+  (previously no-op stubs), so arbitrary-precision integers and rationals
+  now work as on the JavaScript runtime (#2263)
+* Runtime/wasm: faster string↔ArrayBuffer copies, faster small-string
+  conversions, and optimized bigstring primitives (#2124, #2144)
+* Runtime/wasm: pure-Wasm zstd and BLAKE2b implementations; the runtime
+  no longer relies on the JavaScript zstd/BLAKE2 shims to unmarshal
+  compressed values or compute Digest.BLAKE512/256/128. This also makes
+  both available under the WASI target, which has no JavaScript (#2249)
+* Runtime: initial support for quickjs-ng (#2229)
+* Lib: add `Promise` — type-safe bindings to JavaScript promises (even for
+  `'a Promise.t Promise.t`), with Lwt interop in `Js_of_ocaml_lwt.Promise`
+  (`to_lwt`/`of_lwt`) and Promise-typed `Dom_html` bindings
+  (`requestFullscreen`, `requestPointerLock`, `exitFullscreen`,
+  `mediaElement.play`, `imageElement.decode`, `Animation.{finished,ready}`).
+  Breaking: `mediaElement.play` now returns `unit Promise.t` (#2031)
+* Lib: add `Fetch` and `Abort` — Fetch API binding with a typed
+  `AbortController`/`AbortSignal` primitive for cancellation (#596)
+* Lib: many additional `Dom_html` bindings and a new `Performance` module
+  (#2221, #2248)
+* Lib: add `Console` bindings for `table`, `count`, `countReset` and
+  `timeLog` (#2350)
+* Lib: align `Dom_svg` with SVG 2 — new `graphicsElement`/`geometryElement`
+  parents, `style`/`className`/`dataset` merged into `element`, SVG 2
+  members, `markerElement` and the full `SVGFE*` filter-primitive family,
+  every SVG element is now an event target (#519), and `prop`/`readonly_prop`
+  fixes. Breaking: drops the SVG 1.1-only `getTransformToElement`;
+  `nearestViewportElement`/`farthestViewportElement` are now typed `optdef`
+* Lib: implement the popover API (#1734)
+* Lib: add `Intl.RelativeTimeFormat` (#2070)
+* Lib: remove dead legacy-browser code from the DOM bindings (IE
+  `attachEvent`/`createElement`/`cancelBubble` fallbacks, prefixed
+  `requestAnimationFrame`, the Firefox 3.x `File.fileName` property).
+  Breaking: drops the obsolete Gecko `MouseScrollEvent`/`_DOMMouseScroll`
+  bindings — the `mouseScrollEvent` type, the `MouseScrollEvent`
+  `taggedEvent` variant, `CoerceTo.mouseScrollEvent` and
+  `Event._DOMMouseScroll` (#2350)
+
+## Documentation
+* Doc: check documentation examples. An `{@ocaml[ … ]}` code block in an `.mli`
+  doc-comment or an `.mld` manual page is type-checked against the library by
+  `dune build @runtest`, so examples that no longer match the API fail the build.
+  The `{@ocaml parse[ … ]}` and `{@ocaml skip[ … ]}` markers opt out of typing
+  (parse-only) and of checking entirely; plain `{[ … ]}` blocks are never
+  checked. See `manual/examples-check/` (#1020)
+
+## Bug fixes
+* Compiler: don't rewrite `x = e + x` into `x += e` for `+` (not
+  commutative on strings), which reversed `Filename.concat` operands and
+  broke `Filename.temp_file` in whole-program builds (#2228)
+* Compiler: fix the dead `require()` guard in share_constant (it matched
+  "requires"), which could replace `require` string arguments and confuse
+  bundlers (#2284)
+* Compiler: parenthesize `in` in conditional else-branches, arrow concise
+  bodies and `for`-initializer yields when re-printing parsed JavaScript,
+  which previously emitted output that did not parse (#2282)
+* Compiler: emit a flat dispatch loop instead of deeply nested labelled
+  blocks for many sibling merge targets, avoiding parser "too much
+  recursion" overflows (#2122)
+* Compiler: avoid JS stack overflow on deep mutually-recursive direct-style
+  calls under `--effects=double-translation` (#2243)
+* Compiler: fix reference unboxing (#2210), a missing conditional
+  simplification (#2217), `Js_assign.simpl` (#2218), and UGEINT lowering
+* Compiler/wasm: fix the int-division return type (#2197), preserve the
+  physical identity of empty closures (#2207), and fix a crash on some
+  function calls (#2208)
+* Runtime: hashing is now consistent across backends — JS strings with code
+  points above U+00FF mix two 16-bit units per word, `Hashtbl.hash` of float
+  arrays, bigarray tail zero-extension and `float32_hash` normalize like
+  native; ASCII/Latin-1 strings are unchanged (#2263, #2270, #2332)
+* Runtime/wasm: bring many primitives in line with the JavaScript runtime —
+  `caml_wrap_exception` only wraps real `Error`s, `caml_js_meth_call`
+  decodes method names as UTF-8, the exception formatter grows its buffer,
+  `Sys.is_directory`/`file_exists` follow symlinks, `isatty` returns false
+  in browsers, `caml_seek_in` validates the destination, `Array.make`/
+  `Obj.new_block` build proper float arrays, `caml_unregister_named_value`
+  handles non-head bucket entries, the lexer only moves position memory on
+  memory-action transitions, the bytecode-section accessors raise without
+  `--toplevel`, format-string `#`/`%+f`/`% f` corner cases, and
+  `Condition.wait` is a no-op with each condition variable having a distinct
+  identity (#2263)
+* Runtime: marshalling fixes on both backends — `Marshal.to_buffer` returns
+  the byte count; float arrays use `CODE_DOUBLE_ARRAY` (readable by native
+  and Wasm); BLOCK32 sizes are decoded with an unsigned shift (≥ 2^21 fields
+  no longer truncated) and a block with ≥ 2^22 fields raises instead of
+  truncating; `input_value` on a bad object raises `Failure`; bigarray
+  deserialization rejects bad dimensions; big-endian double arrays are
+  registered in the object table (#2263, #2270)
+* Runtime: filesystem fixes (#2270) — the fake device no longer destroys a
+  directory renamed into its own subtree, refuses to unlink directories,
+  honors `Open_append` (which now implies write access), reports proper Unix
+  error codes/syscalls/paths, no longer matches mount points as regexes,
+  raises `Sys_error` on cross-device renames, keeps file sizes 64-bit on the
+  node backend, and no longer deletes a file renamed onto itself; `flush` on
+  a closed channel no longer raises
+* Runtime: `O_APPEND`/`Open_append` matches native on both backends — the
+  file offset starts at 0 (so `lseek`/`pos_out` report 0 right after opening)
+  and every write goes to the end of the file, even after seeking backwards
+  (#2306)
+* Runtime: an empty path raises `ENOENT` on the JavaScript backend like
+  native (and the Wasm runtime), so `Unix.stat ""`, `Unix.opendir ""`, etc.
+  raise instead of operating on the cwd, and `Sys.file_exists ""` is false
+  (#2354)
+* Runtime: Unix fixes — `Unix.localtime` computes `tm_yday` from the date
+  (was off by one during DST) and reaches `Intl` safely; `Unix.close` frees
+  the fd-table slot; `Unix.error_message` no longer crashes on unknown codes
+  or node < 22; `chmod` raises `Unix_error`; `readdir` includes "." and
+  "..", and add `Unix.getegid` / fix the `Unix.getgrgid` export (#2263,
+  #2270, #2303, #2304)
+* Runtime: channel fixes — `in_channel_of_descr`/`out_channel_of_descr`
+  allocate fresh channels (they used to share a record and loop on reads);
+  refill-hook channels grow their buffer and keep `pos_in`/`pos_out`
+  correct; `Sys.command` returns the child exit status; `Sys.getenv` raises
+  on prototype names; `Sys.isatty` consults the channel's file (#2270, #2330)
+* Runtime: Str engine fixes — SIMPLEOPT/STAR/PLUS no longer read past the
+  end of the string (a trailing negated class could loop forever),
+  instruction arguments are no longer masked to 8 bits (regexps with > 256
+  pool entries mis-indexed), and a `Str.replace` backreference one past the
+  last group raises instead of trapping (#2263, #2270)
+* Runtime: ephemeron/weak fixes — `blit_key`, `blit_data`, `get_data`,
+  `get_copy` and `get_data_copy` corrected (no clobbering, copy bytes and
+  float arrays, no traps on JS-valued data); data is weakly keyed on the key
+  object so key↔data cycles can be collected; `Gc.finalise_last` runs under
+  `--effects=cps`; `Gc.counters` returns a plain tuple (#2263, #2270, #2274,
+  #2279)
+* Runtime: numeric fixes — `Digest`/MD5 correct for inputs ≥ 2 GiB;
+  `Int64.shift_right` for negatives with shift counts 41–47;
+  `Int64.of_string` (#2223); `Printf "%#x" 0` prints `0`; float16 bigarray
+  NaN comparison; comparing an immediate against a custom block no longer
+  throws and orders correctly; `Float.Array.sub`/`append`/`concat` return
+  tag-254 arrays; `caml_bigstring_blit_*` treat positions as raw offsets;
+  `compare_nat` reads only the common digit length (#2263, #2270)
+* Runtime: float formatting and parsing — the exact decimal expansion is
+  printed beyond `toFixed`/`toExponential`'s limits (`%.150e`, `%f` of values
+  ≥ 1e21); hex-float literals parse with correct rounding, saturate huge
+  exponents instead of wrapping, and reject non-decimal/JavaScript literals;
+  `ldexp` rounds once into the subnormal range; and `float_of_string` skips
+  all leading whitespace (#2263, #2270)
+* Runtime: `caml_float16_of_double` rounds through `float32` like native, so
+  `float16` tie values agree across the js, wasm and native backends; and
+  `Unix.getuid`/`geteuid`/`getgid`/`getegid` return the real ids on Node (the
+  WASI build keeps `1`) (#2280)
+* Runtime: Graphics backend fixes (#2270) — consistent bottom-left pixel
+  origin across all primitives, correct `draw_arc` quadrant, synchronous
+  first `draw_image`, `fill_rect` paints the far edges, pie-slice `fill_arc`,
+  half-pixel-centred strokes/fills for crisp lines, and round caps/joins,
+  matching the native X11 backend
+* Runtime: `Domain.spawn` of a raising body now succeeds and `Domain.join`
+  re-raises (with the `Finished` payload layout expected per OCaml version),
+  instead of corrupting the domain id and termination mutex (#2263, #2270,
+  #2302)
+* Runtime: `caml_dynlink_open_lib` drops the `mode` argument on OCaml ≥ 5.1
+  and returns the filled library-slot index (#2270)
+* Runtime: misc runtime-review fixes — `Runtime_events.User.register`
+  orders `typ`/`tag` correctly and the cursor primitives are renamed
+  `caml_ml_runtime_events_*`; `jsoo_effect_not_supported` is provided only
+  when effects are disabled; `Blake2.create` truncates an over-long key;
+  `OCAMLRUNPARAM` backtrace parsing is last-wins; fix `caml_oo_cache_id`
+  (#2224) and JS→OCaml string conversion (#2230) (#2263, #2270)
+* Lib: binding fixes (#2350) — `CSS.Angle` parses integer angles such as
+  `"45deg"`; `CSS.Color` rejects empty channels (`"rgb(,,)"`);
+  `IntersectionObserver.takeRecords` is wrapped in `Js.t`; `EventSource`
+  `onopen`/`onerror` receive a plain `Dom.event`; `Intl.Collator.compare`
+  returns `Js.number_t`; `Dom.attr.ownerElement` is typed `element t opt
+  readonly_prop`; `Regexp.replace_first` preserves all flags except `g`
+  (adds a `flags` accessor)
+* Lib: fix method-name mangling — `Typed_array._BYTES_PER_ELEMENT_`,
+  `WebGL._MAX_RENDERBUFFER_SIZE_` and `canvasElement.toDataURL_compression`
+  resolved to the wrong JavaScript identifiers (#2239)
+* Lib: defer `Intl.{Collator,DateTimeFormat,...}` member lookups so the
+  module no longer throws at load time when `globalThis.Intl` is undefined
+  (#2229)
+* Lib: fix `onbeforeunload` breaking navigation (#1436) — the
+  `event_listener` return type is now `bool t optdef` (`undefined` means "no
+  opinion"), with new `Dom.listener`/`full_listener` and a typed
+  `beforeUnloadEvent`
+* Lib: fix several `Dom_html` bindings (#2221)
+* Lib: `Deriving_Json` now round-trips non-finite floats — the writer emits
+  `NaN`/`Infinity`/`-Infinity` (matching the reader) instead of OCaml's
+  `nan`/`inf`/`-inf`, which the reader rejected (#2365)
+* Lib: drop a stray `console.log` fired on every event in
+  `Lwt_js_events.mousewheel` (#2365)
+* Lib: `Lwt_file` read functions now fail the thread with an exception on a
+  read error or abort instead of raising `assert false` (#2365)
+* Lib: `Lwt_xmlHttpRequest` frame `content_xml` returns `None` for non-default
+  response types (text/json/blob/arraybuffer/document) instead of raising
+  `assert false` (#2365)
+* Lib: `Lwt_js_events.request_animation_frame` is now cancellable — cancelling
+  the thread cancels the pending animation-frame callback (#2365)
+
+# 6.3.2 (2026-02-15) - Lille
+
+## Changes
+*  Misc: fix installation of completion files again.
+
+# 6.3.1 (2026-02-13) - Lille
+
+## Changes
+*  Misc: fix installation of completion files in monorepo, working around
+   bugs in dune
+
+# 6.3.0 (2026-02-06) - Lille
+
+## Features/Changes
+* Misc: install shell completion script generated by cmdliner (#2140)
+* Compiler/wasm: omit code pointer from closures when not used (#2059, #2093)
+* Compiler/wasm: number unboxing (#2069, #2101)
+* Compiler/wasm: specialization of number comparisons and bigarray operations (#1954)
+* Compiler/wasm: make the type of some Wasm primitives more precise (#2100)
+* Compiler: reference unboxing (#1958)
+* Compiler: js-parser: support import/export with attributes
+* Compiler: js-parser: support 'using X = E' for resource management (#2143)
+* Compiler: js-parser: support decorators
+* Compiler: js-parser: support html-comments
+* Compiler: avoid unnecessary boolean-to-integer conversions (#2168)
+* Runtime: improved handling of NaNs (#2110)
+* Lib: allow to reference values from the runtime (#2086)
+* Lib: add `Dom_html.onload` for WASM-safe load handling (#1948)
+* Runtime: make eval functions more robust (#2108)
+* Compiler: added a constant sinking pass (#2167)
+
+## Bug fixes
+* Compiler: fix `Global_flow.do_escape` monotonicity
+* Compiler: fix static eval of `caml_nativeint_to_int`
+* Compiler: remove invalid conditional simplification
+* Lib: fix `characterData.substringData` method name typo in Dom module
+* Lib: fix various Dom_html bindings (submitEvent, mediaQueryListEvent, pointerEvent, element, inputElement, tableElement types and deprecations)
+* Lib: fix `numberList` type in Dom_svg to use `number_t`
+* Lib: fix `eventSource.url` type to use `js_string t`
+* Lib: fix `file.lastModifiedDate` type to use `Js.date t`, add `lastModified`
+* Lib: fix `Form.get_form_elements` infinite loop bug
+* Lib: fix `position.timestamp` type in Geolocation module
+* Lib: remove non-existent `setDay` and `setUTCDay` methods from `Js.date`
+* Lib: fix `_ACTIVE_TEXTURE_` type in WebGL to use `textureUnit`
+* Compiler: fix purity of comparison functions (again) (#2092)
+* Compiler: fix inlining (#2107)
+* Compiler: allow arrow functions in for loops
+* Ppx: disable spurious warning for unused "self" in object literal (#2128)
+* Ppx: fix labelled arguments for methods (#2126)
+* Runtime/wasm: fix Unix.times (#2096)
+* Runtime: runtime with target-env=browser should not rely on "require(..)" (#2129)
+* Runtime: fix fake filesystem with path containing special regexp chars. (#2132)
+* Runtime/wasm: fix unmarshalling of compressed data (#2141)
+* Runtime: fix compilation of loops at start of exception handlers (#2151)
+* Compiler: fix parallel renaming (#2156)
+
+# 6.2.0 (2025-07-30) - Lille
+
+## Features/Changes
+* Compiler: exit-loop-early in more cases (#2077)
+* Runtime: support rename in fake filesystem (#2080)
+* Compiler: remove reserved keyword in ecmascript 3
+* Compiler/wasm: omit code pointer from closures when not used (#2059)
+
+## Bug fixes
+* Compiler: Fix inlining. do not inline recursive functions (#2084)
+* Compiler: fix purity of caml_compare and caml_lxm_next
+* Runtime: fix Sys.rename for directories on windows
+
+# 6.1.1 (2025-07-07) - Lille
+
+## Bug fixes
+* Compiler: Fix shape loading (#2074)
+
+# 6.1.0 (2025-07-01) - Lille
+
+## Features/Changes
+* Misc: drop support for OCaml 4.12 and below
+* Misc: switch to dune.3.19
+* Misc: initial support for ocaml 5.4 (#2030, #2058)
 * Compiler: support for OCaml 4.14.3+trunk (#1844)
-* Compiler: optimize compilation of switches
+* Compiler: add the `--empty-sourcemap` flag
+* Compiler: improve debug/sourcemap location of closures (#1947)
+* Compiler: optimize compilation of switches (#1921, #2057)
 * Compiler: evaluate statically more primitives (#1912, #1915, #1965, #1969)
+* Compiler: rewrote inlining pass (#1935, #2018, #2027)
+* Compiler: improve tailcall optimization (#1943)
+* Compiler: improve deadcode optimization (#1963, #1962, #1967)
+* Compiler: deadcode elimination of cyclic values (#1978)
+* Compiler: remove empty blocks (#1934)
+* Compiler: improve coloring optimization (#1971, #1984, #1986, #1989)
+* Compiler: faster constant sharing (#1988)
+* Compiler: faster js code generation (#1985, #2066)
+* Compiler: improve performance of Javascript linking
+* Compiler: more efficient code generation from bytecode (#1972)
+* Compiler: faster compilation by improving the scheduling of optimization passes (#1962, #2001, #2012, #2027)
+* Compiler: faster compilation by stopping sooner when optimizations become unproductive (#1939)
+* Compiler: Propagate arity between compilation units (#1594)
+* Compiler: Add flags to enable/disable warnings (#2052)
+* Compiler/wasm: directly write Wasm binary modules (#2000, #2003)
+* Compiler/wasm: faster wat output (#1992)
+* Compiler/wasm: use a Wasm text files preprocessor (#1822)
+* Compiler/wasm: optimize integer operations (#2032)
+* Compiler/wasm: use type analysis to remove some unnecessary uses of JavaScript strict equality (#2040)
+* Compiler/wasm: use more precise environment types (#2041)
+* Compiler/wasm: optimize calls to statically known function (#2044)
 * Runtime: use es6 class (#1840)
 * Runtime: support more Unix functions (#1829)
 * Runtime: remove polyfill for Map to simplify MlObjectTable implementation (#1846)
@@ -14,41 +417,39 @@
 * Runtime: make Obj.dup work with floats and boxed numbers (#1871)
 * Runtime: delete BigStringReader, one should use UInt8ArrayReader instead
 * Runtime: less conversion during un-marshalling (#1889)
+* Runtime: use TextEncoder/TextDecoder for utf8-utf16 conversions
+* Runtime: use Dataview to convert between floats and bit representation
+* Runtime: optimize Str.search_forward/search_backward (#2056)
+* Runtime: deprecate caml_ba_create_from (#2056)
+* Runtime: check for unused variable in the runtime (#2056)
 * Runtime/wasm: implement BLAKE2b primitives for Wasm (#1873)
 * Runtime/wasm: support jsoo_env and keep track of backtrace status (#1881)
 * Runtime/wasm: support unmarshaling compressed data (#1898)
 * Runtime/wasm: make resuming a continuation more efficient in Wasm (#1892)
-* Compiler: improve performance of Javascript linking
-* Compiler: remove empty blocks (#1934)
+* Runtime/wasm: use imported string constants for JavaScript strings (#2022)
+* Runtime/wasm: use DataView primitives to implement bigarrays (#1979)
 * Ppx: explicitly disallow polymorphic method (#1897)
 * Ppx: allow "function" in object literals (#1897)
+* Lib: add Dom_html.window.matchMedia & Dom_html.mediaQueryList (#2017)
 * Lib: make the Wasm version of Json.output work with native ints and JavaScript objects (#1872)
-* Compiler: add the `--empty-sourcemap` flag
-* Compiler: faster compilation by stopping sooner when optimizations become unproductive (#1939)
-* Compiler: improve debug/sourcemap location of closures (#1947)
-* Compiler: improve tailcall optimization (#1943)
-* Compiler: improve deadcode optimization (#1963, #1962, #1967)
-* Compiler: improve coloring optimization (#1971, #1984, #1986, #1989)
-* Compiler: faster constant sharing (#1988)
-* Compiler: more efficient code generation from bytecode (#1972)
-* Runtime: use Dataview to convert between floats and bit representation
-* Compiler: speed-up compilation by improving the scheduling of optimization passes (#1962)
-* Compiler: deadcode elimination of cyclic values (#1978)
-* Compiler: directly write Wasm binary modules (#2000, #2003)
 
 ## Bug fixes
 * Compiler: fix stack overflow issues with double translation (#1869)
 * Compiler: minifier fix (#1867)
+* Compiler: fix shortvar with --enable es6 (AssignTarget was not properly handled)
 * Compiler: fix assert failure with double translation (#1870)
 * Compiler: fix path rewriting of Wasm source maps (#1882)
+* Compiler: fix global dead code in presence of dead tailcall (#2010)
 * Compiler/wasm: fix bound check for empty float array (#1904)
-* Lib: fix Dom_html.Keyboard_code.of_event (#1878)
 * Runtime: fix path normalization (#1848)
 * Runtime: fix reading from the pseudo-filesystem (#1859)
 * Runtime: fix initialization of standard streams under Windows (#1849)
 * Runtime: fix Int64.of_string overflow check (#1874)
 * Runtime: fix caml_string_concat when not using JS strings (#1874)
 * Runtime: consistent bigarray hashing across all architectures (#1977)
+* Runtime: fix caml_utf8_of_utf16 bug in high surrogate case (#2008)
+* Runtime: fix method lookup (#2034, #2038, #2039)
+* Lib: fix Dom_html.Keyboard_code.of_event (#1878)
 * Tools: fix jsoo_mktop and jsoo_mkcmis (#1877)
 * Toplevel: fix for when use-js-strings is disabled (#1997)
 
@@ -84,12 +485,12 @@
 * Runtime: make sure [n / 0L] is not optimized away by DCE
 * Runtime: fix Unix.LargeFile.stat/lstat
 * Runtime: fix stat/lstat times
-* Runtime: fix reading from stdin in an interactive nodejs
+* Runtime: fix reading from stdin in an interactive Node.js
 
 # 5.9.1 (02-12-2024) - Lille
 
 ## Features/Changes
-* Compiler: add mechanism to deprecate runtime promitives
+* Compiler: add mechanism to deprecate runtime primitives
 * Runtime: re-introduce caml_new_string, marked as deprecated
 
 # 5.9.0 (2024-11-22) - Lille
@@ -151,7 +552,7 @@
 # 5.8.0 (2024-04-20) - Lille
 
 ## Features/Changes
-* Compiler: es6 now generate consise body
+* Compiler: es6 now generate concise body
 * Compiler: codegen: optimize Offset_ref for negative offsets
 * Compiler: codegen: change argument passing of back edges.
 * Compiler: codegen: use Array destruction to assign args of back
@@ -209,7 +610,7 @@
 # 5.6.0 (2024-01-02) - Lille
 
 ## Features/Changes
-* Compiler: try to preserve clorures ordering between ml and js
+* Compiler: try to preserve closures ordering between ml and js
 * Compiler: js-parser accept for await
 
 ## Bug fixes
@@ -270,7 +671,7 @@
 * Compiler: fix location for parsing errors when last token is a virtual semicolon
 * Compiler: fix variable renaming with nested const/let decl with identical names
 * Compiler: fix variable renaming inside js method
-* Compiler: consise body should allow any expression but object literals
+* Compiler: concise body should allow any expression but object literals
 * Compiler: preserve [new] without arguments [new C] (vs [new C()]
 * Compiler: remove invalid rewriting of js (#1471, #1469)
 * Runtime: fix int32 values returned from bigarrays when wrapping Uint32Array objects (#1472)
@@ -284,7 +685,7 @@
 * Compiler (js parser): fix parsing of js labels (fix #1440)
 * Compiler: fix simplification of js with let and const
 * Compiler: reduce memory consumption when parsing js
-* Compiler: parsing js can return a list of token, the list was sometime incorrect
+* Compiler: parsing js can return a list of token, the list was sometimes incorrect
 * Sourcemap: stop producing sourcemaps mappings with negative lines or columns
 * Runtime: fix marshalling with sharing and string (use-js-string)
 
@@ -313,7 +714,7 @@
 * Compiler: improve analysis for more direct call (#1397)
 * Compiler: change memory representation of OCaml strings to use js ones.
 * Toplevel: Enable separate compilation of toplevels
-* Runtime: js backtrace recording controled by OCAMLRUNPARAM
+* Runtime: js backtrace recording controlled by OCAMLRUNPARAM
 * Runtime: support for zstd decompression of marshalled data (ocaml.5.1) (#12006)
 * Runtime: stub out custom runtime events symbols for OCaml 5.1 (#1414)
 
@@ -340,12 +741,12 @@ Runtime: fix caml_read_file_content
 * Misc: fix and update benchmarks
 * Misc: upgrade CI
 * Toplevel: recover more names when generating code during toplevel evaluation
-* Runtime: wrapping exception or not is now controled in the runtime.
+* Runtime: wrapping exception or not is now controlled in the runtime.
 
 ## Bug fixes
-* Runime: Gc.finalise_last should not be eliminated
+* Runtime: Gc.finalise_last should not be eliminated
 * Tyxml: reactive dom needed a fix after #1268 (#1353)
-* Toplevel: Make sure the toplevel uses the correct memory representaion for strings
+* Toplevel: Make sure the toplevel uses the correct memory representation for strings
 * Compiler: fix minifier, missing constraint on try-catch blocks.
 * Compiler: Miscompilation of code involving references and exceptions (#1354, #1356)
 
@@ -374,7 +775,7 @@ Runtime: fix caml_read_file_content
 * Runtime: Implement Gc.finalise_last
 * Runtime: Implement buffer for in_channels
 * Runtime: add support for unix_opendir, unix_readdir, unix_closedir, win_findfirst, win_findnext, win_findclose
-* Runtime: Dont use require when target-env is browser
+* Runtime: Don't use require when target-env is browser
 * Runtime: Implements Parsing.set_trace (#1308)
 * Runtime: ocaml string are represented as javascript ones.
 * Test: track external used in the stdlib and unix
@@ -435,17 +836,17 @@ Runtime: fix caml_read_file_content
 * Compiler: setting tc_depth to 0 remove direct call from the tc optimization.
 * Lib: add hidden, onfullscreenchange and onwebkitfullscreenchange to document
 * Runtime: fixes for Windows, all tests pass
-* Runtime: make all windows drive available on nodejs.
+* Runtime: make all windows drive available on Node.js.
 * Runtime: add support for Sys.mkdir and Sys.rmdir
-* Runtime: make stdin work on nodejs
-* Runtime: add support for Unix(stat,lstat,mkdir,rmdir,symlink,readlink,unlink,getuid) on nodejs.
+* Runtime: make stdin work on Node.js
+* Runtime: add support for Unix(stat,lstat,mkdir,rmdir,symlink,readlink,unlink,getuid) on Node.js.
 * Runtime: add caml_raise_with_args
 
 ## Bug fixes
 * Compiler: fix toplevel generation (#1129, #1130, #1131)
 * Compiler: fix predefined exn id with separate compilation
 * Compiler: js stubs without 'Provides' should still allow 'Require'
-* Runtime: fix handling of uncaugh exceptions
+* Runtime: fix handling of uncaught exceptions
 * Runtime: fix error handling of Sys.readdir
 * Dune: make git version lookup more resilient
 
@@ -453,7 +854,7 @@ Runtime: fix caml_read_file_content
 ## Features/Changes
 * Compiler: add support for OCaml 4.13
 * Compiler: new tool to check for missing primitives
-* Compiler: drop support for OCaml 4.03 and bellow
+* Compiler: drop support for OCaml 4.03 and below
 * Lib: add offsetX and offsetY to Dom_html.mouseEvent
 * Lib: add innerText property for Dom_html
 * Runtime: add dummy implementation for many dummy primitives
@@ -539,7 +940,7 @@ Runtime: fix caml_read_file_content
 * Compiler: fix vardecl optim (#946)
 * Compiler: restore optimization when generating if statements
 * Compiler: fix javascript parser in the presence of line directives (#980)
-* Runtime: Catch nodejs errors and re-raise them as Sys_error
+* Runtime: Catch Node.js errors and re-raise them as Sys_error
 * Runtime: fix caml_parse_sign_and_base and unsigned syntax
 * Runtime: fix caml_js_wrap_meth_callback_strict (#996)
 * Runtime: fix over-application of javascript callback (#996)
@@ -630,14 +1031,14 @@ Runtime: fix caml_read_file_content
 * Misc: dunify the build of the toplevel
 * Misc: support for OCaml 4.08
 * Lib: wrap js_of_ocaml-lwt, js_of_ocaml-tyxml, js_of_ocaml-toplevel, js_of_ocaml-compiler
-* Runtime: don't use deprecated [new Buffer] on nodejs (#726)
+* Runtime: don't use deprecated [new Buffer] on Node.js (#726)
 
 ## Bug fixes
 * Compiler: fix compilation of empty cma
 * Compiler: fix js parser with keyword as ident
 * Compiler, Runtime: make --setenv work with Sys.getenv_opt
 * Compiler: fix miscompilation of Obj.is_int with a match expression
-* Compiler: fix quadratic behaviour in findlib.ml
+* Compiler: fix quadratic behavior in findlib.ml
 * Compiler: prevent addition with a positively-signed number from being coalesced… (#764)
 * Compiler: Fix: static eval of String.get (#770)
 * Runtime: make obj_dup work on string/bytes
@@ -812,7 +1213,7 @@ Runtime: fix caml_read_file_content
 * Lib: Support for Core_kernel and Async_kernel (32bit only).
 * Lib: Mutation observer.
 * Runtime: bigstring, caml_int32_bits_of_float, ..
-* Runtime: better nodejs integration
+* Runtime: better Node.js integration
 
 ## Misc
 * Support for OCaml 4.03
@@ -912,7 +1313,7 @@ Runtime: fix caml_read_file_content
 * Compiler: generate js files with default permission, was 0o600
   (#182) (Daniel Bünzli)
 * Syntax: fix typing of method arguments
-* Runtime: fix behaviour of Sys.argv (Tomohiro Matsuyama)
+* Runtime: fix behavior of Sys.argv (Tomohiro Matsuyama)
 * Runtime: fix caml_js_meth_call
 * Compiler: fix assert false when deadcode is off
 * Compiler: fix compilation of Js.debugger
@@ -955,7 +1356,7 @@ Runtime: fix caml_read_file_content
 * Compiler: allow to embed directory with -file dir_name=ext1,ext2:dest_path
 * Compiler: can now output embedded files in a different js file
 * Lib: js_of_ocaml.graphics
-* Lib: Js.Unsafe.expr to embed JavasScript expression
+* Lib: Js.Unsafe.expr to embed JavaScript expression
   to be used instead of Js.Unsafe.variable (or eval_string)
 * Lib: Sys_js.js_of_ocaml_version && Sys_js.file_content
 * OCamlbuild plugin: Add the OASIS support, document the API and add the tags
@@ -964,7 +1365,7 @@ Runtime: fix caml_read_file_content
 
 ## BugFixes
 * Syntax: Better type constraint (#84)
-* Compiler: caml_failwith primitive was sometime missing (#147)
+* Compiler: caml_failwith primitive was sometimes missing (#147)
 * Compiler: variable names used outside a program were
   not marked as reserved (#146)
 * Lib: fix WebGl interface
@@ -988,7 +1389,7 @@ Runtime: fix caml_read_file_content
   (by Hugo Heuzard)
 * Compiler: improve missing primitives & reserved name detection
   (by Hugo Heuzard)
-* Compiler: static evaluation of constant ("staticeval" optimisation)
+* Compiler: static evaluation of constant ("staticeval" optimization)
   (by Hugo Heuzard)
 * Compiler: share constants (by Hugo Heuzard)
 * Compiler: alias primitives (by Hugo Heuzard)

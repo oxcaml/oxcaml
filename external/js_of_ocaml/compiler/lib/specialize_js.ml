@@ -30,13 +30,7 @@ let debug_stats = Debug.find "stats-debug"
 
 let specialize_instr opt_count ~target info i =
   match i, target with
-  | Let (x, Prim (Extern "caml_make_unboxed_int32_vect_bytecode", [ y ])), _ ->
-      Let (x, Prim (Extern "caml_make_vect", [ y; Pc (Int32 0l) ]))
-  | Let (x, Prim (Extern "caml_make_unboxed_int64_vect_bytecode", [ y ])), _ ->
-      Let (x, Prim (Extern "caml_make_vect", [ y; Pc (Int64 0L) ]))
-  | Let (x, Prim (Extern "caml_make_unboxed_nativeint_vect_bytecode", [ y ])), _ ->
-      Let (x, Prim (Extern "caml_make_vect", [ y; Pc (NativeInt 0l) ]))
-  | Let (x, Prim (Extern "caml_format_int", [ y; z ])), `JavaScript -> (
+  | Let (x, Prim (Extern ("caml_format_int", _), [ y; z ])), `JavaScript -> (
       (* We can implement the special case where the format string is "%s" in JavaScript
          in a concise and efficient way with [""+x]. It does not make as much sense in
          Wasm to have a special case for this. *)
@@ -45,9 +39,9 @@ let specialize_instr opt_count ~target info i =
           incr opt_count;
           match the_int info z with
           | Some i -> Let (x, Constant (String (Targetint.to_string i)))
-          | None -> Let (x, Prim (Extern "%caml_format_int_special", [ z ])))
+          | None -> Let (x, Prim (Extern ("%caml_format_int_special", None), [ z ])))
       | _ -> i)
-  | Let (x, Prim (Extern "%caml_format_int_special", [ z ])), `JavaScript -> (
+  | Let (x, Prim (Extern ("%caml_format_int_special", _), [ z ])), `JavaScript -> (
       match the_int info z with
       | Some i ->
           incr opt_count;
@@ -57,39 +51,39 @@ let specialize_instr opt_count ~target info i =
   | ( Let
         ( x
         , Prim
-            ( Extern (("caml_js_var" | "caml_js_expr" | "caml_pure_js_expr") as prim)
+            ( Extern ((("caml_js_var" | "caml_js_expr" | "caml_pure_js_expr") as prim), _)
             , [ (Pv _ as y) ] ) )
     , _ ) -> (
       match the_string_of info y with
       | Some s ->
           incr opt_count;
-          Let (x, Prim (Extern prim, [ Pc (String s) ]))
+          Let (x, Prim (Extern (prim, None), [ Pc (String s) ]))
       | _ -> i)
-  | Let (x, Prim (Extern ("caml_register_named_value" as prim), [ (Pv _ as y); z ])), _
-    -> (
+  | ( Let (x, Prim (Extern (("caml_register_named_value" as prim), _), [ (Pv _ as y); z ]))
+    , _ ) -> (
       match the_string_of info y with
       | Some s when Primitive.need_named_value s ->
           incr opt_count;
-          Let (x, Prim (Extern prim, [ Pc (String s); z ]))
+          Let (x, Prim (Extern (prim, None), [ Pc (String s); z ]))
       | Some _ ->
           incr opt_count;
           Let (x, Constant (Int Targetint.zero))
       | None -> i)
-  | Let (x, Prim (Extern "caml_js_call", [ f; o; a ])), _ -> (
+  | Let (x, Prim (Extern ("caml_js_call", _), [ f; o; a ])), _ -> (
       match the_block_contents_of info a with
       | Some a ->
           incr opt_count;
           let a = Array.map a ~f:(fun x -> Pv x) in
-          Let (x, Prim (Extern "%caml_js_opt_call", f :: o :: Array.to_list a))
+          Let (x, Prim (Extern ("%caml_js_opt_call", None), f :: o :: Array.to_list a))
       | _ -> i)
-  | Let (x, Prim (Extern "caml_js_fun_call", [ f; a ])), _ -> (
+  | Let (x, Prim (Extern ("caml_js_fun_call", _), [ f; a ])), _ -> (
       match the_block_contents_of info a with
       | Some a ->
           incr opt_count;
           let a = Array.map a ~f:(fun x -> Pv x) in
-          Let (x, Prim (Extern "%caml_js_opt_fun_call", f :: Array.to_list a))
+          Let (x, Prim (Extern ("%caml_js_opt_fun_call", None), f :: Array.to_list a))
       | _ -> i)
-  | Let (x, Prim (Extern "caml_js_meth_call", [ o; m; a ])), _ -> (
+  | Let (x, Prim (Extern ("caml_js_meth_call", _), [ o; m; a ])), _ -> (
       match the_string_of info m with
       | Some m when Javascript.is_ident m -> (
           match the_block_contents_of info a with
@@ -99,20 +93,20 @@ let specialize_instr opt_count ~target info i =
               Let
                 ( x
                 , Prim
-                    ( Extern "%caml_js_opt_meth_call"
+                    ( Extern ("%caml_js_opt_meth_call", None)
                     , o
                       :: Pc (NativeString (Native_string.of_string m))
                       :: Array.to_list a ) )
           | None -> i)
       | _ -> i)
-  | Let (x, Prim (Extern "caml_js_new", [ c; a ])), _ -> (
+  | Let (x, Prim (Extern ("caml_js_new", _), [ c; a ])), _ -> (
       match the_block_contents_of info a with
       | Some a ->
           incr opt_count;
           let a = Array.map a ~f:(fun x -> Pv x) in
-          Let (x, Prim (Extern "%caml_js_opt_new", c :: Array.to_list a))
+          Let (x, Prim (Extern ("%caml_js_opt_new", None), c :: Array.to_list a))
       | _ -> i)
-  | Let (x, Prim (Extern "caml_js_object", [ a ])), _ -> (
+  | Let (x, Prim (Extern ("caml_js_object", _), [ a ])), _ -> (
       try
         let a =
           match the_def_of info a with
@@ -136,40 +130,42 @@ let specialize_instr opt_count ~target info i =
               | Some _ | None -> raise Exit)
         in
         incr opt_count;
-        Let (x, Prim (Extern "%caml_js_opt_object", List.flatten (Array.to_list a)))
+        Let
+          (x, Prim (Extern ("%caml_js_opt_object", None), List.flatten (Array.to_list a)))
       with Exit -> i)
-  | Let (x, Prim (Extern "caml_js_get", [ o; (Pv _ as f) ])), _ -> (
+  | Let (x, Prim (Extern ("caml_js_get", _), [ o; (Pv _ as f) ])), _ -> (
       match the_native_string_of info f with
       | Some s ->
           incr opt_count;
-          Let (x, Prim (Extern "caml_js_get", [ o; Pc (NativeString s) ]))
+          Let (x, Prim (Extern ("caml_js_get", None), [ o; Pc (NativeString s) ]))
       | _ -> i)
-  | Let (x, Prim (Extern "caml_js_set", [ o; (Pv _ as f); v ])), _ -> (
+  | Let (x, Prim (Extern ("caml_js_set", _), [ o; (Pv _ as f); v ])), _ -> (
       match the_native_string_of info f with
       | Some s ->
           incr opt_count;
-          Let (x, Prim (Extern "caml_js_set", [ o; Pc (NativeString s); v ]))
+          Let (x, Prim (Extern ("caml_js_set", None), [ o; Pc (NativeString s); v ]))
       | _ -> i)
-  | Let (x, Prim (Extern "caml_js_delete", [ o; (Pv _ as f) ])), _ -> (
+  | Let (x, Prim (Extern ("caml_js_delete", _), [ o; (Pv _ as f) ])), _ -> (
       match the_native_string_of info f with
       | Some s ->
           incr opt_count;
-          Let (x, Prim (Extern "caml_js_delete", [ o; Pc (NativeString s) ]))
+          Let (x, Prim (Extern ("caml_js_delete", None), [ o; Pc (NativeString s) ]))
       | _ -> i)
-  | Let (x, Prim (Extern ("caml_jsstring_of_string" | "caml_js_from_string"), [ y ])), _
-    -> (
+  | ( Let
+        (x, Prim (Extern (("caml_jsstring_of_string" | "caml_js_from_string"), _), [ y ]))
+    , _ ) -> (
       match the_string_of info y with
       | Some s when String.is_valid_utf_8 s ->
           incr opt_count;
           Let (x, Constant (NativeString (Native_string.of_string s)))
       | Some _ | None -> i)
-  | Let (x, Prim (Extern "caml_jsbytes_of_string", [ y ])), _ -> (
+  | Let (x, Prim (Extern ("caml_jsbytes_of_string", _), [ y ])), _ -> (
       match the_string_of info y with
       | Some s ->
           incr opt_count;
           Let (x, Constant (NativeString (Native_string.of_bytestring s)))
       | None -> i)
-  | Let (x, Prim (Extern "%int_mul", [ y; z ])), `JavaScript -> (
+  | Let (x, Prim (Extern ("%int_mul", _), [ y; z ])), `JavaScript -> (
       let limit = Targetint.of_int_exn 0x200000 in
       (* Using * to multiply integers in JavaScript yields a float; and if the
            float is large enough, some bits can be lost. So, in the general case,
@@ -177,22 +173,28 @@ let specialize_instr opt_count ~target info i =
       match the_int info y, the_int info z with
       | Some j, _ when Targetint.(abs j < limit) ->
           incr opt_count;
-          Let (x, Prim (Extern "%direct_int_mul", [ y; z ]))
+          Let (x, Prim (Extern ("%direct_int_mul", None), [ y; z ]))
       | _, Some j when Targetint.(abs j < limit) ->
           incr opt_count;
-          Let (x, Prim (Extern "%direct_int_mul", [ y; z ]))
+          Let (x, Prim (Extern ("%direct_int_mul", None), [ y; z ]))
       | _ -> i)
-  | Let (x, Prim (Extern "%int_div", [ y; z ])), _ -> (
+  | Let (x, Prim (Extern ("%int_div", _), [ y; z ])), _ -> (
       match the_int info z with
       | Some j when not (Targetint.is_zero j) ->
           incr opt_count;
-          Let (x, Prim (Extern "%direct_int_div", [ y; z ]))
+          Let (x, Prim (Extern ("%direct_int_div", None), [ y; z ]))
       | _ -> i)
-  | Let (x, Prim (Extern "%int_mod", [ y; z ])), _ -> (
+  | Let (x, Prim (Extern ("%int_mod", _), [ y; z ])), _ -> (
       match the_int info z with
       | Some j when not (Targetint.is_zero j) ->
           incr opt_count;
-          Let (x, Prim (Extern "%direct_int_mod", [ y; z ]))
+          Let (x, Prim (Extern ("%direct_int_mod", None), [ y; z ]))
+      | _ -> i)
+  | Let (x, Prim (Extern ("caml_jsoo_runtime_value", _), [ nm ])), _ -> (
+      match the_string_of info nm with
+      | Some nm when Javascript.is_ident nm ->
+          incr opt_count;
+          Let (x, Prim (Extern ("caml_jsoo_runtime_value", None), [ Pc (String nm) ]))
       | _ -> i)
   | _, _ -> i
 
@@ -202,7 +204,7 @@ let recognize_string_length cont =
   skip_event
   @@ fun l ->
   match l with
-  | (Let (len, Prim (Extern "caml_ml_string_length", [ Pv str ])) as i) :: l ->
+  | (Let (len, Prim (Extern ("caml_ml_string_length", _), [ Pv str ])) as i) :: l ->
       cont i ~len ~str l
   | _ -> None
 
@@ -210,7 +212,7 @@ let recognize_int_add ~x ~y cont =
   skip_event
   @@ fun l ->
   match l with
-  | (Let (res, Prim (Extern "%int_add", [ Pv x'; Pv y' ])) as i) :: l
+  | (Let (res, Prim (Extern ("%int_add", _), [ Pv x'; Pv y' ])) as i) :: l
     when Code.Var.equal x x' && Code.Var.equal y y' -> cont i ~res l
   | _ -> None
 
@@ -218,7 +220,7 @@ let recognize_create_bytes ~len cont =
   skip_event
   @@ fun l ->
   match l with
-  | Let (bytes, Prim (Extern "caml_create_bytes", [ Pv len' ])) :: l
+  | Let (bytes, Prim (Extern ("caml_create_bytes", _), [ Pv len' ])) :: l
     when Code.Var.equal len len' -> cont ~bytes l
   | _ -> None
 
@@ -229,8 +231,8 @@ let recognize_blit_string ~str ~bytes ~ofs ~len cont =
   | Let
       ( _
       , Prim
-          (Extern "caml_blit_string", [ Pv str'; Pc (Int zero); Pv bytes'; ofs'; Pv len' ])
-      )
+          ( Extern ("caml_blit_string", _)
+          , [ Pv str'; Pc (Int zero); Pv bytes'; ofs'; Pv len' ] ) )
     :: l
     when Code.Var.equal str str'
          && Targetint.is_zero zero
@@ -247,7 +249,7 @@ let recognize_string_of_bytes ~bytes cont =
   skip_event
   @@ fun l ->
   match l with
-  | Let (str, Prim (Extern "caml_string_of_bytes", [ Pv bytes' ])) :: l
+  | Let (str, Prim (Extern ("caml_string_of_bytes", _), [ Pv bytes' ])) :: l
     when Code.Var.equal bytes bytes' -> cont ~str l
   | _ -> None
 
@@ -277,8 +279,8 @@ let specialize_string_concat opt_count l =
          [ len1
          ; len2
          ; len3
-         ; Let (str, Prim (Extern "caml_string_concat", [ Pv a; Pv b ]))
-         ; Let (bytes, Prim (Extern "caml_bytes_of_string", [ Pv str ]))
+         ; Let (str, Prim (Extern ("caml_string_concat", None), [ Pv a; Pv b ]))
+         ; Let (bytes, Prim (Extern ("caml_bytes_of_string", None), [ Pv str ]))
          ])
 
 let idx_equal (v1, c1) (v2, c2) =
@@ -288,6 +290,52 @@ let idx_equal (v1, c1) (v2, c2) =
   | `Cst a, `Cst b -> Targetint.equal a b
   | `Var a, `Var b -> Code.Var.equal a b
   | `Cst _, `Var _ | `Var _, `Cst _ -> false
+
+let indexing_primitives l =
+  let h = String.Hashtbl.create 16 in
+  List.iter l ~f:(fun prim ->
+      List.iter [ "int32"; "nativeint"; "int64" ] ~f:(fun int ->
+          String.Hashtbl.add
+            h
+            (prim ^ "_indexed_by_" ^ int)
+            ("caml_checked_" ^ int ^ "_to_int", prim)));
+  h
+
+let getters =
+  indexing_primitives
+    [ "caml_array_get"
+    ; "caml_string_get16"
+    ; "caml_string_get32"
+    ; "caml_string_get64"
+    ; "caml_string_getf32"
+    ; "caml_bytes_get16"
+    ; "caml_bytes_get32"
+    ; "caml_bytes_get64"
+    ; "caml_bytes_getf32"
+    ; "caml_ba_uint8_get16"
+    ; "caml_ba_uint8_get32"
+    ; "caml_ba_uint8_get64"
+    ; "caml_ba_uint8_getf32"
+    ]
+
+let setters =
+  indexing_primitives
+    [ "caml_array_set"
+    ; "caml_bytes_set16"
+    ; "caml_bytes_set32"
+    ; "caml_bytes_set64"
+    ; "caml_bytes_setf32"
+    ; "caml_ba_uint8_set16"
+    ; "caml_ba_uint8_set32"
+    ; "caml_ba_uint8_set64"
+    ; "caml_ba_uint8_setf32"
+    ]
+
+let make_vect x y constant acc =
+  let c = Var.fresh () in
+  Let (x, Prim (Extern ("caml_make_vect", None), [ y; Pv c ]))
+  :: Let (c, Constant constant)
+  :: acc
 
 let specialize_instrs ~target opt_count info l =
   let rec aux info checks l acc =
@@ -299,28 +347,17 @@ let specialize_instrs ~target opt_count info l =
            the array access. The bound checking function returns the array,
            which allows to produce more compact code. *)
         match i with
-        | Let
-            ( x
-            , Prim
-                ( Extern
-                    (( "caml_array_get_indexed_by_int32"
-                     | "caml_array_get_indexed_by_int64"
-                     | "caml_array_get_indexed_by_nativeint" ) as prim)
-                , [ y; z ] ) ) ->
-            let conv =
-              match prim with
-              | "caml_array_get_indexed_by_int32" -> "caml_checked_int32_to_int"
-              | "caml_array_get_indexed_by_int64" -> "caml_checked_int64_to_int"
-              | "caml_array_get_indexed_by_nativeint" -> "caml_checked_nativeint_to_int"
-              | _ -> assert false
-            in
+        | Let (x, Prim (Extern (prim, _), [ y; z ])) when String.Hashtbl.mem getters prim
+          ->
+            incr opt_count;
+            let conv, access = String.Hashtbl.find getters prim in
             let z' = Code.Var.fresh () in
             let r =
-              Let (z', Prim (Extern conv, [ z ]))
-              (* The recursive call to [aux] will optimize [caml_array_get] into
-               a nominally "unsafe" (but guarded) access.
-            *)
-              :: Let (x, Prim (Extern "caml_array_get", [ y; Pv z' ]))
+              Let (z', Prim (Extern (conv, None), [ z ]))
+              (* The recursive call to [aux] will optimize
+                 [caml_array_get] into a nominally "unsafe" (but
+                 guarded) access. *)
+              :: Let (x, Prim (Extern (access, None), [ y; Pv z' ]))
               :: r
             in
             aux info checks r acc
@@ -328,10 +365,11 @@ let specialize_instrs ~target opt_count info l =
             ( x
             , Prim
                 ( Extern
-                    (( "caml_array_get"
-                     | "caml_array_get_float"
-                     | "caml_floatarray_get"
-                     | "caml_array_get_addr" ) as prim)
+                    ( (( "caml_array_get"
+                       | "caml_array_get_float"
+                       | "caml_floatarray_get"
+                       | "caml_array_get_addr" ) as prim)
+                    , _ )
                 , [ Pv y; z ] ) ) ->
             let idx =
               match the_int info z with
@@ -344,9 +382,9 @@ let specialize_instrs ~target opt_count info l =
             let instr y =
               let prim =
                 match prim with
-                | "caml_array_get" -> Extern "caml_array_unsafe_get"
+                | "caml_array_get" -> Extern ("caml_array_unsafe_get", None)
                 | "caml_array_get_float" | "caml_floatarray_get" ->
-                    Extern "caml_floatarray_unsafe_get"
+                    Extern ("caml_floatarray_unsafe_get", None)
                 | "caml_array_get_addr" -> Array_get
                 | _ -> assert false
               in
@@ -368,30 +406,21 @@ let specialize_instrs ~target opt_count info l =
               in
               let y' = Code.Var.fresh () in
               incr opt_count;
-              let acc = instr y' :: Let (y', Prim (Extern check, [ Pv y; z ])) :: acc in
+              let acc =
+                instr y' :: Let (y', Prim (Extern (check, None), [ Pv y; z ])) :: acc
+              in
               aux info ((y, idx) :: checks) r acc
-        | Let
-            ( x
-            , Prim
-                ( Extern
-                    (( "caml_array_set_indexed_by_int32"
-                     | "caml_array_set_indexed_by_int64"
-                     | "caml_array_set_indexed_by_nativeint" ) as prim)
-                , [ y; z; w ] ) ) ->
-            let conv =
-              match prim with
-              | "caml_array_set_indexed_by_int32" -> "caml_checked_int32_to_int"
-              | "caml_array_set_indexed_by_int64" -> "caml_checked_int64_to_int"
-              | "caml_array_set_indexed_by_nativeint" -> "caml_checked_nativeint_to_int"
-              | _ -> assert false
-            in
+        | Let (x, Prim (Extern (prim, _), [ y; z; w ]))
+          when String.Hashtbl.mem setters prim ->
+            incr opt_count;
+            let conv, setter = String.Hashtbl.find setters prim in
             let z' = Code.Var.fresh () in
             let r =
-              Let (z', Prim (Extern conv, [ z ]))
-              (* The recursive call to [aux] will optimize [caml_array_set] into
-               a nominally "unsafe" (but guarded) access.
-            *)
-              :: Let (x, Prim (Extern "caml_array_set", [ y; Pv z'; w ]))
+              Let (z', Prim (Extern (conv, None), [ z ]))
+              (* The recursive call to [aux] will optimize
+                 [caml_array_set] into a nominally "unsafe" (but
+                 guarded) access. *)
+              :: Let (x, Prim (Extern (setter, None), [ y; Pv z'; w ]))
               :: r
             in
             aux info checks r acc
@@ -399,10 +428,11 @@ let specialize_instrs ~target opt_count info l =
             ( x
             , Prim
                 ( Extern
-                    (( "caml_array_set"
-                     | "caml_array_set_float"
-                     | "caml_floatarray_set"
-                     | "caml_array_set_addr" ) as prim)
+                    ( (( "caml_array_set"
+                       | "caml_array_set_float"
+                       | "caml_floatarray_set"
+                       | "caml_array_set_addr" ) as prim)
+                    , _ )
                 , [ Pv y; z; t ] ) ) ->
             let idx =
               match the_int info z with
@@ -421,7 +451,7 @@ let specialize_instrs ~target opt_count info l =
                 | "caml_array_set_addr" -> "caml_array_unsafe_set_addr"
                 | _ -> assert false
               in
-              Let (x, Prim (Extern prim, [ Pv y; z; t ]))
+              Let (x, Prim (Extern (prim, None), [ Pv y; z; t ]))
             in
             if List.mem ~eq:idx_equal (y, idx) checks
             then (
@@ -438,9 +468,24 @@ let specialize_instrs ~target opt_count info l =
                 | _ -> assert false
               in
               let y' = Code.Var.fresh () in
-              let acc = instr y' :: Let (y', Prim (Extern check, [ Pv y; z ])) :: acc in
+              let acc =
+                instr y' :: Let (y', Prim (Extern (check, None), [ Pv y; z ])) :: acc
+              in
               incr opt_count;
               aux info ((y, idx) :: checks) r acc
+        | Let (x, Prim (Extern ("caml_make_unboxed_int32_vect_bytecode", _), [ y ])) ->
+            incr opt_count;
+            aux info checks r (make_vect x y (Int32 0l) acc)
+        | Let (x, Prim (Extern ("caml_make_unboxed_int64_vect_bytecode", _), [ y ])) ->
+            incr opt_count;
+            aux info checks r (make_vect x y (Int64 0L) acc)
+        | Let (x, Prim (Extern ("caml_make_unboxed_nativeint_vect_bytecode", _), [ y ]))
+          ->
+            incr opt_count;
+            aux info checks r (make_vect x y (NativeInt 0l) acc)
+        | Let (x, Prim (Extern ("caml_make_unboxed_float32_vect_bytecode", _), [ y ])) ->
+            incr opt_count;
+            aux info checks r (make_vect x y (Float32 0L) acc)
         | _ ->
             let i = specialize_instr ~target opt_count info i in
             aux info checks r (i :: acc))
@@ -488,13 +533,14 @@ let f_once_before p =
             ( x
             , (Prim
                  ( Extern
-                     ( "caml_array_set"
-                     | "caml_array_unsafe_set"
-                     | "caml_array_set_float"
-                     | "caml_floatarray_set"
-                     | "caml_array_set_addr"
-                     | "caml_array_unsafe_set_float"
-                     | "caml_floatarray_unsafe_set" )
+                     ( ( "caml_array_set"
+                       | "caml_array_unsafe_set"
+                       | "caml_array_set_float"
+                       | "caml_floatarray_set"
+                       | "caml_array_set_addr"
+                       | "caml_array_unsafe_set_float"
+                       | "caml_floatarray_unsafe_set" )
+                     , _ )
                  , [ _; _; _ ] ) as p) ) ->
             let x' = Code.Var.fork x in
             let acc = Let (x', p) :: Let (x, Constant (Int Targetint.zero)) :: acc in
@@ -504,7 +550,9 @@ let f_once_before p =
   let blocks =
     Addr.Map.map (fun block -> { block with Code.body = loop [] block.body }) p.blocks
   in
-  { p with blocks }
+  let p = { p with blocks } in
+  Code.invariant p;
+  p
 
 let rec args_equal xs ys =
   match xs, ys with
@@ -517,16 +565,16 @@ let f_once_after p =
     match Config.target (), Config.effects () with
     | `JavaScript, `Disabled -> true
     | `JavaScript, (`Cps | `Double_translation) | `Wasm, _ -> false
-    | `JavaScript, `Jspi -> assert false
+    | `JavaScript, (`Jspi | `Native) -> assert false
   in
   let f = function
     | Let (x, Closure (l, (pc, []), _)) as i -> (
         let block = Addr.Map.find pc p.blocks in
         match block with
         | { body =
-              ( [ Let (y, Prim (Extern prim, args)) ]
-              | [ Event _; Let (y, Prim (Extern prim, args)) ]
-              | [ Event _; Let (y, Prim (Extern prim, args)); Event _ ] )
+              ( [ Let (y, Prim (Extern (prim, _), args)) ]
+              | [ Event _; Let (y, Prim (Extern (prim, _), args)) ]
+              | [ Event _; Let (y, Prim (Extern (prim, _), args)); Event _ ] )
           ; branch = Return y'
           ; params = []
           } ->
@@ -541,11 +589,13 @@ let f_once_after p =
     | i -> i
   in
   if first_class_primitives
-  then
+  then (
     let blocks =
       Addr.Map.map
         (fun block -> { block with Code.body = List.map block.body ~f })
         p.blocks
     in
-    Deadcode.remove_unused_blocks { p with blocks }
+    let p = Deadcode.remove_unused_blocks { p with blocks } in
+    Code.invariant p;
+    p)
   else p

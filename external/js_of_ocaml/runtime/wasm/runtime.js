@@ -16,9 +16,9 @@
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (js) => async (args) => {
-  // biome-ignore lint/suspicious/noRedundantUseStrict:
+  // biome-ignore lint/suspicious/noRedundantUseStrict: needed for non-module execution
   "use strict";
-  const { link, src, generated } = args;
+  const { link, src, generated, disable_effects } = args;
 
   const isNode = globalThis.process?.versions?.node;
 
@@ -67,6 +67,40 @@
   ];
 
   const fs = isNode && require("node:fs");
+
+  const on_windows = isNode && globalThis.process.platform === "win32";
+
+  // Virtual filesystem for embedded files (e.g. CMIs for toplevel)
+  const virtual_files = new Map(); // path -> Uint8Array
+  const virtual_dirs = new Set(); // directory paths
+  const virtual_fds = new Map(); // fd -> { data, offset }
+  let next_virtual_fd = 1000000;
+
+  // The virtual filesystem uses "/" as path separator. On Windows, the
+  // program manipulates paths with "\" (Sys.os_type is "Win32"), so
+  // normalize paths on registration and before each lookup.
+  const virtual_path = on_windows ? (p) => p.replaceAll("\\", "/") : (p) => p;
+
+  function register_virtual_file(name, content) {
+    name = virtual_path(name);
+    virtual_files.set(name, content);
+    let dir = name;
+    while (true) {
+      const i = dir.lastIndexOf("/");
+      if (i <= 0) break;
+      dir = dir.slice(0, i);
+      virtual_dirs.add(dir);
+    }
+  }
+
+  if (args.files) {
+    for (const [name, data] of Object.entries(args.files)) {
+      register_virtual_file(
+        name,
+        Uint8Array.from(atob(data), (c) => c.charCodeAt(0)),
+      );
+    }
+  }
 
   const fs_cst = fs?.constants;
 
@@ -124,7 +158,9 @@
     return WebAssembly?.Suspending ? new WebAssembly.Suspending(f) : f;
   }
   function make_promising(f) {
-    return WebAssembly?.promising && f ? WebAssembly.promising(f) : f;
+    return !disable_effects && WebAssembly?.promising && f
+      ? WebAssembly.promising(f)
+      : f;
   }
 
   const decoder = new TextDecoder("utf-8", { ignoreBOM: 1 });
@@ -138,9 +174,57 @@
     h = (h << 13) | (h >>> 19); //ROTL32(h, 13);
     return (((h + (h << 2)) | 0) + (0xe6546b64 | 0)) | 0;
   }
+  function jsstring_is_bytes(s) {
+    // Whether every code unit fits in a byte, i.e. no code point above U+00FF.
+    for (var i = 0; i < s.length; i++) if (s.charCodeAt(i) > 0xff) return false;
+    return true;
+  }
+  function caml_hash_mix_jsbytes(h, s) {
+    // Mix a byte string four code units per word, like the JS runtime.
+    var len = s.length,
+      i,
+      w;
+    for (i = 0; i + 4 <= len; i += 4) {
+      w =
+        s.charCodeAt(i) |
+        (s.charCodeAt(i + 1) << 8) |
+        (s.charCodeAt(i + 2) << 16) |
+        (s.charCodeAt(i + 3) << 24);
+      h = hash_int(h, w);
+    }
+    w = 0;
+    switch (len & 3) {
+      // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
+      case 3:
+        w = s.charCodeAt(i + 2) << 16;
+      // falls through
+      // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
+      case 2:
+        w |= s.charCodeAt(i + 1) << 8;
+      // falls through
+      case 1:
+        w |= s.charCodeAt(i);
+        h = hash_int(h, w);
+    }
+    return h ^ len;
+  }
   function hash_string(h, s) {
-    for (var i = 0; i < s.length; i++) h = hash_int(h, s.charCodeAt(i));
-    return h ^ s.length;
+    // A string whose code units all fit in a byte (every ASCII string, all of
+    // Latin-1) is mixed as bytes, leaving its hash unchanged and matching the
+    // JS runtime.
+    if (jsstring_is_bytes(s)) return caml_hash_mix_jsbytes(h, s);
+    // Genuine Unicode text: mix two 16-bit code units per word, so no
+    // information is lost (packing them four per word at byte offsets would
+    // overlap their high bits).
+    var len = s.length,
+      i,
+      w;
+    for (i = 0; i + 2 <= len; i += 2) {
+      w = s.charCodeAt(i) | (s.charCodeAt(i + 1) << 16);
+      h = hash_int(h, w);
+    }
+    if (len & 1) h = hash_int(h, s.charCodeAt(i));
+    return h ^ len;
   }
 
   function getenv(n) {
@@ -178,7 +262,7 @@
       s.dev,
       s.ino | 0,
       kind,
-      s.mode,
+      s.mode & 0o7777,
       s.nlink,
       s.uid,
       s.gid,
@@ -190,9 +274,13 @@
     );
   }
 
-  const on_windows = isNode && globalThis.process.platform === "win32";
+  const on_arm64 = globalThis.process?.arch === "arm64";
 
-  const on_arm64 = globalThis.process?.arch === "arm64?";
+  // See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/stack
+  const isV8 = new Error().stack?.includes("\n    at ") ?? false;
+
+  const call = Function.prototype.call;
+  const DV = DataView.prototype;
 
   const bindings = {
     jstag:
@@ -205,10 +293,11 @@
     set: (x, y, z) => (x[y] = z),
     delete: (x, y) => delete x[y],
     instanceof: (x, y) => x instanceof y,
+    is_js_error: (x) => x instanceof Error,
+    to_js_string: (x) => String(x),
     typeof: (x) => typeof x,
-    // biome-ignore lint/suspicious/noDoubleEquals:
+    // biome-ignore lint/suspicious/noDoubleEquals: ..
     equals: (x, y) => x == y,
-    eval: (x) => eval("("+x+")"),
     strict_equals: (x, y) => x === y,
     fun_call: (f, o, args) => f.apply(o, args),
     meth_call: (o, f, args) => o[f].apply(o, args),
@@ -247,33 +336,7 @@
         : a,
     ta_kind: (a) => typed_arrays.findIndex((c) => a instanceof c),
     ta_length: (a) => a.length,
-    ta_get_f64: (a, i) => a[i],
-    ta_get_f32: (a, i) => a[i],
     ta_get_i32: (a, i) => a[i],
-    ta_get_i16: (a, i) => a[i],
-    ta_get_ui16: (a, i) => a[i],
-    ta_get_i8: (a, i) => a[i],
-    ta_get_ui8: (a, i) => a[i],
-    ta_get16_ui8: (a, i) => a[i] | (a[i + 1] << 8),
-    ta_get32_ui8: (a, i) =>
-      a[i] | (a[i + 1] << 8) | (a[i + 2] << 16) | (a[i + 3] << 24),
-    ta_set_f64: (a, i, v) => (a[i] = v),
-    ta_set_f32: (a, i, v) => (a[i] = v),
-    ta_set_i32: (a, i, v) => (a[i] = v),
-    ta_set_i16: (a, i, v) => (a[i] = v),
-    ta_set_ui16: (a, i, v) => (a[i] = v),
-    ta_set_i8: (a, i, v) => (a[i] = v),
-    ta_set_ui8: (a, i, v) => (a[i] = v),
-    ta_set16_ui8: (a, i, v) => {
-      a[i] = v;
-      a[i + 1] = v >> 8;
-    },
-    ta_set32_ui8: (a, i, v) => {
-      a[i] = v;
-      a[i + 1] = v >> 8;
-      a[i + 2] = v >> 16;
-      a[i + 3] = v >> 24;
-    },
     ta_fill: (a, v) => a.fill(v),
     ta_blit: (s, d) => d.set(s),
     ta_subarray: (a, i, j) => a.subarray(i, j),
@@ -282,12 +345,27 @@
     ta_copy: (ta, t, s, e) => ta.copyWithin(t, s, e),
     ta_bytes: (a) =>
       new Uint8Array(a.buffer, a.byteOffset, a.length * a.BYTES_PER_ELEMENT),
-    ta_blit_from_bytes: (s, p1, a, p2, l) => {
-      for (let i = 0; i < l; i++) a[p2 + i] = bytes_get(s, p1 + i);
-    },
-    ta_blit_to_bytes: (a, p1, s, p2, l) => {
-      for (let i = 0; i < l; i++) bytes_set(s, p2 + i, a[p1 + i]);
-    },
+    dv_make: (a) => new DataView(a.buffer, a.byteOffset, a.byteLength),
+    dv_get_f64: call.bind(DV.getFloat64),
+    dv_get_f32: call.bind(DV.getFloat32),
+    dv_get_i64: call.bind(DV.getBigInt64),
+    // 2026-03-16: using call.bind is faster in V8 which recognize the
+    // primitive and generate inlined call, but calling a JavaScript
+    // function is currently faster in other engines which does not
+    // have this optimization yet. Use benchmarks/bench_dv_getint32.js
+    // for performance comparisons.
+    dv_get_i32: isV8 ? call.bind(DV.getInt32) : (x, y, z) => x.getInt32(y, z),
+    dv_get_i16: call.bind(DV.getInt16),
+    dv_get_ui16: call.bind(DV.getUint16),
+    dv_get_i8: call.bind(DV.getInt8),
+    dv_get_ui8: call.bind(DV.getUint8),
+    dv_set_f64: call.bind(DV.setFloat64),
+    dv_set_f32: call.bind(DV.setFloat32),
+    dv_set_i64: call.bind(DV.setBigInt64),
+    dv_set_i32: call.bind(DV.setInt32),
+    dv_set_i16: call.bind(DV.setInt16),
+    dv_set_i8: call.bind(DV.setInt8),
+    littleEndian: new Uint8Array(new Uint32Array([1]).buffer)[0],
     wrap_callback: (f) =>
       function (...args) {
         if (args.length === 0) {
@@ -333,25 +411,66 @@
         return f(args);
       },
     format_float: (prec, conversion, pad, x) => {
-      function toFixed(x, dp) {
-        if (Math.abs(x) < 1.0) {
-          return x.toFixed(dp);
-        } else {
-          var e = Number.parseInt(x.toString().split("+")[1]);
-          if (e > 20) {
-            e -= 20;
-            x /= Math.pow(10, e);
-            x += new Array(e + 1).join("0");
-            if (dp > 0) {
-              x = x + "." + new Array(dp + 1).join("0");
-            }
-            return x;
-          } else return x.toFixed(dp);
+      // Exact decimal expansion through BigInt, for precisions beyond
+      // toFixed/toExponential's limit of 100 and for %f of values >= 1e21
+      function decompose(x) {
+        // x (finite, >= 0) is m * 2^e
+        var dv = new DataView(new ArrayBuffer(8));
+        dv.setFloat64(0, x);
+        var hi = dv.getUint32(0),
+          lo = dv.getUint32(4);
+        var eb = (hi >>> 20) & 0x7ff;
+        var m = (BigInt(hi & 0xfffff) << 32n) | BigInt(lo);
+        if (eb === 0) return [m, -1074];
+        return [m | (1n << 52n), eb - 1075];
+      }
+      function exact_scaled(x, k) {
+        // round_half_even(x * 10^k) as a BigInt
+        var d = decompose(x);
+        var num = d[0],
+          den = 1n;
+        if (k >= 0) num *= 10n ** BigInt(k);
+        else den = 10n ** BigInt(-k);
+        if (d[1] >= 0) num <<= BigInt(d[1]);
+        else den <<= BigInt(-d[1]);
+        var q = num / den,
+          r2 = (num % den) * 2n;
+        if (r2 > den || (r2 === den && q & 1n)) q += 1n;
+        return q;
+      }
+      function exact_fixed(x, prec) {
+        // toFixed, exactly
+        var q = exact_scaled(x, prec).toString();
+        if (prec === 0) return q;
+        if (q.length <= prec) q = "0".repeat(prec + 1 - q.length) + q;
+        return q.slice(0, q.length - prec) + "." + q.slice(q.length - prec);
+      }
+      function exact_exponential(x, prec) {
+        // toExponential, exactly
+        if (x === 0) return (prec > 0 ? "0." + "0".repeat(prec) : "0") + "e+0";
+        var e10 = Math.floor(Math.log10(x));
+        for (;;) {
+          // we want round(x * 10^(prec - e10)) to have exactly prec + 1
+          // digits; the estimate of e10 is off by at most one (and
+          // rounding can add a digit), so adjust and retry
+          var s = exact_scaled(x, prec - e10).toString();
+          if (s.length === prec + 1) {
+            var m = prec > 0 ? s.charAt(0) + "." + s.slice(1) : s;
+            return m + "e" + (e10 < 0 ? "-" : "+") + Math.abs(e10);
+          }
+          e10 += s.length - (prec + 1);
         }
+      }
+      function toExponential(x, prec) {
+        return prec > 100 ? exact_exponential(x, prec) : x.toExponential(prec);
+      }
+      function toFixed(x, dp) {
+        if (dp > 100 || x >= 1e21) return exact_fixed(x, dp);
+        return x.toFixed(dp);
       }
       switch (conversion) {
         case 0:
-          var s = x.toExponential(prec);
+          var s = toExponential(x, prec);
           // exponent should be at least two digits
           var i = s.length;
           if (s.charAt(i - 3) === "e")
@@ -362,7 +481,7 @@
           break;
         case 2:
           prec = prec ? prec : 1;
-          s = x.toExponential(prec - 1);
+          s = toExponential(x, prec - 1);
           var j = s.indexOf("e");
           var exp = +s.slice(j + 1);
           if (exp < -4 || x >= 1e21 || x.toFixed(0).length > prec) {
@@ -379,8 +498,8 @@
             var p = prec;
             if (exp < 0) {
               p -= exp + 1;
-              s = x.toFixed(p);
-            } else while (((s = x.toFixed(p)), s.length > prec + 1)) p--;
+              s = toFixed(x, p);
+            } else while (((s = toFixed(x, p)), s.length > prec + 1)) p--;
             if (p) {
               // remove trailing zeroes
               var i = s.length - 1;
@@ -393,14 +512,14 @@
       }
       return pad ? " " + s : s;
     },
-    gettimeofday: () => new Date().getTime() / 1000,
+    gettimeofday: () => Date.now() / 1000,
     times: () => {
       if (globalThis.process?.cpuUsage) {
         var t = globalThis.process.cpuUsage();
         return caml_alloc_times(t.user / 1e6, t.system / 1e6);
       } else {
         var t = performance.now() / 1000;
-        return caml_alloc_times(t, t);
+        return caml_alloc_times(t, 0);
       }
     },
     gmtime: (t) => {
@@ -422,15 +541,33 @@
     },
     localtime: (t) => {
       var d = new Date(t * 1000);
-      var d_num = d.getTime();
-      var januaryfirst = new Date(d.getFullYear(), 0, 1).getTime();
-      var doy = Math.floor((d_num - januaryfirst) / 86400000);
+      // tm_yday is the distance in days to January 1; compute it in UTC so
+      // that the one-hour DST shift of wall-clock arithmetic does not apply
+      var doy = Math.floor(
+        (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) -
+          Date.UTC(d.getFullYear(), 0, 1)) /
+          86400000,
+      );
       var jan = new Date(d.getFullYear(), 0, 1);
       var jul = new Date(d.getFullYear(), 6, 1);
       var stdTimezoneOffset = Math.max(
         jan.getTimezoneOffset(),
         jul.getTimezoneOffset(),
       );
+      var isdst = d.getTimezoneOffset() < stdTimezoneOffset;
+      // Europe/Dublin uses "negative DST": the IANA database marks winter
+      // (GMT) as the daylight deviation from its summer standard (IST), so
+      // the native runtime reports tm_isdst inverted from the offset
+      // heuristic. The offsets alone cannot distinguish it from
+      // Europe/London, so match it by name (guarded to the GMT/+1 signature
+      // to avoid the Intl lookup for every other zone).
+      if (
+        stdTimezoneOffset === 0 &&
+        jan.getTimezoneOffset() !== jul.getTimezoneOffset() &&
+        globalThis.Intl?.DateTimeFormat?.().resolvedOptions().timeZone ===
+          "Europe/Dublin"
+      )
+        isdst = !isdst;
       return caml_alloc_tm(
         d.getSeconds(),
         d.getMinutes(),
@@ -440,7 +577,7 @@
         d.getFullYear() - 1900,
         d.getDay(),
         doy,
-        d.getTimezoneOffset() < stdTimezoneOffset,
+        isdst,
       );
     },
     mktime: (year, month, day, h, m, s) =>
@@ -451,13 +588,26 @@
         p,
         access_flags.reduce((f, v, i) => (flags & (1 << i) ? f | v : f), 0),
       ),
-    open: (p, flags, perm) =>
-      fs.openSync(
+    open: (p, flags, perm) => {
+      const vp = virtual_path(p);
+      if (virtual_files.has(vp) && !(flags & 2)) {
+        const fd = next_virtual_fd++;
+        virtual_fds.set(fd, { data: virtual_files.get(vp), offset: 0 });
+        return fd;
+      }
+      return fs.openSync(
         p,
         open_flags.reduce((f, v, i) => (flags & (1 << i) ? f | v : f), 0),
         perm,
-      ),
-    close: (fd) => fs.closeSync(fd),
+      );
+    },
+    close: (fd) => {
+      if (virtual_fds.has(fd)) {
+        virtual_fds.delete(fd);
+        return;
+      }
+      fs.closeSync(fd);
+    },
     write: (fd, b, o, l, p) =>
       fs
         ? fs.writeSync(fd, b, o, l, p === null ? p : Number(p))
@@ -465,9 +615,24 @@
             typeof b === "string" ? b : decoder.decode(b.slice(o, o + l)),
           ),
           l),
-    read: (fd, b, o, l, p) => fs.readSync(fd, b, o, l, p),
+    read: (fd, b, o, l, p) => {
+      const vf = virtual_fds.get(fd);
+      if (vf) {
+        const pos = p === null ? vf.offset : Number(p);
+        const n = Math.min(l, vf.data.length - pos);
+        if (n <= 0) return 0;
+        b.set(vf.data.subarray(pos, pos + n), o);
+        vf.offset = pos + n;
+        return n;
+      }
+      return fs.readSync(fd, b, o, l, p);
+    },
     fsync: (fd) => fs.fsyncSync(fd),
-    file_size: (fd) => fs.fstatSync(fd, { bigint: true }).size,
+    file_size: (fd) => {
+      const vf = virtual_fds.get(fd);
+      if (vf) return BigInt(vf.data.length);
+      return fs.fstatSync(fd, { bigint: true }).size;
+    },
     register_channel,
     unregister_channel,
     channel_list,
@@ -486,7 +651,17 @@
       if (res.error) throw res.error;
       return res.signal ? 255 : res.status;
     },
-    isatty: (fd) => +require("node:tty").isatty(fd),
+    // In a browser there is no tty and no [require]; report false instead of
+    // throwing on the undefined [require].
+    isatty: (fd) => (isNode ? +require("node:tty").isatty(fd) : 0),
+    getuid: () =>
+      globalThis.process?.getuid ? globalThis.process.getuid() : 1,
+    geteuid: () =>
+      globalThis.process?.geteuid ? globalThis.process.geteuid() : 1,
+    getgid: () =>
+      globalThis.process?.getgid ? globalThis.process.getgid() : 1,
+    getegid: () =>
+      globalThis.process?.getegid ? globalThis.process.getegid() : 1,
     time: () => performance.now(),
     getcwd: () => (isNode ? globalThis.process.cwd() : "/static"),
     chdir: (x) => globalThis.process.chdir(x),
@@ -496,21 +671,61 @@
     symlink: (t, p, kind) => fs.symlinkSync(t, p, [null, "file", "dir"][kind]),
     readlink: (p) => fs.readlinkSync(p),
     unlink: (p) => fs.unlinkSync(p),
-    read_dir: (p) => fs.readdirSync(p),
-    opendir: (p) => fs.opendirSync(p),
+    read_dir: (p) => {
+      const vp = virtual_path(p);
+      const prefix = vp.endsWith("/") ? vp : vp + "/";
+      const entries = new Set();
+      for (const name of virtual_files.keys()) {
+        if (name.startsWith(prefix)) {
+          const rest = name.slice(prefix.length);
+          const slash = rest.indexOf("/");
+          entries.add(slash < 0 ? rest : rest.slice(0, slash));
+        }
+      }
+      if (fs) {
+        try {
+          for (const e of fs.readdirSync(p)) entries.add(e);
+        } catch (e) {
+          if (entries.size === 0) throw e;
+        }
+      }
+      return [...entries];
+    },
+    // node's Dir.readSync does not report "." and ".."; native does
+    opendir: (p) => ({ dir: fs.opendirSync(p), dots: [".", ".."] }),
     readdir: (d) => {
-      var n = d.readSync()?.name;
+      if (d.dots.length > 0) return d.dots.shift();
+      var n = d.dir.readSync()?.name;
       return n === undefined ? null : n;
     },
-    closedir: (d) => d.closeSync(),
+    closedir: (d) => {
+      d.dots = []; // a read on the closed handle must fail, not return "." / ".."
+      d.dir.closeSync();
+    },
     stat: (p, l) => alloc_stat(fs.statSync(p), l),
     lstat: (p, l) => alloc_stat(fs.lstatSync(p), l),
     fstat: (fd, l) => alloc_stat(fs.fstatSync(fd), l),
     chmod: (p, perms) => fs.chmodSync(p, perms),
     fchmod: (p, perms) => fs.fchmodSync(p, perms),
-    file_exists: (p) => +fs.existsSync(p),
-    is_directory: (p) => +fs.lstatSync(p).isDirectory(),
-    is_file: (p) => +fs.lstatSync(p).isFile(),
+    file_exists: (p) => {
+      const vp = virtual_path(p);
+      if (virtual_files.has(vp) || virtual_dirs.has(vp)) return 1;
+      return fs ? +fs.existsSync(p) : 0;
+    },
+    is_directory: (p) => {
+      const vp = virtual_path(p);
+      if (virtual_dirs.has(vp)) return 1;
+      if (virtual_files.has(vp)) return 0;
+      // Follow symlinks, like native and the JS runtime (statSync, not lstat).
+      return +fs.statSync(p).isDirectory();
+    },
+    is_file: (p) => {
+      const vp = virtual_path(p);
+      if (virtual_files.has(vp)) return 1;
+      if (virtual_dirs.has(vp)) return 0;
+      // Follow symlinks, like native and the JS runtime (statSync, not lstat).
+      return +fs.statSync(p).isFile();
+    },
     utimes: (p, a, m) => fs.utimesSync(p, a, m),
     truncate: (p, l) => fs.truncateSync(p, l),
     ftruncate: (fd, l) => fs.ftruncateSync(fd, l),
@@ -540,6 +755,7 @@
       }
       fs.renameSync(o, n);
     },
+    tmpdir: () => require("node:os").tmpdir(),
     start_fiber: (x) => start_fiber(x),
     suspend_fiber: make_suspending((f, env) => new Promise((k) => f(k, env))),
     resume_fiber: (k, v) => k(v),
@@ -558,6 +774,62 @@
     map_delete: (m, x) => m.delete(x),
     hash_string,
     log: (x) => console.log(x),
+    register_fragments: (unitName, fragmentsSource) => {
+      // biome-ignore lint/security/noGlobalEval: ..
+      const frags = eval?.(fragmentsSource);
+      imports[unitName + ".fragments"] = frags;
+    },
+    load_module: (wasmBytes) => {
+      const module = new WebAssembly.Module(wasmBytes, options);
+      const inst = new WebAssembly.Instance(module, imports);
+      Object.assign(imports.OCaml, inst.exports);
+      return inst.exports["_dynlink.init"]();
+    },
+    load_wasmo: (zipBytes) => {
+      // Parse ZIP to extract code.wasm and link_order (uncompressed ZIP)
+      const dv = new DataView(
+        zipBytes.buffer,
+        zipBytes.byteOffset,
+        zipBytes.byteLength,
+      );
+      const len = zipBytes.byteLength;
+      // Find End of Central Directory record (search backwards)
+      let eocdOff = len - 22;
+      while (eocdOff >= 0 && dv.getUint32(eocdOff, true) !== 0x06054b50)
+        eocdOff--;
+      if (eocdOff < 0) throw new Error("Invalid ZIP: EOCD not found");
+      const cdOff = dv.getUint32(eocdOff + 16, true);
+      const cdEntries = dv.getUint16(eocdOff + 10, true);
+      // Scan central directory for code.wasm and link_order
+      const entries = {};
+      let off = cdOff;
+      for (let i = 0; i < cdEntries; i++) {
+        if (dv.getUint32(off, true) !== 0x02014b50)
+          throw new Error("Invalid ZIP: bad CD entry");
+        const nameLen = dv.getUint16(off + 28, true);
+        const extraLen = dv.getUint16(off + 30, true);
+        const commentLen = dv.getUint16(off + 32, true);
+        const localOff = dv.getUint32(off + 42, true);
+        const name = decoder.decode(
+          zipBytes.subarray(off + 46, off + 46 + nameLen),
+        );
+        const size = dv.getUint32(off + 24, true);
+        const localNameLen = dv.getUint16(localOff + 26, true);
+        const localExtraLen = dv.getUint16(localOff + 28, true);
+        const dataOff = localOff + 30 + localNameLen + localExtraLen;
+        entries[name] = zipBytes.subarray(dataOff, dataOff + size);
+        off += 46 + nameLen + extraLen + commentLen;
+      }
+      if (!entries["code.wasm"])
+        throw new Error("code.wasm not found in .wasmo");
+      const module = new WebAssembly.Module(entries["code.wasm"], options);
+      const inst = new WebAssembly.Instance(module, imports);
+      Object.assign(imports.OCaml, inst.exports);
+      const names = decoder.decode(entries.link_order).split("\x00");
+      for (const name of names) inst.exports[name + ".init"]();
+    },
+    register_file: (name, data) => register_virtual_file(name, data),
+    read_file: (name) => virtual_files.get(virtual_path(name)) ?? null,
   };
   const string_ops = {
     test: (v) => +(typeof v === "string"),
@@ -565,6 +837,8 @@
     decodeStringFromUTF8Array: () => "",
     encodeStringToUTF8Array: () => 0,
     fromCharCodeArray: () => "",
+    length: (s) => s.length,
+    intoCharCodeArray: () => 0,
   };
   const imports = Object.assign(
     {
@@ -574,11 +848,22 @@
       "wasm:js-string": string_ops,
       "wasm:text-decoder": string_ops,
       "wasm:text-encoder": string_ops,
+      str: new globalThis.Proxy(
+        {},
+        {
+          get(_, prop) {
+            return prop;
+          },
+        },
+      ),
       env: {},
     },
     generated,
   );
-  const options = { builtins: ["js-string", "text-decoder", "text-encoder"] };
+  const options = {
+    builtins: ["js-string", "text-decoder", "text-encoder"],
+    importedStringConstants: "str",
+  };
 
   function loadRelative(src) {
     const path = require("node:path");
@@ -640,8 +925,6 @@
     caml_handle_uncaught_exception,
     caml_buffer,
     caml_extract_bytes,
-    bytes_get,
-    bytes_set,
     _initialize,
   } = wasmModule.instance.exports;
 
@@ -651,7 +934,7 @@
   start_fiber = make_promising(caml_start_fiber);
   var _initialize = make_promising(_initialize);
   if (globalThis.process?.on) {
-    globalThis.process.on("uncaughtException", (err, origin) =>
+    globalThis.process.on("uncaughtException", (err, _origin) =>
       caml_handle_uncaught_exception(err),
     );
   } else if (globalThis.addEventListener) {

@@ -42,13 +42,6 @@ type form_contents =
   | `FormData of formData t
   ]
 
-let rec filter_map f = function
-  | [] -> []
-  | v :: q -> (
-      match f v with
-      | None -> filter_map f q
-      | Some v' -> v' :: filter_map f q)
-
 class type submittableElement = object
   method disabled : bool t prop
 
@@ -76,7 +69,7 @@ let get_select_val (elt : selectElement t) =
       let options =
         Array.init elt##.options##.length (fun i -> Opt.to_option (elt##.options##item i))
       in
-      filter_map
+      List.filter_map
         (function
           | None -> None
           | Some e ->
@@ -84,14 +77,6 @@ let get_select_val (elt : selectElement t) =
         (Array.to_list options)
     else [ name, `String elt##.value ]
   else []
-
-class type file_input = object
-  inherit inputElement
-
-  method files : File.fileList t readonly_prop
-
-  method multiple : bool optdef readonly_prop
-end
 
 let get_input_val ?(get = false) (elt : inputElement t) =
   if have_content (elt :> submittableElement t)
@@ -103,22 +88,23 @@ let get_input_val ?(get = false) (elt : inputElement t) =
         if to_bool elt##.checked then [ name, `String value ] else []
     | "submit" | "reset" -> []
     | "text" | "password" -> [ name, `String value ]
-    | "file" -> (
+    | "file" ->
         if get
         then [ name, `String value ]
         else
-          let elt : file_input t = Unsafe.coerce elt in
-          let list = elt##.files in
-          if list##.length = 0
-          then [ name, `String (Js.string "") ]
-          else
-            match Optdef.to_option elt##.multiple with
-            | None | Some false -> (
+          Opt.case
+            elt##.files
+            (fun () -> [ name, `String (Js.string "") ])
+            (fun list ->
+              if list##.length = 0
+              then [ name, `String (Js.string "") ]
+              else if not (Js.to_bool elt##.multiple)
+              then
                 match Opt.to_option (list##item 0) with
                 | None -> []
-                | Some file -> [ name, `File file ])
-            | Some true ->
-                filter_map
+                | Some file -> [ name, `File file ]
+              else
+                List.filter_map
                   (fun f ->
                     match Opt.to_option f with
                     | None -> None
@@ -133,7 +119,7 @@ let get_form_elements (form : formElement t) =
     then acc
     else
       match Opt.to_option (form##.elements##item i) with
-      | None -> loop acc (i - i)
+      | None -> loop acc (i - 1)
       | Some x -> loop (x :: acc) (i - 1)
   in
   loop [] (form##.elements##.length - 1)

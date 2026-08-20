@@ -18,25 +18,33 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
+open Stdlib
+
 type optimized_result =
   { program : Code.program
   ; variable_uses : Deadcode.variable_uses
   ; trampolined_calls : Effects.trampolined_calls
   ; in_cps : Effects.in_cps
-  ; deadcode_sentinal : Code.Var.t
+  ; deadcode_sentinel : Code.Var.t
+  ; shapes : Shape.t StringMap.t
   }
 
-val optimize : profile:Profile.t -> Code.program -> optimized_result
+val optimize_for_wasm :
+     shapes:bool
+  -> profile:Profile.t
+  -> Code.program
+  -> optimized_result * (Global_flow.state * Global_flow.info)
 
 val f :
      ?standalone:bool
   -> ?wrap_with_fun:[ `Iife | `Anonymous | `Named of string ]
   -> ?profile:Profile.t
+  -> ?shapes:bool
   -> link:[ `All | `All_from of string list | `Needed | `No ]
   -> source_map:bool
   -> formatter:Pretty_print.t
   -> Code.program
-  -> Source_map.info
+  -> Source_map.info * Shape.t StringMap.t
 
 val f' :
      ?standalone:bool
@@ -45,6 +53,13 @@ val f' :
   -> link:[ `All | `All_from of string list | `Needed | `No ]
   -> Pretty_print.t
   -> Code.program
+  -> unit
+
+val from_string :
+     prims:string array
+  -> debug:Instruct.debug_event list array
+  -> string
+  -> Pretty_print.t
   -> unit
 
 val link_and_pack :

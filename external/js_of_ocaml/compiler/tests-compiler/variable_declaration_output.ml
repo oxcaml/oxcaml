@@ -23,6 +23,7 @@ let%expect_test _ =
   let program =
     compile_and_parse
       ~use_js_string:true
+      ~flags:[ "--disable=constant-sinking" ]
       {|
     type js_string
     external js_string : string -> js_string = "caml_jsstring_of_string"
@@ -58,12 +59,14 @@ let%expect_test _ =
     var cx = [254, NaN, NaN, Infinity, - Infinity, 0., - 0.];
     //end
     var symbol_op = [0, symbol_bind, symbol_map, symbol];
-    //end |}]
+    //end
+    |}]
 
 let%expect_test _ =
   let program =
     compile_and_parse
       ~use_js_string:false
+      ~flags:[ "--disable=constant-sinking" ]
       {|
     type js_string
     external js_string : string -> js_string = "caml_jsstring_of_string"
@@ -101,7 +104,8 @@ let%expect_test _ =
     var cx = [254, NaN, NaN, Infinity, - Infinity, 0., - 0.];
     //end
     var symbol_op = [0, symbol_bind, symbol_map, symbol];
-    //end |}]
+    //end
+    |}]
 
 let%expect_test _ =
   let compile ~enable s =
@@ -123,21 +127,18 @@ let%expect_test _ =
   with_temp_dir ~f:(fun () -> print_fun_decl (program ~enable:true) (Some "match_expr"));
   [%expect
     {|
-    function match_expr(param){
-     var _c_, _b_, _a_;
+    function match_expr(_a_){
+     var _b_;
      a:
-     if(param){
-      _a_ = param[1];
-      if(_a_){
-       _b_ = _a_[1];
-       if(_b_){
-        if(2 === _b_[1] && ! param[2]) return 3;
-       }
-       else if(! param[2]) return 2;
+     if(_a_){
+      _b_ = _a_[1];
+      if(_b_){
+       _b_ = _b_[1];
+       if(_b_){if(2 === _b_[1] && ! _a_[2]) return 3;} else if(! _a_[2]) return 2;
       }
-      else if(! param[2]) break a;
-      _c_ = param[2];
-      if(_c_ && ! _c_[1]) break a;
+      else if(! _a_[2]) break a;
+      _a_ = _a_[2];
+      if(_a_ && ! _a_[1]) break a;
       return 4;
      }
      return 1;
@@ -147,20 +148,17 @@ let%expect_test _ =
   with_temp_dir ~f:(fun () -> print_fun_decl (program ~enable:false) (Some "match_expr"));
   [%expect
     {|
-    function match_expr(param){
+    function match_expr(_a_){
      a:
-     if(param){
-      var _a_ = param[1];
-      if(_a_){
-       var _b_ = _a_[1];
-       if(_b_){
-        if(2 === _b_[1] && ! param[2]) return 3;
-       }
-       else if(! param[2]) return 2;
+     if(_a_){
+      var _b_ = _a_[1];
+      if(_b_){
+       _b_ = _b_[1];
+       if(_b_){if(2 === _b_[1] && ! _a_[2]) return 3;} else if(! _a_[2]) return 2;
       }
-      else if(! param[2]) break a;
-      var _c_ = param[2];
-      if(_c_ && ! _c_[1]) break a;
+      else if(! _a_[2]) break a;
+      _a_ = _a_[2];
+      if(_a_ && ! _a_[1]) break a;
       return 4;
      }
      return 1;

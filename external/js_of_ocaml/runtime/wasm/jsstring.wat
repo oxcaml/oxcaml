@@ -16,14 +16,21 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
+(@if (not $wasi)
+(@then
    (import "wasm:js-string" "compare"
       (func $compare_strings (param externref externref) (result i32)))
    (import "wasm:js-string" "test"
       (func $is_string (param externref) (result i32)))
+   (import "wasm:js-string" "length"
+      (func $string_length (param externref) (result i32)))
    (import "wasm:js-string" "fromCharCodeArray"
       (func $fromCharCodeArray
          (param (ref null $wstring)) (param i32) (param i32)
          (result (ref extern))))
+   (import "wasm:js-string" "intoCharCodeArray"
+      (func $intoCharCodeArray
+         (param externref (ref null $wstring) i32) (result i32)))
 
    (import "wasm:text-decoder" "decodeStringFromUTF8Array"
       (func $decodeStringFromUTF8Array
@@ -50,7 +57,7 @@
    (global $text_converters_available (mut i32) (i32.const 0))
    (global $string_builtins_available (mut i32) (i32.const 0))
 
-   (global $utf16_buffer_size i32 (i32.const 32768))
+   (global $utf16_buffer_size i32 (i32.const 1024))
    (global $buffer (mut (ref $wstring))
       (array.new $wstring (i32.const 0) (i32.const 0)))
 
@@ -118,7 +125,7 @@
                (if (i32.lt_u (local.get $i) (local.get $len))
                   (then
                      (local.set $c
-                        (array.get $bytes (local.get $s)
+                        (array.get_u $bytes (local.get $s)
                            (i32.add (local.get $pos) (local.get $i))))
                      (br_if $continue
                         (i32.ge_u (local.get $c) (i32.const 128)))
@@ -138,10 +145,38 @@
          (local.get $s) (i32.const 0) (array.len (local.get $s))))
 
    (func (export "bytes_of_jsstring") (param $s anyref) (result (ref $bytes))
+      (local $s' externref)
+      (local $len i32) (local $i i32) (local $c i32)
+      (local $b (ref $bytes))
       (if (global.get $text_converters_available)
          (then
             (return_call $encodeStringToUTF8Array
                (extern.convert_any (local.get $s)))))
+      (if $continue
+         (i32.and (global.get $string_builtins_available)
+            (i32.le_u
+               (local.tee $len
+                  (call $string_length
+                     (local.tee $s' (extern.convert_any (local.get $s)))))
+               (global.get $utf16_buffer_size)))
+         (then
+            (drop
+               (call $intoCharCodeArray
+                  (local.get $s') (global.get $buffer) (i32.const 0)))
+            (local.set $b (array.new_default $bytes (local.get $len)))
+            (loop $loop
+               (if (i32.lt_u (local.get $i) (local.get $len))
+                  (then
+                     (local.set $c
+                        (array.get_u $wstring (global.get $buffer)
+                           (local.get $i)))
+                     (br_if $continue
+                        (i32.ge_u (local.get $c) (i32.const 128)))
+                     (array.set $bytes (local.get $b) (local.get $i)
+                        (local.get $c))
+                     (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                     (br $loop))))
+            (return (local.get $b))))
       (return_call $string_of_jsstring_fallback (local.get $s)))
 
    ;; Fallback implementation of string conversion functions
@@ -257,4 +292,5 @@
       (local.set $s (array.new $bytes (i32.const 0) (local.get $len)))
       (call $read_from_buffer (local.get $s) (i32.const 0) (local.get $len))
       (global.set $stack (struct.new $stack (local.get $s) (global.get $stack))))
+))
 )

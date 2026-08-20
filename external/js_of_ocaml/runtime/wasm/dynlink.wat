@@ -16,4 +16,96 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
+   (import "bigarray" "caml_uint8_array_of_string"
+      (func $caml_uint8_array_of_string (param (ref eq)) (result (ref eq))))
+   (import "jslib" "unwrap" (func $unwrap (param (ref eq)) (result anyref)))
+   (import "jslib" "wrap" (func $wrap (param anyref) (result (ref eq))))
+   (import "jslib" "caml_jsstring_of_string"
+      (func $caml_jsstring_of_string (param (ref eq)) (result (ref eq))))
+   (import "bindings" "load_module"
+      (func $load_module (param anyref) (result anyref)))
+   (import "bindings" "load_wasmo"
+      (func $load_wasmo (param anyref)))
+   (import "bindings" "register_fragments"
+      (func $register_fragments (param anyref) (param anyref)))
+   (import "fail" "javascript_exception"
+      (tag $javascript_exception (param externref)))
+   (import "stdlib" "link_info"
+      (global $link_info (mut (ref $block))))
+
+   (type $block (array (mut (ref eq))))
+   (type $bytes (array (mut i8)))
+
+(@if (not $wasi)
+(@then
+   (func (export "caml_wasm_load_module")
+      (param $str (ref eq)) (result (ref eq))
+      (call $wrap
+         (call $load_module
+            (call $unwrap
+               (call $caml_uint8_array_of_string (local.get $str))))))
+
+   (func (export "caml_wasm_load_wasmo")
+      (param $str (ref eq)) (result (ref eq))
+      (call $load_wasmo
+         (call $unwrap
+            (call $caml_uint8_array_of_string (local.get $str))))
+      (ref.i31 (i32.const 0)))
+
+   (func (export "caml_wasm_register_fragments")
+      (param $unit_name (ref eq)) (param $source (ref eq)) (result (ref eq))
+      (call $register_fragments
+         (call $unwrap (call $caml_jsstring_of_string (local.get $unit_name)))
+         (call $unwrap (call $caml_jsstring_of_string (local.get $source))))
+      (ref.i31 (i32.const 0)))
+))
+
+   ;; Field index for prim_count in link_info (must match stdlib.wat)
+   (global $LINK_INFO_PRIM_COUNT i32 (i32.const 3))
+
+   ;; Standard OCaml dynlink primitives
+
+(@if (and (>= $ocaml_version (5 1 0)) (not $oxcaml))
+(@then
+   (func (export "caml_dynlink_open_lib")
+      (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+)
+(@else
+   (func (export "caml_dynlink_open_lib")
+      (param (ref eq)) (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+))
+
+   (func (export "caml_dynlink_close_lib")
+      (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+
+   (func (export "caml_dynlink_lookup_symbol")
+      (param (ref eq)) (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+
+   (func (export "caml_dynlink_add_primitive")
+      (param (ref eq)) (result (ref eq))
+      (local $idx i32)
+      (local.set $idx
+         (i31.get_u
+            (ref.cast (ref i31)
+               (array.get $block (global.get $link_info)
+                  (global.get $LINK_INFO_PRIM_COUNT)))))
+      (array.set $block (global.get $link_info)
+         (global.get $LINK_INFO_PRIM_COUNT)
+         (ref.i31 (i32.add (local.get $idx) (i32.const 1))))
+      (ref.i31 (local.get $idx)))
+
+   (func (export "caml_dynlink_get_current_libs")
+      (param (ref eq)) (result (ref eq))
+      (array.new_fixed $block 1 (ref.i31 (i32.const 0))))
+
+(@if (>= $ocaml_version (5 5 0))
+(@then
+   (func (export "caml_dynlink_parse_ld_conf")
+      (param (ref eq)) (result (ref eq))
+      (ref.i31 (i32.const 0)))
+))
 )

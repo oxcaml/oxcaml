@@ -25,10 +25,16 @@ function caml_trailing_slash(name) {
 }
 
 //Provides: caml_current_dir
-//Requires: caml_trailing_slash, fs_node_supported
-if (fs_node_supported() && globalThis.process && globalThis.process.cwd)
-  var caml_current_dir = globalThis.process.cwd().replace(/\\/g, "/");
-else var caml_current_dir = "/static";
+//Requires: caml_trailing_slash, fs_node_supported, fs_quickjs_supported
+var caml_current_dir = (function () {
+  if (fs_node_supported() && globalThis.process?.cwd)
+    return globalThis.process.cwd().replace(/\\/g, "/");
+  if (fs_quickjs_supported()) {
+    var r = globalThis.os.getcwd();
+    if (r[1] === 0) return r[0];
+  }
+  return "/static";
+})();
 caml_current_dir = caml_trailing_slash(caml_current_dir);
 
 //Provides: caml_get_root
@@ -50,6 +56,7 @@ function MlFile() {}
 
 //Provides: path_is_absolute
 //Requires: fs_node_supported
+//Requires: jsoo_is_win32
 function make_path_is_absolute() {
   function posix(path) {
     if (path.charAt(0) === "/") return ["", path.slice(1)];
@@ -72,21 +79,26 @@ function make_path_is_absolute() {
     }
     return;
   }
-  if (
-    fs_node_supported() &&
-    globalThis.process &&
-    globalThis.process.platform
-  ) {
-    return globalThis.process.platform === "win32" ? win32 : posix;
-  } else return posix;
+  return jsoo_is_win32 ? win32 : posix;
 }
 var path_is_absolute = make_path_is_absolute();
 
 //Provides: caml_make_path
 //Requires: caml_current_dir
-//Requires: caml_jsstring_of_string, path_is_absolute
-function caml_make_path(name) {
+//Requires: caml_jsstring_of_string, path_is_absolute, caml_raise_system_error
+function caml_make_path(name, raise_unix) {
   name = caml_jsstring_of_string(name);
+  // An empty path is invalid: like native (and the wasm runtime), it must not
+  // resolve to the current directory but fail with ENOENT. [raise_unix]
+  // selects Unix_error (Unix callers) vs Sys_error (Sys callers).
+  if (name === "")
+    caml_raise_system_error(
+      raise_unix,
+      "ENOENT",
+      "",
+      "No such file or directory",
+      "",
+    );
   if (!path_is_absolute(name)) name = caml_current_dir + name;
   var comp0 = path_is_absolute(name);
   var comp = comp0[1].split(/[/\\]/);
@@ -110,13 +122,38 @@ function caml_make_path(name) {
   return ncomp;
 }
 
+// QuickJS filesystem support can be added with by passing
+// +fs_quickjs.js to the command line. It's not included by default to
+// avoid bloat.
+
+//Provides: MlQuickJSDevice
+//Weakdef
+class MlQuickJSDevice {}
+
+//Provides: fs_quickjs_supported
+//Weakdef
+function fs_quickjs_supported() {
+  return false;
+}
+
+//Provides: caml_sys_open_for_quickjs
+//Weakdef
+function caml_sys_open_for_quickjs(_fd, _flags) {
+  return null;
+}
+
 //Provides:jsoo_mount_point
-//Requires: MlFakeDevice, MlNodeDevice, caml_root, fs_node_supported
+//Requires: MlFakeDevice, MlNodeDevice, MlQuickJSDevice, caml_root, fs_node_supported, fs_quickjs_supported
 var jsoo_mount_point = [];
 if (fs_node_supported()) {
   jsoo_mount_point.push({
     path: caml_root,
     device: new MlNodeDevice(caml_root),
+  });
+} else if (fs_quickjs_supported()) {
+  jsoo_mount_point.push({
+    path: caml_root,
+    device: new MlQuickJSDevice(caml_root),
   });
 } else {
   jsoo_mount_point.push({
@@ -142,15 +179,15 @@ function caml_list_mount_point() {
 
 //Provides: resolve_fs_device
 //Requires: caml_make_path, jsoo_mount_point, caml_raise_sys_error, caml_get_root, MlNodeDevice, caml_trailing_slash, fs_node_supported
-function resolve_fs_device(name) {
-  var path = caml_make_path(name);
+function resolve_fs_device(name, raise_unix) {
+  var path = caml_make_path(name, raise_unix);
   var name = path.join("/");
   var name_slash = caml_trailing_slash(name);
   var res;
   for (var i = 0; i < jsoo_mount_point.length; i++) {
     var m = jsoo_mount_point[i];
     if (
-      name_slash.search(m.path) === 0 &&
+      name_slash.startsWith(m.path) &&
       (!res || res.path.length < m.path.length)
     )
       res = {
@@ -222,24 +259,31 @@ function caml_sys_chdir(dir, raise_unix) {
       caml_jsstring_of_string(dir),
     );
   } else {
-    caml_raise_no_such_file(caml_jsstring_of_string(dir), raise_unix);
+    caml_raise_no_such_file(caml_jsstring_of_string(dir), raise_unix, "chdir");
   }
 }
 
 //Provides: caml_raise_no_such_file
-//Requires: caml_raise_system_error
-function caml_raise_no_such_file(name, raise_unix) {
-  caml_raise_system_error(
-    raise_unix,
-    "ENOENT",
-    "no such file or directory",
-    name,
-  );
+//Requires: caml_raise_system_error, caml_raise_sys_error
+function caml_raise_no_such_file(name, raise_unix, cmd) {
+  if (raise_unix)
+    caml_raise_system_error(
+      raise_unix,
+      "ENOENT",
+      cmd || "open",
+      "no such file or directory",
+      name,
+    );
+  // match the native Sys_error message
+  caml_raise_sys_error(name + ": No such file or directory");
 }
 
 //Provides: caml_sys_file_exists
-//Requires: resolve_fs_device
+//Requires: resolve_fs_device, caml_jsstring_of_string
 function caml_sys_file_exists(name) {
+  // An empty path exists nowhere; like native, return false rather than
+  // resolving "" to the current directory (which always exists).
+  if (caml_jsstring_of_string(name) === "") return 0;
   var root = resolve_fs_device(name);
   return root.device.exists(root.rest);
 }
@@ -272,13 +316,14 @@ function caml_sys_is_directory(name) {
 }
 
 //Provides: caml_sys_rename
-//Requires: caml_failwith, resolve_fs_device
+//Requires: caml_failwith, resolve_fs_device, caml_raise_sys_error
 function caml_sys_rename(o, n) {
   var o_root = resolve_fs_device(o);
   var n_root = resolve_fs_device(n);
   if (o_root.device !== n_root.device)
-    caml_failwith("caml_sys_rename: cannot move file between two filesystem");
-  if (!o_root.device.rename) caml_failwith("caml_sys_rename: no implemented");
+    // native raises Sys_error (strerror of EXDEV)
+    caml_raise_sys_error("Invalid cross-device link");
+  if (!o_root.device.rename) caml_failwith("caml_sys_rename: not implemented");
   o_root.device.rename(o_root.rest, n_root.rest);
 }
 
@@ -300,14 +345,15 @@ function caml_sys_rmdir(name) {
 
 //Provides: caml_ba_map_file
 //Requires: caml_failwith
-function caml_ba_map_file(vfd, kind, layout, shared, dims, pos) {
+function caml_ba_map_file(_vfd, _kind, _layout, _shared, _dims, _pos) {
   // var data = caml_sys_fds[vfd];
   caml_failwith("caml_ba_map_file not implemented");
 }
 
 //Provides: caml_ba_map_file_bytecode
 //Requires: caml_ba_map_file
-function caml_ba_map_file_bytecode(argv, argn) {
+function caml_ba_map_file_bytecode(argv, _argn) {
+  // argn === 6
   return caml_ba_map_file(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
 }
 
@@ -324,7 +370,7 @@ function jsoo_create_file_extern(name, content) {
 //Provides: caml_fs_init
 //Requires: jsoo_create_file
 function caml_fs_init() {
-  var tmp = [].concat(globalThis.jsoo_fs_tmp || [], globalThis.caml_fs_tmp || []);
+  var tmp = globalThis.jsoo_fs_tmp;
   if (tmp) {
     for (var i = 0; i < tmp.length; i++) {
       jsoo_create_file(tmp[i].name, tmp[i].content);
@@ -332,7 +378,6 @@ function caml_fs_init() {
   }
   globalThis.jsoo_create_file = jsoo_create_file;
   globalThis.jsoo_fs_tmp = [];
-  globalThis.caml_fs_tmp = [];
   return 0;
 }
 
@@ -363,7 +408,8 @@ function caml_read_file_content(name) {
     var file = root.device.open(root.rest, { rdonly: 1 });
     var len = file.length();
     var buf = new Uint8Array(len);
-    file.read(buf, 0, len);
+    file.read(buf, 0, len, false);
+    file.close();
     return caml_string_of_uint8_array(buf);
   }
   caml_raise_no_such_file(caml_jsstring_of_string(name));

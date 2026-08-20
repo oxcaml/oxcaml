@@ -44,7 +44,7 @@ var caml_marshal_constants = {
   CODE_CUSTOM: 0x12,
   CODE_CUSTOM_LEN: 0x18,
   CODE_CUSTOM_FIXED: 0x19,
-  CODE_NULL: 0x1f
+  CODE_NULL: 0x1f,
 };
 
 //Provides: UInt8ArrayReader
@@ -246,6 +246,9 @@ var caml_custom_ops = {
     serialize: caml_int64_marshal,
     fixed_length: 8,
     compare: caml_int64_compare,
+    // No [compare_ext]: like the native runtime, an immediate is ordered
+    // strictly before an int64 custom block (see caml_int64_ops).
+    compare_ext: null,
     hash: caml_int64_hash,
   },
   _i: {
@@ -262,6 +265,8 @@ var caml_custom_ops = {
     },
     serialize: caml_ba_serialize,
     compare: caml_ba_compare,
+    // No [compare_ext]: an immediate is ordered before a bigarray block.
+    compare_ext: null,
     hash: caml_ba_hash,
   },
   _bigarr02: {
@@ -270,6 +275,8 @@ var caml_custom_ops = {
     },
     serialize: caml_ba_serialize,
     compare: caml_ba_compare,
+    // No [compare_ext]: an immediate is ordered before a bigarray block.
+    compare_ext: null,
     hash: caml_ba_hash,
   },
 };
@@ -292,6 +299,7 @@ function caml_input_value_from_reader(reader) {
     }
     return n;
   }
+  var old_pos = reader.i;
   var magic = reader.read32u();
   switch (magic) {
     case 0x8495a6be /* Intext_magic_number_small */:
@@ -326,6 +334,9 @@ function caml_input_value_from_reader(reader) {
     default:
       caml_failwith("caml_input_value_from_reader: bad object");
       break;
+  }
+  if (header_len !== reader.i - old_pos) {
+    caml_failwith("caml_input_value_from_reader: invalid header");
   }
   var stack = [];
   var objects = [];
@@ -376,7 +387,8 @@ function caml_input_value_from_reader(reader) {
           case 0x08: //cst.CODE_BLOCK32:
             var header = reader.read32u();
             var tag = header & 0xff;
-            var size = header >> 10;
+            // unsigned: bit 31 of the header is set for sizes >= 2^21
+            var size = header >>> 10;
             var v = [tag];
             if (size === 0) return v;
             if (intern_obj_table) intern_obj_table[obj_counter++] = v;
@@ -445,6 +457,7 @@ function caml_input_value_from_reader(reader) {
             var len = reader.read32u();
             var v = new Array(len + 1);
             v[0] = 254;
+            if (intern_obj_table) intern_obj_table[obj_counter++] = v;
             var t = new Array(8);
             for (var i = 1; i <= len; i++) {
               for (var j = 0; j < 8; j++) t[j] = reader.read8u();
@@ -482,7 +495,6 @@ function caml_input_value_from_reader(reader) {
                 reader.read32s();
                 break;
             }
-            var old_pos = reader.i;
             var size = [0];
             var v = ops.deserialize(reader, size);
             if (expected_size !== undefined) {
@@ -624,7 +636,6 @@ var caml_output_val = (function () {
     }
 
     write_at(pos, size, value) {
-      var pos = pos;
       for (var i = size - 8; i >= 0; i -= 8)
         this.chunk[pos++] = (value >> i) & 0xff;
     }
@@ -714,15 +725,34 @@ var caml_output_val = (function () {
           for (var i = 0; i < name.length; i++)
             writer.write(8, name.charCodeAt(i));
           writer.write(8, 0);
-          var old_pos = writer.pos();
           ops.serialize(writer, v, sz_32_64);
-          if (ops.fixed_length !== writer.pos() - old_pos)
+          if (ops.fixed_length !== sz_32_64[0])
             caml_failwith(
               "output_value: incorrect fixed sizes specified by " + name,
             );
         }
         writer.size_32 += 2 + ((sz_32_64[0] + 3) >> 2);
         writer.size_64 += 2 + ((sz_32_64[1] + 7) >> 3);
+      } else if (Array.isArray(v) && v[0] === 254) {
+        // float array (Double_array_tag): emit a CODE_DOUBLE_ARRAY
+        // block (raw doubles) like the native runtime, so other
+        // runtimes can read it
+        if (memo(v)) return;
+        var nfloats = v.length - 1;
+        if (nfloats < 0x100)
+          writer.write_code(8, 0x0e /*cst.CODE_DOUBLE_ARRAY8_LITTLE*/, nfloats);
+        else
+          writer.write_code(
+            32,
+            0x07 /*cst.CODE_DOUBLE_ARRAY32_LITTLE*/,
+            nfloats,
+          );
+        for (var i = 1; i <= nfloats; i++) {
+          var t = caml_int64_to_bytes(caml_int64_bits_of_float(v[i]));
+          for (var j = 0; j < 8; j++) writer.write(8, t[7 - j]);
+        }
+        writer.size_32 += 1 + nfloats * 2;
+        writer.size_64 += 1 + nfloats;
       } else if (Array.isArray(v) && v[0] === (v[0] | 0)) {
         if (v[0] === 251) {
           caml_failwith("output_value: abstract value (Abstract)");
@@ -735,12 +765,17 @@ var caml_output_val = (function () {
             8,
             0x80 /*cst.PREFIX_SMALL_BLOCK*/ + v[0] + ((v.length - 1) << 4),
           );
-        else
+        else {
+          if (v.length - 1 >= 0x400000 /* 2^22 */)
+            caml_failwith(
+              "output_value: array cannot be read back on 32-bit platform",
+            );
           writer.write_code(
             32,
             0x08 /*cst.CODE_BLOCK32*/,
             ((v.length - 1) << 10) | v[0],
           );
+        }
         writer.size_32 += v.length;
         writer.size_64 += v.length;
         if (v.length > 1) stack.push(v, 1);
@@ -830,5 +865,6 @@ function caml_output_value_to_buffer(s, ofs, len, v, flags) {
   var t = caml_output_val(v, flags);
   if (t.length > len) caml_failwith("Marshal.to_buffer: buffer overflow");
   caml_blit_bytes(caml_bytes_of_uint8_array(t), 0, s, ofs, t.length);
-  return 0;
+  // Return the number of bytes written, like the native runtime.
+  return t.length;
 }

@@ -8,9 +8,11 @@
   fs.js
   fs_fake.js
   fs_node.js
+  fs_quickjs.js
   gc.js
   graphics.js
   ieee_754.js
+  float32.js
   int64.js
   io.js
   jslib.js
@@ -20,8 +22,8 @@
   md5.js
   mlBytes.js
   nat.js
-  ocamlj.js
   parsing.js
+  promise.js
   stdlib.js
   toplevel.js
   unix.js

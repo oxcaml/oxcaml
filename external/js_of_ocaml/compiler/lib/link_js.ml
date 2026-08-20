@@ -135,7 +135,7 @@ let prefix_kind line =
   | true -> (
       match String.starts_with ~prefix:sourceMappingURL line with
       | false -> (
-          match Build_info.parse line with
+          match Build_info.parse_comment line with
           | Some bi -> `Build_info bi
           | None -> (
               match Unit_info.parse Unit_info.empty line with
@@ -228,41 +228,30 @@ let link
     ~output
     ~linkall
     ~mklib
-    ~toplevel
     ~files
     ~resolve_sourcemap_url
     ~(source_map : Source_map.Encoding_spec.t option) =
-  (* we currently don't do anything with [toplevel]. It could be used
-     to conditionally include link_info ?*)
-  ignore (toplevel : bool);
   let t = Timer.make () in
   let oc = Line_writer.of_channel output in
-  let event_tracing_context =
-    (* NOTE: If tracing is disabled, this is a no-op. *)
-    Build_action_trace_kernel.Context.create ~name:"jsoo.link.tracing"
-  in
-  (* CR-soon mshinwell: [warn_effects = true] is a temporary hack for the
-     period when the [Effect] module is in [Stdlib], but no code is actually
-     using it. *)
-  let warn_effects = ref true in
-  let files = List.map files ~f:(fun file ->
-    Dune_action_trace.add_trace_event_if_enabled
-      ~event_tracing_context
-      ~category:"jsoo.link.read_file"
-      ~name:file
-      @@ fun () ->
+  let warn_effects = ref false in
+  let files =
+    List.map files ~f:(fun file ->
         let lr = Line_reader.open_ file in
-        file, lr, Units.scan_file lr) in
+        file, lr, Units.scan_file lr)
+  in
   let missing, to_link, all =
     List.fold_right
       files
-      ~init:(StringSet.empty, StringSet.empty, StringSet.empty)
+      ~init:
+        ( Global_name.Compunit_set.empty
+        , Global_name.Compunit_set.empty
+        , Global_name.Compunit_set.empty )
       ~f:(fun (_file, _lr, (build_info, units)) acc ->
-        let cmo_or_cmj_file =
+        let cmo_file =
           match build_info with
           | Some bi -> (
               match Build_info.kind bi with
-              | `Cmo | `Cmj | `Cmja -> true
+              | `Cmo -> true
               | `Cma | `Exe | `Runtime | `Unknown -> false)
           | None -> false
         in
@@ -270,59 +259,66 @@ let link
           units
           ~init:acc
           ~f:(fun (info : Unit_info.t) (requires, to_link, all) ->
-            let all = StringSet.union all info.provides in
+            let all = Global_name.Compunit_set.union all info.provides in
             if
               (not (Config.Flag.auto_link ()))
               || mklib
-              || cmo_or_cmj_file
+              || cmo_file
               || linkall
               || info.force_link
-              || not (StringSet.is_empty (StringSet.inter requires info.provides))
+              || not
+                   (Global_name.Compunit_set.is_empty
+                      (Global_name.Compunit_set.inter requires info.provides))
             then
-              ( StringSet.diff (StringSet.union info.requires requires) info.provides
-              , StringSet.union to_link info.provides
+              ( Global_name.Compunit_set.diff
+                  (Global_name.Compunit_set.union info.requires requires)
+                  info.provides
+              , Global_name.Compunit_set.union to_link info.provides
               , all )
             else requires, to_link, all))
   in
-  let _skip = StringSet.diff all to_link in
-  if (not (StringSet.is_empty missing)) && not mklib
+  let _skip = Global_name.Compunit_set.diff all to_link in
+  if (not (Global_name.Compunit_set.is_empty missing)) && not mklib
   then
     failwith
       (Printf.sprintf
          "Could not find compilation unit for %s"
-         (String.concat ~sep:", " (StringSet.elements missing)));
+         (String.concat
+            ~sep:", "
+            (List.map
+               ~f:(fun (Global_name.Compunit name) -> name)
+               (Global_name.Compunit_set.elements missing))));
   if times () then Format.eprintf "  scan: %a@." Timer.print t;
   let sm = ref [] in
   let build_info = ref None in
   let t = Timer.make () in
   let sym = ref Ocaml_compiler.Symtable.GlobalMap.empty in
-  let sym_js = ref [] in
+  Array.iter Runtimedef.builtin_exceptions ~f:(fun name ->
+      ignore
+        (Ocaml_compiler.Symtable.GlobalMap.enter
+           sym
+           (Global_name.Glob_predef (Predef name))
+          : int));
   List.iter files ~f:(fun (_, _, (_, units)) ->
       List.iter units ~f:(fun (u : Unit_info.t) ->
-          StringSet.iter
-            (fun s ->
+          Global_name.Compunit_set.iter
+            (fun (Global_name.Compunit name) ->
               ignore
                 (Ocaml_compiler.Symtable.GlobalMap.enter
                    sym
-                   (Ocaml_compiler.Symtable.Global.Glob_compunit s)
-                  : int);
-              sym_js := s :: !sym_js)
+                   (Global_name.Glob_compunit (Compunit name))
+                  : int))
             u.Unit_info.provides));
 
   let build_info_emitted = ref false in
   List.iter files ~f:(fun (file, ic, (build_info_for_file, units)) ->
-    Dune_action_trace.add_trace_event_if_enabled
-      ~event_tracing_context
-      ~category:"jsoo.link.driver"
-      ~name:file
-      @@ fun () ->
       Line_reader.reset ic;
       let is_runtime =
         match build_info_for_file with
         | Some bi -> (
             match Build_info.kind bi with
             | `Runtime -> Some bi
-            | `Cma | `Exe | `Cmo | `Cmj | `Cmja | `Unknown -> None)
+            | `Cma | `Exe | `Cmo | `Unknown -> None)
         | None -> None
       in
       let sm_for_file = ref None in
@@ -350,19 +346,22 @@ let link
                 then (
                   let bi = Build_info.with_kind bi (if mklib then `Cma else `Unknown) in
                   Line_writer.write oc Global_constant.header;
-                  Line_writer.write_lines oc (Build_info.to_string bi);
+                  Line_writer.write_lines oc (Build_info.to_comment bi);
                   build_info_emitted := true)
             | Drop -> skip ic
             | Unit ->
                 let u = Units.read ic Unit_info.empty in
-                if StringSet.cardinal (StringSet.inter u.Unit_info.provides to_link) > 0
+                if
+                  u.Unit_info.force_link
+                  || not (Global_name.Compunit_set.disjoint u.Unit_info.provides to_link)
                 then (
                   if u.effects_without_cps && not !warn_effects
                   then (
                     warn_effects := true;
-                    warn
-                      "Warning: your program contains effect handlers; you should \
-                       probably run js_of_ocaml with option '--effects=cps'@.");
+                    Warning.warn
+                      `Effect_handlers_without_effect_backend
+                      "your program contains effect handlers; you should probably run \
+                       js_of_ocaml with option '--effects=cps'@.");
                   (if mklib
                    then
                      let u = if linkall then { u with force_link = true } else u in
@@ -398,14 +397,23 @@ let link
                       "Copy %d bytes for %s@."
                       !bsize
                       (match is_runtime with
-                      | None -> String.concat ~sep:", " (StringSet.elements u.provides)
+                      | None ->
+                          String.concat
+                            ~sep:", "
+                            (List.map
+                               ~f:(fun (Global_name.Compunit name) -> name)
+                               (Global_name.Compunit_set.elements u.provides))
                       | Some _ -> "the js runtime"))
                 else (
                   if debug ()
                   then
                     Format.eprintf
                       "Skip %s@."
-                      (String.concat ~sep:"," (StringSet.elements u.provides));
+                      (String.concat
+                         ~sep:","
+                         (List.map
+                            ~f:(fun (Global_name.Compunit name) -> name)
+                            (Global_name.Compunit_set.elements u.provides)));
                   let lnum = ref 0 in
                   let read_loffset = Line_reader.lnum ic in
                   while
@@ -436,7 +444,12 @@ let link
                 List.iter u.aliases ~f:(fun (a, b) -> Primitive.alias a b);
                 StringSet.union acc (StringSet.of_list u.primitives))
           in
-          let code = Parse_bytecode.link_info ~symbols:!sym ~primitives ~crcs:[] in
+          let num_globals =
+            Ocaml_compiler.Symtable.GlobalMap.fold (fun _ n m -> max n m) !sym 0 + 1
+          in
+          let code =
+            Parse_bytecode.link_info ~symbols:!sym ~primitives ~crcs:[] ~num_globals
+          in
           let b = Buffer.create 100 in
           let fmt = Pretty_print.to_buffer b in
           Driver.configure fmt;
@@ -453,11 +466,9 @@ let link
       | None, Some build_info_for_file -> build_info := Some (file, build_info_for_file)
       | Some (first_file, bi), Some build_info_for_file ->
           build_info :=
-            Some (first_file, Build_info.merge first_file bi file build_info_for_file));
-  let () =
-    (* NOTE: If tracing is disabled, this is a no-op. *)
-    Build_action_trace_kernel.Context.close event_tracing_context
-  in
+            Some
+              ( first_file
+              , Build_info.merge `JavaScript first_file bi file build_info_for_file ));
   if times () then Format.eprintf "  emit: %a@." Timer.print t;
   let t = Timer.make () in
   match source_map with
@@ -530,8 +541,8 @@ let link
           Line_writer.write oc s);
       if times () then Format.eprintf "  sourcemap: %a@." Timer.print t
 
-let link ~output ~linkall ~mklib ~toplevel ~files ~resolve_sourcemap_url ~source_map =
-  try link ~output ~linkall ~toplevel ~mklib ~files ~resolve_sourcemap_url ~source_map
+let link ~output ~linkall ~mklib ~files ~resolve_sourcemap_url ~source_map =
+  try link ~output ~linkall ~mklib ~files ~resolve_sourcemap_url ~source_map
   with Build_info.Incompatible_build_info { key; first = f1, v1; second = f2, v2 } ->
     let string_of_v = function
       | None -> "<empty>"

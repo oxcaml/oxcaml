@@ -1,10 +1,16 @@
 (env
  (with-effects-double-translation)
+ (with-native-effects)
  (with-effects)
+ (wasi-with-native-effects)
+ (wasi
+  (wasm_of_ocaml
+   (flags
+    (:standard --effects cps))))
  (_
   (js_of_ocaml
    (flags
-    (:standard --enable effects)))))
+    (:standard --effects cps)))))
 
 (tests
  (names

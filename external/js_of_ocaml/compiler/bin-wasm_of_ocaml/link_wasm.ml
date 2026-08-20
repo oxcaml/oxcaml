@@ -32,6 +32,7 @@ type options =
   ; variables : Preprocess.variables
   ; allowed_imports : string list option
   ; binaryen_options : binaryen_options
+  ; effects_backend : Js_of_ocaml_compiler.Config.effects_backend
   }
 
 let options =
@@ -71,13 +72,26 @@ let options =
     let allowed_imports =
       if List.is_empty allowed_imports then None else Some (List.concat allowed_imports)
     in
-    `Ok
-      { input_modules
-      ; output_file
-      ; variables
-      ; allowed_imports
-      ; binaryen_options = { common; opt; merge }
-      }
+    let effects_backend =
+      match
+        List.find_map
+          ~f:(fun (k, v) -> if String.equal k "effects" then Some v else None)
+          variables.Preprocess.set
+      with
+      | None -> Ok (`Jspi : Js_of_ocaml_compiler.Config.effects_backend)
+      | Some s -> Js_of_ocaml_compiler.Build_info.effects_backend_of_string_result s
+    in
+    match effects_backend with
+    | Ok effects_backend ->
+        `Ok
+          { input_modules
+          ; output_file
+          ; variables
+          ; allowed_imports
+          ; binaryen_options = { common; opt; merge }
+          ; effects_backend
+          }
+    | Error msg -> `Error (false, msg)
   in
   let t =
     Term.(
@@ -98,7 +112,14 @@ let link
     ; variables
     ; allowed_imports
     ; binaryen_options = { common; merge; opt }
+    ; effects_backend
     } =
+  (* So that the --enable-stack-switching option is passed to Binaryen
+     tools for native effects. *)
+  Js_of_ocaml_compiler.Config.set_effects_backend effects_backend;
+  (* So that wasm-opt is invoked with --emit-exnref when targeting WASI. *)
+  if List.mem ~eq:String.equal "wasi" variables.Preprocess.enable
+  then Js_of_ocaml_compiler.Config.Flag.enable "wasi";
   let inputs =
     List.map
       ~f:(fun (module_name, file) -> { Wat_preprocess.module_name; file; source = File })

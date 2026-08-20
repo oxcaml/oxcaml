@@ -30,6 +30,7 @@ type context =
   ; types : Wasm_ast.type_field Code.Var.Hashtbl.t
   ; mutable closure_envs : Code.Var.t Code.Var.Map.t
         (** GC: mapping of recursive functions to their shared environment *)
+  ; closure_types : (Wasm_ast.value_type option list, int) Hashtbl.t
   ; mutable apply_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable cps_apply_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable curry_funs : Code.Var.t Stdlib.IntMap.t
@@ -37,13 +38,11 @@ type context =
   ; mutable dummy_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable cps_dummy_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable init_code : Wasm_ast.instruction list
-  ; mutable string_count : int
-  ; mutable strings : string list
-  ; mutable string_index : int StringMap.t
   ; mutable fragments : Javascript.expression StringMap.t
   ; mutable globalized_variables : Code.Var.Set.t
   ; value_type : Wasm_ast.value_type
   ; mutable unit_name : string option
+  ; mutable no_tail_call : unit Code.Var.Hashtbl.t
   }
 
 val make_context : value_type:Wasm_ast.value_type -> context
@@ -60,7 +59,7 @@ val instr : Wasm_ast.instruction -> unit t
 
 val seq : unit t -> expression -> expression
 
-val expression_list : ('a -> expression) -> 'a list -> Wasm_ast.expression list t
+val expression_list : ('a -> 'b t) -> 'a list -> 'b list t
 
 module Arith : sig
   val const : int32 -> expression
@@ -141,8 +140,6 @@ val define_var : Wasm_ast.var -> expression -> unit t
 
 val is_small_constant : Wasm_ast.expression -> bool t
 
-val get_i31_value : Wasm_ast.var -> Wasm_ast.var option t
-
 val event : Parse_info.t -> unit t
 
 val no_event : unit t
@@ -160,7 +157,11 @@ val register_type : string -> (unit -> type_def t) -> Wasm_ast.var t
 val heap_type_sub : Wasm_ast.heap_type -> Wasm_ast.heap_type -> bool t
 
 val register_import :
-  ?import_module:string -> name:string -> Wasm_ast.import_desc -> Wasm_ast.var t
+     ?allow_tail_call:bool
+  -> ?import_module:string
+  -> name:string
+  -> Wasm_ast.import_desc
+  -> Wasm_ast.var t
 
 val register_global :
      Wasm_ast.var
@@ -177,8 +178,6 @@ val register_data_segment : Code.Var.t -> string -> unit t
 val register_init_code : unit t -> unit t
 
 val init_code : context -> unit t
-
-val register_string : string -> int t
 
 val register_fragment : string -> (unit -> Javascript.expression) -> unit t
 
@@ -203,3 +202,11 @@ val function_body :
   -> param_names:Code.Var.t list
   -> body:unit t
   -> (Wasm_ast.var * Wasm_ast.value_type) list * Wasm_ast.instruction list
+
+val variable_type : Code.Var.t -> Wasm_ast.value_type option t
+
+val array_placeholder : Code.Var.t -> expression
+
+val default_value :
+     Wasm_ast.value_type
+  -> (Wasm_ast.expression * Wasm_ast.value_type * Wasm_ast.ref_type option) t
