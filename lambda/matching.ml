@@ -2127,11 +2127,10 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let loc = head_loc ~scopes head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
-  let make_void_access binding_kind sort pos =
-    (* Constructors whose arguments are all void, e.g.
-       [A of #(void * void) * void], are immediate. Accesses to their arguments
-       must create a void (represented in lambda as an empty unboxed product)
-       or product of voids rather than access a block.
+  let make_void_access binding_kind sort =
+    (* Accesses to the void arguments of a constant constructor must create a
+       void (represented in lambda as an empty unboxed product) or product of
+       voids rather than access a block.
 
        This is necessary for bytecode, where [Pmixedfield]s that access void are
        not erased but translated into field access(es) (as unboxed products are
@@ -2151,19 +2150,23 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
     match cstr_shape with
-    | Constructor_uniform_value ->
-      fatal_error
-        "Matching.get_exr_args_constr: constant Constructor_uniform_value"
-    | Constructor_mixed shape ->
-      let shape = transl_mixed_product_shape shape in
-      let e, layout = lambda_void_of_el shape.(pos) in
+    | Constructor_immediate_all_void ->
+      let shape =
+        transl_mixed_product_shape
+          [| Types.mixed_block_element_of_const_sort sort |]
+      in
+      let e, layout = lambda_void_of_el shape.(0) in
       { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
-    | (Constructor_undetermined | Constructor_variable _) ->
-      fatal_error "Matching.get_exr_args_constr: variable representation"
+    | Constructor_uniform_value ->
+      fatal_error "Matching.get_exr_args_constr: if constant, should have no \
+                   args and then shouldn't produce accesses"
+    | Constructor_mixed _ | Constructor_undetermined
+    | Constructor_variable _ ->
+      fatal_error "Matching.get_exr_args_constr: not constant"
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
     if cstr.cstr_constant then
-      make_void_access binding_kind sort pos
+      make_void_access binding_kind sort
     else
       let prim =
         match cstr_shape with
@@ -2179,7 +2182,9 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
                 shape
             in
             Pmixedfield ([pos], shape, sem)
-        | (Constructor_undetermined | Constructor_variable _) ->
+        | Constructor_immediate_all_void ->
+            fatal_error "Matching.get_exr_args_constr: non-constant immediate"
+        | Constructor_undetermined | Constructor_variable _ ->
             fatal_error "Matching.get_exr_args_constr: variable representation"
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
@@ -2637,6 +2642,9 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_dummy _ ->
           fatal_error "get_expr_args_record: unexpected dummy representation"
+        | Record_inlined (_, Constructor_immediate_all_void, _) ->
+          fatal_error
+            "get_expr_args_record: unexpected immediate representation"
         | Record_inlined
             (_, (Constructor_undetermined
                 | Constructor_variable _), _)

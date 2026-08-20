@@ -783,6 +783,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     if !Clflags.native_code
                     then Outval_record_mixed_block mixed
                     else Outval_record_boxed
+              | Record_inlined (_, Constructor_immediate_all_void, _) ->
+                  Misc.fatal_error "immediate record representation"
               | Record_dummy _ ->
                   Misc.fatal_error "dummy record representation"
               | Record_undetermined | Record_variable _

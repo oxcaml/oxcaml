@@ -2311,6 +2311,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Constructor_mixed _ ->
           (* CR layouts v5.9: support this *)
           Misc.fatal_error "Mixed blocks extensible variants are not supported"
+        | Constructor_immediate_all_void ->
+          Misc.fatal_error "convert_lprim: Pduprecord: immediate representation"
         | Constructor_undetermined | Constructor_variable _ ->
           Misc.fatal_error "convert_lprim: Pduprecord: variable representation")
       | Record_inlined (Extension _, _, _)
@@ -2324,6 +2326,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           Printlambda.primitive prim
       | Record_dummy _ ->
         Misc.fatal_error "convert_lprim: Pduprecord: dummy representation"
+      | Record_inlined (_, Constructor_immediate_all_void, _) ->
+        Misc.fatal_error "convert_lprim: Pduprecord: immediate representation"
       | Record_undetermined | Record_variable _
       | Record_inlined
           (_, (Constructor_undetermined | Constructor_variable _), _) ->
