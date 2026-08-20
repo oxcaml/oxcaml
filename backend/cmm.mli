@@ -688,9 +688,6 @@ val map_tail : (expression -> expression) -> expression -> expression
 (** Apply the callback to each immediate sub-expression. *)
 val iter_shallow : (expression -> unit) -> expression -> unit
 
-(** Apply the transformation to each immediate sub-expression. *)
-val map_shallow : (expression -> expression) -> expression -> expression
-
 (** Whether an expression contains constructs that only arise from debugging
     information ([Cphantom_let] and [Cname_for_debugger]). *)
 val contains_debug_only_constructs : expression -> bool
