@@ -5981,7 +5981,6 @@ let check_statement exp =
   | Tconstr (p, _, _) when Path.same p Predef.path_unit
                         || Path.same p Predef.path_unboxed_unit ->
     ()
-  (* CR layouts v5: when we have unboxed unit, add a case here for it *)
   | Tvar _ -> ()
   | _ ->
       let rec loop {exp_loc; exp_desc; exp_extra; _} =
@@ -8209,8 +8208,7 @@ and type_expect_
         | _ -> instance Predef.type_unit
       in
       let wh_body, wh_body_sort =
-        type_statement ~explanation:While_loop_body
-          ~position body_env sbody
+        type_statement ~explanation:While_loop_body ~position body_env sbody
       in
       rue {
         exp_desc =
@@ -11346,22 +11344,21 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
     | _ -> false
   in
   let expected_ty, sort =
-    if !Clflags.strict_sequence then
-      (* CR layouts v5: when we have unboxed unit, allow it for -strict-sequence
-         *)
-      instance Predef.type_unit, Jkind.Sort.scannable
-    else begin
-      (* We're requiring the statement to have a representable jkind.  But that
-         doesn't actually rule out things like "assert false"---we'll just end
-         up getting a sort variable for its jkind. *)
-      (* CR layouts v10: Abstract jkinds will introduce cases where we really
-         have [any] and can't get a sort here. *)
-      new_rep_var ~why:Statement ()
-    end
+    (* We're requiring the statement to have a representable jkind.  But that
+       doesn't actually rule out things like "assert false"---we'll just end
+       up getting a sort variable for its jkind. *)
+    (* CR layouts v10: Abstract jkinds will introduce cases where we really
+       have [any] and can't get a sort here. *)
+    new_rep_var ~why:Statement ()
   in
   (* Raise the current level to detect non-returning functions *)
   with_local_level_generalize
-    (fun () -> type_exp env (mode_max_with_position position) sexp, sort)
+    (fun () ->
+       let exp =
+         with_local_level_generalize_structure_if_principal
+           (fun () -> type_exp env (mode_max_with_position position) sexp)
+       in
+       exp, sort)
   ~before_generalize: begin fun (exp, _sort) ->
     let subexp = final_subexpression exp in
     let ty = expand_head env exp.exp_type in
@@ -11372,10 +11369,22 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
       Location.prerr_warning
         subexp.exp_loc
         Warnings.Nonreturning_statement;
-    if !Clflags.strict_sequence then
+    if !Clflags.strict_sequence then begin
+      (* XXX jrayman: Factor out into helper *)
+      let disambiguated_unit_ty =
+        match get_desc ty with
+        | Tconstr(path, [], _) when Path.same path Predef.path_unboxed_unit ->
+          if not (is_principal ty) then
+            Location.prerr_warning subexp.exp_loc
+              (not_principal "this type-based unit# disambiguation");
+          instance Predef.type_unboxed_unit
+        | _ ->
+          instance Predef.type_unit
+      in
+      unify_var env expected_ty disambiguated_unit_ty;
       with_explanation explanation (fun () ->
         unify_exp ~sexp env exp expected_ty)
-    else begin
+    end else begin
       if not !has_errors then check_partial_application ~statement:true exp;
       with_explanation explanation (fun () ->
         try unify_var env ty expected_ty
