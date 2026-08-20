@@ -279,7 +279,6 @@ let%expect_test "blit bytes-ba" =
     \000\001\002\003\004\005\006\007\008\009
     \255\255\255\255\255\255\003\004\005\255 |}]
 
-(*
 let%expect_test ("hash" [@when not int_size_64]) =
   let test_hash nm kind conv sz =
     let a = Array1.create kind c_layout sz in
@@ -334,7 +333,6 @@ let%expect_test ("hash" [@when not int_size_64]) =
     1e14ef2b nativeint 20
     314148ee nativeint 300 |}]
 [@@if ocaml_version >= (5, 2, 0)]
-*)
 
 let%expect_test ("hash" [@when int_size_64]) =
   let test_hash nm kind conv sz =
@@ -381,14 +379,22 @@ let%expect_test ("hash" [@when int_size_64]) =
     31ebf1b2 int16_signed 300
     16a15c12 int16_unsigned 20
     31ebf1b2 int16_unsigned 300
-    1e14ef2b int 20
-    314148ee int 300
+    00b18db2 int 20
+    1c259f64 int 300
     1e14ef2b int32 20
     314148ee int32 300
     00b18db2 int64 20
     1c259f64 int64 300
     00b18db2 nativeint 20
     1c259f64 nativeint 300 |}]
+
+let%expect_test ("indices wider than 32 bits fail the bounds check" [@when int_size_64]) =
+  let a = Bigarray.Array1.create Bigarray.int Bigarray.c_layout 10 in
+  a.{3} <- 42;
+  let huge = (1 lsl 32) + 3 + Random.int 1 in
+  (try Printf.printf "%d\n" a.{huge} with
+   | Invalid_argument _ -> print_endline "bounds error");
+  [%expect {| bounds error |}]
 
 let%expect_test "float16 equality with nan" =
   (* nan <> nan, so structural equality on a bigarray containing a nan
