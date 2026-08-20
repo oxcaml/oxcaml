@@ -66,3 +66,8 @@ package-lock.json
 
 # Themed doc build output (wodoc build)
 _doc-site/
+.local-merlin-binaries
+.local-ocaml-lib
+_install
+*.orig
+*.rej
