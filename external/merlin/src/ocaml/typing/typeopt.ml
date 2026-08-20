@@ -561,6 +561,19 @@ let add_nullability_from_ty env ty raw_kind =
 let fallback_if_missing_cmi ~default f =
   try f () with Missing_cmi_fallback -> default
 
+let instantiate_decl_fields env type_params args =
+  match args with
+  | [] -> Fun.id
+  | _ :: _ ->
+    fun tys -> (try Ctype.apply_list env type_params tys args
+                with Ctype.Cannot_apply -> tys)
+
+let instantiate_decl_field instantiate ty =
+  match instantiate [ty] with
+  | [ty] -> ty
+  | [] | _ :: _ :: _ ->
+    Misc.fatal_error "Typeopt.instantiate_decl_field: arity changed"
+
 (* CR layouts v2.5: It will be possible for subcomponents of types to be
    non-values for non-error reasons (e.g., [type t = { x : float# }
    [@@unboxed]).  And in later releases, this will also happen in normal
@@ -693,6 +706,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
       let decl =
         try Env.find_type p env with Not_found -> raise Missing_cmi_fallback
       in
+      let instantiate = instantiate_decl_fields env decl.type_params args in
       if cannot_proceed () then
         num_nodes_visited,
         add_nullability_from_ty env scty
@@ -720,7 +734,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
-                         ~num_nodes_visited labels rep)
+                         ~num_nodes_visited ~instantiate labels rep)
         | Type_record_unboxed_product (_, Record_unboxed_product_variable, _) ->
           num_nodes_visited, nullable Pgenval
         | Type_record_unboxed_product ([{ld_type}],
@@ -837,11 +851,12 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
           | exception Not_found -> unknown ()
           | { type_kind = Type_record_unboxed_product (lbls, _, _);
               type_params; _ } ->
-            let type_of_ld { Types.ld_type } =
-              try Some (Ctype.apply env type_params ld_type args)
-              with Ctype.Cannot_apply -> None
+            let instantiate = instantiate_decl_fields env type_params args in
+            let ld_types =
+              instantiate
+                (List.map (fun { Types.ld_type } -> ld_type) lbls)
             in
-            Misc.Stdlib.Array.of_list_map type_of_ld lbls
+            Misc.Stdlib.Array.of_list_map (fun ty -> Some ty) ld_types
           | { type_kind =
                 Type_variant _ | Type_record _ | Type_abstract _ | Type_open;
               _ } ->
@@ -884,11 +899,13 @@ and value_kind_mixed_block
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (cstrs : Types.constructor_declaration list) rep =
+  let instantiate = instantiate_decl_fields env params args in
   match rep with
   | Variant_extensible -> assert false
   | Variant_with_null -> begin
     match Datarepr.find_variant_with_null_payload cstrs with
     | Some { payload_arg = { Types.ca_type = ty; _ }; _ } ->
+      let ty = instantiate_decl_field instantiate ty in
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
@@ -902,58 +919,67 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       match cstrs with
       | [{cd_args=Cstr_tuple [{ca_type=ty}]}]
       | [{cd_args=Cstr_record [{ld_type=ty}]}] ->
-        value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
+        value_kind env ~loc ~visited ~depth ~num_nodes_visited
+          (instantiate_decl_field instantiate ty)
       | _ -> assert false
     end
   | Variant_boxed cstr_layouts ->
     let depth = depth + 1 in
     let substitute_cd_args (cd_args : Types.constructor_arguments) =
-      let substitute ty = Ctype.apply env params ty args in
+      let substitute tys = Ctype.apply_list env params tys args in
       match cd_args with
       | Types.Cstr_tuple cas ->
         Types.Cstr_tuple
-          (List.map (fun (ca : Types.constructor_argument) ->
-             { ca with ca_type = substitute ca.ca_type }) cas)
+          (List.map2 (fun (ca : Types.constructor_argument) ca_type ->
+             { ca with ca_type })
+             cas
+             (substitute (List.map (fun ca -> ca.Types.ca_type) cas)))
       | Types.Cstr_record lds ->
         Types.Cstr_record
-          (List.map (fun (ld : Types.label_declaration) ->
-             { ld with ld_type = substitute ld.ld_type }) lds)
+          (List.map2 (fun (ld : Types.label_declaration) ld_type ->
+             { ld with ld_type })
+             lds
+             (substitute (List.map (fun ld -> ld.Types.ld_type) lds)))
     in
-    let for_one_uniform_value_constructor fields ~field_to_type ~depth
+    let for_one_uniform_value_constructor field_types ~depth
           ~num_nodes_visited =
       let num_nodes_visited, shape =
         List.fold_left_map
-          (fun num_nodes_visited field ->
-             let ty = field_to_type field in
+          (fun num_nodes_visited ty ->
              let num_nodes_visited = num_nodes_visited + 1 in
              value_kind env ~loc ~visited ~depth ~num_nodes_visited ty)
           num_nodes_visited
-          fields
+          field_types
       in
       num_nodes_visited, Lambda.Constructor_uniform shape
     in
     let for_one_constructor (constructor : Types.constructor_declaration)
-          ~depth ~num_nodes_visited
+          ~depth ~num_nodes_visited ~instantiate
           ~(cstr_shape : Types.constructor_representation) =
       let num_nodes_visited = num_nodes_visited + 1 in
       match constructor.cd_args with
       | Cstr_tuple fields ->
-        let field_to_type { Types.ca_type } = ca_type in
+        let field_types =
+          instantiate (List.map (fun { Types.ca_type } -> ca_type) fields)
+        in
         let num_nodes_visited, fields =
           match cstr_shape with
           | Constructor_uniform_value ->
-              for_one_uniform_value_constructor fields ~field_to_type
+              for_one_uniform_value_constructor field_types
                 ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-                ~shape (List.map (fun f -> Some (field_to_type f)) fields)
+                ~shape (List.map (fun ty -> Some ty) field_types)
           | Constructor_variable ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
         (false, num_nodes_visited), fields
       | Cstr_record labels ->
-        let field_to_type (lbl:Types.label_declaration) = lbl.ld_type in
+        let field_types =
+          instantiate
+            (List.map (fun (lbl:Types.label_declaration) -> lbl.ld_type) labels)
+        in
         let is_mutable =
           List.exists
             (fun (lbl:Types.label_declaration) ->
@@ -963,11 +989,11 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         let num_nodes_visited, fields =
           match cstr_shape with
           | Constructor_uniform_value ->
-              for_one_uniform_value_constructor labels ~field_to_type
+              for_one_uniform_value_constructor field_types
                 ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-                ~shape (List.map (fun f -> Some (field_to_type f)) labels)
+                ~shape (List.map (fun ty -> Some ty) field_types)
           | Constructor_variable ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
@@ -1011,28 +1037,29 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            let ~variable_repr, cstr_shape_opt, constructor =
+            let ~variable_repr, cstr_shape_opt, constructor, ~instantiate =
               match cstr_layouts.(idx) with
               | Cstr_layout_known { shape; _ } ->
-                ~variable_repr:false, Some shape, constructor
+                ~variable_repr:false, Some shape, constructor, ~instantiate
               | Cstr_layout_variable ->
                 (match substitute_cd_args constructor.cd_args with
                  | exception Ctype.Cannot_apply ->
-                   ~variable_repr:true, None, constructor
+                   ~variable_repr:true, None, constructor, ~instantiate
                  | cd_args ->
                    let cd_args, ~constant:_, repr, _arg_sorts =
                      Typedecl.update_constructor_representation_and_arg_sorts
                        env loc cd_args ~is_extension_constructor:false
                    in
+                   (* [substitute_cd_args] already instantiated the fields *)
                    ~variable_repr:true, Result.to_option repr,
-                   { constructor with cd_args })
+                   { constructor with cd_args }, ~instantiate:Fun.id)
             in
             match cstr_shape_opt with
             | None -> None
             | Some cstr_shape ->
                 let (is_mutable, num_nodes_visited), fields =
                   for_one_constructor constructor ~depth ~num_nodes_visited
-                    ~cstr_shape
+                    ~instantiate ~cstr_shape
                 in
                 if is_mutable then None
                 else match fields with
@@ -1076,7 +1103,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     in
     num_nodes_visited, non_nullable raw_kind
 
-and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
+and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited ~instantiate
       (labels : Types.label_declaration list) rep =
   match rep with
   | (Record_unboxed | (Record_inlined (_, _, Variant_unboxed))) -> begin
@@ -1085,7 +1112,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
          needed when we deal with missing cmis. *)
       match labels with
       | [{ld_type}] ->
-        value_kind env ~loc ~visited ~depth ~num_nodes_visited ld_type
+        value_kind env ~loc ~visited ~depth ~num_nodes_visited
+          (instantiate_decl_field instantiate ld_type)
       | [] | _ :: _ :: _ -> assert false
     end
   | Record_dummy _ ->
@@ -1104,44 +1132,43 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       if is_mutable then
         num_nodes_visited, non_nullable Pgenval
       else
+        let label_types () =
+          instantiate
+            (List.map (fun (label:Types.label_declaration) -> label.ld_type)
+               labels)
+        in
         let num_nodes_visited, fields =
           match rep with
           | Record_unboxed | Record_dummy _ | Record_variable
           | Record_inlined (_, Constructor_variable, _) ->
               (* The outer match guards against this *)
               assert false
-          | Record_inlined (_, Constructor_uniform_value, _)
-          | Record_boxed | Record_float | Record_ufloat ->
+          | Record_float | Record_ufloat ->
+              (* We're using the `Pboxedfloatval` value kind for unboxed floats
+                 inside of records. This is kind of a lie, but that was already
+                 happening here due to the float record optimization. *)
               let num_nodes_visited, fields =
                 List.fold_left_map
-                  (fun num_nodes_visited (label:Types.label_declaration) ->
-                    let num_nodes_visited = num_nodes_visited + 1 in
-                    let num_nodes_visited, field =
-                      (* We're using the `Pboxedfloatval` value kind for unboxed
-                        floats inside of records. This is kind of a lie, but
-                         that was already happening here due to the float record
-                        optimization. *)
-                      match rep with
-                      | Record_float | Record_ufloat ->
-                        num_nodes_visited,
-                        non_nullable (Pboxedfloatval Boxed_float64)
-                      | Record_inlined _ | Record_boxed ->
-                          value_kind env ~loc ~visited ~depth ~num_nodes_visited
-                            label.ld_type
-                      | Record_mixed _ | Record_unboxed | Record_dummy _
-                      | Record_variable ->
-                          (* The outer match guards against this *)
-                          assert false
-                    in
-                    num_nodes_visited, field)
+                  (fun num_nodes_visited (_:Types.label_declaration) ->
+                    num_nodes_visited + 1,
+                    non_nullable (Pboxedfloatval Boxed_float64))
                   num_nodes_visited labels
+              in
+              num_nodes_visited, Constructor_uniform fields
+          | Record_inlined (_, Constructor_uniform_value, _) | Record_boxed ->
+              let num_nodes_visited, fields =
+                List.fold_left_map
+                  (fun num_nodes_visited ld_type ->
+                    let num_nodes_visited = num_nodes_visited + 1 in
+                    value_kind env ~loc ~visited ~depth ~num_nodes_visited
+                      ld_type)
+                  num_nodes_visited (label_types ())
               in
               num_nodes_visited, Constructor_uniform fields
           | Record_inlined (_, Constructor_mixed shape, _)
           | Record_mixed shape ->
-            let types = List.map (fun label -> label.Types.ld_type) labels in
             value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-              ~shape (List.map (fun t -> Some t) types)
+              ~shape (List.map (fun ty -> Some ty) (label_types ()))
         in
         let non_consts =
           match rep with
