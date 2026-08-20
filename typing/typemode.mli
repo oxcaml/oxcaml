@@ -23,14 +23,24 @@ val untransl_mode : _ modes -> Parsetree.modes
     legacy if unspecified *)
 val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t modes
 
-type modepoly_bound =
-  { bound_vars : string Location.loc list;
+type 'd morph =
+  | Past : ('l * 'r) morph
+  | Close : (Allowance.allowed * Allowance.disallowed) morph
+
+type 'd modepoly_elem =
+  { elem_var : string Location.loc;
+    elem_morph : 'd morph option;
+    elem_mod : Mode.Alloc.Const.Option.t
+  }
+
+type 'd modepoly_bound =
+  { bound_vars : 'd modepoly_elem list;
     bound_const : Mode.Alloc.Const.Option.t modes
   }
 
 type modepoly_bounds =
-  { upper : modepoly_bound;
-    lower : modepoly_bound
+  { upper : (Allowance.disallowed * Allowance.allowed) modepoly_bound;
+    lower : (Allowance.allowed * Allowance.disallowed) modepoly_bound
   }
 
 type modepoly_annot =

@@ -155,7 +155,18 @@ let modalities i ppf modalities =
   List.iter (fun m -> modality i ppf m) modalities
 
 let string_of_mode_bound sep { bound_vars; bound_const } =
-  let vars = List.map (fun v -> "'" ^ v.txt) bound_vars in
+  let string_of_elem { elem_morph; elem_var; elem_mod } =
+    let base =
+      match elem_morph with
+      | None -> "'" ^ elem_var.txt
+      | Some m -> m.txt ^ "('" ^ elem_var.txt ^ ")"
+    in
+    match elem_mod with
+    | [] -> base
+    | _ :: _ ->
+      base ^ " mod " ^ String.concat " " (List.map (fun c -> c.txt) elem_mod)
+  in
+  let vars = List.map string_of_elem bound_vars in
   let consts =
     match bound_const with
     | [] -> []

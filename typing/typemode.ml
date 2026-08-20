@@ -13,14 +13,24 @@ type modalities =
     moda_desc : Mode.Modality.atom Location.loc list
   }
 
-type modepoly_bound =
-  { bound_vars : string Location.loc list;
+type 'd morph =
+  | Past : ('l * 'r) morph
+  | Close : (Allowance.allowed * Allowance.disallowed) morph
+
+type 'd modepoly_elem =
+  { elem_var : string Location.loc;
+    elem_morph : 'd morph option;
+    elem_mod : Mode.Alloc.Const.Option.t
+  }
+
+type 'd modepoly_bound =
+  { bound_vars : 'd modepoly_elem list;
     bound_const : Mode.Alloc.Const.Option.t modes
   }
 
 type modepoly_bounds =
-  { upper : modepoly_bound;
-    lower : modepoly_bound
+  { upper : (Allowance.disallowed * Allowance.allowed) modepoly_bound;
+    lower : (Allowance.allowed * Allowance.disallowed) modepoly_bound
   }
 
 type modepoly_annot =
@@ -65,6 +75,8 @@ type error =
   | Mode_variable_not_allowed : error
   | Mixed_mode_annotation : error
   | Conflicting_mode_annotations : error
+  | Unrecognized_morphism : string -> error
+  | Morphism_only_in_lower_bound : string -> error
 
 exception Error of Location.t * error
 
@@ -581,8 +593,35 @@ let transl_alloc_mode annots =
   let modes = Alloc.Const.Option.value opt_modes ~default:Alloc.Const.legacy in
   { mode_modes = modes; mode_desc = annots }
 
-let transl_modepoly_bound (bound : Parsetree.mode_bound) : modepoly_bound =
-  { bound_vars = bound.bound_vars;
+type 'd bound_position =
+  | Upper_bound : (Allowance.disallowed * Allowance.allowed) bound_position
+  | Lower_bound : (Allowance.allowed * Allowance.disallowed) bound_position
+
+let transl_modepoly_elem : type l r.
+    position:(l * r) bound_position ->
+    Parsetree.mode_bound_elem ->
+    (l * r) modepoly_elem =
+ fun ~position elem ->
+  let elem_morph =
+    Option.map
+      (fun ({ txt; loc } : string Location.loc) : (l * r) morph ->
+        match txt, position with
+        | "past", _ -> Past
+        | "close", Lower_bound -> Close
+        | "close", Upper_bound ->
+          raise (Error (loc, Morphism_only_in_lower_bound txt))
+        | s, _ -> raise (Error (loc, Unrecognized_morphism s)))
+      elem.elem_morph
+  in
+  let elem_mod = (transl_mode_atoms elem.elem_mod).mode_modes in
+  { elem_var = elem.elem_var; elem_morph; elem_mod }
+
+let transl_modepoly_bound : type l r.
+    position:(l * r) bound_position ->
+    Parsetree.mode_bound ->
+    (l * r) modepoly_bound =
+ fun ~position bound ->
+  { bound_vars = List.map (transl_modepoly_elem ~position) bound.bound_vars;
     bound_const = transl_mode_atoms bound.bound_const
   }
 
@@ -604,8 +643,8 @@ let transl_modepoly_annot annots : modepoly_annot =
     | Mode_bounds { upper; lower } ->
       Pmode_bounds
         { txt =
-            { upper = transl_modepoly_bound upper;
-              lower = transl_modepoly_bound lower
+            { upper = transl_modepoly_bound ~position:Upper_bound upper;
+              lower = transl_modepoly_bound ~position:Lower_bound lower
             };
           loc
         }
@@ -830,6 +869,11 @@ let report_error ppf =
     fprintf ppf
       "A mode annotation must be a single mode variable or a single bounds \
        annotation."
+  | Unrecognized_morphism s ->
+    fprintf ppf "Unrecognized mode morphism %a." Misc.Style.inline_code s
+  | Morphism_only_in_lower_bound s ->
+    fprintf ppf "The mode morphism %a may only appear in a lower bound."
+      Misc.Style.inline_code s
 
 let () =
   Location.register_error_of_exn (function

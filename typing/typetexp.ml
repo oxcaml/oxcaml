@@ -915,13 +915,58 @@ end
 
 type sig_var =
   { mode : Alloc.lr;
-    upper_vars : Alloc.lr list;
+    upper_elems : Alloc.r list;
     upper_const : Alloc.Const.t
   }
 
 type sig_mode =
   | Sig_const of Alloc.Const.t
   | Sig_var of sig_var
+
+let transl_modepoly_morph_r
+    (elem : (Allowance.disallowed * Allowance.allowed) Typemode.modepoly_elem)
+    : Alloc.r =
+  let v = Mode_var_env.lookup elem.elem_var.txt in
+  let base =
+    match elem.elem_morph with
+    | None -> Alloc.disallow_left v
+    | Some Typemode.Past ->
+      { monadic = Alloc.Monadic.disallow_left Alloc.Monadic.max;
+        comonadic = Alloc.Comonadic.disallow_left v.comonadic
+      }
+  in
+  let { monadic; _ } =
+    elem.elem_mod
+    |> Alloc.Const.Option.value ~default:Alloc.Const.min
+    |> Alloc.Const.split in
+  let { comonadic; _ } =
+    elem.elem_mod
+    |> Alloc.Const.Option.value ~default:Alloc.Const.max
+    |> Alloc.Const.split in
+  Alloc.join_const monadic (Alloc.imply_const comonadic base)
+
+let transl_modepoly_morph_l
+    (elem : (Allowance.allowed * Allowance.disallowed) Typemode.modepoly_elem)
+    : Alloc.l =
+  let v = Mode_var_env.lookup elem.elem_var.txt in
+  let base : Alloc.l =
+    match elem.elem_morph with
+    | None -> Alloc.disallow_right v
+    | Some Typemode.Past ->
+      { monadic = Alloc.Monadic.disallow_right Alloc.Monadic.min;
+        comonadic = Alloc.Comonadic.disallow_right v.comonadic
+      }
+    | Some Typemode.Close -> Alloc.close_over v
+  in
+  let { comonadic; _ } =
+    elem.elem_mod
+    |> Alloc.Const.Option.value ~default:Alloc.Const.max
+    |> Alloc.Const.split in
+  let { monadic; _ } =
+    elem.elem_mod
+    |> Alloc.Const.Option.value ~default:Alloc.Const.min
+    |> Alloc.Const.split in
+  Alloc.meet_const comonadic (Alloc.subtract_const monadic base)
 
 let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
   (if not (Mode_var_env.allowed ())
@@ -933,44 +978,41 @@ let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
      in
      raise (Error (loc, env, Mode_variables_not_allowed)));
   let m = Alloc.newvar (get_current_level ()) in
-  let bound_modes (bound : Typemode.modepoly_bound) ~default =
-    let vars = List.map (fun m -> Mode_var_env.lookup m.txt) bound.bound_vars in
-    let const =
-      Alloc.Const.Option.value bound.bound_const.mode_modes ~default
-    in
-    vars, const
-  in
   match annot with
   | Typemode.Pmode_var { txt = name; loc } ->
       let v = Mode_var_env.lookup name in
       (match Alloc.equate m v with
       | Ok () -> ()
       | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_variable name)));
-      { mode = m;
-        upper_vars = [v];
+            { mode = m;
+        upper_elems = [Alloc.disallow_left v];
         upper_const = Alloc.Const.max
       }
   | Typemode.Pmode_bounds { txt = { upper; lower }; loc } ->
-      let upper_vars, upper_const =
-        bound_modes upper ~default:Alloc.Const.max
+      let upper_const =
+        Alloc.Const.Option.value upper.bound_const.mode_modes
+          ~default:Alloc.Const.max
       in
+      let upper_elems = List.map transl_modepoly_morph_r upper.bound_vars in
       (match
          Alloc.submode m
-           (Alloc.meet (upper_vars @ [Alloc.of_const upper_const]))
+           (Alloc.meet (Alloc.of_const upper_const :: upper_elems))
        with
       | Ok () -> ()
       | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_bound)));
-      let lower_vars, lower_const =
-        bound_modes lower ~default:Alloc.Const.min
+      let lower_const =
+        Alloc.Const.Option.value lower.bound_const.mode_modes
+          ~default:Alloc.Const.min
       in
+      let lower_elems = List.map transl_modepoly_morph_l lower.bound_vars in
       (match
          Alloc.submode
-           (Alloc.join (lower_vars @ [Alloc.of_const lower_const]))
+           (Alloc.join (Alloc.of_const lower_const :: lower_elems))
            m
        with
       | Ok () -> ()
       | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_bound)));
-      { mode = m; upper_vars; upper_const }
+      { mode = m; upper_elems; upper_const }
 
 let alloc_of_sig_mode = function
   | Sig_const c -> Alloc.of_const c
@@ -988,14 +1030,14 @@ let curry_sig_mode acc_mode arg_mode =
       Alloc.Comonadic.submode_exn
         (Alloc.Comonadic.of_const (Alloc.Const.close_over arg))
         curry.comonadic
-    | Sig_var { mode = v; upper_vars; upper_const } ->
+    | Sig_var { mode = v; upper_elems; upper_const } ->
       (* ('a @ v[< 'm1 & ... & mn & c] -> (... -> ...) @ curry) @ acc *)
       (* v.comonadic < curry.comonadic *)
       Alloc.Comonadic.submode_exn v.comonadic curry.comonadic;
       (* comonadic_to_monadic_min(curry) < 'm1 & ... & mn & c *)
       Alloc.Monadic.submode_exn
         (Alloc.comonadic_to_monadic_min curry.comonadic)
-        (Alloc.meet (Alloc.of_const upper_const :: upper_vars)).monadic;
+        (Alloc.meet (Alloc.of_const upper_const :: upper_elems)).monadic;
       (* c.areality < curry.areality *)
       Locality.submode_exn
         (Locality.of_const upper_const.areality)
@@ -1005,10 +1047,7 @@ let curry_sig_mode acc_mode arg_mode =
       (alloc_of_sig_mode acc_mode).comonadic
       curry.comonadic;
     Sig_var
-      { mode = curry;
-        upper_vars = [];
-        upper_const = Alloc.Const.max
-      }
+      { mode = curry; upper_elems = []; upper_const = Alloc.Const.max }
 
 let transl_arrow_mode env pmodes : sig_mode Typemode.modes =
   if Typemode.has_mode_variables pmodes

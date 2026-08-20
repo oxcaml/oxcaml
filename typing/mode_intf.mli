@@ -953,6 +953,10 @@ module type S = sig
 
     val join_const : Monadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
 
+    val imply_const : Comonadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
+
+    val subtract_const : Monadic.Const.t -> ('l * 'r) t -> ('l * disallowed) t
+
     val meet_const_with :
       'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * disallowed) t
 
