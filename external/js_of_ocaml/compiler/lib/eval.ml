@@ -678,7 +678,9 @@ let eval_instr update_count inline_constant ~target info i =
       ( _
       , Prim
           ( Extern
-              ( ( "%resume"
+              ( ( "%continue"
+                | "%discontinue"
+                | "%discontinue_with_backtrace"
                 | "%perform"
                 | "%reperform"
                 | "%with_stack"

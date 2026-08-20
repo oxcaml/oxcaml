@@ -144,7 +144,7 @@
 
    (@string $already_resumed "Effect.Continuation_already_resumed")
 
-   (func $resume_fiber (export "%resume")
+   (func $resume_fiber
       (param $vfiber (ref eq)) (param $f (ref eq)) (param $v (ref eq))
       (param $tail (ref eq)) (result (ref eq))
       (local $fiber (ref $fiber))
@@ -215,6 +215,44 @@
          (local.tee $f
             (struct.get $fiber $exn (local.get $fiber)))
          (struct.get $closure 0 (ref.cast (ref $closure) (local.get $f)))))
+
+   (func $resume_identity
+      (param $x (ref eq)) (param (ref eq)) (result (ref eq))
+      (local.get $x))
+
+   (global $resume_identity (ref $closure)
+      (struct.new $closure (ref.func $resume_identity)))
+
+   (func $resume_raise
+      (param $exn (ref eq)) (param (ref eq)) (result (ref eq))
+      (throw $ocaml_exception (local.get $exn)))
+
+   (global $resume_raise (ref $closure)
+      (struct.new $closure (ref.func $resume_raise)))
+
+   ;; Resume the continuation, returning [$v] to the perform site.
+   (func (export "%continue")
+      (param $vfiber (ref eq)) (param $v (ref eq)) (param $tail (ref eq))
+      (result (ref eq))
+      (return_call $resume_fiber
+         (local.get $vfiber) (global.get $resume_identity)
+         (local.get $v) (local.get $tail)))
+
+   ;; Resume the continuation, raising [$exn] at the perform site.
+   (func (export "%discontinue")
+      (param $vfiber (ref eq)) (param $exn (ref eq)) (param $tail (ref eq))
+      (result (ref eq))
+      (return_call $resume_fiber
+         (local.get $vfiber) (global.get $resume_raise)
+         (local.get $exn) (local.get $tail)))
+
+   ;; As %discontinue; backtraces are not supported, so [$bt] is ignored.
+   (func (export "%discontinue_with_backtrace")
+      (param $vfiber (ref eq)) (param $exn (ref eq)) (param $bt (ref eq))
+      (param $tail (ref eq)) (result (ref eq))
+      (return_call $resume_fiber
+         (local.get $vfiber) (global.get $resume_raise)
+         (local.get $exn) (local.get $tail)))
 
    ;; Perform
 
