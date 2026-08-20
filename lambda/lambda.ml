@@ -1244,9 +1244,7 @@ and lfunction =
 
 and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
-    ktmpl_return: layout;
-    ktmpl_body: lambda;
-    ktmpl_ret_mode: return_mode;
+    ktmpl_body: lfunction;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
@@ -1894,8 +1892,8 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
-  | Lkindtemplate {ktmpl_body} ->
-      f ktmpl_body
+  | Lkindtemplate {ktmpl_body={body}} ->
+      f body
   | Lkindinstantiate {kinst_func} ->
       f kinst_func
 
@@ -2378,13 +2376,17 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
 let subst update_env ?freshen_bound_variables s =
   (build_substs update_env ?freshen_bound_variables s).subst_lambda
 
-let rename idmap lam =
+
+let rename_inner idmap =
   let update_env oldid (vd, mode) env =
     let newid = Ident.Map.find oldid idmap in
     Env.add_value_lazy ~mode newid vd env
   in
   let s = Ident.Map.map (fun new_id -> Lvar new_id) idmap in
-  subst update_env s lam
+  build_substs update_env s
+
+let rename idmap lam = (rename_inner idmap).subst_lambda lam
+let rename_lfun idmap lfun = (rename_inner idmap).subst_lfunction lfun
 
 let duplicate_function =
   (build_substs
@@ -2443,10 +2445,10 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
-  | Lkindtemplate { ktmpl_params; ktmpl_return; ktmpl_body = old_body;
-                    ktmpl_ret_mode; ktmpl_env = old_env; ktmpl_env_mode;
+  | Lkindtemplate { ktmpl_params; ktmpl_body = old_body;
+                    ktmpl_env = old_env; ktmpl_env_mode;
                     ktmpl_loc } ->
-      let new_body = f old_body in
+      let new_body = map_lfunction f old_body in
       let env_changed = ref false in
       let new_env =
         Ident.Map.map
@@ -2461,9 +2463,7 @@ let shallow_map ~tail ~non_tail:f lam =
       else
         Lkindtemplate {
           ktmpl_params;
-          ktmpl_return;
           ktmpl_body = new_body;
-          ktmpl_ret_mode;
           ktmpl_env = new_env;
           ktmpl_env_mode;
           ktmpl_loc;
