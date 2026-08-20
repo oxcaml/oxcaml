@@ -66,11 +66,11 @@ let%expect_test "unyielding calls stay direct in CPS context" =
   print_double_fun_decl program "apply_fn";
   [%expect {|
     function apply_fn(f){
-     var r = 0, for$ = 0;
+     var for$ = 0, r = [0, 0];
      for(;;){
-      var r$0 = r + 1 | 0, _b_ = for$ + 1 | 0;
-      if(2 === for$) return caml_call1(f, 0) + r$0 | 0;
-      r = r$0;
+      r[1]++;
+      var _b_ = for$ + 1 | 0;
+      if(2 === for$){_b_ = r[1]; return caml_call1(f, 0) + _b_ | 0;}
       for$ = _b_;
      }
     }
@@ -89,25 +89,21 @@ let%expect_test "unyielding calls are CPS-translated with --disable \
   print_double_fun_decl program "apply_fn";
   [%expect {|
     function apply_fn$0(f){
-     var r = 0, for$ = 0;
+     var for$ = 0, r = [0, 0];
      for(;;){
-      var r$0 = r + 1 | 0, _d_ = for$ + 1 | 0;
-      if(2 === for$) return caml_call1(f, 0) + r$0 | 0;
-      r = r$0;
-      for$ = _d_;
+      r[1]++;
+      var _e_ = for$ + 1 | 0;
+      if(2 === for$){_e_ = r[1]; return caml_call1(f, 0) + _e_ | 0;}
+      for$ = _e_;
      }
     }
     //end
     function apply_fn$1(f, cont){
-     var for$ = 0, r = 0;
-     for(;;){
-      var r$0 = r + 1 | 0, _d_ = for$ + 1 | 0;
-      if(2 === for$) break;
-      for$ = _d_;
-      r = r$0;
-     }
+     var for$ = 0, r = [0, 0];
+     for(;;){r[1]++; var _e_ = for$ + 1 | 0; if(2 === for$) break; for$ = _e_;}
+     var _d_ = r[1];
      return caml_trampoline_cps_call2
-             (f, 0, function(_d_){return cont(_d_ + r$0 | 0);});
+             (f, 0, function(_e_){return cont(_e_ + _d_ | 0);});
     }
     //end
     var apply_fn = caml_cps_closure(apply_fn$0, apply_fn$1);

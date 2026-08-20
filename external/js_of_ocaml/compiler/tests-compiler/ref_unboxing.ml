@@ -17,6 +17,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
+(* The Ref_unboxing pass is disabled. *)
+[@@@if false]
+
 open Util
 
 (* Reference unboxing eliminates the variable [y] bound by [!r] and
