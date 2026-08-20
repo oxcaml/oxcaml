@@ -38,3 +38,13 @@ end;;
 module type Bad = sig
   val bad : 'a @ [> 'n < 'm] -> 'a @ [> 'm]
 end;;
+
+(* Morphisms are only allowed inside bounds *)
+
+module type Bad = sig
+  val bad : 'a @ past('m) -> 'a @ [> 'm]
+end;;
+
+module type Bad = sig
+  val bad : 'a @ 'm mod portable -> 'a @ [> 'm]
+end;;
