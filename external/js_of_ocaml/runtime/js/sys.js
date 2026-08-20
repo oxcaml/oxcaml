@@ -456,14 +456,6 @@ function caml_sys_io_buffer_size(_unit) {
   return caml_io_buffer_size;
 }
 
-//Provides: caml_sys_io_buffer_size
-//Requires: caml_io_buffer_size
-//Version: >= 5.2, < 5.4
-//If: oxcaml
-function caml_sys_io_buffer_size(_unit) {
-  return caml_io_buffer_size;
-}
-
 //Provides: caml_sys_temp_dir_name
 //Requires: os_type
 //Requires: caml_string_of_jsstring
