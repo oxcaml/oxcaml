@@ -511,16 +511,6 @@ let prim_name_never_returns name =
   | "%raise" | "%reraise" | "%raise_notrace" | "%raise_with_backtrace" -> true
   | _ -> false
 
-type return_behavior =
-  | Returns
-  | Never_returns_layout_any
-  | Never_returns_representable
-
-let classify_return_behavior ~name ~result_layout_is_any =
-  if not (prim_name_never_returns name) then Returns
-  else if result_layout_is_any then Never_returns_layout_any
-  else Never_returns_representable
-
 module Repr_check = struct
 
   type result =
@@ -606,17 +596,7 @@ module Repr_check = struct
       (List.init (arity+1) (fun _ -> repr))
       prim
 
-  let no_non_value_repr prim =
-    let arity = List.length prim.prim_native_repr_args in
-    check
-      (List.init (arity+1)
-         (fun _ repr ->
-            if value_or_unboxed_or_untagged repr
-            then []
-            else [Expected_value_prim]))
-      prim
-
-  let no_non_value_repr_never_returning_res prim =
+  let no_non_value_repr ~never_returns prim =
     let arity = List.length prim.prim_native_repr_args in
     let value_check repr =
       if value_or_unboxed_or_untagged repr
@@ -624,7 +604,7 @@ module Repr_check = struct
       else [Expected_value_prim]
     in
     let res_check = function
-      | Repr_never_returns -> []
+      | Repr_never_returns when never_returns -> []
       | repr -> value_check repr
     in
     check (List.init arity (fun _ -> value_check) @ [res_check]) prim
@@ -826,9 +806,6 @@ let prim_has_valid_reprs ~loc prim =
       check [any; is (Same_as_ocaml_repr C.scannable); any]
     | "%apply" ->
       check [is (Same_as_ocaml_repr C.scannable); any; any]
-
-    | name when prim_name_never_returns name ->
-      no_non_value_repr_never_returning_res
 
     (* This doesn't prevent
 
@@ -1241,7 +1218,7 @@ let prim_has_valid_reprs ~loc prim =
                   (List.map (fun sort -> Same_as_ocaml_repr sort)
                      (I.sort intrinsic))
               | exception Not_found ->
-                if is_builtin_prim_name name then no_non_value_repr
+                if is_builtin_prim_name name then
                   (* These can probably support non-value reprs if the
                      need arises:
                      {|
@@ -1250,6 +1227,8 @@ let prim_has_valid_reprs ~loc prim =
                        | "%sendcache"
                      |}
                   *)
+                  no_non_value_repr
+                    ~never_returns:(prim_name_never_returns name)
                 else check_c_stub)
   in
   match check prim with
