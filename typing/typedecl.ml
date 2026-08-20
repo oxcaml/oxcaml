@@ -4395,14 +4395,9 @@ let make_native_repr
     match prim_name with
     | None -> false
     | Some name ->
-      match
-        Primitive.classify_return_behavior ~name
-          ~result_layout_is_any:
-            (Jkind.has_layout_any env jkind
-             && get_level ty = Btype.generic_level)
-      with
-      | Never_returns_layout_any -> true
-      | Never_returns_representable | Returns -> false
+      Primitive.prim_name_never_returns name
+      && Jkind.has_layout_any env jkind
+      && get_level ty = Btype.generic_level
   in
   let sort_or_poly =
     match get_desc (Ctype.get_unboxed_type_approximation env ty).ty with

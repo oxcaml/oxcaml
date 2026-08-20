@@ -153,20 +153,9 @@ val prim_has_valid_reprs : loc:Location.t -> description -> unit
     the layout of type parameters ([%array_length] for example). *)
 val prim_can_contain_layout_any : description -> bool
 
-type return_behavior =
-  | Returns
-        (** The primitive can return normally. *)
-  | Never_returns_layout_any
-        (** A raise variant, which never returns normally, whose declared
-            result is a generic type variable of layout [any]. *)
-  | Never_returns_representable
-        (** A raise variant whose declared result is representable, as in
-            [external raise : exn -> 'a] with ['a : value]. *)
-
-(** [result_layout_is_any] is whether the primitive's result is a generic
-    type variable of layout [any]. *)
-val classify_return_behavior :
-  name:string -> result_layout_is_any:bool -> return_behavior
+(** Whether the named primitive is a raise variant, which never returns
+    normally. Such primitives may declare a result of layout [any]. *)
+val prim_name_never_returns : string -> bool
 
 type wrong_repr_error =
   | Product_arg
