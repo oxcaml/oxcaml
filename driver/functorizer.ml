@@ -32,14 +32,14 @@ type chain = CU.Name.t list
     inputs have the empty chain. *)
 
 type state = {
-  rev_modules : (GM.t * Subst.Lazy.signature) list;
+  mutable rev_modules : (GM.t * Subst.Lazy.signature) list;
       (** Bundled modules with their signatures. Two substitutions apply:
           [Signature_with_global_bindings.subst] (GM → GM) and
           [Subst.add_module]/[Subst.Lazy.signature] (GM → local ident).
           Signatures here have gone through the first but not the second (which
           is applied in one pass at the end of [analyze]). *)
-  param_map : Ident.t GM.Parameter_name.Map.t;
-  module_map : chain GM.Name.Map.t;
+  mutable param_map : Ident.t GM.Parameter_name.Map.t;
+  mutable module_map : chain GM.Name.Map.t;
       (** Bundled module → the shortest [chain] through which it has been
           reached so far. Modules whose shortest chain is non-empty are bound
           under a [DEP__]-prefixed name to discourage users from accessing them
@@ -47,25 +47,20 @@ type state = {
       *)
 }
 
-let empty_state =
+let new_empty_state () =
   {
     rev_modules = [];
     param_map = GM.Parameter_name.Map.empty;
     module_map = GM.Name.Map.empty;
   }
 
-let register_parameter p_name state =
-  let id = Ident.create_local (GM.Parameter_name.to_string p_name) in
-  ( id,
-    {
-      state with
-      param_map = GM.Parameter_name.Map.add p_name id state.param_map;
-    } )
-
 let maybe_register_parameter p_name state =
   match GM.Parameter_name.Map.find_opt p_name state.param_map with
-  | Some id -> (id, state)
-  | None -> register_parameter p_name state
+  | Some id -> id
+  | None ->
+      let id = Ident.create_local (GM.Parameter_name.to_string p_name) in
+      state.param_map <- GM.Parameter_name.Map.add p_name id state.param_map;
+      id
 
 let assert_subset ~gm ~chain sub sup =
   if not (GM.Parameter_name.Set.subset sub sup) then
@@ -130,12 +125,7 @@ let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
 
 let rec insert_module_exact ~chain (gm : GM.t)
     (swg : Signature_with_global_bindings.t) state =
-  let state =
-    {
-      state with
-      module_map = GM.Name.Map.add (GM.to_name gm) chain state.module_map;
-    }
-  in
+  state.module_map <- GM.Name.Map.add (GM.to_name gm) chain state.module_map;
   let chain = CU.Name.of_head_of_global_name (GM.to_name gm) :: chain in
 
   let swg =
@@ -146,30 +136,22 @@ let rec insert_module_exact ~chain (gm : GM.t)
     in
     Signature_with_global_bindings.subst swg args
   in
-  let state =
-    Array.fold_left
-      (fun state gm_prec -> maybe_insert_module ~chain gm_prec state)
-      state swg.bound_globals
-  in
+  Array.iter
+    (fun gm_prec -> maybe_insert_module ~chain gm_prec state)
+    swg.bound_globals;
 
-  let state =
-    List.fold_left
-      (fun state (a : GM.t GM.Argument.t) ->
-        if GM.is_complete a.value then state
-        else
-          let swg = load_exact ~chain a.value in
-          maybe_insert_module_exact ~chain a.value swg state)
-      state gm.visible_args
-  in
-  let state =
-    List.fold_left
-      (fun state (a : _ GM.Argument.t) ->
-        let _id, state = maybe_register_parameter a.param state in
-        state)
-      state gm.hidden_args
-  in
+  List.iter
+    (fun (a : GM.t GM.Argument.t) ->
+      if not (GM.is_complete a.value) then
+        let swg = load_exact ~chain a.value in
+        maybe_insert_module_exact ~chain a.value swg state)
+    gm.visible_args;
+  List.iter
+    (fun (a : _ GM.Argument.t) ->
+      ignore (maybe_register_parameter a.param state : Ident.t))
+    gm.hidden_args;
   let sign_lazy, _staticity = swg.sign in
-  { state with rev_modules = (gm, sign_lazy) :: state.rev_modules }
+  state.rev_modules <- (gm, sign_lazy) :: state.rev_modules
 
 and maybe_insert_module_exact ~chain (gm : GM.t) swg state =
   let name = GM.to_name gm in
@@ -177,16 +159,14 @@ and maybe_insert_module_exact ~chain (gm : GM.t) swg state =
   | None -> insert_module_exact ~chain gm swg state
   | Some old_chain ->
       if List.compare_lengths chain old_chain < 0 then
-        { state with module_map = GM.Name.Map.add name chain state.module_map }
-      else state
+        state.module_map <- GM.Name.Map.add name chain state.module_map
 
 and maybe_insert_module ~chain ((gm, prec) : GM.With_precision.t) state =
   match prec with
   | Approximate ->
       let gm, swg = load_approx ~chain gm in
-
-      if GM.is_complete gm then state
-      else maybe_insert_module_exact ~chain gm swg state
+      if not (GM.is_complete gm) then
+        maybe_insert_module_exact ~chain gm swg state
   | Exact ->
       let swg = load_exact ~chain gm in
       maybe_insert_module_exact ~chain gm swg state
@@ -212,29 +192,26 @@ let validate_inputs (input_module_names : string list) : CU.Name.Set.t =
 
 let analyze (src_names : CU.Name.Set.t) : result =
   let chain = [] in
-  let state =
-    CU.Name.Set.fold
-      (fun cu_name state ->
-        match Env.find_import ~chain cu_name with
-        | None, _, _ ->
-            Compenv.fatal
-              (Printf.sprintf
-                 "Invalid -functorize input: '%s' is a parameter module"
-                 (CU.Name.to_string cu_name))
-        | Some _, [], _ ->
-            Compenv.fatal
-              (Printf.sprintf
-                 "Invalid -functorize input: '%s' is not a parameterised module"
-                 (CU.Name.to_string cu_name))
-        | Some _, cmi_params, swg ->
-            let gm =
-              GM.create_exn
-                (CU.Name.to_string cu_name)
-                [] ~hidden_args:cmi_params
-            in
-            maybe_insert_module_exact ~chain gm swg state)
-      src_names empty_state
-  in
+  let state = new_empty_state () in
+  CU.Name.Set.iter
+    (fun cu_name ->
+      match Env.find_import ~chain cu_name with
+      | None, _, _ ->
+          Compenv.fatal
+            (Printf.sprintf
+               "Invalid -functorize input: '%s' is a parameter module"
+               (CU.Name.to_string cu_name))
+      | Some _, [], _ ->
+          Compenv.fatal
+            (Printf.sprintf
+               "Invalid -functorize input: '%s' is not a parameterised module"
+               (CU.Name.to_string cu_name))
+      | Some _, cmi_params, swg ->
+          let gm =
+            GM.create_exn (CU.Name.to_string cu_name) [] ~hidden_args:cmi_params
+          in
+          maybe_insert_module_exact ~chain gm swg state)
+    src_names;
   let id_map =
     GM.Name.Map.mapi
       (fun (name : GM.Name.t) (chain : chain) ->
