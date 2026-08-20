@@ -635,7 +635,7 @@ AC_DEFUN([OCAML_CC_SUPPORTS_LABELS_AS_VALUES], [
 
 # Detects whether the C compiler supports requesting the initial-exec TLS
 # model for a thread-local variable. The __has_attribute test mirrors the
-# one guarding CAMLthread_local_initial_exec in runtime/caml/misc.h, so that
+# one guarding CAMLthread_local_hot in runtime/caml/misc.h, so that
 # a compiler accepted here is one that will honour the attribute.
 AC_DEFUN([OCAML_CC_SUPPORTS_INITIAL_EXEC_TLS], [
   AC_CACHE_CHECK(m4_normalize([whether $CC supports

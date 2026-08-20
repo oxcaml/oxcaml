@@ -183,7 +183,7 @@ CAMLdeprecated_typedef(addr, char *);
 #define CAMLthread_local _Thread_local
 #endif
 
-/* CAMLthread_local_initial_exec is used for the thread-local variables that
+/* CAMLthread_local_hot is used for the thread-local variables that
    sit on hot paths of the runtime. In position-independent code, the default
    (general-dynamic) TLS model makes every access to such a variable go
    through a call to __tls_get_addr, which is costly when the runtime ends up
@@ -199,10 +199,10 @@ CAMLdeprecated_typedef(addr, char *);
    under DEBUG should stay plain CAMLthread_local. */
 #if defined(CAML_INITIAL_EXEC_TLS) && defined(__PIC__) \
     && __has_attribute(__tls_model__)
-#define CAMLthread_local_initial_exec \
+#define CAMLthread_local_hot \
   CAMLthread_local __attribute__((__tls_model__("initial-exec")))
 #else
-#define CAMLthread_local_initial_exec CAMLthread_local
+#define CAMLthread_local_hot CAMLthread_local
 #endif
 
 /* Prefetching */

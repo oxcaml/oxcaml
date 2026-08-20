@@ -173,7 +173,7 @@ struct caml_thread_struct {
 
 typedef struct caml_thread_struct* caml_thread_t;
 
-static CAMLthread_local_initial_exec caml_thread_t This_thread;
+static CAMLthread_local_hot caml_thread_t This_thread;
 
 /* overall table for threads across domains */
 struct caml_thread_table {
