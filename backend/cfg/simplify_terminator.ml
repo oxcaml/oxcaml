@@ -236,8 +236,14 @@ let interpret_basic (known_values : known_value Loc_map.t)
     then replace instr.res.(0) (Const_float c) known_values
     else known_values
   | Op Move -> (
-    (* CR xclerc for xclerc: double check the "magic" / conversions behind moves
-       in `Emit` will not result in invalid tracking here. *)
+    (* The machtype guard below makes the tracking robust to the per-type
+       encodings of moves in `Emit`: `Emit`'s move performs no conversions and
+       rejects moves between differing types (except within the bit-preserving
+       {Int, Val, Addr} and {Vec128, Valx2} groups, which the guard
+       conservatively also rejects), and every same-component move faithfully
+       copies exactly the bits the tracked value describes (e.g. a `Float32`
+       move copies the 32-bit payload, which is all that `Const_float32`
+       asserts). *)
     match Loc_map.find_opt instr.arg.(0) known_values with
     | Some value
       when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ ->
