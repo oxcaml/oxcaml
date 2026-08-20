@@ -435,7 +435,14 @@ let pp_mode_consts f consts =
     (fun f c -> pp_print_string f c.txt) f consts
 
 let mode_bound sep f { bound_vars; bound_const } =
-  let pp_var f v = pp f "'%s" v.txt in
+  let pp_var f { elem_morph; elem_var; elem_mod } =
+    (match elem_morph with
+     | None -> pp f "'%s" elem_var.txt
+     | Some m -> pp f "%s('%s)" m.txt elem_var.txt);
+    match elem_mod with
+    | [] -> ()
+    | _ :: _ -> pp f " mod %a" pp_mode_consts elem_mod
+  in
   let pp_vars = pp_print_list ~pp_sep:(fun f () -> pp f "%s" sep) pp_var in
   match bound_vars, bound_const with
   | vars, [] -> pp_vars f vars

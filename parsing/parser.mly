@@ -4765,13 +4765,27 @@ strict_function_or_labeled_tuple_type:
   | QUOTE ident { mkloc $2 (make_loc $sloc) }
 ;
 
+mode_bound_elem_core:
+  | v = mode_bound_var
+      { { elem_morph = None; elem_var = v; elem_mod = [] } }
+  | morph = mode_const LPAREN v = mode_bound_var RPAREN
+      { { elem_morph = Some morph; elem_var = v; elem_mod = [] } }
+;
+
+mode_bound_elem:
+  | e = mode_bound_elem_core
+      { e }
+  | e = mode_bound_elem_core MOD consts = mode_const+
+      { { e with elem_mod = consts } }
+;
+
 mode_bound(SEP):
   | consts = mode_const+
       { { bound_vars = []; bound_const = consts } }
-  | v = mode_bound_var
-      { { bound_vars = [v]; bound_const = [] } }
-  | v = mode_bound_var SEP rest = mode_bound(SEP)
-      { { rest with bound_vars = v :: rest.bound_vars } }
+  | e = mode_bound_elem
+      { { bound_vars = [e]; bound_const = [] } }
+  | e = mode_bound_elem SEP rest = mode_bound(SEP)
+      { { rest with bound_vars = e :: rest.bound_vars } }
 ;
 
 %inline empty_mode_bound:

@@ -22,4 +22,12 @@ Line 5, characters 23-24:
 5 |   val bad : 'a @ [> 'n < 'm] -> 'a @ [> 'm]
                            ^
 Error: Syntax error
+Line 5, characters 21-22:
+5 |   val bad : 'a @ past('m) -> 'a @ [> 'm]
+                         ^
+Error: Syntax error
+Line 3, characters 20-23:
+3 |   val bad : 'a @ 'm mod portable -> 'a @ [> 'm]
+                        ^^^
+Error: Syntax error
 
