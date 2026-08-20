@@ -27,6 +27,14 @@
 module CU = Compilation_unit
 module GM = Global_module
 
+(* CR-someday zqian: the analysis below duplicates machinery in
+   [Persistent_env]: parameter registration ([param_map]), cmi loading and
+   elaboration ([load_exact]/[load_approx]) and the global-to-global
+   substitution of loaded signatures. [Persistent_env] already elaborates
+   globals against a cmi's parameter list and substitutes arguments when
+   importing parameterised units, and it already distinguishes parameters of
+   the current unit from parameters it is merely aware of. *)
+
 type chain = CU.Name.t list
 (** The modules through which a module is reached, innermost first. Command-line
     inputs have the empty chain. *)
