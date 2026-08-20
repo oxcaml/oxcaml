@@ -274,3 +274,31 @@ Test 5.1 : Nothing to do
     "value": "Nothing to do",
     "notifications": []
   }
+
+####################
+## UNBOXED TUPLES ##
+####################
+
+Test 6.1
+
+  $ $MERLIN single case-analysis -start 1:7 -end 1:8 \
+  > -filename labeled_unboxed_tuple.ml <<EOF
+  > let f (x : #(foo:int * bar:float#)) = x
+  > EOF
+  {
+    "class": "return",
+    "value": [
+      {
+        "start": {
+          "line": 1,
+          "col": 7
+        },
+        "end": {
+          "line": 1,
+          "col": 8
+        }
+      },
+      "#(~foo:_, ~bar:_)"
+    ],
+    "notifications": []
+  }
