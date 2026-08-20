@@ -41,6 +41,7 @@ type config =
   { strategy : strategy;
     validation : bool;
     prologue_insertion : bool;
+    copy_propagation : bool;
     linscan_threshold : int;
     debug_output : bool;
     csv_output : bool;
@@ -74,12 +75,15 @@ let dummy_in_stats =
   }
 
 type out_stats =
-  { spills : int;
+  { moves : int;
+    spills : int;
     reloads : int;
     spill_cost : int;
     reload_cost : int
   }
 
+(* [duration] is allocation-only; [total_duration] adds copy propagation.
+   Neither includes validation. *)
 let row_header =
   String.concat ";"
     [ "allocator";
@@ -92,12 +96,16 @@ let row_header =
       "in_num_instrs";
       "in_num_destruction_points";
       "in_num_high_pressure_points";
+      "out_moves";
       "out_spills";
       "out_reloads";
       "out_spill_cost";
-      "out_reload_cost" ]
+      "out_reload_cost";
+      "copy_propagation_duration";
+      "total_duration" ]
 
-let print_row ~allocator ~function_name ~duration ~rounds
+let print_row ~allocator ~function_name ~duration ~copy_propagation_duration
+    ~rounds
     ~in_stats:
       { is_entry_function;
         num_regs;
@@ -105,12 +113,14 @@ let print_row ~allocator ~function_name ~duration ~rounds
         num_instrs;
         num_destruction_points;
         num_high_pressure_points
-      } ~out_stats:{ spills; reloads; spill_cost; reload_cost } =
-  Printf.printf "%s;%s;%g;%d;%s;%d;%d;%d;%d;%d;%d;%d;%d;%d\n%!" allocator
-    function_name duration rounds
+      } ~out_stats:{ moves; spills; reloads; spill_cost; reload_cost } =
+  Printf.printf "%s;%s;%g;%d;%s;%d;%d;%d;%d;%d;%d;%d;%d;%d;%d;%g;%g\n%!"
+    allocator function_name duration rounds
     (if is_entry_function then "True" else "False")
     num_regs num_blocks num_instrs num_destruction_points
-    num_high_pressure_points spills reloads spill_cost reload_cost
+    num_high_pressure_points moves spills reloads spill_cost reload_cost
+    copy_propagation_duration
+    (duration +. copy_propagation_duration)
 
 let collect_in_stats (cfg_with_infos : Cfg_with_infos.t)
     (relocatable_regs : Reg.t list) =
@@ -201,7 +211,8 @@ let safe_pow10 n =
 let collect_out_stats (cfg_with_infos : Cfg_with_infos.t) =
   let loop_depths = (Cfg_with_infos.loop_infos cfg_with_infos).loop_depths in
   Cfg_with_infos.fold_blocks cfg_with_infos
-    ~init:{ spills = 0; reloads = 0; spill_cost = 0; reload_cost = 0 }
+    ~init:
+      { moves = 0; spills = 0; reloads = 0; spill_cost = 0; reload_cost = 0 }
     ~f:(fun (label : Label.t) (block : Cfg.basic_block) (acc : out_stats) ->
       let cost =
         match Label.Map.find_opt label loop_depths with
@@ -215,6 +226,10 @@ let collect_out_stats (cfg_with_infos : Cfg_with_infos.t) =
       DLL.fold_left block.body ~init:acc
         ~f:(fun (acc : out_stats) (instr : Cfg.basic Cfg.instruction) ->
           match[@ocaml.warning "-4"] instr.desc with
+          | Op Move ->
+            if Cfg.is_noop_move instr
+            then acc
+            else { acc with moves = succ acc.moves }
           | Op Spill ->
             { acc with
               spills = succ acc.spills;
@@ -259,6 +274,14 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
   Cmm.reset ();
   Cmm.set_label cmm_label;
   Reg.For_testing.set_state ~stamp:reg_stamp ~relocatable_regs;
+  let cfg_with_infos, copy_propagation_duration =
+    match config.copy_propagation with
+    | false -> cfg_with_infos, 0.
+    | true ->
+      let start_time = cpu_time () in
+      let cfg_with_infos = Cfg_copy_propagation.run cfg_with_infos in
+      cfg_with_infos, cpu_time () -. start_time
+  in
   let cfg_description =
     match config.validation with
     | false -> None
@@ -293,11 +316,17 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
     let cfg = Cfg_with_layout.cfg cfg_with_layout in
     print_row
       ~allocator:(string_of_register_allocator allocator)
-      ~function_name:cfg.fun_name ~duration ~rounds:!rounds_ref ~in_stats
-      ~out_stats
+      ~function_name:cfg.fun_name ~duration ~copy_propagation_duration
+      ~rounds:!rounds_ref ~in_stats ~out_stats
   end;
   if config.debug_output
-  then Printf.eprintf "  register allocation took %gs...\n%!" duration;
+  then begin
+    if config.copy_propagation
+    then
+      Printf.eprintf "  copy propagation took %gs...\n%!"
+        copy_propagation_duration;
+    Printf.eprintf "  register allocation took %gs...\n%!" duration
+  end;
   if config.prologue_insertion
   then begin
     Misc.protect_refs
@@ -361,6 +390,7 @@ let parse_command_line () =
   in
   let validate = ref false in
   let insert_prologue = ref false in
+  let copy_propagation = ref false in
   let linscan_threshold = ref !Oxcaml_flags.regalloc_linscan_threshold in
   let csv_output = ref false in
   let debug_output = ref false in
@@ -380,6 +410,9 @@ let parse_command_line () =
         "Select linscan if the number of registers is above the threshold" );
       "-validate", Arg.Set validate, "Enable validation";
       "-insert-prologue", Arg.Set insert_prologue, "Enable prologue insertion";
+      ( "-copy-propagation",
+        Arg.Set copy_propagation,
+        "Enable copy propagation (linscan and greedy only)" );
       "-csv-output", Arg.Set csv_output, "Enable CSV output";
       "-debug-output", Arg.Set debug_output, "Enable debug output";
       "-summary", Arg.Set print_summary, "Print summary" ]
@@ -389,9 +422,20 @@ let parse_command_line () =
   match !strategy with
   | None -> fatal "register allocator was not set (use -regalloc)"
   | Some strategy ->
+    (match strategy, !copy_propagation with
+    | Allocator IRC, true ->
+      fatal "-copy-propagation is not supported with the IRC allocator"
+    | Default, true ->
+      fatal
+        "-copy-propagation requires -regalloc ls or -regalloc gi (the default \
+         strategy may select IRC)"
+    | (Allocator (GI | LS) | Custom), true
+    | (Allocator (GI | LS | IRC) | Default | Custom), false ->
+      ());
     { strategy;
       validation = !validate;
       prologue_insertion = !insert_prologue;
+      copy_propagation = !copy_propagation;
       linscan_threshold = !linscan_threshold;
       csv_output = !csv_output;
       debug_output = !debug_output;
