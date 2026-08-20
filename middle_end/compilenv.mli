@@ -44,6 +44,12 @@ val get_global_export_info : Compilation_unit.t
 val get_unit_export_info
   : Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
 
+val set_lto_participants : Compilation_unit.t list -> unit
+        (* In a [-reaped-rebuild] invocation, set the units that were involved
+           in the [-reaper-solve]. Other invocations should leave this empty.
+           We use this to determine whether to read [.reaped.cmx] files or
+           plain [.cmx] files for our dependencies. *)
+
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
         (* Set the export information for the current unit. *)
 
@@ -109,6 +115,7 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of Compilation_unit.t * Compilation_unit.t * string
+  | Missing_reaped_cmx of Compilation_unit.t * string
 
 exception Error of error
 

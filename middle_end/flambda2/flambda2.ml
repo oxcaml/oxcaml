@@ -429,26 +429,28 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   (* CR mvellacott: split the resulting solution into per-compilation-unit
      portions. *)
   let solution = Flambda2_reaper.Reaper.Staged.solve combined_graph in
-  Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~solution;
+  let participants =
+    List.map Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmrs
+  in
+  Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
+    ~solution;
   (* CR mvellacott: remove this debug print once we can test useful
      functionality. *)
   Format.eprintf "reaper_lto_solve: solved units: [%s]; ltosol output: %s@."
     (String.concat "; "
-       (List.map
-          (fun cmr ->
-            Compilation_unit.full_path_as_string
-              (Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr))
-          cmrs))
+       (List.map Compilation_unit.full_path_as_string participants))
     ltosol_file
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables ~ltosol_filename ~cmr_filename =
   let { Flambda2_reaper.Ltosol_format.File_contents.id_stamp_counters;
+        participants;
         solution = ltosol_solution
       } =
     Flambda2_reaper.Ltosol_format.load ltosol_filename
   in
   Flambda2_reaper.Id_stamp_counters.restore_for_resume id_stamp_counters;
+  Compilenv.set_lto_participants participants;
   (* We expect the stamp counters in the .cmr file to be less than the counters
      in the .ltosol file, because the -reaper-solve invocation begins by taking
      the maximum counters across the .cmr files it reads. Therefore, we can

@@ -30,6 +30,7 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of CU.t * CU.t * string
+  | Missing_reaped_cmx of CU.t * string
 
 exception Error of error
 
@@ -55,6 +56,10 @@ let reset_info_tables () =
   Infos_table.reset global_infos_table
 
 module String = Misc.Stdlib.String
+
+let lto_participants = ref CU.Set.empty
+
+let set_lto_participants units = lto_participants := CU.Set.of_list units
 
 let cached_zero_alloc_info = Zero_alloc_info.create ()
 
@@ -193,21 +198,26 @@ let get_unit_export_info comp_unit =
       let (infos, crc) =
         if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
         else begin
+          let need_reaped_cmx = CU.Set.mem comp_unit !lto_participants in
           let missing_extension =
-            match !Clflags.jsir with
-            | false -> "cmx"
-            | true -> "cmjx"
+            if need_reaped_cmx then "reaped.cmx"
+            else if !Clflags.jsir then "cmjx"
+            else "cmx"
           in
+          let filename = CU.base_filename comp_unit ^ "." ^ missing_extension in
           try
-            let filename =
-              Load_path.find_normalized
-                (CU.base_filename comp_unit ^ "." ^ missing_extension) in
+            let filename = Load_path.find_normalized filename in
             let (ui, crc) = read_unit_info filename in
             if not (CU.equal ui.ui_unit comp_unit) then
               raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
             cache_zero_alloc_info ui.ui_zero_alloc_info;
             (Some ui, Some crc)
           with Not_found ->
+            (* A missing [.reaped.cmx] for an LTO participant is fatal because
+               we already decided at compile time to do inlining, direct calls,
+               etc. *)
+            if need_reaped_cmx then
+              raise(Error(Missing_reaped_cmx(comp_unit, filename)));
             let warn =
               Warnings.No_cmx_file
                 { missing_extension
@@ -423,6 +433,12 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
+  | Missing_reaped_cmx(name, filename) ->
+      fprintf ppf
+        "Dependency %a@ was included in -reaper-solve@ but its reaped cmx \
+         file@ %a@ was not found."
+        CU.print_as_inline_code name
+        Location.Doc.quoted_filename filename
 
 let () =
   Location.register_error_of_exn
