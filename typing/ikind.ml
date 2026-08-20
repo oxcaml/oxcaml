@@ -78,14 +78,12 @@ module Provenance = struct
       Format_doc.doc_printf "@[<hov>%a@]" Jkind.format_type_expr ty
       |> make ~plural:false
            ~source_type_id:(Some (Types.get_id source_type))
-           ~is_decl_under_check
-           ~parent
+           ~is_decl_under_check ~parent
     in
     let register_text text =
       make ~plural:true
         ~source_type_id:(Some (Types.get_id ty))
-        ~is_decl_under_check
-        ~parent
+        ~is_decl_under_check ~parent
         (Format_doc.doc_printf "%s" text)
     in
     match Types.get_desc ty with
@@ -234,9 +232,7 @@ module Solver = struct
           | decl -> Types.Uid.equal decl_uid decl.type_uid)
         | None, _, _ | Some _, None, _ | Some _, Some _, _ -> false
       in
-      let provenance =
-        Provenance.register ~is_decl_under_check ~parent ty
-      in
+      let provenance = Provenance.register ~is_decl_under_check ~parent ty in
       ( (fun poly -> Ldd.meet poly (rigid_name ctx (Provenance.name provenance))),
         { ctx with
           provenance = Some { provenance_ctx with parent = Some provenance.id }
@@ -1587,8 +1583,7 @@ let best_effort_provenance_error ~fallback_error ~origin ~sub_jkind ~super_jkind
     with
     | Ok () -> None
     | Error provenance_error ->
-      if
-        subjkind_errors_have_same_violating_axes actual_error provenance_error
+      if subjkind_errors_have_same_violating_axes actual_error provenance_error
       then subjkind_error_with_provenance_residuals provenance_error
       else None
   in
@@ -1697,8 +1692,7 @@ let check_type_decl_bound ?allow_any_crossing ?origin ~type_equal ~context env
     ~decl ~actual ~bound =
   check_bound ?allow_any_crossing ?origin
     ~decl_uid_under_check:decl.Types.type_uid ~type_equal ~context env ~actual
-    ~bound
-    ~provenance_lhs:(fun ctx -> type_decl_rhs_kind_poly ctx decl)
+    ~bound ~provenance_lhs:(fun ctx -> type_decl_rhs_kind_poly ctx decl)
 
 let crossing_of_jkind ~(context : Jkind.jkind_context) env
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
