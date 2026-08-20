@@ -25,11 +25,15 @@ type uses =
 (* CR-someday xclerc for xclerc: we could save a pass over the CFG by computing
    a more general notion of uses, to be uses both here and in
    `Regalloc_utils.collect_cfg_infos`. *)
-let compute_uses : Cfg.t -> uses Reg.Tbl.t =
+let compute_uses : Cfg.t -> uses Reg.Tbl.t * int Reg.Tbl.t Label.Tbl.t =
  fun cfg ->
   let uses = Reg.Tbl.create 32 in
-  let record_uses ~label ~instr ~read ~regs ~idx =
+  let last_writes : int Reg.Tbl.t Label.Tbl.t = Label.Tbl.create 32 in
+  let record_uses ~label ~block_last_writes ~instr ~read ~regs ~idx =
     Array.iter regs ~f:(fun reg ->
+        (* Indices increase over the traversal of the block, so replacing
+           unconditionally keeps the index of the last write. *)
+        if not read then Reg.Tbl.replace block_last_writes reg idx;
         match Reg.Tbl.find_opt uses reg with
         | None ->
           let reads, writes = if read then 1, [] else 0, [instr, idx] in
@@ -53,22 +57,40 @@ let compute_uses : Cfg.t -> uses Reg.Tbl.t =
         | Some Multiple_blocks -> ())
   in
   Cfg.iter_blocks cfg ~f:(fun label block ->
+      let block_last_writes = Reg.Tbl.create 8 in
+      Label.Tbl.replace last_writes label block_last_writes;
+      let record_uses = record_uses ~label ~block_last_writes in
       let idx =
         DLL.fold_left block.body ~init:0
           ~f:(fun idx (instr : Cfg.basic Cfg.instruction) ->
             let basic = Basic instr in
-            record_uses ~label ~read:true ~instr:basic ~regs:instr.arg ~idx;
-            record_uses ~label ~read:false ~instr:basic ~regs:instr.res ~idx;
+            record_uses ~read:true ~instr:basic ~regs:instr.arg ~idx;
+            record_uses ~read:false ~instr:basic ~regs:instr.res ~idx;
             succ idx)
       in
       let term = Terminator block.terminator in
-      record_uses ~label ~read:true ~instr:term ~regs:block.terminator.arg ~idx;
-      record_uses ~label ~read:false ~instr:term ~regs:block.terminator.res ~idx);
-  uses
+      record_uses ~read:true ~instr:term ~regs:block.terminator.arg ~idx;
+      record_uses ~read:false ~instr:term ~regs:block.terminator.res ~idx);
+  uses, last_writes
 
-let compute_subst : uses Reg.Tbl.t -> Subst.t * InstructionId.Set.t Label.Tbl.t
-    =
- fun uses ->
+(* Returns whether `reg` is written in the block `label` at an index strictly
+   greater than `index`; conservatively returns `true` if the information is not
+   available. *)
+let written_after :
+    int Reg.Tbl.t Label.Tbl.t -> label:Label.t -> Reg.t -> index:int -> bool =
+ fun last_writes ~label reg ~index ->
+  match Label.Tbl.find_opt last_writes label with
+  | None -> true
+  | Some block_last_writes -> (
+    match Reg.Tbl.find_opt block_last_writes reg with
+    | None -> false
+    | Some last_write -> last_write > index)
+
+let compute_subst :
+    uses Reg.Tbl.t ->
+    int Reg.Tbl.t Label.Tbl.t ->
+    Subst.t * InstructionId.Set.t Label.Tbl.t =
+ fun uses last_writes ->
   let subst = Reg.Tbl.create 8 in
   let to_delete = Label.Tbl.create 8 in
   Reg.Tbl.iter
@@ -81,10 +103,12 @@ let compute_subst : uses Reg.Tbl.t -> Subst.t * InstructionId.Set.t Label.Tbl.t
         | [(write, write_index)] ->
           begin match[@ocaml.warning "-fragile-match"] write with
           | Basic { id; desc = Op Move; arg; res; _ } ->
-            (* On the compiler distribution, linscan and greedy show interesting
-               results with the heuristics below (condition over number of reads
-               and max distance) : respectively -3% and -5% moves, for
-               basically no changes to spills/reloads/stack slots. *)
+            (* On the compiler distribution (as measured with regalloc.exe),
+               the heuristics below (conditions over the number of reads, the
+               max distance, and the stability of the source) delete about 19%
+               of the move instructions remaining after allocation, for both
+               linscan and greedy, while spills and reloads change by less
+               than 1%. *)
             (* CR-someday xclerc for xclerc: re-run benchmarks with different
                heuristics (the current one is OK for both linscan and greedy,
                but it looks like we could be a bit more aggressive in terms of
@@ -103,6 +127,14 @@ let compute_subst : uses Reg.Tbl.t -> Subst.t * InstructionId.Set.t Label.Tbl.t
               && Reg.is_unknown res.(0)
               && (not (Reg.same arg.(0) res.(0)))
               && Cmm.equal_machtype_component arg.(0).typ res.(0).typ
+              (* The source of the move must not be redefined between the move
+                 and the read, otherwise the rewritten read would see the new
+                 value. We conservatively require that the source has no write
+                 after the move in the whole block: this stronger condition
+                 remains valid when substitutions are composed by
+                 `close_subst`. *)
+              && not
+                   (written_after last_writes ~label arg.(0) ~index:write_index)
             then begin
               let instrs_to_delete =
                 match Label.Tbl.find_opt to_delete label with
@@ -137,8 +169,8 @@ let rec close_subst : Subst.t -> Subst.t =
 let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
-  let uses = compute_uses cfg in
-  let subst, to_delete = compute_subst uses in
+  let uses, last_writes = compute_uses cfg in
+  let subst, to_delete = compute_subst uses last_writes in
   match Reg.Tbl.length subst with
   | 0 -> cfg_with_infos
   | _ ->
