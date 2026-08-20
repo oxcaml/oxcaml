@@ -839,6 +839,48 @@ Error: The kind of type "t" is immutable_data with bad outer
          because of the annotation on the declaration of the type t.
 |}]
 
+(* A self-recursive declaration currently lists itself as a cause
+   alongside the genuine carrier. *)
+type t : value mod portable = Leaf of (int -> int) | Node of t
+[%%expect {|
+Line 1, characters 0-62:
+1 | type t : value mod portable = Leaf of (int -> int) | Node of t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Mutually-recursive pair where the SIBLING (not self) is the carrier:
+   [t] reports both its self-occurrence and the group-mate [u]. Any
+   change to self-reporting must keep the [u] line. *)
+type t : value mod portable = A of t | B of u
+and u = C of (int -> int)
+[%%expect {|
+Line 1, characters 0-45:
+1 | type t : value mod portable = A of t | B of u
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Sibling-only carrier (no self-occurrence in [t2]): a group-mate
+   subject is not self. *)
+type t2 : value mod portable = K of u2
+and u2 = L of (int -> int)
+[%%expect {|
+Line 1, characters 0-38:
+1 | type t2 : value mod portable = K of u2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t2" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t2.
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t

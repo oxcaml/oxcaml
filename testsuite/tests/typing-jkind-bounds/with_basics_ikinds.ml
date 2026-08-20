@@ -824,6 +824,49 @@ Error: This type definition does not satisfy its kind annotation
        - bad is not mod portable
 |}]
 
+(* A self-recursive declaration currently lists itself as a cause
+   alongside the genuine carrier. *)
+type t : value mod portable = Leaf of (int -> int) | Node of t
+[%%expect {|
+Line 1, characters 0-62:
+1 | type t : value mod portable = Leaf of (int -> int) | Node of t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because
+       - functions are not mod portable
+       - t is not mod portable
+|}]
+
+(* Mutually-recursive pair where the SIBLING (not self) is the carrier:
+   [t] reports both its self-occurrence and the group-mate [u]. Any
+   change to self-reporting must keep the [u] line. *)
+type t : value mod portable = A of t | B of u
+and u = C of (int -> int)
+[%%expect {|
+Line 1, characters 0-45:
+1 | type t : value mod portable = A of t | B of u
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because
+       - t is not mod portable
+       - u is not mod portable
+|}]
+
+(* Sibling-only carrier (no self-occurrence in [t2]): a group-mate
+   subject is not self. *)
+type t2 : value mod portable = K of u2
+and u2 = L of (int -> int)
+[%%expect {|
+Line 1, characters 0-38:
+1 | type t2 : value mod portable = K of u2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because u2 is not mod portable.
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t
