@@ -720,13 +720,20 @@ let axes_in_violation_order ~violating_axes axes =
       List.exists (Jkind_axis.Axis.equal violating_axis) axes)
     violating_axes
 
+type provenance_residual =
+  { provenance : Provenance.t;
+    mode_bounds : Axis_lattice.t;
+    axes : Jkind_axis.Axis.packed list
+  }
+
 type mode_crossing_error =
   { printing_env : Env.t;
     super_jkind : Types.jkind_l;
     sub_poly : Ldd.node;
     super_poly : Ldd.node;
     provenances : Provenance.t list;
-    violating_axes : Jkind_axis.Axis.packed list
+    violating_axes : Jkind_axis.Axis.packed list;
+    provenance_residuals : provenance_residual list option
   }
 
 type subjkind_error =
@@ -739,12 +746,6 @@ let subjkind_error_printing_env = function
 
 let map_jkind_error result =
   Result.map_error (fun error -> Jkind_error error) result
-
-type provenance_residual =
-  { provenance : Provenance.t;
-    mode_bounds : Axis_lattice.t;
-    axes : Jkind_axis.Axis.packed list
-  }
 
 let add_provenance_residual entries
     ({ provenance = { ty; plural; _ }; mode_bounds; axes } as entry) =
@@ -989,10 +990,8 @@ let pp_type_definition_kind_annotation env ppf super_jkind =
     (Jkind.format env) super_jkind
 
 let report_provenance_mode_crossing_error env ppf
-    { super_jkind; sub_poly; super_poly; provenances; violating_axes; _ } =
-  match
-    provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly
-  with
+    { super_jkind; provenance_residuals; _ } =
+  match provenance_residuals with
   | None | Some [] -> None
   | Some [entry] ->
     Some
@@ -1507,18 +1506,22 @@ let check_mode_crossing_polys ~origin:_ ~sub_jkind:_ ~super_jkind ~printing_env
            sub_poly;
            super_poly;
            provenances = Provenance.all ();
-           violating_axes
+           violating_axes;
+           provenance_residuals = None
          })
 
-let subjkind_error_has_provenance_residuals = function
-  | Jkind_error _ -> false
-  | Mode_crossing_error { sub_poly; super_poly; provenances; violating_axes; _ }
-    -> (
+let subjkind_error_with_provenance_residuals = function
+  | Jkind_error _ -> None
+  | Mode_crossing_error
+      ({ sub_poly; super_poly; provenances; violating_axes; _ } as error) -> (
     match
       provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly
     with
-    | None | Some [] -> false
-    | Some (_ :: _) -> true)
+    | None | Some [] -> None
+    | Some (_ :: _ as provenance_residuals) ->
+      Some
+        (Mode_crossing_error
+           { error with provenance_residuals = Some provenance_residuals }))
 
 let same_axis_set axes1 axes2 =
   let of_list =
@@ -1558,8 +1561,10 @@ let best_effort_provenance_error ~fallback_error ~origin ~sub_jkind ~super_jkind
   | Error provenance_error ->
     if
       subjkind_errors_have_same_violating_axes actual_error provenance_error
-      && subjkind_error_has_provenance_residuals provenance_error
-    then Error provenance_error
+    then
+      match subjkind_error_with_provenance_residuals provenance_error with
+      | None -> fallback actual_error
+      | Some provenance_error -> Error provenance_error
     else fallback actual_error
 
 let sub_jkind_l ?(allow_any_crossing = false) ?origin
