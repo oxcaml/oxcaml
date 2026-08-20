@@ -233,7 +233,10 @@ let link
     ~(source_map : Source_map.Encoding_spec.t option) =
   let t = Timer.make () in
   let oc = Line_writer.of_channel output in
-  let warn_effects = ref false in
+  (* TODO: [warn_effects = true] is a temporary hack for the
+     period when the [Effect] module is in [Stdlib], but no code is actually
+     using it. *)
+  let warn_effects = ref true in
   let files =
     List.map files ~f:(fun file ->
         let lr = Line_reader.open_ file in
