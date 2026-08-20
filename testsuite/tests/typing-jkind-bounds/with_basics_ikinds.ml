@@ -863,6 +863,44 @@ Error: This type definition does not satisfy its kind annotation
        because u2 is not mod portable.
 |}]
 
+(* Chain-3 axis (externality), equal-value suppression: both subjects
+   require exactly [external64], so the enclosing subject entails the
+   nested one. *)
+type ('a : value) outer : value with 'a
+type bad : value
+type t : value mod external64 = { x : bad outer }
+[%%expect {|
+type 'a outer
+type bad
+Line 3, characters 0-49:
+3 | type t : value mod external64 = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod external64,
+       because
+       - boxed records are not mod external64
+       - outer is not mod external64
+|}]
+
+(* Chain-3 entailment where the enclosing subject does not report the
+   axis at all: the nested [external64] requirement must survive. *)
+type ('a : value) outer2 : value mod external64 with 'a
+type bad2 : value
+type t2 : value mod portable external64 = { x : bad2 outer2 }
+[%%expect {|
+type 'a outer2 : value mod external64 with 'a
+type bad2
+Line 3, characters 0-61:
+3 | type t2 : value mod portable external64 = { x : bad2 outer2 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable external64,
+       because
+       - boxed records are not mod external64
+       - outer2 is not mod portable
+       - bad2 is not mod external64
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t

@@ -881,6 +881,42 @@ Error: The kind of type "t2" is value non_float mod immutable
          because of the annotation on the declaration of the type t2.
 |}]
 
+(* Chain-3 axis (externality), equal-value suppression: both subjects
+   require exactly [external64], so the enclosing subject entails the
+   nested one. *)
+type ('a : value) outer : value with 'a
+type bad : value
+type t : value mod external64 = { x : bad outer }
+[%%expect {|
+type 'a outer
+type bad
+Line 3, characters 0-49:
+3 | type t : value mod external64 = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod external64
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Chain-3 entailment where the enclosing subject does not report the
+   axis at all: the nested [external64] requirement must survive. *)
+type ('a : value) outer2 : value mod external64 with 'a
+type bad2 : value
+type t2 : value mod portable external64 = { x : bad2 outer2 }
+[%%expect {|
+type 'a outer2 : value mod external64 with 'a
+type bad2
+Line 3, characters 0-61:
+3 | type t2 : value mod portable external64 = { x : bad2 outer2 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is immutable_data with bad2 outer2
+         because it's a boxed record type.
+       But the kind of type "t2" must be a subkind of
+           value mod portable external64
+         because of the annotation on the declaration of the type t2.
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t
