@@ -1379,10 +1379,15 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     Lambda_to_flambda_primitives_helpers.bind_recs acc None ~register_const0
       (Lambda_to_flambda_primitives_helpers.maybe_create_unboxed_product prims)
       dbg k
-  | Pclose_template { template; mode }, _ -> (
+  | Pclose_template { template }, _ -> (
     match raw_args with
     | [[IR.Var code_ident]; env_arg] ->
-      let ({ lb_code_id; lb_function_slot; lb_value_slots; lb_slot_layouts }
+      let ({ lb_code_id;
+             lb_function_slot;
+             lb_value_slots;
+             lb_slot_layouts;
+             lb_alloc_mode
+           }
             : Env.lcode_binding) =
         match Env.find_lcode_binding env code_ident with
         | Some binding -> binding
@@ -1442,8 +1447,11 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       let set = Set_of_closures.create ~value_slots function_decls in
       let acc = Acc.add_set_of_closures_offsets ~is_phantom:false acc set in
       let alloc_mode =
-        Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
-          ~current_region
+        (* The closure holds copies of the captures, so its mode is the
+           environment's mode (recorded on the [Lcode]), not anything carried by
+           the primitive. *)
+        Alloc_mode.For_allocations.from_lambda lb_alloc_mode
+          ~current_alloc_region ~current_region
       in
       let acc, expr = k acc [Named.create_set_of_closures ~alloc_mode set] in
       List.fold_left
@@ -3445,8 +3453,8 @@ let close_functions acc external_env ~current_alloc_region ~current_region
     acc, Lifted symbols_with_approx
   else acc, Dynamic (set_of_closures, alloc_mode, approximations)
 
-let close_lcode acc env ~code_binding ~closure_var ~slot_layouts decl
-    ~(body : Acc.t -> Env.t -> Expr_with_acc.t) : Expr_with_acc.t =
+let close_lcode acc env ~code_binding ~closure_var ~slot_layouts ~alloc_mode
+    decl ~(body : Acc.t -> Env.t -> Expr_with_acc.t) : Expr_with_acc.t =
   let compilation_unit = Current_unit.get_cu_exn () in
   (* The code must be closed: every capture is accessed through the closure's
      value slots ([Pproject_value_slot]), and any other free identifier must be
@@ -3566,7 +3574,8 @@ let close_lcode acc env ~code_binding ~closure_var ~slot_layouts decl
       { lb_code_id = code_id;
         lb_function_slot = function_slot;
         lb_value_slots = value_slots;
-        lb_slot_layouts = slot_layouts
+        lb_slot_layouts = slot_layouts;
+        lb_alloc_mode = alloc_mode
       }
   in
   body acc env

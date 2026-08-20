@@ -653,11 +653,11 @@ and eval_prim env prim =
     then prim
     else
       Pset_of_closures { template = new_template; layouts = new_layouts; mode }
-  | Pclose_template { template = old_template; mode } ->
+  | Pclose_template { template = old_template } ->
     let new_template = eval_template_ref env old_template in
     if new_template == old_template
     then prim
-    else Pclose_template { template = new_template; mode }
+    else Pclose_template { template = new_template }
   | Pproject_value_slot { index; layout = old_layout } ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
@@ -808,8 +808,7 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Pset_of_closures { template; layouts; mode = _ } ->
     assert_template_ref_is_resolved template;
     List.iter assert_layout_contains_no_splices layouts
-  | Pclose_template { template; mode = _ } ->
-    assert_template_ref_is_resolved template
+  | Pclose_template { template } -> assert_template_ref_is_resolved template
   | Pproject_value_slot { index = _; layout } ->
     assert_layout_contains_no_splices layout
   | Popaque layout | Pobj_magic layout ->

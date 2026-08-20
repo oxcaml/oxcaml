@@ -262,24 +262,34 @@ module Acc = struct
       } )
 end
 
+let function_slot_of_fun_decl (fun_decl : Fexpr.fun_decl) =
+  match fun_decl.function_slot, fun_decl.code_id with
+  (* By default, pun the code id as the function slot *)
+  | Some function_slot, _ | None, Some function_slot -> function_slot
+  | None, None ->
+    Misc.fatal_error "A deleted closure must be given an explicit function slot"
+
 let set_of_closures env fun_decls value_slots =
   let fun_decls : Function_declarations.t =
     let translate_fun_decl (fun_decl : Fexpr.fun_decl) :
-        Function_slot.t * Code_id.t =
-      let code_id = find_code_id env fun_decl.code_id in
-      let function_slot =
-        (* By default, pun the code id as the function slot *)
-        fun_decl.function_slot |> Option.value ~default:fun_decl.code_id
+        Function_slot.t * Function_declarations.code_id_in_function_declaration
+        =
+      let code_id : Function_declarations.code_id_in_function_declaration =
+        match fun_decl.code_id with
+        | Some code_id ->
+          Code_id
+            { code_id = find_code_id env code_id;
+              only_full_applications = false
+            }
+        | None -> Deleted { function_slot_size = 2; dbg = Debuginfo.none }
       in
-      let function_slot = fresh_or_existing_function_slot env function_slot in
+      let function_slot =
+        fresh_or_existing_function_slot env (function_slot_of_fun_decl fun_decl)
+      in
       function_slot, code_id
     in
     List.map translate_fun_decl fun_decls
-    |> Function_slot.Lmap.of_list
-    |> Function_slot.Lmap.map
-         (fun code_id : Function_declarations.code_id_in_function_declaration ->
-           Code_id { code_id; only_full_applications = false })
-    |> Function_declarations.create
+    |> Function_slot.Lmap.of_list |> Function_declarations.create
   in
   let value_slots = Option.value value_slots ~default:[] in
   let value_slots : Simple.t Value_slot.Map.t =
@@ -545,14 +555,11 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           Bound_static.Pattern.block_like symbol, env
         | Set_of_closures soc ->
           let closure_binding env
-              ({ symbol; fun_decl = { function_slot; code_id; _ } } :
-                Fexpr.static_closure_binding) =
+              ({ symbol; fun_decl } : Fexpr.static_closure_binding) =
             let symbol = declare_symbol env symbol in
             let function_slot =
-              function_slot |> Option.value ~default:code_id
-            in
-            let function_slot =
-              fresh_or_existing_function_slot env function_slot
+              fresh_or_existing_function_slot env
+                (function_slot_of_fun_decl fun_decl)
             in
             (function_slot, symbol), env
           in

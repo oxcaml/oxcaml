@@ -1,0 +1,38 @@
+let code `Static_instantiation/id/0_float64_0` deleted in
+let code f_1 deleted in
+let $camlStatic_instantiation__lpoly_env_2 =
+  closure deleted @lpoly_env &toplevel.alloc_region
+in
+let code inline(never) loopify(never) size(1) newer_version_of(`Static_instantiation/id/0_float64_0`)
+      `Static_instantiation/id/0_float64_0_1` (x : float)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float =
+  cont k (x)
+in
+let $`camlStatic_instantiation__Static_instantiation/id/0_float64_4` =
+  closure `Static_instantiation/id/0_float64_0_1`
+    @`Static_instantiation/id/0_float64` &toplevel.alloc_region
+in
+let code loopify(never) size(10) newer_version_of(f_1)
+      f_1_1 (v : float)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  apply direct(`Static_instantiation/id/0_float64_0_1` &my_alloc_region)
+    ($`camlStatic_instantiation__Static_instantiation/id/0_float64_4`
+     : _ -> float)
+      (v)
+      -> k2 * k1
+    where k2 (apply_result : float) =
+      let `float_of_float#` = %box_num.`float`.my_alloc_region (apply_result)
+      in
+      cont k (`float_of_float#`)
+in
+let $camlStatic_instantiation__f_3 = closure f_1_1 @f &toplevel.alloc_region
+in
+let $camlStatic_instantiation =
+  Block 0 ($camlStatic_instantiation__lpoly_env_2,
+           $camlStatic_instantiation__f_3)
+in
+cont done ($camlStatic_instantiation)

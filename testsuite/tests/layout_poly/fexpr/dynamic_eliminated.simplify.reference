@@ -1,0 +1,22 @@
+let code f_2 deleted in
+let $`camlDynamic_eliminated__float_of_float#103` = 0x1p+1 in
+let code loopify(never) size(9) newer_version_of(f_2)
+      f_2_1 (r : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  let prim = %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (r) in
+  let prim_1 = %int_barith.add (1, prim) in
+  let Poffsetref =
+    %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`] (r, prim_1)
+  in
+  let prim_2 = %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (r) in
+  let prim_3 = %int_barith.add (1, prim_2) in
+  let Poffsetref_1 =
+    %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`] (r, prim_3)
+  in
+  cont k ($`camlDynamic_eliminated__float_of_float#103`)
+in
+let $camlDynamic_eliminated__f_3 = closure f_2_1 @f &toplevel.alloc_region in
+let $camlDynamic_eliminated = Block 0 ($camlDynamic_eliminated__f_3) in
+cont done ($camlDynamic_eliminated)

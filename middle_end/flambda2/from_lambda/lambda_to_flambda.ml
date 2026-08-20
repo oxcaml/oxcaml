@@ -591,7 +591,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         _,
         code_binding,
         duid,
-        Lcode { code_fun; code_closure_var; code_slots },
+        Lcode { code_fun; code_closure_var; code_slots; code_alloc_mode },
         body ) ->
     (* Shared specialized code for a layout-polymorphism template. Only the code
        is emitted here; closures pairing it with captured values are created per
@@ -609,7 +609,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let env = Env.register_lcode_ident env code_binding in
     let body acc ccenv = cps acc env ccenv body k k_exn in
     CC.close_lcode acc ccenv ~code_binding ~closure_var:code_closure_var
-      ~slot_layouts:code_slots decl ~body
+      ~slot_layouts:code_slots ~alloc_mode:code_alloc_mode decl ~body
   | Llet ((Strict | Alias | StrictOpt), layout, id, duid, Lconst const, body) ->
     (* This case avoids extraneous continuations. *)
     let body acc ccenv = cps acc env ccenv body k k_exn in

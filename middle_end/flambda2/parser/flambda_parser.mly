@@ -622,7 +622,11 @@ fun_decl:
   | KWD_CLOSURE; code_id = code_id;
     function_slot = function_slot_opt;
     alloc = alloc_mode_for_allocations;
-    { { code_id; function_slot; alloc; } }
+    { { code_id = Some code_id; function_slot; alloc; } }
+  | KWD_CLOSURE; KWD_DELETED;
+    function_slot = function_slot_opt;
+    alloc = alloc_mode_for_allocations;
+    { { code_id = None; function_slot; alloc; } }
 ;
 
 apply_expr:

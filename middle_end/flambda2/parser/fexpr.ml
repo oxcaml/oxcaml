@@ -365,7 +365,7 @@ and named =
   | Rec_info of rec_info
 
 and fun_decl =
-  { code_id : code_id;
+  { code_id : code_id option (* [None] means the code has been deleted *);
     function_slot : function_slot option (* defaults to same name as code id *);
     alloc : alloc_mode_for_allocations
         (* alloc mode for set of closures (ignored except on first binding) *)

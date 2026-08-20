@@ -49,6 +49,7 @@ val close_lcode :
   code_binding:Ident.t ->
   closure_var:Ident.t ->
   slot_layouts:Lambda.layout list ->
+  alloc_mode:Lambda.locality_mode ->
   Function_decl.t ->
   body:(Acc.t -> Env.t -> Expr_with_acc.t) ->
   Expr_with_acc.t

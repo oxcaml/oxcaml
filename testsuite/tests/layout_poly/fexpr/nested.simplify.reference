@@ -1,0 +1,44 @@
+let code `Nested/inner/1_float64_0` deleted in
+let code `Nested/outer/0_float64_1` deleted in
+let code f_2 deleted in
+let $camlNested__lpoly_env_3 =
+  closure deleted @lpoly_env &toplevel.alloc_region
+in
+let code inline(never) loopify(never) size(1) newer_version_of(`Nested/inner/1_float64_0`)
+      `Nested/inner/1_float64_0_1` (y : float)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float =
+  cont k (y)
+in
+let $`camlNested__Nested/inner/1_float64_7` =
+  closure `Nested/inner/1_float64_0_1` @`Nested/inner/1_float64`
+    &toplevel.alloc_region
+in
+let code inline(never) loopify(never) size(4) newer_version_of(`Nested/outer/0_float64_1`)
+      `Nested/outer/0_float64_1_1` (x : float)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float =
+  apply direct(`Nested/inner/1_float64_0_1` &my_alloc_region)
+    ($`camlNested__Nested/inner/1_float64_7` : _ -> float) (x) -> k * k1
+in
+let $`camlNested__Nested/outer/0_float64_5` =
+  closure `Nested/outer/0_float64_1_1` @`Nested/outer/0_float64`
+    &toplevel.alloc_region
+in
+let code loopify(never) size(10) newer_version_of(f_2)
+      f_2_1 (v : float)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  apply direct(`Nested/outer/0_float64_1_1` &my_alloc_region)
+    ($`camlNested__Nested/outer/0_float64_5` : _ -> float) (v) -> k2 * k1
+    where k2 (apply_result : float) =
+      let `float_of_float#` = %box_num.`float`.my_alloc_region (apply_result)
+      in
+      cont k (`float_of_float#`)
+in
+let $camlNested__f_4 = closure f_2_1 @f &toplevel.alloc_region in
+let $camlNested = Block 0 ($camlNested__lpoly_env_3, $camlNested__f_4) in
+cont done ($camlNested)

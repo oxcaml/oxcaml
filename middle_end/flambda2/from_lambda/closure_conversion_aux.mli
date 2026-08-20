@@ -150,7 +150,11 @@ module Env : sig
       lb_value_slots : (Value_slot.t * Flambda_kind.With_subkind.t) list list;
           (** One inner list per captured value, one element per unarized
               component. *)
-      lb_slot_layouts : Lambda.layout list
+      lb_slot_layouts : Lambda.layout list;
+      lb_alloc_mode : Lambda.locality_mode
+          (** The allocation mode of the closures created by
+              [Lambda.Pclose_template]: local iff the template's environment is
+              local. *)
     }
 
   val add_lcode_binding : t -> Ident.t -> lcode_binding -> t

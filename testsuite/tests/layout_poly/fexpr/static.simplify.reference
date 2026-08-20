@@ -1,0 +1,5 @@
+let $camlStatic__lpoly_env_0 =
+  closure deleted @lpoly_env &toplevel.alloc_region
+in
+let $camlStatic = Block 0 ($camlStatic__lpoly_env_0) in
+cont done ($camlStatic)

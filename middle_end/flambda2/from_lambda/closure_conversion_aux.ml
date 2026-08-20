@@ -165,7 +165,8 @@ module Env = struct
     { lb_code_id : Code_id.t;
       lb_function_slot : Function_slot.t;
       lb_value_slots : (Value_slot.t * Flambda_kind.With_subkind.t) list list;
-      lb_slot_layouts : Lambda.layout list
+      lb_slot_layouts : Lambda.layout list;
+      lb_alloc_mode : Lambda.locality_mode
     }
 
   type t =

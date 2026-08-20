@@ -31,7 +31,7 @@ Static data:
                      #app/1 = (#tmpl/2 ⟪layout $layout_6⟫))
                     { c = #app/1.c
                     ; r =
-                      ⟪(close_template[#tmpl/2][L] $#app/1
+                      ⟪(close_template[#tmpl/2] $#app/1
                          (field_imm 0
                            (global static Cross_module_static_lib!)))⟫ })
                  x/318)⟫ })

@@ -573,8 +573,12 @@ let fun_decl expr_or_static ppf (decl : fun_decl) =
   let pp_at_function_slot ppf cid =
     pp_option ~space:Before (pp_like "@@%a" function_slot) ppf cid
   in
+  let pp_code_id_or_deleted ppf = function
+    | Some cid -> code_id ppf cid
+    | None -> Format.pp_print_string ppf "deleted"
+  in
   Format.fprintf ppf "@[<2>%tclosure%t@ %a%a%a@]" expr_or_static
-    Flambda_colours.pop code_id decl.code_id pp_at_function_slot
+    Flambda_colours.pop pp_code_id_or_deleted decl.code_id pp_at_function_slot
     decl.function_slot alloc_mode_for_allocations decl.alloc
 
 let named ppf = function

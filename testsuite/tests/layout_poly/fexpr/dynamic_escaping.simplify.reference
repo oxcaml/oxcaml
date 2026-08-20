@@ -1,0 +1,39 @@
+let code `Dynamic_escaping/k/0_value_or_null_0` deleted in
+let code f_1 deleted in
+let code loopify(never) size(6) newer_version_of(`Dynamic_escaping/k/0_value_or_null_0`)
+      `Dynamic_escaping/k/0_value_or_null_0_1` (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1 =
+  let Pproject_value_slot =
+    %project_value_slot.[`Dynamic_escaping/k/0_value_or_null`].[`Dynamic_escaping/k/0_value_or_null_cap0_0`]
+      (my_closure)
+  in
+  let prim =
+    %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (Pproject_value_slot)
+  in
+  let prim_1 = %int_barith.add (1, prim) in
+  let Poffsetref =
+    %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`]
+      (Pproject_value_slot, prim_1)
+  in
+  cont k (x)
+in
+let code loopify(never) size(16) newer_version_of(f_1)
+      f_1_1 (r : val, v : float)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let Pclose_template =
+    closure `Dynamic_escaping/k/0_value_or_null_0_1`
+      @`Dynamic_escaping/k/0_value_or_null` &my_alloc_region
+  with {
+    `Dynamic_escaping/k/0_value_or_null_cap0_0` = r;
+    `Dynamic_escaping/k/0_value_or_null_cap1_0` : float = v
+  }
+  in
+  let Popaque = %opaque (Pclose_template) in
+  cont k (Popaque)
+in
+let $camlDynamic_escaping__f_2 = closure f_1_1 @f &toplevel.alloc_region in
+let $camlDynamic_escaping = Block 0 ($camlDynamic_escaping__f_2) in
+cont done ($camlDynamic_escaping)

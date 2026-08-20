@@ -234,10 +234,7 @@ type primitive =
         layouts : layout list;
         mode : locality_mode
       }
-  | Pclose_template of
-      { template : template_ref;
-        mode : locality_mode
-      }
+  | Pclose_template of { template : template_ref }
   | Pproject_value_slot of
       { index : int;
         layout : layout
@@ -1254,6 +1251,7 @@ and lcode =
   { code_fun: lfunction;
     code_closure_var: Ident.t;
     code_slots: layout list;
+    code_alloc_mode: locality_mode;
   }
 
 and lkindtemplate =
@@ -2830,7 +2828,12 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Psetufloatfield _ -> None
   | Psetmixedfield _ -> None
   | Pduprecord _ -> Some alloc_heap
-  | Pset_of_closures { mode; _ } | Pclose_template { mode; _ } -> Some mode
+  | Pset_of_closures { mode; _ } -> Some mode
+  | Pclose_template _ ->
+    (* The closure is allocated at the [Lcode]'s [code_alloc_mode], which is
+       not known here (the code may come from another compilation unit);
+       conservatively assume a local allocation. *)
+    Some alloc_local
   | Pproject_value_slot _ ->
     (* Value slots store values at their natural kinds, so projection never
        needs to box. *)

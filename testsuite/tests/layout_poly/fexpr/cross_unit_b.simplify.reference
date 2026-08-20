@@ -1,0 +1,82 @@
+let code `Cross_unit_a/bump/0_value_or_null_1` deleted in
+let code `Cross_unit_a/bump/0_float64_2` deleted in
+let code f_3 deleted in
+let lpoly_cap =
+  %project_value_slot.[lpoly_env].[lpoly_env_0_0]
+    ($Cross_unit_a.camlCross_unit_a__lpoly_env_0)
+in
+let $`camlCross_unit_b__Cross_unit_a/bump/0_float64_6` =
+  closure `Cross_unit_a/bump/0_float64_2_1` @`Cross_unit_a/bump/0_float64`
+    &toplevel.alloc_region
+and code inline(never) loopify(never) size(6) newer_version_of(`Cross_unit_a/bump/0_float64_2`)
+      `Cross_unit_a/bump/0_float64_2_1` (x : float)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float =
+  let Pproject_value_slot =
+    %project_value_slot.[`Cross_unit_a/bump/0_float64`].[`Cross_unit_a/bump/0_float64_cap0_0`]
+      ($`camlCross_unit_b__Cross_unit_a/bump/0_float64_6`)
+  in
+  let prim =
+    %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (Pproject_value_slot)
+  in
+  let prim_1 = %int_barith.add (1, prim) in
+  let Poffsetref =
+    %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`]
+      (Pproject_value_slot, prim_1)
+  in
+  cont k (x)
+  with { `Cross_unit_a/bump/0_float64_cap0_0` = lpoly_cap }
+in
+let lpoly_cap_1 =
+  %project_value_slot.[lpoly_env].[lpoly_env_0_0]
+    ($Cross_unit_a.camlCross_unit_a__lpoly_env_0)
+in
+let $`camlCross_unit_b__Cross_unit_a/bump/0_value_or_null_5` =
+  closure `Cross_unit_a/bump/0_value_or_null_1_1`
+    @`Cross_unit_a/bump/0_value_or_null` &toplevel.alloc_region
+and code inline(never) loopify(never) size(6) newer_version_of(`Cross_unit_a/bump/0_value_or_null_1`)
+      `Cross_unit_a/bump/0_value_or_null_1_1` (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1 =
+  let Pproject_value_slot =
+    %project_value_slot.[`Cross_unit_a/bump/0_value_or_null`].[`Cross_unit_a/bump/0_value_or_null_cap0_0`]
+      ($`camlCross_unit_b__Cross_unit_a/bump/0_value_or_null_5`)
+  in
+  let prim =
+    %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (Pproject_value_slot)
+  in
+  let prim_1 = %int_barith.add (1, prim) in
+  let Poffsetref =
+    %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`]
+      (Pproject_value_slot, prim_1)
+  in
+  cont k (x)
+  with { `Cross_unit_a/bump/0_value_or_null_cap0_0` = lpoly_cap_1 }
+in
+let code loopify(never) size(15) newer_version_of(f_3)
+      f_3_1 (param : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float boxed =
+  apply direct(`Cross_unit_a/bump/0_value_or_null_1_1` &my_alloc_region)
+    ($`camlCross_unit_b__Cross_unit_a/bump/0_value_or_null_5`
+     : _ -> imm tagged)
+      (1)
+      -> k3 * k1
+    where k3 (param_1) =
+      cont k2
+    where k2 =
+      (apply direct(`Cross_unit_a/bump/0_float64_2_1` &my_alloc_region)
+         ($`camlCross_unit_b__Cross_unit_a/bump/0_float64_6` : _ -> float)
+           (0x1p+1)
+           -> k2 * k1
+         where k2 (apply_result : float) =
+           let `float_of_float#` =
+             %box_num.`float`.my_alloc_region (apply_result)
+           in
+           cont k (`float_of_float#`))
+in
+let $camlCross_unit_b__f_4 = closure f_3_1 @f &toplevel.alloc_region in
+let $camlCross_unit_b = Block 0 ($camlCross_unit_b__f_4) in
+cont done ($camlCross_unit_b)

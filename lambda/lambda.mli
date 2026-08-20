@@ -205,14 +205,12 @@ type primitive =
         a set of closures with no functions, only value slots. Takes one
         argument per captured value; [layouts] gives their layouts. Slot
         identities are derived from [template]. *)
-  | Pclose_template of
-      { template : template_ref;
-        mode : locality_mode
-      }
+  | Pclose_template of { template : template_ref }
     (** Takes [\[code; env\]] where [code] is a variable let-bound to an
         [Lcode] and [env] an environment block built by [Pset_of_closures]
-        for the same [template]; allocates a closure running [code] whose
-        value slots are copies of [env]'s. *)
+        for the same [template]; allocates a closure (at the [Lcode]'s
+        [code_alloc_mode]) running [code] whose value slots are copies of
+        [env]'s. *)
   | Pproject_value_slot of
       { index : int;
         layout : layout
@@ -1138,6 +1136,11 @@ and lcode =
     code_slots: layout list;
     (** Layouts of the captured values held in the closure's value slots, in
         the order of the corresponding [Pset_of_closures] arguments. *)
+    code_alloc_mode: locality_mode;
+    (** The allocation mode of the closures created by [Pclose_template]:
+        local iff the template's environment is local (the closures hold
+        copies of the captures, so they are bounded by the environment's
+        region). *)
   }
 
 and lkindtemplate =

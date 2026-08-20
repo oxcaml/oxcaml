@@ -549,9 +549,8 @@ let primitive ppf = function
   | Pset_of_closures { template; layouts = _; mode } ->
       fprintf ppf "set_of_closures[%a]%s" template_ref template
         (locality_kind mode)
-  | Pclose_template { template; mode } ->
-      fprintf ppf "close_template[%a]%s" template_ref template
-        (locality_kind mode)
+  | Pclose_template { template } ->
+      fprintf ppf "close_template[%a]" template_ref template
   | Pproject_value_slot { index; layout = _ } ->
       fprintf ppf "project_value_slot %i" index
   | Pwith_stack -> fprintf ppf "with_stack"

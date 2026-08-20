@@ -393,7 +393,10 @@ let rec fracture_lam lambda : slambda =
             Lcode
               { code_fun = lfunction_with_yielding yielding lf;
                 code_closure_var = closure_id;
-                code_slots = List.map (fun (_, (_, layout)) -> layout) env
+                code_slots = List.map (fun (_, (_, layout)) -> layout) env;
+                (* Instantiated closures hold copies of the captures, so they
+                   are bounded by the environment's region. *)
+                code_alloc_mode = ktmpl_env_mode
               }
           in
           SLhalves { sval_comptime = body_c; sval_runtime })
@@ -442,8 +445,12 @@ let rec fracture_lam lambda : slambda =
           })
       kind_function env
   | Lkindinstantiate
-      { kinst_func; kinst_args; kinst_result_layout = _; kinst_mode; kinst_loc }
-    ->
+      { kinst_func;
+        kinst_args;
+        kinst_result_layout = _;
+        kinst_mode = _;
+        kinst_loc
+      } ->
     slet_local "fun" kinst_func (fun fun_c fun_r ->
         let app_id = Slambdaident.create_local "app" in
         let app_var = SLvar app_id in
@@ -467,9 +474,7 @@ let rec fracture_lam lambda : slambda =
                         sval_runtime =
                           Lprim
                             ( Pclose_template
-                                { template = Template_var template_id;
-                                  mode = return_mode_to_locality_mode kinst_mode
-                                },
+                                { template = Template_var template_id },
                               [Lsplice (kinst_loc, app_var); fun_r],
                               kinst_loc )
                       }

@@ -771,7 +771,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       copy_mixed_block_element
         (Lambda.mixed_block_element_of_layout layout)
         (unary (Getfield index))
-    | Pclose_template { template = _; mode = _ } -> (
+    | Pclose_template { template = _ } -> (
       (* The specialized code ([Lcode]) was compiled with the closure variable
          as an extra first parameter, so pairing it with an environment block
          is just a partial application. *)
