@@ -212,18 +212,24 @@ let query ~pipeline (typedtree : Mtyper.typedtree) =
   let mconfig = Mpipeline.final_config pipeline in
   let targets = module_type_decls typedtree in
   let index_files = mconfig.merlin.index_files in
-  let facts, (reader_status : Module_facts_reader.status) =
-    Helpers.module_facts mconfig
-  in
-  let engine = Module_change_impact.create facts in
+  let facts, reader_status = Helpers.module_facts mconfig in
+  let engine = Option.map facts ~f:Module_change_impact.create in
   let results =
     List.map targets ~f:(fun target ->
-        (target, Module_change_impact.query_family engine target.target_uid))
+        let result =
+          match engine with
+          | None ->
+            ({ impacts = []; omissions = [] } : Module_change_impact.result)
+          | Some engine ->
+            Module_change_impact.query_family engine target.target_uid
+        in
+        (target, result))
   in
   let omissions =
-    match targets with
-    | [] -> Module_change_impact.global_omissions engine
-    | _ :: _ ->
+    match (engine, targets) with
+    | None, _ -> []
+    | Some engine, [] -> Module_change_impact.global_omissions engine
+    | Some _, _ :: _ ->
       List.concat_map results
         ~f:(fun ((_, result) : _ * Module_change_impact.result) ->
           result.omissions)

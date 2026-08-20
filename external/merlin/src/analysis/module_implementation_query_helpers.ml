@@ -23,8 +23,13 @@ let impl_source_of_interface (mconfig : Mconfig.t) intf_file =
 
 let module_facts (mconfig : Mconfig.t) =
   let index_files = mconfig.merlin.index_files in
-  let facts, (status : Module_facts_reader.status) =
-    Module_facts_reader.load ~index_files
+  let facts, status =
+    Module_facts_reader.fold ~index_files ~init:None
+      ~f:(fun facts ~path:_ source ->
+        Some
+          (match facts with
+          | None -> source
+          | Some facts -> Module_implementation_facts.merge facts source))
   in
   List.iter status.problems ~f:(fun problem ->
       log ~title:"module_facts" "%a" Logger.fmt (fun fmt ->
