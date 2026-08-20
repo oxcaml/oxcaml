@@ -220,6 +220,9 @@ end
 
 type _ t =
   | Type_expr (* *) : string * Msource.position -> string t
+  | Structured_errors (* *) :
+      { pronouns : bool }
+      -> Structured_diagnostic.t list t
   | Stack_or_heap_enclosing (* *) :
       Msource.position * bool * int option
       -> (Location.t * [ `String of string | `Index of int ]) list t

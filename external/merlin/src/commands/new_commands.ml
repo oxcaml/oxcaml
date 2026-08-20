@@ -899,6 +899,19 @@ let all_commands =
         run buffer
           (Query_protocol.Mode_enclosing { position; override_verbosity = None })
       end;
+    command "structured-errors"
+      ~doc:
+        "Returns structured OxCaml-specific error data (currently: mode \
+         errors) for all errors in the buffer. Each result carries its \
+         reported span (the span diagnostics are reported at), so clients \
+         select by span as they do for regular diagnostics."
+      ~spec:
+        [ optional "-pronouns"
+            "<bool> Render repeated mentions as pronouns (default is true)"
+            (Marg.bool (fun pronouns _pronouns -> pronouns))
+        ] ~default:true begin fun buffer pronouns ->
+      run buffer (Query_protocol.Structured_errors { pronouns })
+      end;
     command "type-expression"
       ~doc:
         "Returns the type of the expression when typechecked in the \
