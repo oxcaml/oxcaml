@@ -938,19 +938,17 @@ let bind_phantom_variable env res var defining_expr =
 (* Variable lookup (for potential inlining) *)
 
 (* When a binding is inlined and phantom lets are enabled, the inlined
-   expression is wrapped in [Cname_for_debugger] so that the value can still be
-   associated with the variable's name in the debugger; the variable is recorded
-   as a phantom-mode free variable so that the corresponding [Inlined] binding
-   is flushed as a phantom let. *)
+   expression is wrapped in [Cname_for_debugger] so that instruction selection
+   can emit a naming operation associating the value with the variable's name.
+   The wrapper is an annotation only: the variable it names deliberately does
+   not count as a free variable (no binding for it is required), so inlining by
+   itself never gives rise to a phantom let. Empty phantom lets for [Inlined]
+   bindings are still generated when the variable is referenced from a phantom
+   defining expression; see [flush_phantom_binding]. *)
 let wrap_phantom ~phantomize cmm_var cmm_expr free_vars =
   if not phantomize
   then cmm_expr, free_vars
-  else
-    let free_vars =
-      FV.add ~mode:Phantom (Backend_var.With_provenance.var cmm_var) free_vars
-    in
-    let cmm_expr = Cmm.Cname_for_debugger (cmm_var, cmm_expr) in
-    cmm_expr, free_vars
+  else Cmm.Cname_for_debugger (cmm_var, cmm_expr), free_vars
 
 let will_inline_simple env res
     { effs;

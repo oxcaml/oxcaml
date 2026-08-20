@@ -18,8 +18,10 @@
 (* The locals of an inlined function whose defining expressions are
    substituted into their use sites must remain visible to the debugger:
    the substituted expressions are wrapped in naming constructs
-   ([name_for_debugger] in the -dcmm output) and the variables themselves
-   are rebound by empty phantom lets ([let?]). *)
+   ([name_for_debugger] in the -dcmm output).  The wrappers are annotations
+   only, from which instruction selection produces naming operations; the
+   named variables do not require bindings (in particular, no phantom
+   lets). *)
 
 [@@@ocaml.warning "-26-27-32"]
 
