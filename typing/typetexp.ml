@@ -912,15 +912,54 @@ type sig_mode =
   | Sig_const of With_locality.Const.t
   | Sig_var of sig_var
 
+let transl_modepoly_morph_r
+    (elem : (Allowance.disallowed * Allowance.allowed) Typemode.modepoly_elem)
+    : With_locality.r =
+  let v = Mode_var_env.lookup elem.elem_var.txt in
+  let base =
+    match elem.elem_morph with
+    | None -> With_locality.disallow_left v
+    | Some Typemode.Past ->
+      { monadic = With_locality.Monadic.disallow_left With_locality.Monadic.max;
+        comonadic = With_locality.Comonadic.disallow_left v.comonadic
+      }
+  in
+  let { monadic; _ } =
+    elem.elem_mod
+    |> With_locality.Const.Option.value ~default:With_locality.Const.min
+    |> With_locality.Const.split in
+  let { comonadic; _ } =
+    elem.elem_mod
+    |> With_locality.Const.Option.value ~default:With_locality.Const.max
+    |> With_locality.Const.split in
+  With_locality.join_const monadic (With_locality.imply_const comonadic base)
+
+let transl_modepoly_morph_l
+    (elem : (Allowance.allowed * Allowance.disallowed) Typemode.modepoly_elem)
+    : With_locality.l =
+  let v = Mode_var_env.lookup elem.elem_var.txt in
+  let base : With_locality.l =
+    match elem.elem_morph with
+    | None -> With_locality.disallow_right v
+    | Some Typemode.Past ->
+      { monadic =
+          With_locality.Monadic.disallow_right With_locality.Monadic.min;
+        comonadic = With_locality.Comonadic.disallow_right v.comonadic
+      }
+    | Some Typemode.Close -> With_locality.close_over v
+  in
+  let { comonadic; _ } =
+    elem.elem_mod
+    |> With_locality.Const.Option.value ~default:With_locality.Const.max
+    |> With_locality.Const.split in
+  let { monadic; _ } =
+    elem.elem_mod
+    |> With_locality.Const.Option.value ~default:With_locality.Const.min
+    |> With_locality.Const.split in
+  With_locality.meet_const comonadic (With_locality.subtract_const monadic base)
+
 let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
   let m = With_locality.newvar (get_current_level ()) in
-  let bound_modes (bound : Typemode.modepoly_bound) ~default =
-    let vars = List.map (fun m -> Mode_var_env.lookup m.txt) bound.bound_vars in
-    let const =
-      With_locality.Const.Option.value bound.bound_const.mode_modes ~default
-    in
-    vars, const
-  in
   match annot with
   | Typemode.Pmode_var { txt = name; loc } ->
       let v = Mode_var_env.lookup name in
@@ -929,23 +968,27 @@ let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
       | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_variable name)));
       { mode = m; upper_const = With_locality.Const.max }
   | Typemode.Pmode_bounds { txt = { upper; lower }; loc } ->
-      let upper_vars, upper_const =
-        bound_modes upper ~default:With_locality.Const.max
+      let upper_const =
+        With_locality.Const.Option.value upper.bound_const.mode_modes
+          ~default:With_locality.Const.max
       in
+      let upper_elems = List.map transl_modepoly_morph_r upper.bound_vars in
       (match
          With_locality.submode m
            (With_locality.meet
-              (upper_vars @ [With_locality.of_const upper_const]))
+              (With_locality.of_const upper_const :: upper_elems))
        with
       | Ok () -> ()
       | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_bound)));
-      let lower_vars, lower_const =
-        bound_modes lower ~default:With_locality.Const.min
+      let lower_const =
+        With_locality.Const.Option.value lower.bound_const.mode_modes
+          ~default:With_locality.Const.min
       in
+      let lower_elems = List.map transl_modepoly_morph_l lower.bound_vars in
       (match
          With_locality.submode
            (With_locality.join
-              (lower_vars @ [With_locality.of_const lower_const]))
+              (With_locality.of_const lower_const :: lower_elems))
            m
        with
       | Ok () -> ()

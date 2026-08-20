@@ -7335,6 +7335,16 @@ module Mode_with (Areality : Areality) = struct
     let comonadic = Comonadic.disallow_left comonadic in
     { monadic; comonadic }
 
+  let imply_const c { comonadic; monadic } =
+    let monadic = Monadic.disallow_left monadic in
+    let comonadic = Comonadic.imply_const c comonadic in
+    { monadic; comonadic }
+
+  let subtract_const c { comonadic; monadic } =
+    let monadic = Monadic.subtract_const c monadic in
+    let comonadic = Comonadic.disallow_right comonadic in
+    { monadic; comonadic }
+
   let zap_to_ceil_force { comonadic; monadic } =
     let monadic = Monadic.zap_to_ceil_force monadic in
     let comonadic = Comonadic.zap_to_ceil_force comonadic in
