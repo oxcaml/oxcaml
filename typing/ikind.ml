@@ -46,6 +46,7 @@ module Provenance = struct
       ty : Format_doc.doc;
       plural : bool;
       source_type_id : int option;
+      is_decl_under_check : bool;
       parent : id option
     }
 
@@ -57,15 +58,17 @@ module Provenance = struct
 
   let name { id = Id id; ty; plural; _ } = Ldd.Name.provenance ~id ~ty ~plural
 
-  let make ~plural ~source_type_id ~parent ty =
+  let make ~plural ~source_type_id ~is_decl_under_check ~parent ty =
     let next = !next_id in
     next_id := next + 1;
     let id = Id next in
-    let provenance = { id; ty; plural; source_type_id; parent } in
+    let provenance =
+      { id; ty; plural; source_type_id; is_decl_under_check; parent }
+    in
     entries := provenance :: !entries;
     provenance
 
-  let register ~parent (ty : Types.type_expr) =
+  let register ~is_decl_under_check ~parent (ty : Types.type_expr) =
     (* A surviving residual for an occurrence reflects only the head
        constructor's own contribution (the decomposition zeroes anything
        flowing through a separately-tracked inner type or parameter), so
@@ -75,11 +78,13 @@ module Provenance = struct
       Format_doc.doc_printf "@[<hov>%a@]" Jkind.format_type_expr ty
       |> make ~plural:false
            ~source_type_id:(Some (Types.get_id source_type))
+           ~is_decl_under_check
            ~parent
     in
     let register_text text =
       make ~plural:true
         ~source_type_id:(Some (Types.get_id ty))
+        ~is_decl_under_check
         ~parent
         (Format_doc.doc_printf "%s" text)
     in
@@ -96,7 +101,7 @@ module Provenance = struct
     | _ -> register_type ~source_type:ty ty
 
   let register_phrase ~parent text =
-    make ~plural:true ~source_type_id:None ~parent
+    make ~plural:true ~source_type_id:None ~is_decl_under_check:false ~parent
       (Format_doc.doc_printf "%s" text)
 
   let reset () = entries := []
@@ -113,6 +118,12 @@ module Solver = struct
   type mode =
     | Normal
     | Round_up
+
+  let rec uid_is_reliable_identity = function
+    | Types.Uid.Internal -> false
+    | Types.Uid.Unboxed_version uid -> uid_is_reliable_identity uid
+    | Types.Uid.Compilation_unit _ | Types.Uid.Item _ | Types.Uid.Predef _ ->
+      true
 
   (* Hash tables avoiding polymorphic structural comparison on deep values.
      [Btype.TypeHash] keys by the representative of a [type_expr], so
@@ -145,6 +156,7 @@ module Solver = struct
 
   and provenance_ctx =
     { parent : Provenance.id option;
+      decl_uid_under_check : Types.Uid.t option;
       kinds : (int * Provenance.id option, Ldd.node) Hashtbl.t
     }
 
@@ -176,9 +188,10 @@ module Solver = struct
 
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
 
-  let with_provenance (ctx : ctx) : ctx =
+  let with_provenance ?decl_uid_under_check (ctx : ctx) : ctx =
     { ctx with
-      provenance = Some { parent = None; kinds = Hashtbl.create 1 };
+      provenance =
+        Some { parent = None; decl_uid_under_check; kinds = Hashtbl.create 1 };
       ty_to_kind = TyTbl.create 1
     }
 
@@ -210,7 +223,20 @@ module Solver = struct
     match ctx.provenance with
     | None -> Fun.id, ctx
     | Some ({ parent; _ } as provenance_ctx) ->
-      let provenance = Provenance.register ~parent ty in
+      let is_decl_under_check =
+        match
+          provenance_ctx.decl_uid_under_check, ctx.env, Types.get_desc ty
+        with
+        | Some decl_uid, Some env, Types.Tconstr (path, _, _)
+          when uid_is_reliable_identity decl_uid -> (
+          match Env.find_type path env with
+          | exception Not_found -> false
+          | decl -> Types.Uid.equal decl_uid decl.type_uid)
+        | None, _, _ | Some _, None, _ | Some _, Some _, _ -> false
+      in
+      let provenance =
+        Provenance.register ~is_decl_under_check ~parent ty
+      in
       ( (fun poly -> Ldd.meet poly (rigid_name ctx (Provenance.name provenance))),
         { ctx with
           provenance = Some { provenance_ctx with parent = Some provenance.id }
@@ -846,10 +872,14 @@ let provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly =
   match Ldd.leq_with_reason base super_poly with
   | _ :: _ -> None
   | [] ->
+    (* Self occurrences stay in the decomposition universe and provenance
+       forest, but are not independent causes to report for their own
+       declaration. Filtering here also prevents them from hiding nested
+       causes as enclosing residuals. *)
     let entries =
       List.combine provenances coeffs
-      |> List.filter_map (fun (provenance, coeff) ->
-          if is_bot_poly coeff
+      |> List.filter_map (fun ((provenance : Provenance.t), coeff) ->
+          if provenance.is_decl_under_check || is_bot_poly coeff
           then None
           else
             let mode_bounds = Ldd.imply coeff super_poly |> Ldd.round_down in
@@ -1492,10 +1522,10 @@ let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
     ~lhs_floor:(Some (fun ctx -> Solver.mod_bounds_floor_of_jkind ctx sub))
     ~lhs:(fun ctx -> Solver.ckind_of_jkind ctx sub)
 
-let compute_provenance_bound_polys env ~(lhs : Solver.ctx -> Ldd.node)
-    (bound : Types.jkind_l) : subcheck_polys =
+let compute_provenance_bound_polys ?decl_uid_under_check env
+    ~(lhs : Solver.ctx -> Ldd.node) (bound : Types.jkind_l) : subcheck_polys =
   compute_bound_polys env bound ~lhs_floor:None ~lhs:(fun ctx ->
-      let ctx = Solver.with_provenance ctx in
+      let ctx = Solver.with_provenance ?decl_uid_under_check ctx in
       lhs ctx)
 
 let check_mode_crossing_polys ~origin:_ ~sub_jkind:_ ~super_jkind ~printing_env
@@ -1615,8 +1645,8 @@ let sub_jkind_l ?(allow_any_crossing = false) ?origin
           | Ok () -> Error ikind_error
           | Error jkind_error -> Error (Jkind_error jkind_error))
 
-let check_bound ?(allow_any_crossing = false) ?origin ~type_equal ~context env
-    ~actual ~bound ~provenance_lhs =
+let check_bound ?(allow_any_crossing = false) ?origin ?decl_uid_under_check
+    ~type_equal ~context env ~actual ~bound ~provenance_lhs =
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then
     sub_jkind_l ~allow_any_crossing ?origin ~type_equal ~context env actual
@@ -1656,7 +1686,8 @@ let check_bound ?(allow_any_crossing = false) ?origin ~type_equal ~context env
         in
         best_effort_provenance_error ~fallback_error ~origin ~sub_jkind:actual
           ~super_jkind:bound ~printing_env:env actual_error (fun () ->
-            compute_provenance_bound_polys env ~lhs:provenance_lhs bound)
+            compute_provenance_bound_polys ?decl_uid_under_check env
+              ~lhs:provenance_lhs bound)
 
 let check_type_expr_bound ?origin ~type_equal ~context env ~ty ~actual ~bound =
   check_bound ?origin ~type_equal ~context env ~actual ~bound
@@ -1664,8 +1695,10 @@ let check_type_expr_bound ?origin ~type_equal ~context env ~ty ~actual ~bound =
 
 let check_type_decl_bound ?allow_any_crossing ?origin ~type_equal ~context env
     ~decl ~actual ~bound =
-  check_bound ?allow_any_crossing ?origin ~type_equal ~context env ~actual
-    ~bound ~provenance_lhs:(fun ctx -> type_decl_rhs_kind_poly ctx decl)
+  check_bound ?allow_any_crossing ?origin
+    ~decl_uid_under_check:decl.Types.type_uid ~type_equal ~context env ~actual
+    ~bound
+    ~provenance_lhs:(fun ctx -> type_decl_rhs_kind_poly ctx decl)
 
 let crossing_of_jkind ~(context : Jkind.jkind_context) env
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =

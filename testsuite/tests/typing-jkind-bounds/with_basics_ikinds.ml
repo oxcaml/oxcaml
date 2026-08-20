@@ -833,9 +833,7 @@ Line 1, characters 0-62:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value mod portable,
-       because
-       - functions are not mod portable
-       - t is not mod portable
+       because functions are not mod portable.
 |}]
 
 (* Mutually-recursive pair where the SIBLING (not self) is the carrier:
@@ -849,9 +847,7 @@ Line 1, characters 0-45:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value mod portable,
-       because
-       - t is not mod portable
-       - u is not mod portable
+       because u is not mod portable.
 |}]
 
 (* Sibling-only carrier (no self-occurrence in [t2]): a group-mate
