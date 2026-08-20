@@ -3751,6 +3751,25 @@ let diagnose_unique_use_during_borrowing _request
              context ends, the value is not the borrower's to use" ] ]
     ()
 
+let describe_usage usage =
+  let open Uniqueness_analysis.Usage in
+  let { action; context } = view usage in
+  let action =
+    match action with
+    | Use -> "used"
+    | Borrow -> "borrowed"
+    | Read -> "read from"
+    | Write -> "written to"
+  in
+  match context with
+  | Direct -> action
+  | In_pattern Lazy -> action ^ " in a lazy pattern"
+  | In_pattern Array -> action ^ " in an array pattern"
+  | In_pattern Constant -> action ^ " in a constant pattern"
+  | In_closure_that_might_be_called_later ->
+    action ^ " in a closure that might be called later"
+  | While_being_borrowed -> action ^ " while being borrowed"
+
 let diagnose_uniqueness _request err =
   let open Nlg in
   let unique_word =
@@ -3846,7 +3865,7 @@ let diagnose_uniqueness _request err =
     | None -> []
     | Some there_occ ->
       let here = occ, "used" in
-      let other = there_occ, Uniqueness_analysis.Usage.describe there in
+      let other = there_occ, describe_usage there in
       let (first, first_usage), (second, second_usage), second_is_here =
         match order with
         | Uniqueness_analysis.Seq_before -> here, other, false
