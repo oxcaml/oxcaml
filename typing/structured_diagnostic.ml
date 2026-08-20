@@ -1,5 +1,3 @@
-module Protocol = Structured_diagnostic_protocol
-
 module Location_key = struct
   type t =
     { file : string;
@@ -105,20 +103,20 @@ module Glossary = struct
 end
 
 module Form = struct
-  type t = Protocol.Form.t =
+  type t =
     | Name
     | Pronoun
 end
 
 module Kind = struct
-  type t = Protocol.Kind.t =
+  type t =
     | Explanation
     | Background
     | Suggestion
 end
 
 module Relation = struct
-  type t = Protocol.Relation.t =
+  type t =
     | Claim
     | Elaboration
 end
@@ -184,63 +182,3 @@ let locations t content =
       here @ List.concat_map collect content
   in
   dedup_by_key (List.concat_map collect content)
-
-let to_protocol ~location t : _ Protocol.Generic.diagnostic =
-  let rec protocol_of_inline (inline : Inline.t) : _ Protocol.Generic.inline =
-    match inline with
-    | Text text -> Text text
-    | Annotated { annotation; content } ->
-      Annotated
-        { annotation = protocol_of_annotation annotation;
-          content = List.map protocol_of_inline content
-        }
-  and protocol_of_annotation (annotation : Annotation.t) :
-      _ Protocol.Generic.annotation =
-    match annotation with
-    | Code -> Code
-    | Source loc -> Source (location loc)
-    | Mention { entity; form } ->
-      Mention { entity = Entities.Id.to_int entity; form }
-    | Term id -> Term (Glossary.Id.to_int id)
-  and protocol_of_block (block : Block.t) : _ Protocol.Generic.block =
-    { kind = block.kind;
-      content = List.map protocol_of_inline block.content;
-      children = List.map protocol_of_child block.children
-    }
-  and protocol_of_child ((relation, block) : Relation.t * Block.t) :
-      _ Protocol.Generic.child =
-    { relation; block = protocol_of_block block }
-  in
-  let protocol_of_entity ((id, loc) : Entities.Id.t * Location.t) :
-      _ Protocol.Generic.entity =
-    { id = Entities.Id.to_int id; loc = location loc }
-  in
-  let protocol_of_entry ((id, entry) : Glossary.Id.t * Glossary.Entry.t) :
-      Protocol.Generic.glossary_entry =
-    { id = Glossary.Id.to_int id;
-      term = entry.term;
-      category = entry.category;
-      description = entry.description;
-      url = entry.url
-    }
-  in
-  { loc = location t.loc;
-    title = t.title;
-    entities = List.map protocol_of_entity (Entities.to_list t.entities);
-    glossary = List.map protocol_of_entry (Glossary.to_list t.glossary);
-    body = List.map protocol_of_block t.body
-  }
-
-let raw_location (loc : Location.t) : Protocol.Raw.Location.t =
-  let position (position : Lexing.position) : Protocol.Raw.Position.t =
-    { line = position.pos_lnum; col = position.pos_cnum - position.pos_bol }
-  in
-  { file = loc.loc_start.pos_fname;
-    start = position loc.loc_start;
-    end_ = position loc.loc_end
-  }
-
-let to_raw_diagnostic t = to_protocol ~location:raw_location t
-
-let raw_response ts =
-  Protocol.Raw.response_of_diagnostics (List.map to_raw_diagnostic ts)

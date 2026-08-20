@@ -52,20 +52,20 @@ module Glossary : sig
 end
 
 module Form : sig
-  type t = Structured_diagnostic_protocol.Form.t =
+  type t =
     | Name
     | Pronoun
 end
 
 module Kind : sig
-  type t = Structured_diagnostic_protocol.Kind.t =
+  type t =
     | Explanation
     | Background
     | Suggestion
 end
 
 module Relation : sig
-  type t = Structured_diagnostic_protocol.Relation.t =
+  type t =
     | Claim
     | Elaboration
 end
@@ -107,14 +107,3 @@ type t =
   }
 
 val locations : t -> Inline.t list -> Location.t list
-
-val to_protocol :
-  location:(Location.t -> 'loc) ->
-  t ->
-  'loc Structured_diagnostic_protocol.Generic.diagnostic
-
-val raw_location : Location.t -> Structured_diagnostic_protocol.Raw.Location.t
-
-val to_raw_diagnostic : t -> Structured_diagnostic_protocol.Raw.diagnostic
-
-val raw_response : t list -> Structured_diagnostic_protocol.Raw.response
