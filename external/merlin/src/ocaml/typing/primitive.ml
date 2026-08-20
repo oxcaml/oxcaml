@@ -70,9 +70,7 @@ type description = native_repr description_gen
    is added, then errors will always be unique and de-duping will no longer be
    necessary. *)
 type wrong_repr_error =
-  | Product_arg
   | Expected_value_prim
-  | Product_return
   | Unpacked_product_return
   | Repr_mismatch
 [@@immediate]
@@ -515,33 +513,11 @@ module Repr_check = struct
     | Unboxed_mask -> true
     | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ -> false
 
-  let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
-    | Product _ -> true
-    | Base _ -> false
-    | Univar _ -> Misc.fatal_error "sort_is_product: univar"
-    | Genvar _ -> Misc.fatal_error "sort_is_product: genvar"
-
-  let c_stub_arg_errors = function
-    | Same_as_ocaml_repr s ->
-      if sort_is_product s then [Product_arg] else []
-    | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Unboxed_mask | Unpacked_product _ | Repr_poly -> []
-
   let c_stub_return_errors = function
-    | Same_as_ocaml_repr (Base _)
+    | Same_as_ocaml_repr _
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Unboxed_mask | Repr_poly -> []
     | Unpacked_product _ -> [Unpacked_product_return]
-    | Same_as_ocaml_repr (Product [s1; s2]) ->
-      if (sort_is_product s1) ||
-         (sort_is_product s2)
-      then [Product_return]
-      else []
-    | Same_as_ocaml_repr (Product _) -> [Product_return]
-    | Same_as_ocaml_repr (Univar _) ->
-      Misc.fatal_error "c_stub_return_errors: univar"
-    | Same_as_ocaml_repr (Genvar _) ->
-      Misc.fatal_error "c_stub_return_errors: genvar"
 
   (* [checks = [check_arg1; check_arg2; ..; check_argn; check_ret]], where for
      each check, [check (repr : native_repr)] returns a [wrong_repr_error list].
@@ -582,11 +558,41 @@ module Repr_check = struct
       prim
 
   let check_c_stub prim =
-    (* C externals are allowed to return a tuple, but may not take products as
-       arguments or return products with more than two elements. *)
+    (* C externals may take and return unboxed products, which in native code
+       follow the calling conventions of the corresponding (possibly nested)
+       C struct types.  (Note that the [@unpacked] attribute instead causes
+       the components of a product argument to be passed as separate C
+       arguments, and is not allowed on returns.)  Not all product shapes can
+       currently be compiled in native code: those that the C ABIs pass in
+       memory are rejected during Cmm generation (see [To_cmm_extcall] in
+       flambda2).
+
+       CR mshinwell: it would be better to reject such unsupported shapes
+       here, at type-checking time: the Cmm-level rejection is an unlocated
+       fatal error, and it fires as soon as an offending external is merely
+       declared in a natively-compiled module (the module block's field for
+       the external requires an eta-expanded wrapper), even if the
+       declaration is perfectly usable in bytecode.  However this does not
+       appear to be straightforward:
+
+       - The ABI classification logic lives in the middle end
+         ([To_cmm_extcall]), which cannot be referenced from [typing/]; and a
+         hook installed by the middle end would be unpleasant.  The least bad
+         approach might be to extract the pure classification logic into a
+         small library in [utils/] (which [typing/] can see, cf.
+         [Target_system]), parameterized over an abstract notion of component
+         (register class and size) so that it depends on neither [Jkind] nor
+         [Flambda_kind]; both this module and [To_cmm_extcall] would then
+         translate into that shared representation.
+
+       - The check is inherently target- and backend-dependent: bytecode and
+         JSIR accept every shape, so the check would have to be conditioned
+         on compiling native code for a supported target (and Merlin would
+         need to keep accepting everything), making the elaboration of
+         [external] declarations backend-dependent. *)
     let arity = List.length prim.prim_native_repr_args in
     let checks =
-      (List.init arity (fun _ -> c_stub_arg_errors))
+      (List.init arity (fun _ -> any))
       @ [c_stub_return_errors]
     in
     check checks prim
@@ -1218,21 +1224,11 @@ let report_error ppf err =
     let errors = List.sort_uniq compare_wrong_repr_error errors in
     List.iter
       (function
-      | Product_arg ->
-        Format_doc.fprintf ppf
-          "@.@{<hint>Hint@}: @[<v>\
-           Types with product layouts in C stub arguments require the@ \
-           %a attribute.@]"
-          Style.inline_code "[@unpacked]"
       | Expected_value_prim ->
         Format_doc.fprintf ppf
           "@.@{<hint>Hint@}: @[<v>\
            This was expected to be a value-only primitive. You might've@ \
            misspelled the primitive name.@]"
-      | Product_return ->
-        Format_doc.fprintf ppf
-          "@.@{<hint>Hint@}: @[<v>\
-           Unboxed products in C stub returns must be a pair of non-products.@]"
       | Unpacked_product_return ->
         Format_doc.fprintf ppf
           "@.@{<hint>Hint@}: @[<v>\
