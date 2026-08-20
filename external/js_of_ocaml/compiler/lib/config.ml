@@ -249,7 +249,10 @@ let set_target (t : [ `JavaScript | `Wasm ])  =
   | `JavaScript, false -> Targetint.set_num_bits 32; Targetnativeint.set_num_bits 32
   | `JavaScript, true-> failwith "Portable int representation is incompatible with JavaScript"
   | `Wasm, false -> Targetint.set_num_bits 31; Targetnativeint.set_num_bits 32
-  | `Wasm, true -> Targetint.set_num_bits 31; Targetnativeint.set_num_bits 64);
+  | `Wasm, true when Flag.wasi () ->
+      failwith "Portable int representation is currently incompatible with wasi";
+  | `Wasm, true ->
+      Targetint.set_num_bits 63; Targetnativeint.set_num_bits 64);
   target_ := (t :> [ `JavaScript | `Wasm | `None ])
 
 type effects_backend =
