@@ -182,7 +182,7 @@ let loc_results_return res =
      remaining args on stack.
    macOS/iOS peculiarities: scalars passed on stack occupy only their size in
    bytes, while the AAPCS64 pads them to 8 bytes.
-   Return values in r0...r1 or d0. *)
+   Return values in r0...r1 or d0...d3. *)
 
 let external_calling_conventions
     int_registers float_registers make_stack ty_args =
@@ -221,8 +221,16 @@ let loc_external_arguments ty_args =
     [D0; D1; D2; D3; D4; D5; D6; D7]
      outgoing ty_args
 
+(* External calls' results are in x0-x1 (scalars, and composites of at most
+   16 bytes that are not homogeneous floating-point/vector aggregates) and/or
+   d0-d3 (floating-point and vector scalars, and homogeneous floating-point/
+   vector aggregates of at most four members).  [To_cmm_expr] ensures that
+   result components are only assigned to registers here in situations
+   agreeing with the C ABI. *)
 let loc_external_results res =
-  let (loc, _) = calling_conventions [X0; X1] [D0; D1] not_supported 0 res in
+  let (loc, _) =
+    calling_conventions [X0; X1] [D0; D1; D2; D3] not_supported 0 res
+  in
   loc
 
 let loc_exn_bucket = phys_reg Int X0

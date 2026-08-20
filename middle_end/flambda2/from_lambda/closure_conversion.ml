@@ -641,9 +641,15 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
   | Genvar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Genvar"
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
 
-let unarize_extern_repr ~machine_width alloc_mode
+let rec unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
   match extern_repr with
+  | Unpacked_product sort ->
+    (* The unarized representation of an [@unpacked] product is the same as that
+       of an ordinary unboxed product; the two differ only in calling convention
+       (see [arity_components_of_extern_repr] below). *)
+    unarize_extern_repr ~machine_width alloc_mode
+      (Lambda.Same_as_ocaml_repr sort)
   | Same_as_ocaml_repr (Base Void) -> []
   | Same_as_ocaml_repr (Base _ as sort) ->
     let kind =
@@ -723,6 +729,61 @@ let unarize_extern_repr ~machine_width alloc_mode
         arg_transformer = Some P.Untag_immediate;
         return_transformer = Some P.Tag_immediate
       } ]
+
+let rec arity_component_of_const_sort_for_extern_repr
+    (sort : Jkind.Sort.Const.t) :
+    [`Complex] Flambda_arity.Component_for_creation.t =
+  match sort with
+  | Base _ -> (
+    match unarize_const_sort_for_extern_repr sort with
+    | [] ->
+      (* Void, the nullary unboxed product. *)
+      Flambda_arity.Component_for_creation.Unboxed_product []
+    | [{ kind; _ }] ->
+      Flambda_arity.Component_for_creation.Singleton
+        (K.With_subkind.anything kind)
+    | _ :: _ :: _ ->
+      Misc.fatal_error
+        "Base sorts never unarize to more than one kind for [extern_repr] \
+         purposes")
+  | Product sorts ->
+    Flambda_arity.Component_for_creation.Unboxed_product
+      (List.map arity_component_of_const_sort_for_extern_repr sorts)
+  | Univar _ ->
+    Misc.fatal_error
+      "arity_component_of_const_sort_for_extern_repr: unexpected univar"
+  | Genvar _ ->
+    Misc.fatal_error
+      "arity_component_of_const_sort_for_extern_repr: unexpected genvar"
+
+(* Note that this returns a list: an [@unpacked] product parameter contributes
+   one (singleton) component per unarized element of the product, since such
+   elements are passed as separate C arguments. In contrast an ordinary unboxed
+   product parameter contributes a single unboxed product component, since it
+   follows the calling convention of the corresponding C struct (see
+   [To_cmm_expr.translate_external_call]). *)
+let arity_components_of_extern_repr ~machine_width alloc_mode
+    (extern_repr : Lambda.extern_repr) :
+    [`Complex] Flambda_arity.Component_for_creation.t list =
+  match extern_repr with
+  | Same_as_ocaml_repr ((Product _ | Base Void) as sort) ->
+    [arity_component_of_const_sort_for_extern_repr sort]
+  | Unpacked_product _ ->
+    List.map
+      (fun { kind; _ } ->
+        Flambda_arity.Component_for_creation.Singleton
+          (K.With_subkind.anything kind))
+      (unarize_extern_repr ~machine_width alloc_mode extern_repr)
+  | Same_as_ocaml_repr (Base _ | Univar _ | Genvar _)
+  | Unboxed_float _ | Unboxed_vector _ | Unboxed_mask
+  | Unboxed_or_untagged_integer _ -> (
+    match unarize_extern_repr ~machine_width alloc_mode extern_repr with
+    | [{ kind; _ }] ->
+      [ Flambda_arity.Component_for_creation.Singleton
+          (K.With_subkind.anything kind) ]
+    | [] | _ :: _ :: _ ->
+      Misc.fatal_error
+        "This [extern_repr] should have unarized to exactly one kind")
 
 let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
     (({ prim_name;
@@ -818,14 +879,30 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
       Apply_cont_expr.continuation apply_cont, false
     | _ -> Continuation.create (), true
   in
-  (* Unlike for OCaml function calls, we don't preserve unboxed product arity
-     information here, as there is no partial application etc. *)
-  let[@inline] build_arity unarized =
-    List.map (fun { kind; _ } -> K.With_subkind.anything kind) unarized
-    |> Flambda_arity.create_singletons
+  (* Unboxed products must not be unarized in the parameter and return arities:
+     [To_cmm_extcall] uses the structure of any such products (including
+     nesting) to determine the C calling convention, an unboxed product being
+     passed or returned as if it were a value of the corresponding (possibly
+     nested) C struct type. *)
+  let param_arity =
+    List.concat_map
+      (fun (_mode, repr) ->
+        arity_components_of_extern_repr ~machine_width alloc_mode repr)
+      prim_native_repr_args
+    |> Flambda_arity.create
   in
-  let param_arity = build_arity unarized_params in
-  let return_arity = build_arity unarized_results in
+  let return_arity =
+    let arity =
+      arity_components_of_extern_repr ~machine_width alloc_mode
+        (snd prim_native_repr_res)
+      |> Flambda_arity.create
+    in
+    (* A return of void layout (or of a product layout all of whose components
+       are void) is given a nullary arity, matching [unarized_results] above. *)
+    if Flambda_arity.cardinal_unarized arity = 0
+    then Flambda_arity.nullary
+    else arity
+  in
   let effects = Effects.from_lambda prim_effects in
   let coeffects = Coeffects.from_lambda prim_coeffects in
   let call_kind =

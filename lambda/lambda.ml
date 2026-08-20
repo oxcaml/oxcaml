@@ -497,6 +497,7 @@ type primitive =
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
+  | Unpacked_product of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
@@ -3203,11 +3204,13 @@ let layout_of_extern_repr : extern_repr -> _ = function
     layout_boxed_int Boxed_int32
   | Unboxed_or_untagged_integer Unboxed_nativeint ->
     layout_boxed_int Boxed_nativeint
-  | Same_as_ocaml_repr s -> layout_of_const_sort s
+  | Same_as_ocaml_repr s | Unpacked_product s -> layout_of_const_sort s
 
 let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
   | Same_as_ocaml_repr (Product _)
+  | Unpacked_product _ ->
+    true
   | Same_as_ocaml_repr (Base _)
   | Unboxed_vector _ | Unboxed_mask | Unboxed_float _
   | Unboxed_or_untagged_integer _ ->
