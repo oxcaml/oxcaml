@@ -143,6 +143,16 @@ Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (***********************************************************************)
+type 'a t =
+  | K : ('b : value mod portable). 'b -> 'b t
+
+let foo (t : (unit -> unit) t @ nonportable) = use_portable t
+[%%expect {|
+type 'a t = K : ('b : value mod portable). 'b -> 'b t
+val foo : (unit -> unit) t -> unit = <fun>
+|}]
+
+(***********************************************************************)
 type 'a t : value mod contended portable =
   | Shared : ('b : value mod contended portable). 'b  -> 'b t
   | Unshared : (unit -> 'c) @@ portable               -> 'c t
@@ -1053,3 +1063,4 @@ type 'a unboxed_local_bound_r : value mod portable =
 type 'a unboxed_local_bound_r =
     R : ('a : value mod portable). { foo : 'a; } -> 'a unboxed_local_bound_r [@@unboxed]
 |}]
+
