@@ -6175,10 +6175,20 @@ end = struct
     let env = exp.exp_env in
     let loc = proper_exp_loc exp in
     let forwarder = is_return_forwarder_shape exp in
-    let type_sort ty =
-      Ctype.type_sort ~why:Function_result ~fixed:forwarder env ty
+    let type_sort ~fixed ty =
+      Ctype.type_sort ~why:Function_result ~fixed env ty
     in
-    match type_sort exp.exp_type, demand with
+    let site_sort =
+      match type_sort ~fixed:forwarder exp.exp_type with
+      | Ok _ as ok -> ok
+      | Error _ as error ->
+          match
+            type_sort ~fixed:true (Ctype.duplicate_type exp.exp_type)
+          with
+          | Ok _ as ok -> ok
+          | Error _ -> error
+    in
+    match site_sort, demand with
     | Error _, Never_returns when forwarder -> Forwards
     | Error _, (Forwards | Returns _) when forwarder -> demand
     | Error err, _ ->
