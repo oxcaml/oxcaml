@@ -33,11 +33,17 @@ val create : Cfg.t -> layout:layout -> t
 
 val cfg : t -> Cfg.t
 
+(** [with_cfg t cfg] returns a value that shares the layout and section table of
+    [t], but holds [cfg]. It is intended for updates to function-level fields of
+    the cfg: the graph itself is expected to be unchanged. *)
+val with_cfg : t -> Cfg.t -> t
+
 val layout : t -> layout
 
 val set_layout : t -> layout -> unit
 
-(** Add to cfg, layout, and other data-structures that track labels. *)
+(** Add to cfg, layout, and other data-structures that track labels. The new
+    block inherits the section of the [after] block, if any. *)
 val add_block : t -> Cfg.basic_block -> after:Label.t -> unit
 
 val assign_blocks_to_section : t -> Label.t list -> string -> unit
@@ -109,7 +115,8 @@ val fold_instructions :
 
 (* Insert specified instructions along all outgoing edges from the block
    [after]; if [before] it not [None], the insertion is restricted to edges
-   having [before] as their destination. *)
+   having [before] as their destination. Inserted blocks inherit the section of
+   the [after] block, if any. *)
 val insert_block :
   t ->
   Cfg.basic_instruction_list ->
