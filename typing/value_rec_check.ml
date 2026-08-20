@@ -809,9 +809,9 @@ let rec expression : Typedtree.expression -> term_judg =
                     representation = rep } ->
         let field_mode =
           match rep with
-          | Record_float | Record_ufloat -> Dereference
+          | Record_float -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
-          | Record_boxed | Record_mixed _ | Record_variable _
+          | Record_boxed | Record_ufloat | Record_mixed _ | Record_variable _
           | Record_inlined
               (_, (Constructor_uniform_value | Constructor_mixed _
                   | Constructor_variable _), _) ->
