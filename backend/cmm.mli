@@ -691,6 +691,10 @@ val iter_shallow : (expression -> unit) -> expression -> unit
 (** Apply the transformation to each immediate sub-expression. *)
 val map_shallow : (expression -> expression) -> expression -> expression
 
+(** Whether an expression contains constructs that only arise from debugging
+    information ([Cphantom_let] and [Cname_for_debugger]). *)
+val contains_debug_only_constructs : expression -> bool
+
 val compare_machtype_component : machtype_component -> machtype_component -> int
 
 val equal_machtype_component : machtype_component -> machtype_component -> bool

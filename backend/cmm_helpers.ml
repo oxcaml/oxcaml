@@ -99,38 +99,12 @@ module Unboxed_or_untagged_array_tags = struct
     | _ -> unboxed_float32_array_one_tag
 end
 
-(* Whether an expression contains constructs that only arise from debugging
-   information ([Cphantom_let] and [Cname_for_debugger]). The non-engine
-   implementations of the helpers checked by [check_equal_*] below do not handle
-   these constructs, whereas the [Cmm_peephole_engine] versions skip over them,
-   re-placing them around any rewritten result. In the presence of such
-   constructs the results of the two implementations may therefore differ
-   legitimately, in which case the engine's result is used without checking. *)
-let rec contains_debug_only_constructs (e : expression) =
-  match e with
-  | Cphantom_let _ | Cname_for_debugger _ -> true
-  | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
-  | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
-  | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
-    false
-  | Clet (_, e1, e2) | Csequence (e1, e2) ->
-    contains_debug_only_constructs e1 || contains_debug_only_constructs e2
-  | Ctuple es | Cop (_, es, _) | Cexit (_, es, _) ->
-    List.exists contains_debug_only_constructs es
-  | Cifthenelse (e1, _, e2, _, e3, _) ->
-    contains_debug_only_constructs e1
-    || contains_debug_only_constructs e2
-    || contains_debug_only_constructs e3
-  | Cswitch (e, _, arms, _) ->
-    contains_debug_only_constructs e
-    || Array.exists (fun (e, _) -> contains_debug_only_constructs e) arms
-  | Ccatch (_, handlers, body) ->
-    contains_debug_only_constructs body
-    || List.exists
-         (fun ({ body; _ } : static_handler) ->
-           contains_debug_only_constructs body)
-         handlers
-
+(* The non-engine implementations of the helpers checked by [check_equal_*]
+   below do not handle [Cphantom_let] or [Cname_for_debugger], whereas the
+   [Cmm_peephole_engine] versions skip over such constructs, re-placing them
+   around any rewritten result. In the presence of these constructs the results
+   of the two implementations may therefore differ legitimately, in which case
+   the engine's result is used without checking. *)
 let check_equal_1 name f1 f2 arg1 =
   let r1 = f1 arg1 in
   let r2 = f2 arg1 in

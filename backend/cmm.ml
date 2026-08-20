@@ -882,7 +882,9 @@ let iter_shallow f = function
     f cond;
     f ifso;
     f ifnot
-  | Cswitch (_e, _ia, ea, _dbg) -> Array.iter (fun (e, _) -> f e) ea
+  | Cswitch (e, _ia, ea, _dbg) ->
+    f e;
+    Array.iter (fun (e, _) -> f e) ea
   | Ccatch (_f, hl, body) ->
     let iter_h { body = handler; _ } = f handler in
     List.iter iter_h hl;
@@ -903,7 +905,7 @@ let map_shallow f = function
   | Cifthenelse (cond, ifso_dbg, ifso, ifnot_dbg, ifnot, dbg) ->
     Cifthenelse (f cond, ifso_dbg, f ifso, ifnot_dbg, f ifnot, dbg)
   | Cswitch (e, ia, ea, dbg) ->
-    Cswitch (e, ia, Array.map (fun (e, dbg) -> f e, dbg) ea, dbg)
+    Cswitch (f e, ia, Array.map (fun (e, dbg) -> f e, dbg) ea, dbg)
   | Ccatch (flag, hl, body) ->
     let map_h { label; params; body = handler; dbg; is_cold } =
       { label; params; body = f handler; dbg; is_cold }
@@ -914,6 +916,22 @@ let map_shallow f = function
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
     | Cconst_symbol _ | Cvar _ | Cinvalid _ ) as c ->
     c
+
+let contains_debug_only_constructs expr =
+  let exception Found in
+  let rec check expr =
+    match expr with
+    | Cphantom_let _ | Cname_for_debugger _ -> raise Found
+    | Clet _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _
+    | Ccatch _ | Cexit _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _
+    | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
+    | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
+      iter_shallow check expr
+  in
+  try
+    check expr;
+    false
+  with Found -> true
 
 let rank_machtype_component : machtype_component -> int = function
   | Val -> 0
