@@ -214,15 +214,16 @@ let rec find_context_opt t (context : Context.t) =
 
 let key_repr t (key : Key.t) : Key_repr.t =
   match key with
-  | Named (context, uid) -> Named (find t (intern t context), uid)
-  | Anon uid -> Anon uid
+  | Named { context; family_uid } ->
+    Named (find t (intern t context), family_uid)
+  | Anon { key_uid } -> Anon key_uid
 
 let find_key_opt t (key : Key.t) =
   match (key : Key.t) with
-  | Named (context, uid) ->
+  | Named { context; family_uid } ->
     Option.bind (find_context_opt t context) (fun root ->
-        Key_map.find_opt (Key_repr.Named (root, uid)) t.key_ids)
-  | Anon uid -> Key_map.find_opt (Key_repr.Anon uid) t.key_ids
+        Key_map.find_opt (Key_repr.Named (root, family_uid)) t.key_ids)
+  | Anon { key_uid } -> Key_map.find_opt (Key_repr.Anon key_uid) t.key_ids
 
 let key_id t (key : Key.t) =
   let repr = key_repr t key in
@@ -344,7 +345,8 @@ let create (facts : Facts.t) =
       atoms = Ctx_map.empty;
       sigs = Sig_map.empty;
       key_ids = Key_map.empty;
-      key_witness = Vec.create (Key.Anon Uid.internal_not_actually_unique);
+      key_witness =
+        Vec.create (Key.Anon { key_uid = Uid.internal_not_actually_unique });
       key_family = Vec.create None;
       key_checks = Vec.create [];
       key_out = Vec.create [];
@@ -361,17 +363,17 @@ let create (facts : Facts.t) =
       use_moves = 0
     }
   in
-  List.iter
+  Facts.Context_equality.Set.iter
     (fun ({ left; right } : Facts.Context_equality.t) ->
       merge t (intern t left) (intern t right))
     facts.equalities;
-  List.iter
+  Facts.Check.Set.iter
     (fun (check : Facts.Check.t) ->
       let id = key_id t check.expectation in
       Vec.set t.key_checks id (check :: Vec.get t.key_checks id);
       observe_family t id)
     facts.checks;
-  List.iter
+  Facts.Dependency.Set.iter
     (fun ({ derived; source; reason } : Facts.Dependency.t) ->
       let derived_id = key_id t derived in
       let source_id = key_id t source in
@@ -405,7 +407,7 @@ let create (facts : Facts.t) =
       | Argument_member
       | Interface -> observe_family t source_id)
     facts.dependencies;
-  List.iter
+  Facts.Omission.Set.iter
     (fun (omission : Facts.Omission.t) ->
       (match omission.affected with
       | None -> ()

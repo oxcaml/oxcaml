@@ -3,11 +3,10 @@ configured indexes. With no index configured it reports [unavailable] rather
 than a complete empty answer, so a client can tell "nothing implements this
 module type" apart from "the facts were never loaded".
 
-  $ cat main.ml
+  $ sed '/^$/d' main.ml
   module type S = sig
     type t
   end
-
   module M : S = struct
     type t = int
   end

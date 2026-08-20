@@ -1,7 +1,7 @@
 val impl_source_of_interface : Mconfig.t -> string -> string option
 
 val module_facts :
-  Mconfig.t -> Module_implementation_facts.t * Module_facts_reader.status
+  Mconfig.t -> Module_implementation_facts.t option * Module_facts_reader.status
 
 val own_file : Mconfig.t -> string
 
