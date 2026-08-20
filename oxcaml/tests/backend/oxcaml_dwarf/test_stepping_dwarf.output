@@ -1,4 +1,4 @@
-    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_start(param=() : unit @ value)
     frame #N: <ADDRESS> test_stepping_dwarf.exe`Test_stepping_dwarf.f_step_through_mutations(counter=[0] : int ref @ value)
 === Stepping through mutations ===
 (int ref @ value) counter = [0]
