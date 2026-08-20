@@ -648,6 +648,10 @@ module With_bounds = struct
       With_bounds (With_bounds_types.singleton type_expr type_info)
     | With_bounds bounds -> With_bounds (add_bound type_expr type_info bounds)
 
+  let of_list = function
+    | [] -> No_with_bounds
+    | _ :: _ as bounds -> With_bounds (With_bounds_types.of_list bounds)
+
   let format (type l r) ppf (t : (l * r) t) =
     match t with
     | No_with_bounds -> ()
@@ -2707,13 +2711,37 @@ let apply_modality_l modality jk =
   { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
   |> disallow_right
 
-let apply_modality_r modality jk =
-  let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
+let restrict_to_axes_r relevant_axes jk =
   let mod_bounds =
     Mod_bounds.set_max_in_set jk.jkind.mod_bounds
       (Axis_set.complement relevant_axes)
   in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
+
+let apply_modality_r modality jk =
+  restrict_to_axes_r (Mod_bounds.relevant_axes_of_modality ~modality) jk
+
+let split_with_bound_vars ~context env t bound =
+  match bound.jkind.base with
+  | Kconstr _ -> None
+  | Layout _ -> (
+    let t = normalize ~mode:Require_best ~context env t in
+    let vars, others =
+      With_bounds.to_list t.jkind.with_bounds
+      |> List.partition_map (fun ((ty, ti) as with_bound) ->
+          match get_desc ty with
+          | Tvar _ ->
+            let var_bound =
+              restrict_to_axes_r ti.With_bounds_type_info.relevant_axes bound
+            in
+            Left (ty, set_layout var_bound (Layout.Any Scannable_axes.max))
+          | _ -> Right with_bound)
+    in
+    match vars with
+    | [] -> None
+    | _ :: _ ->
+      let with_bounds = With_bounds.of_list others in
+      Some (vars, { t with jkind = { t.jkind with with_bounds } }))
 
 let apply_or_null_l env jkind =
   let jkind =

@@ -199,23 +199,44 @@ Error: This expression has type "(< to_string : string; .. > -> unit) signal"
        The second object type has no method "to_string"
 |}]
 
-(* No propagation into a bare expected variable: here the variable's kind
-   requires portability, which [id]'s result only satisfies once [x]
-   has instantiated the kind's with-bounds. *)
+(* Kinds with with-bounds: the expected kind [value mod portable] reaches
+   ['a box] while ['a] is still unknown, so ['a] itself is constrained to be
+   portable. *)
 
 type 'a box = Box of 'a
 let require_portable : ('a : value mod portable). 'a -> unit = fun _ -> ()
 
-let f (x : int) = require_portable (id (Box x))
+let f (x : int) = require_portable (Box x)
 [%%expect{|
 type 'a box = Box of 'a
 val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 val f : int -> unit = <fun>
+|}]
+
+let f x = require_portable (Box x)
+[%%expect{|
+val f : ('a : value mod portable). 'a -> unit = <fun>
+|}]
+
+let f (x : int -> int) = require_portable (Box x)
+[%%expect{|
+Line 1, characters 47-48:
+1 | let f (x : int -> int) = require_portable (Box x)
+                                                   ^
+Error: The value "x" has type "int -> int" but an expression was expected of type
+         "('a : value mod portable)"
+       The kind of int -> int is value non_float mod aliased immutable
+         because it's a function type.
+       But the kind of int -> int must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+let f (x : int) = require_portable (id (Box x))
+[%%expect{|
+val f : int -> unit = <fun>
 |}, Principal{|
-type 'a box = Box of 'a
-val require_portable : ('a : value mod portable). 'a -> unit = <fun>
-Line 4, characters 35-47:
-4 | let f (x : int) = require_portable (id (Box x))
+Line 1, characters 35-47:
+1 | let f (x : int) = require_portable (id (Box x))
                                        ^^^^^^^^^^^^
 Error: This expression has type "int box"
        but an expression was expected of type "('a : value mod portable)"
@@ -231,15 +252,7 @@ let f (x : int) = require_portable_fst (id (Box x, ()))
 [%%expect{|
 val require_portable_fst : ('a : value mod portable) 'b. 'a * 'b -> unit =
   <fun>
-Line 3, characters 44-49:
-3 | let f (x : int) = require_portable_fst (id (Box x, ()))
-                                                ^^^^^
-Error: This constructor has type "'a box"
-       but an expression was expected of type "('b : value mod portable)"
-       The kind of 'a box is immutable_data with 'a
-         because of the definition of box at line 1, characters 0-23.
-       But the kind of 'a box must be a subkind of value mod portable
-         because of the definition of require_portable_fst at line 1, characters 4-24.
+val f : int -> unit = <fun>
 |}, Principal{|
 val require_portable_fst : ('a : value mod portable) 'b. 'a * 'b -> unit =
   <fun>
@@ -254,15 +267,25 @@ Error: This expression has type "int box * unit"
          because of the definition of require_portable_fst at line 1, characters 4-24.
 |}]
 
-(* GADT equation scoping (trefis's example): the expected type here is a
-   bare variable, into which we do not propagate, so the error is
-   unchanged. *)
+(* GADT equation scoping (trefis's example from the upstream discussion):
+   propagating the expected type makes the error on the application match
+   the one on the conditional below. *)
 
 type _ g = Int : int g
 let ky x y = ignore (x = y); x
 
 let test : type a. a g -> _ = function Int -> ky (1 : a) 1
 [%%expect{|
+type _ g = Int : int g
+val ky : 'a -> 'a -> 'a = <fun>
+Line 4, characters 57-58:
+4 | let test : type a. a g -> _ = function Int -> ky (1 : a) 1
+                                                             ^
+Error: The constant "1" has type "int" but an expression was expected of type
+         "a" = "int"
+       This instance of "int" is ambiguous:
+       it would escape the scope of its equation
+|}, Principal{|
 type _ g = Int : int g
 val ky : 'a -> 'a -> 'a = <fun>
 Line 4, characters 46-58:

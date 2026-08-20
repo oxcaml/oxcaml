@@ -675,6 +675,20 @@ val apply_modality_l :
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 
+(** [split_with_bound_vars ~context env t bound] separates the type variables
+    mentioned in the with-bounds of [t] from the rest of [t]: it returns the
+    jkind each such variable must have for [t] to be a subjkind of [bound] (only
+    the mod-bounds along the variable's relevant axes are kept, and the layout
+    is unconstrained), together with [t] without those with-bounds. Returns
+    [None] if [t] mentions no type variables in its with-bounds or if [bound] is
+    abstract. *)
+val split_with_bound_vars :
+  context:jkind_context ->
+  Env.t ->
+  Types.jkind_l ->
+  ('l * allowed) Types.jkind ->
+  ((Types.type_expr * Types.jkind_r) list * Types.jkind_l) option
+
 (** Change a jkind to be appropriate for ['a or_null] based on passed ['a].
     Adjusts nullability to be [Maybe_null], and separability to be
     [Maybe_separable] if it is already [Separable]. If the jkind is already
