@@ -28,6 +28,15 @@
    (type $block (array (mut (ref eq))))
    (type $bytes (array (mut i8)))
 
+   (@if $portable-int
+   (@then
+      (import "portableint" "portable_int_val"
+         (func $portable_int_val (param (ref eq)) (result i64)))
+      (import "portableint" "val_portable_int"
+         (func $val_portable_int (param i64) (result (ref eq))))
+   ))
+
+
    (func (export "caml_atomic_cas")
       (param $ref (ref eq)) (param $o (ref eq)) (param $n (ref eq))
       (result (ref eq))
@@ -88,9 +97,18 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (i32.const 1)
+            (call $val_portable_int
+               (i64.add (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (i32.const 1)
          (ref.i31 (i32.add (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (local.get $old))
 
    (func (export "caml_atomic_fetch_add_field")
@@ -103,9 +121,18 @@
          (i32.add (i31.get_u (ref.cast (ref i31) (local.get $i))) (i32.const 1)))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (local.get $j)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (local.get $j)
+            (call $val_portable_int
+               (i64.add (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $n)))))
+      )
+      (@else
       (array.set $block (local.get $b) (local.get $j)
          (ref.i31 (i32.add (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $n))))))
+      ))
       (local.get $old))
 
    (func (export "caml_atomic_add")
@@ -114,9 +141,18 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (i32.const 1)
+            (call $val_portable_int
+               (i64.add (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (i32.const 1)
          (ref.i31 (i32.add (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_sub")
@@ -125,9 +161,18 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (i32.const 1)
+            (call $val_portable_int
+               (i64.sub (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (i32.const 1)
          (ref.i31 (i32.sub (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_land")
@@ -136,9 +181,18 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (i32.const 1)
+            (call $val_portable_int
+               (i64.and (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (i32.const 1)
          (ref.i31 (i32.and (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_lor")
@@ -147,9 +201,18 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (i32.const 1)
+            (call $val_portable_int
+               (i64.or (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (i32.const 1)
          (ref.i31 (i32.or (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_lxor")
@@ -158,9 +221,18 @@
       (local $old (ref eq))
       (local.set $b (ref.cast (ref $block) (local.get $ref)))
       (local.set $old (array.get $block (local.get $b) (i32.const 1)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (i32.const 1)
+            (call $val_portable_int
+               (i64.xor (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (i32.const 1)
          (ref.i31 (i32.xor (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_exchange")
@@ -389,9 +461,18 @@
          (i32.add (i31.get_s (ref.cast (ref i31) (local.get $field)))
             (i32.const 1)))
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (local.get $idx)
+            (call $val_portable_int
+               (i64.add (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (local.get $idx)
          (ref.i31 (i32.add (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_sub_field")
@@ -405,9 +486,18 @@
          (i32.add (i31.get_s (ref.cast (ref i31) (local.get $field)))
             (i32.const 1)))
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (local.get $idx)
+            (call $val_portable_int
+               (i64.sub (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (local.get $idx)
          (ref.i31 (i32.sub (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_land_field")
@@ -421,9 +511,18 @@
          (i32.add (i31.get_s (ref.cast (ref i31) (local.get $field)))
             (i32.const 1)))
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (local.get $idx)
+            (call $val_portable_int
+               (i64.and (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (local.get $idx)
          (ref.i31 (i32.and (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_lor_field")
@@ -437,9 +536,18 @@
          (i32.add (i31.get_s (ref.cast (ref i31) (local.get $field)))
             (i32.const 1)))
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (local.get $idx)
+            (call $val_portable_int
+               (i64.or (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (local.get $idx)
          (ref.i31 (i32.or (i31.get_s (ref.cast (ref i31) (local.get $old)))
                           (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_lxor_field")
@@ -453,9 +561,18 @@
          (i32.add (i31.get_s (ref.cast (ref i31) (local.get $field)))
             (i32.const 1)))
       (local.set $old (array.get $block (local.get $b) (local.get $idx)))
+      (@if $portable-int
+      (@then
+         (array.set $block (local.get $b) (local.get $idx)
+            (call $val_portable_int
+               (i64.xor (call $portable_int_val (local.get $old))
+                  (call $portable_int_val (local.get $i)))))
+      )
+      (@else
       (array.set $block (local.get $b) (local.get $idx)
          (ref.i31 (i32.xor (i31.get_s (ref.cast (ref i31) (local.get $old)))
                            (i31.get_s (ref.cast (ref i31) (local.get $i))))))
+      ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_atomic_compare_exchange_field")
