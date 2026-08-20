@@ -40,6 +40,7 @@ end
 module File_contents = struct
   type t =
     { id_stamp_counters : Id_stamp_counters.t;
+      participants : Compilation_unit.t list;
       solution : Serialisable_solution.t
     }
 end
@@ -52,12 +53,14 @@ type error =
 
 exception Error of error
 
-let save ~filename ~solution =
+let save ~filename ~participants ~solution =
   let solution = Serialisable_solution.create solution in
   (* We need to store ID stamp counters so that stamp-based ids created during
      rebuild don't conflict with the ones created during solve. *)
   let id_stamp_counters = Id_stamp_counters.save () in
-  let file_contents = { File_contents.id_stamp_counters; solution } in
+  let file_contents =
+    { File_contents.id_stamp_counters; participants; solution }
+  in
   let oc = open_out_bin filename in
   Misc.try_finally
     (fun () ->

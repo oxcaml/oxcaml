@@ -24,6 +24,7 @@ end
 module File_contents : sig
   type t =
     { id_stamp_counters : Id_stamp_counters.t;
+      participants : Compilation_unit.t list;
       solution : Serialisable_solution.t
     }
 end
@@ -36,8 +37,13 @@ type error =
 
 exception Error of error
 
-(** Write an .ltosol file with the given solution to disk. *)
-val save : filename:string -> solution:Unboxing_analysis.result -> unit
+(** Write an .ltosol file with the given solution to disk. [participants] should
+    list the compilation units included in the solution. *)
+val save :
+  filename:string ->
+  participants:Compilation_unit.t list ->
+  solution:Unboxing_analysis.result ->
+  unit
 
 (** Read and unmarshal an ltosol file from disk. *)
 val load : string -> File_contents.t
