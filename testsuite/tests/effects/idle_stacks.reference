@@ -1,0 +1,8 @@
+mass: 4506000
+discontinue: 5050
+nested: 121
+callstack: true
+async_boundary: 20
+dynamic: 42
+locals: 42
+chain3: 777
