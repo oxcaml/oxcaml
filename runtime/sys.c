@@ -197,6 +197,7 @@ CAMLexport void caml_do_exit(int retcode)
                       s.global_stats.chunk_words);
       CAML_GC_MESSAGE(STATS, "max chunk_words: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
                       s.global_stats.max_chunk_words);
+      caml_stack_stats_print();
     }
   }
 

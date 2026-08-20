@@ -398,6 +398,11 @@ tail_call:
           gc_regs = (value *)(Field(result, 2));
         }
         if (stk != NULL) {
+#ifdef STACK_GUARD_PAGES
+          /* The continuation is moving to the major heap: idle its
+             stacks, recycling their guarded stacks. */
+          stk = caml_cont_idle_stacks(result);
+#endif
           caml_scan_stack(&oldify_one, oldify_scanning_flags, st,
                           stk, gc_regs);
         }
@@ -624,6 +629,12 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   st.domain_alone = caml_domain_alone();
   st.status = caml_allocation_status();
   st.fast_data = caml_shared_fast_data(domain->shared_heap);
+
+#ifdef STACK_GUARD_PAGES
+  /* Stacks still in the local caches have gone a whole minor cycle
+     without reuse: demote them to the global cache. */
+  caml_stack_cache_flush_local();
+#endif
 
   prev_alloc_words = domain->allocated_words;
 

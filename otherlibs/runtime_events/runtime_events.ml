@@ -40,6 +40,10 @@ type runtime_counter =
 | EV_C_MAJOR_SLICE_TOTAL_WORK
 | EV_C_MAJOR_SLICE_BUDGET
 | EV_C_MAJOR_SLICE_WORK_DONE
+| EV_C_STACK_CREATED
+| EV_C_STACK_FREED
+| EV_C_STACK_IDLED
+| EV_C_STACK_WOKEN
 
 type runtime_phase =
 | EV_EXPLICIT_GC_SET
@@ -145,6 +149,14 @@ let runtime_counter_name counter =
     "major_slice_budget"
   | EV_C_MAJOR_SLICE_WORK_DONE ->
     "major_slice_work_done"
+  | EV_C_STACK_CREATED ->
+    "stack_created"
+  | EV_C_STACK_FREED ->
+    "stack_freed"
+  | EV_C_STACK_IDLED ->
+    "stack_idled"
+  | EV_C_STACK_WOKEN ->
+    "stack_woken"
 
 let runtime_phase_name phase =
   match phase with
