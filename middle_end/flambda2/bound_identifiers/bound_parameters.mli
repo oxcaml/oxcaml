@@ -46,6 +46,9 @@ val vars : t -> Variable.t list
 
 val vars_and_uids : t -> (Variable.t * Flambda_debug_uid.t) list
 
+val vars_and_uids_and_debuginfo :
+  t -> (Variable.t * Flambda_debug_uid.t * Debuginfo.t) list
+
 val var_set : t -> Variable.Set.t
 
 val iter : (Bound_parameter.t -> unit) -> t -> unit

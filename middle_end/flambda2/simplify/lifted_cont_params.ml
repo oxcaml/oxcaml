@@ -38,6 +38,7 @@ let new_param t ~replay_history bound_param =
       let param_var, param_duid = BP.var_and_uid bound_param in
       let original_var = Variable.Map.find param_var variable_mapping in
       BP.create original_var (BP.kind bound_param) param_duid
+        ~dbg:Debuginfo.none
   in
   let new_params_indexed = BP.Map.add key bound_param t.new_params_indexed in
   { len = t.len + 1; new_params_indexed }

@@ -358,6 +358,7 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
     let cond_result_duid = Flambda_debug_uid.none in
     let cond_result_pat =
       Bound_var.create cond_result cond_result_duid Name_mode.normal
+        ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
     in
     let ifso_cont = Continuation.create () in
     let ifnot_cont = Continuation.create () in
@@ -373,7 +374,8 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
     let result_params =
       List.map2
         (fun (result_var, result_var_duid) result_kind ->
-          Bound_parameter.create result_var result_kind result_var_duid)
+          Bound_parameter.create result_var result_kind result_var_duid
+            ~dbg:Debuginfo.none)
         result_vars result_kinds
     in
     let result_simples = List.map (fun (v, _) -> Simple.var v) result_vars in
@@ -411,7 +413,8 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
       let result_pats =
         List.map
           (fun (result_var, result_var_duid) ->
-            Bound_var.create result_var result_var_duid Name_mode.normal)
+            Bound_var.create result_var result_var_duid Name_mode.normal
+              ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
           result_vars
       in
       let result_simples = List.map (fun (v, _) -> Simple.var v) result_vars in
@@ -452,7 +455,8 @@ let rec bind_recs acc exn_cont ~register_const0 (prim : expr_primitive)
             let pat =
               Bound_var.create
                 (Variable.create "seq" Flambda_kind.value)
-                Flambda_debug_uid.none Name_mode.normal
+                Flambda_debug_uid.none Name_mode.normal ~dbg:Debuginfo.none
+                ~is_parameter:Bound_var.Is_parameter.local_var
               |> Bound_pattern.singleton
             in
             Let_with_acc.create acc pat named ~body))
@@ -482,7 +486,9 @@ and bind_rec_primitive acc exn_cont ~register_const0 (prim : simple_or_prim)
       in
       let vars' =
         List.map
-          (fun (var, var_duid) -> VB.create var var_duid Name_mode.normal)
+          (fun (var, var_duid) ->
+            VB.create var var_duid Name_mode.normal ~dbg:Debuginfo.none
+              ~is_parameter:VB.Is_parameter.local_var)
           vars
       in
       let acc, body = cont acc (List.map (fun (v, _) -> Simple.var v) vars) in

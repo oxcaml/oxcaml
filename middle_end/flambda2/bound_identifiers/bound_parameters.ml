@@ -54,6 +54,8 @@ let vars t = List.map BP.var t
 
 let vars_and_uids t = List.map BP.var_and_uid t
 
+let vars_and_uids_and_debuginfo t = List.map BP.var_and_uid_and_debuginfo t
+
 let simples t = List.map BP.simple t
 
 let to_set t = Bound_parameter.Set.of_list t
