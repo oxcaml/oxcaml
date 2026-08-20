@@ -117,6 +117,8 @@ module Flag = struct
   let toplevel = o ~name:"toplevel" ~default:false
 
   let wasi = o ~name:"wasi" ~default:false
+
+  let portable_int = o ~name:"portable-int" ~default:false
 end
 
 module Param = struct
@@ -242,10 +244,12 @@ let target () =
   | `None -> failwith "target was not set"
   | (`JavaScript | `Wasm) as t -> t
 
-let set_target (t : [ `JavaScript | `Wasm ]) =
-  (match t with
-  | `JavaScript -> Targetint.set_num_bits 32; Targetnativeint.set_num_bits 32
-  | `Wasm -> Targetint.set_num_bits 31; Targetnativeint.set_num_bits 32);
+let set_target (t : [ `JavaScript | `Wasm ])  =
+  (match t, Flag.portable_int () with
+  | `JavaScript, false -> Targetint.set_num_bits 32; Targetnativeint.set_num_bits 32
+  | `JavaScript, true-> failwith "Portable int representation is incompatible with JavaScript"
+  | `Wasm, false -> Targetint.set_num_bits 31; Targetnativeint.set_num_bits 32
+  | `Wasm, true -> Targetint.set_num_bits 31; Targetnativeint.set_num_bits 32);
   target_ := (t :> [ `JavaScript | `Wasm | `None ])
 
 type effects_backend =
