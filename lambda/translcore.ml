@@ -985,16 +985,13 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
            above. *)
         Jkind.Sort.Const.for_boxed_record
       in
-      let sort_newval =
-        (* Computed before finalizing [record_repres]: a variable
-           representation carries the fields' sorts. *)
-        match label_sort Legacy lbl record_repres with
-        | `Sort s -> Jkind.Sort.default_for_transl_and_get s
-        | `Same_as_record_sort -> sort_arg
+      let record_repres, variable_sorts =
+        Typedecl.finalize_record_representation_and_sorts arg.exp_env
+          e.exp_loc record_repres
       in
-      let record_repres =
-        Typedecl.finalize_record_representation arg.exp_env e.exp_loc
-          record_repres
+      let sort_newval =
+        finalized_label_sort lbl record_repres ~record_sort:sort_arg
+          ~variable_sorts
       in
       let arg_layout = layout_exp sort_arg arg in
       let arg_lambda = transl_exp ~scopes arg_layout arg in
