@@ -664,7 +664,7 @@ and locality_mode : type l r. _ -> _ -> (l * r) Mode.Locality.t -> _ =
 
 and yielding_mode i ppf m =
   line i ppf "yielding_mode %s\n"
-    (match Mode.Yielding.zap_to_floor m with
+    (match Mode.Yielding.zap_to_floor_exn m with
      | Mode.Yielding.Const.Unyielding -> "unyielding"
      | Mode.Yielding.Const.Yielding -> "yielding")
 

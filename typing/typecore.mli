@@ -174,6 +174,7 @@ val type_option_some:
 val type_option_none:
         Env.t -> type_expr -> Location.t -> Typedtree.expression
 val generalizable: int -> type_expr -> bool
+val generalize_structure_exp: Typedtree.expression -> unit
 val reset_delayed_checks: unit -> unit
 val force_delayed_checks: unit -> unit
 
@@ -353,6 +354,7 @@ type error =
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Mode_mismatch of mode_mismatch_kind * Mode.Alloc.equate_error
   | Uncurried_function_escapes_comonadic of Mode.Alloc.Comonadic.error
+  | Uncurried_function_escapes_locality
   | Function_returns_local
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
