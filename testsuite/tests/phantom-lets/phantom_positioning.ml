@@ -2,21 +2,19 @@
  flambda2;
  (* Insulate the test from OCAMLPARAM settings used by CI configurations
     (e.g. classic mode, the reaper, or dump-dir redirection), which would
-    perturb the Cmm dump this test greps. *)
+    perturb the Cmm output this test checks. *)
  set OCAMLPARAM = "_,";
  setup-ocamlopt.byte-build-env;
- {
-   flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -dcmm -dump-into-file";
-   module = "phantom_positioning.ml";
-   ocamlopt.byte;
- }{
-   script = "sh ${test_source_directory}/check-positioning.sh phantom_positioning.cmx.dump";
-   script;
- }
+ flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -dcmm";
+ module = "phantom_positioning.ml";
+ ocamlopt.byte;
+ check-ocamlopt.byte-output;
 *)
 
 (* Positioning of phantom lets whose defining expressions reference
-   delayed bindings (see [To_cmm_env.flush_delayed_lets]).
+   delayed bindings (see [To_cmm_env.flush_delayed_lets]).  The whole Cmm
+   output is compared against the reference file, so that the positions of
+   the phantom lets and their copies are directly visible.
 
    [precise]: both components of [pair1] are in scope at the flush where
    its phantom let is emitted: a single, fully-precise block.
