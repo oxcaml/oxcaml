@@ -625,6 +625,12 @@ let json_of_response (type a) (query : a t) (response : a) : json =
         @ (match i.instance with
           | Some instance -> [ ("instance", `String instance) ]
           | None -> [])
+        @ (match i.implementation_uid with
+          | Some uid -> [ ("uid", `String uid) ]
+          | None -> [])
+        @ (match i.implementation_name with
+          | Some name -> [ ("name", `String name) ]
+          | None -> [])
         @ [ ( "kind",
               `String
                 (match i.site.impl_kind with
