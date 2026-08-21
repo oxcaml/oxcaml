@@ -192,7 +192,16 @@ let phantom_defining_expr ppf defining_expr =
     Format.fprintf ppf "%s[%d]" sym.sym_name field
   | Cphantom_block { tag; fields } ->
     Format.fprintf ppf "[%d: " tag;
-    List.iter (fun field -> Format.fprintf ppf "%a; " V.print field) fields;
+    List.iter
+      (fun (field : Cmm.phantom_block_field) ->
+        match field with
+        | Cphantom_field_var var -> Format.fprintf ppf "%a; " V.print var
+        | Cphantom_field_const_int i ->
+          Format.fprintf ppf "%a; " Targetint.print i
+        | Cphantom_field_const_symbol sym ->
+          Format.fprintf ppf "%s; " sym.sym_name
+        | Cphantom_field_unavailable -> Format.fprintf ppf "?; ")
+      fields;
     Format.fprintf ppf "]"
 
 let phantom_defining_expr_opt ppf defining_expr =
@@ -390,8 +399,9 @@ let rec expr ppf = function
   | Cphantom_let (var, def, body) ->
     fprintf ppf "@[<2>(let?@ @[<2>%a@ %a@]@ %a)@]" VP.print var
       phantom_defining_expr_opt def sequence body
-  | Cname_for_debugger (var, body) ->
-    fprintf ppf "@[<2>(name_for_debugger@ %a@ %a)@]" VP.print var expr body
+  | Cname_for_debugger (provenance, body) ->
+    fprintf ppf "@[<2>(name_for_debugger@ %a@ %a)@]" V.Provenance.print
+      provenance expr body
   | Ctuple el ->
     let tuple ppf el =
       let first = ref true in
