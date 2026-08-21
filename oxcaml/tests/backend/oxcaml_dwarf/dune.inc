@@ -1,4 +1,19 @@
 
+(rule
+ (alias runtest-dwarf)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{env:OXCAML_LLDB=} "")))
+ (action
+  (progn
+   (echo
+    "ERROR: OXCAML_LLDB environment variable not set.\n\
+DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
+the path of your custom LLDB binary.\n\
+Example: export OXCAML_LLDB=/path/to/custom/lldb")
+   (bash "exit 1"))))
+
 (executable
  (name test_basic_dwarf)
  (modules test_basic_dwarf)
@@ -25,24 +40,11 @@
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_basic_dwarf.output.corrected)
- (deps test_basic_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_basic_dwarf.output test_basic_dwarf.output.corrected)
  (action (diff test_basic_dwarf.output test_basic_dwarf.output.corrected)))
 
@@ -72,24 +74,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_unboxed_dwarf.output.corrected)
- (deps test_unboxed_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_unboxed_dwarf.output test_unboxed_dwarf.output.corrected)
  (action (diff test_unboxed_dwarf.output test_unboxed_dwarf.output.corrected)))
 
@@ -119,24 +108,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_datatypes_dwarf.output.corrected)
- (deps test_datatypes_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_datatypes_dwarf.output test_datatypes_dwarf.output.corrected)
  (action (diff test_datatypes_dwarf.output test_datatypes_dwarf.output.corrected)))
 
@@ -166,24 +142,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_simd_dwarf.output.corrected)
- (deps test_simd_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_simd_dwarf.output test_simd_dwarf.output.corrected)
  (action (diff test_simd_dwarf.output test_simd_dwarf.output.corrected)))
 
@@ -213,24 +176,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_simple_functor_dwarf.output.corrected)
- (deps test_simple_functor_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_simple_functor_dwarf.output test_simple_functor_dwarf.output.corrected)
  (action (diff test_simple_functor_dwarf.output test_simple_functor_dwarf.output.corrected)))
 
@@ -260,24 +210,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_parameters_dwarf.output.corrected)
- (deps test_parameters_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_parameters_dwarf.output test_parameters_dwarf.output.corrected)
  (action (diff test_parameters_dwarf.output test_parameters_dwarf.output.corrected)))
 
@@ -307,24 +244,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_callstack_dwarf.output.corrected)
- (deps test_callstack_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_callstack_dwarf.output test_callstack_dwarf.output.corrected)
  (action (diff test_callstack_dwarf.output test_callstack_dwarf.output.corrected)))
 
@@ -354,24 +278,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_stepping_dwarf.output.corrected)
- (deps test_stepping_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_stepping_dwarf.output test_stepping_dwarf.output.corrected)
  (action (diff test_stepping_dwarf.output test_stepping_dwarf.output.corrected)))
 
@@ -401,24 +312,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_closures_dwarf.output.corrected)
- (deps test_closures_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_closures_dwarf.output test_closures_dwarf.output.corrected)
  (action (diff test_closures_dwarf.output test_closures_dwarf.output.corrected)))
 
@@ -448,24 +346,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_large_data_dwarf.output.corrected)
- (deps test_large_data_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_large_data_dwarf.output test_large_data_dwarf.output.corrected)
  (action (diff test_large_data_dwarf.output test_large_data_dwarf.output.corrected)))
 
@@ -495,24 +380,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_tailrec_dwarf.output.corrected)
- (deps test_tailrec_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)
  (action (diff test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)))
 
@@ -542,24 +414,11 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      (run sh ./filter_for_function_call_only.sh))))))
 
 (rule
+ (alias runtest-dwarf)
  (enabled_if
   (and
    (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (targets test_ocaml_and_c_dwarf.output.corrected)
- (deps test_ocaml_and_c_dwarf.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if (= %{context_name} "main"))
+   (<> %{env:OXCAML_LLDB=} "")))
  (deps test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)
  (action (diff test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)))
 
@@ -580,18 +439,3 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (deps test_inlined_frames_dwarf.exe test_inlined_frames_dwarf.py test_inlined_frames_dwarf.ml lldb_test_utils.py)
  (action
   (run %{env:OXCAML_LLDB=} --batch -o "command script import test_inlined_frames_dwarf.py")))
-
-(rule
- (alias runtest-dwarf)
- (enabled_if
-  (and
-   (= %{context_name} "main")
-   (= %{env:OXCAML_LLDB=} "")))
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))

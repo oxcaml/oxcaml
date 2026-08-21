@@ -32,6 +32,27 @@ let () =
  (foreign_archives simd_stubs))
 |}
   in
+  (* Without an LLDB configured, every per-test rule below is disabled, and the
+     [runtest-dwarf] alias contains only this single rule, which fails with an
+     informative error. *)
+  let print_missing_lldb_error () =
+    Buffer.clear buf;
+    Buffer.add_substitute buf (subst_common "")
+      {|
+(rule
+ (alias runtest-dwarf)
+ ${enabled_if_without_lldb}
+ (action
+  (progn
+   (echo
+    "ERROR: OXCAML_LLDB environment variable not set.\n\
+DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
+the path of your custom LLDB binary.\n\
+Example: export OXCAML_LLDB=/path/to/custom/lldb")
+   (bash "exit 1"))))
+|};
+    Buffer.output_buffer Out_channel.stdout buf
+  in
   (* Function to generate rules for executable tests that produce output *)
   let print_dwarf_test ?(extra_deps = []) name =
     (* Leading "" yields a space after [${filter}], or "" when empty. *)
@@ -60,21 +81,8 @@ let () =
      (run sh ./${filter}))))))
 
 (rule
- ${enabled_if_without_lldb}
- (targets ${name}.output.corrected)
- (deps ${name}.exe)
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
-
-(rule
  (alias runtest-dwarf)
- ${enabled_if}
+ ${enabled_if_with_lldb}
  (deps ${name}.output ${name}.output.corrected)
  (action (diff ${name}.output ${name}.output.corrected)))
 |};
@@ -95,21 +103,10 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (deps ${name}.exe ${name}.py ${name}.ml lldb_test_utils.py)
  (action
   (run %{env:OXCAML_LLDB=} --batch -o "command script import ${name}.py")))
-
-(rule
- (alias runtest-dwarf)
- ${enabled_if_without_lldb}
- (action
-  (progn
-   (echo
-    "ERROR: OXCAML_LLDB environment variable not set.\n\
-DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
-the path of your custom LLDB binary.\n\
-Example: export OXCAML_LLDB=/path/to/custom/lldb")
-   (bash "exit 1"))))
 |};
     Buffer.output_buffer Out_channel.stdout buf
   in
+  print_missing_lldb_error ();
   (* Generate tests - add more tests here as needed *)
   print_dwarf_test "test_basic_dwarf";
   print_dwarf_test "test_unboxed_dwarf";
