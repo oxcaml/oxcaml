@@ -16,7 +16,7 @@ module Wrapper : sig
 end
 
 (* A signature with a module member and a module type member, so that an
-   ascription against it from another unit pairs members across the unit
+   annotation against it from another unit pairs members across the unit
    boundary. *)
 module type Container = sig
   module type Local = S
