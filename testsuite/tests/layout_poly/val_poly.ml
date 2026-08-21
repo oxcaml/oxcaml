@@ -227,6 +227,395 @@ Error: Signature mismatch:
        which is not supported yet.
 |}]
 
+module F3' (M : sig
+  val f : 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is value_or_null
+         because of the definition of f at line 4, characters 2-39.
+       But the layout of 'a must be a sublayout of value
+         because of the definition of f at line 2, characters 2-18.
+|}]
+
+(* instantiation to [value] *)
+module F4 (M : sig
+  val f : layout_ x. ('a : x separable non_null). 'a -> 'a
+end) : sig
+  val f : 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'a end
+       is not included in
+         sig val f : 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a -> 'a
+       is not included in
+         val f : 'a -> 'a
+       the first has 1 more layout parameter that is not used,
+       which is not supported yet.
+|}]
+
+module F4' (M : sig
+  val f : 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x separable non_null). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The kind of 'a is value
+         because of the definition of f at line 4, characters 2-58.
+       But the kind of 'a must be a subkind of value
+         because of the definition of f at line 2, characters 2-18.
+|}]
+
+(* instantiation to [bits64] *)
+module F5 (M : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end) : sig
+  val f : ('a : bits64). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'a end
+       is not included in
+         sig val f : ('a : bits64). 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a -> 'a
+       is not included in
+         val f : ('a : bits64). 'a -> 'a
+       the first has 1 more layout parameter that is not used,
+       which is not supported yet.
+|}]
+
+module F5' (M : sig
+  val f : ('a : bits64). 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : ('a : bits64). 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : ('a : bits64). 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The kind of 'a is bits64
+         because of the definition of f at line 4, characters 2-39.
+       But the kind of 'a must be a subkind of bits64
+         because of the definition of f at line 2, characters 2-33.
+|}]
+
+(* instantiation to partially known product *)
+module F6 (M : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : bits64 & x). 'a -> 'a
+end = M
+[%%expect{|
+Line 4, characters 27-37:
+4 |   val f : layout_ x. ('a : bits64 & x). 'a -> 'a
+                               ^^^^^^^^^^
+Error: Abstract kinds are not yet supported in products.
+|}]
+
+module F6' (M : sig
+  val f : layout_ x. ('a : bits64 & x). 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect{|
+Line 2, characters 27-37:
+2 |   val f : layout_ x. ('a : bits64 & x). 'a -> 'a
+                               ^^^^^^^^^^
+Error: Abstract kinds are not yet supported in products.
+|}]
+
+(* [any]-bounded variables can instead quantify over all layouts *)
+module F_any (M : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end) : sig
+  val f : ('a : any). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'a end
+       is not included in
+         sig val f : ('a : any). 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a -> 'a
+       is not included in
+         val f : ('a : any). 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is any
+         because of the definition of f at line 4, characters 2-30.
+       But the layout of 'a must be a value layout
+         because of the definition of f at line 2, characters 2-39.
+|}]
+
+module F_any' (M : sig
+  val f : ('a : any). 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : ('a : any). 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : ('a : any). 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       the second has 1 more layout parameter that is not used,
+       which is not supported yet.
+|}]
+
+module F7 (M : sig
+  val f : layout_ x. 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : layout_ l. 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : layout_ l. 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is value_or_null
+         because of the definition of f at line 4, characters 2-39.
+       But the layout of 'a must be a sublayout of value
+         because of the definition of f at line 2, characters 2-29.
+|}];;
+
+module F7' (M : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end) : sig
+  val f : layout_ x. 'a -> 'a
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'a end
+       is not included in
+         sig val f : layout_ l. 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a -> 'a
+       is not included in
+         val f : layout_ l. 'a -> 'a
+       The layout parameter at position 1 in the first
+       is instantiated with layout "value",
+       which is not supported yet.
+|}];;
+
+module F8 (M : sig
+  val f : layout_ y. ('a : any). 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : layout_ l. ('a : any). 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : layout_ l. ('a : any). 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The layout parameter at position 1 in the first
+       is instantiated with an unconstrained layout variable,
+       which is not supported yet.
+|}];;
+
+module F8' (M : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end) : sig
+  val f : layout_ y. 'a -> 'a
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'a end
+       is not included in
+         sig val f : layout_ l. 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a -> 'a
+       is not included in
+         val f : layout_ l. 'a -> 'a
+       The layout parameter at position 1 in the first
+       is instantiated with layout "value",
+       which is not supported yet.
+|}];;
+
+(* Examples with weak sort variables *)
+
+module M1 : sig
+  val poly_ f : 'a -> 'a
+end = struct
+  let f x = x
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f x = x
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       the second has 1 more layout parameter that is not used,
+       which is not supported yet.
+|}]
+
+module M2 : sig
+  val poly_ f : 'a -> 'b -> 'a
+end = struct
+  let f x y = x
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f x y = x
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'b -> 'a end
+       Values do not match:
+         val f : 'a -> 'b -> 'a
+       is not included in
+         val poly_ f : 'a -> 'b -> 'a
+       the second has 2 more layout parameters that are not used,
+       which is not supported yet.
+|}]
+
+module M3 : sig
+  val poly_ f : 'a -> 'b -> 'c -> #('a * 'b * 'c)
+end = struct
+  let f x y z = #(x, y, z)
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f x y z = #(x, y, z)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
+       is not included in
+         sig val poly_ f : 'a -> 'b -> 'c -> #('a * 'b * 'c) end
+       Values do not match:
+         val f : 'a -> 'b -> 'c -> #('a * 'b * 'c)
+       is not included in
+         val poly_ f : 'a -> 'b -> 'c -> #('a * 'b * 'c)
+       the second has 3 more layout parameters that are not used,
+       which is not supported yet.
+|}]
+
+(* Both functions are polymorphic over the number of sort variables,
+   but one only has it in the argument type, with a weak one in the result. *)
+module N : sig
+  val f : layout_ x. ('a : x). 'a -> 'a -> 'a
+end = struct
+  external[@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
+  let poly_ f x y = id x
+end
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   external[@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
+5 |   let poly_ f x y = id x
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
+           val poly_ f : 'a -> 'b -> 'a
+         end
+       is not included in
+         sig val poly_ f : 'a -> 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a -> 'b -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a -> 'a
+       the first has 1 more layout parameter that is not used,
+       which is not supported yet.
+|}]
+
 (* Ordering: both use first var on both sides - same position, should succeed *)
 (* CR-soon zqian: same issue; should pass with coercion. *)
 module FO1 (M : sig
@@ -682,3 +1071,393 @@ Error: Abstract kinds are not yet supported in products.
  *       layout_ l. ('a : value & l) 'b. 'a -> 'b -> #('a * 'b)
  *   end
  * |}] *)
+
+(** Subsumption checks with [layout_] quantifiers and [poly_] items **)
+
+(* one used layout variable *)
+
+module F (M : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end) : sig
+  val poly_ f : 'a -> 'a
+end = M
+[%%expect {|
+module F :
+  functor (M : sig val poly_ f : 'a -> 'a end) ->
+    sig val poly_ f : 'a -> 'a end
+|}];;
+
+(* fails: [poly_] only quantifies over [value]-like layouts ("legacy sorts") *)
+module F (M : sig
+  val poly_ f : 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is '_representable_layout_22
+         because of the definition of f at line 4, characters 2-39.
+       But the layout of 'a must be a sublayout of
+           '_representable_layout_22 separable non_null
+         because of the definition of f at line 2, characters 2-24.
+|}];;
+
+(* From this point onwards, we constrain types with quantified [layout_]s
+   to be [value]-like ([separable non_null]), like [poly_]. *)
+
+(* one used -- both ways succeed *)
+
+module F (M : sig
+  val f : layout_ x. ('a : x separable non_null). 'a -> 'a
+end) : sig
+  val poly_ f : 'a -> 'a
+end = M
+[%%expect {|
+module F :
+  functor (M : sig val poly_ f : 'a -> 'a end) ->
+    sig val poly_ f : 'a -> 'a end
+|}];;
+
+module F (M : sig
+  val poly_ f : 'a -> 'a
+end) : sig
+  val f : layout_ x. ('a : x separable non_null). 'a -> 'a
+end = M
+[%%expect {|
+module F :
+  functor (M : sig val poly_ f : 'a -> 'a end) ->
+    sig val poly_ f : 'a -> 'a end
+|}];;
+
+(* two used -- both ways succeed *)
+
+module F (M : sig
+  val f : layout_ x y. ('a : x separable non_null) ('b : y separable non_null). 'a -> 'b
+end) : sig
+  val poly_ f : 'a -> 'b
+end = M
+[%%expect {|
+module F :
+  functor (M : sig val poly_ f : 'a -> 'b end) ->
+    sig val poly_ f : 'a -> 'b end
+|}];;
+
+module F (M : sig
+  val poly_ f : 'a -> 'b
+end) : sig
+  val f : layout_ x y. ('a : x separable non_null) ('b : y separable non_null). 'a -> 'b
+end = M
+[%%expect {|
+module F :
+  functor (M : sig val poly_ f : 'a -> 'b end) ->
+    sig val poly_ f : 'a -> 'b end
+|}];;
+
+(* two instantiated -- instantiation succeeds *)
+
+module F (M : sig
+  val f : ('a : float64) ('b : bits64). 'a -> 'b
+end) : sig
+  val poly_ f : 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : ('a : float64) ('b : bits64). 'a -> 'b end
+       is not included in
+         sig val poly_ f : 'a -> 'b end
+       Values do not match:
+         val f : ('a : float64) ('b : bits64). 'a -> 'b
+       is not included in
+         val poly_ f : 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'c -> 'd"
+       The kind of 'a is float64
+         because of the definition of f at line 4, characters 2-24.
+       But the kind of 'a must be a subkind of float64
+         because of the definition of f at line 2, characters 2-48.
+|}];;
+
+module F (M : sig
+  val poly_ f : 'a -> 'b
+end) : sig
+  val f : ('a : float64) ('b : bits64). 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'b end
+       is not included in
+         sig val f : ('a : float64) ('b : bits64). 'a -> 'b end
+       Values do not match:
+         val poly_ f : 'a -> 'b
+       is not included in
+         val f : ('a : float64) ('b : bits64). 'a -> 'b
+       the first has 2 more layout parameters that are not used,
+       which is not supported yet.
+|}];;
+
+(* two instantiated to default ([value]) -- instantiation succeeds *)
+
+module F (M : sig
+  val f : 'a -> 'b
+end) : sig
+  val poly_ f : 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'b end
+       is not included in
+         sig val poly_ f : 'a -> 'b end
+       Values do not match:
+         val f : 'a -> 'b
+       is not included in
+         val poly_ f : 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'c -> 'd"
+       The kind of 'a is value
+         because of the definition of f at line 4, characters 2-24.
+       But the kind of 'a must be a subkind of value
+         because of the definition of f at line 2, characters 2-18.
+|}];;
+
+module F (M : sig
+  val poly_ f : 'a -> 'b
+end) : sig
+  val f : 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'b end
+       is not included in
+         sig val f : 'a -> 'b end
+       Values do not match:
+         val poly_ f : 'a -> 'b
+       is not included in
+         val f : 'a -> 'b
+       the first has 2 more layout parameters that are not used,
+       which is not supported yet.
+|}];;
+
+(* one used, one instantiated -- instantiation succeeds *)
+
+module F (M : sig
+  val f : layout_ x. ('a : x separable non_null) ('b : bits64). 'a -> 'b
+end) : sig
+  val poly_ f : 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : ('b : bits64). 'a -> 'b end
+       is not included in
+         sig val poly_ f : 'a -> 'b end
+       Values do not match:
+         val poly_ f : ('b : bits64). 'a -> 'b
+       is not included in
+         val poly_ f : 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'a -> 'c"
+       The kind of 'a is bits64
+         because of the definition of f at line 4, characters 2-24.
+       But the kind of 'a must be a subkind of bits64
+         because of the definition of f at line 2, characters 2-72.
+|}];;
+
+module F (M : sig
+  val poly_ f : 'a -> 'b
+end) : sig
+  val f : layout_ x. ('a : x separable non_null) ('b : bits64). 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'b end
+       is not included in
+         sig val poly_ f : ('b : bits64). 'a -> 'b end
+       Values do not match:
+         val poly_ f : 'a -> 'b
+       is not included in
+         val poly_ f : ('b : bits64). 'a -> 'b
+       the first has 1 more layout parameter that is not used,
+       which is not supported yet.
+|}];;
+
+(* one used, one unused, one instantiated -- instantiation succeeds *)
+
+module F (M : sig
+  val f : layout_ x y. ('a : x separable non_null) ('b : bits64). 'a -> 'b
+end) : sig
+  val poly_ f : 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : layout_ l l0. ('a : l) ('b : bits64). 'a -> 'b end
+       is not included in
+         sig val poly_ f : 'a -> 'b end
+       Values do not match:
+         val f : layout_ l l0. ('a : l) ('b : bits64). 'a -> 'b
+       is not included in
+         val poly_ f : 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'a -> 'c"
+       The kind of 'a is bits64
+         because of the definition of f at line 4, characters 2-24.
+       But the kind of 'a must be a subkind of bits64
+         because of the definition of f at line 2, characters 2-74.
+|}];;
+
+module F (M : sig
+  val poly_ f : 'a -> 'b
+end) : sig
+  val f : layout_ x y. ('a : x separable non_null) ('b : bits64). 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'b end
+       is not included in
+         sig val f : layout_ l l0. ('a : l) ('b : bits64). 'a -> 'b end
+       Values do not match:
+         val poly_ f : 'a -> 'b
+       is not included in
+         val f : layout_ l l0. ('a : l) ('b : bits64). 'a -> 'b
+       The layout parameter at position 2 in the first
+       is instantiated with layout "bits64",
+       which is not supported yet.
+|}];;
+
+(* one unused, one used, one instantiated -- instantiation succeeds *)
+
+module F (M : sig
+  val f : layout_ x y. ('a : bits64) ('b : x separable non_null). 'a -> 'b
+end) : sig
+  val poly_ f : 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : layout_ l l0. ('a : bits64) ('b : l). 'a -> 'b end
+       is not included in
+         sig val poly_ f : 'a -> 'b end
+       Values do not match:
+         val f : layout_ l l0. ('a : bits64) ('b : l). 'a -> 'b
+       is not included in
+         val poly_ f : 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'c -> 'd"
+       The kind of 'a is bits64
+         because of the definition of f at line 4, characters 2-24.
+       But the kind of 'a must be a subkind of bits64
+         because of the definition of f at line 2, characters 2-74.
+|}];;
+
+module F (M : sig
+  val poly_ f : 'a -> 'b
+end) : sig
+  val f : layout_ x y. ('a : bits64) ('b : x separable non_null). 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'b end
+       is not included in
+         sig val f : layout_ l l0. ('a : bits64) ('b : l). 'a -> 'b end
+       Values do not match:
+         val poly_ f : 'a -> 'b
+       is not included in
+         val f : layout_ l l0. ('a : bits64) ('b : l). 'a -> 'b
+       The layout parameter at position 1 in the first
+       is instantiated with layout "bits64",
+       which is not supported yet.
+|}];;
+
+(* two unused, two instantiated -- instantiation succeeds *)
+
+module F (M : sig
+  val f : layout_ x y. ('a : float64) ('b : bits64). 'a -> 'b
+end) : sig
+  val poly_ f : 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : layout_ l l0. ('a : float64) ('b : bits64). 'a -> 'b end
+       is not included in
+         sig val poly_ f : 'a -> 'b end
+       Values do not match:
+         val f : layout_ l l0. ('a : float64) ('b : bits64). 'a -> 'b
+       is not included in
+         val poly_ f : 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'c -> 'd"
+       The kind of 'a is float64
+         because of the definition of f at line 4, characters 2-24.
+       But the kind of 'a must be a subkind of float64
+         because of the definition of f at line 2, characters 2-61.
+|}];;
+
+module F (M : sig
+  val poly_ f : 'a -> 'b
+end) : sig
+  val f : layout_ x y. ('a : float64) ('b : bits64). 'a -> 'b
+end = M
+[%%expect {|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'b end
+       is not included in
+         sig val f : layout_ l l0. ('a : float64) ('b : bits64). 'a -> 'b end
+       Values do not match:
+         val poly_ f : 'a -> 'b
+       is not included in
+         val f : layout_ l l0. ('a : float64) ('b : bits64). 'a -> 'b
+       The layout parameter at position 1 in the first
+       is instantiated with layout "float64",
+       which is not supported yet.
+|}];;
