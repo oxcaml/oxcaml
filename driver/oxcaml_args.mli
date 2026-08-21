@@ -70,6 +70,8 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation_float : unit -> unit
   val cfg_value_propagation_flow : unit -> unit
   val no_cfg_value_propagation_flow : unit -> unit
+  val cfg_copy_propagation : unit -> unit
+  val no_cfg_copy_propagation : unit -> unit
   val experimental_optimizations : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
