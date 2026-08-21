@@ -5,6 +5,12 @@ module Array = ArrayLabels
 module DLL = Doubly_linked_list
 module Subst = Regalloc_substitution
 
+(* Maximum allowed distance between the indices of the write and of the read
+   (the bound is strict, i.e. with a value of [5] the actual distance can be at
+   most [4]). It is a parameter only to make testing / benchmarking easy. *)
+let max_distance : int Lazy.t =
+  Regalloc_utils.int_of_param ~default:5 "COPY_PROPAGATION_MAX_DISTANCE"
+
 type instr =
   | Basic of Cfg.basic Cfg.instruction
   | Terminator of Cfg.terminator Cfg.instruction
@@ -110,10 +116,11 @@ let compute_subst :
                linscan and greedy, while spills and reloads change by less
                than 1%. *)
             (* CR-someday xclerc for xclerc: re-run benchmarks with different
-               heuristics (the current one is OK for both linscan and greedy,
-               but it looks like we could be a bit more aggressive in terms of
-               distance for greedy - maybe even more once the split part
-               of greedy is implemented). *)
+               heuristics, e.g. by setting the COPY_PROPAGATION_MAX_DISTANCE
+               parameter (the current default is OK for both linscan and
+               greedy, but it looks like we could be a bit more aggressive in
+               terms of distance for greedy - maybe even more once the split
+               part of greedy is implemented). *)
             (* With a single read and a single write, the two uses are
                at `min_index` and `max_index`; requiring the write to be
                strictly below `max_index` hence means that the write precedes
@@ -122,7 +129,7 @@ let compute_subst :
                and can thus not be rewritten to read the source directly. *)
             if
               reads = 1 && write_index < max_index
-              && max_index - min_index < 5
+              && max_index - min_index < Lazy.force max_distance
               && Reg.is_unknown arg.(0)
               && Reg.is_unknown res.(0)
               && (not (Reg.same arg.(0) res.(0)))
