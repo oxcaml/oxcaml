@@ -35,7 +35,7 @@ let sample_facts () =
     { checks =
         [ { expectation = Named (Def (uid "Unit"), uid "Expected");
             implementation = Uid (uid "Implementation");
-            kind = Ascription;
+            kind = Annotation;
             site = span ~ghost:false ~file:"site.ml" ~line:3
           };
           { expectation = Named (deep_context, uid "Origin");
@@ -101,7 +101,7 @@ let other_facts () =
     { checks =
         [ { expectation = Named (Def (uid "Other"), uid "Other_S");
             implementation = Uid (uid "Other_impl");
-            kind = Ascription;
+            kind = Annotation;
             site = Location.none
           }
         ];
@@ -123,7 +123,7 @@ let index_of_facts ~facts ~present : Index_format.index =
     root_directory = None;
     related_uids = Index_format.Uid_map.empty ();
     module_facts =
-      if present then Some (Index_format.inline_module_facts facts) else None
+      (if present then Some (Index_format.inline_module_facts facts) else None)
   }
 
 let facts_of_index (index : Index_format.index) =

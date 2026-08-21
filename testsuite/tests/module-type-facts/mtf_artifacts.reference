@@ -14,11 +14,11 @@ cmsi = cmti: true
 == facts of a unit whose expectations come from a .cmi
 counts: checks 5 deps 5 equalities 1 omissions 0
 check argument A : Mtf_aux.S
-check ascription M : Mtf_aux.S
-check ascription Container.Member : Mtf_aux.S
-check ascription Container : Mtf_aux.Container
-check ascription Container.Member : <Mtf_aux.Container.Member>
-== an ascription against another unit's signature is no pair
+check annotation M : Mtf_aux.S
+check annotation Container.Member : Mtf_aux.S
+check annotation Container : Mtf_aux.Container
+check annotation Container.Member : <Mtf_aux.Container.Member>
+== an annotation against another unit's signature is no pair
 mtf_aux, which has an .mli: interface checks 5, interface pairs 4
 mtf_client, which has none: interface checks 0, interface pairs 0
 == the parameter expectation of a functor loaded from a .cmi
