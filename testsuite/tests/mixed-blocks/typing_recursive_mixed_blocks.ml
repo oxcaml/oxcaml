@@ -112,3 +112,11 @@ let rec good_block = let _ = A { cstr = good_block; flt = #4.0 } in
 [%%expect {|
 val good_block : cstr = A {cstr = <cycle>; flt = <abstr>}
 |}];;
+
+(* OK: a nested recursive mixed block *)
+type n = { flt : float#; n : n option }
+let rec n = let rec inner = { flt = #0.; n = Some n } in inner;;
+[%%expect {|
+type n = { flt : float#; n : n option; }
+val n : n = {flt = <abstr>; n = Some <cycle>}
+|}];;
