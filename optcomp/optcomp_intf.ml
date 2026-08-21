@@ -37,7 +37,11 @@ type emit = Compile_common.info -> unit
 
 (** Rebuild a reaped compilation unit from its reaped Flambda data. *)
 type compile_from_reaped_flambda =
-  keep_symbol_tables:bool -> cmr_file:string -> Compile_common.info -> unit
+  keep_symbol_tables:bool ->
+  ltosol_file:string ->
+  cmr_file:string ->
+  Compile_common.info ->
+  unit
 
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular

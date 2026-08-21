@@ -11,7 +11,16 @@
  file-exists;
 
  compile_only = "false";
- flags = "-reaper-rebuild cmr_creation_and_rebuild.cmr";
+ flags = "-reaper-solve cmr_creation_and_rebuild.cmr";
+ last_flags = "-o cmr_creation_and_rebuild.ltosol";
+ all_modules = "";
+ ocamlopt.opt;
+
+ file = "cmr_creation_and_rebuild.ltosol";
+ file-exists;
+
+ flags = "-reaper-rebuild cmr_creation_and_rebuild.cmr cmr_creation_and_rebuild.ltosol";
+ last_flags = "";
  all_modules = "";
  ocamlopt.opt;
 
