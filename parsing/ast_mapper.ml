@@ -1039,7 +1039,27 @@ let default_mapper =
          { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc });
 
     modes = (fun this m ->
-      List.map (map_loc this) m);
+      let map_bound_elem { elem_morph; elem_var; elem_mod } =
+        { elem_morph = Option.map (map_loc this) elem_morph;
+          elem_var = map_loc this elem_var;
+          elem_mod = List.map (map_loc this) elem_mod
+        }
+      in
+      let map_bound { bound_vars; bound_const } =
+        { bound_vars = List.map map_bound_elem bound_vars;
+          bound_const = List.map (map_loc this) bound_const
+        }
+      in
+      let map_mode : mode -> mode = function
+        | Mode consts -> Mode (List.map (map_loc this) consts)
+        | Mode_var v -> Mode_var (map_loc this v)
+        | Mode_bounds { upper; lower } ->
+          Mode_bounds { upper = map_bound upper; lower = map_bound lower }
+      in
+      List.map
+        (fun ({ txt; loc } : mode Location.loc) ->
+          { txt = map_mode txt; loc = this.location this loc })
+        m);
 
     modalities = (fun this m ->
       List.map (map_loc this) m);

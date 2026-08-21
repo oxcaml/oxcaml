@@ -1147,7 +1147,7 @@ let bad (x @ aliased) = use_unique (M_ref_no_mod.alloc x)
 Line 1, characters 35-57:
 1 | let bad (x @ aliased) = use_unique (M_ref_no_mod.alloc x)
                                        ^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is aliased but is expected to be unique.
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (* an [@@ contended] modality requires [mod contended] on the argument's
@@ -1207,7 +1207,7 @@ let bad2 (x @ contended) = use_uncontended (M_cbox_no_mod.cbox x)
 Line 1, characters 43-65:
 1 | let bad2 (x @ contended) = use_uncontended (M_cbox_no_mod.cbox x)
                                                ^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is contended but is expected to be uncontended.
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* an [@@ portable] modality requires [mod portable] on the result's lower
@@ -1247,7 +1247,7 @@ let bad3 (b @ nonportable) = use_portable (M_pget_no_mod.pget b)
 Line 1, characters 42-64:
 1 | let bad3 (b @ nonportable) = use_portable (M_pget_no_mod.pget b)
                                               ^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is nonportable but is expected to be portable.
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* Invalid signatures *)
@@ -1258,9 +1258,9 @@ module type Bad = sig
   val bad : 'a @ [< close('m)] -> 'a @ [> 'm]
 end
 [%%expect{|
-Line 1006, characters 20-25:
-1006 |   val bad : 'a @ [< close('m)] -> 'a @ [> 'm]
-                           ^^^^^
+Line 2, characters 20-25:
+2 |   val bad : 'a @ [< close('m)] -> 'a @ [> 'm]
+                        ^^^^^
 Error: The mode morphism "close" may only appear in a lower bound.
 |}]
 
@@ -1270,9 +1270,9 @@ module type Bad = sig
   val bad : 'a @ [< dual('m)] -> 'a @ [> 'm]
 end
 [%%expect{|
-Line 1018, characters 20-24:
-1018 |   val bad : 'a @ [< dual('m)] -> 'a @ [> 'm]
-                           ^^^^
+Line 2, characters 20-24:
+2 |   val bad : 'a @ [< dual('m)] -> 'a @ [> 'm]
+                        ^^^^
 Error: Unrecognized mode morphism "dual".
 |}]
 
@@ -1282,9 +1282,9 @@ module type Bad = sig
   val bad : 'a @ [< 'm mod portable nonportable] -> 'a @ [> 'm]
 end
 [%%expect{|
-Line 1030, characters 36-47:
-1030 |   val bad : 'a @ [< 'm mod portable nonportable] -> 'a @ [> 'm]
-                                           ^^^^^^^^^^^
+Line 2, characters 36-47:
+2 |   val bad : 'a @ [< 'm mod portable nonportable] -> 'a @ [> 'm]
+                                        ^^^^^^^^^^^
 Error: The portability axis has already been specified.
 |}]
 
@@ -1307,9 +1307,9 @@ module type Bad = sig
   val bad : 'a @ 'm 'n -> unit @ 'k
 end
 [%%expect{|
-Line 1055, characters 17-19:
-1055 |   val bad : 'a @ 'm 'n -> unit @ 'k
-                        ^^
+Line 2, characters 17-19:
+2 |   val bad : 'a @ 'm 'n -> unit @ 'k
+                     ^^
 Error: A mode annotation must be a single mode variable or a single bounds annotation.
 |}]
 
@@ -1329,9 +1329,9 @@ module type Bad = sig
   val bad : 'a @ [< 'm & portable nonportable] -> 'a @ [> 'm]
 end
 [%%expect{|
-Line 1077, characters 34-45:
-1077 |   val bad : 'a @ [< 'm & portable nonportable] -> 'a @ [> 'm]
-                                         ^^^^^^^^^^^
+Line 2, characters 34-45:
+2 |   val bad : 'a @ [< 'm & portable nonportable] -> 'a @ [> 'm]
+                                      ^^^^^^^^^^^
 Error: The portability axis has already been specified.
 |}]
 
