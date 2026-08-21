@@ -1,17 +1,17 @@
-let $camlData_flow_exception_bug__immstring_12 = "data_flow_exception_bug.ml"
+let $camlData_flow_exception_bug__immstring12 = "data_flow_exception_bug.ml"
 in
-let $camlData_flow_exception_bug__const_block_14 =
-  Block 0 ($camlData_flow_exception_bug__immstring_12, 9, 19)
+let $camlData_flow_exception_bug__const_block14 =
+  Block 0 ($camlData_flow_exception_bug__immstring12, 9, 19)
 in
-let $camlData_flow_exception_bug__Pmakeblock_17 =
+let $camlData_flow_exception_bug__Pmakeblock17 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlData_flow_exception_bug__const_block_14)
+           $camlData_flow_exception_bug__const_block14)
 in
 let code do_stuff_0 deleted in
 let code stuff_1 deleted in
 let code loopify(never) size(3) newer_version_of(do_stuff_0)
       do_stuff_0_1 (env) my_closure &my_alloc_region my_depth -> k * k1 =
-  cont k1 pop(regular k1) ($camlData_flow_exception_bug__Pmakeblock_17)
+  cont k1 pop(regular k1) ($camlData_flow_exception_bug__Pmakeblock17)
 in
 let $camlData_flow_exception_bug__do_stuff_2 =
   closure do_stuff_0_1 @do_stuff &toplevel.alloc_region

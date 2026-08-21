@@ -1,17 +1,17 @@
-let $camlValue_slot_c__immstring_130 = "value_slot_c.ml" in
-let $camlValue_slot_c__const_block_132 =
-  Block 0 ($camlValue_slot_c__immstring_130, 24, 2)
+let $camlValue_slot_c__immstring130 = "value_slot_c.ml" in
+let $camlValue_slot_c__const_block132 =
+  Block 0 ($camlValue_slot_c__immstring130, 24, 2)
 in
-let $camlValue_slot_c__Pmakeblock_135 =
+let $camlValue_slot_c__Pmakeblock135 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlValue_slot_c__const_block_132)
+           $camlValue_slot_c__const_block132)
 in
-let $camlValue_slot_c__const_block_143 =
-  Block 0 ($camlValue_slot_c__immstring_130, 25, 2)
+let $camlValue_slot_c__const_block143 =
+  Block 0 ($camlValue_slot_c__immstring130, 25, 2)
 in
-let $camlValue_slot_c__Pmakeblock_146 =
+let $camlValue_slot_c__Pmakeblock146 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlValue_slot_c__const_block_143)
+           $camlValue_slot_c__const_block143)
 in
 let code f_3 deleted in
 let code loopify(never) size(59) newer_version_of(f_3)
@@ -41,14 +41,14 @@ let code loopify(never) size(59) newer_version_of(f_3)
                  let prim_1 = %phys_eq (x, 1) in
                  switch prim_1
                    | 0 ->
-                     k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_135)
+                     k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock135)
                    | 1 -> k2)
               where k2 =
                 let Pfield = %block_load.[`1`] (`*match*`) in
                 let prim = %phys_eq (Pfield, 3) in
                 switch prim
                   | 0 ->
-                    k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_146)
+                    k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock146)
                   | 1 -> k (0)))
 in
 let $camlValue_slot_c__f_4 = closure f_3_1 @f &toplevel.alloc_region in

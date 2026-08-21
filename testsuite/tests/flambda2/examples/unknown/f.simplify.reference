@@ -1,6 +1,6 @@
-let $camlF__string_30 = "index out of bounds" in
-let $camlF__block_32 =
-  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlF__string_30)
+let $camlF__string30 = "index out of bounds" in
+let $camlF__block32 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlF__string30)
 in
 let code maxson_0 deleted in
 let code loopify(never) size(82) newer_version_of(maxson_0)
@@ -42,9 +42,9 @@ let code loopify(never) size(82) newer_version_of(maxson_0)
                        | 0 -> k (0)
                        | 1 -> k (int_add_2))
               where k3 =
-                cont k1 pop(regular k1) ($camlF__block_32))
+                cont k1 pop(regular k1) ($camlF__block32))
          where k2 =
-           cont k1 pop(regular k1) ($camlF__block_32))
+           cont k1 pop(regular k1) ($camlF__block32))
 in
 let $camlF__maxson_1 = closure maxson_0_1 @maxson &toplevel.alloc_region in
 let $camlF = Block 0 ($camlF__maxson_1) in

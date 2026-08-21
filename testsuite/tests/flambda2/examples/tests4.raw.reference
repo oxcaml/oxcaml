@@ -1,5 +1,5 @@
-(let $camlTests4__float_16 = 0x0p+0 in
- let $camlTests4__float_22 = 0x1.8p+1 in
+(let $camlTests4__float16 = 0x0p+0 in
+ let $camlTests4__float22 = 0x1.8p+1 in
  let code size(54)
        pr2162_2_first_0 (z : imm tagged, x : imm tagged, y : float boxed)
          my_closure &my_alloc_region my_depth
@@ -15,13 +15,13 @@
      where k6 =
        cont k5
      where k5 =
-       let prim = %unbox_num.`float` ($camlTests4__float_16) in
+       let prim = %unbox_num.`float` ($camlTests4__float16) in
        let prim_1 = %unbox_num.`float` (y) in
        let prim_2 = %bfloat_arith.add (prim_1, prim) in
        let b = %box_num.`float`.my_alloc_region (prim_2) in
        cont k3 (x, b)
      where k4 =
-       let prim = %unbox_num.`float` ($camlTests4__float_22) in
+       let prim = %unbox_num.`float` ($camlTests4__float22) in
        let prim_1 = %unbox_num.`float` (y) in
        let prim_2 = %bfloat_arith.mul (prim_1, prim) in
        let b = %box_num.`float`.my_alloc_region (prim_2) in
@@ -52,13 +52,13 @@
      where k6 =
        cont k5
      where k5 =
-       let prim = %unbox_num.`float` ($camlTests4__float_16) in
+       let prim = %unbox_num.`float` ($camlTests4__float16) in
        let prim_1 = %unbox_num.`float` (y) in
        let prim_2 = %bfloat_arith.add (prim_1, prim) in
        let b = %box_num.`float`.my_alloc_region (prim_2) in
        cont k3 (x, b)
      where k4 =
-       let prim = %unbox_num.`float` ($camlTests4__float_22) in
+       let prim = %unbox_num.`float` ($camlTests4__float22) in
        let prim_1 = %unbox_num.`float` (y) in
        let prim_2 = %bfloat_arith.mul (prim_1, prim) in
        let b = %box_num.`float`.my_alloc_region (prim_2) in
@@ -89,14 +89,14 @@
      where k6 =
        cont k5
      where k5 =
-       let prim = %unbox_num.`float` ($camlTests4__float_16) in
+       let prim = %unbox_num.`float` ($camlTests4__float16) in
        let prim_1 = %unbox_num.`float` (y) in
        let prim_2 = %bfloat_arith.add (prim_1, prim) in
        let float_add = %box_num.`float`.my_alloc_region (prim_2) in
        let Pmakeblock = %block.[`0`].my_alloc_region (x, float_add) in
        cont k3 (Pmakeblock)
      where k4 =
-       let prim = %unbox_num.`float` ($camlTests4__float_22) in
+       let prim = %unbox_num.`float` ($camlTests4__float22) in
        let prim_1 = %unbox_num.`float` (y) in
        let prim_2 = %bfloat_arith.mul (prim_1, prim) in
        let float_mul = %box_num.`float`.my_alloc_region (prim_2) in
@@ -115,10 +115,10 @@
        let float_sub = %box_num.`float`.my_alloc_region (prim_4) in
        cont k1 (float_sub)
  in
- let $camlTests4__int64_104 = 0L in
- let $camlTests4__int32_110 = 2l in
- let $camlTests4__int64_114 = 3L in
- let $camlTests4__int32_120 = 4l in
+ let $camlTests4__int64104 = 0L in
+ let $camlTests4__int32110 = 2l in
+ let $camlTests4__int64114 = 3L in
+ let $camlTests4__int32120 = 4l in
  let code size(125)
        pr2162_3_as_int64_3
          (z : imm tagged, x : imm tagged, y : int64 boxed, y' : int32 boxed)
@@ -135,21 +135,21 @@
      where k6 =
        cont k5
      where k5 =
-       let prim = %unbox_num.`int64` ($camlTests4__int64_104) in
+       let prim = %unbox_num.`int64` ($camlTests4__int64104) in
        let prim_1 = %unbox_num.`int64` (y) in
        let prim_2 = %int_barith.`int64`.add (prim_1, prim) in
        let int64_add = %box_num.`int64`.my_alloc_region (prim_2) in
        let Pmakeblock =
-         %block.[`0`].my_alloc_region ($camlTests4__int32_110, int64_add)
+         %block.[`0`].my_alloc_region ($camlTests4__int32110, int64_add)
        in
        let Pmakeblock_1 = %block.[`0`].my_alloc_region (x, Pmakeblock) in
        cont k3 (Pmakeblock_1)
      where k4 =
-       let prim = %unbox_num.`int64` ($camlTests4__int64_114) in
+       let prim = %unbox_num.`int64` ($camlTests4__int64114) in
        let prim_1 = %unbox_num.`int64` (y) in
        let prim_2 = %int_barith.`int64`.mul (prim_1, prim) in
        let int64_mul = %box_num.`int64`.my_alloc_region (prim_2) in
-       let prim_3 = %unbox_num.`int32` ($camlTests4__int32_120) in
+       let prim_3 = %unbox_num.`int32` ($camlTests4__int32120) in
        let prim_4 = %unbox_num.`int32` (y') in
        let prim_5 = %int_barith.`int32`.mul (prim_4, prim_3) in
        let int32_mul = %box_num.`int32`.my_alloc_region (prim_5) in

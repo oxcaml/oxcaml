@@ -5,20 +5,20 @@ let code max_3 deleted in
 let code abs_4 deleted in
 let code lnot_5 deleted in
 let code char_hex_6 deleted in
-let $camlTo_hex__immstring_130 = "Digest.to_hex" in
-let $camlTo_hex__immstring_8 = "index out of bounds" in
-let $camlTo_hex__block_151 =
-  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTo_hex__immstring_8)
+let $camlTo_hex__immstring130 = "Digest.to_hex" in
+let $camlTo_hex__immstring8 = "index out of bounds" in
+let $camlTo_hex__block151 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTo_hex__immstring8)
 in
 let code to_hex_7 deleted in
-let $camlTo_hex__immstring_35 = "To_hex.Stdlib.Exit" in
-let $camlTo_hex__immstring_11 = "Pervasives.array_bound_error" in
-let $camlTo_hex__Pmakeblock_180 =
-  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTo_hex__immstring_8)
+let $camlTo_hex__immstring35 = "To_hex.Stdlib.Exit" in
+let $camlTo_hex__immstring11 = "Pervasives.array_bound_error" in
+let $camlTo_hex__Pmakeblock180 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlTo_hex__immstring8)
 in
 apply ccall
   ($`*extern*`.caml_register_named_value : val * val -> val)
-    ($camlTo_hex__immstring_11, $camlTo_hex__Pmakeblock_180)
+    ($camlTo_hex__immstring11, $camlTo_hex__Pmakeblock180)
     -> k1 * error
   where k1 (param) =
     cont k
@@ -53,9 +53,9 @@ apply ccall
     (apply ccall noalloc
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
        where k (Pccall) =
-         let $camlTo_hex__Exit_201 =
+         let $camlTo_hex__Exit201 =
            Block immutable_unique
-           248 ($camlTo_hex__immstring_35, Pccall)
+           248 ($camlTo_hex__immstring35, Pccall)
          in
          let code loopify(never) size(21) newer_version_of(min_2)
                min_2_1 (x : val, y : val)
@@ -120,10 +120,10 @@ apply ccall
          let $camlTo_hex__lnot_13 =
            closure lnot_5_1 @lnot &toplevel.alloc_region
          in
-         let $camlTo_hex__Pmakeblock_256 =
+         let $camlTo_hex__Pmakeblock256 =
            Block 0 ($camlTo_hex__failwith_8,
                     $camlTo_hex__invalid_arg_9,
-                    $camlTo_hex__Exit_201,
+                    $camlTo_hex__Exit201,
                     $`*predef*`.caml_exn_Match_failure,
                     $`*predef*`.caml_exn_Assert_failure,
                     $`*predef*`.caml_exn_Invalid_argument,
@@ -173,7 +173,7 @@ apply ccall
               where k3 =
                 apply direct(invalid_arg_1_1 &my_alloc_region)
                   ($camlTo_hex__invalid_arg_9 : _ -> imm tagged)
-                    ($camlTo_hex__immstring_130)
+                    ($camlTo_hex__immstring130)
                     -> never * k1)
              where k2 (prim : imm) =
                let cse_param = prim in
@@ -264,15 +264,13 @@ apply ccall
                                           | 0 -> k (result)
                                           | 1 -> k2 (for_next_naked)))
                             where k3 =
-                              cont k1
-                                     pop(regular k1)
-                                     ($camlTo_hex__block_151))))
+                              cont k1 pop(regular k1) ($camlTo_hex__block151))))
          in
          let $camlTo_hex__to_hex_15 =
            closure to_hex_7_1 @to_hex &toplevel.alloc_region
          in
          let $camlTo_hex =
-           Block 0 ($camlTo_hex__Pmakeblock_256,
+           Block 0 ($camlTo_hex__Pmakeblock256,
                     $camlTo_hex__char_hex_14,
                     $camlTo_hex__to_hex_15)
          in
