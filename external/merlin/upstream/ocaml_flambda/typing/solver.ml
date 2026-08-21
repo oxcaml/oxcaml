@@ -1133,6 +1133,77 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           C.join obj acc (zap_to_floor_morphvar obj mv ~commit:None))
         mvs a
 
+  module Var_id = struct
+    type t = int
+
+    let equal = Int.equal
+
+    let compare = Int.compare
+
+    let hash (t : t) = Hashtbl.hash t
+
+    let print ppf (t : t) = Fmt.fprintf ppf "modevar#%x" t
+  end
+
+  let get_var_id : type a l r. a C.obj -> (a, l * r) mode -> Var_id.t option =
+   fun _obj m ->
+    match m with
+    | Amodevar (Amorphvar (v, _, _)) -> Some v.id
+    | Amode _ | Amodejoin _ | Amodemeet _ -> None
+
+  type candidate_origin =
+    | Constant
+    | Variable of Var_id.t
+
+  type ('a, 'd) candidate =
+    { origin : candidate_origin;
+      ahint : ('a, 'd) ahint
+    }
+
+  let get_loose_floor_hints : type a r.
+      a C.obj -> (a, allowed * r) mode -> (a, left_only) candidate list =
+   fun obj m ->
+    match m with
+    | Amode (_a, a_hint_lower, _a_hint_upper) ->
+      [ { origin = Constant;
+          ahint = Comp_hint.populate obj (Comp_hint.disallow_right a_hint_lower)
+        } ]
+    | Amodevar (Amorphvar (v, _, _) as mv) ->
+      [ { origin = Variable v.id;
+          ahint = Comp_hint.populate obj (mlower_hint mv)
+        } ]
+    | Amodejoin (_a, a_hint, mvs) ->
+      { origin = Constant; ahint = Comp_hint.populate obj a_hint }
+      :: VarMap.fold
+           (fun _ (Amorphvar (v, _, _) as mv) acc ->
+             { origin = Variable v.id;
+               ahint = Comp_hint.populate obj (mlower_hint mv)
+             }
+             :: acc)
+           mvs []
+
+  let get_loose_ceil_hints : type a l.
+      a C.obj -> (a, l * allowed) mode -> (a, right_only) candidate list =
+   fun obj m ->
+    match m with
+    | Amode (_a, _a_hint_lower, a_hint_upper) ->
+      [ { origin = Constant;
+          ahint = Comp_hint.populate obj (Comp_hint.disallow_left a_hint_upper)
+        } ]
+    | Amodevar (Amorphvar (v, _, _) as mv) ->
+      [ { origin = Variable v.id;
+          ahint = Comp_hint.populate obj (mupper_hint mv)
+        } ]
+    | Amodemeet (_a, a_hint, mvs) ->
+      { origin = Constant; ahint = Comp_hint.populate obj a_hint }
+      :: VarMap.fold
+           (fun _ (Amorphvar (v, _, _) as mv) acc ->
+             { origin = Variable v.id;
+               ahint = Comp_hint.populate obj (mupper_hint mv)
+             }
+             :: acc)
+           mvs []
+
   let to_const_exn obj m =
     let floor = get_floor obj m in
     let ceil = get_ceil obj m in

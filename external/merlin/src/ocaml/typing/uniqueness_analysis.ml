@@ -210,8 +210,6 @@ module Maybe_aliased : sig
     | Read of Unique_barrier.t
     | Write
 
-  val string_of_access : access -> string
-
   (** The type representing a usage that could be either aliased or borrowed *)
 
   (** Extract an arbitrary occurrence from the usage *)
@@ -238,10 +236,6 @@ end = struct
   type access =
     | Read of Unique_barrier.t
     | Write
-
-  let string_of_access = function
-    | Read _ -> "read from"
-    | Write -> "written to"
 
   (** list of occurences together with modes to be forced as borrowed in the
       future if needed. It is a list because of multiple control flows. For
@@ -414,6 +408,32 @@ module Usage : sig
   (** Extract an arbitrary occurrence from a usage *)
   val extract_occurrence : t -> Occurrence.t option
 
+  type action =
+    | Use
+    | Borrow
+    | Read
+    | Write
+
+  type pattern_kind =
+    | Lazy
+    | Array
+    | Constant
+
+  type context =
+    | Direct
+    | In_pattern of pattern_kind
+    | In_closure_that_might_be_called_later
+    | While_being_borrowed
+
+  type view =
+    { action : action;
+      context : context
+    }
+
+  val view : t -> view
+
+  val describe : t -> string
+
   type cannot_force_error =
     { cannot_force : Maybe_unique.cannot_force;
       there : t;  (** The other usage *)
@@ -529,6 +549,73 @@ end = struct
     | Aliased t -> Some (Aliased.extract_occurrence t)
     | Maybe_unique t -> Some (Maybe_unique.extract_occurrence t)
     | Antiquote t -> extract_occurrence t
+
+  type action =
+    | Use
+    | Borrow
+    | Read
+    | Write
+
+  type pattern_kind =
+    | Lazy
+    | Array
+    | Constant
+
+  type context =
+    | Direct
+    | In_pattern of pattern_kind
+    | In_closure_that_might_be_called_later
+    | While_being_borrowed
+
+  type view =
+    { action : action;
+      context : context
+    }
+
+  let action_of_access = function
+    | Maybe_aliased.Read _ -> Read
+    | Maybe_aliased.Write -> Write
+
+  let view_of_aliased_reason = function
+    | Aliased.Forced -> { action = Use; context = Direct }
+    | Aliased.Lazy -> { action = Use; context = In_pattern Lazy }
+    | Aliased.Array -> { action = Use; context = In_pattern Array }
+    | Aliased.Constant -> { action = Use; context = In_pattern Constant }
+    | Aliased.Lifted access ->
+      { action = action_of_access access;
+        context = In_closure_that_might_be_called_later
+      }
+    | Aliased.Lifted_borrowed ->
+      { action = Borrow; context = In_closure_that_might_be_called_later }
+    | Aliased.In_borrowing -> { action = Use; context = While_being_borrowed }
+
+  let view = function
+    | Unused | Maybe_unique _ | Antiquote _ ->
+      { action = Use; context = Direct }
+    | Borrowed _ -> { action = Borrow; context = Direct }
+    | Maybe_aliased t ->
+      { action = action_of_access (Maybe_aliased.extract_access t);
+        context = Direct
+      }
+    | Aliased t -> view_of_aliased_reason (Aliased.reason t)
+
+  let describe t =
+    let { action; context } = view t in
+    let action =
+      match action with
+      | Use -> "used"
+      | Borrow -> "borrowed"
+      | Read -> "read from"
+      | Write -> "written to"
+    in
+    match context with
+    | Direct -> action
+    | In_pattern Lazy -> action ^ " in a lazy pattern"
+    | In_pattern Array -> action ^ " in an array pattern"
+    | In_pattern Constant -> action ^ " in a constant pattern"
+    | In_closure_that_might_be_called_later ->
+      action ^ " in a closure that might be called later"
+    | While_being_borrowed -> action ^ " while being borrowed"
 
   let empty = Unused
 
@@ -2950,24 +3037,7 @@ let check_uniqueness_value_bindings vbs =
 let report_multi_use inner first_is_of_second =
   let { Usage.cannot_force = { occ; axis }; there; order } = inner in
   let here_usage = "used" in
-  let there_usage =
-    match there with
-    | Usage.Borrowed _ -> "borrowed"
-    | Usage.Maybe_aliased t ->
-      Maybe_aliased.string_of_access (Maybe_aliased.extract_access t)
-    | Usage.Aliased t -> (
-      match Aliased.reason t with
-      | Forced -> "used"
-      | Lazy -> "used in a lazy pattern"
-      | Array -> "used in an array pattern"
-      | Constant -> "used in a constant pattern"
-      | Lifted access ->
-        Maybe_aliased.string_of_access access
-        ^ " in a closure that might be called later"
-      | Lifted_borrowed -> "borrowed in a closure that might be called later"
-      | In_borrowing -> "used while being borrowed")
-    | _ -> "used"
-  in
+  let there_usage = Usage.describe there in
   let first, first_usage, second, second_usage, access_order, second_is_occ =
     match order with
     | Seq_before ->

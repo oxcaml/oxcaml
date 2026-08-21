@@ -221,7 +221,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Lpoly_inst -> Lpoly_inst
         | Contained_by c -> Contained_by c
-        | Annotation loc -> Annotation loc
+        | Annotation annotation -> Annotation annotation
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -244,7 +244,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
-        | Annotation loc -> Annotation loc
+        | Annotation annotation -> Annotation annotation
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -273,7 +273,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
-        | Annotation loc -> Annotation loc
+        | Annotation annotation -> Annotation annotation
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -302,7 +302,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
-        | Annotation loc -> Annotation loc
+        | Annotation annotation -> Annotation annotation
     end)
   end
 end
@@ -1552,6 +1552,12 @@ module Lattices_mono = struct
     let compare : type p r1 r2. (p, r1) t -> (p, r2) t -> int =
      fun ax1 ax2 -> Int.compare (ord ax1) (ord ax2)
 
+    type packed = P : ('t, 'r) t -> packed
+
+    let equal_packed (P ax1) (P ax2) = Int.equal (ord ax1) (ord ax2)
+
+    let print_packed ppf (P ax) = print ppf ax
+
     let proj : type p r. (p, r) t -> p -> r =
      fun ax t ->
       match ax with
@@ -1654,6 +1660,12 @@ module Lattices_mono = struct
   end
 
   type packed_obj = Obj : 'a obj -> packed_obj
+
+  let axis_of_obj : type a. a obj -> Axis.packed option =
+   fun obj ->
+    match Axis.to_ obj with
+    | [] -> None
+    | Axis.To (_, ax) :: _ -> Some (Axis.P ax)
 
   let all_objs =
     [ Obj Locality;
@@ -4419,6 +4431,106 @@ end
 
 module C = Lattices_mono
 module S = Solver_mono (Hint_for_solver) (C)
+module Var_id = S.Var_id
+
+module Mode_point = struct
+  type t = P : 'a C.obj * 'a -> t
+end
+
+module Mode_description = struct
+  type atom =
+    | Exact of Mode_point.t
+    | Local_to_parent_region of
+        { displayed : Mode_point.t;
+          semantic : Mode_point.t
+        }
+
+  type t =
+    { first : atom;
+      alternatives : atom list
+    }
+end
+
+let mode_atom obj mode = Mode_description.Exact (Mode_point.P (obj, mode))
+
+let local_to_parent_region obj =
+  Mode_description.Local_to_parent_region
+    { displayed = Mode_point.P (obj, C.Regionality.Local);
+      semantic = Mode_point.P (obj, C.Regionality.Regional)
+    }
+
+let describe_mode : type a.
+    [`Actual | `Expected] -> a C.obj -> a -> Mode_description.t =
+ fun side obj x ->
+  let one first = { Mode_description.first; alternatives = [] } in
+  let alternatives first alternatives =
+    { Mode_description.first; alternatives }
+  in
+  match side, obj, x with
+  | `Actual, Regionality, Regional -> one (local_to_parent_region obj)
+  | `Expected, Contention_op, Shared ->
+    alternatives
+      (mode_atom obj C.Contention.Shared)
+      [mode_atom obj C.Contention.Uncontended]
+  | `Expected, Contention_op, Corrupted ->
+    alternatives
+      (mode_atom obj C.Contention.Corrupted)
+      [mode_atom obj C.Contention.Uncontended]
+  | `Expected, Visibility_op, Read ->
+    alternatives
+      (mode_atom obj C.Visibility.Read)
+      [mode_atom obj C.Visibility.Read_write]
+  | `Expected, Visibility_op, Write ->
+    alternatives
+      (mode_atom obj C.Visibility.Write)
+      [mode_atom obj C.Visibility.Read_write]
+  | `Expected, Regionality, Regional ->
+    alternatives
+      (local_to_parent_region obj)
+      [mode_atom obj C.Regionality.Global]
+  | _ -> one (mode_atom obj x)
+[@@ocaml.warning "-4"]
+
+module Hint_chain = struct
+  module Mode = struct
+    type t = Mode_point.t = P : 'a C.obj * 'a -> t
+
+    let name (P (obj, m) : t) = Fmt.asprintf "%a" (C.print obj) m
+
+    let equal (P (obj1, m1) : t) (P (obj2, m2) : t) =
+      match C.equal_obj obj1 obj2 with
+      | Misc.Is_eq -> C.equal obj1 m1 m2
+      | Misc.Is_not_eq -> false
+
+    let describe (P (obj, m) : t) = describe_mode `Actual obj m
+  end
+
+  type kind =
+    | Morph :
+        { morph : ('l * 'r) Mode_hint.morph;
+          changed_mode : bool
+        }
+        -> kind
+    | Const : ('l * 'r) Mode_hint.const -> kind
+
+  type step =
+    { mode : Mode.t;
+      pinpoint : Hint.pinpoint;
+      kind : kind;
+      axis : C.Axis.packed option
+    }
+
+  type candidate_origin = S.candidate_origin =
+    | Constant
+    | Variable of Var_id.t
+
+  type candidate =
+    { origin : candidate_origin;
+      chain : t
+    }
+
+  and t = step list
+end
 
 let erase_hints () = S.erase_hints ()
 
@@ -4440,7 +4552,23 @@ type 'a comonadic_with = 'a C.comonadic_with =
 
 module Axis = C.Axis
 
+type packed_axis = Axis.packed
+
+type axis_error =
+  { axis : Axis.packed;
+    actual_chain : Hint_chain.t;
+    expected_chain : Hint_chain.t;
+    actual_description : Mode_description.t;
+    expected_description : Mode_description.t;
+    actual_loosening : loosening;
+    expected_loosening : loosening
+  }
+
 type nonrec 'a simple_error = 'a simple_error
+
+type nonrec loosening = loosening =
+  | Loosened
+  | Not_loosened
 
 let print_longident =
   ref (fun _ _ -> assert false : Fmt.formatter -> Longident.t -> unit)
@@ -4490,6 +4618,15 @@ module Report = struct
 
   (** Convert Solver error to report. *)
   module Of_solver = struct
+    type 'a query =
+      | Explain_error of 'a
+      | Explain_bound
+
+    let map_query : type a b. (a -> b) -> a query -> b query =
+     fun f -> function
+      | Explain_error other -> Explain_error (f other)
+      | Explain_bound -> Explain_bound
+
     (** Given a branch of two constant bounds on a single axis, choose the the
         one that's responsible for the branch. *)
     let choose_branch_axis : type a l r.
@@ -4497,30 +4634,36 @@ module Report = struct
         a C.obj ->
         a ->
         a ->
-        other:a ->
+        query:a query ->
         [`First | `Second] =
-     fun b a_obj x y ~other ->
+     fun b a_obj x y ~query ->
       (* CR-someday zqian: in the case where each of [x] and [y] can be
          responsible independently, for not satisfying [~other], we currently
          arbitrarily prioritize `Second. In the future we might want to
          prioritize for better error messages. For example, prioritize the first
          element in a [join]. This requires inspecting the [solver.ml] to ensure
          the ordering in the [join] list is preserved. *)
-      match b with
-      | Meet ->
-        if C.le a_obj other x
-        then begin
-          if C.le a_obj other y then print_bug_stderr ();
-          `Second
-        end
-        else `First
-      | Join ->
-        if C.le a_obj x other
-        then begin
-          if C.le a_obj y other then print_bug_stderr ();
-          `Second
-        end
-        else `First
+      match query with
+      | Explain_error other -> (
+        match b with
+        | Meet ->
+          if C.le a_obj other x
+          then begin
+            if C.le a_obj other y then print_bug_stderr ();
+            `Second
+          end
+          else `First
+        | Join ->
+          if C.le a_obj x other
+          then begin
+            if C.le a_obj y other then print_bug_stderr ();
+            `Second
+          end
+          else `First)
+      | Explain_bound -> (
+        match b with
+        | Meet -> if C.le a_obj x y then `First else `Second
+        | Join -> if C.le a_obj y x then `First else `Second)
 
     type 'd side =
       | Left : left_only side
@@ -4546,25 +4689,28 @@ module Report = struct
         a ->
         (l * r) morph ->
         (b, a, l * r) C.morph ->
-        other:a ->
+        query:a query ->
         (b, l * r) S.ahint ->
         b C.For_hint.responsible_axis ->
         (a, l * r) ahint =
-     fun obj side a morph_hint morph ~other ahint res ->
+     fun obj side a morph_hint morph ~query ahint res ->
       let src = C.src obj morph in
+      let pull_back query =
+        map_query
+          (fun other -> C.apply src (adjoint obj side morph) other)
+          query
+      in
       match res with
       | None_responsible -> a, Irrelevant
       | All_responsible ->
-        let morph' = adjoint obj side morph in
-        let other = C.apply src morph' other in
-        let ahint = hint_all src side ~other ahint in
+        let query = pull_back query in
+        let ahint = hint_all src side ~query ahint in
         let ma = C.apply obj morph (fst ahint) in
         ma, Apply (morph_hint, src, ahint)
       | Axis ax ->
         let b, hint = ahint in
-        let morph' = adjoint obj side morph in
-        let other = C.apply src morph' other in
-        let x, hint = hint_proj src side ax ~other (b, hint) in
+        let query = pull_back query in
+        let x, hint = hint_proj src side ax ~query (b, hint) in
         let b = C.Axis.set ax x b in
         let a = C.apply obj morph b in
         let src = C.proj_obj ax src in
@@ -4574,51 +4720,51 @@ module Report = struct
         t C.obj ->
         (l * r) side ->
         (t, a) Axis.t ->
-        other:t ->
+        query:t query ->
         (t, l * r) S.ahint ->
         (a, l * r) ahint =
-     fun obj side ax ~other (a, hint) ->
+     fun obj side ax ~query (a, hint) ->
       match hint with
       | Apply (morph_hint, morph, ahint) ->
         let t, hint =
-          hint_apply obj side a morph_hint morph ~other ahint
+          hint_apply obj side a morph_hint morph ~query ahint
             (C.For_hint.find_responsible_axis_proj morph ax)
         in
         Axis.proj ax t, hint
       | Const c -> Axis.proj ax a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
         let chosen_ahint =
-          let other = Axis.proj ax other in
+          let query = map_query (Axis.proj ax) query in
           let proj1 = Axis.proj ax a1 in
           let proj2 = Axis.proj ax a2 in
           let obj = C.proj_obj ax obj in
-          match choose_branch_axis b obj proj1 proj2 ~other with
+          match choose_branch_axis b obj proj1 proj2 ~query with
           | `First -> a1, hint1
           | `Second -> a2, hint2
         in
-        hint_proj obj side ax ~other chosen_ahint
+        hint_proj obj side ax ~query chosen_ahint
 
     (** Given a solver hint on a single axis lattice, returns a human-readible
         hint. *)
     and hint_all : type a l r.
         a C.obj ->
         (l * r) side ->
-        other:a ->
+        query:a query ->
         (a, l * r) S.ahint ->
         (a, l * r) ahint =
-     fun obj side ~other (a, hint) ->
+     fun obj side ~query (a, hint) ->
       match hint with
       | Apply (morph_hint, morph, ahint) ->
-        hint_apply obj side a morph_hint morph ~other ahint
+        hint_apply obj side a morph_hint morph ~query ahint
           (C.For_hint.find_responsible_axis_all morph)
       | Const c -> a, Const c
       | Branch (b, (a1, hint1), (a2, hint2)) ->
         let chosen_ahint =
-          match choose_branch_axis b obj a1 a2 ~other with
+          match choose_branch_axis b obj a1 a2 ~query with
           | `First -> a1, hint1
           | `Second -> a2, hint2
         in
-        hint_all obj side ~other chosen_ahint
+        hint_all obj side ~query chosen_ahint
 
     let hint_proj_loosening : type t a l r.
         t C.obj ->
@@ -4629,7 +4775,7 @@ module Report = struct
         loosening * (a, l * r) ahint =
      fun obj side ax ~other ((t, _) as ahint) ->
       let axis_obj = C.proj_obj ax obj in
-      let a, hint = hint_proj obj side ax ~other ahint in
+      let a, hint = hint_proj obj side ax ~query:(Explain_error other) ahint in
       let loosening =
         if Misc.Le_result.equal ~le:(C.le axis_obj) a (Axis.proj ax t)
         then Not_loosened
@@ -4644,7 +4790,7 @@ module Report = struct
         (a, l * r) S.ahint ->
         loosening * (a, l * r) ahint =
      fun obj side ~other ((original, _) as ahint) ->
-      let a, hint = hint_all obj side ~other ahint in
+      let a, hint = hint_all obj side ~query:(Explain_error other) ahint in
       let loosening =
         if Misc.Le_result.equal ~le:(C.le obj) a original
         then Not_loosened
@@ -4834,47 +4980,34 @@ module Report = struct
     | Captured_by_partial_application ->
       Fmt.dprintf "is captured by a partial application"
 
-  let modality_if_relevant ~fixpoint pp =
-    if
-      fixpoint
-      (* if the modality doesn't change the bound, we omit the modality and
-          print the remaining chain. *)
-    then (fun _ppf Modality -> ()), pp
-    else
-      (* if the modality change the bound, we signal that. Moreover, since each
-         axis is total ordering, the modality is solely responsible for the
-         bound, and we omit the remaining chain. *)
-      (* CR-someday zqian: print the modality on the offending axis. *)
-      ( (fun ppf Modality -> Fmt.fprintf ppf " (with some modality)"),
-        (Location.none, Unknown : pinpoint) )
+  let print_modality_if_relevant ~fixpoint ppf Modality =
+    if not fixpoint then Fmt.fprintf ppf " (with some modality)"
+
+  let pinpoint_unless_modality_relevant ~fixpoint (pp : pinpoint) : pinpoint =
+    if fixpoint then pp else Location.none, Unknown
 
   let print_contains :
-      fixpoint:bool -> contains -> ((Fmt.formatter -> unit) * pinpoint) option =
+      fixpoint:bool -> contains -> (Fmt.formatter -> unit) option =
    fun ~fixpoint { containing; contained } ->
     print_pinpoint contained
     |> Option.map (fun print_pp ->
         let print_pp = print_pp ~definite:true ~capitalize:false in
-        let maybe_modality, contained =
-          modality_if_relevant ~fixpoint contained
-        in
-        let pr =
-          match containing with
-          | Tuple -> Fmt.dprintf "is a tuple that contains %t" print_pp
-          | Record (s, moda) ->
-            Fmt.dprintf "is a record whose field %a%a is %t"
-              Misc.Style.inline_code s maybe_modality moda print_pp
-          | Array moda ->
-            Fmt.dprintf "is an array that contains%a %t" maybe_modality moda
-              print_pp
-          | Constructor (s, moda) ->
-            Fmt.dprintf "contains (via constructor %a)%a %t"
-              Misc.Style.inline_code s maybe_modality moda print_pp
-          | Structure (x, moda) ->
-            Fmt.dprintf "contains %t%a defined as %t"
-              (print_structure_item ~capitalize:false x)
-              maybe_modality moda print_pp
-        in
-        pr, contained)
+        let maybe_modality = print_modality_if_relevant ~fixpoint in
+        match containing with
+        | Tuple -> Fmt.dprintf "is a tuple that contains %t" print_pp
+        | Record (s, moda) ->
+          Fmt.dprintf "is a record whose field %a%a is %t"
+            Misc.Style.inline_code s maybe_modality moda print_pp
+        | Array moda ->
+          Fmt.dprintf "is an array that contains%a %t" maybe_modality moda
+            print_pp
+        | Constructor (s, moda) ->
+          Fmt.dprintf "contains (via constructor %a)%a %t"
+            Misc.Style.inline_code s maybe_modality moda print_pp
+        | Structure (x, moda) ->
+          Fmt.dprintf "contains %t%a defined as %t"
+            (print_structure_item ~capitalize:false x)
+            maybe_modality moda print_pp)
 
   let print_containing maybe_modality { containing; container } =
     let container = fst container in
@@ -4905,14 +5038,14 @@ module Report = struct
         container
 
   let print_is_contained_by :
-      fixpoint:bool -> is_contained_by -> (Fmt.formatter -> unit) * pinpoint =
+      fixpoint:bool -> is_contained_by -> Fmt.formatter -> unit =
    fun ~fixpoint { containing; container } ->
-    let maybe_modality, pp = modality_if_relevant ~fixpoint container in
     (* CR-someday zqian: Use the full [container] to improve the printing below.
        E.g., insted of printing "the tuple at XXX", we can print "the tuple
        pattern at XXX" or "the tuple expression at XXX". *)
-    let pr = print_containing maybe_modality { containing; container } in
-    pr, pp
+    print_containing
+      (print_modality_if_relevant ~fixpoint)
+      { containing; container }
 
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
       prints the const to explain the mode on the pinpoint. *)
@@ -4998,6 +5131,41 @@ module Report = struct
       Fmt.fprintf ppf "it %t" (print_containing print_mod c)
     | Annotation _ -> ()
 
+  type modality_policy =
+    | Narrow_to_unknown
+    | Keep_contained
+
+  let morph_src_pinpoint : type l r.
+      fixpoint:bool ->
+      modality_policy:modality_policy ->
+      pinpoint ->
+      (l * r) morph ->
+      pinpoint =
+   fun ~fixpoint ~modality_policy pp morph ->
+    let after_modality contained =
+      match modality_policy with
+      | Keep_contained -> contained
+      | Narrow_to_unknown ->
+        pinpoint_unless_modality_relevant ~fixpoint contained
+    in
+    match morph with
+    | Skip -> pp
+    | Unknown -> pp
+    | Crossing -> pp
+    | Allocation_r _ -> pp
+    | Allocation_l _ -> pp
+    | Allocation _ -> pp
+    | Functor_to_parameter loc -> loc, Functor
+    | Parameter_to_functor loc -> loc, Functor_parameter
+    | Functor_to_application loc -> loc, Functor
+    | Application_to_functor loc -> loc, Module
+    | Close_over (_, { closed; _ }) -> closed
+    | Is_closed_by (_, { closure; _ }) -> closure
+    | Contains_l (_, { contained; _ }) -> after_modality contained
+    | Contains_r (_, { contained; _ }) -> after_modality contained
+    | Is_contained_by (_, { container; _ }) -> after_modality container
+    | Function_argument { callee; _ } -> callee
+
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and return the
       source pinpoint. The source pinpoint could be [Unknown], in which case the
@@ -5007,7 +5175,11 @@ module Report = struct
       pinpoint ->
       (l * r) morph ->
       ((Fmt.formatter -> unit) * pinpoint) option =
-   fun ~fixpoint pp -> function
+   fun ~fixpoint pp morph ->
+    let src_pinpoint () =
+      morph_src_pinpoint ~fixpoint ~modality_policy:Narrow_to_unknown pp morph
+    in
+    match morph with
     | Skip ->
       Some (print_bug ~explanation:"Skip hint should not be printed" (), pp)
     | Allocation _ ->
@@ -5019,86 +5191,77 @@ module Report = struct
             (),
           pp )
     | Unknown -> None
-    | Close_over (Comonadic, { closed = pp; _ }) ->
-      print_pinpoint pp
+    | Close_over (Comonadic, { closed; _ }) ->
+      print_pinpoint closed
       |> Option.map (fun print_pp ->
           ( Fmt.dprintf "closes over %t"
               (print_pp ~definite:true ~capitalize:false),
-            pp ))
-    | Close_over (Monadic, { closed = pp; _ }) ->
-      print_pinpoint pp
+            src_pinpoint () ))
+    | Close_over (Monadic, { closed; _ }) ->
+      print_pinpoint closed
       |> Option.map (fun print_pp ->
           ( Fmt.dprintf "contains a usage (of %t)"
               (print_pp ~definite:true ~capitalize:false),
-            pp ))
-    | Is_closed_by (_, { closure = pp; _ }) ->
-      print_pinpoint pp
+            src_pinpoint () ))
+    | Is_closed_by (_, { closure; _ }) ->
+      print_pinpoint closure
       |> Option.map (fun print_pp ->
           ( Fmt.dprintf "is used inside %t"
               (print_pp ~definite:true ~capitalize:false),
-            pp ))
-    | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
+            src_pinpoint () ))
+    | Crossing -> Some (Fmt.dprintf "crosses with something", src_pinpoint ())
     | Functor_to_parameter loc ->
-      let funct_pp = loc, Functor in
-      print_pinpoint funct_pp
+      print_pinpoint (loc, Functor)
       |> Option.map (fun print_pp ->
           ( Fmt.dprintf "shares the staticity of %t"
               (print_pp ~definite:true ~capitalize:false),
-            funct_pp ))
+            src_pinpoint () ))
     | Parameter_to_functor loc ->
-      let param_pp = loc, Functor_parameter in
-      print_pinpoint param_pp
+      print_pinpoint (loc, Functor_parameter)
       |> Option.map (fun print_pp ->
           ( Fmt.dprintf "shares the staticity of %t"
               (print_pp ~definite:true ~capitalize:false),
-            param_pp ))
+            src_pinpoint () ))
     | Functor_to_application loc ->
       Some
         ( Fmt.dprintf "is an application of the functor at %a"
             (Location.Doc.loc ~capitalize_first:false)
             loc,
-          (loc, Functor) )
+          src_pinpoint () )
     | Application_to_functor loc ->
       Some
         ( Fmt.dprintf "is applied at %a"
             (Location.Doc.loc ~capitalize_first:false)
             loc,
-          (loc, Module) )
-    | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
-    | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
-    | Contains_l (_, contains) -> print_contains ~fixpoint contains
-    | Contains_r (_, contains) -> print_contains ~fixpoint contains
+          src_pinpoint () )
+    | Allocation_r alloc -> Some (print_allocation_r alloc, src_pinpoint ())
+    | Allocation_l alloc -> Some (print_allocation_l alloc, src_pinpoint ())
+    | Contains_l (_, contains) ->
+      print_contains ~fixpoint contains
+      |> Option.map (fun pr -> pr, src_pinpoint ())
+    | Contains_r (_, contains) ->
+      print_contains ~fixpoint contains
+      |> Option.map (fun pr -> pr, src_pinpoint ())
     | Is_contained_by (_, is_contained_by) ->
-      Some (print_is_contained_by ~fixpoint is_contained_by)
+      Some (print_is_contained_by ~fixpoint is_contained_by, src_pinpoint ())
     | Function_argument _ -> None
 
-  let print_mode : type a.
-      [`Actual | `Expected] -> a C.obj -> Fmt.formatter -> a -> unit =
-   fun side obj ppf x ->
-    let mode_printer = Misc.Style.as_inline_code (C.print obj) in
-    match side, obj, x with
-    | `Actual, Regionality, Regional ->
-      Fmt.fprintf ppf "%a to the parent region" mode_printer C.Regionality.Local
-      (* CR-someday zqian: treat the following cases generally. *)
-    | `Expected, Contention_op, Shared ->
-      (* When "shared" is expected, we tell the user that either shared or
-         uncontended is expected. *)
-      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
-        C.Contention.Uncontended
-    | `Expected, Contention_op, Corrupted ->
-      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Corrupted
-        mode_printer C.Contention.Uncontended
-    | `Expected, Visibility_op, Read ->
-      Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
-        C.Visibility.Read_write
-    | `Expected, Visibility_op, Write ->
-      Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Write mode_printer
-        C.Visibility.Read_write
-    | `Expected, Regionality, Regional ->
-      Fmt.fprintf ppf "%a to the parent region or %a" mode_printer
-        C.Regionality.Local mode_printer C.Regionality.Global
-    | _ -> mode_printer ppf x
-  [@@ocaml.warning "-4"]
+  let print_mode_atom ppf = function
+    | Mode_description.Exact displayed ->
+      Misc.Style.inline_code ppf (Hint_chain.Mode.name displayed)
+    | Mode_description.Local_to_parent_region { displayed; _ } ->
+      Misc.Style.inline_code ppf (Hint_chain.Mode.name displayed);
+      Fmt.pp_print_string ppf " to the parent region"
+
+  let print_mode_description ppf (description : Mode_description.t) =
+    let { Mode_description.first; alternatives } = description in
+    print_mode_atom ppf first;
+    List.iter
+      (fun alternative -> Fmt.fprintf ppf " or %a" print_mode_atom alternative)
+      alternatives
+
+  let print_mode side obj ppf x =
+    print_mode_description ppf (describe_mode side obj x)
 
   let adjust_side : type a. a C.obj -> [`Left | `Right] -> [`Actual | `Expected]
       =
@@ -5170,12 +5333,36 @@ module Report = struct
     | Misc.Is_eq -> Misc.Le_result.equal ~le:(C.le a_obj) a b
     | Misc.Is_not_eq -> false
 
-  (** The [Allocation], [Allocation_l] and [Allocation_r] hints are special, and
-      have slightly different skip conditions. An [Allocation] hint should
-      always be skipped, while [Allocation_l] and [Allocation_r] hints are
-      skipped when they change a regionality mode to a different locality mode.
-      In each case, we report an error if the hint was not applied to its
-      expected associated morphism. *)
+  let mode_preserved : type l r a b.
+      (l * r) morph -> src:a C.obj -> obj:b C.obj -> a -> b -> bool =
+   fun hint ~src ~obj a b ->
+    match hint with
+    | Function_argument _ -> implements_identity src obj a b
+    | Allocation_r _ | Allocation_l _ ->
+      implements_alloc_to_value Locality_as_regionality obj src b a
+    | Allocation _ ->
+      implements_alloc_to_value Locality_as_regionality src obj a b
+    | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
+    | Is_contained_by _ | Skip | Crossing | Functor_to_parameter _
+    | Parameter_to_functor _ | Functor_to_application _
+    | Application_to_functor _ ->
+      equal_mode src obj a b
+
+  let hint_applied_to_expected_morph : type l r a b.
+      (l * r) morph -> src:a C.obj -> obj:b C.obj -> a -> b -> bool =
+   fun hint ~src ~obj a b ->
+    match hint with
+    | Allocation_r _ -> implements_value_to_alloc Regional_to_global src obj a b
+    | Allocation_l _ -> implements_value_to_alloc Regional_to_local src obj a b
+    | Allocation _ ->
+      implements_alloc_to_value Locality_as_regionality src obj a b
+    | Function_argument _ -> implements_identity src obj a b
+    | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
+    | Is_contained_by _ | Skip | Crossing | Functor_to_parameter _
+    | Parameter_to_functor _ | Functor_to_application _
+    | Application_to_functor _ ->
+      true
+
   let should_skip : type l r a b.
       (l * r) morph ->
       src:a C.obj ->
@@ -5184,39 +5371,19 @@ module Report = struct
       b ->
       (is_skip:bool * fixpoint:bool) =
    fun hint ~src ~obj a b ->
-    let fixpoint = equal_mode src obj a b in
-    match hint with
-    | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
-    | Is_contained_by _ | Functor_to_parameter _ | Parameter_to_functor _
-    | Functor_to_application _ | Application_to_functor _ ->
-      (* These morphisms should never be skipped *)
-      ~is_skip:false, ~fixpoint
-    | Function_argument _ ->
-      if not (implements_identity src obj a b) then print_bug_stderr ();
-      ~is_skip:true, ~fixpoint
-    | Skip | Crossing ->
-      (* We only skip when the morphism changes the mode *)
-      ~is_skip:fixpoint, ~fixpoint
-    | Allocation_r _ ->
-      (* We check that the morphism is value_to_alloc_r2g *)
-      if not (implements_value_to_alloc Regional_to_global src obj a b)
-      then print_bug_stderr ();
-      (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
-        ~fixpoint )
-    | Allocation_l _ ->
-      (* We check that the morphism is value_to_alloc_r2l *)
-      if not (implements_value_to_alloc Regional_to_local src obj a b)
-      then print_bug_stderr ();
-      (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
-        ~fixpoint )
-    | Allocation _ ->
-      (* We always want to skip an Allocation hint. Report if the hint was not
-         applied to an alloc_as_value morphism. *)
-      if not (implements_alloc_to_value Locality_as_regionality src obj a b)
-      then print_bug_stderr ();
-      ~is_skip:true, ~fixpoint
+    if not (hint_applied_to_expected_morph hint ~src ~obj a b)
+    then print_bug_stderr ();
+    let is_skip =
+      match hint with
+      | Allocation _ | Function_argument _ -> true
+      | Skip | Crossing | Allocation_l _ | Allocation_r _ ->
+        mode_preserved hint ~src ~obj a b
+      | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
+      | Is_contained_by _ | Functor_to_parameter _ | Parameter_to_functor _
+      | Functor_to_application _ | Application_to_functor _ ->
+        false
+    in
+    ~is_skip, ~fixpoint:(equal_mode src obj a b)
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
@@ -5264,6 +5431,41 @@ module Report = struct
         a (print_const pp) c;
       Some Mode_with_hint
   [@@ocaml.warning "-4"]
+
+  let rec walk_ahint : type a l r.
+      pinpoint -> a C.obj -> (a, l * r) ahint -> Hint_chain.t =
+   fun pp obj (a, hint) ->
+    let mode = Hint_chain.Mode.P (obj, a) in
+    let axis = C.axis_of_obj obj in
+    match hint with
+    | Apply (morph_hint, src, ahint) ->
+      let fixpoint = equal_mode obj src a (fst ahint) in
+      let step =
+        { Hint_chain.mode;
+          pinpoint = pp;
+          kind =
+            Morph
+              { morph = morph_hint;
+                changed_mode =
+                  not (mode_preserved morph_hint ~src ~obj (fst ahint) a)
+              };
+          axis
+        }
+      in
+      let src_pp =
+        morph_src_pinpoint ~fixpoint ~modality_policy:Keep_contained pp
+          morph_hint
+      in
+      step :: walk_ahint src_pp src ahint
+    | Const c -> [{ Hint_chain.mode; pinpoint = pp; kind = Const c; axis }]
+    | Irrelevant -> []
+
+  let walk_ahint_loosening : type a l r.
+      pinpoint ->
+      a C.obj ->
+      loosening * (a, l * r) ahint ->
+      loosening * Hint_chain.t =
+   fun pp obj (loosening, ahint) -> loosening, walk_ahint pp obj ahint
 
   let print_ahint_loosening : type a l r.
       [`Left | `Right] ->
@@ -5346,6 +5548,14 @@ module Error = struct
     | Proj : 'r C.obj * ('r, 'a) Axis.t * 'r t -> packed
     | All : 'a C.obj * 'a t -> packed
 
+  let failing_axes : type r. r C.obj -> r t -> r C.Axis.from list =
+   fun obj { left; right; _ } ->
+    List.filter
+      (fun (C.Axis.From ax) ->
+        let ax_obj = C.proj_obj ax obj in
+        not (C.le ax_obj (C.Axis.proj ax left) (C.Axis.proj ax right)))
+      (C.Axis.from obj)
+
   let print_proj : type r a.
       Hint.pinpoint -> r C.obj -> (r, a) Axis.t -> r t -> print_error =
    fun pp obj ax err ->
@@ -5359,6 +5569,67 @@ module Error = struct
     let err = S.populate_error obj err in
     let err = Report.Of_solver.error_all obj err in
     Report.print pp obj err
+
+  let walk_report ~axis pp obj ({ Report.left; right } : _ Report.t) =
+    let _, (left_mode, _) = left in
+    let _, (right_mode, _) = right in
+    let left_loosening, left_chain = Report.walk_ahint_loosening pp obj left in
+    let right_loosening, right_chain =
+      Report.walk_ahint_loosening pp obj right
+    in
+    if C.is_opposite obj
+    then
+      { axis;
+        actual_chain = right_chain;
+        expected_chain = left_chain;
+        actual_description = describe_mode `Actual obj right_mode;
+        expected_description = describe_mode `Expected obj left_mode;
+        actual_loosening = right_loosening;
+        expected_loosening = left_loosening
+      }
+    else
+      { axis;
+        actual_chain = left_chain;
+        expected_chain = right_chain;
+        actual_description = describe_mode `Actual obj left_mode;
+        expected_description = describe_mode `Expected obj right_mode;
+        actual_loosening = left_loosening;
+        expected_loosening = right_loosening
+      }
+
+  let walk_proj : type r a.
+      Hint.pinpoint ->
+      axis:Axis.packed ->
+      r C.obj ->
+      (r, a) Axis.t ->
+      r t ->
+      axis_error =
+   fun pp ~axis obj ax err ->
+    let err = S.populate_error obj err in
+    let report = Report.Of_solver.error_proj obj ax err in
+    walk_report ~axis pp (C.proj_obj ax obj) report
+
+  let walk_all : type a.
+      Hint.pinpoint -> axis:Axis.packed -> a C.obj -> a t -> axis_error =
+   fun pp ~axis obj err ->
+    let err = S.populate_error obj err in
+    let report = Report.Of_solver.error_all obj err in
+    walk_report ~axis pp obj report
+
+  let walk_error_all : type a.
+      Hint.pinpoint -> a C.obj -> a t -> axis_error list =
+   fun pp obj err ->
+    match C.axis_of_obj obj with
+    | Some axis -> [walk_all pp ~axis obj err]
+    | None ->
+      List.map
+        (fun (C.Axis.From ax) -> walk_proj pp ~axis:(Axis.P ax) obj ax err)
+        (failing_axes obj err)
+
+  let walk_packed_all : Hint.pinpoint -> packed -> axis_error list =
+   fun pp -> function
+    | Proj (obj, _ax, err) -> walk_error_all pp obj err
+    | All (obj, err) -> walk_error_all pp obj err
 
   let print_packed : Hint.pinpoint -> packed -> print_error =
    fun pp -> function
@@ -5404,6 +5675,12 @@ let () =
     | Submode_error_simple_context (pp, err) ->
       Some (Error.print_packed_simple_context pp err)
     | _ -> None)
+
+let walk_error_all_exn exn =
+  match exn with
+  | Submode_error_simple_context (pp, packed) ->
+    Some (Error.walk_packed_all pp packed)
+  | _ -> None
 
 module type Common_axis_pos = sig
   module Const : Const
@@ -5524,6 +5801,8 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let print_error pp err = Error.print_all pp obj err
 
+  let walk_error_all pp err = Error.walk_error_all pp obj err
+
   let join l = S.join obj l
 
   let meet l = S.meet obj l
@@ -5630,6 +5909,8 @@ module Monadic_gen (Obj : Obj) = struct
     | Error e -> raise (Submode_error_simple_context (pp, All (obj, e)))
 
   let print_error pp err = Error.print_all pp obj err
+
+  let walk_error_all pp err = Error.walk_error_all pp obj err
 
   let join l = S.meet obj l
 
@@ -6720,6 +7001,10 @@ module Value_with (Areality : Areality) = struct
       let (Error (ax, e)) = Comonadic.to_simple_error e in
       Error (Comonadic ax, e)
 
+  let walk_error_all pp : error -> _ = function
+    | Monadic e -> Monadic.walk_error_all pp e
+    | Comonadic e -> Comonadic.walk_error_all pp e
+
   let print_error pp = function
     | Monadic e -> Monadic.print_error pp e
     | Comonadic e -> Comonadic.print_error pp e
@@ -6763,6 +7048,51 @@ module Value_with (Areality : Areality) = struct
   let proj_monadic ax { monadic; _ } = Monadic.proj ax monadic
 
   let proj_comonadic ax { comonadic; _ } = Comonadic.proj ax comonadic
+
+  let axis_of_packed : C.Axis.packed -> Axis.packed = function
+    | C.Axis.P C.Axis.Areality -> Axis.P (Comonadic Areality)
+    | C.Axis.P C.Axis.Linearity -> Axis.P (Comonadic Linearity)
+    | C.Axis.P C.Axis.Portability -> Axis.P (Comonadic Portability)
+    | C.Axis.P C.Axis.Forkable -> Axis.P (Comonadic Forkable)
+    | C.Axis.P C.Axis.Yielding -> Axis.P (Comonadic Yielding)
+    | C.Axis.P C.Axis.Statefulness -> Axis.P (Comonadic Statefulness)
+    | C.Axis.P C.Axis.Uniqueness -> Axis.P (Monadic Uniqueness)
+    | C.Axis.P C.Axis.Visibility -> Axis.P (Monadic Visibility)
+    | C.Axis.P C.Axis.Contention -> Axis.P (Monadic Contention)
+    | C.Axis.P C.Axis.Staticity -> Axis.P (Monadic Staticity)
+
+  let walk_bounds_on_axis ~axis pp (m : l) : Hint_chain.candidate list =
+    let walk_floor (type a) (obj : a C.obj)
+        (m : (a, allowed * disallowed) S.mode) =
+      S.get_loose_floor_hints obj m
+      |> List.map (fun { S.origin; ahint } ->
+          let ahint =
+            Report.Of_solver.hint_all obj Report.Of_solver.Left
+              ~query:Report.Of_solver.Explain_bound ahint
+          in
+          { Hint_chain.origin; chain = Report.walk_ahint pp obj ahint })
+    in
+    let walk_ceil (type a) (obj : a C.obj)
+        (m : (a, disallowed * allowed) S.mode) =
+      S.get_loose_ceil_hints obj m
+      |> List.map (fun { S.origin; ahint } ->
+          let ahint =
+            Report.Of_solver.hint_all obj Report.Of_solver.Right
+              ~query:Report.Of_solver.Explain_bound ahint
+          in
+          { Hint_chain.origin; chain = Report.walk_ahint pp obj ahint })
+    in
+    match axis_of_packed axis with
+    | Axis.P (Comonadic ax) ->
+      walk_floor (Comonadic.proj_obj ax) (proj_comonadic ax m)
+    | Axis.P (Monadic ax) -> walk_ceil (Monadic.proj_obj ax) (proj_monadic ax m)
+
+  let var_id_on_axis ~axis (m : l) : Var_id.t option =
+    match axis_of_packed axis with
+    | Axis.P (Comonadic ax) ->
+      S.get_var_id (Comonadic.proj_obj ax) (proj_comonadic ax m)
+    | Axis.P (Monadic ax) ->
+      S.get_var_id (Monadic.proj_obj ax) (proj_monadic ax m)
 
   let max_with_comonadic ax m =
     let comonadic = Comonadic.max_with ax m in
@@ -6895,6 +7225,42 @@ end
 
 module Value = Value_with (Regionality)
 module Alloc = Value_with (Locality)
+
+let alloc_atom_of_hint_mode (Hint_chain.Mode.P (obj, m)) : Alloc.atom option =
+  match obj with
+  | C.Locality -> Some (Alloc.Atom (Comonadic Areality, m))
+  | C.Regionality ->
+    begin match m with
+    | C.Regionality.Global ->
+      Some (Alloc.Atom (Comonadic Areality, C.Locality.Global))
+    | C.Regionality.Local ->
+      Some (Alloc.Atom (Comonadic Areality, C.Locality.Local))
+    | C.Regionality.Regional -> None
+    end
+  | C.Linearity -> Some (Alloc.Atom (Comonadic Linearity, m))
+  | C.Portability -> Some (Alloc.Atom (Comonadic Portability, m))
+  | C.Forkable -> Some (Alloc.Atom (Comonadic Forkable, m))
+  | C.Yielding -> Some (Alloc.Atom (Comonadic Yielding, m))
+  | C.Statefulness -> Some (Alloc.Atom (Comonadic Statefulness, m))
+  | C.Uniqueness_op -> Some (Alloc.Atom (Monadic Uniqueness, m))
+  | C.Contention_op -> Some (Alloc.Atom (Monadic Contention, m))
+  | C.Visibility_op -> Some (Alloc.Atom (Monadic Visibility, m))
+  | C.Staticity_op -> Some (Alloc.Atom (Monadic Staticity, m))
+  | C.Monadic_op | C.Comonadic_with_locality | C.Comonadic_with_regionality ->
+    None
+
+let hint_mode_of_alloc_atom (Alloc.Atom (ax, m)) : Hint_chain.Mode.t =
+  match ax with
+  | Comonadic Areality -> Hint_chain.Mode.P (C.Locality, m)
+  | Comonadic Linearity -> Hint_chain.Mode.P (C.Linearity, m)
+  | Comonadic Portability -> Hint_chain.Mode.P (C.Portability, m)
+  | Comonadic Forkable -> Hint_chain.Mode.P (C.Forkable, m)
+  | Comonadic Yielding -> Hint_chain.Mode.P (C.Yielding, m)
+  | Comonadic Statefulness -> Hint_chain.Mode.P (C.Statefulness, m)
+  | Monadic Uniqueness -> Hint_chain.Mode.P (C.Uniqueness_op, m)
+  | Monadic Contention -> Hint_chain.Mode.P (C.Contention_op, m)
+  | Monadic Visibility -> Hint_chain.Mode.P (C.Visibility_op, m)
+  | Monadic Staticity -> Hint_chain.Mode.P (C.Staticity_op, m)
 
 module Const = struct
   let locality_as_regionality = C.Locality_morph.apply Locality_as_regionality
