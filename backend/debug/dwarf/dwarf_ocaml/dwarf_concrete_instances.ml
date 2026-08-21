@@ -56,6 +56,14 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
     then [DAH.create_artificial ()]
     else
       let file, line, startchar = Location.get_pos_info loc.loc_start in
+      (* Prefer the [dinfo_dir]-qualified filename, which remains valid when
+         [fundecl] is a copy of code imported from another compilation unit
+         (whose source directory may differ from this unit's). *)
+      let file =
+        match Debuginfo.to_file_path fundecl.fun_dbg with
+        | Some file -> file
+        | None -> file
+      in
       let attributes = [DAH.create_decl_file (get_file_id file)] in
       if line < 0
       then attributes

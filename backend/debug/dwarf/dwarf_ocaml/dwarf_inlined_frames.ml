@@ -180,7 +180,8 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
     ~attribute_values:
       (abstract_instance @ range_list_attributes
       @ [ DAH.create_call_file
-            (Dwarf_state.get_file_num state caller_item.dinfo_file) ]
+            (Dwarf_state.get_file_num state
+               (Debuginfo.item_file_path caller_item)) ]
       @ (if caller_item.dinfo_line >= 0
          then [DAH.create_call_line caller_item.dinfo_line]
          else [])
