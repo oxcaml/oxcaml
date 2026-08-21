@@ -161,8 +161,18 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
       (* CR mvellacott: change validation: should take one .ltosol and many
          .cmx files (potentially other files too?). *)
       let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
+      let ltosol_file, (other_inputs : string list) = match
+        List.partition (fun f -> Filename.check_suffix f ".ltosol") inputs
+      with
+        | [ltosol_file], other_inputs -> ltosol_file, other_inputs
+        | ltosol_files, _ ->
+          Printf.ksprintf Compenv.fatal
+            "Must specify exactly one .ltosol file with -reaper-rebuild \
+             (found %d: [%s])"
+            (List.length ltosol_files) (String.concat ", " ltosol_files)
+      in
       let cmr_file, (_other_inputs : string list) = match
-        List.partition (fun f -> Filename.check_suffix f ".cmr") inputs
+        List.partition (fun f -> Filename.check_suffix f ".cmr") other_inputs
       with
         | [cmr_file], inputs -> cmr_file, inputs
         | cmr_files, _ ->
@@ -171,7 +181,7 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
              %d: [%s])"
             (List.length cmr_files) (String.concat ", " cmr_files)
       in
-      Compiler.reaper_rebuild ~cmr_file
+      Compiler.reaper_rebuild ~ltosol_file ~cmr_file
         ~output_prefix:(Compenv.output_prefix cmr_file ^ ".reaped")
         ~keep_symbol_tables:false;
       Warnings.check_fatal ();

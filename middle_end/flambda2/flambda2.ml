@@ -445,11 +445,20 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     ltosol_file
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
-    ~keep_symbol_tables ~cmr_filename =
-  let cmr_serialisable, id_stamp_counters =
-    Flambda2_reaper.Cmr_format.load cmr_filename
+    ~keep_symbol_tables ~ltosol_filename ~cmr_filename =
+  let { Flambda2_reaper.Ltosol_format.File_contents.id_stamp_counters;
+        solution = ltosol_solution
+      } =
+    Flambda2_reaper.Ltosol_format.load ltosol_filename
   in
   Flambda2_reaper.Id_stamp_counters.restore_for_resume id_stamp_counters;
+  (* We expect the stamp counters in the .cmr file to be less than the counters
+     in the .ltosol file, because the -reaper-solve invocation begins by taking
+     the maximum counters across the .cmr files it reads. Therefore, we can
+     ignore these counters. *)
+  let cmr_serialisable, (_ : Flambda2_reaper.Id_stamp_counters.t) =
+    Flambda2_reaper.Cmr_format.load cmr_filename
+  in
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
@@ -465,6 +474,11 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   (* Make the paused compilation's imported offsets available to
      [Slot_offsets.finalize_offsets]. *)
   Exported_offsets.import_offsets imported_offsets;
+  (* CR mvellacott: use this solution instead of solving again. *)
+  let (_solved_dep : Flambda2_reaper.Unboxing_analysis.result) =
+    Flambda2_reaper.Ltosol_format.Serialisable_solution.deserialise
+      ltosol_solution
+  in
   (* CR mvellacott: add profiling and debug printing code. *)
   let solved_dep = Flambda2_reaper.Reaper.Staged.solve deps in
   let flambda, free_names, all_code, slot_offsets, final_typing_env =
