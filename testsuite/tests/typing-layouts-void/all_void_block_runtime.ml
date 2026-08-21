@@ -54,6 +54,38 @@ let () =
   in
   describe "imm A marshalled" round_tripped
 
+(* All-void constructors without the attribute are blocks. *)
+
+type blk =
+  | A2 of unit#
+  | B2 of #(unit# * unit#)
+  | C2
+  | D2 of int
+
+let () =
+  describe "blk A2" (A2 #());
+  describe "blk B2" (B2 #(#(), #()));
+  describe "blk C2" C2;
+  describe "blk D2" (D2 3);
+  (match A2 #() with
+   | A2 v -> let #() = v in print_endline "blk match: A2"
+   | B2 _ | C2 | D2 _ -> assert false);
+  (match B2 #(#(), #()) with
+   | B2 #(v, _) -> let #() = v in print_endline "blk match: B2"
+   | A2 _ | C2 | D2 _ -> assert false);
+  let eff s = print_endline s; #() in
+  let a = A2 (eff "blk effect: A2 arg") in
+  let _ : blk = a in
+  let b = B2 #(eff "blk effect: B2 arg 1", eff "blk effect: B2 arg 2") in
+  let _ : blk = b in
+  Printf.printf "blk equal: %b\n" (A2 #() = A2 #());
+  Printf.printf "blk hash equal: %b\n"
+    (Hashtbl.hash (A2 #()) = Hashtbl.hash (A2 #()));
+  let round_tripped : blk =
+    Marshal.from_string (Marshal.to_string (A2 #()) []) 0
+  in
+  describe "blk A2 marshalled" round_tripped
+
 (* An any-arg constructor refined to void is a block. *)
 
 type ('a : any) refined = R of 'a | S

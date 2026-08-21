@@ -10,6 +10,18 @@ imm effect: B arg 1
 imm equal: true
 imm hash equal: true
 imm A marshalled: imm 0
+blk A2: block tag 0
+blk B2: block tag 1
+blk C2: imm 0
+blk D2: block tag 2
+blk match: A2
+blk match: B2
+blk effect: A2 arg
+blk effect: B2 arg 2
+blk effect: B2 arg 1
+blk equal: true
+blk hash equal: true
+blk A2 marshalled: block tag 0
 refined R: block tag 0
 refined S: imm 0
 refined match: R
