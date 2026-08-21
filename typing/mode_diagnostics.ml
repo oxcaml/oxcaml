@@ -309,20 +309,23 @@ module Meaning = struct
     | Mode.Hint_chain.Morph (Function_argument fa) ->
       Signature_argument fa
     | Mode.Hint_chain.Const Unknown -> Unexplained
-    | Mode.Hint_chain.Const (Explicit_annotations locs) -> (
-      match s.axis with
-      | None -> Unexplained
-      | Some _ -> (
-        match
-          List.find_opt
-            (fun loc ->
-              match snippet_of_loc ~source loc with
-              | Some word -> String.equal word (Step_mode.name s.mode)
-              | None -> false)
-            locs
-        with
-        | Some loc -> User_annotation loc
-        | None -> Unexplained))
+    | Mode.Hint_chain.Const (Annotation { written_modes; _ }) -> (
+      let mode_name = Step_mode.name s.mode in
+      match
+        List.find_opt
+          (fun (written_mode : string Location.loc) ->
+            String.equal written_mode.txt mode_name
+            &&
+            match snippet_of_loc ~source written_mode.loc with
+            | Some source_name ->
+              String.equal source_name mode_name
+              || (String.equal mode_name "local"
+                 && String.equal source_name "local_")
+            | None -> false)
+          written_modes
+      with
+      | Some written_mode -> User_annotation written_mode.loc
+      | None -> Unexplained)
     | Mode.Hint_chain.Const Lazy_allocated_on_heap ->
       Fact Lazy_allocated_on_heap
     | Mode.Hint_chain.Const (Legacy legacy) -> Fact (Legacy_construct legacy)
