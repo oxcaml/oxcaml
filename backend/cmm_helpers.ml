@@ -982,9 +982,9 @@ let rec and_const e n dbg =
               if Nativeint.logand n 1n = 0n then ignore_low_bit_int e else e
             in
             let e =
-              if Nativeint.compare n 0n < 0
-              then e
-              else low_bits ~bits:(1 + Misc.log2_nativeint n) ~dbg e
+              low_bits
+                ~bits:(arch_bits - Misc.count_leading_zeroes_nativeint n)
+                ~dbg e
             in
             (* prefer putting constants on the right *)
             Cop (Cand, [e; natint_const_untagged dbg n], dbg)
