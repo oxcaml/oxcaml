@@ -36,6 +36,7 @@ val main
     keep_symbol_tables:bool ->
     ltosol_filename:string ->
     cmr_filename:string ->
+    paused_imports_cmx:Import_info.t list ->
     Cmm.phrase list)
   -> reaper_lto_solve:(
     cmr_files:string list ->

@@ -22,6 +22,29 @@
  file = "reaper_solve.ltosol";
  file-exists;
 
+ flags = "-reaper-rebuild reaper_solve_dependency.cmr reaper_solve.ltosol";
+ last_flags = "";
+ ocamlopt.opt;
+
+ file = "reaper_solve_dependency.reaped.cmx";
+ file-exists;
+
+ flags = "-reaper-rebuild reaper_solve.cmr reaper_solve.ltosol";
+ last_flags = "";
+ ocamlopt.opt;
+
+ file = "reaper_solve.reaped.cmx";
+ file-exists;
+
+ flags = "-flambda2-reaper";
+ last_flags = "";
+ compile_only = "true";
+ all_modules = "reaper_solve.ml";
+ ocamlopt.opt;
+
+ script = "cmp reaper_solve.reaped.o reaper_solve.o";
+ script;
+
  check-ocamlopt.opt-output;
 *)
 
