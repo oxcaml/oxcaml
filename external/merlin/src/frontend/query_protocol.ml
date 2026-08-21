@@ -231,6 +231,8 @@ module Module_type_impls = struct
     { target : target;
       target_loc : Location.t option;
       instance : string option;
+      implementation_uid : string option;
+      implementation_name : string option;
       site : impl_site;
       check : check_kind option;
       check_site : Location.t option
