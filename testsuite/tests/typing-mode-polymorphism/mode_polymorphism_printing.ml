@@ -63,14 +63,14 @@ val foo : ('a, 'b) mytypemod @ [< 'm] -> 'a @ [> 'm] = <fun>
 
 let foo t = t.y
 [%%expect{|
-val foo : ('a, 'b) mytypemod @ [< 'm] -> 'b @ [> 'm @@ portable] = <fun>
+val foo : ('a, 'b) mytypemod @ [< 'm] -> 'b @ [> 'm mod portable] = <fun>
 |}]
 
 let foo x z = x.y
 [%%expect{|
 val foo :
   ('a, 'b) mytypemod @ [< 'm & global] ->
-  ('c @ 'n -> 'b @ [> 'm @@ portable]) @ [> close('m)] = <fun>
+  ('c @ 'n -> 'b @ [> 'm mod portable]) @ [> close('m)] = <fun>
 |}]
 
 
@@ -123,15 +123,15 @@ type 'a myref = { mutable x : 'a; }
 let create a = { x = a }
 [%%expect{|
 val create :
-  'a @ [< 'm . aliased dynamic & global many] -> 'a myref @ [> 'm | stateful] =
-  <fun>
+  'a @ [< 'm mod aliased dynamic & global many] ->
+  'a myref @ [> 'm | stateful] = <fun>
 |}]
 
 let read r = r.x
 [%%expect{|
 val read :
   'a myref @ [< 'm & read] ->
-  'a @ [> 'm @@ global many forkable unyielding | aliased dynamic] = <fun>
+  'a @ [> 'm mod global many forkable unyielding | aliased dynamic] = <fun>
 |}]
 
 let store r = fun a -> r.x <- a
@@ -333,15 +333,15 @@ val foo :
 let foo (f : int -> int) x y = f
 [%%expect{|
 val foo :
-  (int -> int) @ [< 'p . aliased contended immutable & past('o) & past('m) & global] ->
+  (int -> int) @ [< 'p mod aliased contended immutable & past('o) & past('m) & global] ->
   ('a @ [< past('n) & global] ->
    ('b @ 'q -> (int -> int) @ [> 'p]) @ [> past('n) | past('o)]) @ [> past('m)] =
   <fun>
 |}, Principal{|
 val foo :
-  (int -> int) @ [< 'm . aliased contended immutable & global] ->
+  (int -> int) @ [< 'm mod aliased contended immutable & global] ->
   ('a @ [< past('n) & global] ->
-   ('b @ 'o -> (int -> int) @ [> 'm]) @ [> close('m) @@ many portable stateless | past('n)]) @ [> close('m) @@ many portable stateless] =
+   ('b @ 'o -> (int -> int) @ [> 'm]) @ [> close('m) mod many portable stateless | past('n)]) @ [> close('m) mod many portable stateless] =
   <fun>
 |}]
 
@@ -350,7 +350,7 @@ let foo (f : intref @ local -> int) (x : intref) (y : intref) = f x
 val foo :
   (intref @ local -> int) @ [< past('o) & past('m) & global] ->
   (intref @ [< past('n) & global read_write] ->
-   (intref @ 'p -> int @ [> dynamic]) @ [> past('n @@ many portable forkable unyielding stateless) | past('o) | stateful]) @ [> past('m)] =
+   (intref @ 'p -> int @ [> dynamic]) @ [> past('n) mod many portable forkable unyielding stateless | past('o) | stateful]) @ [> past('m)] =
   <fun>
 |}, Principal{|
 val foo :

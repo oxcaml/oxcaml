@@ -123,15 +123,15 @@ let which = function
   | true -> g
 [%%expect{|
 val f :
-  string @ [< 'm . contended immutable] ->
-  string @ [> 'm @@ many portable forkable unyielding stateless] = <fun>
+  string @ [< 'm mod contended immutable] ->
+  string @ [> 'm mod many portable forkable unyielding stateless] = <fun>
 val g :
-  string @ [< 'm . contended immutable & portable] ->
-  string @ [> 'm @@ many portable forkable unyielding stateless] = <fun>
+  string @ [< 'm mod contended immutable & portable] ->
+  string @ [> 'm mod many portable forkable unyielding stateless] = <fun>
 val which :
   bool @ 'n ->
-  (string @ [< 'm . contended immutable & portable] ->
-   string @ [> 'm @@ many portable forkable unyielding stateless]) @ [> aliased stateful dynamic] =
+  (string @ [< 'm mod contended immutable & portable] ->
+   string @ [> 'm mod many portable forkable unyielding stateless]) @ [> aliased stateful dynamic] =
   <fun>
 |}]
 
