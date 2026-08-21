@@ -806,46 +806,7 @@ let rec or_const e n dbg =
             | Some y -> or_const x (Nativeint.logor y n) dbg)
           | _ -> default ()))
 
-let rec and_const e n dbg =
-  match n with
-  | 0n -> replace e ~with_:(Cconst_int (0, dbg))
-  | -1n -> e
-  | n ->
-    map_tail1 e ~f:(fun e ->
-        match get_const e with
-        | Some e -> natint_const_untagged dbg (Nativeint.logand e n)
-        | None -> (
-          let[@local] default () =
-            let e =
-              if Nativeint.logand n 1n = 0n then ignore_low_bit_int e else e
-            in
-            let e =
-              if Nativeint.compare n 0n < 0
-              then e
-              else low_bits ~bits:(1 + Misc.log2_nativeint n) ~dbg e
-            in
-            (* prefer putting constants on the right *)
-            Cop (Cand, [e; natint_const_untagged dbg n], dbg)
-          in
-          match e with
-          | Cop (Cand, [x; y], dbg) -> (
-            match get_const y with
-            | Some y -> and_const x (Nativeint.logand y n) dbg
-            | None -> default ())
-          | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) -> (
-            let[@local] load memory_chunk =
-              Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
-            in
-            match memory_chunk, n with
-            | (Byte_signed | Byte_unsigned), 0xffn -> load Byte_unsigned
-            | (Sixteen_signed | Sixteen_unsigned), 0xffffn ->
-              load Sixteen_unsigned
-            | (Thirtytwo_signed | Thirtytwo_unsigned), 0xffff_ffffn ->
-              load Thirtytwo_unsigned
-            | _ -> default ())
-          | _ -> default ()))
-
-and xor_int c1 c2 dbg =
+let xor_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match get_const c1, get_const c2 with
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logxor c1 c2)
@@ -853,7 +814,7 @@ and xor_int c1 c2 dbg =
       | Some c1, None -> xor_const c2 c1 dbg
       | None, None -> Cop (Cxor, [c1; c2], dbg))
 
-and or_int c1 c2 dbg =
+let or_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match get_const c1, get_const c2 with
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logor c1 c2)
@@ -861,15 +822,7 @@ and or_int c1 c2 dbg =
       | Some c1, None -> or_const c2 c1 dbg
       | None, None -> Cop (Cor, [c1; c2], dbg))
 
-and and_int c1 c2 dbg =
-  map_tail2 c1 c2 ~f:(fun c1 c2 ->
-      match get_const c1, get_const c2 with
-      | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logand c1 c2)
-      | None, Some c2 -> and_const c1 c2 dbg
-      | Some c1, None -> and_const c2 c1 dbg
-      | None, None -> Cop (Cand, [c1; c2], dbg))
-
-and lsr_int c1 c2 dbg =
+let rec lsr_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match c1, c2 with
       | c1, Cconst_int (0, _) -> c1
@@ -985,13 +938,13 @@ and asr_const c n dbg = asr_int c (Cconst_int (n, dbg)) dbg
 
 and lsr_const c n dbg = lsr_int c (Cconst_int (n, dbg)) dbg
 
-and lsl_const0 c n dbg = Cop (Clsl, [c; Cconst_int (n, dbg)], dbg)
+let lsl_const0 c n dbg = Cop (Clsl, [c; Cconst_int (n, dbg)], dbg)
 
-and is_power2 n = n = 1 lsl Misc.log2 n
+let is_power2 n = n = 1 lsl Misc.log2 n
 
 and mult_power2 c n dbg = lsl_int c (Cconst_int (Misc.log2 n, dbg)) dbg
 
-and mul_int c1 c2 dbg =
+let rec mul_int c1 c2 dbg =
   match c1, c2 with
   | c, Cconst_int (0, _) | Cconst_int (0, _), c ->
     Csequence (c, Cconst_int (0, dbg))
@@ -1007,13 +960,60 @@ and mul_int c1 c2 dbg =
   | c1, c2 -> Cop (Cmuli, [c1; c2], dbg)
 
 (** [get_const_bitmask x] returns [Some (y, mask)] if [x] is [y & mask] *)
-and get_const_bitmask = function
+let get_const_bitmask = function
   | Cop (Cand, ([x; Cconst_natint (mask, _)] | [Cconst_natint (mask, _); x]), _)
     ->
     Some (x, mask)
   | Cop (Cand, ([x; Cconst_int (mask, _)] | [Cconst_int (mask, _); x]), _) ->
     Some (x, Nativeint.of_int mask)
   | _ -> None
+
+let rec and_const e n dbg =
+  match n with
+  | 0n -> replace e ~with_:(Cconst_int (0, dbg))
+  | -1n -> e
+  | n ->
+    map_tail1 e ~f:(fun e ->
+        match get_const e with
+        | Some e -> natint_const_untagged dbg (Nativeint.logand e n)
+        | None -> (
+          let[@local] default () =
+            let e =
+              if Nativeint.logand n 1n = 0n then ignore_low_bit_int e else e
+            in
+            let e =
+              if Nativeint.compare n 0n < 0
+              then e
+              else low_bits ~bits:(1 + Misc.log2_nativeint n) ~dbg e
+            in
+            (* prefer putting constants on the right *)
+            Cop (Cand, [e; natint_const_untagged dbg n], dbg)
+          in
+          match e with
+          | Cop (Cand, [x; y], dbg) -> (
+            match get_const y with
+            | Some y -> and_const x (Nativeint.logand y n) dbg
+            | None -> default ())
+          | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) -> (
+            let[@local] load memory_chunk =
+              Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
+            in
+            match memory_chunk, n with
+            | (Byte_signed | Byte_unsigned), 0xffn -> load Byte_unsigned
+            | (Sixteen_signed | Sixteen_unsigned), 0xffffn ->
+              load Sixteen_unsigned
+            | (Thirtytwo_signed | Thirtytwo_unsigned), 0xffff_ffffn ->
+              load Thirtytwo_unsigned
+            | _ -> default ())
+          | _ -> default ()))
+
+and and_int c1 c2 dbg =
+  map_tail2 c1 c2 ~f:(fun c1 c2 ->
+      match get_const c1, get_const c2 with
+      | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logand c1 c2)
+      | None, Some c2 -> and_const c1 c2 dbg
+      | Some c1, None -> and_const c2 c1 dbg
+      | None, None -> Cop (Cand, [c1; c2], dbg))
 
 (** [low_bits ~bits x] is a (potentially simplified) value which agrees with x
     on at least the low [bits] bits. E.g., [low_bits ~bits x & mask = x & mask],
