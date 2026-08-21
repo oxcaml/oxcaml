@@ -65,6 +65,11 @@ CAMLextern int caml_check_pending_actions (void);
    fields are pointed here to make polls fault. Allocated by
    [caml_init_signals]; never freed. */
 CAMLextern void* caml_safepoint_trigger_page;
+
+/* Diagnostic counters for faulting safepoints, printed at exit when
+   CAML_SP_STATS is set (see domain.c). */
+CAMLextern atomic_uintnat caml_safepoint_fault_count;
+CAMLextern atomic_uintnat caml_safepoint_trigger_count;
 #endif
 
 value caml_process_pending_actions_with_root (value extra_root); // raises
