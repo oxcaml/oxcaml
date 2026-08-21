@@ -7,14 +7,14 @@ module B = A
 [%%expect{|
 {
  "A"[module] -> {<.1>
-                 "t"[type] -> <.0>;
+                 "t"[type] -> ((? ) : value)<.0>;
                  };
  }
 module A : sig type t end
 {
  "B"[module] -> Alias(<.2>
                       {<.1>
-                       "t"[type] -> <.0>;
+                       "t"[type] -> ((? ) : value)<.0>;
                        });
  }
 module B = A
@@ -24,7 +24,7 @@ type u = B.t
 
 [%%expect{|
 {
- "u"[type] -> <.3>;
+ "u"[type] -> ((? ) : value)<.3>;
  }
 type u = B.t
 |}]
@@ -33,12 +33,12 @@ module F (X : sig type t end) = X
 module F' = F
 [%%expect{|
 {
- "F"[module] -> Abs<.6>(X, X<.5>);
+ "F"[module] -> Abs<.7>(X, X<.6>);
  }
 module F : functor (X : sig type t end) -> sig type t = X.t end
 {
- "F'"[module] -> Alias(<.7>
-                       Abs<.6>(X, X<.5>));
+ "F'"[module] -> Alias(<.8>
+                       Abs<.7>(X, X<.6>));
  }
 module F' = F
 |}]
@@ -46,8 +46,8 @@ module F' = F
 module C = F'(A)
 [%%expect{|
 {
- "C"[module] -> {<.8>
-                 "t"[type] -> <.0>;
+ "C"[module] -> {<.9>
+                 "t"[type] -> ((? ) : value)<.0>;
                  };
  }
 module C : sig type t = A.t end
@@ -58,9 +58,9 @@ module C = F(B)
 
 [%%expect{|
 {
- "C"[module] -> Alias(<.9>
+ "C"[module] -> Alias(<.10>
                       {<.1>
-                       "t"[type] -> <.0>;
+                       "t"[type] -> ((? ) : value)<.0>;
                        });
  }
 module C : sig type t = B.t end
@@ -70,11 +70,12 @@ module D = C
 
 [%%expect{|
 {
- "D"[module] -> Alias(<.10>
-                      Alias(<.9>
-                            {<.1>
-                             "t"[type] -> <.0>;
-                             }));
+ "D"[module] ->
+   Alias(<.11>
+         Alias(<.10>
+               {<.1>
+                "t"[type] -> ((? ) : value)<.0>;
+                }));
  }
 module D = C
 |}]
@@ -82,8 +83,8 @@ module D = C
 module G (X : sig type t end) = struct include X end
 [%%expect{|
 {
- "G"[module] -> Abs<.13>(X, {
-                             "t"[type] -> X<.12> . "t"[type];
+ "G"[module] -> Abs<.15>(X, {
+                             "t"[type] -> X<.14> . "t"[type];
                              });
  }
 module G : functor (X : sig type t end) -> sig type t = X.t end
@@ -92,8 +93,8 @@ module G : functor (X : sig type t end) -> sig type t = X.t end
 module E = G(B)
 [%%expect{|
 {
- "E"[module] -> {<.14>
-                 "t"[type] -> <.0>;
+ "E"[module] -> {<.16>
+                 "t"[type] -> ((? ) : value)<.0>;
                  };
  }
 module E : sig type t = B.t end
@@ -104,22 +105,22 @@ module N : sig type t end = M
 module O = N
 [%%expect{|
 {
- "M"[module] -> {<.17>
-                 "t"[type] -> <.15>;
-                 "x"[value] -> <.16>;
+ "M"[module] -> {<.19>
+                 "t"[type] -> ((? ) : value)<.17>;
+                 "x"[value] -> <.18>;
                  };
  }
 module M : sig type t val x : int end
 {
- "N"[module] -> {<.19>
-                 "t"[type] -> <.15>;
+ "N"[module] -> {<.22>
+                 "t"[type] -> ((? ) : value)<.17>;
                  };
  }
 module N : sig type t end
 {
- "O"[module] -> Alias(<.20>
-                      {<.19>
-                       "t"[type] -> <.15>;
+ "O"[module] -> Alias(<.23>
+                      {<.22>
+                       "t"[type] -> ((? ) : value)<.17>;
                        });
  }
 module O = N

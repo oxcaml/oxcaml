@@ -118,14 +118,14 @@ let () =
   print_counts facts;
   print_checks (printer labels) facts
 
-let () = heading "an ascription against another unit's signature is no pair"
+let () = heading "an annotation against another unit's signature is no pair"
 
 (* Only the inclusion check of the [.ml] of a unit against its own [.mli]
    yields [Interface] facts.  [Mtf_client] has no [.mli], and the members of
-   [Mtf_aux.Container] that its last ascription is checked against are declared
+   [Mtf_aux.Container] that its last annotation is checked against are declared
    in [mtf_aux.mli]; pairing them with the client's own declarations would
    claim an interface the client does not have.  Those members are still
-   checked, as [Ascription] checks against the foreign expectation, in the
+   checked, as [Annotation] checks against the foreign expectation, in the
    checks printed above. *)
 let () =
   let report description file =
