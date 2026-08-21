@@ -242,6 +242,8 @@ module type Sort = sig
 
   val undo_change : change -> unit
 
+  exception Weaken_genvar
+
   (** Create a generic sort variable. *)
   val new_genvar : unit -> var
 

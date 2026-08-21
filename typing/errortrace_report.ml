@@ -415,6 +415,13 @@ let explanation (type variety) intro prev env
     Some (doc_printf "@ because their kinds are different.\
                       @ @[<v>%t@;%t@]"
             (fmt_history "the first" k1) (fmt_history "the second" k2))
+  | Errortrace.Weaken_sort_genvar (ty1, ty2) ->
+    add_type_to_preparation ty1;
+    add_type_to_preparation ty2;
+    Some (doc_printf "@ The layout of %a is not polymorphic,\
+                      @ unlike the layout of %a which is polymorphic."
+      (Style.as_inline_code prepared_type_expr) ty1
+      (Style.as_inline_code prepared_type_expr) ty2)
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)

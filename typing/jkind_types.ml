@@ -434,6 +434,8 @@ module Sort = struct
     | Ccontents t_op -> v.contents <- t_op
     | Clevel level -> v.level <- level
 
+  exception Weaken_genvar
+
   let rec update_level level = function
     | Var v -> update_level_var level v
     | Base _ | Univar _ -> ()
@@ -443,11 +445,11 @@ module Sort = struct
     match u.contents with
     | Some t -> update_level level t
     | None ->
-      let new_level = min level u.level in
-      if u.level <> new_level
+      if level < u.level
       then (
+        if u.level > fresh_level then raise Weaken_genvar;
         log_change (u, Clevel u.level);
-        u.level <- new_level)
+        u.level <- level)
 
   let[@inline] set_without_level : var -> t option -> unit =
    fun v t_op ->

@@ -6514,7 +6514,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (_, _) ->
               raise_unexplained_for Moregen
         end
-  with Moregen_trace trace ->
+  with
+  | Jkind.Sort.Weaken_genvar ->
+    raise_for Moregen (Weaken_sort_genvar (t1, t2))
+  | Moregen_trace trace ->
     raise_trace_for Moregen (Diff {got = t1; expected = t2} :: trace)
 
 
