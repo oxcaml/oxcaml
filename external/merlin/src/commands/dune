@@ -4,11 +4,13 @@
   (flags
     :standard
     -open Ocaml_parsing
+    -open Ocaml_typing
     -open Ocaml_utils
     -open Merlin_utils
     -open Merlin_kernel)
   (libraries
     merlin-lib.ocaml_parsing
+    merlin-lib.ocaml_typing
     merlin-lib.utils
     merlin-lib.kernel
     merlin-lib.query_protocol

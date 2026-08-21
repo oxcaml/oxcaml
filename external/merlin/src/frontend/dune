@@ -2,8 +2,15 @@
  (name        query_protocol)
  (public_name merlin-lib.query_protocol)
  (modules     query_protocol)
- (flags :standard -open Merlin_utils -open Merlin_kernel -open Ocaml_parsing -open Ocaml_utils)
- (libraries merlin_kernel merlin_utils ocaml_parsing ocaml_utils))
+ (flags
+  :standard
+  -open Merlin_utils
+  -open Merlin_kernel
+  -open Ocaml_parsing
+  -open Ocaml_typing
+  -open Ocaml_utils)
+ (libraries
+  merlin_kernel merlin_utils ocaml_parsing ocaml_typing ocaml_utils))
 
 (library
  (name        query_commands)
