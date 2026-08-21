@@ -20,8 +20,6 @@ let () =
     | "name" -> name
     | _ -> assert false
   in
-  (* Pin the optimization level to [-O3] so the DWARF output is stable
-     regardless of the dune build profile. *)
   let print_executable name =
     Buffer.add_substitute buf (subst_common name)
       {|
@@ -30,10 +28,7 @@ let () =
  (modules ${name})
  ${enabled_if}
  (libraries stdlib_stable)
- (ocamlopt_flags
-  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
-   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
-   -function-sections -O3))
+ (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp)))
  (foreign_archives simd_stubs))
 |}
   in
