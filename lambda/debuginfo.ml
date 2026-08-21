@@ -383,6 +383,47 @@ let from_location = function
     let assume_zero_alloc = Scoped_location.get_assume_zero_alloc ~scopes in
     { dbg = [item_from_location ~scopes loc]; assume_zero_alloc; }
 
+(* The build root against which a relative [-directory] argument is to be
+   interpreted.  By convention (see the documentation of [-directory] in
+   [Main_args]), a compilation unit built with a relative [-directory d] has
+   its working directory at [<root>/d]; we recover [<root>] by stripping that
+   suffix from the current working directory. *)
+let build_root_for_relative_directory =
+  lazy
+    (match !Clflags.directory with
+    | None -> None
+    | Some dir ->
+      if Filename.is_relative dir
+      then
+        let cwd = Sys.getcwd () in
+        let suffix = Filename.dir_sep ^ dir in
+        if String.ends_with ~suffix cwd
+           && String.length cwd > String.length suffix
+        then Some (String.sub cwd 0 (String.length cwd - String.length suffix))
+        else None
+      else None)
+
+let item_file_path d =
+  let file = d.dinfo_file in
+  if not (Filename.is_relative file)
+  then Location.rewrite_absolute_path file
+  else
+    match d.dinfo_dir with
+    | None -> file
+    | Some dir ->
+      let composed = Filename.concat dir file in
+      if not (Filename.is_relative dir)
+      then Location.rewrite_absolute_path composed
+      else (
+        match Lazy.force build_root_for_relative_directory with
+        | Some root ->
+          Location.rewrite_absolute_path (Filename.concat root composed)
+        | None ->
+          (* We cannot reliably absolutize the path, e.g. because this unit was
+             compiled without [-directory].  The composed relative path still
+             carries more information than the bare filename. *)
+          composed)
+
 let to_location { dbg; assume_zero_alloc=_ } =
   let rec last = function
     | [] -> None
@@ -405,6 +446,9 @@ let to_location { dbg; assume_zero_alloc=_ } =
         pos_cnum = d.dinfo_start_bol + d.dinfo_char_end;
       } in
     { loc_ghost = false; loc_start; loc_end; }
+
+let to_file_path { dbg; assume_zero_alloc = _ } =
+  Option.map item_file_path (Misc.last dbg)
 
 let inline { dbg = dbg1; assume_zero_alloc = a1; }
       ~from_inlined_body:{ dbg = dbg2; assume_zero_alloc = a2; } =

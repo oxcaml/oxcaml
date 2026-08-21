@@ -112,6 +112,17 @@ val from_location : Scoped_location.t -> t
 
 val to_location : t -> Location.t
 
+(** The source file of the given item, qualified with the directory recorded
+    in [dinfo_dir] (see the [-directory] flag) whenever the recorded filename
+    is relative, so that the result remains meaningful outside the directory
+    in which the item's compilation unit was compiled -- in particular in the
+    debugging information of other units into which its code is inlined.
+    Used when emitting DWARF line tables and file attributes. *)
+val item_file_path : item -> string
+
+(** [item_file_path] applied to the item that determines [to_location]. *)
+val to_file_path : t -> string option
+
 val inline : t -> from_inlined_body:t -> t
 
 val compare : t -> t -> int
