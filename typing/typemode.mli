@@ -23,6 +23,34 @@ val untransl_mode : _ modes -> Parsetree.modes
     legacy if unspecified *)
 val transl_alloc_mode : Parsetree.modes -> Mode.Alloc.Const.t modes
 
+type 'd morph =
+  | Past : ('l * 'r) morph
+  | Close : (Allowance.allowed * Allowance.disallowed) morph
+
+type 'd modepoly_elem =
+  { elem_var : string Location.loc;
+    elem_morph : 'd morph option;
+    elem_mod : Mode.Alloc.Const.Option.t
+  }
+
+type 'd modepoly_bound =
+  { bound_vars : 'd modepoly_elem list;
+    bound_const : Mode.Alloc.Const.Option.t modes
+  }
+
+type modepoly_bounds =
+  { upper : (Allowance.disallowed * Allowance.allowed) modepoly_bound;
+    lower : (Allowance.allowed * Allowance.disallowed) modepoly_bound
+  }
+
+type modepoly_annot =
+  | Pmode_var of string Location.loc
+  | Pmode_bounds of modepoly_bounds Location.loc
+
+val has_mode_variables : Parsetree.modes -> bool
+
+val transl_modepoly_annot : Parsetree.modes -> modepoly_annot
+
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and
     attributes on the field and insert mutable-implied modalities accordingly.

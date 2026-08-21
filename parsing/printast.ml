@@ -154,9 +154,46 @@ let modality i ppf modality =
 let modalities i ppf modalities =
   List.iter (fun m -> modality i ppf m) modalities
 
+let string_of_mode_bound sep { bound_vars; bound_const } =
+  let string_of_elem { elem_morph; elem_var; elem_mod } =
+    let base =
+      match elem_morph with
+      | None -> "'" ^ elem_var.txt
+      | Some m -> m.txt ^ "('" ^ elem_var.txt ^ ")"
+    in
+    match elem_mod with
+    | [] -> base
+    | _ :: _ ->
+      base ^ " mod " ^ String.concat " " (List.map (fun c -> c.txt) elem_mod)
+  in
+  let vars = List.map string_of_elem bound_vars in
+  let consts =
+    match bound_const with
+    | [] -> []
+    | _ :: _ ->
+      [String.concat " " (List.map (fun c -> c.txt) bound_const)]
+  in
+  String.concat sep (vars @ consts)
+
+let string_of_mode = function
+  | Mode consts -> String.concat " " (List.map (fun c -> c.txt) consts)
+  | Mode_var v -> "'" ^ v.txt
+  | Mode_bounds { upper; lower } ->
+    let upper =
+      match string_of_mode_bound " & " upper with
+      | "" -> []
+      | s -> ["< " ^ s]
+    in
+    let lower =
+      match string_of_mode_bound " | " lower with
+      | "" -> []
+      | s -> ["> " ^ s]
+    in
+    "[" ^ String.concat " " (upper @ lower) ^ "]"
+
 let mode i ppf mode =
   line i ppf "mode %a\n" fmt_string_loc
-    (Location.map (fun (Mode x) -> x) mode)
+    (Location.map string_of_mode mode)
 
 let modes i ppf modes =
   List.iter (fun m -> mode i ppf m) modes

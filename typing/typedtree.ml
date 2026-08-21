@@ -894,8 +894,8 @@ and core_type =
 
 and core_type_desc =
   | Ttyp_var of string option * Parsetree.jkind_annotation option
-  | Ttyp_arrow of arg_label * core_type * Mode.Alloc.Const.t modes *
-                  core_type * Mode.Alloc.Const.t modes
+  | Ttyp_arrow of arg_label * core_type * Mode.Alloc.lr modes *
+                  core_type * Mode.Alloc.lr modes
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list

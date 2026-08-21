@@ -111,6 +111,9 @@ type error =
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
   | Val_poly_and_layout
+  | Unsatisfiable_mode_bound
+  | Unsatisfiable_mode_variable of string
+  | Mode_variables_not_allowed
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -875,18 +878,203 @@ let get_type_param_name styp =
   | Ptyp_var (name, _) -> Some name
   | _ -> Misc.fatal_error "non-type-variable in get_type_param_name"
 
-let rec extract_params styp =
+module Mode_var_env : sig
+  val lookup : string -> Alloc.lr
+
+  val allowed : unit -> bool
+
+  val with_mode_vars_allowed : (unit -> 'a) -> 'a
+end = struct
+  module StringMap = Map.Make(String)
+
+  type env = Alloc.lr StringMap.t ref
+
+  let table : env = ref StringMap.empty
+
+  let enabled = ref false
+
+  let reset () = table := StringMap.empty
+
+  let lookup name =
+    match StringMap.find_opt name !table with
+    | Some v -> v
+    | None ->
+        let v = Alloc.newvar (get_current_level ()) in
+        table := StringMap.add name v !table;
+        v
+
+  let allowed () = !enabled
+
+  let with_mode_vars_allowed f =
+    reset ();
+    enabled := true;
+    Misc.try_finally f ~always:(fun () ->
+        enabled := false;
+        reset ())
+end
+
+type sig_var =
+  { mode : Alloc.lr;
+    upper_elems : Alloc.r list;
+    upper_const : Alloc.Const.t
+  }
+
+type sig_mode =
+  | Sig_const of Alloc.Const.t
+  | Sig_var of sig_var
+
+let transl_modepoly_morph_r
+    (elem : (Allowance.disallowed * Allowance.allowed) Typemode.modepoly_elem)
+    : Alloc.r =
+  let v = Mode_var_env.lookup elem.elem_var.txt in
+  let base =
+    match elem.elem_morph with
+    | None -> Alloc.disallow_left v
+    | Some Typemode.Past ->
+      { monadic = Alloc.Monadic.disallow_left Alloc.Monadic.max;
+        comonadic = Alloc.Comonadic.disallow_left v.comonadic
+      }
+  in
+  let { monadic; _ } =
+    elem.elem_mod
+    |> Alloc.Const.Option.value ~default:Alloc.Const.min
+    |> Alloc.Const.split in
+  let { comonadic; _ } =
+    elem.elem_mod
+    |> Alloc.Const.Option.value ~default:Alloc.Const.max
+    |> Alloc.Const.split in
+  Alloc.join_const monadic (Alloc.imply_const comonadic base)
+
+let transl_modepoly_morph_l
+    (elem : (Allowance.allowed * Allowance.disallowed) Typemode.modepoly_elem)
+    : Alloc.l =
+  let v = Mode_var_env.lookup elem.elem_var.txt in
+  let base : Alloc.l =
+    match elem.elem_morph with
+    | None -> Alloc.disallow_right v
+    | Some Typemode.Past ->
+      { monadic = Alloc.Monadic.disallow_right Alloc.Monadic.min;
+        comonadic = Alloc.Comonadic.disallow_right v.comonadic
+      }
+    | Some Typemode.Close -> Alloc.close_over v
+  in
+  let { comonadic; _ } =
+    elem.elem_mod
+    |> Alloc.Const.Option.value ~default:Alloc.Const.max
+    |> Alloc.Const.split in
+  let { monadic; _ } =
+    elem.elem_mod
+    |> Alloc.Const.Option.value ~default:Alloc.Const.min
+    |> Alloc.Const.split in
+  Alloc.meet_const comonadic (Alloc.subtract_const monadic base)
+
+let transl_modepoly_annot env (annot : Typemode.modepoly_annot) : sig_var =
+  (if not (Mode_var_env.allowed ())
+   then
+     let loc =
+       match annot with
+       | Typemode.Pmode_var { loc; _ } | Typemode.Pmode_bounds { loc; _ } ->
+           loc
+     in
+     raise (Error (loc, env, Mode_variables_not_allowed)));
+  let m = Alloc.newvar (get_current_level ()) in
+  match annot with
+  | Typemode.Pmode_var { txt = name; loc } ->
+      let v = Mode_var_env.lookup name in
+      (match Alloc.equate m v with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_variable name)));
+            { mode = m;
+        upper_elems = [Alloc.disallow_left v];
+        upper_const = Alloc.Const.max
+      }
+  | Typemode.Pmode_bounds { txt = { upper; lower }; loc } ->
+      let upper_const =
+        Alloc.Const.Option.value upper.bound_const.mode_modes
+          ~default:Alloc.Const.max
+      in
+      let upper_elems = List.map transl_modepoly_morph_r upper.bound_vars in
+      (match
+         Alloc.submode m
+           (Alloc.meet (Alloc.of_const upper_const :: upper_elems))
+       with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_bound)));
+      let lower_const =
+        Alloc.Const.Option.value lower.bound_const.mode_modes
+          ~default:Alloc.Const.min
+      in
+      let lower_elems = List.map transl_modepoly_morph_l lower.bound_vars in
+      (match
+         Alloc.submode
+           (Alloc.join (Alloc.of_const lower_const :: lower_elems))
+           m
+       with
+      | Ok () -> ()
+      | Error _ -> raise (Error (loc, env, Unsatisfiable_mode_bound)));
+      { mode = m; upper_elems; upper_const }
+
+let alloc_of_sig_mode = function
+  | Sig_const c -> Alloc.of_const c
+  | Sig_var { mode; _ } -> mode
+
+let sig_mode_legacy = Sig_const Alloc.Const.legacy
+
+let curry_sig_mode acc_mode arg_mode =
+  match acc_mode, arg_mode with
+  | Sig_const acc, Sig_const arg -> Sig_const (curry_mode_const acc arg)
+  | Sig_var _, _ | _, Sig_var _ ->
+    let curry = Alloc.newvar (get_current_level ()) in
+    (match arg_mode with
+    | Sig_const arg ->
+      Alloc.Comonadic.submode_exn
+        (Alloc.Comonadic.of_const (Alloc.Const.close_over arg))
+        curry.comonadic
+    | Sig_var { mode = v; upper_elems; upper_const } ->
+      (* ('a @ v[< 'm1 & ... & mn & c] -> (... -> ...) @ curry) @ acc *)
+      (* v.comonadic < curry.comonadic *)
+      Alloc.Comonadic.submode_exn v.comonadic curry.comonadic;
+      (* comonadic_to_monadic_min(curry) < 'm1 & ... & mn & c *)
+      Alloc.Monadic.submode_exn
+        (Alloc.comonadic_to_monadic_min curry.comonadic)
+        (Alloc.meet (Alloc.of_const upper_const :: upper_elems)).monadic;
+      (* c.areality < curry.areality *)
+      Locality.submode_exn
+        (Locality.of_const upper_const.areality)
+        (Alloc.proj_comonadic Areality curry));
+    (* curry.comonadic < acc_mode.comonadic *)
+    Alloc.Comonadic.submode_exn
+      (alloc_of_sig_mode acc_mode).comonadic
+      curry.comonadic;
+    Sig_var
+      { mode = curry; upper_elems = []; upper_const = Alloc.Const.max }
+
+let transl_arrow_mode env pmodes : sig_mode Typemode.modes =
+  if Typemode.has_mode_variables pmodes
+  then
+    { mode_modes =
+        Sig_var
+          (transl_modepoly_annot env (Typemode.transl_modepoly_annot pmodes));
+      mode_desc = []
+    }
+  else
+    let { Typemode.mode_modes; mode_desc } =
+      Typemode.transl_alloc_mode pmodes
+    in
+    { mode_modes = Sig_const mode_modes; mode_desc }
+
+let rec extract_params env styp =
   match styp.ptyp_desc with
   | Ptyp_arrow (l, a, r, ma, mr) ->
-      let arg_mode = Typemode.transl_alloc_mode ma in
-      let ret_mode = Typemode.transl_alloc_mode mr in
-      let params, ret, ret_mode =
-        match r.ptyp_desc with
-        | Ptyp_arrow _ when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
-          extract_params r
-        | _ -> [], r, ret_mode
-      in
-      (l, arg_mode, a) :: params, ret, ret_mode
+      let arg_mode = transl_arrow_mode env ma in
+      (match r.ptyp_desc with
+      | Ptyp_arrow _
+        when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
+          let params, ret, ret_mode = extract_params env r in
+          (l, arg_mode, a) :: params, ret, ret_mode
+      | _ ->
+          let ret_mode = transl_arrow_mode env mr in
+          [l, arg_mode, a], r, ret_mode)
   | _ -> assert false
 
 let check_arg_type styp =
@@ -988,7 +1176,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       ctyp desc typ
   | Ptyp_arrow _ ->
-      let args, ret, ret_mode = extract_params styp in
+      let args, ret, ret_mode = extract_params env styp in
       let rec loop acc_mode args =
         match args with
         | (l, arg_mode, arg) :: rest ->
@@ -997,16 +1185,18 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           let arg_cty =
             if Btype.is_position l then
               ctyp Ttyp_call_pos (newconstr Predef.path_lexing_position [])
-            else transl_type env ~policy ~row_context arg_mode.mode_modes arg
+            else
+              transl_type env ~policy ~row_context arg_mode.mode_modes arg
           in
-          let acc_mode = curry_mode_const acc_mode arg_mode.mode_modes in
           let ret_mode =
             match rest with
             | [] -> ret_mode
             | _ :: _ ->
-              { mode_modes = acc_mode; mode_desc = [] }
+              { mode_modes = curry_sig_mode acc_mode arg_mode.mode_modes;
+                mode_desc = []
+              }
           in
-          let ret_cty = loop acc_mode rest in
+          let ret_cty = loop ret_mode.mode_modes rest in
           let arg_ty = arg_cty.ctyp_type in
           let arg_ty =
             if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
@@ -1020,16 +1210,20 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                 (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
             end
           in
-          let arg_mode_desc = Alloc.of_const arg_mode.mode_modes in
-          let ret_mode_desc = Alloc.of_const ret_mode.mode_modes in
-          let arrow_desc = (l, arg_mode_desc, ret_mode_desc) in
+          let arg_alloc = alloc_of_sig_mode arg_mode.mode_modes in
+          let ret_alloc = alloc_of_sig_mode ret_mode.mode_modes in
+          let arrow_desc = (l, arg_alloc, ret_alloc) in
           let ty =
             newty (Tarrow(arrow_desc, arg_ty, ret_cty.ctyp_type, commu_ok))
           in
-          ctyp
-            (Ttyp_arrow (l, arg_cty, arg_mode, ret_cty, ret_mode))
-            ty
-        | [] -> transl_type env ~policy ~row_context ret_mode.mode_modes ret
+          let arg_modes =
+            { mode_modes = arg_alloc; mode_desc = arg_mode.mode_desc }
+          in
+          let ret_modes =
+            { mode_modes = ret_alloc; mode_desc = ret_mode.mode_desc }
+          in
+          ctyp (Ttyp_arrow (l, arg_cty, arg_modes, ret_cty, ret_modes)) ty
+        | [] -> transl_type env ~policy ~row_context acc_mode ret
       in
       loop mode args
   | Ptyp_tuple stl ->
@@ -1045,7 +1239,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
     let tl =
       List.map
         (fun (label, t) ->
-           label, transl_type env ~policy ~row_context Alloc.Const.legacy t)
+           label, transl_type env ~policy ~row_context sig_mode_legacy t)
         stl
     in
     let ctyp_type =
@@ -1066,7 +1260,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                     Type_arity_mismatch(lid.txt, decl.type_arity,
                                         List.length stl)));
       let args =
-        List.map (transl_type env ~policy ~row_context Alloc.Const.legacy) stl
+        List.map (transl_type env ~policy ~row_context sig_mode_legacy) stl
       in
       let params = instance_list decl.type_params in
       let unify_param =
@@ -1128,7 +1322,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                     Type_arity_mismatch(lid.txt, decl.type_arity,
                                         List.length stl)));
       let args =
-        List.map (transl_type env ~policy ~row_context Alloc.Const.legacy) stl
+        List.map (transl_type env ~policy ~row_context sig_mode_legacy) stl
       in
       let body = Option.get decl.type_manifest in
       let (params, body) = instance_parameterized_type decl.type_params body in
@@ -1190,7 +1384,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               Builtin_attributes.warning_scope rf_attributes
                 (fun () ->
                    List.map
-                     (transl_type env ~policy ~row_context Alloc.Const.legacy)
+                     (transl_type env ~policy ~row_context sig_mode_legacy)
                      stl)
             in
             List.iter (fun {ctyp_type; ctyp_loc} ->
@@ -1221,7 +1415,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               Ttag (l,c,tl)
         | Rinherit sty ->
             let cty =
-              transl_type env ~policy ~row_context Alloc.Const.legacy sty
+              transl_type env ~policy ~row_context sig_mode_legacy sty
             in
             let ty = cty.ctyp_type in
             let nm =
@@ -1538,7 +1732,7 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
   let ctys =
     List.map
       (fun (l, t) ->
-         l, transl_type env ~policy ~row_context Alloc.Const.legacy t)
+         l, transl_type env ~policy ~row_context sig_mode_legacy t)
       stl
   in
   List.iter (fun (_, {ctyp_type; ctyp_loc}) ->
@@ -1577,7 +1771,7 @@ and transl_fields env ~policy ~row_context o fields =
     | Otag (s, ty1) -> begin
         let ty1 =
           Builtin_attributes.warning_scope of_attributes
-            (fun () -> transl_type env ~policy ~row_context Alloc.Const.legacy
+            (fun () -> transl_type env ~policy ~row_context sig_mode_legacy
                 (Ast_helper.Typ.force_poly ty1))
         in
         begin
@@ -1596,7 +1790,7 @@ and transl_fields env ~policy ~row_context o fields =
         field
       end
     | Oinherit sty -> begin
-        let cty = transl_type env ~policy ~row_context Alloc.Const.legacy sty in
+        let cty = transl_type env ~policy ~row_context sig_mode_legacy sty in
         let nm =
           match get_desc cty.ctyp_type with
             Tconstr(p, _, _) -> Some p
@@ -1655,7 +1849,7 @@ and transl_package env ~policy ~row_context ptyp =
   let ptys =
     List.map
       (fun (s, pty) ->
-         s, transl_type env ~policy ~row_context Alloc.Const.legacy pty)
+         s, transl_type env ~policy ~row_context sig_mode_legacy pty)
       l
   in
   let mty =
@@ -1706,7 +1900,8 @@ let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
 
 let transl_simple_type env ~new_var_jkind ?univars ~closed mode styp =
   let policy = if closed then Closed else Open in
-  transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp
+  transl_simple_type_impl env ~new_var_jkind ?univars ~policy (Sig_const mode)
+    styp
 
 let transl_simple_type_univars env styp =
   TyVarEnv.reset_locals ();
@@ -1714,7 +1909,7 @@ let transl_simple_type_univars env styp =
     TyVarEnv.collect_univars begin fun () ->
       with_local_level_generalize begin fun () ->
         let policy = TyVarEnv.univars_policy in
-        let typ = transl_type env policy Alloc.Const.legacy styp in
+        let typ = transl_type env policy sig_mode_legacy styp in
         TyVarEnv.globalize_used_variables policy env ();
         typ
       end
@@ -1729,7 +1924,7 @@ let transl_simple_type_delayed env mode styp =
   let typ, force =
     with_local_level_generalize begin fun () ->
       let policy = TyVarEnv.make_policy Open Any in
-      let typ = transl_type env policy mode styp in
+      let typ = transl_type env policy (Sig_const mode) styp in
       make_fixed_univars typ.ctyp_type;
       (* This brings the used variables to the global level, but doesn't link
          them to their other occurrences just yet. This will be done when
@@ -1746,7 +1941,9 @@ let transl_type_scheme_mono env styp =
   let typ =
     with_local_level_generalize begin fun () ->
       TyVarEnv.reset ();
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false Alloc.Const.legacy styp
+      Mode_var_env.with_mode_vars_allowed (fun () ->
+          transl_simple_type ~new_var_jkind:Sort env ~closed:false
+            Alloc.Const.legacy styp)
     end
     ~before_generalize:generalize_ctyp
   in
@@ -1766,13 +1963,14 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
       let univars = transl_bound_vars env vars in
       let typed_vars = TyVarEnv.ttyp_poly_arg univars in
       let typ =
-        if Language_extension.erasable_extensions_only () then
-          transl_simple_type_impl ~new_var_jkind:Sort env ~univars
-            ~policy:Closed_for_upstream_compatibility Alloc.Const.legacy
-            inner_type
-        else
-          transl_simple_type_impl ~new_var_jkind:Sort env ~univars ~policy:Open
-            Alloc.Const.legacy inner_type
+        Mode_var_env.with_mode_vars_allowed (fun () ->
+            if Language_extension.erasable_extensions_only () then
+              transl_simple_type_impl ~new_var_jkind:Sort env ~univars
+                ~policy:Closed_for_upstream_compatibility sig_mode_legacy
+                inner_type
+            else
+              transl_simple_type_impl ~new_var_jkind:Sort env ~univars
+                ~policy:Open sig_mode_legacy inner_type)
       in
       (typed_vars, univars, typ)
     end
@@ -2106,6 +2304,15 @@ let report_error_doc loc env = function
          value descriptions introduced using %a.@]"
         Style.inline_code "layout_"
         Style.inline_code "val poly_"
+  | Unsatisfiable_mode_bound ->
+      Location.errorf ~loc "This mode bound cannot be satisfied."
+  | Unsatisfiable_mode_variable name ->
+      Location.errorf ~loc
+        "The mode constraints on %a cannot be satisfied."
+        Style.inline_code ("'" ^ name)
+  | Mode_variables_not_allowed ->
+      Location.errorf ~loc
+        "Mode variables are only allowed in the types of signature items."
 
 let () =
   Location.register_error_of_exn

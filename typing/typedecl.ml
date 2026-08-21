@@ -4697,7 +4697,9 @@ let transl_value_decl env loc ~modal ~why valdecl =
     match modal with
     | Str_primitive ->
         assert (not valdecl.pval_poly);
-        let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
+        let modality_to_mode {txt = Modality m; loc} =
+          {txt = Mode [{txt = m; loc}]; loc}
+        in
         let modes = List.map modality_to_mode valdecl.pval_modalities in
         let modes = Typemode.transl_mode_annots modes in
         let mode =
@@ -5399,7 +5401,7 @@ module Reaching_path = struct
     in
     let mod_strings =
       Typemode.untransl_mod_bounds mod_bounds
-      |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
+      |> List.map (fun { Location.txt; _ } -> Printast.string_of_mode txt)
     in
     match mod_strings with
     | [] -> pp_base ppf base

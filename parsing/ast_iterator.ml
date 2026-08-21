@@ -867,7 +867,24 @@ let default_iterator =
 
     (* Location inside a mode expression needs to be traversed. *)
     modes = (fun this m ->
-      List.iter (iter_loc this) m
+      let iter_bound_elem { elem_morph; elem_var; elem_mod } =
+        Option.iter (iter_loc this) elem_morph;
+        iter_loc this elem_var;
+        List.iter (iter_loc this) elem_mod
+      in
+      let iter_bound { bound_vars; bound_const } =
+        List.iter iter_bound_elem bound_vars;
+        List.iter (iter_loc this) bound_const
+      in
+      let iter_mode : mode -> unit = function
+        | Mode consts -> List.iter (iter_loc this) consts
+        | Mode_var v -> iter_loc this v
+        | Mode_bounds { upper; lower } -> iter_bound upper; iter_bound lower
+      in
+      List.iter
+        (fun ({ txt; loc } : mode Location.loc) ->
+          iter_mode txt; this.location this loc)
+        m
     );
 
     modalities = (fun this m ->
