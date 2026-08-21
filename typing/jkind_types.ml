@@ -799,6 +799,18 @@ module Sort = struct
     | Equal_mutated_both
     | Equal_no_mutation
 
+  let[@inline] join_equate_result x y =
+    match x, y with
+    | Unequal, _ | _, Unequal -> Unequal
+    | Equal_no_mutation, z | z, Equal_no_mutation -> z
+    | Equal_mutated_first, Equal_mutated_second
+    | Equal_mutated_second, Equal_mutated_first
+    | Equal_mutated_both, _
+    | _, Equal_mutated_both ->
+      Equal_mutated_both
+    | Equal_mutated_first, Equal_mutated_first -> Equal_mutated_first
+    | Equal_mutated_second, Equal_mutated_second -> Equal_mutated_second
+
   let rec equate s1 s2 =
     match s1, s2 with
     | Var v1, Var v2 when v1.id = v2.id -> Equal_no_mutation
@@ -820,24 +832,13 @@ module Sort = struct
 
   and equate_list sorts1 sorts2 =
     let rec go sorts1 sorts2 acc =
-      match sorts1, sorts2 with
-      | [], [] -> acc
-      | sort1 :: sorts1, sort2 :: sorts2 -> (
-        match equate sort1 sort2, acc with
-        | Unequal, _ -> Unequal
-        | _, Unequal -> assert false
-        | Equal_no_mutation, acc | acc, Equal_no_mutation ->
-          go sorts1 sorts2 acc
-        | Equal_mutated_both, _ | _, Equal_mutated_both ->
-          go sorts1 sorts2 Equal_mutated_both
-        | Equal_mutated_first, Equal_mutated_first ->
-          go sorts1 sorts2 Equal_mutated_first
-        | Equal_mutated_second, Equal_mutated_second ->
-          go sorts1 sorts2 Equal_mutated_second
-        | Equal_mutated_first, Equal_mutated_second
-        | Equal_mutated_second, Equal_mutated_first ->
-          go sorts1 sorts2 Equal_mutated_both)
-      | _, _ -> Unequal
+      match sorts1, sorts2, acc with
+      | _, _, Unequal -> Unequal
+      | _ :: _, [], _ -> Unequal
+      | [], _ :: _, _ -> Unequal
+      | [], [], acc -> acc
+      | sort1 :: sorts1, sort2 :: sorts2, acc ->
+        go sorts1 sorts2 (join_equate_result acc (equate sort1 sort2))
     in
     go sorts1 sorts2 Equal_no_mutation
 
