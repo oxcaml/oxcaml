@@ -149,6 +149,18 @@ type closure_details =
     closed : pinpoint
   }
 
+type argument_label =
+  | Unlabelled
+  | Labelled of string
+  | Optional of string
+  | Position of string
+
+type function_argument =
+  { callee : pinpoint;
+    label : argument_label;
+    index_in_callee_arrow_type : int
+  }
+
 type allocation_desc =
   | Unknown
   | Optional_argument
@@ -197,6 +209,7 @@ type 'd morph =
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph
+  | Function_argument : function_argument -> ('l * 'r) morph
     (* CR-someday zqian: add [Tail_of_region] which connects the mode of region
        to the mode of the region's tail *)
   constraint 'd = _ * _
