@@ -5790,13 +5790,16 @@ module Portability = struct
 
   let legacy = of_const Const.legacy
 
-  (* CR dkalinichenko: ideally, [reading] should zap to [shareable]. *)
-  let zap_to_legacy ~statefulness =
+  let zap_to_ceil_clamped c m =
+    (match submode m (of_const c) with Ok () | Error _ -> ());
+    zap_to_ceil m
+
+  let zap_to_legacy ~statefulness m =
     match statefulness with
-    | Statefulness.Const.Stateful | Statefulness.Const.Reading
-    | Statefulness.Const.Writing ->
-      zap_to_ceil
-    | Statefulness.Const.Stateless -> zap_to_floor
+    | Statefulness.Const.Stateful -> zap_to_ceil m
+    | Statefulness.Const.Reading -> zap_to_ceil_clamped Const.Shareable m
+    | Statefulness.Const.Writing -> zap_to_ceil_clamped Const.Corruptible m
+    | Statefulness.Const.Stateless -> zap_to_floor m
 end
 
 module Uniqueness = struct
@@ -5832,13 +5835,18 @@ module Contention = struct
 
   let legacy = of_const Const.legacy
 
-  (* CR dkalinichenko: ideally, [read] should zap to [shared]. *)
-  let zap_to_legacy ~visibility =
+  let zap_to_floor_clamped c m =
+    (match submode (of_const c) m with Ok () | Error _ -> ());
+    zap_to_floor m
+
+  let zap_to_legacy ~visibility ~arg m =
     match visibility with
-    | Visibility.Const.Read_write | Visibility.Const.Read
+    | Visibility.Const.Read_write -> zap_to_floor m
+    | Visibility.Const.Immutable -> zap_to_ceil m
+    | Visibility.Const.Read ->
+      if arg then zap_to_floor_clamped Const.Shared m else zap_to_floor m
     | Visibility.Const.Write ->
-      zap_to_floor
-    | Visibility.Const.Immutable -> zap_to_ceil
+      if arg then zap_to_floor_clamped Const.Corrupted m else zap_to_floor m
 end
 
 module Forkable = struct
@@ -6179,11 +6187,11 @@ module Monadic = struct
   let min_with ax m =
     S.apply ~hint:Skip Obj.obj (Max_with_simple (ax, Id)) (S.disallow_left m)
 
-  let zap_to_legacy m : Const.t =
+  let zap_to_legacy ~arg m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
     let visibility = proj Visibility m |> Visibility.zap_to_legacy in
     let contention =
-      proj Contention m |> Contention.zap_to_legacy ~visibility
+      proj Contention m |> Contention.zap_to_legacy ~visibility ~arg
     in
     let staticity = proj Staticity m |> Staticity.zap_to_legacy in
     { uniqueness; contention; visibility; staticity }
@@ -6822,8 +6830,8 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.zap_to_floor comonadic in
     merge { monadic; comonadic }
 
-  let zap_to_legacy { comonadic; monadic } =
-    let monadic = Monadic.zap_to_legacy monadic in
+  let zap_to_legacy ~arg { comonadic; monadic } =
+    let monadic = Monadic.zap_to_legacy ~arg monadic in
     let comonadic = Comonadic.zap_to_legacy comonadic in
     merge { monadic; comonadic }
 
