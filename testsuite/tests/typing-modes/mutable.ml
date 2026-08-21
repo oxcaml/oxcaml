@@ -15,7 +15,7 @@ Line 2, characters 31-32:
                                    ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "s" (with some modality) of the record at line 2, characters 30-33.
+         because it is the field "s" (with modality "global" in effect) of the record at line 2, characters 30-33.
 |}]
 
 (* you can override those implied modalities *)
@@ -118,7 +118,7 @@ Line 1, characters 32-34:
                                     ^^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "s'" (with some modality) of the record at line 1, characters 31-35.
+         because it is the field "s'" (with modality "global" in effect) of the record at line 1, characters 31-35.
 |}]
 
 (* mutable defaults to mutable(legacy = nonportable), so currently we can't construct a
@@ -151,7 +151,7 @@ Line 1, characters 24-27:
 1 | let foo (r @ unique) = (r.s : _ @ unique)
                             ^^^
 Error: This value is "aliased"
-         because it is the field "s" (with some modality) of the record at line 1, characters 24-25.
+         because it is the field "s" (with modality "aliased" in effect) of the record at line 1, characters 24-25.
        However, the highlighted expression is expected to be "unique".
 |}]
 
