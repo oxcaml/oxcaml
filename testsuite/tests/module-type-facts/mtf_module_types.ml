@@ -3,20 +3,20 @@
  include ocamlcommon;
 *)
 
-(* Module-type facts extracted from module ascriptions and from the ways one
+(* Module-type facts extracted from module annotations and from the ways one
    module type is built out of another: aliases, includes, [with]
    constraints, destructive substitutions, [module type of] and
    strengthening.  See [mtf_facts.ml] for the output format. *)
 
 open Mtf_facts
 
-let () = heading "an ascription, and the members of an ascribed signature"
+let () = heading "an annotation, and the members of an annotated signature"
 
-(* The ascription of [Pair] is checked as a whole, and each module member of
-   the signature it is ascribed is paired with the member of the
+(* The annotation of [Pair] is checked as a whole, and each module member of
+   the annotated signature is paired with the member of the
    implementation it is checked against. *)
 let () =
-  report_implementation ~filename:"ascription.ml"
+  report_implementation ~filename:"annotation.ml"
     {|
 module type S = sig type t end
 module M : S = struct type t = int end

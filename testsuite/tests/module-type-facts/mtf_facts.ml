@@ -9,7 +9,7 @@
    declaration, i.e. the module types written inline in the source, are
    printed as [#1], [#2], ... numbered in order of first appearance.
 
-   A declaration [X] of the signature ascribed to [M] is named [M.X'], to
+   A declaration [X] of the signature annotating [M] is named [M.X'], to
    tell it apart from the declaration [M.X] of the implementation it is
    checked against, and the module type expected of the parameter [X] of a
    functor [F] is named [param(F.X)].
@@ -96,7 +96,7 @@ let string_of_node t (node : Facts.Node.t) =
   | Location (_, _) -> "<location>"
 
 let string_of_check_kind : Facts.Check.Kind.t -> string = function
-  | Ascription -> "ascription"
+  | Annotation -> "annotation"
   | Argument -> "argument"
   | Package -> "package"
   | Interface -> "interface"
@@ -188,7 +188,7 @@ let interface_checks (facts : Facts.t) =
     (fun ({ kind; _ } : Facts.Check.t) ->
       match kind with
       | Interface -> true
-      | Ascription | Argument | Package -> false)
+      | Annotation | Argument | Package -> false)
     facts.checks
 
 (* A uid the typechecker allocated while typing an interface, i.e. one that
@@ -231,7 +231,7 @@ let declaration_labels ?(prefix = "") typedtree =
      keeps the name of that module type. *)
   let parameters = ref [] in
   let qualify path name = if path = "" then name else path ^ "." ^ name in
-  (* Declarations of an ascribed signature are primed, to tell them apart from
+  (* Declarations of an annotated signature are primed, to tell them apart from
      the declarations of the implementation they are checked against. *)
   let segment ~expected name = if expected then name ^ "'" else name in
   let add uid path = labels := (uid, prefix ^ path) :: !labels in
