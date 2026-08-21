@@ -2006,6 +2006,13 @@ static void stw_cycle_all_domains(
     caml_compact_heap(domain, participating_count, participating);
   }
 
+#ifdef STACK_GUARD_PAGES
+  /* Release cached stack mappings that have gone unused for a whole
+     major cycle. (After a compaction this is a no-op: compaction
+     released them all.) */
+  if (participating[0] == domain) caml_stack_cache_trim();
+#endif
+
   /* Update GC stats (these could have significantly changed e.g. due
    * to compaction). */
   caml_collect_gc_stats_sample_stw(domain);

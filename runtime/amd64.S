@@ -1562,7 +1562,7 @@ END_FUNCTION(caml_preempt)
    through to the caller's tail. Shared by caml_continue / caml_discontinue /
    caml_discontinue_with_backtrace. */
 #define DO_RESUME_SWITCH \
-        movq   Cont_last_fiber(%rax),  %r13 ; /* %r13 := last_fiber */ \
+        movq   %rax, %r13 ;             /* %r13 := the continuation */ \
         WOSIZE_BLOCK_VAL(%rax, %rcx) ; \
         cmpq   $3, %rcx ;                    /* Wosize_hd(%rax) == 3 ? */ \
         je     1f ; \
@@ -1578,6 +1578,7 @@ END_FUNCTION(caml_preempt)
     /* check if stack null, then already used */ \
         testq   %r10, %r10 ; \
         jz      LBL(continuation_already_resumed) ; \
+        movq   Cont_last_fiber(%r13),  %r13 ; /* %r13 := last_fiber */ \
         RESUME_SWITCH_TSAN ; \
     /* Record fiber id */ \
         cmpb    $0, G(caml_cpu_ptwrite)(%rip) ; \

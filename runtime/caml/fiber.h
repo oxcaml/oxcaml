@@ -61,7 +61,7 @@ struct stack_info {
    * [caml_fiber_wsz] or the stack is bigger than pooled sizes. */
   int cache_bucket;
   int domain_idx; /* the index of the domain that allocated this fiber */
-  size_t size; /* only used when USE_MMAP_MAP_STACK is defined */
+  size_t size; /* size in bytes of this stack's memory */
   uintnat magic;
   int64_t id;
 
@@ -74,6 +74,15 @@ struct stack_info {
 
   /* Temporary dynamic bindings, applying only in this fiber */
   struct dynamic_table_s dyn;
+
+  /* NULL for a stack whose data is in ordinary stack memory. For an
+     "idle" stack -- one whose data has been copied into a malloced
+     buffer while its continuation sits on the major heap (see the
+     design comment in fiber.c) -- the [Stack_high] address of the
+     guarded stack the data last occupied, used to relocate
+     stack-internal pointers when the stack is woken. Last, so that the
+     assembly code's field offsets are unaffected. */
+  void* idled_from;
 };
 
 #ifdef STACK_GUARD_PAGES
@@ -312,10 +321,40 @@ struct stack_cache {
   _Atomic(uintnat) len;
 };
 
+/* A stack in a cache is dead storage: its [exception_ptr] field doubles
+   as the intrusive link to the next cached stack. (The runtime builds
+   with -fno-strict-aliasing, so the lvalue pun is fine.) */
+#define Stack_cache_next(stk) (*(struct stack_info**)&(stk)->exception_ptr)
+
 struct stack_cache* caml_alloc_stack_caches(void);
 void caml_enable_stack_caches(struct stack_cache*);
 void caml_disable_stack_caches(struct stack_cache*);
 void caml_free_stack_caches(struct stack_cache*);
+
+#ifdef STACK_GUARD_PAGES
+/* Idle the stacks of promoted continuation [cont]: copy them into
+   malloced buffers, recycling their guarded stacks. Called during minor
+   collection; returns the new head of the stack chain (also stored in
+   the continuation). */
+struct stack_info* caml_cont_idle_stacks(value cont);
+
+/* Demote guarded stacks cached since before the previous minor
+   collection from the current domain's local caches to the global cache.
+   Called by each domain at the start of a minor collection. */
+void caml_stack_cache_flush_local(void);
+
+/* Unmap all globally-cached guarded stacks.. Called by one domain
+ * during compaction. */
+void caml_stack_cache_free_unused(void);
+
+/* Unmap over-bound cached stacks and global-cache stacks unused for a
+   whole major cycle. Called by one domain at the end of each major
+   cycle. */
+void caml_stack_cache_trim(void);
+#endif
+
+/* Report the stack counters via CAML_GC_MESSAGE (STATS category). */
+void caml_stack_stats_print(void);
 
 CAMLextern struct stack_info* caml_alloc_main_stack (uintnat init_wsize);
 
@@ -336,6 +375,7 @@ extern uintnat caml_init_main_stack_wsz;   /* -Xmain_stack_size= */
 extern uintnat caml_init_thread_stack_wsz; /* -Xthread_stack_size= */
 extern uintnat caml_init_fiber_stack_wsz;  /* -Xfiber_stack_size= */
 extern uintnat caml_cache_stacks_per_class;/* -Xcache_stacks_per_class= */
+extern uintnat caml_max_guarded_stacks;    /* -Xmax_guarded_stacks= */
 
 #define STACK_SIZE_MAIN   0
 #define STACK_SIZE_THREAD 1
@@ -364,9 +404,18 @@ caml_rewrite_exception_stack(struct stack_info *old_stack,
    Once a continuation object has been made visible to the GC, it *must* be
    resumed exactly once by calling this function, and must not be resumed any
    other way (eg by reading the stack out directly).
+
+   The stacks of the result are ready to run: if the continuation had
+   been idled (see fiber.c), its stacks are woken onto fresh guarded
+   stacks by this call.
  */
 value caml_continuation_use_noexc (value cont);
 value caml_continuation_use (value cont);
+
+/* As [caml_continuation_use_noexc], but never wakes idle stacks: the
+   result may not be run, only inspected or updated and then given back
+   with [caml_continuation_replace]. */
+value caml_continuation_use_raw_noexc (value cont);
 
 /* Replace the stack of a continuation that was previously removed
    with caml_continuation_use. The GC must not be allowed to run
