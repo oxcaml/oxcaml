@@ -629,14 +629,14 @@ let json_of_response (type a) (query : a t) (response : a) : json =
               `String
                 (match i.site.impl_kind with
                 | Whole_unit -> "unit"
-                | Ascription_sites -> "ascriptions") )
+                | Annotation_sites -> "annotations") )
           ]
         @ (match i.check with
           | Some check ->
             [ ( "check",
                 `String
                   (match check with
-                  | Ascription -> "ascription"
+                  | Annotation -> "annotation"
                   | Argument -> "argument"
                   | Package -> "package"
                   | Interface -> "interface") )

@@ -613,9 +613,9 @@ buffer), computed from the compiler facts recorded in the configured indexes.
       'file'       : string,
       'start'      : position,
       'end'        : position,
-      'kind'       : 'unit' | 'ascriptions',
+      'kind'       : 'unit' | 'annotations',
       // 'check' is omitted for the '(interface)' target
-      'check'      : 'ascription' | 'argument' | 'package' | 'interface',
+      'check'      : 'annotation' | 'argument' | 'package' | 'interface',
       // 'check-site' is omitted when the check has no recorded site
       'check-site' : { 'file', 'start', 'end' }
     }
