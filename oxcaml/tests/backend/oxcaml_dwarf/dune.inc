@@ -598,3 +598,39 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (enabled_if (= %{context_name} "main"))
  (deps test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)
  (action (diff test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)))
+
+(executable
+ (name test_inlined_frames_dwarf)
+ (modules test_inlined_frames_dwarf)
+ (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
+ (ocamlopt_flags
+  (:standard -g -gno-upstream-dwarf -bin-annot-cms -gdwarf-fidelity high
+   -shape-format debugging-shapes -extension simd_beta -gdwarf-pedantic
+   -function-sections -O3))
+ (foreign_archives simd_stubs))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{env:OXCAML_LLDB=} "")))
+ (deps test_inlined_frames_dwarf.exe test_inlined_frames_dwarf.py test_inlined_frames_dwarf.ml lldb_test_utils.py)
+ (action
+  (run %{env:OXCAML_LLDB=} --batch -o "command script import test_inlined_frames_dwarf.py")))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{env:OXCAML_LLDB=} "")))
+ (action
+  (progn
+   (echo
+    "ERROR: OXCAML_LLDB environment variable not set.\n\
+DWARF tests require a custom LLDB build. Please set OXCAML_LLDB to \
+the path of your custom LLDB binary.\n\
+Example: export OXCAML_LLDB=/path/to/custom/lldb")
+   (bash "exit 1"))))
