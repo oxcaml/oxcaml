@@ -6886,9 +6886,12 @@ let moregeneral ~self_check env inst_nongen pat_sort_vars
           let sorts =
             List.map
               (fun v ->
-                 v
-                 |> Jkind_types.Sort.get_representable_var
-                 |> Option.map (Jkind_types.Sort.subst subst_map))
+                (* Since we haven't called [get] on [pat_sorts],
+                   [is_root v] exactly when [v] was not bound to anything *)
+                if Jkind.Sort.Var.is_root v
+                then None
+                (* [subst] looks through the contents of [v] *)
+                else Some (Jkind_types.Sort.subst subst_map (Var v)))
               pat_sorts
           in
           subj_inst, Ok sorts

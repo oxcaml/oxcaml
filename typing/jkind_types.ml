@@ -766,44 +766,6 @@ module Sort = struct
         (* path compression *)
         result)
 
-  let rec get_representable : t -> t option = function
-    | (Base _ | Univar _) as t -> Some t
-    | Product ts ->
-      begin match get_representable_product ts with
-      | None -> None
-      | Some ts' -> Some (Product ts')
-      end
-    | Addressable s ->
-      begin match get_representable s with
-      | None -> None
-      | Some s' -> Some (Addressable s')
-      end
-    | Var v -> get_representable_var v
-
-  and get_representable_product : t list -> t list option =
-   fun ts ->
-    List.fold_right
-      (fun t acc ->
-        match acc, get_representable t with
-        | None, _ | _, None -> None
-        | Some ts, Some t -> Some (t :: ts))
-      ts (Some [])
-
-  and get_representable_var : var -> t option =
-   fun v ->
-    match v.contents with
-    | None ->
-      begin if is_rigidvar v then Some (Var v) else None
-      end
-    | Some t -> get_representable t
-
-  let rec strip_head_addressable : t -> t = function
-    | Addressable s -> strip_head_addressable s
-    | Var { contents = Some s; _ } as t ->
-      let s' = strip_head_addressable s in
-      if s' == s then t else s'
-    | (Var _ | Base _ | Product _ | Univar _) as t -> t
-
   let rec subst s t =
     match t with
     | Var v ->
@@ -920,6 +882,13 @@ module Sort = struct
         true)
 
   let is_surely_addressable = constrain_addressable ~allow_mutation:false
+
+  let rec strip_head_addressable : t -> t = function
+    | Addressable s -> strip_head_addressable s
+    | Var { contents = Some s; _ } as t ->
+      let s' = strip_head_addressable s in
+      if s' == s then t else s'
+    | (Var _ | Base _ | Product _ | Univar _) as t -> t
 
   let rec equate ~allow_mutation s1 s2 =
     match s1, s2 with
