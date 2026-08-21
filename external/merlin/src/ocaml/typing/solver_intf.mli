@@ -367,6 +367,35 @@ module type Solver_mono = sig
       right : ('a, right_only) ahint
     }
 
+  module Var_id : sig
+    type t
+
+    val equal : t -> t -> bool
+
+    val compare : t -> t -> int
+
+    val hash : t -> int
+
+    val print : Fmt.formatter -> t -> unit
+  end
+
+  val get_var_id : 'a obj -> ('a, 'l * 'r) mode -> Var_id.t option
+
+  type candidate_origin =
+    | Constant
+    | Variable of Var_id.t
+
+  type ('a, 'd) candidate =
+    { origin : candidate_origin;
+      ahint : ('a, 'd) ahint
+    }
+
+  val get_loose_floor_hints :
+    'a obj -> ('a, allowed * 'r) mode -> ('a, left_only) candidate list
+
+  val get_loose_ceil_hints :
+    'a obj -> ('a, 'l * allowed) mode -> ('a, right_only) candidate list
+
   (** Takes a bound with a [hint_raw] given by [submode], and returns a [ahint]
       that's suitable for consumption. *)
   val populate_hint :

@@ -1362,11 +1362,17 @@ let apply_mode_annots ~loc ~env kind
   in
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
-  let loc =
+  let display_loc =
     if List.is_empty m.mode_desc then loc else
     Location.merge (List.map (fun a -> a.loc) m.mode_desc)
   in
-  let hint = Hint.Annotation loc in
+  let written_modes =
+    List.map
+      (Location.map (fun mode ->
+         Mode.Hint_chain.Mode.name (Mode.hint_mode_of_alloc_atom mode)))
+      m.mode_desc
+  in
+  let hint = Hint.Annotation { display_loc; written_modes } in
   let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
   let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
   (match Alloc.submode min mode with
