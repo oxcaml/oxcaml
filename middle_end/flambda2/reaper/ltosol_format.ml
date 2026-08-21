@@ -22,19 +22,66 @@ module Serialisable_solution : sig
 
   val deserialise : t -> Unboxing_analysis.result
 end = struct
-  type t = string
+  (* CR mvellacott: add solution tables. *)
 
-  (* CR mvellacott: the file currently contains only a placeholder string; it
-     should hold the serialised whole-program Reaper solution instead. *)
-  let create _solution = "imagine a whole datalog database"
+  (* Fields are hashconsed per-process, so the solution is stored with views of
+     them in the style of [table_data]. *)
+  type t =
+    { table_data : Flambda_cmx_format.table_data;
+      field_views : (Field.t * Field.view) list;
+      unboxed_fields : Unboxing_analysis.unboxed Code_id_or_name.Map.t;
+      changed_representation :
+        (Unboxing_analysis.changed_representation * Code_id_or_name.t)
+        Code_id_or_name.Map.t
+    }
 
-  let deserialise t =
-    Format.eprintf "Read placeholder .ltosol file: %s" t;
-    Unboxing_analysis.
-      { db = Datalog.empty;
-        unboxed_fields = Code_id_or_name.Map.empty;
-        changed_representation = Code_id_or_name.Map.empty
-      }
+  let create
+      ({ db = _; unboxed_fields; changed_representation } :
+        Unboxing_analysis.result) =
+    let ids = Ids_for_export.empty in
+    let ids =
+      Unboxing_analysis.unboxed_fields_ids_for_export unboxed_fields ids
+    in
+    let ids =
+      Unboxing_analysis.changed_representation_ids_for_export
+        changed_representation ids
+    in
+    let fields = Field.Set.empty in
+    let fields =
+      Unboxing_analysis.unboxed_fields_fields_for_export unboxed_fields fields
+    in
+    let fields =
+      Unboxing_analysis.changed_representation_fields_for_export
+        changed_representation fields
+    in
+    { table_data = Flambda_cmx_format.create_table_data ids;
+      field_views = Field.export_views fields;
+      unboxed_fields;
+      changed_representation
+    }
+
+  let deserialise
+      { table_data; field_views; unboxed_fields; changed_representation } :
+      Unboxing_analysis.result =
+    (* [used_value_slots] and [original_compilation_unit] only drive value-slot
+       pruning, which is only consulted when rewriting Flambda types, and the
+       solution contains no types. [code_ids] is only needed by
+       [Exported_code.apply_renaming], and the solution contains no code. *)
+    let renaming, (_code_ids : Code_id.t Code_id.Map.t) =
+      Flambda_cmx_format.import_renaming ~table_data
+        ~used_value_slots:Value_slot.Set.empty
+        ~original_compilation_unit:(Symbol.external_symbols_compilation_unit ())
+    in
+    let rename_field = Field.import_views field_views in
+    let unboxed_fields =
+      Unboxing_analysis.unboxed_fields_apply_renaming unboxed_fields renaming
+        ~rename_field
+    in
+    let changed_representation =
+      Unboxing_analysis.changed_representation_apply_renaming
+        changed_representation renaming ~rename_field
+    in
+    { db = Datalog.empty; unboxed_fields; changed_representation }
 end
 
 module File_contents = struct

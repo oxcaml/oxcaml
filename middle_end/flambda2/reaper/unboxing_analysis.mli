@@ -56,6 +56,34 @@ type result =
 
 val pp_result : Format.formatter -> result -> unit
 
+val unboxed_fields_ids_for_export :
+  unboxed Code_id_or_name.Map.t -> Ids_for_export.t -> Ids_for_export.t
+
+val unboxed_fields_fields_for_export :
+  unboxed Code_id_or_name.Map.t -> Field.Set.t -> Field.Set.t
+
+val unboxed_fields_apply_renaming :
+  unboxed Code_id_or_name.Map.t ->
+  Renaming.t ->
+  rename_field:(Field.t -> Field.t) ->
+  unboxed Code_id_or_name.Map.t
+
+val changed_representation_ids_for_export :
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t ->
+  Ids_for_export.t ->
+  Ids_for_export.t
+
+val changed_representation_fields_for_export :
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t ->
+  Field.Set.t ->
+  Field.Set.t
+
+val changed_representation_apply_renaming :
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t ->
+  Renaming.t ->
+  rename_field:(Field.t -> Field.t) ->
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+
 val cannot_change_calling_convention : result -> Code_id.t -> bool
 
 val perform_analysis :
