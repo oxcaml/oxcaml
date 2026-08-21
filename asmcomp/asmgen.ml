@@ -368,7 +368,12 @@ let register_allocator_ls cfg_with_infos =
   cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run
     cfg_with_infos
 
-let register_allocator fd : (Cfg_with_infos.t -> Cfg_with_infos.t) * bool =
+type register_allocator =
+  { allocator : Cfg_with_infos.t -> Cfg_with_infos.t;
+    copy_propagation : bool
+  }
+
+let register_allocator fd : register_allocator =
   (* First check for per-function regalloc attribute in codegen_options *)
   let rec find_regalloc_option = function
     | [] -> None
@@ -385,11 +390,26 @@ let register_allocator fd : (Cfg_with_infos.t -> Cfg_with_infos.t) * bool =
   match (regalloc : Clflags.Register_allocator.t) with
   | Cfg ->
     if should_use_linscan fd
-    then register_allocator_ls, propagate_copy_if_enabled
-    else register_allocator_irc, never_propagate_copy
-  | Irc -> register_allocator_irc, never_propagate_copy
-  | Ls -> register_allocator_ls, propagate_copy_if_enabled
-  | Gi -> register_allocator_gi, propagate_copy_if_enabled
+    then
+      { allocator = register_allocator_ls;
+        copy_propagation = propagate_copy_if_enabled
+      }
+    else
+      { allocator = register_allocator_irc;
+        copy_propagation = never_propagate_copy
+      }
+  | Irc ->
+    { allocator = register_allocator_irc;
+      copy_propagation = never_propagate_copy
+    }
+  | Ls ->
+    { allocator = register_allocator_ls;
+      copy_propagation = propagate_copy_if_enabled
+    }
+  | Gi ->
+    { allocator = register_allocator_gi;
+      copy_propagation = propagate_copy_if_enabled
+    }
 
 let available_regs ~stack_slots ~f x =
   (* Skip DWARF variable range generation for complicated functions to avoid
@@ -430,7 +450,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
      cannot happen right now because that pass deletes instructions and the
      validator does not support that. *)
   ++ (fun cfg_with_infos ->
-  let register_allocator, copy_propagation = register_allocator fd_cmm in
+  let { allocator; copy_propagation } = register_allocator fd_cmm in
   (match copy_propagation with
     | false -> cfg_with_infos
     | true -> Cfg_copy_propagation.run cfg_with_infos)
@@ -439,7 +459,7 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
         Regalloc_validate.Description.create
           (Cfg_with_infos.cfg_with_layout cfg_with_infos)
       in
-      cfg_with_infos ++ register_allocator
+      cfg_with_infos ++ allocator
       ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
            (Regalloc_validate.run cfg_description)))
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
