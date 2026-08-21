@@ -3408,24 +3408,14 @@ let plain_story ~claim ?contrast ?(educate = []) ?(suggestion = []) () :
   in
   [prose { Nlg.statement = None; children = claims beats }]
 
-let violation_crossing_axes (v : Jkind.Violation.t) : string list =
-  match v.violation with
-  | Jkind.Violation.No_intersection _ -> []
-  | Jkind.Violation.Not_a_subjkind (_, _, reasons) ->
-    List.filter_map
-      (fun reason ->
-        match (reason : Jkind.Sub_failure_reason.t) with
-        | Axis_disagreement (Jkind_axis.Axis.Pack axis) ->
-          Some (Jkind_axis.Axis.name axis)
-        | Layout_disagreement | With_bounds_on_left | Constrain_ran_out_of_fuel
-          ->
-          None)
-      reasons
+let subjkind_error_crossing_axes (err : Ikind.subjkind_error) : string list =
+  Ikind.subjkind_error_violating_axes err
+  |> List.map (fun (Jkind_axis.Axis.Pack axis) -> Jkind_axis.Axis.name axis)
 
-let jkind_crossing_story ~loc ~what (v : Jkind.Violation.t) : story list option
-    =
+let jkind_crossing_story ~loc ~what (err : Ikind.subjkind_error) :
+    story list option =
   let open Nlg in
-  match violation_crossing_axes v with
+  match subjkind_error_crossing_axes err with
   | [] -> None
   | axes ->
     let plural = match axes with [_] -> " axis" | _ -> " axes" in
@@ -3955,7 +3945,9 @@ let diagnose_unexplained request exn =
 let diagnose_typetexp request ~loc ~env err =
   match err with
   | Typetexp.Bad_jkind_annot (_ty, v) ->
-    Option.value (jkind_crossing_story ~loc ~what:"this type" v) ~default:[]
+    Option.value
+      (jkind_crossing_story ~loc ~what:"this type" (Ikind.Jkind_error v))
+      ~default:[]
   | err ->
     let (_ : Scope.t) = typetexp_scope err in
     diagnose_unexplained request (Typetexp.Error (loc, env, err))
