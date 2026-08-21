@@ -4691,7 +4691,7 @@ let module_implementation_facts ~unit_interface ~argument_interface
     let current_comp_unit =
       Compilation_unit.full_path_as_string compilation_unit
     in
-    (* Only this unit's own [.mli] items: an ascription can mention a module
+    (* Only this unit's own [.mli] items: an annotation can mention a module
        type from another unit's interface. *)
     let is_interface_item (uid : Uid.t) =
       match uid with

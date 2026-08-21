@@ -115,13 +115,13 @@ end
 module Check = struct
   module Kind = struct
     type t =
-      | Ascription
+      | Annotation
       | Argument
       | Package
       | Interface
 
     let int_of_t = function
-      | Ascription -> 0
+      | Annotation -> 0
       | Argument -> 1
       | Package -> 2
       | Interface -> 3
@@ -1138,7 +1138,7 @@ let facts_of_tree compilation_unit artifact iterate =
              | Mty_for_hole ->
                ())
   in
-  let register_functor_ascription (inner : module_expr)
+  let register_functor_annotation (inner : module_expr)
       (interface_type : Types.module_type) =
     let rec join_parameters env ~body_context ~interface_context
         (body_type : Types.module_type) (interface_type : Types.module_type) =
@@ -1242,7 +1242,7 @@ let facts_of_tree compilation_unit artifact iterate =
       | Tmod_typed_hole ->
         None)
   in
-  let register_ascription_member_pairs uid (inner : module_expr)
+  let register_annotation_member_pairs uid (inner : module_expr)
       (module_type : Typedtree.module_type) =
     let site = inner.mod_loc in
     let rec resolve_member visited env (member_type : Types.module_type) =
@@ -1273,8 +1273,8 @@ let facts_of_tree compilation_unit artifact iterate =
         | None -> `Other)
       | Types.Mty_functor _ | Types.Mty_for_hole -> `Other
     in
-    let rec pair_members visited env ~body_context ~ascribed_context
-        (body_signature : Types.signature) (ascribed : Types.signature) =
+    let rec pair_members visited env ~body_context ~annotation_context
+        (body_signature : Types.signature) (annotation : Types.signature) =
       let body_index = index_of_signature body_signature in
       let env = Env.add_signature body_signature env in
       let (_ : Env.t) =
@@ -1292,7 +1292,7 @@ let facts_of_tree compilation_unit artifact iterate =
                             declaration.mtd_uid) ->
                   add_dependency
                     (Key.Named
-                       { context = ascribed_context;
+                       { context = annotation_context;
                          family_uid = declaration.mtd_uid
                        })
                     (named_key body_context body_declaration.Types.mtd_uid)
@@ -1311,19 +1311,20 @@ let facts_of_tree compilation_unit artifact iterate =
                      then Node.Uid body_declaration.Types.md_uid
                      else Node.Location (compilation_unit, site))
                     (Key.Anon { key_uid = declaration.md_uid })
-                    Check.Kind.Ascription site;
+                    Check.Kind.Annotation site;
                 match resolve_member visited env declaration.Types.md_type with
-                | `Signature (visited, ascribed_owner, ascribed_members) -> (
+                | `Signature (visited, annotation_owner, annotation_members)
+                  -> (
                   match
                     resolve_member Uid.Set.empty env
                       body_declaration.Types.md_type
                   with
                   | `Signature (_, body_owner, body_members) ->
-                    let ascribed_context =
-                      match ascribed_owner with
+                    let annotation_context =
+                      match annotation_owner with
                       | Some owner -> owner
                       | None ->
-                        Context.Proj (ascribed_context, declaration.md_uid)
+                        Context.Proj (annotation_context, declaration.md_uid)
                     in
                     let body_context =
                       match body_owner with
@@ -1332,8 +1333,8 @@ let facts_of_tree compilation_unit artifact iterate =
                         Context.Proj
                           (body_context, body_declaration.Types.md_uid)
                     in
-                    pair_members visited env ~body_context ~ascribed_context
-                      body_members ascribed_members
+                    pair_members visited env ~body_context ~annotation_context
+                      body_members annotation_members
                   | `Abstract | `Unresolved | `Other ->
                     add_omission Omission.Reason.Unresolved_module)
                 | `Unresolved ->
@@ -1342,13 +1343,13 @@ let facts_of_tree compilation_unit artifact iterate =
               | Some _ | None -> ())
             | Other_member -> ());
             Env.add_signature [item] env)
-          env ascribed
+          env annotation
       in
       ()
     in
     let inner = unwrap_implicit_constraint inner in
     match scraped_signature module_type.mty_env module_type.mty_type with
-    | Some ascribed -> (
+    | Some annotation -> (
       match scraped_alias_signature inner.mod_env inner.mod_type with
       | Some body_signature ->
         let context = module_context uid in
@@ -1361,19 +1362,19 @@ let facts_of_tree compilation_unit artifact iterate =
           | None -> context
         in
         pair_members Uid.Set.empty module_type.mty_env ~body_context
-          ~ascribed_context:context body_signature ascribed
+          ~annotation_context:context body_signature annotation
       | None -> ())
     | None -> ()
   in
   let add_binding uid (implementation : module_expr) =
     match implementation.mod_desc with
     | Tmod_constraint (inner, _, Tmodtype_explicit (module_type, _), _) -> (
-      register_functor_ascription inner module_type.mty_type;
-      register_ascription_member_pairs uid inner module_type;
+      register_functor_annotation inner module_type.mty_type;
+      register_annotation_member_pairs uid inner module_type;
       match register_binding_expectation uid implementation with
       | Some expectation ->
         mark_handled expectation inner.mod_loc;
-        add_check (Node.Uid uid) expectation Check.Kind.Ascription inner.mod_loc
+        add_check (Node.Uid uid) expectation Check.Kind.Annotation inner.mod_loc
       | None -> ())
     | Tmod_constraint (inner, _, Tmodtype_package _, _) -> (
       match register_binding_expectation uid implementation with
@@ -1695,10 +1696,10 @@ let facts_of_tree compilation_unit artifact iterate =
               let expectation = key_of_module_type module_type in
               if not (handled expectation implementation.mod_loc)
               then begin
-                register_functor_ascription implementation module_type.mty_type;
+                register_functor_annotation implementation module_type.mty_type;
                 add_check
                   (Node.Location (compilation_unit, module_expr.mod_loc))
-                  expectation Check.Kind.Ascription implementation.mod_loc
+                  expectation Check.Kind.Annotation implementation.mod_loc
               end
             end
           | Tmod_constraint
@@ -1921,7 +1922,7 @@ let facts_of_tree compilation_unit artifact iterate =
                       add_check node
                         (Key.Anon
                            { key_uid = component_declaration.Types.md_uid })
-                        Check.Kind.Ascription lid.loc
+                        Check.Kind.Annotation lid.loc
                     | None ->
                       add_omission ~affected:key
                         Omission.Reason.Unresolved_module)
@@ -1933,7 +1934,7 @@ let facts_of_tree compilation_unit artifact iterate =
               (let node =
                  node_of_module_path env ~loc:module_type.mty_loc path
                in
-               add_check node (key_of_module_type base) Check.Kind.Ascription
+               add_check node (key_of_module_type base) Check.Kind.Annotation
                  module_type.mty_loc);
               add_subject_expectation_edges key ~site:module_type.mty_loc env
                 Dependency.Reason.Strengthening path;
