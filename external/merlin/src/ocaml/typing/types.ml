@@ -1015,11 +1015,6 @@ let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
   | Record_unboxed_product_variable, Record_unboxed_product_variable -> true
   | (Record_unboxed_product | Record_unboxed_product_variable), _ -> false
 
-<<<<<<< Merlin:rtjoa.all-void-variant-block
-(* The scannable axes in the resulting  are always [max] *)
-||||||| Compiler:last-imported
-(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
-=======
 let cstr_layout_is_constant (layout : cstr_layout) =
   match layout with
   | Cstr_layout_known { shape = Constructor_immediate_all_void; _ } -> true
@@ -1031,7 +1026,6 @@ let cstr_layout_is_constant (layout : cstr_layout) =
   | Cstr_layout_variable -> false
 
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
->>>>>>> Compiler:HEAD
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
   (* CR layouts-scannable: since sorts do not store scannable axis information,
