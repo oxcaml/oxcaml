@@ -22,13 +22,13 @@ Static data:
       ; r =
         ⟪(function {nlocal = 1} closure/333[L]
            (function {nlocal = 0} x/318[$layout_2] : $layout_2 x/318))⟫ });
-    (closure ⟨env⟩ layout_11 layout_12 ->
+    (closure ⟨env⟩ layout_5 layout_7 ->
       { c = (missing)
       ; r =
         ⟪(function {nlocal = 1} closure/334[L]
-           (function {nlocal = 0} x/321[$layout_11] y/322[$layout_12]
-             : #($layout_11, $layout_12)
-             (make_unboxed_product #($layout_11, $layout_12) x/321 y/322)))⟫ });
+           (function {nlocal = 0} x/321[$layout_5] y/322[$layout_7]
+             : #($layout_5, $layout_7)
+             (make_unboxed_product #($layout_5, $layout_7) x/321 y/322)))⟫ });
     [ (missing); ];
     (closure ⟨env⟩ layout_16 ->
       { c = (missing)
