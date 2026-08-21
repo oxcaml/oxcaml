@@ -173,6 +173,10 @@ let flambda_to_flambda0 : type m.
     flambda_result =
  fun ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
      ~close_prog_metadata ~code_slot_offsets ~sections raw_flambda ->
+  if Flambda_features.classic_mode ()
+  then
+    (* CR mvellacott: We want to allow classic mode again in the future. *)
+    Misc.fatal_error "failed to prevent classic mode from being enabled";
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;
   dump_fexpr_annot ~prefixname "raw" raw_flambda;

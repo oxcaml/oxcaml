@@ -550,13 +550,17 @@ module Flambda2 = struct
 end
 
 let set_oclassic () =
-  if Clflags.is_flambda2 () then begin
+  (* CR mvellacott: We're preventing classic mode from being enabled as a
+      hack to ensure that LTO always has Reaper data available. We should
+      find a better solution in the long term. *)
+  (*if Clflags.is_flambda2 () then begin
     Flambda2.Inlining.use_inlining_arguments_set
       Flambda2.Inlining.oclassic_arguments;
     opt_level := Set Oclassic
   end else begin
     Clflags.Opt_flag_handler.default.set_oclassic ();
-  end
+  end*)
+  ()
 
 let set_o2 () =
   if Clflags.is_flambda2 () then begin

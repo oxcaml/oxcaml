@@ -1,4 +1,6 @@
+(* CR mvellacott: Re-enable when we bring back classic mode. *)
 (* TEST
+ skip;
  compile_only = "true";
  setup-ocamlopt.byte-build-env;
  flags = "-Oclassic";
