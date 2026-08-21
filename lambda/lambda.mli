@@ -498,6 +498,7 @@ and extern_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Repr_never_returns
 
 and external_call_description = extern_repr Primitive.description_gen
 

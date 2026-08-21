@@ -2911,6 +2911,10 @@ module Format_history = struct
   let format_concrete_creation_reason ppf :
       History.concrete_creation_reason -> unit = function
     | Match -> fprintf ppf "a value of this type is matched against a pattern"
+    | Match_or_try_result ->
+      fprintf ppf
+        "it's the result of a try expression or of a match with@ exception \
+         patterns or effect handlers"
     | Extension_constructor_declaration _ ->
       fprintf ppf "it's the type of an argument to an extension constructor"
     | Extension_label_declaration lbl ->
@@ -3081,6 +3085,9 @@ module Format_history = struct
       fprintf ppf "it's the type of a variable captured in an object"
     | Let_rec_variable v ->
       fprintf ppf "it's the type of the recursive variable %s" (Ident.name v)
+    | Effect_handler_result ->
+      fprintf ppf
+        "it's the result of a match or try expression with effect handlers"
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "the %stype argument of %a has %s value_or_null"
         (format_position ~arity position)
@@ -4005,6 +4012,7 @@ module Debug_printers = struct
   let concrete_creation_reason ppf : History.concrete_creation_reason -> unit =
     function
     | Match -> fprintf ppf "Match"
+    | Match_or_try_result -> fprintf ppf "Match_or_try_result"
     | Extension_constructor_declaration idx ->
       fprintf ppf "Extension_constructor_declaration %d" idx
     | Extension_label_declaration lbl ->
@@ -4113,6 +4121,7 @@ module Debug_printers = struct
     | Probe -> fprintf ppf "Probe"
     | Captured_in_object -> fprintf ppf "Captured_in_object"
     | Let_rec_variable v -> fprintf ppf "Let_rec_variable %a" Ident.print v
+    | Effect_handler_result -> fprintf ppf "Effect_handler_result"
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
         (Fmt.compat !printtyp_path)

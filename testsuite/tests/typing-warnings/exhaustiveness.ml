@@ -268,7 +268,7 @@ type _ t = Int : int t
 
 let f (x : bool t) = match x with _ -> . ;; (* ok *)
 [%%expect {|
-val f : bool t -> 'a = <fun>
+val f : ('a : any). bool t -> 'a = <fun>
 |}]
 
 
