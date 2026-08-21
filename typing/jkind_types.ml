@@ -47,22 +47,18 @@ module Sort = struct
     univar_pairs := pairs @ old_univars;
     Misc.try_finally f ~always:(fun () -> univar_pairs := old_univars)
 
-  (* Special sentinel levels stored in [var.level] when [contents = None]:
-     - [level_generic]: a generalized sort variable (genvar), used for layout
-       polymorphism and must be quantified. That is, they can only appear under
-       [instance_map], etc.)
-     - [level_rigid]: a rigid sort variable that cannot be unified.
-     - [level_fresh]: a freshly-created unifiable sort variable whose level has
-       not yet been set; it will be lowered via [update_level] as soon as it is
-       unified with another variable.
-     When [contents = Some t], [level] is meaningless. *)
-  (* CR-soon zqian: Add the invariant that, when [contents = Some v], we have
-    [level >= v.level]. This can improve performance. *)
-  let level_generic = Ident.highest_scope
+  (* Variables [v] at [v.level >= generic_level - 1] are rigid,
+     and [v.contents = None] and [v.level] is never lowered.
+     No such invariants apply to flexible (non-rigid) variables. *)
 
-  let level_rigid = Ident.highest_scope - 1
+  (* Same as [Btype.generic_level]. Rigid, but substituted by [instance]. *)
+  let generic_level = Ident.highest_scope
 
-  let level_fresh = Ident.highest_scope - 2
+  (* Same as [Ctype.subject_level]. Rigid. *)
+  let subject_level = generic_level - 1
+
+  (* Highest level for a flexible variable. *)
+  let fresh_level = subject_level - 1
 
   type t =
     | Var of var
@@ -72,17 +68,17 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
-      mutable level : int;  (** See comments on [level_generic] *)
+      mutable level : int;
       id : int
     }
 
   let is_rigidvar var =
     assert (Option.is_none var.contents);
-    var.level = level_rigid
+    var.level = subject_level
 
   let is_genvar var =
     assert (Option.is_none var.contents);
-    var.level = level_generic
+    var.level = generic_level
 
   let equal_base b1 b2 =
     match b1, b2 with
@@ -649,22 +645,17 @@ module Sort = struct
     { contents = None; level; id = !last_var_id }
 
   let new_var ~level =
-    (* Guard against accidentally creating a genvar or rigidvar via this path:
-       those require special handling (instance_map registration for genvars;
-       refusal to unify for rigidvars). [level_fresh] is intentionally
-       not guarded here — it behaves like any other unifiable variable and its
-       level is simply lowered by [update_level] upon unification. *)
-    if level >= level_rigid
-    then Misc.fatal_error "Jkind_types.new_var: level >= level_rigid";
+    if level > fresh_level
+    then Misc.fatal_error "Jkind_types.new_var: level > fresh_level";
     new_var_unsafe ~level
 
-  let new_genvar () = new_var_unsafe ~level:level_generic
+  let new_genvar () = new_var_unsafe ~level:generic_level
 
   let new_genvar_for_cmi () =
     decr last_var_cmi_id;
-    { contents = None; level = level_generic; id = !last_var_cmi_id }
+    { contents = None; level = generic_level; id = !last_var_cmi_id }
 
-  let new_rigidvar () = new_var_unsafe ~level:level_rigid
+  let new_rigidvar () = new_var_unsafe ~level:subject_level
 
   let instance_map : (var * var) list ref = ref []
 
@@ -968,7 +959,7 @@ module Sort = struct
       true
 
   let decompose_into_product t n =
-    let ts = List.init n (fun _ -> of_var (new_var ~level:level_fresh)) in
+    let ts = List.init n (fun _ -> of_var (new_var ~level:fresh_level)) in
     if equate t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
