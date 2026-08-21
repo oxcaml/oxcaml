@@ -209,6 +209,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Lpoly_inst -> Lpoly_inst
         | Contained_by c -> Contained_by c
+        | Annotation annotation -> Annotation annotation
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -231,6 +232,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
+        | Annotation annotation -> Annotation annotation
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -259,6 +261,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
+        | Annotation annotation -> Annotation annotation
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -287,6 +290,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Monadic -> Spliced Monadic
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
+        | Annotation annotation -> Annotation annotation
     end)
   end
 end
@@ -4980,6 +4984,7 @@ module Report = struct
     | Contained_by c ->
       let print_mod ppf Modality = Fmt.fprintf ppf " (with some modality)" in
       Fmt.fprintf ppf "it %t" (print_containing print_mod c)
+    | Annotation _ -> ()
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and return the
@@ -5223,6 +5228,9 @@ module Report = struct
           then ignore (print_ahint ~sub:true side pp src ppf ahint);
           Some Mode_with_hint)
     | Const Unknown ->
+      print_mode_with_side ~sub side obj ppf a;
+      Some Mode
+    | Const (Annotation _) ->
       print_mode_with_side ~sub side obj ppf a;
       Some Mode
     | Irrelevant ->
