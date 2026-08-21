@@ -655,8 +655,6 @@ module Sort = struct
     decr last_var_cmi_id;
     { contents = None; level = generic_level; id = !last_var_cmi_id }
 
-  let new_rigidvar () = new_var_unsafe ~level:subject_level
-
   let instance_map : (var * var) list ref = ref []
 
   let instance_with ~level vars f =
@@ -683,14 +681,7 @@ module Sort = struct
     | None when is_genvar v ->
       begin match List.assq_opt v !instance_map with
       | Some v' -> Var v'
-      | None ->
-        (* If the caller didn't set up layout instantiation, conservatively
-           return a rigid variable (which is not equal to anything) *)
-        (* CR-someday zqian: explicitly distinguish among three cases:
-        - instantiating layouts properly
-        - knowingly instantiating to rigidvar conservatively
-        - unknown context, in which case we should crash *)
-        Var (new_rigidvar ())
+      | None -> Misc.fatal_error "Jkind_types.instance_var: free genvar"
       end
     | None -> Var v
     | Some t -> instance t
