@@ -193,10 +193,14 @@ let phantom_defining_expr ppf defining_expr =
   | Cphantom_block { tag; fields } ->
     Format.fprintf ppf "[%d: " tag;
     List.iter
-      (fun field ->
+      (fun (field : Cmm.phantom_block_field) ->
         match field with
-        | Some field -> Format.fprintf ppf "%a; " V.print field
-        | None -> Format.fprintf ppf "?; ")
+        | Cphantom_field_var var -> Format.fprintf ppf "%a; " V.print var
+        | Cphantom_field_const_int i ->
+          Format.fprintf ppf "%a; " Targetint.print i
+        | Cphantom_field_const_symbol sym ->
+          Format.fprintf ppf "%s; " sym.sym_name
+        | Cphantom_field_unavailable -> Format.fprintf ppf "?; ")
       fields;
     Format.fprintf ppf "]"
 

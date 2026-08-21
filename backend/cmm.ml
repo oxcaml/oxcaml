@@ -320,6 +320,14 @@ let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
   String.equal left_sym_name right_sym_name
   && equal_is_global left_sym_global right_sym_global
 
+type phantom_block_field =
+  | Cphantom_field_var of Backend_var.t
+  | Cphantom_field_const_int of Targetint.t
+      (** The tagged representation, as for [Cphantom_const_int]. *)
+  | Cphantom_field_const_symbol of symbol
+  | Cphantom_field_unavailable
+      (** A field whose value is unavailable (optimised out). *)
+
 type phantom_defining_expr =
   | Cphantom_const_int of Targetint.t
   | Cphantom_const_symbol of symbol
@@ -338,9 +346,7 @@ type phantom_defining_expr =
       }
   | Cphantom_block of
       { tag : int;
-        fields : Backend_var.t option list
-            (** [None] denotes a field whose value is unavailable (optimised
-                out). *)
+        fields : phantom_block_field list
       }
 
 type trywith_shared_label = Lambda.static_label

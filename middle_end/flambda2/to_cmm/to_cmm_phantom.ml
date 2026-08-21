@@ -52,17 +52,20 @@ let simple env res s =
         expr, env, res, FV.empty
       | _ -> None, env, res, FV.empty)
     ~var:(fun v ~coercion:_ ->
-      let Env.{ env; res; var = cmm_var_opt } =
-        Env.get_variable_for_phantom_expr env res v
-      in
-      let expr, fv =
-        match cmm_var_opt with
-        | Some backend_var ->
-          ( Some (Cmm.Cphantom_var backend_var),
-            FV.singleton ~mode:Phantom backend_var )
-        | None -> None, FV.empty
-      in
-      expr, env, res, fv)
+      match Env.phantom_const_for_var env v with
+      | Some const -> Some const, env, res, FV.empty
+      | None ->
+        let Env.{ env; res; var = cmm_var_opt } =
+          Env.get_variable_for_phantom_expr env res v
+        in
+        let expr, fv =
+          match cmm_var_opt with
+          | Some backend_var ->
+            ( Some (Cmm.Cphantom_var backend_var),
+              FV.singleton ~mode:Phantom backend_var )
+          | None -> None, FV.empty
+        in
+        expr, env, res, fv)
 
 let simple_block_field env res s =
   Simple.pattern_match' s
@@ -74,19 +77,64 @@ let simple_block_field env res s =
       in
       env, res, cmm_var_opt)
 
+let block_field env res s : _ * _ * Cmm.phantom_block_field * _ =
+  Simple.pattern_match' s
+    ~symbol:(fun sym ~coercion:_ ->
+      let cmm_sym = To_cmm_result.symbol res sym in
+      let symbol_usable =
+        (* See the comment in [simple], above. *)
+        match cmm_sym.sym_global with
+        | Global -> true
+        | Local -> To_cmm_result.data_symbol_is_defined res cmm_sym
+      in
+      let field : Cmm.phantom_block_field =
+        if symbol_usable
+        then Cmm.Cphantom_field_const_symbol cmm_sym
+        else Cmm.Cphantom_field_unavailable
+      in
+      env, res, field, FV.empty)
+    ~const:(fun const ->
+      match[@warning "-4"] Reg_width_const.descr const with
+      | Tagged_immediate i ->
+        let machine_width = Target_system.Machine_width.Sixty_four in
+        let targetint_32_64 = Target_ocaml_int.to_targetint machine_width i in
+        let targetint =
+          Targetint.of_int64 (Targetint_32_64.to_int64 targetint_32_64)
+        in
+        env, res, Cmm.Cphantom_field_const_int targetint, FV.empty
+      | _ -> env, res, Cmm.Cphantom_field_unavailable, FV.empty)
+    ~var:(fun v ~coercion:_ ->
+      match Env.phantom_const_for_var env v with
+      | Some (Cmm.Cphantom_const_int i) ->
+        env, res, Cmm.Cphantom_field_const_int i, FV.empty
+      | Some (Cmm.Cphantom_const_symbol sym) ->
+        env, res, Cmm.Cphantom_field_const_symbol sym, FV.empty
+      | Some
+          ( Cmm.Cphantom_var _ | Cmm.Cphantom_offset_var _
+          | Cmm.Cphantom_read_field _ | Cmm.Cphantom_read_symbol_field _
+          | Cmm.Cphantom_block _ )
+      | None -> (
+        let Env.{ env; res; var = cmm_var_opt } =
+          Env.get_variable_for_phantom_expr env res v
+        in
+        match cmm_var_opt with
+        | Some backend_var ->
+          ( env,
+            res,
+            Cmm.Cphantom_field_var backend_var,
+            FV.singleton ~mode:Phantom backend_var )
+        | None -> env, res, Cmm.Cphantom_field_unavailable, FV.empty))
+
 (* Contrary to what we need to do in [To_cmm_primitive], the order of
    environment lookups here should not matter. Fields that cannot be described
-   are presented as optimised out ([None]) without preventing the description of
-   the remaining fields. *)
+   are presented as unavailable without preventing the description of the
+   remaining fields. *)
 let rec block_field_list env res = function
   | [] -> env, res, [], FV.empty
   | s :: args ->
-    let env, res, cmm_var_opt = simple_block_field env res s in
+    let env, res, field, fv0 = block_field env res s in
     let env, res, rest, fv = block_field_list env res args in
-    let fv =
-      match cmm_var_opt with None -> fv | Some v -> FV.add ~mode:Phantom v fv
-    in
-    env, res, cmm_var_opt :: rest, fv
+    env, res, field :: rest, FV.union fv0 fv
 
 let prim env res _dbg p =
   match[@warning "-4"] (p : P.t) with

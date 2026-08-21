@@ -82,9 +82,7 @@ type phantom_defining_expr = private
       }
   | Cphantom_block of
       { tag : int;
-        fields : Backend_var.t option list
-            (** [None] denotes a field whose value is unavailable (optimised
-                out). *)
+        fields : Cmm.phantom_block_field list
       }
   | Cphantom_optimised_out
 

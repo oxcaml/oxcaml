@@ -219,6 +219,14 @@ type symbol =
 
 val equal_symbol : symbol -> symbol -> bool
 
+type phantom_block_field =
+  | Cphantom_field_var of Backend_var.t
+  | Cphantom_field_const_int of Targetint.t
+      (** The tagged representation, as for [Cphantom_const_int]. *)
+  | Cphantom_field_const_symbol of symbol
+  | Cphantom_field_unavailable
+      (** A field whose value is unavailable (optimised out). *)
+
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the
      representation of "target-width OCaml integers of type [int]" becomes when
@@ -253,9 +261,7 @@ type phantom_defining_expr =
           symbol. *)
   | Cphantom_block of
       { tag : int;
-        fields : Backend_var.t option list
-            (** [None] denotes a field whose value is unavailable (optimised
-                out). *)
+        fields : phantom_block_field list
       }
       (** The phantom-let-bound variable points at a block with the given
           structure. *)

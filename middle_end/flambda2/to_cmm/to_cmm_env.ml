@@ -120,7 +120,11 @@ type _ inline =
    The arguments are stored with their effects. This means that if we need to
    split the binding, we can re-bind each argument with its correct effects. *)
 type _ bound_expr =
-  | Inlined : phantom bound_expr
+  | Inlined :
+      { defining_expr : Cmm.phantom_defining_expr option }
+      -> phantom bound_expr
+        (** The defining expression is the conversion, when expressible, of the
+            Cmm expression that was inlined at the variable's use site. *)
   | Phantom :
       { cmm_expr : Cmm.phantom_defining_expr option;
         free_vars : free_vars
@@ -276,7 +280,8 @@ let print_phantom_with_free_vars ppf (phantom, free_vars) =
 
 let [@ocamlformat "disable"] print_bound_expr (type a) ppf (b : a bound_expr) =
   match b with
-  | Inlined -> Format.fprintf ppf "(inlined)"
+  | Inlined { defining_expr; } ->
+    Format.fprintf ppf "(inlined %a)" print_phantom_cmm defining_expr
   | Phantom { cmm_expr; free_vars; } ->
     print_phantom_with_free_vars ppf (cmm_expr, free_vars)
   | Simple { cmm_expr; free_vars; } | Split { cmm_expr; free_vars; } ->
@@ -563,7 +568,7 @@ let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
   let order =
     let incr =
       match bound_expr with
-      | Inlined | Phantom _ | Simple _ | Split _ -> 1
+      | Inlined _ | Phantom _ | Simple _ | Split _ -> 1
       | Splittable_prim { args; _ } ->
         (* one binding for each arg + one for the actual binding + 1 for the
            phantom binding left behind upon splitting (see
@@ -595,7 +600,7 @@ let create_binding (type a) effs var ~(inline : a inline)
      must_inline_and_duplicate (since it basically replaces a variable by either
      another variable, a constant, or a symbol). *)
   match bound_expr with
-  | Inlined ->
+  | Inlined _ ->
     Misc.fatal_errorf
       "[Inlined] bindings should never be created directly; they are only \
        generated when an existing binding is inlined."
@@ -612,12 +617,27 @@ let create_binding (type a) effs var ~(inline : a inline)
 
 (* Binding splitting *)
 
-let mark_binding_as_inlined env var binding =
-  (* The binding is replaced, rather than removed: at flush time an empty
-     phantom let can then be generated for it (when phantom lets are enabled and
-     the variable is referenced by other phantom bindings), so that the variable
-     remains visible to the debugger. *)
-  let new_binding = { binding with inline = Inlined; bound_expr = Inlined } in
+let mark_binding_as_inlined (type a) env var (binding : a binding) =
+  (* The binding is replaced, rather than removed: at flush time a phantom let
+     can then be generated for it (when phantom lets are enabled and the
+     variable is referenced by other phantom bindings), so that the variable
+     remains visible to the debugger.  When the inlined expression is
+     convertible to a phantom defining expression, the phantom let describes
+     the variable's value rather than presenting it as optimised out. *)
+  let defining_expr =
+    if not binding.phantomize
+    then None
+    else
+      match binding.bound_expr with
+      | Simple { cmm_expr; free_vars = _ } ->
+        Cmm_helpers.phantom_defining_expr_of_expr cmm_expr
+      | Split { cmm_expr; free_vars = _ } ->
+        Cmm_helpers.phantom_defining_expr_of_expr cmm_expr
+      | Inlined _ | Phantom _ | Splittable_prim _ -> None
+  in
+  let new_binding =
+    { binding with inline = Inlined; bound_expr = Inlined { defining_expr } }
+  in
   { env with
     bindings = Variable.Map.add var (Binding new_binding) env.bindings
   }
@@ -644,7 +664,7 @@ let new_bindings_for_splitting ~phantomize ~cmm_var order args =
             phantomize = true;
             effs = Ece.pure_can_be_duplicated;
             inline = Inlined;
-            bound_expr = Inlined;
+            bound_expr = Inlined { defining_expr = None };
             cmm_var
           }
       in
@@ -1177,6 +1197,30 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
         let env = mark_binding_as_inlined env var binding in
         will_inline_simple env res binding))
 
+(* If the variable's delayed binding is trivially a constant, return the
+   corresponding phantom defining expression, so that it can be substituted
+   directly into phantom defining expressions under construction (the binding
+   itself will typically be inlined out). *)
+let phantom_const_for_var env var =
+  let var = resolve_alias env var in
+  match Variable.Map.find var env.bindings with
+  | exception Not_found -> None
+  | Binding b -> (
+    let const_of cmm_expr =
+      match Cmm_helpers.phantom_defining_expr_of_expr cmm_expr with
+      | Some (Cphantom_const_int _ | Cphantom_const_symbol _) as result ->
+        result
+      | Some
+          ( Cphantom_var _ | Cphantom_offset_var _ | Cphantom_read_field _
+          | Cphantom_read_symbol_field _ | Cphantom_block _ )
+      | None ->
+        None
+    in
+    match b.bound_expr with
+    | Simple { cmm_expr; free_vars = _ } -> const_of cmm_expr
+    | Split { cmm_expr; free_vars = _ } -> const_of cmm_expr
+    | Inlined _ | Phantom _ | Splittable_prim _ -> None)
+
 let get_variable_for_phantom_expr env res var =
   let var = resolve_alias env var in
   match Variable.Map.find var env.bindings with
@@ -1212,7 +1256,7 @@ let find_pure_bound_cmm_expr env var =
         | Simple { cmm_expr; free_vars = _ } | Split { cmm_expr; free_vars = _ }
           ->
           Some cmm_expr
-        | Inlined | Phantom _ | Splittable_prim _ -> None
+        | Inlined _ | Phantom _ | Splittable_prim _ -> None
       in
       cmm_expr_of_bound_expr binding.bound_expr)
 
@@ -1346,8 +1390,12 @@ let phantom_defining_expr_refs (expr : Cmm.phantom_defining_expr) =
     Backend_var.Set.singleton var
   | Cphantom_block { tag = _; fields } ->
     List.fold_left
-      (fun acc field ->
-        match field with None -> acc | Some var -> Backend_var.Set.add var acc)
+      (fun acc (field : Cmm.phantom_block_field) ->
+        match field with
+        | Cphantom_field_var var -> Backend_var.Set.add var acc
+        | Cphantom_field_const_int _ | Cphantom_field_const_symbol _
+        | Cphantom_field_unavailable ->
+          acc)
       Backend_var.Set.empty fields
 
 type filtered_phantom_defining_expr =
@@ -1372,10 +1420,14 @@ let filter_phantom_defining_expr (expr : Cmm.phantom_defining_expr) ~in_scope =
     | Cphantom_block { tag; fields } ->
       let fields =
         List.map
-          (fun field ->
+          (fun (field : Cmm.phantom_block_field) ->
             match field with
-            | Some var when Backend_var.Set.mem var in_scope -> Some var
-            | Some _ | None -> None)
+            | Cphantom_field_var var when Backend_var.Set.mem var in_scope ->
+              field
+            | Cphantom_field_var _ -> Cmm.Cphantom_field_unavailable
+            | Cphantom_field_const_int _ | Cphantom_field_const_symbol _
+            | Cphantom_field_unavailable ->
+              field)
           fields
       in
       Some_refs_in_scope
@@ -1428,8 +1480,17 @@ let reissue_pendings ~pendings ~consumed ~scope_at ~order v (body, fvs) =
       else unchanged)
     (body, fvs) pendings
 
+(* How a phantom binder is being flushed: markers (from inlined-out or demoted
+   bindings) are emitted only when referenced, whereas phantom lets are always
+   emitted.  Markers carry the conversion, when expressible, of the inlined or
+   demoted defining expression, which is filtered against the binders in scope
+   at the emission point. *)
+type flushed_phantom =
+  | Marker of Cmm.phantom_defining_expr option
+  | Phantom_expr of Cmm.phantom_defining_expr option * free_vars
+
 let flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at ~order
-    (acc, acc_free_vars, symbol_inits) cmm_var phantom_expr_opt =
+    (acc, acc_free_vars, symbol_inits) cmm_var flushed_phantom =
   let v = Backend_var.With_provenance.var cmm_var in
   (* there should be no symbol inits tied to a phantom binding *)
   let inits, symbol_inits = pop_symbol_inits symbol_inits v in
@@ -1442,12 +1503,11 @@ let flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at ~order
     let free_vars = FV.remove v free_vars in
     expr, free_vars, symbol_inits
   in
-  match phantom_expr_opt with
-  | None ->
-    (* An [Inlined] binding (or a demoted pure binding): only generate an
-       (empty) phantom let if the variable is actually referenced phantom-ly by
-       the body, or is awaited by a pending phantom let, whose copy is then
-       placed directly beneath this binder. *)
+  match flushed_phantom with
+  | Marker defining_expr ->
+    (* Only generate a phantom let if the variable is actually referenced
+       phantom-ly by the body, or is awaited by a pending phantom let, whose
+       copy is then placed directly beneath this binder. *)
     let pending_references_v =
       phantomize
       && List.exists
@@ -1462,9 +1522,29 @@ let flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at ~order
         reissue_pendings ~pendings ~consumed ~scope_at ~order v
           (acc, acc_free_vars)
       in
-      gen_phantom_let None acc acc_free_vars
+      let defining_expr, acc_free_vars =
+        match defining_expr with
+        | None -> None, acc_free_vars
+        | Some expr -> (
+          match
+            filter_phantom_defining_expr expr ~in_scope:(scope_at order)
+          with
+          | All_refs_in_scope ->
+            ( Some expr,
+              Backend_var.Set.fold
+                (fun r fvs -> FV.add ~mode:Phantom r fvs)
+                (phantom_defining_expr_refs expr)
+                acc_free_vars )
+          | Some_refs_in_scope { filtered_expr; refs_in_scope } ->
+            ( Some filtered_expr,
+              Backend_var.Set.fold
+                (fun r fvs -> FV.add ~mode:Phantom r fvs)
+                refs_in_scope acc_free_vars )
+          | No_refs_in_scope -> None, acc_free_vars)
+      in
+      gen_phantom_let defining_expr acc acc_free_vars
     else acc, acc_free_vars, symbol_inits
-  | Some (cmm_expr, expr_free_vars) ->
+  | Phantom_expr (cmm_expr, expr_free_vars) ->
     let free_vars = FV.union acc_free_vars expr_free_vars in
     gen_phantom_let cmm_expr acc free_vars
 
@@ -1477,10 +1557,15 @@ let flush_regular_binding ~phantomize ~pendings ~consumed ~scope_at ~order
   | None when can_be_omitted -> acc, acc_free_vars, symbol_inits
   | Some Phantom when can_be_omitted ->
     (* The variable is only used by phantom bindings in the body: demote the
-       binding itself to an (empty) phantom let. *)
+       binding itself to a phantom let, describing the value when the defining
+       expression is convertible. *)
     flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at ~order
       (acc, acc_free_vars, symbol_inits)
-      cmm_var None
+      cmm_var
+      (Marker
+         (if phantomize
+         then Cmm_helpers.phantom_defining_expr_of_expr cmm_expr
+         else None))
   | None | Some Normal | Some Phantom ->
     let body =
       List.fold_left (fun acc init -> Cmm_helpers.sequence init acc) acc inits
@@ -1506,17 +1591,17 @@ let flush_bindings ~pendings ~scope_at order_map flushed_symbol_inits e
       | Splittable_prim _ ->
         Misc.fatal_errorf
           "Complex bindings should have been split prior to being flushed."
-      | Inlined ->
+      | Inlined { defining_expr } ->
         flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at
           ~order:b.order
           (acc, acc_free_vars, symbol_inits)
-          b.cmm_var None
+          b.cmm_var (Marker defining_expr)
       | Phantom { cmm_expr; free_vars } ->
         flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at
           ~order:b.order
           (acc, acc_free_vars, symbol_inits)
           b.cmm_var
-          (Some (cmm_expr, free_vars))
+          (Phantom_expr (cmm_expr, free_vars))
       | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
         flush_regular_binding ~phantomize ~pendings ~consumed ~scope_at
           ~order:b.order
@@ -1661,7 +1746,7 @@ let flush_delayed_lets ~mode env res =
             || Backend_var.Map.mem v env.symbol_inits
           then (b.order, v) :: acc
           else acc
-        | Inlined | Phantom _ | Splittable_prim _ -> acc)
+        | Inlined _ | Phantom _ | Splittable_prim _ -> acc)
       !bindings_to_flush []
   in
   let definite_real =
@@ -1674,7 +1759,8 @@ let flush_delayed_lets ~mode env res =
       (fun _ (Binding b) acc ->
         let v = Backend_var.With_provenance.var b.cmm_var in
         match b.bound_expr with
-        | Inlined -> if b.phantomize then Backend_var.Set.add v acc else acc
+        | Inlined _ ->
+          if b.phantomize then Backend_var.Set.add v acc else acc
         | Simple _ | Split _ ->
           if b.phantomize && can_be_removed b.effs
           then Backend_var.Set.add v acc
@@ -1743,7 +1829,7 @@ let flush_delayed_lets ~mode env res =
         | Phantom { cmm_expr = None; free_vars = _ } ->
           emitted_phantom ();
           Some (order, binding)
-        | Inlined | Simple _ | Split _ | Splittable_prim _ ->
+        | Inlined _ | Simple _ | Split _ | Splittable_prim _ ->
           Some (order, binding))
       (List.rev (M.bindings !bindings_to_flush))
     |> List.fold_left (fun m (order, b) -> M.add order b m) M.empty
@@ -1755,7 +1841,7 @@ let flush_delayed_lets ~mode env res =
     M.fold
       (fun _ (Binding b) acc ->
         match b.bound_expr with
-        | Inlined ->
+        | Inlined _ ->
           let v = Backend_var.With_provenance.var b.cmm_var in
           if
             b.phantomize
