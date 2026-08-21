@@ -98,6 +98,7 @@ let () =
   | r -> ignore !r
   | effect Need_ref, k -> use_unique (continue k (ref 0))
 [%%expect {|
+|}, Principal{|
 Line 4, characters 37-57:
 4 |   | effect Need_ref, k -> use_unique (continue k (ref 0))
                                          ^^^^^^^^^^^^^^^^^^^^

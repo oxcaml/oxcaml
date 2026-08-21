@@ -517,9 +517,6 @@ let foo (t : _ t @ nonportable contended once) =
 [%%expect {|
 type ('a : immutable_data) t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
-|}, Principal{|
-type ('a : immutable_data) t = { x : 'a; }
-val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]

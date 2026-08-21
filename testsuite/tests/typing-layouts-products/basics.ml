@@ -2133,15 +2133,6 @@ Error: This type "string t" should be an instance of type "('a : any mod global)
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
-|}, Principal{|
-Line 1, characters 19-27:
-1 | type should_fail = string t needs_any_mod_global
-                       ^^^^^^^^
-Error: This type "string t" should be an instance of type "('a : any mod global)"
-       The kind of string t is immutable_data & immutable_data
-         because of the definition of t at line 2, characters 0-47.
-       But the kind of string t must be a subkind of any mod global
-         because of the definition of needs_any_mod_global at line 4, characters 0-47.
 |}]
 
 type ('a : any mod external_) t

@@ -254,19 +254,6 @@ Error: This alias is bound to type "int list"
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
-|}, Principal{|
-Line 1, characters 21-23:
-1 | let x : int list as ('a : immediate) = [3;4;5]
-                         ^^
-Error: This alias is bound to type "int list"
-       but is used as an instance of type "('a : immediate)"
-       The layout of int list is value non_float
-         because it's a boxed variant type.
-       But the layout of int list must be a sublayout of value non_pointer
-         because of the annotation on the type variable 'a.
-       Note: The layout of immediate is value non_pointer.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 (* CR layouts: error message could be phrased better *)
 

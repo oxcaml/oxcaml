@@ -28,6 +28,8 @@ val require_portable : ('a : value mod portable). 'a -> unit = <fun>
    more than we use if we ran out previously. *)
 let f (t : int list list list t) = require_portable t
 [%%expect {|
+val f : int list list list t -> unit = <fun>
+|}, Principal{|
 Line 1, characters 52-53:
 1 | let f (t : int list list list t) = require_portable t
                                                         ^
@@ -62,6 +64,8 @@ val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 |}]
 let f (t : int list list list Foo.t) = require_portable t
 [%%expect {|
+val f : int list list list Foo.t -> unit = <fun>
+|}, Principal{|
 Line 1, characters 56-57:
 1 | let f (t : int list list list Foo.t) = require_portable t
                                                             ^
