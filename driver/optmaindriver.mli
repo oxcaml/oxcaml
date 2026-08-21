@@ -34,6 +34,7 @@ val main
     prefixname:string ->
     machine_width:Target_system.Machine_width.t ->
     keep_symbol_tables:bool ->
+    ltosol_filename:string ->
     cmr_filename:string ->
     Cmm.phrase list)
   -> reaper_lto_solve:(

@@ -114,6 +114,13 @@ module Variable : sig
 
   val create : ?user_visible:unit -> string -> Flambda_kind.t -> t
 
+  val create_in_compilation_unit :
+    compilation_unit:Compilation_unit.t ->
+    ?user_visible:unit ->
+    string ->
+    Flambda_kind.t ->
+    t
+
   val compilation_unit : t -> Compilation_unit.t
 
   val name : t -> string

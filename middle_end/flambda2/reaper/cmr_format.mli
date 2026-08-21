@@ -25,16 +25,6 @@ type t =
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
-module Id_stamp_counters : sig
-  type t
-
-  (** Restore all stamp counters to the values they had when the file this came
-      from was serialised. This can only be called once, before any stamps have
-      been created, and will error otherwise. The affected stamp counters are
-      for value slots, function slots, variables, code IDs and continuations. *)
-  val restore_for_resume : t -> unit
-end
-
 module Serialisable : sig
   type cmr_format = t
 
@@ -49,6 +39,13 @@ module Serialisable : sig
     resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
     t ->
     cmr_format
+
+  (** The unit that was being compiled when the file was saved. *)
+  val compilation_unit : t -> Compilation_unit.t
+
+  (** Get just the renamed dependency graph from the .cmr file, for use in
+      solving. *)
+  val deserialise_deps : t -> Global_flow_graph.graph
 end
 
 type error =

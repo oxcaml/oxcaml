@@ -24,34 +24,6 @@ type t =
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
-module Id_stamp_counters = struct
-  (** Identifiers are compared by compilation unit and stamp only, so a resuming
-      process must not mint stamps that collide with the imported ones. *)
-  type t =
-    { variables : int;
-      code_ids : int;
-      continuations : int;
-      function_slots : int;
-      value_slots : int
-    }
-
-  let save () =
-    { variables = Variable.export_name_stamp_counter ();
-      code_ids = Code_id.export_name_stamp_counter ();
-      continuations = Continuation.export_stamp_counter ();
-      function_slots = Function_slot.export_stamp_counter ();
-      value_slots = Value_slot.export_stamp_counter ()
-    }
-
-  let restore_for_resume
-      { variables; code_ids; continuations; function_slots; value_slots } =
-    Variable.restore_name_stamp_counter variables;
-    Code_id.restore_name_stamp_counter code_ids;
-    Continuation.restore_stamp_counter continuations;
-    Function_slot.restore_stamp_counter function_slots;
-    Value_slot.restore_stamp_counter value_slots
-end
-
 module All_code_with_sections = struct
   type t =
     { all_code : Exported_code.raw;
@@ -142,11 +114,16 @@ module Serialisable : sig
     resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
     t ->
     cmr_format
+
+  val compilation_unit : t -> Compilation_unit.t
+
+  val deserialise_deps : t -> Global_flow_graph.graph
 end = struct
   type cmr_format = t
 
   type t =
-    { table_data : Flambda_cmx_format.table_data;
+    { original_compilation_unit : Compilation_unit.t;
+      table_data : Flambda_cmx_format.table_data;
       used_value_slots : Value_slot.Set.t;
       unit_metadata : Flambda_unit.Metadata.t;
       final_typing_env : Typing_env.Serializable.t option;
@@ -199,7 +176,8 @@ end = struct
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
     in
-    { table_data = Flambda_cmx_format.create_table_data exported_ids;
+    { original_compilation_unit = Compilation_unit.get_current_exn ();
+      table_data = Flambda_cmx_format.create_table_data exported_ids;
       used_value_slots;
       unit_metadata;
       final_typing_env;
@@ -211,7 +189,8 @@ end = struct
     }
 
   let deserialise ~machine_width ~resolver
-      { table_data;
+      { original_compilation_unit;
+        table_data;
         used_value_slots;
         unit_metadata;
         final_typing_env;
@@ -228,7 +207,7 @@ end = struct
        the paused process, see [Slot_offsets.result]. *)
     let renaming, code_ids =
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
-        ~original_compilation_unit:(Compilation_unit.get_current_exn ())
+        ~original_compilation_unit
     in
     let final_typing_env =
       Option.map
@@ -255,6 +234,28 @@ end = struct
       deps;
       rebuild_data
     }
+
+  let compilation_unit t = t.original_compilation_unit
+
+  let deserialise_deps
+      { original_compilation_unit;
+        table_data;
+        used_value_slots;
+        unit_metadata = _;
+        final_typing_env = _;
+        all_code = _;
+        imported_offsets = _;
+        deps;
+        rebuild_data = _
+      } =
+    (* [code_ids] is part of [renaming] that [Exported_code.apply_renaming]
+       requires as a separate argument. We're not deserialising any
+       [Exported_code], so we drop it here. *)
+    let renaming, _code_ids =
+      Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
+        ~original_compilation_unit
+    in
+    Deps_with_fields.deserialise deps renaming
 end
 
 type error =
