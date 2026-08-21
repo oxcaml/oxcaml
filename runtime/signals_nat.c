@@ -471,6 +471,9 @@ DECLARE_SIGNAL_HANDLER(segv_handler)
 #ifdef FAULTING_SAFEPOINTS
   const fault_insn* pi = safepoint_fault_check(info, context);
   if (pi != NULL) {
+    /* Diagnostic; relaxed suffices in signal context. */
+    atomic_fetch_add_explicit(&caml_safepoint_fault_count, 1,
+                              memory_order_relaxed);
     context_fake_call(context, pi);
     return; /* to a caml_call_gc stub */
   }
