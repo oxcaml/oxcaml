@@ -312,6 +312,7 @@
   out_type
   data_types
   diagnostic_nlg
+  mode_diagnostics
   ; manual update: mli only files
   annot
   outcometree
