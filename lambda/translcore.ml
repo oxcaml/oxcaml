@@ -468,7 +468,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         kinst_func = (transl_exp ~scopes Lambda.layout_template_env func);
         kinst_args = List.map
           (fun var ->
-            let layout = Jkind.Sort.var_default_to_scannable_and_get var in
+            let layout =
+              Jkind.Sort.(default_to_scannable_and_get (of_var var))
+            in
             Typeopt.layout_of_sort e.exp_loc layout)
           args;
         kinst_result_layout = layout;

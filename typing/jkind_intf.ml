@@ -288,9 +288,6 @@ module type Sort = sig
   (** Return a [Const.t] if the sort has no unset variables, or [None] *)
   val to_const_opt : t -> Const.t option
 
-  (** Like [default_to_scannable_and_get] but operates directly on a [var]. *)
-  val var_default_to_scannable_and_get : var -> Const.t
-
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
   type change

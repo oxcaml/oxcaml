@@ -160,7 +160,7 @@ Error: Signature mismatch:
        is not included in
          val g : layout_ l. ('a : l addressable). 'a -> 'a
        The layout parameter at position 1 in the first
-       is instantiated with an unconstrained layout variable,
+       is instantiated with layout "'_representable_layout_1 addressable",
        which is not supported yet.
 |}]
 
@@ -186,9 +186,9 @@ Error: Signature mismatch:
        is not included in
          val poly_ g : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's1 addressable
+       The kind of 'a is <genvar> addressable
          because of the definition of g at line 5, characters 4-41.
-       But the kind of 'a must be addressable
+       But the kind of 'a must be a subkind of <genvar> addressable
          because of the definition of g at line 3, characters 4-53.
 |}]
 

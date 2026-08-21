@@ -536,8 +536,8 @@ Error: Signature mismatch:
          val f : 'a -> 'a
        is not included in
          val poly_ f : 'a -> 'a
-       the second has 1 more layout parameter that is not used,
-       which is not supported yet.
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of "'b" is not polymorphic.
 |}]
 
 module M2 : sig
@@ -559,8 +559,8 @@ Error: Signature mismatch:
          val f : 'a -> 'b -> 'a
        is not included in
          val poly_ f : 'a -> 'b -> 'a
-       the second has 2 more layout parameters that are not used,
-       which is not supported yet.
+       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
+       The layout of "'c" is not polymorphic.
 |}]
 
 module M3 : sig
@@ -582,8 +582,9 @@ Error: Signature mismatch:
          val f : 'a -> 'b -> 'c -> #('a * 'b * 'c)
        is not included in
          val poly_ f : 'a -> 'b -> 'c -> #('a * 'b * 'c)
-       the second has 3 more layout parameters that are not used,
-       which is not supported yet.
+       The type "'a -> 'b -> 'c -> #('a * 'b * 'c)"
+       is not compatible with the type "'d -> 'e -> 'f -> #('d * 'e * 'f)"
+       The layout of "'d" is not polymorphic.
 |}]
 
 (* Both functions are polymorphic over the number of sort variables,

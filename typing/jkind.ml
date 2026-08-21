@@ -551,6 +551,19 @@ module Layout = struct
     | Product layouts -> List.iter (generalize ~current_level) layouts
     | Any _ -> ()
     | Addressable t -> generalize ~current_level t
+
+  let rec update_level level : _ Layout.t -> unit = function
+    | Any _ -> ()
+    | Sort (s, _) -> Sort.update_level level s
+    | Product ts -> List.iter (update_level level) ts
+    | Addressable t -> update_level level t
+
+  let rec get_level : _ Layout.t -> int = function
+    | Any _ -> Btype.generic_level
+    | Sort (s, _) -> Sort.get_level s
+    | Product ts ->
+      List.fold_left (fun acc t -> min acc (get_level t)) Btype.generic_level ts
+    | Addressable t -> get_level t
 end
 
 module Externality = Externality
@@ -2764,6 +2777,16 @@ let generalize ~current_level t =
   match t.jkind.base with
   | Kconstr _ -> ()
   | Layout l -> Layout.generalize ~current_level l
+
+let update_level level t =
+  match t.jkind.base with
+  | Kconstr _ -> ()
+  | Layout l -> Layout.update_level level l
+
+let get_level t =
+  match t.jkind.base with
+  | Kconstr _ -> Btype.generic_level
+  | Layout l -> Layout.get_level l
 
 let get t = Jkind_desc.get t.jkind
 
