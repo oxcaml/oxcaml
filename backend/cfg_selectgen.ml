@@ -520,6 +520,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           function. *)
        Uncaught, Csequence (segfault, dummy_raise))
 
+  let join_branch (r : _ Or_never_returns.t) sub_cfg : Sub_cfg.join_branch =
+    { sub_cfg;
+      may_fall_through = (match r with Ok _ -> true | Never_returns -> false)
+    }
+
   (* The following two functions, [emit_parts] and [emit_parts_list], force
      right-to-left evaluation order as required by the Flambda [Un_anf] pass
      (and to be consistent with the bytecode compiler). *)
@@ -1078,11 +1083,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ~label_false:(Sub_cfg.start_label sub_else)
       in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg;
-      let may_fall_through (r : _ Or_never_returns.t) =
-        match r with Ok _ -> true | Never_returns -> false
-      in
       Sub_cfg.join
-        ~from:[sub_if, may_fall_through rif; sub_else, may_fall_through relse]
+        ~from:[join_branch rif sub_if; join_branch relse sub_else]
         ~to_:sub_cfg;
       r
 
@@ -1107,10 +1109,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Sub_cfg.join
         ~from:
           (Array.to_list
-             (Array.map
-                (fun ((r : _ Or_never_returns.t), sub_cfg) ->
-                  sub_cfg, match r with Ok _ -> true | Never_returns -> false)
-                sub_cases))
+             (Array.map (fun (r, sub) -> join_branch r sub) sub_cases))
         ~to_:sub_cfg;
       r
 
@@ -1218,21 +1217,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     let a = Array.of_list ((r_body, sub_body) :: List.map snd l) in
     let r = SU.join_array env a ~bound_name in
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
-    let may_fall_through (r : _ Or_never_returns.t) =
-      match r with Ok _ -> true | Never_returns -> false
-    in
     let sub_handlers =
       List.map
         (fun ((rs, label), (r, sub_handler)) ->
           Sub_cfg.add_empty_block_at_start sub_handler ~label;
           setup_catch_handler flag rs sub_handler;
-          sub_handler, may_fall_through r)
+          join_branch r sub_handler)
         l
     in
     let term_desc = Cfg.Always (Sub_cfg.start_label sub_body) in
     Sub_cfg.update_exit_terminator sub_cfg term_desc;
     Sub_cfg.join
-      ~from:((sub_body, may_fall_through r_body) :: sub_handlers)
+      ~from:(join_branch r_body sub_body :: sub_handlers)
       ~to_:sub_cfg;
     r
 

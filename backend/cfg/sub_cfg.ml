@@ -114,11 +114,18 @@ let exists_basic_blocks sub_cfg ~f = DLL.exists sub_cfg.layout ~f
 
 let transfer ~from ~to_ = DLL.transfer ~from:from.layout ~to_:to_.layout ()
 
+type join_branch =
+  { sub_cfg : t;
+    may_fall_through : bool
+  }
+
 let join ~from ~to_ =
-  List.iter (fun (from, _may_fall_through) -> transfer ~from ~to_) from;
+  List.iter
+    (fun { sub_cfg = from; may_fall_through = _ } -> transfer ~from ~to_)
+    from;
   let join_block = make_never_block () in
   List.iter
-    (fun (from, may_fall_through) ->
+    (fun { sub_cfg = from; may_fall_through } ->
       (* A branch whose emission stopped because the code never returns must not
          be linked to the join block, even if its exit block still has a [Never]
          terminator: that can happen when the divergence arose inside a nested
