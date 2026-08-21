@@ -1,0 +1,66 @@
+generic: flag off reports prose: ok
+generic: flag off reports something: ok
+generic: flag on reports one json object: ok
+generic: exit status is unchanged: ok
+generic: title carries the severity: ok
+generic: diagnostic is located in the source file: ok
+generic: no entities: ok
+generic: no glossary: ok
+generic: first block carries the normal rendered text: ok
+generic: rendered text spans several lines: ok
+generic: rendered text quotes the offending source: ok
+mode: flag off reports prose: ok
+mode: flag on reports one json object: ok
+mode: exit status is unchanged: ok
+mode: diagnostic is specialized: ok
+mode: diagnostic is located in the source file: ok
+mode: entities are interned: ok
+mode: glossary is populated: ok
+mode: body is not the rendered message: ok
+several: flag off reports prose: ok
+several: every line is json: ok
+several: one line per diagnostic: ok
+several: exit status is unchanged: ok
+several: every diagnostic is located in the source file: ok
+several: severities are two warnings then an error: ok
+stdout: unaffected by the flag: ok
+stdout: carries the inferred signature: ok
+stdout: carries no json: ok
+stdout: warning still reported on stderr: ok
+silent: nothing is reported either way: ok
+silent: compilation succeeds either way: ok
+unicode: flag on reports one json object: ok
+unicode: decoded text is the normal rendered text: ok
+unicode: decoded text keeps the source characters: ok
+environment (ocamlc): flag off reports prose: ok
+environment (ocamlc): exit status is unchanged: ok
+environment (ocamlc): flag on reports json only: ok
+environment (ocamlc): one line per diagnostic: ok
+environment (ocamlc): severities are preserved: ok
+environment (ocamlopt): flag off reports prose: ok
+environment (ocamlopt): exit status is unchanged: ok
+environment (ocamlopt): flag on reports json only: ok
+environment (ocamlopt): one line per diagnostic: ok
+environment (ocamlopt): severities are preserved: ok
+unknown flag (ocamlc): flag off reports prose: ok
+unknown flag (ocamlc): exit status is unchanged: ok
+unknown flag (ocamlc): flag on reports json only: ok
+unknown flag (ocamlc): one line per diagnostic: ok
+unknown flag (ocamlc): severities are preserved: ok
+unknown flag (ocamlopt): flag off reports prose: ok
+unknown flag (ocamlopt): exit status is unchanged: ok
+unknown flag (ocamlopt): flag on reports json only: ok
+unknown flag (ocamlopt): one line per diagnostic: ok
+unknown flag (ocamlopt): severities are preserved: ok
+unknown suffix (ocamlc): flag off reports prose: ok
+unknown suffix (ocamlc): exit status is unchanged: ok
+unknown suffix (ocamlc): flag on reports json only: ok
+unknown suffix (ocamlc): one line per diagnostic: ok
+unknown suffix (ocamlc): severities are preserved: ok
+unknown suffix (ocamlopt): flag off reports prose: ok
+unknown suffix (ocamlopt): exit status is unchanged: ok
+unknown suffix (ocamlopt): flag on reports json only: ok
+unknown suffix (ocamlopt): one line per diagnostic: ok
+unknown suffix (ocamlopt): severities are preserved: ok
+unknown flag: usage is printed as prose: ok
+unknown flag: usage is dropped rather than emitted: ok
