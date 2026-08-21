@@ -704,6 +704,7 @@ and module_coercion =
   | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
+  | Tcoerce_kindtemplate of kindtemplate_coercion
   | Tcoerce_invalid
 
 and module_type =
@@ -732,8 +733,15 @@ and primitive_coercion =
     pc_poly_sort: Jkind.Sort.t option;
     pc_yielding: Mode.Yielding.l;
     pc_zero_alloc_check: Zero_alloc.check option;
+    pc_kindtemplate: kindtemplate_coercion;
     pc_env: Env.t;
     pc_loc : Location.t;
+  }
+
+and kindtemplate_coercion =
+  {
+    tc_args: Jkind.Sort.Const.t list;
+    tc_params: Jkind.Sort.var list;
   }
 
 and signature = {

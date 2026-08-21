@@ -895,6 +895,8 @@ let module_coercion sub = function
   | Tcoerce_primitive pc ->
       Tcoerce_primitive {pc with pc_loc = sub.location sub pc.pc_loc;
                                  pc_env = sub.env sub pc.pc_env}
+  | Tcoerce_kindtemplate ks ->
+      Tcoerce_kindtemplate ks
   | Tcoerce_invalid -> Tcoerce_invalid
 
 let module_expr sub x =

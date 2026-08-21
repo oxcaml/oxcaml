@@ -444,6 +444,10 @@ let rec print_coercion ppf c =
       pr "@[<2>alias %a@ (%a)@]"
         Printtyp.path p
         print_coercion c
+  | Tcoerce_kindtemplate { tc_params; tc_args } ->
+      pr "@[<2>kindtemplate (%a => _ %a)@]"
+        (print_list Jkind.Sort.Debug_printers.var) tc_params
+        (print_list Jkind.Sort.Const.Debug_printers.t) tc_args
   | Tcoerce_invalid ->
       pr "invalid_coercion"
 and print_coercion2 ppf (n, c) =
@@ -476,6 +480,30 @@ let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
   then Tcoerce_none
   else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
 
+let kindtemplate_coercion_instantiates { tc_args; tc_params = _ } =
+  match tc_args with
+  | _ :: _ -> true
+  | [] -> false
+
+let rec coercion_instantiates_kindtemplate = function
+  | Tcoerce_none -> false
+  | Tcoerce_structure { pos_cc_list; id_pos_list; _ } ->
+    List.exists
+      (fun (_, c) -> coercion_instantiates_kindtemplate c)
+      pos_cc_list ||
+    List.exists
+      (fun (_, _, c) -> coercion_instantiates_kindtemplate c)
+      id_pos_list
+  | Tcoerce_functor (c, c', _) ->
+    coercion_instantiates_kindtemplate c ||
+    coercion_instantiates_kindtemplate c'
+  | Tcoerce_primitive { pc_kindtemplate; _ } ->
+    kindtemplate_coercion_instantiates pc_kindtemplate
+  | Tcoerce_alias (_, _, c) ->
+    coercion_instantiates_kindtemplate c
+  | Tcoerce_kindtemplate tc ->
+    kindtemplate_coercion_instantiates tc
+  | Tcoerce_invalid -> false
 
 (* Build a table of the components of sig1, along with their positions.
    The table is indexed by kind and name of component *)
@@ -729,7 +757,16 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
       begin match
         signatures ~core ~direction ~loc env subst ~modes sig1 sig2 orig_shape
       with
-      | Ok _ as ok -> ok
+      | Ok (cc, _) as ok ->
+        begin if coercion_instantiates_kindtemplate cc then
+          match modes with
+          | All -> ()
+          | Specific ((m1, _locks), _m2) ->
+            let staticity = Mode.Value.proj_monadic Staticity m1 in
+            Mode.Staticity.submode_err (loc, Module) staticity
+              (Mode.Staticity.of_const ~hint:Lpoly_inst Static)
+        end;
+        ok
       | Error e -> Error (Error.Signature e)
       end
 
