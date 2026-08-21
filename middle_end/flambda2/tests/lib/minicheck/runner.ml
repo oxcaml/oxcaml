@@ -2,11 +2,16 @@ let default_attempts = 1000
 
 let default_seed = 0
 
-let default_verbose = false
-
 (* Guard against non-terminating shrinkers. This should be quite large, as a
    well-reduced test case is worth waiting for. *)
 let max_shrink_steps = 100000
+
+type verbosity =
+  | Verbose
+  | Normal
+  | SilentSuccess
+
+let default_verbose = SilentSuccess
 
 module Failure = struct
   type t =
@@ -28,9 +33,11 @@ module Outcome = struct
 
   let is_success = function Success -> true | Failure _ -> false
 
-  let report t ~attempts ~duration =
+  let report ?(verbose = default_verbose) t ~attempts ~duration =
     match t with
-    | Success -> Format.eprintf "PASSED %d attempts (%f s)@." attempts duration
+    | Success ->
+      if verbose <> SilentSuccess
+      then Format.eprintf "PASSED %d attempts (%f s)@." attempts duration
     | Failure { failure; counterexample; arbitrary_impl; shrink_steps; attempt }
       ->
       let explanation =
@@ -69,18 +76,19 @@ let check_once _t ~f ~(arbitrary_impl : (_, 'repr) Arbitrary.t) (repr : 'repr) :
 
 let check0 ?(n = default_attempts) ?(seed = default_seed)
     ?(verbose = default_verbose) t ~arbitrary_impl ~f ~name =
-  Format.eprintf "%s: " name;
+  let print_name = lazy (Format.eprintf "%s: " name) in
   let start = Sys.time () in
   let r = Splittable_random.of_int seed in
   let i = ref 1 in
   let outcome = ref Outcome.Success in
   while Outcome.is_success !outcome && !i <= n do
     let repr = Arbitrary.generate_repr arbitrary_impl r in
-    if verbose
-    then
+    if verbose = Verbose
+    then (
+      Lazy.force print_name;
       Format.eprintf "@[<hov 2>Attempt %d/%d:@ %a@]@." !i n
         (Arbitrary.print arbitrary_impl)
-        repr;
+        repr);
     match check_once t ~f ~arbitrary_impl repr with
     | Success -> incr i
     | Failure failure ->
@@ -124,13 +132,15 @@ let check0 ?(n = default_attempts) ?(seed = default_seed)
   done;
   let finish = Sys.time () in
   let duration = finish -. start in
+  if verbose <> SilentSuccess || not (Outcome.is_success !outcome)
+  then Lazy.force print_name;
   Outcome.report !outcome ~attempts:n ~duration;
   t.outcomes_rev <- !outcome :: t.outcomes_rev
 
 let check : type a reprs.
     ?n:int ->
     ?seed:int ->
-    ?verbose:bool ->
+    ?verbose:verbosity ->
     t ->
     arbitrary_impls:(a, reprs, bool) Tuple.Of2(Arbitrary.T).t ->
     f:a ->
