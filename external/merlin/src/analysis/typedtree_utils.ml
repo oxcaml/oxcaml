@@ -13,7 +13,8 @@ let extract_toplevel_identifier item =
     List.map ~f:(fun Typedtree.{ ci_id_class; _ } -> ci_id_class) cls
   | Typedtree.Tsig_class_type cls ->
     List.map ~f:(fun Typedtree.{ ci_id_class_type; _ } -> ci_id_class_type) cls
-  | Typedtree.Tsig_jkind { jkind_id; _ } -> [ jkind_id ]
+  | Typedtree.Tsig_jkind { jkind_id; _ }
+  | Typedtree.Tsig_jkindsubst { jkind_id; _ } -> [ jkind_id ]
   | Typedtree.Tsig_type _
   | Typedtree.Tsig_typesubst _
   | Typedtree.Tsig_typext _
