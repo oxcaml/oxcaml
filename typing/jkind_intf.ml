@@ -253,12 +253,8 @@ module type Sort = sig
 
   val reset_cmi_sort_id : unit -> unit
 
-  (** Get the concrete content of a variable. The returned sort must be
-      representable (including rigid sorts). *)
-  val get_representable_var : var -> t option
-
   (** [subst s t] applies the variable substitution [s] to [t], replacing each
-      [Var v] where [(v, t')] is in [subst] with [t']. *)
+      [Var v] where [(v, t')] is in [s] with [t']. *)
   val subst : (var * t) list -> t -> t
 
   (** [instance_with ~level vars f] creates a fresh sort var at [level] for each

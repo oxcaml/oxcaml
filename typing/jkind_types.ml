@@ -705,32 +705,6 @@ module Sort = struct
         (* path compression *)
         result)
 
-  let rec get_representable : t -> t option = function
-    | (Base _ | Univar _) as t -> Some t
-    | Product ts ->
-      begin match get_representable_product ts with
-      | None -> None
-      | Some ts' -> Some (Product ts')
-      end
-    | Var v -> get_representable_var v
-
-  and get_representable_product : t list -> t list option =
-   fun ts ->
-    List.fold_right
-      (fun t acc ->
-        match acc, get_representable t with
-        | None, _ | _, None -> None
-        | Some ts, Some t -> Some (t :: ts))
-      ts (Some [])
-
-  and get_representable_var : var -> t option =
-   fun v ->
-    match v.contents with
-    | None ->
-      begin if is_rigidvar v then Some (Var v) else None
-      end
-    | Some t -> get_representable t
-
   let rec subst s t =
     match t with
     | Var v ->
