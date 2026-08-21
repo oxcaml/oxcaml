@@ -71,7 +71,7 @@ module Env : sig
     defining_expr:Cmm.phantom_defining_expr option ->
     t
 
-  val register_name_for_debugger : t -> Backend_var.With_provenance.t -> t
+  val register_name_for_debugger : t -> Backend_var.Provenance.t -> t
 
   val place_preserved_wrappers : t -> Cmm.expression -> Cmm.expression
 end = struct
@@ -80,7 +80,7 @@ end = struct
   type wrapper =
     | Phantom_let of
         Backend_var.With_provenance.t * Cmm.phantom_defining_expr option
-    | Name_for_debugger of Backend_var.With_provenance.t
+    | Name_for_debugger of Backend_var.Provenance.t
 
   type t =
     { exprs : Cmm.expression IM.t;
@@ -324,8 +324,8 @@ module Cmm_comparator = struct
       V.equal (VP.var v1) (VP.var v2)
       && Option.equal equal_phantom_defining_expr def1 def2
       && equivalent body1 body2
-    | Cname_for_debugger (v1, e1), Cname_for_debugger (v2, e2) ->
-      V.equal (VP.var v1) (VP.var v2) && equivalent e1 e2
+    | Cname_for_debugger (p1, e1), Cname_for_debugger (p2, e2) ->
+      V.Provenance.equal p1 p2 && equivalent e1 e2
     | Ctuple t1, Ctuple t2 -> List.equal equivalent t1 t2
     | Cop (op1, args1, _), Cop (op2, args2, _) ->
       equal_operation op1 op2 && List.equal equivalent args1 args2

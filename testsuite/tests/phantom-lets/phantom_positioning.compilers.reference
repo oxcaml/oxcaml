@@ -66,8 +66,8 @@
             [0: a2/542; ?; ])
          (exit 11
            (name_for_debugger
-             a2/542[((module_path a2/542) (location ) (original_ident a2/542)
-                     (is_parameter local))]
+             ((module_path a2/542) (location ) (original_ident a2/542)
+              (is_parameter local))
              (+ (load val p/537) 2))))
        (let?
          (b2/543[((module_path b2/543) (location ) (original_ident b2/543)
@@ -78,8 +78,8 @@
             [0: ?; b2/543; ])
          (exit 11
            (name_for_debugger
-             b2/543[((module_path b2/543) (location ) (original_ident b2/543)
-                     (is_parameter local))]
+             ((module_path b2/543) (location ) (original_ident b2/543)
+              (is_parameter local))
              (+ (load val (+a p/537 8)) 4)))))
    with(11 region_return/540: int)
      (let unit/541 (seq (endregion region/539) 1) region_return/540))) )
@@ -118,8 +118,8 @@
                     [0: a3/557; b3/560; ])
                  (exit 12
                    (name_for_debugger
-                     b3/560[((module_path b3/560) (location )
-                             (original_ident b3/560) (is_parameter local))]
+                     ((module_path b3/560) (location )
+                      (original_ident b3/560) (is_parameter local))
                      (+ (load val Popaque/559) 2))))
                (exit 12 1))))))
    with(12 region_return/554: int)
