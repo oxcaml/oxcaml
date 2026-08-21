@@ -13,7 +13,7 @@ open Mtf_facts
 let () = heading "an annotation, and the members of an annotated signature"
 
 (* The annotation of [Pair] is checked as a whole, and each module member of
-   the annotated signature is paired with the member of the
+   the signature it is annotated with is paired with the member of the
    implementation it is checked against. *)
 let () =
   report_implementation ~filename:"annotation.ml"
