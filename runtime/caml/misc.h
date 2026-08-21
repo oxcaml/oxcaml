@@ -175,9 +175,7 @@ CAMLdeprecated_typedef(addr, char *);
 #define CAMLalign(n) _Alignas(n)
 #endif
 
-#if defined(CAML_BARE_METAL)
-#define CAMLthread_local
-#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L || \
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L || \
     defined(__cplusplus) && !defined(__CYGWIN__)
     /* #14220: flexlink does not support C++11 's thread_local,
        so prefer _Thread_local on Cygwin systems. */
