@@ -83,6 +83,34 @@ Warning 18 [not-principal]: this type-based unit# disambiguation is not
 val f : unit# -> int = <fun>
 |}]
 
+(* The previous example is analogous to: *)
+type t1 = A
+type t2 = A
+
+let g (A : t1) = (A : t1)
+let f x =
+  match g x with
+  | A ->
+    match x with
+    | A -> 42
+[%%expect{|
+type t1 = A
+type t2 = A
+val g : t1 -> t1 = <fun>
+val f : t1 -> int = <fun>
+|}, Principal{|
+type t1 = A
+type t2 = A
+val g : t1 -> t1 = <fun>
+Line 9, characters 6-7:
+9 |     | A -> 42
+          ^
+Warning 18 [not-principal]: this type-based constructor disambiguation is not
+  principal.
+
+val f : t1 -> int = <fun>
+|}]
+
 (* Can't disambiguate to arbitrary void type *)
 let x = non_unit_void (); 42
 [%%expect{|
