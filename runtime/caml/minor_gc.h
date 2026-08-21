@@ -34,7 +34,6 @@
 #define CAML_TABLE_STRUCT(t) { \
   t *base;                     \
   t *end;                      \
-  t *threshold;                \
   t *ptr;                      \
   t *limit;                    \
   asize_t size;                \
