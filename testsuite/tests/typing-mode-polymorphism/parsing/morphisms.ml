@@ -543,14 +543,9 @@ module type Bad = sig
   val bad : 'a @ [< close('m)] -> 'a @ [> 'm]
 end
 [%%expect{|
-Line 534, characters 20-25:
-534 |   val bad : 'a @ [< close('m)] -> 'a @ [> 'm]
-                          ^^^^^
-Error: The mode morphism "close" may only appear in a lower bound.
-|}, Principal{|
-Line 543, characters 20-25:
-543 |   val bad : 'a @ [< close('m)] -> 'a @ [> 'm]
-                          ^^^^^
+Line 2, characters 20-25:
+2 |   val bad : 'a @ [< close('m)] -> 'a @ [> 'm]
+                        ^^^^^
 Error: The mode morphism "close" may only appear in a lower bound.
 |}]
 
@@ -560,14 +555,9 @@ module type Bad = sig
   val bad : 'a @ [< dual('m)] -> 'a @ [> 'm]
 end
 [%%expect{|
-Line 551, characters 20-24:
-551 |   val bad : 'a @ [< dual('m)] -> 'a @ [> 'm]
-                          ^^^^
-Error: Unrecognized mode morphism "dual".
-|}, Principal{|
-Line 555, characters 20-24:
-555 |   val bad : 'a @ [< dual('m)] -> 'a @ [> 'm]
-                          ^^^^
+Line 2, characters 20-24:
+2 |   val bad : 'a @ [< dual('m)] -> 'a @ [> 'm]
+                        ^^^^
 Error: Unrecognized mode morphism "dual".
 |}]
 
@@ -577,13 +567,8 @@ module type Bad = sig
   val bad : 'a @ [< 'm mod portable nonportable] -> 'a @ [> 'm]
 end
 [%%expect{|
-Line 568, characters 36-47:
-568 |   val bad : 'a @ [< 'm mod portable nonportable] -> 'a @ [> 'm]
-                                          ^^^^^^^^^^^
-Error: The portability axis has already been specified.
-|}, Principal{|
-Line 572, characters 36-47:
-572 |   val bad : 'a @ [< 'm mod portable nonportable] -> 'a @ [> 'm]
-                                          ^^^^^^^^^^^
+Line 2, characters 36-47:
+2 |   val bad : 'a @ [< 'm mod portable nonportable] -> 'a @ [> 'm]
+                                        ^^^^^^^^^^^
 Error: The portability axis has already been specified.
 |}]
