@@ -839,8 +839,8 @@ Error: The kind of type "t" is immutable_data with bad outer
          because of the annotation on the declaration of the type t.
 |}]
 
-(* A self-recursive declaration currently lists itself as a cause
-   alongside the genuine carrier. *)
+(* A self-recursive declaration does not list itself as a cause; only
+   the genuine carrier is reported. *)
 type t : value mod portable = Leaf of (int -> int) | Node of t
 [%%expect {|
 Line 1, characters 0-62:
@@ -852,9 +852,8 @@ Error: The kind of type "t" is value non_float mod immutable
          because of the annotation on the declaration of the type t.
 |}]
 
-(* Mutually-recursive pair where the SIBLING (not self) is the carrier:
-   [t] reports both its self-occurrence and the group-mate [u]. Any
-   change to self-reporting must keep the [u] line. *)
+(* Mutually-recursive pair where the sibling (not self) is the carrier:
+   [t]'s self-occurrence is not reported, but the group-mate [u] is. *)
 type t : value mod portable = A of t | B of u
 and u = C of (int -> int)
 [%%expect {|
