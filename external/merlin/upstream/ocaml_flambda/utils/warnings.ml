@@ -163,6 +163,7 @@ type t =
   | Lpoly_in_letrec                         (* 218 *)
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
+  | Unused_alert_disable of string          (* 221 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -265,6 +266,7 @@ let number = function
   | Lpoly_in_letrec -> 218
   | Useless_valpoly -> 219
   | Redundant_modality -> 220
+  | Unused_alert_disable _ -> 221
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -701,6 +703,11 @@ let descriptions = [
     names = ["redundant-modality"];
     description = "Modality is redundant with the default.";
     since = since 5 2 };
+  { number = 221;
+    names = ["unused-alert-disable"];
+    description = "An attribute disabling an alert did not suppress any\n\
+    \    occurrence of that alert.";
+    since = since 5 4 };
 ]
 
 let name_to_number =
@@ -754,6 +761,10 @@ type state =
     error: bool array;
     alerts: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
     alert_errors: (Misc.Stdlib.String.Set.t * bool); (* false:set complement *)
+    alert_disable_watches: loc list Misc.Stdlib.String.Map.t;
+    (* Locations of attributes that disabled a given alert and are in force in
+       the current scope; used to detect alert-disabling attributes that never
+       suppress anything (warning 221 [Unused_alert_disable]). *)
   }
 
 let current =
@@ -763,6 +774,7 @@ let current =
       error = Array.make (last_warning_number + 1) false;
       alerts = (Misc.Stdlib.String.Set.empty, false);
       alert_errors = (Misc.Stdlib.String.Set.empty, true); (* all soft *)
+      alert_disable_watches = Misc.Stdlib.String.Map.empty;
     }
 
 let disabled = ref false
@@ -805,6 +817,73 @@ let mk_lazy f =
   let state = backup () in
   lazy (with_state state f)
 
+(* Status of alert-disabling attributes, for warning 221
+   [Unused_alert_disable].  Table keys are the location of the disabling
+   attribute together with the name of the disabled alert.
+
+   An [Unfulfilled] entry carries a snapshot of the warning state at the
+   point where the attribute was processed; if the entry is still
+   unfulfilled at the end of compilation, the snapshot decides the
+   activity/error status of warning 221 when the entry is reported (like
+   [Unchecked_zero_alloc_attribute]).
+
+   An entry becomes [Fulfilled] when the disable suppresses an occurrence
+   of its alert; fulfilled entries are never reported.  They are kept in
+   the table because the same attribute may be processed several times
+   (e.g. the type-checker enters the warning scope of a value binding once
+   to type the expression and again to check pattern totality), and a
+   later processing must not register the attribute anew.
+
+   The table deliberately lives outside [state]: an entry's status must
+   survive scope exits, so that leftovers can be reported at the end of
+   compilation via [flush_unused_alert_disables]. *)
+type alert_disable_status =
+  | Unfulfilled of state
+  | Fulfilled
+
+let alert_disables : (loc * string, alert_disable_status) Hashtbl.t =
+  Hashtbl.create 16
+
+let register_alert_disable ~loc name =
+  let watches =
+    Misc.Stdlib.String.Map.update name
+      (function None -> Some [loc] | Some locs -> Some (loc :: locs))
+      (!current).alert_disable_watches
+  in
+  current := {(!current) with alert_disable_watches = watches};
+  if not (Hashtbl.mem alert_disables (loc, name)) then
+    Hashtbl.add alert_disables (loc, name) (Unfulfilled !current)
+
+let mark_alert_disables_used kind =
+  if not !disabled then begin
+    let mark name =
+      match
+        Misc.Stdlib.String.Map.find_opt name (!current).alert_disable_watches
+      with
+      | None -> ()
+      | Some locs ->
+          List.iter
+            (fun loc -> Hashtbl.replace alert_disables (loc, name) Fulfilled)
+            locs
+    in
+    mark kind;
+    (* Disables of "all" act as wildcards: any suppressed alert fulfills
+       them.  ("all" is reserved, so [kind] is never literally "all".) *)
+    mark "all"
+  end
+
+let flush_unused_alert_disables () =
+  let entries =
+    Hashtbl.fold
+      (fun (loc, name) status acc ->
+         match status with
+         | Fulfilled -> acc
+         | Unfulfilled state -> (loc, name, state) :: acc)
+      alert_disables []
+  in
+  Hashtbl.clear alert_disables;
+  entries
+
 let set_alert ~error ~enable s =
   let upd =
     match s with
@@ -826,7 +905,7 @@ let set_alert ~error ~enable s =
   else
     current := {(!current) with alerts=upd}
 
-let parse_alert_option s =
+let parse_alert_option ?disable_loc s =
   let n = String.length s in
   let id_char = function
     | 'a'..'z' | 'A'..'Z' | '_' | '\'' | '0'..'9' -> true
@@ -835,6 +914,12 @@ let parse_alert_option s =
   let rec parse_id i =
     if i < n && id_char s.[i] then parse_id (i + 1) else i
   in
+  let disable name =
+    set_alert ~error:false ~enable:false name;
+    (* Watch attribute-level disables so that we can warn about the ones
+       that never suppress anything (warning 221). *)
+    Option.iter (fun loc -> register_alert_disable ~loc name) disable_loc
+  in
   let rec scan i =
     if i = n then ()
     else if i + 1 = n then raise (Arg.Bad "Ill-formed list of alert settings")
@@ -842,7 +927,7 @@ let parse_alert_option s =
       | '+', '+' -> id (set_alert ~error:true ~enable:true) (i + 2)
       | '+', _ -> id (set_alert ~error:false ~enable:true) (i + 1)
       | '-', '-' -> id (set_alert ~error:true ~enable:false) (i + 2)
-      | '-', _ -> id (set_alert ~error:false ~enable:false) (i + 1)
+      | '-', _ -> id disable (i + 1)
       | '@', _ ->
           id (fun s ->
               set_alert ~error:true ~enable:true s;
@@ -1035,7 +1120,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-221"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1516,6 +1601,10 @@ let message = function
       so \"poly_\" has no effect. Consider using a regular \"val\" instead."
   | Redundant_modality ->
       msg "This modality is redundant."
+  | Unused_alert_disable name ->
+      msg "This attribute disables alert %a,@ \
+           but it did not suppress any occurrence of the alert."
+        Style.inline_code name
 ;;
 
 let nerrors = ref 0
@@ -1549,7 +1638,9 @@ let report w =
 
 let report_alert (alert : alert) =
   match alert_is_active alert with
-  | false -> `Inactive
+  | false ->
+      mark_alert_disables_used alert.kind;
+      `Inactive
   | true ->
       let is_error = alert_is_error alert in
       if is_error then incr nerrors;

@@ -56,12 +56,10 @@ abs:
   ret
 |}]
 
-(* CR ttebbi: This should be vsqrtsd %xmm0, %xmm0, %xmm0 *)
 let sqrt x = Float_u.sqrt x
 [%%expect_asm X86_64{|
 sqrt:
-  vxorpd %xmm1, %xmm1, %xmm1
-  vsqrtsd %xmm0, %xmm1, %xmm0
+  vsqrtsd %xmm0, %xmm0, %xmm0
   ret
 |}]
 
@@ -295,20 +293,15 @@ let min_unchecked (a : Float_u.t) (b : Float_u.t) =
 ;;
 [%%expect_asm X86_64{|
 min_unchecked:
-  vmovapd %xmm0, %xmm2
-  vmovapd %xmm1, %xmm0
-  vcomisd %xmm2, %xmm0
+  vcomisd %xmm0, %xmm1
   jbe   .L0
-  vmovapd %xmm2, %xmm0
   ret
 .L0:
+  vmovapd %xmm1, %xmm0
   ret
 |}]
 
-(* CR ttebbi: Bad codegen:
-      - useless spill and hence no need for a frame
-      - could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3
-*)
+(* CR ttebbi: could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3 *)
 let is_nan (x : Float_u.t) = Float.is_nan (Float_u.to_float x)
 [%%expect_asm X86_64{|
 is_nan:
@@ -320,10 +313,7 @@ is_nan:
 |}]
 
 
-(* CR ttebbi: Bad codegen:
-      - useless spill and hence no need for a frame
-      - could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3
-*)
+(* CR ttebbi: could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3 *)
 let is_finite (x : Float_u.t) =
   let equal x y = float_equal (Float_u.to_float x) (Float_u.to_float y) in
   let zero_or_nan = Float_u.sub x x in

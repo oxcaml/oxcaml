@@ -949,7 +949,8 @@ update_major_slice_work(intnat howmuch,
   uintnat work_done_between_slices =
     Sweepwork_markwork(mark_work_done_between_slices()) +
     sweep_work_done_between_slices();
-  atomic_fetch_add (&total_work_completed, work_done_between_slices);
+  if (work_done_between_slices > 0)
+    atomic_fetch_add (&total_work_completed, work_done_between_slices);
   dom_st->stat_major_work_done += work_done_between_slices;
 
   uintnat my_alloc_count = dom_st->allocated_words;
@@ -979,7 +980,8 @@ update_major_slice_work(intnat howmuch,
                   my_dependent_count,
                   my_minor_count);
 
-  atomic_fetch_add (&total_work_incurred, new_work);
+  if (new_work > 0)
+    atomic_fetch_add (&total_work_incurred, new_work);
 
   if (howmuch == AUTO_TRIGGERED_MAJOR_SLICE ||
       howmuch == GC_CALCULATE_MAJOR_SLICE) {

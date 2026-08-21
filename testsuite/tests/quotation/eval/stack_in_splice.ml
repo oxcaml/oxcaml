@@ -7,7 +7,7 @@
 #syntax quotations on
 
 (* Test that local (stack_) allocations work inside splices.
-   This exercises the Lregion wrapping of antiquotations
+   This exercises the Lregion wrapping of splices
    in translquote.ml. The outer Sys.opaque_identity prevents
    dead-code elimination of the local alloc; the inner one
    prevents static allocation. The fun () -> wrapper places the

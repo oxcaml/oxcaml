@@ -121,21 +121,21 @@ let code inline(always) loopify(never) size(221) newer_version_of(parity_is_0)
                             inlining_state(depth(30))
                        odd ~ depth 0 -> unroll 0 3 (int_sub_2) -> k * k1)))
 in
-let $camlUnroll4__parity_is_4 =
+let $camlUnroll4__parity_is_1 =
   closure parity_is_0_1 @parity_is &toplevel.alloc_region
 in
 let code inline(always) loopify(never) size(1) newer_version_of(k_3)
       k_3_1 (b) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (b)
 in
-let $camlUnroll4__k_5 = closure k_3_1 @k &toplevel.alloc_region in
+let $camlUnroll4__k_2 = closure k_3_1 @k &toplevel.alloc_region in
 apply direct(k_3_1 &toplevel.alloc_region) inlined(hint)
        inlining_state(depth(21))
-  $camlUnroll4__k_5 (0) -> k * error
+  $camlUnroll4__k_2 (0) -> k * error
   where k (one_is_even : imm tagged) =
-    ((let $camlUnroll4__even_8 =
+    ((let $camlUnroll4__even_5 =
         closure even_1_2 @even &toplevel.alloc_region
-      and $camlUnroll4__odd_9 =
+      and $camlUnroll4__odd_6 =
         closure odd_2_2 @odd &toplevel.alloc_region
       and code rec loopify(never) size(18) newer_version_of(odd_2_1)
             odd_2_2 (n : imm tagged)
@@ -148,7 +148,7 @@ apply direct(k_3_1 &toplevel.alloc_region) inlined(hint)
           where k3 =
             let int_sub = %int_barith.sub (n, 1) in
             apply direct(even_1_2 &my_alloc_region) inlining_state(depth(1))
-              $camlUnroll4__even_8 ~ depth my_depth -> succ my_depth
+              $camlUnroll4__even_5 ~ depth my_depth -> succ my_depth
                 (int_sub)
                 -> k1 * k2
       and code rec loopify(never) size(18) newer_version_of(even_1_1)
@@ -162,17 +162,17 @@ apply direct(k_3_1 &toplevel.alloc_region) inlined(hint)
           where k3 =
             let int_sub = %int_barith.sub (n, 1) in
             apply direct(odd_2_2 &my_alloc_region) inlining_state(depth(1))
-              $camlUnroll4__odd_9 ~ depth my_depth -> succ my_depth
+              $camlUnroll4__odd_6 ~ depth my_depth -> succ my_depth
                 (int_sub)
                 -> k1 * k2
-        with { k = $camlUnroll4__k_5 }
+        with { k = $camlUnroll4__k_2 }
       in
       apply direct(odd_2_2 &toplevel.alloc_region) inlining_state(depth(41))
-        $camlUnroll4__odd_9 ~ depth 0 -> unroll 0 4 (0) -> k * error)
+        $camlUnroll4__odd_6 ~ depth 0 -> unroll 0 4 (0) -> k * error)
        where k (four_is_odd : imm tagged) =
          let $camlUnroll4 =
-           Block 0 ($camlUnroll4__parity_is_4,
-                    $camlUnroll4__k_5,
+           Block 0 ($camlUnroll4__parity_is_1,
+                    $camlUnroll4__k_2,
                     one_is_even,
                     four_is_odd)
          in

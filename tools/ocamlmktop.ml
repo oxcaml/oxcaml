@@ -28,7 +28,8 @@ let main () =
   let cmdline =
     extra_quote ^ ocamlc ^
     " -I +compiler-libs " ^
-    "-linkall ocamlcommon.cma ocamlbytecomp.cma ocamltoplevel.cma " ^
+    "-linkall ocamlcommon.cma ocamlfrontend.cma " ^
+    "ocamlbytecomp.cma ocamltoplevel.cma " ^
     args ^ " topstart.cmo" ^
     extra_quote
   in

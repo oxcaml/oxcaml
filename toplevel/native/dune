@@ -23,7 +23,7 @@
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries
-  ocamlcommon
+  ocamlfrontend
   ocamlbytecomp
   ocamloptcomp
   oxcaml_common

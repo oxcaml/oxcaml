@@ -620,6 +620,7 @@ module Primitive_reprs = struct
         ("u256", "", C.scannable);
         ("a512", "", C.scannable);
         ("u512", "", C.scannable);
+        ("mask", "", C.scannable);
         ("8", "#", C.bits8);
         ("i8", "#", C.bits8);
         ("16", "#", C.bits16);
@@ -633,6 +634,7 @@ module Primitive_reprs = struct
         ("u256", "#", C.vec256);
         ("a512", "#", C.vec512);
         ("u512", "#", C.vec512);
+        ("mask", "#", C.mask);
       ]
     in
     let indices : (_ * Jkind_types.Sort.Const.t) list =
@@ -1085,6 +1087,10 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.vec512; Same_as_ocaml_repr C.scannable]
     | "%unbox_vec512" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.vec512]
+    | "%box_mask" ->
+      exactly [Same_as_ocaml_repr C.mask; Same_as_ocaml_repr C.scannable]
+    | "%unbox_mask" ->
+      exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.mask]
 
     | "%reinterpret_tagged_int63_as_unboxed_int64" ->
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.bits64]

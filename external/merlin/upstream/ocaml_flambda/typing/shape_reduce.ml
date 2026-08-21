@@ -151,7 +151,7 @@ end) = struct
     | NPredef of Predef.t * nf list
     | NArrow
     | NPoly_variant of nf poly_variant_constructors
-    | NVariant of  (delayed_nf * Layout.t) complex_constructors
+    | NVariant of  (delayed_nf * Layout.t option) complex_constructors
     | NVariant_unboxed of
       { name : string;
         variant_uid : Uid.t option;
@@ -259,7 +259,7 @@ end) = struct
       List.equal
         (Shape.equal_complex_constructor
           (fun (dnf1, ly1) (dnf2, ly2) ->
-            Layout.equal ly1 ly2 && equal_delayed_nf dnf1 dnf2))
+            Option.equal Layout.equal ly1 ly2 && equal_delayed_nf dnf1 dnf2))
         cc1 cc2
     | NVariant_unboxed { name = n1; variant_uid = vu1; arg_name = an1;
                          arg_uid = au1; arg_shape = as1; arg_layout = al1 },
@@ -496,6 +496,12 @@ end) = struct
                                            field_value = sh, layout } ->
                   let name = Option.get field_name in
                   let sh = delayed_nf_set_uid sh field_uid in
+                  (* Since this projection only exists for Merlin (see comment
+                     above), we can choose any layout here. Merlin does not
+                     consume the layout. *)
+                  let layout =
+                    Option.value layout ~default:(Layout.Base Scannable)
+                  in
                   (name, field_uid, sh, layout)
                 ) args in
                 { desc = NRecord { fields; kind = Record_boxed };

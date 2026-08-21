@@ -14,7 +14,7 @@
  (name extract_externals)
  (modes byte native)
  (modules extract_externals)
- (libraries ocamlcommon ocamlbytecomp ocamloptcomp))
+ (libraries ocamlfrontend ocamlbytecomp ocamloptcomp))
 
 (install
  (files

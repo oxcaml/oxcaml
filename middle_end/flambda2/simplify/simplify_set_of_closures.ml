@@ -72,13 +72,13 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
   in
   let denv =
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region = my_alloc_region } ->
+    | Not_alloc_stack { alloc_region = my_alloc_region } ->
       let my_alloc_region_duid = Flambda_debug_uid.none in
       let my_alloc_region =
         Bound_var.create my_alloc_region my_alloc_region_duid Name_mode.normal
       in
       DE.add_variable denv my_alloc_region (T.unknown K.region)
-    | Local
+    | Maybe_alloc_stack
         { alloc_region = my_alloc_region;
           region = my_region;
           ghost_region = my_ghost_region
@@ -210,10 +210,10 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   let my_ghost_region_duid = Flambda_debug_uid.none in
   let region_params =
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region } ->
+    | Not_alloc_stack { alloc_region } ->
       [ Bound_parameter.create alloc_region Flambda_kind.With_subkind.region
           my_alloc_region_duid ]
-    | Local { alloc_region; region; ghost_region } ->
+    | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
       [ Bound_parameter.create alloc_region Flambda_kind.With_subkind.region
           my_alloc_region_duid;
         Bound_parameter.create region Flambda_kind.With_subkind.region
@@ -710,11 +710,8 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
   let closure_symbols =
     Function_slot.Lmap.mapi
       (fun function_slot _func_decl ->
-        let name =
-          function_slot |> Function_slot.rename |> Function_slot.to_string
-          |> Linkage_name.of_string
-        in
-        Symbol.create (Current_unit.get_cu_exn ()) name)
+        let name = Function_slot.canonical_name function_slot in
+        Symbol.manufacture (Current_unit.get_cu_exn ()) name)
       (Function_declarations.funs_in_order function_decls)
   in
   let closure_symbols_map =

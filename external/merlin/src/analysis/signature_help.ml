@@ -180,8 +180,9 @@ let application_signature ~prefix ~cursor = function
   | (_, Browse_raw.Expression arg)
     :: ( _,
          Expression
-           { exp_desc = Texp_apply (({ exp_type; _ } as e), args, _, _, _); _ }
-       )
+           { exp_desc = Texp_apply (({ exp_type; _ } as e), args, _, _, _, _);
+             _
+           } )
     :: _
     when is_arrow exp_type ->
     log ~title:"application_signature" "Last arg:\n%a" Logger.fmt (fun fmt ->

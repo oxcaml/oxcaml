@@ -207,7 +207,9 @@ let register_name typ phys_reg : X86_ast.arg =
   | Vec512 ->
     I.require_vec512 ();
     Regf zmm_reg_name.(reg_index)
-  | Mask -> Misc.fatal_error "avx512 masks not yet implemented"
+  | Mask ->
+    (* Indices [0..6] correspond to [k1..7]. *)
+    Regmask (reg_index + 1)
 
 let phys_rax = phys_reg Int (P RAX)
 
@@ -531,24 +533,42 @@ let res16 i n = emit_subreg reg_low_16_name WORD i.res.(n)
 
 let res32 i n = emit_subreg reg_low_32_name DWORD i.res.(n)
 
-let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
+let arg_as_xmm : X86_ast.arg -> X86_ast.arg = function
   | Regf (YMM r | ZMM r) -> Regf (XMM r)
   | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
     | Regf (XMM _)
-    | Mem _ | Mem64_RIP _ ) as res ->
+    | Regmask _ | Mem _ | Mem64_RIP _ ) as res ->
+    res
+
+let arg_as_ymm : X86_ast.arg -> X86_ast.arg = function
+  | Regf (XMM r | ZMM r) -> Regf (YMM r)
+  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+    | Regf (YMM _)
+    | Regmask _ | Mem _ | Mem64_RIP _ ) as res ->
+    res
+
+let arg_as_zmm : X86_ast.arg -> X86_ast.arg = function
+  | Regf (XMM r | YMM r) -> Regf (ZMM r)
+  | ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
+    | Regf (ZMM _)
+    | Regmask _ | Mem _ | Mem64_RIP _ ) as res ->
     res
 
 let arg_idx i n : X86_ast.reg_idx =
   match arg i n with
   | Reg64 reg -> Scalar reg
   | Regf reg -> Vector reg
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Mem _ | Mem64_RIP _
-    ->
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Regmask _ | Mem _
+  | Mem64_RIP _ ->
     assert false
 
-let argX i n = narrow_to_xmm (reg i.arg.(n))
+let argX i n = arg_as_xmm (reg i.arg.(n))
 
-let resX i n = narrow_to_xmm (reg i.res.(n))
+let resX i n = arg_as_xmm (reg i.res.(n))
+
+let argY i n = arg_as_ymm (reg i.arg.(n))
+
+let argZ i n = arg_as_zmm (reg i.arg.(n))
 
 (* Output an addressing mode *)
 
@@ -583,10 +603,11 @@ let must_save_simd_regs live : Regs.Save_simd_regs.t =
       else
         match r.typ with
         | Vec256 -> v256 := true
-        | Vec512 -> v512 := true
+        | Vec512 | Mask ->
+          (* Masks may be used with smaller vectors, but imply zmm support *)
+          v512 := true
         | Float | Vec128 | Float32 | Valx2 -> v128 := true
-        | Val | Addr | Int -> ()
-        | Mask -> Misc.fatal_error "avx512 masks not yet implemented")
+        | Val | Addr | Int -> ())
     live;
   if !v512
   then (
@@ -846,27 +867,27 @@ let instr_for_intop = function
 let instr_for_floatop (width : Cmm.float_width) op =
   let open Simd_instrs in
   match width, op with
-  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd
-  | Float64, Isubf -> sse_or_avx3 subsd vsubsd
-  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd
-  | Float64, Idivf -> sse_or_avx3 divsd vdivsd
-  | Float32, Iaddf -> sse_or_avx3 addss vaddss
-  | Float32, Isubf -> sse_or_avx3 subss vsubss
-  | Float32, Imulf -> sse_or_avx3 mulss vmulss
-  | Float32, Idivf -> sse_or_avx3 divss vdivss
+  | Float64, Iaddf -> sse_or_avx3 addsd vaddsd_X_X_Xm64
+  | Float64, Isubf -> sse_or_avx3 subsd vsubsd_X_X_Xm64
+  | Float64, Imulf -> sse_or_avx3 mulsd vmulsd_X_X_Xm64
+  | Float64, Idivf -> sse_or_avx3 divsd vdivsd_X_X_Xm64
+  | Float32, Iaddf -> sse_or_avx3 addss vaddss_X_X_Xm32
+  | Float32, Isubf -> sse_or_avx3 subss vsubss_X_X_Xm32
+  | Float32, Imulf -> sse_or_avx3 mulss vmulss_X_X_Xm32
+  | Float32, Idivf -> sse_or_avx3 divss vdivss_X_X_Xm32
   | (Float32 | Float64), (Inegf | Iabsf | Icompf _) -> assert false
 
 let instr_for_floatarithmem (width : Cmm.float_width) op =
   let open Simd_instrs in
   match width, op with
-  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd
-  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd
-  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd
-  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd
-  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss
-  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss
-  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss
-  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss
+  | Float64, Ifloatadd -> sse_or_avx3 addsd vaddsd_X_X_Xm64
+  | Float64, Ifloatsub -> sse_or_avx3 subsd vsubsd_X_X_Xm64
+  | Float64, Ifloatmul -> sse_or_avx3 mulsd vmulsd_X_X_Xm64
+  | Float64, Ifloatdiv -> sse_or_avx3 divsd vdivsd_X_X_Xm64
+  | Float32, Ifloatadd -> sse_or_avx3 addss vaddss_X_X_Xm32
+  | Float32, Ifloatsub -> sse_or_avx3 subss vsubss_X_X_Xm32
+  | Float32, Ifloatmul -> sse_or_avx3 mulss vmulss_X_X_Xm32
+  | Float32, Ifloatdiv -> sse_or_avx3 divss vdivss_X_X_Xm32
 
 let cond : Operation.integer_comparison -> X86_ast.condition = function
   | Ceq -> E
@@ -906,8 +927,10 @@ let emit_float_test (width : Cmm.float_width) (cmp : Cmm.float_comparison) i
   let open Simd_instrs in
   let ucomi, comi =
     match width with
-    | Float64 -> sse_or_avx ucomisd vucomisd, sse_or_avx comisd vcomisd
-    | Float32 -> sse_or_avx ucomiss vucomiss, sse_or_avx comiss vcomiss
+    | Float64 ->
+      sse_or_avx ucomisd vucomisd_X_Xm64, sse_or_avx comisd vcomisd_X_Xm64
+    | Float32 ->
+      sse_or_avx ucomiss vucomiss_X_Xm32, sse_or_avx comiss vcomiss_X_Xm32
   in
   match cmp with
   | CFeq when equal_arg (arg i 1) (arg i 0) ->
@@ -1111,6 +1134,20 @@ let movq src dst =
     then I.simd vmovq_Xm64_X [| src; dst |]
     else I.simd vmovq_r64m64_X [| src; dst |]
 
+let kmov src dst =
+  let open Simd_instrs in
+  match is_regmask src, is_regmask dst with
+  | true, true -> I.simd kmovq_K_Km64 [| src; dst |]
+  | false, true ->
+    if is_mem src
+    then I.simd kmovq_K_Km64 [| src; dst |]
+    else I.simd kmovq_K_r64 [| src; dst |]
+  | true, false ->
+    if is_mem dst
+    then I.simd kmovq_m64_K [| src; dst |]
+    else I.simd kmovq_r64_K [| src; dst |]
+  | false, false -> Misc.fatal_error "Illegal kmov operands"
+
 let movss src dst =
   let open Simd_instrs in
   match Arch.Extension.enabled AVX, is_mem src, is_mem dst with
@@ -1149,7 +1186,7 @@ let prefer_load_form (src : X86_ast.arg) (dst : X86_ast.arg) =
     (* otherwise load form needs 3-byte VEX *)
     && regf_index s <= 7
   | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-      | Mem _ | Mem64_RIP _ ),
+      | Regmask _ | Mem _ | Mem64_RIP _ ),
       _ ) ->
     false
 
@@ -1197,10 +1234,23 @@ let move (src : Reg.t) (dst : Reg.t) =
   | Vec256, Stack _, Vec256, Reg _ ->
     (* CR-soon mslater: align vec256/512 stack slots *)
     if distinct then I.simd vmovupd_Y_Ym256 [| reg src; reg dst |]
-  | Vec512, _, Vec512, _ ->
-    (* CR-soon mslater: avx512 *)
-    Misc.fatal_error "avx512 instructions not yet implemented"
-  | Mask, _, Mask, _ -> Misc.fatal_error "avx512 masks not yet implemented"
+  | Vec512, Reg _, Vec512, Reg _ ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct
+    then
+      if prefer_load_form (reg src) (reg dst)
+      then I.simd vmovupd_Z_Zm512 [| reg src; reg dst |]
+      else I.simd vmovupd_Zm512_Z [| reg src; reg dst |]
+  | Vec512, Reg _, Vec512, Stack _ ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct then I.simd vmovupd_Zm512_Z [| reg src; reg dst |]
+  | Vec512, Stack _, Vec512, Reg _ ->
+    (* CR-soon mslater: align vec256/512 stack slots *)
+    if distinct then I.simd vmovupd_Z_Zm512 [| reg src; reg dst |]
+  | Mask, Reg _, Mask, Reg _ | Mask, Stack _, Mask, Reg _ ->
+    if distinct then I.simd kmovq_K_Km64 [| reg src; reg dst |]
+  | Mask, Reg _, Mask, Stack _ ->
+    if distinct then I.simd kmovq_m64_K [| reg src; reg dst |]
   | Float, (Reg _ | Stack _), Float, (Reg _ | Stack _) ->
     if distinct then movsd (reg src) (reg dst)
   | Float32, (Reg _ | Stack _), Float32, (Reg _ | Stack _) ->
@@ -1403,7 +1453,7 @@ end = struct
     | Mem64_RIP (ty, sym, displ), offset ->
       I.lea (Mem64_RIP (ty, sym, displ + offset)) dest
     | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _
-        | Regf _ ),
+        | Regf _ | Regmask _ ),
         offset ) ->
       I.lea src dest;
       if offset <> 0 then I.add (int offset) dest
@@ -1493,7 +1543,7 @@ end = struct
     | Mem { idx = Scalar register'; base = Some register''; _ } ->
       equal_reg64 register register' || equal_reg64 register register''
     | Mem { idx = Vector _; _ }
-    | Regf _ | Imm _ | Sym _ | Reg8H _
+    | Regf _ | Regmask _ | Imm _ | Sym _ | Reg8H _
     | Mem64_RIP (_, _, _) ->
       false
 
@@ -1673,7 +1723,7 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   | Int_of_value | Value_of_int -> if distinct then I.mov (arg i 0) (res i 0)
   | Float_of_float32 | Float32_of_float ->
     if distinct then movss (arg i 0) (res i 0)
-  | V128_of_vec (Vec128 | Vec256) ->
+  | V128_of_vec (Vec128 | Vec256 | Vec512) ->
     if distinct then movpd ~unaligned:false (argX i 0) (res i 0)
   | V256_of_vec Vec128 ->
     if distinct then movpd ~unaligned:false (arg i 0) (resX i 0)
@@ -1684,12 +1734,14 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
       if Reg.is_stack i.arg.(0) || prefer_load_form (arg i 0) (res i 0)
       then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
       else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
-  | V128_of_vec Vec512 | V256_of_vec Vec512 | V512_of_vec _ ->
-    (* CR-soon mslater: avx512 *)
-    Misc.fatal_error "avx512 instructions not yet implemented"
+  | V256_of_vec Vec512 ->
+    if distinct then I.simd vmovupd_Y_Ym256 [| argY i 0; res i 0 |]
+  | V512_of_vec (Vec128 | Vec256 | Vec512) ->
+    if distinct then I.simd vmovupd_Z_Zm512 [| argZ i 0; res i 0 |]
   | Float_of_int64 | Int64_of_float -> movq (arg i 0) (res i 0)
   | Float32_of_int32 -> movd (arg32 i 0) (res i 0)
   | Int32_of_float32 -> movd (arg i 0) (res32 i 0)
+  | Mask_of_int64 | Int64_of_mask -> kmov (arg i 0) (res i 0)
 
 let emit_static_cast (cast : Cmm.static_cast) i =
   let open Simd_instrs in
@@ -1703,8 +1755,10 @@ let emit_static_cast (cast : Cmm.static_cast) i =
     sse_or_avx_dst cvtsi2ss_X_r64m64 vcvtsi2ss_X_X_r64m64 (arg i 0) (res i 0)
   | Int_of_float Float32 ->
     sse_or_avx cvttss2si_r64_Xm32 vcvttss2si_r64_Xm32 (arg i 0) (res i 0)
-  | Float_of_float32 -> sse_or_avx_dst cvtss2sd vcvtss2sd (arg i 0) (res i 0)
-  | Float32_of_float -> sse_or_avx_dst cvtsd2ss vcvtsd2ss (arg i 0) (res i 0)
+  | Float_of_float32 ->
+    sse_or_avx_dst cvtss2sd vcvtss2sd_X_X_Xm32 (arg i 0) (res i 0)
+  | Float32_of_float ->
+    sse_or_avx_dst cvtsd2ss vcvtsd2ss_X_X_Xm64 (arg i 0) (res i 0)
   | Scalar_of_v128 Float64x2 | Scalar_of_v256 Float64x4 ->
     if distinct then movsd (argX i 0) (res i 0)
   | V128_of_scalar Float64x2 | V256_of_scalar Float64x4 ->
@@ -1736,9 +1790,23 @@ let emit_static_cast (cast : Cmm.static_cast) i =
        OK because the argument is an untagged int and these operations leave the
        top bits of the vector unspecified. *)
     movd (arg32 i 0) (resX i 0)
-  | V512_of_scalar _ | Scalar_of_v512 _ ->
-    (* CR-soon mslater: avx512 *)
-    Misc.fatal_error "avx512 instructions not yet implemented"
+  | Scalar_of_v512 Float64x8 -> if distinct then movsd (argX i 0) (res i 0)
+  | V512_of_scalar Float64x8 -> if distinct then movsd (arg i 0) (resX i 0)
+  | Scalar_of_v512 Int64x8 -> movq (argX i 0) (res i 0)
+  | V512_of_scalar Int64x8 -> movq (arg i 0) (resX i 0)
+  | Scalar_of_v512 Int32x16 -> movd (argX i 0) (res32 i 0)
+  | V512_of_scalar Int32x16 -> movd (arg32 i 0) (resX i 0)
+  | Scalar_of_v512 Float32x16 -> if distinct then movss (argX i 0) (res i 0)
+  | V512_of_scalar Float32x16 -> if distinct then movss (arg i 0) (resX i 0)
+  | Scalar_of_v512 Float16x32 | V512_of_scalar Float16x32 ->
+    Misc.fatal_error "float16 scalar type not supported"
+  | Scalar_of_v512 Int16x32 -> movd (argX i 0) (res32 i 0)
+  | Scalar_of_v512 Int8x64 -> movd (argX i 0) (res32 i 0)
+  | V512_of_scalar Int16x32 | V512_of_scalar Int8x64 ->
+    (* [movw] and [movb] cannot operate on vector registers. Moving 32 bits is
+       OK because the argument is an untagged int and these operations leave the
+       top bits of the vector unspecified. *)
+    movd (arg32 i 0) (resX i 0)
 
 let assert_loc (loc : Simd.loc) arg =
   (match Reg.is_reg arg with
@@ -1811,14 +1879,14 @@ let to_arg_with_width loc instr i =
   | Some R8 -> arg8 instr i
   | Some R16 -> arg16 instr i
   | Some R32 -> arg32 instr i
-  | Some (R64 | R128 | R256) | None -> arg instr i
+  | Some (R64 | R128 | R256 | R512) | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
   | Some R8 -> res8 instr i
   | Some R16 -> res16 instr i
   | Some R32 -> res32 instr i
-  | Some (R64 | R128 | R256) | None -> res instr i
+  | Some (R64 | R128 | R256 | R512) | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
@@ -1828,7 +1896,8 @@ let to_addr_width loc : X86_ast.data_type =
   | M64 -> QWORD
   | M128 -> VEC128
   | M256 -> VEC256
-  | M32X | M32Y | M64X | M64Y ->
+  | M512 -> VEC512
+  | M32X | M32Y | M32Z | M64X | M64Y | M64Z ->
     (* Will not be used by the assembler. *)
     NONE
 
@@ -1844,8 +1913,9 @@ let emit_simd_sanitize ~address ~instr ~loc ~kind =
       (* Conservatively assumes unaligned memory; generates slower checks. *)
       | M128 -> Some Onetwentyeight_unaligned
       | M256 -> Some Twofiftysix_unaligned
+      | M512 -> Some Fivetwelve_unaligned
       (* We do not sanitize gather/scatter instructions. *)
-      | M32X | M32Y | M64X | M64Y -> None
+      | M32X | M32Y | M32Z | M64X | M64Y | M64Z -> None
     in
     match chunk with
     | None -> ()
@@ -1883,7 +1953,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
       Array.fold_left
         (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
           match enc with
-          | Implicit | Immediate -> idx, acc
+          | Implicit | Immediate | Mask -> idx, acc
           | RM_r | RM_rm | Vex_v ->
             idx + 1, to_res_with_width loc instr idx :: acc)
         (0, args) rr
@@ -2061,17 +2131,39 @@ let emit_instr ~first ~last ~fallthrough i =
       let lbl = add_vec128_constant { word0; word1 } in
       movpd ~unaligned:false (mem64_rip VEC128 (L.encode lbl)) (res i 0))
   | Lop (Const_vec256 { word0; word1; word2; word3 }) -> (
-    match
+    let all_zero =
       List.for_all (fun w -> Int64.equal w 0L) [word3; word2; word1; word0]
-    with
+    in
+    match all_zero with
     | true -> I.simd vxorpd_Y_Y_Ym256 [| res i 0; res i 0; res i 0 |]
     | false ->
       let lbl = add_vec256_constant { word0; word1; word2; word3 } in
       I.simd vmovapd_Y_Ym256 [| mem64_rip VEC256 (L.encode lbl); res i 0 |])
-  | Lop (Const_vec512 _) ->
-    (* CR-soon mslater: avx512 *)
-    ignore add_vec512_constant;
-    Misc.fatal_error "avx512 instructions not yet implemented"
+  | Lop
+      (Const_vec512 { word0; word1; word2; word3; word4; word5; word6; word7 })
+    -> (
+    let all_zero =
+      List.for_all
+        (fun w -> Int64.equal w 0L)
+        [word7; word6; word5; word4; word3; word2; word1; word0]
+    in
+    match all_zero with
+    | true -> I.simd vpxorq_Z_Z_Zm512 [| res i 0; res i 0; res i 0 |]
+    | false ->
+      let lbl =
+        add_vec512_constant
+          { word0; word1; word2; word3; word4; word5; word6; word7 }
+      in
+      I.simd vmovapd_Z_Zm512 [| mem64_rip VEC512 (L.encode lbl); res i 0 |])
+  | Lop (Const_mask n) -> (
+    match n with
+    | 0L -> I.simd kxorq [| res i 0; res i 0; res i 0 |]
+    | -1L -> I.simd kxnorq [| res i 0; res i 0; res i 0 |]
+    | _ ->
+      (* Float constants are simply 64 bits of static storage, so we may use
+         them as masks. *)
+      let lbl = add_float_constant n in
+      I.simd kmovq_K_Km64 [| mem64_rip QWORD (L.encode lbl); res i 0 |])
   | Lop (Const_symbol s) ->
     add_used_symbol s.sym_name;
     load_symbol_addr s (res i 0)
@@ -2136,7 +2228,9 @@ let emit_instr ~first ~last ~fallthrough i =
     in
     match memory_chunk with
     | Word_int | Word_val -> load ~dest:(res i 0) QWORD I.mov
-    | Word_mask -> Misc.fatal_error "avx512 masks not yet implemented"
+    | Word_mask ->
+      load ~dest:(res i 0) QWORD (fun src dst ->
+          I.simd kmovq_K_Km64 [| src; dst |])
     | Byte_unsigned -> load ~dest:(res i 0) BYTE I.movzx
     | Byte_signed -> load ~dest:(res i 0) BYTE I.movsx
     | Sixteen_unsigned -> load ~dest:(res i 0) WORD I.movzx
@@ -2153,11 +2247,14 @@ let emit_instr ~first ~last ~fallthrough i =
     | Twofiftysix_aligned ->
       load ~dest:(res i 0) VEC256 (fun src dst ->
           I.simd vmovapd_Y_Ym256 [| src; dst |])
-    | Fivetwelve_unaligned | Fivetwelve_aligned ->
-      (* CR-soon mslater: avx512 *)
-      Misc.fatal_error "avx512 instructions not yet implemented"
+    | Fivetwelve_unaligned ->
+      load ~dest:(res i 0) VEC512 (fun src dst ->
+          I.simd vmovupd_Z_Zm512 [| src; dst |])
+    | Fivetwelve_aligned ->
+      load ~dest:(res i 0) VEC512 (fun src dst ->
+          I.simd vmovapd_Z_Zm512 [| src; dst |])
     | Single { reg = Float64 } ->
-      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd)
+      load ~dest:(res i 0) REAL4 (sse_or_avx_dst cvtss2sd vcvtss2sd_X_X_Xm32)
     | Single { reg = Float32 } -> load ~dest:(res i 0) REAL4 movss
     | Double -> load ~dest:(res i 0) REAL8 movsd)
   | Lop (Store (chunk, addr, is_modify)) -> (
@@ -2173,7 +2270,8 @@ let emit_instr ~first ~last ~fallthrough i =
     in
     match chunk with
     | Word_int | Word_val -> store QWORD arg I.mov
-    | Word_mask -> Misc.fatal_error "avx512 masks not yet implemented"
+    | Word_mask ->
+      store QWORD arg (fun src dst -> I.simd kmovq_m64_K [| src; dst |])
     | Byte_unsigned | Byte_signed -> store BYTE arg8 I.mov
     | Sixteen_unsigned | Sixteen_signed -> store WORD arg16 I.mov
     | Thirtytwo_signed | Thirtytwo_unsigned -> store DWORD arg32 I.mov
@@ -2183,12 +2281,13 @@ let emit_instr ~first ~last ~fallthrough i =
       store VEC256 arg (fun src dst -> I.simd vmovupd_Ym256_Y [| src; dst |])
     | Twofiftysix_aligned ->
       store VEC256 arg (fun src dst -> I.simd vmovapd_Ym256_Y [| src; dst |])
-    | Fivetwelve_unaligned | Fivetwelve_aligned ->
-      (* CR-soon mslater: avx512 *)
-      Misc.fatal_error "avx512 instructions not yet implemented"
+    | Fivetwelve_unaligned ->
+      store VEC512 arg (fun src dst -> I.simd vmovupd_Zm512_Z [| src; dst |])
+    | Fivetwelve_aligned ->
+      store VEC512 arg (fun src dst -> I.simd vmovapd_Zm512_Z [| src; dst |])
     | Single { reg = Float64 } ->
       let src = arg i 0 in
-      sse_or_avx_dst cvtsd2ss vcvtsd2ss src xmm15;
+      sse_or_avx_dst cvtsd2ss vcvtsd2ss_X_X_Xm64 src xmm15;
       let address = addressing addr REAL4 i 1 in
       Address_sanitizer.emit_sanitize ~dependencies:[| src; xmm15 |] ~instr:i
         ~address chunk memory_access;
@@ -2357,14 +2456,14 @@ let emit_instr ~first ~last ~fallthrough i =
     let cond, need_swap = float_cond_and_need_swap cmp in
     let r0, r1 = res i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpsd vcmpsd cond a1 a0 r1;
+    cmp_sse_or_avx cmpsd vcmpsd_X_X_Xm64 cond a1 a0 r1;
     movq r1 r0;
     I.neg r0
   | Lop (Floatop (Float32, Icompf cmp)) ->
     let cond, need_swap = float_cond_and_need_swap cmp in
     let r0, r0_32, r1 = res i 0, res32 i 0, res i 1 in
     let a0, a1 = if need_swap then arg i 1, arg i 0 else arg i 0, arg i 1 in
-    cmp_sse_or_avx cmpss vcmpss cond a1 a0 r1;
+    cmp_sse_or_avx cmpss vcmpss_X_X_Xm32 cond a1 a0 r1;
     movd r1 r0_32;
     (* CMPSS only sets the bottom 32 bits of the result, so we sign-extend to
        copy the result to the top 32 bits. *)
@@ -2413,6 +2512,7 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop (Specific (Ibswap { bitwidth = Sixtyfour })) -> I.bswap (res i 0)
   | Lop (Specific Isextend32) -> I.movsxd (arg32 i 0) (res i 0)
   | Lop (Specific Izextend32) -> I.mov (arg32 i 0) (res32 i 0)
+  | Lop (Specific Ineg) -> I.neg (res i 0)
   | Lop (Intop Iclz) ->
     (* CR-someday gyorsh: can we do it at selection? mshinwell: We need to
        address this and the similar CRs below. My feeling is that we should try

@@ -59,6 +59,7 @@ module Sort : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
 
   val to_string_base : base -> string
 

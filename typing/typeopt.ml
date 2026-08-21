@@ -1250,10 +1250,10 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
                      Language_extension.(is_at_least SIMD Stable) ->
     Lambda.layout_unboxed_vector Unboxed_vec256
   | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
-                     Language_extension.(is_at_least SIMD Alpha) ->
+                     Language_extension.(is_at_least SIMD Beta) ->
     Lambda.layout_unboxed_vector Unboxed_vec512
   | Base Mask when Language_extension.(is_at_least Layouts Stable) &&
-                   Language_extension.(is_at_least SIMD Alpha) ->
+                   Language_extension.(is_at_least SIMD Beta) ->
     Lambda.layout_unboxed_mask
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_product []

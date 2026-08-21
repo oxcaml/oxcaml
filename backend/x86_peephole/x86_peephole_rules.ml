@@ -9,13 +9,17 @@ module U = X86_peephole_utils
 type peephole_stats =
   { mutable remove_mov_to_dead_register : int;
     mutable remove_redundant_cmp : int;
-    mutable combine_add_rsp : int
+    mutable remove_redundant_extension : int;
+    mutable combine_add_rsp : int;
+    mutable remove_redundant_test : int
   }
 
 let create_peephole_stats () =
   { remove_mov_to_dead_register = 0;
     remove_redundant_cmp = 0;
-    combine_add_rsp = 0
+    remove_redundant_extension = 0;
+    combine_add_rsp = 0;
+    remove_redundant_test = 0
   }
 
 let peephole_stats_to_counters stats =
@@ -24,7 +28,11 @@ let peephole_stats_to_counters stats =
        stats.remove_mov_to_dead_register
   |> Profile.Counters.set "x86_peephole.remove_redundant_cmp"
        stats.remove_redundant_cmp
+  |> Profile.Counters.set "x86_peephole.remove_redundant_extension"
+       stats.remove_redundant_extension
   |> Profile.Counters.set "x86_peephole.combine_add_rsp" stats.combine_add_rsp
+  |> Profile.Counters.set "x86_peephole.remove_redundant_test"
+       stats.remove_redundant_test
 
 (* Rewrite rule: combine adjacent ADD to RSP with CFI directives. Pattern: addq
    $n1, %rsp; .cfi_adjust_cfa_offset d1; addq $n2, %rsp; .cfi_adjust_cfa_offset
@@ -179,6 +187,61 @@ let remove_redundant_cmp stats cell =
     | (Some _ | None), _ -> U.No_match)
   | _ -> U.No_match
 
+(* Rewrite rule: remove a sign/zero-extension instruction that immediately
+   follows an identical one. Pattern: ext src, dst; ext src, dst (where ext is
+   one of movsx/movsxd/movzx and src is a register). Rewrite: ext src, dst
+
+   The first instruction only writes [dst], and an extension writes the bits it
+   read, unchanged, into the low bits of [dst]. So even when [src] is a
+   subregister of [dst], the second instruction recomputes the same value. This
+   does not hold for a high-8-bit source such as %ah when [dst] overlaps it (the
+   extension moves those bits to the low byte), so such sources are excluded.
+   Extensions do not write flags. *)
+let is_low_part_register (arg : X86_ast.arg) =
+  match arg with Reg8L _ | Reg16 _ | Reg32 _ | Reg64 _ -> true | _ -> false
+
+let remove_redundant_extension stats cell =
+  match U.get_cells cell 2 with
+  | [cell1; cell2] -> (
+    match DLL.value cell1, DLL.value cell2 with
+    | Ins (MOVSX (src1, dst1)), Ins (MOVSX (src2, dst2))
+    | Ins (MOVSXD (src1, dst1)), Ins (MOVSXD (src2, dst2))
+    | Ins (MOVZX (src1, dst1)), Ins (MOVZX (src2, dst2))
+      when equal_arg src1 src2 && equal_arg dst1 dst2
+           && is_low_part_register src1 ->
+      DLL.delete_curr cell2;
+      stats.remove_redundant_extension <- stats.remove_redundant_extension + 1;
+      (* Return cell1 so that a third identical extension is also removed *)
+      U.Matched (Some cell1)
+    | _, _ -> U.No_match)
+  | _ -> U.No_match
+
+(* Rewrite rule: remove a TEST made redundant by the preceding instruction.
+   Pattern: op src, r; test r, r (where op is one of and/or/xor and r is a
+   64-bit register). Rewrite: op src, r
+
+   AND, OR and XOR set ZF, SF and PF according to their result and clear CF and
+   OF - exactly the flag state [test r, r] computes from that same value (AF is
+   undefined after both instructions). The deletion therefore leaves the flags
+   bit-for-bit identical, whatever condition is read afterwards. Other
+   arithmetic instructions (e.g. ADD, SUB) set CF and OF from the computation
+   rather than clearing them, so extending the rule to them would require
+   checking which flags the following instructions read. Both operands are
+   restricted to 64-bit registers so that the flag-setting operation and the
+   test have the same width. *)
+let remove_redundant_test stats cell =
+  match U.get_cells cell 2 with
+  | [cell1; cell2] -> (
+    match DLL.value cell1, DLL.value cell2 with
+    | ( Ins (AND (_, Reg64 dst) | OR (_, Reg64 dst) | XOR (_, Reg64 dst)),
+        Ins (TEST (Reg64 src1, Reg64 src2)) )
+      when equal_reg64 dst src1 && equal_reg64 dst src2 ->
+      DLL.delete_curr cell2;
+      stats.remove_redundant_test <- stats.remove_redundant_test + 1;
+      U.Matched (Some cell1)
+    | _, _ -> U.No_match)
+  | _ -> U.No_match
+
 (* Apply all rewrite rules in sequence using a pipeline. *)
 let apply stats cell =
   let[@inline always] if_no_match ~enabled f result =
@@ -194,5 +257,11 @@ let apply stats cell =
        ~enabled:!Oxcaml_flags.x86_peephole_remove_redundant_cmp
        remove_redundant_cmp
   |> if_no_match
+       ~enabled:!Oxcaml_flags.x86_peephole_remove_redundant_extension
+       remove_redundant_extension
+  |> if_no_match
        ~enabled:!Oxcaml_flags.x86_peephole_combine_add_rsp
        combine_add_rsp
+  |> if_no_match
+       ~enabled:!Oxcaml_flags.x86_peephole_remove_redundant_test
+       remove_redundant_test

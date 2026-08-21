@@ -73,7 +73,7 @@ module IR = struct
       region_close : Lambda.region_close;
       inlined : Lambda.inlined_attribute;
       probe : Lambda.probe;
-      mode : Lambda.locality_mode;
+      mode : Lambda.return_mode;
       region : Ident.t option;
       ghost_region : Ident.t option;
       alloc_region : Ident.t;
@@ -377,15 +377,8 @@ module Acc = struct
       seen_a_function : bool;
       slot_offsets : Slot_offsets.t;
       code_slot_offsets : Slot_offsets.t Code_id.Map.t;
-      closure_infos : closure_info list;
-      symbol_short_name_counter : int
+      closure_infos : closure_info list
     }
-
-  let manufacture_symbol_short_name t =
-    let counter = t.symbol_short_name_counter in
-    let t = { t with symbol_short_name_counter = counter + 1 } in
-    let name = Linkage_name.of_string ("s" ^ string_of_int counter) in
-    t, name
 
   let cost_metrics t = t.cost_metrics
 
@@ -475,8 +468,7 @@ module Acc = struct
       seen_a_function = false;
       slot_offsets = Slot_offsets.empty;
       code_slot_offsets = Code_id.Map.empty;
-      closure_infos = [];
-      symbol_short_name_counter = 0
+      closure_infos = []
     }
 
   let declared_symbols t = t.declared_symbols
@@ -780,10 +772,14 @@ module Function_decls = struct
       | Unboxed_number of Flambda_kind.Boxable_number.t
       | Unboxed_float_record of int
 
+    type unboxing_return_kind = unboxing_kind * Lambda.locality_mode
+
     type calling_convention =
       | Normal_calling_convention
       | Unboxed_calling_convention of
-          unboxing_kind option list * unboxing_kind option * Function_slot.t
+          unboxing_kind option list
+          * unboxing_return_kind option
+          * Function_slot.t
 
     type t =
       { let_rec_ident : Ident.t;
@@ -807,7 +803,7 @@ module Function_decls = struct
         recursive : Recursive.t;
         closure_alloc_mode : Lambda.locality_mode;
         first_complex_local_param : int;
-        result_mode : Lambda.locality_mode
+        result_mode : Lambda.return_mode
       }
 
     let create ~let_rec_ident ~let_rec_uid ~function_slot ~kind ~params

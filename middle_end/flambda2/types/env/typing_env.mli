@@ -45,8 +45,6 @@ module Serializable : sig
 
   val print : Format.formatter -> t -> unit
 
-  val name_domain : t -> Name.Set.t
-
   val ids_for_export : t -> Ids_for_export.t
 
   val apply_renaming : t -> Renaming.t -> t

@@ -49,8 +49,8 @@ let create ~return_continuation ~exn_continuation ~params ~my_closure
      let my_set, expected_size =
        let regions, num_regions =
          match (my_alloc_mode : Alloc_mode.For_applications.t) with
-         | Heap { alloc_region } -> [alloc_region], 1
-         | Local { alloc_region; region; ghost_region } ->
+         | Not_alloc_stack { alloc_region } -> [alloc_region], 1
+         | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
            [alloc_region; region; ghost_region], 3
        in
        Variable.Set.of_list (my_closure :: my_depth :: regions), 2 + num_regions
@@ -80,17 +80,18 @@ let my_closure t = t.my_closure
 
 let my_region t =
   match t.my_alloc_mode with
-  | Heap _ -> None
-  | Local { region; _ } -> Some region
+  | Not_alloc_stack _ -> None
+  | Maybe_alloc_stack { region; _ } -> Some region
 
 let my_ghost_region t =
   match t.my_alloc_mode with
-  | Heap _ -> None
-  | Local { ghost_region; _ } -> Some ghost_region
+  | Not_alloc_stack _ -> None
+  | Maybe_alloc_stack { ghost_region; _ } -> Some ghost_region
 
 let my_alloc_region t =
   match t.my_alloc_mode with
-  | Heap { alloc_region } | Local { alloc_region; _ } -> alloc_region
+  | Not_alloc_stack { alloc_region } | Maybe_alloc_stack { alloc_region; _ } ->
+    alloc_region
 
 let my_alloc_mode t = t.my_alloc_mode
 

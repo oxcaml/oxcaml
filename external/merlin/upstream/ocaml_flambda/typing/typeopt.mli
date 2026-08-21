@@ -52,6 +52,10 @@ val bigarray_specialize_kind_and_layout :
 val layout :
   Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
 
+(* Find the layout of an ident in the given environment. Returns [None] if the
+   ident refers to a primitive. *)
+val layout_of_ident : Env.t -> Ident.t -> Lambda.layout option
+
 (* These translate a type system sort to a lambda layout.  The function [layout]
    gives a more precise result---this should only be used when the kind is
    needed for compilation but the precise Lambda.layout isn't needed for
@@ -59,6 +63,11 @@ val layout :
    [layout_of_non_void_sort] loudly fails on void. *)
 val layout_of_sort : Location.t -> Jkind.Sort.Const.t -> Lambda.layout
 val layout_of_non_void_sort : Jkind.Sort.Const.t -> Lambda.layout
+
+(* Like [layout], but falls back to the sort when the type does not determine a
+   value kind (e.g. has jkind [any]) *)
+val layout_or_sort :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
 
 (* Given a function type and the sort of its return type, compute the layout of
    its return type. *)

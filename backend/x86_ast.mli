@@ -115,6 +115,7 @@ type arg =
   | Reg32 of reg64
   | Reg64 of reg64
   | Regf of regf
+  | Regmask of int
 
   | Mem of addr
   | Mem64_RIP of data_type * string * int

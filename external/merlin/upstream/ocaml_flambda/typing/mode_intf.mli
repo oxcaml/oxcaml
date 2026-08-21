@@ -212,7 +212,7 @@ module type Axis = sig
   type 'a t
 
   (** Compare two axes in implication order. If A implies B, then A is before B.
-  *)
+      This is also observed by [printtyp]. *)
   val compare : 'a t -> 'b t -> int
 
   type packed = P : 'a t -> packed

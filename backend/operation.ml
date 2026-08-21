@@ -285,6 +285,7 @@ type t =
   | Const_vec128 of Cmm.vec128_bits
   | Const_vec256 of Cmm.vec256_bits
   | Const_vec512 of Cmm.vec512_bits
+  | Const_mask of int64
   | Stackoffset of int
   | Load of
       { memory_chunk : Cmm.memory_chunk;
@@ -341,6 +342,7 @@ let is_pure = function
   | Const_vec128 _ -> true
   | Const_vec256 _ -> true
   | Const_vec512 _ -> true
+  | Const_mask _ -> true
   | Stackoffset _ -> false
   | Load _ -> true
   | Store _ -> false
@@ -353,7 +355,7 @@ let is_pure = function
   | Reinterpret_cast
       ( V128_of_vec _ | V256_of_vec _ | V512_of_vec _ | Float32_of_float
       | Float32_of_int32 | Float_of_float32 | Float_of_int64 | Int64_of_float
-      | Int32_of_float32 ) ->
+      | Int32_of_float32 | Mask_of_int64 | Int64_of_mask ) ->
     true
   | Static_cast _ -> true
   (* Conservative to ensure valueofint/intofvalue are not eliminated before
@@ -435,6 +437,7 @@ let dump ppf op =
     Format.fprintf ppf
       "const vec512 %016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx"
       word0 word1 word2 word3 word4 word5 word6 word7
+  | Const_mask n -> Format.fprintf ppf "const mask %016Lx" n
   | Stackoffset n -> Format.fprintf ppf "stackoffset %d" n
   | Load _ -> Format.fprintf ppf "load"
   | Store _ -> Format.fprintf ppf "store"
@@ -543,6 +546,7 @@ let equal left right =
     && Int64.equal left_w5 right_w5
     && Int64.equal left_w6 right_w6
     && Int64.equal left_w7 right_w7
+  | Const_mask left_n, Const_mask right_n -> Int64.equal left_n right_n
   | Stackoffset left_n, Stackoffset right_n -> Int.equal left_n right_n
   | ( Load
         { memory_chunk = left_chunk;
@@ -613,10 +617,10 @@ let equal left right =
     && Cmm.Alloc_mode.equal left_mode right_mode
   | ( ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
       | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-      | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
-      | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
-      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-      | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
-      | Alloc _ ),
+      | Const_mask _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
+      | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+      | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
+      | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
+      | Poll | Pause | Alloc _ ),
       _ ) ->
     false

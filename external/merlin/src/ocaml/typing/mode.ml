@@ -1492,18 +1492,21 @@ module Lattices_mono = struct
           _ ) ->
         Is_not_eq
 
+    (** Used by [compare] below. *)
     let ord : type p r. (p, r) t -> int = function
       | Areality -> 0
       | Forkable -> 1
       | Yielding -> 2
       | Linearity -> 3
-      | Statefulness -> 4
-      | Portability -> 5
-      | Uniqueness -> 6
-      | Visibility -> 7
+      | Uniqueness -> 4
+      | Statefulness -> 5
+      | Visibility -> 6
+      | Portability -> 7
       | Contention -> 8
       | Staticity -> 9
 
+    (** Compare two axes in implication order. If A implies B, then A is before
+        B. This is also observed by [printtyp]. *)
     let compare : type p r1 r2. (p, r1) t -> (p, r2) t -> int =
      fun ax1 ax2 -> Int.compare (ord ax1) (ord ax2)
 
@@ -6164,13 +6167,12 @@ module Value_with (Areality : Areality) = struct
       | Comonadic : 'a Comonadic.Axis.t -> 'a t
       | Monadic : 'a Monadic.Axis.t -> 'a t
 
+    let ord : type a. a t -> int = function
+      | Comonadic ax -> Axis.ord ax
+      | Monadic ax -> Axis.ord ax
+
     let compare : type a b. a t -> b t -> int =
-     fun t1 t2 ->
-      match t1, t2 with
-      | Comonadic t1, Comonadic t2 -> Axis.compare t1 t2
-      | Comonadic _, _ -> -1
-      | _, Comonadic _ -> 1
-      | Monadic t1, Monadic t2 -> Axis.compare t1 t2
+     fun t1 t2 -> Int.compare (ord t1) (ord t2)
 
     type packed = P : 'a t -> packed
 

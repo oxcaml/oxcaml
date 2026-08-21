@@ -883,23 +883,23 @@ end = struct
       t1.for_loc
 
   let union t1 t2 =
-    { for_loc =
-        Location.Map.merge
-          (fun _loc regs1 regs2 ->
-            match regs1, regs2 with
-            | None, None -> None
-            | Some r, None | None, Some r -> Some r
-            | Some r1, Some r2 -> Some (Register.Set.union r1 r2))
-          t1.for_loc t2.for_loc;
-      for_reg =
-        Register.Map.merge
-          (fun _reg locs1 locs2 ->
-            match locs1, locs2 with
-            | None, None -> None
-            | Some l, None | None, Some l -> Some l
-            | Some l1, Some l2 -> Some (Location.Set.union l1 l2))
-          t1.for_reg t2.for_reg
-    }
+    (* [Map.union] shares the subtrees that occur in only one operand, so this
+       costs O(overlap) rather than O(size); the guard keeps the join with an
+       empty set allocation-free. *)
+    if is_empty t1
+    then t2
+    else if is_empty t2
+    then t1
+    else
+      { for_loc =
+          Location.Map.union
+            (fun _loc regs1 regs2 -> Some (Register.Set.union regs1 regs2))
+            t1.for_loc t2.for_loc;
+        for_reg =
+          Register.Map.union
+            (fun _reg locs1 locs2 -> Some (Location.Set.union locs1 locs2))
+            t1.for_reg t2.for_reg
+      }
 
   let array_fold2 f acc arr1 arr2 =
     let acc = ref acc in
@@ -1179,7 +1179,8 @@ module Transfer (Desc_val : Description_value) :
               (* Verify the destroyed registers for exceptional path only. *)
               equations
               |> Equation_set.verify_destroyed_locations
-                   ~destroyed:(Location.of_regs_exn Proc.destroyed_at_raise)
+                   ~destroyed:
+                     (Location.of_regs_exn (Proc.destroyed_at_raise ()))
               |> Result.map_error (fun message ->
                   Printf.sprintf
                     "While verifying locations destroyed at raise: %s" message)

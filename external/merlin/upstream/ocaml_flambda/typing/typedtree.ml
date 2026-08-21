@@ -23,7 +23,7 @@ open Mode
 type constant =
     Const_int of int
   | Const_char of char
-  | Const_untagged_char of char
+  | Const_untagged_char of int
   | Const_string of string * Location.t * string option
   | Const_float of string
   | Const_float32 of string
@@ -158,7 +158,7 @@ and _ poly_param =
 
 type record_sorts =
   | Fixed
-  | Variable of Jkind.Sort.Const.t array
+  | Variable of Jkind.sort array
 
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
@@ -174,7 +174,7 @@ and 'a pattern_data =
    }
 
 and pat_extra =
-  | Tpat_constraint of core_type * Mode.Alloc.Const.t modes
+  | Tpat_constraint of core_type option * Mode.Alloc.Const.t modes
   | Tpat_type of Path.t * Longident.t loc
   | Tpat_open of Path.t * Longident.t loc * Env.t
   | Tpat_unpack
@@ -283,6 +283,7 @@ and expression_desc =
         desc : Types.value_description;
         kind : ident_kind;
         unique_use : unique_use;
+        staticity : Mode.Staticity.r;
         mode : Mode.Value.l }
   | Texp_apply_layout of expression * Jkind_types.Sort.var list
   | Texp_constant of constant
@@ -294,11 +295,12 @@ and expression_desc =
         ret_mode : Mode.Alloc.l modes;
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
+        yielding : Mode.Yielding.l;
         zero_alloc : Zero_alloc.t;
       }
   | Texp_apply of
       expression * (arg_label * apply_arg) list * apply_position *
-        Mode.Locality.l * Zero_alloc.assume option
+        Mode.Locality.l * Mode.Yielding.l * Zero_alloc.assume option
   | Texp_match of
       expression * Jkind.sort * computation case list * value case list
       * partial
@@ -422,7 +424,8 @@ and expression_desc =
 
 and ident_kind =
   | Id_value
-  | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
+  | Id_prim of
+      Mode.Locality.l option * Jkind.Sort.t option * Mode.Yielding.l
 
 and meth =
   | Tmeth_name of string
@@ -632,8 +635,9 @@ and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
   | Tmod_functor of functor_parameter * module_expr
-  | Tmod_apply of module_expr * module_expr * module_coercion
-  | Tmod_apply_unit of module_expr
+  | Tmod_apply of
+      module_expr * module_expr * module_coercion * Mode.Yielding.l
+  | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion
   | Tmod_unpack of expression * Types.module_type
@@ -696,7 +700,7 @@ and module_coercion =
       ; pos_cc_list : (int * module_coercion) list
       ; id_pos_list : (Ident.t * int * module_coercion) list
       }
-  | Tcoerce_functor of module_coercion * module_coercion
+  | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
   | Tcoerce_primitive of primitive_coercion
   | Tcoerce_alias of Env.t * Path.t * module_coercion
   | Tcoerce_invalid
@@ -725,6 +729,7 @@ and primitive_coercion =
     pc_type: type_expr;
     pc_poly_mode: Mode.Locality.l option;
     pc_poly_sort: Jkind.Sort.t option;
+    pc_yielding: Mode.Yielding.l;
     pc_env: Env.t;
     pc_loc : Location.t;
   }
@@ -813,10 +818,12 @@ and include_kind =
   | Tincl_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
 
 and 'a include_infos =
@@ -1259,7 +1266,10 @@ let rec iter_bound_idents
   match pat.pat_desc with
   | Tpat_var { id; name = s; uid; sort; _ } ->
       f (id, s, pat.pat_type, sort, uid)
-  | Tpat_fun_layout { id; name = s; uid; sort; _ } ->
+  | Tpat_fun_layout { id; name = s; uid; sort; lpoly; _ } ->
+      let sort =
+        if Lpoly.is_empty_exn lpoly then sort else Jkind.Sort.scannable
+      in
       f (id, s, pat.pat_type, sort, uid)
   | Tpat_alias { pattern = p; id; name = s; uid; sort; type_expr = ty; _ } ->
       iter_bound_idents f p;
@@ -1527,7 +1537,7 @@ let rec fold_antiquote_exp f  acc exp =
   | Texp_function { params; body; _ } ->
       let acc = fold_antiquote_fun_params f acc params in
       fold_antiquote_function_body f acc body
-  | Texp_apply (exp, list, _, _, _) ->
+  | Texp_apply (exp, list, _, _, _, _) ->
       let acc = fold_antiquote_exp f acc exp in
       fold_antiquote_args f acc list
   | Texp_match (exp, _, cases, eff_cases, _) ->
@@ -1696,7 +1706,7 @@ let label_sort (type rep)
   | _ ->
     begin match record_sorts, label.lbl_sort with
     | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)
-    | Fixed, Some sort -> `Sort sort
+    | Fixed, Some sort -> `Sort (Jkind.Sort.of_const sort)
     | Fixed, None ->
       Misc.fatal_errorf "no sort for label %s in fixed-sort record"
         label.lbl_name

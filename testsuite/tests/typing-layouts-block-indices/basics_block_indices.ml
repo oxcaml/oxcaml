@@ -532,6 +532,47 @@ Line 2, characters 13-17:
 Error: Block indices do not yet support [@atomic] record fields.
 |}]
 
+(**********************************************)
+(* Block indices to polymorphic record fields *)
+
+type poly_imm = { p_imm : 'a. 'a option }
+type poly_mut = { mutable p_mut : 'a. 'a option }
+[%%expect{|
+type poly_imm = { p_imm : 'a. 'a option; }
+type poly_mut = { mutable p_mut : 'a. 'a option; }
+|}]
+
+(* Immutable indices only read, so instantiating the field is fine. *)
+let ok = (.p_imm)
+[%%expect{|
+val ok : (poly_imm, 'a option) idx_imm = <abstr>
+|}]
+
+let bad = (.p_mut)
+[%%expect{|
+Line 1, characters 12-17:
+1 | let bad = (.p_mut)
+                ^^^^^
+Error: Mutable block indices to polymorphic record fields
+       (here "p_mut") are forbidden.
+|}]
+
+type poly_unboxed = #{ p_u : 'a. 'a option }
+type holds_poly = { mutable h : poly_unboxed }
+[%%expect{|
+type poly_unboxed = #{ p_u : 'a. 'a option; }
+type holds_poly = { mutable h : poly_unboxed; }
+|}]
+
+let bad_unboxed = (.h.#p_u)
+[%%expect{|
+Line 1, characters 23-26:
+1 | let bad_unboxed = (.h.#p_u)
+                           ^^^
+Error: Mutable block indices to polymorphic record fields
+       (here "p_u") are forbidden.
+|}]
+
 (**************)
 (* Modalities *)
 

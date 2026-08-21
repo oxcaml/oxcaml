@@ -27,10 +27,10 @@ _CamlU14E2e_suboptimalSu26O2e_e2e_suboptimalml_77_15F4v_N_M_code  (error)       
 _CamlU14E2e_suboptimalSu26O2e_e2e_suboptimalml_81_12F3v_N_M_code  (error)                          E2e_suboptimal.mod(e2e_suboptimal.ml:81:12).v_N  E2e_suboptimal.mod(e2e_suboptimal.ml:81:12).v_N
 camlE2e_suboptimal                                                E2e_suboptimal                   (error)                                          E2e_suboptimal
 camlE2e_suboptimal__Make_N                                        E2e_suboptimal.Make_N            (error)                                          E2e_suboptimal.Make_N
-camlE2e_suboptimal__PmakeblockN                                   E2e_suboptimal.PmakeblockN       (error)                                          E2e_suboptimal.PmakeblockN
-camlE2e_suboptimal__PmakeblockN                                   E2e_suboptimal.PmakeblockN       (error)                                          E2e_suboptimal.PmakeblockN
-camlE2e_suboptimal__PmakeblockN                                   E2e_suboptimal.PmakeblockN       (error)                                          E2e_suboptimal.PmakeblockN
-camlE2e_suboptimal__PmakeblockN                                   E2e_suboptimal.PmakeblockN       (error)                                          E2e_suboptimal.PmakeblockN
+camlE2e_suboptimal__Pmakeblock_N                                  E2e_suboptimal.Pmakeblock_N      (error)                                          E2e_suboptimal.Pmakeblock_N
+camlE2e_suboptimal__Pmakeblock_N                                  E2e_suboptimal.Pmakeblock_N      (error)                                          E2e_suboptimal.Pmakeblock_N
+camlE2e_suboptimal__Pmakeblock_N                                  E2e_suboptimal.Pmakeblock_N      (error)                                          E2e_suboptimal.Pmakeblock_N
+camlE2e_suboptimal__Pmakeblock_N                                  E2e_suboptimal.Pmakeblock_N      (error)                                          E2e_suboptimal.Pmakeblock_N
 camlE2e_suboptimal__cmp_N                                         E2e_suboptimal.cmp_N             (error)                                          E2e_suboptimal.cmp_N
 camlE2e_suboptimal__cmp_N                                         E2e_suboptimal.cmp_N             (error)                                          E2e_suboptimal.cmp_N
 camlE2e_suboptimal__code_begin                                    E2e_suboptimal.code_begin        (error)                                          E2e_suboptimal.code_begin

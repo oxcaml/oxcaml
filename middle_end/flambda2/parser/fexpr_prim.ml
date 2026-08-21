@@ -230,6 +230,7 @@ let string_accessor_width =
           | "256u" -> Two_fifty_six { aligned = false }
           | "512a" -> Five_twelve { aligned = true }
           | "512u" -> Five_twelve { aligned = false }
+          | "mask" -> Mask
           | _ -> Misc.fatal_errorf "invalid string accessor width '%s'" i);
       encode =
         (fun _ saw ->
@@ -248,6 +249,7 @@ let string_accessor_width =
             | Two_fifty_six { aligned = true } -> "256a"
             | Five_twelve { aligned = false } -> "512u"
             | Five_twelve { aligned = true } -> "512a"
+            | Mask -> "mask"
           in
           wrap_loc s)
     }

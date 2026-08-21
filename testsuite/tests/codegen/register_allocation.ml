@@ -102,11 +102,11 @@ let f x =
 f:
   subq  $24, %rsp
   movq  %rax, (%rsp)
-  call  camlTOP7__g_11_13_code@PLT
+  call  camlTOP7__g_6_13_code@PLT
 .L0:
   movq  %rax, 8(%rsp)
   movq  (%rsp), %rax
-  call  camlTOP7__g_11_13_code@PLT
+  call  camlTOP7__g_6_13_code@PLT
 .L1:
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
@@ -138,7 +138,7 @@ loop_readonly_use_spilled_var:
   addq  $8, %rsp
   ret
 .L1:
-  call  camlTOP8__g_15_18_code@PLT
+  call  camlTOP8__g_8_18_code@PLT
 .L2:
   movq  (%rsp), %rbx
   cmpq  $1, %rax
@@ -174,7 +174,7 @@ spill_unspill_loop_movement:
   movl  $1, %edi
 .L0:
   movq  %rdi, 16(%rsp)
-  call  camlTOP9__f_20_23_code@PLT
+  call  camlTOP9__f_11_23_code@PLT
 .L1:
   movq  %rax, %rsi
   movq  16(%rsp), %rdi
@@ -186,7 +186,7 @@ spill_unspill_loop_movement:
   jle   .L3
   movq  %rsi, 32(%rsp)
   movq  %rdi, 16(%rsp)
-  call  camlTOP9__f_20_23_code@PLT
+  call  camlTOP9__f_11_23_code@PLT
 .L2:
   movq  (%rsp), %rax
   movq  8(%rsp), %rbx
@@ -271,27 +271,26 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 ;;
 [%%expect_asm X86_64{|
 unnecessary_moves:
-  movq  %rax, %rcx
-  movq  %rbx, %r8
+  movq  %rbx, %rcx
   movq  %rdx, %rbx
-  leaq  -1(%rcx,%r8), %rax
-  cmpq  %r8, %rcx
+  leaq  -1(%rax,%rcx), %rdx
+  cmpq  %rcx, %rax
   jge   .L0
-  movq  %rcx, %rax
   ret
 .L0:
   cmpq  %rsi, %rdi
   jge   .L2
   subq  $8, %rsp
-  movq  %rax, (%rsp)
+  movq  %rdx, (%rsp)
   movq  (%rbx), %rdi
-  movq  %r8, %rax
+  movq  %rcx, %rax
   call  *%rdi
 .L1:
   movq  (%rsp), %rax
   addq  $8, %rsp
   ret
 .L2:
+  movq  %rdx, %rax
   ret
 |}]
 
@@ -336,13 +335,13 @@ let double_loop_no_definition_at_beginning array n list =
 [%%expect_asm X86_64{|
 double_loop_no_definition_at_beginning:
   subq  $72, %rsp
-  movq  %rbx, %rsi
-  movq  64(%r14), %rbx
-  cmpq  $1, %rsi
+  movq  64(%r14), %rsi
+  cmpq  $1, %rbx
   jl    .L5
-  movq  %rbx, 16(%rsp)
+  movq  %rsi, 16(%rsp)
   movq  %rdi, 32(%rsp)
   movq  %rax, 24(%rsp)
+  movq  %rbx, %rsi
   sarq  $1, %rsi
   movq  %rsi, 40(%rsp)
   xorl  %edx, %edx
@@ -373,7 +372,7 @@ double_loop_no_definition_at_beginning:
 .L2:
   movq  (%rdx), %rax
   movq  %rdx, 56(%rsp)
-  call  camlTOP15__f_33_37_code@PLT
+  call  camlTOP15__f_18_37_code@PLT
 .L3:
   movq  56(%rsp), %rdx
   movq  8(%rdx), %rdx
@@ -390,9 +389,9 @@ double_loop_no_definition_at_beginning:
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L0
-  movq  16(%rsp), %rbx
+  movq  16(%rsp), %rsi
 .L5:
-  movq  %rbx, 64(%r14)
+  movq  %rsi, 64(%r14)
   movl  $1, %eax
   addq  $72, %rsp
   ret
@@ -496,35 +495,35 @@ let spill_slot_lifetime () =
 spill_slot_lifetime:
   subq  $56, %rsp
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L0:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L1:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L2:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L3:
   vmovsd %xmm0, 24(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L4:
   vmovsd %xmm0, 32(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L5:
   vmovsd %xmm0, 40(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L6:
   vmovsd %xmm0, 48(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L7:
   vxorpd %xmm1, %xmm1, %xmm1
   vmovsd (%rsp), %xmm2
@@ -556,10 +555,10 @@ let f ~(s: int64#) (t : int64#) =
   Int64_u.sub t (Int64_u.mul t s)
 [%%expect_asm X86_64{|
 f:
-  movq  %rax, %rdi
+  movq  %rbx, %rdi
+  imulq %rax, %rdi
   movq  %rbx, %rax
-  imulq %rdi, %rbx
-  subq  %rbx, %rax
+  subq  %rdi, %rax
   ret
 |}]
 

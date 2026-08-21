@@ -232,6 +232,7 @@ let string_or_bigstring_load ~machine_width kind width =
     | One_twenty_eight _ -> 2 (* add, load (alignment handled explicitly) *)
     | Two_fifty_six _ -> 2 (* add, load (alignment handled explicitly) *)
     | Five_twelve _ -> 2 (* add, load (alignment handled explicitly) *)
+    | Mask -> 2 (* add, load *)
   in
   start_address_load + elt_load
 

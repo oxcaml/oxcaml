@@ -943,58 +943,55 @@ define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__mod_imm_HIDE_STAMP(i64 
   %14 = alloca i64
   %15 = alloca i64
   %16 = alloca i64
-  %17 = alloca i64
   br label %L1
 L1:
   br label %L262
 L262:
-  %18 = load i64, ptr %4
-  store i64 %18, ptr %5
-  %19 = ptrtoint ptr @camlInt_ops_data to i64
-  store i64 %19, ptr %6
-  %20 = load i64, ptr %6
-  %21 = inttoptr i64 %20 to ptr
-  %22 = load ptr addrspace(1), ptr %21
-  store ptr addrspace(1) %22, ptr %7
-  %23 = load i64, ptr %7
-  %24 = ashr i64 %23, 1
-  store i64 %24, ptr %8
-  %25 = load i64, ptr %8
-  store i64 %25, ptr %9
-  store i64 -4, ptr %10
-  %26 = load i64, ptr %9
-  %27 = ashr i64 %26, 1
-  store i64 %27, ptr %11
-  %28 = load i64, ptr %11
-  %29 = lshr i64 %28, 62
-  store i64 %29, ptr %12
-  %30 = load i64, ptr %9
-  %31 = load i64, ptr %12
-  %32 = add i64 %30, %31
-  store i64 %32, ptr %13
-  %33 = load i64, ptr %13
-  %34 = load i64, ptr %10
-  %35 = and i64 %33, %34
-  store i64 %35, ptr %14
-  %36 = load i64, ptr %9
+  %17 = load i64, ptr %4
+  store i64 %17, ptr %5
+  %18 = ptrtoint ptr @camlInt_ops_data to i64
+  store i64 %18, ptr %6
+  %19 = load i64, ptr %6
+  %20 = inttoptr i64 %19 to ptr
+  %21 = load ptr addrspace(1), ptr %20
+  store ptr addrspace(1) %21, ptr %7
+  %22 = load i64, ptr %7
+  %23 = ashr i64 %22, 1
+  store i64 %23, ptr %8
+  %24 = load i64, ptr %8
+  store i64 %24, ptr %9
+  %25 = load i64, ptr %9
+  %26 = ashr i64 %25, 1
+  store i64 %26, ptr %10
+  %27 = load i64, ptr %10
+  %28 = lshr i64 %27, 62
+  store i64 %28, ptr %11
+  %29 = load i64, ptr %9
+  %30 = load i64, ptr %11
+  %31 = add i64 %29, %30
+  store i64 %31, ptr %12
+  %32 = load i64, ptr %12
+  %33 = and i64 %32, -4
+  store i64 %33, ptr %13
+  %34 = load i64, ptr %9
+  %35 = load i64, ptr %13
+  %36 = sub i64 %34, %35
+  store i64 %36, ptr %14
   %37 = load i64, ptr %14
-  %38 = sub i64 %36, %37
+  %38 = shl i64 %37, 1
   store i64 %38, ptr %15
   %39 = load i64, ptr %15
-  %40 = shl i64 %39, 1
+  %40 = add i64 %39, 1
   store i64 %40, ptr %16
   %41 = load i64, ptr %16
-  %42 = add i64 %41, 1
-  store i64 %42, ptr %17
-  %43 = load i64, ptr %17
-  store i64 %43, ptr %4
-  %44 = load i64, ptr %4
-  %45 = load i64, ptr %ds
-  %46 = load i64, ptr %alloc
-  %47 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %45, 0, 0
-  %48 = insertvalue { { i64, i64 }, { i64 } } %47, i64 %46, 0, 1
-  %49 = insertvalue { { i64, i64 }, { i64 } } %48, i64 %44, 1, 0
-  ret { { i64, i64 }, { i64 } } %49
+  store i64 %41, ptr %4
+  %42 = load i64, ptr %4
+  %43 = load i64, ptr %ds
+  %44 = load i64, ptr %alloc
+  %45 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %43, 0, 0
+  %46 = insertvalue { { i64, i64 }, { i64 } } %45, i64 %44, 0, 1
+  %47 = insertvalue { { i64, i64 }, { i64 } } %46, i64 %42, 1, 0
+  ret { { i64, i64 }, { i64 } } %47
 }
 
 define  oxcamlcc { { i64, i64 }, { i64 } } @camlInt_ops__land_imm_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
@@ -1471,59 +1468,59 @@ define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) retu
 
 @camlInt_ops__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
 @header.camlInt_ops = global i64 28416, section ".data", align 8
-@camlInt_ops = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, i64, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlInt_ops__add_26, ptr @camlInt_ops__sub_27, ptr @camlInt_ops__mul_28, ptr @camlInt_ops__div_29, ptr @camlInt_ops__mod__30, ptr @camlInt_ops__land__31, ptr @camlInt_ops__lor__32, ptr @camlInt_ops__lxor__33, ptr @camlInt_ops__lnot__34, ptr @camlInt_ops__lsl__35, ptr @camlInt_ops__lsr__36, ptr @camlInt_ops__asr__37, i64 9, ptr @camlInt_ops__add_imm_38, ptr @camlInt_ops__sub_imm_39, ptr @camlInt_ops__mul_imm_40, ptr @camlInt_ops__div_imm_41, ptr @camlInt_ops__mod_imm_42, ptr @camlInt_ops__land_imm_43, ptr @camlInt_ops__lor_imm_44, ptr @camlInt_ops__lxor_imm_45, ptr @camlInt_ops__lsl_imm_46, ptr @camlInt_ops__lsr_imm_47, ptr @camlInt_ops__asr_imm_48, ptr @camlInt_ops__popcnt_49, ptr @camlInt_ops__ctz_50, ptr @camlInt_ops__clz_51 }, section ".data", align 8
-@header.camlInt_ops__clz_51 = global i64 3063, section ".data", align 8
-@camlInt_ops__clz_51 = global { ptr, i64 } { ptr @camlInt_ops__clz_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__ctz_50 = global i64 3063, section ".data", align 8
-@camlInt_ops__ctz_50 = global { ptr, i64 } { ptr @camlInt_ops__ctz_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__popcnt_49 = global i64 3063, section ".data", align 8
-@camlInt_ops__popcnt_49 = global { ptr, i64 } { ptr @camlInt_ops__popcnt_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__asr_imm_48 = global i64 3063, section ".data", align 8
-@camlInt_ops__asr_imm_48 = global { ptr, i64 } { ptr @camlInt_ops__asr_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__lsr_imm_47 = global i64 3063, section ".data", align 8
-@camlInt_ops__lsr_imm_47 = global { ptr, i64 } { ptr @camlInt_ops__lsr_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__lsl_imm_46 = global i64 3063, section ".data", align 8
-@camlInt_ops__lsl_imm_46 = global { ptr, i64 } { ptr @camlInt_ops__lsl_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__lxor_imm_45 = global i64 3063, section ".data", align 8
-@camlInt_ops__lxor_imm_45 = global { ptr, i64 } { ptr @camlInt_ops__lxor_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__lor_imm_44 = global i64 3063, section ".data", align 8
-@camlInt_ops__lor_imm_44 = global { ptr, i64 } { ptr @camlInt_ops__lor_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__land_imm_43 = global i64 3063, section ".data", align 8
-@camlInt_ops__land_imm_43 = global { ptr, i64 } { ptr @camlInt_ops__land_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__mod_imm_42 = global i64 3063, section ".data", align 8
-@camlInt_ops__mod_imm_42 = global { ptr, i64 } { ptr @camlInt_ops__mod_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__div_imm_41 = global i64 3063, section ".data", align 8
-@camlInt_ops__div_imm_41 = global { ptr, i64 } { ptr @camlInt_ops__div_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__mul_imm_40 = global i64 3063, section ".data", align 8
-@camlInt_ops__mul_imm_40 = global { ptr, i64 } { ptr @camlInt_ops__mul_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__sub_imm_39 = global i64 3063, section ".data", align 8
-@camlInt_ops__sub_imm_39 = global { ptr, i64 } { ptr @camlInt_ops__sub_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__add_imm_38 = global i64 3063, section ".data", align 8
-@camlInt_ops__add_imm_38 = global { ptr, i64 } { ptr @camlInt_ops__add_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__asr__37 = global i64 3063, section ".data", align 8
-@camlInt_ops__asr__37 = global { ptr, i64 } { ptr @camlInt_ops__asr__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__lsr__36 = global i64 3063, section ".data", align 8
-@camlInt_ops__lsr__36 = global { ptr, i64 } { ptr @camlInt_ops__lsr__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__lsl__35 = global i64 3063, section ".data", align 8
-@camlInt_ops__lsl__35 = global { ptr, i64 } { ptr @camlInt_ops__lsl__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__lnot__34 = global i64 3063, section ".data", align 8
-@camlInt_ops__lnot__34 = global { ptr, i64 } { ptr @camlInt_ops__lnot__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__lxor__33 = global i64 3063, section ".data", align 8
-@camlInt_ops__lxor__33 = global { ptr, i64 } { ptr @camlInt_ops__lxor__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__lor__32 = global i64 3063, section ".data", align 8
-@camlInt_ops__lor__32 = global { ptr, i64 } { ptr @camlInt_ops__lor__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__land__31 = global i64 3063, section ".data", align 8
-@camlInt_ops__land__31 = global { ptr, i64 } { ptr @camlInt_ops__land__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__mod__30 = global i64 3063, section ".data", align 8
-@camlInt_ops__mod__30 = global { ptr, i64 } { ptr @camlInt_ops__mod__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__div_29 = global i64 3063, section ".data", align 8
-@camlInt_ops__div_29 = global { ptr, i64 } { ptr @camlInt_ops__div_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__mul_28 = global i64 3063, section ".data", align 8
-@camlInt_ops__mul_28 = global { ptr, i64 } { ptr @camlInt_ops__mul_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__sub_27 = global i64 3063, section ".data", align 8
-@camlInt_ops__sub_27 = global { ptr, i64 } { ptr @camlInt_ops__sub_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
-@header.camlInt_ops__add_26 = global i64 3063, section ".data", align 8
-@camlInt_ops__add_26 = global { ptr, i64 } { ptr @camlInt_ops__add_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@camlInt_ops = global { ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, i64, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr } { ptr @camlInt_ops__add_0_1, ptr @camlInt_ops__sub_1_2, ptr @camlInt_ops__mul_2_3, ptr @camlInt_ops__div_3_4, ptr @camlInt_ops__mod__4_5, ptr @camlInt_ops__land__5_6, ptr @camlInt_ops__lor__6_7, ptr @camlInt_ops__lxor__7_8, ptr @camlInt_ops__lnot__8_9, ptr @camlInt_ops__lsl__9_10, ptr @camlInt_ops__lsr__10_11, ptr @camlInt_ops__asr__11_12, i64 9, ptr @camlInt_ops__add_imm_12_13, ptr @camlInt_ops__sub_imm_13_14, ptr @camlInt_ops__mul_imm_14_15, ptr @camlInt_ops__div_imm_15_16, ptr @camlInt_ops__mod_imm_16_17, ptr @camlInt_ops__land_imm_17_18, ptr @camlInt_ops__lor_imm_18_19, ptr @camlInt_ops__lxor_imm_19_20, ptr @camlInt_ops__lsl_imm_20_21, ptr @camlInt_ops__lsr_imm_21_22, ptr @camlInt_ops__asr_imm_22_23, ptr @camlInt_ops__popcnt_23_24, ptr @camlInt_ops__ctz_24_25, ptr @camlInt_ops__clz_HIDE_STAMP }, section ".data", align 8
+@header.camlInt_ops__clz_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__clz_25_26 = global { ptr, i64 } { ptr @camlInt_ops__clz_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__ctz_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__ctz_24_25 = global { ptr, i64 } { ptr @camlInt_ops__ctz_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__popcnt_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__popcnt_23_24 = global { ptr, i64 } { ptr @camlInt_ops__popcnt_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__asr_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__asr_imm_22_23 = global { ptr, i64 } { ptr @camlInt_ops__asr_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__lsr_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__lsr_imm_21_22 = global { ptr, i64 } { ptr @camlInt_ops__lsr_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__lsl_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__lsl_imm_20_21 = global { ptr, i64 } { ptr @camlInt_ops__lsl_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__lxor_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__lxor_imm_19_20 = global { ptr, i64 } { ptr @camlInt_ops__lxor_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__lor_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__lor_imm_18_19 = global { ptr, i64 } { ptr @camlInt_ops__lor_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__land_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__land_imm_17_18 = global { ptr, i64 } { ptr @camlInt_ops__land_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__mod_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__mod_imm_16_17 = global { ptr, i64 } { ptr @camlInt_ops__mod_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__div_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__div_imm_15_16 = global { ptr, i64 } { ptr @camlInt_ops__div_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__mul_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__mul_imm_14_15 = global { ptr, i64 } { ptr @camlInt_ops__mul_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__sub_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__sub_imm_13_14 = global { ptr, i64 } { ptr @camlInt_ops__sub_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__add_imm_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__add_imm_12_13 = global { ptr, i64 } { ptr @camlInt_ops__add_imm_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__asr__HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__asr__11_12 = global { ptr, i64 } { ptr @camlInt_ops__asr__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__lsr__HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__lsr__10_11 = global { ptr, i64 } { ptr @camlInt_ops__lsr__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__lsl__HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__lsl__9_10 = global { ptr, i64 } { ptr @camlInt_ops__lsl__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__lnot__HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__lnot__8_9 = global { ptr, i64 } { ptr @camlInt_ops__lnot__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__lxor__HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__lxor__7_8 = global { ptr, i64 } { ptr @camlInt_ops__lxor__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__lor__HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__lor__6_7 = global { ptr, i64 } { ptr @camlInt_ops__lor__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__land__HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__land__5_6 = global { ptr, i64 } { ptr @camlInt_ops__land__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__mod__HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__mod__4_5 = global { ptr, i64 } { ptr @camlInt_ops__mod__HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__div_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__div_3_4 = global { ptr, i64 } { ptr @camlInt_ops__div_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__mul_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__mul_2_3 = global { ptr, i64 } { ptr @camlInt_ops__mul_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__sub_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__sub_1_2 = global { ptr, i64 } { ptr @camlInt_ops__sub_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+@header.camlInt_ops__add_HIDE_STAMP = global i64 3063, section ".data", align 8
+@camlInt_ops__add_0_1 = global { ptr, i64 } { ptr @camlInt_ops__add_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
 @temp.Int_ops.0 = global { ptr, ptr, ptr } { ptr @caml_int_clz_untagged_to_untagged, ptr @caml_int_ctz_untagged_to_untagged, ptr @caml_int_popcnt_untagged_to_untagged }, section ".data", align 8
 @camlInt_ops_data = external global ptr
 @caml_exn_Division_by_zero = external global ptr

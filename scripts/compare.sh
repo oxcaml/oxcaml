@@ -59,6 +59,7 @@ archives_to_compare="\
   bigarray.a \
   compiler-libs/ocamlbytecomp.a \
   compiler-libs/ocamlcommon.a \
+  compiler-libs/ocamlfrontend.a \
   stdlib.a \
   str.a \
   threads/threads.a \
@@ -114,6 +115,7 @@ cma_to_compare="\
   bigarray.cma \
   threads/threads.cma \
   compiler-libs/ocamlcommon.cma \
+  compiler-libs/ocamlfrontend.cma \
   compiler-libs/ocamlbytecomp.cma \
   compiler-libs/ocamltoplevel.cma \
   unix.cma \
@@ -127,6 +129,7 @@ cmxa_to_compare="\
   bigarray.cmxa \
   threads/threads.cmxa \
   compiler-libs/ocamlcommon.cmxa \
+  compiler-libs/ocamlfrontend.cmxa \
   compiler-libs/ocamlbytecomp.cmxa \
   unix.cmxa \
   str.cmxa

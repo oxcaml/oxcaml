@@ -62,7 +62,8 @@
 
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
 
-static _Atomic int64_t fiber_id = 0;
+static _Atomic int64_t fiber_id_global = 0;
+static CAMLthread_local int64_t fiber_id_local = 0;
 
 #define NUM_STACK_SIZE_CLASSES 5
 #define MAX_STACK_CACHE_LIMIT  Max_domains_max
@@ -373,10 +374,18 @@ caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff, int6
                                       /*htick=*/Val_null, id);
 }
 
+static int64_t new_fiber_id(void)
+{
+  enum { Fiber_id_chunk = 1024 };
+  if (fiber_id_local % Fiber_id_chunk == 0)
+    fiber_id_local = atomic_fetch_add(&fiber_id_global, Fiber_id_chunk);
+  return fiber_id_local++;
+}
+
 #ifdef NATIVE_CODE
 
 value caml_alloc_stack (value hval, value hexn, value heff) {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
                                    hexn, heff, /*htick=*/Val_null, id);
@@ -396,7 +405,7 @@ value caml_alloc_stack (value hval, value hexn, value heff) {
 
 value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
                                         value htick) {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff, htick, id);
@@ -712,7 +721,7 @@ value caml_global_data = Val_unit;
 CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
 {
   value* sp;
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
                                    hexn, heff, /*htick=*/Val_null, id);
@@ -737,7 +746,7 @@ CAMLprim value caml_alloc_stack_preemptible(value hval, value hexn,
                                             value heff, value htick)
 {
   value* sp;
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff, htick, id);
@@ -1027,7 +1036,7 @@ int caml_try_realloc_stack(asize_t required_space)
 
 struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
 {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info* stk =
     caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
   return stk;

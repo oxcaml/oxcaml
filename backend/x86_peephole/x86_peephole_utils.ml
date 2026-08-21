@@ -46,7 +46,7 @@ let get_cells cell n =
 
 let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
-  | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
+  | Regmask _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
 
 let underlying_reg64 = function
   | Reg64 r | Reg32 r | Reg16 r | Reg8L r -> Some r
@@ -56,7 +56,7 @@ let underlying_reg64 = function
     | BH -> Some RBX
     | CH -> Some RCX
     | DH -> Some RDX)
-  | Regf _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> None
+  | Regf _ | Regmask _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> None
 
 let is_reg64_subregister reg arg =
   match underlying_reg64 arg with Some r -> equal_reg64 reg r | None -> false
@@ -72,7 +72,7 @@ let arg_contains_reg64 target arg =
        | Vector _ -> false)
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
     equal_reg64 target (underlying_reg64 arg |> Option.get)
-  | Imm _ | Sym _ | Regf _ | Mem64_RIP _ -> false
+  | Imm _ | Sym _ | Regf _ | Regmask _ | Mem64_RIP _ -> false
 
 let reg64_read_when_writing target arg =
   match arg with
@@ -81,7 +81,8 @@ let reg64_read_when_writing target arg =
      update. *)
   | Reg8L _ | Reg8H _ | Reg16 _ ->
     equal_reg64 target (underlying_reg64 arg |> Option.get)
-  | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _ | Mem64_RIP _ -> false
+  | Reg32 _ | Reg64 _ | Regf _ | Regmask _ | Imm _ | Sym _ | Mem64_RIP _ ->
+    false
 
 let writes_to_reg64 target = function
   | MOV (_, dst)

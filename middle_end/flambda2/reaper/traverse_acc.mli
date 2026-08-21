@@ -57,18 +57,6 @@ type t
 (** Create a fresh, empty accumulator. *)
 val create : unit -> t
 
-(** Record the kind of a name. *)
-val kind : t -> Name.t -> Flambda_kind.t -> unit
-
-(** Record the kind of a bound parameter's variable. *)
-val bound_parameter_kind : t -> Bound_parameter.t -> unit
-
-(** Record the kind of [name] by inferring it from [simple]. *)
-val alias_kind : t -> Name.t -> Simple.t -> unit
-
-(** Return the map of all recorded kinds. *)
-val kinds : t -> Flambda_kind.t Name.Map.t
-
 (** Mark a continuation as having fixed arity (mostly function return
     continuations): the rebuild pass may not change its number of parameters. *)
 val fixed_arity_continuation : t -> Continuation.t -> unit

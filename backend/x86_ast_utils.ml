@@ -92,20 +92,31 @@ let equal_arg left right =
   | Reg32 l, Reg32 r -> equal_reg64 l r
   | Reg64 l, Reg64 r -> equal_reg64 l r
   | Regf l, Regf r -> equal_regf l r
+  | Regmask l, Regmask r -> Int.equal l r
   | Mem l, Mem r -> equal_addr l r
   | Mem64_RIP (l_dt, l_s, l_i), Mem64_RIP (r_dt, r_s, r_i) ->
     equal_data_type l_dt r_dt && String.equal l_s r_s && Int.equal l_i r_i
-  | (Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Mem _ | Mem64_RIP _), _ -> false
+  | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+      | Regmask _ | Mem _ | Mem64_RIP _ ),
+      _ ) ->
+    false
 
 let is_mem = function
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ ->
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+  | Regmask _ ->
     false
   | Mem _ | Mem64_RIP _ -> true
 
 let is_regf = function
   | Regf _ -> true
-  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Mem _
-  | Mem64_RIP _ ->
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regmask _
+  | Mem _ | Mem64_RIP _ ->
+    false
+
+let is_regmask = function
+  | Regmask _ -> true
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
+  | Mem _ | Mem64_RIP _ ->
     false
 
 let equal_args arg1 arg2 =
@@ -118,10 +129,11 @@ let equal_args arg1 arg2 =
   | Reg32 r1, Reg32 r2 -> equal_reg64 r1 r2
   | Reg64 r1, Reg64 r2 -> equal_reg64 r1 r2
   | Regf rf1, Regf rf2 -> equal_regf rf1 rf2
+  | Regmask k1, Regmask k2 -> Int.equal k1 k2
   | Mem addr1, Mem addr2 -> equal_addr addr1 addr2
   | Mem64_RIP (t1, s1, i1), Mem64_RIP (t2, s2, i2) ->
     equal_data_type t1 t2 && String.equal s1 s2 && i1 = i2
   | ( ( Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
-      | Mem _ | Mem64_RIP _ ),
+      | Regmask _ | Mem _ | Mem64_RIP _ ),
       _ ) ->
     false

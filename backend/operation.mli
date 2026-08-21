@@ -138,6 +138,7 @@ type t =
   | Const_vec128 of Cmm.vec128_bits
   | Const_vec256 of Cmm.vec256_bits
   | Const_vec512 of Cmm.vec512_bits
+  | Const_mask of int64
   | Stackoffset of int
   | Load of
       { memory_chunk : Cmm.memory_chunk;

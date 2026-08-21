@@ -361,7 +361,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Thirty_two -> "get32"
       | Single -> "getf32"
       | Sixty_four -> "get64"
-      | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
+      | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ | Mask ->
         raise Primitive_not_supported
     in
     let extern_name =
@@ -372,7 +372,8 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         match width with
         | Eight -> "caml_ba_get_1"
         | Eight_signed | Sixteen | Sixteen_signed | Thirty_two | Single
-        | Sixty_four | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
+        | Sixty_four | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _
+        | Mask ->
           "caml_ba_uint8_" ^ op_name)
     in
     use_prim' (Extern extern_name)
@@ -548,7 +549,8 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   | Bytes_or_bigstring_set (value, width) ->
     let extern_name =
       match value, width with
-      | _, One_twenty_eight _ | _, Two_fifty_six _ | _, Five_twelve _ ->
+      | _, One_twenty_eight _ | _, Two_fifty_six _ | _, Five_twelve _ | _, Mask
+        ->
         (* No SIMD *)
         raise Primitive_not_supported
       | Bytes, (Eight | Eight_signed) -> "caml_bytes_unsafe_set"

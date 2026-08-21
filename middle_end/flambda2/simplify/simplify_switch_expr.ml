@@ -500,10 +500,7 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
     ~scrutinee ~dest ~(lookup_table_fields : lookup_table_fields) dbg =
   let rebuilding = UA.are_rebuilding_terms uacc in
   let block_sym =
-    let var = Variable.create "switch_block" K.value in
-    Symbol.create
-      (Current_unit.get_cu_exn ())
-      (Linkage_name.of_string (Variable.unique_name var))
+    Symbol.manufacture (Current_unit.get_cu_exn ()) "switch_block"
   in
   let uacc, array_kind, array_load_kind, loaded_kind =
     let alias_types_of kind simples =
@@ -772,7 +769,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
         let apply_cont = Apply_cont.create dest ~args ~dbg in
         let expr = RE.create_apply_cont apply_cont in
         let uacc = UA.add_free_names uacc (Apply_cont.free_names apply_cont) in
-        expr, uacc
+        expr, UA.notify_added ~code_size:(Code_size.apply_cont apply_cont) uacc
       | None -> (
         match switch_is_identity with
         | Some dest ->

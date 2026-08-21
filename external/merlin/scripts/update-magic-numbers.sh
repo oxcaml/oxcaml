@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$(dirname "${BASH_SOURCE[0]}")"/..
 
 # This script updates the magic numbers in src/ocaml/utils/config.ml and
 # src/ocaml/typing/magic_numbers.ml based on the magic numbers in

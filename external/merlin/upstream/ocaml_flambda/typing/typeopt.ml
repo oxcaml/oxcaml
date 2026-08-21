@@ -186,6 +186,7 @@ type 'a classification =
   | Unboxed_float of unboxed_float
   | Unboxed_int of Primitive.unboxed_or_untagged_integer
   | Unboxed_vector of unboxed_vector
+  | Unboxed_mask
   | Lazy
   | Addr  (* any value except a float or a lazy *)
   | Any
@@ -210,6 +211,7 @@ let classify ~classify_product env ty layout : _ classification =
   else match get_desc ty with
   | Tvar _ | Tunivar _ | Tof_kind _ ->
       Any
+  | Tmod _ -> Misc.fatal_error "Typeopt.classify: unexpected Tmod"
   | Tconstr (p, _args, _abbrev) ->
       begin match Predef.find_type_constr p with
       | Some `Float -> Float
@@ -247,7 +249,7 @@ let classify ~classify_product env ty layout : _ classification =
              | `Float64x8
              )
         -> Addr
-      | Some (`Lexing_position | `Code | `Eval | `Box)
+      | Some (`Lexing_position | `Expr | `Eval | `Box)
       | Some (#Predef.data_type_constr | #Predef.abstract_non_value_type_constr)
       | None ->
         try
@@ -288,6 +290,7 @@ let classify ~classify_product env ty layout : _ classification =
                       Punboxedvector_ignorable Unboxed_vec128 ])
     else Unboxed_vector Unboxed_vec256
   | Base (Vec512, _) -> Unboxed_vector Unboxed_vec512
+  | Base (Mask, _) -> Unboxed_mask
   | Base (Word, _) -> Unboxed_int Unboxed_nativeint
   | Base (Untagged_immediate, _) -> Unboxed_int Untagged_int
   | Base (Void, _) -> Void
@@ -308,7 +311,7 @@ and sort_to_scannable_product_element_kind elt_ty_for_error loc
       if le separability (upper_bound_if_is_always_gc_ignorable ())
         then Pint_scannable else Paddr_scannable
   | Base ((Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
-          Untagged_immediate | Vec128 | Vec256 | Vec512), _) as c ->
+          Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask), _) as c ->
     raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
   | Base (Void, _) ->
     raise (Error (loc, Unsupported_void_in_array))
@@ -347,6 +350,7 @@ and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
   | Base (Untagged_immediate, _) -> Punboxedoruntaggedint_ignorable Untagged_int
   | Base ((Vec128 | Vec256 | Vec512), _) ->
     raise (Error (loc, Unsupported_vector_in_product_array))
+  | Base (Mask, _) -> raise (Error (loc, Unsupported_vector_in_product_array))
   | Base (Void, _) -> raise (Error (loc, Unsupported_void_in_array))
   | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
   | Univar _ ->
@@ -386,6 +390,7 @@ let array_kind_of_elt env loc ty =
   | Unboxed_int Untagged_int16 -> Punboxedoruntaggedintarray Untagged_int16
   | Unboxed_int Untagged_int8 -> Punboxedoruntaggedintarray Untagged_int8
   | Unboxed_vector v -> Punboxedvectorarray v
+  | Unboxed_mask -> Punboxedmaskarray
   | Product c -> c
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
@@ -510,7 +515,7 @@ let value_kind_of_scannable_jkind env jkind =
          | Genvar _
          | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-                  | Vec512 ),
+                  | Vec512 | Mask ),
                   _ )) ->
     Misc.fatal_error "expected a layout of scannable"
 
@@ -705,6 +710,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
   | Tconstr(p, _, _) when Path.same p Predef.path_float64x8 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_mask ->
+    num_nodes_visited, non_nullable Pboxedmaskval
   | Tconstr(p, [arg], _)
     when (Path.same p Predef.path_array
           || Path.same p Predef.path_iarray) ->
@@ -795,6 +802,10 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     if Btype.tvariant_not_immediate row
     then non_nullable Pgenval
     else non_nullable Pintval
+  | Tvar { jkind; _ } | Tunivar { jkind; _ } | Tof_kind jkind ->
+    num_nodes_visited,
+    add_nullability_from_ty env scty
+      (value_kind_of_scannable_jkind env (Jkind.disallow_right jkind))
   | _ ->
     num_nodes_visited,
     add_nullability_from_ty env scty Pgenval
@@ -804,17 +815,28 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   : int * unit Lambda.mixed_block_element =
   match field with
   | Scannable { separability } ->
+    let pointerness = pointerness_of_separability separability in
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
+      (* The declared shape's separability can be more precise than what
+         [value_kind] computes here (e.g. for existential type variables), so
+         take the better of the two. *)
+      (* CR layouts: The most precise thing would be a real meet of value kinds
+         (e.g. a pointerness of [Immediate] could remove the non-constant
+         constructors from [Pvariant _]) *)
+      let kind =
+        match pointerness, kind.raw_kind with
+        | Immediate, Pgenval -> { kind with raw_kind = Pintval }
+        | Immediate, _ | Pointer, _ -> kind
+      in
       num_nodes_visited, Value kind
     | None ->
-      let raw_kind =
-        value_kind_of_pointerness (pointerness_of_separability separability)
-      in
-      num_nodes_visited, Value { generic_value with raw_kind }
+      num_nodes_visited,
+      Value
+        { generic_value with raw_kind = value_kind_of_pointerness pointerness }
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
@@ -828,6 +850,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   | Vec128 -> num_nodes_visited, Vec128
   | Vec256 -> num_nodes_visited, Vec256
   | Vec512 -> num_nodes_visited, Vec512
+  | Mask -> num_nodes_visited, Mask
   | Word -> num_nodes_visited, Word
   | Untagged_immediate -> num_nodes_visited, Untagged_immediate
   | Product fs ->
@@ -842,6 +865,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         match get_desc ty with
         | Tunboxed_tuple fields ->
           Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
+        | Tmod _ -> Misc.fatal_error "Typeopt: unexpected Tmod"
         | Tconstr(p, args, _) ->
           begin match Env.find_type p env with
           | exception Not_found -> unknown ()
@@ -1228,6 +1252,9 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Alpha) ->
     Lambda.layout_unboxed_vector Unboxed_vec512
+  | Base Mask when Language_extension.(is_at_least Layouts Stable) &&
+                   Language_extension.(is_at_least SIMD Alpha) ->
+    Lambda.layout_unboxed_mask
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_product []
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
@@ -1238,11 +1265,11 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
                    ~value_kind:(lazy Lambda.generic_value) ~error)
          consts)
   | ((  Base (Void | Float32 | Float64 | Word | Bits8 |
-             Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
+             Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask)
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
-  | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
+  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1256,7 +1283,7 @@ let layout env loc sort ty =
       | Base Float32 as const ->
         raise (Error (loc, Small_number_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
-      | Base (Vec128 | Vec256 | Vec512) as const ->
+      | Base (Vec128 | Vec256 | Vec512 | Mask) as const ->
         raise (Error (loc, Simd_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
       | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
@@ -1269,6 +1296,29 @@ let layout env loc sort ty =
       | Genvar _ -> assert false
     )
 
+let layout_of_ident env ident =
+  let path = Path.Pident ident in
+  match Env.find_module path env with
+  | _ -> Some layout_any_value
+  | exception Not_found ->
+    let value_desc =
+      try Env.find_value path env
+      with Not_found ->
+        Misc.fatal_errorf "Failed to find value_desc for %a"
+          Ident.print ident
+    in
+    let { val_type; val_kind; val_loc; _ } =
+      Subst.Lazy.force_value_description value_desc
+    in
+    match val_kind with
+    | Val_reg sort | Val_mut (_, sort) ->
+      let const_sort = Jkind.Sort.default_for_transl_and_get sort in
+      let layout = layout env val_loc const_sort val_type in
+      Some layout
+    | Val_prim _ -> None
+    | Val_ivar _ | Val_self _ | Val_anc _ ->
+      Some layout_any_value
+
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
     ~error:(function
@@ -1280,7 +1330,7 @@ let layout_of_sort loc sort =
     | Base Float32 as const ->
       raise (Error (loc, Small_number_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
-    | Base (Vec128 | Vec256 | Vec512) as const ->
+    | Base (Vec128 | Vec256 | Vec512 | Mask) as const ->
       raise (Error (loc, Simd_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
     | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
@@ -1299,6 +1349,10 @@ let layout_of_non_void_sort c =
     ~error:(fun const ->
       Misc.fatal_errorf_doc "layout_of_const_sort: %a encountered"
         Jkind.Sort.Const.format const)
+
+let layout_or_sort env loc sort ty =
+  try layout env loc sort ty
+  with Error (_, Non_value_layout _) -> layout_of_sort loc sort
 
 let function_return_layout env loc sort ty =
   match is_function_type env ty with
@@ -1335,7 +1389,7 @@ let lazy_val_requires_forward env loc ty =
      Blocks with forward_tag can get scanned by the gc thus can't
      store unboxed values. Not boxing is also incorrect since the lazy
      type has layout [value] which is different from these unboxed layouts. *)
-  | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ | Void ->
+  | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ | Unboxed_mask | Void ->
     Misc.fatal_error "Unboxed value encountered inside lazy expression"
   | Float -> Config.flat_float_array
   | Addr | Immediate | Immediate_or_null -> false

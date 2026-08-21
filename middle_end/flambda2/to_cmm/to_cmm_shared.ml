@@ -375,11 +375,7 @@ let invalid res ~message =
     match To_cmm_result.invalid_message_symbol res ~message with
     | None ->
       let message_sym =
-        Symbol.create
-          (Current_unit.get_cu_exn ())
-          (Linkage_name.of_string
-             (Variable.unique_name
-                (Variable.create "invalid" Flambda_kind.value)))
+        Symbol.manufacture (Current_unit.get_cu_exn ()) "invalid"
       in
       let res =
         Cmm_helpers.emit_string_constant
@@ -569,8 +565,9 @@ let extended_machtype_of_return_arity arity =
 
 let alloc_mode_for_applications_to_cmx t =
   match t with
-  | Alloc_mode.For_applications.Local _ -> Cmx_format.Alloc_local
-  | Alloc_mode.For_applications.Heap _ -> Cmx_format.Alloc_heap
+  | Alloc_mode.For_applications.Maybe_alloc_stack _ ->
+    Cmx_format.Maybe_alloc_stack
+  | Alloc_mode.For_applications.Not_alloc_stack _ -> Cmx_format.Not_alloc_stack
 
 let alloc_mode_for_allocations_to_cmm t =
   match t with

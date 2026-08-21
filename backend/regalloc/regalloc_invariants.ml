@@ -16,9 +16,9 @@ let precondition : Cfg_with_layout.t -> unit =
       | Spill -> fatal "instruction %a is a spill" InstructionId.format id
       | Reload -> fatal "instruction %a is a reload" InstructionId.format id
       | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-      | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-      | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
+      | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+      | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
       | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
       | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
       | Alloc _ ->
@@ -106,7 +106,7 @@ let postcondition_layout : Cfg_with_layout.t -> unit =
           ( Move | Opaque | Begin_region | End_region | Dls_get | Tls_get
           | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
           | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Stackoffset _ | Load _
+          | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
           | Store (_, _, _)
           | Intop _ | Int128op _
           | Intop_imm (_, _)

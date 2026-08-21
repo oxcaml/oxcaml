@@ -1093,8 +1093,6 @@ module Serializable : sig
 
   val print : Format.formatter -> t -> unit
 
-  val name_domain : t -> Name.Set.t
-
   val ids_for_export : t -> Ids_for_export.t
 
   val apply_renaming : t -> Renaming.t -> t
@@ -1167,12 +1165,6 @@ end = struct
     Cached_level.free_function_slots_and_value_slots t.just_after_level
 
   let print = print_serializable
-
-  let name_domain t =
-    List.fold_left
-      (fun name_domain symbol -> Name.Set.add (Name.symbol symbol) name_domain)
-      (Name.Map.keys (Cached_level.names_to_types t.just_after_level))
-      t.defined_symbols_without_equations
 
   let ids_for_export
       { defined_symbols_without_equations; code_age_relation; just_after_level }
