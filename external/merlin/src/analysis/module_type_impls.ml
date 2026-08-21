@@ -115,20 +115,20 @@ let resolve_implementation mconfig (node : Facts.Node.t) =
       else if
         loc.loc_start.Lexing.pos_cnum = -1 || loc.loc_end.Lexing.pos_cnum = -1
       then Whole_unit
-      else Ascription_sites
+      else Annotation_sites
     in
     Option.map (source_of_site mconfig compilation_unit loc)
       ~f:(fun (file, loc) ->
         match kind with
         | Whole_unit -> { loc = Location.in_file file; kind }
-        | Ascription_sites -> { loc = Helpers.location_in_file file loc; kind })
+        | Annotation_sites -> { loc = Helpers.location_in_file file loc; kind })
   | Uid uid ->
     Option.bind (uid_site mconfig uid) ~f:(fun { spans_file; row_file; loc } ->
         if loc.Location.loc_ghost then None
         else if String.equal spans_file row_file then
           Some
             ({ loc = Helpers.location_in_file row_file loc;
-               kind = Ascription_sites
+               kind = Annotation_sites
              }
               : implementer)
         else
@@ -162,7 +162,7 @@ let resolve_check_site mconfig (check : Facts.Check.t) =
 
 let protocol_check_kind :
     Facts.Check.Kind.t -> Query_protocol.Module_type_impls.check_kind = function
-  | Ascription -> Ascription
+  | Annotation -> Annotation
   | Argument -> Argument
   | Package -> Package
   | Interface -> Interface
