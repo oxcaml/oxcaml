@@ -426,14 +426,12 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
       (Flambda2_reaper.Global_flow_graph.create ())
       cmrs
   in
-  (* CR mvellacott: serialise the solution to [ltosol_filename] instead of
-     discarding it. *)
   (* CR mvellacott: split the resulting solution into per-compilation-unit
      portions. *)
-  (* CR mvellacott: store the new stamp counters to the solution file. *)
-  let (_solution : Flambda2_reaper.Unboxing_analysis.result) =
-    Flambda2_reaper.Reaper.Staged.solve combined_graph
-  in
+  let solution = Flambda2_reaper.Reaper.Staged.solve combined_graph in
+  Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~solution;
+  (* CR mvellacott: remove this debug print once we can test useful
+     functionality. *)
   Format.eprintf "reaper_lto_solve: solved units: [%s]; ltosol output: %s@."
     (String.concat "; "
        (List.map

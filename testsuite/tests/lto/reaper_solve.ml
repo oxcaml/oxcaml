@@ -19,6 +19,9 @@
  all_modules = "";
  ocamlopt.opt;
 
+ file = "reaper_solve.ltosol";
+ file-exists;
+
  check-ocamlopt.opt-output;
 *)
 
