@@ -1986,19 +1986,15 @@ end = struct
         m ppf via.comonadic
     | Lower_comonadic { c_via; c_name } ->
       let m = add_named_modevar c_name in
-      Fmt.fprintf ppf "past(%a)"
-        (Alloc.pretty_print_comonadic_morph
-           (fun ppf s -> Fmt.fprintf ppf "%s" s)
-           m)
-        c_via
+      Alloc.pretty_print_comonadic_morph
+        (fun ppf s -> Fmt.fprintf ppf "past(%s)" s)
+        m ppf c_via
     | Lower_closing_over_to { cls_target; cls_src; cls_edge } ->
       let m = add_named_modevar cls_edge.name in
       Alloc.pretty_print_comonadic_morph
-        (fun ppf cls ->
-          Alloc.pretty_print_comonadic_morph
-            (fun ppf s -> Fmt.fprintf ppf "%s" s)
-            m ppf cls)
-        cls_target ppf cls_src
+        (fun ppf s -> Fmt.fprintf ppf "%s" s)
+        m ppf
+        (C.compose Alloc.obj_comonadic cls_src cls_target)
 
   let partition_edges_into_bounds :
       edges_from:edge list ->

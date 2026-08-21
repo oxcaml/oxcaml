@@ -41,7 +41,7 @@ let pin (w : 'x arr) (g : 'x) =
 [%%expect{|
 val pin :
   (int -> int) arr @ 'o ->
-  ((int -> int) @ [< 'n . aliased contended immutable] ->
+  ((int -> int) @ [< 'n mod aliased contended immutable] ->
    (int -> int) @ [> 'n]) @ 'm =
   <fun>
 |}, Principal{|
@@ -120,6 +120,6 @@ let unpack (P f) = f
 type packed = P : (int -> int) -> packed
 val pack : packed = P <fun>
 val unpack :
-  packed @ [< 'm . aliased contended immutable] -> (int -> int) @ [> 'm] =
+  packed @ [< 'm mod aliased contended immutable] -> (int -> int) @ [> 'm] =
   <fun>
 |}]
