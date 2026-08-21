@@ -46,6 +46,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Is_closed_by (Monadic, co) -> co.closure, Close_over (Monadic, co)
       | Is_closed_by (Comonadic, co) -> co.closure, Close_over (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Function_argument function_argument ->
+        pp, Function_argument function_argument
       | Functor_to_parameter loc ->
         (loc, Functor), Parameter_to_functor (fst pp)
       | Parameter_to_functor loc ->
@@ -74,6 +76,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Close_over (Monadic, co) -> co.closed, Is_closed_by (Monadic, co)
       | Close_over (Comonadic, co) -> co.closed, Is_closed_by (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Function_argument function_argument ->
+        pp, Function_argument function_argument
       | Functor_to_parameter loc ->
         (loc, Functor), Parameter_to_functor (fst pp)
       | Parameter_to_functor loc ->
@@ -106,6 +110,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Application_to_functor loc -> Application_to_functor loc
+        | Function_argument function_argument ->
+          Function_argument function_argument
         | Allocation_l loc -> Allocation_l loc
         | Allocation loc -> Allocation loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
@@ -123,6 +129,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
+        | Function_argument function_argument ->
+          Function_argument function_argument
         | Functor_to_application loc -> Functor_to_application loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation loc -> Allocation loc
@@ -143,6 +151,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
+        | Function_argument function_argument ->
+          Function_argument function_argument
         | Functor_to_application loc -> Functor_to_application loc
         | Application_to_functor loc -> Application_to_functor loc
         | Allocation_r loc -> Allocation_r loc
@@ -165,6 +175,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Function_argument function_argument ->
+          Function_argument function_argument
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Functor_to_application loc -> Functor_to_application loc
@@ -5058,6 +5070,7 @@ module Report = struct
     | Contains_r (_, contains) -> print_contains ~fixpoint contains
     | Is_contained_by (_, is_contained_by) ->
       Some (print_is_contained_by ~fixpoint is_contained_by)
+    | Function_argument _ -> None
 
   let print_mode : type a.
       [`Actual | `Expected] -> a C.obj -> Fmt.formatter -> a -> unit =
@@ -5178,6 +5191,9 @@ module Report = struct
     | Functor_to_application _ | Application_to_functor _ ->
       (* These morphisms should never be skipped *)
       ~is_skip:false, ~fixpoint
+    | Function_argument _ ->
+      if not (implements_identity src obj a b) then print_bug_stderr ();
+      ~is_skip:true, ~fixpoint
     | Skip | Crossing ->
       (* We only skip when the morphism changes the mode *)
       ~is_skip:fixpoint, ~fixpoint
