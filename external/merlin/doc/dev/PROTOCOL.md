@@ -340,7 +340,7 @@ The queried unit's own interface is strengthened against the unit itself. A
 module type declared in the buffer is shared, so it is strengthened against
 everything the configured indexes record a check against it, keeping only the
 annotations all of those support. A whole-unit check is evidence about the
-unit's own signature and an ascription is evidence only about the module bound
+unit's own signature and an annotation is evidence only about the module bound
 at that site; a check whose signature cannot be read, or that the analysis says
 nothing about, leaves its interface unstrengthened. So does a `partial`
 discovery: an incomplete view of who was checked cannot certify anything.
