@@ -21,7 +21,7 @@ let same_file a b = String.equal (Filename.basename a) (Filename.basename b)
 
 type site =
   | Unit_signature
-  | Ascription of Location.t
+  | Annotation of Location.t
 
 type subject = {
   file : string;
@@ -76,9 +76,9 @@ let subject_of_row config (row : Impls.implementation) =
   Option.bind file ~f:(fun file ->
       match row.site.impl_kind with
       | Whole_unit -> Some { file; site = Unit_signature }
-      | Ascription_sites ->
+      | Annotation_sites ->
         if same_file recorded file && span_start loc < span_end loc then
-          Some { file; site = Ascription loc }
+          Some { file; site = Annotation loc }
         else None)
 
 let works_of_response config (response : Impls.response) =
@@ -244,7 +244,7 @@ let config_for_file (config : Mconfig.t) file =
         }
     }
 
-let ascribed_module_type ~loc (structure : Typedtree.structure) =
+let annotated_module_type ~loc (structure : Typedtree.structure) =
   let covering = ref [] in
   let covers (binding : Location.t) =
     same_file binding.loc_start.Lexing.pos_fname
@@ -273,12 +273,12 @@ let ascribed_module_type ~loc (structure : Typedtree.structure) =
 let subject_signature ~env ~site (structure : Typedtree.structure) =
   match site with
   | Unit_signature -> Some structure.str_type
-  | Ascription loc -> (
-    match Option.map (ascribed_module_type ~loc structure) ~f:(Mtype.scrape env)
+  | Annotation loc -> (
+    match Option.map (annotated_module_type ~loc structure) ~f:(Mtype.scrape env)
     with
     | Some (Types.Mty_signature signature) -> Some signature
     | Some _ | None ->
-      log ~title:"subject_signature" "no module signature ascribed at %d-%d"
+      log ~title:"subject_signature" "no module signature annotated at %d-%d"
         (span_start loc) (span_end loc);
       None)
 
