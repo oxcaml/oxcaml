@@ -44,3 +44,5 @@ val is_empty : t -> bool
 val mode : Backend_var.t -> t -> Mode.t option
 
 val mem : mode:Mode.t -> Backend_var.t -> t -> bool
+
+val fold : (Backend_var.t -> Mode.t -> 'a -> 'a) -> t -> 'a -> 'a

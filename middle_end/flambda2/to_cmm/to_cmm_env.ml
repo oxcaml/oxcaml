@@ -158,6 +158,21 @@ type effect_stage =
   | Effect of Variable.t
   | Coeffect_only of Variable.Set.t
 
+(* A phantom let whose defining expression mentioned variables that were not in
+   scope when the phantom let was flushed. The flushed copy has those references
+   erased; this record keeps the original defining expression so that further
+   copies (with fresh backend variables but shared provenance) can be emitted at
+   the points where the referenced binders eventually materialise. See
+   [flush_delayed_lets]. *)
+type pending_phantom =
+  { pending_cmm_var : Backend_var.With_provenance.t;
+    (* The binder of the original phantom let (fresh copies of it are created
+       for each re-emission, sharing its provenance). *)
+    pending_defining_expr : Cmm.phantom_defining_expr;
+    pending_refs : Backend_var.Set.t
+        (* The variables referenced by [pending_defining_expr]. *)
+  }
+
 type validity_stage =
   | Control_flow_point of Variable.t
   | Depend_on_control_flow of Variable.Set.t
@@ -200,6 +215,16 @@ type t =
     (* Stages of let-bindings, most recent at the head. *)
     validity_stages : validity_stage list;
     (* Stages of let-bindings, most recent at the head. *)
+    bound_in_scope : Backend_var.Set.t;
+    (* Backend variables whose binders are guaranteed to be emitted by an
+       enclosing flush (parameters, and flushed bindings that always
+       materialise). References to these from phantom defining expressions can
+       safely be kept: the free-variable records are discharged when the
+       enclosing binder's flush is applied. *)
+    pending_phantoms : pending_phantom list;
+    (* Flushed phantom lets whose defining expressions were erased because they
+       mentioned out-of-scope variables; kept so that precise copies can be
+       re-emitted where the referenced binders materialise. *)
     symbol_inits : Symbol_inits.t
         (* Symbol initialization expressions, indexed by the variable used as
            value for the symbol field initialization. *)
@@ -339,6 +364,8 @@ let create offsets functions_info ~trans_prim ~return_continuation
     vars = Variable.Map.empty;
     conts;
     exn_handlers = Continuation.Set.singleton exn_continuation;
+    bound_in_scope = Backend_var.Set.empty;
+    pending_phantoms = [];
     symbol_inits = Backend_var.Map.empty
   }
 
@@ -409,7 +436,8 @@ let add_bound_param env v v' =
   let v'' = Backend_var.With_provenance.var v' in
   let free_vars = FV.singleton ~mode:Normal v'' in
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
-  { env with vars }
+  let bound_in_scope = Backend_var.Set.add v'' env.bound_in_scope in
+  { env with vars; bound_in_scope }
 
 let create_bound_parameter env (v, debug_uid, needed_by_phantom_let) =
   if Variable.Map.mem v env.vars
@@ -1303,8 +1331,101 @@ let place_symbol_inits ~params e free_vars symbol_inits =
     (e, free_vars, symbol_inits)
     params
 
-let flush_phantom_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
-    phantom_expr_opt =
+let phantom_defining_expr_refs (expr : Cmm.phantom_defining_expr) =
+  match expr with
+  | Cphantom_const_int _ | Cphantom_const_symbol _
+  | Cphantom_read_symbol_field _ ->
+    Backend_var.Set.empty
+  | Cphantom_var var
+  | Cphantom_offset_var { var; offset_in_words = _ }
+  | Cphantom_read_field { var; field = _ } ->
+    Backend_var.Set.singleton var
+  | Cphantom_block { tag = _; fields } ->
+    List.fold_left
+      (fun acc field ->
+        match field with None -> acc | Some var -> Backend_var.Set.add var acc)
+      Backend_var.Set.empty fields
+
+type filtered_phantom_defining_expr =
+  | All_refs_in_scope
+  | Some_refs_in_scope of
+      { filtered_expr : Cmm.phantom_defining_expr;
+        refs_in_scope : Backend_var.Set.t
+      }
+  | No_refs_in_scope
+
+(* Restrict a phantom defining expression to the variables in [in_scope],
+   presenting the out-of-scope parts as unavailable. *)
+let filter_phantom_defining_expr (expr : Cmm.phantom_defining_expr) ~in_scope =
+  let refs = phantom_defining_expr_refs expr in
+  let refs_in_scope = Backend_var.Set.inter refs in_scope in
+  if Backend_var.Set.equal refs_in_scope refs
+  then All_refs_in_scope
+  else if Backend_var.Set.is_empty refs_in_scope
+  then No_refs_in_scope
+  else
+    match expr with
+    | Cphantom_block { tag; fields } ->
+      let fields =
+        List.map
+          (fun field ->
+            match field with
+            | Some var when Backend_var.Set.mem var in_scope -> Some var
+            | Some _ | None -> None)
+          fields
+      in
+      Some_refs_in_scope
+        { filtered_expr = Cphantom_block { tag; fields }; refs_in_scope }
+    | Cphantom_const_int _ | Cphantom_const_symbol _
+    | Cphantom_read_symbol_field _ | Cphantom_var _ | Cphantom_offset_var _
+    | Cphantom_read_field _ ->
+      Misc.fatal_errorf
+        "Partially-in-scope references are impossible for a phantom defining \
+         expression with at most one reference"
+
+(* Emit, around [body], a copy of any pending phantom let that references [v] (a
+   binder being emitted at position [order] in the current flush), filtered to
+   the references in scope there. Bindings are processed innermost first, so
+   this is the placement with the most references in scope for the current
+   flush; each copy is emitted at most once per flush. Each copy binds a fresh
+   backend variable sharing the original's provenance; the backend presents all
+   such copies as a single variable to the debugger. *)
+let reissue_pendings ~pendings ~consumed ~scope_at ~order v (body, fvs) =
+  List.fold_left
+    (fun ((body, fvs) as unchanged)
+         { pending_cmm_var; pending_defining_expr; pending_refs } ->
+      let pending_id = Backend_var.With_provenance.var pending_cmm_var in
+      if
+        Backend_var.Set.mem v pending_refs
+        && not (Backend_var.Set.mem pending_id !consumed)
+      then (
+        consumed := Backend_var.Set.add pending_id !consumed;
+        let in_scope = Backend_var.Set.add v (scope_at order) in
+        let emit filtered_expr refs =
+          let fresh =
+            Backend_var.With_provenance.create
+              ?provenance:
+                (Backend_var.With_provenance.provenance pending_cmm_var)
+              (Backend_var.create_local
+                 (Backend_var.With_provenance.name pending_cmm_var))
+          in
+          ( Cmm_helpers.make_phantom_let fresh (Some filtered_expr) body,
+            Backend_var.Set.fold
+              (fun r fvs -> FV.add ~mode:Phantom r fvs)
+              refs fvs )
+        in
+        match filter_phantom_defining_expr pending_defining_expr ~in_scope with
+        | All_refs_in_scope -> emit pending_defining_expr pending_refs
+        | Some_refs_in_scope { filtered_expr; refs_in_scope } ->
+          emit filtered_expr refs_in_scope
+        | No_refs_in_scope ->
+          (* Impossible: [v] is both in scope and referenced. *)
+          unchanged)
+      else unchanged)
+    (body, fvs) pendings
+
+let flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at ~order
+    (acc, acc_free_vars, symbol_inits) cmm_var phantom_expr_opt =
   let v = Backend_var.With_provenance.var cmm_var in
   (* there should be no symbol inits tied to a phantom binding *)
   let inits, symbol_inits = pop_symbol_inits symbol_inits v in
@@ -1312,24 +1433,39 @@ let flush_phantom_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
   | [] -> ()
   | _ :: _ ->
     Misc.fatal_errorf "Non-empty list of symbol inits tied to a phantom binding");
-  let gen_phantom_let phantom_defining_expr free_vars =
+  let gen_phantom_let phantom_defining_expr acc free_vars =
     let expr = Cmm_helpers.make_phantom_let cmm_var phantom_defining_expr acc in
     let free_vars = FV.remove v free_vars in
     expr, free_vars, symbol_inits
   in
   match phantom_expr_opt with
   | None ->
-    (* An [Inlined] binding: only generate an (empty) phantom let if the
-       variable is actually referenced phantom-ly by the body. *)
-    if phantomize && FV.mem ~mode:Phantom v acc_free_vars
-    then gen_phantom_let None acc_free_vars
+    (* An [Inlined] binding (or a demoted pure binding): only generate an
+       (empty) phantom let if the variable is actually referenced phantom-ly by
+       the body, or is awaited by a pending phantom let, whose copy is then
+       placed directly beneath this binder. *)
+    let pending_references_v =
+      phantomize
+      && List.exists
+           (fun { pending_refs; _ } -> Backend_var.Set.mem v pending_refs)
+           pendings
+    in
+    if
+      phantomize
+      && (FV.mem ~mode:Phantom v acc_free_vars || pending_references_v)
+    then
+      let acc, acc_free_vars =
+        reissue_pendings ~pendings ~consumed ~scope_at ~order v
+          (acc, acc_free_vars)
+      in
+      gen_phantom_let None acc acc_free_vars
     else acc, acc_free_vars, symbol_inits
   | Some (cmm_expr, expr_free_vars) ->
     let free_vars = FV.union acc_free_vars expr_free_vars in
-    gen_phantom_let cmm_expr free_vars
+    gen_phantom_let cmm_expr acc free_vars
 
-let flush_regular_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
-    cmm_expr free_vars effs =
+let flush_regular_binding ~phantomize ~pendings ~consumed ~scope_at ~order
+    (acc, acc_free_vars, symbol_inits) cmm_var cmm_expr free_vars effs =
   let v = Backend_var.With_provenance.var cmm_var in
   let inits, symbol_inits = pop_symbol_inits symbol_inits v in
   let can_be_omitted = can_be_removed effs && Misc.Stdlib.List.is_empty inits in
@@ -1338,21 +1474,27 @@ let flush_regular_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
   | Some Phantom when can_be_omitted ->
     (* The variable is only used by phantom bindings in the body: demote the
        binding itself to an (empty) phantom let. *)
-    flush_phantom_binding ~phantomize
+    flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at ~order
       (acc, acc_free_vars, symbol_inits)
       cmm_var None
   | None | Some Normal | Some Phantom ->
     let body =
       List.fold_left (fun acc init -> Cmm_helpers.sequence init acc) acc inits
     in
+    let body, acc_free_vars =
+      reissue_pendings ~pendings ~consumed ~scope_at ~order v
+        (body, acc_free_vars)
+    in
     let expr = Cmm_helpers.letin cmm_var ~defining_expr:cmm_expr ~body in
     let free_vars = FV.union free_vars (FV.remove v acc_free_vars) in
     expr, free_vars, symbol_inits
 
-let flush_bindings order_map flushed_symbol_inits e free_vars symbol_inits =
+let flush_bindings ~pendings ~scope_at order_map flushed_symbol_inits e
+    free_vars symbol_inits =
   (* Merge the symbol inits from the env that was flushed, and those from the
      body (i.e. [e]) that we want to wrap *)
   let symbol_inits = Symbol_inits.merge flushed_symbol_inits symbol_inits in
+  let consumed = ref Backend_var.Set.empty in
   M.fold
     (fun _ (Binding b) (acc, acc_free_vars, symbol_inits) ->
       let phantomize = b.phantomize in
@@ -1361,16 +1503,19 @@ let flush_bindings order_map flushed_symbol_inits e free_vars symbol_inits =
         Misc.fatal_errorf
           "Complex bindings should have been split prior to being flushed."
       | Inlined ->
-        flush_phantom_binding ~phantomize
+        flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at
+          ~order:b.order
           (acc, acc_free_vars, symbol_inits)
           b.cmm_var None
       | Phantom { cmm_expr; free_vars } ->
-        flush_phantom_binding ~phantomize
+        flush_phantom_binding ~phantomize ~pendings ~consumed ~scope_at
+          ~order:b.order
           (acc, acc_free_vars, symbol_inits)
           b.cmm_var
           (Some (cmm_expr, free_vars))
       | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
-        flush_regular_binding ~phantomize
+        flush_regular_binding ~phantomize ~pendings ~consumed ~scope_at
+          ~order:b.order
           (acc, acc_free_vars, symbol_inits)
           b.cmm_var cmm_expr free_vars b.effs)
     order_map
@@ -1477,7 +1622,159 @@ let flush_delayed_lets ~mode env res =
             None))
       env.bindings
   in
-  let flush = flush_bindings !bindings_to_flush env.symbol_inits in
+  (* Phantom defining expressions must only reference variables whose binders
+     are in scope in the emitted code. A referenced binder is in scope if it was
+     guaranteed to be emitted by an enclosing flush ([bound_in_scope]); if it is
+     being flushed now and definitely materialises (bindings with effects or
+     symbol inits; phantom lets, which always materialise); or if it is being
+     flushed now and materialises exactly when phantom-referenced ([Inlined]
+     markers and pure phantomizable bindings, which are emitted as empty phantom
+     lets, or as real lets, whenever referenced -- and the kept reference itself
+     ensures this; such binders are moreover always outer to the reference,
+     since a variable can only be referenced after it is bound).
+
+     References to out-of-scope variables are erased from the flushed copy: the
+     affected parts of the defining expression are presented as optimised out,
+     and if no referenced variable is in scope at all, the phantom let is not
+     emitted here. Whenever an out-of-scope referenced binder is merely delayed
+     (still in [bindings_to_keep]), a [pending_phantom] records the original
+     defining expression so that a copy, filtered to the references then in
+     scope, is emitted wherever such a binder later materialises. *)
+  let kept_binders =
+    Variable.Map.fold
+      (fun _ (Binding b) acc ->
+        Backend_var.Set.add (Backend_var.With_provenance.var b.cmm_var) acc)
+      bindings_to_keep Backend_var.Set.empty
+  in
+  let definite_real_events =
+    M.fold
+      (fun _ (Binding b) acc ->
+        match b.bound_expr with
+        | Simple _ | Split _ ->
+          let v = Backend_var.With_provenance.var b.cmm_var in
+          if
+            (not (can_be_removed b.effs))
+            || Backend_var.Map.mem v env.symbol_inits
+          then (b.order, v) :: acc
+          else acc
+        | Inlined | Phantom _ | Splittable_prim _ -> acc)
+      !bindings_to_flush []
+  in
+  let definite_real =
+    List.fold_left
+      (fun acc (_, v) -> Backend_var.Set.add v acc)
+      Backend_var.Set.empty definite_real_events
+  in
+  let conditional_same_flush =
+    M.fold
+      (fun _ (Binding b) acc ->
+        let v = Backend_var.With_provenance.var b.cmm_var in
+        match b.bound_expr with
+        | Inlined -> if b.phantomize then Backend_var.Set.add v acc else acc
+        | Simple _ | Split _ ->
+          if b.phantomize && can_be_removed b.effs
+          then Backend_var.Set.add v acc
+          else acc
+        | Phantom _ | Splittable_prim _ -> acc)
+      !bindings_to_flush Backend_var.Set.empty
+  in
+  let new_pendings = ref [] in
+  let phantom_events = ref [] in
+  let bindings_to_flush =
+    (* Process in creation order (references only point backwards), growing the
+       scope with each emitted phantom binder. *)
+    let scope =
+      ref
+        (Backend_var.Set.union env.bound_in_scope
+           (Backend_var.Set.union definite_real conditional_same_flush))
+    in
+    List.filter_map
+      (fun (order, (Binding b as binding)) ->
+        let v = Backend_var.With_provenance.var b.cmm_var in
+        let emitted_phantom () =
+          scope := Backend_var.Set.add v !scope;
+          phantom_events := (order, v) :: !phantom_events
+        in
+        match b.bound_expr with
+        | Phantom { cmm_expr = Some defining_expr; free_vars = _ } -> (
+          let refs = phantom_defining_expr_refs defining_expr in
+          let record_pending missing =
+            if
+              not
+                (Backend_var.Set.is_empty
+                   (Backend_var.Set.inter missing kept_binders))
+            then
+              new_pendings
+                := { pending_cmm_var = b.cmm_var;
+                     pending_defining_expr = defining_expr;
+                     pending_refs = refs
+                   }
+                   :: !new_pendings
+          in
+          match filter_phantom_defining_expr defining_expr ~in_scope:!scope with
+          | All_refs_in_scope ->
+            emitted_phantom ();
+            Some (order, binding)
+          | Some_refs_in_scope { filtered_expr; refs_in_scope } ->
+            record_pending (Backend_var.Set.diff refs refs_in_scope);
+            emitted_phantom ();
+            let free_vars =
+              Backend_var.Set.fold
+                (fun r acc -> FV.add ~mode:Phantom r acc)
+                refs_in_scope FV.empty
+            in
+            Some
+              ( order,
+                Binding
+                  { b with
+                    bound_expr =
+                      Phantom { cmm_expr = Some filtered_expr; free_vars }
+                  } )
+          | No_refs_in_scope ->
+            (* Nothing useful can be said here: do not emit the phantom let at
+               all. Copies will be emitted wherever referenced binders
+               materialise. *)
+            record_pending refs;
+            None)
+        | Phantom { cmm_expr = None; free_vars = _ } ->
+          emitted_phantom ();
+          Some (order, binding)
+        | Inlined | Simple _ | Split _ | Splittable_prim _ ->
+          Some (order, binding))
+      (List.rev (M.bindings !bindings_to_flush))
+    |> List.fold_left (fun m (order, b) -> M.add order b m) M.empty
+  in
+  (* Markers awaited by a pending phantom let definitely emit (empty) phantom
+     binders (see [flush_phantom_binding]), so they count as scope events, and
+     they enclose all deeper code. *)
+  let marker_events =
+    M.fold
+      (fun _ (Binding b) acc ->
+        match b.bound_expr with
+        | Inlined ->
+          let v = Backend_var.With_provenance.var b.cmm_var in
+          if
+            b.phantomize
+            && List.exists
+                 (fun { pending_refs; _ } -> Backend_var.Set.mem v pending_refs)
+                 env.pending_phantoms
+          then (b.order, v) :: acc
+          else acc
+        | Phantom _ | Simple _ | Split _ | Splittable_prim _ -> acc)
+      bindings_to_flush []
+  in
+  let scope_at =
+    let scope_events = definite_real_events @ !phantom_events @ marker_events in
+    fun order ->
+      List.fold_left
+        (fun acc (o, var) ->
+          if o < order then Backend_var.Set.add var acc else acc)
+        env.bound_in_scope scope_events
+  in
+  let flush =
+    flush_bindings ~pendings:env.pending_phantoms ~scope_at bindings_to_flush
+      env.symbol_inits
+  in
   let validity_stages =
     let control_flow_dep_variables =
       Variable.Map.fold
@@ -1501,11 +1798,29 @@ let flush_delayed_lets ~mode env res =
     then []
     else [Depend_on_control_flow control_flow_dep_variables]
   in
+  let pending_phantoms =
+    (* Pending phantom lets are only useful while a binder they await may still
+       materialise, i.e. while it is still a delayed binding. *)
+    List.filter
+      (fun { pending_refs; _ } ->
+        not
+          (Backend_var.Set.is_empty
+             (Backend_var.Set.inter pending_refs kept_binders)))
+      (!new_pendings @ env.pending_phantoms)
+  in
+  let bound_in_scope =
+    List.fold_left
+      (fun acc (_, v) -> Backend_var.Set.add v acc)
+      (Backend_var.Set.union env.bound_in_scope definite_real)
+      (!phantom_events @ marker_events)
+  in
   let env =
     { env with
       effect_stages = [];
       validity_stages;
       bindings = bindings_to_keep;
+      bound_in_scope;
+      pending_phantoms;
       symbol_inits = Backend_var.Map.empty
     }
   in

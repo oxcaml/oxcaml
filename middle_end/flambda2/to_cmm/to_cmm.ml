@@ -112,6 +112,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   let free_vars =
     To_cmm_shared.remove_var_with_provenance body_free_vars toplevel_region_var
   in
+  (* See the comment about [Phantom]-mode free variables in
+     [To_cmm_set_of_closures]. *)
   if not (To_cmm_free_vars.is_empty free_vars)
   then
     Misc.fatal_errorf

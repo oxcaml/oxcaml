@@ -75,21 +75,18 @@ let simple_block_field env res s =
       env, res, cmm_var_opt)
 
 (* Contrary to what we need to do in [To_cmm_primitive], the order of
-   environment lookups here should not matter *)
+   environment lookups here should not matter. Fields that cannot be described
+   are presented as optimised out ([None]) without preventing the description of
+   the remaining fields. *)
 let rec block_field_list env res = function
-  | [] -> env, res, Some [], FV.empty
-  | s :: args -> (
+  | [] -> env, res, [], FV.empty
+  | s :: args ->
     let env, res, cmm_var_opt = simple_block_field env res s in
-    match cmm_var_opt with
-    | None -> env, res, None, FV.empty
-    | Some v ->
-      let env, res, r, fv = block_field_list env res args in
-      let ret, fv =
-        match r with
-        | None -> None, FV.empty
-        | Some l -> Some (v :: l), FV.add ~mode:Phantom v fv
-      in
-      env, res, ret, fv)
+    let env, res, rest, fv = block_field_list env res args in
+    let fv =
+      match cmm_var_opt with None -> fv | Some v -> FV.add ~mode:Phantom v fv
+    in
+    env, res, cmm_var_opt :: rest, fv
 
 let prim env res _dbg p =
   match[@warning "-4"] (p : P.t) with
@@ -113,12 +110,8 @@ let prim env res _dbg p =
       | Naked_floats -> Tag.to_int Tag.double_array_tag
       | Mixed (tag, _) -> Tag.Scannable.to_int tag
     in
-    let env, res, args, fv = block_field_list env res args in
-    let expr =
-      match args with
-      | None -> None
-      | Some fields -> Some (Cmm.Cphantom_block { tag; fields })
-    in
+    let env, res, fields, fv = block_field_list env res args in
+    let expr = Some (Cmm.Cphantom_block { tag; fields }) in
     expr, env, res, fv
   | Unary (Project_value_slot { project_from; value_slot }, arg) -> (
     let env, res, var_opt = simple_block_field env res arg in

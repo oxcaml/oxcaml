@@ -192,7 +192,12 @@ let phantom_defining_expr ppf defining_expr =
     Format.fprintf ppf "%s[%d]" sym.sym_name field
   | Cphantom_block { tag; fields } ->
     Format.fprintf ppf "[%d: " tag;
-    List.iter (fun field -> Format.fprintf ppf "%a; " V.print field) fields;
+    List.iter
+      (fun field ->
+        match field with
+        | Some field -> Format.fprintf ppf "%a; " V.print field
+        | None -> Format.fprintf ppf "?; ")
+      fields;
     Format.fprintf ppf "]"
 
 let phantom_defining_expr_opt ppf defining_expr =

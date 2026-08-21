@@ -537,6 +537,10 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
          my_region_var)
       fun_params
   in
+  (* Residual free variables at [Phantom] mode cannot occur: phantom defining
+     expressions have any references to out-of-scope variables erased when they
+     are flushed (see [To_cmm_env.flush_delayed_lets]). Residual free variables
+     at [Normal] mode indicate a genuine translation bug. *)
   if not (To_cmm_free_vars.is_empty fun_free_vars)
   then
     Misc.fatal_errorf

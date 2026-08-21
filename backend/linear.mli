@@ -39,7 +39,9 @@ type phantom_defining_expr = private
       }
   | Lphantom_block of
       { tag : int;
-        fields : Backend_var.t list
+        fields : Backend_var.t option list
+            (** [None] denotes a field whose value is unavailable (optimised
+                out). *)
       }
   | Lphantom_optimised_out
 
@@ -61,7 +63,7 @@ val lphantom_read_symbol_field :
   sym:Cmm.symbol -> field:int -> phantom_defining_expr
 
 val lphantom_block :
-  tag:int -> fields:Backend_var.t list -> phantom_defining_expr
+  tag:int -> fields:Backend_var.t option list -> phantom_defining_expr
 
 type instruction =
   { mutable desc : instruction_desc;

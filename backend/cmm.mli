@@ -253,7 +253,9 @@ type phantom_defining_expr =
           symbol. *)
   | Cphantom_block of
       { tag : int;
-        fields : Backend_var.t list
+        fields : Backend_var.t option list
+            (** [None] denotes a field whose value is unavailable (optimised
+                out). *)
       }
       (** The phantom-let-bound variable points at a block with the given
           structure. *)
