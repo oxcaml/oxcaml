@@ -20,7 +20,7 @@ end
 
 (* An application, whose instance context is recorded as an equality, and a
    snapshot of a structure that is not a path, whose subject cannot be named
-   and is therefore recorded as an omission.  Together with the ascriptions
+   and is therefore recorded as an omission.  Together with the annotations
    and the interface above they make all four lists of facts non-empty. *)
 module FM = F (M)
 

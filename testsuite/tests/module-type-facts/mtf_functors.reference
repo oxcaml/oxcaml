@@ -17,8 +17,8 @@ dep <Members> -alias-> Members
 equal F(A) = FA
 == an inlined application anchors at a site
 counts: checks 3 deps 6 equalities 0 omissions 0
-check ascription <location> : S
-check ascription M : S.T@site(Site.ml#0)
+check annotation <location> : S
+check annotation M : S.T@site(Site.ml#0)
 check argument <location> : param(F.X)@site(Site.ml#1)
 dep S.T -include-> S.T@site(Site.ml#0)
 dep S -definition-> <#1>

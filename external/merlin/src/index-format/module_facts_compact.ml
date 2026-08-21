@@ -289,13 +289,13 @@ let artifact_of_tag = function
   | tag -> malformed "unknown artifact tag %d" tag
 
 let check_kind_tag : Facts.Check.Kind.t -> int = function
-  | Ascription -> 0
+  | Annotation -> 0
   | Argument -> 1
   | Package -> 2
   | Interface -> 3
 
 let check_kind_of_tag : int -> Facts.Check.Kind.t = function
-  | 0 -> Ascription
+  | 0 -> Annotation
   | 1 -> Argument
   | 2 -> Package
   | 3 -> Interface

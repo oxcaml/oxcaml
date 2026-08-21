@@ -20,7 +20,7 @@ end
 [%%expect{|
 {
  "M"[module] ->
-   {<.41>
+   {<.42>
     "Exn"[extension constructor] -> Record_boxed<.1> { lbl_exn<.0>: int  };
     "Ext"[extension constructor] -> Record_boxed<.7> { lbl_ext<.6>: int  };
     "ext"[type] -> ((? ) : value)<.5>;

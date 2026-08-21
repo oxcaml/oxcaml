@@ -1,15 +1,15 @@
-== an ascription, and the members of an ascribed signature
+== an annotation, and the members of an annotated signature
 counts: checks 3 deps 4 equalities 0 omissions 0
-check ascription M : S
-check ascription Pair.Inner : <Pair.Inner'>
-check ascription Pair : <#1>
+check annotation M : S
+check annotation Pair.Inner : <Pair.Inner'>
+check annotation Pair : <#1>
 dep <M> -interface-> S
 dep <Pair.Inner'> -interface-> S
 dep <#1> -interface-> <Pair.Inner'>
 dep <Pair> -interface-> <#1>
 == aliases, includes, with constraints, module type of, functor types
 counts: checks 1 deps 13 equalities 0 omissions 0
-check ascription M : S
+check annotation M : S
 dep A -alias-> S
 dep W -definition-> <#1>
 dep K -definition-> <#2>
@@ -25,9 +25,9 @@ dep <#4> -typeof-> S
 dep <#4> -typeof-> <M>
 == destructive substitution and strengthening
 counts: checks 3 deps 11 equalities 0 omissions 0
-check ascription M : S
-check ascription M : Base
-check ascription N : K
+check annotation M : S
+check annotation M : Base
+check annotation N : K
 dep T -definition-> <#1>
 dep U -definition-> <#2>
 dep K -definition-> <#3>
