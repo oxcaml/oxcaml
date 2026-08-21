@@ -571,7 +571,11 @@ and expression =
   | Clet of Backend_var.With_provenance.t * expression * expression
   | Cphantom_let of
       Backend_var.With_provenance.t * phantom_defining_expr option * expression
-  | Cname_for_debugger of Backend_var.With_provenance.t * expression
+  | Cname_for_debugger of Backend_var.Provenance.t * expression
+      (** Annotation recording that the wrapped expression's value was bound to
+          the variable described by the provenance, from which instruction
+          selection produces a naming operation. No [Backend_var.t] is involved:
+          the variable itself may no longer be bound anywhere. *)
   | Ctuple of expression list
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
