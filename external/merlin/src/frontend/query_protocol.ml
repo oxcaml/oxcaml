@@ -219,13 +219,13 @@ module Locate_types_result = struct
 end
 
 module Module_type_impls = struct
-  type impl_kind = Whole_unit | Ascription_sites
+  type impl_kind = Whole_unit | Annotation_sites
 
   type impl_site = { impl_loc : Location.t; impl_kind : impl_kind }
 
   type target = Own_interface | Modtype of string
 
-  type check_kind = Ascription | Argument | Package | Interface
+  type check_kind = Annotation | Argument | Package | Interface
 
   type implementation =
     { target : target;

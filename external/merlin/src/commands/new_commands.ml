@@ -148,9 +148,9 @@ let all_commands =
          'file'       : string,\n\
          'start'      : position,\n\
          'end'        : position,\n\
-         'kind'       : 'unit' | 'ascriptions',\n\
+         'kind'       : 'unit' | 'annotations',\n\
          // 'check' is omitted for the '(interface)' target\n\
-         'check'      : 'ascription' | 'argument' | 'package' | 'interface',\n\
+         'check'      : 'annotation' | 'argument' | 'package' | 'interface',\n\
          // 'check-site' is omitted when the check has no recorded site\n\
          'check-site' : { 'file', 'start', 'end' }\n\
          }\n\
