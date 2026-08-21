@@ -276,9 +276,9 @@ module type Bad = sig
   val bad : 'a @ 'm 'n -> unit @ 'k
 end
 [%%expect{|
-Line 276, characters 17-19:
-276 |   val bad : 'a @ 'm 'n -> unit @ 'k
-                       ^^
+Line 2, characters 17-19:
+2 |   val bad : 'a @ 'm 'n -> unit @ 'k
+                     ^^
 Error: A mode annotation must be a single mode variable or a single bounds annotation.
 |}]
 
@@ -298,8 +298,8 @@ module type Bad = sig
   val bad : 'a @ [< 'm & portable nonportable] -> 'a @ [> 'm]
 end
 [%%expect{|
-Line 298, characters 34-45:
-298 |   val bad : 'a @ [< 'm & portable nonportable] -> 'a @ [> 'm]
-                                        ^^^^^^^^^^^
+Line 2, characters 34-45:
+2 |   val bad : 'a @ [< 'm & portable nonportable] -> 'a @ [> 'm]
+                                      ^^^^^^^^^^^
 Error: The portability axis has already been specified.
 |}]
