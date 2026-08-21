@@ -1657,10 +1657,19 @@ val map_apply_arg:
 val label_sort:
   'rep Data_types.record_form -> 'rep Data_types.gen_label_description
   -> 'rep
-  -> [ `Sort of Jkind.sort | `Same_as_record_sort ]
+  -> record_sort:Jkind.sort
+  -> Jkind.sort
 
-(** Computes the sort of a label. Becuase the sepcial case above doesn't apply
-    to unboxed records, this doesn't return an option. *)
+(** Compute a label's sort given its finalized representation (from
+    [Typedecl.finalize_record_representation]) *)
+val finalized_label_sort:
+  Data_types.label_description -> Types.record_representation
+  -> record_sort:Jkind.Sort.Const.t
+  -> variable_sorts:Jkind.Sort.Const.t array option
+  -> Jkind.Sort.Const.t
+
+(** [label_sort] specialized to unboxed records; doesn't need to know the record
+    sort *)
 val unboxed_label_sort :
   Data_types.unboxed_label_description ->
   Types.record_unboxed_product_representation -> Jkind.sort

@@ -123,6 +123,14 @@ val finalize_record_representation:
     Env.t -> Location.t -> Types.record_representation ->
     Types.record_representation
 
+(* As [finalize_record_representation], also returning the fields' (now
+   defaulted) sorts if the representation was variable. [None] means the
+   representation was already final, so the field sorts are on the
+   declaration ([lbl_sort]). *)
+val finalize_record_representation_and_sorts:
+    Env.t -> Location.t -> Types.record_representation ->
+    Types.record_representation * Jkind.Sort.Const.t array option
+
 (* As [finalize_record_representation], for [Constructor_variable]. *)
 val finalize_constructor_representation:
     Env.t -> Location.t -> Types.constructor_representation ->

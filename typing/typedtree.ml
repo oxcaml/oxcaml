@@ -1522,31 +1522,57 @@ let mode_without_locks_exn = function
   | (_, Some _) -> assert false
   | (m, None) -> m
 
-let label_sort (type rep)
-      (record_form : rep record_form)
-      (label : rep gen_label_description) (repres : rep) =
-  match record_form, repres with
-  | Legacy, (Record_unboxed | Record_inlined (_, _, Variant_unboxed)) ->
-    `Same_as_record_sort
-  | Legacy, Record_variable sorts_and_types ->
-    `Sort (fst sorts_and_types.(label.lbl_pos))
-  | Legacy, Record_inlined (_, Constructor_variable sorts_and_types, _) ->
-    `Sort (fst sorts_and_types.(label.lbl_pos))
-  | Unboxed_product, Record_unboxed_product_variable sorts ->
-    `Sort sorts.(label.lbl_pos)
-  | _ ->
+let unboxed_label_sort (label : Data_types.unboxed_label_description)
+      (repres : Types.record_unboxed_product_representation) =
+  match repres with
+  | Record_unboxed_product_variable sorts -> sorts.(label.lbl_pos)
+  | Record_unboxed_product | Record_unboxed_product_undetermined ->
     begin match label.lbl_sort with
-    | Some sort -> `Sort (Jkind.Sort.of_const sort)
+    | Some sort -> Jkind.Sort.of_const sort
     | None ->
       Misc.fatal_errorf
         "no sort for label %s despite non-variable representation"
         label.lbl_name
     end
 
-let unboxed_label_sort label repres =
-  match label_sort Unboxed_product label repres with
-  | `Same_as_record_sort -> assert false
-  | `Sort s -> s
+let label_sort (type rep)
+      (record_form : rep record_form)
+      (label : rep gen_label_description) (repres : rep) ~record_sort =
+  match record_form with
+  | Unboxed_product -> unboxed_label_sort label repres
+  | Legacy ->
+    begin match repres with
+    | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
+    | Record_variable sorts_and_types ->
+      fst sorts_and_types.(label.lbl_pos)
+    | Record_inlined (_, Constructor_variable sorts_and_types, _) ->
+      fst sorts_and_types.(label.lbl_pos)
+    | _ ->
+      begin match label.lbl_sort with
+      | Some sort -> Jkind.Sort.of_const sort
+      | None ->
+        Misc.fatal_errorf
+          "no sort for label %s despite non-variable representation"
+          label.lbl_name
+      end
+    end
+
+let finalized_label_sort (label : Data_types.label_description)
+      (repres : Types.record_representation) ~record_sort ~variable_sorts =
+  match repres with
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
+  | _ ->
+    begin match variable_sorts with
+    | Some sorts -> sorts.(label.lbl_pos)
+    | None ->
+      begin match label.lbl_sort with
+      | Some sort -> sort
+      | None ->
+        Misc.fatal_errorf
+          "no sort for label %s despite finalized representation"
+          label.lbl_name
+      end
+    end
 
 let unboxed_label_all_sorts label repres =
   Array.map (fun lbl -> unboxed_label_sort lbl repres) label.lbl_all

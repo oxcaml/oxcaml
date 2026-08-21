@@ -2561,29 +2561,32 @@ let finalize_typechecked_shape env loc sorts_and_types kind =
          | _ -> false)
       consts
   in
-  if all_scannable then
-    (* Optimization: the other branch would also compute [`Not_mixed] *)
-    `Not_mixed
-  else
-    let ts =
-      Array.to_list sorts_and_types
-      |> List.map (fun (_sort, ty) ->
-           Element_repr.classify env ty (Ctype.type_jkind env ty)
-             ~default_to_scannable:false,
-           ty)
-    in
-    match Element_repr.mixed_product_shape loc ts kind with
-    | Ok shape -> shape
-    | Error (Element_repr.Unrepresentable_element _) ->
-        Misc.fatal_error
-          "Typedecl.finalize_typechecked_shape: unrepresentable element, but \
-           typechecking succeeded"
+  let shape =
+    if all_scannable then
+      (* Optimization: the other branch would also compute [`Not_mixed] *)
+      `Not_mixed
+    else
+      let ts =
+        Array.to_list sorts_and_types
+        |> List.map (fun (_sort, ty) ->
+             Element_repr.classify env ty (Ctype.type_jkind env ty)
+               ~default_to_scannable:false,
+             ty)
+      in
+      match Element_repr.mixed_product_shape loc ts kind with
+      | Ok shape -> shape
+      | Error (Element_repr.Unrepresentable_element _) ->
+          Misc.fatal_error
+            "Typedecl.finalize_typechecked_shape: unrepresentable element, \
+             but typechecking succeeded"
+  in
+  shape, consts
 
 let finalize_typechecked_constructor env loc sorts_and_types kind
     : Types.constructor_representation =
   match finalize_typechecked_shape env loc sorts_and_types kind with
-  | `Not_mixed -> Constructor_uniform_value
-  | `Mixed shape -> Constructor_mixed shape
+  | `Not_mixed, _ -> Constructor_uniform_value
+  | `Mixed shape, _ -> Constructor_mixed shape
 
 let finalize_constructor_representation env loc
     (shape : Types.constructor_representation) =
@@ -2596,25 +2599,39 @@ let finalize_constructor_representation env loc
         "Typedecl.finalize_constructor_representation: representation was \
          not typechecked"
 
-let finalize_record_representation env loc
+let finalize_record_representation_and_sorts env loc
     (repres : Types.record_representation) =
   match repres with
   | Record_variable sorts_and_types ->
-      (match finalize_typechecked_shape env loc sorts_and_types Record with
+      let shape, consts =
+        finalize_typechecked_shape env loc sorts_and_types Record
+      in
+      let repres =
+       match shape with
        | `Not_mixed -> Record_boxed
-       | `Mixed shape -> Record_mixed shape)
+       | `Mixed shape -> Record_mixed shape
+      in
+      repres, Some consts
   | Record_inlined (tag, Constructor_variable sorts_and_types,
                     vrep) ->
-      let shape =
-        finalize_typechecked_constructor env loc sorts_and_types Cstr_record
+      let shape, consts =
+        finalize_typechecked_shape env loc sorts_and_types Cstr_record
       in
-      Record_inlined (tag, shape, vrep)
+      let shape =
+        match shape with
+        | `Not_mixed -> Constructor_uniform_value
+        | `Mixed shape -> Constructor_mixed shape
+      in
+      Record_inlined (tag, shape, vrep), Some consts
   | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
       Misc.fatal_error
         "Typedecl.finalize_record_representation: representation was not \
          typechecked"
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _) -> repres
+    | Record_ufloat | Record_mixed _ | Record_dummy _) -> repres, None
+
+let finalize_record_representation env loc repres =
+  fst (finalize_record_representation_and_sorts env loc repres)
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks

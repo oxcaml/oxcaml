@@ -2571,7 +2571,7 @@ let get_pat_args_record_unboxed_product num_fields p rem =
 
 let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
   let loc = head_loc ~scopes head in
-  let all_labels, unfinalized_repres =
+  let all_labels, repres =
     let open Patterns.Head in
     match head.pat_desc with
     | Record (lbl :: _, rep) -> lbl.lbl_all, rep
@@ -2579,9 +2579,9 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
     | _ ->
         assert false
   in
-  let lbl_repres =
-    Typedecl.finalize_record_representation head.pat_env head.pat_loc
-      unfinalized_repres
+  let lbl_repres, variable_sorts =
+    Typedecl.finalize_record_representation_and_sorts head.pat_env
+      head.pat_loc repres
   in
   let rec make_args pos =
     if pos >= Array.length all_labels then
@@ -2590,11 +2590,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        (* Computed from the unfinalized representation: a variable
-           representation carries the fields' sorts. *)
-        match label_sort Legacy lbl unfinalized_repres with
-        | `Sort s -> Jkind.Sort.default_for_transl_and_get s
-        | `Same_as_record_sort -> sort
+        finalized_label_sort lbl lbl_repres ~record_sort:sort ~variable_sorts
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
