@@ -54,6 +54,8 @@ let add_code ~keep_code code_map t =
 let mark_as_imported t =
   Code_id.Map.map_sharing Code_or_metadata.remember_only_metadata t
 
+let filter t ~f = Code_id.Map.filter (fun code_id _ -> f code_id) t
+
 let merge t1 t2 = Code_id.Map.union_total Code_or_metadata.merge t1 t2
 
 let mem code_id t = Code_id.Map.mem code_id t

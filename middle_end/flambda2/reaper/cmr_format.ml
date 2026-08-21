@@ -19,7 +19,6 @@ type t =
   { unit_metadata : Flambda_unit.Metadata.t;
     final_typing_env : Typing_env.t option;
     all_code : Exported_code.t;
-    imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
@@ -128,20 +127,19 @@ end = struct
       unit_metadata : Flambda_unit.Metadata.t;
       final_typing_env : Typing_env.Serializable.t option;
       all_code : All_code_with_sections.t;
-      imported_offsets : Exported_offsets.t;
       deps : Deps_with_fields.t;
       rebuild_data : Reaper.Staged.Traverse_rebuild.t
     }
 
   let create ~used_value_slots
-      ({ unit_metadata;
-         final_typing_env;
-         all_code;
-         imported_offsets;
-         deps;
-         rebuild_data
-       } :
+      ({ unit_metadata; final_typing_env; all_code; deps; rebuild_data } :
         cmr_format) : t =
+    (* The resuming invocation reads imported code metadata from the
+       dependencies' .cmx files so only this unit's own code needs storing. *)
+    let all_code =
+      Exported_code.filter all_code ~f:(fun code_id ->
+          Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+    in
     let final_typing_env, canonicalise =
       match final_typing_env with
       | None -> None, Fun.id
@@ -182,8 +180,6 @@ end = struct
       unit_metadata;
       final_typing_env;
       all_code;
-      (* Slots not hashconsed so we can store them as is. *)
-      imported_offsets;
       deps = Deps_with_fields.create deps;
       rebuild_data
     }
@@ -195,7 +191,6 @@ end = struct
         unit_metadata;
         final_typing_env;
         all_code;
-        imported_offsets;
         deps;
         rebuild_data
       } : cmr_format =
@@ -227,13 +222,7 @@ end = struct
     let rebuild_data =
       Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming
     in
-    { unit_metadata;
-      final_typing_env;
-      all_code;
-      imported_offsets;
-      deps;
-      rebuild_data
-    }
+    { unit_metadata; final_typing_env; all_code; deps; rebuild_data }
 
   let compilation_unit t = t.original_compilation_unit
 
@@ -244,7 +233,6 @@ end = struct
         unit_metadata = _;
         final_typing_env = _;
         all_code = _;
-        imported_offsets = _;
         deps;
         rebuild_data = _
       } =

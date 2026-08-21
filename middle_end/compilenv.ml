@@ -233,6 +233,13 @@ let get_unit_export_info comp_unit =
       Option.bind infos of_infos
   end
 
+let get_unit_imports comp_unit =
+  let name = CU.to_global_name_without_prefix comp_unit in
+  match Infos_table.find global_infos_table name with
+  | Some ui -> ui.ui_imports_cmx
+  | None -> []
+  | exception Not_found -> []
+
 let which_cmx_file comp_unit =
   CU.which_cmx_file comp_unit ~accessed_by:(CU.get_current_exn ())
 
@@ -365,8 +372,6 @@ let save_resumed_unit_info filename ~paused =
         Import_info.create_normal (Import_info.cu import) ~crc:None)
       paused.ui_imports_cmx
   in
-  (* CR mvellacott: we only use the resulting cmx for linking, not compiling
-     against, so we may be able to be more selective in what we store here. *)
   let info =
     { (* Set by [reset], should equal [paused.ui_unit]. *)
       ui_unit = current_unit.uib_unit;

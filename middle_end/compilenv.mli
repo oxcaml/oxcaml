@@ -50,6 +50,11 @@ val set_lto_participants : Compilation_unit.t list -> unit
            We use this to determine whether to read [.reaped.cmx] files or
            plain [.cmx] files for our dependencies. *)
 
+val get_unit_imports : Compilation_unit.t -> Import_info.t list
+        (* The cmx imports recorded in the given unit's cmx file, if its
+           unit infos have already been loaded via [get_unit_export_info];
+           empty otherwise. *)
+
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
         (* Set the export information for the current unit. *)
 

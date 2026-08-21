@@ -294,6 +294,7 @@ let native unix
        keep_symbol_tables:bool ->
        ltosol_filename:string ->
        cmr_filename:string ->
+       paused_imports_cmx:Import_info.t list ->
        Cmm.phrase list) =
   (module Make (struct
     let backend = Compile_common.Native
@@ -350,19 +351,20 @@ let native unix
           (info : Compile_common.info)
         ->
           let machine_width = Target_system.Machine_width.Sixty_four in
+          let paused_unit_infos, (_ : Digest.t) =
+            Compilenv.read_unit_info
+              (Filename.chop_suffix cmr_file ".cmr" ^ ext_flambda_obj)
+          in
           Asmgen.compile_implementation_from_cmm unix
             ~sourcefile:(Some cmr_file)
             ~prefixname:(Unit_info.prefix info.target)
             ~ppf_dump:info.ppf_dump
             (reaped_flambda2_to_cmm ~machine_width ~keep_symbol_tables
-               ~ltosol_filename:ltosol_file ~cmr_filename:cmr_file);
+               ~ltosol_filename:ltosol_file ~cmr_filename:cmr_file
+               ~paused_imports_cmx:paused_unit_infos.Cmx_format.ui_imports_cmx);
           (* Unlike [compile_implementation] we also create the .reaped.cmx file
              here, using the old .cmx file and data accumulated in
              [Compilenv].*)
-          let paused_unit_infos, (_ : Digest.t) =
-            Compilenv.read_unit_info
-              (Filename.chop_suffix cmr_file ".cmr" ^ ext_flambda_obj)
-          in
           Compilenv.save_resumed_unit_info
             (Unit_info.Artifact.filename
                (Unit_info.artifact info.target ~extension:ext_flambda_obj))

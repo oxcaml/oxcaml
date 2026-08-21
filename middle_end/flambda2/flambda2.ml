@@ -259,7 +259,6 @@ let flambda_to_flambda0 : type m.
                   Flambda_unit.metadata flambda;
                 final_typing_env;
                 all_code;
-                imported_offsets = Exported_offsets.imported_offsets ();
                 deps;
                 rebuild_data
               }
@@ -442,7 +441,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     ltosol_file
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
-    ~keep_symbol_tables ~ltosol_filename ~cmr_filename =
+    ~keep_symbol_tables ~ltosol_filename ~cmr_filename ~paused_imports_cmx =
   let { Flambda2_reaper.Ltosol_format.File_contents.id_stamp_counters;
         participants;
         solution = ltosol_solution
@@ -462,7 +461,6 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
         all_code;
-        imported_offsets;
         deps;
         rebuild_data
       } =
@@ -470,9 +468,32 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
       ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
       cmr_serialisable
   in
-  (* Make the paused compilation's imported offsets available to
-     [Slot_offsets.finalize_offsets]. *)
-  Exported_offsets.import_offsets imported_offsets;
+  (* We need post-rebuild exported offsets, code metadata and value slot usage
+     from our dependencies that participate in LTO. To make sure we get the
+     right version, we load all our transitive dependencies eagerly before
+     resuming compilation.
+
+     CR mvellacott: For performance, we should look at alternatives to eagerly
+     loading everything. *)
+  let () =
+    let rec load_transitively loaded imports =
+      List.fold_left
+        (fun loaded import ->
+          let comp_unit = Import_info.cu import in
+          if Compilation_unit.Set.mem comp_unit loaded
+          then loaded
+          else
+            let loaded = Compilation_unit.Set.add comp_unit loaded in
+            let (_ : Flambda2_types.Typing_env.Serializable.t option) =
+              Flambda_cmx.load_cmx_file_contents cmx_loader comp_unit
+            in
+            load_transitively loaded (Compilenv.get_unit_imports comp_unit))
+        loaded imports
+    in
+    ignore
+      (load_transitively Compilation_unit.Set.empty paused_imports_cmx
+        : Compilation_unit.Set.t)
+  in
   (* CR mvellacott: use this solution instead of solving again. *)
   let (_solved_dep : Flambda2_reaper.Unboxing_analysis.result) =
     Flambda2_reaper.Ltosol_format.Serialisable_solution.deserialise

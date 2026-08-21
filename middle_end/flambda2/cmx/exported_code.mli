@@ -33,6 +33,8 @@ val add_code : keep_code:(Code_id.t -> bool) -> Code.t Code_id.Map.t -> t -> t
 
 val mark_as_imported : t -> t
 
+val filter : t -> f:(Code_id.t -> bool) -> t
+
 val merge : t -> t -> t
 
 val mem : Code_id.t -> t -> bool
