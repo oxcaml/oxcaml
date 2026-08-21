@@ -62,11 +62,6 @@ module type Sort = sig
       | Product of t list
       | Univar of univar
       | Genvar of var
-          (** A layout variable bound by a surrounding [val_lpoly]. It's a
-              "fake" constant that will be instantiated to real layout constant
-              by slambda. The [var] is used only for physical identity; its
-              contents are not consumed and its level must be
-              [Ident.highest_scope]. *)
 
     val equal : t -> t -> bool
 
@@ -247,16 +242,13 @@ module type Sort = sig
 
   val undo_change : change -> unit
 
-  (** Create a fresh polymorphic sort variable (level = [Ident.highest_scope]).
-  *)
+  (** Create a generic sort variable. *)
   val new_genvar : unit -> var
 
-  (** Create a polymorphic sort variable (level = [Ident.highest_scope]),
-      intended for saving to a cmi. *)
+  (** Create a generic sort variable for saving to a cmi. *)
   val new_genvar_for_cmi : unit -> var
 
-  (** Returns [true] iff the variable was created by {!new_genvar} or
-      {!new_genvar_for_cmi}. *)
+  (** Checks the variable is a generic sort variable. *)
   val is_genvar : var -> bool
 
   val reset_cmi_sort_id : unit -> unit
@@ -297,7 +289,7 @@ module type Sort = sig
   val generalize_with : (unit -> 'a) -> 'a * var list
 
   (** Generalize sort variables when in sort generalization context. Sets the
-      level of sort variables to Ident.highest_scope and accumulates them. This
+      level of sort variables to [generic_level] and accumulates them. This
       should be called from Ctype.generalize. Only has an effect when called
       within {!generalize_with}. *)
   val generalize : current_level:int -> t -> unit

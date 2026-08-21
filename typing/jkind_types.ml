@@ -743,41 +743,41 @@ module Sort = struct
     | Base _ | Univar _ -> t
     | Product ts -> Product (List.map (subst s) ts)
 
-  (* Sort generalization context for let poly_ *)
-  let in_sort_generalization_context : var list ref option ref = ref None
+  (** List of variables generalized so far during a call to [generalize_with],
+      [None] otherwise. *)
+  let generalized : var list ref option ref = ref None
 
-  (* Generalize sort variables when in sort generalization context.
-     This is called from Ctype.generalize when processing let poly_ bindings.
-     For each free sort variable, the level is set to Ident.highest_scope,
-     making it a generic sort variable (genvar), and the var is accumulated. *)
-  let rec generalize_rec ~current_level ~vars_ref sort =
-    match sort with
-    | Var v ->
-      assert (Option.is_none v.contents);
-      if v.level > current_level && v.level <> Ident.highest_scope
-      then begin
-        v.level <- Ident.highest_scope;
-        vars_ref := v :: !vars_ref
-      end
-    | Product sorts -> List.iter (generalize_rec ~current_level ~vars_ref) sorts
-    | Base _ | Univar _ -> ()
-
+  (** All free sort variables above the [current_level] are generalized: their
+      level is set to [generic_level]. *)
   let generalize ~current_level sort =
-    match !in_sort_generalization_context with
+    match !generalized with
     | None -> () (* Not in generalization context *)
-    | Some vars_ref -> generalize_rec ~current_level ~vars_ref (get sort)
+    | Some vars_ref ->
+      let rec loop sort =
+        match sort with
+        | Var v ->
+          assert (Option.is_none v.contents);
+          if v.level > current_level && v.level <> generic_level
+          then begin
+            v.level <- generic_level;
+            vars_ref := v :: !vars_ref
+          end
+        | Product sorts -> List.iter loop sorts
+        | Base _ | Univar _ -> ()
+      in
+      loop (get sort)
 
-  (* Wrapper to run a function in sort generalization context. Returns the
-     result of [f] and the vars generalized during [f]. *)
+  (** Calls [f] with sort variable generalization enabled, returning its result
+      and sort variables generalized during the call. *)
   let generalize_with f =
     let vars_ref = ref [] in
-    let old_context = !in_sort_generalization_context in
-    in_sort_generalization_context := Some vars_ref;
-    let result =
-      Misc.try_finally f ~always:(fun () ->
-          in_sort_generalization_context := old_context)
-    in
-    result, List.rev !vars_ref
+    match !generalized with
+    | None ->
+      generalized := Some vars_ref;
+      let result = Misc.try_finally f ~always:(fun () -> generalized := None) in
+      result, List.rev !vars_ref
+    | Some _ ->
+      Misc.fatal_error "Jkind_types.generalize_with: nested generalize"
 
   let rec default_to_scannable_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
