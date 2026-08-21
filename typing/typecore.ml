@@ -11608,12 +11608,12 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           Lpoly.generalize
             ~on_determined:(fun () -> generalize ty)
             ~on_to_generalize:(fun loc ->
-              let _, univars =
+              let (), genvars =
                 Jkind_types.Sort.generalize_with (fun () -> generalize ty)
               in
-              if List.is_empty univars then
+              if List.is_empty genvars then
                 raise (Error (loc, env, Useless_lpoly));
-              univars)
+              genvars)
             pv_lpoly)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
         pvs;
