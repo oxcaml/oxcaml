@@ -1117,6 +1117,11 @@ let rec log2 n =
 let rec log2_nativeint n =
   if n <= 1n then 0 else 1 + log2_nativeint (Nativeint.shift_right n 1)
 
+let rec count_leading_zeroes_nativeint n =
+  if n = 0n
+  then Nativeint.size
+  else count_leading_zeroes_nativeint (Nativeint.shift_right_logical n 1) - 1
+
 let power ~base n =
   let res = ref 1 in
   for _ = 1 to n do
