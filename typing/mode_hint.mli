@@ -102,6 +102,11 @@ type is_contained_by =
     container : pinpoint
   }
 
+type annotation =
+  { display_loc : Location.t;
+    written_modes : string Location.loc list
+  }
+
 (* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
 the RHS". They are similiar to the [Skip] morph hint and should raise when being
 printed. *)
@@ -135,12 +140,25 @@ type 'd const =
   | Quoted_computation : ('l * disallowed) pos const
   | Spliced : ('l * 'r, 'd) polarity -> 'd const
   | Contained_by : is_contained_by -> ('l * 'r) const
+  | Annotation : annotation -> ('l * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
 type closure_details =
   { closure : pinpoint;
     closed : pinpoint
+  }
+
+type argument_label =
+  | Unlabelled
+  | Labelled of string
+  | Optional of string
+  | Position of string
+
+type function_argument =
+  { callee : pinpoint;
+    label : argument_label;
+    index_in_callee_arrow_type : int
   }
 
 type allocation_desc =
@@ -191,6 +209,7 @@ type 'd morph =
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph
+  | Function_argument : function_argument -> ('l * 'r) morph
     (* CR-someday zqian: add [Tail_of_region] which connects the mode of region
        to the mode of the region's tail *)
   constraint 'd = _ * _
