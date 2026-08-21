@@ -77,7 +77,7 @@ end
 module Check : sig
   module Kind : sig
     type t =
-      | Ascription
+      | Annotation
       | Argument
       | Package
       | Interface
