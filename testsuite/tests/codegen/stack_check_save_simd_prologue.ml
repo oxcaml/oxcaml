@@ -33,7 +33,7 @@ f:
   cmpq  $1, %rdi
   jne   .L6
   pushq %r10
-  leaq  -384(%rsp), %r10
+  leaq  -368(%rsp), %r10
   cmpq  40(%r14), %r10
   popq  %r10
   jb    .L11
