@@ -20,7 +20,8 @@ type unit_u : void mod everything
 type unit_u : void mod everything
 |}]
 
-(* Variants whose constructor arguments are all void are immediates *)
+(* Variants whose all-void constructors carry
+   [@immediate_all_void_constructor] are immediates *)
 
 type v : immediate = A of unit_u [@immediate_all_void_constructor]
 [%%expect{|
@@ -310,8 +311,8 @@ Line 1, characters 29-30:
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
-(* [@immediate_all_void_constructor] is required on constructors whose arguments
-   are all void, and optional elsewhere. *)
+(* [@immediate_all_void_constructor] makes a constructor whose arguments are
+   all void an immediate; without it, such a constructor is a block. *)
 
 type t = A of unit_u [@immediate_all_void_constructor]
 [%%expect{|
@@ -341,35 +342,23 @@ module type S =
   sig type t = A of unit_u [@immediate_all_void_constructor] end
 |}]
 
-(* Missing attribute *)
+(* Without the attribute *)
 
 type t = A of unit_u
 [%%expect{|
-Line 1, characters 9-20:
-1 | type t = A of unit_u
-             ^^^^^^^^^^^
-Error: All arguments of the constructor "A" are void, so it must be
-       annotated with "[@immediate_all_void_constructor]".
+type t = A of unit_u
 |}]
 
 type t = A of #(unit_u * unit_u) | B of int
 [%%expect{|
-Line 1, characters 9-32:
-1 | type t = A of #(unit_u * unit_u) | B of int
-             ^^^^^^^^^^^^^^^^^^^^^^^
-Error: All arguments of the constructor "A" are void, so it must be
-       annotated with "[@immediate_all_void_constructor]".
+type t = A of #(unit_u * unit_u) | B of int
 |}]
 
 module type S = sig
   type t = A of unit_u
 end
 [%%expect{|
-Line 2, characters 11-22:
-2 |   type t = A of unit_u
-               ^^^^^^^^^^^
-Error: All arguments of the constructor "A" are void, so it must be
-       annotated with "[@immediate_all_void_constructor]".
+module type S = sig type t = A of unit_u end
 |}]
 
 (* A misplaced attribute is a warning, not an error, so the type is still

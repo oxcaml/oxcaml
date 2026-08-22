@@ -811,7 +811,7 @@ let constructor_of_extension_constructor
     ocstr_name = ext.oext_name;
     ocstr_args = ext.oext_args;
     ocstr_return_type = ext.oext_ret_type;
-    ocstr_all_void = false;
+    ocstr_immediate_all_void = false;
   }
 
 let rec print_out_module_type ppf = function
@@ -1065,7 +1065,7 @@ and print_out_constr ppf constr =
     ocstr_name = name;
     ocstr_args = tyl;
     ocstr_return_type = return_type;
-    ocstr_all_void;
+    ocstr_immediate_all_void;
   } = constr in
   let name =
     match name with
@@ -1073,7 +1073,7 @@ and print_out_constr ppf constr =
     | s -> s
   in
   let print_all_void ppf =
-    if ocstr_all_void
+    if ocstr_immediate_all_void
     then pp_print_string ppf " [@immediate_all_void_constructor]"
   in
   match return_type with

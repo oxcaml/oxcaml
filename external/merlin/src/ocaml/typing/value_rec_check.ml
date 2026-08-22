@@ -800,6 +800,7 @@ let rec expression : Typedtree.expression -> term_judg =
                  | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
                  | Void | Product _ ->
                    Dereference)
+            | Constructor_immediate_all_void -> Dereference
             | Constructor_variable ->
                 Misc.fatal_error
                   "value_rec_check: variable constructor representation")
@@ -833,6 +834,9 @@ let rec expression : Typedtree.expression -> term_judg =
                Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
+          | Record_inlined (_, Constructor_immediate_all_void, _) ->
+            Misc.fatal_error
+              "value_rec_check: unexpected immediate representation"
           | Record_inlined (_, Constructor_variable, _)
           | Record_variable ->
             Misc.fatal_error

@@ -1461,6 +1461,8 @@ let check_atomic_loc ~loc ~env record_repres label lid =
       raise (Error (loc, env, Mixed_record_atomic_loc lid))
   (* We should know constructor representation at this point. *)
   | Record_inlined (_, Constructor_variable, _)
+  (* Inline records are never immediate. *)
+  | Record_inlined (_, Constructor_immediate_all_void, _)
   (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
   | Record_unboxed
   (* [@atomic] fields disable float record optimization. *)
@@ -3255,7 +3257,9 @@ type unrepresentable_arg =
 let representation_for_tuple_constructor env constr ty_args ~loc ~types
       ~containing_type ~why : _ Result.t =
   match constr.cstr_shape with
-  | (Constructor_uniform_value | Constructor_mixed _) as shape ->
+  | (Constructor_uniform_value | Constructor_mixed _
+    | Constructor_immediate_all_void)
+    as shape ->
       begin match
         Misc.Stdlib.List.map_option
           (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
