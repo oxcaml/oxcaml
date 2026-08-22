@@ -78,7 +78,7 @@ module IR = struct
       ghost_region : Ident.t option;
       alloc_region : Ident.t;
       args_arity : [`Complex] Flambda_arity.t;
-      return_arity : [`Unarized] Flambda_arity.t
+      return_arity : [`Complex] Flambda_arity.t
     }
 
   type switch =
@@ -797,7 +797,7 @@ module Function_decls = struct
         params : param list;
         removed_params : Ident.Set.t;
         params_arity : [`Complex] Flambda_arity.t;
-        return : [`Unarized] Flambda_arity.t;
+        return : [`Complex] Flambda_arity.t;
         calling_convention : calling_convention;
         return_continuation : Continuation.t;
         exn_continuation : IR.exn_continuation;

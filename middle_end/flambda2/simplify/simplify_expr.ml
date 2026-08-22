@@ -68,7 +68,8 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
             (UE.create
                (DA.are_rebuilding_terms dacc)
                ~machine_width:(DE.machine_width (DA.denv dacc)))
-            return_continuation return_arity
+            return_continuation
+            (Flambda_arity.unarize_t return_arity)
         in
         let uenv =
           UE.add_function_return_or_exn_continuation uenv exn_continuation

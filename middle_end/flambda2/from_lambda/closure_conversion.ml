@@ -2222,7 +2222,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
       let boxed_variable = Variable.create "boxed_result" K.value in
       let boxed_variable_duid = Flambda_debug_uid.none in
       let return =
-        match Flambda_arity.unarized_components return with
+        match Flambda_arity.unarize return with
         | [return] -> return
         | [] | _ :: _ :: _ ->
           Misc.fatal_error
@@ -2445,7 +2445,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
                in
                let var_duid = Flambda_debug_uid.none in
                Bound_parameter.create var kind var_duid)
-             (Flambda_arity.unarized_components result_arity_main_code))
+             (Flambda_arity.unarize result_arity_main_code))
       in
       let handler, free_names_of_handler =
         let boxed_return = Variable.create "boxed_return" K.value in
@@ -3615,7 +3615,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
             in
             let result_var_duid = Flambda_debug_uid.none in
             BP.create result_var kind result_var_duid)
-          (Flambda_arity.unarized_components apply.return_arity)
+          (Flambda_arity.unarize apply.return_arity)
       in
       let handler acc =
         let acc, call_return_continuation =
@@ -3693,7 +3693,7 @@ type call_args_split =
         provided_arity : [`Complex] Flambda_arity.t;
         missing_arity : [`Complex] Flambda_arity.t;
         missing_param_modes : Alloc_mode.For_types.t list;
-        result_arity : [`Unarized] Flambda_arity.t
+        result_arity : [`Complex] Flambda_arity.t
       }
   | Over_app of
       { full : IR.simple list;

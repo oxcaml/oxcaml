@@ -43,7 +43,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
         Variable.create
           (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
           (KS.kind kind))
-      (Flambda_arity.unarized_components (Code.result_arity code))
+      (Flambda_arity.unarize (Code.result_arity code))
   in
   let exn = Variable.create "function_exn" K.value in
   let my_closure = Variable.create "my_closure" K.value in
@@ -749,9 +749,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   in
   Acc.continuation_info acc return_continuation ~is_exn_handler:false
     ~params:return
-    ~arity:
-      (Flambda_arity.unarized_components
-         (Code_metadata.result_arity code_metadata));
+    ~arity:(Flambda_arity.unarize (Code_metadata.result_arity code_metadata));
   Acc.continuation_info acc exn_continuation ~is_exn_handler:true ~params:[exn]
     ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;

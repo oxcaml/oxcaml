@@ -554,7 +554,7 @@ let check_arity arity args =
   Flambda_arity.cardinal_unarized arity = List.length args
 
 let extended_machtype_of_return_arity arity =
-  match Flambda_arity.unarized_components arity with
+  match Flambda_arity.unarize arity with
   | [] ->
     (* Functions that never return have arity 0. In that case, we use the most
        restrictive machtype to ensure that the return value of the function is

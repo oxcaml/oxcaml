@@ -23,7 +23,7 @@ type t =
     (* Note: first_complex_local_param cannot be computed from param_modes,
        because it might be 0 if the closure itself has to be allocated locally,
        for instance as a result of a partial application. *)
-    result_arity : [`Unarized] Flambda_arity.t;
+    result_arity : [`Complex] Flambda_arity.t;
     result_types : Result_types.t Or_unknown_or_bottom.t;
     result_mode : Lambda.return_mode;
     stub : bool;
@@ -143,7 +143,7 @@ type 'a create_type =
   params_arity:[`Complex] Flambda_arity.t ->
   param_modes:Alloc_mode.For_types.t list ->
   first_complex_local_param:First_complex_local_param.t ->
-  result_arity:[`Unarized] Flambda_arity.t ->
+  result_arity:[`Complex] Flambda_arity.t ->
   result_types:Result_types.t Or_unknown_or_bottom.t ->
   result_mode:Lambda.return_mode ->
   stub:bool ->

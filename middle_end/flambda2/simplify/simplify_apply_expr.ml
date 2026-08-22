@@ -207,7 +207,9 @@ let rebuild_non_inlined_direct_full_application apply ~use_id ~exn_cont_use_id
    * in *)
   let apply = if erase_callee then Apply.erase_callee apply else apply in
   let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id result_arity apply
+    EB.rewrite_fixed_arity_apply uacc ~use_id
+      (Flambda_arity.unarize_t result_arity)
+      apply
   in
   after_rebuild expr uacc
 
@@ -346,9 +348,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
                          arg))
                   denv params args
               in
-              let result_arity =
-                Flambda_arity.unarized_components result_arity
-              in
+              let result_arity = Flambda_arity.unarize result_arity in
               let denv =
                 List.fold_left2
                   (fun denv kind result ->
@@ -873,7 +873,9 @@ let rebuild_function_call_where_callee's_type_unavailable apply ~use_id
          Unused_because_function_unknown)
   in
   let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
+    EB.rewrite_fixed_arity_apply uacc ~use_id
+      (Flambda_arity.unarize_t (Apply.return_arity apply))
+      apply
   in
   after_rebuild expr uacc
 
@@ -1264,7 +1266,9 @@ let rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id uacc
       apply
   in
   let uacc, expr =
-    EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
+    EB.rewrite_fixed_arity_apply uacc ~use_id
+      (Flambda_arity.unarize_t (Apply.return_arity apply))
+      apply
   in
   after_rebuild expr uacc
 

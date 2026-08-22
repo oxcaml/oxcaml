@@ -140,7 +140,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
         cmm
   in
   let wrap return_values =
-    let kinds = Flambda_arity.unarized_components return_arity in
+    let kinds = Flambda_arity.unarize return_arity in
     (* As per the comment above, [return_arity] does not mention void
        components. (Unlike parameter arities; see the phantom type parameters on
        the arity fields in [Apply_expr.t], for example.) *)
@@ -1088,7 +1088,7 @@ and apply_expr env res apply =
     | Return { param_types } ->
       (* Case 1 *)
       let apply_result_arity =
-        Flambda_arity.unarized_components (Apply.return_arity apply)
+        Flambda_arity.unarize (Apply.return_arity apply)
       in
       if List.compare_lengths apply_result_arity param_types = 0
       then
