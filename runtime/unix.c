@@ -89,6 +89,104 @@
 #define EWOULDBLOCK (-1)
 #endif
 
+#ifdef CAML_BARE_METAL
+
+Caml_inline int is_std_fd(int fd)
+{
+  return fd >= 0 && fd <= 2;
+}
+
+int caml_read_fd(int fd, int flags, void * buf, int n)
+{
+  (void)flags;
+  if (is_std_fd(fd))
+    return read(fd, buf, n);
+  else {
+    errno = ENOSYS;
+    return -1;
+  }
+}
+
+int caml_write_fd(int fd, int flags, void * buf, int n)
+{
+  (void)flags;
+  if (is_std_fd(fd))
+    return write(fd, buf, n);
+  else {
+    errno = ENOSYS;
+    return -1;
+  }
+}
+
+char *caml_secure_getenv (char const *var)
+{
+  (void)var;
+  return NULL;
+}
+
+
+/* No wall clock on bare metal: print seconds since the origin of
+   [caml_bare_metal_time_ns] (e.g. boot) instead of a calendar date. */
+int caml_format_timestamp(char* buf, size_t sz, int formatted)
+{
+  uint64_t ns = caml_bare_metal_time_ns();
+  ARCH_UINT64_TYPE sec = (ARCH_UINT64_TYPE)(ns / 1000000000);
+  unsigned usec = (unsigned)((ns % 1000000000) / 1000);
+  if (formatted) {
+    return snprintf(buf, sz, "[%" ARCH_INT64_PRINTF_FORMAT "u.%06u] ",
+                    sec, usec);
+  } else {
+    return snprintf(buf, sz, "%" ARCH_INT64_PRINTF_FORMAT "u.%06u ",
+                    sec, usec);
+  }
+}
+
+void caml_init_os_params(void)
+{
+  caml_plat_pagesize = Page_size;
+  caml_plat_mmap_alignment = Page_size;
+  caml_plat_hugepagesize = 0;
+}
+
+/* Malloc-backed "memory mapping".  Two differences from anonymous mmap
+   to be aware of:
+   - the memory is *not* zeroed (the runtime's current callers do not
+     rely on fresh mappings being zeroed - debug builds even poison
+     committed memory - but new callers must not assume otherwise);
+   - there is no reserve-vs-commit distinction, so reservations are
+     physically allocated up front. */
+void *caml_plat_mem_map(uintnat size, uintnat flags, const char* name)
+{
+  (void)flags;
+  (void)name;
+  uintnat alignment = caml_plat_mmap_alignment;
+  uintptr_t raw, aligned;
+  void **slot;
+  if (alignment < sizeof(void *)) alignment = sizeof(void *);
+  raw = (uintptr_t)malloc(size + alignment - 1 + sizeof(void *));
+  if (raw == 0) return NULL;
+  aligned = (raw + sizeof(void *) + alignment - 1) & ~(alignment - 1);
+  slot = (void **)aligned;
+  slot[-1] = (void *)raw;
+  return (void *)aligned;
+}
+
+void caml_plat_mem_unmap(void* mem, uintnat size)
+{
+  (void)size;
+  if (mem != NULL) free(((void **)mem)[-1]);
+}
+
+/* Monotonic nanosecond counter used by the runtime-events producer. The
+   platform already has to supply caml_bare_metal_time_ns, so reuse it rather
+   than requiring a second clock. */
+uint64_t caml_time_counter(void)
+{
+  return caml_bare_metal_time_ns();
+}
+
+#else /* !CAML_BARE_METAL */
+
 int caml_read_fd(int fd, int flags, void * buf, int n)
 {
   int retcode;
@@ -233,103 +331,6 @@ caml_stat_string caml_search_dll_in_path(struct ext_table * path,
   return res;
 }
 
-#ifdef WITH_DYNAMIC_LINKING
-#ifdef __CYGWIN__
-/* Use flexdll */
-
-void * caml_dlopen(char * libname, int global)
-{
-  int flags = (global ? FLEXDLL_RTLD_GLOBAL : 0);
-  return flexdll_dlopen(libname, flags);
-}
-
-void caml_dlclose(void * handle)
-{
-  flexdll_dlclose(handle);
-}
-
-void * caml_dlsym(void * handle, const char * name)
-{
-  return flexdll_dlsym(handle, name);
-}
-
-void * caml_globalsym(const char * name)
-{
-  return flexdll_dlsym(flexdll_dlopen(NULL,0), name);
-}
-
-char * caml_dlerror(void)
-{
-  return flexdll_dlerror();
-}
-
-#else /* ! __CYGWIN__ */
-/* Use normal dlopen */
-
-#ifndef RTLD_GLOBAL
-#define RTLD_GLOBAL 0
-#endif
-#ifndef RTLD_LOCAL
-#define RTLD_LOCAL 0
-#endif
-
-void * caml_dlopen(char * libname, int global)
-{
-  return dlopen(libname, RTLD_NOW | (global ? RTLD_GLOBAL : RTLD_LOCAL));
-}
-
-void caml_dlclose(void * handle)
-{
-  dlclose(handle);
-}
-
-void * caml_dlsym(void * handle, const char * name)
-{
-  return dlsym(handle, name);
-}
-
-void * caml_globalsym(const char * name)
-{
-#ifdef RTLD_DEFAULT
-  return caml_dlsym(RTLD_DEFAULT, name);
-#else
-  return NULL;
-#endif
-}
-
-char * caml_dlerror(void)
-{
-  return (char*) dlerror();
-}
-
-#endif /* __CYGWIN__ */
-#else
-
-void * caml_dlopen(char * libname, int global)
-{
-  return NULL;
-}
-
-void caml_dlclose(void * handle)
-{
-}
-
-void * caml_dlsym(void * handle, const char * name)
-{
-  return NULL;
-}
-
-void * caml_globalsym(const char * name)
-{
-  return NULL;
-}
-
-char * caml_dlerror(void)
-{
-  return "dynamic loading not supported on this platform";
-}
-
-#endif /* WITH_DYNAMIC_LINKING */
 
 /* Add to [contents] the (short) names of the files contained in
    the directory named [dirname].  No entries are added for [.] and [..].
@@ -686,3 +687,103 @@ void caml_plat_mem_unmap(void* mem, uintnat size)
     CAMLassert(0);
 #endif
 }
+
+#endif /* CAML_BARE_METAL */
+
+#ifdef WITH_DYNAMIC_LINKING
+#ifdef __CYGWIN__
+/* Use flexdll */
+
+void * caml_dlopen(char * libname, int global)
+{
+  int flags = (global ? FLEXDLL_RTLD_GLOBAL : 0);
+  return flexdll_dlopen(libname, flags);
+}
+
+void caml_dlclose(void * handle)
+{
+  flexdll_dlclose(handle);
+}
+
+void * caml_dlsym(void * handle, const char * name)
+{
+  return flexdll_dlsym(handle, name);
+}
+
+void * caml_globalsym(const char * name)
+{
+  return flexdll_dlsym(flexdll_dlopen(NULL,0), name);
+}
+
+char * caml_dlerror(void)
+{
+  return flexdll_dlerror();
+}
+
+#else /* ! __CYGWIN__ */
+/* Use normal dlopen */
+
+#ifndef RTLD_GLOBAL
+#define RTLD_GLOBAL 0
+#endif
+#ifndef RTLD_LOCAL
+#define RTLD_LOCAL 0
+#endif
+
+void * caml_dlopen(char * libname, int global)
+{
+  return dlopen(libname, RTLD_NOW | (global ? RTLD_GLOBAL : RTLD_LOCAL));
+}
+
+void caml_dlclose(void * handle)
+{
+  dlclose(handle);
+}
+
+void * caml_dlsym(void * handle, const char * name)
+{
+  return dlsym(handle, name);
+}
+
+void * caml_globalsym(const char * name)
+{
+#ifdef RTLD_DEFAULT
+  return caml_dlsym(RTLD_DEFAULT, name);
+#else
+  return NULL;
+#endif
+}
+
+char * caml_dlerror(void)
+{
+  return (char*) dlerror();
+}
+
+#endif /* __CYGWIN__ */
+#else
+
+void * caml_dlopen(char * libname, int global)
+{
+  return NULL;
+}
+
+void caml_dlclose(void * handle)
+{
+}
+
+void * caml_dlsym(void * handle, const char * name)
+{
+  return NULL;
+}
+
+void * caml_globalsym(const char * name)
+{
+  return NULL;
+}
+
+char * caml_dlerror(void)
+{
+  return "dynamic loading not supported on this platform";
+}
+
+#endif /* WITH_DYNAMIC_LINKING */
