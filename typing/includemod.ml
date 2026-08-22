@@ -782,7 +782,7 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             let open Mode in
             let param_yielding =
               match (param2 : Subst.Lazy.functor_parameter) with
-              | Named (_, _, mm) ->
+              | Named (_, _, _, mm) ->
                 [Yielding.disallow_right (Alloc.proj_comonadic Yielding mm)]
               | Unit -> []
             in
@@ -864,7 +864,7 @@ and functor_param ~core ~direction ~loc env subst param1 param2 =
   match param1, param2 with
   | Unit, Unit ->
       Ok Tcoerce_none, env, subst
-  | Named (name1, arg1, marg1), Named (name2, arg2, marg2) ->
+  | Named (name1, arg1, _, marg1), Named (name2, arg2, _, marg2) ->
       let arg2' = Subst.Lazy.modtype Keep subst arg2 in
       let marg1 = Mode.alloc_as_value marg1 in
       let marg2 = Mode.alloc_as_value marg2 in
@@ -1409,7 +1409,7 @@ module Functor_inclusion_diff = struct
   module Diff = Diffing.Define(Defs)
 
   let param_name = function
-      | Named(x,_,_) -> x
+      | Named (x, _, _, _) -> x
       | Unit -> None
 
   let weight: Diff.change -> _ = function
@@ -1458,13 +1458,14 @@ module Functor_inclusion_diff = struct
 
   let rec update (d:Diff.change) st =
     match d with
-    | Insert (Unit | Named (None,_,_))
-    | Delete (Unit | Named (None,_,_))
+    | Insert (Unit | Named (None,_,_,_))
+    | Delete (Unit | Named (None,_,_,_))
     | Keep (Unit,_,_)
     | Keep (_,Unit,_) ->
         (* No named abstract parameters: we keep the same environment *)
         st, [||]
-    | Insert (Named (Some id, arg, _)) | Delete (Named (Some id, arg, _)) ->
+    | Insert (Named (Some id, arg, _, _))
+    | Delete (Named (Some id, arg, _, _)) ->
         (* one named parameter to bind *)
         st |> bind id arg |> expand_params
     | Change (delete, insert, _) ->
@@ -1472,7 +1473,7 @@ module Functor_inclusion_diff = struct
            to the environment without equating them. *)
         let st, _expansion = update (Diffing.Delete delete) st in
         update (Diffing.Insert insert) st
-    | Keep (Named (name1, _, _), Named (name2, arg2, _), _) ->
+    | Keep (Named (name1, _, _, _), Named (name2, arg2, _, _), _) ->
         let arg2 = Subst.Lazy.of_modtype arg2 in
         let arg = Subst.Lazy.modtype Keep st.subst arg2 in
         let env, subst =
@@ -1540,15 +1541,15 @@ module Functor_app_diff = struct
   let update (d: Diff.change) (st:Defs.state) =
     let open Error in
     match d with
-    | Insert (Unit|Named(None,_,_))
+    | Insert (Unit|Named(None,_,_,_))
     | Delete _ (* delete is a concrete argument, not an abstract parameter*)
     | Keep ((Unit,_,_),_,_) (* Keep(Unit,_) implies Keep(Unit,Unit) *)
-    | Keep (_,(Unit|Named(None,_,_)),_)
-    | Change (_,(Unit|Named (None,_,_)), _ ) ->
+    | Keep (_,(Unit|Named(None,_,_,_)),_)
+    | Change (_,(Unit|Named (None,_,_,_)), _ ) ->
         (* no abstract parameters to add, nor any equations *)
         st, [||]
-    | Insert(Named(Some param, param_ty, _))
-    | Change(_, Named(Some param, param_ty, _), _ ) ->
+    | Insert(Named(Some param, param_ty, _, _))
+    | Change(_, Named(Some param, param_ty, _, _), _ ) ->
         (* Change is Delete + Insert: we add the Inserted parameter to the
            environment to track equalities with external components that the
            parameter might add. *)
@@ -1556,7 +1557,7 @@ module Functor_app_diff = struct
         let env = Env.add_module ~arg:true param Mp_present mty st.env in
         I.expand_params { st with env }
     | Keep ((Named arg,  _mty, _mode),
-      Named (Some param, _param, _param_m), _) ->
+      Named (Some param, _param, _, _param_m), _) ->
         let res =
           Option.map (fun res ->
               let scope = Ctype.create_scope () in
@@ -1568,7 +1569,7 @@ module Functor_app_diff = struct
         let subst = Subst.add_module param arg st.subst in
         I.expand_params { st with subst; res }
     | Keep (((Anonymous|Empty_struct), mty, (mode, _locks)),
-            Named (Some param, _param, _param_m), _) ->
+            Named (Some param, _param, _, _param_m), _) ->
         let mty' = Subst.modtype Keep st.subst mty in
         let env = Env.add_module ~arg:true param Mp_present mty' ~mode st.env in
         let res = Option.map (Mtype.nondep_supertype env [param]) st.res in
@@ -1585,7 +1586,7 @@ module Functor_app_diff = struct
             | Unit, Named _ | (Anonymous | Named _), Unit ->
                 Result.Error (Error.Incompatible_params(arg,param))
             | ( Anonymous | Named _ | Empty_struct ),
-              Named (_, param, param_m) ->
+              Named (_, param, _, param_m) ->
                let param_m = Mode.alloc_as_value param_m in
                let direction = Directionality.unknown ~mark:false in
                 match

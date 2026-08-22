@@ -20,6 +20,14 @@ module Union_find : sig
   val union : t -> t -> t
 end
 
+(** The module facts of an index, stored in a channel of its own so that
+    consumers that do not care about them never pay to load them. *)
+type module_facts = Module_facts_compact.t Granular_marshal.link
+
+val module_facts_block : module_facts -> Module_facts_compact.t
+val link_module_facts : Module_facts_compact.t -> module_facts
+val inline_module_facts : Module_implementation_facts.t -> module_facts
+
 type stat = { mtime : float; size : int; source_digest : string option }
 
 type index =
@@ -28,7 +36,8 @@ type index =
     cu_shape : (Compilation_unit.t, Shape.t) Hashtbl.t;
     stats : stat Stats.t;
     root_directory : string option;
-    related_uids : Union_find.t Uid_map.t
+    related_uids : Union_find.t Uid_map.t;
+    module_facts : module_facts option;
   }
 
 val pp : Format.formatter -> index -> unit

@@ -1,0 +1,37 @@
+== facts read back from the .cmt and the .cmti of a unit
+present: cmt true cmti true
+counts: checks 9 deps 17 equalities 1 omissions 1
+counts: checks 0 deps 22 equalities 0 omissions 0
+== the interface pairs of the unit are directional
+pair S <- [intf]S
+pair T <- [intf]T
+pair Container <- [intf]Container
+pair Wrapper.Inner@Wrapper <- [intf]Wrapper.Inner@[intf]Wrapper
+== .cms and .cmsi hold the same facts as .cmt and .cmti
+present: cms true cmsi true
+cms = cmt: true
+cmsi = cmti: true
+== facts of a unit whose expectations come from a .cmi
+counts: checks 5 deps 5 equalities 1 omissions 0
+check argument A : Mtf_aux.S
+check annotation M : Mtf_aux.S
+check annotation Container.Member : Mtf_aux.S
+check annotation Container : Mtf_aux.Container
+check annotation Container.Member : <Mtf_aux.Container.Member>
+== an annotation against another unit's signature is no pair
+mtf_aux, which has an .mli: interface checks 5, interface pairs 4
+mtf_client, which has none: interface checks 0, interface pairs 0
+== the parameter expectation of a functor loaded from a .cmi
+loaded from the .cmi: Mtf_aux.S
+after substitution: Mtf_aux.S
+after strengthening: Mtf_aux.S
+== the interface a unit is an argument for
+counts: checks 1 deps 0 equalities 0 omissions 0
+check interface Mtf_argument : <Mtf_param>
+== facts are only extracted for the artifacts that are written
+mtf_gate_cmt: cmt true, cms no artifact
+mtf_gate_cms: cmt no artifact, cms true
+mtf_gate_none: cmt no artifact, cms no artifact
+== a partial artifact carries no facts
+partial implementation: true
+present: false

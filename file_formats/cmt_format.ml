@@ -50,6 +50,7 @@ type cmt_infos = {
   cmt_modname : Compilation_unit.t;
   cmt_annots : binary_annots;
   cmt_declaration_dependencies : (dependency_kind * Uid.t * Uid.t) list;
+  cmt_module_implementation_facts : Module_implementation_facts.t option;
   cmt_comments : (string * Location.t) list;
   cmt_args : string array;
   cmt_sourcefile : string option;
@@ -512,7 +513,8 @@ let record_declaration_dependency (rk, uid1, uid2) =
   if not (Uid.equal uid1 uid2) then
     uids_deps := (rk, uid1, uid2) :: !uids_deps
 
-let save_cmt target cu binary_annots initial_env cmi shape =
+let save_cmt target cu binary_annots initial_env cmi shape
+    cmt_module_implementation_facts =
   if !Clflags.binary_annotations && not !Clflags.print_types then begin
     Misc.output_to_file_via_temporary
        ~mode:[Open_binary] (Unit_info.Artifact.filename target)
@@ -555,6 +557,7 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            cmt_modname = cu;
            cmt_annots;
            cmt_declaration_dependencies = !uids_deps;
+           cmt_module_implementation_facts;
            cmt_comments = Lexer.comments ();
            cmt_args;
            cmt_sourcefile = sourcefile;

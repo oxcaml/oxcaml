@@ -32,19 +32,34 @@ let add map uid locs =
 
 type stat = { mtime : float; size : int; source_digest : string option }
 
+type module_facts = Module_facts_compact.t Granular_marshal.link
+
+let module_facts_block = Granular_marshal.fetch
+
+let link_module_facts block = Granular_marshal.link block
+
+let inline_module_facts facts =
+  Granular_marshal.link (Module_facts_compact.of_facts facts)
+
 type index =
   { defs : Lid_set.t Uid_map.t;
     approximated : Lid_set.t Uid_map.t;
     cu_shape : (Compilation_unit.t, Shape.t) Hashtbl.t;
     stats : stat Stats.t;
     root_directory : string option;
-    related_uids : Union_find.t Uid_map.t
+    related_uids : Union_find.t Uid_map.t;
+    module_facts : module_facts option;
   }
 
 let lidset_schema iter lidset = Lid_set.schema iter Lid.schema lidset
 
 let type_setmap : Lid_set.t Uid_map.t Type.Id.t = Type.Id.make ()
 let type_ufmap : Union_find.t Uid_map.t Type.Id.t = Type.Id.make ()
+let type_module_facts : module_facts Type.Id.t = Type.Id.make ()
+
+let module_facts_schema ({ Granular_marshal.yield } : Granular_marshal.iter)
+    (facts : module_facts) =
+  yield facts type_module_facts Granular_marshal.schema_no_sublinks
 
 let index_schema (iter : Granular_marshal.iter) index =
   Uid_map.schema type_setmap iter
@@ -55,7 +70,8 @@ let index_schema (iter : Granular_marshal.iter) index =
     index.approximated;
   Uid_map.schema type_ufmap iter
     (fun iter _ v -> Union_find.schema iter v)
-    index.related_uids
+    index.related_uids;
+  Option.iter (module_facts_schema iter) index.module_facts
 
 let compress index =
   let cache = Lid.cache () in
