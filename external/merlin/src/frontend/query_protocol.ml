@@ -261,6 +261,15 @@ module Module_type_impls = struct
     }
 end
 
+module Intf_weakness = struct
+  type text_edit = { edit_loc : Location.t; edit_text : string }
+
+  (* One action per interface. [edits] must be applied atomically: a hoisted
+     signature clause without its per-item exemptions claims capabilities the
+     exempted items do not have. *)
+  type code_action = { intf_file : string; edits : text_edit list }
+end
+
 type _ t =
   | Type_expr (* *) : string * Msource.position -> string t
   | Stack_or_heap_enclosing (* *) :

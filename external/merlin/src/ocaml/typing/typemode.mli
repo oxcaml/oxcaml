@@ -42,6 +42,15 @@ val least_modalities :
   Mode.Modality.Const.t ->
   Mode.Modality.atom list
 
+(** Like [least_modalities], but relative to an explicit [default] modality
+    (e.g. an item's signature-default modalities) instead of the
+    mutability-implied one. *)
+val least_modalities_with_default :
+  include_implied:bool ->
+  default:Mode.Modality.Const.t ->
+  Mode.Modality.Const.t ->
+  Mode.Modality.atom list
+
 val sort_dedup_modalities : Mode.Modality.atom list -> Mode.Modality.atom list
 
 (** Get the default modalities implied by the mutability of a field. *)

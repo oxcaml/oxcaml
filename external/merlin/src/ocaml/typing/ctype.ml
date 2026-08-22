@@ -6294,6 +6294,29 @@ let relevant_pairs pairs v =
   | Contravariant -> pairs.contravariant_pairs
   | Bivariant -> pairs.bivariant_pairs
 
+(* A flag for controlling submode constraints placed on intermediate
+   return arrows. [Constrain_all_ret_modes] is the current default behavior.
+   Merlin uses [Skip_intermediate_ret_modes] to pretend like they don't exist,
+   which allows us to compute the strongest OxCaml signature for a function.
+
+   The flag holds for a whole [moregeneral] check, so it applies to arrows
+   wherever they turn up, including under tuples, constructors, packages,
+   rows and objects. [moregen]'s helpers therefore take it as a mandatory
+   argument, so that a new recursive call cannot silently fall back to
+   [Constrain_all_ret_modes]. *)
+type moregen_ret_modes =
+  | Constrain_all_ret_modes
+  | Skip_intermediate_ret_modes
+
+(* Number of arrows along a type's return spine. Abbreviations ([Tconstr])
+   are not expanded, and [Tpoly] wrappers do not count as a step, matching
+   the syntactic walk of Merlin's intf-weakness analysis. *)
+let rec count_arrow_spine ty =
+  match get_desc ty with
+  | Tpoly (ty, _) -> count_arrow_spine ty
+  | Tarrow (_, _, ret_ty, _) -> 1 + count_arrow_spine ret_ty
+  | _ -> 0
+
 let zap_modalities_to_floor_if_modes_enabled_at level =
   if Language_extension.(is_at_least Mode level)
     then Mode.Modality.zap_to_floor
@@ -6433,7 +6456,8 @@ let may_instantiate inst_nongen t1 =
   if inst_nongen then level <> subject_level
                  else level =  generic_level
 
-let rec moregen inst_nongen variance type_pairs env t1 t2 =
+let rec moregen ?(ret_modes = Constrain_all_ret_modes)
+    inst_nongen variance type_pairs env t1 t2 =
   if eq_type t1 t2 then () else
 
   try
@@ -6468,53 +6492,66 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
               eq_labels Moregen ~in_pattern_mode:false l1 l2;
-              moregen inst_nongen (neg_variance variance) type_pairs env t1 t2;
-              moregen inst_nongen variance type_pairs env u1 u2;
+              (* When intermediate return modes are skipped, only the mode of
+                 the last arrow of the subject's spine is constrained. *)
+              let constrain_ret_mode =
+                match ret_modes with
+                | Constrain_all_ret_modes -> true
+                | Skip_intermediate_ret_modes -> count_arrow_spine u2 = 0
+              in
+              moregen ~ret_modes inst_nongen (neg_variance variance)
+                type_pairs env t1 t2;
+              moregen ~ret_modes inst_nongen variance type_pairs env u1 u2;
               (* [t2] and [u2] is the user-written interface, which we deem as
                  more "principal" and used for mode crossing. See
                  [typing-modes/crossing.ml]. *)
               (* CR zqian: should use the meet of [t1] and [t2] for mode
               crossing. Similar for [u1] and [u2]. *)
               moregen_alloc_mode env t2 ~is_ret:false (neg_variance variance) a1 a2;
-              moregen_alloc_mode env u2 ~is_ret:true variance r1 r2
+              if constrain_ret_mode then
+                moregen_alloc_mode env u2 ~is_ret:true variance r1 r2
           | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
-              moregen_labeled_list inst_nongen variance type_pairs env
-                labeled_tl1 labeled_tl2
+              moregen_labeled_list ~ret_modes inst_nongen variance type_pairs
+                env labeled_tl1 labeled_tl2
           | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
-              moregen_labeled_list inst_nongen variance type_pairs env
-                labeled_tl1 labeled_tl2
+              moregen_labeled_list ~ret_modes inst_nongen variance type_pairs
+                env labeled_tl1 labeled_tl2
           | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _))
                 when Path.same p1 p2 -> begin
               match variance with
               | Invariant | Bivariant ->
-                  moregen_list inst_nongen variance type_pairs env tl1 tl2
+                  moregen_list ~ret_modes inst_nongen variance type_pairs env
+                    tl1 tl2
               | _ ->
                 match Env.find_type p1 env with
                 | decl ->
-                    moregen_param_list inst_nongen variance type_pairs env
-                      decl.type_variance tl1 tl2
+                    moregen_param_list ~ret_modes inst_nongen variance
+                      type_pairs env decl.type_variance tl1 tl2
                 | exception Not_found ->
-                    moregen_list inst_nongen Invariant type_pairs env tl1 tl2
+                    moregen_list ~ret_modes inst_nongen Invariant type_pairs
+                      env tl1 tl2
             end
           | (Tpackage pack1, Tpackage pack2) ->
-              moregen_package inst_nongen variance type_pairs env
+              moregen_package ~ret_modes inst_nongen variance type_pairs env
                 (get_level t1') pack1 (get_level t2') pack2
           | (Tnil,  Tconstr _ ) -> raise_for Moregen (Obj (Abstract_row Second))
           | (Tconstr _,  Tnil ) -> raise_for Moregen (Obj (Abstract_row First))
           | (Tvariant row1, Tvariant row2) ->
-              moregen_row inst_nongen variance type_pairs env row1 row2
+              moregen_row ~ret_modes inst_nongen variance type_pairs env
+                row1 row2
           | (Tobject (fi1, _nm1), Tobject (fi2, _nm2)) ->
-              moregen_fields inst_nongen variance type_pairs env fi1 fi2
+              moregen_fields ~ret_modes inst_nongen variance type_pairs env
+                fi1 fi2
           | (Tfield _, Tfield _) ->           (* Actually unused *)
-              moregen_fields inst_nongen variance type_pairs env
+              moregen_fields ~ret_modes inst_nongen variance type_pairs env
                 t1' t2'
           | (Tnil, Tnil) ->
               ()
           | (Tpoly (t1, []), Tpoly (t2, [])) ->
-              moregen inst_nongen variance type_pairs env t1 t2
+              moregen ~ret_modes inst_nongen variance type_pairs env t1 t2
           | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
               enter_poly_for Moregen env t1 tl1 t2 tl2
-                (moregen inst_nongen variance type_pairs env)
+                (moregen ~ret_modes inst_nongen variance type_pairs env)
           | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
               (* For layout-polymorphic types, establish correspondence
                  between sort variables positionally, then check moregen on
@@ -6522,26 +6559,27 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               (try
                 let pairs = List.combine sort_vars1 sort_vars2 in
                 Jkind_types.Sort.enter_repr pairs (fun () ->
-                    moregen inst_nongen variance type_pairs env t1 t2)
+                    moregen ~ret_modes inst_nongen variance type_pairs env
+                      t1 t2)
               with Invalid_argument _ -> raise_unexplained_for Moregen)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen env t1' t2' k1 k2 !univar_pairs
           | (Tquote t1, _) ->
-              moregen inst_nongen variance type_pairs
+              moregen ~ret_modes inst_nongen variance type_pairs
                 (incr_stage env) t1 (new_splice_ty t2)
           | (Tsplice t1, _) ->
-              moregen inst_nongen variance type_pairs
+              moregen ~ret_modes inst_nongen variance type_pairs
                 (decr_stage env) t1 (new_quote_ty t2)
           | (Tquote_eval t1, Tquote_eval t2) ->
-              moregen inst_nongen variance type_pairs
+              moregen ~ret_modes inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
           | (Tbox t1, Tbox t2) ->
-              moregen inst_nongen variance type_pairs env t1 t2
+              moregen ~ret_modes inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
-              moregen inst_nongen variance type_pairs
+              moregen ~ret_modes inst_nongen variance type_pairs
                 env t (unbox_ty_exn env t2')
           | (_, Tbox t) when is_unboxable_ty env t1' ->
-              moregen inst_nongen variance type_pairs
+              moregen ~ret_modes inst_nongen variance type_pairs
                 env (unbox_ty_exn env t1') t
           | (_, _) ->
               raise_unexplained_for Moregen
@@ -6550,41 +6588,45 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
     raise_trace_for Moregen (Diff {got = t1; expected = t2} :: trace)
 
 
-and moregen_list inst_nongen variance type_pairs env tl1 tl2 =
+and moregen_list ~ret_modes inst_nongen variance type_pairs env tl1 tl2 =
   if List.length tl1 <> List.length tl2 then
     raise_unexplained_for Moregen;
-  List.iter2 (moregen inst_nongen variance type_pairs env) tl1 tl2
+  List.iter2 (moregen ~ret_modes inst_nongen variance type_pairs env) tl1 tl2
 
-and moregen_labeled_list inst_nongen variance type_pairs env labeled_tl1
-    labeled_tl2 =
+and moregen_labeled_list ~ret_modes inst_nongen variance type_pairs env
+    labeled_tl1 labeled_tl2 =
   if 0 <> List.compare_lengths labeled_tl1 labeled_tl2 then
     raise_unexplained_for Moregen;
   List.iter2
     (fun (label1, ty1) (label2, ty2) ->
       if not (Option.equal String.equal label1 label2) then
         raise_unexplained_for Moregen;
-      moregen inst_nongen variance type_pairs env ty1 ty2)
+      moregen ~ret_modes inst_nongen variance type_pairs env ty1 ty2)
     labeled_tl1 labeled_tl2
 
-and moregen_param_list inst_nongen variance type_pairs env vl tl1 tl2 =
+and moregen_param_list ~ret_modes inst_nongen variance type_pairs env vl tl1
+    tl2 =
   match vl, tl1, tl2 with
   | [], [], [] -> ()
   | v :: vl, t1 :: tl1, t2 :: tl2 ->
     let param_variance = compose_variance variance v in
-    moregen inst_nongen param_variance type_pairs env t1 t2;
-    moregen_param_list inst_nongen variance type_pairs env vl tl1 tl2
+    moregen ~ret_modes inst_nongen param_variance type_pairs env t1 t2;
+    moregen_param_list ~ret_modes inst_nongen variance type_pairs env vl tl1
+      tl2
   | _, _, _ -> raise_unexplained_for Moregen
 
-and moregen_package inst_nongen variance type_pairs env lvl1 pack1 lvl2 pack2 =
+and moregen_package ~ret_modes inst_nongen variance type_pairs env lvl1 pack1
+    lvl2 pack2 =
   match
-    compare_package env (moregen_list inst_nongen variance type_pairs env)
+    compare_package env
+      (moregen_list ~ret_modes inst_nongen variance type_pairs env)
       lvl1 pack1 lvl2 pack2
   with
   | Ok () -> ()
   | Error fme -> raise_for Moregen (First_class_module fme)
   | exception Not_found -> raise_unexplained_for Moregen
 
-and moregen_fields inst_nongen variance type_pairs env ty1 ty2 =
+and moregen_fields ~ret_modes inst_nongen variance type_pairs env ty1 ty2 =
   let (fields1, rest1) = flatten_fields ty1
   and (fields2, rest2) = flatten_fields ty2 in
   let (pairs, miss1, miss2) = associate_fields fields1 fields2 in
@@ -6593,13 +6635,14 @@ and moregen_fields inst_nongen variance type_pairs env ty1 ty2 =
     | (n, _, _) :: _ -> raise_for Moregen (Obj (Missing_field (Second, n)))
     | [] -> ()
   end;
-  moregen inst_nongen variance type_pairs env rest1
+  moregen ~ret_modes inst_nongen variance type_pairs env rest1
     (build_fields (get_level ty2) miss2 rest2);
   List.iter
     (fun (name, k1, t1, k2, t2) ->
        (* The below call should never throw [Public_method_to_private_method] *)
        moregen_kind k1 k2;
-       try moregen inst_nongen variance type_pairs env t1 t2 with Moregen_trace trace ->
+       try moregen ~ret_modes inst_nongen variance type_pairs env t1 t2
+       with Moregen_trace trace ->
          raise_trace_for Moregen
            (incompatible_fields ~name ~got:t1 ~expected:t2 :: trace)
     )
@@ -6612,7 +6655,7 @@ and moregen_kind k1 k2 =
   | (Fpublic, Fprivate)              -> raise Public_method_to_private_method
   | (Fabsent, _) | (_, Fabsent)      -> assert false
 
-and moregen_row inst_nongen variance type_pairs env row1 row2 =
+and moregen_row ~ret_modes inst_nongen variance type_pairs env row1 row2 =
   let Row {fields = row1_fields; more = rm1; closed = row1_closed} =
     row_repr row1 in
   let Row {fields = row2_fields; more = rm2; closed = row2_closed;
@@ -6653,7 +6696,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
       (* This [link_type] has to be undone if the rest of the function fails *)
       link_type rm1 ext
   | Tconstr _, Tconstr _ ->
-      moregen inst_nongen variance type_pairs env rm1 rm2
+      moregen ~ret_modes inst_nongen variance type_pairs env rm1 rm2
   | _ -> raise_unexplained_for Moregen
   end;
   try
@@ -6664,7 +6707,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
          (* Both matching [Rpresent]s *)
          | Rpresent(Some t1), Rpresent(Some t2) -> begin
              try
-               moregen inst_nongen variance type_pairs env t1 t2
+               moregen ~ret_modes inst_nongen variance type_pairs env t1 t2
              with Moregen_trace trace ->
                raise_trace_for Moregen
                  (Variant (Incompatible_types_for l) :: trace)
@@ -6679,11 +6722,15 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
                    rf_either [] ~use_ext_of:f2 ~no_arg:c2 ~matched:m2 in
                  link_row_field_ext ~inside:f1 f2';
                  if List.length tl1 = List.length tl2 then
-                   List.iter2 (moregen inst_nongen variance type_pairs env) tl1 tl2
+                   List.iter2
+                     (moregen ~ret_modes inst_nongen variance type_pairs env)
+                     tl1 tl2
                  else match tl2 with
                    | t2 :: _ ->
                      List.iter
-                       (fun t1 -> moregen inst_nongen variance type_pairs env t1 t2)
+                       (fun t1 ->
+                          moregen ~ret_modes inst_nongen variance type_pairs
+                            env t1 t2)
                        tl1
                    | [] -> if tl1 <> [] then raise_unexplained_for Moregen
                end
@@ -6696,7 +6743,9 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
              try
                link_row_field_ext ~inside:f1 f2;
                List.iter
-                 (fun t1 -> moregen inst_nongen variance type_pairs env t1 t2)
+                 (fun t1 ->
+                    moregen ~ret_modes inst_nongen variance type_pairs env
+                      t1 t2)
                  tl1
              with Moregen_trace trace ->
                raise_trace_for Moregen
@@ -6737,7 +6786,8 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    Usually, the subject is given by the user, and the pattern
    is unimportant.  So, no need to propagate abbreviations.
 *)
-let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
+let moregeneral ?(ret_modes = Constrain_all_ret_modes)
+    env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
   (* Moregen splits the generic level into two finer levels:
      [generic_level] and [subject_level = generic_level - 1].
      In order to properly detect and print weak variables when
@@ -6772,7 +6822,7 @@ let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
       try
         with_univar_pairs [] begin fun () ->
           let type_pairs = fresh_moregen_pairs () in
-          moregen inst_nongen Covariant type_pairs env patt subj;
+          moregen ~ret_modes inst_nongen Covariant type_pairs env patt subj;
           (* After [moregen], [pat_sorts] have been set to [subj_sorts].
              [subj_sorts] are ephemeral rigid vars created by [instance_with] to
              stand for [subj_sort_vars] during moregen.  Replace them back with
