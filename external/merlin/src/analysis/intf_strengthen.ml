@@ -577,7 +577,7 @@ end = struct
           ( (intf_param : Types.functor_parameter),
             (impl_param : Types.functor_parameter) )
         with
-        | Named (intf_id, _, _), Named (impl_id, impl_pmty, _) ->
+        | Named (intf_id, _, _, _), Named (impl_id, impl_pmty, _, _) ->
           let env =
             match impl_id with
             | Some impl_id ->
@@ -603,7 +603,7 @@ end = struct
       ( (intf_param : Types.functor_parameter),
         (impl_param : Types.functor_parameter) )
     with
-    | Named (_, intf_pmty, _), Named (_, impl_pmty, _) -> (
+    | Named (_, intf_pmty, _, _), Named (_, impl_pmty, _, _) -> (
       match
         ( head_of_mty context.env subst intf_pmty,
           head_of_mty context.env Subst.identity impl_pmty )
