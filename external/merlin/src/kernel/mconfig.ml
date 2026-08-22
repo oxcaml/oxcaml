@@ -611,6 +611,7 @@ let ocaml_ignored_flags =
     "-fno-simd-regalloc";
     "-fclmul";
     "-fno-clmul";
+    "-fcssc";
     "-no-auto-include-otherlibs";
     "-fbmi2";
     "-fno-bmi2";
