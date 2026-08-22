@@ -22,6 +22,6 @@ let code loopify(never) size(29) newer_version_of(f_0)
       let float_add = %box_num.`float`.my_alloc_region (prim) in
       cont k (float_add)
 in
-let $camlFloat_tuple__f_1 = closure f_0_1 @f &toplevel.alloc_region in
-let $camlFloat_tuple = Block 0 ($camlFloat_tuple__f_1) in
+let $camlFloat_tuple__f_3 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlFloat_tuple = Block 0 ($camlFloat_tuple__f_3) in
 cont done ($camlFloat_tuple)
