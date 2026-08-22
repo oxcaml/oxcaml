@@ -534,6 +534,16 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block)
        infer the tested temporary is equal to zero at the start of the block. *)
     (* CR-someday xclerc for xclerc: that could be extended to multiple
     predecessors, if all lead to the same inference. *)
+    (* Note that [block.predecessors] may be stale here: [run] rewrites
+       terminators during its fold over blocks and recomputes predecessors only
+       at the end. This is currently sound: edges removed by earlier rewrites
+       can only make the single-predecessor check below conservative, or make
+       it consider an already-rewritten terminator (e.g. [Always]) that matches
+       none of the cases below; and edges added by earlier rewrites are always
+       derived from evaluating or copying the terminator of an existing
+       predecessor, so a fact inferred from that terminator also holds along
+       the new edges. Any new rewrite in this module (or new inference below)
+       must preserve this property. *)
     (* A trap handler is entered through exceptional edges, on which the
        predecessor's terminator has not been executed: no fact can be inferred
        from that terminator. *)
@@ -844,6 +854,13 @@ let block_with_initial_values (cfg : C.t) (block : C.basic_block)
            are jumping "inside" the loop directly, which in turn means the loop
            is no longer natural. This is acceptable if we are past the last use
            of the loop information. *)
+        (* CR-someday xclerc for xclerc: unlike the terminator-copy case below,
+           this rewrite is not disabled for the entry block. If the skipped
+           (empty) successor is the destination of a [Tailcall_self], the
+           rewrite breaks the invariant that the tailrec block is the entry
+           block or the only successor of the entry block (reported by
+           [Cfg_invariants] when -dcfg-invariants is enabled; the generated
+           code remains correct). *)
         match known_values with
         | Some known_values when cfg.allowed_to_be_irreducible ->
           evaluate_terminator known_values successor_block.terminator
@@ -867,9 +884,13 @@ let block_with_initial_values (cfg : C.t) (block : C.basic_block)
           (* If we jump to a block that is empty, we can copy the terminator
              from the successor to the current block. There might be size
              considerations, so we currently do so only for "tests" and return.
-             The optimization is disabled because of a CFG invariant expecting
-             "the tailrec block to be the entry block or the only successor of
-             the entry block". *)
+             Copying is also only correct for terminators that do not destroy
+             any register (cf. [Proc.destroyed_at_terminator]): copying e.g. a
+             [Switch] would introduce a clobber (rax and rdx on amd64) at a
+             point where register allocation did not account for it. The
+             optimization is disabled for the entry block because of a CFG
+             invariant expecting "the tailrec block to be the entry block or the
+             only successor of the entry block". *)
           match successor_block.terminator.desc with
           | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
             block.terminator
