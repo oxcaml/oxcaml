@@ -16,6 +16,7 @@ open Modes
 type scope
 external freeze_scope : unit -> scope = "caml_dynamic_freeze_scope"
 external use_scope : scope -> unit = "caml_dynamic_use_scope"
+external release_scope : scope -> unit = "caml_dynamic_thaw_scope"
 external set_root : unit -> unit = "caml_dynamic_set_root"
 
 let print_null = function
@@ -40,8 +41,9 @@ type _ Effect.t += Spawn_unpinned : (unit -> unit) -> unit Effect.t
 type _ Effect.t += Yield : unit Effect.t
 
 let fork_join f g =
-  let self = freeze_scope () in
-  Effect.perform (Fork (self, f, g))
+  let scope = freeze_scope () in
+  Effect.perform (Fork (scope, f, g));
+  release_scope scope
 
 let next_worker = ref 100
 let reset () = next_worker := 100
@@ -233,8 +235,8 @@ let () =
         end
       in
       ignore (grow 1_000);
-      let t = freeze_scope () in
       with_temp d_lex 1 ~f:(fun () ->
+        let t = freeze_scope () in
         passthrough (fun () ->
           (* fiber S: the child's own "worker" *)
           with_temp d_worker 222 ~f:(fun () ->
@@ -246,6 +248,7 @@ let () =
               Printf.printf
                 "child d_worker from own worker [expect 222]: %s\n"
                 (get d_worker))));
+        release_scope t;
         Printf.printf "parent d_worker [expect 111]: %s\n" (get d_worker))))
 
 (* A fiber created inside a fork child can escape the scheduler entirely
@@ -289,7 +292,7 @@ let () =
   | Some k -> with_temp d_lex 9 ~f:(fun () -> Effect.Deep.continue k ())
   | None -> assert false
 
-(* The fork-point handle is the fiber's stable dynamic-state node, so it
+(* The scope handle refers to the fiber's stable dynamic-state node, so it
    survives stack reallocation: growing the fork point's stack after taking
    the handle (bytecode fibers start tiny and grow by realloc) must not
    invalidate the edge or the bindings reached through it. *)
@@ -322,7 +325,8 @@ let () =
               Printf.printf "child d_lex after growth [expect 1]: %s\n"
                 (get d_lex);
               Printf.printf "child d_worker [expect 222]: %s\n"
-                (get d_worker)))))))
+                (get d_worker))));
+        release_scope t)))
 
 (* Freezing again from the same fork point must revalidate the chain: after
    the fork point is captured out of one intermediate fiber and resumed
@@ -357,11 +361,15 @@ let () =
               let s1 = freeze_scope () in
               run_child s1 (fun () ->
                 Printf.printf "child1 d_inter [expect 7]: %s\n" (get d_inter));
-              (* re-freezing an unchanged chain is a no-op *)
+              (* re-freezing an unchanged chain rewrites no links (children
+                 of the first scope may still be reading them) and freezes
+                 the fork point's table again; releases pair up LIFO *)
               let s1b = freeze_scope () in
               run_child s1b (fun () ->
                 Printf.printf "child1b d_inter [expect 7]: %s\n"
                   (get d_inter));
+              release_scope s1b;
+              release_scope s1;
               Printf.printf "F d_inter before capture [expect 7]: %s\n"
                 (get d_inter);
               Effect.perform Capture;
@@ -371,7 +379,8 @@ let () =
               let s2 = freeze_scope () in
               run_child s2 (fun () ->
                 Printf.printf "child2 d_inter [expect 8]: %s\n"
-                  (get d_inter))))
+                  (get d_inter));
+              release_scope s2))
           ()
           { retc = (fun () -> ());
             exnc = (fun e -> raise e);
@@ -383,3 +392,103 @@ let () =
     match !stash with
     | Some k -> with_temp d_inter 8 ~f:(fun () -> Effect.Deep.continue k ())
     | None -> assert false)
+
+(* Test 11: shifting. fork_join freezes the fork point's chain before
+   publishing the stolen child, then runs the other child inline as a plain
+   call on the same fiber. The inline child's with_temps go to a fresh
+   table pushed above the frozen one: the fiber's own chain sees them, but
+   the stolen child — reading from the scope's bound — keeps seeing the
+   state as it was when the scope was frozen. (The "stolen" child is
+   simulated by fibers mounted above the inline execution; unlike a real
+   stolen child its spine passes through the frozen fiber, so we only
+   assert lookups that resolve before reaching it.) *)
+
+let d_str : string Dynamic.t = Dynamic.make ()
+
+let () =
+  reset ();
+  print_endline
+    "\n# Test 11: bindings above a freeze are invisible to bounded children";
+  passthrough (fun () ->
+    (* fiber F: the fork point *)
+    set_root ();
+    with_temp d_lex 1 ~f:(fun () ->
+      let s = freeze_scope () in
+      (* the inline child: a plain call on F, rebinding d_lex *)
+      with_temp d_lex 9 ~f:(fun () ->
+        with_temp d_child 5 ~f:(fun () ->
+          Printf.printf "inline sees own rebind [expect 9]: %s\n" (get d_lex);
+          Printf.printf "inline sees own binding [expect 5]: %s\n"
+            (get d_child);
+          passthrough (fun () ->
+            (* fiber S: the stolen child's worker *)
+            with_temp d_child 7 ~f:(fun () ->
+              passthrough (fun () ->
+                (* fiber C: the stolen child, pinned and bounded *)
+                use_scope s;
+                Printf.printf
+                  "stolen child sees frozen state [expect 1]: %s\n"
+                  (get d_lex);
+                Printf.printf
+                  "stolen child misses inline binding [expect 7]: %s\n"
+                  (get d_child))));
+          Printf.printf "inline still sees rebind [expect 9]: %s\n"
+            (get d_lex)));
+      Printf.printf "after inline child [expect 1]: %s\n" (get d_lex);
+      (* a second scope while still frozen gets a fresh table again *)
+      with_temp d_lex 8 ~f:(fun () ->
+        Printf.printf "second scope above freeze [expect 8]: %s\n" (get d_lex));
+      Printf.printf "after second scope [expect 1]: %s\n" (get d_lex);
+      (* bindings above a freeze are GC roots *)
+      with_temp d_str (String.concat "-" ["over"; "lay"]) ~f:(fun () ->
+        Gc.full_major ();
+        (match Dynamic.get d_str with
+         | This str ->
+           Printf.printf "fresh table survives GC [expect over-lay]: %s\n" str
+         | Null -> print_endline "fresh table survives GC: null"));
+      release_scope s;
+      Printf.printf "after release [expect 1]: %s\n" (get d_lex));
+    Printf.printf "after scope [expect null]: %s\n" (get d_lex))
+
+(* Test 12: nested scopes while frozen. Each freeze marks the fork point's
+   newest table and bounds that scope's children there: children of the
+   outer scope never see bindings the inline child pushed (even once a
+   nested freeze makes them immutable), while children of the nested scope
+   do. *)
+
+let () =
+  reset ();
+  print_endline "\n# Test 12: nested freezes bound their children separately";
+  passthrough (fun () ->
+    set_root ();
+    with_temp d_lex 1 ~f:(fun () ->
+      let outer = freeze_scope () in
+      (* outer inline child *)
+      with_temp d_child 5 ~f:(fun () ->
+        let nested = freeze_scope () in
+        (* a child of the nested scope sees the inline child's bindings *)
+        passthrough (fun () ->
+          with_temp d_worker 200 ~f:(fun () ->
+            passthrough (fun () ->
+              use_scope nested;
+              Printf.printf
+                "nested child sees inline binding [expect 5]: %s\n"
+                (get d_child);
+              Printf.printf "nested child sees outer scope [expect 1]: %s\n"
+                (get d_lex);
+              Printf.printf "nested child own worker [expect 200]: %s\n"
+                (get d_worker))));
+        (* a child of the outer scope does not *)
+        passthrough (fun () ->
+          with_temp d_child 7 ~f:(fun () ->
+            passthrough (fun () ->
+              use_scope outer;
+              Printf.printf
+                "outer child misses inline binding [expect 7]: %s\n"
+                (get d_child);
+              Printf.printf "outer child sees outer scope [expect 1]: %s\n"
+                (get d_lex))));
+        release_scope nested);
+      Printf.printf "after nested inline [expect null]: %s\n" (get d_child);
+      release_scope outer);
+    Printf.printf "after scope [expect null]: %s\n" (get d_lex))

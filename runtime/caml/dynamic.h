@@ -47,7 +47,9 @@ CAMLprim value caml_dynamic_pop(value dyn);
       spawn (fun () -> caml_dynamic_use_scope scope),
       spawn (fun () -> caml_dynamic_use_scope scope)
    in
-   await l, await r
+   let res = await l, await r in
+   caml_dynamic_thaw_scope scope;
+   res
 
    Using the scope in child fibers causes them to inherit dynamic bindings
    installed on the path to the root task, even if they're migrated to other
@@ -55,15 +57,18 @@ CAMLprim value caml_dynamic_pop(value dyn);
 
    All calls to [caml_dynamic_freeze_scope] must occur in a descendant of
    a fiber that called [caml_dynamic_set_root]. The returned [scope] must
-   outlive all child fibers that call [caml_dynamic_use_scope], and must
-   *not* outlive the current fiber. It is unsafe to modify the binding
-   state of any fiber on the frozen path (the current fiber up to the
-   enclosing task) during the lifetime of [scope]. */
+   outlive all child fibers that call [caml_dynamic_use_scope], the parent
+   must not perform an effect during the lifetime of [scope], and [scope]
+   must be passed to [caml_dynamic_thaw_scope] after all children exit. */
 CAMLprim value caml_dynamic_freeze_scope(value unit);
 
 /* Make a set of frozen dynamic bindings visible to the current fiber.
    See [caml_dynamic_freeze_scope] for usage. */
 CAMLprim value caml_dynamic_use_scope(value scope);
+
+/* Release a scope returned by [caml_dynamic_freeze_scope]. Must be called on
+   the fiber that froze the scope and the scope must not be in use. */
+CAMLprim value caml_dynamic_thaw_scope(value scope);
 
 /* Mark the current fiber as a root task. Dynamic bindings installed above
    the current fiber will not be captured by [caml_dynamic_freeze_scope].
@@ -121,45 +126,49 @@ typedef struct dynamic_table_s {
   size_t mask; /* capacity - 1 */
   size_t count;
   dynamic_stack_t bindings;
+  struct dynamic_table_s* parent;
+
+  /* Number of frozen scopes that refer to this table.
+     This table is immutable if [frozen] > 0. Attempting to change the binding
+     state of a frozen table instead allocates a fresh child table. */
+  uintnat frozen;
 } dynamic_table_s, *dynamic_table_t;
 
-/* Initialize a dynamic table to an empty state. */
-extern void caml_dynamic_table_init(dynamic_table_t table);
+/* Freeze and return the current table. Changes to the binding state
+   after [snapshot] will not be visible after [restore]. */
+extern dynamic_table_t caml_dynamic_state_snapshot(void);
 
-/* Uninitialize a dynamic table, freeing any internal allocations. */
-extern void caml_dynamic_table_free(dynamic_table_t table);
-
-/* Duplicate a dynamic table. Returns false if allocation fails. */
-extern bool caml_dynamic_table_copy(dynamic_table_t dst, dynamic_table_t src);
-
-/* Register all bindings as GC roots. */
-extern void caml_dynamic_table_register_roots(dynamic_table_t table);
-
-/* Unregister all bindings as GC roots. */
-extern void caml_dynamic_table_unregister_roots(dynamic_table_t table);
-
-/* Apply a GC scanning action to all bindings in a dynamic table. */
-extern void caml_dynamic_table_scan_roots(dynamic_table_t,
-                                          scanning_action,
-                                          scanning_action_flags,
-                                          void *);
+/* Restore the current table to its state at [snapshot], freeing any
+   intermediate tables installed in the interim. */
+extern void caml_dynamic_state_restore(dynamic_table_t snapshot);
 
 /* Per-fiber binding state. Owned by the fiber, but separately allocated for
    stability (the stack_info allocation may be resized). Scanned by the GC via
    the owning fiber only.
 
-   [lexical_parent] records the path from the current fiber to the root task.
+   [table] stores dynamic binding state at the base of the owning fiber.
+   Its chain of parent pointers records the path to the root task.
+
+   [newest] typically points to [table], unless [table] was frozen and another
+   binding was installed. In this case, [newest] points to a separately allocated
+   table whose parent pointer records the path to [table] (then to the root).
 
    [is_task] indicates whether this node is a concurrent task. If it is, lookup
-   prioritizes [lexical_parent], which points to the inherited binding state. */
+   proceeds into [table.parent], which points to the inherited binding state. */
 typedef struct dynamic_node_s {
   dynamic_table_s table;
-  struct dynamic_node_s* lexical_parent;
+  dynamic_table_t newest;
   bool is_task;
 } dynamic_node_s, *dynamic_node_t;
 
 /* Free a dynamic node and its contents. */
 extern void caml_dynamic_node_free(dynamic_node_t node);
+
+/* Apply a GC scanning action to all bindings in a node's chain. */
+extern void caml_dynamic_node_scan_roots(dynamic_node_t node,
+                                         scanning_action f,
+                                         scanning_action_flags fflags,
+                                         void *fdata);
 
 #endif /* CAML_INTERNALS */
 

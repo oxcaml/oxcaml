@@ -105,27 +105,6 @@ static void dynamic_stack_free(dynamic_stack_t stack)
 }
 
 // Returns false if allocation fails.
-static bool dynamic_stack_copy(dynamic_stack_t dst, dynamic_stack_t src)
-{
-  dst->capacity = src->capacity;
-  dst->count = src->count;
-  dst->dyn = src->dyn;
-
-  if(src->vals) {
-    dst->vals = caml_stat_alloc_noexc(sizeof(value) * src->capacity);
-    if(dst->vals == NULL) {
-      return false;
-    }
-
-    memcpy(dst->vals, src->vals, sizeof(value) * src->count);
-  } else {
-    dst->vals = NULL;
-  }
-
-  return true;
-}
-
-// Returns false if allocation fails.
 static bool dynamic_stack_grow(dynamic_stack_t stack)
 {
   size_t old_capacity = stack->capacity;
@@ -183,26 +162,6 @@ static bool dynamic_stack_pop(dynamic_stack_t stack)
   return false;
 }
 
-static void dynamic_stack_register_roots(dynamic_stack_t stack)
-{
-  if(Is_this(stack->dyn)) {
-    caml_register_generational_global_root(&stack->dyn);
-    for(size_t i = 0; i < stack->count; ++i) {
-      caml_register_generational_global_root(&stack->vals[i]);
-    }
-  }
-}
-
-static void dynamic_stack_unregister_roots(dynamic_stack_t stack)
-{
-  if(Is_this(stack->dyn)) {
-    caml_remove_generational_global_root(&stack->dyn);
-    for(size_t i = 0; i < stack->count; ++i) {
-      caml_remove_generational_global_root(&stack->vals[i]);
-    }
-  }
-}
-
 static void dynamic_stack_scan_roots(dynamic_stack_t stack,
                                      scanning_action f,
                                      scanning_action_flags fflags,
@@ -224,14 +183,16 @@ static size_t dynamic_table_capacity(dynamic_table_t table) {
   return table->mask + 1;
 }
 
-CAMLexport void caml_dynamic_table_init(dynamic_table_t table)
+static void dynamic_table_init(dynamic_table_t table)
 {
   table->mask = (size_t)-1;
   table->count = 0;
   table->bindings = NULL;
+  table->frozen = 0;
+  table->parent = NULL;
 }
 
-CAMLexport void caml_dynamic_table_free(dynamic_table_t table)
+static void dynamic_table_free(dynamic_table_t table)
 {
   if(table->bindings) {
     size_t capacity = dynamic_table_capacity(table);
@@ -240,7 +201,7 @@ CAMLexport void caml_dynamic_table_free(dynamic_table_t table)
     }
     caml_stat_free(table->bindings);
   }
-  caml_dynamic_table_init(table);
+  dynamic_table_init(table);
 }
 
 static void dynamic_table_add(dynamic_table_t table, dynamic_stack_s stack)
@@ -392,61 +353,29 @@ static void dynamic_table_pop(dynamic_table_t table, value dyn)
   }
 }
 
-// Returns false if allocation fails.
-CAMLexport bool caml_dynamic_table_copy(dynamic_table_t dst, dynamic_table_t src)
-{
-  size_t capacity = dynamic_table_capacity(src);
-
-  dst->mask = src->mask;
-  dst->count = src->count;
-
-  if(src->bindings) {
-    dst->bindings = caml_stat_alloc_noexc(sizeof(dynamic_stack_s) * capacity);
-    if(dst->bindings == NULL) {
-      return false;
-    }
-
-    for(size_t i = 0; i < capacity; ++i) {
-      if(!dynamic_stack_copy(&dst->bindings[i], &src->bindings[i])) {
-        for(size_t j = 0; j < i; ++j) {
-          dynamic_stack_free(&dst->bindings[j]);
-        }
-        caml_stat_free(dst->bindings);
-        return false;
-      }
-    }
-  } else {
-    dst->bindings = NULL;
-  }
-
-  return true;
-}
-
-CAMLexport void caml_dynamic_table_register_roots(dynamic_table_t table)
-{
-  size_t capacity = dynamic_table_capacity(table);
-  for(size_t i = 0; i < capacity; ++i) {
-    dynamic_stack_register_roots(&table->bindings[i]);
-  }
-}
-
-CAMLexport void caml_dynamic_table_unregister_roots(dynamic_table_t table)
-{
-  size_t capacity = dynamic_table_capacity(table);
-  for(size_t i = 0; i < capacity; ++i) {
-    dynamic_stack_unregister_roots(&table->bindings[i]);
-  }
-}
-
-CAMLexport void caml_dynamic_table_scan_roots(dynamic_table_t table,
-                                              scanning_action f,
-                                              scanning_action_flags fflags,
-                                              void *fdata)
+static void dynamic_table_scan_roots(dynamic_table_t table,
+                                     scanning_action f,
+                                     scanning_action_flags fflags,
+                                     void *fdata)
 {
   if(table->bindings) {
     size_t capacity = dynamic_table_capacity(table);
     for(size_t i = 0; i < capacity; ++i) {
       dynamic_stack_scan_roots(&table->bindings[i], f, fflags, fdata);
+    }
+  }
+}
+
+CAMLexport void caml_dynamic_node_scan_roots(dynamic_node_t node,
+                                             scanning_action f,
+                                             scanning_action_flags fflags,
+                                             void *fdata)
+{
+  /* Stops at the base: tables past it are scanned by their own fibers */
+  for(dynamic_table_t table = node->newest;; table = table->parent) {
+    dynamic_table_scan_roots(table, f, fflags, fdata);
+    if(table == &node->table) {
+      break;
     }
   }
 }
@@ -467,8 +396,8 @@ static dynamic_node_t dynamic_node_get_or_init(struct stack_info *stack)
     if(node == NULL) {
       caml_raise_out_of_memory();
     }
-    caml_dynamic_table_init(&node->table);
-    node->lexical_parent = NULL;
+    dynamic_table_init(&node->table);
+    node->newest = &node->table;
     node->is_task = false;
     stack->dyn_node = node;
   }
@@ -478,27 +407,23 @@ static dynamic_node_t dynamic_node_get_or_init(struct stack_info *stack)
 CAMLexport void caml_dynamic_node_free(dynamic_node_t node)
 {
   if(node != NULL) {
-    caml_dynamic_table_free(&node->table);
+
+    // Free tables from [node->newest] to [&node->table]
+    dynamic_table_t table = node->newest;
+    while(table != &node->table) {
+      dynamic_table_t prev = table->parent;
+      dynamic_table_free(table);
+      caml_stat_free(table);
+      table = prev;
+    }
+
+    dynamic_table_free(&node->table);
     caml_stat_free(node);
   }
 }
 
-static bool dynamic_node_find(dynamic_node_t node, value dyn, value *val)
-{
-  dynamic_stack_t bindings;
-  if(node != NULL
-     && dynamic_table_find(&node->table, dyn, &bindings)
-     && bindings->count > 0) {
-    *val = bindings->vals[bindings->count - 1];
-    return true;
-  }
-  return false;
-}
-
 static value dynamic_lookup(struct stack_info *stack, value dyn)
 {
-  value val;
-
   // Outer loop traverses the Stack_parent chain. In the absence of structured
   // concurrency, this is all we need.
   for(; stack != NULL; stack = Stack_parent(stack)) {
@@ -507,28 +432,22 @@ static value dynamic_lookup(struct stack_info *stack, value dyn)
     if(node == NULL) {
       continue;
     }
-    if(dynamic_node_find(node, dyn, &val)) {
-      return val;
-    }
 
-    // If the current node is a task whose lexical parent disagrees with its
-    // dynamic parent, traverse the lexical chain. Note we ignore plain nodes:
-    // their lexical parents only cache frozen parent pointers.
-    if(node->is_task &&
-       /* If lexical_parent is NULL, this is the root task. */
-       node->lexical_parent != NULL &&
-        /* If the lexical parent is suspended, its Stack_parent is NULL. */
-        (Stack_parent(stack) == NULL ||
-         Stack_parent(stack)->dyn_node != node->lexical_parent)) {
+    // Inner loop walks the fiber's tables newest-first. Plain fibers'
+    // lookups stop at their base; tasks continue toward the task root.
+    dynamic_table_t table = node->newest;
+    while(table != NULL) {
 
-      dynamic_node_t lex_node = node->lexical_parent;
-
-      // Inner loop traverses the lexical parent chain.
-      for(; lex_node != NULL; lex_node = lex_node->lexical_parent) {
-        if(dynamic_node_find(lex_node, dyn, &val)) {
-          return val;
-        }
+      dynamic_stack_t bindings;
+      bool found = dynamic_table_find(table, dyn, &bindings);
+      if(found && bindings->count > 0) {
+        return bindings->vals[bindings->count - 1];
       }
+
+      if(table == &node->table && !node->is_task) {
+        break;
+      }
+      table = table->parent;
     }
   }
   return Val_null;
@@ -565,8 +484,31 @@ CAMLprim value caml_dynamic_push(value dyn, value val)
   CAMLassert(stack);
 
   dynamic_node_t node = dynamic_node_get_or_init(stack);
-  if(!dynamic_table_push(&node->table, dyn, val)) {
-    caml_raise_out_of_memory();
+  dynamic_table_t table = node->newest;
+
+  // We cannot modify a frozen table, so push a fresh one
+  if(table->frozen > 0) {
+
+    dynamic_table_t fresh = caml_stat_alloc_noexc(sizeof(dynamic_table_s));
+    if(fresh != NULL) {
+      dynamic_table_init(fresh);
+    } else {
+      caml_raise_out_of_memory();
+    }
+
+    if(!dynamic_table_push(fresh, dyn, val)) {
+      dynamic_table_free(fresh);
+      caml_stat_free(fresh);
+      caml_raise_out_of_memory();
+    }
+
+    fresh->parent = table;
+    node->newest = fresh;
+
+  } else {
+    if(!dynamic_table_push(table, dyn, val)) {
+      caml_raise_out_of_memory();
+    }
   }
 
   dynamic_binding_t entry = dynamic_cache_entry(dyn);
@@ -583,10 +525,22 @@ CAMLprim value caml_dynamic_pop(value dyn)
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
-  /* There should be a corresponding push on this fiber */
-  CAMLassert(stack->dyn_node);
-  if(stack->dyn_node != NULL) {
-    dynamic_table_pop(&stack->dyn_node->table, dyn);
+  // The binding being popped was pushed to the newest table
+  dynamic_node_t node = stack->dyn_node;
+  CAMLassert(node);
+
+  if(node != NULL) {
+    dynamic_table_t table = node->newest;
+    CAMLassert(table->frozen == 0);
+
+    dynamic_table_pop(table, dyn);
+
+    if(table != &node->table && table->count == 0 && table->frozen == 0) {
+      // The last binding scope below a freeze closed; free its table
+      node->newest = table->parent;
+      dynamic_table_free(table);
+      caml_stat_free(table);
+    }
   }
 
   dynamic_binding_t entry = dynamic_cache_entry(dyn);
@@ -597,15 +551,51 @@ CAMLprim value caml_dynamic_pop(value dyn)
   return Val_unit;
 }
 
+CAMLexport dynamic_table_t caml_dynamic_state_snapshot(void)
+{
+  dynamic_node_t node = dynamic_node_get_or_init(Caml_state->current_stack);
+  dynamic_table_t snapshot = node->newest;
+  snapshot->frozen++;
+  return snapshot;
+}
+
+CAMLexport void caml_dynamic_state_restore(dynamic_table_t snapshot)
+{
+  dynamic_node_t node = Caml_state->current_stack->dyn_node;
+  CAMLassert(node != NULL);
+
+  // Discard the tables pushed above the snapshot
+  dynamic_table_t table = node->newest;
+  while(table != snapshot && table != &node->table) {
+
+    CAMLassert(table->frozen == 0);
+    dynamic_table_t prev = table->parent;
+    dynamic_table_free(table);
+    caml_stat_free(table);
+    table = prev;
+  }
+
+  CAMLassert(table == snapshot);
+  node->newest = snapshot;
+
+  CAMLassert(snapshot->frozen > 0);
+  if(snapshot->frozen > 0) {
+    snapshot->frozen--;
+  }
+
+  caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
+}
+
 CAMLprim value caml_dynamic_freeze_scope(value unit)
 {
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
-  dynamic_node_t node = dynamic_node_get_or_init(stack);
+  // Child fibers may concurrently read the current binding table, so freeze it
+  dynamic_table_t scope = caml_dynamic_state_snapshot();
 
-  // Link fibers up to the enclosing task into the lexical parent chain.
-  dynamic_node_t cur = node;
+  // Link fibers up to the enclosing task into the frozen path
+  dynamic_node_t cur = stack->dyn_node;
   while(!cur->is_task && Stack_parent(stack) != NULL) {
 
     stack = Stack_parent(stack);
@@ -615,10 +605,10 @@ CAMLprim value caml_dynamic_freeze_scope(value unit)
       continue;
     }
 
-    // Avoid writing the parent if we've already frozen it
-    // (children may be reading it concurrently)
-    if(cur->lexical_parent != next) {
-      cur->lexical_parent = next;
+    // Avoid writing the link if we've already frozen it
+    dynamic_table_t link = next->newest;
+    if(cur->table.parent != link) {
+      cur->table.parent = link;
     }
     cur = next;
   }
@@ -626,7 +616,7 @@ CAMLprim value caml_dynamic_freeze_scope(value unit)
   // Freezing must happen inside a root task, so the walk ends at a task node.
   CAMLassert(cur->is_task);
 
-  return Val_ptr(node);
+  return Val_ptr(scope);
 }
 
 CAMLprim value caml_dynamic_use_scope(value scope)
@@ -634,21 +624,36 @@ CAMLprim value caml_dynamic_use_scope(value scope)
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
-  dynamic_node_t parent = Ptr_val(scope);
+  dynamic_table_t parent = Ptr_val(scope);
   CAMLassert(parent);
 
   dynamic_node_t node = dynamic_node_get_or_init(stack);
-  node->lexical_parent = parent;
+  node->table.parent = parent;
   node->is_task = true;
   caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
 
   return Val_unit;
 }
 
+CAMLprim value caml_dynamic_thaw_scope(value scope)
+{
+  CAMLnoalloc;
+
+  // Scopes are thawed on the fiber that froze them, after any binding
+  // scopes opened in the interim have closed.
+  dynamic_table_t table = Ptr_val(scope);
+  CAMLassert(table);
+  CAMLassert(table->frozen > 0);
+  if(table->frozen > 0) {
+    table->frozen--;
+  }
+  return Val_unit;
+}
+
 CAMLprim value caml_dynamic_set_root(value unit)
 {
   dynamic_node_t node = dynamic_node_get_or_init(Caml_state->current_stack);
-  node->lexical_parent = NULL;
+  node->table.parent = NULL;
   node->is_task = true;
   caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
   return Val_unit;

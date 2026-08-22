@@ -55,3 +55,25 @@ child1b d_inter [expect 7]: 7
 F d_inter before capture [expect 7]: 7
 F d_inter after resume [expect 8]: 8
 child2 d_inter [expect 8]: 8
+
+# Test 11: bindings above a freeze are invisible to bounded children
+inline sees own rebind [expect 9]: 9
+inline sees own binding [expect 5]: 5
+stolen child sees frozen state [expect 1]: 1
+stolen child misses inline binding [expect 7]: 7
+inline still sees rebind [expect 9]: 9
+after inline child [expect 1]: 1
+second scope above freeze [expect 8]: 8
+after second scope [expect 1]: 1
+fresh table survives GC [expect over-lay]: over-lay
+after release [expect 1]: 1
+after scope [expect null]: null
+
+# Test 12: nested freezes bound their children separately
+nested child sees inline binding [expect 5]: 5
+nested child sees outer scope [expect 1]: 1
+nested child own worker [expect 200]: 200
+outer child misses inline binding [expect 7]: 7
+outer child sees outer scope [expect 1]: 1
+after nested inline [expect null]: null
+after scope [expect null]: null
