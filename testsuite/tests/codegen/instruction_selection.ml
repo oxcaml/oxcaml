@@ -81,7 +81,6 @@ logand_branch:
   movq  (%rbx), %rdi
   jmp   *%rdi
 .L0:
-  movl  $1, %eax
   ret
 |}]
 
