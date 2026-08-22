@@ -139,6 +139,7 @@ function caml_make_unhandled_effect_exn(eff) {
 //Requires: caml_get_cps_fun
 //If: effects
 //Version: >= 5.0
+//Version: < 5.6
 function caml_perform_effect(eff, k0) {
   if (caml_current_stack.e === 0) {
     var exn = caml_make_unhandled_effect_exn(eff);
@@ -157,6 +158,30 @@ function caml_perform_effect(eff, k0) {
     : caml_trampoline_return(handler, [eff, cont, last_fiber, k1]);
 }
 
+//Provides: caml_perform_effect
+//Requires: caml_pop_fiber, caml_stack_check_depth, caml_trampoline_return
+//Requires: caml_make_unhandled_effect_exn, caml_current_stack
+//Requires: caml_get_cps_fun
+//If: effects
+//Version: >= 5.6
+function caml_perform_effect(eff, k0) {
+  if (caml_current_stack.e === 0) {
+    var exn = caml_make_unhandled_effect_exn(eff);
+    throw exn;
+  }
+  // Get current effect handler
+  var handler = caml_current_stack.h[3];
+  var last_fiber = caml_current_stack;
+  last_fiber.k = k0;
+  var cont = [245 /*continuation*/, last_fiber, last_fiber];
+  // Move to parent fiber and execute the effect handler there
+  // The handler is defined in Stdlib.Effect, so we know that the arity matches
+  var k1 = caml_pop_fiber();
+  return caml_stack_check_depth()
+    ? caml_get_cps_fun(handler)(eff, cont, k1)
+    : caml_trampoline_return(handler, [eff, cont, k1]);
+}
+
 //Provides: caml_reperform_effect
 //Requires: caml_pop_fiber, caml_stack_check_depth, caml_trampoline_return
 //Requires: caml_make_unhandled_effect_exn, caml_current_stack
@@ -164,6 +189,7 @@ function caml_perform_effect(eff, k0) {
 //Requires: caml_get_cps_fun
 //If: effects
 //Version: >= 5.0
+//Version: < 5.6
 function caml_reperform_effect(eff, cont, last, k0) {
   if (caml_current_stack.e === 0) {
     var exn = caml_make_unhandled_effect_exn(eff);
@@ -183,6 +209,36 @@ function caml_reperform_effect(eff, cont, last, k0) {
   return caml_stack_check_depth()
     ? caml_get_cps_fun(handler)(eff, cont, last_fiber, k1)
     : caml_trampoline_return(handler, [eff, cont, last_fiber, k1]);
+}
+
+//Provides: caml_reperform_effect
+//Requires: caml_pop_fiber, caml_stack_check_depth, caml_trampoline_return
+//Requires: caml_make_unhandled_effect_exn, caml_current_stack
+//Requires: caml_resume_stack, caml_continuation_use_noexc
+//Requires: caml_get_cps_fun
+//If: effects
+//Version: >= 5.6
+function caml_reperform_effect(eff, cont, _last, k0) {
+  if (caml_current_stack.e === 0) {
+    var exn = caml_make_unhandled_effect_exn(eff);
+    var stack = caml_continuation_use_noexc(cont);
+    caml_resume_stack(stack, cont[2], k0);
+    throw exn;
+  }
+  // Get current effect handler
+  var handler = caml_current_stack.h[3];
+  var last_fiber = caml_current_stack;
+  last_fiber.k = k0;
+  // [cont_last_fiber] is gone in OCaml 5.6, but we still maintain the tail
+  // at cont[2] ourselves on every (re)perform.
+  cont[2].e = last_fiber;
+  cont[2] = last_fiber;
+  // Move to parent fiber and execute the effect handler there
+  // The handler is defined in Stdlib.Effect, so we know that the arity matches
+  var k1 = caml_pop_fiber();
+  return caml_stack_check_depth()
+    ? caml_get_cps_fun(handler)(eff, cont, k1)
+    : caml_trampoline_return(handler, [eff, cont, k1]);
 }
 
 //Provides: caml_get_cps_fun
@@ -236,7 +292,7 @@ function caml_alloc_stack(hv, hx, hf) {
 //Provides: caml_alloc_stack
 //If: !effects
 //Version: >= 5.0
-function caml_alloc_stack(hv, hx, hf) {
+function caml_alloc_stack(_hv, _hx, _hf) {
   return 0;
 }
 
@@ -266,6 +322,27 @@ function caml_continuation_use_and_update_handler_noexc(
   return stack;
 }
 
+//Provides: caml_continuation_update_handler_noexc
+//Version: >= 5.2
+//If: oxcaml
+function caml_continuation_update_handler_noexc(cont, hval, hexn, heff, _htick) {
+  var stack = cont[1];
+  if (stack === 0) return cont;
+  var last = cont[2];
+  last.h[1] = hval;
+  last.h[2] = hexn;
+  last.h[3] = heff;
+  return cont;
+}
+
+//Provides: caml_continuation_update_tick_handler_noexc
+//Requires: caml_failwith
+//Version: >= 5.4
+//If: oxcaml
+function caml_continuation_update_tick_handler_noexc(_cont, _htick) {
+  caml_failwith("caml_continuation_update_tick_handler_noexc not implemented");
+}
+
 //Provides: caml_get_continuation_callstack
 //Version: >= 5.0
 function caml_get_continuation_callstack() {
@@ -274,42 +351,42 @@ function caml_get_continuation_callstack() {
 
 //Provides: caml_ml_condition_new
 //Version: >= 5.0
-function caml_ml_condition_new(unit) {
+function caml_ml_condition_new(_unit) {
   return { condition: 1 };
 }
 
 //Provides: caml_ml_condition_wait
 //Version: >= 5.0
-function caml_ml_condition_wait(t, mutext) {
+function caml_ml_condition_wait(_t, _mutext) {
   return 0;
 }
 
 //Provides: caml_ml_condition_broadcast
 //Version: >= 5.0
-function caml_ml_condition_broadcast(t) {
+function caml_ml_condition_broadcast(_t) {
   return 0;
 }
 
 //Provides: caml_ml_condition_signal
 //Version: >= 5.0
-function caml_ml_condition_signal(t) {
+function caml_ml_condition_signal(_t) {
   return 0;
 }
 
 //Provides: jsoo_effect_not_supported
 //Requires: caml_failwith
-//!If: effects
+//If: !effects
 //Version: >= 5.0
 function jsoo_effect_not_supported() {
   caml_failwith("Effect handlers are not supported");
 }
 
-//Provides: caml_resume
+//Provides: caml_resume_run
 //Requires:caml_stack_depth, caml_call_gen_cps, caml_current_stack, caml_wrap_exception, caml_resume_stack
 //If: effects
 //If: doubletranslate
 //Version: >= 5.0
-function caml_resume(f, arg, stack, last) {
+function caml_resume_run(stack, last, mk_res) {
   var saved_stack_depth = caml_stack_depth;
   var saved_current_stack = caml_current_stack;
   try {
@@ -317,8 +394,7 @@ function caml_resume(f, arg, stack, last) {
     var k = caml_resume_stack(stack, last, function (x) {
       return x;
     });
-    /* Note: f is not an ordinary function but a (direct-style, CPS) closure pair */
-    var res = { joo_tramp: f, joo_args: [arg, k], joo_direct: 0 };
+    var res = mk_res(k);
     do {
       /* Avoids trampolining too often while still avoiding stack overflow. See
          [caml_callback]. */
@@ -344,6 +420,74 @@ function caml_resume(f, arg, stack, last) {
     caml_stack_depth = saved_stack_depth;
     caml_current_stack = saved_current_stack;
   }
+}
+
+//Provides: caml_run_stack
+//Requires: caml_resume_run
+//If: effects
+//If: doubletranslate
+//Version: >= 5.0
+function caml_run_stack(f, arg, stack, last) {
+  /* Run [f arg] on a freshly allocated stack (the with_stack family). */
+  return caml_resume_run(stack, last, function (k) {
+    /* Note: f is not an ordinary function but a (direct-style, CPS) closure pair */
+    return { joo_tramp: f, joo_args: [arg, k], joo_direct: 0 };
+  });
+}
+
+//Provides: caml_continue
+//Requires: caml_resume_run
+//If: effects
+//If: doubletranslate
+//Version: >= 5.0
+function caml_continue(stack, value, last) {
+  /* Return [value] to the perform site on the resumed stack, by calling the
+     low-level continuation of the resumed stack with it. */
+  return caml_resume_run(stack, last, function (k) {
+    return { joo_tramp: k, joo_args: [value], joo_direct: 1 };
+  });
+}
+
+//Provides: caml_discontinue
+//Requires: caml_resume_run, caml_maybe_attach_backtrace
+//If: effects
+//If: doubletranslate
+//Version: >= 5.0
+function caml_discontinue(stack, exn, last) {
+  /* Raise [exn] at the perform site on the resumed stack: the throw is
+     caught by the trampoline loop in [caml_resume_run] and dispatched to the
+     innermost exception handler of the resumed stack. */
+  return caml_resume_run(stack, last, function (_k) {
+    return {
+      joo_tramp: function (e) {
+        throw caml_maybe_attach_backtrace(e, 1);
+      },
+      joo_args: [exn],
+      joo_direct: 1,
+    };
+  });
+}
+
+//Provides: caml_discontinue_with_backtrace
+//Requires: caml_resume_run, caml_maybe_attach_backtrace, caml_restore_raw_backtrace
+//If: effects
+//If: doubletranslate
+//Version: >= 5.0
+function caml_discontinue_with_backtrace(stack, exn, bt, last) {
+  /* As [caml_discontinue], except that it reraises: restoring a raw
+     backtrace is a no-op in js_of_ocaml, and, as for a reraise, we keep any
+     JS error already attached to the exception instead of forcing a fresh
+     one. */
+  caml_restore_raw_backtrace(exn, bt);
+  return caml_resume_run(stack, last, function (_k) {
+    return {
+      joo_tramp: function (e) {
+        throw caml_maybe_attach_backtrace(e, 0);
+      },
+      joo_args: [exn],
+      joo_direct: 1,
+    };
+  });
 }
 
 //Provides: caml_cps_closure

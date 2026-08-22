@@ -1,4 +1,4 @@
-(lang dune 3.17)
+(lang dune 3.19)
 
 (env
  (_
@@ -8,5 +8,6 @@
   (js_of_ocaml
 ;; enable for debugging
 ;; (flags (:standard --debug stats-debug --debug invariant))
-   (flags (:standard --Werror))
+   (flags (:standard -w "no-missing-effects-backend"))
+   (link_flags (:standard -w "no-missing-effects-backend"))
    (runtest_alias runtest-js))))

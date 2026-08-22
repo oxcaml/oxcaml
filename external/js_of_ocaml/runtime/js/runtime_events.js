@@ -12,7 +12,7 @@ function caml_runtime_events_user_register(event_name, event_tag, event_type) {
 
 //Provides: caml_runtime_events_user_write
 //Version: >= 5.1
-function caml_runtime_events_user_write(event, event_content) {
+function caml_runtime_events_user_write(_event, _event_content) {
   return 0;
 }
 
@@ -64,26 +64,27 @@ function caml_ml_runtime_events_resume() {
   return 0;
 }
 
-//Provides: caml_runtime_events_create_cursor
+//Provides: caml_ml_runtime_events_create_cursor
 //Version: >= 5.0
-function caml_runtime_events_create_cursor(target) {
+function caml_ml_runtime_events_create_cursor(_target) {
   return {};
 }
 
-//Provides: caml_runtime_events_free_cursor
+//Provides: caml_ml_runtime_events_free_cursor
 //Version: >= 5.0
-function caml_runtime_events_free_cursor(cursor) {
+function caml_ml_runtime_events_free_cursor(_cursor) {
   return 0;
 }
 
-//Provides: caml_runtime_events_read_poll
+//Provides: caml_ml_runtime_events_read_poll
 //Version: >= 5.0
-function caml_runtime_events_read_poll(cursor, callbacks, num) {
+function caml_ml_runtime_events_read_poll(_cursor, _callbacks, _num) {
   return 0;
 }
 
 //Provides: caml_ml_runtime_events_path const
-//Version: >= 5.3
+//Version: >= 5.2
+//Since 5.3 in OCaml mainstream, but also available in OxCaml
 function caml_ml_runtime_events_path(_unit) {
   return 0;
 }

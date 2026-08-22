@@ -88,7 +88,7 @@ always uses this location.
     (0,f)(e)(e')
          ^  ^
 
-Usually, Chrome stops at the begining of statements.
+Usually, Chrome stops at the beginning of statements.
 
    if (e) { ... }
    ^
@@ -142,8 +142,10 @@ end) =
 struct
   open D
 
-  let nane_of_label = function
-    | Javascript.Label.L _ -> assert false
+  let name_of_label = function
+    | Javascript.Label.L v ->
+        assert accept_unnamed_var;
+        Utf8_string.of_string_exn (Format.asprintf "<%a>" Code.Var.print v)
     | Javascript.Label.S n -> n
 
   let debug_enabled = Config.Flag.debuginfo ()
@@ -231,6 +233,14 @@ struct
                   ; ori_col = col
                   ; ori_name = get_name_index nm
                   })
+
+  let identName f x =
+    match Js_token.is_reserved x with
+    | None -> PP.string f x
+    | Some _ ->
+        (* identName, that are reserved keyword, are escaped *)
+        let rest = String.sub x ~pos:1 ~len:(String.length x - 1) in
+        PP.string f (Printf.sprintf "\\u{%x}%s" (Char.code x.[0]) rest)
 
   let ident f ~kind = function
     | S { name = Utf8 name; var = Some v; _ } ->
@@ -458,19 +468,21 @@ struct
       | EVar (S { name = Utf8 "in"; _ }) -> true
       | ESeq (e1, e2) ->
           Prec.(l <= Expression) && (traverse Expression e1 || traverse Expression e2)
-      | ECond (e1, e2, e3) ->
+      | ECond (e1, _, e3) ->
+          (* the then-branch is parsed at [+In] (it is delimited by `?` and
+             `:`), so an `in` there never needs parentheses; only the
+             condition and the else-branch propagate the [In] restriction.
+             Both are printed at most at AssignementExpression. *)
           Prec.(l <= ConditionalExpression)
-          && (traverse ShortCircuitExpression e1
-             || traverse ShortCircuitExpression e2
-             || traverse ShortCircuitExpression e3)
+          && (traverse ShortCircuitExpression e1 || traverse AssignementExpression e3)
       | EAssignTarget (ObjectTarget _) -> false
       | EAssignTarget (ArrayTarget _) -> false
       | EBin (op, e1, e2) ->
           let out, lft, rght = op_prec op in
           Prec.(l <= out)
           && ((match op with
-              | In -> in_
-              | _ -> false)
+                | In -> in_
+                | _ -> false)
              || traverse lft e1
              || traverse rght e2)
       | EUn ((IncrA | DecrA | IncrB | DecrB), e) ->
@@ -484,7 +496,19 @@ struct
       | EAccess (e, _, _)
       | EDot (e, _, _)
       | EDotPrivate (e, _, _) -> traverse CallOrMemberExpression e
-      | EArrow _
+      | EArrow ((_, _, b, _), concise, _) -> (
+          (* a concise body is printed at AssignementExpression; a
+             braced body resets the [In] restriction *)
+          Prec.(l <= AssignementExpression)
+          &&
+          match b, concise with
+          | [ (Return_statement (Some e, _), _) ], true ->
+              traverse AssignementExpression e
+          | _ -> false)
+      | EYield { expr = Some e; _ } ->
+          (* the payload is printed at AssignementExpression *)
+          Prec.(l <= AssignementExpression) && traverse AssignementExpression e
+      | EYield { expr = None; _ } -> false
       | EVar _
       | EStr _
       | ETemplate _
@@ -493,7 +517,6 @@ struct
       | ENum _
       | ERegexp _
       | ENew _
-      | EYield _
       | EPrivName _ -> false
       | CoverCallExpressionAndAsyncArrowHead e
       | CoverParenthesizedExpressionAndArrowParameterList e -> early_error e
@@ -530,15 +553,22 @@ struct
     | Try_statement _
     | Debugger_statement -> true
 
-  let best_string_quote s =
-    let simple = ref 0 and double = ref 0 in
-    for i = 0 to String.length s - 1 do
+  let best_string_quote ?(allow_backtick = false) s =
+    let single = ref 0 and double = ref 0 and backtick = ref 0 in
+    let len = String.length s in
+    for i = 0 to len - 1 do
       match s.[i] with
-      | '\'' -> incr simple
+      | '\'' -> incr single
       | '"' -> incr double
+      | '`' -> incr backtick
+      | '$' when i + 1 < len && Char.equal s.[i + 1] '{' -> incr backtick
       | _ -> ()
     done;
-    if !simple < !double then '\'' else '"'
+    if allow_backtick && !backtick < !single && !backtick < !double
+    then '`'
+    else if !single < !double
+    then '\''
+    else '"'
 
   let pp_string f ?(quote = '"') s =
     let l = String.length s in
@@ -560,6 +590,8 @@ struct
       | '\000' .. '\031' | '\127' ->
           Buffer.add_string b "\\x";
           Buffer.add_char_hex b c
+      | '$' when Char.equal quote '`' && i + 1 < l && Char.equal s.[i + 1] '{' ->
+          Buffer.add_string b "\\$"
       | _ ->
           if Char.equal c quote
           then (
@@ -570,8 +602,8 @@ struct
     Buffer.add_char b quote;
     PP.string f (Buffer.contents b)
 
-  let pp_string_lit f (Stdlib.Utf8_string.Utf8 s) =
-    let quote = best_string_quote s in
+  let pp_string_lit ?(allow_backtick = false) f (Stdlib.Utf8_string.Utf8 s) =
+    let quote = best_string_quote ~allow_backtick s in
     pp_string f ~quote s
 
   let pp_ident_or_string_lit f (Stdlib.Utf8_string.Utf8 s_lit as s) =
@@ -720,11 +752,18 @@ struct
         then (
           PP.string f ")";
           PP.end_group f)
-    | EStr x -> pp_string_lit f x
+    | EStr x -> pp_string_lit ~allow_backtick:(PP.compact f) f x
     | ETemplate l -> template f l
-    | EBool b -> PP.string f (if b then "true" else "false")
+    | EBool b ->
+        if PP.compact f
+        then
+          (* Emit [!0]/[!1] in compact mode. Recurse into the [EUn (Not, _)]
+             printer so precedence-driven parenthesisation comes for free. *)
+          let n = if b then "0" else "1" in
+          expression l f (EUn (Not, ENum (Num.of_string_unsafe n)))
+        else PP.string f (if b then "true" else "false")
     | ENum num ->
-        let s = Num.to_string num in
+        let s = Num.to_string ~minify:(PP.compact f) num in
         let need_parent =
           if Num.is_neg num
           then
@@ -1078,33 +1117,32 @@ struct
         match opt with
         | None -> ()
         | Some o -> PP.string f o)
-    | EYield { delegate; expr = e } -> (
+    | EYield { delegate; expr = e } ->
         let kw =
           match delegate with
           | false -> "yield"
           | true -> "yield*"
         in
-        match e with
+        if Prec.(l > AssignementExpression)
+        then (
+          PP.start_group f 1;
+          PP.string f "(");
+        (match e with
         | None -> PP.string f kw
         | Some e ->
-            if Prec.(l > AssignementExpression)
-            then (
-              PP.start_group f 1;
-              PP.string f "(");
             PP.start_group f 7;
             PP.string f kw;
             PP.non_breaking_space f;
             PP.start_group f 0;
             expression AssignementExpression f e;
             PP.end_group f;
-            PP.end_group f;
-            if Prec.(l > AssignementExpression)
-            then (
-              PP.end_group f;
-              PP.string f ")"
-              (* There MUST be a space between the yield and its
-                 argument. A line return will not work *))
-        )
+            PP.end_group f
+            (* There MUST be a space between the yield and its
+                 argument. A line return will not work *));
+        if Prec.(l > AssignementExpression)
+        then (
+          PP.end_group f;
+          PP.string f ")")
     | EPrivName (Utf8 i) ->
         PP.string f "#";
         PP.string f i
@@ -1238,7 +1276,10 @@ struct
         PP.start_group f 1;
         PP.space f;
         output_debug_info f loc;
-        let p = (not in_) && contains ~in_:true Expression e in
+        (* the initializer is printed at [AssignementExpression]; matching
+           that level avoids redundant parentheses around a comma sequence,
+           which the printer already parenthesizes here *)
+        let p = (not in_) && contains ~in_:true AssignementExpression e in
         if p
         then (
           PP.start_group f 1;
@@ -1260,7 +1301,10 @@ struct
         output_debug_info f loc;
         PP.start_group f 1;
         PP.space f;
-        let p = (not in_) && contains ~in_:true Expression e in
+        (* the initializer is printed at [AssignementExpression]; matching
+           that level avoids redundant parentheses around a comma sequence,
+           which the printer already parenthesizes here *)
+        let p = (not in_) && contains ~in_:true AssignementExpression e in
         if p
         then (
           PP.start_group f 1;
@@ -1351,23 +1395,33 @@ struct
 
   and variable_declaration_kind f kind =
     match kind with
-    | Var -> PP.string f "var"
-    | Let -> PP.string f "let"
-    | Const -> PP.string f "const"
+    | Var ->
+        PP.string f "var";
+        PP.space f
+    | Let ->
+        PP.string f "let";
+        PP.space f
+    | Const ->
+        PP.string f "const";
+        PP.space f
+    | Using ->
+        PP.string f "using";
+        PP.non_breaking_space f
+    | AwaitUsing ->
+        PP.string f "await using";
+        PP.non_breaking_space f
 
   and variable_declaration_list ?in_ kind close f = function
     | [] -> ()
     | [ x ] ->
         PP.start_group f 1;
         variable_declaration_kind f kind;
-        PP.space f;
         variable_declaration f ?in_ x;
         if close then PP.string f ";";
         PP.end_group f
     | l ->
         PP.start_group f 1;
         variable_declaration_kind f kind;
-        PP.space f;
         variable_declaration_list_aux f ?in_ l;
         if close then PP.string f ";";
         PP.end_group f
@@ -1399,7 +1453,6 @@ struct
 
   and for_binding f k v =
     variable_declaration_kind f k;
-    PP.space f;
     binding f v
 
   and statement1 ?last f s =
@@ -1617,16 +1670,16 @@ struct
         last_semi ()
     | Continue_statement (Some s) ->
         PP.string f "continue ";
-        let (Utf8 l) = nane_of_label s in
-        PP.string f l;
+        let (Utf8 l) = name_of_label s in
+        identName f l;
         last_semi ()
     | Break_statement None ->
         PP.string f "break";
         last_semi ()
     | Break_statement (Some s) ->
         PP.string f "break ";
-        let (Utf8 l) = nane_of_label s in
-        PP.string f l;
+        let (Utf8 l) = name_of_label s in
+        identName f l;
         last_semi ()
     | Return_statement (e, loc) -> (
         match e with
@@ -1670,8 +1723,8 @@ struct
                argument. A line return will not work *)
         )
     | Labelled_statement (i, s) ->
-        let (Utf8 l) = nane_of_label i in
-        PP.string f l;
+        let (Utf8 l) = name_of_label i in
+        identName f l;
         PP.string f ":";
         PP.space f;
         statement ~last f s
@@ -1774,13 +1827,19 @@ struct
         PP.break f;
         statement f s;
         PP.end_group f
-    | Import ({ kind; from }, _loc) ->
+    | Import ({ kind; from; withClause }, _loc) ->
         PP.start_group f 0;
         PP.string f "import";
         (match kind with
         | SideEffect -> ()
         | Default i ->
             PP.space f;
+            ident f ~kind:`Binding i
+        | DeferNamespace i ->
+            PP.space f;
+            PP.string f "defer";
+            PP.space f;
+            PP.string f "* as ";
             ident f ~kind:`Binding i
         | Namespace (def, i) ->
             Option.iter def ~f:(fun def ->
@@ -1821,10 +1880,39 @@ struct
             PP.string f "from");
         PP.space f;
         pp_string_lit f from;
+        (match withClause with
+        | None -> ()
+        | Some l ->
+            PP.space f;
+            PP.string f "with";
+            PP.space f;
+            PP.string f "{";
+            PP.space f;
+            comma_list
+              ~force_last_comma:(fun _ -> false)
+              f
+              (fun f (i, s) ->
+                pp_ident_or_string_lit f i;
+                PP.string f " : ";
+                pp_string_lit f s)
+              l;
+            PP.space f;
+            PP.string f "}");
         PP.string f ";";
         PP.end_group f
     | Export (e, _loc) ->
         PP.start_group f 0;
+        (* Print decorators before 'export' for decorated class exports *)
+        (match e with
+        | ExportClass (_, decl) | ExportDefaultClass (_, decl) ->
+            decorator_list f decl.decorators
+        | ExportVar _
+        | ExportFun _
+        | ExportNames _
+        | ExportDefaultFun _
+        | ExportDefaultExpression _
+        | ExportFrom _
+        | CoverExportFrom _ -> ());
         PP.string f "export";
         (match e with
         | ExportNames l ->
@@ -1847,7 +1935,7 @@ struct
               l;
             PP.space f;
             PP.string f "};"
-        | ExportFrom { kind; from } ->
+        | ExportFrom { kind; from; withClause } ->
             PP.space f;
             (match kind with
             | Export_all None -> PP.string f "*"
@@ -1874,6 +1962,25 @@ struct
             PP.string f "from";
             PP.space f;
             pp_string_lit f from;
+            (match withClause with
+            | None -> ()
+            | Some l ->
+                PP.space f;
+                PP.string f "with";
+                PP.space f;
+                PP.string f "{";
+                PP.space f;
+                comma_list
+                  ~force_last_comma:(fun _ -> false)
+                  f
+                  (fun f (i, s) ->
+                    pp_ident_or_string_lit f i;
+                    PP.string f " : ";
+                    pp_string_lit f s)
+                  l;
+                PP.space f;
+                PP.string f "}");
+
             PP.string f ";"
         | ExportDefaultExpression e ->
             PP.space f;
@@ -1897,13 +2004,15 @@ struct
             PP.space f;
             PP.string f "default";
             PP.space f;
-            class_declaration f id decl
+            (* Decorators already printed before 'export' *)
+            class_declaration f id { decl with decorators = [] }
         | ExportFun (id, decl) ->
             PP.space f;
             function_declaration' f (Some id) decl
         | ExportClass (id, decl) ->
             PP.space f;
-            class_declaration f (Some id) decl
+            (* Decorators already printed before 'export' *)
+            class_declaration f (Some id) { decl with decorators = [] }
         | ExportVar (k, l) ->
             PP.space f;
             variable_declaration_list k (not can_omit_semi) f l
@@ -1970,8 +2079,25 @@ struct
     in
     function_declaration f prefix (ident ~kind:`Binding) name l b loc'
 
+  and decorator f e =
+    PP.start_group f 2;
+    PP.string f "@";
+    expression LeftHandSideExpression f e;
+    PP.end_group f
+
+  and decorator_list f decorators =
+    match decorators with
+    | [] -> ()
+    | _ ->
+        PP.start_group f 0;
+        List.iter decorators ~f:(fun d ->
+            decorator f d;
+            PP.space f);
+        PP.end_group f
+
   and class_declaration f i x =
-    PP.start_group f 1;
+    PP.start_group f 0;
+    decorator_list f x.decorators;
     PP.start_group f 0;
     PP.start_group f 0;
     PP.string f "class";
@@ -1993,20 +2119,42 @@ struct
     PP.break f;
     List.iter_last x.body ~f:(fun last x ->
         (match x with
-        | CEMethod (static, n, m) ->
+        | CEMethod (decorators, static, n, m) ->
             PP.start_group f 0;
+            decorator_list f decorators;
             if static
             then (
               PP.string f "static";
               PP.space f);
             method_ f class_element_name n m;
             PP.end_group f
-        | CEField (static, n, i) ->
+        | CEField (decorators, static, n, i) ->
             PP.start_group f 0;
+            decorator_list f decorators;
             if static
             then (
               PP.string f "static";
               PP.space f);
+            class_element_name f n;
+            (match i with
+            | None -> ()
+            | Some (e, loc) ->
+                PP.space f;
+                PP.string f "=";
+                PP.space f;
+                output_debug_info f loc;
+                expression AssignementExpression f e);
+            PP.string f ";";
+            PP.end_group f
+        | CEAccessor (decorators, static, n, i) ->
+            PP.start_group f 0;
+            decorator_list f decorators;
+            if static
+            then (
+              PP.string f "static";
+              PP.space f);
+            PP.string f "accessor";
+            PP.space f;
             class_element_name f n;
             (match i with
             | None -> ()
@@ -2060,6 +2208,9 @@ let need_space a b =
   (* https://github.com/ocsigen/js_of_ocaml/issues/507 *)
   | '-', '-'
   | '+', '+' -> true
+  (* never emit html comments <!-- or --> *)
+  | '-', '>' -> true
+  | '<', '!' -> true
   | _, _ -> false
 
 let hashtbl_to_list htb =
@@ -2113,7 +2264,7 @@ let program ?(accept_unnamed_var = false) ?(source_map = false) f p =
   PP.set_needed_space_function f need_space;
   (match Config.effects () with
   | `Cps | `Double_translation -> PP.set_adjust_indentation_function f (fun n -> n mod 40)
-  | `Disabled | `Jspi | (exception Failure _) -> ());
+  | `Disabled | `Jspi | `Native | (exception Failure _) -> ());
   PP.start_group f 0;
   O.program f p;
   PP.end_group f;

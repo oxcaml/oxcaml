@@ -24,7 +24,10 @@ let normalize x =
   |> Str.global_replace (Str.regexp "ocamlrun\\(.exe\\)?") "%{OCAMLRUN}"
   |> Str.global_replace (Str.regexp "node\\(.exe\\)?") "%{NODE}"
 
-let%expect_test "uncaugh error" =
+let compile_and_run_no_alert =
+  compile_and_run ~ocaml_flags:[ "-alert"; "-unsafe_multidomain" ]
+
+let%expect_test ("uncaugh error" [@when target_engine <> "quickjs"]) =
   let prog = {| let _ = raise Not_found |} in
   compile_and_run prog;
   print_endline (normalize [%expect.output]);
@@ -38,9 +41,9 @@ let%expect_test "uncaugh error" =
   print_endline (normalize [%expect.output]);
   [%expect
     {|
-    /bin/sh: %{OCAMLRUN}: command not found
+    Fatal error: exception Not_found
 
-    process exited with error code 127
+    process exited with error code 2
      %{OCAMLRUN} test.bc |}];
   (* Test caml_format_exception by un-registeting  "Printexc.handle_uncaught_exception". Note that this hack unly work with jsoo *)
   let prog =
@@ -50,15 +53,14 @@ let () = Callback.register "Printexc.handle_uncaught_exception" null
 exception C
 let _ = raise C |}
   in
-  compile_and_run prog;
+  compile_and_run_no_alert prog;
   print_endline (normalize [%expect.output]);
   [%expect
     {|
     Fatal error: exception Test.C
 
     process exited with error code 2
-     %{NODE} test.js
-    |}];
+     %{NODE} test.js |}];
   let prog =
     {|
 let null = Array.unsafe_get [|1|] 1
@@ -67,45 +69,42 @@ exception D of int * string * Int64.t
 let _ = raise (D(2,"test",43L))
               |}
   in
-  compile_and_run prog;
+  compile_and_run_no_alert prog;
   print_endline (normalize [%expect.output]);
   [%expect
     {|
     Fatal error: exception Test.D(2, "test", _)
 
     process exited with error code 2
-     %{NODE} test.js
-    |}];
+     %{NODE} test.js |}];
   let prog =
     {|
 let null = Array.unsafe_get [|1|] 1
 let () = Callback.register "Printexc.handle_uncaught_exception" null
 let _ = assert false |}
   in
-  compile_and_run prog;
+  compile_and_run_no_alert prog;
   print_endline (normalize [%expect.output]);
   [%expect
     {|
     Fatal error: exception Assert_failure("test.ml", 4, 8)
 
     process exited with error code 2
-     %{NODE} test.js
-    |}];
+     %{NODE} test.js |}];
   let prog =
     {|
 let null = Array.unsafe_get [|1|] 1
 let () = Callback.register "Printexc.handle_uncaught_exception" null
  [@@@ocaml.warning "-8"] let _ = match 3 with 2 -> () |}
   in
-  compile_and_run prog;
+  compile_and_run_no_alert prog;
   print_endline (normalize [%expect.output]);
   [%expect
     {|
     Fatal error: exception Match_failure("test.ml", 4, 33)
 
     process exited with error code 2
-     %{NODE} test.js
-    |}];
+     %{NODE} test.js |}];
 
   (* Uncaught javascript exception *)
   let prog =
@@ -116,7 +115,7 @@ exception D of int * string * Int64.t
 let _ = null 1 2
              |}
   in
-  compile_and_run prog;
+  compile_and_run_no_alert prog;
   let s = normalize [%expect.output] in
   (try ignore (Str.search_forward (Str.regexp "TypeError: Cannot read") s 0)
    with Not_found -> print_endline s);

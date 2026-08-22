@@ -117,7 +117,7 @@ let%expect_test _ =
   Util.print_fun_decl program (Some "fun1");
   [%expect
     {|
-    function fun1(param){
+    function fun1(_b_){
      var i = 0;
      for(;;){
       let i$0 = i;
@@ -125,40 +125,40 @@ let%expect_test _ =
        f$0 =
          function(counter, n){
           if(- 1 === n){
-           var _d_ = - 2;
-           if(counter >= 50) return caml_trampoline_return(g$0, [0, _d_]);
-           var counter$1 = counter + 1 | 0;
-           return g$0(counter$1, _d_);
+           var _b_ = - 2;
+           return counter < 50
+                   ? g$0(counter + 1 | 0, _b_)
+                   : caml_trampoline_return(g$0, [0, _b_]);
           }
           if(0 === n) return i$0;
-          var _e_ = n - 1 | 0;
-          if(counter >= 50) return caml_trampoline_return(g$0, [0, _e_]);
-          var counter$0 = counter + 1 | 0;
-          return g$0(counter$0, _e_);
+          _b_ = n - 1 | 0;
+          return counter < 50
+                  ? g$0(counter + 1 | 0, _b_)
+                  : caml_trampoline_return(g$0, [0, _b_]);
          },
        f = function(n){return caml_trampoline(f$1(0, n));},
        g =
          function(counter, n){
           if(- 1 === n){
-           var _c_ = - 2;
-           if(counter >= 50) return caml_trampoline_return(f$1, [0, _c_]);
-           var counter$1 = counter + 1 | 0;
-           return f$1(counter$1, _c_);
+           var _b_ = - 2;
+           return counter < 50
+                   ? f$1(counter + 1 | 0, _b_)
+                   : caml_trampoline_return(f$1, [0, _b_]);
           }
           if(0 === n) return i$0;
-          var _d_ = n - 1 | 0;
-          if(counter >= 50) return caml_trampoline_return(f$1, [0, _d_]);
-          var counter$0 = counter + 1 | 0;
-          return f$1(counter$0, _d_);
+          _b_ = n - 1 | 0;
+          return counter < 50
+                  ? f$1(counter + 1 | 0, _b_)
+                  : caml_trampoline_return(f$1, [0, _b_]);
          };
       let f$1 = f$0, g$0 = g;
-      var _b_ = direct[1];
+      _b_ = direct[1];
       direct[1] = [0, f(i), _b_];
       let f$2 = f;
       indirect[1] = [0, function(param){return f$2(i$0);}, indirect[1]];
-      var _c_ = i + 1 | 0;
+      _b_ = i + 1 | 0;
       if(3 === i) break;
-      i = _c_;
+      i = _b_;
      }
      var
       indirect$0 =
@@ -185,9 +185,9 @@ let f =
        "use strict";
        var runtime = globalThis.jsoo_runtime, my_ref = [0, 1];
        function f(param){my_ref[1]++; return my_ref[1];}
-       var Test = [0, f];
-       runtime.caml_register_global(0, Test, "Test");
+       runtime.caml_register_global([0, f], "Test");
        return;
       }
       (globalThis));
-    //end |}]
+    //end
+    |}]

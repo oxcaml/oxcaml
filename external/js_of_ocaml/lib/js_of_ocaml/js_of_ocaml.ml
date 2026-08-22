@@ -17,17 +17,27 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
+(** Bindings to the browser and Node.js runtime.
+
+    {b This library is provided by the [js_of_ocaml] opam package.} *)
+
+module Abort = Abort
 module CSS = CSS
+module Cache = Cache
+module Clipboard = Clipboard
 module Console = Console
+module Crypto = Crypto
 module Dom = Dom
 module Dom_events = Dom_events
 module Dom_html = Dom_html
 module Dom_svg = Dom_svg
 module Effect_js = Effect_js
 module EventSource = EventSource
+module Fetch = Fetch
 module File = File
 module Firebug = Console
 [@@ocaml.deprecated "[since 6.0] Use Js_of_ocaml.Console instead."]
+module FontFace = FontFace
 module Form = Form
 module Geolocation = Geolocation
 module IntersectionObserver = IntersectionObserver
@@ -36,14 +46,20 @@ module Js = Js
 module Js_error = Js.Js_error
 module Json = Json
 module Jstable = Jstable
+module MessageChannel = MessageChannel
 module MutationObserver = MutationObserver
+module Notification = Notification
+module Performance = Performance
 module PerformanceObserver = PerformanceObserver
+module Promise = Promise
 module ResizeObserver = ResizeObserver
 module Regexp = Regexp
+module ServiceWorker = ServiceWorker
 module Sys_js = Sys_js
 module Typed_array = Typed_array
 module Url = Url
 module WebGL = WebGL
+module WebGL2 = WebGL2
 module WebSockets = WebSockets
 module Worker = Worker
 module XmlHttpRequest = XmlHttpRequest

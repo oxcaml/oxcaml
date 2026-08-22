@@ -96,6 +96,17 @@ let test_to_option_list_seq () =
   assert ((Option.to_seq None) () = Seq.Nil);
   ()
 
+(* OxCaml's stdlib does not yet include these functions: comment out their
+   tests. *)
+(*
+let test_product () =
+  assert (Option.product None None = None);
+  assert (Option.product None (Some 1) = None);
+  assert (Option.product (Some 1) None = None);
+  assert (Option.product (Some 1) (Some 2) = Some (1, 2));
+  ()
+*)
+
 let tests () =
   test_none_some ();
   test_value ();
@@ -109,6 +120,7 @@ let tests () =
   test_equal ();
   test_compare ();
   test_to_option_list_seq ();
+  (* test_product (); *)
   ()
 
 let () =

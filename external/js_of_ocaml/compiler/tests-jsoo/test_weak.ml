@@ -152,3 +152,85 @@ let%expect_test _ =
   E.unset_data e;
   bool (E.check_data e);
   [%expect {| false |}]
+
+(* Regression test for https://github.com/ocsigen/js_of_ocaml/issues/2263:
+   [blit_key] must only copy keys; it must not modify the destination's
+   data. *)
+let%expect_test "blit_key does not touch data" =
+  let module E = Obj.Ephemeron in
+  let print_data e =
+    match E.get_data e with
+    | None -> print_endline "no data"
+    | Some d -> print_endline (Obj.obj d : string)
+  in
+  let k1 = Some 1 and k2 = Some 2 and k3 = Some 3 and k4 = Some 4 in
+  let src = E.create 2 in
+  let dst = E.create 2 in
+  E.set_key src 0 (Obj.repr k1);
+  E.set_key src 1 (Obj.repr k2);
+  E.set_key dst 0 (Obj.repr k3);
+  E.set_key dst 1 (Obj.repr k4);
+  E.set_data src (Obj.repr "src data");
+  E.set_data dst (Obj.repr "dst data");
+  E.blit_key src 0 dst 0 2;
+  print_data dst;
+  [%expect {| dst data |}];
+  (* blitting from a source without data must not clear the destination's
+     data either *)
+  E.unset_data src;
+  E.set_data dst (Obj.repr "dst data");
+  E.blit_key src 0 dst 0 2;
+  print_data dst;
+  [%expect {| dst data |}];
+  ignore (Sys.opaque_identity (k1, k2, k3, k4))
+
+(* [Weak.get_copy] / [Ephemeron.get_data_copy] must copy bytes too:
+   returning the value itself both lets mutations reach the weakly
+   held original and creates a strong reference to it. *)
+let%expect_test "get_copy copies bytes" =
+  let b = Bytes.of_string "hello" in
+  let w = Weak.create 1 in
+  Weak.set w 0 (Some b);
+  (match Weak.get_copy w 0 with
+  | Some b' -> Printf.printf "%b %b\n" (b' == b) (Bytes.equal b' b)
+  | None -> print_endline "none");
+  [%expect {| false true |}];
+  let e = Obj.Ephemeron.create 1 in
+  Obj.Ephemeron.set_data e (Obj.repr b);
+  (match Obj.Ephemeron.get_data_copy e with
+  | Some d -> Printf.printf "%b\n" (d == Obj.repr b)
+  | None -> print_endline "none");
+  [%expect {| false |}]
+
+(* A float array is a mutable no-scan block, so like ordinary blocks
+   and bytes it must be copied. In the Wasm runtime it is its own type
+   (not an ordinary block), so it needs its own case. *)
+let%expect_test "get_copy copies float arrays" =
+  let fa = [| 1.0; 2.0; 3.0 |] in
+  let w = Weak.create 1 in
+  Weak.set w 0 (Some fa);
+  (match Weak.get_copy w 0 with
+  | Some fa' ->
+      fa'.(0) <- 99.0;
+      Printf.printf "shares=%b orig_mutated=%b\n" (fa' == fa) (fa.(0) = 99.0)
+  | None -> print_endline "none");
+  [%expect {| shares=false orig_mutated=false |}]
+
+(* Custom blocks (Int64, bigarrays, ...) are deliberately NOT copied:
+   the native runtime returns the value itself rather than risk an
+   unsafe raw copy (finalizers, the bigarray data proxy, ...). *)
+let%expect_test "get_copy does not copy custom blocks" =
+  let n = Int64.add 1L 2L in
+  let w = Weak.create 1 in
+  Weak.set w 0 (Some n);
+  (match Weak.get_copy w 0 with
+  | Some n' -> Printf.printf "%b %b\n" (n' == n) (Int64.equal n' n)
+  | None -> print_endline "none");
+  [%expect {| true true |}];
+  let a = Bigarray.Array1.create Bigarray.int Bigarray.c_layout 1 in
+  let w = Weak.create 1 in
+  Weak.set w 0 (Some a);
+  (match Weak.get_copy w 0 with
+  | Some a' -> Printf.printf "%b\n" (a' == a)
+  | None -> print_endline "none");
+  [%expect {| true |}]

@@ -33,8 +33,7 @@ let clear_static_env () = String.Hashtbl.clear static_env
 
 let set_static_env s value = String.Hashtbl.add static_env s value
 
-let get_static_env s =
-  try Some (String.Hashtbl.find static_env s) with Not_found -> None
+let get_static_env s = String.Hashtbl.find_opt static_env s
 
 let int_unop l f =
   match l with
@@ -124,22 +123,24 @@ let int64_shiftop (l : constant list) (f : int64 -> int -> int64) : constant opt
 
 let nativeint i = Some (NativeInt i)
 
-let nativeint_unop (l : constant list) (f : int32 -> int32) : constant option =
+let nativeint_unop (l : constant list) (f : Targetnativeint.t -> Targetnativeint.t) : constant option =
   match l with
   | [ NativeInt i ] -> Some (NativeInt (f i))
   | _ -> None
 
-let nativeint_binop (l : constant list) (f : int32 -> int32 -> int32) : constant option =
+let nativeint_binop (l : constant list) (f : Targetnativeint.t -> Targetnativeint.t -> Targetnativeint.t) : constant option =
   match l with
   | [ NativeInt i; NativeInt j ] -> Some (NativeInt (f i j))
   | _ -> None
 
-let nativeint_shiftop (l : constant list) (f : int32 -> int -> int32) : constant option =
+let nativeint_shiftop (l : constant list) (f : Targetnativeint.t -> int -> Targetnativeint.t) : constant option =
   match l with
   | [ NativeInt i; Int j ] -> Some (NativeInt (f i (Targetint.to_int_exn j)))
   | _ -> None
 
-let eval_prim x =
+let quiet_nan n = Int64.logor n 0x00_08_00_00_00_00_00_00L
+
+let eval_prim ~target x =
   match x with
   | Not, [ Int i ] -> bool (Targetint.is_zero i)
   | Lt, [ Int i; Int j ] -> bool Targetint.(i < j)
@@ -147,7 +148,7 @@ let eval_prim x =
   | Eq, [ Int i; Int j ] -> bool Targetint.(i = j)
   | Neq, [ Int i; Int j ] -> bool Targetint.(i <> j)
   | Ult, [ Int i; Int j ] -> bool (Targetint.unsigned_lt i j)
-  | Extern name, l -> (
+  | Extern (name, _), l -> (
       match name, l with
       (* int *)
       | "%int_add", _ -> int_binop l Targetint.add
@@ -231,7 +232,15 @@ let eval_prim x =
       (* int32 *)
       | "caml_int32_bits_of_float", [ Float f ] ->
           int32 (Int32.bits_of_float (Int64.float_of_bits f))
-      | "caml_int32_float_of_bits", [ Int32 i ] -> Some (float (Int32.float_of_bits i))
+      | "caml_int32_float_of_bits", [ Int32 i ]
+        when match target with
+             | `JavaScript ->
+                 let f = Int32.float_of_bits i in
+                 (not (Float.is_nan f))
+                 || Int64.equal
+                      (quiet_nan (Int64.bits_of_float f))
+                      (Int64.bits_of_float nan)
+             | `Wasm -> true -> Some (float (Int32.float_of_bits i))
       | "caml_int32_of_float", [ Float f ] ->
           int32 (Int32.of_float (Int64.float_of_bits f))
       | "caml_int32_to_float", [ Int32 i ] -> Some (float (Int32.to_float i))
@@ -253,49 +262,69 @@ let eval_prim x =
           Some (Int (Targetint.of_int_exn (Int32.compare i j)))
       | "caml_int32_to_int", [ Int32 i ] -> Some (Int (Targetint.of_int32_truncate i))
       | "caml_int32_of_int", [ Int i ] -> int32 (Targetint.to_int32 i)
-      | "caml_nativeint_of_int32", [ Int32 i ] -> Some (NativeInt i)
-      | "caml_nativeint_to_int32", [ NativeInt i ] -> Some (Int32 i)
+      | "caml_nativeint_of_int32", [ Int32 i ] -> Some (NativeInt (Targetnativeint.of_int32_truncate i))
+      | "caml_nativeint_to_int32", [ NativeInt i ] -> Some (Int32 (Targetnativeint.to_int32 i))
       (* nativeint *)
       | "caml_nativeint_bits_of_float", [ Float f ] ->
-          nativeint (Int32.bits_of_float (Int64.float_of_bits f))
-      | "caml_nativeint_float_of_bits", [ NativeInt i ] ->
-          Some (float (Int32.float_of_bits i))
+          nativeint (Targetnativeint.bits_of_float (Int64.float_of_bits f))
+      | "caml_nativeint_float_of_bits", [ NativeInt i ]
+        when match target with
+             | `JavaScript ->
+                 let f = Targetnativeint.float_of_bits i in
+                 (not (Float.is_nan f))
+                 || Int64.equal
+                      (quiet_nan (Int64.bits_of_float f))
+                      (Int64.bits_of_float nan)
+             | `Wasm -> true -> Some (float (Targetnativeint.float_of_bits i))
       | "caml_nativeint_of_float", [ Float f ] ->
-          nativeint (Int32.of_float (Int64.float_of_bits f))
-      | "caml_nativeint_to_float", [ NativeInt i ] -> Some (float (Int32.to_float i))
-      | "caml_nativeint_neg", _ -> nativeint_unop l Int32.neg
-      | "caml_nativeint_add", _ -> nativeint_binop l Int32.add
-      | "caml_nativeint_sub", _ -> nativeint_binop l Int32.sub
-      | "caml_nativeint_mul", _ -> nativeint_binop l Int32.mul
-      | "caml_nativeint_and", _ -> nativeint_binop l Int32.logand
-      | "caml_nativeint_or", _ -> nativeint_binop l Int32.logor
-      | "caml_nativeint_xor", _ -> nativeint_binop l Int32.logxor
-      | "caml_nativeint_div", [ _; NativeInt i ] when not (Int32.equal i 0l) ->
-          nativeint_binop l Int32.div
-      | "caml_nativeint_mod", [ _; NativeInt i ] when not (Int32.equal i 0l) ->
-          nativeint_binop l Int32.rem
-      | "caml_nativeint_shift_left", _ -> nativeint_shiftop l Int32.shift_left
-      | "caml_nativeint_shift_right", _ -> nativeint_shiftop l Int32.shift_right
+          nativeint (Targetnativeint.of_float (Int64.float_of_bits f))
+      | "caml_nativeint_to_float", [ NativeInt i ] -> Some (float (Targetnativeint.to_float i))
+      | "caml_nativeint_neg", _ -> nativeint_unop l Targetnativeint.neg
+      | "caml_nativeint_add", _ -> nativeint_binop l Targetnativeint.add
+      | "caml_nativeint_sub", _ -> nativeint_binop l Targetnativeint.sub
+      | "caml_nativeint_mul", _ -> nativeint_binop l Targetnativeint.mul
+      | "caml_nativeint_and", _ -> nativeint_binop l Targetnativeint.logand
+      | "caml_nativeint_or", _ -> nativeint_binop l Targetnativeint.logor
+      | "caml_nativeint_xor", _ -> nativeint_binop l Targetnativeint.logxor
+      | "caml_nativeint_div", [ _; NativeInt i ] when not (Targetnativeint.is_zero i) ->
+          nativeint_binop l Targetnativeint.div
+      | "caml_nativeint_mod", [ _; NativeInt i ] when not (Targetnativeint.is_zero i) ->
+          nativeint_binop l Targetnativeint.rem
+      | "caml_nativeint_shift_left", _ -> nativeint_shiftop l Targetnativeint.shift_left
+      | "caml_nativeint_shift_right", _ -> nativeint_shiftop l Targetnativeint.shift_right
       | "caml_nativeint_shift_right_unsigned", _ ->
-          nativeint_shiftop l Int32.shift_right_logical
+          nativeint_shiftop l Targetnativeint.shift_right_logical
       | "caml_nativeint_compare", [ NativeInt i; NativeInt j ] ->
-          Some (Int (Targetint.of_int_exn (Int32.compare i j)))
-      | "caml_nativeint_to_int", [ Int32 i ] -> Some (Int (Targetint.of_int32_truncate i))
-      | "caml_checked_nativeint_to_int", [ Int32 i ] ->
+          Some (Int (Targetint.of_int_exn (Targetnativeint.compare i j)))
+      | "caml_nativeint_to_int", [ NativeInt i ] ->
+          Some (Int (Targetint.of_int64_truncate (Targetnativeint.to_int64 i)))
+      | "caml_checked_int32_to_int", [ Int32 i ]
+        when Int32.equal i (Targetint.to_int32 (Targetint.of_int32_truncate i)) ->
           Some (Int (Targetint.of_int32_truncate i))
-      | "caml_checked_int32_to_int", [ Int32 i ] ->
-          Some (Int (Targetint.of_int32_truncate i))
-      | "caml_nativeint_of_int", [ Int i ] -> nativeint (Targetint.to_int32 i)
+      | "caml_checked_nativeint_to_int", [ NativeInt i ]
+        when Int64.equal (Targetnativeint.to_int64 i) (Targetnativeint.to_int64 i |> Targetint.of_int64_truncate |> Targetint.to_int64) ->
+          Some (Int (Targetint.of_int64_truncate (Targetnativeint.to_int64 i)))
+      | "caml_checked_int64_to_int", [ Int64 i ]
+        when let j = Targetint.of_int64_truncate i in
+             Int64.equal i (Targetint.to_int64 j)->
+          Some (Int (Targetint.of_int64_truncate i))
+      | "caml_nativeint_of_int", [ Int i ] -> nativeint (Targetnativeint.of_int64_truncate (Targetint.to_int64 i))
       (* int64 *)
-      (* [Float_u.Option.none ()] is a very specific, sentinel NaN.
-         This [js_of_ocaml] compile time eval will end up turning the specific sentinel NaN into
-         [NaN], making [Float_u.Option.(is_none (none ()))] return false.
+      (* TODO: unboxed float option encodings represent [none] as a very
+         specific, sentinel NaN. This [js_of_ocaml] compile time eval would turn
+         that sentinel NaN into a canonical [NaN], making [is_none (none ())]
+         return false.
 
          [none ()] calls [caml_int64_bits_of_float], so making this function
          no longer available at comp-time eval stops the over-optimization that breaks [is_none].
       *)
       (* | "caml_int64_bits_of_float", [ Float f ] -> int64 f *)
-      | "caml_int64_float_of_bits", [ Int64 i ] -> Some (Float i)
+      | "caml_int64_float_of_bits", [ Int64 i ]
+        when match target with
+             | `JavaScript ->
+                 (not (Float.is_nan (Int64.float_of_bits i)))
+                 || Int64.equal (quiet_nan i) (Int64.bits_of_float nan)
+             | `Wasm -> true -> Some (Float i)
       | "caml_int64_of_float", [ Float f ] ->
           int64 (Int64.of_float (Int64.float_of_bits f))
       | "caml_int64_to_float", [ Int64 i ] -> Some (float (Int64.to_float i))
@@ -316,12 +345,12 @@ let eval_prim x =
       | "caml_int64_compare", [ Int64 i; Int64 j ] ->
           Some (Int (Targetint.of_int_exn (Int64.compare i j)))
       | "caml_int64_to_int", [ Int64 i ] ->
-          Some (Int (Targetint.of_int32_truncate (Int64.to_int32 i)))
-      | "caml_int64_of_int", [ Int i ] -> int64 (Int64.of_int32 (Targetint.to_int32 i))
+          Some (Int (Targetint.of_int64_truncate i))
+      | "caml_int64_of_int", [ Int i ] -> int64 (Targetint.to_int64 i)
       | "caml_int64_to_int32", [ Int64 i ] -> int32 (Int64.to_int32 i)
       | "caml_int64_of_int32", [ Int32 i ] -> int64 (Int64.of_int32 i)
-      | "caml_int64_to_nativeint", [ Int64 i ] -> nativeint (Int64.to_int32 i)
-      | "caml_int64_of_nativeint", [ NativeInt i ] -> int64 (Int64.of_int32 i)
+      | "caml_int64_to_nativeint", [ Int64 i ] -> nativeint (Targetnativeint.of_int64_truncate i)
+      | "caml_int64_of_nativeint", [ NativeInt i ] -> int64 (Targetnativeint.to_int64 i)
       (* others *)
       | ("caml_string_get" | "caml_string_unsafe_get"), [ String s; Int pos ] ->
           let pos = Targetint.to_int_exn pos in
@@ -335,7 +364,11 @@ let eval_prim x =
           match get_static_env s with
           | Some env -> Some (String env)
           | None -> None)
-      | "caml_sys_const_word_size", [ _ ] -> Some (Int (Targetint.of_int_exn 32))
+      | "caml_sys_const_word_size", [ _ ] ->
+        Some (Int (Targetint.of_int_exn
+        (if Config.Flag.portable_int ()
+         then 64
+         else 32)))
       | "caml_sys_const_int_size", [ _ ] ->
           Some (Int (Targetint.of_int_exn (Targetint.num_bits ())))
       | "caml_sys_const_big_endian", [ _ ] -> Some (Int Targetint.zero)
@@ -349,8 +382,8 @@ let the_length_of info x =
     (fun x ->
       match Flow.Info.def info x with
       | Some (Constant (String s)) -> Some (Targetint.of_int_exn (String.length s))
-      | Some (Prim (Extern "caml_create_string", [ arg ]))
-      | Some (Prim (Extern "caml_create_bytes", [ arg ])) -> the_int info arg
+      | Some (Prim (Extern ("caml_create_string", _), [ arg ]))
+      | Some (Prim (Extern ("caml_create_bytes", _), [ arg ])) -> the_int info arg
       | None | Some _ -> None)
     None
     (fun u v ->
@@ -421,7 +454,8 @@ let the_cont_of info x (a : cont array) =
     info
     (fun x ->
       match Flow.Info.def info x with
-      | Some (Prim (Extern "%direct_obj_tag", [ b ])) -> the_tag_of info b get cont_equal
+      | Some (Prim (Extern ("%direct_obj_tag", _), [ b ])) ->
+          the_tag_of info b get cont_equal
       | Some (Constant (Int j)) -> get (Targetint.to_int_exn j)
       | None | Some _ -> None)
     None
@@ -443,11 +477,11 @@ let rec int_predicate deep info pred x (i : Targetint.t) =
       info
       (fun x ->
         match Flow.Info.def info x with
-        | Some (Prim (Extern "%direct_obj_tag", [ b ])) ->
+        | Some (Prim (Extern ("%direct_obj_tag", _), [ b ])) ->
             the_tag_of info b (fun j -> Some (pred (Targetint.of_int_exn j) i)) Bool.equal
-        | Some (Prim (Extern "%int_sub", [ Pv a; Pc (Int b) ])) ->
+        | Some (Prim (Extern ("%int_sub", _), [ Pv a; Pc (Int b) ])) ->
             int_predicate (deep + 1) info (fun x y -> pred (Targetint.sub x b) y) a i
-        | Some (Prim (Extern "%int_add", [ Pv a; Pc (Int b) ])) ->
+        | Some (Prim (Extern ("%int_add", _), [ Pv a; Pc (Int b) ])) ->
             int_predicate (deep + 1) info (fun x y -> pred (Targetint.add x b) y) a i
         | Some (Constant (Int j)) -> Some (pred j i)
         | None | Some _ -> None)
@@ -469,7 +503,7 @@ let constant_js_equal a b =
   | Float32 _, Float _ | Float _, Float32 _ -> None
   | NativeString a, NativeString b -> Some (Native_string.equal a b)
   | String a, String b when Config.Flag.use_js_string () -> Some (String.equal a b)
-  | Null, Null -> Some true
+  | Null_, Null_ -> Some true
   | Int _, (Float _ | Float32 _) | (Float _ | Float32 _), Int _ -> None
   (* All other values may be distinct objects and thus different by [caml_js_equals]. *)
   | String _, _
@@ -486,8 +520,8 @@ let constant_js_equal a b =
   | _, NativeInt _
   | Tuple _, _
   | _, Tuple _
-  | Null, _
-  | _, Null -> None
+  | Null_, _
+  | _, Null_ -> None
 
 (* [eval_prim] does not distinguish the two constants *)
 let constant_equal a b =
@@ -498,19 +532,19 @@ let constant_equal a b =
   | NativeString a, NativeString b -> Native_string.equal a b
   | String a, String b -> String.equal a b
   | Int32 a, Int32 b -> Int32.equal a b
-  | NativeInt a, NativeInt b -> Int32.equal a b
+  | NativeInt a, NativeInt b -> Targetnativeint.equal a b
   | Int64 a, Int64 b -> Int64.equal a b
-  | Null, Null -> true
+  | Null_, Null_ -> true
   (* We don't need to compare other constants, so let's just return false. *)
   | Tuple _, Tuple _ -> false
   | Float_array _, Float_array _ -> false
-  | (Int _ | Float _ | Float32 _ | Int64 _ | Int32 _ | NativeInt _ | Null), _ -> false
+  | (Int _ | Float _ | Float32 _ | Int64 _ | Int32 _ | NativeInt _ | Null_), _ -> false
   | (String _ | NativeString _), _ -> false
   | (Float_array _ | Tuple _), _ -> false
 
 let eval_instr update_count inline_constant ~target info i =
   match i with
-  | Let (x, Prim (Extern (("caml_equal" | "caml_notequal") as prim), [ y; z ])) -> (
+  | Let (x, Prim (Extern ((("caml_equal" | "caml_notequal") as prim), _), [ y; z ])) -> (
       let eq e1 e2 =
         match Code.Constant.ocaml_equal e1 e2 with
         | None -> false
@@ -532,7 +566,8 @@ let eval_instr update_count inline_constant ~target info i =
               incr update_count;
               [ Let (x, c) ])
       | _ -> [ i ])
-  | Let (x, Prim (Extern ("caml_js_equals" | "caml_js_strict_equals"), [ y; z ])) -> (
+  | Let (x, Prim (Extern (("caml_js_equals" | "caml_js_strict_equals"), _), [ y; z ]))
+    -> (
       let eq e1 e2 =
         match constant_js_equal e1 e2 with
         | None -> false
@@ -548,7 +583,7 @@ let eval_instr update_count inline_constant ~target info i =
               incr update_count;
               [ Let (x, c) ])
       | _ -> [ i ])
-  | Let (x, Prim (Extern "caml_ml_string_length", [ s ])) -> (
+  | Let (x, Prim (Extern ("caml_ml_string_length", _), [ s ])) -> (
       let c =
         match s with
         | Pc (String s) -> Some (Targetint.of_int_exn (String.length s))
@@ -566,23 +601,31 @@ let eval_instr update_count inline_constant ~target info i =
       ( _
       , Prim
           ( ( Extern
-                ( "caml_array_unsafe_get"
-                | "caml_array_unsafe_set"
-                | "caml_floatarray_unsafe_get"
-                | "caml_floatarray_unsafe_set"
-                | "caml_array_unsafe_set_addr" )
+                ( ( "caml_array_unsafe_get"
+                  | "caml_array_unsafe_set"
+                  | "caml_floatarray_unsafe_get"
+                  | "caml_floatarray_unsafe_set"
+                  | "caml_array_unsafe_set_addr" )
+                , _ )
             | Array_get )
           , _ ) ) ->
       (* Fresh parameters can be introduced for these primitives
            in Specialize_js, which would make the call to [the_const_of]
            below fail. *)
       [ i ]
+  | Let (x, Prim (Extern ("caml_atomic_load_field", _), [ Pv o; f ])) -> (
+      match the_int info f with
+      | None -> [ i ]
+      | Some i ->
+          incr update_count;
+          [ Let (x, Field (o, Targetint.to_int_exn i, Non_float)) ])
   | Let (x, Prim (IsInt, [ y ])) -> (
       match is_int info y with
       | Unknown -> [ i ]
       | Y ->
           let c = Constant (bool' true) in
           Flow.Info.update_def info x c;
+          incr update_count;
           [ Let (x, c) ]
       | N ->
           let c = Constant (bool' false) in
@@ -615,7 +658,7 @@ let eval_instr update_count inline_constant ~target info i =
           incr update_count;
           [ Let (x, c) ]
       | None -> [ i ])
-  | Let (x, Prim (Extern "%direct_obj_tag", [ y ])) -> (
+  | Let (x, Prim (Extern ("%direct_obj_tag", _), [ y ])) -> (
       match the_tag_of info y (fun x -> Some x) ( = ) with
       | Some tag ->
           let c = Constant (Int (Targetint.of_int_exn tag)) in
@@ -623,7 +666,7 @@ let eval_instr update_count inline_constant ~target info i =
           incr update_count;
           [ Let (x, c) ]
       | None -> [ i ])
-  | Let (x, Prim (Extern "caml_sys_const_backend_type", [ _ ])) ->
+  | Let (x, Prim (Extern ("caml_sys_const_backend_type", _), [ _ ])) ->
       let jsoo = Code.Var.fresh () in
       let backend_name =
         match target with
@@ -634,7 +677,19 @@ let eval_instr update_count inline_constant ~target info i =
       [ Let (jsoo, Constant (String backend_name))
       ; Let (x, Block (0, [| jsoo |], NotArray, Immutable))
       ]
-  | Let (_, Prim (Extern ("%resume" | "%perform" | "%reperform"), _)) ->
+  | Let
+      ( _
+      , Prim
+          ( Extern
+              ( ( "%continue"
+                | "%discontinue"
+                | "%discontinue_with_backtrace"
+                | "%perform"
+                | "%reperform"
+                | "%with_stack"
+                | "%with_stack_preemptible" )
+              , _ )
+          , _ ) ) ->
       [ i ] (* We need that the arguments to this primitives remain variables *)
   | Let (x, Prim (prim, prim_args)) -> (
       let prim_args' =
@@ -647,6 +702,7 @@ let eval_instr update_count inline_constant ~target info i =
             | _ -> false)
         then
           eval_prim
+            ~target
             ( prim
             , List.map prim_args' ~f:(function
                 | Some c -> c
@@ -654,7 +710,7 @@ let eval_instr update_count inline_constant ~target info i =
         else None
       in
       match res with
-      | Some c when Var.idx x < Info.info_defs_length info ->
+      | Some c ->
           let c = Constant c in
           Flow.Info.update_def info x c;
           incr update_count;
@@ -704,7 +760,7 @@ let the_cond_of info x =
     (fun x ->
       match Flow.Info.def info x with
       | Some (Constant (Int x)) -> if Targetint.is_zero x then Zero else Non_zero
-      | Some (Constant Null) -> Zero
+      | Some (Constant Null_) -> Zero
       | Some
           (Constant
              ( Int32 _
@@ -766,7 +822,7 @@ let rec do_not_raise pc visited rewrite blocks =
             | Block (_, _, _, _) | Field (_, _, _) | Constant _ | Closure _ -> ()
             | Apply _ -> raise May_raise
             | Special _ -> ()
-            | Prim (Extern name, _) when Primitive.is_pure name -> ()
+            | Prim (Extern (name, _), _) when Primitive.is_pure name -> ()
             | Prim (Extern _, _) -> raise May_raise
             | Prim (_, _) -> ()));
     match b.branch with

@@ -42,11 +42,20 @@ module Flag : sig
 
   val effects : unit -> bool
 
+  (** Whether to take advantage of the per-call-site "unyielding call"
+      information recorded in bytecode debug events by the OxCaml compiler.
+      Only used with the double-translation effects backend. *)
+  val oxcaml_use_unyielding_debuginfo_for_effect_cps : unit -> bool
+
   val genprim : unit -> bool
 
   val strictmode : unit -> bool
 
   val compact_vardecl : unit -> bool
+
+  val constant_sinking : unit -> bool
+
+  val var_coalescing : unit -> bool
 
   val debugger : unit -> bool
 
@@ -59,8 +68,6 @@ module Flag : sig
   val excwrap : unit -> bool
 
   val improved_stacktrace : unit -> bool
-
-  val warn_unused : unit -> bool
 
   val inline_callgen : unit -> bool
 
@@ -76,16 +83,24 @@ module Flag : sig
 
   val es6 : unit -> bool
 
+  val load_shapes_auto : unit -> bool
+
+  val toplevel : unit -> bool
+
+  val wasi : unit -> bool
+
   val enable : string -> unit
 
   val disable : string -> unit
+
+  val portable_int : unit -> bool
 end
 
 (** This module contains parameters that may be modified through command-line flags. *)
 module Param : sig
   val set : string -> string -> unit
 
-  val all : unit -> (string * string) list
+  val all : unit -> (string * string * (string -> (unit, string) Result.t)) list
 
   val switch_max_case : unit -> int
 
@@ -94,6 +109,8 @@ module Param : sig
   val tailcall_max_depth : unit -> int
 
   val constant_max_depth : unit -> int
+
+  val merge_node_max : unit -> int
 
   type tc =
     | TcNone
@@ -122,6 +139,7 @@ type effects_backend =
   | `Cps
   | `Double_translation
   | `Jspi
+  | `Native
   ]
 
 val effects : unit -> effects_backend

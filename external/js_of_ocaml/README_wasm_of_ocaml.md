@@ -11,27 +11,34 @@ In particular, the output code requires the following [Wasm extensions](https://
 - [the tail-call extension](https://github.com/WebAssembly/tail-call/blob/main/proposals/tail-call/Overview.md)
 - [the exception handling extension](https://github.com/WebAssembly/exception-handling/blob/master/proposals/exception-handling/Exceptions.md)
 
-OCaml 5.x code using effect handlers can be compiled in two different ways:
-one can enable the CPS transformation from `js_of_ocaml` by passing the
-`--effects=cps` flag. Without the flag `wasm_of_ocaml` will instead default to
-`--effects=jspi` and emit code utilizing
-- [the JavaScript-Promise Integration extension](https://github.com/WebAssembly/js-promise-integration/blob/main/proposals/js-promise-integration/Overview.md).
+OCaml 5.x code using effect handlers can be compiled in three different ways:
+- `--effects=jspi` (default) emits code utilizing
+  [the JavaScript-Promise Integration extension](https://github.com/WebAssembly/js-promise-integration/blob/main/proposals/js-promise-integration/Overview.md).
+  It works by default in Chrome 137, Node.js 25, and higher versions. Performing
+  effects is slower than with `--effects=cps`.
+- `--effects=cps` enables the CPS transformation from `js_of_ocaml`. The
+  generated code is slower, larger, and less readable, but it runs on any
+  supported engine. Use this for other browsers.
+- `--effects=native` uses the
+  [WebAssembly Stack Switching proposal](https://github.com/WebAssembly/stack-switching)
+  (typed continuations). It provides the best performance but requires a runtime
+  with support for the WasmFX extension (currently available, behind the
+  `--experimental-wasm-wasmfx` flag, in Chrome 148 or higher, or in a recent
+  Node.js canary release with V8 version 14.7.100 or higher).
 
 ## Installation and usage
 
-Installation and usage documentation can be found in [the js_of_ocaml manual](https://ocsigen.org/js_of_ocaml/dev/manual/wasm_overview).
+Installation and usage documentation can be found in [the js_of_ocaml manual](https://ocsigen.org/js_of_ocaml/latest/js_of_ocaml/wasm_overview.html).
 
 ## Running the test suite
 
 The following commands can be used to set up an opam switch and run the test suite.
+A recent Node.js and [Binaryen](https://github.com/WebAssembly/binaryen) need to be
+available on the PATH.
 ```
-opam switch create wasm-tests 4.14.0
+opam switch create wasm-tests 5.3.0
 eval $(opam env --switch=wasm-tests)
-opam pin add -n base.v0.16.1 git@github.com:ocaml-wasm/base#wasm
-opam pin add -n time_now.v0.16.1 git@github.com:ocaml-wasm/time_now#wasm
-opam pin add -n ppx_inline_test.v0.16.1 git@github.com:ocaml-wasm/ppx_inline_test#wasm
-opam pin add -n ppx_expect.v0.16.1 git@github.com:ocaml-wasm/ppx_expect#wasm
-opam pin add -y -n --with-version 6.0.0 .
+opam pin add -y -n --with-version 6.4.1 .
 opam install . --deps-only --with-test
 WASM_OF_OCAML=true dune build @runtest-wasm
 ```

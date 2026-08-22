@@ -53,7 +53,10 @@ class type file = object
 
   method name : js_string t readonly_prop
 
-  method lastModifiedDate : js_string t readonly_prop
+  method lastModified : number_t readonly_prop
+
+  method lastModifiedDate : Js.date t readonly_prop
+  (** @deprecated Use [lastModified] instead. *)
 end
 
 type file_any
@@ -127,18 +130,6 @@ class type fileReader = object ('self)
 
   method error : fileError t readonly_prop
 
-  method onloadstart : ('self t, 'self progressEvent t) event_listener writeonly_prop
-
-  method onprogress : ('self t, 'self progressEvent t) event_listener writeonly_prop
-
-  method onload : ('self t, 'self progressEvent t) event_listener writeonly_prop
-
-  method onabort : ('self t, 'self progressEvent t) event_listener writeonly_prop
-
-  method onerror : ('self t, 'self progressEvent t) event_listener writeonly_prop
-
-  method onloadend : ('self t, 'self progressEvent t) event_listener writeonly_prop
-
   inherit progressEventTarget
 end
 
@@ -159,7 +150,7 @@ module ReaderEvent : sig
 end
 
 val filename : file t -> js_string t
-(** [filename] handles old firefox without name property *)
+(** [filename file] is the name of [file] (equivalent to [file##.name]). *)
 
 val fileReader : fileReader t constr
 

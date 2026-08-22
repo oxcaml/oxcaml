@@ -17,7 +17,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open Util
+open! Util
+
+(* In OxCaml, raise is always reraise, which changes the generated code. *)
+[@@@if not oxcaml]
 
 let%expect_test "test-compiler/lib-effects/test1.ml" =
   let code =
@@ -60,7 +63,7 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
 
          (* Two continuation functions are created. One to bind [ic] before
             entering the loop, and one for the loop. We use a dummy argument
-            to go back to the begining of the loop if [b] is false *)
+            to go back to the beginning of the loop if [b] is false *)
          let loop1 b =
            let all = ref [] in
            let ic = open_in "/static/examples.ml" in
@@ -102,29 +105,29 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
   [%expect
     {|
     function exceptions(s, cont){
-     try{var _i_ = runtime.caml_int_of_string(s), n = _i_;}
+     try{var _g_ = runtime.caml_int_of_string(s), n = _g_;}
      catch(exn$0){
-      var exn = caml_wrap_exception(exn$0), tag = exn[1];
-      if(tag !== Stdlib[7]){
-       var raise$1 = caml_pop_trap(), exn$2 = caml_maybe_attach_backtrace(exn, 0);
-       return raise$1(exn$2);
+      var exn = caml_wrap_exception(exn$0);
+      if(exn[1] !== Stdlib[7]){
+       _g_ = caml_pop_trap();
+       var exn$2 = caml_maybe_attach_backtrace(exn, 0);
+       return _g_(exn$2);
       }
-      var n = 0;
+      n = 0;
      }
      try{
       if(caml_string_equal(s, cst$0))
        throw caml_maybe_attach_backtrace(Stdlib[8], 0);
-      var _h_ = 7, m = _h_;
+      var m = 7;
      }
      catch(exn){
       var exn$0 = caml_wrap_exception(exn);
       if(exn$0 !== Stdlib[8]){
-       var
-        raise$0 = caml_pop_trap(),
-        exn$1 = caml_maybe_attach_backtrace(exn$0, 0);
-       return raise$0(exn$1);
+       _g_ = caml_pop_trap();
+       var exn$1 = caml_maybe_attach_backtrace(exn$0, 0);
+       return _g_(exn$1);
       }
-      var m = 0;
+      m = 0;
      }
      runtime.caml_push_trap
       (function(exn){
@@ -136,8 +139,9 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
       return caml_trampoline_cps_call2
               (Stdlib[79],
                cst_toto,
-               function(_i_){caml_pop_trap(); return cont([0, [0, _i_, n, m]]);});
-     var _g_ = Stdlib[8], raise = caml_pop_trap();
+               function(_g_){caml_pop_trap(); return cont([0, [0, _g_, n, m]]);});
+     _g_ = Stdlib[8];
+     var raise = caml_pop_trap();
      return raise(caml_maybe_attach_backtrace(_g_, 0));
     }
     //end

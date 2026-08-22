@@ -60,13 +60,15 @@ module Var : sig
 
   val get_name : t -> string option
 
-  val set_name : t -> string -> unit
+  val set_name : t -> ?generated:bool -> string -> unit
+
+  val generated_name : t -> bool
 
   val propagate_name : t -> t -> unit
 
-  val reset : unit -> unit
+  val forget_generated_name : t -> unit
 
-  val set_last : int -> unit
+  val reset : unit -> unit
 
   module Set : Set.S with type elt = t
 
@@ -114,9 +116,9 @@ end
 type cont = Addr.t * Var.t list
 
 type prim =
-  | Vectlength
+  | Vectlength of Optimization_hint.array_kind
   | Array_get
-  | Extern of string
+  | Extern of string * Optimization_hint.ccall option
   | Not
   | IsInt
   | Eq
@@ -151,9 +153,9 @@ type constant =
   | Int of Targetint.t
   | Int32 of Int32.t  (** Only produced when compiling to WebAssembly. *)
   | Int64 of Int64.t
-  | NativeInt of Int32.t  (** Only produced when compiling to WebAssembly. *)
+  | NativeInt of Targetnativeint.t
   | Tuple of int * constant array * array_or_not
-  | Null
+  | Null_
 
 module Constant : sig
   type t = constant
@@ -186,15 +188,31 @@ type field_type =
   | Non_float
   | Float
 
+type yielding_kind =
+  | Unyielding
+  | May_yield
+  | Unknown
+
 type expr =
   | Apply of
       { f : Var.t
       ; args : Var.t list
       ; exact : bool (* if true, then # of arguments = # of parameters *)
+      ; yielding : yielding_kind
+        (* if [Unyielding], the OCaml compiler has proven that this call cannot
+           perform an effect that would capture the current continuation
+           (see [Instruct.Event_unyielding_call]). It is thus safe to call
+           the direct-style version of the function even in CPS context.
+           [May_yield] is always a sound default. The flag applies only to this
+           call; it says nothing about the call's result (which may be a
+           closure that yields when later applied).
+           [Unknown] is used for calls emitted by passes that run after
+           [Partial_cps_analysis], which fails if it encounters [Unknown]. *)
       }
   | Block of int * Var.t array * array_or_not * mutability
   | Field of Var.t * int * field_type
-  | Closure of Var.t list * cont * Parse_info.t option
+  | Closure of
+      Var.t list * cont * (Optimization_hint.closure_hint option * Parse_info.t option)
   | Constant of constant
   | Prim of prim * prim_arg list
   | Special of special
@@ -229,13 +247,6 @@ type program =
   ; free_pc : Addr.t
   }
 
-type cmj_body =
-  { program : program
-  ; last_var : Addr.t
-  ; imported_compilation_units : Compilation_unit.t list
-  ; exported_compilation_unit : Compilation_unit.t
-  }
-
 module Print : sig
   type xinstr =
     | Instr of instr
@@ -249,10 +260,9 @@ module Print : sig
 
   val instr : Format.formatter -> instr -> unit
 
-  val block :
-    Format.formatter -> (Addr.Map.key -> xinstr -> string) -> int -> block -> unit
+  val block : Format.formatter -> (Addr.t -> xinstr -> string) -> int -> block -> unit
 
-  val program : Format.formatter -> (Addr.Map.key -> xinstr -> string) -> program -> unit
+  val program : Format.formatter -> (Addr.t -> xinstr -> string) -> program -> unit
 
   val last : Format.formatter -> last -> unit
 
@@ -301,6 +311,8 @@ val fold_children : 'c fold_blocs
 val fold_children_skip_try_body : 'c fold_blocs
 
 val poptraps : block Addr.Map.t -> Addr.t -> Addr.Set.t
+
+val return_values : program -> Var.Set.t Var.Map.t
 
 val traverse :
   fold_blocs_poly -> (Addr.t -> 'c -> 'c) -> Addr.t -> block Addr.Map.t -> 'c -> 'c

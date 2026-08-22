@@ -120,28 +120,57 @@ module Mappings = struct
         let ori_line_r = ref 1 in
         let ori_col_r = ref 0 in
         let ori_name_r = ref 0 in
-        let rec loop prev i =
+        let rec loop ~emitted i =
           if i < len
-          then
-            let c = a.(i) in
-            if
-              i + 1 < len
-              && gen_line c = gen_line a.(i + 1)
-              && gen_col c = gen_col a.(i + 1)
-            then
-              (* Only keep one source location per generated location *)
-              loop prev (i + 1)
-            else (
-              if !gen_line_r <> gen_line c
-              then (
-                assert (!gen_line_r < gen_line c);
-                for _i = !gen_line_r to gen_line c - 1 do
-                  Buffer.add_char buf ';'
-                done;
-                gen_col_r := 0;
-                gen_line_r := gen_line c)
-              else if i > 0
-              then Buffer.add_char buf ',';
+          then (
+            let left_bound = i in
+            (* Only keep one source location per generated location,
+               preferring named mappings *)
+            let right_bound =
+              (* Find all the contiguous sources with the same line and column. They'll be
+                 from [i, j] (inclusive on both ends) *)
+              let rec find_right_bound curr =
+                let next = curr + 1 in
+                if (
+                  next < len
+                  && gen_line a.(next) = gen_line a.(left_bound)
+                  && gen_col a.(next) = gen_col a.(left_bound))
+                then
+                  find_right_bound (next)
+                else
+                  curr
+              in
+              find_right_bound left_bound
+            in
+            let c =
+              let rec last_named k =
+                (* Return the rightmost element within the bounds, prioritizing named
+                   elements. *)
+                if k < i
+                then a.(right_bound)
+                else
+                  match a.(k) with
+                  | Gen_Ori_Name _ -> a.(k)
+                  | Gen _ | Gen_Ori _ -> last_named (k - 1)
+              in
+              last_named right_bound
+            in
+            let i = right_bound in
+            (if !gen_line_r <> gen_line c
+             then (
+               assert (!gen_line_r < gen_line c);
+               for _i = !gen_line_r to gen_line c - 1 do
+                 Buffer.add_char buf ';'
+               done;
+               gen_col_r := 0;
+               gen_line_r := gen_line c)
+             else if emitted
+             then
+               (* Only emit a separator if a segment was already emitted on
+                  this line. Deduplication may skip the first mappings, and a
+                  leading separator (empty segment) is rejected by some
+                  consumers, e.g. Binaryen. *)
+               Buffer.add_char buf ',');
               let l =
                 match c with
                 | Gen { gen_line = _; gen_col } ->
@@ -179,7 +208,7 @@ module Mappings = struct
                     res
               in
               Vlq64.encode_l buf l;
-              loop i (i + 1))
+              loop ~emitted:true (i + 1))
         in
 
         let offset =
@@ -191,7 +220,7 @@ module Mappings = struct
             first_line - 1)
           else 0
         in
-        loop (-1) 0;
+        loop ~emitted:false 0;
         offset, Uninterpreted (Buffer.contents buf)
 
   let encode mapping =

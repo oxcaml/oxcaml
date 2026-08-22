@@ -35,9 +35,8 @@ let%expect_test _ =
       |> compile_cmo_to_javascript ~sourcemap:true ~pretty:false
       |> extract_sourcemap
       |> function
-      | Some
-          (Js_of_ocaml_compiler.Source_map.Standard
-             (sm : Js_of_ocaml_compiler.Source_map.Standard.t)) -> print_section sm
+      | Some (Js_of_ocaml_compiler.Source_map.Standard (sm : Js_of_ocaml_compiler.Source_map.Standard.t)) ->
+          print_section sm
       | Some (Index i) ->
           List.iter
             i.sections

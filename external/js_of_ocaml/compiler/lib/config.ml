@@ -75,6 +75,9 @@ module Flag = struct
 
   let effects = o ~name:"effects" ~default:false
 
+  let oxcaml_use_unyielding_debuginfo_for_effect_cps =
+    o ~name:"oxcaml-use-unyielding-debuginfo-for-effect-cps" ~default:true
+
   let staticeval = o ~name:"staticeval" ~default:true
 
   let share_constant = o ~name:"share" ~default:true
@@ -89,8 +92,6 @@ module Flag = struct
 
   let improved_stacktrace = o ~name:"with-js-error" ~default:false
 
-  let warn_unused = o ~name:"warn-unused" ~default:false
-
   let inline_callgen = o ~name:"callgen" ~default:false
 
   let safe_string = o ~name:"safestring" ~default:true
@@ -101,44 +102,71 @@ module Flag = struct
 
   let compact_vardecl = o ~name:"vardecl" ~default:false
 
+  let constant_sinking = o ~name:"constant-sinking" ~default:true
+
+  let var_coalescing = o ~name:"var-coalescing" ~default:true
+
   let header = o ~name:"header" ~default:true
 
   let auto_link = o ~name:"auto-link" ~default:true
 
   let es6 = o ~name:"es6" ~default:false
+
+  let load_shapes_auto = o ~name:"load-shapes-auto" ~default:false
+
+  let toplevel = o ~name:"toplevel" ~default:false
+
+  let wasi = o ~name:"wasi" ~default:false
+
+  let portable_int = o ~name:"portable-int" ~default:false
 end
 
 module Param = struct
-  let int default = default, int_of_string
+  let int default =
+    ( default
+    , int_of_string
+    , fun s ->
+        try
+          ignore (int_of_string s : int);
+          Ok ()
+        with _ -> Error "expecting an integer" )
 
   let enum : (string * 'a) list -> _ = function
-    | (_, v) :: _ as l -> (
+    | (_, v) :: _ as l ->
         ( v
-        , fun x ->
+        , (fun x ->
             match List.string_assoc x l with
             | Some x -> x
-            | None -> assert false ))
+            | None -> assert false)
+        , fun x ->
+            if List.exists ~f:(fun (y, _) -> String.equal x y) l
+            then Ok ()
+            else
+              Error
+                (Printf.sprintf
+                   "expecting one of %s"
+                   (String.concat ~sep:", " (List.map l ~f:fst))) )
     | _ -> assert false
 
   let params : (string * _) list ref = ref []
 
-  let p ~name ~desc (default, convert) =
+  let p ~name ~desc (default, convert, valid) =
     assert (Option.is_none (List.string_assoc name !params));
     let state = ref default in
     let set : string -> unit =
      fun v ->
       try state := convert v
-      with _ -> warn "Warning: malformed option %s=%s. IGNORE@." name v
+      with _ -> failwith (Printf.sprintf "malformed option %s=%s." name v)
     in
-    params := (name, (set, desc)) :: !params;
+    params := (name, (set, desc, valid)) :: !params;
     fun () -> !state
 
   let set s v =
     match List.string_assoc s !params with
-    | Some (f, _) -> f v
+    | Some (f, _, _) -> f v
     | None -> failwith (Printf.sprintf "The option named %S doesn't exist" s)
 
-  let all () = List.map !params ~f:(fun (n, (_, d)) -> n, d)
+  let all () = List.map !params ~f:(fun (n, (_, d, valid)) -> n, d, valid)
 
   (* V8 "optimize" switches with less than 128 case.
      60 seams to perform well. *)
@@ -146,7 +174,7 @@ module Param = struct
     p ~name:"switch_size" ~desc:"set the maximum number of case in a switch" (int 60)
 
   let inlining_limit =
-    p ~name:"inlining-limit" ~desc:"set the size limit for inlining" (int 200)
+    p ~name:"inlining-limit" ~desc:"set the size limit for inlining" (int 150)
 
   let tailcall_max_depth =
     p
@@ -158,6 +186,18 @@ module Param = struct
     p
       ~name:"cst_depth"
       ~desc:"set the maximum depth of generated literal JavaScript values"
+      (int 10)
+
+  let merge_node_max =
+    (* Above this many sibling merge-node branch targets, emit a flat
+       selector-driven dispatch loop instead of a tower of nested labelled
+       blocks, to bound the statement-nesting depth of generated functions
+       (deep nesting overflows some JS engine parsers, e.g. SpiderMonkey). *)
+    p
+      ~name:"merge_node_max"
+      ~desc:
+        "set the maximum number of nested labelled blocks before switching to a flat \
+         dispatch loop"
       (int 10)
 
   type tc =
@@ -204,10 +244,15 @@ let target () =
   | `None -> failwith "target was not set"
   | (`JavaScript | `Wasm) as t -> t
 
-let set_target (t : [ `JavaScript | `Wasm ]) =
-  (match t with
-  | `JavaScript -> Targetint.set_num_bits 32
-  | `Wasm -> Targetint.set_num_bits 31);
+let set_target (t : [ `JavaScript | `Wasm ])  =
+  (match t, Flag.portable_int () with
+  | `JavaScript, false -> Targetint.set_num_bits 32; Targetnativeint.set_num_bits 32
+  | `JavaScript, true-> failwith "Portable int representation is incompatible with JavaScript"
+  | `Wasm, false -> Targetint.set_num_bits 31; Targetnativeint.set_num_bits 32
+  | `Wasm, true when Flag.wasi () ->
+      failwith "Portable int representation is currently incompatible with wasi";
+  | `Wasm, true ->
+      Targetint.set_num_bits 63; Targetnativeint.set_num_bits 64);
   target_ := (t :> [ `JavaScript | `Wasm | `None ])
 
 type effects_backend =
@@ -215,14 +260,15 @@ type effects_backend =
   | `Cps
   | `Double_translation
   | `Jspi
+  | `Native
   ]
 
 let effects_ : [< `None | effects_backend ] ref = ref `None
 
 let effects () =
   match !effects_ with
-  | `None -> `Disabled
-  | (`Jspi | `Cps | `Disabled | `Double_translation) as b -> b
+  | `None -> failwith "effects was not set"
+  | (`Jspi | `Cps | `Native | `Disabled | `Double_translation) as b -> b
 
 let set_effects_backend (backend : effects_backend) =
   effects_ := (backend :> [ `None | effects_backend ])

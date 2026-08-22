@@ -1,7 +1,7 @@
 //Provides: caml_unix_gettimeofday
 //Alias: unix_gettimeofday
 function caml_unix_gettimeofday() {
-  return new Date().getTime() / 1000;
+  return Date.now() / 1000;
 }
 
 //Provides: caml_unix_time
@@ -50,15 +50,33 @@ function caml_unix_gmtime(t) {
 //Alias: unix_localtime
 function caml_unix_localtime(t) {
   var d = new Date(t * 1000);
-  var d_num = d.getTime();
-  var januaryfirst = new Date(d.getFullYear(), 0, 1).getTime();
-  var doy = Math.floor((d_num - januaryfirst) / 86400000);
+  // tm_yday is the distance in days to January 1; compute it in UTC so
+  // that the one-hour DST shift of wall-clock arithmetic does not apply
+  var doy = Math.floor(
+    (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) -
+      Date.UTC(d.getFullYear(), 0, 1)) /
+      86400000,
+  );
   var jan = new Date(d.getFullYear(), 0, 1);
   var jul = new Date(d.getFullYear(), 6, 1);
   var stdTimezoneOffset = Math.max(
     jan.getTimezoneOffset(),
     jul.getTimezoneOffset(),
   );
+  var isdst = d.getTimezoneOffset() < stdTimezoneOffset;
+  // Europe/Dublin uses "negative DST": the IANA database marks winter
+  // (GMT) as the daylight deviation from its summer standard (IST), so the
+  // native runtime reports tm_isdst inverted from the offset heuristic.
+  // The offsets alone cannot distinguish it from Europe/London, so match
+  // it by name (guarded to the GMT/+1 signature to avoid the Intl lookup
+  // for every other zone).
+  if (
+    stdTimezoneOffset === 0 &&
+    jan.getTimezoneOffset() !== jul.getTimezoneOffset() &&
+    globalThis.Intl?.DateTimeFormat?.().resolvedOptions().timeZone ===
+      "Europe/Dublin"
+  )
+    isdst = !isdst;
   return BLOCK(
     0,
     d.getSeconds(),
@@ -69,8 +87,7 @@ function caml_unix_localtime(t) {
     d.getFullYear() - 1900,
     d.getDay(),
     doy,
-    (d.getTimezoneOffset() < stdTimezoneOffset) |
-      0 /* daylight savings time  field. */,
+    isdst | 0 /* daylight savings time  field. */,
   );
 }
 
@@ -98,21 +115,18 @@ function caml_unix_filedescr_of_fd(x) {
 }
 
 //Provides: caml_unix_isatty
-//Requires: fs_node_supported, caml_unix_lookup_file
+//Requires: caml_unix_lookup_file
 //Alias: unix_isatty
 function caml_unix_isatty(fd) {
-  if (fs_node_supported()) {
-    var tty = require("node:tty");
-    return tty.isatty(caml_unix_lookup_file(fd).fd) ? 1 : 0;
-  } else {
-    return 0;
-  }
+  var file = caml_unix_lookup_file(fd);
+  if (!file.isatty) return 0;
+  return file.isatty();
 }
 
 //Provides: caml_unix_isatty
 //Alias: unix_isatty
 //If: browser
-function caml_unix_isatty(fileDescriptor) {
+function caml_unix_isatty(_fileDescriptor) {
   return 0;
 }
 
@@ -216,16 +230,29 @@ function make_unix_err_args(code, syscall, path, errno) {
 //Provides: caml_strerror
 //Requires: unix_error
 function caml_strerror(errno) {
+  if (typeof require === "undefined") {
+    const code = unix_error[errno];
+    return code || "Unknown error " + errno;
+  }
   const util = require("node:util");
   if (errno >= 0) {
     const code = unix_error[errno];
-    return util
-      .getSystemErrorMap()
-      .entries()
-      .find((x) => x[1][0] === code)[1][1];
+    // no Iterator.prototype.find: it requires node >= 22
+    for (const e of util.getSystemErrorMap())
+      if (e[1][0] === code) return e[1][1];
+    // not every code is in libuv's error map
+    return code || "Unknown error " + errno;
   } else {
     return util.getSystemErrorMessage(errno);
   }
+}
+
+//Provides: caml_strerror
+//Requires: unix_error
+//If: browser
+function caml_strerror(errno) {
+  const code = unix_error[errno];
+  return code || "Unknown error " + errno;
 }
 
 //Provides: unix_error_message
@@ -247,7 +274,7 @@ function caml_unix_chdir(dir) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_stat
 function caml_unix_stat(name) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.stat) {
     caml_failwith("caml_unix_stat: not implemented");
   }
@@ -262,7 +289,7 @@ function caml_unix_stat(name) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_stat_64
 function caml_unix_stat_64(name) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.stat) {
     caml_failwith("caml_unix_stat_64: not implemented");
   }
@@ -277,7 +304,7 @@ function caml_unix_stat_64(name) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_lstat
 function caml_unix_lstat(name) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.lstat) {
     caml_failwith("caml_unix_lstat: not implemented");
   }
@@ -292,7 +319,7 @@ function caml_unix_lstat(name) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_lstat_64
 function caml_unix_lstat_64(name) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.lstat) {
     caml_failwith("caml_unix_lstat_64: not implemented");
   }
@@ -307,11 +334,11 @@ function caml_unix_lstat_64(name) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_chmod
 function caml_unix_chmod(name, perms) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.chmod) {
     caml_failwith("caml_unix_chmod: not implemented");
   }
-  return root.device.chmod(root.rest, perms);
+  return root.device.chmod(root.rest, perms, /* raise Unix_error */ 1);
 }
 
 //Provides: caml_unix_rename
@@ -319,11 +346,11 @@ function caml_unix_chmod(name, perms) {
 //Requires: caml_raise_system_error
 //Alias: unix_rename
 function caml_unix_rename(o, n) {
-  var o_root = resolve_fs_device(o);
-  var n_root = resolve_fs_device(n);
+  var o_root = resolve_fs_device(o, /* raise Unix_error */ 1);
+  var n_root = resolve_fs_device(n, /* raise Unix_error */ 1);
   if (o_root.device !== n_root.device)
     caml_raise_system_error(/* raise Unix_error */ 1, "EXDEV", "rename");
-  if (!o_root.device.rename) caml_failwith("caml_sys_rename: no implemented");
+  if (!o_root.device.rename) caml_failwith("caml_sys_rename: not implemented");
   o_root.device.rename(o_root.rest, n_root.rest, /* raise Unix_error */ true);
 }
 
@@ -331,7 +358,7 @@ function caml_unix_rename(o, n) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_mkdir
 function caml_unix_mkdir(name, perm) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.mkdir) {
     caml_failwith("caml_unix_mkdir: not implemented");
   }
@@ -342,7 +369,7 @@ function caml_unix_mkdir(name, perm) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_rmdir
 function caml_unix_rmdir(name) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.rmdir) {
     caml_failwith("caml_unix_rmdir: not implemented");
   }
@@ -353,8 +380,8 @@ function caml_unix_rmdir(name) {
 //Requires: resolve_fs_device, caml_failwith, caml_raise_system_error
 //Alias: unix_link
 function caml_unix_link(follow, src, dst) {
-  var src_root = resolve_fs_device(src);
-  var dst_root = resolve_fs_device(dst);
+  var src_root = resolve_fs_device(src, /* raise Unix_error */ 1);
+  var dst_root = resolve_fs_device(dst, /* raise Unix_error */ 1);
   if (!src_root.device.link) {
     caml_failwith("caml_unix_link: not implemented");
   }
@@ -375,7 +402,7 @@ function caml_unix_link(follow, src, dst) {
 //Requires: resolve_fs_device, caml_failwith, caml_jsstring_of_string
 //Alias: unix_symlink
 function caml_unix_symlink(to_dir, src, dst) {
-  var dst_root = resolve_fs_device(dst);
+  var dst_root = resolve_fs_device(dst, /* raise Unix_error */ 1);
   if (!dst_root.device.symlink) {
     caml_failwith("caml_unix_symlink: not implemented");
   }
@@ -391,7 +418,7 @@ function caml_unix_symlink(to_dir, src, dst) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_readlink
 function caml_unix_readlink(name) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.readlink) {
     caml_failwith("caml_unix_readlink: not implemented");
   }
@@ -402,7 +429,7 @@ function caml_unix_readlink(name) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_unlink
 function caml_unix_unlink(name) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.unlink) {
     caml_failwith("caml_unix_unlink: not implemented");
   }
@@ -414,7 +441,7 @@ function caml_unix_unlink(name) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_utimes
 function caml_unix_utimes(name, atime, mtime) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.utimes) {
     caml_failwith("caml_unix_utimes: not implemented");
   }
@@ -426,7 +453,7 @@ function caml_unix_utimes(name, atime, mtime) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_truncate
 function caml_unix_truncate(name, len) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.truncate) {
     caml_failwith("caml_unix_truncate: not implemented");
   }
@@ -438,7 +465,7 @@ function caml_unix_truncate(name, len) {
 //Requires: resolve_fs_device, caml_failwith, caml_int64_to_float
 //Alias: unix_truncate_64
 function caml_unix_truncate_64(name, len) {
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.truncate) {
     caml_failwith("caml_unix_truncate_64: not implemented");
   }
@@ -472,7 +499,7 @@ function caml_unix_access(name, flags) {
     }
     flags = flags[2];
   }
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   if (!root.device.access) {
     caml_failwith("caml_unix_access: not implemented");
   }
@@ -481,7 +508,7 @@ function caml_unix_access(name, flags) {
 }
 
 //Provides: caml_unix_open
-//Requires: resolve_fs_device, caml_sys_fds, MlChanid
+//Requires: resolve_fs_device, caml_sys_fds
 //Alias: unix_open
 function caml_unix_open(name, flags, perms) {
   var f = {};
@@ -523,11 +550,10 @@ function caml_unix_open(name, flags, perms) {
     }
     flags = flags[2];
   }
-  var root = resolve_fs_device(name);
+  var root = resolve_fs_device(name, /* raise Unix_error */ 1);
   var file = root.device.open(root.rest, f, perms, /* raise Unix_error */ true);
   var idx = caml_sys_fds.length;
-  var chanid = new MlChanid(idx);
-  caml_sys_fds[idx] = { file: file, chanid: chanid };
+  caml_sys_fds[idx] = { file: file };
   return idx | 0;
 }
 
@@ -615,7 +641,6 @@ function caml_unix_single_write(fd, buf, pos, len) {
 }
 
 //Provides: caml_unix_write_bigarray
-//Alias: caml_unix_lookup_file
 //Requires: caml_ba_to_typed_array, caml_unix_lookup_file
 //Version: >= 5.2
 function caml_unix_write_bigarray(fd, buf, pos, len) {
@@ -696,10 +721,11 @@ function caml_unix_ftruncate_64(fd, len) {
 
 //Provides: caml_unix_close
 //Alias: unix_close
-//Requires: caml_unix_lookup_file
+//Requires: caml_unix_lookup_file, caml_sys_fds
 function caml_unix_close(fd) {
   var file = caml_unix_lookup_file(fd, "close");
   file.close(/* raise unix_error */ 1);
+  delete caml_sys_fds[fd];
   return 0;
 }
 
@@ -708,7 +734,7 @@ function caml_unix_close(fd) {
 //Alias: win_inchannel_of_filedescr
 //Requires: caml_unix_lookup_file, caml_ml_open_descriptor_in
 function caml_unix_inchannel_of_filedescr(fd) {
-  var file = caml_unix_lookup_file(fd, "out_channel_of_descr");
+  var file = caml_unix_lookup_file(fd, "in_channel_of_descr");
   file.check_stream_semantics("in_channel_of_descr");
   return caml_ml_open_descriptor_in(fd);
 }
@@ -725,7 +751,7 @@ function caml_unix_outchannel_of_filedescr(fd) {
 
 //Provides: caml_unix_getuid
 //Alias: unix_getuid
-function caml_unix_getuid(unit) {
+function caml_unix_getuid(_unit) {
   if (globalThis.process?.getuid) {
     return globalThis.process.getuid();
   }
@@ -734,7 +760,7 @@ function caml_unix_getuid(unit) {
 
 //Provides: caml_unix_geteuid
 //Alias: unix_geteuid
-function caml_unix_geteuid(unit) {
+function caml_unix_geteuid(_unit) {
   if (globalThis.process?.geteuid) {
     return globalThis.process.geteuid();
   }
@@ -743,7 +769,7 @@ function caml_unix_geteuid(unit) {
 
 //Provides: caml_unix_getgid
 //Alias: unix_getgid
-function caml_unix_getgid(unit) {
+function caml_unix_getgid(_unit) {
   if (globalThis.process?.getgid) {
     return globalThis.process.getgid();
   }
@@ -752,7 +778,7 @@ function caml_unix_getgid(unit) {
 
 //Provides: caml_unix_getegid
 //Alias: unix_getegid
-function caml_unix_getegid(unit) {
+function caml_unix_getegid(_unit) {
   if (globalThis.process?.getegid) {
     return globalThis.process.getegid();
   }
@@ -768,14 +794,14 @@ function caml_unix_getegid(unit) {
 //Alias: unix_getgrnam
 //Alias: caml_unix_getgrgid
 //Alias: unix_getgrgid
-function caml_unix_getpwnam(unit) {
+function caml_unix_getpwnam(_unit) {
   caml_raise_not_found();
 }
 
 //Provides: caml_unix_has_symlink
 //Requires: fs_node_supported
 //Alias: unix_has_symlink
-function caml_unix_has_symlink(unit) {
+function caml_unix_has_symlink(_unit) {
   return fs_node_supported() ? 1 : 0;
 }
 
@@ -783,12 +809,13 @@ function caml_unix_has_symlink(unit) {
 //Requires: resolve_fs_device, caml_failwith
 //Alias: unix_opendir
 function caml_unix_opendir(path) {
-  var root = resolve_fs_device(path);
+  var root = resolve_fs_device(path, /* raise Unix_error */ 1);
   if (!root.device.opendir) {
     caml_failwith("caml_unix_opendir: not implemented");
   }
   var dir_handle = root.device.opendir(root.rest, /* raise Unix_error */ true);
-  return { pointer: dir_handle, path: path };
+  // node's Dir.readSync does not report "." and ".."; native readdir does
+  return { pointer: dir_handle, path: path, dots: [".", ".."] };
 }
 
 //Provides: caml_unix_readdir
@@ -798,6 +825,8 @@ function caml_unix_opendir(path) {
 //Alias: unix_readdir
 function caml_unix_readdir(dir_handle) {
   var entry;
+  if (dir_handle.dots && dir_handle.dots.length > 0)
+    return caml_string_of_jsstring(dir_handle.dots.shift());
   try {
     entry = dir_handle.pointer.readSync();
   } catch (e) {
@@ -814,6 +843,8 @@ function caml_unix_readdir(dir_handle) {
 //Requires: caml_raise_system_error
 //Alias: unix_closedir
 function caml_unix_closedir(dir_handle) {
+  // drop the synthesized "." / ".." so readdir on a closed handle fails
+  dir_handle.dots = null;
   try {
     dir_handle.pointer.closeSync();
   } catch (e) {
@@ -828,6 +859,7 @@ function caml_unix_rewinddir(dir_handle) {
   caml_unix_closedir(dir_handle);
   var new_dir_handle = caml_unix_opendir(dir_handle.path);
   dir_handle.pointer = new_dir_handle.pointer;
+  dir_handle.dots = new_dir_handle.dots;
   return 0;
 }
 

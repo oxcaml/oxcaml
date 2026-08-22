@@ -3,11 +3,10 @@
  (public_name js_of_ocaml-compiler)
  (synopsis "Js_of_ocaml compiler library")
  (libraries
-  compiler-libs.common
-  compiler-libs.bytecomp
+  ocaml-compiler-libs.common
+  ocaml-compiler-libs.bytecomp
   menhirLib
   sedlex
-  time_now
   yojson)
  (flags
   (:standard -w -7-37 -safe-string))
@@ -29,9 +28,7 @@
   --unused-token
   TCommentLineDirective
   --unused-token
-  T_ERROR
-  --unused-token
-  T_AT))
+  T_ERROR))
 
 (menhir
  (modules annot_parser))

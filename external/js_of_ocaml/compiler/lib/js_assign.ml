@@ -237,14 +237,14 @@ while compiling the OCaml toplevel:
     in
     let all =
       match block with
-      | Normal -> all
+      | Let_scope | Var_scope -> all
       | Params _ -> all
       | Catch (p, _) ->
           let ids = bound_idents_of_binding p in
           List.fold_left ids ~init:all ~f:(fun all i -> Javascript.IdentSet.add i all)
     in
     match block with
-    | Normal -> add_constraints state all ~offset:0 []
+    | Let_scope | Var_scope -> add_constraints state all ~offset:0 []
     | Catch (v, _) -> add_constraints state all ~offset:5 (bound_idents_of_binding v)
     | Params p -> add_constraints state all ~offset:0 (bound_idents_of_params p)
 end
@@ -253,7 +253,7 @@ module Preserve : Strategy = struct
   (* Try to preserve variable names.
      - Assign the origin name if present: "{original_name}"
      - If present but not available, derive a similar name: "{original_name}${n}" (eg. result$3).
-     - If not present, make up a name: "${n}"
+     - If not present, make up a name: "$${n}"
 
      Color variables one scope/block at a time - outer scope first.
   *)
@@ -271,7 +271,7 @@ module Preserve : Strategy = struct
       | Catch (p, _) ->
           bound_idents_of_binding p
           @ Javascript.IdentSet.elements scope.Js_traverse.def_local
-      | Normal -> Javascript.IdentSet.elements scope.Js_traverse.def_local
+      | Let_scope | Var_scope -> Javascript.IdentSet.elements scope.Js_traverse.def_local
       | Params _ ->
           Javascript.IdentSet.elements
             (IdentSet.union scope.Js_traverse.def_var scope.Js_traverse.def_local)
@@ -358,17 +358,17 @@ module Preserve : Strategy = struct
               | 0 -> Var.compare i j
               | c -> c)
           |> List.fold_left ~init:reserved ~f:(fun reserved var ->
-                 let name =
-                   while
-                     let name = create_unamed !unamed in
-                     StringSet.mem name reserved || StringSet.mem name Reserved.keyword
-                   do
-                     incr unamed
-                   done;
-                   create_unamed !unamed
-                 in
-                 names.(Var.idx var) <- name;
-                 StringSet.add name reserved)
+              let name =
+                while
+                  let name = create_unamed !unamed in
+                  StringSet.mem name reserved || StringSet.mem name Reserved.keyword
+                do
+                  incr unamed
+                done;
+                create_unamed !unamed
+              in
+              names.(Var.idx var) <- name;
+              StringSet.add name reserved)
         in
         ());
     names
@@ -379,7 +379,16 @@ class traverse record_block =
     inherit Js_traverse.free as super
 
     method! record_block b =
-      record_block m#state b;
+      (* A [Let_scope] (lexical) block that binds nothing block-scoped only
+         constrains naming through identifiers that its enclosing scope also
+         records (its [var]s hoist and its uses propagate up via
+         [merge_block_info]). Recording it would add a redundant constraint
+         table, so skip it. [Var_scope]/[Params]/[Catch] anchor their own
+         bindings and are always recorded. *)
+      (match b with
+      | Js_traverse.Let_scope
+        when Javascript.IdentSet.is_empty m#state.Js_traverse.def_local -> ()
+      | Let_scope | Var_scope | Params _ | Catch _ -> record_block m#state b);
       super#record_block b
   end
 
@@ -435,7 +444,9 @@ let program' (module Strategy : Strategy) p =
     let o = new traverse_idents_and_labels ~idents:count ~labels in
     o#program p
   in
-  mapper#record_block Normal;
+  (* The program top level anchors its own [var]s and has no enclosing scope
+     to record them, so it is a [Var_scope] (never skipped). *)
+  mapper#record_block Var_scope;
   let freevar =
     IdentSet.fold
       (fun ident acc ->
@@ -448,7 +459,7 @@ let program' (module Strategy : Strategy) p =
   let has_free_var = not (Var.Set.is_empty freevar) in
   let unallocated_names = ref Var.Set.empty in
   let names = Strategy.allocate_variables state ~count in
-  (* ignore the choosen name for escaping/free [V _] variables *)
+  (* ignore the chosen name for escaping/free [V _] variables *)
   Var.Set.iter (fun x -> names.(Var.idx x) <- "") freevar;
   let ident =
     if Config.Flag.stable_var ()
@@ -481,7 +492,7 @@ let program' (module Strategy : Strategy) p =
         S (Utf8_string.of_string_exn lname_per_depth.(i))
   in
   let p = (new name ident label)#program p in
-  (if has_free_var || Var.Set.cardinal !unallocated_names > 0
+  (if has_free_var || not (Var.Set.is_empty !unallocated_names)
    then
      let () =
        if not (debug_shortvar () || debug ())

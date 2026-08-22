@@ -27,19 +27,11 @@ type state =
   | OPEN
   | CLOSED
 
-class type ['a] messageEvent = object
-  inherit ['a] Dom.event
-
-  method data : js_string t readonly_prop
-
-  method origin : js_string t readonly_prop
-
-  method lastEventId : js_string t readonly_prop
-  (* method source : unit *)
-end
+type 'a messageEvent = ('a, js_string t) Dom_html.messageEvent
+[@@ocaml.deprecated "[since 6.5] Use Dom_html.messageEvent instead."]
 
 class type eventSource = object ('self)
-  method url : string t readonly_prop
+  method url : js_string t readonly_prop
 
   method withCredentials : bool t readonly_prop
 
@@ -47,11 +39,12 @@ class type eventSource = object ('self)
 
   method close : unit meth
 
-  method onopen : ('self t, 'self messageEvent t) event_listener writeonly_prop
+  method onopen : ('self t, 'self Dom.event t) event_listener writeonly_prop
 
-  method onmessage : ('self t, 'self messageEvent t) event_listener writeonly_prop
+  method onmessage :
+    ('self t, ('self, js_string t) Dom_html.messageEvent t) event_listener writeonly_prop
 
-  method onerror : ('self t, 'self messageEvent t) event_listener writeonly_prop
+  method onerror : ('self t, 'self Dom.event t) event_listener writeonly_prop
 end
 
 class type options = object

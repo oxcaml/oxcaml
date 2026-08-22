@@ -147,6 +147,16 @@ let rec format_sexp f s =
       Format.pp_print_string f ";;";
       Format.pp_print_string f s
 
+let escape_string s =
+  let b = Buffer.create (String.length s + 2) in
+  for i = 0 to String.length s - 1 do
+    let c = s.[i] in
+    if Char.(c >= ' ' && c <= '~' && c <> '"' && c <> '\\')
+    then Buffer.add_char b c
+    else Printf.bprintf b "\\%02x" (Char.code c)
+  done;
+  Buffer.contents b
+
 let index tbl x = Atom ("$" ^ Code.Var.Hashtbl.find tbl x)
 
 let heap_type st (ty : heap_type) =
@@ -186,12 +196,13 @@ let value_type_list st name tl =
 
 let func_type st ?param_names { params; result } =
   (match param_names with
-  | None -> value_type_list st "param" params
-  | Some names ->
-      List.map2
-        ~f:(fun i typ -> List [ Atom "param"; index st.local_names i; value_type st typ ])
-        names
-        params)
+    | None -> value_type_list st "param" params
+    | Some names ->
+        List.map2
+          ~f:(fun i typ ->
+            List [ Atom "param"; index st.local_names i; value_type st typ ])
+          names
+          params)
   @ value_type_list st "result" result
 
 let storage_type st typ =
@@ -215,7 +226,7 @@ let str_type st typ =
 
 let block_type = func_type
 
-let quoted_name name = Atom ("\"" ^ name ^ "\"")
+let quoted_name name = Atom ("\"" ^ escape_string name ^ "\"")
 
 let export name =
   match name with
@@ -224,10 +235,10 @@ let export name =
 
 let type_prefix op nm =
   (match op with
-  | I32 _ -> "i32."
-  | I64 _ -> "i64."
-  | F32 _ -> "f32."
-  | F64 _ -> "f64.")
+    | I32 _ -> "i32."
+    | I64 _ -> "i64."
+    | F32 _ -> "f32."
+    | F64 _ -> "f64.")
   ^ nm
 
 let signage op (s : Wasm_ast.signage) =
@@ -243,7 +254,8 @@ let int_un_op sz op =
   | Ctz -> "ctz"
   | Popcnt -> "popcnt"
   | Eqz -> "eqz"
-  | TruncSatF64 s -> signage "trunc_sat_f64" s
+  | TruncSat (`F64, s) -> signage "trunc_sat_f64" s
+  | TruncSat (`F32, s) -> signage "trunc_sat_f32" s
   | ReinterpretF -> "reinterpret_f" ^ sz
 
 let int_bin_op _ (op : int_bin_op) =
@@ -318,18 +330,22 @@ let float64 _ f =
   match classify_float f with
   | FP_normal | FP_subnormal | FP_zero -> Printf.sprintf "%h" f
   | FP_nan ->
+      let f = Int64.(bits_of_float f) in
       Printf.sprintf
-        "nan:0x%Lx"
-        Int64.(logand (bits_of_float f) (of_int ((1 lsl 52) - 1)))
+        "%snan:0x%Lx"
+        (if Int64.( >= ) f 0L then "" else "-")
+        Int64.(logand f (of_int ((1 lsl 52) - 1)))
   | FP_infinite -> if Float.(f > 0.) then "inf" else "-inf"
 
 let float32 _ f =
   match classify_float f with
   | FP_normal | FP_subnormal | FP_zero -> Printf.sprintf "%h" f
   | FP_nan ->
+      let f = Int32.(bits_of_float f) in
       Printf.sprintf
-        "nan:0x%lx"
-        Int32.(logand (bits_of_float f) (of_int ((1 lsl 23) - 1)))
+        "%snan:0x%lx"
+        (if Int32.( >= ) f 0l then "" else "-")
+        Int32.(logand f (of_int ((1 lsl 23) - 1)))
   | FP_infinite -> if Float.(f > 0.) then "inf" else "-inf"
 
 let expression_or_instructions ctx st in_function =
@@ -467,20 +483,35 @@ let expression_or_instructions ctx st in_function =
             @ [ List (Atom "else" :: expression iff) ])
         ]
     | Try (ty, body, catches) ->
-        [ List
-            (Atom "try"
-            :: (block_type st ty
-               @ List (Atom "do" :: instructions body)
-                 :: List.map
-                      ~f:(fun (tag, i, ty) ->
-                        List
-                          (Atom "catch"
-                          :: index st.tag_names tag
-                          :: (instruction (Wasm_ast.Event Code_generation.hidden_location)
-                             @ instruction (Wasm_ast.Br (i + 1, Some (Pop ty))))))
-                      catches))
-        ]
+        if Config.Flag.wasi ()
+        then
+          [ List
+              (Atom "try_table"
+              :: (block_type st ty
+                 @ List.map
+                     ~f:(fun (tag, i, _ty) ->
+                       List
+                         [ Atom "catch"; index st.tag_names tag; Atom (string_of_int i) ])
+                     catches
+                 @ instructions body))
+          ]
+        else
+          [ List
+              (Atom "try"
+              :: (block_type st ty
+                 @ List (Atom "do" :: instructions body)
+                   :: List.map
+                        ~f:(fun (tag, i, ty) ->
+                          List
+                            (Atom "catch"
+                            :: index st.tag_names tag
+                            :: (instruction
+                                  (Wasm_ast.Event Code_generation.hidden_location)
+                               @ instruction (Wasm_ast.Br (i + 1, Some (Pop ty))))))
+                        catches))
+          ]
     | ExternConvertAny e' -> [ List (Atom "extern.convert_any" :: expression e') ]
+    | AnyConvertExtern e' -> [ List (Atom "any.convert_extern" :: expression e') ]
   and instruction i =
     match i with
     | Drop e -> [ List (Atom "drop" :: expression e) ]
@@ -612,16 +643,6 @@ let import st f =
           ]
       ]
 
-let escape_string s =
-  let b = Buffer.create (String.length s + 2) in
-  for i = 0 to String.length s - 1 do
-    let c = s.[i] in
-    if Char.(c >= ' ' && c <= '~' && c <> '"' && c <> '\\')
-    then Buffer.add_char b c
-    else Printf.bprintf b "\\%02x" (Char.code c)
-  done;
-  Buffer.contents b
-
 let type_field st { name; typ; supertype; final } =
   if final && Option.is_none supertype
   then List [ Atom "type"; index st.type_names name; str_type st typ ]
@@ -666,10 +687,13 @@ let field ctx st f =
   | Type [ t ] -> [ type_field st t ]
   | Type l -> [ List (Atom "rec" :: List.map ~f:(type_field st) l) ]
 
+let times = Debug.find "times"
+
 let f ch fields =
+  let t = Timer.make () in
   let st = build_name_tables fields in
   let ctx = { function_refs = Code.Var.Set.empty } in
-  let other_fields = List.concat (List.map ~f:(fun f -> field ctx st f) fields) in
+  let other_fields = List.concat_map ~f:(fun f -> field ctx st f) fields in
   let funct_decl =
     let functions = Code.Var.Set.elements ctx.function_refs in
     if List.is_empty functions
@@ -682,12 +706,9 @@ let f ch fields =
           :: List.map ~f:(index st.func_names) functions)
       ]
   in
-  Format.fprintf
-    (Format.formatter_of_out_channel ch)
-    "%a@."
-    format_sexp
-    (List
-       (Atom "module"
-       :: (List.concat (List.map ~f:(fun i -> import st i) fields)
-          @ funct_decl
-          @ other_fields)))
+  let imports = List.concat_map ~f:(fun i -> import st i) fields in
+  let sexp = List (Atom "module" :: List.concat [ imports; funct_decl; other_fields ]) in
+  if times () then Format.eprintf "    prepare: %a@." Timer.print t;
+  let t = Timer.make () in
+  Format.fprintf (Format.formatter_of_out_channel ch) "%a@." format_sexp sexp;
+  if times () then Format.eprintf "    format: %a@." Timer.print t

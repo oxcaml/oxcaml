@@ -14,6 +14,8 @@
    --export
    export
    --pretty
+   -w
+   no-missing-effects-backend
    -o
    %{target}
    %{dep:main.bc})))
@@ -23,8 +25,13 @@
  (action
   (run %{bin:ocamlc} -c %{dep:./plugin.ml})))
 
+; Dynlink loads bytecode plugins via CommonJS-style relative-path
+; require, which the QuickJS shim does not implement.
+
 (rule
  (target main.out)
+ (enabled_if
+  (<> %{profile} quickjs))
  (deps plugin.cmo)
  (action
   (with-outputs-to
@@ -33,5 +40,7 @@
 
 (rule
  (alias runtest-js)
+ (enabled_if
+  (<> %{profile} quickjs))
  (action
   (diff main.out.expected main.out)))
