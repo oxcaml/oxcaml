@@ -56,6 +56,8 @@ let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)
 let cfg_value_propagation_float = ref false
                                         (* -[no]-cfg-value-propagation-float *)
 let cfg_value_propagation_flow = ref false
+
+let cfg_value_propagation_dataflow = ref false (* -[no]-cfg-value-propagation-dataflow *)
                                         (* -[no]-cfg-value-propagation-flow *)
 let reorder_blocks_random = ref None    (* -reorder-blocks-random seed *)
 let basic_block_sections = ref false    (* -basic-block-sections *)
