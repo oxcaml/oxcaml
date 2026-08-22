@@ -5345,166 +5345,6 @@ let cmm_arith_size (e : Cmm.expression) =
   | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     None
 
-(* Atomics *)
-
-let atomic_load_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block
-    ~field =
-  let memory_chunk =
-    match imm_or_ptr with Immediate -> Word_int | Pointer -> Word_val
-  in
-  Cop
-    (mk_load_atomic memory_chunk, [field_address_computed block field dbg], dbg)
-
-let atomic_extcall_name base_name (mode : Lambda.modify_mode) =
-  match mode with
-  | Modify_heap -> base_name
-  | Modify_maybe_stack -> base_name ^ "_local"
-
-let atomic_exchange_extcall ~dbg ~mode block ~field ~new_value =
-  Cop
-    ( Cextcall
-        { func = atomic_extcall_name "caml_atomic_exchange_field" mode;
-          builtin = false;
-          returns = true;
-          effects = Arbitrary_effects;
-          coeffects = Has_coeffects;
-          ty = typ_val;
-          ty_args = [];
-          alloc = false
-        },
-      [block; field; new_value],
-      dbg )
-
-let atomic_exchange_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode
-    block ~field ~new_value =
-  match imm_or_ptr with
-  | Immediate ->
-    let op = Catomic { op = Exchange; size = Word } in
-    if Proc.operation_supported op
-    then Cop (op, [new_value; field_address_computed block field dbg], dbg)
-    else atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
-  | Pointer -> atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
-
-let atomic_arith ~dbg ~op ~untag ~ext_name block ~field i =
-  let i = if untag then decr_int i dbg else i in
-  let op = Catomic { op; size = Word } in
-  if Proc.operation_supported op
-  then
-    (* input is a tagged integer *)
-    Cop (op, [i; field_address_computed block field dbg], dbg)
-  else
-    Cop
-      ( Cextcall
-          { func = ext_name;
-            builtin = false;
-            returns = true;
-            effects = Arbitrary_effects;
-            coeffects = Has_coeffects;
-            ty = typ_int;
-            ty_args = [];
-            alloc = false
-          },
-        [block; field; i],
-        dbg )
-
-let atomic_fetch_and_add_field ~dbg atomic ~field i =
-  atomic_arith ~dbg ~untag:true ~op:Fetch_and_add
-    ~ext_name:"caml_atomic_fetch_add_field" atomic ~field i
-
-let atomic_add_field ~dbg atomic ~field i =
-  atomic_arith ~dbg ~untag:true ~op:Add ~ext_name:"caml_atomic_add_field" atomic
-    ~field i
-  |> return_unit dbg
-
-let atomic_sub_field ~dbg atomic ~field i =
-  atomic_arith ~dbg ~untag:true ~op:Sub ~ext_name:"caml_atomic_sub_field" atomic
-    ~field i
-  |> return_unit dbg
-
-let atomic_land_field ~dbg atomic ~field i =
-  atomic_arith ~dbg ~untag:false ~op:Land ~ext_name:"caml_atomic_land_field"
-    atomic ~field i
-  |> return_unit dbg
-
-let atomic_lor_field ~dbg atomic ~field i =
-  atomic_arith ~dbg ~untag:false ~op:Lor ~ext_name:"caml_atomic_lor_field"
-    atomic ~field i
-  |> return_unit dbg
-
-let atomic_lxor_field ~dbg atomic ~field i =
-  atomic_arith ~dbg ~untag:true ~op:Lxor ~ext_name:"caml_atomic_lxor_field"
-    atomic ~field i
-  |> return_unit dbg
-
-let atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
-    =
-  Cop
-    ( Cextcall
-        { func = atomic_extcall_name "caml_atomic_cas_field" mode;
-          builtin = false;
-          returns = true;
-          effects = Arbitrary_effects;
-          coeffects = Has_coeffects;
-          ty = typ_int;
-          ty_args = [];
-          alloc = false
-        },
-      [block; field; old_value; new_value],
-      dbg )
-
-let atomic_compare_and_set_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
-    ~mode block ~field ~old_value ~new_value =
-  match imm_or_ptr with
-  | Immediate ->
-    let op = Catomic { op = Compare_set; size = Word } in
-    if Proc.operation_supported op
-    then
-      (* Use a bind to ensure [tag_int] gets optimised. *)
-      bind "res"
-        (Cop
-           ( op,
-             [old_value; new_value; field_address_computed block field dbg],
-             dbg ))
-        (fun a2 -> tag_int a2 dbg)
-    else
-      atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value
-        ~new_value
-  | Pointer ->
-    atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
-
-let atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
-    ~new_value =
-  Cop
-    ( Cextcall
-        { func = atomic_extcall_name "caml_atomic_compare_exchange_field" mode;
-          builtin = false;
-          returns = true;
-          effects = Arbitrary_effects;
-          coeffects = Has_coeffects;
-          ty = typ_val;
-          ty_args = [];
-          alloc = false
-        },
-      [block; field; old_value; new_value],
-      dbg )
-
-let atomic_compare_exchange_field ~dbg
-    (imm_or_ptr : Lambda.immediate_or_pointer) ~mode block ~field ~old_value
-    ~new_value =
-  match imm_or_ptr with
-  | Immediate ->
-    let op = Catomic { op = Compare_exchange; size = Word } in
-    if Proc.operation_supported op
-    then
-      Cop
-        (op, [old_value; new_value; field_address_computed block field dbg], dbg)
-    else
-      atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
-        ~new_value
-  | Pointer ->
-    atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
-      ~new_value
-
 let pack_small_ints_into_word ~bits int_list dbg =
   if bits * List.length int_list > arch_bits
   then Misc.fatal_error "Cmm_helpers.pack_small_ints_into_word: too many bits";
@@ -6080,3 +5920,188 @@ module Scalar_type = struct
       static_cast ~dbg ~src:(to_numeric src) ~dst:(to_numeric dst) exp
   end
 end
+
+(* Atomics *)
+
+type atomic_offset =
+  | Field_index of expression * Scalar_type.Integral.t
+  | Byte_offset of expression * Scalar_type.Integral.t
+
+let tagged_immediate =
+  Scalar_type.Integral.Tagged Scalar_type.Tagged_integer.immediate
+
+let untagged_nativeint = Scalar_type.Integral.nativeint
+
+let atomic_field_index_for_extcall offset dbg =
+  match offset with
+  | Field_index (field, src) ->
+    Scalar_type.Integral.static_cast field ~dbg ~src ~dst:tagged_immediate
+  | Byte_offset (offset, src) ->
+    let offset =
+      Scalar_type.Integral.static_cast offset ~dbg ~src ~dst:untagged_nativeint
+    in
+    (* can use lsr because byte offset is nonnegative *)
+    tag_int (lsr_int offset (Cconst_int (log2_size_addr, dbg)) dbg) dbg
+
+let atomic_address block offset dbg =
+  match offset with
+  | Field_index (field, src) ->
+    let index =
+      Scalar_type.Integral.static_cast field ~dbg ~src ~dst:tagged_immediate
+    in
+    field_address_computed block index dbg
+  | Byte_offset (offset, src) ->
+    let offset =
+      Scalar_type.Integral.static_cast offset ~dbg ~src ~dst:untagged_nativeint
+    in
+    add_int_addr block offset dbg
+
+let atomic_load ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block offset =
+  let memory_chunk =
+    match imm_or_ptr with Immediate -> Word_int | Pointer -> Word_val
+  in
+  Cop (mk_load_atomic memory_chunk, [atomic_address block offset dbg], dbg)
+
+let atomic_extcall_name base_name (mode : Lambda.modify_mode) =
+  match mode with
+  | Modify_heap -> base_name
+  | Modify_maybe_stack -> base_name ^ "_local"
+
+let atomic_exchange_extcall ~dbg ~mode block offset ~new_value =
+  Cop
+    ( Cextcall
+        { func = atomic_extcall_name "caml_atomic_exchange_field" mode;
+          builtin = false;
+          returns = true;
+          effects = Arbitrary_effects;
+          coeffects = Has_coeffects;
+          ty = typ_val;
+          ty_args = [];
+          alloc = false
+        },
+      [block; atomic_field_index_for_extcall offset dbg; new_value],
+      dbg )
+
+let atomic_exchange ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode block
+    offset ~new_value =
+  match imm_or_ptr with
+  | Immediate ->
+    let op = Catomic { op = Exchange; size = Word } in
+    if Proc.operation_supported op
+    then Cop (op, [new_value; atomic_address block offset dbg], dbg)
+    else atomic_exchange_extcall ~dbg ~mode block offset ~new_value
+  | Pointer -> atomic_exchange_extcall ~dbg ~mode block offset ~new_value
+
+let atomic_arith ~dbg ~op ~untag ~ext_name block offset i =
+  let i = if untag then decr_int i dbg else i in
+  let op = Catomic { op; size = Word } in
+  if Proc.operation_supported op
+  then
+    (* input is a tagged integer *)
+    Cop (op, [i; atomic_address block offset dbg], dbg)
+  else
+    Cop
+      ( Cextcall
+          { func = ext_name;
+            builtin = false;
+            returns = true;
+            effects = Arbitrary_effects;
+            coeffects = Has_coeffects;
+            ty = typ_int;
+            ty_args = [];
+            alloc = false
+          },
+        [block; atomic_field_index_for_extcall offset dbg; i],
+        dbg )
+
+let atomic_fetch_and_add ~dbg atomic offset i =
+  atomic_arith ~dbg ~untag:true ~op:Fetch_and_add
+    ~ext_name:"caml_atomic_fetch_add_field" atomic offset i
+
+let atomic_add ~dbg atomic offset i =
+  atomic_arith ~dbg ~untag:true ~op:Add ~ext_name:"caml_atomic_add_field" atomic
+    offset i
+  |> return_unit dbg
+
+let atomic_sub ~dbg atomic offset i =
+  atomic_arith ~dbg ~untag:true ~op:Sub ~ext_name:"caml_atomic_sub_field" atomic
+    offset i
+  |> return_unit dbg
+
+let atomic_land ~dbg atomic offset i =
+  atomic_arith ~dbg ~untag:false ~op:Land ~ext_name:"caml_atomic_land_field"
+    atomic offset i
+  |> return_unit dbg
+
+let atomic_lor ~dbg atomic offset i =
+  atomic_arith ~dbg ~untag:false ~op:Lor ~ext_name:"caml_atomic_lor_field"
+    atomic offset i
+  |> return_unit dbg
+
+let atomic_lxor ~dbg atomic offset i =
+  atomic_arith ~dbg ~untag:true ~op:Lxor ~ext_name:"caml_atomic_lxor_field"
+    atomic offset i
+  |> return_unit dbg
+
+let atomic_compare_and_set_extcall ~dbg ~mode block offset ~old_value ~new_value
+    =
+  Cop
+    ( Cextcall
+        { func = atomic_extcall_name "caml_atomic_cas_field" mode;
+          builtin = false;
+          returns = true;
+          effects = Arbitrary_effects;
+          coeffects = Has_coeffects;
+          ty = typ_int;
+          ty_args = [];
+          alloc = false
+        },
+      [block; atomic_field_index_for_extcall offset dbg; old_value; new_value],
+      dbg )
+
+let atomic_compare_and_set ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode
+    block offset ~old_value ~new_value =
+  match imm_or_ptr with
+  | Immediate ->
+    let op = Catomic { op = Compare_set; size = Word } in
+    if Proc.operation_supported op
+    then
+      (* Use a bind to ensure [tag_int] gets optimised. *)
+      bind "res"
+        (Cop (op, [old_value; new_value; atomic_address block offset dbg], dbg))
+        (fun a2 -> tag_int a2 dbg)
+    else
+      atomic_compare_and_set_extcall ~dbg ~mode block offset ~old_value
+        ~new_value
+  | Pointer ->
+    atomic_compare_and_set_extcall ~dbg ~mode block offset ~old_value ~new_value
+
+let atomic_compare_exchange_extcall ~dbg ~mode block offset ~old_value
+    ~new_value =
+  Cop
+    ( Cextcall
+        { func = atomic_extcall_name "caml_atomic_compare_exchange_field" mode;
+          builtin = false;
+          returns = true;
+          effects = Arbitrary_effects;
+          coeffects = Has_coeffects;
+          ty = typ_val;
+          ty_args = [];
+          alloc = false
+        },
+      [block; atomic_field_index_for_extcall offset dbg; old_value; new_value],
+      dbg )
+
+let atomic_compare_exchange ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
+    ~mode block offset ~old_value ~new_value =
+  match imm_or_ptr with
+  | Immediate ->
+    let op = Catomic { op = Compare_exchange; size = Word } in
+    if Proc.operation_supported op
+    then Cop (op, [old_value; new_value; atomic_address block offset dbg], dbg)
+    else
+      atomic_compare_exchange_extcall ~dbg ~mode block offset ~old_value
+        ~new_value
+  | Pointer ->
+    atomic_compare_exchange_extcall ~dbg ~mode block offset ~old_value
+      ~new_value

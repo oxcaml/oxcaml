@@ -1812,19 +1812,6 @@ let block_index_access_offsets ~machine_width layout idx =
     in
     snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
 
-(* [block_index_access_offsets] produces untagged byte offsets, but
-   [Atomic_load_field] and [Atomic_set_field] expect a tagged word index. *)
-let tagged_field_index_of_offset ~machine_width offset : H.simple_or_prim =
-  let log2_size_addr =
-    H.simple_untagged_int ~machine_width
-      (Misc.log2 (Target_system.Machine_width.size_in_bytes machine_width))
-  in
-  let index =
-    H.Binary (Int_shift (Naked_int64, Lsr), Prim offset, log2_size_addr)
-  in
-  Prim
-    (Unary (Num_conv { src = Naked_int64; dst = Tagged_immediate }, Prim index))
-
 let check_single_element offsets kinds =
   let offset, full_kind =
     match offsets, kinds with
@@ -1834,12 +1821,10 @@ let check_single_element offsets kinds =
         "check_single_element: expected single element for atomic op"
   in
   if not (K.is_value (K.With_subkind.kind full_kind))
-  then
-    (* defensive check: field index computation assumes data is word-sized *)
-    Misc.fatal_error "check_single_element: expected value for atomic op";
+  then Misc.fatal_error "check_single_element: expected value for atomic op";
   offset, full_kind
 
-let convert_atomic_idx_field ~machine_width primitive dbg layout ~idx =
+let idx_atomic_offset_and_field_kind ~machine_width primitive dbg layout ~idx =
   needs_64_bit_target primitive dbg;
   let offsets = block_index_access_offsets ~machine_width layout idx in
   let kinds =
@@ -1848,8 +1833,7 @@ let convert_atomic_idx_field ~machine_width primitive dbg layout ~idx =
   in
   let offset, full_kind = check_single_element offsets kinds in
   let field_kind = P.Block_access_field_kind.from_kind full_kind in
-  let field = tagged_field_index_of_offset ~machine_width offset in
-  field, field_kind
+  H.Prim offset, field_kind
 
 let convert_pget_indirect ~machine_width ~dbg primitive layout
     (mut : Asttypes.mutable_flag) ~ptr ~idx : H.expr_primitive list =
@@ -3325,8 +3309,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [get_header obj m ~current_alloc_region ~current_region]
   | Patomic_load_field { immediate_or_pointer }, [[atomic]; [field]] ->
     [ Binary
-        ( Atomic_load_field
-            (convert_block_access_field_kind immediate_or_pointer),
+        ( Atomic_load
+            (Field_index, convert_block_access_field_kind immediate_or_pointer),
           atomic,
           field ) ]
   | Patomic_load_mixed_field { index; shape }, [[atomic]] ->
@@ -3335,13 +3319,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~prim_name:"Patomic_load_mixed_field" index shape
     in
     [ Binary
-        (Atomic_load_field field_kind, atomic, H.Simple (Simple.const_int imm))
-    ]
+        ( Atomic_load (Field_index, field_kind),
+          atomic,
+          H.Simple (Simple.const_int imm) ) ]
   | ( Patomic_set_field { immediate_or_pointer; mode },
       [[atomic]; [field]; [new_value]] ) ->
     [ Ternary
-        ( Atomic_set_field
-            ( convert_block_access_field_kind immediate_or_pointer,
+        ( Atomic_set
+            ( Field_index,
+              convert_block_access_field_kind immediate_or_pointer,
               Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
@@ -3352,16 +3338,19 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~prim_name:"Patomic_set_mixed_field" index shape
     in
     [ Ternary
-        ( Atomic_set_field
-            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+        ( Atomic_set
+            ( Field_index,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           H.Simple (Simple.const_int imm),
           new_value ) ]
   | ( Patomic_exchange_field { immediate_or_pointer; mode },
       [[atomic]; [field]; [new_value]] ) ->
     [ Ternary
-        ( Atomic_exchange_field
-            ( convert_block_access_field_kind immediate_or_pointer,
+        ( Atomic_exchange
+            ( Field_index,
+              convert_block_access_field_kind immediate_or_pointer,
               Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
@@ -3370,8 +3359,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[atomic]; [field]; [comparison_value]; [new_value]] ) ->
     let access_kind = convert_block_access_field_kind immediate_or_pointer in
     [ Quaternary
-        ( Atomic_compare_exchange_field
-            { atomic_kind = access_kind;
+        ( Atomic_compare_exchange
+            { offset_units = Field_index;
+              atomic_kind = access_kind;
               args_kind = access_kind;
               mode = Alloc_mode.For_assignments.from_lambda mode
             },
@@ -3382,189 +3372,204 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | ( Patomic_compare_set_field { immediate_or_pointer; mode },
       [[atomic]; [field]; [old_value]; [new_value]] ) ->
     [ Quaternary
-        ( Atomic_compare_and_set_field
-            ( convert_block_access_field_kind immediate_or_pointer,
+        ( Atomic_compare_and_set
+            ( Field_index,
+              convert_block_access_field_kind immediate_or_pointer,
               Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
           old_value,
           new_value ) ]
   | Patomic_fetch_add_field, [[atomic]; [field]; [i]] ->
-    [Ternary (Atomic_field_int_arith Fetch_add, atomic, field, i)]
+    [Ternary (Atomic_int_arith (Field_index, Fetch_add), atomic, field, i)]
   | Patomic_add_field, [[atomic]; [field]; [i]] ->
-    [Ternary (Atomic_field_int_arith Add, atomic, field, i)]
+    [Ternary (Atomic_int_arith (Field_index, Add), atomic, field, i)]
   | Patomic_sub_field, [[atomic]; [field]; [i]] ->
-    [Ternary (Atomic_field_int_arith Sub, atomic, field, i)]
+    [Ternary (Atomic_int_arith (Field_index, Sub), atomic, field, i)]
   | Patomic_land_field, [[atomic]; [field]; [i]] ->
-    [Ternary (Atomic_field_int_arith And, atomic, field, i)]
+    [Ternary (Atomic_int_arith (Field_index, And), atomic, field, i)]
   | Patomic_lor_field, [[atomic]; [field]; [i]] ->
-    [Ternary (Atomic_field_int_arith Or, atomic, field, i)]
+    [Ternary (Atomic_int_arith (Field_index, Or), atomic, field, i)]
   | Patomic_lxor_field, [[atomic]; [field]; [i]] ->
-    [Ternary (Atomic_field_int_arith Xor, atomic, field, i)]
+    [Ternary (Atomic_int_arith (Field_index, Xor), atomic, field, i)]
   | Patomic_load_idx { layout }, [[ptr]; [idx]] ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
-    [Binary (Atomic_load_field field_kind, ptr, field)]
+    [Binary (Atomic_load (Byte_offset, field_kind), ptr, offset)]
   | Patomic_set_idx { layout; mode }, [[ptr]; [idx]; [new_value]] ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
     [ Ternary
-        ( Atomic_set_field
-            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+        ( Atomic_set
+            ( Byte_offset,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
           ptr,
-          field,
+          offset,
           new_value ) ]
   | Patomic_exchange_idx { layout; mode }, [[ptr]; [idx]; [new_value]] ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
     [ Ternary
-        ( Atomic_exchange_field
-            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+        ( Atomic_exchange
+            ( Byte_offset,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
           ptr,
-          field,
+          offset,
           new_value ) ]
   | ( Patomic_compare_exchange_idx { layout; mode },
       [[ptr]; [idx]; [comparison_value]; [new_value]] ) ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
     [ Quaternary
-        ( Atomic_compare_exchange_field
-            { atomic_kind = field_kind;
+        ( Atomic_compare_exchange
+            { offset_units = Byte_offset;
+              atomic_kind = field_kind;
               args_kind = field_kind;
               mode = Alloc_mode.For_assignments.from_lambda mode
             },
           ptr,
-          field,
+          offset,
           comparison_value,
           new_value ) ]
   | ( Patomic_compare_set_idx { layout; mode },
       [[ptr]; [idx]; [old_value]; [new_value]] ) ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
     [ Quaternary
-        ( Atomic_compare_and_set_field
-            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+        ( Atomic_compare_and_set
+            ( Byte_offset,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
           ptr,
-          field,
+          offset,
           old_value,
           new_value ) ]
   | Patomic_fetch_add_idx, [[ptr]; [idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Fetch_add, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Fetch_add), ptr, offset, i)]
   | Patomic_add_idx, [[ptr]; [idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Add, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Add), ptr, offset, i)]
   | Patomic_sub_idx, [[ptr]; [idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Sub, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Sub), ptr, offset, i)]
   | Patomic_land_idx, [[ptr]; [idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith And, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, And), ptr, offset, i)]
   | Patomic_lor_idx, [[ptr]; [idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Or, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Or), ptr, offset, i)]
   | Patomic_lxor_idx, [[ptr]; [idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Xor, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Xor), ptr, offset, i)]
   | Patomic_load_ptr { layout }, [[ptr; idx]] ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
-    [Binary (Atomic_load_field field_kind, ptr, field)]
+    [Binary (Atomic_load (Byte_offset, field_kind), ptr, offset)]
   | Patomic_set_ptr { layout; mode }, [[ptr; idx]; [new_value]] ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
     [ Ternary
-        ( Atomic_set_field
-            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+        ( Atomic_set
+            ( Byte_offset,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
           ptr,
-          field,
+          offset,
           new_value ) ]
   | Patomic_exchange_ptr { layout; mode }, [[ptr; idx]; [new_value]] ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
     [ Ternary
-        ( Atomic_exchange_field
-            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+        ( Atomic_exchange
+            ( Byte_offset,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
           ptr,
-          field,
+          offset,
           new_value ) ]
   | ( Patomic_compare_exchange_ptr { layout; mode },
       [[ptr; idx]; [comparison_value]; [new_value]] ) ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
     [ Quaternary
-        ( Atomic_compare_exchange_field
-            { atomic_kind = field_kind;
+        ( Atomic_compare_exchange
+            { offset_units = Byte_offset;
+              atomic_kind = field_kind;
               args_kind = field_kind;
               mode = Alloc_mode.For_assignments.from_lambda mode
             },
           ptr,
-          field,
+          offset,
           comparison_value,
           new_value ) ]
   | ( Patomic_compare_set_ptr { layout; mode },
       [[ptr; idx]; [old_value]; [new_value]] ) ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
     [ Quaternary
-        ( Atomic_compare_and_set_field
-            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+        ( Atomic_compare_and_set
+            ( Byte_offset,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
           ptr,
-          field,
+          offset,
           old_value,
           new_value ) ]
   | Patomic_fetch_add_ptr, [[ptr; idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Fetch_add, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Fetch_add), ptr, offset, i)]
   | Patomic_add_ptr, [[ptr; idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Add, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Add), ptr, offset, i)]
   | Patomic_sub_ptr, [[ptr; idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Sub, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Sub), ptr, offset, i)]
   | Patomic_land_ptr, [[ptr; idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith And, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, And), ptr, offset, i)]
   | Patomic_lor_ptr, [[ptr; idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Or, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Or), ptr, offset, i)]
   | Patomic_lxor_ptr, [[ptr; idx]; [i]] ->
-    let field, _ =
-      convert_atomic_idx_field ~machine_width prim dbg L.layout_int ~idx
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
     in
-    [Ternary (Atomic_field_int_arith Xor, ptr, field, i)]
+    [Ternary (Atomic_int_arith (Byte_offset, Xor), ptr, offset, i)]
   (* unary ptr-accepting atomic primitives *)
   | Patomic_load_ptr _, [([] | _ :: [] | _ :: _ :: _ :: _)] ->
     Misc.fatal_errorf
