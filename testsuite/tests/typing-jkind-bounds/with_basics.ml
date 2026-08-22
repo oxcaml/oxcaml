@@ -657,6 +657,265 @@ Error: The kind of type "c" is mutable_data with 'a
          because of the annotation on the declaration of the type c.
 |}]
 
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-73:
+3 | type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with 'a with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type 'a c : value mod portable contended = { b : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-55:
+3 | type 'a c : value mod portable contended = { b : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with 'a with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+(* Same as above with ['a := int]: even with a fully-crossing parameter,
+   [c] still fails portability via [t] inside [b], so [b] must be blamed. *)
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type c : value mod portable contended = { b : int b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-53:
+3 | type c : value mod portable contended = { b : int b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+type bad : value
+type t : value mod contended = { x : (bad * int) ref }
+[%%expect {|
+type bad
+Line 2, characters 0-54:
+2 | type t : value mod contended = { x : (bad * int) ref }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is
+           mutable_data with bad @@ forkable unyielding many
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+|}]
+
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { x : ('a ref * int) b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-67:
+3 | type 'a c : value mod portable contended = { x : ('a ref * int) b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is
+           mutable_data with 'a @@ forkable unyielding many with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+         portability: mod portable with 'a with t ≰ mod portable
+|}]
+
+(* Ancestor and descendant requirements can differ in VALUE on the same
+   axis: [outer]'s own portability requirement is only [corruptible],
+   while the nested [bad] must be fully [portable]. On the portability
+   diamond (portable < {shareable, corruptible} < nonportable) the
+   enclosing, weaker requirement does not entail the nested, stronger
+   one, so both must be reported. *)
+type 'a outer : value mod shareable with 'a
+type bad : value
+type t : value mod portable = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shareable with 'a
+type bad
+Line 3, characters 0-47:
+3 | type t : value mod portable = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Same on the contention diamond. *)
+type 'a outer : value mod shared with 'a
+type bad : value
+type t : value mod contended = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shared with 'a
+type bad
+Line 3, characters 0-48:
+3 | type t : value mod contended = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Two enclosing subjects on one path with incomparable requirements
+   (corruptible and shareable) do not jointly cover a nested subject that
+   must be fully portable: entailment is tested against each enclosing
+   requirement separately, never against their combination. *)
+type 'a o1 : value mod shareable with 'a
+type 'a o2 : value mod corruptible with 'a
+type bad : value
+type t : value mod portable = { x : bad o2 o1 }
+[%%expect {|
+type 'a o1 : value mod shareable with 'a
+type 'a o2 : value mod corruptible with 'a
+type bad
+Line 4, characters 0-47:
+4 | type t : value mod portable = { x : bad o2 o1 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad o2 o1
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* A strictly stronger enclosing requirement suppresses a weaker nested
+   one (not only an equal one). *)
+type 'a outer : value with 'a
+type bad : value mod shareable
+type t : value mod portable = { x : bad outer }
+[%%expect {|
+type 'a outer
+type bad : value mod shareable
+Line 3, characters 0-47:
+3 | type t : value mod portable = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Partial per-axis coverage: the enclosing subject covers the nested
+   contention requirement but not the stronger nested portability one,
+   so the nested subject keeps exactly the uncovered axis. *)
+type 'a outer : value mod shareable with 'a
+type bad : value
+type t : value mod portable contended = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shareable with 'a
+type bad
+Line 3, characters 0-57:
+3 | type t : value mod portable contended = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* A self-recursive declaration does not list itself as a cause; only
+   the genuine carrier is reported. *)
+type t : value mod portable = Leaf of (int -> int) | Node of t
+[%%expect {|
+Line 1, characters 0-62:
+1 | type t : value mod portable = Leaf of (int -> int) | Node of t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Mutually-recursive pair where the sibling (not self) is the carrier:
+   [t]'s self-occurrence is not reported, but the group-mate [u] is. *)
+type t : value mod portable = A of t | B of u
+and u = C of (int -> int)
+[%%expect {|
+Line 1, characters 0-45:
+1 | type t : value mod portable = A of t | B of u
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Sibling-only carrier (no self-occurrence in [t2]): a group-mate
+   subject is not self. *)
+type t2 : value mod portable = K of u2
+and u2 = L of (int -> int)
+[%%expect {|
+Line 1, characters 0-38:
+1 | type t2 : value mod portable = K of u2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t2" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t2.
+|}]
+
+(* Chain-3 axis (externality), equal-value suppression: both subjects
+   require exactly [external64], so the enclosing subject entails the
+   nested one. *)
+type ('a : value) outer : value with 'a
+type bad : value
+type t : value mod external64 = { x : bad outer }
+[%%expect {|
+type 'a outer
+type bad
+Line 3, characters 0-49:
+3 | type t : value mod external64 = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod external64
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Chain-3 entailment where the enclosing subject does not report the
+   axis at all: the nested [external64] requirement must survive. *)
+type ('a : value) outer2 : value mod external64 with 'a
+type bad2 : value
+type t2 : value mod portable external64 = { x : bad2 outer2 }
+[%%expect {|
+type 'a outer2 : value mod external64 with 'a
+type bad2
+Line 3, characters 0-61:
+3 | type t2 : value mod portable external64 = { x : bad2 outer2 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is immutable_data with bad2 outer2
+         because it's a boxed record type.
+       But the kind of type "t2" must be a subkind of
+           value mod portable external64
+         because of the annotation on the declaration of the type t2.
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t

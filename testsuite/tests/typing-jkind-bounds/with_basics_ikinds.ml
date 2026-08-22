@@ -651,6 +651,255 @@ Error: This type definition does not satisfy its kind annotation
        - 'a is not mod portable
 |}]
 
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-73:
+3 | type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because
+       - 'a is not mod portable contended
+       - b is not mod portable
+|}]
+
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type 'a c : value mod portable contended = { b : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-55:
+3 | type 'a c : value mod portable contended = { b : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because
+       - b is not mod portable
+       - 'a is not mod contended
+|}]
+
+(* Same as above with ['a := int]: even with a fully-crossing parameter,
+   [c] still fails portability via [t] inside [b], so [b] must be blamed. *)
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type c : value mod portable contended = { b : int b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-53:
+3 | type c : value mod portable contended = { b : int b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because b is not mod portable.
+|}]
+
+type bad : value
+type t : value mod contended = { x : (bad * int) ref }
+[%%expect {|
+type bad
+Line 2, characters 0-54:
+2 | type t : value mod contended = { x : (bad * int) ref }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
+       because ref is not mod contended.
+|}]
+
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { x : ('a ref * int) b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-67:
+3 | type 'a c : value mod portable contended = { x : ('a ref * int) b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because
+       - b is not mod portable
+       - ref is not mod contended
+|}]
+
+(* Ancestor and descendant requirements can differ in VALUE on the same
+   axis: [outer]'s own portability requirement is only [corruptible],
+   while the nested [bad] must be fully [portable]. On the portability
+   diamond (portable < {shareable, corruptible} < nonportable) the
+   enclosing, weaker requirement does not entail the nested, stronger
+   one, so both must be reported. *)
+type 'a outer : value mod shareable with 'a
+type bad : value
+type t : value mod portable = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shareable with 'a
+type bad
+Line 3, characters 0-47:
+3 | type t : value mod portable = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because
+       - outer is not mod corruptible
+       - bad is not mod portable
+|}]
+
+(* Same on the contention diamond. *)
+type 'a outer : value mod shared with 'a
+type bad : value
+type t : value mod contended = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shared with 'a
+type bad
+Line 3, characters 0-48:
+3 | type t : value mod contended = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
+       because
+       - outer is not mod corrupted
+       - bad is not mod contended
+|}]
+
+(* Two enclosing subjects on one path with incomparable requirements
+   (corruptible and shareable) do not jointly cover a nested subject that
+   must be fully portable: entailment is tested against each enclosing
+   requirement separately, never against their combination. *)
+type 'a o1 : value mod shareable with 'a
+type 'a o2 : value mod corruptible with 'a
+type bad : value
+type t : value mod portable = { x : bad o2 o1 }
+[%%expect {|
+type 'a o1 : value mod shareable with 'a
+type 'a o2 : value mod corruptible with 'a
+type bad
+Line 4, characters 0-47:
+4 | type t : value mod portable = { x : bad o2 o1 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because
+       - o1 is not mod corruptible
+       - o2 is not mod shareable
+       - bad is not mod portable
+|}]
+
+(* A strictly stronger enclosing requirement suppresses a weaker nested
+   one (not only an equal one). *)
+type 'a outer : value with 'a
+type bad : value mod shareable
+type t : value mod portable = { x : bad outer }
+[%%expect {|
+type 'a outer
+type bad : value mod shareable
+Line 3, characters 0-47:
+3 | type t : value mod portable = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because outer is not mod portable.
+|}]
+
+(* Partial per-axis coverage: the enclosing subject covers the nested
+   contention requirement but not the stronger nested portability one,
+   so the nested subject keeps exactly the uncovered axis. *)
+type 'a outer : value mod shareable with 'a
+type bad : value
+type t : value mod portable contended = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shareable with 'a
+type bad
+Line 3, characters 0-57:
+3 | type t : value mod portable contended = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable contended,
+       because
+       - outer is not mod corruptible contended
+       - bad is not mod portable
+|}]
+
+(* A self-recursive declaration does not list itself as a cause; only
+   the genuine carrier is reported. *)
+type t : value mod portable = Leaf of (int -> int) | Node of t
+[%%expect {|
+Line 1, characters 0-62:
+1 | type t : value mod portable = Leaf of (int -> int) | Node of t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because functions are not mod portable.
+|}]
+
+(* Mutually-recursive pair where the sibling (not self) is the carrier:
+   [t]'s self-occurrence is not reported, but the group-mate [u] is. *)
+type t : value mod portable = A of t | B of u
+and u = C of (int -> int)
+[%%expect {|
+Line 1, characters 0-45:
+1 | type t : value mod portable = A of t | B of u
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because u is not mod portable.
+|}]
+
+(* Sibling-only carrier (no self-occurrence in [t2]): a group-mate
+   subject is not self. *)
+type t2 : value mod portable = K of u2
+and u2 = L of (int -> int)
+[%%expect {|
+Line 1, characters 0-38:
+1 | type t2 : value mod portable = K of u2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because u2 is not mod portable.
+|}]
+
+(* Chain-3 axis (externality), equal-value suppression: both subjects
+   require exactly [external64], so the enclosing subject entails the
+   nested one. *)
+type ('a : value) outer : value with 'a
+type bad : value
+type t : value mod external64 = { x : bad outer }
+[%%expect {|
+type 'a outer
+type bad
+Line 3, characters 0-49:
+3 | type t : value mod external64 = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod external64,
+       because
+       - boxed records are not mod external64
+       - outer is not mod external64
+|}]
+
+(* Chain-3 entailment where the enclosing subject does not report the
+   axis at all: the nested [external64] requirement must survive. *)
+type ('a : value) outer2 : value mod external64 with 'a
+type bad2 : value
+type t2 : value mod portable external64 = { x : bad2 outer2 }
+[%%expect {|
+type 'a outer2 : value mod external64 with 'a
+type bad2
+Line 3, characters 0-61:
+3 | type t2 : value mod portable external64 = { x : bad2 outer2 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod portable external64,
+       because
+       - boxed records are not mod external64
+       - outer2 is not mod portable
+       - bad2 is not mod external64
+|}]
+
 (* GADTs: only the offending constructor's payload is reported. *)
 type _ t : value mod contended =
   | I : int -> int t
