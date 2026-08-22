@@ -32,14 +32,11 @@ let add map uid locs =
 
 type stat = { mtime : float; size : int; source_digest : string option }
 
-type module_facts = Module_facts_compact.t Granular_marshal.link
+type module_facts = Module_implementation_facts.t list Granular_marshal.link
 
-let module_facts_block = Granular_marshal.fetch
+let module_facts_list = Granular_marshal.fetch
 
-let link_module_facts block = Granular_marshal.link block
-
-let inline_module_facts facts =
-  Granular_marshal.link (Module_facts_compact.of_facts facts)
+let link_module_facts = Granular_marshal.link
 
 type index =
   { defs : Lid_set.t Uid_map.t;
@@ -48,7 +45,7 @@ type index =
     stats : stat Stats.t;
     root_directory : string option;
     related_uids : Union_find.t Uid_map.t;
-    module_facts : module_facts option;
+    module_facts : module_facts option
   }
 
 let lidset_schema iter lidset = Lid_set.schema iter Lid.schema lidset

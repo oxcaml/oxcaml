@@ -1,112 +1,19 @@
-type problem =
-  | Unreadable of { path : string; message : string }
-  | Malformed of { path : string; message : string }
-
-type status =
-  { facts_present : bool;
-    channels_loaded : int;
-    sources_folded : int;
-    problems : problem list
-  }
-
-let pp_problem fmt = function
-  | Unreadable { path; message } ->
-    Format.fprintf fmt "unreadable %s: %s" path message
-  | Malformed { path; message } ->
-    Format.fprintf fmt "malformed facts in %s: %s" path message
-
-let facts_is_empty (facts : Module_implementation_facts.t) =
-  match facts with
-  | { checks = []; dependencies = []; equalities = []; omissions = [] } -> true
-  | _ -> false
-
-exception Not_an_index_file
-
-type decoded =
-  { facts : Module_implementation_facts.t;
-    facts_present : bool;
-    malformed : string option
-  }
-
-module Decoded_cache = File_cache.Make (struct
-  type t = decoded
+module Facts_cache = File_cache.Make (struct
+  type t = Module_implementation_facts.t list
 
   let read file =
-    match Index_format.read ~file with
-    | Cmt _ | Cms _ | Unknown -> raise Not_an_index_file
-    | Index index -> (
-      match index.module_facts with
-      | None ->
-        { facts = Module_implementation_facts.empty;
-          facts_present = false;
-          malformed = None
-        }
-      | Some module_facts ->
-        let block = Index_format.module_facts_block module_facts in
-        match Module_facts_compact.to_facts block with
-        | Ok facts -> { facts; facts_present = true; malformed = None }
-        | Error message ->
-          { facts = Module_implementation_facts.empty;
-            facts_present = true;
-            malformed = Some message
-          })
+    let index = Index_format.read_exn ~file in
+    Index_format.module_facts_list (Option.get index.module_facts)
 
   let cache_name = "Module_facts_reader"
 end)
 
-type 'acc state =
-  { mutable accumulator : 'acc;
-    mutable present : bool;
-    mutable channels_loaded : int;
-    mutable sources_folded : int;
-    mutable problems_rev : problem list
-  }
-
 let fold ~index_files ~init ~f =
-  let state =
-    { accumulator = init;
-      present = true;
-      channels_loaded = 0;
-      sources_folded = 0;
-      problems_rev = []
-    }
-  in
-  let report problem =
-    state.problems_rev <- problem :: state.problems_rev;
-    state.present <- false
-  in
-  let consume ~path decoded =
-    state.present <- state.present && decoded.facts_present;
-    match decoded.malformed with
-    | Some message -> report (Malformed { path; message })
-    | None ->
-      if decoded.facts_present then
-        state.channels_loaded <- state.channels_loaded + 1;
-      if not (facts_is_empty decoded.facts) then begin
-        state.sources_folded <- state.sources_folded + 1;
-        state.accumulator <- f state.accumulator ~path decoded.facts
-      end
-  in
-  List.iter
-    (fun path ->
-      match Decoded_cache.read path with
-      | exception Not_an_index_file ->
-        report (Unreadable { path; message = "not an index file" })
-      | exception exn ->
-        report (Unreadable { path; message = Printexc.to_string exn })
-      | decoded -> consume ~path decoded)
-    index_files;
-  ( state.accumulator,
-    { facts_present = state.present;
-      channels_loaded = state.channels_loaded;
-      sources_folded = state.sources_folded;
-      problems = List.rev state.problems_rev
-    } )
+  List.fold_left
+    (fun accumulator path ->
+      List.fold_left
+        (fun accumulator facts -> f accumulator ~path facts)
+        accumulator (Facts_cache.read path))
+    init index_files
 
-let flush ?older_than () = Decoded_cache.flush ?older_than ()
-
-let load ~index_files =
-  let runs, status =
-    fold ~index_files ~init:[] ~f:(fun runs ~path:_ facts -> facts :: runs)
-  in
-  (Module_implementation_facts.merge_many (List.rev runs), status)
+let flush ?older_than () = Facts_cache.flush ?older_than ()

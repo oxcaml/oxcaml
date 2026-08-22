@@ -392,9 +392,14 @@ and expression_desc =
   | Texp_setinstvar of Path.t * Path.t * string loc * expression
   | Texp_setmutvar of Ident.t loc * Jkind.sort * expression
   | Texp_override of Path.t * (Ident.t * string loc * expression) list
-  | Texp_letmodule of
-      Ident.t option * string option loc * Types.module_presence * module_expr *
-        expression
+  | Texp_letmodule of {
+      id : Ident.t option;
+      name : string option loc;
+      presence : Types.module_presence;
+      uid : Shape.Uid.t;
+      module_expr : module_expr;
+      body : expression;
+    }
   | Texp_letexception of extension_constructor * expression
   | Texp_assert of expression * Location.t
   | Texp_lazy of expression
@@ -625,6 +630,7 @@ and module_expr =
 
 and module_type_constraint =
   Tmodtype_implicit
+| Tmodtype_package of { package_module_type_path : Path.t }
 | Tmodtype_explicit of module_type * Mode.Value.lr modes
 
 and functor_parameter =
@@ -711,6 +717,7 @@ and module_coercion =
 and module_type =
   { mty_desc: module_type_desc;
     mty_type : Types.module_type;
+    mty_uid : Shape.Uid.t;
     mty_env : Env.t;
     mty_loc: Location.t;
     mty_attributes: attribute list;
@@ -1087,6 +1094,7 @@ and jkind_declaration =
 type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;
+  ai_parameter_uid : Shape.Uid.t;
 }
 
 type implementation = {
