@@ -43,5 +43,6 @@ grep -v \
   -e '^Breakpoint [0-9]*:' \
   -e '^Current executable set to' \
   -e '^Executing commands in' \
+  -e 'unsupported DW_FORM values' \
   -e '^$' | \
 tr -d '\r'
