@@ -17,6 +17,7 @@
 
 #ifdef CAML_INTERNALS
 
+#include <stdbool.h>
 #include "mlvalues.h"
 #include "roots.h"
 
@@ -34,6 +35,40 @@ CAMLprim value caml_dynamic_push(value dyn, value val);
    Must be paired with [caml_dynamic_push] on the same fiber. */
 CAMLprim value caml_dynamic_pop(value dyn);
 
+/* Freeze dynamic binding state between the current fiber and the root task,
+   returning an identifying handle.
+
+   The following functions are intended to be used by structured concurrency
+   primitives in the following order:
+
+   caml_dynamic_set_root ();
+   let scope = caml_dynamic_freeze_scope () in
+   let l, r =
+      spawn (fun () -> caml_dynamic_use_scope scope),
+      spawn (fun () -> caml_dynamic_use_scope scope)
+   in
+   await l, await r
+
+   Using the scope in child fibers causes them to inherit dynamic bindings
+   installed on the path to the root task, even if they're migrated to other
+   worker threads.
+
+   All calls to [caml_dynamic_freeze_scope] must occur in a descendant of
+   a fiber that called [caml_dynamic_set_root]. The returned [scope] must
+   outlive all child fibers that call [caml_dynamic_use_scope], and must
+   *not* outlive the current fiber. It is unsafe to modify the binding
+   state of any fiber on the frozen path (the current fiber up to the
+   enclosing task) during the lifetime of [scope]. */
+CAMLprim value caml_dynamic_freeze_scope(value unit);
+
+/* Make a set of frozen dynamic bindings visible to the current fiber.
+   See [caml_dynamic_freeze_scope] for usage. */
+CAMLprim value caml_dynamic_use_scope(value scope);
+
+/* Mark the current fiber as a root task. Dynamic bindings installed above
+   the current fiber will not be captured by [caml_dynamic_freeze_scope].
+   See [caml_dynamic_freeze_scope] for usage. */
+CAMLprim value caml_dynamic_set_root(value unit);
 
 typedef struct dynamic_binding_s {
   value dyn; /* Dynamic id, or Val_null if unbound */
@@ -109,13 +144,18 @@ extern void caml_dynamic_table_scan_roots(dynamic_table_t,
                                           scanning_action_flags,
                                           void *);
 
+/* Per-fiber binding state. Owned by the fiber, but separately allocated for
+   stability (the stack_info allocation may be resized). Scanned by the GC via
+   the owning fiber only.
 
-/* Per-fiber binding state. Owned by the fiber, but separately allocated
-   for stability (the stack_info allocation may be resized).
+   [lexical_parent] records the path from the current fiber to the root task.
 
-   Scanned by the GC via the owning fiber only. */
+   [is_task] indicates whether this node is a concurrent task. If it is, lookup
+   prioritizes [lexical_parent], which points to the inherited binding state. */
 typedef struct dynamic_node_s {
   dynamic_table_s table;
+  struct dynamic_node_s* lexical_parent;
+  bool is_task;
 } dynamic_node_s, *dynamic_node_t;
 
 /* Free a dynamic node and its contents. */
