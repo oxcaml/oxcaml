@@ -5,12 +5,12 @@
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 (* External declarations for unsigned primitives *)
-external unsigned_lt : int32# -> int32# -> bool = "%int32#_unsigned_lessthan"
-external unsigned_gt : int32# -> int32# -> bool = "%int32#_unsigned_greaterthan"
-external unsigned_div : int32# -> int32# -> int32# = "%int32#_unsigned_div"
-external unsigned_mod : int32# -> int32# -> int32# = "%int32#_unsigned_mod"
-external unsafe_unsigned_div : int32# -> int32# -> int32# = "%int32#_unsafe_unsigned_div"
-external unsafe_unsigned_mod : int32# -> int32# -> int32# = "%int32#_unsafe_unsigned_mod"
+external unsigned_lt : int32_u -> int32_u -> bool = "%int32#_unsigned_lessthan"
+external unsigned_gt : int32_u -> int32_u -> bool = "%int32#_unsigned_greaterthan"
+external unsigned_div : int32_u -> int32_u -> int32_u = "%int32#_unsigned_div"
+external unsigned_mod : int32_u -> int32_u -> int32_u = "%int32#_unsigned_mod"
+external unsafe_unsigned_div : int32_u -> int32_u -> int32_u = "%int32#_unsafe_unsigned_div"
+external unsafe_unsigned_mod : int32_u -> int32_u -> int32_u = "%int32#_unsafe_unsigned_mod"
 
 module Int32_u = Stdlib_upstream_compatible.Int32_u
 

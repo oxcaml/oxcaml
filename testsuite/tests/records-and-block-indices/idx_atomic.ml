@@ -72,7 +72,7 @@ end
 (* test reading/writing from mixed record *)
 
 module Mixed = struct
-  type t = { x: int64#; mutable y: string [@atomic]; z: int64# }
+  type t = { x: int64_u; mutable y: string [@atomic]; z: int64_u }
 
   let () =
     Printf.printf "== Basic idx_atomic (mixed record) ==\n";

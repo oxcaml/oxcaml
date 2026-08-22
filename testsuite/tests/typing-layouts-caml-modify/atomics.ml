@@ -279,7 +279,7 @@ end
 
 (* Patomic_set_mixed_field skips runtime call for immediates. *)
 module Set_field_mixed = struct
-  type t = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+  type t = { f : int64_u; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
 
   let () =
     let t = { f = #42L; imm = 1; ptr = "two"} in
@@ -313,7 +313,7 @@ end
 
 (* Idx_atomic.set on mixed field skips runtime call for immediates. *)
 module Set_idx_atomic_mixed = struct
-  type t = { f : int64#; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+  type t = { f : int64_u; mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
 
   let () =
     let t = { f = #42L; imm = 1; ptr = "two"} in

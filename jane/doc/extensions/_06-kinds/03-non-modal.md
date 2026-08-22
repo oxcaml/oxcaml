@@ -10,7 +10,7 @@ title: Non-modal bounds
 
 The externality axis records whether all a type's values may safely be ignored
 by the GC.  This may be because they are OCaml "immediates" (values represented
-by a tagged integer), because they are unboxed types like `float#` or `int32#`,
+by a tagged integer), because they are unboxed types like `float#` or `int32_u`,
 or because they are allocated elsewhere.
 
 The axis has three possible values, with `external_ < external64 < internal`.

@@ -431,7 +431,7 @@ let makearray_dynamic_non_scannable_unboxed_product env
          | Alloc_local -> L.modify_maybe_stack)
          lambda_array_kind)
       (* There is no packing in unboxed product arrays, even if the elements are
-         all float32# or int32#. *)
+         all float32_u or int32_u. *)
       Sixty_four_or_more ~init term
 
 let makearray_dynamic_scannable_unboxed_product0

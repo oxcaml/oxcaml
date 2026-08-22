@@ -234,28 +234,28 @@ module M :
 
 (* Externals *)
 
-external f_1 : int -> bool -> int64# = "foo" "bar";;
+external f_1 : int -> bool -> int64_u = "foo" "bar";;
 [%%expect{|
-Line 1, characters 30-36:
-1 | external f_1 : int -> bool -> int64# = "foo" "bar";;
-                                  ^^^^^^
+Line 1, characters 30-37:
+1 | external f_1 : int -> bool -> int64_u = "foo" "bar";;
+                                  ^^^^^^^
 Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
   to external declaration
   argument type with layout bits64 for upstream compatibility.
 
-external f_1 : int -> bool -> (int64# [@unboxed]) = "foo" "bar"
+external f_1 : int -> bool -> (int64_u [@unboxed]) = "foo" "bar"
 |}];;
 
-external f_2 : int32# -> bool -> int = "foo" "bar";;
+external f_2 : int32_u -> bool -> int = "foo" "bar";;
 [%%expect{|
-Line 1, characters 15-21:
-1 | external f_2 : int32# -> bool -> int = "foo" "bar";;
-                   ^^^^^^
+Line 1, characters 15-22:
+1 | external f_2 : int32_u -> bool -> int = "foo" "bar";;
+                   ^^^^^^^
 Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
   to external declaration
   argument type with layout bits32 for upstream compatibility.
 
-external f_2 : (int32# [@unboxed]) -> bool -> int = "foo" "bar"
+external f_2 : (int32_u [@unboxed]) -> bool -> int = "foo" "bar"
 |}];;
 
 external f_3 : (float#[@unboxed]) -> bool -> string  = "foo" "bar";;
@@ -263,71 +263,71 @@ external f_3 : (float#[@unboxed]) -> bool -> string  = "foo" "bar";;
 external f_3 : (float# [@unboxed]) -> bool -> string = "foo" "bar"
 |}];;
 
-external f_4 : string -> (nativeint#[@unboxed])  = "foo" "bar";;
+external f_4 : string -> (nativeint_u[@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f_4 : string -> (nativeint# [@unboxed]) = "foo" "bar"
+external f_4 : string -> (nativeint_u [@unboxed]) = "foo" "bar"
 |}];;
 
-external f_5 : int64 -> int64#  = "foo" "bar" [@@unboxed];;
+external f_5 : int64 -> int64_u  = "foo" "bar" [@@unboxed];;
 [%%expect{|
-external f_5 : int64 -> int64# = "foo" "bar" [@@unboxed]
+external f_5 : int64 -> int64_u = "foo" "bar" [@@unboxed]
 |}];;
 
-external f_6 : (int32#[@untagged]) -> bool -> string  = "foo" "bar";;
+external f_6 : (int32_u[@untagged]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 16-22:
-1 | external f_6 : (int32#[@untagged]) -> bool -> string  = "foo" "bar";;
-                    ^^^^^^
+Line 1, characters 16-23:
+1 | external f_6 : (int32_u[@untagged]) -> bool -> string  = "foo" "bar";;
+                    ^^^^^^^
 Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
-external f_7 : string -> (int64#[@untagged])  = "foo" "bar";;
+external f_7 : string -> (int64_u[@untagged])  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 26-32:
-1 | external f_7 : string -> (int64#[@untagged])  = "foo" "bar";;
-                              ^^^^^^
+Line 1, characters 26-33:
+1 | external f_7 : string -> (int64_u[@untagged])  = "foo" "bar";;
+                              ^^^^^^^
 Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
 (* Aliases *)
 
-type ('a : any) int64' = int64
-type int32' = int32
+type ('a : any) int64' = int64_u
+type int32' = int32_u
 type float' = float
-type 'a nativeint' = nativeint
+type 'a nativeint' = nativeint_u
 type nativeint'' = int nativeint'
 [%%expect{|
-type ('a : any) int64' = int64
-type int32' = int32
+type ('a : any) int64' = int64_u
+type int32' = int32_u
 type float' = float
-type 'a nativeint' = nativeint
+type 'a nativeint' = nativeint_u
 type nativeint'' = int nativeint'
 |}]
 
-external f_1 : int -> bool -> int int64'# = "foo" "bar";;
+external f_1 : int -> bool -> int int64' = "foo" "bar";;
 [%%expect{|
-Line 1, characters 30-41:
-1 | external f_1 : int -> bool -> int int64'# = "foo" "bar";;
-                                  ^^^^^^^^^^^
+Line 1, characters 30-40:
+1 | external f_1 : int -> bool -> int int64' = "foo" "bar";;
+                                  ^^^^^^^^^^
 Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
   to external declaration
   argument type with layout bits64 for upstream compatibility.
 
-external f_1 : int -> bool -> (int int64'# [@unboxed]) = "foo" "bar"
+external f_1 : int -> bool -> (int int64' [@unboxed]) = "foo" "bar"
 |}];;
 
-external f_2 : int32'# -> bool -> int = "foo" "bar";;
+external f_2 : int32' -> bool -> int = "foo" "bar";;
 [%%expect{|
-Line 1, characters 15-22:
-1 | external f_2 : int32'# -> bool -> int = "foo" "bar";;
-                   ^^^^^^^
+Line 1, characters 15-21:
+1 | external f_2 : int32' -> bool -> int = "foo" "bar";;
+                   ^^^^^^
 Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
   to external declaration
   argument type with layout bits32 for upstream compatibility.
 
-external f_2 : (int32'# [@unboxed]) -> bool -> int = "foo" "bar"
+external f_2 : (int32' [@unboxed]) -> bool -> int = "foo" "bar"
 |}];;
 
 external f_3 : (float'#[@unboxed]) -> bool -> string  = "foo" "bar";;
@@ -335,24 +335,24 @@ external f_3 : (float'#[@unboxed]) -> bool -> string  = "foo" "bar";;
 external f_3 : (float'# [@unboxed]) -> bool -> string = "foo" "bar"
 |}];;
 
-external f_4 : string -> (nativeint''#[@unboxed])  = "foo" "bar";;
+external f_4 : string -> (nativeint''[@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f_4 : string -> (nativeint''# [@unboxed]) = "foo" "bar"
+external f_4 : string -> (nativeint'' [@unboxed]) = "foo" "bar"
 |}];;
 
-external f_4b : string -> (int nativeint'#[@unboxed])  = "foo" "bar";;
+external f_4b : string -> (int nativeint'[@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f_4b : string -> (int nativeint'# [@unboxed]) = "foo" "bar"
+external f_4b : string -> (int nativeint' [@unboxed]) = "foo" "bar"
 |}];;
 
-external f_5 : int64 -> string int64'#  = "foo" "bar" [@@unboxed];;
+external f_5 : int64 -> string int64'  = "foo" "bar" [@@unboxed];;
 [%%expect{|
-external f_5 : int64 -> string int64'# = "foo" "bar" [@@unboxed]
+external f_5 : int64 -> string int64' = "foo" "bar" [@@unboxed]
 |}];;
 
-external f_5b : int64 -> (string int64'# [@unboxed])  = "foo" "bar";;
+external f_5b : int64 -> (string int64' [@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f_5b : int64 -> (string int64'# [@unboxed]) = "foo" "bar"
+external f_5b : int64 -> (string int64' [@unboxed]) = "foo" "bar"
 |}];;
 
 external f_6 : (int32'[@untagged]) -> bool -> string  = "foo" "bar";;
@@ -364,10 +364,10 @@ Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
-external f_7 : string -> (int64# int64'#[@untagged])  = "foo" "bar";;
+external f_7 : string -> (int64_u int64'[@untagged])  = "foo" "bar";;
 [%%expect{|
 Line 1, characters 26-40:
-1 | external f_7 : string -> (int64# int64'#[@untagged])  = "foo" "bar";;
+1 | external f_7 : string -> (int64_u int64'[@untagged])  = "foo" "bar";;
                               ^^^^^^^^^^^^^^
 Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
@@ -436,7 +436,7 @@ Line 1, characters 15-18:
                    ^^^
 Warning 187 [incompatible-with-upstream]: External declaration here is not upstream compatible.
   The only types with non-value layouts allowed are
-  float#, int32#, int64#, and nativeint#. Unknown type with layout
+  float#, int32_u, int64_u, and nativeint_u. Unknown type with layout
   float64 encountered.
 
 Line 1, characters 22-25:
@@ -444,7 +444,7 @@ Line 1, characters 22-25:
                           ^^^
 Warning 187 [incompatible-with-upstream]: External declaration here is not upstream compatible.
   The only types with non-value layouts allowed are
-  float#, int32#, int64#, and nativeint#. Unknown type with layout
+  float#, int32_u, int64_u, and nativeint_u. Unknown type with layout
   float64 encountered.
 
 external f_2 : M.t -> M.t = "%identity" [@@unboxed]
@@ -476,10 +476,10 @@ external f_4 : M3.t -> M3.t = "%identity" [@@unboxed]
 |}];;
 
 (* Disabled warnings. *)
-external[@warning "-187"] f_ok : int -> bool -> int64# = "foo" "bar";;
+external[@warning "-187"] f_ok : int -> bool -> int64_u = "foo" "bar";;
 
 [%%expect{|
-external f_ok : int -> bool -> (int64# [@unboxed]) = "foo" "bar"
+external f_ok : int -> bool -> (int64_u [@unboxed]) = "foo" "bar"
 |}]
 
 external f_2_ok : M.t -> M.t = "%identity" [@@unboxed] [@@warning "-187"];;

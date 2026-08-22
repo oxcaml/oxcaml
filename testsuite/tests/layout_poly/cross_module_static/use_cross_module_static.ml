@@ -39,8 +39,8 @@
    requires reading that unit's static data out of its cmx. *)
 
 external to_float : float# -> float = "%box_float"
-external to_int64 : int64# -> int64 = "%box_int64"
-external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
+external to_int64 : int64_u -> int64 = "%box_int64"
+external to_nativeint : nativeint_u -> nativeint = "%box_nativeint"
 
 module Lib = Cross_module_static_lib
 

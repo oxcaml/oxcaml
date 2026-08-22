@@ -5,13 +5,13 @@
 external [@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
 
 (* External declarations for unsigned primitives *)
-external unsigned_lt : nativeint# -> nativeint# -> bool = "%nativeint#_unsigned_lessthan"
-external unsigned_gt : nativeint# -> nativeint# -> bool = "%nativeint#_unsigned_greaterthan"
-external unsigned_div : nativeint# -> nativeint# -> nativeint# = "%nativeint#_unsigned_div"
-external unsigned_mod : nativeint# -> nativeint# -> nativeint# = "%nativeint#_unsigned_mod"
-external unsafe_unsigned_div : nativeint# -> nativeint# -> nativeint#
+external unsigned_lt : nativeint_u -> nativeint_u -> bool = "%nativeint#_unsigned_lessthan"
+external unsigned_gt : nativeint_u -> nativeint_u -> bool = "%nativeint#_unsigned_greaterthan"
+external unsigned_div : nativeint_u -> nativeint_u -> nativeint_u = "%nativeint#_unsigned_div"
+external unsigned_mod : nativeint_u -> nativeint_u -> nativeint_u = "%nativeint#_unsigned_mod"
+external unsafe_unsigned_div : nativeint_u -> nativeint_u -> nativeint_u
   = "%nativeint#_unsafe_unsigned_div"
-external unsafe_unsigned_mod : nativeint# -> nativeint# -> nativeint#
+external unsafe_unsigned_mod : nativeint_u -> nativeint_u -> nativeint_u
   = "%nativeint#_unsafe_unsigned_mod"
 
 module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
