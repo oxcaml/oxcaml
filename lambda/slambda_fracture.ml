@@ -566,10 +566,10 @@ and fracture_prim lambda prim args loc =
   | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
   | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
   | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-  | Popaque _ | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _ | Punbox_unit
-  | Punbox_vector _ | Pbox_vector _ | Punbox_mask | Pbox_mask _ | Pjoin_vec256
-  | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
-  | Preinterpret_tuple_as_boxed_vector _
+  | Patomic_load_idx _ | Patomic_set_idx _ | Popaque _ | Pprobe_is_enabled _
+  | Pobj_dup | Pobj_magic _ | Punbox_unit | Punbox_vector _ | Pbox_vector _
+  | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get

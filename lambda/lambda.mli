@@ -55,12 +55,6 @@ type modify_mode = private
   | Modify_heap
   | Modify_maybe_stack
 
-type atomic_flag = Asttypes.atomic_flag
-
-type access_flag = Asttypes.access_flag
-
-val access_atomicity : access_flag -> atomic_flag
-
 val alloc_heap : locality_mode
 
 val alloc_local : locality_mode
@@ -432,6 +426,8 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_load_idx of { layout : layout }
+  | Patomic_set_idx of { layout : layout; mode : modify_mode }
   | Patomic_exchange_idx of
     { layout : layout; mode : modify_mode }
   | Patomic_compare_exchange_idx of
@@ -493,8 +489,8 @@ type primitive =
   | Ppoll
   (* Arch-specific pause. Without poll insertion, also acts as a [Ppoll]. *)
   | Pcpu_relax
-  | Pget_idx of layout * access_flag
-  | Pset_idx of layout * modify_mode * atomic_flag
+  | Pget_idx of layout * Asttypes.mutable_flag
+  | Pset_idx of layout * modify_mode
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
   (* External pointer primitives: like [Pget_ptr]/[Pset_ptr] but take only the
