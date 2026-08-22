@@ -836,6 +836,12 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
           (loc, Format.flush_str_formatter ()))
     in
     List.concat_map ~f:loc_and_types_of_holes nodes
+  | Module_type_impls ->
+    let typer = Mpipeline.typer_result pipeline in
+    let typedtree = Mtyper.get_typedtree typer in
+    (* [open Query_protocol] above shadows the analysis module with the
+       response types it declares under the same name. *)
+    Merlin_analysis.Module_type_impls.query ~pipeline typedtree
   | Construct (pos, with_values, depth) ->
     let values_scope =
       match with_values with

@@ -125,7 +125,7 @@ let () = heading "an annotation against another unit's signature is no pair"
    [Mtf_aux.Container] that its last annotation is checked against are declared
    in [mtf_aux.mli]; pairing them with the client's own declarations would
    claim an interface the client does not have.  Those members are still
-   checked, as [Annotation] checks against the foreign expectation, in the
+   checked as ordinary annotation checks against the foreign expectation, in the
    checks printed above. *)
 let () =
   let report description file =

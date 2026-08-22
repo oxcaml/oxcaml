@@ -218,6 +218,49 @@ module Locate_types_result = struct
   type t = Success of Tree.t | Invalid_context
 end
 
+module Module_type_impls = struct
+  type impl_kind = Whole_unit | Annotation_sites
+
+  type impl_site = { impl_loc : Location.t; impl_kind : impl_kind }
+
+  type target = Own_interface | Modtype of string
+
+  type check_kind = Annotation | Argument | Package | Interface
+
+  type implementation =
+    { target : target;
+      target_loc : Location.t option;
+      instance : string option;
+      implementation_uid : string option;
+      implementation_name : string option;
+      site : impl_site;
+      check : check_kind option;
+      check_site : Location.t option
+    }
+
+  type status = Complete | Partial | Unavailable
+
+  type reason =
+    | No_index_files
+    | Channel_absent
+    | Reader_problem of string
+    | Omission of { family : string option; reason : string }
+    | Unresolved_implementation of
+        { target : string;
+          witness : string;
+          implementation : string;
+          site : string option
+        }
+    | Unresolved_check_site of
+        { target : string; witness : string; site : string }
+
+  type response =
+    { status : status;
+      reasons : reason list;
+      implementations : implementation list
+    }
+end
+
 type _ t =
   | Type_expr (* *) : string * Msource.position -> string t
   | Stack_or_heap_enclosing (* *) :
@@ -307,6 +350,7 @@ type _ t =
       Msource.position * Msource.position
       -> (Location.t * string) t
   | Holes (* *) : (Location.t * string) list t
+  | Module_type_impls (* *) : Module_type_impls.response t
   | Construct :
       Msource.position * [ `None | `Local ] option * int option
       -> (Location.t * string list) t

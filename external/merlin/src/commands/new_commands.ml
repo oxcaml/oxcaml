@@ -127,6 +127,54 @@ let all_commands =
       ~default:() begin fun buffer () ->
         run buffer Query_protocol.Holes
       end;
+    command "module-type-impls" ~spec:[]
+      ~doc:
+        "Declaration-level change impact for the module-type declarations of \
+         the buffer: for each declaration, the modules that were checked \
+         against a module type that depends on it (and the buffer's own \
+         implementation unit, for an interface buffer), computed from the \
+         compiler facts in the configured indexes. The response is:\n\n\
+         ```javascript\n\
+         {\n\
+         'status'  : 'complete' | 'partial' | 'unavailable',\n\
+         'reasons' : [ { 'kind' : string, ... } ],\n\
+         'implementations' : [\n\
+         {\n\
+         'target'     : string,\n\
+         // 'decl' is omitted for the '(interface)' target\n\
+         'decl'       : { 'file', 'start', 'end' },\n\
+         // 'instance' is omitted for the '(interface)' target\n\
+         'instance'   : string,\n\
+         'file'       : string,\n\
+         'start'      : position,\n\
+         'end'        : position,\n\
+         'kind'       : 'unit' | 'annotations',\n\
+         // 'check' is omitted for the '(interface)' target\n\
+         'check'      : 'annotation' | 'argument' | 'package' | 'interface',\n\
+         // 'check-site' is omitted when the check has no recorded site\n\
+         'check-site' : { 'file', 'start', 'end' }\n\
+         }\n\
+         ]\n\
+         }\n\
+         ```\n\n\
+         Reason kinds: 'no-index-files', 'facts-channel-absent', \
+         'reader-problem' (with 'message'), 'omission' (with 'reason' and \
+         optional 'family'), 'unresolved-implementation' (with 'target', \
+         'instance', 'implementation' and optional 'site') when an impacted \
+         module could not be resolved to a source location, and \
+         'unresolved-check-site' (with 'target', 'instance' and 'site') when a \
+         recorded check site could not be resolved; neither impacts nor \
+         recorded sites are ever silently dropped, and an impact whose \
+         implementation and recorded site both fail to resolve reports both \
+         reasons.\n\n\
+         'complete' requires the facts channel to be present with no reader \
+         problems, no omission scoped to the queried declarations, and every \
+         impacted module and recorded check site resolved; 'partial' carries \
+         the reasons; 'unavailable' means no usable facts channel was \
+         configured or loaded, which is distinct from a complete empty result."
+      ~default:() begin fun buffer () ->
+        run buffer Query_protocol.Module_type_impls
+      end;
     command "construct"
       ~spec:
         [ arg "-position" "<position> Position where construct should happen"
