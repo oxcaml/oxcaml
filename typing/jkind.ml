@@ -968,17 +968,20 @@ module Base_and_axes = struct
       | Layout _ -> false
       | Kconstr _ -> true
     in
+    let ambient_bounds_is_bot =
+      Axis_lattice.equal ambient_bounds Axis_lattice.bot
+    in
     let mod_bounds_with_ambient =
       (* The short-circuit keeps the common exact-normalization case
          allocation-free: normalization is on a very hot path. *)
-      if Axis_lattice.equal ambient_bounds Axis_lattice.bot
+      if ambient_bounds_is_bot
       then t.mod_bounds
       else Mod_bounds.join_axis_lattice t.mod_bounds ambient_bounds
     in
     (* handle a few common cases first, before doing anything else *)
     match t with
     | { with_bounds = No_with_bounds; _ } as t ->
-      ( (if mod_bounds_with_ambient == t.mod_bounds
+      ( (if ambient_bounds_is_bot
          then t
          else { t with mod_bounds = mod_bounds_with_ambient }),
         Sufficient_fuel )
