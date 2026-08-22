@@ -873,6 +873,15 @@ AC_ARG_ENABLE([multidomain],
   [AS_HELP_STRING([--enable-multidomain],
     [allow the creation of multiple domains])])
 
+AC_ARG_ENABLE([initial-exec-tls],
+  [AS_HELP_STRING([--enable-initial-exec-tls],
+    [use the initial-exec TLS model for the runtime's hot thread-local
+     variables. This avoids calls to __tls_get_addr in position-independent
+     builds of the runtime, but consumes static TLS space, which restricts
+     how late a shared object embedding the runtime can be dlopen'd.
+     Supported on GNU/Linux with glibc only, which is the only platform
+     reserving surplus static TLS space for dlopen'd modules])])
+
 AC_ARG_ENABLE([assembler-suitable-for-dissector],
   [AS_HELP_STRING([--enable-assembler-suitable-for-dissector@<:@=PATH@:>@],
     [Use LLVM assembler with large code mode for dissector. If PATH is not
@@ -1679,6 +1688,23 @@ AS_CASE([$target],
   [*-apple-darwin*|*-w64-mingw32*|*-pc-windows], [],
   [AC_DEFINE([HAS_FULL_THREAD_VARIABLES], [1])]
 )
+
+# Handle --enable-initial-exec-tls
+# Only the ELF/glibc combination guarantees that a module using the
+# initial-exec TLS model can still be loaded with dlopen, thanks to the
+# surplus static TLS area glibc reserves for that purpose.
+
+AS_IF([test x"$enable_initial_exec_tls" = "xyes"],
+  [AS_CASE([$target],
+    [*-*-linux-gnu*], [],
+    [AC_MSG_ERROR(m4_normalize([the initial-exec TLS model is only supported
+       on GNU/Linux with glibc]))])
+  OCAML_CC_SUPPORTS_INITIAL_EXEC_TLS
+  AS_IF([$cc_supports_initial_exec_tls],
+    [AC_DEFINE([CAML_INITIAL_EXEC_TLS], [1])
+    AC_MSG_NOTICE([using the initial-exec TLS model])],
+    [AC_MSG_ERROR(m4_normalize([$CC does not support
+       __attribute__((__tls_model__("initial-exec")))]))])])
 
 # Shared library support
 
