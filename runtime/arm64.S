@@ -746,14 +746,19 @@ FUNCTION(caml_c_call)
         SWITCH_C_TO_OCAML
 #if defined(WITH_THREAD_SANITIZER)
     /* Save return value registers. Since the called function could be
-       anything, it may have returned its result (if any) either in x0
-       or q0:q1. */
+       anything, it may have returned its result (if any) in x0:x1 and/or
+       q0:q3 (the latter in the case of homogeneous floating-point/vector
+       aggregate returns). */
         stp     x0, x1, [sp, -16]!
         CFI_ADJUST(16)
         stp     q0, q1, [sp, -32]!
         CFI_ADJUST(32)
+        stp     q2, q3, [sp, -32]!
+        CFI_ADJUST(32)
         TSAN_EXIT_FUNCTION
     /* Restore return value registers */
+        ldp     q2, q3, [sp], 32
+        CFI_ADJUST(-32)
         ldp     q0, q1, [sp], 32
         CFI_ADJUST(-32)
         ldp     x0, x1, [sp], 16

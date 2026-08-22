@@ -1,0 +1,17 @@
+sum_i64_pair: 333
+sum_i32_pair: 864198
+sum_i16_i32: 999700
+sum_f64_pair: 3.7500
+sum_f32_quad: 11.0000
+sum_f32_i32: 8.5000
+sum_int_f64: 41.2500
+sum_f64_i64: 102.5000
+sum_nested: 998
+sum_two_pairs: 10
+sum_three_pairs: 21
+mixed_args: 44
+sum_i64_void: 123
+ret_i32i32_i64: -11 22 -3333
+ret_f32_quad: 0.5000 -1.5000 2.2500 -4.0000
+ret_nested: -77 88 9999
+swap_mixed: -2.5000 5

@@ -491,9 +491,16 @@ type primitive =
   | Pset_ext_ptr of layout * modify_mode
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
-    compiled away. *)
+    compiled away.
+
+    [Unpacked_product], which arises from the [@unpacked] attribute, differs
+    from [Same_as_ocaml_repr] on a product sort in terms of native-code
+    calling conventions: the components of an [Unpacked_product] are passed
+    as separate C arguments, whereas a [Same_as_ocaml_repr] product follows
+    the calling convention of the corresponding C struct. *)
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
+  | Unpacked_product of Jkind.Sort.Const.t
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
