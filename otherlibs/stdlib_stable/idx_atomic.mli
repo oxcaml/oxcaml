@@ -14,8 +14,16 @@
 
 (** Atomic indices into blocks. *)
 
+(*
+   Here, ['b] has kind [any] for consistency with other index types, even though
+   we only allow atomic fields with kind [value_or_null].
+
+   This is also enforced by primitives that operate on [('a, 'b) idx_atomic],
+   since they rely on value layout assumptions.
+*)
+
 (** An alias for the type of atomic indices into blocks. *)
-type ('a : value_or_null, 'b : value_or_null) t : bits64 mod everything =
+type ('a : value_or_null, 'b : any) t : bits64 mod everything =
   ('a, 'b) idx_atomic
 
 (** [get a i] gets [a] at index [i] atomically.
