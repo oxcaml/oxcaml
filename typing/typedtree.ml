@@ -1526,7 +1526,7 @@ let unboxed_label_sort (label : Data_types.unboxed_label_description)
       (repres : Types.record_unboxed_product_representation) =
   match repres with
   | Record_unboxed_product_variable sorts -> sorts.(label.lbl_pos)
-  | Record_unboxed_product | Record_unboxed_product_undetermined ->
+  | Record_unboxed_product ->
     begin match label.lbl_sort with
     | Some sort -> Jkind.Sort.of_const sort
     | None ->
@@ -1534,6 +1534,9 @@ let unboxed_label_sort (label : Data_types.unboxed_label_description)
         "no sort for label %s despite non-variable representation"
         label.lbl_name
     end
+  | Record_unboxed_product_undetermined ->
+    Misc.fatal_error "unboxed_label_sort: unexpected undetermined \
+                      representation"
 
 let label_sort (type rep)
       (record_form : rep record_form)
@@ -1543,11 +1546,12 @@ let label_sort (type rep)
   | Legacy ->
     begin match repres with
     | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
-    | Record_variable sorts_and_types ->
-      fst sorts_and_types.(label.lbl_pos)
+    | Record_variable sorts_and_types
     | Record_inlined (_, Constructor_variable sorts_and_types, _) ->
       fst sorts_and_types.(label.lbl_pos)
-    | _ ->
+    | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+    | Record_inlined
+        (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
       begin match label.lbl_sort with
       | Some sort -> Jkind.Sort.of_const sort
       | None ->
@@ -1555,13 +1559,20 @@ let label_sort (type rep)
           "no sort for label %s despite non-variable representation"
           label.lbl_name
       end
+    | Record_undetermined
+    | Record_inlined (_, Constructor_undetermined, _) ->
+      Misc.fatal_error "label_sort: unexpected undetermined representation"
+    | Record_dummy _ ->
+      Misc.fatal_error "label_sort: unexpected dummy representation"
     end
 
 let finalized_label_sort (label : Data_types.label_description)
       (repres : Types.record_representation) ~record_sort ~variable_sorts =
   match repres with
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
-  | _ ->
+  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+  | Record_inlined
+      (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
     begin match variable_sorts with
     | Some sorts -> sorts.(label.lbl_pos)
     | None ->
@@ -1573,6 +1584,12 @@ let finalized_label_sort (label : Data_types.label_description)
           label.lbl_name
       end
     end
+  | Record_undetermined | Record_variable _
+  | Record_inlined
+      (_, (Constructor_undetermined | Constructor_variable _), _) ->
+    Misc.fatal_error "finalized_label_sort: representation was not finalized"
+  | Record_dummy _ ->
+    Misc.fatal_error "finalized_label_sort: unexpected dummy representation"
 
 let unboxed_label_all_sorts label repres =
   Array.map (fun lbl -> unboxed_label_sort lbl repres) label.lbl_all

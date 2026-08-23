@@ -1651,9 +1651,10 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 val map_apply_arg:
   ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
 
-(** Compute a label's sort given the representation from its use (assumes it
-    isn't [Record_undetermined] or [Record_unboxed_product_undetermined], which
-    should only appear on declarations). *)
+(** Compute a label's sort. The label comes from a declaration, but the
+    representation should be the one stored at the label's use site (this errors
+    given [Record_undetermined] and [Record_unboxed_product_undetermined], which
+    only appear on declarations). *)
 val label_sort:
   'rep Data_types.record_form -> 'rep Data_types.gen_label_description
   -> 'rep
