@@ -717,38 +717,43 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         match check_depth depth obj ty with
         | Some x -> x
         | None ->
+            let sorts_and_types () =
+              let label_params_and_types, record_params =
+                Ctype.instance_label_declarations ~fixed:false
+                  (lbl_list |> Array.of_list) ~params:type_params
+              in
+              List.iter2 (Ctype.unify env) record_params
+                (Ctype.instance_list ty_list);
+              let try_map_all a f =
+                Misc.Stdlib.Array.all_somes (Array.map f a)
+              in
+              let with_sort ty =
+                Option.map (fun s -> s, ty)
+                  (Jkind.sort_option_of_jkind env (Ctype.type_jkind env ty))
+              in
+              try_map_all label_params_and_types (fun (_, ty) -> with_sort ty)
+            in
+            (* Finalize the representation just to be able to print it *)
+            let finalize rep =
+              Typedecl.finalize_record_representation env Location.none rep
+            in
             let rep =
               match rep with
-              | (Record_undetermined
-                | Record_inlined (_, Constructor_undetermined, _))
-                as old_repres ->
-                  let label_params_and_types, record_params =
-                    Ctype.instance_label_declarations ~fixed:false
-                      (lbl_list |> Array.of_list) ~params:type_params
-                  in
-                  List.iter2 (Ctype.unify env) record_params
-                    (Ctype.instance_list ty_list);
-                  (* Finalize the representation just to be able to print it *)
-                  let sorts_and_types =
-                    Array.map
-                      (fun (_params, ty) ->
-                         Jkind.sort_of_jkind env (Ctype.type_jkind env ty), ty)
-                      label_params_and_types
-                  in
-                  let rep : Types.record_representation =
-                    match old_repres with
-                    | Record_undetermined ->
-                        Record_variable sorts_and_types
-                    | Record_inlined (tag, Constructor_undetermined, vrep) ->
-                        Record_inlined
-                          (tag,
-                           Constructor_variable sorts_and_types,
-                           vrep)
-                    | _ -> assert false
-                  in
-                  Typedecl.finalize_record_representation env Location.none rep
-              | rep -> rep
+              | Record_undetermined ->
+                Option.map
+                  (fun l -> finalize (Record_variable l))
+                  (sorts_and_types ())
+              | Record_inlined (tag, Constructor_undetermined, vrep) ->
+                Option.map
+                  (fun l ->
+                     finalize
+                       (Record_inlined (tag, Constructor_variable l, vrep)))
+                  (sorts_and_types ())
+              | _ -> Some rep
             in
+            match rep with
+            | None -> Oval_stuff "<abstr>"
+            | Some rep ->
             let pos =
               match rep with
               | Record_inlined (_, _, Variant_extensible) -> 1
