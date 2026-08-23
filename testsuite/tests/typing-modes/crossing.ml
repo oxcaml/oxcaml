@@ -316,12 +316,8 @@ type s = { v : t @@ shared; } [@@unboxed]
 type s = { v : t @@ corrupted; } [@@unboxed]
 type s = { f : int -> int @@ shared; } [@@unboxed]
 type s = { f : int -> int @@ corrupted; } [@@unboxed]
-Line 5, characters 0-73:
-5 | type concrete_shared : value mod shared = { v : t @@ shared } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation
-         value mod shared,
-       because t is not mod shared.
+type concrete_shared = { v : t @@ shared; } [@@unboxed]
+type concrete_corrupted = { v : t @@ corrupted; } [@@unboxed]
 |}]
 
 let concrete_shared_from_shared
@@ -333,20 +329,22 @@ let concrete_shared_from_contended
   x
 
 [%%expect{|
-Line 2, characters 9-24:
-2 |     (x : concrete_shared @ shared) : concrete_shared @ uncontended =
-             ^^^^^^^^^^^^^^^
-Error: Unbound type constructor "concrete_shared"
+val concrete_shared_from_shared : concrete_shared @ shared -> concrete_shared =
+  <fun>
+val concrete_shared_from_contended :
+  concrete_shared @ contended -> concrete_shared @ corrupted = <fun>
 |}]
 
 let concrete_shared_no_cross
     (x : concrete_shared @ contended) : concrete_shared @ shared =
   x
 [%%expect{|
-Line 2, characters 9-24:
-2 |     (x : concrete_shared @ contended) : concrete_shared @ shared =
-             ^^^^^^^^^^^^^^^
-Error: Unbound type constructor "concrete_shared"
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "corrupted" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "shared" or "uncontended".
 |}]
 
 let concrete_corrupted_from_corrupted
@@ -358,18 +356,20 @@ let concrete_corrupted_from_contended
   x
 
 [%%expect{|
-Line 2, characters 9-27:
-2 |     (x : concrete_corrupted @ corrupted) : concrete_corrupted @ uncontended =
-             ^^^^^^^^^^^^^^^^^^
-Error: Unbound type constructor "concrete_corrupted"
+val concrete_corrupted_from_corrupted :
+  concrete_corrupted @ corrupted -> concrete_corrupted = <fun>
+val concrete_corrupted_from_contended :
+  concrete_corrupted @ contended -> concrete_corrupted @ shared = <fun>
 |}]
 
 let concrete_corrupted_no_cross
     (x : concrete_corrupted @ contended) : concrete_corrupted @ corrupted =
   x
 [%%expect{|
-Line 2, characters 9-27:
-2 |     (x : concrete_corrupted @ contended) : concrete_corrupted @ corrupted =
-             ^^^^^^^^^^^^^^^^^^
-Error: Unbound type constructor "concrete_corrupted"
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "shared" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "corrupted" or "uncontended".
 |}]

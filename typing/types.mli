@@ -85,8 +85,7 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
-  (** The axes that the with-bound applies to *)
-  type t = { relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  type t = { relevant_bounds : Axis_lattice.t } [@@unboxed]
 
   val join : t -> t -> t
 end
@@ -893,7 +892,7 @@ type type_declaration =
 and type_decl_kind = (label_declaration, label_declaration, constructor_declaration) type_kind
 
 and unsafe_mode_crossing =
-  { unsafe_mod_bounds : Mode.Crossing.t
+  { unsafe_mod_bounds : mod_bounds
   ; unsafe_with_bounds : (allowed * disallowed) with_bounds
   }
 
@@ -1372,10 +1371,6 @@ val mixed_block_element_to_lowercase_string : mixed_block_element -> string
 
 val equal_mixed_product_shape_up_to_scannable_axes :
   mixed_product_shape -> mixed_product_shape -> bool
-
-val equal_unsafe_mode_crossing :
-  type_equal:(type_expr -> type_expr -> bool) ->
-  unsafe_mode_crossing -> unsafe_mode_crossing -> bool
 
 (**** Utilities for backtracking ****)
 

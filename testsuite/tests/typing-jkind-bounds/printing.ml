@@ -71,14 +71,14 @@ type reading_with : immutable_data with middle_payload @@ reading
 type writing_with : immutable_data with middle_payload @@ writing
 [%%expect {|
 type middle_payload
-type shared_with : immutable_data with middle_payload
-type corrupted_with : immutable_data with middle_payload
-type shareable_with : immutable_data with middle_payload
-type corruptible_with : immutable_data with middle_payload
-type read_with : immutable_data with middle_payload
-type write_with : immutable_data with middle_payload
-type reading_with : immutable_data with middle_payload
-type writing_with : immutable_data with middle_payload
+type shared_with : immutable_data with middle_payload @@ shared
+type corrupted_with : immutable_data with middle_payload @@ corrupted
+type shareable_with : immutable_data with middle_payload @@ shareable
+type corruptible_with : immutable_data with middle_payload @@ corruptible
+type read_with : immutable_data with middle_payload @@ read
+type write_with : immutable_data with middle_payload @@ write
+type reading_with : immutable_data with middle_payload @@ reading
+type writing_with : immutable_data with middle_payload @@ writing
 |}]
 
 module M : sig

@@ -784,8 +784,15 @@ let report_kind_mismatch first second ppf (kind1, kind2) =
     (kind_to_string kind2)
 
 let print_unsafe_mode_crossing ppf umc =
-  Fmt.fprintf ppf "mod %a@ %a"
-    Mode.Crossing.print umc.unsafe_mod_bounds
+  Fmt.fprintf ppf "mod %a%a@ %a"
+    Mode.Crossing.print umc.unsafe_mod_bounds.crossing
+    (fun ppf externality ->
+      if
+        not
+          (Jkind_axis.Externality.equal externality
+             Jkind_axis.Externality.max)
+      then Fmt.fprintf ppf "@ %a" Jkind_axis.Externality.print externality)
+    umc.unsafe_mod_bounds.externality
     Jkind.With_bounds.format umc.unsafe_with_bounds
 
 let report_unsafe_mode_crossing_mismatch first second ppf e =
@@ -886,8 +893,10 @@ let compare_unsafe_mode_crossing ~env umc1 umc2 =
   | Some _, None -> Some (Unsafe_mode_crossing (Mode_crossing_only_on First))
   | None, Some _ -> Some (Unsafe_mode_crossing (Mode_crossing_only_on Second))
   | Some umc1, Some umc2 ->
-    if equal_unsafe_mode_crossing
+    if Jkind.equal_unsafe_mode_crossing
          ~type_equal:(Ctype.type_equal env)
+         ~context:(Ctype.mk_jkind_context_always_principal env)
+         env
          umc1 umc2
     then None
     else

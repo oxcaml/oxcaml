@@ -28,12 +28,12 @@ type t_arrow : value mod write = { f : (int -> int) @@ write } [@@unboxed]
 
 [%%expect{|
 type middle_payload
-Line 2, characters 0-68:
-2 | type s : value mod read = { v : middle_payload @@ read } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation
-         value mod read,
-       because middle_payload is not mod read.
+type s = { v : middle_payload @@ read; } [@@unboxed]
+type t = { v : middle_payload @@ write; } [@@unboxed]
+type u = { v : middle_payload @@ reading; } [@@unboxed]
+type v = { v : middle_payload @@ writing; } [@@unboxed]
+type s_arrow = { f : int -> int @@ read; } [@@unboxed]
+type t_arrow = { f : int -> int @@ write; } [@@unboxed]
 |}]
 
 let read_from_read (x : s @ read) : s @ read_write = x
@@ -41,19 +41,19 @@ let read_from_read (x : s @ read) : s @ read_write = x
 let read_from_immutable (x : s @ immutable) : s @ write = x
 
 [%%expect{|
-Line 1, characters 24-25:
-1 | let read_from_read (x : s @ read) : s @ read_write = x
-                            ^
-Error: Unbound type constructor "s"
+val read_from_read : s @ read -> s = <fun>
+val read_from_immutable : s @ immutable -> s @ write = <fun>
 |}]
 
 let read_no_cross (x : s @ immutable) : s @ read = x
 
 [%%expect{|
-Line 1, characters 23-24:
+Line 1, characters 51-52:
 1 | let read_no_cross (x : s @ immutable) : s @ read = x
-                           ^
-Error: Unbound type constructor "s"
+                                                       ^
+Error: This value is "write" because it crosses with something
+         which is "immutable".
+       However, the highlighted expression is expected to be "read" or "read_write".
 |}]
 
 let write_from_write (x : t @ write) : t @ read_write = x
@@ -61,19 +61,19 @@ let write_from_write (x : t @ write) : t @ read_write = x
 let write_from_immutable (x : t @ immutable) : t @ read = x
 
 [%%expect{|
-Line 1, characters 26-27:
-1 | let write_from_write (x : t @ write) : t @ read_write = x
-                              ^
-Error: Unbound type constructor "t"
+val write_from_write : t @ write -> t = <fun>
+val write_from_immutable : t @ immutable -> t @ read = <fun>
 |}]
 
 let write_no_cross (x : t @ immutable) : t @ write = x
 
 [%%expect{|
-Line 1, characters 24-25:
+Line 1, characters 53-54:
 1 | let write_no_cross (x : t @ immutable) : t @ write = x
-                            ^
-Error: Unbound type constructor "t"
+                                                         ^
+Error: This value is "read" because it crosses with something
+         which is "immutable".
+       However, the highlighted expression is expected to be "write" or "read_write".
 |}]
 
 let reading_from_writing (x : u @ writing) : u @ stateless = x
@@ -81,19 +81,19 @@ let reading_from_writing (x : u @ writing) : u @ stateless = x
 let reading_from_stateful (x : u @ stateful) : u @ reading = x
 
 [%%expect{|
-Line 1, characters 30-31:
-1 | let reading_from_writing (x : u @ writing) : u @ stateless = x
-                                  ^
-Error: Unbound type constructor "u"
+val reading_from_writing : u @ writing -> u @ stateless = <fun>
+val reading_from_stateful : u -> u @ reading = <fun>
 |}]
 
 let reading_no_cross (x : u @ reading) : u @ stateless = x
 
 [%%expect{|
-Line 1, characters 26-27:
+Line 1, characters 57-58:
 1 | let reading_no_cross (x : u @ reading) : u @ stateless = x
-                              ^
-Error: Unbound type constructor "u"
+                                                             ^
+Error: This value is "reading"
+       but is expected to be "writing" because it crosses with something
+         which is expected to be "stateless".
 |}]
 
 let writing_from_reading (x : v @ reading) : v @ stateless = x
@@ -101,19 +101,17 @@ let writing_from_reading (x : v @ reading) : v @ stateless = x
 let writing_from_stateful (x : v @ stateful) : v @ writing = x
 
 [%%expect{|
-Line 1, characters 30-31:
-1 | let writing_from_reading (x : v @ reading) : v @ stateless = x
-                                  ^
-Error: Unbound type constructor "v"
+val writing_from_reading : v @ reading -> v @ stateless = <fun>
+val writing_from_stateful : v -> v @ writing = <fun>
 |}]
 
 let writing_no_cross (x : v @ writing) : v @ reading = x
 
 [%%expect{|
-Line 1, characters 26-27:
+Line 1, characters 55-56:
 1 | let writing_no_cross (x : v @ writing) : v @ reading = x
-                              ^
-Error: Unbound type constructor "v"
+                                                           ^
+Error: This value is "writing" but is expected to be "reading".
 |}]
 
 let foo x a = x.a <- a

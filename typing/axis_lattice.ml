@@ -206,27 +206,6 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
   in
   lo lor ((lo land 0x49451) lsl 1)
 
-(* IK-only: compute relevant axes of a constant modality, mirroring
-   Jkind.relevant_axes_of_modality. *)
-let relevant_axes_of_modality (modality : Mode.Modality.Const.t) :
-    Jkind_axis.Axis_set.t =
-  Jkind_axis.Axis_set.create ~f:(fun ~axis:(Jkind_axis.Axis.Pack axis) ->
-      match axis with
-      | Modal axis ->
-        let (Mode.Modality.Axis.P axis_for_modality) =
-          Mode.Crossing.Axis.(P axis |> to_modality)
-        in
-        let modality_on_axis =
-          Mode.Modality.Const.proj axis_for_modality modality
-        in
-        not
-          (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis)
-      | Nonmodal Externality -> true)
-
-(* Directly produce an axis-lattice mask from a constant modality. *)
-let mask_of_modality (modality : Mode.Modality.Const.t) : t =
-  relevant_axes_of_modality modality |> of_axis_set
-
 (* Helpers to translate between axis enumerations and packed levels. *)
 module Levels = struct
   let level_of_areality (a : Mode.Regionality.Const.t) : int =
@@ -470,6 +449,32 @@ let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
   |> set_statefulness statefulness
   |> set_visibility visibility |> set_staticity staticity
   |> set_externality externality
+
+let of_mode_crossing (crossing : Mode.Crossing.t) ~externality =
+  let create_lattice = create in
+  let open Mode.Crossing in
+  let monadic axis =
+    let (Monadic.Atom.Modality (Mode.Modality.Monadic.Atom.Join_const c)) =
+      proj (Axis.Monadic axis) crossing
+    in
+    c
+  in
+  let comonadic axis =
+    let (Comonadic.Atom.Modality (Mode.Modality.Comonadic.Atom.Meet_const c)) =
+      proj (Axis.Comonadic axis) crossing
+    in
+    c
+  in
+  let open Mode.Axis in
+  create_lattice ~areality:(comonadic Areality) ~linearity:(comonadic Linearity)
+    ~uniqueness:(monadic Uniqueness) ~portability:(comonadic Portability)
+    ~contention:(monadic Contention) ~forkable:(comonadic Forkable)
+    ~yielding:(comonadic Yielding) ~statefulness:(comonadic Statefulness)
+    ~visibility:(monadic Visibility) ~staticity:(monadic Staticity) ~externality
+
+let mask_of_modality (modality : Mode.Modality.Const.t) : t =
+  let crossing = Mode.Crossing.modality modality Mode.Crossing.max in
+  of_mode_crossing crossing ~externality:Jkind_axis.Externality.max
 
 (* Canonical lattice constants used by ikinds. *)
 let nonfloat_value : t =

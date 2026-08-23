@@ -92,7 +92,9 @@ Line 1, characters 43-46:
 1 | let get : 'a t -> 'a @ portable = fun t -> t.x
                                                ^^^
 Error: This value is "shareable"
-         because it is the field "x" (with some modality) of the record at line 1, characters 43-44.
+         because it is the field "x" of the record at line 1, characters 43-44
+         which is "shareable" because it crosses with something
+         which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
 
@@ -126,12 +128,8 @@ type u : value mod corruptible = { v : t @@ corruptible } [@@unboxed]
 
 [%%expect{|
 type t
-Line 3, characters 0-65:
-3 | type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation
-         value mod shareable,
-       because t is not mod shareable.
+type s = { v : t @@ shareable; } [@@unboxed]
+type u = { v : t @@ corruptible; } [@@unboxed]
 |}]
 
 let s_from_corruptible (x : s @ corruptible) : s @ portable = x
@@ -139,19 +137,19 @@ let s_from_corruptible (x : s @ corruptible) : s @ portable = x
 let s_from_nonportable (x : s @ nonportable) : s @ shareable = x
 
 [%%expect{|
-Line 1, characters 28-29:
-1 | let s_from_corruptible (x : s @ corruptible) : s @ portable = x
-                                ^
-Error: Unbound type constructor "s"
+val s_from_corruptible : s @ corruptible -> s @ portable = <fun>
+val s_from_nonportable : s -> s @ shareable = <fun>
 |}]
 
 let s_no_self_cross (x : s @ shareable) : s @ portable = x
 
 [%%expect{|
-Line 1, characters 25-26:
+Line 1, characters 57-58:
 1 | let s_no_self_cross (x : s @ shareable) : s @ portable = x
-                             ^
-Error: Unbound type constructor "s"
+                                                             ^
+Error: This value is "shareable"
+       but is expected to be "corruptible" because it crosses with something
+         which is expected to be "portable".
 |}]
 
 let u_from_shareable (x : u @ shareable) : u @ portable = x
@@ -159,17 +157,15 @@ let u_from_shareable (x : u @ shareable) : u @ portable = x
 let u_from_nonportable (x : u @ nonportable) : u @ corruptible = x
 
 [%%expect{|
-Line 1, characters 26-27:
-1 | let u_from_shareable (x : u @ shareable) : u @ portable = x
-                              ^
-Error: Unbound type constructor "u"
+val u_from_shareable : u @ shareable -> u @ portable = <fun>
+val u_from_nonportable : u -> u @ corruptible = <fun>
 |}]
 
 let u_no_self_cross (x : u @ corruptible) : u @ shareable = x
 
 [%%expect{|
-Line 1, characters 25-26:
+Line 1, characters 60-61:
 1 | let u_no_self_cross (x : u @ corruptible) : u @ shareable = x
-                             ^
-Error: Unbound type constructor "u"
+                                                                ^
+Error: This value is "corruptible" but is expected to be "shareable".
 |}]
