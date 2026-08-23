@@ -3141,7 +3141,7 @@ let representation_for_tuple_constructor env constr ~types ~why
       | None -> Misc.fatal_error "representable constructor missing a sort"
       end
   | Constructor_undetermined ->
-      begin match
+      let sorts_result =
         Misc.Stdlib.List.mapi_result
           (fun i (ty, loc) ->
              match (List.nth constr.cstr_args i).ca_sort with
@@ -3151,18 +3151,19 @@ let representation_for_tuple_constructor env constr ~types ~why
                  |> Result.map_error
                       (fun err -> Unrepresentable_arg (loc, ty, err)))
           types
-        with
-        | Ok sorts ->
-            let sorts_and_types =
-              List.map2 (fun sort (ty, _loc) -> sort, ty) sorts types
-              |> Array.of_list
-            in
-            Ok (Constructor_variable sorts_and_types, sorts)
-        | Error err -> Error err
+      in
+      begin match sorts_result with
+      | Ok sorts ->
+          let sorts_and_types =
+            List.map2 (fun sort (ty, _loc) -> sort, ty) sorts types
+            |> Array.of_list
+          in
+          Ok (Constructor_variable sorts_and_types, sorts)
+      | Error err -> Error err
       end
   | Constructor_variable _ ->
       Misc.fatal_error
-        "representation_for_tuple_constructor: unexpected typechecked \
+        "representation_for_tuple_constructor: unexpected variable \
          representation in a constructor description"
 
 (* Typing of patterns *)

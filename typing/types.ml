@@ -961,7 +961,7 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   (* [Constructor_variable] only appears in the typedtree, never in a decl. *)
   | Constructor_variable _, _ | _, Constructor_variable _ ->
       Misc.fatal_error
-        "equal_constructor_representation_up_to_scannable_axes: typechecked \
+        "equal_constructor_representation_up_to_scannable_axes: variable \
          representation"
   | (Constructor_mixed _ | Constructor_uniform_value
     | Constructor_undetermined), _
@@ -1013,7 +1013,7 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   (* [Record_variable] only appears in the typedtree, never in a decl. *)
   | Record_variable _, _ | _, Record_variable _ ->
       Misc.fatal_error
-        "equal_record_representation_up_to_scannable_axes: typechecked \
+        "equal_record_representation_up_to_scannable_axes: variable \
          representation"
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
     | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_undetermined),
@@ -1031,7 +1031,7 @@ let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
   | _, Record_unboxed_product_variable _ ->
       Misc.fatal_error
         "equal_record_unboxed_product_representation_up_to_scannable_axes: \
-         typechecked representation"
+         variable representation"
   | (Record_unboxed_product | Record_unboxed_product_undetermined), _ -> false
 
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)

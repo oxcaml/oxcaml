@@ -17,8 +17,7 @@
  }
 *)
 
-(* A variable-representation inline record, used in functions that don't
-   constrain the sort variable *)
+(* Specializing [any]-fields in inline records *)
 
 type ('a : any) w = W of { id : int; value : 'a }
 
@@ -27,6 +26,7 @@ type t =
    ; bar : string
    }
 
+(* These functions determine the representation in slightly different ways. *)
 let g (W { id; value = t } : t w) =
   ignore (id : int);
   String.length t.#bar
@@ -35,6 +35,7 @@ let f (W { id; value = t } : _ w) =
   ignore (id : int);
   String.length t.#bar
 
+(* [x] later gets specialized to an unboxed product *)
 let mk x = W { id = 1; value = x }
 
 let use_mk () = mk #{ foo = 2; bar = "hello" }

@@ -1045,11 +1045,9 @@ and constructor_representation =
   (* The constructor has an inlined record argument with a field of layout
      [any], so its shape cannot be determined at typedecl time. *)
   | Constructor_variable of (Jkind_types.Sort.t * type_expr) array
-  (* [Constructor_undetermined] after typechecking a use of the constructor
-     whose shape is still undetermined: each argument's (or inlined-record
-     field's) sort and type at that use site. Counterpart of
-     [Record_variable]; only ever appears in the typedtree, never in a type
-     declaration. *)
+  (* What [Constructor_undetermined] becomes after typechecking a use of the
+     constructor. Like [Record_variable], only ever appears in the typedtree,
+     never in a type declaration. *)
 
 and label_declaration =
   {

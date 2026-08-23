@@ -1129,7 +1129,7 @@ module Record_diffing = struct
         | Record_variable _, _
         | _, Record_variable _ ->
           Misc.fatal_error
-            "compare_with_representation: typechecked record representation"
+            "compare_with_representation: instantiated record representation"
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
@@ -1144,7 +1144,7 @@ module Record_diffing = struct
         | Record_unboxed_product_variable _, _
         | _, Record_unboxed_product_variable _ ->
             Misc.fatal_error
-              "compare_with_representation: typechecked record representation"
+              "compare_with_representation: instantiated record representation"
         end
 end
 

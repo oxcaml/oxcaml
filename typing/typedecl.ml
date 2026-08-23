@@ -1382,7 +1382,7 @@ let record_gets_unboxed_version lbls repr =
   | Record_mixed shape -> not (shape_has_float_boxed shape)
   | Record_variable _ ->
     fatal_error
-      "record_gets_unboxed_version: unexpected typechecked representation"
+      "record_gets_unboxed_version: unexpected variable representation"
 
 let gets_unboxed_version decl =
   (* This must be kept in sync with the match in [derive_unboxed_version] *)
@@ -1875,24 +1875,20 @@ let eagerly_check_record_not_all_void loc sorts =
 (* CR-soon rtjoa: The [default_to_scannable] parameter was added in
    oxcaml/oxcaml#6496, but should be removed.
 
-   This function is called in two main code paths:
+   Previously, this function defaulted label sorts to scannable. The above PR
+   stopped use-site typechecking from defaulting, but use sites no longer go
+   through this function at all (see [instance_record_representation]): every
+   remaining caller is typechecking a declaration and passes
+   [default_to_scannable:true], so the [false] path is unused.
 
-   1. When typechecking a declaration, to determine the declaration type_kind
-      (e.g. via [compute_record_kind]).
-   2. When typechecking an expression, in order to specialize a record/variant
-      representation to its field sorts (via [instance_record_representation]).
-
-   Previously, we always defaulted label sorts to scannable. The above PR made
-   it so we no longer do so for expressions, but introduced the flag to preserve
-   the existing behavior for declarations.
-
-   This leaves the question of why we need to default in declarations, as in
+   That leaves the question of why declarations need to default, as in
    [transl_type_decl], sort variables are already defaulted by calling
    [Ctype.closed_type_decl]. The reason is that in
    [transl_extension_constructor_decl], the constructor representation is
-   computed *before* defaulting, causing fatal errors if we don't default here.
-   We should fix this, so this function never needs to default and the flag can
-   be removed.
+   computed *before* defaulting, causing fatal errors if we don't default
+   here; for other declarations the defaulting is a no-op. We should fix
+   this, so this function never needs to default and the flag can be
+   removed.
 *)
 let update_label_sorts (type rep) env loc types ~(form : rep record_form)
       ~default_to_scannable =
@@ -2045,8 +2041,9 @@ module Element_repr = struct
     of_t t
 
   (* If [default_to_scannable] is true, unfilled sort variables are defaulted;
-     otherwise the element is classified as [None]. See the comment above
-     [update_label_sorts].
+     otherwise the element is classified as [None]. Unlike
+     [update_label_sorts], both paths are used: declaration checking defaults
+     (see the CR above [update_label_sorts]), finalization does not.
   *)
   let classify env ty jkind ~default_to_scannable =
 
@@ -2597,7 +2594,7 @@ let finalize_constructor_representation env loc
   | Constructor_undetermined ->
       Misc.fatal_error
         "Typedecl.finalize_constructor_representation: representation was \
-         not typechecked"
+         not instantiated"
 
 let finalize_record_representation_and_sorts env loc
     (repres : Types.record_representation) =
@@ -2626,7 +2623,7 @@ let finalize_record_representation_and_sorts env loc
   | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
       Misc.fatal_error
         "Typedecl.finalize_record_representation: representation was not \
-         typechecked"
+         instantiated"
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
     | Record_ufloat | Record_mixed _ | Record_dummy _) ->
       repres, ~variable_sorts:None

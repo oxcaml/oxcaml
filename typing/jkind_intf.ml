@@ -75,7 +75,10 @@ module type Sort = sig
     val all_void : t -> bool
 
     (** Like [all_void], but a layout variable counts as maybe-void, since it
-        can be instantiated as void. *)
+        can be instantiated as void.
+
+        CR layout-polymorphism: This function should be deleted once we support
+        layout-poly any-fields *)
     val maybe_all_void : t -> bool
 
     (** True if the sort contains no univars or genvars.
