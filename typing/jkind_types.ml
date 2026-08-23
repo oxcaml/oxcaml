@@ -124,9 +124,8 @@ module Sort = struct
     | Mask -> "mask"
 
   let base_is_addressable = function
-    | Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 -> true
-    | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32
-    | Mask ->
+    | Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 | Mask -> true
+    | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
       false
 
   (* Global association list mapping poly vars to names for printing *)
