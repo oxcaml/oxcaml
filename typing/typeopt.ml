@@ -758,9 +758,12 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             (fun () -> value_kind_record env ~loc ~visited ~depth
                          ~num_nodes_visited labels rep)
         | Type_record_unboxed_product
-            (_, (Record_unboxed_product_undetermined
-                | Record_unboxed_product_variable _), _) ->
+            (_, Record_unboxed_product_undetermined, _) ->
           num_nodes_visited, nullable Pgenval
+        | Type_record_unboxed_product
+            (_, Record_unboxed_product_variable _, _) ->
+          Misc.fatal_error
+            "Typeopt.value_kind: variable representation in a declaration"
         | Type_record_unboxed_product ([{ld_type}],
                                        Record_unboxed_product, _) ->
           let depth = depth + 1 in
