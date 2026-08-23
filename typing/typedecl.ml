@@ -2142,7 +2142,7 @@ let check_atomic_fields reprs lbls =
          raise (Error (lbl.ld_loc, Non_value_atomic_field)))
     reprs lbls
 
-let instance_constructor_representation
+let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
     ~is_extension_constructor ~default_to_scannable
   =
@@ -2184,13 +2184,13 @@ let instance_constructor_representation
         raise (Error (loc, Illegal_mixed_product Extension_constructor));
       Ok (Constructor_mixed shape)
 
-let instance_constructor_representation env loc args
+let update_constructor_representation env loc args
       ~is_extension_constructor =
   let args, constant, jkinds, arg_sorts =
     update_constructor_arguments_sorts env loc args
   in
   let constructor_shape =
-    instance_constructor_representation env args jkinds ~loc
+    update_constructor_representation env args jkinds ~loc
       ~is_extension_constructor ~default_to_scannable:true
   in
   args, ~constant, constructor_shape, arg_sorts
@@ -2763,7 +2763,7 @@ let rec update_decl_jkind env dpath decl =
       let cstrs =
         List.mapi (fun idx cstr ->
           let cd_args, ~constant, cstr_repr, arg_sorts =
-            instance_constructor_representation env
+            update_constructor_representation env
               cstr.Types.cd_loc cstr.Types.cd_args
               ~is_extension_constructor:false
           in
@@ -4037,7 +4037,7 @@ let transl_extension_constructor_decl
       typext_params svars sargs sret_type
   in
   let args, ~constant, constructor_shape, _arg_sorts =
-    instance_constructor_representation env loc args
+    update_constructor_representation env loc args
       ~is_extension_constructor:true
   in
   let constructor_shape =

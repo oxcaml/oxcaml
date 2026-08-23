@@ -99,7 +99,7 @@ type unrepresentable_constructor =
   | Unrepresentable_argument of int
   | Unrepresentable_argument_field of string
 
-val instance_constructor_representation :
+val update_constructor_representation :
   Env.t -> Location.t -> Types.constructor_arguments ->
   is_extension_constructor:bool ->
   Types.constructor_arguments * constant:bool *
