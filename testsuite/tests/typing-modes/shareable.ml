@@ -121,15 +121,55 @@ val cross_shareable2 : cross_shareable -> cross_shareable @ shareable = <fun>
 
 type t
 
-(* Doesn't work yet. *)
 type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
+type u : value mod corruptible = { v : t @@ corruptible } [@@unboxed]
 
 [%%expect{|
 type t
-Line 4, characters 0-65:
-4 | type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
+Line 3, characters 0-65:
+3 | type s : value mod shareable = { v : t @@ shareable } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value mod shareable,
        because t is not mod shareable.
+|}]
+
+let s_from_corruptible (x : s @ corruptible) : s @ portable = x
+
+let s_from_nonportable (x : s @ nonportable) : s @ shareable = x
+
+[%%expect{|
+Line 1, characters 28-29:
+1 | let s_from_corruptible (x : s @ corruptible) : s @ portable = x
+                                ^
+Error: Unbound type constructor "s"
+|}]
+
+let s_no_self_cross (x : s @ shareable) : s @ portable = x
+
+[%%expect{|
+Line 1, characters 25-26:
+1 | let s_no_self_cross (x : s @ shareable) : s @ portable = x
+                             ^
+Error: Unbound type constructor "s"
+|}]
+
+let u_from_shareable (x : u @ shareable) : u @ portable = x
+
+let u_from_nonportable (x : u @ nonportable) : u @ corruptible = x
+
+[%%expect{|
+Line 1, characters 26-27:
+1 | let u_from_shareable (x : u @ shareable) : u @ portable = x
+                              ^
+Error: Unbound type constructor "u"
+|}]
+
+let u_no_self_cross (x : u @ corruptible) : u @ shareable = x
+
+[%%expect{|
+Line 1, characters 25-26:
+1 | let u_no_self_cross (x : u @ corruptible) : u @ shareable = x
+                             ^
+Error: Unbound type constructor "u"
 |}]

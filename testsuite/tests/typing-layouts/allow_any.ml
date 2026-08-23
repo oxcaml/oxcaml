@@ -445,6 +445,55 @@ Error: This variant or record definition does not match that of type
          portable contended with 'a
 |}]
 
+type 'a unsafe_saturated : value mod shared with 'a = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_saturated_reexport
+  : value mod shared with 'a @@ corrupted = 'a unsafe_saturated = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type ('a : value mod shared) unsafe_parameter_saturated
+  : value with 'a = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type ('a : value mod shared) unsafe_parameter_saturated_reexport
+  : value with 'a @@ shared = 'a unsafe_parameter_saturated = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_externality_saturated
+  : value with 'a @@ external64 = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_externality_saturated_reexport
+  : value with 'a = 'a unsafe_externality_saturated = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type 'a unsafe_saturated : value non_float mod shared with 'a = { x : 'a; }
+[@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_saturated_reexport
+  : value non_float mod shared with 'a =
+  'a unsafe_saturated = {
+  x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type ('a : value mod shared) unsafe_parameter_saturated
+  : value non_float with 'a = {
+  x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type ('a : value mod shared) unsafe_parameter_saturated_reexport
+  : value non_float with 'a =
+  'a unsafe_parameter_saturated = {
+  x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_externality_saturated : value non_float with 'a = { x : 'a; }
+[@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_externality_saturated_reexport
+  : value non_float with 'a =
+  'a unsafe_externality_saturated = {
+  x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+|}]
+
 (* mcomp *)
 
 type (_, _) eq = Refl : ('a, 'a) eq

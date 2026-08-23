@@ -307,10 +307,69 @@ type s = { v : t @@ contended; } [@@unboxed]
 |}]
 type s : value = { v : t @@ shared } [@@unboxed]
 type s : value = { v : t @@ corrupted } [@@unboxed]
-(* CR layouts: Ideally, these should have better jkinds than [value], but we
-   don't yet support the interaction between middle modes (like [shared] and
-   [poisoned]) and modal kinds. *)
+type s : value mod shared = { f : (int -> int) @@ shared } [@@unboxed]
+type s : value mod corrupted = { f : (int -> int) @@ corrupted } [@@unboxed]
+type concrete_shared : value mod shared = { v : t @@ shared } [@@unboxed]
+type concrete_corrupted : value mod corrupted = { v : t @@ corrupted } [@@unboxed]
 [%%expect{|
 type s = { v : t @@ shared; } [@@unboxed]
 type s = { v : t @@ corrupted; } [@@unboxed]
+type s = { f : int -> int @@ shared; } [@@unboxed]
+type s = { f : int -> int @@ corrupted; } [@@unboxed]
+Line 5, characters 0-73:
+5 | type concrete_shared : value mod shared = { v : t @@ shared } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod shared,
+       because t is not mod shared.
+|}]
+
+let concrete_shared_from_shared
+    (x : concrete_shared @ shared) : concrete_shared @ uncontended =
+  x
+
+let concrete_shared_from_contended
+    (x : concrete_shared @ contended) : concrete_shared @ corrupted =
+  x
+
+[%%expect{|
+Line 2, characters 9-24:
+2 |     (x : concrete_shared @ shared) : concrete_shared @ uncontended =
+             ^^^^^^^^^^^^^^^
+Error: Unbound type constructor "concrete_shared"
+|}]
+
+let concrete_shared_no_cross
+    (x : concrete_shared @ contended) : concrete_shared @ shared =
+  x
+[%%expect{|
+Line 2, characters 9-24:
+2 |     (x : concrete_shared @ contended) : concrete_shared @ shared =
+             ^^^^^^^^^^^^^^^
+Error: Unbound type constructor "concrete_shared"
+|}]
+
+let concrete_corrupted_from_corrupted
+    (x : concrete_corrupted @ corrupted) : concrete_corrupted @ uncontended =
+  x
+
+let concrete_corrupted_from_contended
+    (x : concrete_corrupted @ contended) : concrete_corrupted @ shared =
+  x
+
+[%%expect{|
+Line 2, characters 9-27:
+2 |     (x : concrete_corrupted @ corrupted) : concrete_corrupted @ uncontended =
+             ^^^^^^^^^^^^^^^^^^
+Error: Unbound type constructor "concrete_corrupted"
+|}]
+
+let concrete_corrupted_no_cross
+    (x : concrete_corrupted @ contended) : concrete_corrupted @ corrupted =
+  x
+[%%expect{|
+Line 2, characters 9-27:
+2 |     (x : concrete_corrupted @ contended) : concrete_corrupted @ corrupted =
+             ^^^^^^^^^^^^^^^^^^
+Error: Unbound type constructor "concrete_corrupted"
 |}]

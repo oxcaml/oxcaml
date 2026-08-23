@@ -132,6 +132,67 @@ end
 module M : sig type 'a t : value mod global many portable contended end
 |}]
 
+module Direct_middle_bound_saturates_with_bound : sig
+  type 'a t : value mod shared
+end = struct
+  type 'a t : value mod shared with 'a @@ shared
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t : value mod shared with 'a @@ shared
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t : value mod shared with 'a end
+       is not included in
+         sig type 'a t : value mod shared end
+       Type declarations do not match:
+         type 'a t : value mod shared with 'a
+       is not included in
+         type 'a t : value mod shared
+       The kind of the first is value mod shared with 'a
+         because of the definition of t at line 4, characters 2-48.
+       But the kind of the first must be a subkind of value mod shared
+         because of the definition of t at line 2, characters 2-30.
+|}]
+
+module Incomparable_middle_bound_remains_relevant : sig
+  type 'a t : value mod shared
+end = struct
+  type 'a t : value mod shared with 'a @@ corrupted
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t : value mod shared with 'a @@ corrupted
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t : value mod shared with 'a end
+       is not included in
+         sig type 'a t : value mod shared end
+       Type declarations do not match:
+         type 'a t : value mod shared with 'a
+       is not included in
+         type 'a t : value mod shared
+       The kind of the first is value mod shared with 'a
+         because of the definition of t at line 4, characters 2-51.
+       But the kind of the first must be a subkind of value mod shared
+         because of the definition of t at line 2, characters 2-30.
+|}]
+
+module External64_with_bound_is_middle : sig
+  type ('a : value mod external64) t : value mod external_
+end = struct
+  type ('a : value mod external64) t : value mod external_
+    with 'a @@ external64
+end
+[%%expect{|
+module External64_with_bound_is_middle :
+  sig type ('a : value mod external64) t : value mod external_ end
+|}]
+
 module M : sig
   type ('a, 'b) t : value mod portable
 end = struct

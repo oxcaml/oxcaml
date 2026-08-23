@@ -246,6 +246,43 @@ let check_of_axis_set () =
              (to_string actual)))
     all_axis_sets
 
+let check_imply_mixed_axes () =
+  let from_top = sample_of_lattice top in
+  let mask =
+    lattice_of_sample
+      { from_top with
+        portability = Mode.Portability.Const.Shareable;
+        contention = Mode.Contention.Const.Shared;
+        statefulness = Mode.Statefulness.Const.Reading;
+        visibility = Mode.Visibility.Const.Read
+      }
+  in
+  let rhs =
+    lattice_of_sample
+      { from_top with
+        portability = Mode.Portability.Const.Portable;
+        contention = Mode.Contention.Const.Contended;
+        statefulness = Mode.Statefulness.Const.Stateless;
+        visibility = Mode.Visibility.Const.Immutable
+      }
+  in
+  let expected_result =
+    lattice_of_sample
+      { from_top with
+        portability = Mode.Portability.Const.Corruptible;
+        contention = Mode.Contention.Const.Corrupted;
+        statefulness = Mode.Statefulness.Const.Writing;
+        visibility = Mode.Visibility.Const.Write
+      }
+  in
+  let result = imply mask rhs in
+  if not (equal result expected_result)
+  then
+    failwith
+      (Format.asprintf "mixed-axis imply mismatch: expected %s, got %s"
+         (to_string expected_result)
+         (to_string result))
+
 let () =
   check_axis
     (module Mode.Regionality.Const)
@@ -329,4 +366,5 @@ let () =
     [ Jkind_axis.Externality.External;
       Jkind_axis.Externality.External64;
       Jkind_axis.Externality.Internal ];
-  check_of_axis_set ()
+  check_of_axis_set ();
+  check_imply_mixed_axes ()

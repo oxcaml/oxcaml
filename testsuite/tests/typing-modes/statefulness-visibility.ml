@@ -18,6 +18,104 @@ type 'a myref = { mutable a : 'a; b : 'a }
 type 'a myref = { mutable a : 'a; b : 'a; }
 |}]
 
+type middle_payload
+type s : value mod read = { v : middle_payload @@ read } [@@unboxed]
+type t : value mod write = { v : middle_payload @@ write } [@@unboxed]
+type u : value mod reading = { v : middle_payload @@ reading } [@@unboxed]
+type v : value mod writing = { v : middle_payload @@ writing } [@@unboxed]
+type s_arrow : value mod read = { f : (int -> int) @@ read } [@@unboxed]
+type t_arrow : value mod write = { f : (int -> int) @@ write } [@@unboxed]
+
+[%%expect{|
+type middle_payload
+Line 2, characters 0-68:
+2 | type s : value mod read = { v : middle_payload @@ read } [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod read,
+       because middle_payload is not mod read.
+|}]
+
+let read_from_read (x : s @ read) : s @ read_write = x
+
+let read_from_immutable (x : s @ immutable) : s @ write = x
+
+[%%expect{|
+Line 1, characters 24-25:
+1 | let read_from_read (x : s @ read) : s @ read_write = x
+                            ^
+Error: Unbound type constructor "s"
+|}]
+
+let read_no_cross (x : s @ immutable) : s @ read = x
+
+[%%expect{|
+Line 1, characters 23-24:
+1 | let read_no_cross (x : s @ immutable) : s @ read = x
+                           ^
+Error: Unbound type constructor "s"
+|}]
+
+let write_from_write (x : t @ write) : t @ read_write = x
+
+let write_from_immutable (x : t @ immutable) : t @ read = x
+
+[%%expect{|
+Line 1, characters 26-27:
+1 | let write_from_write (x : t @ write) : t @ read_write = x
+                              ^
+Error: Unbound type constructor "t"
+|}]
+
+let write_no_cross (x : t @ immutable) : t @ write = x
+
+[%%expect{|
+Line 1, characters 24-25:
+1 | let write_no_cross (x : t @ immutable) : t @ write = x
+                            ^
+Error: Unbound type constructor "t"
+|}]
+
+let reading_from_writing (x : u @ writing) : u @ stateless = x
+
+let reading_from_stateful (x : u @ stateful) : u @ reading = x
+
+[%%expect{|
+Line 1, characters 30-31:
+1 | let reading_from_writing (x : u @ writing) : u @ stateless = x
+                                  ^
+Error: Unbound type constructor "u"
+|}]
+
+let reading_no_cross (x : u @ reading) : u @ stateless = x
+
+[%%expect{|
+Line 1, characters 26-27:
+1 | let reading_no_cross (x : u @ reading) : u @ stateless = x
+                              ^
+Error: Unbound type constructor "u"
+|}]
+
+let writing_from_reading (x : v @ reading) : v @ stateless = x
+
+let writing_from_stateful (x : v @ stateful) : v @ writing = x
+
+[%%expect{|
+Line 1, characters 30-31:
+1 | let writing_from_reading (x : v @ reading) : v @ stateless = x
+                                  ^
+Error: Unbound type constructor "v"
+|}]
+
+let writing_no_cross (x : v @ writing) : v @ reading = x
+
+[%%expect{|
+Line 1, characters 26-27:
+1 | let writing_no_cross (x : v @ writing) : v @ reading = x
+                              ^
+Error: Unbound type constructor "v"
+|}]
+
 let foo x a = x.a <- a
 [%%expect{|
 val foo : 'a myref -> 'a -> unit = <fun>
