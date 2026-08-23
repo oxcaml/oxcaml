@@ -1872,35 +1872,25 @@ let eagerly_check_record_not_all_void loc sorts =
    [transl_declaration] due to mutually recursive types.
 *)
 (* [update_label_sorts] additionally returns the jkinds of the labels *)
-(* CR-soon rtjoa: The [default_to_scannable] parameter was added in
-   oxcaml/oxcaml#6496, but should be removed.
-
-   Previously, this function defaulted label sorts to scannable. The above PR
-   stopped use-site typechecking from defaulting, but use sites no longer go
-   through this function at all (see [instance_record_representation]): every
-   remaining caller is typechecking a declaration and passes
-   [default_to_scannable:true], so the [false] path is unused.
-
-   That leaves the question of why declarations need to default, as in
-   [transl_type_decl], sort variables are already defaulted by calling
-   [Ctype.closed_type_decl]. The reason is that in
-   [transl_extension_constructor_decl], the constructor representation is
-   computed *before* defaulting, causing fatal errors if we don't default
-   here; for other declarations the defaulting is a no-op. We should fix
-   this, so this function never needs to default and the flag can be
-   removed.
-*)
-let update_label_sorts (type rep) env loc types ~(form : rep record_form)
-      ~default_to_scannable =
+let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
   let sorts_and_jkinds =
     List.map (fun ld_type ->
       let jkind = Ctype.type_jkind env ld_type in
       let sort = Jkind.sort_option_of_jkind env jkind in
       let ld_sort =
-        Option.bind sort
-          (if default_to_scannable
-           then Jkind.Sort.get_concrete_defaulting_to_scannable
-           else Jkind.Sort.to_const_opt)
+        (* CR-soon rtjoa: Declaration checking (this function, and
+           [Element_repr.classify ~default_to_scannable:true]) defaults unfilled
+           sort variables to scannable, but shouldn't need to.
+
+          In [transl_type_decl], sort variables are already defaulted with
+          [Ctype.closed_type_decl]. But the reason that this function still
+          defaults is that in [transl_extension_constructor_decl], the
+          constructor representation is computed *before* defaulting, causing
+          fatal errors if we don't default here; for other declarations the
+          defaulting is a no-op. We should fix this, so declaration checking
+          never needs to default.
+        *)
+        Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
       in
       sort, (ld_sort, jkind)
     ) types
@@ -1914,9 +1904,7 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form)
 
 let update_label_sorts_in_place env loc lbls ~form =
   let types = List.map (fun lbl -> lbl.Types.ld_type) lbls in
-  let sorts, jkinds =
-    update_label_sorts env loc types ~form ~default_to_scannable:true
-  in
+  let sorts, jkinds = update_label_sorts env loc types ~form in
   let lbls =
     List.map2 (fun lbl sort -> { lbl with ld_sort = sort }) lbls sorts
   in
@@ -2041,10 +2029,8 @@ module Element_repr = struct
     of_t t
 
   (* If [default_to_scannable] is true, unfilled sort variables are defaulted;
-     otherwise the element is classified as [None]. Unlike
-     [update_label_sorts], both paths are used: declaration checking defaults
-     (see the CR above [update_label_sorts]), finalization does not.
-  *)
+     otherwise the element is classified as [None]. See the CR in
+     [update_label_sorts]. *)
   let classify env ty jkind ~default_to_scannable =
 
     if is_float env ty
@@ -2141,7 +2127,7 @@ let check_atomic_fields reprs lbls =
 
 let update_constructor_representation
     env (cd_args : Types.constructor_arguments) arg_jkinds ~loc
-    ~is_extension_constructor ~default_to_scannable
+    ~is_extension_constructor
   =
   let flat_suffix =
     match cd_args with
@@ -2149,7 +2135,7 @@ let update_constructor_representation
         let arg_reprs =
           List.map2 (fun {Types.ca_type=arg_type; _} arg_jkind ->
             Element_repr.classify env arg_type arg_jkind
-              ~default_to_scannable,
+              ~default_to_scannable:true,
             arg_type)
             arg_types_and_modes arg_jkinds
         in
@@ -2160,7 +2146,7 @@ let update_constructor_representation
         let arg_reprs =
           List.map2 (fun ld arg_jkind ->
             Element_repr.classify env ld.Types.ld_type arg_jkind
-              ~default_to_scannable,
+              ~default_to_scannable:true,
             ld.Types.ld_type)
             fields arg_jkinds
         in
@@ -2188,7 +2174,7 @@ let update_constructor_representation env loc args
   in
   let constructor_shape =
     update_constructor_representation env args jkinds ~loc
-      ~is_extension_constructor ~default_to_scannable:true
+      ~is_extension_constructor
   in
   args, ~constant, constructor_shape, arg_sorts
 
@@ -2318,11 +2304,11 @@ type element_repr_summary =
      mutable first_any : Ident.t option;
   }
 
-let compute_repr_summary env lbls jkinds ~default_to_scannable =
+let compute_repr_summary env lbls jkinds =
   let reprs =
     List.map2
       (fun (_lbl, ld_type) jkind ->
-          Element_repr.classify env ld_type jkind ~default_to_scannable,
+          Element_repr.classify env ld_type jkind ~default_to_scannable:true,
           ld_type)
       lbls jkinds
   in
@@ -2388,12 +2374,8 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   | Legacy, _, Record_dummy _
   | Unboxed_product, _, _ ->
     let types = List.map snd lbls in
-    let sorts, jkinds =
-      update_label_sorts env loc types ~form ~default_to_scannable:true
-    in
-    let reprs, repr_summary =
-      compute_repr_summary env lbls jkinds ~default_to_scannable:true
-    in
+    let sorts, jkinds = update_label_sorts env loc types ~form in
+    let reprs, repr_summary = compute_repr_summary env lbls jkinds in
     let jkind =
       match form with
       | Legacy ->
