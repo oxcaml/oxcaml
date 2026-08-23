@@ -3128,7 +3128,7 @@ end)
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
-let representation_for_tuple_constructor env constr ~types ~why
+let instance_constructor_representation env constr ~types ~why
     : _ Result.t =
   match constr.cstr_shape with
   | (Constructor_uniform_value | Constructor_mixed _) as shape ->
@@ -3163,7 +3163,7 @@ let representation_for_tuple_constructor env constr ~types ~why
       end
   | Constructor_variable _ ->
       Misc.fatal_error
-        "representation_for_tuple_constructor: unexpected variable \
+        "instance_constructor_representation: unexpected variable \
          representation in a constructor description"
 
 (* Typing of patterns *)
@@ -3817,10 +3817,10 @@ and type_pat_aux
             jkind_to_check)
           ctor_args jkinds_to_check;
         (* CR rtjoa: The enforcement above that the constructor argument is
-           representable, and the call to [representation_for_tuple_constructor]
+           representable, and the call to [instance_constructor_representation]
            below, are quite redundant. We should refactor. *)
         match
-          representation_for_tuple_constructor !!penv constr ~types
+          instance_constructor_representation !!penv constr ~types
             ~why:Constructor_arg_projection
         with
         | Ok (repr, sorts) -> repr, sorts
@@ -10887,7 +10887,7 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
   let shape, sorts =
     let types = List.map (fun arg -> arg.exp_type, arg.exp_loc) args in
     match
-      representation_for_tuple_constructor env constr
+      instance_constructor_representation env constr
         ~types ~why:Constructor_arg_assignment
     with
     | Ok (shape, sorts) -> shape, sorts
