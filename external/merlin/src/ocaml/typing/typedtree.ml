@@ -1524,32 +1524,6 @@ let mode_without_locks_exn = function
   | (_, Some _) -> assert false
   | (m, None) -> m
 
-<<<<<<< Merlin:rtjoa.default-variable-rep-at-transl
-
-let label_sort (type rep)
-      (record_form : rep record_form)
-      (label : rep gen_label_description) record_sorts =
-  match record_form, label.lbl_repres with
-  | Legacy, Record_unboxed -> `Same_as_record_sort
-  | _ ->
-    begin match record_sorts, label.lbl_sort with
-    | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)
-    | Fixed, Some sort -> `Sort (Jkind.Sort.of_const sort)
-    | Fixed, None ->
-      Misc.fatal_errorf "no sort for label %s in fixed-sort record"
-||||||| Compiler:last-imported
-let label_sort (type rep)
-      (record_form : rep record_form)
-      (label : rep gen_label_description) record_sorts =
-  match record_form, label.lbl_repres with
-  | Legacy, Record_unboxed -> `Same_as_record_sort
-  | _ ->
-    begin match record_sorts, label.lbl_sort with
-    | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)
-    | Fixed, Some sort -> `Sort (Jkind.Sort.of_const sort)
-    | Fixed, None ->
-      Misc.fatal_errorf "no sort for label %s in fixed-sort record"
-=======
 let unboxed_label_sort (label : Data_types.unboxed_label_description)
       (repres : Types.record_unboxed_product_representation) =
   match repres with
@@ -1560,7 +1534,6 @@ let unboxed_label_sort (label : Data_types.unboxed_label_description)
     | None ->
       Misc.fatal_errorf
         "no sort for label %s despite non-variable representation"
->>>>>>> Compiler:HEAD
         label.lbl_name
     end
   | Record_unboxed_product_undetermined ->
@@ -1595,37 +1568,6 @@ let label_sort (type rep)
       Misc.fatal_error "label_sort: unexpected dummy representation"
     end
 
-<<<<<<< Merlin:rtjoa.default-variable-rep-at-transl
-let unboxed_label_all_sorts label record_sorts =
-  Array.map (fun lbl -> unboxed_label_sort lbl record_sorts) label.lbl_all
-
-(* Expressions are considered nominal if they can be used as the subject of a
-   sentence or action. In practice, we consider that an expression is nominal
-   if it is similar to an identifier or does not contain spaces when printed. *)
-let rec exp_is_nominal exp =
-  match exp.exp_desc with
-  | _ when exp.exp_attributes <> [] -> false
-  | Texp_ident _ | Texp_instvar _ | Texp_constant _
-  | Texp_variant (_, None)
-  | Texp_construct (_, _, _, [], _) ->
-      true
-  | Texp_field { record = parent } | Texp_send (parent, _, _) ->
-      exp_is_nominal parent
-  | _ -> false
-
-let unpack_functor_me me =
-  match me.mod_desc with
-  | Tmod_functor (fp, me, _) -> fp, me
-  | _ -> invalid_arg "Typedtree.unpack_functor_me (merlin)"
-
-let unpack_functor_mty mty =
-  match mty.mty_desc with
-  | Tmty_functor (fp, mty, _) -> fp, mty
-  | _ -> invalid_arg "Typedtree.unpack_functor_mty (merlin)"
-||||||| Compiler:last-imported
-let unboxed_label_all_sorts label record_sorts =
-  Array.map (fun lbl -> unboxed_label_sort lbl record_sorts) label.lbl_all
-=======
 let finalized_label_sort (label : Data_types.label_description)
       (repres : Types.record_representation) ~record_sort ~variable_sorts =
   match repres with
@@ -1653,4 +1595,27 @@ let finalized_label_sort (label : Data_types.label_description)
 
 let unboxed_label_all_sorts label repres =
   Array.map (fun lbl -> unboxed_label_sort lbl repres) label.lbl_all
->>>>>>> Compiler:HEAD
+
+(* Expressions are considered nominal if they can be used as the subject of a
+   sentence or action. In practice, we consider that an expression is nominal
+   if it is similar to an identifier or does not contain spaces when printed. *)
+let rec exp_is_nominal exp =
+  match exp.exp_desc with
+  | _ when exp.exp_attributes <> [] -> false
+  | Texp_ident _ | Texp_instvar _ | Texp_constant _
+  | Texp_variant (_, None)
+  | Texp_construct (_, _, _, [], _) ->
+      true
+  | Texp_field { record = parent } | Texp_send (parent, _, _) ->
+      exp_is_nominal parent
+  | _ -> false
+
+let unpack_functor_me me =
+  match me.mod_desc with
+  | Tmod_functor (fp, me, _) -> fp, me
+  | _ -> invalid_arg "Typedtree.unpack_functor_me (merlin)"
+
+let unpack_functor_mty mty =
+  match mty.mty_desc with
+  | Tmty_functor (fp, mty, _) -> fp, mty
+  | _ -> invalid_arg "Typedtree.unpack_functor_mty (merlin)"

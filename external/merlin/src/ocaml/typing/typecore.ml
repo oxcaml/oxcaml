@@ -1452,19 +1452,13 @@ let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
   if not (Types.is_atomic label.lbl_mut) then
     raise (error (loc, env, Label_not_atomic lid));
   if is_poly_Tpoly label.lbl_arg then
-<<<<<<< Merlin:rtjoa.default-variable-rep-at-transl
     raise (error (loc, env, Polymorphic_atomic_loc lid));
-||||||| Compiler:last-imported
-    raise (Error (loc, env, Polymorphic_atomic_loc lid));
-=======
-    raise (Error (loc, env, Polymorphic_atomic_loc lid));
   (match
      Mode.Modality.Const.equate label.lbl_modalities
        (Typemode.atomic_mutable_modalities)
    with
    | Ok () -> ()
-   | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid)));
->>>>>>> Compiler:HEAD
+   | Error _ -> raise (error (loc, env, Modalities_on_atomic_field lid)));
   match record_repres with
   | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
@@ -8932,24 +8926,6 @@ and type_expect_
           let alloc_mode, argument_mode =
             register_allocation ~loc expected_mode
           in
-<<<<<<< Merlin:rtjoa.default-variable-rep-at-transl
-          begin match Mode.Modality.Const.equate label.lbl_modalities
-                        (Typemode.atomic_mutable_modalities)
-          with
-          | Ok () -> ()
-          | Error _ ->
-            raise (error (loc, env, Modalities_on_atomic_field lid.txt))
-          end;
-||||||| Compiler:last-imported
-          begin match Mode.Modality.Const.equate label.lbl_modalities
-                        (Typemode.atomic_mutable_modalities)
-          with
-          | Ok () -> ()
-          | Error _ ->
-            raise (Error (loc, env, Modalities_on_atomic_field lid.txt))
-          end;
-=======
->>>>>>> Compiler:HEAD
           submode ~loc ~env rmode argument_mode;
           let record =
             { record with exp_extra =
