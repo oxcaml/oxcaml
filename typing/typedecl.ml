@@ -2515,7 +2515,7 @@ let instance_record_representation
   in
   rep
 
-let finalize_typechecked_shape env loc sorts_and_types kind =
+let finalize_instantiated_shape env loc sorts_and_types kind =
   let consts =
     Array.map
       (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
@@ -2556,14 +2556,14 @@ let finalize_typechecked_shape env loc sorts_and_types kind =
       | Ok shape -> shape
       | Error (Element_repr.Unrepresentable_element _) ->
           Misc.fatal_error
-            "Typedecl.finalize_typechecked_shape: unrepresentable element, \
+            "Typedecl.finalize_instantiated_shape: unrepresentable element, \
              but typechecking succeeded"
   in
   shape, consts
 
-let finalize_typechecked_constructor env loc sorts_and_types kind
+let finalize_instantiated_constructor env loc sorts_and_types kind
     : Types.constructor_representation =
-  match finalize_typechecked_shape env loc sorts_and_types kind with
+  match finalize_instantiated_shape env loc sorts_and_types kind with
   | `Not_mixed, _ -> Constructor_uniform_value
   | `Mixed shape, _ -> Constructor_mixed shape
 
@@ -2572,7 +2572,7 @@ let finalize_constructor_representation env loc
   match shape with
   | Constructor_uniform_value | Constructor_mixed _ -> shape
   | Constructor_variable sorts_and_types ->
-      finalize_typechecked_constructor env loc sorts_and_types Cstr_tuple
+      finalize_instantiated_constructor env loc sorts_and_types Cstr_tuple
   | Constructor_undetermined ->
       Misc.fatal_error
         "Typedecl.finalize_constructor_representation: representation was \
@@ -2583,7 +2583,7 @@ let finalize_record_representation_and_sorts env loc
   match repres with
   | Record_variable sorts_and_types ->
       let shape, consts =
-        finalize_typechecked_shape env loc sorts_and_types Record
+        finalize_instantiated_shape env loc sorts_and_types Record
       in
       let repres =
        match shape with
@@ -2594,7 +2594,7 @@ let finalize_record_representation_and_sorts env loc
   | Record_inlined (tag, Constructor_variable sorts_and_types,
                     vrep) ->
       let shape, consts =
-        finalize_typechecked_shape env loc sorts_and_types Cstr_record
+        finalize_instantiated_shape env loc sorts_and_types Cstr_record
       in
       let shape =
         match shape with

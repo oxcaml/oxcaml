@@ -4,7 +4,7 @@
 *)
 
 (* We don't yet support variable-representation records and variants with
-   generalized sort variables. See [Typedecl.finalize_typechecked_shape]. *)
+   generalized sort variables. See [Typedecl.finalize_instantiated_shape]. *)
 
 type ('a : any) t =
   | None
