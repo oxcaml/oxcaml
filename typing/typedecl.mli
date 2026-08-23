@@ -129,7 +129,8 @@ val finalize_record_representation:
    declaration ([lbl_sort]). *)
 val finalize_record_representation_and_sorts:
     Env.t -> Location.t -> Types.record_representation ->
-    Types.record_representation * Jkind.Sort.Const.t array option
+    Types.record_representation
+    * variable_sorts:Jkind.Sort.Const.t array option
 
 (* As [finalize_record_representation], for [Constructor_variable]. *)
 val finalize_constructor_representation:

@@ -1662,7 +1662,7 @@ val label_sort:
   -> Jkind.sort
 
 (** Compute a label's sort given its finalized representation (from
-    [Typedecl.finalize_record_representation]) *)
+    [Typedecl.finalize_record_representation_and_sorts]) *)
 val finalized_label_sort:
   Data_types.label_description -> Types.record_representation
   -> record_sort:Jkind.Sort.Const.t

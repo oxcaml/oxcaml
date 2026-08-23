@@ -988,7 +988,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
            above. *)
         Jkind.Sort.Const.for_boxed_record
       in
-      let record_repres, variable_sorts =
+      let record_repres, ~variable_sorts =
         Typedecl.finalize_record_representation_and_sorts arg.exp_env
           e.exp_loc record_repres
       in

@@ -2579,7 +2579,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
     | _ ->
         assert false
   in
-  let lbl_repres, variable_sorts =
+  let lbl_repres, ~variable_sorts =
     Typedecl.finalize_record_representation_and_sorts head.pat_env
       head.pat_loc repres
   in

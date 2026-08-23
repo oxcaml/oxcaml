@@ -2611,7 +2611,7 @@ let finalize_record_representation_and_sorts env loc
        | `Not_mixed -> Record_boxed
        | `Mixed shape -> Record_mixed shape
       in
-      repres, Some consts
+      repres, ~variable_sorts:(Some consts)
   | Record_inlined (tag, Constructor_variable sorts_and_types,
                     vrep) ->
       let shape, consts =
@@ -2622,16 +2622,20 @@ let finalize_record_representation_and_sorts env loc
         | `Not_mixed -> Constructor_uniform_value
         | `Mixed shape -> Constructor_mixed shape
       in
-      Record_inlined (tag, shape, vrep), Some consts
+      Record_inlined (tag, shape, vrep), ~variable_sorts:(Some consts)
   | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
       Misc.fatal_error
         "Typedecl.finalize_record_representation: representation was not \
          typechecked"
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _) -> repres, None
+    | Record_ufloat | Record_mixed _ | Record_dummy _) ->
+      repres, ~variable_sorts:None
 
 let finalize_record_representation env loc repres =
-  fst (finalize_record_representation_and_sorts env loc repres)
+  let repres, ~variable_sorts:_ =
+    finalize_record_representation_and_sorts env loc repres
+  in
+  repres
 
 (* This function updates jkind stored in kinds with more accurate jkinds.
    It is called after the circularity checks and the delayed jkind checks
