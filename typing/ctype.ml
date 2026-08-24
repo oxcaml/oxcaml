@@ -5172,6 +5172,7 @@ and unify3 uenv t1 t1' t2 t2' =
   | (Tquote_eval t1, Tquote_eval t2) ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
   (* We copy [type_desc] to prevent infinite types like [<[t]> eval ~ t]. *)
+  (* CR-someday jbachurski: Don't copy once we memoize expansions of [eval]. *)
   | (Tquote_eval t1, t2)
     when type_is_persistent_in_quotations (get_env uenv) t2' ->
       let t2 =
