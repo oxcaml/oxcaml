@@ -229,3 +229,33 @@ let d (y : r) = id_addressable y
 [%%expect{|
 val d : r -> r = <fun>
 |}]
+
+(* Constraining types with product kinds to be addressable (in a way that
+   exercises [Jkind.decompose_product] because the kind stored on the
+   declaration of [mixed_pair] is approximate). *)
+
+type ('a : any) mixed_pair = #{ a : 'a; b : string }
+
+let ok (y : b8a mixed_pair) = id_addressable y
+[%%expect{|
+type ('a : any) mixed_pair = #{ a : 'a; b : string; }
+val ok : b8a mixed_pair -> b8a mixed_pair = <fun>
+|}]
+
+let bad (y : b8 mixed_pair) = id_addressable y
+[%%expect{|
+Line 1, characters 45-46:
+1 | let bad (y : b8 mixed_pair) = id_addressable y
+                                                 ^
+Error: The value "y" has type "b8 mixed_pair"
+       but an expression was expected of type
+         "('a : ('_representable_layout_5 & value_or_null) addressable)"
+       The layout of b8 mixed_pair is bits8 & value non_float
+         because of the definition of mixed_pair at line 1, characters 0-52.
+       But the layout of b8 mixed_pair must be addressable
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}]
