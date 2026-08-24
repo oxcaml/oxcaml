@@ -1760,10 +1760,14 @@ let extract_block_index_offset ~machine_width idx =
 
 (* Given an index that points to data of some layout, produce the list of
    offsets needed to access each element *)
-let block_index_access_offsets ~machine_width layout idx =
+let block_index_access_offsets_and_kinds ~machine_width layout idx =
   assert (Target_system.is_64_bit ());
   let mbe = L.mixed_block_element_of_layout layout in
   let cts = MPB.count mbe in
+  let kinds =
+    Flambda_arity.unarize
+      (Flambda_arity.from_lambda_list [layout] ~machine_width)
+  in
   if MPB.has_value_and_flat cts
   then
     let offset = extract_block_index_offset ~machine_width idx in
@@ -1799,7 +1803,10 @@ let block_index_access_offsets ~machine_width layout idx =
       let prim = add offset offset_from_offset in
       MPB.add to_left (MPB.count mbe), prim
     in
-    snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
+    let offsets =
+      snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
+    in
+    offsets, kinds
   else
     let f (to_left : MPB.t) (mbe : unit L.mixed_block_element) =
       let summand =
@@ -1810,9 +1817,12 @@ let block_index_access_offsets ~machine_width layout idx =
       let prim = H.Binary (Int_arith (Naked_int64, Add), idx, summand) in
       MPB.add to_left (MPB.count mbe), prim
     in
-    snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
+    let offsets =
+      snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
+    in
+    offsets, kinds
 
-(* [block_index_access_offsets] produces untagged byte offsets, but
+(* [block_index_access_offsets_and_kinds] produces untagged byte offsets, but
    [Atomic_load_field] and [Atomic_set_field] expect a tagged word index. *)
 let tagged_field_index_of_offset ~machine_width offset : H.simple_or_prim =
   let log2_size_addr =
@@ -1846,10 +1856,8 @@ let check_single_element offsets kinds =
 
 let convert_atomic_idx_field ~machine_width primitive dbg layout ~idx =
   needs_64_bit_target primitive dbg;
-  let offsets = block_index_access_offsets ~machine_width layout idx in
-  let kinds =
-    Flambda_arity.unarize
-      (Flambda_arity.from_lambda_list [layout] ~machine_width)
+  let offsets, kinds =
+    block_index_access_offsets_and_kinds ~machine_width layout idx
   in
   let offset, full_kind = check_single_element offsets kinds in
   let field_kind = P.Block_access_field_kind.from_kind full_kind in
@@ -1861,10 +1869,8 @@ let convert_pget_indirect ~machine_width ~dbg primitive layout
   needs_64_bit_target primitive dbg;
   match Lambda.access_atomicity access with
   | Nonatomic ->
-    let offsets = block_index_access_offsets ~machine_width layout idx in
-    let kinds =
-      Flambda_arity.unarize
-        (Flambda_arity.from_lambda_list [layout] ~machine_width)
+    let offsets, kinds =
+      block_index_access_offsets_and_kinds ~machine_width layout idx
     in
     let mut =
       match access with
@@ -1893,10 +1899,8 @@ let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
   let mode = Alloc_mode.For_assignments.from_lambda mode in
   match atomicity with
   | Nonatomic ->
-    let offsets = block_index_access_offsets ~machine_width layout idx in
-    let kinds =
-      Flambda_arity.unarize
-        (Flambda_arity.from_lambda_list [layout] ~machine_width)
+    let offsets, kinds =
+      block_index_access_offsets_and_kinds ~machine_width layout idx
     in
     let writes =
       Misc.Stdlib.List.map3
