@@ -26,7 +26,7 @@
          (exit 6
            (alloc{phantom_duplicated.ml:30,16-22} 2048
              (phantom_add_equality b_pproxy/410
-               (name_for_debugger
+               (normal_var_optimized_out
                  ((module_path b/409) (location ) (original_ident b/409)
                   (is_parameter local))
                  q/404))
@@ -34,7 +34,7 @@
          (exit 6
            (alloc{phantom_duplicated.ml:30,28-34} 2048 5
              (phantom_add_equality b_pproxy/410
-               (name_for_debugger
+               (normal_var_optimized_out
                  ((module_path b/409) (location ) (original_ident b/409)
                   (is_parameter local))
                  q/404))))))

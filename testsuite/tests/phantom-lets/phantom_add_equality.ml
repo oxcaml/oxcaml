@@ -30,7 +30,7 @@
    binders (before the fork) and the points where the values appear (the
    inlined use sites, on the branches) are in different places, so
    free-standing equality operations are needed.  The inlined expressions are wrapped
-   both in [Cname_for_debugger] (recording the deleted normal variables) and
+   both in [Cnormal_var_optimized_out] (recording the deleted normal variables) and
    in [Cphantom_add_equality] (supplying the proxies' values); the equality
    operation is transparent, so the expressions are not duplicated.
 

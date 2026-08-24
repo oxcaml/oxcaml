@@ -15,7 +15,7 @@
    application) referenced by a phantom defining expression.  [s] is
    inlined out at its single use; because the consumer takes the value
    raw, the rebuilt primitive application arrives wrapped in both the
-   [Cphantom_add_equality] for [s]'s proxy and the [Cname_for_debugger]
+   [Cphantom_add_equality] for [s]'s proxy and the [Cnormal_var_optimized_out]
    annotation.  (Contrast the [arith] case of phantom_add_equality.ml,
    where a consumer that is itself arithmetic loses the wrappers.)  The
    whole Cmm output is compared against the reference file. *)

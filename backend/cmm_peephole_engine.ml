@@ -71,7 +71,7 @@ module Env : sig
     defining_expr:Cmm.phantom_defining_expr option ->
     t
 
-  val register_name_for_debugger : t -> Backend_var.Provenance.t -> t
+  val register_normal_var_optimized_out : t -> Backend_var.Provenance.t -> t
 
   val register_add_equality : t -> Backend_var.t -> Debuginfo.t -> t
 
@@ -82,7 +82,7 @@ end = struct
   type wrapper =
     | Phantom_let of
         Backend_var.With_provenance.t * Cmm.phantom_defining_expr option
-    | Name_for_debugger of Backend_var.Provenance.t
+    | Normal_var_optimized_out of Backend_var.Provenance.t
     | Add_equality of Backend_var.t * Debuginfo.t
 
   type t =
@@ -122,8 +122,8 @@ end = struct
         Phantom_let (phantom_var, defining_expr) :: env.wrappers_rev
     }
 
-  let register_name_for_debugger env var =
-    { env with wrappers_rev = Name_for_debugger var :: env.wrappers_rev }
+  let register_normal_var_optimized_out env var =
+    { env with wrappers_rev = Normal_var_optimized_out var :: env.wrappers_rev }
 
   let register_add_equality env var dbg =
     { env with wrappers_rev = Add_equality (var, dbg) :: env.wrappers_rev }
@@ -134,7 +134,8 @@ end = struct
         match wrapper with
         | Phantom_let (phantom_var, defining_expr) ->
           Cmm.Cphantom_let (phantom_var, defining_expr, expr)
-        | Name_for_debugger var -> Cmm.Cname_for_debugger (var, expr)
+        | Normal_var_optimized_out var ->
+          Cmm.Cnormal_var_optimized_out (var, expr)
         | Add_equality (var, dbg) ->
           Cmm.Cop (Cmm.Cphantom_add_equality { var }, [expr], dbg))
       expr env.wrappers_rev
@@ -189,18 +190,18 @@ let match_clauses_in_order ~default ~matches clauses expr =
     | Cphantom_let (phantom_var, defining_expr, expr) ->
       let env = Env.register_phantom_let env ~phantom_var ~defining_expr in
       match_one_pattern ~toplevel env pat expr
-    | Cname_for_debugger (var, body) ->
+    | Cnormal_var_optimized_out (var, body) ->
       (* A matching clause rewrites the whole expression to one computing the
          same value, so a name for that whole expression can be transferred onto
          the rewritten expression. A name on a proper subexpression cannot be
          preserved, however: the subexpression's value may not be computed by
          the rewritten expression at all. Such names are dropped. *)
       let env =
-        if toplevel then Env.register_name_for_debugger env var else env
+        if toplevel then Env.register_normal_var_optimized_out env var else env
       in
       match_one_pattern ~toplevel env pat body
     | Cop (Cphantom_add_equality { var }, [body], dbg) ->
-      (* As for [Cname_for_debugger]: the equality describes the whole
+      (* As for [Cnormal_var_optimized_out]: the equality describes the whole
          expression's value, so it can be transferred onto a rewritten whole
          expression but not preserved on a rewritten subexpression. *)
       let env =
@@ -340,7 +341,7 @@ module Cmm_comparator = struct
       V.equal (VP.var v1) (VP.var v2)
       && Option.equal equal_phantom_defining_expr def1 def2
       && equivalent body1 body2
-    | Cname_for_debugger (p1, e1), Cname_for_debugger (p2, e2) ->
+    | Cnormal_var_optimized_out (p1, e1), Cnormal_var_optimized_out (p2, e2) ->
       V.Provenance.equal p1 p2 && equivalent e1 e2
     | Ctuple t1, Ctuple t2 -> List.equal equivalent t1 t2
     | Cop (op1, args1, _), Cop (op2, args2, _) ->
@@ -407,7 +408,7 @@ module Cmm_comparator = struct
         | Cvar _
         | Clet (_, _, _)
         | Cphantom_let (_, _, _)
-        | Cname_for_debugger _ | Ctuple _
+        | Cnormal_var_optimized_out _ | Ctuple _
         | Cop (_, _, _)
         | Csequence (_, _)
         | Cifthenelse (_, _, _, _, _, _)

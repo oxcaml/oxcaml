@@ -392,8 +392,8 @@ let rec expr ppf = function
   | Cphantom_let (var, def, body) ->
     fprintf ppf "@[<2>(let?@ @[<2>%a@ %a@]@ %a)@]" VP.print var
       phantom_defining_expr_opt def sequence body
-  | Cname_for_debugger (provenance, body) ->
-    fprintf ppf "@[<2>(name_for_debugger@ %a@ %a)@]" V.Provenance.print
+  | Cnormal_var_optimized_out (provenance, body) ->
+    fprintf ppf "@[<2>(normal_var_optimized_out@ %a@ %a)@]" V.Provenance.print
       provenance expr body
   | Ctuple el ->
     let tuple ppf el =

@@ -16,7 +16,7 @@
    with ordinary lets, so the deleted bindings give rise to phantom lets
    with real defining expressions in the caller: [a] as an alias of the
    caller's argument, and [b] as the constant [42].  The inlined local [s]
-   is inlined out in the usual way, leaving a [Cname_for_debugger]
+   is inlined out in the usual way, leaving a [Cnormal_var_optimized_out]
    annotation.  The whole Cmm output is compared against the reference
    file.
 

@@ -20,7 +20,7 @@
    (the projection), which is not user-visible; when it is inlined out (at
    the second use), the inlined expression carries a
    [Cphantom_add_equality] for the temporary's proxy but no
-   [Cname_for_debugger], there being no user variable to name.
+   [Cnormal_var_optimized_out], there being no user variable to name.
 
    [dead_temp]: the projection has no normal uses at all; Simplify itself
    turns it into a phantom let with a real defining expression ([q[0]]),
@@ -39,7 +39,7 @@
 
    [after_use]: the phantom let is placed after its referenced binding
    was already inlined out; the proxy stays without a value (the inlined
-   use site, which carries the [Cname_for_debugger], was emitted before
+   use site, which carries the [Cnormal_var_optimized_out], was emitted before
    the proxy existed). *)
 
 [@@@ocaml.warning "-26-27-32"]

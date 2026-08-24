@@ -99,7 +99,7 @@
    (region/560 (beginregion)
     Popaque/562
       (opaque
-        (name_for_debugger
+        (normal_var_optimized_out
           ((module_path a/561) (location ) (original_ident a/561)
            (is_parameter local))
           (load val q/558))))

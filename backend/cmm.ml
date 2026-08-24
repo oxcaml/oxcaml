@@ -689,7 +689,7 @@ and expression =
   | Clet of Backend_var.With_provenance.t * expression * expression
   | Cphantom_let of
       Backend_var.With_provenance.t * phantom_defining_expr option * expression
-  | Cname_for_debugger of Backend_var.Provenance.t * expression
+  | Cnormal_var_optimized_out of Backend_var.Provenance.t * expression
       (** Annotation recording that the wrapped expression's value was bound to
           the variable described by the provenance, from which instruction
           selection produces a naming operation. No [Backend_var.t] is involved:
@@ -780,8 +780,9 @@ let ctrywith (body, lbl, id, extra_args, handler, dbg) =
 let reset () = Label.reset ()
 
 let iter_shallow_tail f = function
-  | Clet (_, _, body) | Cphantom_let (_, _, body) | Cname_for_debugger (_, body)
-    ->
+  | Clet (_, _, body)
+  | Cphantom_let (_, _, body)
+  | Cnormal_var_optimized_out (_, body) ->
     f body;
     true
   | Cifthenelse (_cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
@@ -823,7 +824,8 @@ let iter_shallow_tail f = function
 let map_shallow_tail f = function
   | Clet (id, exp, body) -> Clet (id, exp, f body)
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, f body)
-  | Cname_for_debugger (var, body) -> Cname_for_debugger (var, f body)
+  | Cnormal_var_optimized_out (var, body) ->
+    Cnormal_var_optimized_out (var, f body)
   | Cifthenelse (cond, ifso_dbg, ifso, ifnot_dbg, ifnot, dbg) ->
     Cifthenelse (cond, ifso_dbg, f ifso, ifnot_dbg, f ifnot, dbg)
   | Csequence (e1, e2) -> Csequence (e1, f e2)
@@ -865,7 +867,7 @@ let map_tail f =
     | ( Cexit _ | Cinvalid _
       | Clet (_, _, _)
       | Cphantom_let (_, _, _)
-      | Cname_for_debugger _
+      | Cnormal_var_optimized_out _
       | Csequence (_, _)
       | Cifthenelse (_, _, _, _, _, _)
       | Cswitch (_, _, _, _)
@@ -879,7 +881,7 @@ let iter_shallow f = function
     f e1;
     f e2
   | Cphantom_let (_id, _de, e) -> f e
-  | Cname_for_debugger (_var, e) -> f e
+  | Cnormal_var_optimized_out (_var, e) -> f e
   | Ctuple el -> List.iter f el
   | Cop (_op, el, _dbg) -> List.iter f el
   | Csequence (e1, e2) ->
@@ -906,7 +908,7 @@ let contains_debug_only_constructs expr =
   let exception Found in
   let rec check expr =
     match expr with
-    | Cphantom_let _ | Cname_for_debugger _
+    | Cphantom_let _ | Cnormal_var_optimized_out _
     | Cop (Cphantom_add_equality _, _, _) ->
       raise Found
     | Cop

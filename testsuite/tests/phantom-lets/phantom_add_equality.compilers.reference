@@ -65,13 +65,13 @@
        (if (>s x/410 1)
          (exit 10
            (phantom_add_equality a2_pproxy/416
-             (name_for_debugger
+             (normal_var_optimized_out
                ((module_path a2/414) (location ) (original_ident a2/414)
                 (is_parameter local))
                (load val p/409))))
          (exit 10
            (phantom_add_equality b2_pproxy/417
-             (name_for_debugger
+             (normal_var_optimized_out
                ((module_path b2/415) (location ) (original_ident b2/415)
                 (is_parameter local))
                (load val (+a p/409 8)))))))

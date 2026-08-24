@@ -583,7 +583,7 @@ and expression =
           be unbound must be bound to fresh phantom-let-bound variables,
           newly-defined previously. Such variables can then be given equalities
           to values that exist at runtime using [Cphantom_add_equality]. *)
-  | Cname_for_debugger of Backend_var.Provenance.t * expression
+  | Cnormal_var_optimized_out of Backend_var.Provenance.t * expression
       (** Annotation recording that the wrapped expression's value was bound to
           the variable described by the provenance, from which instruction
           selection produces a naming operation. No [Backend_var.t] is involved:
@@ -705,7 +705,7 @@ val map_tail : (expression -> expression) -> expression -> expression
 val iter_shallow : (expression -> unit) -> expression -> unit
 
 (** Whether an expression contains constructs that only arise from debugging
-    information ([Cphantom_let], [Cname_for_debugger] and
+    information ([Cphantom_let], [Cnormal_var_optimized_out] and
     [Cphantom_add_equality]). *)
 val contains_debug_only_constructs : expression -> bool
 

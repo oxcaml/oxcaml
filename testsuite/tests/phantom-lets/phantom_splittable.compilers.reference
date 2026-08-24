@@ -22,7 +22,7 @@
        (Popaque/493
           (opaque
             (phantom_add_equality s_pproxy/491
-              (name_for_debugger
+              (normal_var_optimized_out
                 ((module_path s/490) (location ) (original_ident s/490)
                  (is_parameter local))
                 (+ x/488 2))))
