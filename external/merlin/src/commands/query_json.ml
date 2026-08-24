@@ -657,9 +657,6 @@ let json_of_response (type a) (query : a t) (response : a) : json =
       match r with
       | No_index_files -> `Assoc [ ("kind", `String "no-index-files") ]
       | Channel_absent -> `Assoc [ ("kind", `String "facts-channel-absent") ]
-      | Reader_problem message ->
-        `Assoc
-          [ ("kind", `String "reader-problem"); ("message", `String message) ]
       | Omission { family; reason } ->
         `Assoc
           ([ ("kind", `String "omission"); ("reason", `String reason) ]
