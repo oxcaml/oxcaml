@@ -52,22 +52,51 @@ let simple env res s =
         expr, env, res, FV.empty
       | _ -> None, env, res, FV.empty)
     ~var:(fun v ~coercion:_ ->
-      let Env.{ env; res; var = cmm_var_opt } =
-        Env.get_variable_for_phantom_expr env res v
-      in
-      let expr, fv =
-        match cmm_var_opt with
-        | Some backend_var ->
-          ( Some (Cmm.Cphantom_var backend_var),
-            FV.singleton ~mode:Phantom backend_var )
-        | None -> None, FV.empty
-      in
-      expr, env, res, fv)
+      match Env.phantom_const_for_var env v with
+      | Some const -> Some const, env, res, FV.empty
+      | None ->
+        let Env.{ env; res; var = cmm_var_opt } =
+          Env.get_variable_for_phantom_expr env res v
+        in
+        let expr, fv =
+          match cmm_var_opt with
+          | Some backend_var ->
+            ( Some (Cmm.Cphantom_var backend_var),
+              FV.singleton ~mode:Phantom backend_var )
+          | None -> None, FV.empty
+        in
+        expr, env, res, fv)
 
 let simple_block_field env res s =
   Simple.pattern_match' s
-    ~symbol:(fun _ ~coercion:_ -> env, res, None)
-    ~const:(fun _ -> env, res, None)
+    ~symbol:(fun sym ~coercion:_ ->
+      let cmm_sym = To_cmm_result.symbol res sym in
+      let symbol_usable =
+        (* See the comment in [simple], above. *)
+        match cmm_sym.sym_global with
+        | Global -> true
+        | Local -> To_cmm_result.data_symbol_is_defined res cmm_sym
+      in
+      if symbol_usable
+      then
+        let env, v =
+          Env.phantom_var_for_constant env (Cmm.Cphantom_const_symbol cmm_sym)
+        in
+        env, res, Some v
+      else env, res, None)
+    ~const:(fun const ->
+      match[@warning "-4"] Reg_width_const.descr const with
+      | Tagged_immediate i ->
+        let machine_width = Target_system.Machine_width.Sixty_four in
+        let targetint_32_64 = Target_ocaml_int.to_targetint machine_width i in
+        let targetint =
+          Targetint.of_int64 (Targetint_32_64.to_int64 targetint_32_64)
+        in
+        let env, v =
+          Env.phantom_var_for_constant env (Cmm.Cphantom_const_int targetint)
+        in
+        env, res, Some v
+      | _ -> env, res, None)
     ~var:(fun v ~coercion:_ ->
       let Env.{ env; res; var = cmm_var_opt } =
         Env.get_variable_for_phantom_expr env res v

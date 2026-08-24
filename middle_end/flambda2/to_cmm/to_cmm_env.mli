@@ -329,6 +329,17 @@ val inline_variable :
 val get_variable_for_phantom_expr :
   t -> To_cmm_result.t -> Variable.t -> phantom_result
 
+(** If the variable's delayed binding is trivially a constant, the corresponding
+    phantom defining expression, for substitution directly into phantom defining
+    expressions under construction. *)
+val phantom_const_for_var : t -> Variable.t -> Cmm.phantom_defining_expr option
+
+(** Create a fresh phantom-let-bound variable bound to the given (constant)
+    defining expression, for use in phantom defining expressions under
+    construction. *)
+val phantom_var_for_constant :
+  t -> Cmm.phantom_defining_expr -> t * Backend_var.t
+
 (** Look up the Cmm expression associated with a given Flambda variable in the
     delayed let-bindings, if any. Returns [None] if the variable is not present
     in the bindings map (for instance because it is a continuation parameter,

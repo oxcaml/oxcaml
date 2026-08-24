@@ -200,6 +200,11 @@ type t =
     (* Stages of let-bindings, most recent at the head. *)
     validity_stages : validity_stage list;
     (* Stages of let-bindings, most recent at the head. *)
+    phantom_proxies : Backend_var.t Backend_var.Map.t;
+    (* For each delayed binding's backend variable that is referenced by a
+       phantom defining expression, the phantom variable standing for it in such
+       expressions. A [Cphantom_add_equality] operation is emitted for the proxy
+       when (and where) the real binding materialises. *)
     symbol_inits : Symbol_inits.t
         (* Symbol initialization expressions, indexed by the variable used as
            value for the symbol field initialization. *)
@@ -339,6 +344,7 @@ let create offsets functions_info ~trans_prim ~return_continuation
     vars = Variable.Map.empty;
     conts;
     exn_handlers = Continuation.Set.singleton exn_continuation;
+    phantom_proxies = Backend_var.Map.empty;
     symbol_inits = Backend_var.Map.empty
   }
 
@@ -1148,12 +1154,91 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
         let env = mark_binding_as_inlined env var binding in
         will_inline_simple env res binding))
 
+(* If the given Cmm expression is trivially a constant, the corresponding
+   phantom defining expression. *)
+let phantom_const_of_cmm (cmm_expr : Cmm.expression) :
+    Cmm.phantom_defining_expr option =
+  match[@warning "-4"] cmm_expr with
+  | Cconst_int (i, _) -> Some (Cphantom_const_int (Targetint.of_int i))
+  | Cconst_natint (i, _) ->
+    Some (Cphantom_const_int (Targetint.of_int64 (Int64.of_nativeint i)))
+  | Cconst_symbol (({ sym_global = Global; _ } as sym), _) ->
+    Some (Cphantom_const_symbol sym)
+  | _ -> None
+
+let phantom_const_for_var env var : Cmm.phantom_defining_expr option =
+  let var = resolve_alias env var in
+  match Variable.Map.find var env.bindings with
+  | exception Not_found -> None
+  | Binding b -> (
+    match b.bound_expr with
+    | Simple { cmm_expr; free_vars = _ } -> phantom_const_of_cmm cmm_expr
+    | Split { cmm_expr; free_vars = _ } -> phantom_const_of_cmm cmm_expr
+    | Inlined | Phantom _ | Splittable_prim _ -> None)
+
+(* Create a fresh phantom-let-bound variable, as a delayed [Phantom] binding
+   flushed like any other. Its order predates that of any phantom binding
+   subsequently created, so its binder is emitted outside any phantom defining
+   expression referencing it. *)
+let create_phantom_proxy env ~name defining_expr =
+  let fresh_flambda = Variable.create name Flambda_kind.value in
+  let backend_var = Backend_var.create_local name in
+  let cmm_var = Backend_var.With_provenance.create backend_var in
+  next_order := !next_order + 1;
+  let binding =
+    Binding
+      { order = !next_order;
+        effs = Ece.pure_can_be_duplicated;
+        inline = Phantom;
+        phantomize = true;
+        bound_expr = Phantom { cmm_expr = defining_expr; free_vars = FV.empty };
+        cmm_var
+      }
+  in
+  ( { env with bindings = Variable.Map.add fresh_flambda binding env.bindings },
+    backend_var )
+
+let phantom_var_for_constant env const =
+  create_phantom_proxy env ~name:"pconst" (Some const)
+
+(* Resolve a variable occurring in a phantom defining expression under
+   construction. Phantom defining expressions must be closed at creation:
+   references to delayed bindings (which may be moved down, or inlined out) are
+   therefore replaced by phantom proxy variables, bound immediately, whose
+   values are supplied by [Cphantom_add_equality] operations wherever the real
+   bindings materialise. Trivially-constant delayed bindings instead become
+   phantom variables bound directly to the constant. *)
 let get_variable_for_phantom_expr env res var =
   let var = resolve_alias env var in
+  let proxy_for_delayed env (binding_cmm_var : Backend_var.With_provenance.t)
+      ~const =
+    let real = Backend_var.With_provenance.var binding_cmm_var in
+    match const with
+    | Some _ ->
+      let env, proxy =
+        create_phantom_proxy env ~name:(Backend_var.name real ^ "_pconst") const
+      in
+      { env; res; var = Some proxy }
+    | None -> (
+      match Backend_var.Map.find_opt real env.phantom_proxies with
+      | Some proxy -> { env; res; var = Some proxy }
+      | None ->
+        let env, proxy =
+          create_phantom_proxy env
+            ~name:(Backend_var.name real ^ "_pproxy")
+            None
+        in
+        let env =
+          { env with
+            phantom_proxies = Backend_var.Map.add real proxy env.phantom_proxies
+          }
+        in
+        { env; res; var = Some proxy })
+  in
   match Variable.Map.find var env.bindings with
   | exception Not_found -> (
     (* this happens for continuation parameters and bindings that have been
-       flushed *)
+       flushed: such binders are in scope here *)
     match Variable.Map.find var env.vars with
     | exception Not_found ->
       (* The variable may never have been bound at all: for phantom lets whose
@@ -1167,8 +1252,19 @@ let get_variable_for_phantom_expr env res var =
       match[@warning "-4"] cmm with
       | Cvar v -> { env; res; var = Some v }
       | _ -> { env; res; var = None }))
-  | Binding binding ->
-    { env; res; var = Some (Backend_var.With_provenance.var binding.cmm_var) }
+  | Binding binding -> (
+    match binding.bound_expr with
+    | Phantom _ ->
+      (* Phantom binders are flushed eagerly, so they are always in scope. *)
+      { env; res; var = Some (Backend_var.With_provenance.var binding.cmm_var) }
+    | Inlined -> proxy_for_delayed env binding.cmm_var ~const:None
+    | Simple { cmm_expr; free_vars = _ } ->
+      proxy_for_delayed env binding.cmm_var
+        ~const:(phantom_const_of_cmm cmm_expr)
+    | Split { cmm_expr; free_vars = _ } ->
+      proxy_for_delayed env binding.cmm_var
+        ~const:(phantom_const_of_cmm cmm_expr)
+    | Splittable_prim _ -> proxy_for_delayed env binding.cmm_var ~const:None)
 
 let find_pure_bound_cmm_expr env var =
   let var = resolve_alias env var in
@@ -1306,8 +1402,16 @@ let place_symbol_inits ~params e free_vars symbol_inits =
     (e, free_vars, symbol_inits)
     params
 
-let flush_phantom_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
-    phantom_expr_opt =
+let add_equality ~proxy ~real body =
+  Cmm.Csequence
+    ( Cmm.Cop
+        ( Cmm.Cphantom_add_equality { var = proxy },
+          [Cmm.Cvar real],
+          Debuginfo.none ),
+      body )
+
+let flush_phantom_binding ~phantomize ~equality
+    (acc, acc_free_vars, symbol_inits) cmm_var phantom_expr_opt =
   let v = Backend_var.With_provenance.var cmm_var in
   (* there should be no symbol inits tied to a phantom binding *)
   let inits, symbol_inits = pop_symbol_inits symbol_inits v in
@@ -1315,6 +1419,17 @@ let flush_phantom_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
   | [] -> ()
   | _ :: _ ->
     Misc.fatal_errorf "Non-empty list of symbol inits tied to a phantom binding");
+  (* If this binder is a proxy whose real binding materialises in the same flush
+     (necessarily at an outer position, since references only point backwards),
+     the [Cphantom_add_equality] supplying its value is emitted directly inside
+     the binder. The reference to the real variable forces the real binding to
+     materialise. *)
+  let acc, acc_free_vars =
+    match equality with
+    | None -> acc, acc_free_vars
+    | Some real ->
+      add_equality ~proxy:v ~real acc, FV.add ~mode:Normal real acc_free_vars
+  in
   let gen_phantom_let phantom_defining_expr free_vars =
     let expr = Cmm_helpers.make_phantom_let cmm_var phantom_defining_expr acc in
     let free_vars = FV.remove v free_vars in
@@ -1331,8 +1446,8 @@ let flush_phantom_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
     let free_vars = FV.union acc_free_vars expr_free_vars in
     gen_phantom_let cmm_expr free_vars
 
-let flush_regular_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
-    cmm_expr free_vars effs =
+let flush_regular_binding ~phantomize ~deferred_equality
+    (acc, acc_free_vars, symbol_inits) cmm_var cmm_expr free_vars effs =
   let v = Backend_var.With_provenance.var cmm_var in
   let inits, symbol_inits = pop_symbol_inits symbol_inits v in
   let can_be_omitted = can_be_removed effs && Misc.Stdlib.List.is_empty inits in
@@ -1341,39 +1456,80 @@ let flush_regular_binding ~phantomize (acc, acc_free_vars, symbol_inits) cmm_var
   | Some Phantom when can_be_omitted ->
     (* The variable is only used by phantom bindings in the body: demote the
        binding itself to an (empty) phantom let. *)
-    flush_phantom_binding ~phantomize
+    flush_phantom_binding ~phantomize ~equality:None
       (acc, acc_free_vars, symbol_inits)
       cmm_var None
   | None | Some Normal | Some Phantom ->
     let body =
       List.fold_left (fun acc init -> Cmm_helpers.sequence init acc) acc inits
     in
+    (* If this variable has a phantom proxy whose binder was emitted at an
+       earlier (enclosing) flush -- the binding having been sunk past it -- the
+       [Cphantom_add_equality] supplying the proxy's value is emitted here,
+       where the binding materialises. *)
+    let body =
+      match deferred_equality with
+      | None -> body
+      | Some proxy -> add_equality ~proxy ~real:v body
+    in
     let expr = Cmm_helpers.letin cmm_var ~defining_expr:cmm_expr ~body in
     let free_vars = FV.union free_vars (FV.remove v acc_free_vars) in
     expr, free_vars, symbol_inits
 
-let flush_bindings order_map flushed_symbol_inits e free_vars symbol_inits =
+let flush_bindings ~phantom_proxies order_map flushed_symbol_inits e free_vars
+    symbol_inits =
   (* Merge the symbol inits from the env that was flushed, and those from the
      body (i.e. [e]) that we want to wrap *)
   let symbol_inits = Symbol_inits.merge flushed_symbol_inits symbol_inits in
+  (* Real binders being flushed now, and phantom binders being flushed now: used
+     to decide, for each proxy/real pair, whether the equality is emitted at the
+     proxy's binder (real in the same flush, necessarily outer) or at the real
+     binder (proxy emitted by an earlier flush). *)
+  let reals_in_flush, phantoms_in_flush =
+    M.fold
+      (fun _ (Binding b) ((reals, phantoms) as acc) ->
+        let v = Backend_var.With_provenance.var b.cmm_var in
+        match b.bound_expr with
+        | Simple _ | Split _ -> Backend_var.Set.add v reals, phantoms
+        | Phantom _ -> reals, Backend_var.Set.add v phantoms
+        | Inlined | Splittable_prim _ -> acc)
+      order_map
+      (Backend_var.Set.empty, Backend_var.Set.empty)
+  in
+  let real_for_proxy =
+    Backend_var.Map.fold
+      (fun real proxy acc ->
+        if Backend_var.Set.mem real reals_in_flush
+        then Backend_var.Map.add proxy real acc
+        else acc)
+      phantom_proxies Backend_var.Map.empty
+  in
   M.fold
     (fun _ (Binding b) (acc, acc_free_vars, symbol_inits) ->
       let phantomize = b.phantomize in
+      let v = Backend_var.With_provenance.var b.cmm_var in
       match b.bound_expr with
       | Splittable_prim _ ->
         Misc.fatal_errorf
           "Complex bindings should have been split prior to being flushed."
       | Inlined ->
-        flush_phantom_binding ~phantomize
+        flush_phantom_binding ~phantomize ~equality:None
           (acc, acc_free_vars, symbol_inits)
           b.cmm_var None
       | Phantom { cmm_expr; free_vars } ->
         flush_phantom_binding ~phantomize
+          ~equality:(Backend_var.Map.find_opt v real_for_proxy)
           (acc, acc_free_vars, symbol_inits)
           b.cmm_var
           (Some (cmm_expr, free_vars))
       | Split { cmm_expr; free_vars } | Simple { cmm_expr; free_vars } ->
-        flush_regular_binding ~phantomize
+        let deferred_equality =
+          match Backend_var.Map.find_opt v phantom_proxies with
+          | Some proxy when not (Backend_var.Set.mem proxy phantoms_in_flush) ->
+            Some proxy
+          | Some _ | None -> None
+        in
+        flush_regular_binding ~phantomize ~deferred_equality
           (acc, acc_free_vars, symbol_inits)
           b.cmm_var cmm_expr free_vars b.effs)
     order_map
@@ -1480,7 +1636,10 @@ let flush_delayed_lets ~mode env res =
             None))
       env.bindings
   in
-  let flush = flush_bindings !bindings_to_flush env.symbol_inits in
+  let flush =
+    flush_bindings ~phantom_proxies:env.phantom_proxies !bindings_to_flush
+      env.symbol_inits
+  in
   let validity_stages =
     let control_flow_dep_variables =
       Variable.Map.fold
