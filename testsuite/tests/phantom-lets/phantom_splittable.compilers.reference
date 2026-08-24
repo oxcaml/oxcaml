@@ -1,0 +1,42 @@
+(data global "camlPhantom_splittable__gc_roots": int 0)
+(data
+ int 1792
+ global "camlPhantom_splittable":
+ addr G:"camlPhantom_splittable__splittable_1")
+(data
+ int 3063
+ global "camlPhantom_splittable__splittable_1":
+ addr G:"camlPhantom_splittable__splittable_0_1_code"
+ int 108086391056891909)
+(function{phantom_splittable.ml:25,45-135}
+ camlPhantom_splittable__splittable_0_1_code
+     (x/488[((module_path x/488) (location ) (original_ident x/488)
+             (is_parameter local))]: int) : int
+ (let region/489 (beginregion)
+   (let?
+     (s_pproxy/491 ()
+      unused_pair/492[((module_path unused_pair/492) (location )
+                       (original_ident unused_pair/492) (is_parameter local))]
+        [0: s_pproxy/491; x/488; ])
+     (let
+       (Popaque/493
+          (opaque
+            (phantom_add_equality s_pproxy/491
+              (name_for_debugger
+                ((module_path s/490) (location ) (original_ident s/490)
+                 (is_parameter local))
+                (+ x/488 2))))
+        unit/494 (seq (endregion region/489) 1))
+       1))) )
+
+(function no_cse reduce_code_size linscan camlPhantom_splittable__entry
+     () : val
+ (catch
+   (let?
+     splittable/495[((module_path splittable/495) (location )
+                     (original_ident splittable/495) (is_parameter local))]
+       camlPhantom_splittable__splittable_1
+     (exit 2 G:"camlPhantom_splittable"))
+ with(2 *ret*/486: val) 1) )
+
+(data)

@@ -30,7 +30,16 @@
    [consts]: constant components (a string and a boxed float, both static
    data symbols) become phantom variables bound to the symbols, again per
    the ANF discipline; the parameter [x], whose binder is in scope, is
-   referenced directly. *)
+   referenced directly.
+
+   [unrep]: a defining expression with no phantom form (arithmetic)
+   yields an empty phantom let: the variable is presented as optimised
+   out.
+
+   [after_use]: the phantom let is placed after its referenced binding
+   was already inlined out; the proxy stays without a value (the inlined
+   use site, which carries the [Cname_for_debugger], was emitted before
+   the proxy existed). *)
 
 [@@@ocaml.warning "-26-27-32"]
 
@@ -44,4 +53,14 @@ let[@inline never] [@local never] dead_temp q x =
 
 let[@inline never] [@local never] consts x =
   let unused_triple = ("abc", 1.5, x) in
+  x
+
+let[@inline never] [@local never] unrep x =
+  let unused_arith = x * 3 in
+  x
+
+let[@inline never] [@local never] after_use q x =
+  let a = fst q in
+  ignore (Sys.opaque_identity a);
+  let unused_pair = (a, x) in
   x
