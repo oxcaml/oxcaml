@@ -614,7 +614,72 @@ module type S = sig
     val print : Fmt.formatter -> ('p, 'r) t -> unit
 
     val equal : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.is_eq
+
+    type packed = P : ('p, 'r) t -> packed
+
+    val equal_packed : packed -> packed -> bool
+
+    val print_packed : Fmt.formatter -> packed -> unit
   end
+
+  module Mode_point : sig
+    type t
+  end
+
+  module Mode_description : sig
+    type atom =
+      | Exact of Mode_point.t
+      | Local_to_parent_region of
+          { displayed : Mode_point.t;
+            semantic : Mode_point.t
+          }
+
+    type t =
+      { first : atom;
+        alternatives : atom list
+      }
+  end
+
+  module Hint_chain : sig
+    module Mode : sig
+      type t = Mode_point.t
+
+      val name : t -> string
+
+      val equal : t -> t -> bool
+
+      val describe : t -> Mode_description.t
+    end
+
+    type kind =
+      | Morph : ('l * 'r) Mode_hint.morph -> kind
+      | Const : ('l * 'r) Mode_hint.const -> kind
+
+    type step =
+      { mode : Mode.t;
+        pinpoint : Hint.pinpoint;
+        kind : kind;
+        axis : Axis.packed option
+      }
+
+    type t = step list
+  end
+
+  type nonrec loosening = loosening =
+    | Loosened
+    | Not_loosened
+
+  type axis_error =
+    { axis : Axis.packed;
+      actual_chain : Hint_chain.t;
+      expected_chain : Hint_chain.t;
+      actual_description : Mode_description.t;
+      expected_description : Mode_description.t;
+      actual_loosening : loosening;
+      expected_loosening : loosening
+    }
+
+  val walk_error_all_exn : exn -> axis_error list option
 
   module type Mode := sig
     module Areality : Common_axis_pos
@@ -770,6 +835,8 @@ module type S = sig
          and type simple_error := simple_error
          and type 'd t := 'd t
 
+    val walk_error_all : Mode_hint.pinpoint -> error -> axis_error list
+
     (* CR-soon zqian: take [?hint:(_, _) monadic_comonadic] instead. *)
     val of_const :
       ?hint_monadic:('l * 'r) neg Hint.const ->
@@ -843,6 +910,10 @@ module type S = sig
       axis instead of [Regionality] axis, as arrow types are exposed to users
       and would be hard to understand if it involves [Regionality]. *)
   module Alloc : Mode with module Areality := Locality
+
+  val alloc_atom_of_hint_mode : Hint_chain.Mode.t -> Alloc.atom option
+
+  val hint_mode_of_alloc_atom : Alloc.atom -> Hint_chain.Mode.t
 
   module Const : sig
     val alloc_as_value : Alloc.Const.t -> Value.Const.t
