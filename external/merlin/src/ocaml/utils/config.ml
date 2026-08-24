@@ -32,6 +32,13 @@ let version = Sys.ocaml_version
 
 (* When bumping this number, be sure to also update ../typing/magic_numbers.ml *)
 let cmi_magic_number = "Caml1999I584"
+let cmo_magic_number = "Caml1999O584"
+let cma_magic_number = "Caml1999A584"
+
+(* CR mvellacott: replace this with a ltosol magic number. *)
+let cmr_magic_number = "Caml1999R584"
+let cmx_magic_number = "Caml1999Y584"
+let cmxa_magic_number = "Caml1999Z584"
 
 let as_debug_prefix_map_flag = ""
 
@@ -40,6 +47,7 @@ let ast_intf_magic_number = "Caml1999N584"
 let cmt_magic_number = "Caml1999T584"
 let cms_magic_number = "Caml1999S584"
 let index_magic_number = "Merl2023I584"
+let ltosol_magic_number = "Caml1999U584"
 
 let interface_suffix = ref ".mli"
 
