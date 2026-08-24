@@ -40,7 +40,7 @@ module type Code_metadata_accessors_result_type = sig
      equal to the number of (complex) parameters. *)
   val first_complex_local_param : 'a t -> First_complex_local_param.t
 
-  val result_arity : 'a t -> [`Unarized] Flambda_arity.t
+  val result_arity : 'a t -> [`Complex] Flambda_arity.t
 
   val result_types : 'a t -> Result_types.t Or_unknown_or_bottom.t
 
@@ -98,7 +98,7 @@ type 'a create_type =
   params_arity:[`Complex] Flambda_arity.t ->
   param_modes:Alloc_mode.For_types.t list ->
   first_complex_local_param:First_complex_local_param.t ->
-  result_arity:[`Unarized] Flambda_arity.t ->
+  result_arity:[`Complex] Flambda_arity.t ->
   result_types:Result_types.t Or_unknown_or_bottom.t ->
   result_mode:Lambda.return_mode ->
   stub:bool ->
@@ -134,7 +134,7 @@ val with_cost_metrics : Cost_metrics.t -> t -> t
 
 val with_is_my_closure_used : bool -> t -> t
 
-val with_result_arity : [`Unarized] Flambda_arity.t -> t -> t
+val with_result_arity : [`Complex] Flambda_arity.t -> t -> t
 
 val with_params_arity : [`Complex] Flambda_arity.t -> t -> t
 

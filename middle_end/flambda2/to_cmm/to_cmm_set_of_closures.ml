@@ -488,8 +488,7 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   (* Init the env and create a jump id for the return continuation in case a
      trap action is attached to one of its calls *)
   let return_continuation_arity =
-    List.map To_cmm_shared.machtype_of_kind
-      (Flambda_arity.unarized_components result_arity)
+    List.map To_cmm_shared.machtype_of_kind (Flambda_arity.unarize result_arity)
   in
   let env =
     Env.enter_function_body env ~return_continuation ~return_continuation_arity

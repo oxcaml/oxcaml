@@ -434,7 +434,9 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
         Option.map (Env.find_code_id_exn env) (Code.newer_version_of code)
       in
       let param_arity = Some (complex_arity (Code.params_arity code)) in
-      let ret_arity = Code.result_arity code |> arity_opt in
+      let ret_arity =
+        Code.result_arity code |> Flambda_arity.unarize_t |> arity_opt
+      in
       let recursive = recursive_flag (Code.recursive code) in
       let inline =
         if Flambda2_terms.Inline_attribute.is_default (Code.inline code)
@@ -658,7 +660,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
     | Effect _ -> Misc.fatal_error "TODO: Effect call kind"
   in
   let param_arity = Apply_expr.args_arity app in
-  let return_arity = Apply_expr.return_arity app in
+  let return_arity = Apply_expr.return_arity app |> Flambda_arity.unarize_t in
   let arities : Fexpr.function_arities option =
     match Apply_expr.call_kind app with
     | Function { function_call = Indirect_known_arity _ } ->
