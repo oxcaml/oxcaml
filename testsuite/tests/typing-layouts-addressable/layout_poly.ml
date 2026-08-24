@@ -170,6 +170,34 @@ Error: This expression has type "('a : bits64)"
          representable at call sites).
 |}]
 
+(* CR layouts: Meets for addressable are incomplete! See
+   [Jkind.Layout.intersection].
+
+   We should make these complete through "fixing the kind system." *)
+let ok y =
+  let _ : (_ : bits8 addressable) = magic_to_addressable y in
+  (y : b8)
+[%%expect{|
+val ok : b8 -> b8 = <fun>
+|}]
+
+let bad y =
+  let _ : (_ : bits8 addressable) = magic_to_addressable y in
+  (y : b8a)
+[%%expect{|
+Line 3, characters 3-4:
+3 |   (y : b8a)
+       ^
+Error: The value "y" has type "('a : bits8)"
+       but an expression was expected of type "b8a"
+       The layout of b8a is bits8 addressable
+         because of the definition of b8a at line 1, characters 0-28.
+       But the layout of b8a must be a sublayout of bits8
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
 (* [@layout_poly] still requires a variable at layout [any] (possibly made
    addressable) *)
 external bad_ext : ('a : value addressable). 'a -> 'a = "%identity"
