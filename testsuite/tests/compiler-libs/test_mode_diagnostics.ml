@@ -141,8 +141,8 @@ module Glossary = Diagnostic.Glossary
 module Inline = Diagnostic.Inline
 val file : string = "test.ml"
 val context : Mode_diagnostics.context =
-  {Mode_diagnostics.inclusion_site_at = <fun>; declared_modalities_at = <fun>;
-   constructor_arguments_at = <fun>;
+  {Mode_diagnostics.inclusion_site_at = <fun>;
+   declared_modalities_at = <fun>; constructor_arguments_at = <fun>;
    documentation =
     {Mode_diagnostics.Documentation.of_mode = <fun>; of_modality = <fun>}}
 val typer_error : string -> exn option = <fun>
