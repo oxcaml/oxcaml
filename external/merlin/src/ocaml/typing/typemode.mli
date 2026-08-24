@@ -95,17 +95,6 @@ val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
 val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> Parsetree.modes
 
 val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
-<<<<<<< Merlin:ggray/ete/dev
-
-(* Merlin-only: This is exposed for Merlin (for syntax_doc.ml). *)
-
-module Modifier_axis_pair : sig
-  type t = P : 'a Jkind_axis.Axis.t * 'a -> t
-
-  val of_string : string -> t
-end
-||||||| Compiler:last-imported
-=======
 
 type 'ax annot_type =
   | Modifier : 'a Jkind_axis.Axis.t annot_type
@@ -124,4 +113,11 @@ exception Error of Location.t * error
 val print_annot_type : Format_doc.formatter -> _ annot_type -> unit
 
 val print_annot_axis : 'a annot_type -> Format_doc.formatter -> 'a -> unit
->>>>>>> Compiler:HEAD
+
+(* Merlin-only: This is exposed for Merlin (for syntax_doc.ml). *)
+
+module Modifier_axis_pair : sig
+  type t = P : 'a Jkind_axis.Axis.t * 'a -> t
+
+  val of_string : string -> t
+end
