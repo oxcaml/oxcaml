@@ -1124,14 +1124,13 @@ Error: This value is "local" to the parent region but is expected to be "global"
 (*********************)
 (* Test 9: externals *)
 
-(* This test checks that we're correctly enforcing the limitations on products
-   in externals.  Those restrictions say:
-   - For C stubs
-     - No products in arguments
-     - Products in returns can only have two elements.
-   - For layout poly primitives
-     - No restrictions
-*)
+(* This test checks the treatment of products in externals.  Products may
+   appear in C stub arguments and returns; in native code they follow the
+   calling conventions of the corresponding (possibly nested) C structs, with
+   product shapes that the C ABIs pass in memory being rejected during native
+   code generation.  The [@unpacked] attribute instead causes the components
+   of a product argument to be passed as separate C arguments; it is not
+   allowed on returns.  Layout poly primitives have no restrictions. *)
 
 type t_product : value & value
 type t_product_3 : value & value & value
@@ -1140,13 +1139,7 @@ external ext_tuple_arg : #(int * bool) -> int = "foo" "bar"
 [%%expect{|
 type t_product : value & value
 type t_product_3 : value & value & value
-Line 4, characters 25-45:
-4 | external ext_tuple_arg : #(int * bool) -> int = "foo" "bar"
-                             ^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
+external ext_tuple_arg : #(int * bool) -> int = "foo" "bar"
 |}]
 
 external ext_tuple_arg_with_attr_u : (#(int * bool) [@unboxed]) -> int = "foo"
@@ -1170,24 +1163,12 @@ Error: Don't know how to untag this type. Only "int", and
 
 external ext_product_arg : t_product -> int = "foo" "bar"
 [%%expect{|
-Line 1, characters 27-43:
-1 | external ext_product_arg : t_product -> int = "foo" "bar"
-                               ^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
+external ext_product_arg : t_product -> int = "foo" "bar"
 |}]
 
 external ext_product_arg_3 : t_product_3 -> int = "foo" "bar"
 [%%expect{|
-Line 1, characters 29-47:
-1 | external ext_product_arg_3 : t_product_3 -> int = "foo" "bar"
-                                 ^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
+external ext_product_arg_3 : t_product_3 -> int = "foo" "bar"
 |}]
 
 external ext_product_arg_with_attr_u : (t_product [@unboxed]) -> int = "foo"
@@ -1216,22 +1197,13 @@ external ext_tuple_return : int -> #(int * bool) = "foo" "bar"
 
 external ext_triple_return : int -> #(int * bool * string) = "foo" "bar"
 [%%expect{|
-Line 1, characters 29-58:
-1 | external ext_triple_return : int -> #(int * bool * string) = "foo" "bar"
-                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Unboxed products in C stub returns must be a pair of non-products.
+external ext_triple_return : int -> #(int * bool * string) = "foo" "bar"
 |}]
 
 external ext_nested_tuple_return : int -> #(int * #(int * bool)) = "foo" "bar"
 [%%expect{|
-Line 1, characters 35-64:
-1 | external ext_nested_tuple_return : int -> #(int * #(int * bool)) = "foo" "bar"
-                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Unboxed products in C stub returns must be a pair of non-products.
+external ext_nested_tuple_return : int -> #(int * #(int * bool)) = "foo"
+  "bar"
 |}]
 
 external ext_tuple_return_with_attr_u :
@@ -1263,12 +1235,7 @@ external ext_product_return : int -> t_product = "foo" "bar"
 
 external ext_product_return_3 : int -> t_product_3 = "foo" "bar"
 [%%expect{|
-Line 1, characters 32-50:
-1 | external ext_product_return_3 : int -> t_product_3 = "foo" "bar"
-                                    ^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Unboxed products in C stub returns must be a pair of non-products.
+external ext_product_return_3 : int -> t_product_3 = "foo" "bar"
 |}]
 
 external ext_product_return_with_attr_u : int -> (t_product [@unboxed]) = "foo"
@@ -1313,26 +1280,14 @@ type ext_record_arg_record = #{ i : int; b : bool }
 external ext_record_arg : ext_record_arg_record -> int = "foo" "bar"
 [%%expect{|
 type ext_record_arg_record = #{ i : int; b : bool; }
-Line 2, characters 26-54:
-2 | external ext_record_arg : ext_record_arg_record -> int = "foo" "bar"
-                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
+external ext_record_arg : ext_record_arg_record -> int = "foo" "bar"
 |}]
 
 type ext_record_arg_record_3 = #{ i : int; b : bool; s : string }
 external ext_record_arg_3 : ext_record_arg_record_3 -> int = "foo" "bar"
 [%%expect{|
 type ext_record_arg_record_3 = #{ i : int; b : bool; s : string; }
-Line 2, characters 28-58:
-2 | external ext_record_arg_3 : ext_record_arg_record_3 -> int = "foo" "bar"
-                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
+external ext_record_arg_3 : ext_record_arg_record_3 -> int = "foo" "bar"
 |}]
 
 type ext_record_arg_attr_record = #{ i : int; b : bool }
@@ -1369,38 +1324,22 @@ type t_3 = #{ i : int; b : bool; s : string }
 external ext_record_return_3 : int -> t_3 = "foo" "bar"
 [%%expect{|
 type t_3 = #{ i : int; b : bool; s : string; }
-Line 2, characters 31-41:
-2 | external ext_record_return_3 : int -> t_3 = "foo" "bar"
-                                   ^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Unboxed products in C stub returns must be a pair of non-products.
+external ext_record_return_3 : int -> t_3 = "foo" "bar"
 |}]
 
 type ext_record_nested = #{ x : int; y : ext_record_arg_record }
 external ext_record_neested : int -> ext_record_nested = "foo" "bar"
 [%%expect{|
 type ext_record_nested = #{ x : int; y : ext_record_arg_record; }
-Line 2, characters 30-54:
-2 | external ext_record_neested : int -> ext_record_nested = "foo" "bar"
-                                  ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Unboxed products in C stub returns must be a pair of non-products.
+external ext_record_neested : int -> ext_record_nested = "foo" "bar"
 |}]
 
 external error_with_multiple_hints
   : #(int * int) -> #(int * int) -> #(int * int * int)
   = "foo" "bar"
 [%%expect{|
-Line 2, characters 4-54:
-2 |   : #(int * int) -> #(int * int) -> #(int * int * int)
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
-Hint: Unboxed products in C stub returns must be a pair of non-products.
+external error_with_multiple_hints :
+  #(int * int) -> #(int * int) -> #(int * int * int) = "foo" "bar"
 |}]
 
 type t = #{ i : int; b : bool }
@@ -1483,13 +1422,7 @@ Error: Types in an external must have a representable layout.
 external ext_product_no_attr :
   #(int * bool) -> int = "foo" "bar"
 [%%expect{|
-Line 2, characters 2-22:
-2 |   #(int * bool) -> int = "foo" "bar"
-      ^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [foo] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
+external ext_product_no_attr : #(int * bool) -> int = "foo" "bar"
 |}]
 
 (* @unpacked allows product types as arguments to C stubs *)
@@ -1728,13 +1661,8 @@ Error: This expression has type "#('a * 'b)"
 external make : ('a : value & value) . int -> 'a -> 'a array =
   "caml_array_make" "caml_array_make"
 [%%expect{|
-Line 1, characters 16-60:
-1 | external make : ('a : value & value) . int -> 'a -> 'a array =
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [caml_array_make] is used in an invalid declaration.
-       The declaration contains argument/return types with the wrong layout.
-Hint: Types with product layouts in C stub arguments require the
-      "[@unpacked]" attribute.
+external make : ('a : value & value). int -> 'a -> 'a array
+  = "caml_array_make" "caml_array_make"
 |}]
 
 external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =

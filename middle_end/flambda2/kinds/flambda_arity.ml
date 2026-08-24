@@ -99,6 +99,8 @@ let nullary = []
 
 let create t = t
 
+let components t = t
+
 let create_singletons t = List.map (fun kind -> Component.Singleton kind) t
 
 let print ppf t =

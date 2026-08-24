@@ -50,6 +50,10 @@ end
     component may in turn have an arity describing an unboxed product. *)
 val create : 'uc Component_for_creation.t list -> 'uc t
 
+(** The components of an arity, one per parameter, including the structure of
+    any unboxed products (for [`Complex] arities). *)
+val components : 'uc t -> 'uc Component_for_creation.t list
+
 (** A shorthand for creation of arities where no parameter has an unboxed
     product layout. *)
 val create_singletons : Flambda_kind.With_subkind.t list -> [> ] t

@@ -909,13 +909,21 @@ LBL(caml_c_call):
     /* Load ocaml stack and restore global variables */
         SWITCH_C_TO_OCAML
 #ifdef WITH_THREAD_SANITIZER
-    /* Save non-callee-saved registers %rax and %xmm0 before C call */
+    /* Save return value registers. Since the called function could be
+       anything, it may have returned its result (if any) in %rax:%rdx
+       and/or %xmm0:%xmm1 (multi-register returns arise from unboxed
+       product returns following the C struct calling convention). */
         pushq   %rax; CFI_ADJUST(8);
-        subq    $16, %rsp; CFI_ADJUST(16);
-        movupd   %xmm0, (%rsp)
+        pushq   %rdx; CFI_ADJUST(8);
+        subq    $32, %rsp; CFI_ADJUST(32);
+        movupd  %xmm0, (%rsp)
+        movupd  %xmm1, 16(%rsp)
         TSAN_EXIT_FUNCTION
+    /* Restore return value registers */
         movupd  (%rsp), %xmm0
-        addq    $16, %rsp; CFI_ADJUST(-16);
+        movupd  16(%rsp), %xmm1
+        addq    $32, %rsp; CFI_ADJUST(-32);
+        popq    %rdx; CFI_ADJUST(-8);
         popq    %rax; CFI_ADJUST(-8);
 #endif
         LEAVE_FUNCTION

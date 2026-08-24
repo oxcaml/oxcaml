@@ -993,6 +993,12 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
                  idx,
                  Lsequence (store_low, store_high) ) ) ))
 
+(* CR mshinwell: this predicate does not look inside unboxed products (nor
+   [@unpacked] products), so vec256 components of such products escape the
+   splitting transform below and instead reach a fatal error in the arm64
+   backend. Extending the predicate is not sufficient by itself, since the
+   transform cannot currently split products; either that needs implementing or
+   a proper error should be raised here. *)
 let ccall_involves_vec256 (desc : L.external_call_description) =
   let repr_vec256 = function[@warning "-4"]
     | _, L.Unboxed_vector Boxed_vec256 | _, L.Same_as_ocaml_repr (Base Vec256)
