@@ -173,17 +173,6 @@ and _ poly_param =
   (** [Method (m, t)] is used when applying a polymorphic method [m]
       with type scheme [t] *)
 
-(** Sort information for all fields in a record, at the point where the record
-    is being matched against or projected from. Depending on whether the record
-    type has a field of kind `any`, this may differ from value to value. *)
-type record_sorts =
-  | Fixed
-  (** The sorts of this record's fields were determined when the type was
-      declared. Invariant: Every description in [lbl_all] for any field has a
-      [lbl_sort] that's [Some]. *)
-  | Variable of Jkind.sort array
-  (** This value has the specified sorts for its fields. *)
-
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -336,7 +325,7 @@ and 'k pattern_desc =
   | Tpat_record :
       (Longident.t loc * Data_types.label_description * value general_pattern)
         list *
-        record_sorts * Types.record_representation * closed_flag ->
+        Types.record_representation * closed_flag ->
       value pattern_desc
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -346,8 +335,7 @@ and 'k pattern_desc =
   | Tpat_record_unboxed_product :
       (Longident.t loc * Data_types.unboxed_label_description *
          value general_pattern) list *
-        record_sorts * Types.record_unboxed_product_representation *
-        closed_flag ->
+        Types.record_unboxed_product_representation * closed_flag ->
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)
             #{ l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -659,7 +647,6 @@ and expression_desc =
   | Texp_unboxed_field of {
       record : expression;
       record_sort : Jkind.sort;
-      record_sorts : record_sorts;
       record_repres : Types.record_unboxed_product_representation;
       lid : Longident.t loc;
       label : Data_types.unboxed_label_description;
@@ -668,7 +655,6 @@ and expression_desc =
   | Texp_setfield of {
       record : expression;
       record_repres : Types.record_representation;
-      record_sorts : record_sorts;
       modality : Mode.Locality.l;
       lid : Longident.t loc;
       label : Data_types.label_description;
@@ -844,7 +830,8 @@ and block_access =
 
 and unboxed_access =
   | Uaccess_unboxed_field of
-      Longident.t loc * Data_types.unboxed_label_description * record_sorts
+      Longident.t loc * Data_types.unboxed_label_description
+      * Types.record_unboxed_product_representation
 
 and comprehension =
   {
@@ -1664,20 +1651,31 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 val map_apply_arg:
   ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
 
-(** Compute the sort of a label. Returns [None] when we can't determine the sort
-    for a representable record based off of the label alone, namely for a
-    [Record_unboxed]. In that case, the label has the same sort as the whole
-    record. *)
+(** Compute a label's sort. The label comes from a declaration, but the
+    representation should be the one stored at the label's use site (this errors
+    given [Record_undetermined] and [Record_unboxed_product_undetermined], which
+    only appear on declarations). *)
 val label_sort:
   'rep Data_types.record_form -> 'rep Data_types.gen_label_description
-  -> record_sorts
-  -> [ `Sort of Jkind.sort | `Same_as_record_sort ]
+  -> 'rep
+  -> record_sort:Jkind.sort
+  -> Jkind.sort
 
-(** Computes the sort of a label. Becuase the sepcial case above doesn't apply
-    to unboxed records, this doesn't return an option. *)
+(** Compute a label's sort given its finalized representation (from
+    [Typedecl.finalize_record_representation_and_sorts]) *)
+val finalized_label_sort:
+  Data_types.label_description -> Types.record_representation
+  -> record_sort:Jkind.Sort.Const.t
+  -> variable_sorts:Jkind.Sort.Const.t array option
+  -> Jkind.Sort.Const.t
+
+(** [label_sort] specialized to unboxed records; doesn't need to know the record
+    sort *)
 val unboxed_label_sort :
-  Data_types.unboxed_label_description -> record_sorts -> Jkind.sort
+  Data_types.unboxed_label_description ->
+  Types.record_unboxed_product_representation -> Jkind.sort
 
 val unboxed_label_all_sorts:
-  Data_types.unboxed_label_description -> record_sorts
+  Data_types.unboxed_label_description ->
+  Types.record_unboxed_product_representation
   -> Jkind.sort array

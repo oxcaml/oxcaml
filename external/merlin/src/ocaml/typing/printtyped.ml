@@ -249,8 +249,8 @@ let variant_representation i ppf = let open Types in function
     line i ppf "Variant_boxed %a\n"
       (array (i+1) (fun _ ppf l ->
          match (l : Types.cstr_layout) with
-         | Cstr_layout_variable ->
-           line (i+1) ppf "Cstr_layout_variable\n"
+         | Cstr_layout_undetermined ->
+           line (i+1) ppf "Cstr_layout_undetermined\n"
          | Cstr_layout_known { sorts; _ } ->
            sort_array (i+1) ppf sorts))
       layouts
@@ -276,13 +276,17 @@ let record_representation i ppf = let open Types in function
     line i ppf "Record_dummy%s%s\n"
       (if represent_as_float_array then " [@@represent_as_float_array]" else "")
       (if flatten_floats then " [@@flatten_floats]" else "")
-  | Record_variable ->
+  | Record_undetermined ->
+    line i ppf "Record_undetermined\n"
+  | Record_variable _ ->
     line i ppf "Record_variable\n"
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->
     line i ppf "Record_unboxed_product\n"
-  | Record_unboxed_product_variable ->
+  | Record_unboxed_product_undetermined ->
+    line i ppf "Record_unboxed_product_undetermined\n"
+  | Record_unboxed_product_variable _ ->
     line i ppf "Record_unboxed_product_variable\n"
 
 let attribute i ppf k a =
@@ -526,10 +530,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_variant (l, po, _) ->
       line i ppf "Tpat_variant \"%s\"\n" l;
       option i pattern ppf po;
-  | Tpat_record (l, _, _, _c) ->
+  | Tpat_record (l, _, _c) ->
       line i ppf "Tpat_record\n";
       list i longident_x_pattern ppf l;
-  | Tpat_record_unboxed_product (l, _, _, _c) ->
+  | Tpat_record_unboxed_product (l, _, _c) ->
       line i ppf "Tpat_record_unboxed_product\n";
       list i longident_x_pattern ppf l;
   | Tpat_array (am, arg_sort, l) ->

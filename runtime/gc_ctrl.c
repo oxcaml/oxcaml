@@ -297,7 +297,7 @@ static caml_result gc_major_res(int compaction_mode)
   CAML_GC_MESSAGE(MAJOR, "Major GC cycle requested\n");
   caml_empty_minor_heaps_once();
   caml_finish_major_cycle(compaction_mode);
-  caml_reset_major_pacing();
+  caml_reset_major_pacing(false);
   caml_result result = caml_process_pending_actions_res();
   CAML_EV_END(EV_EXPLICIT_GC_MAJOR);
   return result;
@@ -321,7 +321,7 @@ static caml_result gc_full_major_res(void)
      currently-unreachable object to be collected. */
   for (i = 0; i < 3; i++) {
     caml_finish_major_cycle(i == 2 ? Compaction_auto : Compaction_none);
-    caml_reset_major_pacing();
+    caml_reset_major_pacing(i == 2);
     res = caml_process_pending_actions_res();
     if (caml_result_is_exception(res)) break;
   }
@@ -358,7 +358,7 @@ CAMLprim value caml_gc_compaction(value v)
      why this needs three iterations. */
   for (i = 0; i < 3; i++) {
     caml_finish_major_cycle(i == 2 ? Compaction_forced : Compaction_none);
-    caml_reset_major_pacing();
+    caml_reset_major_pacing(i == 2);
     res = caml_process_pending_actions_res();
     if (caml_result_is_exception(res))
       break;
@@ -410,7 +410,8 @@ void caml_init_gc (void)
   atomic_store_relaxed(&caml_major_heap_increment,
                        caml_params->init_major_heap_increment);
 
-  caml_gc_phase = Phase_sweep_and_mark_main;
+  caml_init_major_pacing ();
+  caml_gc_phase = Phase_sweep_main;
   #ifdef NATIVE_CODE
   caml_init_frame_descriptors();
   #endif
@@ -453,8 +454,11 @@ struct gc_tweak {
   uintnat initial_value;
 };
 
+extern uintnat caml_small_heap_limit; /* see major_gc.c */
+
 static struct gc_tweak gc_tweaks[] = {
   { "custom_work_max_multiplier", &caml_custom_work_max_multiplier, 0 },
+  { "small_heap_limit", &caml_small_heap_limit, 0 },
   { "prelinking_in_use", &caml_prelinking_in_use, 0 },
   { "compaction", &caml_compaction_algorithm, 0 },
   { "compact_unmap", &caml_compact_unmap, 0 },
