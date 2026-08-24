@@ -506,6 +506,9 @@ module Helpers = struct
     }
 end
 
+let impl_source_of_interface = Helpers.impl_source_of_interface
+let own_file = Helpers.own_file
+
 type target =
   { target_uid : Shape.Uid.t; target_name : string; target_loc : Location.t }
 
