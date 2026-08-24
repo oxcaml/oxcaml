@@ -81,14 +81,28 @@ let subject_of_row config (row : Impls.implementation) =
         else None)
 
 let works_of_response config (response : Impls.response) =
-  match response.status with
-  | Partial ->
+  let partial =
+    List.find_opt response.targets
+      ~f:(fun (target : Impls.target_result) ->
+        match target.status with
+        | Partial -> true
+        | Complete | Unavailable -> false)
+  in
+  let unavailable =
+    List.exists response.targets
+      ~f:(fun (target : Impls.target_result) ->
+        match target.status with
+        | Unavailable -> true
+        | Complete | Partial -> false)
+  in
+  match partial with
+  | Some target ->
     Unusable
-      (Printf.sprintf "discovery is partial (%d reasons)"
-         (List.length response.reasons))
-  | Unavailable ->
+      (Printf.sprintf "discovery of %s is partial (%d reasons)" target.target
+         (List.length target.reasons))
+  | None when unavailable ->
     Works []
-  | Complete ->
+  | None ->
     let rows =
       List.map response.implementations ~f:(fun row ->
           match Target_key.of_row row, subject_of_row config row with
