@@ -3,7 +3,6 @@ open Std
 let { Logger.log } = Logger.for_section "intf-strengthen-impls"
 
 module Abstract = Intf_strengthen.Abstract
-module Helpers = Module_implementation_query_helpers
 module Impls = Query_protocol.Module_type_impls
 module Intf_weakness = Query_protocol.Intf_weakness
 
@@ -68,7 +67,7 @@ let subject_of_row config (row : Impls.implementation) =
   let file =
     if String.equal recorded "" then None
     else if Filename.check_suffix recorded ".mli" then
-      Helpers.impl_source_of_interface config recorded
+      Module_type_impls.impl_source_of_interface config recorded
     else if Filename.check_suffix recorded ".ml" then
       Some (Misc.canonicalize_filename recorded)
     else None
@@ -120,7 +119,9 @@ let with_own_unit config (typedtree : Mtyper.typedtree) works =
   match typedtree with
   | `Interface _ -> works
   | `Implementation _ ->
-    let own = { file = Helpers.own_file config; site = Unit_signature } in
+    let own =
+      { file = Module_type_impls.own_file config; site = Unit_signature }
+    in
     let updated =
       List.map works ~f:(fun work ->
           match work.target with
@@ -293,7 +294,8 @@ let with_typed_subject ~pipeline ~config subject ~f =
         ~f:(fun impl_sig ->
           f ~config:(Mpipeline.final_config pipeline) ~env ~impl_sig)
   in
-  if String.equal subject.file (Helpers.own_file config) then analyze pipeline
+  if String.equal subject.file (Module_type_impls.own_file config) then
+    analyze pipeline
   else
     Option.bind (read_file subject.file) ~f:(fun text ->
         let source = Msource.make text in
@@ -485,7 +487,7 @@ let analyze_subject ~pipeline ~config ~parsetree ~unit_name work subject =
           ~f:(fun intf ->
             Option.map (module_type_signature ~env ~unit_name name)
               ~f:(fun intf_sig ->
-                ( { intf_file = Helpers.own_file config; intf },
+                ( { intf_file = Module_type_impls.own_file config; intf },
                   Intf_strengthen.analyze ~env ~impl_sig ~intf_sig () ))))
 
 let actions_for_work ~pipeline ~config ~parsetree ~unit_name work =
