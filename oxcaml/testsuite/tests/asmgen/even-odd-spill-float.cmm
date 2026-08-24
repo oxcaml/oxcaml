@@ -1,6 +1,7 @@
 (* TEST
  readonly_files = "main.c";
  arguments = "-DINT_FLOAT -DFUN=is_even main.c";
+ flags = "-dcmm-no-check-machtypes";
  asmgen;
 *)
 

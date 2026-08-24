@@ -89,7 +89,9 @@ let string_of_machtype_component (comp : machtype_component) =
     result.) The order is used only in selection, Valx2 is generated after
     selection. *)
 
-let lub_component comp1 comp2 =
+exception Incomparable_components
+
+let lub_component_result comp1 comp2 =
   match comp1, comp2 with
   | Int, Int -> Int
   | Int, Val -> Val
@@ -114,15 +116,24 @@ let lub_component comp1 comp2 =
   | (Float | Float32), Mask
   | Float32, Float
   | Float, Float32 ->
+    raise Incomparable_components
+  | Valx2, _ | _, Valx2 ->
+    Misc.fatal_errorf "Unexpected machtype_component Valx2"
+
+let lub_component comp1 comp2 =
+  try lub_component_result comp1 comp2
+  with Incomparable_components ->
     (* Float unboxing code must be sure to avoid this case. *)
     Misc.fatal_errorf
       "Cmm.lub_component: unexpected machtype_component combination (%s, %s)"
       (string_of_machtype_component comp1)
       (string_of_machtype_component comp2)
-  | Valx2, _ | _, Valx2 ->
-    Misc.fatal_errorf "Unexpected machtype_component Valx2"
 
-let ge_component comp1 comp2 =
+let lub_component_opt comp1 comp2 =
+  try Some (lub_component_result comp1 comp2)
+  with Incomparable_components -> None
+
+let ge_component_result comp1 comp2 =
   match comp1, comp2 with
   | Int, Int -> true
   | Int, Addr -> false
@@ -147,12 +158,20 @@ let ge_component comp1 comp2 =
   | (Float | Float32), Mask
   | Float32, Float
   | Float, Float32 ->
+    raise Incomparable_components
+  | Valx2, _ | _, Valx2 ->
+    Misc.fatal_error "Unexpected machtype_component Valx2"
+
+let ge_component comp1 comp2 =
+  try ge_component_result comp1 comp2
+  with Incomparable_components ->
     Misc.fatal_errorf
       "Cmm.ge_component: unexpected machtype_component combination (%s, %s)"
       (string_of_machtype_component comp1)
       (string_of_machtype_component comp2)
-  | Valx2, _ | _, Valx2 ->
-    Misc.fatal_error "Unexpected machtype_component Valx2"
+
+let ge_component_bool comp1 comp2 =
+  try ge_component_result comp1 comp2 with Incomparable_components -> false
 
 type exttype =
   | XInt
@@ -160,6 +179,7 @@ type exttype =
   | XInt16
   | XInt32
   | XInt64
+  | XMask
   | XFloat32
   | XFloat
   | XVec128
@@ -175,6 +195,7 @@ let machtype_of_exttype = function
   | XInt16 -> typ_int
   | XInt32 -> typ_int
   | XInt64 -> typ_int
+  | XMask -> typ_mask
   | XFloat -> typ_float
   | XFloat32 -> typ_float32
   | XVec128 -> typ_vec128
@@ -419,6 +440,18 @@ let size_of_memory_chunk : memory_chunk -> int = function
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 16
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 32
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 64
+
+let machtype_of_memory_chunk : memory_chunk -> machtype = function
+  | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+  | Thirtytwo_unsigned | Thirtytwo_signed | Word_int ->
+    typ_int
+  | Word_val -> typ_val
+  | Word_mask -> typ_mask
+  | Single { reg = Float64 } | Double -> typ_float
+  | Single { reg = Float32 } -> typ_float32
+  | Onetwentyeight_unaligned | Onetwentyeight_aligned -> typ_vec128
+  | Twofiftysix_unaligned | Twofiftysix_aligned -> typ_vec256
+  | Fivetwelve_unaligned | Fivetwelve_aligned -> typ_vec512
 
 type reinterpret_cast =
   | Int_of_value
@@ -940,8 +973,8 @@ let equal_machtype left right =
   Misc.Stdlib.Array.equal equal_machtype_component left right
 
 let equal_exttype
-    (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
-     | XVec256 | XVec512 ) as left) right =
+    (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat32 | XFloat
+     | XVec128 | XVec256 | XVec512 ) as left) right =
   (* we can use polymorphic compare as long as exttype is all constant
      constructors *)
   Stdlib.( = ) left right

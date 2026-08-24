@@ -35,3 +35,17 @@
     any errors were encountered (with corresponding error messages printed
     on the given formatter). *)
 val run : Format.formatter -> Cmm.fundecl -> bool
+
+(** Checks that machtypes are used consistently within the given function's
+    body: the machtype inferred for each subexpression is compared against the
+    machtype its context expects, componentwise under the partial order of
+    [Cmm.ge_component]. In particular, the arguments of each [Cop] are checked
+    against the machtypes the operation expects (whose results are given by
+    [Select_utils.oper_result_type]), and the machtype of the body against
+    [fun_ret_type]. Calls [Misc.fatal_error] on the first violation.
+
+    Argument slots whose machtypes are not determined by the operation (e.g.
+    arguments to an application whose signature is unavailable) are not
+    checked. Address operands are checked against [Cmm.typ_addr], which accepts
+    [Int], [Val] and [Addr] under the partial order. *)
+val check_machtypes : Cmm.fundecl -> unit
