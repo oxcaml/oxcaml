@@ -28,9 +28,9 @@
    sink past the proxy's binder.  The proxy is therefore bound directly
    to [a1], with no [Cphantom_add_equality] needed.  (The operation is
    used when the binder and the value's appearance are in different
-   places: at an inlined use site, or -- defensively; not currently
-   reachable, since pure single-use bindings always substitute -- at a
-   real let the binding was sunk past.)
+   places: at an inlined use site, or at a real let the binding was sunk
+   past -- the latter reachable only under
+   -flambda2-expert-cmm-safe-subst; see phantom_safe_subst.ml.)
 
    [combined_temp]: the combined form for a variable that is not
    user-visible.  The two occurrences of [fst q] are shared (by CSE

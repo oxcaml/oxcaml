@@ -11,25 +11,26 @@
  check-ocamlopt.byte-output;
 *)
 
-(* Behaviour under -flambda2-expert-cmm-safe-subst of a moved-down load
-   referenced by a phantom defining expression.  [c] is a faultable load,
-   kept (pure, single normal use) across the fork at which the pair's
-   phantom let and [c]'s proxy binder are emitted, with a division -- a
-   control-flow-containing binding -- intervening before its use.
+(* The deferred, at-the-let form of [Cphantom_add_equality], reachable
+   only under -flambda2-expert-cmm-safe-subst.
 
-   At present the substitution of [c] at its use site is still permitted,
-   so the value arrives via a [Cphantom_add_equality] wrapping the
-   inlined, named expression, as without the flag.  Should the validity
-   classifications ever tighten so that such a substitution is refused,
-   [c] would instead materialise as a real let below the proxy's binder
-   and this reference would change to show the equality emitted at that
-   let -- the deferred form, currently reachable in no other way (see the
-   comment on [materialised] in phantom_add_equality.ml).  The whole Cmm
-   output is compared against the reference file. *)
+   [c] is a memory load, kept (pure, single normal use) across the fork
+   at which the pair's phantom let and [c]'s proxy binder are emitted.
+   Its use lies beyond a call, whose arbitrary effects push a validity
+   stage; under the flag the substitution of the load past the call is
+   therefore refused, and [c] materialises as a real let, before the
+   call, in a later flush than (and so below) the proxy's binder.  The
+   equality supplying the proxy's value is emitted directly under that
+   let: the deferred form.  (Without the flag, the load would instead be
+   substituted at the use site, past the call, and the value would
+   arrive via the equality wrapping the inlined, named expression.)  The
+   whole Cmm output is compared against the reference file. *)
 
 [@@@ocaml.warning "-26-27-32"]
 
-let[@inline never] [@local never] f (s : string) (x : int) =
-  let c = String.unsafe_get s 0 in
+let[@inline never] [@local never] effectful () = print_string ""
+
+let[@inline never] [@local never] f q x =
+  let c = fst q in
   let unused_pair = (c, x) in
-  if x > 0 then (let d = 100 / x in if d > 1 then c else 'a') else 'b'
+  if x > 0 then (effectful (); c) else 0
