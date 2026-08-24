@@ -17,10 +17,16 @@
    is compared against the reference file.
 
    [temp_component]: the pair references a compiler-generated temporary
-   (the projection), which is not user-visible; when it is inlined out (at
-   the second use), the inlined expression carries a
-   [Cphantom_add_equality] for the temporary's proxy but no
-   [Cnormal_var_optimised_out], there being no user variable to name.
+   (the projection), which is not user-visible.  The temporary
+   materialises as a real let (its other use is in return position), so
+   its proxy is bound directly to it, in the combined form; nothing
+   carries a [Cnormal_var_optimised_out], there being no user variable to
+   name.
+
+   [bare_equality]: as [temp_component], but the temporary's single other
+   use is inlined out (into an [opaque_identity]): the inlined expression
+   carries a free-standing [Cphantom_add_equality] for the proxy and,
+   again, no [Cnormal_var_optimised_out] -- the only-equality form.
 
    [dead_temp]: the projection has no normal uses at all; Simplify itself
    turns it into a phantom let with a real defining expression ([q[0]]),
@@ -47,6 +53,11 @@
 let[@inline never] [@local never] temp_component q x =
   let unused_pair = (fst q, x) in
   fst q
+
+let[@inline never] [@local never] bare_equality q x =
+  let unused_pair = (fst q, x) in
+  ignore (Sys.opaque_identity (fst q));
+  x
 
 let[@inline never] [@local never] dead_temp q x =
   let unused_pair = (fst q, x) in
