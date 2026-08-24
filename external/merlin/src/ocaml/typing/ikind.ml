@@ -797,6 +797,21 @@ let subjkind_error_printing_env = function
   | Jkind_error _ -> None
   | Mode_crossing_error { printing_env; _ } -> Some printing_env
 
+let subjkind_error_violating_axes = function
+  | Mode_crossing_error { violating_axes; _ } -> violating_axes
+  | Jkind_error v -> (
+    match v.violation with
+    | Jkind.Violation.No_intersection _ -> []
+    | Jkind.Violation.Not_a_subjkind (_, _, reasons) ->
+      List.filter_map
+        (fun reason ->
+          match (reason : Jkind.Sub_failure_reason.t) with
+          | Axis_disagreement axis -> Some axis
+          | Layout_disagreement | With_bounds_on_left
+          | Constrain_ran_out_of_fuel ->
+            None)
+        reasons)
+
 let map_jkind_error result =
   Result.map_error (fun error -> Jkind_error error) result
 
