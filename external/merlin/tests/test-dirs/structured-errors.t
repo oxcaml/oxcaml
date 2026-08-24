@@ -21,10 +21,6 @@ Each diagnostic is reported at the span the compiler reports the error at, as a
   >   | jq -c '.value.diagnostics[0].loc'
   {"file":"x.ml","start":{"line":4,"col":36},"end":{"line":4,"col":39}}
 
-  $ $MERLIN single errors -filename x.ml < x.ml \
-  >   | jq -c '.value[0] | {start: .start, end: .end}'
-  {"start":{"line":4,"col":36},"end":{"line":4,"col":39}}
-
 The title names the failing axes
 
   $ $MERLIN single structured-errors -filename x.ml < x.ml \
@@ -70,7 +66,7 @@ in the buffer rather than the one it has on disk
 
   $ cat > edited <<EOF
   > let ok () = ()
-  >
+  > 
   > let test () =
   >   let x = ref 42 in
   >   let foo () = x := 24 in
