@@ -1,0 +1,54 @@
+(data global "camlPhantom_duplicated__gc_roots": int 0)
+(data
+ int 1792
+ global "camlPhantom_duplicated":
+ addr G:"camlPhantom_duplicated__f_1")
+(data
+ int 4087
+ global "camlPhantom_duplicated__f_1":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlPhantom_duplicated__f_0_1_code")
+(function{phantom_duplicated.ml:27,36-151} camlPhantom_duplicated__f_0_1_code
+     (q/404[((module_path q/404) (location ) (original_ident q/404)
+             (is_parameter local))]: val
+      x/405[((module_path x/405) (location ) (original_ident x/405)
+             (is_parameter local))]: int) : val
+ (let region/406 (beginregion)
+   (catch
+     (let?
+       (b_pproxy/410 ()
+        unused_pair/411[((module_path unused_pair/411) (location )
+                         (original_ident unused_pair/411)
+                         (is_parameter local))]
+          [0: b_pproxy/410; x/405; ])
+       (if (>s x/405 1)
+         (exit 6
+           (alloc{phantom_duplicated.ml:30,16-22} 2048
+             (phantom_add_equality b_pproxy/410
+               (name_for_debugger
+                 ((module_path b/409) (location ) (original_ident b/409)
+                  (is_parameter local))
+                 q/404))
+             3))
+         (exit 6
+           (alloc{phantom_duplicated.ml:30,28-34} 2048 5
+             (phantom_add_equality b_pproxy/410
+               (name_for_debugger
+                 ((module_path b/409) (location ) (original_ident b/409)
+                  (is_parameter local))
+                 q/404))))))
+   with(6 region_return/407: val)
+     (let unit/408 (seq (endregion region/406) 1) region_return/407))) )
+
+(function no_cse reduce_code_size linscan camlPhantom_duplicated__entry
+     () : val
+ (catch
+   (let?
+     f/415[((module_path f/415) (location ) (original_ident f/415)
+            (is_parameter local))]
+       camlPhantom_duplicated__f_1
+     (exit 5 G:"camlPhantom_duplicated"))
+ with(5 *ret*/402: val) 1) )
+
+(data)
