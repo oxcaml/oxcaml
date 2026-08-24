@@ -1201,7 +1201,7 @@ module Builtins = struct
 
   (* Pause *)
 
-  external pause_hint : unit -> unit
+  external pause_hint : unit# -> unit#
     = "" "caml_pause_hint"
     [@@noalloc] [@@builtin]
 
