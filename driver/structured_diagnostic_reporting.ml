@@ -54,22 +54,22 @@ let kind_field kind = Misc.Json.field "kind" (string_to_json kind)
 
 let position_to_json (position : Lexing.position) =
   Misc.Json.object_
-    [ Misc.Json.field "line" (Misc.Json.int position.pos_lnum);
+    [
+      Misc.Json.field "line" (Misc.Json.int position.pos_lnum);
       Misc.Json.field "col"
-        (Misc.Json.int (position.pos_cnum - position.pos_bol))
+        (Misc.Json.int (position.pos_cnum - position.pos_bol));
     ]
 
 let location_to_json (loc : Location.t) =
   Misc.Json.object_
-    [ Misc.Json.field "file" (string_to_json loc.loc_start.pos_fname);
+    [
+      Misc.Json.field "file" (string_to_json loc.loc_start.pos_fname);
       Misc.Json.field "start" (position_to_json loc.loc_start);
-      Misc.Json.field "end" (position_to_json loc.loc_end)
+      Misc.Json.field "end" (position_to_json loc.loc_end);
     ]
 
 let form_to_string (form : Diagnostic.Form.t) =
-  match form with
-  | Name -> "name"
-  | Pronoun -> "pronoun"
+  match form with Name -> "name" | Pronoun -> "pronoun"
 
 let kind_to_string (kind : Diagnostic.Kind.t) =
   match kind with
@@ -78,30 +78,28 @@ let kind_to_string (kind : Diagnostic.Kind.t) =
   | Suggestion -> "suggestion"
 
 let relation_to_string (relation : Diagnostic.Relation.t) =
-  match relation with
-  | Claim -> "claim"
-  | Elaboration -> "elaboration"
+  match relation with Claim -> "claim" | Elaboration -> "elaboration"
 
 let annotation_to_json (annotation : Diagnostic.Annotation.t) =
   match annotation with
   | Code -> Misc.Json.object_ [ kind_field "code" ]
   | Source loc ->
       Misc.Json.object_
-        [ kind_field "source";
-          Misc.Json.field "loc" (location_to_json loc)
-        ]
+        [ kind_field "source"; Misc.Json.field "loc" (location_to_json loc) ]
   | Mention { entity; form } ->
       Misc.Json.object_
-        [ kind_field "mention";
+        [
+          kind_field "mention";
           Misc.Json.field "entity"
             (Misc.Json.int (Diagnostic.Entities.Id.to_int entity));
-          Misc.Json.field "form" (string_to_json (form_to_string form))
+          Misc.Json.field "form" (string_to_json (form_to_string form));
         ]
   | Term term ->
       Misc.Json.object_
-        [ kind_field "term";
+        [
+          kind_field "term";
           Misc.Json.field "term"
-            (Misc.Json.int (Diagnostic.Glossary.Id.to_int term))
+            (Misc.Json.int (Diagnostic.Glossary.Id.to_int term));
         ]
 
 let rec inline_to_json (inline : Diagnostic.Inline.t) =
@@ -111,56 +109,58 @@ let rec inline_to_json (inline : Diagnostic.Inline.t) =
         [ kind_field "text"; Misc.Json.field "text" (string_to_json text) ]
   | Annotated { annotation; content } ->
       Misc.Json.object_
-        [ kind_field "annotated";
+        [
+          kind_field "annotated";
           Misc.Json.field "annotation" (annotation_to_json annotation);
-          Misc.Json.field "content" (inlines_to_json content)
+          Misc.Json.field "content" (inlines_to_json content);
         ]
 
-and inlines_to_json content =
-  Misc.Json.array (List.map inline_to_json content)
+and inlines_to_json content = Misc.Json.array (List.map inline_to_json content)
 
 let rec block_to_json (block : Diagnostic.Block.t) =
   Misc.Json.object_
-    [ Misc.Json.field "kind" (string_to_json (kind_to_string block.kind));
+    [
+      Misc.Json.field "kind" (string_to_json (kind_to_string block.kind));
       Misc.Json.field "content" (inlines_to_json block.content);
       Misc.Json.field "children"
-        (Misc.Json.array (List.map child_to_json block.children))
+        (Misc.Json.array (List.map child_to_json block.children));
     ]
 
 and child_to_json
     ((relation, block) : Diagnostic.Relation.t * Diagnostic.Block.t) =
   Misc.Json.object_
-    [ Misc.Json.field "relation"
-        (string_to_json (relation_to_string relation));
-      Misc.Json.field "block" (block_to_json block)
+    [
+      Misc.Json.field "relation" (string_to_json (relation_to_string relation));
+      Misc.Json.field "block" (block_to_json block);
     ]
 
-let entity_to_json (id, loc : Diagnostic.Entities.Id.t * Location.t) =
+let entity_to_json ((id, loc) : Diagnostic.Entities.Id.t * Location.t) =
   Misc.Json.object_
-    [ Misc.Json.field "id" (Misc.Json.int (Diagnostic.Entities.Id.to_int id));
-      Misc.Json.field "loc" (location_to_json loc)
+    [
+      Misc.Json.field "id" (Misc.Json.int (Diagnostic.Entities.Id.to_int id));
+      Misc.Json.field "loc" (location_to_json loc);
     ]
 
 let glossary_entry_to_json
-    (id, entry :
-      Diagnostic.Glossary.Id.t * Diagnostic.Glossary.Entry.t) =
+    ((id, entry) : Diagnostic.Glossary.Id.t * Diagnostic.Glossary.Entry.t) =
   let url =
     match entry.url with
     | None -> []
     | Some url -> [ Misc.Json.field "url" (string_to_json url) ]
   in
   Misc.Json.object_
-    ([ Misc.Json.field "id"
-         (Misc.Json.int (Diagnostic.Glossary.Id.to_int id));
+    ([
+       Misc.Json.field "id" (Misc.Json.int (Diagnostic.Glossary.Id.to_int id));
        Misc.Json.field "term" (string_to_json entry.term);
        Misc.Json.field "category" (string_to_json entry.category);
-       Misc.Json.field "description" (string_to_json entry.description)
+       Misc.Json.field "description" (string_to_json entry.description);
      ]
     @ url)
 
 let diagnostic_to_json (diagnostic : Diagnostic.t) =
   Misc.Json.object_
-    [ Misc.Json.field "loc" (location_to_json diagnostic.loc);
+    [
+      Misc.Json.field "loc" (location_to_json diagnostic.loc);
       Misc.Json.field "title" (string_to_json diagnostic.title);
       Misc.Json.field "entities"
         (Misc.Json.array
@@ -171,7 +171,7 @@ let diagnostic_to_json (diagnostic : Diagnostic.t) =
            (List.map glossary_entry_to_json
               (Diagnostic.Glossary.to_list diagnostic.glossary)));
       Misc.Json.field "body"
-        (Misc.Json.array (List.map block_to_json diagnostic.body))
+        (Misc.Json.array (List.map block_to_json diagnostic.body));
     ]
 
 let documentation_unavailable : Mode_diagnostics.Documentation.lookup =
