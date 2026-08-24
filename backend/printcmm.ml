@@ -332,6 +332,8 @@ let operation d = function
       (temporal_locality locality)
   | Catomic { op; size = _ } -> Printf.sprintf "atomic %s" (atomic_op op)
   | Copaque -> "opaque"
+  | Cphantom_add_equality { var } ->
+    Format.asprintf "phantom_add_equality %a" V.print var
   | Cbeginregion -> "beginregion"
   | Cendregion -> "endregion"
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field

@@ -627,6 +627,7 @@ type operation =
         enabled_at_init : bool option
       }
   | Copaque
+  | Cphantom_add_equality of { var : Backend_var.t }
   | Cbeginregion
   | Cendregion
   | Ctuple_field of int * machtype array
@@ -813,7 +814,8 @@ let iter_shallow_tail f = function
         | Creinterpret_cast _ | Cstatic_cast _
         | Ccmpf (_, _)
         | Cprobe _ | Cprobe_is_enabled _
-        | Ctuple_field (_, _) ),
+        | Ctuple_field (_, _)
+        | Cphantom_add_equality _ ),
         _,
         _ ) ->
     false
@@ -848,7 +850,8 @@ let map_shallow_tail f = function
           | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
           | Ccmpf (_, _)
           | Cprobe _ | Cprobe_is_enabled _
-          | Ctuple_field (_, _) ),
+          | Ctuple_field (_, _)
+          | Cphantom_add_equality _ ),
           _,
           _ ) ) as cmm ->
     cmm

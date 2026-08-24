@@ -74,7 +74,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         List.for_all is_simple_expr args
         (* The following may have side effects *)
       | Capply _ | Cextcall _ | Calloc _ | Cstore _ | Craise _ | Catomic _
-      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
+      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause
+      | Cphantom_add_equality _ ->
         false
       | Cprefetch _ | Cbeginregion | Cendregion ->
         false
@@ -126,6 +127,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Cextcall { effects = e; coeffects = ce } ->
           EC.create (SU.select_effects e) (SU.select_coeffects ce)
         | Capply _ | Cprobe _ | Copaque | Cpoll | Cpause -> EC.arbitrary
+        | Cphantom_add_equality _ -> EC.none
         | Calloc (Heap, _) -> EC.none
         | Calloc (Local, _) -> EC.coeffect_only Arbitrary
         | Cstore _ -> EC.effect_only Arbitrary
@@ -434,6 +436,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cpackf32 | Copaque | Cbswap _ | Cprefetch _ | Craise _
     | Ctuple_field (_, _) ->
       Misc.fatal_error "Selection.select_oper"
+    | Cphantom_add_equality _ ->
+      Misc.fatal_error
+        "Cphantom_add_equality should be handled directly in [emit_expr]"
 
   let rec select_operation (op : Cmm.operation) (args : Cmm.expression list)
       (dbg : Debuginfo.t) ~label_after :
@@ -822,6 +827,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_parts_list env sub_cfg exp_list with
       | Never_returns -> Never_returns
       | Ok (simple_list, ext_env) -> emit_tuple ext_env sub_cfg simple_list)
+    | Cop (Cphantom_add_equality _, _, _) ->
+      (* Currently ignored during instruction selection; in particular the
+         argument is not evaluated. *)
+      Ok [||]
     | Cop (Craise k, args, dbg) -> emit_expr_raise env sub_cfg k args dbg
     | Cop (Copaque, args, dbg) -> (
       match emit_parts_list env sub_cfg args with
