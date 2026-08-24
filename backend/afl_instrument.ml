@@ -53,7 +53,7 @@ let rec with_afl_logging b dbg =
       Csequence(
         op (Cstore(Byte_unsigned, Assignment))
           [op Cadda [Cvar afl_area; Cvar cur_pos];
-           op Cadda [op (Cload {memory_chunk=Byte_unsigned;
+           op Caddi [op (Cload {memory_chunk=Byte_unsigned;
                                 mutability=Asttypes.Mutable;
                                 is_atomic=false})
                         [op Cadda [Cvar afl_area; Cvar cur_pos]];

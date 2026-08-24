@@ -61,7 +61,7 @@ let exttype_of_kind (k : Flambda_kind.t) : Cmm.exttype =
   | Naked_number Naked_vec128 -> XVec128
   | Naked_number Naked_vec256 -> XVec256
   | Naked_number Naked_vec512 -> XVec512
-  | Naked_number Naked_mask -> XInt64
+  | Naked_number Naked_mask -> XMask
   | Region -> Misc.fatal_error "[Region] kind not expected here"
   | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
 
