@@ -17,6 +17,8 @@
 (** OxCaml specific command line flags *)
 
 val dump_cfg : bool ref
+
+val dump_cmm_functions : bool ref
 val cfg_invariants : bool ref
 val regalloc : Clflags.Register_allocator.t ref
 val default_regalloc_linscan_threshold : int
