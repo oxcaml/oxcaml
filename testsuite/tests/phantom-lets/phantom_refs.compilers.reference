@@ -1,0 +1,88 @@
+(data global "camlPhantom_refs__gc_roots": int 0)
+(data
+ int 3840
+ global "camlPhantom_refs":
+ addr G:"camlPhantom_refs__temp_component_3"
+ addr G:"camlPhantom_refs__dead_temp_4"
+ addr G:"camlPhantom_refs__consts_5")
+(data
+ int 3063
+ global "camlPhantom_refs__consts_5":
+ addr G:"camlPhantom_refs__consts_2_5_code"
+ int 108086391056891909)
+(data
+ int 4087
+ global "camlPhantom_refs__dead_temp_4":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlPhantom_refs__dead_temp_1_4_code")
+(data
+ int 4087
+ global "camlPhantom_refs__temp_component_3":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlPhantom_refs__temp_component_0_3_code")
+(data int 2045 "camlPhantom_refs__float45": double 1.5)
+(data int 2044 "camlPhantom_refs__immstring43": string "abc" skip 4 byte 4)
+(function{phantom_refs.ml:37,49-96} camlPhantom_refs__temp_component_0_3_code
+     (q/378[((module_path q/378) (location ) (original_ident q/378)
+             (is_parameter local))]: val
+      x/379[((module_path x/379) (location ) (original_ident x/379)
+             (is_parameter local))]: val) : val
+ (let
+   (region/380 (beginregion)
+    Pfield/381[((module_path Pfield/381) (location )
+                (original_ident Pfield/381) (is_parameter local))]
+      (load val q/378))
+   (let? Pfield_pproxy/382 ()
+     (phantom_add_equality Pfield_pproxy/382 Pfield/381)
+     (let?
+       unused_pair/383[((module_path unused_pair/383) (location )
+                        (original_ident unused_pair/383)
+                        (is_parameter local))]
+         [0: Pfield_pproxy/382; x/379; ]
+       (let unit/384 (seq (endregion region/380) 1) Pfield/381)))) )
+
+(function{phantom_refs.ml:41,44-87} camlPhantom_refs__dead_temp_1_4_code
+     (q/386[((module_path q/386) (location ) (original_ident q/386)
+             (is_parameter local))]: val
+      x/387[((module_path x/387) (location ) (original_ident x/387)
+             (is_parameter local))]: val) : val
+ (let region/388 (beginregion)
+   (let?
+     (Pfield/389 q/386[0]
+      unused_pair/390[((module_path unused_pair/390) (location )
+                       (original_ident unused_pair/390) (is_parameter local))]
+        [0: Pfield/389; x/387; ])
+     (let unit/391 (seq (endregion region/388) 1) x/387))) )
+
+(function{phantom_refs.ml:45,41-89} camlPhantom_refs__consts_2_5_code
+     (x/393[((module_path x/393) (location ) (original_ident x/393)
+             (is_parameter local))]: val) : val
+ (let region/394 (beginregion)
+   (let?
+     (pconst/395 camlPhantom_refs__immstring43
+      pconst/396 camlPhantom_refs__float45
+      unused_triple/397[((module_path unused_triple/397) (location )
+                         (original_ident unused_triple/397)
+                         (is_parameter local))]
+        [0: pconst/395; pconst/396; x/393; ])
+     (let unit/398 (seq (endregion region/394) 1) x/393))) )
+
+(function no_cse reduce_code_size linscan camlPhantom_refs__entry () : val
+ (catch
+   (let?
+     (temp_component/385[((module_path temp_component/385) (location )
+                          (original_ident temp_component/385)
+                          (is_parameter local))]
+        camlPhantom_refs__temp_component_3
+      dead_temp/392[((module_path dead_temp/392) (location )
+                     (original_ident dead_temp/392) (is_parameter local))]
+        camlPhantom_refs__dead_temp_4
+      consts/399[((module_path consts/399) (location )
+                  (original_ident consts/399) (is_parameter local))]
+        camlPhantom_refs__consts_5)
+     (exit 6 G:"camlPhantom_refs"))
+ with(6 *ret*/376: val) 1) )
+
+(data)
