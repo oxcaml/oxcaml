@@ -29,7 +29,7 @@
 [@@@ocaml.warning "-26-27-32"]
 
 let[@inline never] [@local never] f x y =
-  let unused_konst = 42 in
+  let unused_const = 42 in
   let unused_alias = x in
   let unused_pair = (x, y) in
   x + y
