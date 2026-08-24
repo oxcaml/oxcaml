@@ -1130,13 +1130,26 @@ end = struct
   determined by two variables and morphism pair. The object
   types are irrelevant, and are thus forgotten. See [edge]
   for more explanation *)
+  type ('a,'b) morphl = ('a, 'b, (allowed * disallowed)) C.morph
+  type monadic_morph =
+    (Alloc.Monadic.Const.t, Alloc.Monadic.Const.t) morphl
+  type comonadic_morph =
+    (Alloc.Comonadic.Const.t, Alloc.Comonadic.Const.t)
+      morphl
+  type closing_over_morph =
+    (Alloc.Monadic.Const.t, Alloc.Comonadic.Const.t) morphl
+
   type boxedname =
-  | N :
+  | Simple_name :
       { target : 'c Desc.Var.Head.t;
         src : 'd Desc.Var.Head.t;
-        morph_src : 'a C.obj;
-        morph_dst : 'b C.obj;
-        morph : ('a, 'b, ('l * 'r)) C.morph
+        via : (monadic_morph, comonadic_morph) monadic_comonadic
+      }
+      -> boxedname
+  | Comonadic_name :
+      { target : 'c Desc.Var.Head.t;
+        src : 'd Desc.Var.Head.t;
+        morph : comonadic_morph
       }
       -> boxedname
 
@@ -1153,15 +1166,6 @@ end = struct
       | 0 -> Int.compare v1'.desc_id v2'.desc_id
       | c -> c
   end)
-
-  type ('a,'b) morphl = ('a, 'b, (allowed * disallowed)) C.morph
-  type monadic_morph =
-    (Alloc.Monadic.Const.t, Alloc.Monadic.Const.t) morphl
-  type comonadic_morph =
-    (Alloc.Comonadic.Const.t, Alloc.Comonadic.Const.t)
-      morphl
-  type closing_over_morph =
-    (Alloc.Monadic.Const.t, Alloc.Comonadic.Const.t) morphl
 
   module Paths = struct
     module Store (X : sig
@@ -1750,21 +1754,15 @@ end = struct
       -> visible_pair
       -> boxedname =
     fun { monadic = mon0; comonadic = com0 }
-        { monadic = mon_morph; comonadic = com_morph }
+        via
         { monadic = mon1; comonadic = com1 } ->
       match com0, com1 with
       | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
-        N { target = u; src = v;
-            morph_src = Alloc.obj_comonadic;
-            morph_dst = Alloc.obj_comonadic;
-            morph = com_morph }
+        Simple_name { target = u; src = v; via }
       | _, _ ->
         match mon0, mon1 with
         | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
-          N { target = u; src = v;
-              morph_src = Alloc.obj_monadic;
-              morph_dst = Alloc.obj_monadic;
-              morph = mon_morph }
+          Simple_name { target = u; src = v; via }
         | _, _ ->
           fatal_error
             "Out_type.construct_name: edge without variable endpoints"
@@ -1779,10 +1777,7 @@ end = struct
         { comonadic = com1 } ->
       match com0, com1 with
       | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
-        N { target = u; src = v;
-            morph_src = Alloc.obj_comonadic;
-            morph_dst = Alloc.obj_comonadic;
-            morph = com_morph }
+        Comonadic_name { target = u; src = v; morph = com_morph }
       | _, _ ->
         fatal_error
           "Out_type.construct_comonadic_name: edge without variable endpoints"
@@ -1832,7 +1827,51 @@ end = struct
         com_morphs
     else []
 
+  let eq_morph : type a0 a1 b l0 r0 l1 r1.
+      b C.obj
+      -> (a0, b, l0 * r0) C.morph
+      -> (a1, b, l1 * r1) C.morph
+      -> bool =
+    fun obj f g ->
+    match C.equal_morph obj f g with
+    | Is_eq -> true
+    | Is_not_eq -> false
+
+  let eq_boxedname n1 n2 =
+    match n1, n2 with
+    | Simple_name { target = v; src = v'; via = via1 },
+      Simple_name { target = u; src = u'; via = via2 } ->
+      Desc.Var.Head.equal v u
+      && Desc.Var.Head.equal v' u'
+      && eq_morph Alloc.obj_monadic via1.monadic via2.monadic
+      && eq_morph Alloc.obj_comonadic via1.comonadic via2.comonadic
+    | Comonadic_name { target = v; src = v'; morph = f },
+      Comonadic_name { target = u; src = u'; morph = g } ->
+      Desc.Var.Head.equal v u
+      && Desc.Var.Head.equal v' u'
+      && eq_morph Alloc.obj_comonadic f g
+    | Simple_name _, Comonadic_name _ | Comonadic_name _, Simple_name _ ->
+      false
+
+  let closing_over_composition { cls_target; cls_src; _ } =
+    C.compose Alloc.obj_comonadic cls_src cls_target
+
+  let eq_closing_over e1 e2 =
+    eq_boxedname e1.cls_edge.name e2.cls_edge.name
+    && C.compare_morph Alloc.obj_comonadic
+         (closing_over_composition e1)
+         (closing_over_composition e2)
+       = 0
+
+  let dedup_closing_over edges =
+    List.rev
+      (List.fold_left
+         (fun acc e ->
+           if List.exists (eq_closing_over e) acc then acc else e :: acc)
+         [] edges)
+
   let construct_closing_over_to pair1 =
+    let edges =
     List.concat_map (fun pair0 ->
       let com_morphs =
         construct_comonadic_morphs pair1.comonadic pair0.comonadic
@@ -1849,7 +1888,6 @@ end = struct
         List.concat_map (fun edge ->
           List.concat_map (fun cls_morph ->
             List.map (fun com_morph ->
-              ClosingOver
                 { cls_target = cls_morph;
                   cls_src = com_morph;
                   cls_edge = edge
@@ -1859,6 +1897,8 @@ end = struct
           simple_edges)
         !visible_pairs)
       !visible_pairs
+    in
+    List.map (fun e -> ClosingOver e) (dedup_closing_over edges)
 
   let construct_edges_between pair0 pair1 =
     if not (construct_edge_condition pair0 pair1) then []
@@ -1882,18 +1922,6 @@ end = struct
     fun pair0 ->
       List.concat_map (fun pair1 -> construct_edges_between pair0 pair1)
         !visible_pairs
-
-  let eq_boxedname
-      (N { target = v; src = v'; morph_dst = dstf; morph = f; _ })
-      (N { target = u; src = u'; morph_dst = dstg; morph = g; _ }) =
-    match C.equal_obj dstf dstg with
-    | Is_eq ->
-      Desc.Var.Head.equal v u
-      && Desc.Var.Head.equal v' u'
-      && (match C.equal_morph dstf f g with
-      | Is_eq -> true
-      | Is_not_eq -> false)
-    | Is_not_eq -> false
 
   let pick_name : int -> string = fun i ->
     match i with

@@ -148,7 +148,7 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  (int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic]) @ [> close('m) | close('m) | stateful] =
+  (int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic]) @ [> close('m) | stateful] =
   <fun>
 |}]
 
@@ -163,7 +163,7 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  (int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic]) @ [> close('m) | close('m) | stateful] =
+  (int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic]) @ [> close('m) | stateful] =
   <fun>
 |}]
 
