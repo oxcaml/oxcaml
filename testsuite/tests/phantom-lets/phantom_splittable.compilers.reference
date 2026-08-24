@@ -1,13 +1,3 @@
-(data global "camlPhantom_splittable__gc_roots": int 0)
-(data
- int 1792
- global "camlPhantom_splittable":
- addr G:"camlPhantom_splittable__splittable_1")
-(data
- int 3063
- global "camlPhantom_splittable__splittable_1":
- addr G:"camlPhantom_splittable__splittable_0_1_code"
- int 108086391056891909)
 (function{phantom_splittable.ml:25,45-135}
  camlPhantom_splittable__splittable_0_1_code
      (x/488[((module_path x/488) (location ()) (original_ident x/488)
@@ -39,4 +29,3 @@
      (exit 2 G:"camlPhantom_splittable"))
  with(2 *ret*/486: val) 1) )
 
-(data)

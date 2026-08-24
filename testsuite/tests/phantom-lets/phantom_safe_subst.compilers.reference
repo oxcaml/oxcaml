@@ -1,26 +1,3 @@
-(data global "camlPhantom_safe_subst__gc_roots": int 0)
-(data
- int 2816
- global "camlPhantom_safe_subst":
- addr G:"camlPhantom_safe_subst__effectful_2"
- addr G:"camlPhantom_safe_subst__f_3")
-(data
- int 4087
- global "camlPhantom_safe_subst__f_3":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_safe_subst__f_1_3_code")
-(data
- int 3063
- global "camlPhantom_safe_subst__effectful_2":
- addr G:"camlPhantom_safe_subst__effectful_0_2_code"
- int 108086391056891909)
-(data
- int 2044
- "camlPhantom_safe_subst__immstring13":
- string ""
- skip 7
- byte 7)
 (function{phantom_safe_subst.ml:31,44-64}
  camlPhantom_safe_subst__effectful_0_2_code
      (param/363[((module_path param/363) (location ())
@@ -74,4 +51,3 @@
      (exit 5 G:"camlPhantom_safe_subst"))
  with(5 *ret*/361: val) 1) )
 
-(data)

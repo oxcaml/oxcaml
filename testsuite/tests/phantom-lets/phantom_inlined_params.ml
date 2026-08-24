@@ -5,7 +5,7 @@
     perturb the Cmm output this test checks. *)
  set OCAMLPARAM = "_,";
  setup-ocamlopt.byte-build-env;
- flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -dcmm";
+ flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -dcmm-functions";
  module = "phantom_inlined_params.ml";
  ocamlopt.byte;
  check-ocamlopt.byte-output;

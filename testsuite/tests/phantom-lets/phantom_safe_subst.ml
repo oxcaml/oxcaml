@@ -5,7 +5,7 @@
     perturb the Cmm output this test checks. *)
  set OCAMLPARAM = "_,";
  setup-ocamlopt.byte-build-env;
- flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -flambda2-expert-cmm-safe-subst -dcmm";
+ flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -flambda2-expert-cmm-safe-subst -dcmm-functions";
  module = "phantom_safe_subst.ml";
  ocamlopt.byte;
  check-ocamlopt.byte-output;

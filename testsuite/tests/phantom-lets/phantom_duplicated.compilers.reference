@@ -1,14 +1,3 @@
-(data global "camlPhantom_duplicated__gc_roots": int 0)
-(data
- int 1792
- global "camlPhantom_duplicated":
- addr G:"camlPhantom_duplicated__f_1")
-(data
- int 4087
- global "camlPhantom_duplicated__f_1":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_duplicated__f_0_1_code")
 (function{phantom_duplicated.ml:27,36-151} camlPhantom_duplicated__f_0_1_code
      (q/404[((module_path q/404) (location ()) (original_ident q/404)
              (is_parameter local))]: val
@@ -51,4 +40,3 @@
      (exit 5 G:"camlPhantom_duplicated"))
  with(5 *ret*/402: val) 1) )
 
-(data)

@@ -1,41 +1,3 @@
-(data global "camlPhantom_exprs__gc_roots": int 0)
-(data
- int 5888
- global "camlPhantom_exprs":
- addr G:"camlPhantom_exprs__constant_5"
- addr G:"camlPhantom_exprs__consts_6"
- addr G:"camlPhantom_exprs__dead_temp_7"
- addr G:"camlPhantom_exprs__unrep_8"
- addr G:"camlPhantom_exprs__after_use_9")
-(data
- int 4087
- global "camlPhantom_exprs__after_use_9":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_exprs__after_use_4_9_code")
-(data
- int 3063
- global "camlPhantom_exprs__unrep_8":
- addr G:"camlPhantom_exprs__unrep_3_8_code"
- int 108086391056891909)
-(data
- int 4087
- global "camlPhantom_exprs__dead_temp_7":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_exprs__dead_temp_2_7_code")
-(data
- int 3063
- global "camlPhantom_exprs__consts_6":
- addr G:"camlPhantom_exprs__consts_1_6_code"
- int 108086391056891909)
-(data
- int 3063
- global "camlPhantom_exprs__constant_5":
- addr G:"camlPhantom_exprs__constant_0_5_code"
- int 108086391056891909)
-(data int 2045 "camlPhantom_exprs__float30": double 1.5)
-(data int 2044 "camlPhantom_exprs__immstring28": string "abc" skip 4 byte 4)
 (function{phantom_exprs.ml:45,43-97} camlPhantom_exprs__constant_0_5_code
      (x/532[((module_path x/532) (location ()) (original_ident x/532)
              (is_parameter local))]: int) : int
@@ -124,4 +86,3 @@
      (exit 8 G:"camlPhantom_exprs"))
  with(8 *ret*/530: val) 1) )
 
-(data)

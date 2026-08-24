@@ -1,41 +1,3 @@
-(data global "camlPhantom_add_equality__gc_roots": int 0)
-(data
- int 5888
- global "camlPhantom_add_equality":
- addr G:"camlPhantom_add_equality__materialised_5"
- addr G:"camlPhantom_add_equality__combined_temp_6"
- addr G:"camlPhantom_add_equality__inlined_out_7"
- addr G:"camlPhantom_add_equality__bare_equality_8"
- addr G:"camlPhantom_add_equality__arith_9")
-(data
- int 3063
- global "camlPhantom_add_equality__arith_9":
- addr G:"camlPhantom_add_equality__arith_4_9_code"
- int 108086391056891909)
-(data
- int 4087
- global "camlPhantom_add_equality__bare_equality_8":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_add_equality__bare_equality_3_8_code")
-(data
- int 4087
- global "camlPhantom_add_equality__inlined_out_7":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_add_equality__inlined_out_2_7_code")
-(data
- int 4087
- global "camlPhantom_add_equality__combined_temp_6":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_add_equality__combined_temp_1_6_code")
-(data
- int 4087
- global "camlPhantom_add_equality__materialised_5":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_add_equality__materialised_0_5_code")
 (function{phantom_add_equality.ml:75,47-128}
  camlPhantom_add_equality__materialised_0_5_code
      (p/549[((module_path p/549) (location ()) (original_ident p/549)
@@ -162,4 +124,3 @@
      (exit 11 G:"camlPhantom_add_equality"))
  with(11 *ret*/547: val) 1) )
 
-(data)

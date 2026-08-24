@@ -5,17 +5,17 @@
     perturb the Cmm output this test checks. *)
  set OCAMLPARAM = "_,";
  setup-ocamlopt.byte-build-env;
- flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -dcmm-functions";
- module = "phantom_basics.ml";
+ flags = "-O3 -g -gno-upstream-dwarf -no-flambda2-expert-phantom-lets -dcmm-functions";
+ module = "phantom_disabled.ml";
  ocamlopt.byte;
  check-ocamlopt.byte-output;
 *)
 
-(* Variables that are optimised away by Simplify give rise to phantom lets
-   in the Cmm code (visible as [let?] in the output).  The whole Cmm
-   output (functions only) is compared against the reference file.
-   phantom_disabled.ml checks that nothing appears without
-   -flambda2-expert-phantom-lets. *)
+(* As phantom_basics.ml, but with phantom lets explicitly disabled: no
+   [let?] appears in the output.  (The flag is passed explicitly rather
+   than relying on the default being off, so that this test remains
+   correct once phantom lets are enabled by default later in the
+   series.) *)
 
 [@@@ocaml.warning "-26-27-32"]
 

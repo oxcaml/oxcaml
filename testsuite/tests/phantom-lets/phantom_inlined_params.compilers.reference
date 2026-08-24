@@ -1,20 +1,3 @@
-(data global "camlPhantom_inlined_params__gc_roots": int 0)
-(data
- int 2816
- global "camlPhantom_inlined_params":
- addr G:"camlPhantom_inlined_params__inner_2"
- addr G:"camlPhantom_inlined_params__caller_3")
-(data
- int 3063
- global "camlPhantom_inlined_params__caller_3":
- addr G:"camlPhantom_inlined_params__caller_1_3_code"
- int 108086391056891909)
-(data
- int 4087
- global "camlPhantom_inlined_params__inner_2":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_inlined_params__inner_0_2_code")
 (function{phantom_inlined_params.ml:30,26-58}
  camlPhantom_inlined_params__inner_0_2_code
      (a/353[((module_path a/353) (location ()) (original_ident a/353)
@@ -63,4 +46,3 @@
      (exit 4 G:"camlPhantom_inlined_params"))
  with(4 *ret*/351: val) 1) )
 
-(data)
