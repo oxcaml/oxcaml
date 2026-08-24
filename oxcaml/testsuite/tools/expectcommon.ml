@@ -559,6 +559,8 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         ~f:(fun () -> let (_, r, _, _) = exec_phrases phrases in r)
   in
   let needs_principal =
+    Option.is_some trailing_code
+    ||
     List.exists chunks ~f:(fun chunk ->
       List.exists chunk.expectations ~f:(fun expectation ->
         match expectation.kind with
