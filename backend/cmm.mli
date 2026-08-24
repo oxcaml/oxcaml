@@ -230,8 +230,8 @@ type phantom_defining_expr =
   | Cphantom_const_symbol of symbol
       (** The phantom-let-bound variable is an alias for a symbol. *)
   | Cphantom_var of Backend_var.t
-      (** The phantom-let-bound variable is an alias for another variable,
-          which may itself be bound by a phantom let (see [Cphantom_let]). *)
+      (** The phantom-let-bound variable is an alias for another variable, which
+          may itself be bound by a phantom let (see [Cphantom_let]). *)
   | Cphantom_offset_var of
       { var : Backend_var.t;
         offset_in_words : int
@@ -509,8 +509,9 @@ type operation =
       (** Marks the phantom-let-bound variable [var] (which must be in scope)
           such that its defining expression will henceforth be treated as the
           result of evaluating the operation's single argument (any variables
-          therein must be in scope). Returns void, generates no code, and is
-          currently ignored during instruction selection. *)
+          therein must be in scope). The operation is transparent: it evaluates
+          to the value of its argument and generates no code of its own. The
+          marking itself is currently ignored during instruction selection. *)
   | Cbeginregion
   | Cendregion
   | Ctuple_field of int * machtype array
@@ -704,7 +705,8 @@ val map_tail : (expression -> expression) -> expression -> expression
 val iter_shallow : (expression -> unit) -> expression -> unit
 
 (** Whether an expression contains constructs that only arise from debugging
-    information ([Cphantom_let] and [Cname_for_debugger]). *)
+    information ([Cphantom_let], [Cname_for_debugger] and
+    [Cphantom_add_equality]). *)
 val contains_debug_only_constructs : expression -> bool
 
 val compare_machtype_component : machtype_component -> machtype_component -> int

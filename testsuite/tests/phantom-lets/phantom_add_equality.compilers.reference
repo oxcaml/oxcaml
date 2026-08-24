@@ -1,103 +1,129 @@
 (data global "camlPhantom_add_equality__gc_roots": int 0)
 (data
- int 3840
+ int 4864
  global "camlPhantom_add_equality":
- addr G:"camlPhantom_add_equality__materialised_3"
- addr G:"camlPhantom_add_equality__inlined_out_4"
- addr G:"camlPhantom_add_equality__constant_5")
+ addr G:"camlPhantom_add_equality__materialised_4"
+ addr G:"camlPhantom_add_equality__inlined_out_5"
+ addr G:"camlPhantom_add_equality__constant_6"
+ addr G:"camlPhantom_add_equality__arith_7")
 (data
  int 3063
- global "camlPhantom_add_equality__constant_5":
- addr G:"camlPhantom_add_equality__constant_2_5_code"
+ global "camlPhantom_add_equality__arith_7":
+ addr G:"camlPhantom_add_equality__arith_3_7_code"
+ int 108086391056891909)
+(data
+ int 3063
+ global "camlPhantom_add_equality__constant_6":
+ addr G:"camlPhantom_add_equality__constant_2_6_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlPhantom_add_equality__inlined_out_4":
+ global "camlPhantom_add_equality__inlined_out_5":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlPhantom_add_equality__inlined_out_1_4_code")
+ addr G:"camlPhantom_add_equality__inlined_out_1_5_code")
 (data
  int 4087
- global "camlPhantom_add_equality__materialised_3":
+ global "camlPhantom_add_equality__materialised_4":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlPhantom_add_equality__materialised_0_3_code")
-(function{phantom_add_equality.ml:36,47-128}
- camlPhantom_add_equality__materialised_0_3_code
-     (p/387[((module_path p/387) (location ) (original_ident p/387)
-             (is_parameter local))]: val
-      x/388[((module_path x/388) (location ) (original_ident x/388)
-             (is_parameter local))]: int) : int
- (let region/389 (beginregion)
-   (catch
-     (let
-       a1/392[((module_path a1/392) (location ) (original_ident a1/392)
-               (is_parameter local))]
-         (load val p/387)
-       (let? a1_pproxy/393 () (phantom_add_equality a1_pproxy/393 a1/392)
-         (let?
-           pair1/394[((module_path pair1/394) (location )
-                      (original_ident pair1/394) (is_parameter local))]
-             [0: a1_pproxy/393; x/388; ]
-           (if (>s x/388 1) (exit 10 (+ (+ a1/392 a1/392) -1)) (exit 10 1)))))
-   with(10 region_return/390: int)
-     (let unit/391 (seq (endregion region/389) 1) region_return/390))) )
-
-(function{phantom_add_equality.ml:41,46-152}
- camlPhantom_add_equality__inlined_out_1_4_code
+ addr G:"camlPhantom_add_equality__materialised_0_4_code")
+(function{phantom_add_equality.ml:42,47-128}
+ camlPhantom_add_equality__materialised_0_4_code
      (p/398[((module_path p/398) (location ) (original_ident p/398)
              (is_parameter local))]: val
       x/399[((module_path x/399) (location ) (original_ident x/399)
              (is_parameter local))]: int) : int
  (let region/400 (beginregion)
    (catch
-     (let?
-       (a2_pproxy/405 () b2_pproxy/406 ()
-        pair2/407[((module_path pair2/407) (location )
-                   (original_ident pair2/407) (is_parameter local))]
-          [0: a2_pproxy/405; b2_pproxy/406; ])
-       (if (>s x/399 1)
-         (exit 11
-           (name_for_debugger
-             ((module_path a2/403) (location ) (original_ident a2/403)
-              (is_parameter local))
-             (+ (load val p/398) 2)))
-         (exit 11
-           (name_for_debugger
-             ((module_path b2/404) (location ) (original_ident b2/404)
-              (is_parameter local))
-             (+ (load val (+a p/398 8)) 4)))))
-   with(11 region_return/401: int)
+     (let
+       a1/403[((module_path a1/403) (location ) (original_ident a1/403)
+               (is_parameter local))]
+         (load val p/398)
+       (let? a1_pproxy/404 () (phantom_add_equality a1_pproxy/404 a1/403)
+         (let?
+           pair1/405[((module_path pair1/405) (location )
+                      (original_ident pair1/405) (is_parameter local))]
+             [0: a1_pproxy/404; x/399; ]
+           (if (>s x/399 1) (exit 9 (+ (+ a1/403 a1/403) -1)) (exit 9 1)))))
+   with(9 region_return/401: int)
      (let unit/402 (seq (endregion region/400) 1) region_return/401))) )
 
-(function{phantom_add_equality.ml:47,43-97}
- camlPhantom_add_equality__constant_2_5_code
-     (x/412[((module_path x/412) (location ) (original_ident x/412)
+(function{phantom_add_equality.ml:47,46-144}
+ camlPhantom_add_equality__inlined_out_1_5_code
+     (p/409[((module_path p/409) (location ) (original_ident p/409)
+             (is_parameter local))]: val
+      x/410[((module_path x/410) (location ) (original_ident x/410)
+             (is_parameter local))]: int) : val
+ (let region/411 (beginregion)
+   (catch
+     (let?
+       (a2_pproxy/416 () b2_pproxy/417 ()
+        pair2/418[((module_path pair2/418) (location )
+                   (original_ident pair2/418) (is_parameter local))]
+          [0: a2_pproxy/416; b2_pproxy/417; ])
+       (if (>s x/410 1)
+         (exit 10
+           (phantom_add_equality a2_pproxy/416
+             (name_for_debugger
+               ((module_path a2/414) (location ) (original_ident a2/414)
+                (is_parameter local))
+               (load val p/409))))
+         (exit 10
+           (phantom_add_equality b2_pproxy/417
+             (name_for_debugger
+               ((module_path b2/415) (location ) (original_ident b2/415)
+                (is_parameter local))
+               (load val (+a p/409 8)))))))
+   with(10 region_return/412: val)
+     (let unit/413 (seq (endregion region/411) 1) region_return/412))) )
+
+(function{phantom_add_equality.ml:53,43-97}
+ camlPhantom_add_equality__constant_2_6_code
+     (x/421[((module_path x/421) (location ) (original_ident x/421)
              (is_parameter local))]: int) : int
- (let region/413 (beginregion)
+ (let region/422 (beginregion)
    (let?
-     (pconst/414 42
-      pair3/415[((module_path pair3/415) (location )
-                 (original_ident pair3/415) (is_parameter local))]
-        [0: pconst/414; x/412; ])
-     (let (int_add/416 (+ x/412 84) unit/417 (seq (endregion region/413) 1))
-       int_add/416))) )
+     (pconst/423 42
+      pair3/424[((module_path pair3/424) (location )
+                 (original_ident pair3/424) (is_parameter local))]
+        [0: pconst/423; x/421; ])
+     (let (int_add/425 (+ x/421 84) unit/426 (seq (endregion region/422) 1))
+       int_add/425))) )
+
+(function{phantom_add_equality.ml:58,40-97}
+ camlPhantom_add_equality__arith_3_7_code
+     (x/428[((module_path x/428) (location ) (original_ident x/428)
+             (is_parameter local))]: int) : int
+ (let region/429 (beginregion)
+   (let?
+     (s4_pproxy/431 ()
+      pair4/432[((module_path pair4/432) (location )
+                 (original_ident pair4/432) (is_parameter local))]
+        [0: s4_pproxy/431; x/428; ])
+     (let
+       (int_mul/433 (+ (<< x/428 1) 3)
+        unit/434 (seq (endregion region/429) 1))
+       int_mul/433))) )
 
 (function no_cse reduce_code_size linscan camlPhantom_add_equality__entry
      () : val
  (catch
    (let?
-     (materialised/397[((module_path materialised/397) (location )
-                        (original_ident materialised/397)
+     (materialised/408[((module_path materialised/408) (location )
+                        (original_ident materialised/408)
                         (is_parameter local))]
-        camlPhantom_add_equality__materialised_3
-      inlined_out/411[((module_path inlined_out/411) (location )
-                       (original_ident inlined_out/411) (is_parameter local))]
-        camlPhantom_add_equality__inlined_out_4
-      constant/418[((module_path constant/418) (location )
-                    (original_ident constant/418) (is_parameter local))]
-        camlPhantom_add_equality__constant_5)
-     (exit 9 G:"camlPhantom_add_equality"))
- with(9 *ret*/385: val) 1) )
+        camlPhantom_add_equality__materialised_4
+      inlined_out/420[((module_path inlined_out/420) (location )
+                       (original_ident inlined_out/420) (is_parameter local))]
+        camlPhantom_add_equality__inlined_out_5
+      constant/427[((module_path constant/427) (location )
+                    (original_ident constant/427) (is_parameter local))]
+        camlPhantom_add_equality__constant_6
+      arith/435[((module_path arith/435) (location )
+                 (original_ident arith/435) (is_parameter local))]
+        camlPhantom_add_equality__arith_7)
+     (exit 8 G:"camlPhantom_add_equality"))
+ with(8 *ret*/396: val) 1) )
 
 (data)

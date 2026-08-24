@@ -906,9 +906,26 @@ let contains_debug_only_constructs expr =
   let exception Found in
   let rec check expr =
     match expr with
-    | Cphantom_let _ | Cname_for_debugger _ -> raise Found
-    | Clet _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _
-    | Ccatch _ | Cexit _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _
+    | Cphantom_let _ | Cname_for_debugger _
+    | Cop (Cphantom_add_equality _, _, _) ->
+      raise Found
+    | Cop
+        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
+          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+          | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
+          | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
+          | Capply _ | Cextcall _ | Cload _
+          | Cstore (_, _)
+          | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz | Cctz | Cprefetch _
+          | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
+          | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+          | Ccmpf (_, _)
+          | Craise _ | Cprobe _ | Cprobe_is_enabled _
+          | Ctuple_field (_, _) ),
+          _,
+          _ )
+    | Clet _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+    | Cexit _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _
     | Cconst_float _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cconst_mask _ | Cconst_symbol _ | Cvar _ | Cinvalid _ ->
       iter_shallow check expr

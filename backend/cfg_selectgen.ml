@@ -827,10 +827,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_parts_list env sub_cfg exp_list with
       | Never_returns -> Never_returns
       | Ok (simple_list, ext_env) -> emit_tuple ext_env sub_cfg simple_list)
-    | Cop (Cphantom_add_equality _, _, _) ->
-      (* Currently ignored during instruction selection; in particular the
-         argument is not evaluated. *)
-      Ok [||]
+    | Cop (Cphantom_add_equality _, [arg], _) ->
+      (* The operation is transparent: only the argument is compiled. The
+         marking itself is currently ignored during instruction selection. *)
+      emit_expr env sub_cfg arg ~bound_name
+    | Cop (Cphantom_add_equality _, ([] | _ :: _ :: _), _) ->
+      Misc.fatal_error "Cphantom_add_equality takes exactly one argument"
     | Cop (Craise k, args, dbg) -> emit_expr_raise env sub_cfg k args dbg
     | Cop (Copaque, args, dbg) -> (
       match emit_parts_list env sub_cfg args with

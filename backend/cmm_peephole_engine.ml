@@ -73,6 +73,8 @@ module Env : sig
 
   val register_name_for_debugger : t -> Backend_var.Provenance.t -> t
 
+  val register_add_equality : t -> Backend_var.t -> Debuginfo.t -> t
+
   val place_preserved_wrappers : t -> Cmm.expression -> Cmm.expression
 end = struct
   (* Debugging-related wrappers that are skipped over during matching and placed
@@ -81,6 +83,7 @@ end = struct
     | Phantom_let of
         Backend_var.With_provenance.t * Cmm.phantom_defining_expr option
     | Name_for_debugger of Backend_var.Provenance.t
+    | Add_equality of Backend_var.t * Debuginfo.t
 
   type t =
     { exprs : Cmm.expression IM.t;
@@ -122,13 +125,18 @@ end = struct
   let register_name_for_debugger env var =
     { env with wrappers_rev = Name_for_debugger var :: env.wrappers_rev }
 
+  let register_add_equality env var dbg =
+    { env with wrappers_rev = Add_equality (var, dbg) :: env.wrappers_rev }
+
   let place_preserved_wrappers env expr =
     List.fold_left
       (fun expr wrapper ->
         match wrapper with
         | Phantom_let (phantom_var, defining_expr) ->
           Cmm.Cphantom_let (phantom_var, defining_expr, expr)
-        | Name_for_debugger var -> Cmm.Cname_for_debugger (var, expr))
+        | Name_for_debugger var -> Cmm.Cname_for_debugger (var, expr)
+        | Add_equality (var, dbg) ->
+          Cmm.Cop (Cmm.Cphantom_add_equality { var }, [expr], dbg))
       expr env.wrappers_rev
 end
 
@@ -189,6 +197,14 @@ let match_clauses_in_order ~default ~matches clauses expr =
          the rewritten expression at all. Such names are dropped. *)
       let env =
         if toplevel then Env.register_name_for_debugger env var else env
+      in
+      match_one_pattern ~toplevel env pat body
+    | Cop (Cphantom_add_equality { var }, [body], dbg) ->
+      (* As for [Cname_for_debugger]: the equality describes the whole
+         expression's value, so it can be transferred onto a rewritten whole
+         expression but not preserved on a rewritten subexpression. *)
+      let env =
+        if toplevel then Env.register_add_equality env var dbg else env
       in
       match_one_pattern ~toplevel env pat body
     | _ -> (

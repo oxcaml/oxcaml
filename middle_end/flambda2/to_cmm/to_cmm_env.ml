@@ -951,14 +951,38 @@ let bind_phantom_variable env res var defining_expr =
    inlining by itself never gives rise to a phantom let. Empty phantom lets for
    [Inlined] bindings are still generated when the variable is referenced from a
    phantom defining expression; see [flush_phantom_binding]. *)
-let wrap_phantom ~phantomize cmm_var cmm_expr free_vars =
-  if not phantomize
-  then cmm_expr, free_vars
-  else
-    match Backend_var.With_provenance.provenance cmm_var with
-    | None -> cmm_expr, free_vars
-    | Some provenance ->
-      Cmm.Cname_for_debugger (provenance, cmm_expr), free_vars
+(* CR mshinwell: when the wrapped expression flows into the Cmm arithmetic
+   helpers (e.g. as an argument of a tagged-integer operation), the helpers
+   can rebuild the expression and drop the wrappers; see the [arith] case of
+   tests/phantom-lets/phantom_add_equality.ml.  The helpers (and the
+   [Untag] extra-info shortcut in [To_cmm_primitive]) need to preserve
+   them. *)
+let wrap_phantom ~phantomize ~phantom_proxies cmm_var cmm_expr free_vars =
+  let cmm_expr =
+    if not phantomize
+    then cmm_expr
+    else
+      match Backend_var.With_provenance.provenance cmm_var with
+      | None -> cmm_expr
+      | Some provenance -> Cmm.Cname_for_debugger (provenance, cmm_expr)
+  in
+  (* If the variable being inlined out has a phantom proxy, the inlined
+     expression also supplies the proxy's value: the [Cphantom_add_equality] is
+     transparent, so the expression is not duplicated. This is not conditional
+     on [phantomize]: non-user-visible bindings referenced by phantom defining
+     expressions need their equalities too. *)
+  let cmm_expr =
+    match
+      Backend_var.Map.find_opt
+        (Backend_var.With_provenance.var cmm_var)
+        phantom_proxies
+    with
+    | None -> cmm_expr
+    | Some proxy ->
+      Cmm.Cop
+        (Cmm.Cphantom_add_equality { var = proxy }, [cmm_expr], Debuginfo.none)
+  in
+  cmm_expr, free_vars
 
 let will_inline_simple env res
     { effs;
@@ -968,7 +992,8 @@ let will_inline_simple env res
       _
     } =
   let cmm_expr, free_vars =
-    wrap_phantom ~phantomize cmm_var cmm_expr free_vars
+    wrap_phantom ~phantomize ~phantom_proxies:env.phantom_proxies cmm_var
+      cmm_expr free_vars
   in
   { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
 
@@ -976,7 +1001,8 @@ let will_inline_complex env res { effs; bound_expr; cmm_var; phantomize; _ } =
   match bound_expr with
   | Split { cmm_expr; free_vars } ->
     let cmm_expr, free_vars =
-      wrap_phantom ~phantomize cmm_var cmm_expr free_vars
+      wrap_phantom ~phantomize ~phantom_proxies:env.phantom_proxies cmm_var
+        cmm_expr free_vars
     in
     { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
   | Splittable_prim { dbg; prim; args } ->
@@ -988,7 +1014,8 @@ let will_inline_complex env res { effs; bound_expr; cmm_var; phantomize; _ } =
     in
     let cmm_expr, res = rebuild_prim ~dbg ~env ~res prim cmm_args in
     let cmm_expr, free_vars =
-      wrap_phantom ~phantomize cmm_var cmm_expr free_vars
+      wrap_phantom ~phantomize ~phantom_proxies:env.phantom_proxies cmm_var
+        cmm_expr free_vars
     in
     { env; res; expr = { cmm = cmm_expr; free_vars; effs } }
 
