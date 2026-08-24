@@ -2,7 +2,7 @@ The [module-type-impls] query answers from the compiler facts recorded in the
 configured indexes.  Compile test programs with the compiler under test so the
 resulting artifacts contain the facts channel.
 
-  $ print-results () {
+  $ print_results () {
   >   local module_type="${1-}"
   >   jq -r --arg module_type "$module_type" '
   >     def position: "\(.line):\(.col)";
@@ -25,7 +25,7 @@ resulting artifacts contain the facts channel.
   >      | join(" "))'
   > }
 
-  $ impls-of () {
+  $ impls_of () {
   >   local module_type="$1"
   >   cat > main.ml
   >   "$MERLIN_TEST_OCAML_PATH/bin/ocamlc" -bin-annot -c main.ml || return
@@ -33,14 +33,14 @@ resulting artifacts contain the facts channel.
   >   $MERLIN single module-type-impls \
   >     -index-file ./module-types.ocaml-index \
   >     -filename ./main.ml < ./main.ml \
-  >     | print-results "$module_type"
+  >     | print_results "$module_type"
   > }
 
 Every module checked against [S] is returned.  Named modules carry their UID
 and source name in the raw response; expression-based implementation sites are
 shown as [<anon>].
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -60,7 +60,7 @@ shown as [<anon>].
 Nested module-type aliases retain their dependency on the top-level [S].  Both
 the module that defines the alias and a module ascribed to it are affected.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type u
   > end
@@ -83,7 +83,7 @@ the module that defines the alias and a module ascribed to it are affected.
 
 Module-type aliases can form a chain before reaching an implementation.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -101,7 +101,7 @@ Module-type aliases can form a chain before reaching an implementation.
 Including a module type should retain the relationship with the included
 module type.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -122,7 +122,7 @@ module type.
 Including the result of a functor application combines include, application,
 projection, and alias contexts.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -149,7 +149,7 @@ projection, and alias contexts.
 A module type obtained through [module type of] should preserve the provenance
 of the module whose type was inspected.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   >   val value : t
@@ -176,7 +176,7 @@ of the module whose type was inspected.
 Destructive module-type substitution should connect the substituted signature
 member to the replacement module type.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -199,7 +199,7 @@ member to the replacement module type.
   M 13:7 13:8 annotation
   Value 14:9 14:14 annotation
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -224,7 +224,7 @@ member to the replacement module type.
 Repeated applications of an applicative functor exercise congruence and
 deduplication of application contexts.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -250,7 +250,7 @@ deduplication of application contexts.
 Projecting a result from an applied functor combines application and projection
 contexts.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   val value : int
   > end
@@ -278,7 +278,7 @@ contexts.
 Functor applications with anonymous arguments should still produce stable
 query results.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   val value : int
   > end
@@ -296,7 +296,7 @@ query results.
 
 Packing and unpacking a module crosses the first-class module boundary.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   >   val value : t
@@ -317,7 +317,7 @@ Packing and unpacking a module crosses the first-class module boundary.
 Mutually recursive modules put multiple annotations in the same recursive
 group.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   val value : unit -> int
   > end
@@ -336,7 +336,7 @@ group.
 A higher-order functor receives an applicative functor, applies it inside its
 body, and exposes the result through a second application context.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -369,7 +369,7 @@ body, and exposes the result through a second application context.
 Independently repeated applications of a functor returning another functor
 should converge on the same nested result family.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -403,7 +403,7 @@ should converge on the same nested result family.
 A functor parameter carries both a module-type member and a module checked
 against that member; the result reexports the member under a new projection.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -435,7 +435,7 @@ against that member; the result reexports the member under a new projection.
 [module type of] follows a projection from an applicative functor result, then
 the captured type constrains another alias of that projection.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -465,7 +465,7 @@ the captured type constrains another alias of that projection.
 Multiple nested [with module] constraints force two signature projections to
 the same implementation before the constrained signature is implemented.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -503,7 +503,7 @@ Two signature includes form a diamond whose leaves independently refer to the
 same module type; the implementation relies on member pairing rather than
 direct annotations.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -538,7 +538,7 @@ direct annotations.
 Including a doubly applied functor with anonymous arguments anchors the result
 at an unnamed site while exporting an alias of [S] used afterward.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -567,7 +567,7 @@ at an unnamed site while exporting an alias of [S] used afterward.
 Generative applications of the same partially applied functor must remain
 distinct while their projected result modules retain the same family.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -597,7 +597,7 @@ distinct while their projected result modules retain the same family.
 Alias-preserving and alias-removing forms of [module type of] derive signatures
 from the same module and are both used in later annotations.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
@@ -628,7 +628,7 @@ from the same module and are both used in later annotations.
 An implementation ascribed to a functor module type joins parameter members,
 result members, aliases, and the eventual application instance.
 
-  $ impls-of S <<'EOF'
+  $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
