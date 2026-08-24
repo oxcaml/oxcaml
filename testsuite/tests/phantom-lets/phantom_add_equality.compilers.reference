@@ -36,7 +36,7 @@
  addr G:"caml_curry2"
  int 180143985094819847
  addr G:"camlPhantom_add_equality__materialised_0_5_code")
-(function{phantom_add_equality.ml:69,47-128}
+(function{phantom_add_equality.ml:75,47-128}
  camlPhantom_add_equality__materialised_0_5_code
      (p/549[((module_path p/549) (location ()) (original_ident p/549)
              (is_parameter local))]: val
@@ -57,7 +57,7 @@
    with(12 region_return/552: int)
      (let unit/553 (seq (endregion region/551) 1) region_return/552))) )
 
-(function{phantom_add_equality.ml:74,48-95}
+(function{phantom_add_equality.ml:80,48-95}
  camlPhantom_add_equality__combined_temp_1_6_code
      (q/560[((module_path q/560) (location ()) (original_ident q/560)
              (is_parameter local))]: val
@@ -75,7 +75,7 @@
         [0: Pfield_pproxy/564; x/561])
      (let unit/566 (seq (endregion region/562) 1) Pfield/563))) )
 
-(function{phantom_add_equality.ml:78,46-144}
+(function{phantom_add_equality.ml:84,46-144}
  camlPhantom_add_equality__inlined_out_2_7_code
      (p/568[((module_path p/568) (location ()) (original_ident p/568)
              (is_parameter local))]: val
@@ -104,7 +104,7 @@
    with(13 region_return/571: val)
      (let unit/572 (seq (endregion region/570) 1) region_return/571))) )
 
-(function{phantom_add_equality.ml:84,48-131}
+(function{phantom_add_equality.ml:90,48-131}
  camlPhantom_add_equality__bare_equality_3_8_code
      (q/580[((module_path q/580) (location ()) (original_ident q/580)
              (is_parameter local))]: val
@@ -122,7 +122,7 @@
         unit/587 (seq (endregion region/582) 1))
        x/581))) )
 
-(function{phantom_add_equality.ml:89,40-97}
+(function{phantom_add_equality.ml:95,40-97}
  camlPhantom_add_equality__arith_4_9_code
      (x/589[((module_path x/589) (location ()) (original_ident x/589)
              (is_parameter local))]: int) : int

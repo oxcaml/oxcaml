@@ -19,12 +19,18 @@
    [Cphantom_add_equality] operation.  The whole Cmm output is compared
    against the reference file.
 
-   [materialised]: the combined form.  [a1] is used twice, so its binding
-   materialises as a real let, in the same flush as (and outside) the
-   proxy's binder; the proxy is therefore bound directly to [a1], with no
-   [Cphantom_add_equality] needed.  (The operation is used when the
-   binder and the value's appearance are in different places: at a real
-   let the binding was sunk past, or at an inlined use site.)
+   [materialised]: the combined form.  [a1] (a memory load) is used
+   twice, so its binding is not inlined; being moved down, it
+   materialises as a real let at the first flush point after its
+   creation, which is necessarily the same flush at which the
+   (later-created) phantom let and the proxy's binder are emitted --
+   non-inlinable bindings never survive a flush point, so they cannot
+   sink past the proxy's binder.  The proxy is therefore bound directly
+   to [a1], with no [Cphantom_add_equality] needed.  (The operation is
+   used when the binder and the value's appearance are in different
+   places: at an inlined use site, or -- defensively; not currently
+   reachable, since pure single-use bindings always substitute -- at a
+   real let the binding was sunk past.)
 
    [combined_temp]: the combined form for a variable that is not
    user-visible.  The two occurrences of [fst q] are shared (by CSE
