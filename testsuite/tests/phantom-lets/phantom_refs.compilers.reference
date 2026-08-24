@@ -34,14 +34,12 @@
     Pfield/381[((module_path Pfield/381) (location )
                 (original_ident Pfield/381) (is_parameter local))]
       (load val q/378))
-   (let? Pfield_pproxy/382 ()
-     (phantom_add_equality Pfield_pproxy/382 Pfield/381)
-     (let?
-       unused_pair/383[((module_path unused_pair/383) (location )
-                        (original_ident unused_pair/383)
-                        (is_parameter local))]
-         [0: Pfield_pproxy/382; x/379; ]
-       (let unit/384 (seq (endregion region/380) 1) Pfield/381)))) )
+   (let?
+     (Pfield_pproxy/382 Pfield/381
+      unused_pair/383[((module_path unused_pair/383) (location )
+                       (original_ident unused_pair/383) (is_parameter local))]
+        [0: Pfield_pproxy/382; x/379; ])
+     (let unit/384 (seq (endregion region/380) 1) Pfield/381))) )
 
 (function{phantom_refs.ml:41,44-87} camlPhantom_refs__dead_temp_1_4_code
      (q/386[((module_path q/386) (location ) (original_ident q/386)

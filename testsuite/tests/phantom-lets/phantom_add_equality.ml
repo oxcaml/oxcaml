@@ -17,13 +17,19 @@
    substituted directly.  The whole Cmm output is compared against the
    reference file.
 
-   [materialised]: [a1] is used twice, so its binding materialises as a
-   real let; the pair's phantom let references a proxy for it, which
-   receives its value via a [Cphantom_add_equality] operation placed where
-   both the real let and the proxy's binder are in scope.
+   [materialised]: the combined form.  [a1] is used twice, so its
+   binding materialises as a
+   real let, in the same flush as (and outside) the proxy's binder; the
+   proxy is therefore bound directly to [a1], with no
+   [Cphantom_add_equality] needed.  (The operation is used when the
+   binder and the value's appearance are in different places: at a real
+   let the binding was sunk past, or at an inlined use site.)
 
-   [inlined_out]: [a2] and [b2] are each used once, on different branches,
-   so their bindings are inlined out.  The inlined expressions are wrapped
+   [inlined_out]: the uncombined form.  [a2] and [b2] are each used once,
+   on different branches, so their bindings are inlined out; the proxies'
+   binders (before the fork) and the points where the values appear (the
+   inlined use sites, on the branches) are in different places, so
+   free-standing equality operations are needed.  The inlined expressions are wrapped
    both in [Cname_for_debugger] (recording the deleted normal variables) and
    in [Cphantom_add_equality] (supplying the proxies' values); the equality
    operation is transparent, so the expressions are not duplicated.

@@ -1446,32 +1446,36 @@ let flush_phantom_binding ~phantomize ~equality
   | [] -> ()
   | _ :: _ ->
     Misc.fatal_errorf "Non-empty list of symbol inits tied to a phantom binding");
-  (* If this binder is a proxy whose real binding materialises in the same flush
-     (necessarily at an outer position, since references only point backwards),
-     the [Cphantom_add_equality] supplying its value is emitted directly inside
-     the binder. The reference to the real variable forces the real binding to
-     materialise. *)
-  let acc, acc_free_vars =
-    match equality with
-    | None -> acc, acc_free_vars
-    | Some real ->
-      add_equality ~proxy:v ~real acc, FV.add ~mode:Normal real acc_free_vars
-  in
-  let gen_phantom_let phantom_defining_expr free_vars =
+  let gen_phantom_let phantom_defining_expr acc free_vars =
     let expr = Cmm_helpers.make_phantom_let cmm_var phantom_defining_expr acc in
     let free_vars = FV.remove v free_vars in
     expr, free_vars, symbol_inits
   in
-  match phantom_expr_opt with
-  | None ->
+  match phantom_expr_opt, equality with
+  | Some (None, expr_free_vars), Some real ->
+    (* This binder is a proxy whose real binding materialises in the same flush,
+       necessarily at an outer position (references only point backwards):
+       rather than an empty binder immediately followed by a
+       [Cphantom_add_equality], bind the proxy directly to the variable. The
+       reference to the real variable forces the real binding to materialise. *)
+    gen_phantom_let (Some (Cmm.Cphantom_var real)) acc
+      (FV.add ~mode:Normal real (FV.union acc_free_vars expr_free_vars))
+  | Some (Some cmm_expr, expr_free_vars), Some real ->
+    (* Defensive: a proxy always starts with no defining expression. *)
+    let acc = add_equality ~proxy:v ~real acc in
+    gen_phantom_let (Some cmm_expr) acc
+      (FV.add ~mode:Normal real (FV.union acc_free_vars expr_free_vars))
+  | None, Some _ ->
+    Misc.fatal_errorf "Equalities cannot be attached to [Inlined] markers"
+  | None, None ->
     (* An [Inlined] binding: only generate an (empty) phantom let if the
        variable is actually referenced phantom-ly by the body. *)
     if phantomize && FV.mem ~mode:Phantom v acc_free_vars
-    then gen_phantom_let None acc_free_vars
+    then gen_phantom_let None acc acc_free_vars
     else acc, acc_free_vars, symbol_inits
-  | Some (cmm_expr, expr_free_vars) ->
+  | Some (cmm_expr, expr_free_vars), None ->
     let free_vars = FV.union acc_free_vars expr_free_vars in
-    gen_phantom_let cmm_expr free_vars
+    gen_phantom_let cmm_expr acc free_vars
 
 let flush_regular_binding ~phantomize ~deferred_equality
     (acc, acc_free_vars, symbol_inits) cmm_var cmm_expr free_vars effs =
