@@ -593,21 +593,20 @@ module Structured_errors = struct
         ("children", `List (List.map ~f:child block.children))
       ]
 
-  and child ((relation_kind, block_value) :
-      Diagnostic.Relation.t * Diagnostic.Block.t) =
+  and child
+      ((relation_kind, block_value) :
+        Diagnostic.Relation.t * Diagnostic.Block.t) =
     `Assoc
       [ ("relation", `String (relation relation_kind));
         ("block", block block_value)
       ]
 
-  let entity (id, loc : Diagnostic.Entities.Id.t * Location.t) =
+  let entity ((id, loc) : Diagnostic.Entities.Id.t * Location.t) =
     `Assoc
-      [ ("id", `Int (Diagnostic.Entities.Id.to_int id));
-        ("loc", location loc)
-      ]
+      [ ("id", `Int (Diagnostic.Entities.Id.to_int id)); ("loc", location loc) ]
 
   let glossary_entry
-      (id, entry : Diagnostic.Glossary.Id.t * Diagnostic.Glossary.Entry.t) =
+      ((id, entry) : Diagnostic.Glossary.Id.t * Diagnostic.Glossary.Entry.t) =
     let url =
       match entry.url with
       | None -> []
@@ -646,8 +645,7 @@ end
 let json_of_response (type a) (query : a t) (response : a) : json =
   match (query, response) with
   | Type_expr _, str -> `String str
-  | Structured_errors _, diagnostics ->
-    Structured_errors.response diagnostics
+  | Structured_errors _, diagnostics -> Structured_errors.response diagnostics
   | Stack_or_heap_enclosing _, results ->
     `List (List.map ~f:json_of_stack_or_heap results)
   | Mode_enclosing _, results -> `List (List.map ~f:json_of_mode results)
