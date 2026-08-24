@@ -157,22 +157,21 @@ let all_commands =
          ]\n\
          }\n\
          ```\n\n\
-         Reason kinds: 'no-index-files', 'facts-channel-absent', \
-         'reader-problem' (with 'message'), 'omission' (with 'reason' and \
-         optional 'family'), 'unresolved-implementation' (with 'target', \
-         'instance', 'implementation' and optional 'site') when an impacted \
-         module could not be resolved to a source location, and \
-         'unresolved-check-site' (with 'target', 'instance' and 'site') when a \
-         recorded check site could not be resolved; neither impacts nor \
+         Reason kinds: 'no-index-files', 'facts-channel-absent', 'omission' \
+         (with 'reason' and optional 'family'), 'unresolved-implementation' \
+         (with 'target', 'instance', 'implementation' and optional 'site') \
+         when an impacted module could not be resolved to a source location, \
+         and 'unresolved-check-site' (with 'target', 'instance' and 'site') \
+         when a recorded check site could not be resolved; neither impacts nor \
          recorded sites are ever silently dropped, and an impact whose \
          implementation and recorded site both fail to resolve reports both \
          reasons.\n\n\
-         'complete' requires the facts channel to be present with no reader \
-         problems, no omission scoped to the queried declarations, and every \
-         impacted module and recorded check site resolved; 'partial' carries \
-         the reasons; 'unavailable' means no usable facts channel was \
-         configured or loaded, which is distinct from a complete empty result."
-      ~default:() begin fun buffer () ->
+         'complete' requires the facts channel to be present with no omission \
+         scoped to the queried declarations, and every impacted module and \
+         recorded check site resolved; 'partial' carries the reasons; \
+         'unavailable' means no usable facts channel was configured or loaded, \
+         which is distinct from a complete empty result." ~default:()
+      begin fun buffer () ->
         run buffer Query_protocol.Module_type_impls
       end;
     command "construct"
