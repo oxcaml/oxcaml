@@ -27,11 +27,15 @@
    let the binding was sunk past, or at an inlined use site.)
 
    [combined_temp]: the combined form for a variable that is not
-   user-visible.  The pair references a compiler-generated temporary (the
-   projection), which materialises as a real let (its other use is in
-   return position); as for [materialised], the proxy is bound directly
-   to it.  Nothing carries a [Cnormal_var_optimised_out], there being no
-   user variable to name.
+   user-visible.  The two occurrences of [fst q] are shared (by CSE
+   during Simplify) into a single compiler-generated temporary; this
+   sharing of duplicate pure expressions is the only way a
+   non-user-visible temporary can acquire both a phantom use and a
+   normal use from source syntax, since such a temporary cannot be named.
+   The temporary materialises as a real let (its normal use is in return
+   position); as for [materialised], the proxy is bound directly to it.
+   Nothing carries a [Cnormal_var_optimised_out], there being no user
+   variable to name.
 
    [inlined_out]: the operation, wrapping a named expression.  [a2] and
    [b2] are each used once, on different branches, so their bindings are
@@ -44,11 +48,15 @@
    equality operation is transparent, so the expressions are not
    duplicated.
 
-   [bare_equality]: the operation alone.  As [combined_temp], but the
-   temporary's single other use is inlined out (into an
+   [bare_equality]: the operation alone.  As [combined_temp] (including
+   the reliance on CSE sharing the two occurrences of [fst q]), but the
+   temporary's single normal use is inlined out (into an
    [opaque_identity]): the inlined expression carries a free-standing
    [Cphantom_add_equality] for the proxy with no
-   [Cnormal_var_optimised_out], there being no user variable to name.
+   [Cnormal_var_optimised_out] inside.  This form cannot arise for a
+   user-visible variable: under -g such a variable's binding always
+   carries provenance, so its inlined-out expression is always wrapped
+   in [Cnormal_var_optimised_out], as in [inlined_out] above.
 
    [arith]: as [inlined_out], but the inlined-out value flows into
    arithmetic: the Cmm arithmetic helpers currently rebuild such
