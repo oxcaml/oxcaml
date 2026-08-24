@@ -10,20 +10,20 @@
  int 108086391056891909)
 (function{phantom_splittable.ml:25,45-135}
  camlPhantom_splittable__splittable_0_1_code
-     (x/488[((module_path x/488) (location ) (original_ident x/488)
+     (x/488[((module_path x/488) (location ()) (original_ident x/488)
              (is_parameter local))]: int) : int
  (let region/489 (beginregion)
    (let?
      (s_pproxy/491 ()
-      unused_pair/492[((module_path unused_pair/492) (location )
+      unused_pair/492[((module_path unused_pair/492) (location ())
                        (original_ident unused_pair/492) (is_parameter local))]
-        [0: s_pproxy/491; x/488; ])
+        [0: s_pproxy/491; x/488])
      (let
        (Popaque/493
           (opaque
             (phantom_add_equality s_pproxy/491
               (normal_var_optimized_out
-                ((module_path s/490) (location ) (original_ident s/490)
+                ((module_path s/490) (location ()) (original_ident s/490)
                  (is_parameter local))
                 (+ x/488 2))))
         unit/494 (seq (endregion region/489) 1))
@@ -33,7 +33,7 @@
      () : val
  (catch
    (let?
-     splittable/495[((module_path splittable/495) (location )
+     splittable/495[((module_path splittable/495) (location ())
                      (original_ident splittable/495) (is_parameter local))]
        camlPhantom_splittable__splittable_1
      (exit 2 G:"camlPhantom_splittable"))
