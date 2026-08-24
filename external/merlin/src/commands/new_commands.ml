@@ -136,8 +136,14 @@ let all_commands =
          compiler facts in the configured indexes. The response is:\n\n\
          ```javascript\n\
          {\n\
+         'targets' : [\n\
+         {\n\
+         'target'  : string,\n\
+         'decl'    : { 'file', 'start', 'end' },\n\
          'status'  : 'complete' | 'partial' | 'unavailable',\n\
-         'reasons' : [ { 'kind' : string, ... } ],\n\
+         'reasons' : [ { 'kind' : string, ... } ]\n\
+         }\n\
+         ],\n\
          'implementations' : [\n\
          {\n\
          'target'     : string,\n\
@@ -166,11 +172,12 @@ let all_commands =
          recorded sites are ever silently dropped, and an impact whose \
          implementation and recorded site both fail to resolve reports both \
          reasons.\n\n\
-         'complete' requires the facts channel to be present with no omission \
-         scoped to the queried declarations, and every impacted module and \
-         recorded check site resolved; 'partial' carries the reasons; \
-         'unavailable' means no usable facts channel was configured or loaded, \
-         which is distinct from a complete empty result." ~default:()
+         Each target has its own status. 'complete' requires the facts channel \
+         to be present with no omission scoped to that declaration, and every \
+         impacted module and recorded check site resolved; 'partial' carries \
+         the reasons; 'unavailable' means no usable facts channel was \
+         configured or loaded, which is distinct from a complete empty result."
+      ~default:()
       begin fun buffer () ->
         run buffer Query_protocol.Module_type_impls
       end;

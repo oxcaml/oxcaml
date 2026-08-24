@@ -6,7 +6,9 @@ resulting artifacts contain the facts channel.
   >   local module_type="${1-}"
   >   jq -r --arg module_type "$module_type" '
   >     def position: "\(.line):\(.col)";
-  >     .value.status,
+  >     (.value.targets[]
+  >      | select(.target == $module_type)
+  >      | .status),
   >     ([.value.implementations[]
   >       | select(($module_type == "") or (.target == $module_type))]
   >      | sort_by([.start.line,
@@ -359,7 +361,7 @@ body, and exposes the result through a second application context.
   >
   > module Result = Apply (Base) (A)
   > EOF
-  partial
+  complete
   Base 12:7 12:11 argument
   <anon> 12:27 14:3 annotation
   <anon> 16:43 17:7 annotation
