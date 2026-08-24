@@ -115,6 +115,7 @@ logic.
   -dcmm-invariants
   -dcounters
   -dcse
+  -ddebug-avail-sets
   -ddebug-available-regs
   -ddebug-invariants
   -ddebug-uid-tables
@@ -154,6 +155,7 @@ logic.
   -disable-zero-alloc-checker
   -dissector
   -dissector-assume-lld-without-64-bit-eh-frames
+  -dissector-max-linker-parallelism
   -dissector-partition-size
   -dlambda
   -dletreclambda
@@ -205,7 +207,11 @@ logic.
   -fPIC
   -favx
   -favx2
+  -favx512bw
+  -favx512cd
+  -favx512dq
   -favx512f
+  -favx512vl
   -fbmi
   -fbmi2
   -fclmul
@@ -248,9 +254,11 @@ logic.
   -flambda2-join-points
   -flambda2-kind-checks
   -flambda2-match-in-match
+  -flambda2-no-simplify-stubs
   -flambda2-reaper
   -flambda2-result-types-all-functions
   -flambda2-result-types-functors-only
+  -flambda2-simplify-stubs
   -flambda2-speculative-inlining-only-if-arguments-useful
   -flambda2-speculative-inlining-track-lifted-constants
   -flambda2-unbox-along-intra-function-control-flow
@@ -260,7 +268,11 @@ logic.
   -fno-asan
   -fno-avx
   -fno-avx2
+  -fno-avx512bw
+  -fno-avx512cd
+  -fno-avx512dq
   -fno-avx512f
+  -fno-avx512vl
   -fno-bmi
   -fno-bmi2
   -fno-clmul
@@ -307,6 +319,7 @@ logic.
   -gno-dwarf-inlined-frames
   -gno-dwarf-may-alter-codegen
   -gno-dwarf-may-alter-codegen-experimental
+  -gno-ocamldebug-types
   -gno-startup
   -gno-upstream-dwarf
   -gstartup
@@ -400,6 +413,7 @@ logic.
   -no-mach-ir
   -no-manual-module-init
   -no-ocamlcfg
+  -no-omit-leaf-frame-pointers
   -no-principal
   -no-probes
   -no-probes-optimized
@@ -420,6 +434,8 @@ logic.
   -no-x86-peephole-optimize
   -no-x86-peephole-remove-mov-to-dead-register
   -no-x86-peephole-remove-redundant-cmp
+  -no-x86-peephole-remove-redundant-extension
+  -no-x86-peephole-remove-redundant-test
   -no-zero-alloc-checker-details-extra
   -noassert
   -noautolink
@@ -431,6 +447,7 @@ logic.
   -o
   -ocamlcfg
   -ocamlrunparam
+  -omit-leaf-frame-pointers
   -only-erasable-extensions
   -opaque
   -open

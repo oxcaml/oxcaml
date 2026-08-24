@@ -53,7 +53,7 @@ apply ccall noalloc
     let $camlLocal_exns_to_jumps__f1_4 =
       closure f1_0_1 @f1 &toplevel.alloc_region
     in
-    let code loopify(never) size(47) newer_version_of(f2_1)
+    let code loopify(never) size(48) newer_version_of(f2_1)
           f2_1_1 (x : imm tagged, g : val)
             my_closure &my_alloc_region my_depth
             -> k * k1
@@ -102,7 +102,7 @@ apply ccall noalloc
     let $camlLocal_exns_to_jumps__f2_5 =
       closure f2_1_1 @f2 &toplevel.alloc_region
     in
-    let code loopify(never) size(47) newer_version_of(f3_2)
+    let code loopify(never) size(48) newer_version_of(f3_2)
           f3_2_1 (x : imm tagged, g : val)
             my_closure &my_alloc_region my_depth
             -> k * k1

@@ -232,10 +232,10 @@ let classify_expression : Typedtree.expression -> sd =
         Static
 
     | Texp_apply ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
-        _, _, _, _)
+        _, _, _, _, _)
       when is_ref vd ->
         Static
-    | Texp_apply (_, args, _, _, _)
+    | Texp_apply (_, args, _, _, _, _)
       when List.exists is_abstracted_arg args ->
         Static
     | Texp_apply _ ->
@@ -280,9 +280,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_try _
     | Texp_override _
     | Texp_letop _
-    (* CR metaprogramming aivaskovic: verify for quotations and splices *)
-    | Texp_quotation _
-    | Texp_antiquotation _ ->
+    | Texp_quote _
+    | Texp_splice _ ->
         Dynamic
     | Texp_typed_hole -> Static
   and classify_value_bindings rec_flag env bindings =
@@ -635,12 +634,12 @@ let array_mode exp =
     (* This is counted as a use, because constructing a generic array
        involves inspecting to decide whether to unbox (PR#6939). *)
     Dereference
-  | Paddrarray | Pgcignorableaddrarray | Pintarray ->
+  | Lambda.Paddrarray | Lambda.Pgcignorableaddrarray | Lambda.Pintarray ->
     (* non-generic, non-float arrays act as constructors *)
     Guard
-  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-  | Punboxedvectorarray _
-  | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+  | Lambda.Punboxedfloatarray _ | Lambda.Punboxedoruntaggedintarray _
+  | Lambda.Punboxedvectorarray _ | Lambda.Punboxedmaskarray
+  | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
     Dereference
   | Lambda.Punspecializedarray ->
     Misc.fatal_error "Value_rec_check.array_mode: Punspecializedarray"
@@ -721,7 +720,7 @@ let rec expression : Typedtree.expression -> term_judg =
         single id.txt << Dereference
     | Texp_apply
         ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
-         [_, Arg (arg, _)], _, _, _)
+         [_, Arg (arg, _)], _, _, _, _)
       when is_ref vd ->
       (*
         G |- e: m[Guard]
@@ -729,7 +728,7 @@ let rec expression : Typedtree.expression -> term_judg =
         G |- ref e: m
       *)
       expression arg << Guard
-    | Texp_apply (e, args, _, _, _)  ->
+    | Texp_apply (e, args, _, _, _, _)  ->
         (* [args] may contain omitted arguments, corresponding to labels in
            the function's type that were not passed in the actual application.
            The arguments before the first omitted argument are passed to the
@@ -761,7 +760,7 @@ let rec expression : Typedtree.expression -> term_judg =
       list expression (List.map snd exprs) << Guard
     | Texp_unboxed_tuple exprs ->
       list expression (List.map (fun (_, e, _) -> e) exprs) << Return
-    | Texp_atomic_loc (expr, _, _, _, _) ->
+    | Texp_atomic_loc { record = expr; _ } ->
       expression expr << Guard
     | Texp_array (_, _, exprs, _) ->
       list expression exprs << array_mode exp
@@ -798,7 +797,7 @@ let rec expression : Typedtree.expression -> term_judg =
                 (match mixed_shape.(i) with
                  | Scannable _ | Float_boxed -> Guard
                  | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+                 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
                  | Void | Product _ ->
                    Dereference)
             | Constructor_variable ->
@@ -829,7 +828,7 @@ let rec expression : Typedtree.expression -> term_judg =
             (match mixed_shape.(i) with
              | Scannable _ | Float_boxed -> Guard
              | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
+             | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
              | Void | Product _ ->
                Dereference)
           | Record_dummy _ ->
@@ -1115,10 +1114,10 @@ let rec expression : Typedtree.expression -> term_judg =
         expression exp2
       ]
     | Texp_hole _ -> empty
-    | Texp_quotation e ->
+    | Texp_quote e ->
         (* The quoted code may be spliced into a dereferencing context. *)
         expression e << Dereference
-    | Texp_antiquotation e ->
+    | Texp_splice e ->
         expression e << Dereference
 
 (* Function bodies.
@@ -1200,14 +1199,14 @@ and modexp : Typedtree.module_expr -> term_judg =
       path pth
     | Tmod_structure s ->
       structure s
-    | Tmod_functor (_, e) ->
+    | Tmod_functor (_, e, _) ->
       modexp e << Delay
-    | Tmod_apply (f, p, _) ->
+    | Tmod_apply (f, p, _, _, _) ->
       join [
         modexp f << Dereference;
         modexp p << Dereference;
       ]
-    | Tmod_apply_unit f ->
+    | Tmod_apply_unit (f, _) ->
       modexp f << Dereference
     | Tmod_constraint (mexp, _, _, coe) ->
       let rec coercion coe k = match coe with

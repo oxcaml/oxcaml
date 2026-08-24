@@ -31,7 +31,11 @@ module Uid = Shape.Uid
 type constant =
     Const_int of int
   | Const_char of char
-  | Const_untagged_char of char
+  | Const_untagged_char of int
+    (* The payload is between -128 and 127, inclusive. [int] is used
+       instead of [char] since untagged chars have layout
+       [bits8], which are expected to be sign-extended, and [char] is
+       zero-extended. *)
   | Const_string of string * Location.t * string option
   | Const_float of string
   | Const_float32 of string
@@ -151,7 +155,11 @@ type label_ambiguity =
 
 type _ type_inspection =
   | Label_disambiguation : label_ambiguity -> [< `pat | `exp ] type_inspection
+  (** Label (e.g. record field or variant constructor) disambiguation *)
   | Polymorphic_parameter : 'a poly_param -> 'a type_inspection
+  (** Polymorphic parameter uses (e.g. polymorphic object method) *)
+  | Module_pack : Types.type_expr -> [< `pat | `exp ] type_inspection
+  (** Package types (first-class modules) *)
 
 and _ poly_param =
   | Param : Types.type_expr -> [ `pat ] poly_param
@@ -173,7 +181,7 @@ type record_sorts =
   (** The sorts of this record's fields were determined when the type was
       declared. Invariant: Every description in [lbl_all] for any field has a
       [lbl_sort] that's [Some]. *)
-  | Variable of Jkind.Sort.Const.t array
+  | Variable of Jkind.sort array
   (** This value has the specified sorts for its fields. *)
 
 type pattern = value general_pattern
@@ -192,7 +200,7 @@ and 'a pattern_data =
    }
 
 and pat_extra =
-  | Tpat_constraint of core_type * Mode.Alloc.Const.t modes
+  | Tpat_constraint of core_type option * Mode.Alloc.Const.t modes
         (** P : T          { pat_desc = P
                            ; pat_extra = (Tpat_constraint T, _, _) :: ... }
          *)
@@ -460,6 +468,7 @@ and expression_desc =
         desc : Types.value_description;
         kind : ident_kind;
         unique_use : unique_use;
+        staticity : Mode.Staticity.r;
         mode : Mode.Value.l }
         (** x
             M.x
@@ -491,6 +500,9 @@ and expression_desc =
         ret_sort : Jkind.sort;
         alloc_mode : alloc_mode;
         (* Mode at which the closure is allocated *)
+        yielding : Mode.Yielding.l;
+        (* Whether fully applying this function can perform a free effect. This
+           is the closure's own mode joined with its parameter modes. *)
         zero_alloc : Zero_alloc.t;
         (* zero-alloc attributes *)
       }
@@ -505,7 +517,7 @@ and expression_desc =
       *)
   | Texp_apply of
       expression * (arg_label * apply_arg) list * apply_position *
-        Mode.Locality.l * Zero_alloc.assume option
+        Mode.Locality.l * Mode.Yielding.l * Zero_alloc.assume option
         (** E0 ~l1:E1 ... ~ln:En
 
             The expression can be Omitted if the expression is abstracted over
@@ -520,6 +532,10 @@ and expression_desc =
                         [(Nolabel, Omitted _);
                          (Labelled "y", Arg (Texp_constant Const_int 3))
                         ])
+
+            The [Mode.Yielding.l] is the join of the yielding modes of the
+            applied function and all of its arguments; if it is [Unyielding],
+            the application can never perform a free effect.
 
             The [Zero_alloc.assume option] records the optional [@zero_alloc
             assume] attribute that may appear on applications. *)
@@ -619,9 +635,14 @@ and expression_desc =
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
           *)
-  | Texp_atomic_loc of
-      expression * Jkind.sort * Longident.t loc * Data_types.label_description *
-      alloc_mode
+  | Texp_atomic_loc of {
+      record : expression;
+      record_sort : Jkind.sort;
+      record_repres : Types.record_representation;
+      lid : Longident.t loc;
+      label : Data_types.label_description;
+      alloc_mode : alloc_mode;
+    }
   | Texp_field of {
       record : expression;
       record_sort : Jkind.sort;
@@ -718,8 +739,8 @@ and expression_desc =
        Position argument in function application *)
   | Texp_overwrite of expression * expression (** overwrite_ exp with exp *)
   | Texp_hole of unique_use (** _ *)
-  | Texp_quotation of expression
-  | Texp_antiquotation of expression
+  | Texp_quote of expression
+  | Texp_splice of expression
   (* merlin-specific: a [Texp_typed_hole] is a typed hole written by the user as a
       placeholder. This is in contrast to a Texp_hole, which is used in overwrite
       expressions *)
@@ -813,13 +834,17 @@ and function_cases =
 
 and ident_kind =
   | Id_value
-  | Id_prim of Mode.Locality.l option * Jkind.Sort.t option
+  | Id_prim of
+      Mode.Locality.l option * Jkind.Sort.t option * Mode.Yielding.l
+      (** The [Mode.Yielding.l] is the join of the yielding modes of the
+          primitive's parameters, for when the primitive is closed over rather
+          than directly applied. *)
 
 and block_access =
   | Baccess_field of
       Longident.t loc * Data_types.label_description
       * Types.record_representation
-  | Baccess_block of mutable_flag * expression
+  | Baccess_block of access_flag * expression
 
 and unboxed_access =
   | Uaccess_unboxed_field of
@@ -989,12 +1014,41 @@ and functor_parameter =
   | Named of Ident.t option * string option loc * module_type *
              Mode.Alloc.Const.t modes
 
+
+(* Note [Staticity of functors]
+
+   There are two kinds of functors, whose machine representations are
+   constructed and consumed differently, making them incompatible:
+   1. regular functors, which take [dynamic] parameters;
+   2. template functors, which take [static] parameters.
+
+   This incompatibility must be reflected in the type system. Differentiating
+   them by the parameter's staticity alone is not sufficient, since the generic
+   mode weakening rule would allow (1) to be used as (2).
+
+   Our workaround is as follows. Upon functor definition, we equate the
+   staticity of the functor and its parameter, giving
+   [module F : (functor (M @ m) -> ...) @ m].
+
+   Upon application of [F : (functor (M @ m0) -> ...) @ m1], where [m0 <= m] and
+   [m1 >= m] due to weakening, we restore the original [m] by requiring
+   [m1 <= m0], which forces [m0 = m1 = m]. *)
+
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
-  | Tmod_functor of functor_parameter * module_expr
-  | Tmod_apply of module_expr * module_expr * module_coercion
-  | Tmod_apply_unit of module_expr
+  | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.r
+    (** The [Mode.Staticity.r] specifies which kind of functor is constructed;
+        see Note [Staticity of functors]. *)
+  | Tmod_apply of
+      module_expr * module_expr * module_coercion * Mode.Yielding.l
+      * Mode.Staticity.r
+        (** The [Mode.Yielding.l] is the join of the yielding modes of the
+            functor and its argument: if it is [Unyielding], applying the
+            functor can never perform a free effect. The [Mode.Staticity.r]
+            specifies which kind of functor is applied; see Note [Staticity of
+            functors]. *)
+  | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion
     (** ME          (constraint = Tmodtype_implicit)
@@ -1063,7 +1117,9 @@ and module_coercion =
       (* [pos] (the [int]s in [pos_cc_list] and [id_pos_list]) is an index into
          the list of fields in the input module *)
       }
-  | Tcoerce_functor of module_coercion * module_coercion
+  | Tcoerce_functor of module_coercion * module_coercion * Mode.Yielding.l
+  (** The [Mode.Yielding.l] is the yielding of an application of the coerced
+      functor *)
   | Tcoerce_primitive of primitive_coercion
   (** External declaration coerced to a regular value.
       {[
@@ -1105,6 +1161,9 @@ and primitive_coercion =
     pc_type: Types.type_expr;
     pc_poly_mode: Mode.Locality.l option;
     pc_poly_sort: Jkind.Sort.t option;
+    pc_yielding: Mode.Yielding.l;
+    (** As the [Mode.Yielding.l] in [Id_prim]. *)
+    pc_zero_alloc_check: Zero_alloc.check option;
     pc_env: Env.t;
     pc_loc : Location.t;
   }
@@ -1193,6 +1252,7 @@ and include_kind =
   | Tincl_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
       (* S1 -> S2 *)
       (* Since [Types.module_representation = Jkind.sort array], this could've
@@ -1202,8 +1262,15 @@ and include_kind =
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
+      ; yielding : Mode.Yielding.l
       }
       (* S1 -> () -> S2 *)
+      (* In both functor cases, the [Mode.Yielding.l] is the join of the
+         yielding modes of the functor and of the enclosing structure it is
+         applied to: if it is [Unyielding], the application can never perform a
+         free effect. For includes in signatures there is no module expression
+         (and no runtime application), so the field is a conservative
+         [Yielding.max]. *)
 
 and 'a include_infos =
     {
@@ -1599,10 +1666,6 @@ val min_mode_with_locks : mode_with_locks
 (** Get the mode, asserting no held locks. *)
 val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 
-(** Fold over the antiquotations in an expression. This function defines the
-    evaluation order of antiquotations. *)
-val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
-
 val map_apply_arg:
   ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
 
@@ -1613,16 +1676,16 @@ val map_apply_arg:
 val label_sort:
   'rep Data_types.record_form -> 'rep Data_types.gen_label_description
   -> record_sorts
-  -> [ `Sort of Jkind.Sort.Const.t | `Same_as_record_sort ]
+  -> [ `Sort of Jkind.sort | `Same_as_record_sort ]
 
 (** Computes the sort of a label. Becuase the sepcial case above doesn't apply
     to unboxed records, this doesn't return an option. *)
 val unboxed_label_sort :
-  Data_types.unboxed_label_description -> record_sorts -> Jkind.Sort.Const.t
+  Data_types.unboxed_label_description -> record_sorts -> Jkind.sort
 
 val unboxed_label_all_sorts:
   Data_types.unboxed_label_description -> record_sorts
-  -> Jkind.Sort.Const.t array
+  -> Jkind.sort array
 
 (** Whether an expression looks nice as the subject of a sentence in an error
     message. *)

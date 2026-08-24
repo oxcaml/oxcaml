@@ -340,7 +340,7 @@ let of_expression e = app (Expression e) ** list_fold of_exp_extra e.exp_extra
 
 let of_pat_extra (pat, _, _) =
   match pat with
-  | Tpat_constraint (ct, modes) -> of_core_type ct ** of_modes modes
+  | Tpat_constraint (ct, modes) -> option_fold of_core_type ct ** of_modes modes
   | Tpat_type _ | Tpat_unpack | Tpat_open _ | Tpat_inspected_type _ -> id_fold
 
 let of_pattern (type k) (p : k general_pattern) =
@@ -442,7 +442,7 @@ let rec of_expression_desc loc = function
   | Texp_function { params; body; ret_mode; _ } ->
     list_fold of_function_param params
     ** of_function_body body ** of_modes ret_mode
-  | Texp_apply (e, ls, _, _, _) ->
+  | Texp_apply (e, ls, _, _, _, _) ->
     of_expression e
     ** list_fold
          (function
@@ -561,10 +561,17 @@ let rec of_expression_desc loc = function
   | Texp_exclave e -> of_expression e
   | Texp_idx (block_access, unboxed_access) ->
     of_block_access block_access ** list_fold of_unboxed_access unboxed_access
-  | Texp_atomic_loc (exp, _, _, _, _) -> of_expression exp
+  | Texp_atomic_loc
+      { record;
+        record_sort = _;
+        record_repres = _;
+        lid = _;
+        label = _;
+        alloc_mode = _
+      } -> of_expression record
   | Texp_hole _ -> id_fold
-  | Texp_quotation exp -> of_expression exp
-  | Texp_antiquotation exp -> of_expression exp
+  | Texp_quote exp -> of_expression exp
+  | Texp_splice exp -> of_expression exp
   | Texp_apply_layout (exp, _) -> of_expression exp
 
 (* We should consider taking into account param.fp_loc at some point, as it
@@ -621,11 +628,11 @@ and of_class_field_desc = function
 and of_module_expr_desc = function
   | Tmod_ident _ -> id_fold
   | Tmod_structure str -> app (Structure str)
-  | Tmod_functor (Unit, me) -> of_module_expr me
-  | Tmod_functor (Named (_, _, mt, modes), me) ->
+  | Tmod_functor (Unit, me, _) -> of_module_expr me
+  | Tmod_functor (Named (_, _, mt, modes), me, _) ->
     of_module_type mt ** of_module_expr me ** of_modes modes
-  | Tmod_apply (me1, me2, _) -> of_module_expr me1 ** of_module_expr me2
-  | Tmod_apply_unit me1 -> of_module_expr me1
+  | Tmod_apply (me1, me2, _, _, _) -> of_module_expr me1 ** of_module_expr me2
+  | Tmod_apply_unit (me1, _) -> of_module_expr me1
   | Tmod_constraint (me, _, mtc, _) ->
     of_module_expr me ** app (Module_type_constraint mtc)
   | Tmod_unpack (e, _) -> of_expression e
@@ -1022,7 +1029,7 @@ let pattern_paths (type k) { Typedtree.pat_desc; pat_extra; _ } =
 let module_expr_paths { Typedtree.mod_desc } =
   match mod_desc with
   | Tmod_ident (path, loc) -> [ (reloc path loc, Some loc.txt) ]
-  | Tmod_functor (Named (Some id, loc, _, _), _) ->
+  | Tmod_functor (Named (Some id, loc, _, _), _, _) ->
     [ (reloc (Path.Pident id) loc, Option.map ~f:mk_lident loc.txt) ]
   | _ -> []
 

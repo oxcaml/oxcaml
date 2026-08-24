@@ -124,6 +124,8 @@ module I = struct
 
   let idiv x = emit (IDIV x)
 
+  let div x = emit (DIV x)
+
   let imul x y = emit (IMUL (x, y))
 
   let mul x = emit (MUL x)

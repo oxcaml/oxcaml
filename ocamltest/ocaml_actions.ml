@@ -693,7 +693,11 @@ let run_fexpr_check log env =
   in
   let test_build_dir = Actions_helpers.test_build_directory env in
   let test_source_dir = Actions_helpers.test_source_directory env in
-  let test_name = Filename.chop_extension (Actions_helpers.testfile env) in
+  let test_name =
+    match Environments.lookup Ocaml_variables.module_ env with
+    | Some module_ -> module_
+    | None -> Actions_helpers.testfile env in
+  let test_name = Filename.chop_extension test_name in
   List.fold_left (fun (res, env) pass_sfx ->
       let pass_dump_file = Filename.make_filename test_name pass_sfx in
       let pass_ref_file =
@@ -1467,6 +1471,22 @@ let only_default_codegen = Actions.make
     "default codegen"
     "non-default codegen")
 
+(* Like [only_default_codegen] but requires stack checks to be enabled. Used by
+   [%%expect_asm] tests that check the code emitted for stack checks (e.g. the
+   stack-realloc handler), which only exists when stack checks are on. *)
+let only_stack_checks_codegen = Actions.make
+  ~name:"only-stack-checks-codegen"
+  ~description:"Passes if codegen options are at the default except that stack \
+                checks are enabled"
+  ~does_something:false
+  (Actions_helpers.predicate
+    (not Config.no_stack_checks
+      && not Config.poll_insertion
+      && not Config.with_address_sanitizer
+      && not Config.with_frame_pointers)
+    "stack-checks codegen"
+    "non-stack-checks codegen")
+
 let ocamldoc = Ocaml_tools.ocamldoc
 module Ocamldoc = (val ocamldoc)
 
@@ -1687,5 +1707,6 @@ let init () =
     ocamlobjinfo;
     stack_checks;
     no_stack_checks;
-    only_default_codegen
+    only_default_codegen;
+    only_stack_checks_codegen
   ]

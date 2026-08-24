@@ -585,6 +585,7 @@ let ocaml_ignored_flags =
     "-disable-poll-insertion";
     "-gdwarf-may-alter-codegen";
     "-gno-dwarf-may-alter-codegen";
+    "-gno-ocamldebug-types";
     "-davail";
     "-dranges";
     "-ddebug-invariants";
@@ -594,6 +595,7 @@ let ocaml_ignored_flags =
     "-no-x86-peephole-optimize";
     "-no-x86-peephole-remove-mov-to-dead-register";
     "-no-x86-peephole-remove-redundant-cmp";
+    "-no-x86-peephole-remove-redundant-extension";
     "-no-x86-peephole-combine-add-rsp";
     "-verbose-types";
     "-no-verbose-types";
@@ -622,6 +624,7 @@ let ocaml_ignored_flags =
     "-fno-popcnt";
     "-disable-zero-alloc-checker";
     "-disable-precise-zero-alloc-checker";
+    "-no-x86-peephole-remove-redundant-test";
     "-cfg-stack-checks";
     "-no-cfg-stack-checks";
     "-gdwarf-inlined-frames";
@@ -669,6 +672,8 @@ let ocaml_ignored_flags =
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
     "-no-cfg-prologue-shrink-wrap";
+    "-omit-leaf-frame-pointers";
+    "-no-omit-leaf-frame-pointers";
     "-cfg-merge-blocks";
     "-no-cfg-merge-blocks";
     "-cfg-value-propagation";
@@ -735,6 +740,7 @@ let ocaml_ignored_flags =
     "-dcfg";
     "-dcfg-invariants";
     "-dcmm-invariants";
+    "-ddebug-avail-sets";
     "-ddebug-available-regs";
     "-dfexpr";
     "-dflambda-invariants";
@@ -746,6 +752,14 @@ let ocaml_ignored_flags =
     "-dump-inlining-paths";
     "-enable-poll-insertion";
     "-fno-asan";
+    "-favx512vl";
+    "-fno-avx512vl";
+    "-favx512bw";
+    "-fno-avx512bw";
+    "-favx512cd";
+    "-fno-avx512cd";
+    "-favx512dq";
+    "-fno-avx512dq";
     "-fno-trap-notes";
     "-ftrap-notes";
     "-function-sections";
@@ -766,7 +780,9 @@ let ocaml_ignored_flags =
     "-flambda2-match-in-match";
     "-no-flambda2-match-in-match";
     "-frametables-in-rodata";
-    "-no-frametables-in-rodata"
+    "-no-frametables-in-rodata";
+    "-flambda2-no-simplify-stubs";
+    "-flambda2-simplify-stubs"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -877,7 +893,8 @@ let ocaml_ignored_parametrized_flags =
     "-llvm-flags";
     "-reaper-preserve-direct-calls";
     "-save-ir-after";
-    "-X"
+    "-X";
+    "-dissector-max-linker-parallelism"
   ]
 
 let ocaml_warnings_spec ~error =

@@ -123,7 +123,8 @@ let rec extract_letop_patterns n pat =
 
 let constant = function
   | Const_char c -> Const.char c
-  | Const_untagged_char c -> Const.mk (Pconst_untagged_char c)
+  | Const_untagged_char c ->
+      Const.mk (Pconst_untagged_char (Char.chr (c land 0xff)))
   | Const_string (s,loc,d) -> Const.string ?quotation_delimiter:d ~loc s
   | Const_int i -> Const.integer (Int.to_string i)
   | Const_int8 i -> Const.integer ~suffix:'s' (Int.to_string i)
@@ -358,7 +359,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | { pat_extra= (Tpat_constraint (ct, modes), _, _attrs) :: rem; _ } ->
         let modes = Typemode.untransl_mode modes in
         Ppat_constraint (sub.pat sub { pat with pat_extra=rem },
-                         Some (sub.typ sub ct), modes)
+                         Option.map (sub.typ sub) ct, modes)
     | { pat_extra = (Tpat_open (_path, lid, _env), _, _attrs) :: rem; _ } ->
         Ppat_open (lid, sub.pat sub { pat with pat_extra=rem })
     | _ ->
@@ -633,7 +634,7 @@ let expression sub exp =
             params
         in
         Pexp_function (params, constraint_, body)
-    | Texp_apply (exp, list, _, _, _) ->
+    | Texp_apply (exp, list, _, _, _, _) ->
         let list = List.map (fun (arg_label, arg) -> label arg_label, arg) list in
         Pexp_apply (sub.expr sub exp,
           List.fold_right (fun (label, arg) list ->
@@ -703,7 +704,7 @@ let expression sub exp =
         Pexp_record_unboxed_product
           (list,
            Option.map (fun (exp, _) -> sub.expr sub exp) extended_expression)
-    | Texp_atomic_loc (exp, _, lid, _label, _) ->
+    | Texp_atomic_loc { record = exp; lid; _ } ->
         Pexp_extension ({ txt = "ocaml.atomic.loc"; loc },
                         PStr [ Str.eval ~loc
                                  (Exp.field ~loc
@@ -840,8 +841,8 @@ let expression sub exp =
     | Texp_overwrite (exp1, exp2) ->
         Pexp_overwrite(sub.expr sub exp1, sub.expr sub exp2)
     | Texp_hole _ -> Pexp_hole
-    | Texp_quotation exp -> Pexp_quote (sub.expr sub exp)
-    | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
+    | Texp_quote exp -> Pexp_quote (sub.expr sub exp)
+    | Texp_splice exp -> Pexp_splice (sub.expr sub exp)
   in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)
@@ -1014,13 +1015,13 @@ let module_expr (sub : mapper) mexpr =
         let desc = match mexpr.mod_desc with
             Tmod_ident (_p, lid) -> Pmod_ident (map_loc sub lid)
           | Tmod_structure st -> Pmod_structure (sub.structure sub st)
-          | Tmod_functor (arg, mexpr) ->
+          | Tmod_functor (arg, mexpr, _) ->
               Pmod_functor
                 (functor_parameter sub arg, sub.module_expr sub mexpr)
-          | Tmod_apply (mexp1, mexp2, _) ->
+          | Tmod_apply (mexp1, mexp2, _, _, _) ->
               Pmod_apply (sub.module_expr sub mexp1,
                           sub.module_expr sub mexp2)
-          | Tmod_apply_unit mexp1 ->
+          | Tmod_apply_unit (mexp1, _) ->
               Pmod_apply_unit (sub.module_expr sub mexp1)
           | Tmod_constraint (mexpr, _, Tmodtype_explicit (mtype, modes), _) ->
               let modes = Typemode.untransl_mode modes in

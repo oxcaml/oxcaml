@@ -246,6 +246,9 @@ let compute_static_size lam =
       assert false
     | Lsplice _ ->
       fatal_error_invalid_constructor lam
+    | Lkindtemplate _ ->
+      Misc.fatal_error "letrec: poly_ not supported"
+    | Lkindinstantiate _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -292,6 +295,8 @@ let compute_static_size lam =
     | Pbigstring_set_f32 _
     | Pbigstring_set_64 _
     | Ppoll
+    | Patomic_set_field _
+    | Patomic_set_mixed_field _
     | Patomic_add_field
     | Patomic_sub_field
     | Patomic_land_field
@@ -356,7 +361,8 @@ let compute_static_size lam =
         | Pfloatarray ->
             Block (Float_record size)
         | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-        | Punboxedvectorarray _ | Pgcscannableproductarray _
+        | Punboxedvectorarray _ | Punboxedmaskarray
+        | Pgcscannableproductarray _
         | Pgcignorableproductarray _ ->
             Misc.fatal_error "size_of_primitive"
         | Punspecializedarray ->
@@ -432,7 +438,7 @@ let compute_static_size lam =
     | Pbigstring_load_64 _
     | Pint_as_pointer _
     | Patomic_load_field _
-    | Patomic_set_field _
+    | Patomic_load_mixed_field _
     | Patomic_exchange_field _
     | Patomic_compare_exchange_field _
     | Patomic_compare_set_field _
@@ -460,7 +466,9 @@ let compute_static_size lam =
 
     | Psetufloatfield (_, _)
     | Pbytes_set_vec _
+    | Pbytes_set_mask _
     | Pbigstring_set_vec _
+    | Pbigstring_set_mask _
     | Pfloatarray_set_vec _
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
@@ -487,8 +495,11 @@ let compute_static_size lam =
     | Pufloatfield (_, _)
     | Punboxed_product_field (_, _)
     | Pstring_load_vec _
+    | Pstring_load_mask _
     | Pbytes_load_vec _
+    | Pbytes_load_mask _
     | Pbigstring_load_vec _
+    | Pbigstring_load_mask _
     | Pfloatarray_load_vec _
     | Pint_array_load_vec _
     | Punboxed_float_array_load_vec _
@@ -502,6 +513,8 @@ let compute_static_size lam =
     | Pobj_magic _
     | Punbox_vector _
     | Pbox_vector (_, _)
+    | Punbox_mask
+    | Pbox_mask _
     | Pjoin_vec256
     | Psplit_vec256
     | Pget_header _
@@ -620,19 +633,21 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
         ap_mode = lfun.ret_mode;
+        ap_yielding = lfun.yielding;
         ap_probe = None;
       }
     in
     let wrapper =
-      lfunction'
-        ~kind:lfun.kind
-        ~params
-        ~return:lfun.return
-        ~body
-        ~attr:default_stub_attribute
-        ~loc:no_loc
-        ~mode:lfun.mode
-        ~ret_mode:lfun.ret_mode
+      lfunction_with_yielding lfun.yielding
+        (lfunction'
+           ~kind:lfun.kind
+           ~params
+           ~return:lfun.return
+           ~body
+           ~attr:default_stub_attribute
+           ~loc:no_loc
+           ~mode:lfun.mode
+           ~ret_mode:lfun.ret_mode)
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,
@@ -803,7 +818,9 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lassign _
   | Lsend _
   | Lifused _
-  | Lexclave _ ->
+  | Lexclave _
+  | Lkindtemplate _
+  | Lkindinstantiate _ ->
     Misc.fatal_errorf
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
@@ -941,7 +958,10 @@ let compile_indirect newval =
     ap_specialised = Default_specialise;
     ap_result_layout = Lambda.layout_lazy;
     ap_region_close = Rc_normal;
-    ap_mode = Lambda.alloc_heap;
+    ap_mode = Lambda.not_alloc_stack;
+    (* [indirect] just allocates a forwarding block; it never runs user code,
+       so it can't yield *)
+    ap_yielding = Unyielding;
     ap_probe = None;
   }
 

@@ -33,17 +33,15 @@ open Misc
 
 (* Declare machtype here to avoid depending on [Cmm]. *)
 type machtype_component =
-  Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Float32 | Valx2
+  Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 | Valx2
 
 type machtype = machtype_component array
 
-(* [alloc_mode] should be isomorphic to [Cmm.Alloc_mode.t],
-   but due to a cyclic dependency we can not use definitions from [Cmm] here. *)
-type alloc_mode =
-  | Alloc_heap
-  | Alloc_local
+type return_mode =
+  | Not_alloc_stack
+  | Maybe_alloc_stack
 
-type apply_fn := machtype list * machtype * alloc_mode
+type apply_fn := machtype list * machtype * return_mode
 
 (* Curry/apply/send functions *)
 type generic_fns =
@@ -77,6 +75,10 @@ type unit_infos =
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
     ui_external_symbols: string list; (* Set of external symbols *)
+    ui_static_data: Slambdaeval.CU_data.raw;
+                                  (* Compile-time (comptime) value of the unit's
+                                     main module block, as produced by
+                                     [Slambda.eval]. *)
     ui_file_sections: File_sections.t;
   }
 
@@ -98,6 +100,7 @@ type unit_infos_raw =
                                       relative to byte immediately after
                                       this record *)
     uir_external_symbols: string array;
+    uir_static_data: Slambdaeval.CU_data.raw;
     uir_sections_length: int;      (* Byte length of all sections *)
   }
 

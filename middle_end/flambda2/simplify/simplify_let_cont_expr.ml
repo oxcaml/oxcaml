@@ -307,8 +307,22 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
   let required_extra_args =
     Continuation.Map.find cont continuation_parameters
   in
-  Variable.Set.fold
-    (fun var epa ->
+  (* We don't want to add the extra params and args according to the order of
+     the Int_ids hash, because that is unstable and produces noise in fexpr
+     dumps.
+
+     Ideally, we'd want to create the parameters according to the binding times
+     of the original variables, but currently binding times are not comparable
+     across scopes, so we instead sort the extra args according to their name
+     stamp, which should be a good enough approximation for now. *)
+  let extra_args_for_aliases_sorted_by_stamp =
+    Variable.Set.fold
+      (fun var acc -> (Variable.name_stamp var, var) :: acc)
+      required_extra_args.extra_args_for_aliases []
+    |> List.sort (fun (stamp1, _) (stamp2, _) -> Int.compare stamp2 stamp1)
+  in
+  List.fold_left
+    (fun epa (_stamp, var) ->
       let extra_args =
         Apply_cont_rewrite_id.Map.of_set
           (fun _id -> EPA.Extra_arg.Already_in_scope (Simple.var var))
@@ -326,7 +340,7 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
       EPA.add
         ~extra_param:(Bound_parameter.create var var_kind var_duid)
         ~extra_args epa ~invalids:Apply_cont_rewrite_id.Set.empty)
-    required_extra_args.extra_args_for_aliases EPA.empty
+    EPA.empty extra_args_for_aliases_sorted_by_stamp
 
 let add_extra_params_for_mutable_unboxing cont uacc extra_params_and_args =
   let Flow_types.Mutable_unboxing_result.{ additional_epa; _ } =
@@ -568,6 +582,29 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         Continuation.print cont
   in
   let handler, uacc =
+    (* We might need to place lifted constants now, as they could depend on
+       continuation parameters. As such we must also compute the unused
+       parameters after placing any constants! *)
+    if not at_unit_toplevel
+    then handler, uacc
+    else
+      let uacc, lifted_constants_from_body =
+        UA.get_and_clear_lifted_constants uacc
+      in
+      EB.place_lifted_constants uacc
+        ~lifted_constants_from_defining_expr:LCS.empty
+        ~lifted_constants_from_body
+        ~put_bindings_around_body:(fun uacc ~body -> body, uacc)
+        ~body:handler
+  in
+  (* The [lets_to_introduce] rebind parameters that the alias analysis has
+     removed from the continuation. These lets must be placed outside any lifted
+     constants placed above, since such constants can reference the removed
+     parameters, which are not bound anywhere else. Conversely, each let's
+     defining expression is the parameter's canonical dominator, which must be
+     in scope at the continuation's use sites, so it cannot be bound by the
+     lifted constants placed inside. *)
+  let handler, uacc =
     Variable.Lmap.fold
       (fun var bound_to (handler, uacc) ->
         let var_duid = Flambda_debug_uid.none in
@@ -586,22 +623,6 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         in
         handler, uacc)
       continuation_parameters.lets_to_introduce (handler, uacc)
-  in
-  let handler, uacc =
-    (* We might need to place lifted constants now, as they could depend on
-       continuation parameters. As such we must also compute the unused
-       parameters after placing any constants! *)
-    if not at_unit_toplevel
-    then handler, uacc
-    else
-      let uacc, lifted_constants_from_body =
-        UA.get_and_clear_lifted_constants uacc
-      in
-      EB.place_lifted_constants uacc
-        ~lifted_constants_from_defining_expr:LCS.empty
-        ~lifted_constants_from_body
-        ~put_bindings_around_body:(fun uacc ~body -> body, uacc)
-        ~body:handler
   in
   let free_names = UA.name_occurrences uacc in
   let cost_metrics = UA.cost_metrics uacc in

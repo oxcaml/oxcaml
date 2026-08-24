@@ -21,6 +21,7 @@ want to modify OxCaml.  Jump to:
   - [How to add a new intrinsic to the compiler](#how-to-add-a-new-intrinsic-to-the-compiler)
   - [How to add a new command line option](#how-to-add-a-new-command-line-option)
   - [Installation tree comparison script](#installation-tree-comparison-script)
+  - [Updating Merlin](#updating-merlin)
 
 ## Branches, pull requests, etc.
 
@@ -271,7 +272,7 @@ ocamldebug emacs mode as follows:
    printing any value may produce `Cannot find module Misc.` or similar
    errors).  If debugging `ocamlc`, run:
    ```
-   (ocd) directory _build/main/.ocamlcommon.objs/byte
+   (ocd) directory _build/main/.ocamlfrontend.objs/byte
    ```
    If debugging `ocamlopt`, you'll need various additional directories depending
    on your middle end.  You can find the right directories by searching for cmo
@@ -474,3 +475,7 @@ takes a while (between 2 and 3 hours).
 
 On the OxCaml side (in this repo), modify `build.yml` to point to the new tag
 and branch the runner should use for the tests.
+
+## Updating Merlin
+
+This repository contains Merlin, a library and CLI for editor support for OCaml, in [`external/merlin`](./external/merlin). Merlin vendors the frontend code of the compiler, but makes some modifications to it. As a result, when we make a change to the compiler’s frontend, we must update Merlin accordingly (a GitHub CI check asserts that we do so). Take a look at [`external/merlin/HACKING.jst.md`](external/merlin/HACKING.jst.md) for more information.

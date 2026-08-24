@@ -67,6 +67,8 @@ val reaper_change_calling_conventions : unit -> bool
 
 val support_lto : unit -> bool
 
+val simplify_stubs : unit -> bool
+
 val kind_checks : unit -> bool
 
 val match_in_match : unit -> bool

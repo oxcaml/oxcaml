@@ -898,5 +898,5 @@ let cannot_change_calling_convention_query =
 
 let cannot_change_calling_convention uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Compilation_unit.is_current (Code_id.get_compilation_unit v)))
+  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db

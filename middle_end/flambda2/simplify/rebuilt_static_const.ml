@@ -18,8 +18,9 @@ open! Flambda
 module ART = Are_rebuilding_terms
 module SC = Static_const
 
-(* The cost metrics for sets of closures do *not* include the code size of their
-   code_ids, as it will be counted in the lifted [Code] as well. *)
+(* The cost metrics for sets of closures include the code size of their
+   code_ids, like for non-lifted sets of closures. To avoid double counting, the
+   cost metrics of [Code] bindings are zero. *)
 type t =
   | Normal of
       { const : Static_const_or_code.t;
@@ -62,7 +63,7 @@ let cost_metrics t =
   | Block_not_rebuilt { cost_metrics; _ }
   | Set_of_closures_not_rebuilt { cost_metrics; _ } ->
     cost_metrics
-  | Code_not_rebuilt code -> Non_constructed_code.cost_metrics code
+  | Code_not_rebuilt _ -> Cost_metrics.zero
 
 let create_normal_non_code ~cost_metrics const =
   Normal
@@ -92,7 +93,7 @@ let create_code are_rebuilding ~params_and_body ~free_names_of_params_and_body =
         ( Normal
             { const = Static_const_or_code.create_code code;
               free_names = Code.free_names code;
-              cost_metrics = Code_metadata.cost_metrics code_metadata
+              cost_metrics = Cost_metrics.zero
             },
           Some code ))
 
@@ -100,8 +101,16 @@ let create_code' code =
   Normal
     { const = Static_const_or_code.create_code code;
       free_names = Code.free_names code;
-      cost_metrics = Code.cost_metrics code
+      cost_metrics = Cost_metrics.zero
     }
+
+let find_code_characteristics find_code_metadata code_id :
+    Cost_metrics.code_characteristics =
+  let code_metadata = find_code_metadata code_id in
+  { cost_metrics = Code_metadata.cost_metrics code_metadata;
+    params_arity =
+      Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
+  }
 
 let create_set_of_closures are_rebuilding ~find_code_metadata set =
   let set =
@@ -112,12 +121,7 @@ let create_set_of_closures are_rebuilding ~find_code_metadata set =
   let free_names = Set_of_closures.free_names set in
   let cost_metrics =
     Cost_metrics.set_of_closures
-      ~find_code_characteristics:(fun code_id ->
-        { cost_metrics = Cost_metrics.zero;
-          params_arity =
-            Flambda_arity.num_params
-              (Code_metadata.params_arity (find_code_metadata code_id))
-        })
+      ~find_code_characteristics:(find_code_characteristics find_code_metadata)
       set
   in
   if ART.do_not_rebuild_terms are_rebuilding
@@ -226,6 +230,16 @@ let create_boxed_vec512 are_rebuilding ~machine_width or_var =
       { free_names = Or_variable.free_names or_var; cost_metrics }
   else create_normal_non_code ~cost_metrics (SC.boxed_vec512 or_var)
 
+let create_boxed_mask are_rebuilding ~machine_width or_var =
+  let cost_metrics =
+    Cost_metrics.from_size (Code_size.box_number ~machine_width Naked_mask)
+  in
+  if ART.do_not_rebuild_terms are_rebuilding
+  then
+    Block_not_rebuilt
+      { free_names = Or_variable.free_names or_var; cost_metrics }
+  else create_normal_non_code ~cost_metrics (SC.boxed_mask or_var)
+
 let create_immutable_float_block are_rebuilding fields =
   let cost_metrics =
     Cost_metrics.from_size (Code_size.array (List.length fields))
@@ -287,6 +301,9 @@ let create_immutable_vec256_array =
 let create_immutable_vec512_array =
   create_immutable_naked_number_array SC.immutable_vec512_array
 
+let create_immutable_mask_array =
+  create_immutable_naked_number_array SC.immutable_mask_array
+
 let create_immutable_value_array are_rebuilding fields =
   let cost_metrics =
     Cost_metrics.from_size (Code_size.array (List.length fields))
@@ -302,14 +319,6 @@ let create_empty_array are_rebuilding array_kind =
   if ART.do_not_rebuild_terms are_rebuilding
   then Block_not_rebuilt { free_names = Name_occurrences.empty; cost_metrics }
   else create_normal_non_code ~cost_metrics (SC.empty_array array_kind)
-
-let create_mutable_string are_rebuilding ~initial_value =
-  let cost_metrics =
-    Cost_metrics.from_size (Code_size.of_int (String.length initial_value))
-  in
-  if ART.do_not_rebuild_terms are_rebuilding
-  then Block_not_rebuilt { free_names = Name_occurrences.empty; cost_metrics }
-  else create_normal_non_code ~cost_metrics (SC.mutable_string ~initial_value)
 
 let create_immutable_string are_rebuilding str =
   let cost_metrics =
@@ -330,12 +339,8 @@ let map_set_of_closures t ~find_code_metadata ~f =
         let set_of_closures = f set_of_closures in
         let cost_metrics =
           Cost_metrics.set_of_closures
-            ~find_code_characteristics:(fun code_id ->
-              { cost_metrics = Cost_metrics.zero;
-                params_arity =
-                  Flambda_arity.num_params
-                    (Code_metadata.params_arity (find_code_metadata code_id))
-              })
+            ~find_code_characteristics:
+              (find_code_characteristics find_code_metadata)
             set_of_closures
         in
         Normal
@@ -347,13 +352,13 @@ let map_set_of_closures t ~find_code_metadata ~f =
           }
       | Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
       | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-      | Boxed_nativeint _ | Immutable_float_block _ | Immutable_float_array _
-      | Immutable_float32_array _ | Immutable_int_array _
-      | Immutable_int8_array _ | Immutable_int16_array _
+      | Boxed_mask _ | Boxed_nativeint _ | Immutable_float_block _
+      | Immutable_float_array _ | Immutable_float32_array _
+      | Immutable_int_array _ | Immutable_int8_array _ | Immutable_int16_array _
       | Immutable_int32_array _ | Immutable_int64_array _
       | Immutable_nativeint_array _ | Immutable_vec128_array _
       | Immutable_vec256_array _ | Immutable_vec512_array _
-      | Immutable_value_array _ | Empty_array _ | Mutable_string _
+      | Immutable_mask_array _ | Immutable_value_array _ | Empty_array _
       | Immutable_string _ ->
         t))
   | Block_not_rebuilt _ | Set_of_closures_not_rebuilt _ | Code_not_rebuilt _ ->
@@ -473,7 +478,7 @@ module Group = struct
          ~free_names_of_body:Unknown
          ~my_closure:(Variable.create "my_closure" Flambda_kind.value)
          ~my_alloc_mode:
-           (Alloc_mode.For_applications.heap
+           (Alloc_mode.For_applications.not_alloc_stack
               ~alloc_region:
                 (Variable.create "my_alloc_region" Flambda_kind.region))
          ~my_depth:(Variable.create "my_depth" Flambda_kind.rec_info))

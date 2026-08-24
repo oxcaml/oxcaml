@@ -183,11 +183,12 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
   | Boxed_vec128 -> rewrite_boxed_number_kind context usages kind Naked_vec128
   | Boxed_vec256 -> rewrite_boxed_number_kind context usages kind Naked_vec256
   | Boxed_vec512 -> rewrite_boxed_number_kind context usages kind Naked_vec512
+  | Boxed_mask -> rewrite_boxed_number_kind context usages kind Naked_mask
   | Float_block _ | Float_array | Immediate_array | Value_array | Generic_array
   | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
   | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
   | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
-  | Unboxed_vec512_array | Unboxed_product_array ->
+  | Unboxed_vec512_array | Unboxed_mask_array | Unboxed_product_array ->
     (* For all these subkinds, we don't track fields (for now). Thus, being in
        this case without being top or bottom means that we never use this
        particular value, but that it syntactically looks like it could be used.
@@ -830,10 +831,10 @@ module Rewriter = struct
             function_slot_types
         in
         let is_local_value_slot vs _ =
-          Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
+          Current_unit.is_current (Value_slot.get_compilation_unit vs)
         in
         let is_local_function_slot fs _ =
-          Compilation_unit.is_current (Function_slot.get_compilation_unit fs)
+          Current_unit.is_current (Function_slot.get_compilation_unit fs)
         in
         let has_local_fields =
           Value_slot.Map.exists is_local_value_slot value_slot_types
@@ -863,7 +864,7 @@ module Rewriter = struct
                    match code_id with
                    | Or_unknown.Unknown -> false
                    | Or_unknown.Known code_id ->
-                     Compilation_unit.is_current
+                     Current_unit.is_current
                        (Code_id.get_compilation_unit code_id))
                  code_id_of_function_slots
           then Must_be_local
@@ -1234,7 +1235,7 @@ let rewrite_typing_env context ~unit_symbol:_ typing_env =
   then Format.eprintf "OLD typing env: %a@." Typing_env.print typing_env;
   let db = context.db in
   let symbol_metadata sym =
-    if not (Compilation_unit.is_current (Symbol.compilation_unit sym))
+    if not (Current_unit.is_current (Symbol.compilation_unit sym))
     then context, Rewriter.Many_sources_any_usage
     else
       let sym = Code_id_or_name.symbol sym in
@@ -1372,9 +1373,12 @@ let rewrite_result_types context ~old_typing_env ~my_closure:func_my_closure
     with
     | None -> []
     | Some fields ->
-      Unboxed_fields.fold_with_kind
-        (fun kind v acc -> (v, kind) :: acc)
-        fields []
+      (* These are in the same order as the parameters introduced in
+         [Rebuild.rebuild_function_params_and_body]. *)
+      List.rev
+        (Unboxed_fields.fold_with_kind
+           (fun kind v acc -> (v, kind) :: acc)
+           fields [])
   in
   let new_vars, new_env_extension =
     TypesRewrite.rewrite_env_extension_with_extra_variables old_typing_env

@@ -51,6 +51,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec128 _ -> true
     | Cconst_vec256 _ -> true
     | Cconst_vec512 _ -> true
+    | Cconst_mask _ -> true
     | Cvar _ -> true
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
@@ -70,10 +71,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         false
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
-      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Caddi128
-      | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Ccmpi _
-      | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccsel _
-      | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
+      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+      | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _
+      | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
       | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
       | Cdls_get | Ctls_get | Cdomain_index ->
         List.for_all is_simple_expr args)
@@ -101,7 +102,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     match exp with
     | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cvar _ ->
+    | Cconst_mask _ | Cvar _ ->
       EC.none
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
@@ -127,7 +128,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ->
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
-        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi
+        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
         | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
         | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv
         | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
@@ -159,17 +160,29 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Is_immediate result -> result
     | Use_default -> is_immediate (Icomp cmp) n
 
+  (* Turn integer constants that fit in an OCaml integer into [Cconst_int], so
+     that the [Cconst_int] patterns below suffice to recognize all constants
+     that may be used as immediate arguments. *)
+  let normalize_int_constant (expr : Cmm.expression) : Cmm.expression =
+    match expr with
+    | Cconst_natint (n, dbg)
+      when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
+      Cconst_int (Nativeint.to_int n, dbg)
+    | _ -> expr
+
   (* Instruction selection for conditionals *)
 
   let select_condition (arg : Cmm.expression) : Operation.test * Cmm.expression
       =
     match arg with
-    | Cop (Ccmpi cmp, [arg1; Cconst_int (n, _)], _) when is_immediate_test cmp n
-      ->
-      Iinttest_imm (cmp, n), arg1
-    | Cop (Ccmpi cmp, [Cconst_int (n, _); arg2], _)
-      when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
-      Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
+    | Cop (Ccmpi cmp, [arg1; arg2], _) -> (
+      match normalize_int_constant arg1, normalize_int_constant arg2 with
+      | arg1, Cconst_int (n, _) when is_immediate_test cmp n ->
+        Iinttest_imm (cmp, n), arg1
+      | Cconst_int (n, _), arg2
+        when is_immediate_test (Cmm.swap_integer_comparison cmp) n ->
+        Iinttest_imm (Cmm.swap_integer_comparison cmp, n), arg2
+      | arg1, arg2 -> Iinttest cmp, Ctuple [arg1; arg2])
     | Cop (Ccmpi cmp, args, _) -> Iinttest cmp, Ctuple args
     | Cop (Ccmpf (width, cmp), args, _) -> Ifloattest (width, cmp), Ctuple args
     | Cop (Cand, [arg1; Cconst_int (1, _)], _) -> Ioddtest, arg1
@@ -224,7 +237,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comm (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match List.map normalize_int_constant args with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | [Cconst_int (n, _); arg] when is_immediate op n ->
@@ -234,7 +247,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match List.map normalize_int_constant args with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | _ -> SU.basic_op (Intop op), args
@@ -242,7 +255,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comp (cmp : Operation.integer_comparison)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match args with
+    match List.map normalize_int_constant args with
     | [arg; Cconst_int (n, _)] when is_immediate (Operation.Icomp cmp) n ->
       SU.basic_op (Intop_imm (Icomp cmp, n)), [arg]
     | [Cconst_int (n, _); arg]
@@ -345,8 +358,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Csubi -> select_arith Isub args
     | Cmuli -> select_arith_comm Imul args
     | Cmulhi { signed } -> select_arith_comm (Imulh { signed }) args
-    | Cdivi -> SU.basic_op (Intop Idiv), args
-    | Cmodi -> SU.basic_op (Intop Imod), args
+    | Cdivi { signed } -> SU.basic_op (Intop (Idiv { signed })), args
+    | Cmodi { signed } -> SU.basic_op (Intop (Imod { signed })), args
     | Caddi128 -> SU.basic_op (Int128op Iadd128), args
     | Csubi128 -> SU.basic_op (Int128op Isub128), args
     | Cmuli64 { signed } -> SU.basic_op (Int128op (Imul64 { signed })), args
@@ -677,6 +690,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Vec128 -> Onetwentyeight_unaligned
               | Vec256 -> Twofiftysix_unaligned
               | Vec512 -> Fivetwelve_unaligned
+              | Mask -> Word_mask
               | Val | Addr | Int -> Word_val
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
@@ -736,6 +750,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_vec512 (bits, _dbg) ->
       let r = Reg.createv Cmm.typ_vec512 in
       Ok (insert_op env sub_cfg (Operation.Const_vec512 bits) [||] r)
+    | Cconst_mask (bits, _dbg) ->
+      let r = Reg.createv Cmm.typ_mask in
+      Ok (insert_op env sub_cfg (Operation.Const_mask bits) [||] r)
     | Cconst_symbol (n, _dbg) ->
       (* Cconst_symbol _ evaluates to a statically-allocated address, so its
          value fits in a typ_int register and is never changed by the GC.
@@ -827,7 +844,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       insert_return env sub_cfg ok (SU.pop_all_traps env)
     | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-    | Cvar _ | Ctuple _ | Cexit _ ->
+    | Cconst_mask _ | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
 
   and emit_invalid env sub_cfg message symbol =
@@ -1197,7 +1214,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 "Cfg_selectgen.emit_expr_exit: unexpected machtype_component \
                  Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Float32 -> ())
+            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 ->
+              ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;
         SU.insert_moves env sub_cfg tmp_regs (Array.concat handler.regs);

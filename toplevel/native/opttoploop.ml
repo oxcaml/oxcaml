@@ -26,6 +26,17 @@ open Ast_helper
 
 module Genprintval = Genprintval_native
 
+(* Eta-expansion gives [create_process] and [waitpid] the unannotated types
+   required by [Compiler_owee.Unix_intf.S]. *)
+module Unix_for_owee = struct
+  include Unix
+
+  let create_process prog args stdin stdout stderr =
+    Unix.create_process prog args stdin stdout stderr
+
+  let waitpid flags pid = Unix.waitpid flags pid
+end
+
 type input =
   | Stdin
   | File of string
@@ -161,7 +172,7 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
         else None (* [pos] points to an unboxed singleton *))
 
 let rec eval_address = function
-  | Env.Aunit cu ->
+  | Env.Aunit (cu, _) ->
       global_symbol cu
   | Env.Alocal id ->
       let glob, pos, repr = toplevel_value id in
@@ -316,7 +327,7 @@ let default_load ppf (program : Lambda.program) =
       (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
   Asmgen.compile_implementation
-    (module Unix : Compiler_owee.Unix_intf.S)
+    (module Unix_for_owee : Compiler_owee.Unix_intf.S)
     ~toplevel:need_symbol
     ~sourcefile:(Some filename) ~prefixname:filename
     ~pipeline ~ppf_dump:ppf
@@ -341,11 +352,12 @@ let default_load ppf (program : Lambda.program) =
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let { Slambda.slv_comptime = _; slv_runtime = rawlam } =
+  let (_static_data, rawlam) =
     (* CR layout poly: If this toplevel value is static we should keep the
        comptime part in a separate table so we can use it in later expressions.
     *)
-    Slambda.eval (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
+    Slambda.eval ~cu_static_data:Compilenv.get_static_data
+      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam =
@@ -880,7 +892,7 @@ let run_script ppf name args =
 
 
 module Compiler = (val Optcompile.native
-                   (module Unix : Compiler_owee.Unix_intf.S)
+                   (module Unix_for_owee : Compiler_owee.Unix_intf.S)
                    ~flambda2:Flambda2.lambda_to_cmm
                    ~reaped_flambda2_to_cmm:Flambda2.reaped_flambda2_to_cmm)
 

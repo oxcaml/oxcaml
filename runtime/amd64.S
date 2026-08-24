@@ -560,10 +560,30 @@ G(caml_system__code_begin):
 #define RESTORE_YMM_REGS DO_0_15(RESTORE_YMM)
 
 #define SAVE_ZMM(i) vmovupd %zmm##i, (i*64 + SIMD_REGS_OFFSET)(%r15);
-#define SAVE_ZMM_REGS DO_0_31(SAVE_ZMM)
-
 #define RESTORE_ZMM(i) vmovupd (i*64 + SIMD_REGS_OFFSET)(%r15), %zmm##i;
-#define RESTORE_ZMM_REGS DO_0_31(RESTORE_ZMM)
+
+#define K_REGS_OFFSET (SIMD_REGS_OFFSET + 32*64)
+
+#define SAVE_K_REGS                                  \
+        kmovq   %k1, (0*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k2, (1*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k3, (2*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k4, (3*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k5, (4*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k6, (5*8 + K_REGS_OFFSET)(%r15);    \
+        kmovq   %k7, (6*8 + K_REGS_OFFSET)(%r15);
+
+#define RESTORE_K_REGS                               \
+        kmovq   (0*8 + K_REGS_OFFSET)(%r15), %k1;    \
+        kmovq   (1*8 + K_REGS_OFFSET)(%r15), %k2;    \
+        kmovq   (2*8 + K_REGS_OFFSET)(%r15), %k3;    \
+        kmovq   (3*8 + K_REGS_OFFSET)(%r15), %k4;    \
+        kmovq   (4*8 + K_REGS_OFFSET)(%r15), %k5;    \
+        kmovq   (5*8 + K_REGS_OFFSET)(%r15), %k6;    \
+        kmovq   (6*8 + K_REGS_OFFSET)(%r15), %k7;
+
+#define SAVE_ZMM_REGS DO_0_31(SAVE_ZMM) SAVE_K_REGS
+#define RESTORE_ZMM_REGS DO_0_31(RESTORE_ZMM) RESTORE_K_REGS
 
 /* Save all of the registers that may be in use to a free gc_regs bucket.
    Returns: bucket in %r15. Clobbers %r11 (after saving it) */
@@ -1351,7 +1371,7 @@ LBL(do_perform):
 1:      movq    %rdi, 8(%rbx) /* Set the last fiber field in the continuation */
         movq    Stack_handler(%rsi), %r11  /* %r11 := old stack -> handler */
         movq    Handler_parent(%r11), %r10 /* %r10 := parent stack */
-        cmpq    $0, %r10                   /* parent is NULL? */
+        cmpq    $1, Handler_effect(%r11)   /* handler is Val_unit? */
         je      LBL(112)
 #if defined(WITH_THREAD_SANITIZER)
      /* Save non-callee-saved registers %rax, %rdi, %rsi, %r10, %r11 before C

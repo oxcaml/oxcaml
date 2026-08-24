@@ -311,14 +311,14 @@ end = struct
     let is_local =
       Compilation_unit.equal
         (Symbol.compilation_unit s)
-        (Compilation_unit.get_current_exn ())
+        (Current_unit.get_cu_exn ())
     in
     if not is_local
     then
       Misc.fatal_errorf "Cannot bind non-local symbol %a@ Current unit is %a"
         Symbol.print s
         (Format_doc.compat Compilation_unit.print)
-        (Compilation_unit.get_current_exn ());
+        (Current_unit.get_cu_exn ());
     let s = Symbol_name_map.translate t.symbols s in
     (None, s) |> nowhere, t
 
@@ -347,9 +347,7 @@ end = struct
 
   let find_symbol_exn t s =
     let cunit = Symbol.compilation_unit s in
-    let is_local =
-      Compilation_unit.equal cunit (Compilation_unit.get_current_exn ())
-    in
+    let is_local = Compilation_unit.equal cunit (Current_unit.get_cu_exn ()) in
     if is_local
     then (None, Symbol_name_map.translate t.symbols s) |> nowhere
     else

@@ -15,27 +15,28 @@
 
 (* Command-line parameters *)
 
-module Int_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
+(* Stripped down version of Numbers, as its dependencies are a lot of code *)
+module Numbers = struct
+  module Int = struct
+    type t = int
+    module Map = Map.Make(Stdlib.Int)
     let of_string = int_of_string
   end
-
-  module Value = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-end)
-module Float_arg_helper = Arg_helper.Make (struct
-  module Key = struct
-    include Numbers.Int
-    let of_string = int_of_string
-  end
-
-  module Value = struct
-    include Numbers.Float
+  module Float = struct
+    type t = float
     let of_string = float_of_string
   end
+end
+
+module Int_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Int
+end)
+module Float_arg_helper = Arg_helper.Make (struct
+  module Key = Numbers.Int
+
+  module Value = Numbers.Float
 end)
 
 type open_arg =
@@ -86,6 +87,7 @@ and print_types = ref false             (* -i *)
 and print_variance = ref false          (* -i-variance *)
 and make_archive = ref false            (* -a *)
 and debug = ref false                   (* -g *)
+and debug_ocamldebug_types = ref true   (* -gno-ocamldebug-types *)
 and debug_full = ref false              (* For full DWARF support *)
 and dwarf_c_toolchain_flag = ref ""     (* DWARF compression flag for C *)
 and dwarf_fission = ref Fission_none    (* -gdwarf-fission=... *)

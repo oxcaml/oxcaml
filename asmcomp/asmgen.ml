@@ -104,19 +104,18 @@ let reset () =
     (fun pass (cfg_unit_info : Cfg_format.cfg_unit_info) ->
       if should_save_ir_after pass || should_save_ir_before pass
       then (
-        cfg_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+        cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
         cfg_unit_info.items <- [];
-        cfg_before_regalloc_unit_info.unit
-          <- Compilation_unit.get_current_or_dummy ();
+        cfg_before_regalloc_unit_info.unit <- Current_unit.get_cu_or_dummy ();
         cfg_before_regalloc_unit_info.items <- []))
     pass_to_cfg;
   if should_save_before_emit ()
   then (
-    linear_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+    linear_unit_info.unit <- Current_unit.get_cu_or_dummy ();
     linear_unit_info.items <- []);
   if should_save_cfg_before_emit ()
   then (
-    cfg_unit_info.unit <- Compilation_unit.get_current_or_dummy ();
+    cfg_unit_info.unit <- Current_unit.get_cu_or_dummy ();
     cfg_unit_info.items <- [])
 
 let save_data dl =
@@ -666,8 +665,6 @@ let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
     ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
   ( make_cmm ()
-  ++ (fun x ->
-  if Clflags.should_stop_after Compiler_pass.Middle_end then exit 0 else x)
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cmm
   ++ Profile.record "compile_phrases" (compile_phrases ~ppf_dump)
   ++ fun () -> () );
@@ -710,8 +707,11 @@ let compile_implementation_from_cmm unix ?toplevel ~sourcefile ~prefixname
     ~may_reduce_heap:(Option.is_none toplevel) (fun () ->
       Compilenv.record_external_symbols ();
       let cmm_phrases = make_cmm ~ppf_dump ~prefixname in
-      end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
-          cmm_phrases))
+      if Clflags.should_stop_after Compiler_pass.Middle_end
+      then ()
+      else
+        end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
+            cmm_phrases))
 
 let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
     ~ppf_dump (program : Lambda.program) =

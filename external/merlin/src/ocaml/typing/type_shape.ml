@@ -47,90 +47,29 @@ module Recursive_binder : sig
 
   val mark_as_used : t -> Shape.t
 
-  val close_term_if_binder_is_used :
-    ?preserve_uid:bool -> t -> Shape.t -> Shape.t
-end = struct
-  (* CR sspies: To improve performance, consider replacing this pass with
-     a single pass over the resulting definition that simultaneously turns
-     all binders into DeBruijn indices. *)
-  let rec shape_subst_uid_with_rec_var ~preserve_uid uid rv outer =
-    let open Shape in
-    let subst = shape_subst_uid_with_rec_var ~preserve_uid uid rv in
-    let subst_list = List.map subst in
-    match outer.desc with
-    | Leaf when Option.equal Uid.equal outer.uid (Some uid) ->
-      let uid = if preserve_uid then Some uid else None in
-      Shape.rec_var ?uid rv
-    | Leaf | Error _ | Rec_var _ | Comp_unit _ | Var _ -> outer (* base cases *)
-    | Alias sh -> Shape.alias ?uid:outer.uid (subst sh)
-    | App (sh, arg) -> Shape.app ?uid:outer.uid (subst sh) ~arg:(subst arg)
-    | Proj (sh, item) -> Shape.proj ?uid:outer.uid (subst sh) item
-    | Struct map -> Shape.str ?uid:outer.uid (Item.Map.map subst map)
-    | Abs (var, sh) -> Shape.abs ?uid:outer.uid var (subst sh)
-    | Mu sh ->
-      Shape.mu ?uid:outer.uid
-        (shape_subst_uid_with_rec_var ~preserve_uid uid
-           (Shape.DeBruijn_index.move_under_binder rv)
-           sh)
-    | Mutrec map -> Shape.mutrec ?uid:outer.uid (Ident.Map.map subst map)
-    | Proj_decl (sh, id) -> Shape.proj_decl ?uid:outer.uid (subst sh) id
-    | Constr (id, args) -> Shape.constr ?uid:outer.uid id (subst_list args)
-    | Tuple shapes -> Shape.tuple ?uid:outer.uid (subst_list shapes)
-    | Unboxed_tuple shapes ->
-      Shape.unboxed_tuple ?uid:outer.uid (subst_list shapes)
-    | Predef (predef, args) ->
-      Shape.predef predef ?uid:outer.uid (subst_list args)
-    | Arrow -> Shape.arrow ?uid:outer.uid ()
-    | Poly_variant fields ->
-      Shape.poly_variant ?uid:outer.uid
-        (poly_variant_constructors_map subst fields)
-    | Record { fields; kind } ->
-      Shape.record ?uid:outer.uid kind
-        (List.map
-           (fun (name, uid_opt, sh, layout) -> name, uid_opt, subst sh, layout)
-           fields)
-    | Variant constructors ->
-      Shape.variant ?uid:outer.uid
-        (Shape.complex_constructors_map
-           (fun (sh, layout) -> subst sh, layout)
-           constructors)
-    | Variant_unboxed
-        { name; variant_uid; arg_name; arg_uid; arg_shape; arg_layout } ->
-      Shape.variant_unboxed ?uid:outer.uid ~variant_uid ~arg_uid name arg_name
-        (subst arg_shape) arg_layout
-    | Unknown_type -> Shape.unknown_type ?uid:outer.uid ()
-    | At_layout (shape, layout) -> Shape.at_layout ?uid:outer.uid shape layout
+  val close_term_if_binder_is_used : t -> Shape.t -> Shape.t
 
+  val equal : t -> t -> bool
+
+  val hash : t -> int
+end = struct
   type t =
-    { uid : Uid.t;
+    { rv : Shape.Rec_var_ident.t;
       mutable used : bool
     }
 
-  let create () = { uid = Uid.mk ~current_unit:None; used = false }
+  let create () = { rv = Shape.Rec_var_ident.mk_fresh (); used = false }
 
-  (* CR sspies: Looking at this again after some evaluation of the shape
-     mechanism, I think there is a question here of whether we want to use de
-     Bruijn indices or just new identifiers for our recursive variables. The
-     latter would allow us to avoid [shape_subst_uid_with_rec_var] in
-     [close_term_if_binder_is_used], which saves us a (potentially costly) shape
-     traversal. The benefit of the de Bruijn indices is that they increase
-     sharing between types that have the exact same recursive structure. I'm not
-     sure how much this happens in practice.
-  *)
   let mark_as_used db =
     db.used <- true;
-    Shape.leaf db.uid
+    Shape.rec_var db.rv
 
-  let close_term_if_binder_is_used ?(preserve_uid = true) db sh =
-    if not db.used
-    then sh
-    else
-      let sh =
-        shape_subst_uid_with_rec_var ~preserve_uid db.uid
-          (Shape.DeBruijn_index.create 0)
-          sh
-      in
-      Shape.mu ?uid:(if preserve_uid then Some db.uid else None) sh
+  let close_term_if_binder_is_used db sh =
+    if not db.used then sh else Shape.mu db.rv sh
+
+  let equal t1 t2 = t1 == t2
+
+  let hash t = Shape.Rec_var_ident.hash t.rv
 end
 
 module Type_shape = struct
@@ -194,6 +133,7 @@ module Type_shape = struct
       | p when Path.same p Predef.path_unboxed_int32 -> Some Unboxed_int32
       | p when Path.same p Predef.path_unboxed_int8 -> Some Unboxed_int8
       | p when Path.same p Predef.path_unboxed_int16 -> Some Unboxed_int16
+      | p when Path.same p Predef.path_unboxed_mask -> Some Unboxed_mask
       | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
 
     let of_path : Path.t -> t option = function
@@ -211,6 +151,7 @@ module Type_shape = struct
       | p when Path.same p Predef.path_int32 -> Some Int32
       | p when Path.same p Predef.path_int64 -> Some Int64
       | p when Path.same p Predef.path_lazy_t -> Some Lazy_t
+      | p when Path.same p Predef.path_mask -> Some Mask
       | p when Path.same p Predef.path_nativeint -> Some Nativeint
       | p when Path.same p Predef.path_string -> Some String
       | p when Path.same p Predef.path_exn -> Some Exception
@@ -291,6 +232,8 @@ module Type_shape = struct
             Option.value shape ~default:unknown_shape_any
             (* CR sspies: We could ask the environment here for extra layout
                information about the type. *)
+          | Tmod _ ->
+            Misc.fatal_error "Type_shape.of_type_expr: unexpected Tmod"
           | Ttuple exprs -> Shape.tuple (of_expr_list (List.map snd exprs))
           | Tvar { name = _; jkind } -> unknown_shape_from_jkind jkind
           | Tpoly (type_expr, _type_vars) ->
@@ -319,6 +262,7 @@ module Type_shape = struct
                 | Tarrow (_, _, _, _)
                 | Ttuple _ | Tunboxed_tuple _
                 | Tconstr (_, _, _)
+                | Tmod (_, _)
                 | Tobject (_, _)
                 | Tfield (_, _, _, _)
                 | Tvariant _ | Tunivar _
@@ -332,7 +276,7 @@ module Type_shape = struct
                 "Linking and substitution should not reach this stage. Found \
                  %s type in file %s."
                 str
-                (match Compilation_unit.get_current () with
+                (match Current_unit.get_cu () with
                 | None -> "<unknown>"
                 | Some cu -> Compilation_unit.full_path_as_string cu)
               (* We cannot access the type printer here, so this
@@ -370,8 +314,7 @@ module Type_shape = struct
           | Tpackage _ -> unknown_shape_value
           (* CR sspies: Support first-class modules. *)
         in
-        Recursive_binder.close_term_if_binder_is_used ~preserve_uid:false
-          rec_binder type_shape
+        Recursive_binder.close_term_if_binder_is_used rec_binder type_shape
 
   let of_type_expr (expr : Types.type_expr) shape_for_constr =
     of_type_expr_go ~visited:Numbers.Int.Map.empty ~depth:0 expr []
@@ -403,6 +346,7 @@ module Type_decl_shape = struct
     | Types.Vec128 -> Layout.Base Vec128
     | Types.Vec256 -> Layout.Base Vec256
     | Types.Vec512 -> Layout.Base Vec512
+    | Types.Mask -> Layout.Base Mask
     | Types.Word -> Layout.Base Word
     | Types.Void -> Layout.Base Void
     | Types.Product args ->
@@ -414,85 +358,86 @@ module Type_decl_shape = struct
     let args =
       match cstr_args.cd_args with
       | Cstr_tuple list ->
-        Misc.Stdlib.List.map_option
+        List.map
           (fun ({ ca_type = type_expr; ca_sort = type_layout; _ } :
                  Types.constructor_argument) ->
-            Option.map
-              (fun type_layout ->
-                { Shape.field_name = None;
-                  field_uid = None;
-                  field_value =
-                    ( Type_shape.of_type_expr_with_type_subst type_expr
-                        shape_for_constr type_subst,
-                      type_layout )
-                })
-              type_layout)
+            { Shape.field_name = None;
+              field_uid = None;
+              field_value =
+                ( Type_shape.of_type_expr_with_type_subst type_expr
+                    shape_for_constr type_subst,
+                  type_layout )
+            })
           list
       | Cstr_record list ->
-        Misc.Stdlib.List.map_option
+        List.map
           (fun (lbl : Types.label_declaration) ->
-            Option.map
-              (fun sort ->
-                { Shape.field_name = Some (Ident.name lbl.ld_id);
-                  field_uid = Some lbl.ld_uid;
-                  field_value =
-                    ( Type_shape.of_type_expr_with_type_subst lbl.ld_type
-                        shape_for_constr type_subst,
-                      sort )
-                })
-              lbl.ld_sort)
+            { Shape.field_name = Some (Ident.name lbl.ld_id);
+              field_uid = Some lbl.ld_uid;
+              field_value =
+                ( Type_shape.of_type_expr_with_type_subst lbl.ld_type
+                    shape_for_constr type_subst,
+                  lbl.ld_sort )
+            })
           list
     in
-    match (arg_layout : Types.cstr_layout), args with
-    | Cstr_layout_known { shape = constructor_repr; _ }, Some args ->
-      let constructor_repr =
+    let constructor_repr =
+      match (arg_layout : Types.cstr_layout) with
+      | Cstr_layout_known { shape = constructor_repr; _ } -> (
         match (constructor_repr : Types.constructor_representation) with
         | Constructor_mixed shapes ->
           List.iter2
             (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
               let ly2 = mixed_block_shape_to_layout mix_shape in
-              if not (Layout.equal ly ly2)
-              then
+              match ly with
+              | Some ly when not (Layout.equal ly ly2) ->
                 if !Clflags.dwarf_pedantic
                 then
                   Misc.fatal_errorf_doc
                     "Type_shape: variant constructor with mismatched layout, \
                      has %a but expected %a"
                     Layout.format ly Layout.format ly2
-                else ())
+                else ()
+              | _ -> ())
             (Array.to_list shapes) args;
-          Array.map mixed_block_shape_to_layout shapes
+          Array.map
+            (fun mix_shape ->
+              Layout.some (mixed_block_shape_to_layout mix_shape))
+            shapes
         | Constructor_uniform_value ->
           let lys =
             List.map
               (fun { Shape.field_name = _; field_value = _, ly } ->
-                if
-                  not
-                    (Layout.equal ly (Layout.Base Scannable)
-                    || Layout.equal ly (Layout.Base Void))
-                then
+                match ly with
+                | Some ly
+                  when not
+                         (Layout.equal ly (Base Scannable)
+                         || Layout.equal ly (Base Void)) ->
                   if !Clflags.dwarf_pedantic
                   then
                     Misc.fatal_errorf_doc
                       "Type_shape: variant constructor with mismatched layout, \
                        has %a but expected value or void."
                       Layout.format ly
-                  else Layout.Base Scannable
-                else ly)
+                  else Layout.some (Base Scannable)
+                | _ -> ly)
               args
           in
           Array.of_list lys
         | Constructor_variable ->
           Misc.fatal_error
-            "Type_shape: unexpected variable constructor representation"
-      in
-      Some
-        { Shape.name;
-          constr_uid = Some cstr_args.cd_uid;
-          kind = constructor_repr;
+            "Type_shape: unexpected variable constructor representation")
+      | Cstr_layout_variable ->
+        Misc.Stdlib.Array.of_list_map
+          (fun { Shape.field_name = _; field_uid = _; field_value = _, ly } ->
+            ly)
           args
-        }
-    | Cstr_layout_known _, None | Cstr_layout_variable, _ -> None
+    in
+    { Shape.name;
+      constr_uid = Some cstr_args.cd_uid;
+      kind = constructor_repr;
+      args
+    }
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
     match cstr_args.cd_args with
@@ -546,17 +491,14 @@ module Type_decl_shape = struct
             List.combine cstr_list (Array.to_list layouts)
           in
           let constructors =
-            Misc.Stdlib.List.map_option
+            List.map
               (fun ((cstr, arg_layouts) : Types.constructor_declaration * _) ->
                 let name = Ident.name cstr.cd_id in
                 of_complex_constructor type_subst name cstr arg_layouts
                   shape_for_constr)
               cstrs_with_layouts
           in
-          begin match constructors with
-          | Some constructors -> Shape.variant constructors
-          | None -> Shape.unknown_type ()
-          end
+          Shape.variant constructors
         | Type_variant ([cstr], Variant_unboxed, _unsafe_mode_crossing)
           when not (is_empty_constructor_list cstr) ->
           let name = Ident.name cstr.cd_id in
@@ -841,32 +783,125 @@ let rec decompose_application (t : Shape.t) =
   | Unknown_type | At_layout _ ->
     t, []
 
-let find_constr_id_with_args (subst_constr, _) id args =
-  match Ident.Map.find_opt id subst_constr with
-  | Some t ->
-    List.find_opt (fun (args', _) -> List.equal Shape.equal args args') t
-    |> Option.map snd
-  | None -> None
+module Shape_map = struct
+  type t = Shape.t Ident.Map.t
 
-let find_mut_rec_shape (_, subst_constr_mut) id =
-  Ident.Map.find_opt id subst_constr_mut
-
-let update_subst_with_id_arg_binder (subst_constr, subst_constr_mut) id args
-    rec_binder =
-  let new_list =
-    (args, rec_binder)
-    ::
-    (match Ident.Map.find_opt id subst_constr with
-    | Some t -> t
-    | None -> [])
-  in
-  Ident.Map.add id new_list subst_constr, subst_constr_mut
-
-let update_subst_with_mutrec_decl (subst_constr, subst_constr_mut) t map =
-  ( subst_constr,
+  let hash m =
     Ident.Map.fold
-      (fun id _ map -> Ident.Map.add id (Shape.proj_decl t id) map)
-      map subst_constr_mut )
+      (fun id shape acc -> Hashtbl.hash (Ident.hash id, shape.Shape.hash, acc))
+      m 0
+
+  let equal m1 m2 = m1 == m2 || Ident.Map.equal Shape.equal m1 m2
+end
+
+(* Maps type variables to their shape substitutions, for beta reduction of type
+   applications. *)
+module Type_var_env = Hash_consed.Dedup (Shape_map) ()
+
+(* Maps constructor ids to the mutually recursive declaration shapes they belong
+   to. *)
+module Mutrec_env = Hash_consed.Dedup (Shape_map) ()
+
+(* Maps constructor ids to (args, recursive binder) pairs, for cycle detection
+   during evaluation. *)
+module Rec_constr_env =
+  Hash_consed.Dedup
+    (struct
+      type t = (Shape.t list * Recursive_binder.t) list Ident.Map.t
+
+      let hash =
+        let hash_entry (args, rb) =
+          Hashtbl.hash
+            (List.map (fun s -> s.Shape.hash) args, Recursive_binder.hash rb)
+        in
+        fun m ->
+          Ident.Map.fold
+            (fun id entries acc ->
+              Hashtbl.hash (Ident.hash id, List.map hash_entry entries, acc))
+            m 0
+
+      let equal =
+        let equal_entry (args1, rb1) (args2, rb2) =
+          Recursive_binder.equal rb1 rb2 && List.equal Shape.equal args1 args2
+        in
+        fun m1 m2 -> m1 == m2 || Ident.Map.equal (List.equal equal_entry) m1 m2
+    end)
+    ()
+
+module Eval_env = struct
+  (* The substitution maps are deduplicated individually (rather than as one
+   bundle) to avoid combinatorial blowup when one map changes and the others
+   stay the same. *)
+  (* CR-someday sspies: Each extension of an environment re-hashes the whole
+     map when interning it, making a chain of [n] extensions O(n^2). If this
+     shows up in profiles, cache a commutative (multiset) hash alongside each
+     map, i.e. the sum of the per-binding hashes, and update it incrementally
+     on extension. The same applies to [Rec_binder_env.add_binder] in
+     [Complex_shape], where fixing it additionally requires switching the
+     environment to absolute binder depths to avoid the De Bruijn shift
+     rewriting the entire map. *)
+  type t =
+    { type_var_env : Type_var_env.t;
+      mutrec_env : Mutrec_env.t;
+      rec_constr_env : Rec_constr_env.t
+    }
+
+  let equal t1 t2 =
+    Type_var_env.equal t1.type_var_env t2.type_var_env
+    && Mutrec_env.equal t1.mutrec_env t2.mutrec_env
+    && Rec_constr_env.equal t1.rec_constr_env t2.rec_constr_env
+
+  let hash { type_var_env; mutrec_env; rec_constr_env } =
+    Hashtbl.hash
+      ( Type_var_env.hash type_var_env,
+        Mutrec_env.hash mutrec_env,
+        Rec_constr_env.hash rec_constr_env )
+
+  let empty ~type_var_table ~mutrec_table ~rec_constr_table =
+    { type_var_env = Type_var_env.create type_var_table Ident.Map.empty;
+      mutrec_env = Mutrec_env.create mutrec_table Ident.Map.empty;
+      rec_constr_env = Rec_constr_env.create rec_constr_table Ident.Map.empty
+    }
+
+  let lookup_rec_constr t id args =
+    let rec_constr_env = Rec_constr_env.value t.rec_constr_env in
+    match Ident.Map.find_opt id rec_constr_env with
+    | Some entries ->
+      List.find_opt
+        (fun (args', _) -> List.equal Shape.equal args args')
+        entries
+      |> Option.map snd
+    | None -> None
+
+  let lookup_mutrec_decl t id =
+    Ident.Map.find_opt id (Mutrec_env.value t.mutrec_env)
+
+  let lookup_type_var t id =
+    Ident.Map.find_opt id (Type_var_env.value t.type_var_env)
+
+  let extend_rec_constr_env ~rec_constr_table t id args rec_binder =
+    let map = Rec_constr_env.value t.rec_constr_env in
+    let old_list = Option.value ~default:[] (Ident.Map.find_opt id map) in
+    let map = Ident.Map.add id ((args, rec_binder) :: old_list) map in
+    { t with rec_constr_env = Rec_constr_env.create rec_constr_table map }
+
+  let extend_mutrec_env ~mutrec_table t ~self ~defs =
+    let map =
+      Ident.Map.fold
+        (fun id _ acc -> Ident.Map.add id (Shape.proj_decl self id) acc)
+        defs
+        (Mutrec_env.value t.mutrec_env)
+    in
+    { t with mutrec_env = Mutrec_env.create mutrec_table map }
+
+  let extend_type_var_env ~type_var_table t id shape =
+    let map = Ident.Map.add id shape (Type_var_env.value t.type_var_env) in
+    { t with type_var_env = Type_var_env.create type_var_table map }
+end
+
+(* Deduplicates evaluated shapes so that structurally-equal results are
+   shared. *)
+module Shape_dedup = Hash_consed.Dedup (Shape) ()
 
 module Evaluation_diagnostics = struct
   type evaluate_diagnostics = { mutable reduction_steps : int }
@@ -889,42 +924,54 @@ end
 module D = Evaluation_diagnostics
 
 (* The cache can be used across invocations of [unfold_and_evaluate] and can
-   improve the performance if we deal with the same type (or components of it)
+   improve performance if we deal with the same type (or components of it)
    repeatedly. *)
-let eval_cache = Shape.Cache.create 256
+module Eval_cache : sig
+  type t
 
-let add_to_cache t res subst_type (subst_constr_mut, subst_constr) =
-  (* Due to internal sharing in memory, type shapes can become too large to
-     traverse recursively. As such, we cannot check here whether the shape [t]
-     is actually closed. We approximate this by checking whether it is being
-     evaluated in an empty environment, since an empty environment will always
-     lead to the same result (regardless of whether the shape is actually
-     closed). In an empty environment:
+  val create : initial_size:int -> t
 
-     - [subst_type] is empty, meaning there are no free type variables to
-       substitute,
+  val add : t -> inp:Shape.t -> env:Eval_env.t -> outp:Shape.t -> unit
 
-     - [subst_constr_mut] is empty, meaning there are no mutually-recursive
-       declarations that we could insert for [Constr]-entries, and
+  val find : t -> inp:Shape.t -> env:Eval_env.t -> Shape.t option
+end = struct
+  module Cache = Hashtbl.Make (struct
+    type t = Shape.t * Eval_env.t
 
-     - [subst_constr] is empty, meaning there are no recursive occurrences
-       of a particular [Constr (id, args)] to be substituted with a recursive
-       variable. *)
-  if
-    Ident.Map.is_empty subst_type
-    && Ident.Map.is_empty subst_constr_mut
-    && Ident.Map.is_empty subst_constr
-  then Shape.Cache.add eval_cache t res
+    let equal (s1, env1) (s2, env2) =
+      Shape.equal s1 s2 && Eval_env.equal env1 env2
 
-let find_in_cache t subst_type (subst_constr_mut, subst_constr) =
-  (* We perform the same emptiness check as in [add_to_cache] when looking up a
-     value. *)
-  if
-    Ident.Map.is_empty subst_type
-    && Ident.Map.is_empty subst_constr_mut
-    && Ident.Map.is_empty subst_constr
-  then Shape.Cache.find_opt eval_cache t
-  else None
+    let hash (s, env) = Hashtbl.hash (s.Shape.hash, Eval_env.hash env)
+  end)
+
+  type t = Shape.t Cache.t
+
+  let create ~initial_size = Cache.create initial_size
+
+  let add eval_cache ~inp ~env ~outp = Cache.replace eval_cache (inp, env) outp
+
+  let find eval_cache ~inp ~env = Cache.find_opt eval_cache (inp, env)
+end
+
+(* Bundles the hash-consing tables and the evaluation cache used by
+   [unfold_and_evaluate]. *)
+module Eval_context = struct
+  type t =
+    { type_var_table : Type_var_env.table;
+      mutrec_table : Mutrec_env.table;
+      rec_constr_table : Rec_constr_env.table;
+      shape_dedup_table : Shape_dedup.table;
+      eval_cache : Eval_cache.t
+    }
+
+  let create ~initial_size =
+    { type_var_table = Type_var_env.create_table ~initial_size;
+      mutrec_table = Mutrec_env.create_table ~initial_size;
+      rec_constr_table = Rec_constr_env.create_table ~initial_size;
+      shape_dedup_table = Shape_dedup.create_table ~initial_size;
+      eval_cache = Eval_cache.create ~initial_size
+    }
+end
 
 let is_above_unfold_and_evaluate_max_depth depth =
   match !Clflags.gdwarf_config_shape_eval_depth with
@@ -933,27 +980,31 @@ let is_above_unfold_and_evaluate_max_depth depth =
 
 (* To unroll the mutually recursive declarations, we perform a simple call by
    value evaluation and catch cycles for ident binders. *)
-let rec unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-    subst_constr (t : Shape.t) =
+let rec unfold_and_evaluate ~ctx ~diagnostics ~depth ~steps_remaining ~env
+    (t : Shape.t) =
   D.count_evaluation_step diagnostics;
   if Misc.Maybe_bounded.is_depleted steps_remaining
   then Shape.unknown_type ()
   else if is_above_unfold_and_evaluate_max_depth depth
-  then Shape.unknown_type ()
+  then
+    (* CR sspies: There is a caching bug here, which can lead to worse results:
+       The fallback value returned here goes into the cache and is reused by
+       subsequent calls even if they have a larger depth limit (or more
+       evaluation steps) available such that they could in principle still
+       compute the fully evaluated result. *)
+    Shape.unknown_type ()
   else (
     Misc.Maybe_bounded.decr steps_remaining;
-    match find_in_cache t subst_type subst_constr with
+    match Eval_cache.find ctx.Eval_context.eval_cache ~inp:t ~env with
     | Some res -> res
     | None ->
-      unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
-        subst_constr t)
+      unfold_and_evaluate0 ~ctx ~diagnostics ~depth ~steps_remaining ~env t)
 
-and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
-    subst_constr (t : Shape.t) =
+and unfold_and_evaluate0 ~ctx ~diagnostics ~depth ~steps_remaining ~env
+    (t : Shape.t) =
   let head, args = decompose_application t in
   let unfold_and_eval =
-    unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-      subst_constr
+    unfold_and_evaluate ~ctx ~diagnostics ~depth ~steps_remaining ~env
   in
   let unfold_and_eval_list = List.map unfold_and_eval in
   let maybe_evaluated_shape =
@@ -967,15 +1018,19 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
       | Mutrec ts ->
         let depth = depth + 1 in
         let rec_binder = Recursive_binder.create () in
-        let subst_constr = update_subst_with_mutrec_decl subst_constr str ts in
-        let subst_constr =
-          update_subst_with_id_arg_binder subst_constr id args rec_binder
+        let env =
+          Eval_env.extend_mutrec_env ~mutrec_table:ctx.Eval_context.mutrec_table
+            env ~self:str ~defs:ts
+        in
+        let env =
+          Eval_env.extend_rec_constr_env
+            ~rec_constr_table:ctx.Eval_context.rec_constr_table env id args
+            rec_binder
         in
         let ts = Ident.Map.find id ts in
-        unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-          subst_constr (Shape.app_list ts args)
-        |> Recursive_binder.close_term_if_binder_is_used ~preserve_uid:false
-             rec_binder
+        unfold_and_evaluate ~ctx ~diagnostics ~depth ~steps_remaining ~env
+          (Shape.app_list ts args)
+        |> Recursive_binder.close_term_if_binder_is_used rec_binder
         |> Option.some
       | Unknown_type | At_layout _ | Error _ -> None
       | Var _
@@ -1021,15 +1076,15 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
     | None -> (
       match t.desc with
       | Var id -> (
-        match Ident.Map.find_opt id subst_type with
+        match Eval_env.lookup_type_var env id with
         | Some t -> t
         | None -> t (* we encountered a free variable *))
       | Constr (id, constr_args) -> (
         let constr_args = unfold_and_eval_list constr_args in
-        match find_constr_id_with_args subst_constr id constr_args with
+        match Eval_env.lookup_rec_constr env id constr_args with
         | Some t -> Recursive_binder.mark_as_used t
         | None -> (
-          match find_mut_rec_shape subst_constr id with
+          match Eval_env.lookup_mutrec_decl env id with
           | Some t -> unfold_and_eval (Shape.app_list t constr_args)
           | None -> Shape.unknown_type ()))
       | App (f, arg) -> (
@@ -1037,9 +1092,11 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
         let arg = unfold_and_eval arg in
         match f.Shape.desc with
         | Abs (x, s') ->
-          unfold_and_evaluate ~diagnostics ~depth ~steps_remaining
-            (Ident.Map.add x arg subst_type)
-            subst_constr s'
+          let env =
+            Eval_env.extend_type_var_env
+              ~type_var_table:ctx.Eval_context.type_var_table env x arg
+          in
+          unfold_and_evaluate ~ctx ~diagnostics ~depth ~steps_remaining ~env s'
         | Var _
         | App (_, _)
         | Struct _ | Alias _ | Leaf
@@ -1083,20 +1140,18 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
           arg_layout
       | Proj (t, i) ->
         Shape.proj
-          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-             subst_constr t)
+          (unfold_and_evaluate ~ctx ~diagnostics ~depth ~steps_remaining ~env t)
           i
       | Tuple args -> Shape.tuple (unfold_and_eval_list args)
       | Unboxed_tuple args -> Shape.unboxed_tuple (unfold_and_eval_list args)
       | Predef (p, args) -> Shape.predef p (unfold_and_eval_list args)
-      | Mu body ->
-        Shape.mu
-          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-             subst_constr body)
+      | Mu (rv, body) ->
+        Shape.mu rv
+          (unfold_and_evaluate ~ctx ~diagnostics ~depth ~steps_remaining ~env
+             body)
       | Alias t ->
         Shape.alias
-          (unfold_and_evaluate ~diagnostics ~depth ~steps_remaining subst_type
-             subst_constr t)
+          (unfold_and_evaluate ~ctx ~diagnostics ~depth ~steps_remaining ~env t)
       | At_layout (t, layout) -> Shape.at_layout (unfold_and_eval t) layout
       | Struct items -> Shape.str (Shape.Item.Map.map unfold_and_eval items)
       (* normal forms for CBV evaluation *)
@@ -1104,18 +1159,24 @@ and unfold_and_evaluate0 ~diagnostics ~depth ~steps_remaining subst_type
       | Unknown_type ->
         t)
   in
-  add_to_cache t result subst_type subst_constr;
+  let result =
+    Shape_dedup.canonical ctx.Eval_context.shape_dedup_table result
+  in
+  Eval_cache.add ctx.Eval_context.eval_cache ~inp:t ~env ~outp:result;
   result
 
-let unfold_and_evaluate ?(diagnostics = Evaluation_diagnostics.no_diagnostics) t
-    =
+let unfold_and_evaluate ~ctx
+    ?(diagnostics = Evaluation_diagnostics.no_diagnostics) t =
   let steps_remaining =
     Misc.Maybe_bounded.of_option
       !Clflags.gdwarf_config_max_evaluation_steps_per_variable
   in
-  unfold_and_evaluate ~diagnostics ~depth:0 ~steps_remaining Ident.Map.empty
-    (Ident.Map.empty, Ident.Map.empty)
-    t
+  let env =
+    Eval_env.empty ~type_var_table:ctx.Eval_context.type_var_table
+      ~mutrec_table:ctx.Eval_context.mutrec_table
+      ~rec_constr_table:ctx.Eval_context.rec_constr_table
+  in
+  unfold_and_evaluate ~ctx ~diagnostics ~depth:0 ~steps_remaining ~env t
 
 (** Instead of exposing [unfold_and_evaluate] directly, we expose the module
     [Evaluated_shape] such that subsequent translations can, using types,
@@ -1123,6 +1184,8 @@ let unfold_and_evaluate ?(diagnostics = Evaluation_diagnostics.no_diagnostics) t
     [Complex_shape.type_shape_to_complex_shape]. *)
 module Evaluated_shape = struct
   type t = Shape.t
+
+  module Eval_context = Eval_context
 
   let unfold_and_evaluate = unfold_and_evaluate
 

@@ -131,7 +131,7 @@ let convert_block_shape ~machine_width (shape : L.block_shape) ~num_fields =
       | Product elts -> Array.fold_left collect_value_fields acc elts
       | Float_boxed ()
       | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-      | Vec512 | Word | Untagged_immediate | Splice_variable _ ->
+      | Vec512 | Mask | Word | Untagged_immediate | Splice_variable _ ->
         Misc.fatal_error "convert_block_shape: non-uniform shape"
     in
     let fields = Array.fold_left collect_value_fields [] shape |> List.rev in
@@ -174,6 +174,7 @@ let convert_array_kind dbg (kind : L.array_kind) : converted_array_kind =
   | Punboxedvectorarray Unboxed_vec128 -> Array_kind Naked_vec128s
   | Punboxedvectorarray Unboxed_vec256 -> Array_kind Naked_vec256s
   | Punboxedvectorarray Unboxed_vec512 -> Array_kind Naked_vec512s
+  | Punboxedmaskarray -> Array_kind Naked_masks
   | Pgcscannableproductarray kinds ->
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         P.Array_kind.t =
@@ -231,6 +232,7 @@ module Array_ref_kind = struct
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
     | Unboxed_product of no_float_array_opt list
 
   type t =
@@ -275,6 +277,7 @@ let convert_array_ref_kind dbg (kind : L.array_ref_kind) :
     Array_ref_kind (No_float_array_opt Naked_vec256s)
   | Punboxedvectorarray_ref Unboxed_vec512 ->
     Array_ref_kind (No_float_array_opt Naked_vec512s)
+  | Punboxedmaskarray_ref -> Array_ref_kind (No_float_array_opt Naked_masks)
   | Pgcscannableproductarray_ref kinds ->
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_ref_kind.no_float_array_opt =
@@ -327,8 +330,9 @@ let rec convert_unboxed_product_array_ref_kind
   | Naked_int64s -> Naked_int64s
   | Naked_nativeints -> Naked_nativeints
   | Naked_vec128s -> Naked_vec128s
-  | Naked_vec256s | Naked_vec512s ->
-    Misc.fatal_error "Arrays of products of wide vectors is not implemented"
+  | Naked_vec256s | Naked_vec512s | Naked_masks ->
+    Misc.fatal_error
+      "Arrays of products of wide vectors or masks are not implemented"
   | Unboxed_product kinds ->
     Unboxed_product (List.map convert_unboxed_product_array_ref_kind kinds)
 
@@ -352,6 +356,7 @@ let convert_array_ref_kind_to_array_kind (array_ref_kind : Array_ref_kind.t) :
     | Naked_vec128s -> Naked_vec128s
     | Naked_vec256s -> Naked_vec256s
     | Naked_vec512s -> Naked_vec512s
+    | Naked_masks -> Naked_masks
     | Unboxed_product kinds ->
       Unboxed_product (List.map convert_unboxed_product_array_ref_kind kinds))
 
@@ -378,6 +383,7 @@ let convert_array_ref_kind_for_length dbg array_ref_kind :
       | Naked_vec128s -> Array_kind Naked_vec128s
       | Naked_vec256s -> Array_kind Naked_vec256s
       | Naked_vec512s -> Array_kind Naked_vec512s
+      | Naked_masks -> Array_kind Naked_masks
       | Unboxed_product kinds ->
         Array_kind
           (Unboxed_product
@@ -398,6 +404,7 @@ module Array_set_kind = struct
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
     | Unboxed_product of no_float_array_opt list
 
   type t =
@@ -445,6 +452,7 @@ let convert_array_set_kind dbg (kind : L.array_set_kind) :
     Array_set_kind (No_float_array_opt Naked_vec256s)
   | Punboxedvectorarray_set Unboxed_vec512 ->
     Array_set_kind (No_float_array_opt Naked_vec512s)
+  | Punboxedmaskarray_set -> Array_set_kind (No_float_array_opt Naked_masks)
   | Pgcscannableproductarray_set (mode, kinds) ->
     let rec convert_kind (kind : L.scannable_product_element_kind) :
         Array_set_kind.no_float_array_opt =
@@ -497,8 +505,9 @@ let rec convert_unboxed_product_array_set_kind
   | Naked_int64s -> Naked_int64s
   | Naked_nativeints -> Naked_nativeints
   | Naked_vec128s -> Naked_vec128s
-  | Naked_vec256s | Naked_vec512s ->
-    Misc.fatal_error "Arrays of products of wide vectors is not implemented"
+  | Naked_vec256s | Naked_vec512s | Naked_masks ->
+    Misc.fatal_error
+      "Arrays of products of wide vectors or masks are not implemented"
   | Unboxed_product kinds ->
     Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds)
 
@@ -521,6 +530,7 @@ let convert_array_set_kind_to_array_kind (array_set_kind : Array_set_kind.t) :
     | Naked_vec128s -> Naked_vec128s
     | Naked_vec256s -> Naked_vec256s
     | Naked_vec512s -> Naked_vec512s
+    | Naked_masks -> Naked_masks
     | Unboxed_product kinds ->
       Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds))
 
@@ -544,6 +554,7 @@ let convert_array_set_kind_for_length dbg array_set_kind :
     | Naked_vec128s -> Array_kind Naked_vec128s
     | Naked_vec256s -> Array_kind Naked_vec256s
     | Naked_vec512s -> Array_kind Naked_vec512s
+    | Naked_masks -> Array_kind Naked_masks
     | Unboxed_product kinds ->
       Array_kind
         (Unboxed_product (List.map convert_unboxed_product_array_set_kind kinds))
@@ -584,6 +595,7 @@ let convert_array_kind_to_duplicate_array_kind dbg (kind : L.array_kind) :
     Duplicate_array_kind (Naked_vec256s { length = None })
   | Punboxedvectorarray Unboxed_vec512 ->
     Duplicate_array_kind (Naked_vec512s { length = None })
+  | Punboxedmaskarray -> Duplicate_array_kind (Naked_masks { length = None })
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     Misc.fatal_error
       "Lambda_to_flambda_primitives.convert_array_kind_to_duplicate_array_kind: \
@@ -688,6 +700,18 @@ let box_vec512 mode (arg : H.expr_primitive) ~current_alloc_region
 
 let unbox_vec512 (arg : H.simple_or_prim) : H.simple_or_prim =
   Prim (Unary (Unbox_number Naked_vec512, arg))
+
+let box_mask mode (arg : H.expr_primitive) ~current_alloc_region ~current_region
+    : H.expr_primitive =
+  Unary
+    ( Box_number
+        ( Naked_mask,
+          Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+            ~current_region ),
+      Prim arg )
+
+let unbox_mask (arg : H.simple_or_prim) : H.simple_or_prim =
+  Prim (Unary (Unbox_number Naked_mask, arg))
 
 let convert_lambda_index_to_standard_int_or_float
     (index_kind : L.array_index_kind) : I_or_f.t =
@@ -921,9 +945,13 @@ let string_like_load ~dbg ~checks
         if boxed_or_tagged
         then box_vec512 mode ~current_alloc_region ~current_region
         else Fun.id
+      | Mask, Some mode ->
+        if boxed_or_tagged
+        then box_mask mode ~current_alloc_region ~current_region
+        else Fun.id
       | (Eight | Eight_signed | Sixteen | Sixteen_signed), Some _
       | ( ( Thirty_two | Single | Sixty_four | One_twenty_eight _
-          | Two_fifty_six _ | Five_twelve _ ),
+          | Two_fifty_six _ | Five_twelve _ | Mask ),
           None ) ->
         Misc.fatal_error "Inconsistent alloc_mode for string or bytes load"
     in
@@ -965,6 +993,7 @@ let bytes_like_set ~dbg ~checks
       | One_twenty_eight _ -> if boxed_or_tagged then unbox_vec128 else Fun.id
       | Two_fifty_six _ -> if boxed_or_tagged then unbox_vec256 else Fun.id
       | Five_twelve _ -> if boxed_or_tagged then unbox_vec512 else Fun.id
+      | Mask -> if boxed_or_tagged then unbox_mask else Fun.id
     in
     H.Ternary
       (Bytes_or_bigstring_set (kind, access_size), bytes, index, wrap new_value)
@@ -1069,7 +1098,7 @@ let multiple_word_array_access_validity_condition array ~machine_width
            compute the non-unarized bound, then compare against that. *)
         Prim
           (Binary
-             ( Int_arith (Naked_nativeint, Div),
+             ( Int_arith (Naked_nativeint, Div Signed),
                nativeint_bound,
                Simple
                  (Simple.const
@@ -1092,7 +1121,7 @@ let array_vector_access_validity_condition array ~machine_width
     | Naked_vec256s -> 32
     | Naked_vec512s -> 64
     | Naked_floats | Immediates | Naked_ints | Naked_int64s | Naked_nativeints
-      ->
+    | Naked_masks ->
       8
     | Naked_int32s | Naked_float32s -> 4
     | Naked_int16s -> 2
@@ -1199,6 +1228,7 @@ let bigarray_box_or_tag_raw_value_to_read kind alloc_mode =
     fun arg -> H.Unary (Box_number (Naked_vec256, alloc_mode), Prim arg)
   | Naked_number Naked_vec512 ->
     fun arg -> H.Unary (Box_number (Naked_vec512, alloc_mode), Prim arg)
+  | Naked_number Naked_mask -> error "a mask"
   | Region -> error "a region expression"
   | Rec_info -> error "recursion info"
 
@@ -1235,6 +1265,7 @@ let bigarray_unbox_or_untag_value_to_store kind =
     fun arg -> H.Prim (Unary (Unbox_number Naked_vec256, arg))
   | Naked_number Naked_vec512 ->
     fun arg -> H.Prim (Unary (Unbox_number Naked_vec512, arg))
+  | Naked_number Naked_mask -> error "a mask"
   | Region -> error "a region expression"
   | Rec_info -> error "recursion info"
 
@@ -1370,6 +1401,7 @@ let rec array_load_unsafe ~machine_width ~array ~index
       | Naked_vec128s -> [Array_ref_kind.No_float_array_opt Naked_vec128s]
       | Naked_vec256s -> [Array_ref_kind.No_float_array_opt Naked_vec256s]
       | Naked_vec512s -> [Array_ref_kind.No_float_array_opt Naked_vec512s]
+      | Naked_masks -> [Array_ref_kind.No_float_array_opt Naked_masks]
       | Unboxed_product kinds -> List.concat_map unarize_kind kinds
     in
     let unarized = List.concat_map unarize_kind array_ref_kinds in
@@ -1395,7 +1427,7 @@ let rec array_load_unsafe ~machine_width ~array ~index
       (( Immediates | Gc_ignorable_values | Values | Naked_floats
        | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
        | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-       | Naked_vec512s ) as nfo) ->
+       | Naked_vec512s | Naked_masks ) as nfo) ->
     let array_load_kind : P.Array_load_kind.t =
       match nfo with
       | Immediates -> Immediates
@@ -1412,6 +1444,7 @@ let rec array_load_unsafe ~machine_width ~array ~index
       | Naked_vec128s -> Naked_vec128s
       | Naked_vec256s -> Naked_vec256s
       | Naked_vec512s -> Naked_vec512s
+      | Naked_masks -> Naked_masks
       | Unboxed_product _ -> assert false
     in
     [Binary (Array_load (array_kind, array_load_kind, mut'), array, index)]
@@ -1455,6 +1488,7 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
       | Naked_vec128s -> [Array_set_kind.No_float_array_opt Naked_vec128s]
       | Naked_vec256s -> [Array_set_kind.No_float_array_opt Naked_vec256s]
       | Naked_vec512s -> [Array_set_kind.No_float_array_opt Naked_vec512s]
+      | Naked_masks -> [Array_set_kind.No_float_array_opt Naked_masks]
       | Unboxed_product kinds -> List.concat_map unarize_kind kinds
     in
     let unarized = List.concat_map unarize_kind array_set_kinds in
@@ -1486,8 +1520,8 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
   | No_float_array_opt
       (( Gc_ignorable_values | Values _ | Naked_floats | Naked_float32s
        | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
-       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s ) as
-       nfo) -> (
+       | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
+       | Naked_masks ) as nfo) -> (
     match nfo with
     | Values init_or_assign -> normal_case (Values init_or_assign) new_values
     | Gc_ignorable_values -> normal_case Gc_ignorable_values new_values
@@ -1502,6 +1536,7 @@ let rec array_set_unsafe ~machine_width dbg ~array ~index array_kind
     | Naked_vec128s -> normal_case Naked_vec128s new_values
     | Naked_vec256s -> normal_case Naked_vec256s new_values
     | Naked_vec512s -> normal_case Naked_vec512s new_values
+    | Naked_masks -> normal_case Naked_masks new_values
     | Unboxed_product _ -> assert false)
 
 let array_set_unsafe ~machine_width dbg ~array ~index array_kind array_set_kind
@@ -1751,7 +1786,7 @@ let block_index_access_offsets ~machine_width layout idx =
           H.simple_i64 (Int64.of_int (BC.on_64_bit_arch to_left.value))
         (* Flats are gap + (all values) + (flats to left) beyond the offset *)
         | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
+        | Word | Vec128 | Vec256 | Vec512 | Mask | Untagged_immediate ->
           Prim
             (add gap
                (H.simple_i64
@@ -1777,25 +1812,97 @@ let block_index_access_offsets ~machine_width layout idx =
     in
     snd (List.fold_left_map f MPB.zero (L.mixed_block_element_leaves mbe))
 
-let write_offset write_offset_kind layout mode ~machine_width ~ptr ~idx
-    ~new_values =
+(* [block_index_access_offsets] produces untagged byte offsets, but
+   [Atomic_load_field] and [Atomic_set_field] expect a tagged word index. *)
+let tagged_field_index_of_offset ~machine_width offset : H.simple_or_prim =
+  let log2_size_addr =
+    H.simple_untagged_int ~machine_width
+      (Misc.log2 (Target_system.Machine_width.size_in_bytes machine_width))
+  in
+  let index =
+    H.Binary (Int_shift (Naked_int64, Lsr), Prim offset, log2_size_addr)
+  in
+  Prim
+    (Unary (Num_conv { src = Naked_int64; dst = Tagged_immediate }, Prim index))
+
+let access_flag_of_mutable_flag : Asttypes.mutable_flag -> L.access_flag =
+  function
+  | Immutable -> Immutable_access
+  | Mutable -> Mutable_access
+
+let check_single_element offsets kinds =
+  let offset, full_kind =
+    match offsets, kinds with
+    | [offset], [kind] -> offset, kind
+    | _ ->
+      Misc.fatal_error
+        "check_single_element: expected single element for atomic op"
+  in
+  if not (K.is_value (K.With_subkind.kind full_kind))
+  then
+    (* defensive check: field index computation assumes data is word-sized *)
+    Misc.fatal_error "check_single_element: expected value for atomic op";
+  offset, full_kind
+
+let convert_pget_indirect ~machine_width ~dbg primitive layout
+    (access : L.access_flag) ~ptr ~idx : H.expr_primitive list =
+  needs_64_bit_target primitive dbg;
+  let offsets = block_index_access_offsets ~machine_width layout idx in
+  let kinds =
+    Flambda_arity.unarize
+      (Flambda_arity.from_lambda_list [layout] ~machine_width)
+  in
+  match Lambda.access_atomicity access with
+  | Nonatomic ->
+    let mut =
+      match access with
+      | Immutable_access -> Asttypes.Immutable
+      | Mutable_access -> Asttypes.Mutable
+      | Atomic_access ->
+        Misc.fatal_error "convert_pget_indirect: expected nonatomic access"
+    in
+    let reads =
+      List.map2
+        (fun kind offset ->
+          H.Binary (Read_offset (kind, mut), ptr, Prim offset))
+        kinds offsets
+    in
+    [H.maybe_create_unboxed_product reads]
+  | Atomic ->
+    let offset, full_kind = check_single_element offsets kinds in
+    let field_kind = P.Block_access_field_kind.from_kind full_kind in
+    let field = tagged_field_index_of_offset ~machine_width offset in
+    [Binary (Atomic_load_field field_kind, ptr, field)]
+
+let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
+    mode (atomicity : L.atomic_flag) ~ptr ~idx ~new_values :
+    H.expr_primitive list =
+  needs_64_bit_target primitive dbg;
   let mode = Alloc_mode.For_assignments.from_lambda mode in
   let offsets = block_index_access_offsets ~machine_width layout idx in
   let kinds =
     Flambda_arity.unarize
       (Flambda_arity.from_lambda_list [layout] ~machine_width)
   in
-  let writes =
-    Misc.Stdlib.List.map3
-      (fun kind offset new_value ->
-        H.Ternary
-          ( Write_offset (write_offset_kind, kind, mode),
-            ptr,
-            Prim offset,
-            new_value ))
-      kinds offsets new_values
-  in
-  [H.Sequence writes]
+  match atomicity with
+  | Nonatomic ->
+    let writes =
+      Misc.Stdlib.List.map3
+        (fun kind offset new_value ->
+          H.Ternary
+            ( Write_offset (write_offset_kind, kind, mode),
+              ptr,
+              Prim offset,
+              new_value ))
+        kinds offsets new_values
+    in
+    [H.Sequence writes]
+  | Atomic ->
+    let offset, full_kind = check_single_element offsets kinds in
+    let field_kind = P.Block_access_field_kind.from_kind full_kind in
+    let field = tagged_field_index_of_offset ~machine_width offset in
+    let new_value = List.hd new_values in
+    [Ternary (Atomic_set_field (field_kind, mode), ptr, field, new_value)]
 
 let string_or_bytes_checks (size : Flambda_primitive.string_accessor_width)
     unsafe =
@@ -1805,6 +1912,29 @@ let string_or_bytes_checks (size : Flambda_primitive.string_accessor_width)
     Some
       ( ~len:(Flambda_primitive.byte_width_of_string_accessor_width size),
         ~align:0 )
+
+let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
+  let shape =
+    Mixed_block_shape.of_mixed_block_elements shape
+      ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+  in
+  let field_index =
+    match Mixed_block_shape.lookup_path_producing_new_indexes shape [index] with
+    | [index] -> index
+    | _ ->
+      Misc.fatal_errorf "%s: expected exactly one flattened index" prim_name
+  in
+  let field_kind =
+    match (Mixed_block_shape.flattened_reordered_shape shape).(field_index) with
+    | Value vk -> H.block_access_field_kind_of_value_kind vk
+    | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+    | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+      Misc.fatal_errorf "%s: expected mixed block element to be a value"
+        prim_name
+  in
+  let imm = Target_ocaml_int.of_int machine_width field_index in
+  check_non_negative_imm imm prim_name;
+  imm, field_kind
 
 (* Primitive conversion *)
 let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
@@ -1865,7 +1995,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           (fun new_index arg ->
             match flattened_reordered_shape.(new_index) with
             | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+            | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
               arg
             | Float_boxed _ -> unbox_float arg)
           args
@@ -2093,7 +2223,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             ( Untagged_int | Untagged_int8 | Untagged_int16 | Unboxed_int32
             | Unboxed_int64 | Unboxed_nativeint )
         | Punboxedvectorarray (Unboxed_vec128 | Unboxed_vec256 | Unboxed_vec512)
-        | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+        | Punboxedmaskarray | Pgcscannableproductarray _
+        | Pgcignorableproductarray _ ->
           args
         | Pfloatarray -> List.map unbox_float args
         | Punspecializedarray ->
@@ -2270,10 +2401,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | And -> Binary (Int_arith (width, And), arg1, arg2)
         | Or -> Binary (Int_arith (width, Or), arg1, arg2)
         | Xor -> Binary (Int_arith (width, Xor), arg1, arg2)
-        | Div Unsafe -> Binary (Int_arith (width, Div), arg1, arg2)
-        | Mod Unsafe -> Binary (Int_arith (width, Mod), arg1, arg2)
-        | Div Safe -> check_zero_division ~machine_width width arg1 arg2 Div dbg
-        | Mod Safe -> check_zero_division ~machine_width width arg1 arg2 Mod dbg
+        | Div (Unsafe, signedness) ->
+          Binary (Int_arith (width, Div signedness), arg1, arg2)
+        | Mod (Unsafe, signedness) ->
+          Binary (Int_arith (width, Mod signedness), arg1, arg2)
+        | Div (Safe, signedness) ->
+          check_zero_division ~machine_width width arg1 arg2 (Div signedness)
+            dbg
+        | Mod (Safe, signedness) ->
+          check_zero_division ~machine_width width arg1 arg2 (Mod signedness)
+            dbg
       in
       [to_expr (maybe_wrap (Prim result))]
     | Shift (outer, op, rhs) ->
@@ -2405,6 +2542,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
               Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
                 ~current_region ),
           arg ) ]
+  | Punbox_mask, [[arg]] -> [Unary (Unbox_number Naked_mask, arg)]
+  | Pbox_mask mode, [[arg]] ->
+    [ Unary
+        ( Box_number
+            ( Naked_mask,
+              Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+                ~current_region ),
+          arg ) ]
   | Punbox_unit, [[_]] -> [Unboxed_product []]
   | Pfield_computed sem, [[obj]; [field]] ->
     (* We are reinterpreting a block(/object) as a value array, so it needs to
@@ -2440,7 +2585,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
         | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-        | Naked_vec256s | Naked_vec512s )
+        | Naked_vec256s | Naked_vec512s | Naked_masks )
     | Float_array_opt_dynamic ->
       [prim]
     | Array_kind (Unboxed_product _ as array_kind) ->
@@ -2451,7 +2596,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         |> Target_ocaml_int.of_int machine_width
         |> Simple.const_int
       in
-      [Binary (Int_arith (Tagged_immediate, Div), Prim prim, Simple divisor)])
+      [ Binary
+          (Int_arith (Tagged_immediate, Div Signed), Prim prim, Simple divisor)
+      ])
   | Pduparray (kind, mutability), [[arg]] -> (
     let duplicate_array_kind =
       convert_array_kind_to_duplicate_array_kind dbg kind
@@ -2584,6 +2731,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ string_like_load ~checks ~dbg ~machine_width ~access_size Bytes
         ~boxed_or_tagged:boxed (Some mode) str ~index_kind index
         ~current_alloc_region ~current_region ]
+  | Pstring_load_mask { unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Mask String
+        ~boxed_or_tagged:boxed (Some mode) str ~index_kind index
+        ~current_alloc_region ~current_region ]
+  | Pbytes_load_mask { unsafe; index_kind; mode; boxed }, [[bytes]; [index]] ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Mask Bytes
+        ~boxed_or_tagged:boxed (Some mode) bytes ~index_kind index
+        ~current_alloc_region ~current_region ]
   | Pbytes_set_8 { unsafe; index_kind; tagged }, [[bytes]; [index]; [new_value]]
     ->
     let checks = string_or_bytes_checks Eight unsafe in
@@ -2614,6 +2771,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let access_size = vec_accessor_width ~aligned:false size in
     let checks = string_or_bytes_checks access_size unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bytes
+        ~boxed_or_tagged:boxed bytes ~index_kind index new_value ]
+  | ( Pbytes_set_mask { unsafe; index_kind; boxed },
+      [[bytes]; [index]; [new_value]] ) ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Mask Bytes
         ~boxed_or_tagged:boxed bytes ~index_kind index new_value ]
   | Pisint { variant_only }, [[arg]] ->
     [tag_int (Unary (Is_int { variant_only }, arg))]
@@ -2690,7 +2852,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         | Float_boxed (mode : Lambda.locality_mode) ->
           box_float mode prim ~current_alloc_region ~current_region
         | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-        | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+        | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
           prim)
       new_indexes
   | ( Psetfield (index, immediate_or_pointer, initialization_or_assignment),
@@ -2765,7 +2927,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           let value : H.simple_or_prim =
             match field_elt with
             | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+            | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
               value
             | Float_boxed _ -> unbox_float value
           in
@@ -3027,6 +3189,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [ string_like_load ~checks ~dbg ~machine_width ~access_size Bigstring
         (Some mode) ~boxed_or_tagged:boxed big_str ~index_kind index
         ~current_alloc_region ~current_region ]
+  | ( Pbigstring_load_mask { unsafe; index_kind; mode; boxed },
+      [[big_str]; [index]] ) ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Mask Bigstring
+        (Some mode) ~boxed_or_tagged:boxed big_str ~index_kind index
+        ~current_alloc_region ~current_region ]
   | ( Pbigstring_set_8 { unsafe; index_kind; tagged },
       [[bigstring]; [index]; [new_value]] ) ->
     let checks = string_or_bytes_checks Eight unsafe in
@@ -3058,6 +3226,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[bigstring]; [index]; [new_value]] ) ->
     let access_size = vec_accessor_width ~aligned size in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bigstring
+        ~boxed_or_tagged:boxed bigstring ~index_kind index new_value ]
+  | ( Pbigstring_set_mask { unsafe; index_kind; boxed },
+      [[bigstring]; [index]; [new_value]] ) ->
+    let checks = string_or_bytes_checks Mask unsafe in
+    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Mask Bigstring
         ~boxed_or_tagged:boxed bigstring ~index_kind index new_value ]
   | ( Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] )
@@ -3173,36 +3346,62 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             (convert_block_access_field_kind immediate_or_pointer),
           atomic,
           field ) ]
-  | Patomic_set_field { immediate_or_pointer }, [[atomic]; [field]; [new_value]]
-    ->
+  | Patomic_load_mixed_field { index; shape }, [[atomic]] ->
+    let imm, field_kind =
+      mixed_field_index_and_kind ~machine_width
+        ~prim_name:"Patomic_load_mixed_field" index shape
+    in
+    [ Binary
+        (Atomic_load_field field_kind, atomic, H.Simple (Simple.const_int imm))
+    ]
+  | ( Patomic_set_field { immediate_or_pointer; mode },
+      [[atomic]; [field]; [new_value]] ) ->
     [ Ternary
-        ( Atomic_set_field (convert_block_access_field_kind immediate_or_pointer),
+        ( Atomic_set_field
+            ( convert_block_access_field_kind immediate_or_pointer,
+              Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
           new_value ) ]
-  | ( Patomic_exchange_field { immediate_or_pointer },
+  | Patomic_set_mixed_field { index; shape; mode }, [[atomic]; [new_value]] ->
+    let imm, field_kind =
+      mixed_field_index_and_kind ~machine_width
+        ~prim_name:"Patomic_set_mixed_field" index shape
+    in
+    [ Ternary
+        ( Atomic_set_field
+            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+          atomic,
+          H.Simple (Simple.const_int imm),
+          new_value ) ]
+  | ( Patomic_exchange_field { immediate_or_pointer; mode },
       [[atomic]; [field]; [new_value]] ) ->
     [ Ternary
         ( Atomic_exchange_field
-            (convert_block_access_field_kind immediate_or_pointer),
+            ( convert_block_access_field_kind immediate_or_pointer,
+              Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
           new_value ) ]
-  | ( Patomic_compare_exchange_field { immediate_or_pointer },
+  | ( Patomic_compare_exchange_field { immediate_or_pointer; mode },
       [[atomic]; [field]; [comparison_value]; [new_value]] ) ->
     let access_kind = convert_block_access_field_kind immediate_or_pointer in
     [ Quaternary
         ( Atomic_compare_exchange_field
-            { atomic_kind = access_kind; args_kind = access_kind },
+            { atomic_kind = access_kind;
+              args_kind = access_kind;
+              mode = Alloc_mode.For_assignments.from_lambda mode
+            },
           atomic,
           field,
           comparison_value,
           new_value ) ]
-  | ( Patomic_compare_set_field { immediate_or_pointer },
+  | ( Patomic_compare_set_field { immediate_or_pointer; mode },
       [[atomic]; [field]; [old_value]; [new_value]] ) ->
     [ Quaternary
         ( Atomic_compare_and_set_field
-            (convert_block_access_field_kind immediate_or_pointer),
+            ( convert_block_access_field_kind immediate_or_pointer,
+              Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
           old_value,
@@ -3247,58 +3446,37 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Ppoke layout, [[ptr]; [new_value]] ->
     let kind = standard_int_or_float_of_peek_or_poke layout in
     [Binary (Poke kind, ptr, new_value)]
-  | Pget_idx (layout, mut), [[ptr]; [idx]] | Pget_ptr (layout, mut), [[ptr; idx]]
-    ->
-    needs_64_bit_target prim dbg;
-    let offsets = block_index_access_offsets ~machine_width layout idx in
-    let kinds =
-      Flambda_arity.unarize
-        (Flambda_arity.from_lambda_list [layout] ~machine_width)
-    in
-    let reads =
-      List.map2
-        (fun kind offset ->
-          H.Binary (Read_offset (kind, mut), ptr, Prim offset))
-        kinds offsets
-    in
-    [H.maybe_create_unboxed_product reads]
+  | Pget_idx (layout, access), [[ptr]; [idx]] ->
+    convert_pget_indirect ~machine_width ~dbg prim layout access ~ptr ~idx
+  | Pget_ptr (layout, mut), [[ptr; idx]] ->
+    convert_pget_indirect ~machine_width ~dbg prim layout
+      (access_flag_of_mutable_flag mut)
+      ~ptr ~idx
   | Pget_ptr _, [([] | [_] | _ :: _ :: _ :: _)] ->
     Misc.fatal_errorf
       "Closure_convertion.convert_primitive: The argument to Pget_ptr should \
        be an unboxed product of length 2"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
-    needs_64_bit_target prim dbg;
-    write_offset Into_block layout mode ~machine_width ~ptr ~idx ~new_values
+  | Pset_idx (layout, mode, atomicity), [[ptr]; [idx]; new_values] ->
+    convert_pset_indirect ~machine_width ~dbg prim Into_block layout mode
+      atomicity ~ptr ~idx ~new_values
   | Pset_ptr (layout, mode), [[ptr; idx]; new_values] ->
-    needs_64_bit_target prim dbg;
-    write_offset Into_block_or_off_heap layout mode ~machine_width ~ptr ~idx
-      ~new_values
+    convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
+      mode Nonatomic ~ptr ~idx ~new_values
   | Pset_ptr _, [([] | [_] | _ :: _ :: _ :: _); _] ->
     Misc.fatal_errorf
       "Closure_convertion.convert_primitive: The first argument to Pset_ptr \
        should be an unboxed product of length 2"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | Pget_ext_ptr (layout, mut), [[idx]] ->
-    needs_64_bit_target prim dbg;
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
-    let offsets = block_index_access_offsets ~machine_width layout idx in
-    let kinds =
-      Flambda_arity.unarize
-        (Flambda_arity.from_lambda_list [layout] ~machine_width)
-    in
-    let reads =
-      List.map2
-        (fun kind offset ->
-          H.Binary (Read_offset (kind, mut), null_base, Prim offset))
-        kinds offsets
-    in
-    [H.maybe_create_unboxed_product reads]
+    convert_pget_indirect ~machine_width ~dbg prim layout
+      (access_flag_of_mutable_flag mut)
+      ~ptr:null_base ~idx
   | Pset_ext_ptr (layout, mode), [[idx]; new_values] ->
-    needs_64_bit_target prim dbg;
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
-    write_offset Into_block_or_off_heap layout mode ~machine_width
-      ~ptr:null_base ~idx ~new_values
+    convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
+      mode Nonatomic ~ptr:null_base ~idx ~new_values
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3317,9 +3495,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Poffsetref _ | Pisint _ | Pisnull | Pint_as_pointer _ | Pbigarraydim _
       | Pobj_dup | Pobj_magic _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
-      | Punboxed_product_field _ | Pget_header _ | Pufloatfield _
-      | Patomic_load_field _ | Pmixedfield _
-      | Preinterpret_unboxed_int64_as_tagged_int63
+      | Punbox_mask | Pbox_mask _ | Punboxed_product_field _ | Pget_header _
+      | Pufloatfield _ | Patomic_load_field _ | Patomic_load_mixed_field _
+      | Pmixedfield _ | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_boxed_vector_as_tuple _
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
@@ -3335,12 +3513,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
       | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
       | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
-      | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
-      | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout | Pfield_computed _
-      | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
-      | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
-      | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-      | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pint_array_load_vec _
+      | Pstring_load_mask _ | Pbytes_load_16 _ | Pbytes_load_32 _
+      | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout
+      | Pfield_computed _ | Pbytes_load_mask _ | Psetfloatfield _
+      | Psetufloatfield _ | Psetmixedfield _ | Pbigstring_load_i8 _
+      | Pbigstring_load_i16 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+      | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
+      | Pfloatarray_load_vec _ | Pint_array_load_vec _ | Pbigstring_load_mask _
       | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
       | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
       | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
@@ -3349,19 +3528,20 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
-            | Punspecializedarray_ref _ ),
+            | Punboxedmaskarray_ref | Pgcscannableproductarray_ref _
+            | Pgcignorableproductarray_ref _ | Punspecializedarray_ref _ ),
             _,
             _ )
       | Parrayrefs
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
             | Pintarray_ref | Pfloatarray_ref _ | Punboxedfloatarray_ref _
             | Punboxedoruntaggedintarray_ref _ | Punboxedvectorarray_ref _
-            | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
-            | Punspecializedarray_ref _ ),
+            | Punboxedmaskarray_ref | Pgcscannableproductarray_ref _
+            | Pgcignorableproductarray_ref _ | Punspecializedarray_ref _ ),
             _,
             _ )
-      | Patomic_load_field _ | Ppoke _ | Pphys_equal _
+      | Patomic_load_field _ | Patomic_set_mixed_field _ | Ppoke _
+      | Pphys_equal _
       | Pscalar (Binary _)
       | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _ ),
       ( []
@@ -3378,27 +3558,28 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
-            | Punspecializedarray_set _ ),
+            | Punboxedmaskarray_set | Pgcscannableproductarray_set _
+            | Pgcignorableproductarray_set _ | Punspecializedarray_set _ ),
             _ )
       | Parraysets
           ( ( Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
             | Pintarray_set | Pfloatarray_set | Punboxedfloatarray_set _
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
-            | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
-            | Punspecializedarray_set _ ),
+            | Punboxedmaskarray_set | Pgcscannableproductarray_set _
+            | Pgcignorableproductarray_set _ | Punspecializedarray_set _ ),
             _ )
       | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
       | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_set_8 _
-      | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
-      | Pbigstring_set_64 _ | Pbigstring_set_vec _ | Pfloatarray_set_vec _
-      | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
-      | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
-      | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
-      | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-      | Patomic_set_field _ | Patomic_exchange_field _ | Patomic_fetch_add_field
-      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
-      | Patomic_lxor_field | Patomic_lor_field | Pset_idx _ ),
+      | Pbytes_set_mask _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+      | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+      | Pfloatarray_set_vec _ | Pbigstring_set_mask _ | Pint_array_set_vec _
+      | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+      | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
+      | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+      | Punboxed_nativeint_array_set_vec _ | Patomic_set_field _
+      | Patomic_exchange_field _ | Patomic_fetch_add_field | Patomic_add_field
+      | Patomic_sub_field | Patomic_land_field | Patomic_lxor_field
+      | Patomic_lor_field | Pset_idx _ ),
       ( []
       | [_]
       | [_; _]

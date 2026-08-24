@@ -63,6 +63,22 @@ let sub_immediates integer_operation imm1 imm2 =
 let mul_immediates integer_operation imm1 imm2 =
   op_immediates integer_operation imm1 imm2 Misc.no_overflow_mul ( * )
 
+let lsl_immediates integer_operation imm1 imm2 =
+  (* Unlike [op_immediates], the two immediates are validated against different
+     operations: [imm1] is a value for [integer_operation], while [imm2] is a
+     shift amount for [Ilsl]. [Misc.no_overflow_lsl] rejects any shift that
+     would overflow the host integers used to compute the folded immediate (e.g.
+     [1 lsl 63], which evaluates to [0]). *)
+  assert_within_range integer_operation imm1;
+  assert_within_range Operation.Ilsl imm2;
+  if Misc.no_overflow_lsl imm1 imm2
+  then
+    let res = imm1 lsl imm2 in
+    if is_immediate_for_intop integer_operation res
+    then Some (integer_operation, res)
+    else None
+  else None
+
 let never_overflow _ _ = true
 
 let bitwise_immediates integer_operation imm1 imm2 op =

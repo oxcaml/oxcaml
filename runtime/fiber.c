@@ -62,7 +62,8 @@
 
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
 
-static _Atomic int64_t fiber_id = 0;
+static _Atomic int64_t fiber_id_global = 0;
+static CAMLthread_local int64_t fiber_id_local = 0;
 
 #define NUM_STACK_SIZE_CLASSES 5
 #define MAX_STACK_CACHE_LIMIT  Max_domains_max
@@ -289,7 +290,6 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
     ++bucket;
     size_bucket_wsz += size_bucket_wsz;
   }
-  CAMLassert(wosize>=size_bucket_wsz/2);
   return -1;
 }
 
@@ -373,10 +373,18 @@ caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff, int6
                                       /*htick=*/Val_null, id);
 }
 
+static int64_t new_fiber_id(void)
+{
+  enum { Fiber_id_chunk = 1024 };
+  if (fiber_id_local % Fiber_id_chunk == 0)
+    fiber_id_local = atomic_fetch_add(&fiber_id_global, Fiber_id_chunk);
+  return fiber_id_local++;
+}
+
 #ifdef NATIVE_CODE
 
 value caml_alloc_stack (value hval, value hexn, value heff) {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
                                    hexn, heff, /*htick=*/Val_null, id);
@@ -396,7 +404,7 @@ value caml_alloc_stack (value hval, value hexn, value heff) {
 
 value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
                                         value htick) {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff, htick, id);
@@ -712,7 +720,7 @@ value caml_global_data = Val_unit;
 CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
 {
   value* sp;
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
                                    hexn, heff, /*htick=*/Val_null, id);
@@ -737,7 +745,7 @@ CAMLprim value caml_alloc_stack_preemptible(value hval, value hexn,
                                             value heff, value htick)
 {
   value* sp;
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff, htick, id);
@@ -825,7 +833,8 @@ CAMLexport void caml_do_local_roots (
   struct caml__roots_block *local_roots,
   struct stack_info *current_stack,
   value * v_gc_regs,
-  dynamic_cache_t dynamic_bindings)
+  dynamic_cache_t dynamic_bindings,
+  struct c_stack_link* c_stack)
 {
 #ifdef NATIVE_CODE
   caml_local_arenas* locals = caml_refresh_locals(current_stack);
@@ -833,6 +842,15 @@ CAMLexport void caml_do_local_roots (
 
   caml_dynamic_cache_scan_roots(dynamic_bindings, f, fflags, fdata);
   for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
+#ifdef NATIVE_CODE
+    /* c_stack marks the boundary between C stack segments. Distinct C stack
+       segments may have distinct ML fiber stacks, so when we change stack
+       segment we need to find the appropriate local arenas. */
+    while (c_stack != NULL && (uintnat)c_stack < (uintnat)lr) {
+      c_stack = c_stack->prev;
+      if (c_stack != NULL) locals = caml_refresh_locals(c_stack->stack);
+    }
+#endif
     for (int i = 0; i < lr->ntables; i++){
       for (int j = 0; j < lr->nitems; j++){
         value *sp = &(lr->tables[i][j]);
@@ -1027,7 +1045,7 @@ int caml_try_realloc_stack(asize_t required_space)
 
 struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
 {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info* stk =
     caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
   return stk;
@@ -1376,39 +1394,39 @@ CAMLexport value caml_get_preemption_effect(void) {
 /* Call the tick handler for each running fiber *in reverse order*, stopping as
    soon as one preempts
 
-   Returns Val_true if a preemption occurred, Val_false if one did not, or an
-   encoded exception result if any of the callbacks raised an exception.
+   Returns Result_value(Val_true) if a preemption occurred,
+   Result_value(Val_false) if one did not, or a Result_exception
+   result if any of the callbacks raised an exception.
 */
-value caml_tick_fiber_exn(struct stack_info *stack) {
-  CAMLparam0();
-  CAMLlocal1(res);
+caml_result caml_tick_fiber_res(struct stack_info *stack) {
+  caml_result res;
 
   if (Stack_parent(stack)) {
-    res = caml_tick_fiber_exn(Stack_parent(stack));
-    if (Is_exception_result(res) || res == Val_true) {
-      CAMLreturn(res);
+    res = caml_tick_fiber_res(Stack_parent(stack));
+    if (caml_result_is_exception(res) || res.data == Val_true) {
+      return res;
     }
   }
 
   if (Stack_is_preemptible(stack)) {
-    res = caml_callback_exn(Stack_handle_tick(stack), Val_unit);
-    if (Is_exception_result(res)) {
-      CAMLreturn(res);
+    res = caml_callback_res(Stack_handle_tick(stack), Val_unit);
+    if (caml_result_is_exception(res)) {
+      return res;
     }
 
-    switch (Long_val(res)) {
+    switch (Long_val(res.data)) {
     case TICK_RESULT_PREEMPT:
-      CAMLreturn(Val_true);
+      return Result_value(Val_true);
     case TICK_RESULT_CONTINUE:
       break;
     default: {
       value exn =
         caml_exception_failure_value(caml_copy_string(
           "caml_tick_fiber: tick_handler returned invalid result"));
-      CAMLreturn(Make_exception_result(exn));
+      return Result_exception(exn);
     }
     }
   }
 
-  CAMLreturn(Val_false);
+  return Result_value(Val_false);
 }

@@ -170,6 +170,10 @@ let mk_for_pack_opt f =
 let mk_g_byt f =
   "-g", Arg.Unit f, " Save debugging information"
 
+let mk_g_no_ocamldebug_types f =
+  "-gno-ocamldebug-types", Arg.Unit f,
+  " Omit type information used only for ocamldebug"
+
 let mk_g_opt f =
   "-g", Arg.Unit f, " Record debugging information for exception backtrace"
 
@@ -210,7 +214,12 @@ let mk_I_manifest f =
   \    by the compiler, <actual_path> is where this file is in the\n\
   \    filesystem (relative to [$MANIFEST_FILES_ROOT]). The manifest file\n\
   \    passed to the [-I-manifest] flag should itself be relative to\n\
-  \    [$MANIFEST_FILES_ROOT]."
+  \    [$MANIFEST_FILES_ROOT]. When linking, files given on the command\n\
+  \    line by their bare names (e.g. 'foo.cmx' or 'lib.cmxa') are also\n\
+  \    resolved through manifest entries; if the entry's <actual_path> does\n\
+  \    not retain the extension, the companion object files ('foo.o',\n\
+  \    'lib.a') are resolved the same way and must therefore be listed as\n\
+  \    separate manifest entries."
 
 let mk_H_manifest f =
   "-H-manifest", Arg.String f, "<file>  Same as -I-manifest, but adds given\n\
@@ -1314,6 +1323,7 @@ end
 module type Bytecomp_options = sig
   include Core_options
   include Compiler_options
+  val _g_no_ocamldebug_types : unit -> unit
   val _compat_32 : unit -> unit
   val _thunkify_cu_init : unit -> unit
   val _custom : unit -> unit
@@ -1510,6 +1520,7 @@ struct
     mk_for_pack_byt F._for_pack;
     mk_g_byt F._g;
     mk_no_g F._no_g;
+    mk_g_no_ocamldebug_types F._g_no_ocamldebug_types;
     mk_stop_after ~native:false F._stop_after;
     mk_i F._i;
     mk_i_variance F._i_variance;
@@ -2384,7 +2395,7 @@ module Default = struct
   module Common = struct
     let _absname = set Clflags.absname
     let _locs = set Clflags.locs
-    let _alert = Warnings.parse_alert_option
+    let _alert s = Warnings.parse_alert_option s
     let _no_ikinds = clear Clflags.ikinds
     let _ikinds_debug = set Clflags.ikinds_debug
     let _alias_deps = clear no_alias_deps
@@ -2802,6 +2813,7 @@ third-party libraries such as Lwt, but with a different API."
 
     include Core
     include Compiler
+    let _g_no_ocamldebug_types = clear debug_ocamldebug_types
     let _compat_32 = set bytecode_compatible_32
     let _thunkify_cu_init = set thunkify_cu_init
     let _custom = set custom_runtime

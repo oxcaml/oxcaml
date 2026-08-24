@@ -115,6 +115,7 @@ type arg =
   | Reg32 of reg64
   | Reg64 of reg64
   | Regf of regf
+  | Regmask of int
 
   | Mem of addr
   | Mem64_RIP of data_type * string * int
@@ -135,6 +136,7 @@ type instruction =
   | DEC of arg
   | HLT
   | IDIV of arg
+  | DIV of arg
   | IMUL of arg * arg option
   | MUL of arg
   | INC of arg

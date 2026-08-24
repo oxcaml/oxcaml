@@ -37,11 +37,8 @@ val exported_offsets : t -> Exported_offsets.t
 
 val with_exported_offsets : t -> Exported_offsets.t -> t
 
-(** Append a cmx for packs *)
-val append :
-  raw option ->
-  raw option * (File_sections.Idx.t -> File_sections.Idx.t) ->
-  raw option
+(** Create the Flambda data for a pack *)
+val pack : sections:File_sections.Builder.t -> t option list -> raw option
 
 (** For ocamlobjinfo *)
 val print :

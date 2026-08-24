@@ -889,8 +889,10 @@ let int_op t (i : Cfg.basic Cfg.instruction) (op : Operation.integer_operation)
       else do_binary Sub
     | Imul -> do_binary Mul
     | Imulh { signed } -> do_imulh ~signed
-    | Idiv -> do_binary Sdiv
-    | Imod -> do_binary Srem
+    | Idiv { signed = true } -> do_binary Sdiv
+    | Idiv { signed = false } -> do_binary Udiv
+    | Imod { signed = true } -> do_binary Srem
+    | Imod { signed = false } -> do_binary Urem
     | Iand -> do_binary And
     | Ior -> do_binary Or
     | Ixor -> do_binary Xor
@@ -1101,6 +1103,7 @@ let load t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   | Single { reg = Float32 } -> basic T.float
   | Double -> basic T.double
   | Single { reg = Float64 } -> extend Fpext ~from:T.float ~to_:T.double
+  | Word_mask -> not_implemented_basic ~msg:"load mask" i
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     not_implemented_basic ~msg:"load vector" i
@@ -1126,6 +1129,7 @@ let store t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   | Single { reg = Float32 } -> basic T.float
   | Double -> basic T.double
   | Single { reg = Float64 } -> trunc Fptrunc T.float
+  | Word_mask -> not_implemented_basic ~msg:"store mask" i
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
   | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
     not_implemented_basic ~msg:"store vector" i
@@ -1232,7 +1236,7 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     store_into_reg t i.res.(0) (V.of_symbol sym_name)
   | Const_float32 bits -> store_into_reg t i.res.(0) (V.of_float32_bits bits)
   | Const_float bits -> store_into_reg t i.res.(0) (V.of_float64_bits bits)
-  | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
+  | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _ ->
     not_implemented_basic ~msg:"const_vec" i
   (* CR yusumez: What do we do with mutability / is_atomic / is_modify? *)
   | Load { memory_chunk; addressing_mode; mutability = _; is_atomic = _ } ->
@@ -1288,7 +1292,9 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
       in
       store_into_reg t i.res.(0) converted
     | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ->
-      not_implemented_basic ~msg:"vector reinterpret cast" i)
+      not_implemented_basic ~msg:"vector reinterpret cast" i
+    | Mask_of_int64 | Int64_of_mask ->
+      not_implemented_basic ~msg:"mask reinterpret cast" i)
   | Specific op -> specific t i op
   | Intop_atomic { op; size; addr } -> atomic t i op ~size ~addr
   | Pause -> call_llvm_intrinsic_no_res t "x86.sse2.pause" []
@@ -1647,7 +1653,8 @@ let make_temp_data_symbol =
   let idx = ref 0 in
   fun () ->
     let module_name =
-      Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+      Compilation_unit.(
+        Current_unit.get_cu_or_dummy () |> name |> Name.to_string)
     in
     let res = Format.asprintf "temp.%s.%d" module_name !idx in
     incr idx;
@@ -1981,11 +1988,16 @@ let write_module_metadata t =
   let module_name =
     if t.is_startup
     then "_startup" (* LLVM will put the "caml" in front *)
-    else Compilation_unit.(get_current_or_dummy () |> name |> Name.to_string)
+    else
+      Compilation_unit.(
+        Current_unit.get_cu_or_dummy () |> name |> Name.to_string)
   in
   F.pp_line t.ppf "";
   F.pp_line t.ppf {|!0 = !{ i32 1, !"oxcaml_module", !"%s" }|} module_name;
-  F.pp_line t.ppf {|!llvm.module.flags = !{ !0 }|}
+  (* Tell LLVM's frametable printer which frame-descriptor layout this runtime
+     expects. 0 is the classic layout. *)
+  F.pp_line t.ppf {|!1 = !{ i32 1, !"oxcaml_short_frametables", i32 0 }|};
+  F.pp_line t.ppf {|!llvm.module.flags = !{ !0, !1 }|}
 
 let write_llvmir_to_file t =
   (match t.sourcefile with

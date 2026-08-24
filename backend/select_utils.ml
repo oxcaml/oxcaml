@@ -175,6 +175,7 @@ let oper_result_type = function
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with
     | Word_val -> typ_val
+    | Word_mask -> typ_mask
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
     | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
@@ -191,8 +192,8 @@ let oper_result_type = function
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
-  | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
+  | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
@@ -221,6 +222,8 @@ let oper_result_type = function
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
   | Creinterpret_cast (Int_of_value | Int64_of_float | Int32_of_float32) ->
     typ_int
+  | Creinterpret_cast Mask_of_int64 -> typ_mask
+  | Creinterpret_cast Int64_of_mask -> typ_int
   | Cstatic_cast (Float_of_float32 | Float_of_int Float64) -> typ_float
   | Cstatic_cast (Float32_of_float | Float_of_int Float32) -> typ_float32
   | Cstatic_cast (Int_of_float (Float64 | Float32)) -> typ_int
@@ -282,6 +285,9 @@ let size_component : machtype_component -> int = function
   | Vec512 ->
     assert (Int.equal (Arch.size_addr * 8) Arch.size_vec512);
     Arch.size_vec512
+  | Mask ->
+    assert (Int.equal Arch.size_int 8);
+    Arch.size_int
 
 let size_machtype mty =
   let size = ref 0 in
@@ -302,6 +308,7 @@ let size_expr env exp =
     | Cconst_vec128 _ -> Arch.size_vec128
     | Cconst_vec256 _ -> Arch.size_vec256
     | Cconst_vec512 _ -> Arch.size_vec512
+    | Cconst_mask _ -> Arch.size_int
     | Cvar id -> (
       try V.Map.find id localenv
       with Not_found -> (
@@ -548,11 +555,11 @@ module Stack_offset_and_exn = struct
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-        | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
-        | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
-        | Alloc _ )
+        | Const_mask _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+        | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
+        | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+        | Domain_index | Poll | Pause | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
@@ -668,8 +675,19 @@ let insert_move_args env sub_cfg arg loc stacksize =
   then insert env sub_cfg (make_stack_offset stacksize) [||] [||];
   insert_moves env sub_cfg arg loc
 
+let insert_move_result env sub_cfg (src : Reg.t) (dst : Reg.t) =
+  if
+    equal_machtype_component dst.typ Mask
+    && equal_machtype_component src.typ Int
+  then
+    (* The C ABI passes masks in GPRs. *)
+    insert env sub_cfg (Op (Reinterpret_cast Mask_of_int64)) [| src |] [| dst |]
+  else insert_move env sub_cfg src dst
+
 let insert_move_results env sub_cfg loc res stacksize =
-  insert_moves env sub_cfg loc res;
+  for i = 0 to min (Array.length loc) (Array.length res) - 1 do
+    insert_move_result env sub_cfg loc.(i) res.(i)
+  done;
   if stacksize <> 0
   then insert env sub_cfg (make_stack_offset (-stacksize)) [||] [||]
 

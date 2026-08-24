@@ -2,6 +2,7 @@
  only-default-codegen;
  flags = " -O3";
  flags += " -experimental-optimizations";
+ flags += " -flambda2-simplify-stubs";
  expect.opt;
 *)
 
@@ -86,17 +87,17 @@ let mutable_load_loop r =
   foo 10 !r
 [%%expect_asm X86_64{|
 mutable_load_loop:
-  movq  %rax, %rbx
-  movq  (%rbx), %rax
-  movl  $21, %edi
+  movq  %rax, %rdi
+  movq  (%rdi), %rax
+  movl  $21, %ebx
   jmp   .L1
 .L0:
   ret
 .L1:
-  movq  (%rbx), %rsi
+  movq  (%rdi), %rsi
   leaq  -1(%rax,%rsi), %rax
-  addq  $-2, %rdi
-  cmpq  $1, %rdi
+  addq  $-2, %rbx
+  cmpq  $1, %rbx
   jne   .L1
   jmp   .L0
 |}]

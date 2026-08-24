@@ -112,6 +112,10 @@ module Layout : sig
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
+
+    (** Whether the layout mentions a genvar anywhere (including inside a
+        product). *)
+    val has_genvar : t -> bool
   end
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
@@ -463,7 +467,10 @@ val of_annotation_option_default :
     Raises if a disallowed or unknown jkind is present.
 
     [use_abstract_jkinds] controls whether references to other kinds here count
-    as uses of them for unused abstract kind warnings. *)
+    as uses of them for unused abstract kind warnings.
+
+    [warn] controls whether redundant-modifier and redundant-kind-modifier
+    warnings are emitted while parsing the annotation. *)
 val of_type_decl :
   ?use_abstract_jkinds:bool ->
   ?warn:bool ->
@@ -519,6 +526,23 @@ val for_boxed_variant :
   get_free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
   Types.constructor_declaration list ->
   Types.jkind_l
+
+(** Choose an appropriate jkind for a user-defined [@@or_null] variant (a
+    [Variant_with_null]), given [payload_jkind], the inferred jkind of its
+    payload [payload_type]. Like the builtin ['a or_null], the result has the
+    builtin's mod-bounds (crossing everything except staticity) with the payload
+    added as a with-bound under [modality]; its layout is the payload's layout
+    adjusted by [apply_or_null_l]. Both the input and the output are [jkind_l]
+    because both are inferred, actual kinds of types (the payload's and the
+    declaration's), not requirements imposed on them. The result is marked best.
+    Returns [Error ()] if the payload's kind is maybe-null or has no known
+    scannable layout. *)
+val for_or_null_variant :
+  Env.t ->
+  payload_type:Types.type_expr ->
+  modality:Mode.Modality.Const.t ->
+  payload_jkind:Types.jkind_l ->
+  (Types.jkind_l, unit) result
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l

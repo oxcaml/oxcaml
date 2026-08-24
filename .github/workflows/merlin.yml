@@ -1,17 +1,21 @@
 # This CI check builds and tests Merlin. Running the Merlin tests requires
-# having a corresponding compiler. Confusingly, the version of Merlin at OxCaml
-# revision X is not meant to work with the compiler at OxCaml revision X.
-# Rather, it is usually the most recently tagged version of the compiler. For
-# this reason, the CI check checks out the repo at 2 different revisions. This
-# will likely change in the near future.
+# having a corresponding compiler, so the CI check builds the compiler at the
+# same revision as the Merlin being tested.
 
 name: merlin
 on:
   push:
     branches: [ main ]
   pull_request:
+    types: [ opened, synchronize, reopened, labeled, unlabeled ]
   merge_group:
   workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 # Overall approach to running the tests:
 #  - Install OCaml 5.4, as this is the version of dependencies our merlin expects.
@@ -19,15 +23,19 @@ on:
 #  - Build merlin using OCaml 5.4, and then run the tests while pointing merlin at
 #    OxCaml's stdlib and ocamlc.
 #
-# The second step only needs to be run when we update OxCaml, so we cache it.
-# We use [upstream/ocaml_flambda/base-rev.txt] as the cache key, given that it
-# is updated when and only when we import new changes from OxCaml into merlin.
+# The second step's result is cached, keyed by the hash of the commit being
+# tested, so re-runs of the same commit can skip rebuilding the compiler.
+#
+# The check can be skipped by adding the merlin-emergency-skip label to the PR.
 
 jobs:
   build:
     # The type of runner that the job will run on
     name: merlin
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      pull-requests: read
 
     strategy:
       fail-fast: false
@@ -38,20 +46,49 @@ jobs:
 
     env:
       MERLIN_TESTS: all
+      EMERGENCY_SKIP_LABEL: merlin-emergency-skip
 
     steps:
+    - name: 'Check for the "merlin-emergency-skip" PR label'
+      if: contains(github.event.pull_request.labels.*.name, env.EMERGENCY_SKIP_LABEL)
+      run: echo MERLIN_EMERGENCY_SKIP=y >> "$GITHUB_ENV"
+
+    - name: 'Check for the "merlin-emergency-skip" PR label (merge queue)'
+      if: github.event_name == 'merge_group'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        HEAD_REF: ${{ github.event.merge_group.head_ref }}
+      run: |
+        # HEAD_REF looks like refs/heads/gh-readonly-queue/main/pr-<N>-<sha>
+        if [[ "$HEAD_REF" =~ /pr-([0-9]+)- ]]; then
+          pr_number="${BASH_REMATCH[1]}"
+          if gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" \
+               --json labels --jq '.labels[].name' | grep -qxF "$EMERGENCY_SKIP_LABEL"; then
+            echo MERLIN_EMERGENCY_SKIP=y >> "$GITHUB_ENV"
+          fi
+        else
+          echo "Could not parse PR number from '$HEAD_REF'; not skipping the merlin check."
+        fi
+
     - name: Checkout the oxcaml repo
-      uses: actions/checkout@master
+      if: env.MERLIN_EMERGENCY_SKIP != 'y'
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         path: 'oxcaml'
+        persist-credentials: false
+
+    - name: Assert Merlin is in sync with the compiler
+      working-directory: oxcaml
+      run: external/merlin/scripts/assert-in-sync.sh
 
     - name: Pretend we're running in a container (makes setup-ocaml go faster)
-      if: runner.os == 'Linux'
+      if: env.MERLIN_EMERGENCY_SKIP != 'y' && runner.os == 'Linux'
       run: sudo touch /.dockerenv
       # makes setup-ocaml skip apt-get, which is slow on first invocation
 
     - name: Set up Opam
-      uses: ocaml/setup-ocaml@v3
+      if: env.MERLIN_EMERGENCY_SKIP != 'y'
+      uses: ocaml/setup-ocaml@e32b06a3e831ff2fbc6f08cf35be2085e3918014 # v3.6.1
       with:
         ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
         opam-repositories: |
@@ -61,34 +98,28 @@ jobs:
         opam-pin: false
 
     - name: Set up Opam environment
+      if: env.MERLIN_EMERGENCY_SKIP != 'y'
       # this command adds the opam environment to the PATH.
       run: |
         opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
     - name: Restore OxCaml build
-      uses: actions/cache/restore@v4
+      if: env.MERLIN_EMERGENCY_SKIP != 'y'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       id: cache
       with:
         path: ${{ github.workspace }}/flambda-backend/_install
-        key: cache-flambda-backend-${{ matrix.name }}-${{ hashFiles('oxcaml/external/merlin/upstream/ocaml_flambda/base-rev.txt') }}
+        key: cache-flambda-backend-${{ matrix.name }}-${{ github.sha }}
 
-    - name: Clone the OxCaml repo
-      uses: actions/checkout@master
-      if: steps.cache.outputs.cache-hit != 'true'
+    - name: Check out the OxCaml repo for the compiler build
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
       with:
-        repository: 'oxcaml/oxcaml'
         path: 'flambda-backend'
-
-    - name: Check out the OxCaml repo to the specified hash
-      if: steps.cache.outputs.cache-hit != 'true'
-      working-directory: flambda-backend
-      run: |
-        REV=$(cat $GITHUB_WORKSPACE/oxcaml/external/merlin/upstream/ocaml_flambda/base-rev.txt)
-        git fetch origin "$REV"
-        git checkout "$REV"
+        persist-credentials: false
 
     - name: Install dependencies for OxCaml
-      if: steps.cache.outputs.cache-hit != 'true'
+      if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
       working-directory: flambda-backend
       run: |
         # We don't need the dev tool parts
@@ -96,7 +127,7 @@ jobs:
         opam pin add --yes oxcaml-dev .
 
     - name: Configure, build, and install OxCaml
-      if: steps.cache.outputs.cache-hit != 'true'
+      if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
       working-directory: flambda-backend
       run: |
         eval $(opam env)
@@ -108,38 +139,34 @@ jobs:
         opam pin remove oxcaml-dev
 
     - name: Upload OxCaml cache
-      if: steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      if: env.MERLIN_EMERGENCY_SKIP != 'y' && steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ github.workspace }}/flambda-backend/_install
-        key: cache-flambda-backend-${{ matrix.name }}-${{ hashFiles('oxcaml/external/merlin/upstream/ocaml_flambda/base-rev.txt') }}
+        key: cache-flambda-backend-${{ matrix.name }}-${{ github.sha }}
 
     - name: Install dependencies
+      if: env.MERLIN_EMERGENCY_SKIP != 'y'
       working-directory: oxcaml/external/merlin
       run: |
         opam pin menhirLib 20231231 --no-action
         opam install --yes ppx_string ppx_compare ocamlformat.0.29.0
         opam install . --deps-only --with-test --yes
 
-    - name: Create dune workspace file
-      working-directory: oxcaml/external/merlin
-      # This will tell dune to treat external/merlin as its own workspace. Once
-      # Merlin is kept in sync with the compiler, this should be removed so that
-      # Merlin is built in the same workspace as the compiler.
+    - name: Configure OxCaml
+      if: env.MERLIN_EMERGENCY_SKIP != 'y'
+      working-directory: oxcaml
       run: |
-        touch dune-workspace
-
-    - name: Check formatting
-      working-directory: oxcaml/external/merlin
-      run: |
-        dune build @fmt
+        autoconf
+        ./configure --prefix=$GITHUB_WORKSPACE/_install
 
     - name: Build and test in release mode (linux)
+      if: env.MERLIN_EMERGENCY_SKIP != 'y'
       working-directory: oxcaml/external/merlin
       run: |
         export MERLIN_TEST_OCAML_PATH=$GITHUB_WORKSPACE/flambda-backend/_install
-        dune build
-        dune runtest -p merlin-lib,dot-merlin-reader,merlin,ocaml-index
+        make build
+        make test
         if ! git diff --quiet ; then
           echo "The following files were modified by dune:" >&2
           git diff --name-only >&2
@@ -149,3 +176,7 @@ jobs:
         menhir version with the one in merlin-lib.opam" >&2
           exit 1
         fi
+
+    - name: Note that the check was skipped
+      if: env.MERLIN_EMERGENCY_SKIP == 'y'
+      run: echo "All steps were skipped because the PR has the $EMERGENCY_SKIP_LABEL label."

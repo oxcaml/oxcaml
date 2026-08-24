@@ -73,7 +73,7 @@ module IR = struct
       region_close : Lambda.region_close;
       inlined : Lambda.inlined_attribute;
       probe : Lambda.probe;
-      mode : Lambda.locality_mode;
+      mode : Lambda.return_mode;
       region : Ident.t option;
       ghost_region : Ident.t option;
       alloc_region : Ident.t;
@@ -177,7 +177,7 @@ module Env = struct
   let current_depth t = t.current_depth
 
   let create ~big_endian =
-    let current_unit = Compilation_unit.get_current_exn () in
+    let current_unit = Current_unit.get_cu_exn () in
     { variables = Ident.Map.empty;
       globals = Numeric_types.Int.Map.empty;
       simples_to_substitute = Ident.Map.empty;
@@ -520,7 +520,7 @@ module Acc = struct
         else Unknown Flambda_kind.value
       | Set_of_closures _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
       | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-      | Boxed_nativeint _ | Immutable_float_block _
+      | Boxed_mask _ | Boxed_nativeint _ | Immutable_float_block _
       (* For immutable float blocks, we can statically allocate them in classic
          mode, but they are not currently provided with approximations. *)
       | Immutable_float_array _ | Immutable_float32_array _
@@ -528,8 +528,8 @@ module Acc = struct
       | Immutable_int8_array _ | Immutable_int16_array _
       | Immutable_int32_array _ | Immutable_int64_array _
       | Immutable_nativeint_array _ | Immutable_vec128_array _
-      | Immutable_vec256_array _ | Immutable_vec512_array _ | Mutable_string _
-      | Immutable_string _ ->
+      | Immutable_vec256_array _ | Immutable_vec512_array _
+      | Immutable_mask_array _ | Immutable_string _ ->
         Unknown Flambda_kind.value
     in
     let symbol_approximations =
@@ -780,10 +780,14 @@ module Function_decls = struct
       | Unboxed_number of Flambda_kind.Boxable_number.t
       | Unboxed_float_record of int
 
+    type unboxing_return_kind = unboxing_kind * Lambda.locality_mode
+
     type calling_convention =
       | Normal_calling_convention
       | Unboxed_calling_convention of
-          unboxing_kind option list * unboxing_kind option * Function_slot.t
+          unboxing_kind option list
+          * unboxing_return_kind option
+          * Function_slot.t
 
     type t =
       { let_rec_ident : Ident.t;
@@ -807,7 +811,7 @@ module Function_decls = struct
         recursive : Recursive.t;
         closure_alloc_mode : Lambda.locality_mode;
         first_complex_local_param : int;
-        result_mode : Lambda.locality_mode
+        result_mode : Lambda.return_mode
       }
 
     let create ~let_rec_ident ~let_rec_uid ~function_slot ~kind ~params

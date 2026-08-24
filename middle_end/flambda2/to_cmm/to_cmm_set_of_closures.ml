@@ -64,8 +64,15 @@ let get_func_decl_params_arity t code_id =
     then Lambda.Tupled
     else
       let nlocal =
-        Flambda_arity.num_params (Code_metadata.params_arity info)
-        - Code_metadata.first_complex_local_param info
+        match
+          (Code_metadata.first_complex_local_param info
+            : First_complex_local_param.t)
+        with
+        | Index index ->
+          Flambda_arity.num_params (Code_metadata.params_arity info) - index
+        | Never_partially_applied ->
+          (* This value should never be observed. *)
+          0
       in
       Lambda.Curried { nlocal }
   in
@@ -196,6 +203,7 @@ end = struct
               | Naked_number Naked_vec128 -> UK.naked_vec128_fields
               | Naked_number Naked_vec256 -> UK.naked_vec256_fields
               | Naked_number Naked_vec512 -> UK.naked_vec512_fields
+              | Naked_number Naked_mask -> UK.naked_mask_fields
               (* The "fields" update kinds are used because we are writing into
                  a 64-bit slot, and wish to initialize the whole. *)
               | Naked_number Naked_int32 -> UK.naked_int32_fields
@@ -495,8 +503,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let env, my_region_var, my_ghost_region_var =
     (* CR alloc_regions: my_alloc_region should be propagated as well. *)
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region = _ } -> env, None, None
-    | Local
+    | Not_alloc_stack { alloc_region = _ } -> env, None, None
+    | Maybe_alloc_stack
         { alloc_region = _; region = my_region; ghost_region = my_ghost_region }
       ->
       let my_region_duid = Flambda_debug_uid.none in
@@ -702,7 +710,7 @@ let let_static_set_of_closures env res closure_symbols set ~prev_updates =
 let lift_set_of_closures env res ~body ~bound_vars layout set
     ~(translate_expr : translate_expr) ~num_normal_occurrences_of_bound_vars =
   (* Generate symbols for the set of closures, and each of the closures *)
-  let comp_unit = Compilation_unit.get_current_exn () in
+  let comp_unit = Current_unit.get_cu_exn () in
   let dbg = debuginfo_for_set_of_closures env set in
   let cids =
     Function_declarations.funs_in_order (Set_of_closures.function_decls set)

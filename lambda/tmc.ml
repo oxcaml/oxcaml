@@ -574,10 +574,10 @@ let find_candidate = function
   | Lfunction lfun when lfun.attr.tmc_candidate ->
      (* TMC does not make sense for local-returning functions *)
      begin match lfun.ret_mode with
-     | Alloc_local ->
+     | Maybe_alloc_stack ->
        raise (Error (Debuginfo.Scoped_location.to_location lfun.loc,
                      Tmc_local_returning))
-     | Alloc_heap -> Some lfun
+     | Not_alloc_stack -> Some lfun
      end
   | _ -> None
 
@@ -685,7 +685,7 @@ let rec choice ctx t =
     | Lexclave lam ->
         let+ lam = choice ctx ~tail lam in
         Lexclave lam
-    | Lsplice _ ->
+    | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
       fatal_error_invalid_constructor t
 
   and choice_apply ctx ~tail apply =
@@ -731,7 +731,7 @@ let rec choice ctx t =
           in
           (* This application is in tail position of a region=true function
              (or Tmc_local_returning would have occurred), so it must be Heap *)
-          assert (Lambda.is_heap_mode apply.ap_mode);
+          assert (Lambda.is_not_alloc_stack apply.ap_mode);
           {
             Choice.dps = Dps.make (fun ~tail ~dst ->
               Lapply { apply with
@@ -917,9 +917,11 @@ let rec choice ctx t =
     | Patomic_compare_set_field _ | Patomic_fetch_add_field
     | Patomic_add_field | Patomic_sub_field | Patomic_land_field
     | Patomic_lor_field | Patomic_lxor_field
-    | Patomic_load_field _ | Patomic_set_field _
+    | Patomic_load_field _ | Patomic_load_mixed_field _
+    | Patomic_set_field _ | Patomic_set_mixed_field _
     | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
+    | Punbox_mask | Pbox_mask _
     | Pjoin_vec256 | Psplit_vec256
 
     (* we don't handle array indices as destinations yet *)
@@ -956,18 +958,23 @@ let rec choice ctx t =
     | Pstring_load_i8 _ | Pstring_load_i16 _
     | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
     | Pstring_load_64 _ | Pstring_load_vec _
+    | Pstring_load_mask _
     | Pbytes_load_i8 _ | Pbytes_load_i16 _
     | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
     | Pbytes_load_64 _ | Pbytes_load_vec _
+    | Pbytes_load_mask _
     | Pbytes_set_8 _
     | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
     | Pbytes_set_64 _ | Pbytes_set_vec _
+    | Pbytes_set_mask _
     | Pbigstring_load_i8 _ | Pbigstring_load_i16 _
     | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_f32 _
     | Pbigstring_load_64 _ | Pbigstring_load_vec _
+    | Pbigstring_load_mask _
     | Pbigstring_set_8 _
     | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
     | Pbigstring_set_64 _ | Pbigstring_set_vec _
+    | Pbigstring_set_mask _
     | Pfloatarray_load_vec _
     | Pint_array_load_vec _
     | Puntagged_int8_array_load_vec _

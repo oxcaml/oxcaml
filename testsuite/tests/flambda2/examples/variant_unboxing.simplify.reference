@@ -1,7 +1,7 @@
 let code f1_0 deleted in
 let code f2_1 deleted in
 let code f3_returning_a_2 deleted in
-let code loopify(never) size(11) newer_version_of(f1_0)
+let code loopify(never) size(12) newer_version_of(f1_0)
       f1_0_1 (b : imm tagged, x : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -40,8 +40,7 @@ let code loopify(never) size(94) newer_version_of(f2_1)
           | 0 -> k4
           | 1 -> k5)
          where k5 =
-           let Pmakeblock =
-             %block.[`0`].my_alloc_region.`local`[`region`] (a)
+           let Pmakeblock = %block.[`0`].my_alloc_region.local[`region`] (a)
            in
            cont k3
                   (Pmakeblock,
@@ -58,7 +57,7 @@ let code loopify(never) size(94) newer_version_of(f2_1)
                | 1 -> k5)
               where k5 =
                 let Pmakeblock =
-                  %block.[`0`].my_alloc_region.`local`[`region`] (b)
+                  %block.[`0`].my_alloc_region.local[`region`] (b)
                 in
                 cont k3
                        (Pmakeblock,
@@ -69,7 +68,7 @@ let code loopify(never) size(94) newer_version_of(f2_1)
                         b)
               where k4 =
                 let Pmakeblock =
-                  %block.[`1`].my_alloc_region.`local`[`region`] (a, b)
+                  %block.[`1`].my_alloc_region.local[`region`] (a, b)
                 in
                 cont k3
                        (Pmakeblock,

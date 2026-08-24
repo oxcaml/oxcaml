@@ -34,7 +34,7 @@ type abstract_type_constr = [
   | `Iarray
   | `Atomic_loc
   | `Lexing_position
-  | `Code
+  | `Expr
   | `Eval
   | `Box
   | `Float32
@@ -46,8 +46,14 @@ type abstract_non_value_type_constr = [
   | `Int32_u
   | `Int64_u
   | `Float32_u
+  | `Uint8_u
+  | `Uint16_u
+  | `Uint32_u
+  | `Uint64_u
+  | `Unativeint_u
   | `Idx_imm
   | `Idx_mut
+  | `Idx_atomic
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -69,6 +75,7 @@ type abstract_non_value_type_constr = [
   | `Float16x32
   | `Float32x16
   | `Float64x8
+  | `Mask
 ]
 type data_type_constr = [
   | `Bool
@@ -112,7 +119,7 @@ val type_extension_constructor:type_expr
 val type_floatarray:type_expr
 val type_lexing_position:type_expr
 val type_atomic_loc:type_expr -> type_expr
-val type_code: type_expr -> type_expr
+val type_expr: type_expr -> type_expr
 val type_unboxed_unit: type_expr
 val type_unboxed_bool: type_expr
 val type_unboxed_float:type_expr
@@ -128,9 +135,15 @@ val type_nativeint_u: type_expr
 val type_int32_u: type_expr
 val type_int64_u: type_expr
 val type_float32_u: type_expr
+val type_uint8_u: type_expr
+val type_uint16_u: type_expr
+val type_uint32_u: type_expr
+val type_uint64_u: type_expr
+val type_unativeint_u: type_expr
 val type_or_null: type_expr -> type_expr
 val type_idx_imm : type_expr -> type_expr -> type_expr
 val type_idx_mut : type_expr -> type_expr -> type_expr
+val type_idx_atomic : type_expr -> type_expr -> type_expr
 
 val type_int8x16: type_expr
 val type_int16x8: type_expr
@@ -169,6 +182,7 @@ val type_int64x8: type_expr
 val type_float16x32: type_expr
 val type_float32x16: type_expr
 val type_float64x8: type_expr
+val type_mask: type_expr
 val type_unboxed_int8x64: type_expr
 val type_unboxed_int16x32: type_expr
 val type_unboxed_int32x16: type_expr
@@ -176,6 +190,7 @@ val type_unboxed_int64x8: type_expr
 val type_unboxed_float16x32: type_expr
 val type_unboxed_float32x16: type_expr
 val type_unboxed_float64x8: type_expr
+val type_unboxed_mask: type_expr
 
 val path_int: Path.t
 val path_char: Path.t
@@ -201,7 +216,7 @@ val path_extension_constructor: Path.t
 val path_floatarray: Path.t
 val path_continuation: Path.t
 val path_lexing_position: Path.t
-val path_code: Path.t
+val path_expr: Path.t
 val path_eval: Path.t
 val path_box: Path.t
 
@@ -220,9 +235,15 @@ val path_nativeint_u: Path.t
 val path_int32_u: Path.t
 val path_int64_u: Path.t
 val path_float32_u: Path.t
+val path_uint8_u: Path.t
+val path_uint16_u: Path.t
+val path_uint32_u: Path.t
+val path_uint64_u: Path.t
+val path_unativeint_u: Path.t
 val path_or_null: Path.t
 val path_idx_imm: Path.t
 val path_idx_mut: Path.t
+val path_idx_atomic: Path.t
 
 val path_int8x16: Path.t
 val path_int16x8: Path.t
@@ -261,6 +282,7 @@ val path_int64x8: Path.t
 val path_float16x32: Path.t
 val path_float32x16: Path.t
 val path_float64x8: Path.t
+val path_mask: Path.t
 val path_unboxed_int8x64: Path.t
 val path_unboxed_int16x32: Path.t
 val path_unboxed_int32x16: Path.t
@@ -268,6 +290,7 @@ val path_unboxed_int64x8: Path.t
 val path_unboxed_float16x32: Path.t
 val path_unboxed_float32x16: Path.t
 val path_unboxed_float64x8: Path.t
+val path_unboxed_mask: Path.t
 
 val path_match_failure: Path.t
 val path_invalid_argument: Path.t
@@ -353,10 +376,13 @@ val or_null_kind : type_expr -> ('a, 'b, constructor_declaration) type_kind
 (* CR layouts v3.5: remove this when users can define null constructors. *)
 val or_null_jkind : Types.type_expr -> Types.jkind_l
 
-(* To initialize linker tables *)
+(* To initialize linker tables and for [Translquote] *)
 
 val builtin_values: (string * Ident.t) list
 val builtin_idents: (string * Ident.t) list
+val builtin_exns: (string * Ident.t) list
+val builtin_constrs: (string * Ident.t) list
+val builtin_type_constrs: (string * Ident.t) list
 
 (** All predefined exceptions, exposed as [Ident.t] for flambda (for
     building value approximations).
