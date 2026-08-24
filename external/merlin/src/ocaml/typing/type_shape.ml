@@ -373,10 +373,10 @@ module Type_decl_shape = struct
               args
           in
           Array.of_list lys
-        | Constructor_variable ->
+        | Constructor_undetermined | Constructor_variable _ ->
           Misc.fatal_error
             "Type_shape: unexpected variable constructor representation")
-      | Cstr_layout_variable ->
+      | Cstr_layout_undetermined ->
         Misc.Stdlib.Array.of_list_map
           (fun { Shape.field_name = _; field_uid = _; field_value = _, ly } ->
             ly)
@@ -503,7 +503,8 @@ module Type_decl_shape = struct
             in
             record_of_labels ~shape_for_constr ~type_subst Record_floats
               lbl_list
-          | Record_inlined _ | Record_dummy _ | Record_variable ->
+          | Record_inlined _ | Record_dummy _ | Record_undetermined
+          | Record_variable _ ->
             (* Inlined records should not occur in type declarations, since they
                only exist temporarily as the type of record arguments inside of
                a match. For example, for [Foo { a : int; b : int }], then [r] is

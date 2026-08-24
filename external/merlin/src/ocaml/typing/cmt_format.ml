@@ -316,9 +316,9 @@ let iter_on_occurrences
       (match pat_desc with
       | Tpat_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description pat_env lid constr_desc
-      | Tpat_record (fields, _, _, _) ->
+      | Tpat_record (fields, _, _) ->
         iter_field_pats ~namespace:Label pat_env fields
-      | Tpat_record_unboxed_product (fields, _, _, _) ->
+      | Tpat_record_unboxed_product (fields, _, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
       | Tpat_fun_layout _
