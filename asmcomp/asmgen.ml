@@ -43,6 +43,7 @@ let cmm_invariants ppf fd_cmm =
   then
     Misc.fatal_errorf "Cmm invariants failed on following fundecl:@.%a@."
       print_fundecl fd_cmm;
+  if !Clflags.check_machtypes then Cmm_invariants.check_machtypes fd_cmm;
   fd_cmm
 
 let cfg_invariants ppf cfg =
