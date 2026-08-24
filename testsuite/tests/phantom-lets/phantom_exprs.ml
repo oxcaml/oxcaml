@@ -6,13 +6,14 @@
  set OCAMLPARAM = "_,";
  setup-ocamlopt.byte-build-env;
  flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -dcmm";
- module = "phantom_refs.ml";
+ module = "phantom_exprs.ml";
  ocamlopt.byte;
  check-ocamlopt.byte-output;
 *)
 
-(* The various kinds of reference a phantom defining expression can make,
-   beyond those covered by phantom_add_equality.ml.  The whole Cmm output
+(* The various forms a phantom defining expression can take, and the kinds
+   of variable it can mention, beyond those covered by
+   phantom_add_equality.ml.  The whole Cmm output
    is compared against the reference file.
 
    [temp_component]: the pair references a compiler-generated temporary
