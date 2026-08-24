@@ -4574,7 +4574,8 @@ let module_implementation_facts ~unit_interface ~argument_interface
     compilation_unit (annots : Cmt_format.binary_annots)
     declaration_dependencies =
   match annots with
-  | Cmt_format.Packed _ | Partial_implementation _ | Partial_interface _ ->
+  | Cmt_format.Packed _ | Partial_implementation _ | Partial_interface _
+  | Functorize ->
     None
   | Interface signature ->
     let argument_interface =
@@ -4961,7 +4962,9 @@ let functorize_signature ~params ~modules : Types.signature =
         let sign, _ = swg.sign in
         let param_type = Mty_signature (Subst.Lazy.force_signature sign) in
         Mty_functor
-          (Named (Some param_id, param_type, Alloc.legacy), body, Alloc.legacy))
+          ( Named (Some param_id, param_type, None, Alloc.legacy),
+            body,
+            Alloc.legacy ))
       params body
   in
   let body =
