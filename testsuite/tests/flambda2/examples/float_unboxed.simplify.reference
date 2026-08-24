@@ -21,6 +21,6 @@ let code loopify(never) size(27) newer_version_of(f_0)
       let float_add = %box_num.`float`.my_alloc_region (prim) in
       cont k (float_add)
 in
-let $camlFloat_unboxed__f_1 = closure f_0_1 @f &toplevel.alloc_region in
-let $camlFloat_unboxed = Block 0 ($camlFloat_unboxed__f_1) in
+let $camlFloat_unboxed__f_3 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlFloat_unboxed = Block 0 ($camlFloat_unboxed__f_3) in
 cont done ($camlFloat_unboxed)
