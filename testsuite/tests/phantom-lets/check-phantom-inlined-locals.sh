@@ -1,5 +1,5 @@
 #!/bin/sh
-# Check the Cmm dump for phantom_inlined.ml.
+# Check the Cmm dump for phantom_inlined_locals.ml.
 file="$1"
 fail() { echo "check failed: $1"; exit ${TEST_FAIL}; }
 # The substituted defining expressions of the inlined locals must carry

@@ -7,10 +7,10 @@
  setup-ocamlopt.byte-build-env;
  {
    flags = "-O3 -g -gno-upstream-dwarf -flambda2-expert-phantom-lets -dcmm -dump-into-file";
-   module = "phantom_inlined.ml";
+   module = "phantom_inlined_locals.ml";
    ocamlopt.byte;
  }{
-   script = "sh ${test_source_directory}/check-phantom-inlined.sh phantom_inlined.cmx.dump";
+   script = "sh ${test_source_directory}/check-phantom-inlined-locals.sh phantom_inlined_locals.cmx.dump";
    script;
  }
 *)

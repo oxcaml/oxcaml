@@ -12,21 +12,18 @@
 *)
 
 (* The various forms a phantom defining expression can take, and the kinds
-   of variable it can mention, beyond those covered by
-   phantom_add_equality.ml.  The whole Cmm output
-   is compared against the reference file.
+   of variable and constant it can mention.  (The supply of proxy
+   variables' values is covered by phantom_add_equality.ml.)  The whole
+   Cmm output is compared against the reference file.
 
-   [temp_component]: the pair references a compiler-generated temporary
-   (the projection), which is not user-visible.  The temporary
-   materialises as a real let (its other use is in return position), so
-   its proxy is bound directly to it, in the combined form; nothing
-   carries a [Cnormal_var_optimised_out], there being no user variable to
-   name.
+   [constant]: [k1] is bound to a constant, which is known when the
+   pair's phantom let is created: the block references a phantom variable
+   bound directly to the constant, and no equality is needed.
 
-   [bare_equality]: as [temp_component], but the temporary's single other
-   use is inlined out (into an [opaque_identity]): the inlined expression
-   carries a free-standing [Cphantom_add_equality] for the proxy and,
-   again, no [Cnormal_var_optimised_out] -- the only-equality form.
+   [consts]: constant components (a string and a boxed float, both static
+   data symbols) become phantom variables bound to the symbols, per the
+   ANF discipline; the parameter [x], whose binder is in scope, is
+   referenced directly.
 
    [dead_temp]: the projection has no normal uses at all; Simplify itself
    turns it into a phantom let with a real defining expression ([q[0]]),
@@ -34,37 +31,28 @@
    expressions may reference phantom-let-bound variables (the ANF
    discipline).
 
-   [consts]: constant components (a string and a boxed float, both static
-   data symbols) become phantom variables bound to the symbols, again per
-   the ANF discipline; the parameter [x], whose binder is in scope, is
-   referenced directly.
-
    [unrep]: a defining expression with no phantom form (arithmetic)
    yields an empty phantom let: the variable is presented as optimised
    out.
 
    [after_use]: the phantom let is placed after its referenced binding
    was already inlined out; the proxy stays without a value (the inlined
-   use site, which carries the [Cnormal_var_optimised_out], was emitted before
-   the proxy existed). *)
+   use site, which carries the [Cnormal_var_optimised_out], was emitted
+   before the proxy existed). *)
 
 [@@@ocaml.warning "-26-27-32"]
 
-let[@inline never] [@local never] temp_component q x =
-  let unused_pair = (fst q, x) in
-  fst q
+let[@inline never] [@local never] constant x =
+  let k1 = 42 in
+  let pair1 = (k1, x) in
+  x + k1
 
-let[@inline never] [@local never] bare_equality q x =
-  let unused_pair = (fst q, x) in
-  ignore (Sys.opaque_identity (fst q));
+let[@inline never] [@local never] consts x =
+  let unused_triple = ("abc", 1.5, x) in
   x
 
 let[@inline never] [@local never] dead_temp q x =
   let unused_pair = (fst q, x) in
-  x
-
-let[@inline never] [@local never] consts x =
-  let unused_triple = ("abc", 1.5, x) in
   x
 
 let[@inline never] [@local never] unrep x =

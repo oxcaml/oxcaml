@@ -1,164 +1,127 @@
 (data global "camlPhantom_exprs__gc_roots": int 0)
 (data
- int 6912
+ int 5888
  global "camlPhantom_exprs":
- addr G:"camlPhantom_exprs__temp_component_6"
- addr G:"camlPhantom_exprs__bare_equality_7"
- addr G:"camlPhantom_exprs__dead_temp_8"
- addr G:"camlPhantom_exprs__consts_9"
- addr G:"camlPhantom_exprs__unrep_10"
- addr G:"camlPhantom_exprs__after_use_11")
+ addr G:"camlPhantom_exprs__constant_5"
+ addr G:"camlPhantom_exprs__consts_6"
+ addr G:"camlPhantom_exprs__dead_temp_7"
+ addr G:"camlPhantom_exprs__unrep_8"
+ addr G:"camlPhantom_exprs__after_use_9")
 (data
  int 4087
- global "camlPhantom_exprs__after_use_11":
+ global "camlPhantom_exprs__after_use_9":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlPhantom_exprs__after_use_5_11_code")
+ addr G:"camlPhantom_exprs__after_use_4_9_code")
 (data
  int 3063
- global "camlPhantom_exprs__unrep_10":
- addr G:"camlPhantom_exprs__unrep_4_10_code"
- int 108086391056891909)
-(data
- int 3063
- global "camlPhantom_exprs__consts_9":
- addr G:"camlPhantom_exprs__consts_3_9_code"
+ global "camlPhantom_exprs__unrep_8":
+ addr G:"camlPhantom_exprs__unrep_3_8_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlPhantom_exprs__dead_temp_8":
+ global "camlPhantom_exprs__dead_temp_7":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlPhantom_exprs__dead_temp_2_8_code")
+ addr G:"camlPhantom_exprs__dead_temp_2_7_code")
 (data
- int 4087
- global "camlPhantom_exprs__bare_equality_7":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_exprs__bare_equality_1_7_code")
+ int 3063
+ global "camlPhantom_exprs__consts_6":
+ addr G:"camlPhantom_exprs__consts_1_6_code"
+ int 108086391056891909)
 (data
- int 4087
- global "camlPhantom_exprs__temp_component_6":
- addr G:"caml_curry2"
- int 180143985094819847
- addr G:"camlPhantom_exprs__temp_component_0_6_code")
-(data int 2045 "camlPhantom_exprs__float61": double 1.5)
-(data int 2044 "camlPhantom_exprs__immstring59": string "abc" skip 4 byte 4)
-(function{phantom_exprs.ml:53,49-96}
- camlPhantom_exprs__temp_component_0_6_code
-     (q/549[((module_path q/549) (location ()) (original_ident q/549)
-             (is_parameter local))]: val
-      x/550[((module_path x/550) (location ()) (original_ident x/550)
-             (is_parameter local))]: val) : val
- (let
-   (region/551 (beginregion)
-    Pfield/552[((module_path Pfield/552) (location ())
-                (original_ident Pfield/552) (is_parameter local))]
-      (load val q/549))
+ int 3063
+ global "camlPhantom_exprs__constant_5":
+ addr G:"camlPhantom_exprs__constant_0_5_code"
+ int 108086391056891909)
+(data int 2045 "camlPhantom_exprs__float30": double 1.5)
+(data int 2044 "camlPhantom_exprs__immstring28": string "abc" skip 4 byte 4)
+(function{phantom_exprs.ml:45,43-97} camlPhantom_exprs__constant_0_5_code
+     (x/532[((module_path x/532) (location ()) (original_ident x/532)
+             (is_parameter local))]: int) : int
+ (let region/533 (beginregion)
    (let?
-     (Pfield_pproxy/553 Pfield/552
-      unused_pair/554[((module_path unused_pair/554) (location ())
-                       (original_ident unused_pair/554) (is_parameter local))]
-        [0: Pfield_pproxy/553; x/550])
-     (let unit/555 (seq (endregion region/551) 1) Pfield/552))) )
+     (pconst/534 42
+      pair1/535[((module_path pair1/535) (location ())
+                 (original_ident pair1/535) (is_parameter local))]
+        [0: pconst/534; x/532])
+     (let (int_add/536 (+ x/532 84) unit/537 (seq (endregion region/533) 1))
+       int_add/536))) )
 
-(function{phantom_exprs.ml:57,48-131}
- camlPhantom_exprs__bare_equality_1_7_code
-     (q/557[((module_path q/557) (location ()) (original_ident q/557)
-             (is_parameter local))]: val
-      x/558[((module_path x/558) (location ()) (original_ident x/558)
+(function{phantom_exprs.ml:50,41-89} camlPhantom_exprs__consts_1_6_code
+     (x/539[((module_path x/539) (location ()) (original_ident x/539)
              (is_parameter local))]: val) : val
- (let region/559 (beginregion)
+ (let region/540 (beginregion)
    (let?
-     (Pfield_pproxy/561 ()
-      unused_pair/562[((module_path unused_pair/562) (location ())
-                       (original_ident unused_pair/562) (is_parameter local))]
-        [0: Pfield_pproxy/561; x/558])
-     (let
-       (Popaque/563
-          (opaque (phantom_add_equality Pfield_pproxy/561 (load val q/557)))
-        unit/564 (seq (endregion region/559) 1))
-       x/558))) )
-
-(function{phantom_exprs.ml:62,44-87} camlPhantom_exprs__dead_temp_2_8_code
-     (q/566[((module_path q/566) (location ()) (original_ident q/566)
-             (is_parameter local))]: val
-      x/567[((module_path x/567) (location ()) (original_ident x/567)
-             (is_parameter local))]: val) : val
- (let region/568 (beginregion)
-   (let?
-     (Pfield/569 q/566[0]
-      unused_pair/570[((module_path unused_pair/570) (location ())
-                       (original_ident unused_pair/570) (is_parameter local))]
-        [0: Pfield/569; x/567])
-     (let unit/571 (seq (endregion region/568) 1) x/567))) )
-
-(function{phantom_exprs.ml:66,41-89} camlPhantom_exprs__consts_3_9_code
-     (x/573[((module_path x/573) (location ()) (original_ident x/573)
-             (is_parameter local))]: val) : val
- (let region/574 (beginregion)
-   (let?
-     (pconst/575 camlPhantom_exprs__immstring59
-      pconst/576 camlPhantom_exprs__float61
-      unused_triple/577[((module_path unused_triple/577) (location ())
-                         (original_ident unused_triple/577)
+     (pconst/541 camlPhantom_exprs__immstring28
+      pconst/542 camlPhantom_exprs__float30
+      unused_triple/543[((module_path unused_triple/543) (location ())
+                         (original_ident unused_triple/543)
                          (is_parameter local))]
-        [0: pconst/575; pconst/576; x/573])
-     (let unit/578 (seq (endregion region/574) 1) x/573))) )
+        [0: pconst/541; pconst/542; x/539])
+     (let unit/544 (seq (endregion region/540) 1) x/539))) )
 
-(function{phantom_exprs.ml:70,40-77} camlPhantom_exprs__unrep_4_10_code
-     (x/580[((module_path x/580) (location ()) (original_ident x/580)
+(function{phantom_exprs.ml:54,44-87} camlPhantom_exprs__dead_temp_2_7_code
+     (q/546[((module_path q/546) (location ()) (original_ident q/546)
+             (is_parameter local))]: val
+      x/547[((module_path x/547) (location ()) (original_ident x/547)
+             (is_parameter local))]: val) : val
+ (let region/548 (beginregion)
+   (let?
+     (Pfield/549 q/546[0]
+      unused_pair/550[((module_path unused_pair/550) (location ())
+                       (original_ident unused_pair/550) (is_parameter local))]
+        [0: Pfield/549; x/547])
+     (let unit/551 (seq (endregion region/548) 1) x/547))) )
+
+(function{phantom_exprs.ml:58,40-77} camlPhantom_exprs__unrep_3_8_code
+     (x/553[((module_path x/553) (location ()) (original_ident x/553)
              (is_parameter local))]: int) : int
  (let?
-   unused_arith/581[((module_path unused_arith/581) (location ())
-                     (original_ident unused_arith/581) (is_parameter local))]
+   unused_arith/554[((module_path unused_arith/554) (location ())
+                     (original_ident unused_arith/554) (is_parameter local))]
      ()
-   x/580) )
+   x/553) )
 
-(function{phantom_exprs.ml:74,44-136} camlPhantom_exprs__after_use_5_11_code
-     (q/583[((module_path q/583) (location ()) (original_ident q/583)
+(function{phantom_exprs.ml:62,44-136} camlPhantom_exprs__after_use_4_9_code
+     (q/556[((module_path q/556) (location ()) (original_ident q/556)
              (is_parameter local))]: val
-      x/584[((module_path x/584) (location ()) (original_ident x/584)
+      x/557[((module_path x/557) (location ()) (original_ident x/557)
              (is_parameter local))]: val) : val
  (let
-   (region/585 (beginregion)
-    Popaque/587
+   (region/558 (beginregion)
+    Popaque/560
       (opaque
         (normal_var_optimised_out
-          ((module_path a/586) (location ()) (original_ident a/586)
+          ((module_path a/559) (location ()) (original_ident a/559)
            (is_parameter local))
-          (load val q/583))))
+          (load val q/556))))
    (let?
-     (a_pproxy/588 ()
-      unused_pair/589[((module_path unused_pair/589) (location ())
-                       (original_ident unused_pair/589) (is_parameter local))]
-        [0: a_pproxy/588; x/584])
-     (let unit/590 (seq (endregion region/585) 1) x/584))) )
+     (a_pproxy/561 ()
+      unused_pair/562[((module_path unused_pair/562) (location ())
+                       (original_ident unused_pair/562) (is_parameter local))]
+        [0: a_pproxy/561; x/557])
+     (let unit/563 (seq (endregion region/558) 1) x/557))) )
 
 (function no_cse reduce_code_size linscan camlPhantom_exprs__entry () : val
  (catch
    (let?
-     (temp_component/556[((module_path temp_component/556) (location ())
-                          (original_ident temp_component/556)
-                          (is_parameter local))]
-        camlPhantom_exprs__temp_component_6
-      bare_equality/565[((module_path bare_equality/565) (location ())
-                         (original_ident bare_equality/565)
-                         (is_parameter local))]
-        camlPhantom_exprs__bare_equality_7
-      dead_temp/572[((module_path dead_temp/572) (location ())
-                     (original_ident dead_temp/572) (is_parameter local))]
-        camlPhantom_exprs__dead_temp_8
-      consts/579[((module_path consts/579) (location ())
-                  (original_ident consts/579) (is_parameter local))]
-        camlPhantom_exprs__consts_9
-      unrep/582[((module_path unrep/582) (location ())
-                 (original_ident unrep/582) (is_parameter local))]
-        camlPhantom_exprs__unrep_10
-      after_use/591[((module_path after_use/591) (location ())
-                     (original_ident after_use/591) (is_parameter local))]
-        camlPhantom_exprs__after_use_11)
-     (exit 11 G:"camlPhantom_exprs"))
- with(11 *ret*/547: val) 1) )
+     (constant/538[((module_path constant/538) (location ())
+                    (original_ident constant/538) (is_parameter local))]
+        camlPhantom_exprs__constant_5
+      consts/545[((module_path consts/545) (location ())
+                  (original_ident consts/545) (is_parameter local))]
+        camlPhantom_exprs__consts_6
+      dead_temp/552[((module_path dead_temp/552) (location ())
+                     (original_ident dead_temp/552) (is_parameter local))]
+        camlPhantom_exprs__dead_temp_7
+      unrep/555[((module_path unrep/555) (location ())
+                 (original_ident unrep/555) (is_parameter local))]
+        camlPhantom_exprs__unrep_8
+      after_use/564[((module_path after_use/564) (location ())
+                     (original_ident after_use/564) (is_parameter local))]
+        camlPhantom_exprs__after_use_9)
+     (exit 8 G:"camlPhantom_exprs"))
+ with(8 *ret*/530: val) 1) )
 
 (data)
