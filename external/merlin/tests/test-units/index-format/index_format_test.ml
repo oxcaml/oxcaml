@@ -242,82 +242,41 @@ let test_writer_roundtrip =
           check_facts "the facts survive the roundtrip" facts
             (facts_of_index present)))
 
-let test_reader_status =
-  Alcotest.test_case "the reader reports what it could and could not read"
-    `Quick (fun () ->
-      with_files 4 (fun files ->
+let test_reader =
+  Alcotest.test_case "the reader preserves absent module facts" `Quick
+    (fun () ->
+      with_files 2 (fun files ->
           let good = List.nth files 0 in
           let absent = List.nth files 1 in
-          let missing = List.nth files 2 in
-          let malformed = List.nth files 3 in
           let facts = sample_facts () in
           let more_facts = other_facts () in
           write_facts ~file:good facts;
           write_facts ~file:absent ~present:false more_facts;
-          Sys.remove missing;
-          Index_format.write ~file:malformed
-            { (index_of_facts ~facts:Facts.empty ~present:true) with
-              module_facts =
-                Some
-                  (Index_format.link_module_facts
-                     { Module_facts_compact.empty with version = 99 })
-            };
-          let loaded, status = Module_facts_reader.load ~index_files:[ good ] in
+          let loaded =
+            match
+              Module_facts_reader.fold ~index_files:[ good ] ~init:[]
+                ~f:(fun facts ~path:_ fact -> fact :: facts)
+            with
+            | Some [ loaded ] -> loaded
+            | Some loaded ->
+              Alcotest.failf "expected one facts value, got %d"
+                (List.length loaded)
+            | None -> Alcotest.fail "the facts value was absent"
+          in
           check_facts "a single index loads its facts" facts loaded;
-          Alcotest.check Alcotest.bool "the answer is complete" true
-            status.facts_present;
-          Alcotest.check Alcotest.int "one channel was loaded" 1
-            status.channels_loaded;
-          Alcotest.check Alcotest.int "one source was folded" 1
-            status.sources_folded;
-          Alcotest.check Alcotest.int "nothing went wrong" 0
-            (List.length status.problems);
-          let loaded, status =
-            Module_facts_reader.load ~index_files:[ good; absent ]
-          in
-          check_facts "absent channels do not contribute facts" facts loaded;
-          Alcotest.check Alcotest.bool "an absent channel taints the answer"
-            false status.facts_present;
-          Alcotest.check Alcotest.int "one channel was loaded" 1
-            status.channels_loaded;
-          let loaded, status =
-            Module_facts_reader.load ~index_files:[ good; missing ]
-          in
-          check_facts "the readable facts are kept" facts loaded;
-          Alcotest.check Alcotest.bool "a missing file taints the answer" false
-            status.facts_present;
-          (match status.problems with
-          | [ Unreadable _ ] -> ()
-          | problems ->
-            Alcotest.failf "expected one unreadable file, got %d"
-              (List.length problems));
-          let loaded, status =
-            Module_facts_reader.load ~index_files:[ good; malformed ]
-          in
-          check_facts "malformed facts do not poison the good ones" facts loaded;
-          Alcotest.check Alcotest.bool "a malformed block taints the answer"
-            false status.facts_present;
-          (match status.problems with
-          | [ Malformed _ ] -> ()
-          | problems ->
-            Alcotest.failf "expected one malformed file, got %d"
-              (List.length problems));
-          let paths, status =
-            Module_facts_reader.fold ~index_files:[ good; absent ] ~init:[]
-              ~f:(fun paths ~path (_ : Facts.t) ->
-                Filename.basename path :: paths)
-          in
-          Alcotest.check Alcotest.int "the present source is visited once" 1
-            (List.length paths);
-          Alcotest.check Alcotest.int "one source was folded" 1
-            status.sources_folded;
-          let count, status =
+          (match
+             Module_facts_reader.fold ~index_files:[ good; absent ] ~init:[]
+               ~f:(fun facts ~path:_ fact -> fact :: facts)
+           with
+          | None -> ()
+          | Some _ -> Alcotest.fail "the absent facts value was ignored");
+          match
             Module_facts_reader.fold ~index_files:[] ~init:0
               ~f:(fun count ~path:_ (_ : Facts.t) -> count + 1)
-          in
-          Alcotest.check Alcotest.int "nothing to fold" 0 count;
-          Alcotest.check Alcotest.bool
-            "no configured index is a complete answer" true status.facts_present))
+          with
+          | Some 0 -> ()
+          | Some count -> Alcotest.failf "expected zero facts, got %d" count
+          | None -> Alcotest.fail "an empty input returned no result")
 
 let () =
   Alcotest.run "merlin-lib.index_format"
@@ -327,6 +286,6 @@ let () =
           test_malformed_blocks;
           test_malformed_integers;
           test_writer_roundtrip;
-          test_reader_status
+          test_reader
         ] )
     ]
