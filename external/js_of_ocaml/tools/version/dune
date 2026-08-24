@@ -1,24 +1,14 @@
-(* -*- tuareg -*- *)
-open StdLabels
-open Jbuild_plugin.V1
+; OxCaml patch: upstream generates GIT-VERSION with an OCaml-syntax dune file
+; (running "git describe" via Jbuild_plugin). Dune evaluates such files with
+; the "ocaml" program from the build context, which does not exist in the
+; oxcaml bootstrap contexts (their PATH starts with _build/_bootinstall/bin,
+; which only contains the freshly built compilers). Use a static rule instead;
+; an empty GIT-VERSION makes version.ml.in fall back to the plain VERSION,
+; exactly like an upstream release tarball.
 
-let git_version =
-  let placeholder = "%%VERSION%%" in
-  match run_and_read_lines "git describe --always --dirty" with
-  | exception _ -> ""
-  | version :: _ ->
-    if "%%" ^ "VERSION" ^ "%%" = placeholder
-    then version
-    else placeholder
-  | [] -> ""
-
-let dyn =
-  Printf.sprintf
-    {|
 (rule
-  (target GIT-VERSION)
-  (action (with-stdout-to %%{target} (echo "%s"))))
-|}
-    git_version
-
-let () = send dyn
+ (target GIT-VERSION)
+ (action
+  (with-stdout-to
+   %{target}
+   (echo ""))))
