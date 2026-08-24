@@ -18,6 +18,58 @@
 open Stdlib_stable
 open Stdlib_upstream_compatible
 
+type ('a : value_or_null, 'b : value_or_null) ptr_atomic =
+  #('a * ('a, 'b) idx_atomic)
+
+external get :
+  ('a : value_or_null) ('b : value_or_null).
+  ('a, 'b) ptr_atomic @ local -> 'b = "%unsafe_atomic_load_ptr"
+
+external set :
+  ('a : value_or_null) ('b : value_or_null).
+  (('a, 'b) ptr_atomic[@local_opt]) -> 'b -> unit = "%unsafe_atomic_set_ptr"
+
+external exchange :
+  ('a : value_or_null) ('b : value_or_null).
+  (('a, 'b) ptr_atomic[@local_opt]) -> 'b -> 'b = "%unsafe_atomic_exchange_ptr"
+
+external compare_and_set :
+  ('a : value_or_null) ('b : value_or_null).
+  (('a, 'b) ptr_atomic[@local_opt]) -> 'b -> 'b -> bool
+  = "%unsafe_atomic_cas_ptr"
+
+external compare_exchange :
+  ('a : value_or_null) ('b : value_or_null).
+  (('a, 'b) ptr_atomic[@local_opt]) -> 'b -> 'b -> 'b
+  = "%unsafe_atomic_compare_exchange_ptr"
+
+external fetch_and_add :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> int
+  = "%unsafe_atomic_fetch_add_ptr"
+
+external add :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_add_ptr"
+
+external sub :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_sub_ptr"
+
+external logand :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_land_ptr"
+
+external logor :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_lor_ptr"
+
+external logxor :
+  ('a : value_or_null). ('a, int) ptr_atomic @ local -> int -> unit
+  = "%unsafe_atomic_lxor_ptr"
+
+let incr p = add p 1
+let decr p = sub p 1
+
 (* test reading/writing atomic fields using atomic ptrs *)
 
 module Basic = struct
@@ -26,12 +78,12 @@ module Basic = struct
   let () =
     Printf.printf "== Basic ptr_atomic ==\n";
     let t = { x = 1; y = "one" } in
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get #(t, (.x)));
-    Printf.printf "(.y) = %s\n" (Ptr_atomic.get #(t, (.y)));
-    Printf.printf "(.x) <- 2\n"; Ptr_atomic.set #(t, (.x)) 2;
-    Printf.printf "(.y) <- two\n"; Ptr_atomic.set #(t, (.y)) "two";
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get #(t, (.x)));
-    Printf.printf "(.y) = %s\n" (Ptr_atomic.get #(t, (.y)));
+    Printf.printf "(.x) = %d\n" (get #(t, (.x)));
+    Printf.printf "(.y) = %s\n" (get #(t, (.y)));
+    Printf.printf "(.x) <- 2\n"; set #(t, (.x)) 2;
+    Printf.printf "(.y) <- two\n"; set #(t, (.y)) "two";
+    Printf.printf "(.x) = %d\n" (get #(t, (.x)));
+    Printf.printf "(.y) = %s\n" (get #(t, (.y)));
     ()
 end
 
@@ -45,41 +97,41 @@ module Rmw = struct
     let t = { x = 1; y = "one" } in
     let px = #(t, (.x)) in
     let py = #(t, (.y)) in
-    Printf.printf "exchange (.x) 2 = %d\n" (Ptr_atomic.exchange px 2);
-    Printf.printf "exchange (.y) two = %s\n" (Ptr_atomic.exchange py "two");
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
-    Printf.printf "(.y) = %s\n" (Ptr_atomic.get py);
+    Printf.printf "exchange (.x) 2 = %d\n" (exchange px 2);
+    Printf.printf "exchange (.y) two = %s\n" (exchange py "two");
+    Printf.printf "(.x) = %d\n" (get px);
+    Printf.printf "(.y) = %s\n" (get py);
     Printf.printf "compare_and_set (.x) 2 3 = %b\n"
-      (Ptr_atomic.compare_and_set px 2 3);
+      (compare_and_set px 2 3);
     Printf.printf "compare_and_set (.x) 2 4 = %b\n"
-      (Ptr_atomic.compare_and_set px 2 4);
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
-    let y = Ptr_atomic.get py in
+      (compare_and_set px 2 4);
+    Printf.printf "(.x) = %d\n" (get px);
+    let y = get py in
     Printf.printf "compare_and_set (.y) y three = %b\n"
-      (Ptr_atomic.compare_and_set py y "three");
-    Printf.printf "(.y) = %s\n" (Ptr_atomic.get py);
+      (compare_and_set py y "three");
+    Printf.printf "(.y) = %s\n" (get py);
     Printf.printf "compare_exchange (.x) 3 5 = %d\n"
-      (Ptr_atomic.compare_exchange px 3 5);
+      (compare_exchange px 3 5);
     Printf.printf "compare_exchange (.x) 3 6 = %d\n"
-      (Ptr_atomic.compare_exchange px 3 6);
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
+      (compare_exchange px 3 6);
+    Printf.printf "(.x) = %d\n" (get px);
     Printf.printf "fetch_and_add (.x) 10 = %d\n"
-      (Ptr_atomic.fetch_and_add px 10);
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
-    Printf.printf "add (.x) 4\n"; Ptr_atomic.add px 4;
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
-    Printf.printf "sub (.x) 5\n"; Ptr_atomic.sub px 5;
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
-    Printf.printf "logand (.x) 6\n"; Ptr_atomic.logand px 6;
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
-    Printf.printf "logor (.x) 9\n"; Ptr_atomic.logor px 9;
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
-    Printf.printf "logxor (.x) 3\n"; Ptr_atomic.logxor px 3;
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
-    Printf.printf "incr (.x)\n"; Ptr_atomic.incr px;
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
-    Printf.printf "decr (.x)\n"; Ptr_atomic.decr px;
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
+      (fetch_and_add px 10);
+    Printf.printf "(.x) = %d\n" (get px);
+    Printf.printf "add (.x) 4\n"; add px 4;
+    Printf.printf "(.x) = %d\n" (get px);
+    Printf.printf "sub (.x) 5\n"; sub px 5;
+    Printf.printf "(.x) = %d\n" (get px);
+    Printf.printf "logand (.x) 6\n"; logand px 6;
+    Printf.printf "(.x) = %d\n" (get px);
+    Printf.printf "logor (.x) 9\n"; logor px 9;
+    Printf.printf "(.x) = %d\n" (get px);
+    Printf.printf "logxor (.x) 3\n"; logxor px 3;
+    Printf.printf "(.x) = %d\n" (get px);
+    Printf.printf "incr (.x)\n"; incr px;
+    Printf.printf "(.x) = %d\n" (get px);
+    Printf.printf "decr (.x)\n"; decr px;
+    Printf.printf "(.x) = %d\n" (get px);
     ()
 end
 
@@ -92,13 +144,13 @@ module RmwMixed = struct
     Printf.printf "== ptr_atomic read-modify-write (mixed record) ==\n";
     let t = { x = #42L; y = 1; z = #67L } in
     let py = #(t, (.y)) in
-    Printf.printf "exchange (.y) 2 = %d\n" (Ptr_atomic.exchange py 2);
+    Printf.printf "exchange (.y) 2 = %d\n" (exchange py 2);
     Printf.printf "compare_and_set (.y) 2 3 = %b\n"
-      (Ptr_atomic.compare_and_set py 2 3);
+      (compare_and_set py 2 3);
     Printf.printf "fetch_and_add (.y) 10 = %d\n"
-      (Ptr_atomic.fetch_and_add py 10);
+      (fetch_and_add py 10);
     Printf.printf "(.x) = %Ld\n" (Int64_u.to_int64 t.x);
-    Printf.printf "(.y) = %d\n" (Ptr_atomic.get py);
+    Printf.printf "(.y) = %d\n" (get py);
     Printf.printf "(.z) = %Ld\n" (Int64_u.to_int64 t.z);
     ()
 end
@@ -113,14 +165,14 @@ module RmwStack = struct
       "== ptr_atomic read-modify-write (stack-allocated record) ==\n";
     let t = stack_ { x = 1 } in
     let px = #(t, (.x)) in
-    Printf.printf "exchange (.x) 2 = %d\n" (Ptr_atomic.exchange px 2);
+    Printf.printf "exchange (.x) 2 = %d\n" (exchange px 2);
     Printf.printf "compare_and_set (.x) 2 3 = %b\n"
-      (Ptr_atomic.compare_and_set px 2 3);
+      (compare_and_set px 2 3);
     Printf.printf "compare_exchange (.x) 3 4 = %d\n"
-      (Ptr_atomic.compare_exchange px 3 4);
+      (compare_exchange px 3 4);
     Printf.printf "fetch_and_add (.x) 10 = %d\n"
-      (Ptr_atomic.fetch_and_add px 10);
-    Printf.printf "(.x) = %d\n" (Ptr_atomic.get px);
+      (fetch_and_add px 10);
+    Printf.printf "(.x) = %d\n" (get px);
     ()
 end
 
@@ -137,14 +189,14 @@ module UnboxedSingleton = struct
     let t = { x = #{ y = 1 } } in
     let fst = #(t, (.x)) in
     let snd = #(t, (.x.#y)) in
-    Printf.printf "(.x) = %a\n" print_inner (Ptr_atomic.get fst);
-    Printf.printf "(.x.#y) = %d\n" (Ptr_atomic.get snd);
-    Printf.printf "(.x) <- #{y = 2}\n"; Ptr_atomic.set fst #{y = 2};
-    Printf.printf "(.x) = %a\n" print_inner (Ptr_atomic.get fst);
-    Printf.printf "(.x.#y) = %d\n" (Ptr_atomic.get snd);
-    Printf.printf "(.x.#y) <- 3\n"; Ptr_atomic.set snd 3;
-    Printf.printf "(.x) = %a\n" print_inner (Ptr_atomic.get fst);
-    Printf.printf "(.x.#y) = %d\n" (Ptr_atomic.get snd);
+    Printf.printf "(.x) = %a\n" print_inner (get fst);
+    Printf.printf "(.x.#y) = %d\n" (get snd);
+    Printf.printf "(.x) <- #{y = 2}\n"; set fst #{y = 2};
+    Printf.printf "(.x) = %a\n" print_inner (get fst);
+    Printf.printf "(.x.#y) = %d\n" (get snd);
+    Printf.printf "(.x.#y) <- 3\n"; set snd 3;
+    Printf.printf "(.x) = %a\n" print_inner (get fst);
+    Printf.printf "(.x.#y) = %d\n" (get snd);
     ()
 
   (* test deepening idx_atomic *)
@@ -154,14 +206,14 @@ module UnboxedSingleton = struct
     let fst_idx = (.x) in
     let fst = #(t, fst_idx) in
     let snd = #(t, (.idx_atomic(fst_idx).#y)) in
-    Printf.printf "(.x) = %a\n" print_inner (Ptr_atomic.get fst);
-    Printf.printf "(.idx_atomic((.x)).#y) = %d\n" (Ptr_atomic.get snd);
-    Printf.printf "(.x) <- #{y = 2}\n"; Ptr_atomic.set fst #{y = 2};
-    Printf.printf "(.x) = %a\n" print_inner (Ptr_atomic.get fst);
-    Printf.printf "(.idx_atomic((.x)).#y) = %d\n" (Ptr_atomic.get snd);
-    Printf.printf "(.idx_atomic((.x)).#y) <- 3\n"; Ptr_atomic.set snd 3;
-    Printf.printf "(.x) = %a\n" print_inner (Ptr_atomic.get fst);
-    Printf.printf "(.idx_atomic((.x)).#y) = %d\n" (Ptr_atomic.get snd);
+    Printf.printf "(.x) = %a\n" print_inner (get fst);
+    Printf.printf "(.idx_atomic((.x)).#y) = %d\n" (get snd);
+    Printf.printf "(.x) <- #{y = 2}\n"; set fst #{y = 2};
+    Printf.printf "(.x) = %a\n" print_inner (get fst);
+    Printf.printf "(.idx_atomic((.x)).#y) = %d\n" (get snd);
+    Printf.printf "(.idx_atomic((.x)).#y) <- 3\n"; set snd 3;
+    Printf.printf "(.x) = %a\n" print_inner (get fst);
+    Printf.printf "(.idx_atomic((.x)).#y) = %d\n" (get snd);
     ()
 end
 
@@ -174,11 +226,11 @@ module Mixed = struct
     Printf.printf "== Basic ptr_atomic (mixed record) ==\n";
     let t = { x = #42L; y = "two"; z = #67L } in
     Printf.printf "(.x) = %Ld\n" (Int64_u.to_int64 t.x);
-    Printf.printf "(.y) = %s\n" (Ptr_atomic.get #(t, (.y)));
+    Printf.printf "(.y) = %s\n" (get #(t, (.y)));
     Printf.printf "(.z) = %Ld\n" (Int64_u.to_int64 t.z);
-    Printf.printf "(.y) <- three\n"; Ptr_atomic.set #(t, (.y)) "three";
+    Printf.printf "(.y) <- three\n"; set #(t, (.y)) "three";
     Printf.printf "(.x) = %Ld\n" (Int64_u.to_int64 t.x);
-    Printf.printf "(.y) = %s\n" (Ptr_atomic.get #(t, (.y)));
+    Printf.printf "(.y) = %s\n" (get #(t, (.y)));
     Printf.printf "(.z) = %Ld\n" (Int64_u.to_int64 t.z);
 end
 
@@ -192,10 +244,10 @@ module Float = struct
     Printf.printf "== Basic ptr_atomic (float record) ==\n";
     let t = { x = 2.0; y = 4.0 } in
     Printf.printf "(.x) = %f\n" t.x;
-    Printf.printf "(.y) = %f\n" (Ptr_atomic.get #(t, (.y)));
-    Printf.printf "(.y) <- 6.0\n"; Ptr_atomic.set #(t, (.y)) 6.0;
+    Printf.printf "(.y) = %f\n" (get #(t, (.y)));
+    Printf.printf "(.y) <- 6.0\n"; set #(t, (.y)) 6.0;
     Printf.printf "(.x) = %f\n" t.x;
-    Printf.printf "(.y) = %f\n" (Ptr_atomic.get #(t, (.y)));
+    Printf.printf "(.y) = %f\n" (get #(t, (.y)));
     ()
 end
 
@@ -207,9 +259,9 @@ module Void = struct
   let () =
     Printf.printf "== Basic ptr_atomic (void record) ==\n";
     let t = { x = #(); y = "hello"; z = #() } in
-    Printf.printf "(.y) = %s\n" (Ptr_atomic.get #(t, (.y)));
-    Printf.printf "(.y) <- world\n"; Ptr_atomic.set #(t, (.y)) "world";
-    Printf.printf "(.y) = %s\n" (Ptr_atomic.get #(t, (.y)));
+    Printf.printf "(.y) = %s\n" (get #(t, (.y)));
+    Printf.printf "(.y) <- world\n"; set #(t, (.y)) "world";
+    Printf.printf "(.y) = %s\n" (get #(t, (.y)));
     ()
 end
 
@@ -221,8 +273,8 @@ module Stack = struct
   let () =
     Printf.printf "== Basic ptr_atomic (stack-allocated record) ==\n";
     let t = stack_ { x = "hello" } in
-    Printf.printf "(.x) = %s\n" (Ptr_atomic.get #(t, (.x)) );
-    Printf.printf "(.x) <- world\n"; Ptr_atomic.set #(t, (.x)) "world";
-    Printf.printf "(.x) = %s\n" (Ptr_atomic.get #(t, (.x)));
+    Printf.printf "(.x) = %s\n" (get #(t, (.x)) );
+    Printf.printf "(.x) <- world\n"; set #(t, (.x)) "world";
+    Printf.printf "(.x) = %s\n" (get #(t, (.x)));
     ()
 end
