@@ -5020,9 +5020,9 @@ let functorize_interface initial_env ~params ~module_sigs unit_info
     in
     let decl_deps = Cmt_format.get_declaration_dependencies () in
     Cmt_format.save_cmt (Unit_info.cmti unit_info) modulename
-      Cmt_format.Functorize initial_env (Some cmi) None;
+      Cmt_format.Functorize initial_env (Some cmi) None None;
     Cms_format.save_cms (Unit_info.cmsi unit_info) modulename
-      Cmt_format.Functorize initial_env None decl_deps
+      Cmt_format.Functorize initial_env None decl_deps None
   end
 
 let functorize_implementation initial_env ~params ~modules ~module_sigs
@@ -5045,9 +5045,9 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
     let save_cmt_cms cmi_opt =
       let decl_deps = Cmt_format.get_declaration_dependencies () in
       Cmt_format.save_cmt (target_artifact ".cmt") modulename
-        Cmt_format.Functorize initial_env cmi_opt None;
+        Cmt_format.Functorize initial_env cmi_opt None None;
       Cms_format.save_cms (target_artifact ".cms") modulename
-        Cmt_format.Functorize initial_env None decl_deps
+        Cmt_format.Functorize initial_env None decl_deps None
     in
     match !Clflags.cmi_file with
     | Some cmi_file ->
