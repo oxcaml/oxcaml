@@ -396,20 +396,23 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   (* ID stamp counters are process-global monotonically increasing counters that
      give us an easy way of creating fresh identifiers. These identifiers get
      persisted across processes, and we need to prevent collisions when this
-     happens. We have two mechanisms:
+     happens. There are two cases:
 
-     (1) Identifiers are scoped to compilation units, as (CU, number) pairs.
-     This means it's fine for different processes to use the same numbers as
-     long as they're working on different CUs.
+     (1) Different processes that operate on different compilation units,
+     potentially in parallel. Collisions are prevented here by the fact that
+     identifiers are scoped to compilation units, as (CU, number) pairs.
 
-     (2) Saving and restoring stamp counters. We have to ensure that when
-     multiple processes operate on the same CUs, these processes happen in
-     sequence, and counters increase monotonically along this sequence.
+     (2) Different processes that operate on the same compilation units, which
+     must always happen in sequence. Collisions are prevented here by saving
+     stamp counters in the earlier processes and restoring them in the later
+     processes.
 
      Here we're resuming from many processes that operated on different CUs, and
-     we're operating on all of those CUs, so we use mechanism 2. To make sure
-     counters are monotonically increasing, we take the maximum across all the
-     process we've resumed from.
+     we're operating on all of those CUs, so we need to restore stamp counters
+     from all of those processes. However stamp counters are global for the
+     process, not per-CU. To make this work, we take the maximum across all the
+     processes we've resumed from. It is okay that this makes some unused stamps
+     get jumped over, the important thing is that they increase monotonically.
 
      After we're done, rebuild processes will be created to do more work on the
      CUs we touched. To keep counters monotonically increasing, we need to save
