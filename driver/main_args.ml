@@ -1005,7 +1005,8 @@ let mk_dcmm_invariants f =
 
 let mk_dcmm_check_machtypes f =
   "-dcmm-check-machtypes", Arg.Unit f,
-  " Check that machtypes are used consistently in Cmm (default)"
+  " Check that machtypes are used consistently in Cmm. Machtypes are never \
+      checked with -Oclassic (default)"
 
 let mk_dcmm_no_check_machtypes f =
   "-dcmm-no-check-machtypes", Arg.Unit f,
