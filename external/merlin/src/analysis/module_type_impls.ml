@@ -479,18 +479,12 @@ module Helpers = struct
 
   let module_facts (mconfig : Mconfig.t) =
     let index_files = mconfig.merlin.index_files in
-    let facts, status =
-      Module_facts_reader.fold ~index_files ~init:None
-        ~f:(fun facts ~path:_ source ->
-          Some
-            (match facts with
-            | None -> source
-            | Some facts -> Facts.merge facts source))
-    in
-    List.iter status.problems ~f:(fun problem ->
-        log ~title:"module_facts" "%a" Logger.fmt (fun fmt ->
-            Module_facts_reader.pp_problem fmt problem));
-    (facts, status)
+    Module_facts_reader.fold ~index_files ~init:None
+      ~f:(fun facts ~path:_ source ->
+        Some
+          (match facts with
+          | None -> source
+          | Some facts -> Facts.merge facts source))
 
   let own_file (mconfig : Mconfig.t) =
     Misc.canonicalize_filename
@@ -681,7 +675,7 @@ let resolve_implementation mconfig (node : Facts.Node.t) =
             { implementation_uid =
                 Some (Format.asprintf "%a" Shape.Uid.print uid);
               implementation_name =
-                if String.equal name "_" then None else Some name;
+                (if String.equal name "_" then None else Some name);
               site
             })
 
@@ -819,16 +813,14 @@ let compare_implementation
 let reason_rank : Query_protocol.Module_type_impls.reason -> int = function
   | No_index_files -> 0
   | Channel_absent -> 1
-  | Reader_problem _ -> 2
-  | Omission _ -> 3
-  | Unresolved_implementation _ -> 4
-  | Unresolved_check_site _ -> 5
+  | Omission _ -> 2
+  | Unresolved_implementation _ -> 3
+  | Unresolved_check_site _ -> 4
 
 let compare_reason left right =
   let open Query_protocol.Module_type_impls in
   match (left, right) with
   | No_index_files, No_index_files | Channel_absent, Channel_absent -> 0
-  | Reader_problem left, Reader_problem right -> String.compare left right
   | ( Omission { family = left_family; reason = left_reason },
       Omission { family = right_family; reason = right_reason } ) ->
     let c = Stdlib.Option.compare String.compare left_family right_family in
@@ -932,27 +924,15 @@ let resolve_impacts ~mconfig ~own_file results =
   in
   (implementations, reasons)
 
-let status_and_reasons ~index_files
-    ~(reader_status : Module_facts_reader.status) ~omissions ~resolution_reasons
-    =
+let status_and_reasons ~index_files ~facts_present ~omissions
+    ~resolution_reasons =
   let open Query_protocol.Module_type_impls in
-  let reader_reasons =
-    List.map reader_status.problems ~f:(fun problem ->
-        Reader_problem
-          (Format.asprintf "%a" Module_facts_reader.pp_problem problem))
-  in
-  let channel_reasons =
-    if reader_status.facts_present then [] else [ Channel_absent ]
-  in
-  match index_files with
-  | [] -> (Unavailable, [ No_index_files ])
-  | _ :: _ when reader_status.channels_loaded = 0 ->
-    (Unavailable, channel_reasons @ reader_reasons)
-  | _ :: _ -> (
+  match (index_files, facts_present) with
+  | [], _ -> (Unavailable, [ No_index_files ])
+  | _ :: _, false -> (Unavailable, [ Channel_absent ])
+  | _ :: _, true -> (
     let reasons =
-      channel_reasons @ reader_reasons
-      @ List.map omissions ~f:reason_of_omission
-      @ resolution_reasons
+      List.map omissions ~f:reason_of_omission @ resolution_reasons
     in
     match reasons with
     | [] -> (Complete, [])
@@ -985,8 +965,12 @@ let query ~pipeline (typedtree : Mtyper.typedtree) =
   let own_file = Helpers.own_file mconfig in
   let targets = module_type_decls typedtree in
   let index_files = mconfig.merlin.index_files in
-  let facts, reader_status = Helpers.module_facts mconfig in
-  let engine = Option.map facts ~f:Dependency_analysis.create in
+  let facts = Helpers.module_facts mconfig in
+  let engine =
+    match facts with
+    | None | Some None -> None
+    | Some (Some facts) -> Some (Dependency_analysis.create facts)
+  in
   let results = query_results engine targets in
   let omissions = query_omissions engine results in
   let implementations, resolution_reasons =
@@ -1000,8 +984,8 @@ let query ~pipeline (typedtree : Mtyper.typedtree) =
         (own_interface :: implementations)
   in
   let status, reasons =
-    status_and_reasons ~index_files ~reader_status ~omissions
-      ~resolution_reasons
+    status_and_reasons ~index_files ~facts_present:(Option.is_some facts)
+      ~omissions ~resolution_reasons
   in
   log ~title:"query" "%d targets, %d rows, status %s" (List.length targets)
     (List.length implementations)
