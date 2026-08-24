@@ -297,16 +297,19 @@ module Layout = struct
       if s' == s then t else Sort (s', sa)
     | (Any _ | Product _) as t -> t
 
-  (* [constrain_addressable t] constrains [t < t addressable] *)
-  let rec constrain_addressable ~allow_mutation : Sort.t t -> bool = function
+  (* [constrain_below_addressable t] constrains [t < t addressable] *)
+  let rec constrain_below_addressable ~allow_mutation : Sort.t t -> bool =
+    function
     | Any _ -> false
     | Addressable _ -> true
     | Sort (s, _) ->
       sort_constrain_result (Sort.constrain_addressable ~allow_mutation s)
-    | Product ts -> List.for_all (constrain_addressable ~allow_mutation) ts
+    | Product ts ->
+      List.for_all (constrain_below_addressable ~allow_mutation) ts
 
   (* [constrain_above_addressable t] constrains [t addressable < t].
-     This differs from [constrain_addressable] only for [t = Any _]. *)
+     This differs from [constrain_below_addressable] only for kinds containing
+     [any]. *)
   let rec constrain_above_addressable ~allow_mutation : Sort.t t -> bool =
     function
     | Any _ -> true
@@ -354,11 +357,10 @@ module Layout = struct
       equate_or_equal ~allow_mutation
         (strip_head_addressable l1)
         (strip_head_addressable l2)
-    | Addressable l1, ((Sort _ | Product _) as t2)
-    | ((Sort _ | Product _) as t2), Addressable l1 ->
-      constrain_addressable ~allow_mutation t2
+    | Addressable l1, ((Any _ | Sort _ | Product _) as t2)
+    | ((Any _ | Sort _ | Product _) as t2), Addressable l1 ->
+      constrain_below_addressable ~allow_mutation t2
       && equate_or_equal ~allow_mutation (Addressable l1) (Addressable t2)
-    | Addressable _, Any _ | Any _, Addressable _ -> false
     | (Any _ | Sort _ | Product _), _ -> false
 
   let rec get_root_scannable_axes : _ t -> Scannable_axes.t option = function
@@ -417,7 +419,7 @@ module Layout = struct
         then sub t1 (Addressable t2)
         else Not_le
       | (Any _ | Sort _ | Product _), Addressable _ ->
-        if constrain_addressable ~allow_mutation:true t1
+        if constrain_below_addressable ~allow_mutation:true t1
         then sub (Addressable t1) t2
         else Not_le
       | Any sa1, Any sa2 -> Scannable_axes.less_or_equal sa1 sa2
@@ -531,7 +533,7 @@ module Layout = struct
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
       | Addressable t ->
-        if constrain_addressable ~allow_mutation:false t
+        if constrain_below_addressable ~allow_mutation:false t
         then pp_element ~nested ppf t
         else Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) t
     in
