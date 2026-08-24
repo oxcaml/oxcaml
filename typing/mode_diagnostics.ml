@@ -3495,8 +3495,7 @@ let typecore_scope : Typecore.error -> Scope.t = function
   | Repeated_tuple_exp_label _ | Repeated_tuple_pat_label _
   | Wrong_expected_record_boxing _ | Expr_record_type_has_wrong_boxing _
   | Invalid_unboxed_access _ | Block_access_bad_record _ | Optional_poly_param
-  | Unboxed_int_literals_not_supported | Indeterminate_record_layout _
-  | Indeterminate_constructor_layout _ | Invalid_label_for_src_pos _
+  | Unboxed_int_literals_not_supported | Invalid_label_for_src_pos _
   | Nonoptional_call_pos_label _ | Unexpected_hole
   | Let_poly_not_yet_implemented | Let_poly_not_syntactic_value
   | Layout_poly_inst_not_yet_supported _ | Function_type_escapes_partial_match _
