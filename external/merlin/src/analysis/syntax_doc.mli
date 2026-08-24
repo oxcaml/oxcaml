@@ -1,5 +1,4 @@
-val get_mode_doc :
-  Mode.Alloc.atom -> Query_protocol.Syntax_doc_result.t option
+val get_mode_doc : Mode.Alloc.atom -> Query_protocol.Syntax_doc_result.t option
 
 val get_modality_doc :
   Mode.Modality.atom -> Query_protocol.Syntax_doc_result.t option
