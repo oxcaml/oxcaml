@@ -601,8 +601,14 @@ buffer), computed from the compiler facts recorded in the configured indexes.
 
 ```javascript
 {
-  'status'  : 'complete' | 'partial' | 'unavailable',
-  'reasons' : [ { 'kind' : string, ... } ],
+  'targets' : [
+    {
+      'target'  : string,
+      'decl'    : { 'file', 'start', 'end' },
+      'status'  : 'complete' | 'partial' | 'unavailable',
+      'reasons' : [ { 'kind' : string, ... } ]
+    }
+  ],
   'implementations' : [
     {
       'target'     : string,
@@ -632,11 +638,11 @@ when a recorded check site could not be resolved; neither impacts nor recorded
 sites are ever silently dropped, and an impact whose implementation and recorded
 site both fail to resolve reports both reasons.
 
-`complete` requires the facts channel to be present with no omission scoped to
-the queried declarations, and every impacted module and
-recorded check site resolved; `partial` carries the reasons; `unavailable` means
-no usable facts channel was configured or loaded, which is distinct from a
-complete empty result.
+Each target has its own status. `complete` requires the facts channel to be
+present with no omission scoped to that declaration, and every impacted module
+and recorded check site resolved; `partial` carries the reasons; `unavailable`
+means no usable facts channel was configured or loaded, which is distinct from
+a complete empty result.
 
 ### `signature-help -position <position>`
 

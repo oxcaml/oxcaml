@@ -12,8 +12,6 @@ module Dependency_analysis : sig
   val create : Facts.t -> t
 
   val query_family : t -> Shape.Uid.t -> result
-
-  val global_omissions : t -> Facts.Omission.t list
 end = struct
   module Context = Facts.Context
   module Key = Facts.Key
@@ -450,8 +448,6 @@ end = struct
       in
       query_seeds t ~queried_families seeds
 
-  let global_omissions t =
-    List.sort_uniq ~cmp:Facts.Omission.compare t.global_omissions
 end
 
 let { Logger.log } = Logger.for_section "module-type-impls"
@@ -952,16 +948,6 @@ let query_results engine targets =
       in
       (target, result))
 
-let query_omissions engine results =
-  match (engine, results) with
-  | None, _ -> []
-  | Some engine, [] -> Dependency_analysis.global_omissions engine
-  | Some _, _ :: _ ->
-    List.concat_map results
-      ~f:(fun ((_, result) : target * Dependency_analysis.result) ->
-        result.omissions)
-    |> List.sort_uniq ~cmp:Facts.Omission.compare
-
 let query ~pipeline (typedtree : Mtyper.typedtree) =
   let open Query_protocol.Module_type_impls in
   let mconfig = Mpipeline.final_config pipeline in
@@ -975,9 +961,27 @@ let query ~pipeline (typedtree : Mtyper.typedtree) =
     | Some (Some facts) -> Some (Dependency_analysis.create facts)
   in
   let results = query_results engine targets in
-  let omissions = query_omissions engine results in
-  let implementations, resolution_reasons =
-    resolve_impacts ~mconfig ~own_file results
+  let targets, implementations =
+    List.split
+      (List.map results
+         ~f:(fun ((target, result) as target_result) ->
+           let implementations, resolution_reasons =
+             resolve_impacts ~mconfig ~own_file [target_result]
+           in
+           let status, reasons =
+             status_and_reasons ~index_files
+               ~facts_present:(Option.is_some facts)
+               ~omissions:result.omissions ~resolution_reasons
+           in
+           ( { target = target.target_name;
+               target_loc = Helpers.location_in_file own_file target.target_loc;
+               status;
+               reasons
+             },
+             implementations )))
+  in
+  let implementations =
+    List.concat implementations |> List.sort_uniq ~cmp:compare_implementation
   in
   let implementations =
     match own_interface_implementation mconfig ~own_file typedtree with
@@ -986,14 +990,6 @@ let query ~pipeline (typedtree : Mtyper.typedtree) =
       List.sort_uniq ~cmp:compare_implementation
         (own_interface :: implementations)
   in
-  let status, reasons =
-    status_and_reasons ~index_files ~facts_present:(Option.is_some facts)
-      ~omissions ~resolution_reasons
-  in
-  log ~title:"query" "%d targets, %d rows, status %s" (List.length targets)
-    (List.length implementations)
-    (match status with
-    | Complete -> "complete"
-    | Partial -> "partial"
-    | Unavailable -> "unavailable");
-  { status; reasons; implementations }
+  log ~title:"query" "%d targets, %d rows" (List.length targets)
+    (List.length implementations);
+  { targets; implementations }
