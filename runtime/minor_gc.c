@@ -657,6 +657,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
     for( curr_idx = 0, c = participating_idx;
          curr_idx < participating_count; curr_idx++) {
       caml_domain_state* foreign_domain = participating[c];
+      c = (c+1) % participating_count;
 
       struct caml_minor_tables* foreign_minor_tables =
                                                  foreign_domain->minor_tables;
@@ -682,6 +683,8 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
       if( curr_idx == participating_count-1 ) {
         ref_end = foreign_major_ref->ptr;
       }
+      if (ref_start == ref_end)
+        continue;
 
       CAML_GC_MESSAGE(MINOR,
                       "Oldifying foreign refs from domain %d, count %"
@@ -701,8 +704,6 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
         oldify_one (&st, *pr, pr);
         remembered_roots++;
       }
-
-      c = (c+1) % participating_count;
     }
   }
   else
