@@ -6,7 +6,7 @@ fail() { echo "check failed: $1"; exit ${TEST_FAIL}; }
 # naming wrappers.  The wrappers are annotations only ("this value used to
 # be called <foo>"): the named variables need no binding, so no phantom
 # lets are required for the inlined locals.
-grep -qF "normal_var_optimized_out" "$file" || fail "no normal_var_optimized_out wrappers"
+grep -qF "normal_var_optimised_out" "$file" || fail "no normal_var_optimised_out wrappers"
 for v in sum1 doubled diff; do
   grep -qF "$v" "$file" || fail "no trace of inlined local $v"
 done

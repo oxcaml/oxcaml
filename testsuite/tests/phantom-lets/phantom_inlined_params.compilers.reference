@@ -23,7 +23,7 @@
              (is_parameter local))]: int) : int
  (+
    (*
-     (normal_var_optimized_out
+     (normal_var_optimised_out
        ((module_path s/355) (location ()) (original_ident s/355)
         (is_parameter local))
        (+ (+ a/353 b/354) -2))
@@ -43,7 +43,7 @@
       42)
    (+
      (*
-       (normal_var_optimized_out
+       (normal_var_optimised_out
          ((module_path s/361) (location ()) (original_ident s/361)
           (is_parameter local))
          (+ x/358 83))

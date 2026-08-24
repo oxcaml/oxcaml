@@ -22,7 +22,7 @@
        (Popaque/493
           (opaque
             (phantom_add_equality s_pproxy/491
-              (normal_var_optimized_out
+              (normal_var_optimised_out
                 ((module_path s/490) (location ()) (original_ident s/490)
                  (is_parameter local))
                 (+ x/488 2))))

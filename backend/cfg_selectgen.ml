@@ -64,7 +64,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
     | Cphantom_let (_var, _defining_expr, body) -> is_simple_expr body
-    | Cnormal_var_optimized_out (_, body) -> is_simple_expr body
+    | Cnormal_var_optimised_out (_, body) -> is_simple_expr body
     | Csequence (e1, e2) -> is_simple_expr e1 && is_simple_expr e2
     | Cop (op, args, _) -> (
       match op with
@@ -117,7 +117,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
     | Cphantom_let (_var, _defining_expr, body) -> effects_of body
-    | Cnormal_var_optimized_out (_, body) -> effects_of body
+    | Cnormal_var_optimised_out (_, body) -> effects_of body
     | Csequence (e1, e2) -> EC.join (effects_of e1) (effects_of e2)
     | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
       EC.join (effects_of cond) (EC.join (effects_of ifso) (effects_of ifnot))
@@ -804,7 +804,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cphantom_let (var, defining_expr, body) ->
       let env = SU.env_add_phantom_let var defining_expr env in
       emit_expr env sub_cfg body ~bound_name
-    | Cnormal_var_optimized_out (provenance, body) -> (
+    | Cnormal_var_optimised_out (provenance, body) -> (
       match emit_expr env sub_cfg body ~bound_name with
       | Never_returns -> Never_returns
       | Ok regs ->
@@ -881,7 +881,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cphantom_let (var, defining_expr, body) ->
       let env = SU.env_add_phantom_let var defining_expr env in
       emit_tail env sub_cfg body
-    | Cnormal_var_optimized_out (_, body) -> emit_tail env sub_cfg body
+    | Cnormal_var_optimised_out (_, body) -> emit_tail env sub_cfg body
     | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
       ->
       emit_tail_apply env sub_cfg ty op args dbg

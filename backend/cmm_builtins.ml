@@ -86,7 +86,7 @@ let shift ~bits make_op arg count dbg =
     | Cvar _
     | Clet (_, _, _)
     | Cphantom_let (_, _, _)
-    | Cnormal_var_optimized_out _ | Ctuple _
+    | Cnormal_var_optimised_out _ | Ctuple _
     | Cop (_, _, _)
     | Csequence (_, _)
     | Cifthenelse (_, _, _, _, _, _)

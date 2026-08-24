@@ -390,7 +390,7 @@ let exported_offsets t = t.offsets
 let gen_variable ~debug_uid ~needed_by_phantom_let v =
   (* Binders marked as needed by phantom lets are treated like user-visible ones
      here: the provenance causes [Name_for_debugger] operations to be emitted
-     during instruction selection (including via [Cnormal_var_optimized_out]),
+     during instruction selection (including via [Cnormal_var_optimised_out]),
      without which the phantom lets' references to such variables could not be
      resolved by the debugger. *)
   let user_visible = Variable.user_visible v || needed_by_phantom_let in
@@ -519,8 +519,8 @@ let rec is_cmm_simple cmm =
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
   | Cconst_symbol _ | Cvar _ ->
     true
-  | Cnormal_var_optimized_out (_, body) ->
-    (* [Cnormal_var_optimized_out] is transparent for the purposes of deciding
+  | Cnormal_var_optimised_out (_, body) ->
+    (* [Cnormal_var_optimised_out] is transparent for the purposes of deciding
        simplicity: it binds nothing and generates no code beyond that of its
        body. *)
     is_cmm_simple body
@@ -944,7 +944,7 @@ let bind_phantom_variable env res var defining_expr =
 (* Variable lookup (for potential inlining) *)
 
 (* When a binding is inlined and phantom lets are enabled, the inlined
-   expression is wrapped in [Cnormal_var_optimized_out] so that instruction selection
+   expression is wrapped in [Cnormal_var_optimised_out] so that instruction selection
    can emit a naming operation associating the value with the variable's name.
    The wrapper is an annotation only, carrying just the variable's provenance:
    no [Backend_var.t] is involved (the variable may end up bound nowhere), so
@@ -964,7 +964,7 @@ let wrap_phantom ~phantomize ~phantom_proxies cmm_var cmm_expr free_vars =
     else
       match Backend_var.With_provenance.provenance cmm_var with
       | None -> cmm_expr
-      | Some provenance -> Cmm.Cnormal_var_optimized_out (provenance, cmm_expr)
+      | Some provenance -> Cmm.Cnormal_var_optimised_out (provenance, cmm_expr)
   in
   (* If the variable being inlined out has a phantom proxy, the inlined
      expression also supplies the proxy's value: the [Cphantom_add_equality] is

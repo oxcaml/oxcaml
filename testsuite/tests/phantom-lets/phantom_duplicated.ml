@@ -16,7 +16,7 @@
    defining expression is trivially simple Cmm (a variable) and the
    binding is classified must-inline-and-duplicate: it is substituted at
    both use sites, one per branch.  Each duplicated copy carries its own
-   [Cphantom_add_equality] for [b]'s proxy (and [Cnormal_var_optimized_out]
+   [Cphantom_add_equality] for [b]'s proxy (and [Cnormal_var_optimised_out]
    annotation), supplying the proxy's value on that path; re-marking with
    the same value is idempotent.  The proxy's binder sits, without a
    value, next to the pair's phantom let before the fork.  The whole Cmm

@@ -137,7 +137,7 @@ let rec check env (expr : Cmm.expression) =
     check env body
   | Cphantom_let (_, _, expr) ->
     check env expr
-  | Cnormal_var_optimized_out (_, expr) ->
+  | Cnormal_var_optimised_out (_, expr) ->
     check env expr
   | Ctuple exprs ->
     List.iter (check env) exprs

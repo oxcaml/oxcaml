@@ -18,7 +18,7 @@
 (* The locals of an inlined function whose defining expressions are
    substituted into their use sites must remain visible to the debugger:
    the substituted expressions are wrapped in naming constructs
-   ([normal_var_optimized_out] in the -dcmm output).  The wrappers are annotations
+   ([normal_var_optimised_out] in the -dcmm output).  The wrappers are annotations
    only, from which instruction selection produces naming operations; the
    named variables do not require bindings (in particular, no phantom
    lets). *)
