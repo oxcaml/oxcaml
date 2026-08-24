@@ -683,14 +683,23 @@ let json_of_response (type a) (query : a t) (response : a) : json =
             ("site", `String site)
           ]
     in
+    let json_of_status = function
+      | Query_protocol.Module_type_impls.Complete -> "complete"
+      | Partial -> "partial"
+      | Unavailable -> "unavailable"
+    in
+    let json_of_target_result
+        (target : Query_protocol.Module_type_impls.target_result) =
+      `Assoc
+        [ ("target", `String target.target);
+          ("decl", json_of_loc target.target_loc);
+          ("status", `String (json_of_status target.status));
+          ("reasons", `List (List.map target.reasons ~f:json_of_reason))
+        ]
+    in
     `Assoc
-      [ ( "status",
-          `String
-            (match response.status with
-            | Complete -> "complete"
-            | Partial -> "partial"
-            | Unavailable -> "unavailable") );
-        ("reasons", `List (List.map response.reasons ~f:json_of_reason));
+      [ ( "targets",
+          `List (List.map response.targets ~f:json_of_target_result) );
         ( "implementations",
           `List (List.map response.implementations ~f:json_of_implementation) )
       ]
