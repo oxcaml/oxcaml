@@ -243,7 +243,6 @@ module Module_type_impls = struct
   type reason =
     | No_index_files
     | Channel_absent
-    | Reader_problem of string
     | Omission of { family : string option; reason : string }
     | Unresolved_implementation of
         { target : string;
