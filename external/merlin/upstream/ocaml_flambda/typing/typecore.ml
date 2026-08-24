@@ -1215,16 +1215,30 @@ let mode_annots_from_pat pat =
 
 (* CR-someday: This function should be migrated to use the new mode
    error system instead of the ad-hoc [Mode_mismatch] error variant. *)
-let apply_mode_annots ~loc ~env kind (m : Alloc.Const.Option.t) mode =
+let apply_mode_annots ~loc ~env kind
+    (m : Alloc.Const.Option.t Typemode.modes) mode =
   let error axis =
     raise (Error(loc, env, Mode_mismatch (kind, axis)))
   in
-  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
-  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
-  (match Alloc.submode (Alloc.of_const min) mode with
+  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
+  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
+  let loc =
+    if List.is_empty m.mode_desc then loc else
+    Location.merge (List.map (fun a -> a.loc) m.mode_desc)
+  in
+  let written_modes =
+    List.map
+      (Location.map (fun (Alloc.Atom (axis, mode)) ->
+         Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode))
+      m.mode_desc
+  in
+  let hint = Hint.Annotation { loc; written_modes } in
+  let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
+  let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
+  (match Alloc.submode min mode with
   | Ok () -> ()
   | Error e -> error (Left_le_right, e));
-  (match Alloc.submode mode (Alloc.of_const max) with
+  (match Alloc.submode mode max with
   | Ok () -> ()
   | Error e -> error (Right_le_left, e))
 
@@ -5535,6 +5549,9 @@ let loc_rest_of_function
    this, let's talk. *)
 let approx_type_default () = newvar (Jkind.Builtin.any ~why:Dummy_jkind)
 
+let alloc_mode_annot_empty : Alloc.Const.Option.t Typemode.modes =
+  { mode_desc = []; mode_modes = Alloc.Const.Option.none }
+
 let rec approx_type env sty =
   match sty.ptyp_desc with
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
@@ -5643,7 +5660,7 @@ let type_approx_fun_one_param
   in
   Option.iter
     (fun mode_annots ->
-      apply_mode_annots ~loc ~env Parameter mode_annots.mode_modes arg_mode)
+      apply_mode_annots ~loc ~env Parameter mode_annots arg_mode)
     mode_annots;
   if has_poly then begin
     match spato with
@@ -9406,8 +9423,8 @@ and type_function
         split_function_ty env expected_mode ty_expected loc
           ~is_first_val_param:first ~is_final_val_param
           ~arg_label:typed_arg_label ~in_function ~has_poly
-          ~mode_annots:mode_annots.mode_modes
-          ~ret_mode_annots:ret_mode_annots.mode_modes
+          ~mode_annots:mode_annots
+          ~ret_mode_annots:ret_mode_annots
       in
       (* [ty_arg_internal] is the type of the parameter viewed internally
          to the function. This is different than [ty_arg_mono] exactly for
@@ -11308,8 +11325,8 @@ and type_function_cases_expect
           ty_arg_mono; expected_pat_mode; expected_inner_mode; alloc_mode;
         } =
       split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
-        ~in_function ~has_poly:false ~mode_annots:Mode.Alloc.Const.Option.none
-        ~ret_mode_annots:Mode.Alloc.Const.Option.none
+        ~in_function ~has_poly:false ~mode_annots:alloc_mode_annot_empty
+        ~ret_mode_annots:alloc_mode_annot_empty
         ~is_first_val_param:first ~is_final_val_param:true
     in
     let cases, partial =
