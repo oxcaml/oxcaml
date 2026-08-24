@@ -253,9 +253,15 @@ module Module_type_impls = struct
     | Unresolved_check_site of
         { target : string; witness : string; site : string }
 
+  type target_result =
+    { target : string;
+      target_loc : Location.t;
+      status : status;
+      reasons : reason list
+    }
+
   type response =
-    { status : status;
-      reasons : reason list;
+    { targets : target_result list;
       implementations : implementation list
     }
 end
