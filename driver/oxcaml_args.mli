@@ -76,8 +76,6 @@ module type Oxcaml_options = sig
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
-  val frametables_in_rodata : unit -> unit
-  val no_frametables_in_rodata : unit -> unit
   val heap_reduction_threshold : int -> unit
   val zero_alloc_check : string -> unit
   val zero_alloc_assert : string -> unit
@@ -215,8 +213,6 @@ end
 
 (** Command line arguments required for ocamlopt.*)
 module type Debugging_options = sig
-  val restrict_to_upstream_dwarf : unit -> unit
-  val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
   val ddebug_avail_sets : unit -> unit

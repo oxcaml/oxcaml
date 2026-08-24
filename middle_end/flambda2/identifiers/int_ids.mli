@@ -21,7 +21,7 @@
 module Const : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S with type t := t
 
@@ -101,15 +101,15 @@ module Const : sig
 
   val descr : t -> Descr.t
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import : importer -> t -> t
 end
 
 module Variable : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S_plus_iterator with type t := t
 
@@ -134,9 +134,9 @@ module Variable : sig
 
   val user_visible : t -> bool
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import : importer -> t -> t
 
   val export_name_stamp_counter : unit -> int
 
@@ -146,7 +146,7 @@ end
 module Symbol : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S_plus_iterator with type t := t
 
@@ -167,9 +167,9 @@ module Symbol : sig
 
   val linkage_name_as_string : t -> string
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import : importer -> t -> t
 
   val external_symbols_compilation_unit : unit -> Compilation_unit.t
 end
@@ -201,7 +201,7 @@ module Coercion :
 module Simple : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S_plus_iterator with type t := t
 
@@ -234,15 +234,21 @@ module Simple : sig
      [same s (with_coercion s coercion)] returns true *)
   val same : t -> t -> bool
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import :
+    importer ->
+    t ->
+    import_const:(Const.t -> Const.t) ->
+    import_symbol:(Symbol.t -> Symbol.t) ->
+    import_var:(Variable.t -> Variable.t) ->
+    t
 end
 
 module Code_id : sig
   type t = private Table_by_int_id.Id.t
 
-  type exported
+  type importer
 
   include Container_types.S with type t := t
 
@@ -268,9 +274,9 @@ module Code_id : sig
 
   val invert_map : t Map.t -> t Map.t
 
-  val export : t -> exported
+  val export : Set.t -> importer
 
-  val import : exported -> t
+  val import : importer -> t -> t
 
   val export_name_stamp_counter : unit -> int
 

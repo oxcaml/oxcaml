@@ -17,12 +17,12 @@
 (** Contents of middle-end-specific portion of .cmx files when using Flambda. *)
 
 type table_data =
-  { symbols : (Symbol.t * Symbol.exported) list;
-    variables : (Variable.t * Variable.exported) list;
-    simples : (Simple.t * Simple.exported) list;
-    consts : (Reg_width_const.t * Reg_width_const.exported) list;
-    code_ids : (Code_id.t * Code_id.exported) list;
-    continuations : (Continuation.t * Continuation.exported) list
+  { symbols : Symbol.importer;
+    variables : Variable.importer;
+    simples : Simple.importer;
+    consts : Reg_width_const.importer;
+    code_ids : Code_id.importer;
+    continuations : Continuation.importer
   }
 
 type t0 =
@@ -46,38 +46,12 @@ let to_raw ~sections (t : t0 list) =
   File_sections.Builder.add sections (Obj.repr t)
 
 let create_table_data (exported_ids : Ids_for_export.t) =
-  let symbols =
-    Symbol.Set.fold
-      (fun symbol symbols -> (symbol, Symbol.export symbol) :: symbols)
-      exported_ids.symbols []
-  in
-  let variables =
-    Variable.Set.fold
-      (fun variable variables ->
-        (variable, Variable.export variable) :: variables)
-      exported_ids.variables []
-  in
-  let simples =
-    Simple.Set.fold
-      (fun simple simples -> (simple, Simple.export simple) :: simples)
-      exported_ids.simples []
-  in
-  let consts =
-    Reg_width_const.Set.fold
-      (fun const consts -> (const, Reg_width_const.export const) :: consts)
-      exported_ids.consts []
-  in
-  let code_ids =
-    Code_id.Set.fold
-      (fun code_id code_ids -> (code_id, Code_id.export code_id) :: code_ids)
-      exported_ids.code_ids []
-  in
-  let continuations =
-    Continuation.Set.fold
-      (fun continuation continuations ->
-        (continuation, Continuation.export continuation) :: continuations)
-      exported_ids.continuations []
-  in
+  let symbols = Symbol.export exported_ids.symbols in
+  let variables = Variable.export exported_ids.variables in
+  let simples = Simple.export exported_ids.simples in
+  let consts = Reg_width_const.export exported_ids.consts in
+  let code_ids = Code_id.export exported_ids.code_ids in
+  let continuations = Continuation.export exported_ids.continuations in
   { symbols; variables; simples; consts; code_ids; continuations }
 
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
@@ -106,59 +80,13 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   in
   to_raw ~sections t
 
-module Make_importer (S : sig
-  type t
-
-  type exported
-
-  val import : exported -> t
-
-  include Container_types.S with type t := t
-end) : sig
-  val import : (S.t * S.exported) list -> S.t S.Map.t
-end = struct
-  let import from_table_data =
-    (* The returned map gives the hash collisions. *)
-    List.fold_left
-      (fun import_map (key, exported) ->
-        let new_key = S.import exported in
-        if key == new_key then import_map else S.Map.add key new_key import_map)
-      S.Map.empty from_table_data
-end
-[@@inline always]
-
-module Symbol_importer = Make_importer (Symbol)
-module Variable_importer = Make_importer (Variable)
-module Simple_importer = Make_importer (Simple)
-module Const_importer = Make_importer (Reg_width_const)
-module Code_id_importer = Make_importer (Code_id)
-module Continuation_importer = Make_importer (Continuation)
-
 let import_renaming ~table_data ~used_value_slots ~original_compilation_unit =
-  let symbols =
-    Profile.record_call ~accumulate:true "import_symbols" (fun () ->
-        Symbol_importer.import table_data.symbols)
-  in
-  let variables =
-    Profile.record_call ~accumulate:true "import_variables" (fun () ->
-        Variable_importer.import table_data.variables)
-  in
-  let simples =
-    Profile.record_call ~accumulate:true "import_simples" (fun () ->
-        Simple_importer.import table_data.simples)
-  in
-  let consts =
-    Profile.record_call ~accumulate:true "import_consts" (fun () ->
-        Const_importer.import table_data.consts)
-  in
-  let code_ids =
-    Profile.record_call ~accumulate:true "import_code_ids" (fun () ->
-        Code_id_importer.import table_data.code_ids)
-  in
-  let continuations =
-    Profile.record_call ~accumulate:true "import_continuations" (fun () ->
-        Continuation_importer.import table_data.continuations)
-  in
+  let symbols = table_data.symbols in
+  let variables = table_data.variables in
+  let simples = table_data.simples in
+  let consts = table_data.consts in
+  let code_ids = table_data.code_ids in
+  let continuations = table_data.continuations in
   let renaming =
     Profile.record_call ~accumulate:true "create_import_map" (fun () ->
         Renaming.create_import_map ~symbols ~variables ~simples ~consts

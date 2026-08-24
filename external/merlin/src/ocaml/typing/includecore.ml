@@ -434,7 +434,7 @@ type type_mismatch =
   | Extensible_representation of position
   | With_null_representation of position
   | Fixed_representation of position
-  | Jkind of Jkind.Violation.t
+  | Jkind of Ikind.subjkind_error
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
 type jkind_mismatch =
@@ -856,8 +856,13 @@ let report_type_mismatch first second decl env ppf err =
          (choose ord first second) decl
          "has a fixed representation while the other varies"
   | Jkind v ->
-      Jkind.Violation.report_with_name ~name:first
-        env ppf v
+      let report () =
+        Ikind.report_subjkind_error_with_name ~name:first env ppf v
+      in
+      (match Ikind.subjkind_error_printing_env v with
+       | None -> report ()
+       | Some printing_env ->
+         Printtyp.wrap_printing_env ~error:true printing_env report)
   | Unsafe_mode_crossing mismatch ->
     pr "They have different unsafe mode crossing behavior:@,@[<v 2>%a@]"
       (fun ppf (first, second, mismatch) ->
@@ -1076,9 +1081,9 @@ module Record_diffing = struct
       match record_form with
       | Legacy ->
         begin match rep1, rep2 with
-        | Record_variable, Record_variable -> None
-        | Record_variable, _ -> Some (Fixed_representation Second)
-        | _, Record_variable -> Some (Fixed_representation First)
+        | Record_undetermined, Record_undetermined -> None
+        | Record_undetermined, _ -> Some (Fixed_representation Second)
+        | _, Record_undetermined -> Some (Fixed_representation First)
 
         | Record_unboxed, Record_unboxed -> None
         | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
@@ -1119,16 +1124,25 @@ module Record_diffing = struct
         | Record_dummy _, _ | _, Record_dummy _ ->
           Misc.fatal_error
             "compare_with_representation: dummy record representation"
+        | Record_variable _, _
+        | _, Record_variable _ ->
+          Misc.fatal_error
+            "compare_with_representation: instantiated record representation"
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
-        | Record_unboxed_product_variable, Record_unboxed_product_variable
+        | Record_unboxed_product_undetermined,
+          Record_unboxed_product_undetermined
         | Record_unboxed_product, Record_unboxed_product ->
             None
-        | Record_unboxed_product, Record_unboxed_product_variable ->
+        | Record_unboxed_product, Record_unboxed_product_undetermined ->
             Some (Fixed_representation First)
-        | Record_unboxed_product_variable, Record_unboxed_product ->
+        | Record_unboxed_product_undetermined, Record_unboxed_product ->
             Some (Fixed_representation Second)
+        | Record_unboxed_product_variable _, _
+        | _, Record_unboxed_product_variable _ ->
+            Misc.fatal_error
+              "compare_with_representation: instantiated record representation"
         end
 end
 
@@ -1300,7 +1314,7 @@ module Variant_diffing = struct
     =
     let shape_of_layout = function
       | Cstr_layout_known { shape; _ } -> Some shape
-      | Cstr_layout_variable -> None
+      | Cstr_layout_undetermined -> None
     in
     let shapes1, shapes2 =
       match rep1, rep2 with

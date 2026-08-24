@@ -159,7 +159,15 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   in
   Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
 
-let argument_types_useful dacc apply =
+type argument_types_useful =
+  | Coarse
+  | Fine
+
+let argument_types_useful =
+  Oxcaml_args.Extra_options.symbol __LOC__ "argument-types-useful" Coarse
+    ["coarse", Coarse; "fine", Fine]
+
+let argument_types_useful dacc ~apply ~code_metadata =
   if
     not
       (Flambda_features.Inlining.speculative_inlining_only_if_arguments_useful
@@ -167,14 +175,40 @@ let argument_types_useful dacc apply =
   then true
   else
     let typing_env = DE.typing_env (DA.denv dacc) in
-    List.exists
-      (fun simple ->
-        Simple.pattern_match simple
-          ~name:(fun name ~coercion:_ ->
-            let ty = TE.find typing_env name None in
-            not (T.is_unknown_maybe_null typing_env ty))
-          ~const:(fun _ -> true))
-      (Apply.args apply)
+    match argument_types_useful () with
+    | Coarse ->
+      List.exists
+        (fun simple ->
+          Simple.pattern_match simple
+            ~name:(fun name ~coercion:_ ->
+              let ty = TE.find typing_env name None in
+              not (T.is_unknown_maybe_null typing_env ty))
+            ~const:(fun _ -> true))
+        (Apply.args apply)
+    | Fine ->
+      let arity = Code_metadata.params_arity code_metadata in
+      List.exists2
+        (fun full_kind simple ->
+          Simple.pattern_match simple
+            ~name:(fun name ~coercion:_ ->
+              T.type_is_useful full_kind typing_env name)
+            ~const:(fun const ->
+              (* If the kind already restricts the possible values to a single
+                 constant (e.g. unit type), even a constant can be not
+                 useful. *)
+              match Reg_width_const.is_tagged_immediate const with
+              | None -> true
+              | Some const ->
+                not
+                  (Flambda_kind.With_subkind.equal full_kind
+                     (Flambda_kind.With_subkind.create Flambda_kind.value
+                        (Variant
+                           { consts = Target_ocaml_int.Set.singleton const;
+                             non_consts = Tag.Scannable.Map.empty
+                           })
+                        Non_nullable))))
+        (Flambda_arity.unarize arity)
+        (Apply.args apply)
 
 let inlining_does_decrease_code_size ~code_metadata cost_metrics =
   let[@ocamlformat "break-infix=fit-or-vertical"] original_code_size =
@@ -246,7 +280,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               "Unexpected call site inlinine decision for speculative inlining";
           counters)
       (fun () : Call_site_inlining_decision_type.t ->
-        if not (argument_types_useful dacc apply)
+        if not (argument_types_useful dacc ~apply ~code_metadata)
         then Argument_types_not_useful
         else if not (code_present ())
         then Missing_code

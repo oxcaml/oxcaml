@@ -90,8 +90,6 @@ let flat_suffix t = t.suffix
 
 let value_prefix_len t = Array.length t.prefix
 
-let flat_suffix_len t = Array.length t.suffix
-
 let flattened_reordered_shape t = Array.map fst t.flattened_reordered_shape
 
 let print_indentation ppf k =

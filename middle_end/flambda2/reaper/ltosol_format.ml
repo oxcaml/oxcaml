@@ -287,7 +287,7 @@ end = struct
        pruning, which is only consulted when rewriting Flambda types, and the
        solution contains no types. [code_ids] is only needed by
        [Exported_code.apply_renaming], and the solution contains no code. *)
-    let renaming, (_code_ids : Code_id.t Code_id.Map.t) =
+    let renaming, (_code_ids : Code_id.importer) =
       Flambda_cmx_format.import_renaming ~table_data
         ~used_value_slots:Value_slot.Set.empty
         ~original_compilation_unit:(Symbol.external_symbols_compilation_unit ())

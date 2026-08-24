@@ -103,4 +103,19 @@ struct
   let find t id =
     assert (Id.flags id = E.flags);
     HT.find t id
+
+  (* We serialize a table using the exact same format we use in memory, except
+     that we only store the data for the exported elements. *)
+  type serializable = E.t HT.t
+
+  let export t ~iter =
+    let exported = HT.create 0 in
+    iter (fun id -> HT.replace exported id (find t id));
+    exported
+
+  let import t id =
+    assert (Id.flags id = E.flags);
+    try HT.find t id
+    with Not_found ->
+      Misc.fatal_error "Id was not exported from this compilation unit."
 end

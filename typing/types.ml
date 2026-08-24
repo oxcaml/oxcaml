@@ -28,6 +28,11 @@ module Rigid_name = struct
         }
     | KAtom of Path.t
     | Param of int
+    | Provenance of
+        { id : int;
+          ty : Format_doc.doc;
+          plural : bool
+        }
     | Unknown of unknown_id
 
   let compare a b =
@@ -40,13 +45,16 @@ module Rigid_name = struct
         if h != 0 then h else Int.compare a1.arg_index a2.arg_index
       | KAtom p1, KAtom p2 -> Path.compare p1 p2
       | Param x, Param y -> Int.compare x y
+      | Provenance x, Provenance y -> Int.compare x.id y.id
       | Atom _, _ -> -1
       | _, Atom _ -> 1
       | KAtom _, _ -> -1
       | _, KAtom _ -> 1
+      | Param _, _ -> -1
+      | _, Param _ -> 1
+      | Provenance _, _ -> -1
+      | _, Provenance _ -> 1
       | Unknown x, Unknown y -> Shape.Uid.compare x y
-      | Unknown _, _ -> 1
-      | _, Unknown _ -> -1
 
   let to_string = function
     | Atom { constr; arg_index } ->
@@ -56,6 +64,8 @@ module Rigid_name = struct
       let path_s = Format_doc.asprintf "%a" Path.print path in
       Printf.sprintf "katom[%s]" path_s
     | Param i -> Printf.sprintf "param[%d]" i
+    | Provenance { id; ty; plural = _ } ->
+      Format_doc.asprintf "provenance[%d:%a]" id Format_doc.pp_doc ty
     | Unknown id ->
       Format.asprintf "unknown[%a]" Shape.Uid.print id
 
@@ -64,6 +74,8 @@ module Rigid_name = struct
   let katom path = KAtom path
 
   let param i = Param i
+
+  let provenance ~id ~ty ~plural = Provenance { id; ty; plural }
 
   let unknown uid = Unknown uid
 end
@@ -525,11 +537,13 @@ and record_representation =
   | Record_ufloat
   | Record_mixed of mixed_product_shape
   | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
-  | Record_variable
+  | Record_undetermined
+  | Record_variable of (Jkind_types.Sort.t * type_expr) array
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
-  | Record_unboxed_product_variable
+  | Record_unboxed_product_undetermined
+  | Record_unboxed_product_variable of Jkind_types.Sort.t array
 
 and variant_representation =
   | Variant_unboxed
@@ -542,12 +556,13 @@ and cstr_layout =
       { shape : constructor_representation;
         sorts : Jkind_types.Sort.Const.t array;
       }
-  | Cstr_layout_variable
+  | Cstr_layout_undetermined
 
 and constructor_representation =
   | Constructor_uniform_value
   | Constructor_mixed of mixed_product_shape
-  | Constructor_variable
+  | Constructor_undetermined
+  | Constructor_variable of (Jkind_types.Sort.t * type_expr) array
 
 and label_declaration =
   {
@@ -942,8 +957,14 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
-  | Constructor_variable, Constructor_variable -> true
-  | (Constructor_mixed _ | Constructor_uniform_value | Constructor_variable), _
+  | Constructor_undetermined, Constructor_undetermined -> true
+  (* [Constructor_variable] only appears in the typedtree, never in a decl. *)
+  | Constructor_variable _, _ | _, Constructor_variable _ ->
+      Misc.fatal_error
+        "equal_constructor_representation_up_to_scannable_axes: variable \
+         representation"
+  | (Constructor_mixed _ | Constructor_uniform_value
+    | Constructor_undetermined), _
     -> false
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
@@ -953,12 +974,12 @@ let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Variant_boxed layouts1, Variant_boxed layouts2 ->
       Misc.Stdlib.Array.equal
         (fun l1 l2 -> match l1, l2 with
-           | Cstr_layout_variable, Cstr_layout_variable -> true
+           | Cstr_layout_undetermined, Cstr_layout_undetermined -> true
            | Cstr_layout_known { shape = s1; sorts = ss1 },
              Cstr_layout_known { shape = s2; sorts = ss2 } ->
              equal_constructor_representation_up_to_scannable_axes s1 s2
              && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal ss1 ss2
-           | (Cstr_layout_known _ | Cstr_layout_variable), _ -> false)
+           | (Cstr_layout_known _ | Cstr_layout_undetermined), _ -> false)
         layouts1
         layouts2
   | Variant_extensible, Variant_extensible ->
@@ -988,16 +1009,30 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_dummy { represent_as_float_array = a1; flatten_floats = b1 },
     Record_dummy { represent_as_float_array = a2; flatten_floats = b2 } ->
       Bool.equal a1 a2 && Bool.equal b1 b2
-  | Record_variable, Record_variable -> true
+  | Record_undetermined, Record_undetermined -> true
+  (* [Record_variable] only appears in the typedtree, never in a decl. *)
+  | Record_variable _, _ | _, Record_variable _ ->
+      Misc.fatal_error
+        "equal_record_representation_up_to_scannable_axes: variable \
+         representation"
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_variable), _ ->
+    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_undetermined),
+    _ ->
       false
 
 let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
   match r1, r2 with
   | Record_unboxed_product, Record_unboxed_product
-  | Record_unboxed_product_variable, Record_unboxed_product_variable -> true
-  | (Record_unboxed_product | Record_unboxed_product_variable), _ -> false
+  | Record_unboxed_product_undetermined, Record_unboxed_product_undetermined
+    -> true
+  (* [Record_unboxed_product_variable] only appears in the typedtree, never in
+     a decl. *)
+  | Record_unboxed_product_variable _, _
+  | _, Record_unboxed_product_variable _ ->
+      Misc.fatal_error
+        "equal_record_unboxed_product_representation_up_to_scannable_axes: \
+         variable representation"
+  | (Record_unboxed_product | Record_unboxed_product_undetermined), _ -> false
 
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
@@ -1035,15 +1070,17 @@ let find_unboxed_type decl =
        Record_inlined (_, _, Variant_unboxed), _)
   | Type_record_unboxed_product
       ([{ld_type = arg; ld_modalities = ms; _ }],
-       (Record_unboxed_product | Record_unboxed_product_variable), _)
+       (Record_unboxed_product | Record_unboxed_product_undetermined), _)
   | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
-                    | Record_mixed _ | Record_dummy _ | Record_variable), _)
+                    | Record_mixed _ | Record_dummy _ | Record_undetermined
+                    | Record_variable _), _)
   | Type_record_unboxed_product
-      (_, (Record_unboxed_product | Record_unboxed_product_variable), _)
+      (_, (Record_unboxed_product | Record_unboxed_product_undetermined
+          | Record_unboxed_product_variable _), _)
   | Type_variant (_, ( Variant_boxed _ | Variant_unboxed
                      | Variant_extensible | Variant_with_null), _)
   | Type_abstract _ | Type_open ->

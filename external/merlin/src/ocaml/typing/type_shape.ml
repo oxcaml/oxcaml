@@ -169,8 +169,8 @@ module Type_shape = struct
       | None -> f path ~args
   end
 
-  let is_above_of_type_expr_max_depth depth =
-    match !Clflags.gdwarf_config_max_type_to_shape_depth with
+  let[@inline] is_above_of_type_expr_max_depth depth =
+    match !Clflags.type_to_shape_max_depth with
     | None -> false
     | Some max_depth -> depth > max_depth
 
@@ -237,10 +237,6 @@ module Type_shape = struct
           | Ttuple exprs -> Shape.tuple (of_expr_list (List.map snd exprs))
           | Tvar { name = _; jkind } -> unknown_shape_from_jkind jkind
           | Tpoly (type_expr, _type_vars) ->
-            (* CR sspies: At the moment, we simply ignore the polymorphic
-               variables.
-               This code used to only work for [_type_vars = []]. Consider
-               alternatively introducing abstractions here? *)
             of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
           | Trepr (type_expr, _sort_vars) ->
             (* CR layout-polymorphism aivaskovic: sort variables do not
@@ -252,36 +248,11 @@ module Type_shape = struct
             unknown_shape_value
             (* Objects are currently not supported in the debugger. *)
           | Tlink _ | Tsubst _ ->
-            if !Clflags.dwarf_pedantic
-            then
-              let str =
-                match desc with
-                | Tlink _ -> "Tlink"
-                | Tsubst _ -> "Tsubst"
-                | Tnil | Tvar _
-                | Tarrow (_, _, _, _)
-                | Ttuple _ | Tunboxed_tuple _
-                | Tconstr (_, _, _)
-                | Tmod (_, _)
-                | Tobject (_, _)
-                | Tfield (_, _, _, _)
-                | Tvariant _ | Tunivar _
-                | Tpoly (_, _)
-                | Trepr (_, _)
-                | Tpackage _ | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _
-                | Tbox _ ->
-                  assert false
-              in
-              Misc.fatal_errorf
-                "Linking and substitution should not reach this stage. Found \
-                 %s type in file %s."
-                str
-                (match Current_unit.get_cu () with
-                | None -> "<unknown>"
-                | Some cu -> Compilation_unit.full_path_as_string cu)
-              (* We cannot access the type printer here, so this
-                 is the best we can do for now. *)
-            else unknown_shape_any
+            (* These cases should be impossible, since [Tlink] is an indirection
+               used by the unification engine and [Tsubst] is used temporarily
+               during type instantiation or copying. See [type_desc] in
+               [typing/types.mli] for more information. *)
+            unknown_shape_any
           | Tvariant rd ->
             let row_fields = Types.row_fields rd in
             let row_fields =
@@ -353,8 +324,8 @@ module Type_decl_shape = struct
       Layout.Product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
 
-  let of_complex_constructor type_subst name
-      (cstr_args : Types.constructor_declaration) arg_layout shape_for_constr =
+  let of_constructor type_subst name (cstr_args : Types.constructor_declaration)
+      arg_layout shape_for_constr =
     let args =
       match cstr_args.cd_args with
       | Cstr_tuple list ->
@@ -386,48 +357,26 @@ module Type_decl_shape = struct
       | Cstr_layout_known { shape = constructor_repr; _ } -> (
         match (constructor_repr : Types.constructor_representation) with
         | Constructor_mixed shapes ->
-          List.iter2
-            (fun mix_shape { Shape.field_name = _; field_value = _, ly } ->
-              let ly2 = mixed_block_shape_to_layout mix_shape in
-              match ly with
-              | Some ly when not (Layout.equal ly ly2) ->
-                if !Clflags.dwarf_pedantic
-                then
-                  Misc.fatal_errorf_doc
-                    "Type_shape: variant constructor with mismatched layout, \
-                     has %a but expected %a"
-                    Layout.format ly Layout.format ly2
-                else ()
-              | _ -> ())
-            (Array.to_list shapes) args;
+          (* We trust the type system here that the layouts in [Construct_mixed]
+           are the same layouts as the ones attached to the arguments in
+           [cstr_args]. *)
           Array.map
             (fun mix_shape ->
               Layout.some (mixed_block_shape_to_layout mix_shape))
             shapes
         | Constructor_uniform_value ->
+          (* We trust the type system here to restrict the arguments to [Value] or
+           [Void] layout. *)
           let lys =
             List.map
-              (fun { Shape.field_name = _; field_value = _, ly } ->
-                match ly with
-                | Some ly
-                  when not
-                         (Layout.equal ly (Base Scannable)
-                         || Layout.equal ly (Base Void)) ->
-                  if !Clflags.dwarf_pedantic
-                  then
-                    Misc.fatal_errorf_doc
-                      "Type_shape: variant constructor with mismatched layout, \
-                       has %a but expected value or void."
-                      Layout.format ly
-                  else Layout.some (Base Scannable)
-                | _ -> ly)
+              (fun { Shape.field_name = _; field_value = _, ly } -> ly)
               args
           in
           Array.of_list lys
-        | Constructor_variable ->
+        | Constructor_undetermined | Constructor_variable _ ->
           Misc.fatal_error
             "Type_shape: unexpected variable constructor representation")
-      | Cstr_layout_variable ->
+      | Cstr_layout_undetermined ->
         Misc.Stdlib.Array.of_list_map
           (fun { Shape.field_name = _; field_uid = _; field_value = _, ly } ->
             ly)
@@ -494,8 +443,7 @@ module Type_decl_shape = struct
             List.map
               (fun ((cstr, arg_layouts) : Types.constructor_declaration * _) ->
                 let name = Ident.name cstr.cd_id in
-                of_complex_constructor type_subst name cstr arg_layouts
-                  shape_for_constr)
+                of_constructor type_subst name cstr arg_layouts shape_for_constr)
               cstrs_with_layouts
           in
           Shape.variant constructors
@@ -555,18 +503,13 @@ module Type_decl_shape = struct
             in
             record_of_labels ~shape_for_constr ~type_subst Record_floats
               lbl_list
-          | Record_inlined _ ->
-            if !Clflags.dwarf_pedantic
-            then
-              Misc.fatal_error
-                "Inlined records should not occur in type declarations, since \
-                 they only exist temporarily as the type of record arguments \
-                 inside of a match. For example, if [Foo] is the constructor \
-                 [Foo { a : int; b : int }], then [r] is an inline record in \
-                 [match e with Foo r -> ...]."
-            else unknown_shape ()
-          | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
-          | Record_variable -> unknown_shape ())
+          | Record_inlined _ | Record_dummy _ | Record_undetermined
+          | Record_variable _ ->
+            (* Inlined records should not occur in type declarations, since they
+               only exist temporarily as the type of record arguments inside of
+               a match. For example, for [Foo { a : int; b : int }], then [r] is
+               an inline record in [match e with Foo r -> ...] *)
+            unknown_shape ())
         | Type_abstract _ -> unknown_shape ()
         | Type_open -> unknown_shape ()
         | Type_record_unboxed_product (lbl_list, _, _) ->
@@ -595,9 +538,9 @@ module Type_decl_shape = struct
           chains.  We approximate closedness with the function
           [is_closed_shape] below.
 
-      For all other cases, we replace the type arguments with a leaf, which will
-      conceptually be handled as [Top], meaning the values of this type could
-      be any valid values of the corresponding layout).
+      For all other cases, we replace the type arguments with an unknown type
+      shape, which will conceptually be handled as [Top], meaning the values of
+      this type could be any valid values of the corresponding layout).
   *)
 
   let rec is_closed_type_shape shape =
@@ -694,8 +637,16 @@ module Type_decl_shape = struct
       of_type_declaration_go type_declaration type_param_shapes shape_for_constr
     in
     let decl_shape = Shape.abs_list definition type_param_idents in
-    Shape.set_uid_if_none decl_shape type_declaration.type_uid
+    (* Use the declaration's own uid even if the definition already carries
+       one: for manifests such as [type t = unit] or [type u = t], the
+       definition keeps the uid of the aliased type (or predef), and
+       uid-based tooling would attribute occurrences of the alias to the
+       aliased type instead. *)
+    Shape.set_uid decl_shape type_declaration.type_uid
 
+  (** [of_type_declarations type_declarations shape_for_constr] turns a block of
+      type declarations into a list of shapes. The number of shapes that is
+      returned must match the length of [type_declarations]. *)
   let of_type_declarations
       (type_declarations : (Ident.t * Types.type_declaration) list)
       shape_for_constr =
@@ -746,7 +697,12 @@ module Type_decl_shape = struct
 
   let of_type_declaration id decl shape_for_constr =
     let decls = of_type_declarations [id, decl] shape_for_constr in
-    match decls with [decl] -> decl | _ -> assert false
+    match decls with
+    | [decl] -> decl
+    | _ ->
+      (* This case is ruled out by the invariant on [of_type_declarations],
+         which for one declaration must return a list with exactly one shape. *)
+      assert false
 
   let of_extension_constructor_merlin_only (ext : Types.extension_constructor) =
     match ext.ext_args with
@@ -1118,7 +1074,7 @@ and unfold_and_evaluate0 ~ctx ~diagnostics ~depth ~steps_remaining ~env
            since it's the default fallback. *)
       | Variant constructors ->
         let constructors =
-          Shape.complex_constructors_map
+          Shape.constructors_map
             (fun (sh, ly) -> unfold_and_eval sh, ly)
             constructors
         in
@@ -1198,40 +1154,26 @@ type shape_with_layout =
     type_name : string
   }
 
-let (all_type_decls : Shape.t Uid.Tbl.t) = Uid.Tbl.create 16
-
 let (all_type_shapes : shape_with_layout Uid.Tbl.t) = Uid.Tbl.create 16
-
-let add_to_type_decls (decls : (Ident.t * Types.type_declaration) list)
-    shape_for_constr =
-  let type_decl_shapes =
-    Type_decl_shape.of_type_declarations decls shape_for_constr
-  in
-  List.iter
-    (fun ((_, decl), sh) -> Uid.Tbl.add all_type_decls decl.Types.type_uid sh)
-    (List.combine decls type_decl_shapes)
 
 let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
     =
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid { type_shape; type_name; type_layout }
 
+let has_type_shape var_uid = Uid.Tbl.mem all_type_shapes var_uid
+
+(* All call sites that record type shapes for debug information must be guarded
+   by this predicate, so that the conditions for emitting type shapes stay
+   consistent across the compiler. *)
+let enabled () =
+  !Clflags.debug
+  && (not !Clflags.restrict_to_upstream_dwarf)
+  && !Clflags.shape_format = Clflags.Debugging_shapes
 
 (* Merlin-only: The below functions are only used for printing when the compiler is passed
    the -ddebug-uids flag, which isn't relevant to Merlin *)
 (*
-let print_table_all_type_decls ppf =
-  let entries = Uid.Tbl.to_list all_type_decls in
-  let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
-  let entries =
-    List.map
-      (fun (k, v) ->
-        Format.asprintf "%a" Uid.print k, Format.asprintf "%a" Shape.print v)
-      entries
-  in
-  let uids, decls = List.split entries in
-  Misc.pp_table ppf ["UID", uids; "Type Declaration", decls]
-
 let print_table_all_type_shapes ppf =
   let entries = Uid.Tbl.to_list all_type_shapes in
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in
@@ -1251,8 +1193,6 @@ let print_table_all_type_shapes ppf =
 
 (* Print debug uid tables when the command line flag [-ddebug-uids] is set. *)
 let print_debug_uid_tables ppf =
-  Format.fprintf ppf "\n";
-  print_table_all_type_decls ppf;
   Format.fprintf ppf "\n";
   print_table_all_type_shapes ppf
 *)
