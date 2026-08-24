@@ -3,7 +3,23 @@ module Location_key = Structured_diagnostic.Location_key
 module Nlg = Diagnostic_nlg
 module Phrase = Nlg.Phrase
 module Statement = Nlg.Statement
-module Step_mode = Mode.Hint_chain.Mode
+module Step_mode = Mode.Reported_mode
+
+module Hint_chain = struct
+  type kind = Mode.Reported_hint.t =
+    | Morph : ('l * 'r) Mode_hint.morph -> kind
+    | Const : ('l * 'r) Mode_hint.const -> kind
+
+  type step =
+    { mode : Step_mode.t;
+      pinpoint : Mode.Hint.pinpoint;
+      kind : kind
+    }
+
+  type t = step list
+end
+
+type mode_description = Mode.Reported_mode.described list
 
 let first = function [] -> None | element :: _ -> Some element
 
@@ -91,8 +107,7 @@ module Bound = struct
     | Exact
     | Loosened
 
-  let of_loosening (loosening : Mode.loosening) =
-    match loosening with Not_loosened -> Exact | Loosened -> Loosened
+  let of_loosened loosened = if loosened then Loosened else Exact
 
   let comparative t ~(side : Side.t) =
     match t with
@@ -108,8 +123,12 @@ type concept =
   | Generative_functor
   | Atomic_field
 
+type mode_term =
+  | Reported_mode of Step_mode.t
+  | Alloc_mode of Mode.Alloc.atom
+
 type term =
-  | Mode_term of Step_mode.t
+  | Mode_term of mode_term
   | Modality_term of Mode.Modality.atom
   | Concept_term of concept
 
@@ -135,21 +154,18 @@ let explicit_subject_words (subject : subject) =
 
 let phrase (segments : term Phrase.segment list) : term Phrase.t = segments
 
-let described_point (atom : Mode.Mode_description.atom) : Step_mode.t =
-  match atom with
-  | Exact point -> point
-  | Local_to_parent_region { displayed = _; semantic } -> semantic
+let described_point (description : Mode.Reported_mode.described) =
+  description.semantic
 
 let term_display_parts (t : term) : string * string option =
   match t with
-  | Mode_term mode -> (
-    let ({ first; alternatives = _ } : Mode.Mode_description.t) =
-      Step_mode.describe mode
-    in
-    match first with
-    | Exact point -> Step_mode.name point, None
-    | Local_to_parent_region { displayed; semantic = _ } ->
-      Step_mode.name displayed, Some " to the parent region")
+  | Mode_term (Reported_mode mode) -> (
+    match Step_mode.describe `Actual mode with
+    | [] -> Step_mode.name mode, None
+    | description :: _ ->
+      Step_mode.name description.displayed, description.suffix)
+  | Mode_term (Alloc_mode (Mode.Alloc.Atom (axis, mode))) ->
+    Format_doc.asprintf "%a" (Mode.Alloc.Const.print_axis axis) mode, None
   | Modality_term (Atom (ax, m)) ->
     Format_doc.asprintf "@@@@ %a" (Mode.Modality.Per_axis.print ax) m, None
   | Concept_term concept ->
@@ -180,7 +196,7 @@ let term_display (t : term) : string =
   name ^ Option.value ~default:"" suffix
 
 let mode_word (mode : Step_mode.t) : term Phrase.segment =
-  Nlg.term (Mode_term mode)
+  Nlg.term (Mode_term (Reported_mode mode))
 
 let modality_word (atom : Mode.Modality.atom) : term Phrase.segment =
   Nlg.term (Modality_term atom)
@@ -189,7 +205,7 @@ let concept_word (concept : concept) : term Phrase.segment =
   Nlg.term (Concept_term concept)
 
 let mode_const_word ax c : term Phrase.segment =
-  mode_word (Mode.hint_mode_of_alloc_atom (Mode.Alloc.Atom (ax, c)))
+  Nlg.term (Mode_term (Alloc_mode (Mode.Alloc.Atom (ax, c))))
 
 let max_quoted_source_length = 40
 
@@ -279,37 +295,31 @@ module Meaning = struct
     | Lpoly_captured_environment ->
       Reroute (Allocation allocation)
 
-  let interpret ~source (s : Mode.Hint_chain.step) : t =
+  let interpret ~source (s : Hint_chain.step) : t =
     match s.kind with
-    | Mode.Hint_chain.Morph Unknown -> Nothing_to_say
-    | Mode.Hint_chain.Morph Skip -> Nothing_to_say
-    | Mode.Hint_chain.Morph (Close_over (_, details)) ->
-      Capture details
-    | Mode.Hint_chain.Morph (Is_closed_by (_, details)) ->
-      Capture details
-    | Mode.Hint_chain.Morph Crossing -> Reroute Mode_crossing
-    | Mode.Hint_chain.Morph (Functor_to_parameter loc) ->
+    | Hint_chain.Morph Unknown -> Nothing_to_say
+    | Hint_chain.Morph Skip -> Nothing_to_say
+    | Hint_chain.Morph (Close_over (_, details)) -> Capture details
+    | Hint_chain.Morph (Is_closed_by (_, details)) -> Capture details
+    | Hint_chain.Morph Crossing -> Reroute Mode_crossing
+    | Hint_chain.Morph (Functor_to_parameter loc) ->
       Reroute (Shared_staticity (Of_functor loc))
-    | Mode.Hint_chain.Morph (Parameter_to_functor loc) ->
+    | Hint_chain.Morph (Parameter_to_functor loc) ->
       Reroute (Shared_staticity (Of_functor_parameter loc))
-    | Mode.Hint_chain.Morph (Functor_to_application loc) ->
+    | Hint_chain.Morph (Functor_to_application loc) ->
       Reroute (Functor_application loc)
-    | Mode.Hint_chain.Morph (Application_to_functor loc) ->
+    | Hint_chain.Morph (Application_to_functor loc) ->
       Reroute (Functor_applied_at loc)
-    | Mode.Hint_chain.Morph (Allocation_r alloc)
-    | Mode.Hint_chain.Morph (Allocation_l alloc)
-    | Mode.Hint_chain.Morph (Allocation alloc) ->
+    | Hint_chain.Morph (Allocation_r alloc)
+    | Hint_chain.Morph (Allocation_l alloc)
+    | Hint_chain.Morph (Allocation alloc) ->
       reroute_of_allocation alloc
-    | Mode.Hint_chain.Morph (Contains_l (_, contains)) ->
-      Reroute (Contains contains)
-    | Mode.Hint_chain.Morph (Contains_r (_, contains)) ->
-      Reroute (Contains contains)
-    | Mode.Hint_chain.Morph (Is_contained_by (_, c)) ->
-      Reroute (Contained_by c)
-    | Mode.Hint_chain.Morph (Function_argument fa) ->
-      Signature_argument fa
-    | Mode.Hint_chain.Const Unknown -> Unexplained
-    | Mode.Hint_chain.Const (Annotation { written_modes; _ }) -> (
+    | Hint_chain.Morph (Contains_l (_, contains)) -> Reroute (Contains contains)
+    | Hint_chain.Morph (Contains_r (_, contains)) -> Reroute (Contains contains)
+    | Hint_chain.Morph (Is_contained_by (_, c)) -> Reroute (Contained_by c)
+    | Hint_chain.Morph (Function_argument fa) -> Signature_argument fa
+    | Hint_chain.Const Unknown -> Unexplained
+    | Hint_chain.Const (Annotation { written_modes; _ }) -> (
       let mode_name = Step_mode.name s.mode in
       match
         List.find_opt
@@ -319,40 +329,37 @@ module Meaning = struct
             match snippet_of_loc ~source written_mode.loc with
             | Some source_name ->
               String.equal source_name mode_name
-              || (String.equal mode_name "local"
-                 && String.equal source_name "local_")
+              || String.equal mode_name "local"
+                 && String.equal source_name "local_"
             | None -> false)
           written_modes
       with
       | Some written_mode -> User_annotation written_mode.loc
       | None -> Unexplained)
-    | Mode.Hint_chain.Const Lazy_allocated_on_heap ->
-      Fact Lazy_allocated_on_heap
-    | Mode.Hint_chain.Const (Legacy legacy) -> Fact (Legacy_construct legacy)
-    | Mode.Hint_chain.Const Toplevel_expression -> Fact Toplevel_expression
-    | Mode.Hint_chain.Const Tailcall_function -> Fact Tailcall_function
-    | Mode.Hint_chain.Const Tailcall_argument -> Fact Tailcall_argument
-    | Mode.Hint_chain.Const (Mutable_read part) ->
+    | Hint_chain.Const Lazy_allocated_on_heap -> Fact Lazy_allocated_on_heap
+    | Hint_chain.Const (Legacy legacy) -> Fact (Legacy_construct legacy)
+    | Hint_chain.Const Toplevel_expression -> Fact Toplevel_expression
+    | Hint_chain.Const Tailcall_function -> Fact Tailcall_function
+    | Hint_chain.Const Tailcall_argument -> Fact Tailcall_argument
+    | Hint_chain.Const (Mutable_read part) ->
       Fact (Mutable_access { part; access = Read })
-    | Mode.Hint_chain.Const (Mutable_write part) ->
+    | Hint_chain.Const (Mutable_write part) ->
       Fact (Mutable_access { part; access = Write })
-    | Mode.Hint_chain.Const Lazy_forced -> Fact Lazy_forced
-    | Mode.Hint_chain.Const Function_return -> Fact Function_return_default
-    | Mode.Hint_chain.Const Stack_expression -> Fact Stack_allocated
-    | Mode.Hint_chain.Const Module_allocated_on_heap ->
-      Fact Module_allocated_on_heap
-    | Mode.Hint_chain.Const (Always_dynamic x) -> Fact (Always_dynamic x)
-    | Mode.Hint_chain.Const Branching -> Fact Has_branches
-    | Mode.Hint_chain.Const Lpoly_inst -> Fact Layout_poly_instantiated
-    | Mode.Hint_chain.Const (Is_used_in closure) ->
+    | Hint_chain.Const Lazy_forced -> Fact Lazy_forced
+    | Hint_chain.Const Function_return -> Fact Function_return_default
+    | Hint_chain.Const Stack_expression -> Fact Stack_allocated
+    | Hint_chain.Const Module_allocated_on_heap -> Fact Module_allocated_on_heap
+    | Hint_chain.Const (Always_dynamic x) -> Fact (Always_dynamic x)
+    | Hint_chain.Const Branching -> Fact Has_branches
+    | Hint_chain.Const Lpoly_inst -> Fact Layout_poly_instantiated
+    | Hint_chain.Const (Is_used_in closure) ->
       Capture { closure; closed = s.pinpoint }
-    | Mode.Hint_chain.Const (Borrowed (_, _)) -> Fact Borrowed
-    | Mode.Hint_chain.Const (Escape_region region) ->
-      Fact (Region_escape region)
-    | Mode.Hint_chain.Const Quoted_computation -> Fact Quoted_computation
-    | Mode.Hint_chain.Const (Spliced _) -> Fact Spliced
-    | Mode.Hint_chain.Const (Contained_by c) -> Reroute (Contained_by c)
-    | Mode.Hint_chain.Const (Cmx_not_guaranteed unit) ->
+    | Hint_chain.Const (Borrowed (_, _)) -> Fact Borrowed
+    | Hint_chain.Const (Escape_region region) -> Fact (Region_escape region)
+    | Hint_chain.Const Quoted_computation -> Fact Quoted_computation
+    | Hint_chain.Const (Spliced _) -> Fact Spliced
+    | Hint_chain.Const (Contained_by c) -> Reroute (Contained_by c)
+    | Hint_chain.Const (Cmx_not_guaranteed unit) ->
       Fact (Static_not_guaranteed unit)
 
   let is_region_escape : fact -> bool = function
@@ -368,7 +375,7 @@ end
 
 let interpret = Meaning.interpret
 
-let rec normalize ~source (chain : Mode.Hint_chain.t) : Mode.Hint_chain.t =
+let rec normalize ~source (chain : Hint_chain.t) : Hint_chain.t =
   match chain with
   | [] -> []
   | s :: rest -> begin
@@ -382,7 +389,7 @@ let rec normalize ~source (chain : Mode.Hint_chain.t) : Mode.Hint_chain.t =
       | next :: _ ->
         if
           String.equal (Step_mode.name s.mode)
-            (Step_mode.name next.Mode.Hint_chain.mode)
+            (Step_mode.name next.Hint_chain.mode)
         then rest
         else s :: rest
       end
@@ -398,18 +405,13 @@ module Message = struct
   type t =
     { pinpoint : Mode.Hint.pinpoint;
       mode : Step_mode.t;
-      axis : Mode.Axis.packed option;
       meaning : Meaning.t
     }
 
-  let of_step ~source (s : Mode.Hint_chain.step) : t =
-    { pinpoint = s.pinpoint;
-      mode = s.mode;
-      axis = s.axis;
-      meaning = interpret ~source s
-    }
+  let of_step ~source (s : Hint_chain.step) : t =
+    { pinpoint = s.pinpoint; mode = s.mode; meaning = interpret ~source s }
 
-  let of_chain ~source (chain : Mode.Hint_chain.t) : t list =
+  let of_chain ~source (chain : Hint_chain.t) : t list =
     List.map (of_step ~source) (normalize ~source chain)
 
   let is_informative (t : t) =
@@ -420,7 +422,28 @@ module Message = struct
       true
 end
 
-let same_axis = Mode.Axis.equal_packed
+let same_alloc_axis (Mode.Alloc.Axis.P left) (Mode.Alloc.Axis.P right) =
+  match left, right with
+  | Mode.Alloc.Axis.Comonadic left, Mode.Alloc.Axis.Comonadic right -> (
+    match Mode.Axis.equal left right with
+    | Misc.Is_eq -> true
+    | Misc.Is_not_eq -> false)
+  | Mode.Alloc.Axis.Monadic left, Mode.Alloc.Axis.Monadic right -> (
+    match Mode.Axis.equal left right with
+    | Misc.Is_eq -> true
+    | Misc.Is_not_eq -> false)
+  | Mode.Alloc.Axis.Comonadic _, Mode.Alloc.Axis.Monadic _
+  | Mode.Alloc.Axis.Monadic _, Mode.Alloc.Axis.Comonadic _ ->
+    false
+
+let same_mode_axis left right =
+  match
+    ( Mode.reported_mode_as_alloc_atom left,
+      Mode.reported_mode_as_alloc_atom right )
+  with
+  | Some (Mode.Alloc.Atom (left, _)), Some (Mode.Alloc.Atom (right, _)) ->
+    Some (same_alloc_axis (Mode.Alloc.Axis.P left) (Mode.Alloc.Axis.P right))
+  | (Some _ | None), (Some _ | None) -> None
 
 let human_desc : Mode.Hint.pinpoint_desc -> string = function
   | Unknown -> "this value"
@@ -585,22 +608,27 @@ let subject_of_pinpoint ~source ((loc, desc) : Mode.Hint.pinpoint) =
       Some _ ) ->
     subject_of_loc ~source ~fallback:(human_desc desc) loc
 
-let description_words ({ first; alternatives } : Mode.Mode_description.t) :
+let description_words (description : mode_description) :
     term Phrase.segment list =
   let open Nlg in
-  mode_word (described_point first)
-  :: List.concat_map
-       (fun (alternative : Mode.Mode_description.atom) ->
-         [txt " or "; mode_word (described_point alternative)])
-       alternatives
+  match description with
+  | [] -> []
+  | first :: alternatives ->
+    mode_word (described_point first)
+    :: List.concat_map
+         (fun alternative ->
+           [txt " or "; mode_word (described_point alternative)])
+         alternatives
 
 let step_mode_segments mode : term Phrase.segment list =
-  description_words (Step_mode.describe mode)
+  description_words (Step_mode.describe `Actual mode)
 
-let mode_matches_description (description : Mode.Mode_description.t) mode =
-  Step_mode.equal (described_point description.first) mode
+let mode_matches_description (description : mode_description) mode =
+  match description with
+  | [] -> false
+  | first :: _ -> Step_mode.equal (described_point first) mode
 
-let described_mode_segments (description : Mode.Mode_description.t) mode :
+let described_mode_segments (description : mode_description) mode :
     term Phrase.segment list =
   if mode_matches_description description mode
   then description_words description
@@ -662,9 +690,9 @@ let capture_use_of_next (m : Message.t) (next : Message.t) =
   | Capture { closure = _; closed }
     when not (same_chars (fst m.pinpoint) (fst closed)) ->
     let crosses_axes =
-      match m.axis, next.axis with
-      | Some a, Some b -> not (same_axis a b)
-      | Some _, None | None, Some _ | None, None -> false
+      match same_mode_axis m.mode next.mode with
+      | Some same -> not same
+      | None -> false
     in
     if crosses_axes && same_chars (fst next.pinpoint) (fst closed)
     then Some closed
@@ -1036,9 +1064,15 @@ let message_is_region_escape (m : Message.t) =
 let has_escape_region chain = List.exists message_is_region_escape chain
 
 let detect ~axis ~actual ~expected : Rule.t list =
-  let is_portability = same_axis axis (Mode.Axis.P Portability) in
-  let is_contention = same_axis axis (Mode.Axis.P Contention) in
-  let is_visibility = same_axis axis (Mode.Axis.P Visibility) in
+  let is_portability =
+    same_alloc_axis axis (Mode.Alloc.Axis.P (Comonadic Portability))
+  in
+  let is_contention =
+    same_alloc_axis axis (Mode.Alloc.Axis.P (Monadic Contention))
+  in
+  let is_visibility =
+    same_alloc_axis axis (Mode.Alloc.Axis.P (Monadic Visibility))
+  in
   let rules = [] in
   let rules =
     if
@@ -1148,11 +1182,11 @@ let plan_suggestions ~(expected : Message.t list) :
                 txt " value" ])) ]
   else []
 
-let plan_partial_application_hint ~(axis : Mode.Axis.packed)
+let plan_partial_application_hint ~(axis : Mode.Alloc.Axis.packed)
     (result_type : Types.type_expr) :
     (Diagnostic.Relation.t * term Nlg.plan) list =
   match axis with
-  | Mode.Axis.P Mode.Axis.Areality -> begin
+  | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Areality) -> begin
     let rec non_local_arity sure n ty =
       match Types.get_desc ty with
       | Types.Tarrow ((_, _, res_mode), _, res_ty, _) ->
@@ -1181,7 +1215,7 @@ let plan_partial_application_hint ~(axis : Mode.Axis.packed)
                     ("adding " ^ string_of_int n ^ " more " ^ arguments ^ " "
                    ^ qualifier ^ " make the value non-local") ])) ]
     end
-  | Mode.Axis.P _ -> []
+  | Mode.Alloc.Axis.P _ -> []
 
 let signature_origin (origin : Message.t) (next : Message.t) :
     Mode.Hint.function_argument option =
@@ -1211,7 +1245,7 @@ let is_explicit_function_annotation ~source (m : Message.t) =
       | Structure_item _ ) ) ->
     false
 
-let plan_expected ~source ~axis ~description (chain : Message.t list) =
+let plan_expected ~source ~axis_mode ~description (chain : Message.t list) =
   let open Nlg in
   let expectation_sentence ?(therefore = false) (subject : subject) mode =
     sentence ?subject:(sentence_subject subject)
@@ -1227,9 +1261,9 @@ let plan_expected ~source ~axis ~description (chain : Message.t list) =
       let closure = subject_of_pinpoint ~source closure in
       let closed = subject_of_pinpoint ~source closed in
       let expectation_words =
-        match m.axis with
-        | Some a when not (same_axis a axis) -> description_words description
-        | Some _ | None -> described_mode_segments description m.mode
+        match same_mode_axis m.mode axis_mode with
+        | Some false -> description_words description
+        | Some true | None -> described_mode_segments description m.mode
       in
       [ sentence ?subject:(sentence_subject closure)
           (phrase
@@ -1504,18 +1538,7 @@ type expected_decl =
     written : declared_modalities option
   }
 
-let value_axis_of_error_axis (Mode.Axis.P axis) : Mode.Value.Axis.packed =
-  match axis with
-  | Mode.Axis.Areality -> P (Comonadic Areality)
-  | Forkable -> P (Comonadic Forkable)
-  | Yielding -> P (Comonadic Yielding)
-  | Linearity -> P (Comonadic Linearity)
-  | Statefulness -> P (Comonadic Statefulness)
-  | Portability -> P (Comonadic Portability)
-  | Uniqueness -> P (Monadic Uniqueness)
-  | Visibility -> P (Monadic Visibility)
-  | Contention -> P (Monadic Contention)
-  | Staticity -> P (Monadic Staticity)
+let value_axis_of_error_axis = Mode.Const.Axis.alloc_as_value
 
 let equal_value_axis (Mode.Value.Axis.P a) (Mode.Value.Axis.P b) : bool =
   match a, b with
@@ -1566,7 +1589,7 @@ let modality_provenance (declared : declared_modalities option)
           then Unwritten
           else Implied_by_mutable)))
 
-let declared_modality (decl : expected_decl) (axis : Mode.Axis.packed) :
+let declared_modality (decl : expected_decl) (axis : Mode.Alloc.Axis.packed) :
     Mode.Modality.atom option =
   match Mode.Modality.Axis.of_value (value_axis_of_error_axis axis) with
   | Mode.Modality.Axis.P maxis ->
@@ -1708,8 +1731,8 @@ type constructor_argument =
     crossing : Mode.Crossing.t
   }
 
-let fully_crosses (axis : Mode.Axis.packed) (crossing : Mode.Crossing.t) : bool
-    =
+let fully_crosses (axis : Mode.Alloc.Axis.packed) (crossing : Mode.Crossing.t) :
+    bool =
   match
     Mode.Crossing.Axis.of_modality
       (Mode.Modality.Axis.of_value (value_axis_of_error_axis axis))
@@ -1729,7 +1752,7 @@ type extra_rules =
 let no_extra_rules = { for_actual = []; for_expected = [] }
 
 let plan_axis ~extra_rules ~actuality_fallback ~subject_override ~source ~axis
-    ~error_loc ~expected_decl ~pronouns ~(actual : Message.t list)
+    ~axis_mode ~error_loc ~expected_decl ~pronouns ~(actual : Message.t list)
     ~(expected : Message.t list) ~actual_description ~expected_description
     ~actual_bound ~expected_bound : term Nlg.plan list =
   let open Nlg in
@@ -1767,7 +1790,8 @@ let plan_axis ~extra_rules ~actuality_fallback ~subject_override ~source ~axis
     match origin_lift with
     | Lift sentences -> elaboration_spine sentences
     | No_lift ->
-      plan_expected ~source ~axis ~description:expected_description expected
+      plan_expected ~source ~axis_mode ~description:expected_description
+        expected
   in
   let actual_rules =
     plan_rules ~axis ~actual ~expected ~explains:Actual @ extra_rules.for_actual
@@ -1780,7 +1804,11 @@ let plan_axis ~extra_rules ~actuality_fallback ~subject_override ~source ~axis
     match actuality_fallback with
     | None -> []
     | Some (Arguments_do_not_cross arguments) ->
-      let axis_name = Format_doc.asprintf "%a" Mode.Axis.print_packed axis in
+      let axis_name =
+        match axis with
+        | Mode.Alloc.Axis.P axis ->
+          Format_doc.asprintf "%a" Mode.Alloc.Axis.print axis
+      in
       let culprits =
         List.filter
           (fun (arg : constructor_argument) ->
@@ -1897,11 +1925,12 @@ let same_requirement_key a b =
   && same_argument_label a.label b.label
 
 type axis_input =
-  { axis : Mode.Axis.packed;
-    actual : Mode.Hint_chain.t;
-    expected : Mode.Hint_chain.t;
-    actual_description : Mode.Mode_description.t;
-    expected_description : Mode.Mode_description.t;
+  { axis : Mode.Alloc.Axis.packed;
+    axis_mode : Step_mode.t;
+    actual : Hint_chain.t;
+    expected : Hint_chain.t;
+    actual_description : mode_description;
+    expected_description : mode_description;
     actual_bound : Bound.t;
     expected_bound : Bound.t
   }
@@ -1927,8 +1956,8 @@ let blamed_axes (stories : story list) =
   List.concat_map (fun s -> s.axes) stories
 
 let render_error ?extra_rules ?actuality_fallback ?subject_override ~source
-    ~error_loc ~expected_decl ~pronouns (axes : axis_input list)
-    : (axis_input list * term Nlg.plan) list =
+    ~error_loc ~expected_decl ~pronouns (axes : axis_input list) :
+    (axis_input list * term Nlg.plan) list =
   let prepared =
     List.map
       (fun input ->
@@ -2005,8 +2034,8 @@ let render_error ?extra_rules ?actuality_fallback ?subject_override ~source
         | None -> no_extra_rules
         | Some rules -> rules p.input.axis)
       ~actuality_fallback ~subject_override ~source ~axis:p.input.axis
-      ~error_loc ~expected_decl ~pronouns ~actual:p.actual_messages
-      ~expected:p.expected_messages
+      ~axis_mode:p.input.axis_mode ~error_loc ~expected_decl ~pronouns
+      ~actual:p.actual_messages ~expected:p.expected_messages
       ~actual_description:p.input.actual_description
       ~expected_description:p.input.expected_description
       ~actual_bound:p.input.actual_bound ~expected_bound:p.input.expected_bound
@@ -2523,29 +2552,36 @@ let render_modality_error ~sides (input : modality_input) : term Nlg.plan =
   in
   pronominalize_one story
 
+let fold_step ~mode ~pinpoint ~hint chain =
+  { Hint_chain.mode; pinpoint; kind = hint } :: chain
+
 let prepare_axis ~source
-    ({ axis;
-       actual_chain;
-       expected_chain;
-       actual_description;
-       expected_description;
-       actual_loosening;
-       expected_loosening
+    ({ actual;
+       expected;
+       actual_mode;
+       expected_mode;
+       actual_loosened;
+       expected_loosened
      } :
-      Mode.axis_error) =
-  let actual_chain = normalize ~source actual_chain in
-  let expected_chain = normalize ~source expected_chain in
-  { axis;
-    actual = actual_chain;
-    expected = expected_chain;
-    actual_description;
-    expected_description;
-    actual_bound = Bound.of_loosening actual_loosening;
-    expected_bound = Bound.of_loosening expected_loosening
-  }
+      Hint_chain.t Mode.folded_axis) =
+  match Mode.reported_mode_as_alloc_atom actual_mode with
+  | None -> None
+  | Some (Mode.Alloc.Atom (axis, _)) ->
+    Some
+      { axis = Mode.Alloc.Axis.P axis;
+        axis_mode = actual_mode;
+        actual = normalize ~source actual;
+        expected = normalize ~source expected;
+        actual_description = Step_mode.describe `Actual actual_mode;
+        expected_description = Step_mode.describe `Expected expected_mode;
+        actual_bound = Bound.of_loosened actual_loosened;
+        expected_bound = Bound.of_loosened expected_loosened
+      }
 
 let axis_name (input : axis_input) : string =
-  Format_doc.asprintf "%a" Mode.Axis.print_packed input.axis
+  match input.axis with
+  | Mode.Alloc.Axis.P axis ->
+    Format_doc.asprintf "%a" Mode.Alloc.Axis.print axis
 
 let modality_story ~declared_modalities_at ~sides (input : modality_input) :
     story =
@@ -2577,9 +2613,9 @@ let modality_story ~declared_modalities_at ~sides (input : modality_input) :
   }
 
 let mode_stories ?extra_rules ?actuality_fallback ?subject_override ~source
-    ~error_loc ~expected_decl ~pronouns (axes : Mode.axis_error list) : story list
-    =
-  List.map (prepare_axis ~source) axes
+    ~error_loc ~expected_decl ~pronouns
+    (axes : Hint_chain.t Mode.folded_axis list) : story list =
+  List.filter_map (prepare_axis ~source) axes
   |> render_error ?extra_rules ?actuality_fallback ?subject_override ~source
        ~error_loc ~expected_decl ~pronouns
   |> List.map (fun (inputs, frame) ->
@@ -2598,13 +2634,15 @@ let term_entry ~(documentation : Documentation.lookup) (t : term) :
   in
   let term = term_display t in
   match t with
-  | Mode_term mode ->
+  | Mode_term (Reported_mode mode) ->
     let documented =
-      match Mode.alloc_atom_of_hint_mode mode with
+      match Mode.reported_mode_as_alloc_atom mode with
       | Some atom -> documentation.of_mode atom
       | None -> None
     in
     entry ~term ~category:"Mode" documented
+  | Mode_term (Alloc_mode atom) ->
+    entry ~term ~category:"Mode" (documentation.of_mode atom)
   | Modality_term atom ->
     entry ~term ~category:"Modality" (documentation.of_modality atom)
   | Concept_term concept ->
@@ -3938,7 +3976,7 @@ let diagnose_uniqueness _request err =
       plain_story ~claim ~contrast ~educate:[rule] ())
 
 let diagnose_unexplained request exn =
-  match Mode.walk_error_all_exn exn with
+  match Mode.fold_error_exn ~init:[] ~step:fold_step exn with
   | None -> []
   | Some axes -> mode_stories request axes
 
@@ -3967,7 +4005,7 @@ let diagnose_inclusion_leaf request ~sides ~in_parameter (leaf : Inclusion.leaf)
           }
     in
     mode_stories request ?expected_decl
-      (Mode.Value.walk_error_all pinpoint error)
+      (Mode.Value.fold_error ~init:[] ~step:fold_step pinpoint error)
   | Inclusion.Modality_leaf input ->
     [modality_story ~declared_modalities_at ~sides input]
   | Inclusion.Missing_leaf missing -> [prose (missing_frame missing)]
@@ -4355,7 +4393,7 @@ let diagnose_typedecl request ~loc err =
     in
     mode_stories request ~extra_rules
       ~actuality_fallback:(Arguments_do_not_cross arguments)
-      (Mode.Value.walk_error_all (loc, Mode.Hint.Unknown) e)
+      (Mode.Value.fold_error ~init:[] ~step:fold_step (loc, Mode.Hint.Unknown) e)
   | Typedecl.Definition_mismatch (ty, env, Some mismatch) ->
     begin match Types.get_desc ty with
     | Types.Tconstr (path, _, _) ->
@@ -4485,7 +4523,9 @@ let diagnose_typecore request ~loc ~env err =
       | Typecore.Other -> (fun _axis -> no_extra_rules), None
     in
     mode_stories request ~extra_rules ?actuality_fallback
-      (Mode.Value.walk_error_all (loc, Mode.Hint.Expression) e)
+      (Mode.Value.fold_error ~init:[] ~step:fold_step
+         (loc, Mode.Hint.Expression)
+         e)
   | Typecore.Curried_application_complete (lbl, e, loc_kind) ->
     let subject_override : subject option =
       match loc_kind with
@@ -4503,13 +4543,13 @@ let diagnose_typecore request ~loc ~env err =
         in
         Some (subject ~span:loc (Phrase.Text "the application up to " :: up_to))
     in
-    let restricted_word (axis : Mode.Axis.packed) =
+    let restricted_word (axis : Mode.Alloc.Axis.packed) =
       match axis with
-      | Mode.Axis.P Mode.Axis.Areality ->
+      | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Areality) ->
         Some (mode_const_word (Comonadic Areality) Mode.Locality.Const.Local)
-      | Mode.Axis.P Mode.Axis.Linearity ->
+      | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Linearity) ->
         Some (mode_const_word (Comonadic Linearity) Mode.Linearity.Const.Once)
-      | Mode.Axis.P _ -> None
+      | Mode.Alloc.Axis.P _ -> None
     in
     let suggestion_phrases =
       match loc_kind with
@@ -4554,7 +4594,9 @@ let diagnose_typecore request ~loc ~env err =
         }
     in
     mode_stories request ~extra_rules ?subject_override
-      (Mode.Alloc.walk_error_all (loc, Mode.Hint.Expression) e)
+      (Mode.Alloc.fold_error ~init:[] ~step:fold_step
+         (loc, Mode.Hint.Expression)
+         e)
   | Typecore.Mode_mismatch (kind, (step, e)) ->
     let subject_override : subject option =
       match kind with
@@ -4563,20 +4605,23 @@ let diagnose_typecore request ~loc ~env err =
       | Typecore.Return ->
         Some (subject ~span:loc [Phrase.Text "this function's return value"])
     in
-    let axes = Mode.Alloc.walk_error_all (loc, Mode.Hint.Expression) e in
+    let axes =
+      Mode.Alloc.fold_error ~init:[] ~step:fold_step
+        (loc, Mode.Hint.Expression)
+        e
+    in
     let axes =
       match (step : Mode.equate_step) with
       | Left_le_right -> axes
       | Right_le_left ->
         List.map
-          (fun (a : Mode.axis_error) ->
-            { a with
-              actual_chain = a.expected_chain;
-              expected_chain = a.actual_chain;
-              actual_description = a.expected_description;
-              expected_description = a.actual_description;
-              actual_loosening = a.expected_loosening;
-              expected_loosening = a.actual_loosening
+          (fun (a : Hint_chain.t Mode.folded_axis) ->
+            { Mode.actual = a.expected;
+              expected = a.actual;
+              actual_mode = a.expected_mode;
+              expected_mode = a.actual_mode;
+              actual_loosened = a.expected_loosened;
+              expected_loosened = a.actual_loosened
             })
           axes
     in
@@ -4586,8 +4631,8 @@ let diagnose_typecore request ~loc ~env err =
     let axes =
       match
         List.filter
-          (fun (a : Mode.axis_error) ->
-            informative a.actual_chain || informative a.expected_chain)
+          (fun (a : Hint_chain.t Mode.folded_axis) ->
+            informative a.actual || informative a.expected)
           axes
       with
       | [] -> axes
@@ -4611,7 +4656,9 @@ let diagnose_typecore request ~loc ~env err =
       }
     in
     mode_stories request ~extra_rules ?subject_override
-      (Mode.Alloc.walk_error_all (loc, Mode.Hint.Expression) e)
+      (Mode.Alloc.fold_error ~init:[] ~step:fold_step
+         (loc, Mode.Hint.Expression)
+         e)
   | Typecore.Overwrite_of_invalid_term ->
     let open Nlg in
     plain_story
