@@ -3554,7 +3554,8 @@ let typedecl_scope : Typedecl.error -> Scope.t = function
   | Invalid_private_row_declaration _ | Unexpected_layout_any_in_primitive _
   | Useless_layout_poly | Bad_or_null_attribute _ | Invalid_reexport _
   | Non_abstract_reexport _ | No_unboxed_version _ | Layout_poly_unsupported
-  | Misplaced_flatten_floats | Bad_represent_as_float_array_attribute ->
+  | Layout_poly_variable_representation | Misplaced_flatten_floats
+  | Bad_represent_as_float_array_attribute ->
     Not_about_modes
 
 let typetexp_scope : Typetexp.error -> Scope.t = function
