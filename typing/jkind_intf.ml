@@ -73,7 +73,7 @@ module type Sort = sig
        - Some base sorts are inherently addressable.
        - If all the components of a product are addressable, then so is the
          product.
-       - Addressability is idempotent: if [k] is addressable, then
+       - Addressability is idempotent: [k] is addressable iff
          [k addressable = k].
        - The addressable kinds are all subkinds of [any addressable].
        - There is no inherent subkinding relationship between [k] and
