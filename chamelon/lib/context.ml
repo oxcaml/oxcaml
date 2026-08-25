@@ -79,7 +79,7 @@ let add ?sourcefile (cmt_infos : Cmt_format.cmt_infos) context =
     match cmt_infos.cmt_annots with
     | Implementation annots -> Some { Utils.cmt_infos; path; annots }, None
     | Interface annots -> None, Some { Utils.cmt_infos; path; annots }
-    | Partial_implementation _ | Packed _ | Partial_interface _ ->
+    | Partial_implementation _ | Packed _ | Partial_interface _ | Functorize ->
       invalid_arg "Context.add: unsupported cmt annotations"
   in
   let modules =

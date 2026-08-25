@@ -196,6 +196,20 @@ module Sort = struct
       | Genvar _ -> Misc.fatal_error "Sort.Const.all_void: Genvar"
       | Product ts -> List.for_all all_void ts
 
+    let rec maybe_all_void = function
+      | Base Void -> true
+      | Base
+          ( Scannable | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask ) ->
+        false
+      | Univar _ | Genvar _ -> true
+      | Product ts -> List.for_all maybe_all_void ts
+
+    let rec is_concrete = function
+      | Base _ -> true
+      | Product ts -> List.for_all is_concrete ts
+      | Univar _ | Genvar _ -> false
+
     let scannable = Base Scannable
 
     let untagged_immediate = Base Untagged_immediate
@@ -819,14 +833,21 @@ module Sort = struct
       (* path compression *)
       result
 
-  (* Like [default_to_scannable_and_get], but returns a [Some] wrapping. Reuses
-     pre-allocated [Some] boxes when the result is one of the known base
-     constants, to avoid an allocation per call site. *)
-  let default_to_scannable_and_get_some s =
-    Const.some (default_to_scannable_and_get s)
+  let get_concrete_defaulting_to_scannable s =
+    let const = default_to_scannable_and_get s in
+    if Const.is_concrete const then Const.some const else None
 
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_scannable_and_get s
+
+  let rec to_const_opt : t -> Const.t option = function
+    | Base b -> Some (Static.Const.of_base b)
+    | Product ts ->
+      Misc.Stdlib.List.map_option to_const_opt ts
+      |> Option.map (fun cs : Const.t -> Const.Product cs)
+    | Univar uv -> Some (Univar uv)
+    | Var r -> (
+      match r.contents with None -> None | Some s -> to_const_opt s)
 
   let is_scannable_or_var s =
     match get s with Base Scannable | Var _ -> true | _ -> false

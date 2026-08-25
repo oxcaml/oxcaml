@@ -183,7 +183,7 @@ as the mode of the record.) For future axes, this would be the top mode; for
 past axes, this would be the bottom mode. These are the identity modalities:
 
 ```ocaml
-local unique once nonportable uncontended unforkable yielding stateless immutable
+local unique once nonportable uncontended unforkable yielding stateful read_write
 ```
 
 Note that a legacy mode might or might not be the same as the identity modality.

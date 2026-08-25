@@ -53,6 +53,7 @@ type abstract_non_value_type_constr = [
   | `Unativeint_u
   | `Idx_imm
   | `Idx_mut
+  | `Idx_atomic
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -142,6 +143,7 @@ val type_unativeint_u: type_expr
 val type_or_null: type_expr -> type_expr
 val type_idx_imm : type_expr -> type_expr -> type_expr
 val type_idx_mut : type_expr -> type_expr -> type_expr
+val type_idx_atomic : type_expr -> type_expr -> type_expr
 
 val type_int8x16: type_expr
 val type_int16x8: type_expr
@@ -241,6 +243,7 @@ val path_unativeint_u: Path.t
 val path_or_null: Path.t
 val path_idx_imm: Path.t
 val path_idx_mut: Path.t
+val path_idx_atomic: Path.t
 
 val path_int8x16: Path.t
 val path_int16x8: Path.t

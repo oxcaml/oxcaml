@@ -96,7 +96,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   (match value_type_proto_die with
   | None -> ()
   | Some value_type_proto_die ->
-    assert (not !Dwarf_flags.restrict_to_upstream_dwarf);
+    assert (not !Clflags.restrict_to_upstream_dwarf);
     Profile.record "dwarf_variables_and_parameters"
       (fun () ->
         Dwarf_variables_and_parameters.dwarf state ~value_type_proto_die

@@ -83,6 +83,11 @@ val create_call_pc : Asm_label.t -> Dwarf_attribute_values.Attribute_value.t
 val create_call_return_pc :
   Asm_label.t -> Dwarf_attribute_values.Attribute_value.t
 
+val create_call_return_pc_with_offset :
+  Asm_label.t ->
+  offset_in_bytes:Targetint.t ->
+  Dwarf_attribute_values.Attribute_value.t
+
 val create_call_tail_call :
   is_tail:bool -> Dwarf_attribute_values.Attribute_value.t
 
