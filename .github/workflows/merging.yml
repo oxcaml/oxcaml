@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout the OxCaml repo
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -25,7 +25,7 @@ jobs:
         # makes setup-ocaml skip apt-get, which is slow on first invocation
 
       - name: Set up Opam
-        uses: ocaml/setup-ocaml@e32b06a3e831ff2fbc6f08cf35be2085e3918014 # v3.6.1
+        uses: ocaml/setup-ocaml@15d660006c1d3110d77c34b7faa3bddefe8b82f0 # v3.7.0
         with:
           ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0
           opam-repositories: |
