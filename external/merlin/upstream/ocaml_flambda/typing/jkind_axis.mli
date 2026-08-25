@@ -71,6 +71,8 @@ module Axis : sig
 
   val all : packed list
 
+  val equal : packed -> packed -> bool
+
   val name : _ t -> string
 end
 

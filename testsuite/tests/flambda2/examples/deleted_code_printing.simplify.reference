@@ -3,7 +3,7 @@ let code foobar_0 deleted in
 let env = %block.mut.[`0`].`toplevel` (42) in
 let env_1 = env in
 let set_of_closures
-      $camlDeleted_code_printing__foobar_2 =
+      $camlDeleted_code_printing__foobar_1 =
       closure foobar_0_1 @foobar &toplevel.alloc_region
       with { env = env }
     end
@@ -13,9 +13,9 @@ and code loopify(never) size(4) newer_version_of(foobar_0)
         -> k * k1
         : imm tagged =
   apply direct(aux_1_1 &my_alloc_region)
-    ($camlDeleted_code_printing__aux_3 : _ -> imm tagged) (0) -> k * k1
+    ($camlDeleted_code_printing__aux_2 : _ -> imm tagged) (0) -> k * k1
 and set_of_closures
-      $camlDeleted_code_printing__aux_3 =
+      $camlDeleted_code_printing__aux_2 =
       closure aux_1_1 @aux &toplevel.alloc_region
       with { env_1 = env_1 }
     end
@@ -27,7 +27,7 @@ and code loopify(done) size(15) newer_version_of(aux_1)
   cont `self`
     where rec `self` =
       let env_2 =
-        %project_value_slot.[aux].[env_1] ($camlDeleted_code_printing__aux_3)
+        %project_value_slot.[aux].[env_1] ($camlDeleted_code_printing__aux_2)
       in
       let Popaque = %opaque (0) in
       ((let untagged = %untag_imm (Popaque) in
@@ -39,6 +39,6 @@ and code loopify(done) size(15) newer_version_of(aux_1)
            cont k (Pfield))
 in
 let $camlDeleted_code_printing =
-  Block 0 (env, $camlDeleted_code_printing__foobar_2)
+  Block 0 (env, $camlDeleted_code_printing__foobar_1)
 in
 cont done ($camlDeleted_code_printing)

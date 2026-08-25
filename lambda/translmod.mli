@@ -61,6 +61,22 @@ val transl_instance:
         -> arg_block_idx:int option
         -> program
 
+(** Translate a bundle as a generative functor over [params] whose body
+    exposes [modules] (after [coercion]).  [find_impl_by_name] looks up
+    a transitive dependency's format and arg descriptor by its
+    [Compilation_unit.t]; [chain] carries the "required by" trace for
+    error reporting. *)
+val transl_functorization:
+      Compilation_unit.t
+        -> Global_module.Parameter_name.t list
+        -> Global_module.t list
+        -> find_impl_by_name:(chain:Global_module.t list ->
+                                Compilation_unit.t ->
+                                main_module_block_format
+                                * arg_descr option)
+        -> coercion:module_coercion
+        -> program
+
 val toplevel_name: Ident.t -> string
 
 val primitive_declarations: Primitive.description list ref

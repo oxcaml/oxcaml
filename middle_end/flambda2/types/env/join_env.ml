@@ -1958,6 +1958,22 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
       joined_envs;
     Printexc.raise_with_backtrace Misc.Fatal_error bt
 
+let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+    source_env source_tenv joined_envs equations_to_join
+    symbol_projections_to_join =
+  (* If there is nothing to join, all input environments are bottom and we
+     should not do a join -- in fact, [fold_incremental_join] would raise an
+     exception ("cannot join an empty list").
+
+     Note: we wrap the true [cut_and_n_way_join0] to avoid hurting readability
+     by increasing indentation. *)
+  if Index.Map.is_empty equations_to_join
+  then ME.make_bottom source_env, Name_in_target_env.Map.empty
+  else
+    cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+      source_env source_tenv joined_envs equations_to_join
+      symbol_projections_to_join
+
 (* Join analysis *)
 
 module Analysis = struct
