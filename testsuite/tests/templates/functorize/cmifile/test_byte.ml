@@ -202,5 +202,14 @@
 
    compiler_reference = "bad_cmi_file_struct.reference";
    check-ocamlc.byte-output;
+
+   (* The failing inclusion should not delete the input [-cmi-file]
+      (this invocation writes no cmi at all).
+
+      CURRENT BEHAVIOR (bug): the error-path cleanup removes
+      [<prefix>.cmi], which here is the input cmi itself. *)
+
+   script = "sh -c '! test -f bundle_bad/bundle_bad.cmi'";
+   script;
  }
 *)
