@@ -589,11 +589,6 @@ let option : 'a. ('a -> term_judg) -> 'a option -> term_judg =
 let list : 'a. ('a -> term_judg) -> 'a list -> term_judg =
   fun f li m ->
     List.fold_left (fun env item -> Env.join env (f item m)) Env.empty li
-let listi : 'a. (int -> 'a -> term_judg) -> 'a list -> term_judg =
-  fun f li m ->
-    List.fold_left (fun (idx, env) item -> idx+1, Env.join env (f idx item m))
-      (0, Env.empty) li
-    |> (snd : (int * Env.t) -> Env.t)
 let array : 'a. ('a -> term_judg) -> 'a array -> term_judg =
   fun f ar m ->
     Array.fold_left (fun env item -> Env.join env (f item m)) Env.empty ar
@@ -785,33 +780,23 @@ let rec expression : Typedtree.expression -> term_judg =
           path pth << Dereference
         | _ -> empty
       in
-      let arg_mode i = match desc.cstr_repr with
+      let arg_mode = match desc.cstr_repr with
         | Variant_unboxed | Variant_with_null ->
           Return
         | Variant_boxed _ | Variant_extensible ->
            (match shape with
-            | Constructor_uniform_value -> Guard
-            | Constructor_mixed mixed_shape ->
-                (match mixed_shape.(i) with
-                 | Scannable _ | Float_boxed -> Guard
-                 | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
-                 | Void | Product _ ->
-                   Dereference)
+            | Constructor_uniform_value
+            | Constructor_mixed _
+            | Constructor_variable _ ->
+              Guard
             | Constructor_undetermined ->
                 Misc.fatal_error
-                  "value_rec_check: unexpected undetermined representation"
-            | Constructor_variable _ ->
-                if Misc.Stdlib.Option.exists
-                     Jkind.Sort.Const.(equal scannable)
-                     (List.nth desc.cstr_args i).ca_sort
-                then Guard
-                else Dereference)
+                  "value_rec_check: unexpected undetermined representation")
       in
-      let arg i (_sort, e) = expression e << arg_mode i in
+      let arg (_sort, e) = expression e << arg_mode in
       join [
         access_constructor;
-        listi arg exprs;
+        list arg exprs;
       ]
     | Texp_variant (_, eo) ->
       (*
@@ -822,40 +807,29 @@ let rec expression : Typedtree.expression -> term_judg =
       option (fun (e, _) -> expression e) eo << Guard
     | Texp_record { fields = es; extended_expression = eo;
                     representation = rep } ->
-        let field_mode (label : Data_types.label_description) =
+        let field_mode =
           match rep with
-          | Record_float | Record_ufloat -> Dereference
+          | Record_float -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
-          | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
+          | Record_boxed | Record_ufloat | Record_mixed _ | Record_variable _
+          | Record_inlined
+              (_, (Constructor_uniform_value | Constructor_mixed _
+                  | Constructor_variable _), _) ->
               Guard
-          | Record_inlined (_, Constructor_mixed mixed_shape, _)
-          | Record_mixed mixed_shape ->
-            (match mixed_shape.(label.lbl_pos) with
-             | Scannable _ | Float_boxed -> Guard
-             | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-             | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
-             | Void | Product _ ->
-               Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
           | Record_inlined (_, Constructor_undetermined, _)
           | Record_undetermined ->
             Misc.fatal_error
               "value_rec_check: unexpected undetermined representation"
-          | Record_inlined (_, Constructor_variable _, _)
-          | Record_variable _ ->
-            if Misc.Stdlib.Option.exists
-                 Jkind.Sort.Const.(equal scannable) label.lbl_sort
-            then Guard
-            else Dereference
         in
-        let field ((label : Data_types.label_description), _sort, field_def) =
+        let field (_, _, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
             | Overridden (_, e) -> expression e
           in
-          env << field_mode label
+          env << field_mode
         in
         join [
           array field es;
