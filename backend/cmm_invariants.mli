@@ -44,7 +44,8 @@ val run : Format.formatter -> Cmm.fundecl -> bool
     [Select_utils.oper_result_type]), and the machtype of the body against
     [fun_ret_type]. Calls [Misc.fatal_error] on the first violation.
 
-    Some argument slots (e.g. addresses, which may be [Val], [Addr] or naked
-    pointers) are not determined by the operation; checks on them are
-    skipped. *)
+    Argument slots whose machtypes are not determined by the operation (e.g.
+    arguments to an application whose signature is unavailable) are not
+    checked. Address operands are checked against [Cmm.typ_addr], which accepts
+    [Int], [Val] and [Addr] under the partial order. *)
 val check_machtypes : Cmm.fundecl -> unit

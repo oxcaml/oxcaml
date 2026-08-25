@@ -85,8 +85,8 @@ val typ_int128 : machtype
 val lub_component :
   machtype_component -> machtype_component -> machtype_component
 
-(** Version of [lub_component] that returns [None] for uncomparable
-    components. *)
+(** Version of [lub_component] that returns [None] for uncomparable components.
+*)
 val lub_component_opt :
   machtype_component -> machtype_component -> machtype_component option
 

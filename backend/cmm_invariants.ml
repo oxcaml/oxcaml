@@ -180,28 +180,28 @@ let run ppf (fundecl : Cmm.fundecl) =
 
 (* Machtype checking *)
 
-let machtype_of_float_width : float_width -> machtype = function
+let machtype_of_float_width = function
   | Float64 -> typ_float
   | Float32 -> typ_float32
 
-let machtype_of_vector_width : vector_width -> machtype = function
+let machtype_of_vector_width = function
   | Vec128 -> typ_vec128
   | Vec256 -> typ_vec256
   | Vec512 -> typ_vec512
 
-let machtype_of_vec128_scalar : vec128_type -> machtype = function
+let machtype_of_vec128_scalar = function
   | Float64x2 -> typ_float
   | Float32x4 -> typ_float32
   | Float16x8 -> Misc.fatal_error "float16x8: scalar type not supported"
   | Int8x16 | Int16x8 | Int32x4 | Int64x2 -> typ_int
 
-let machtype_of_vec256_scalar : vec256_type -> machtype = function
+let machtype_of_vec256_scalar = function
   | Float64x4 -> typ_float
   | Float32x8 -> typ_float32
   | Float16x16 -> Misc.fatal_error "float16x16: scalar type not supported"
   | Int8x32 | Int16x16 | Int32x8 | Int64x4 -> typ_int
 
-let machtype_of_vec512_scalar : vec512_type -> machtype = function
+let machtype_of_vec512_scalar = function
   | Float64x8 -> typ_float
   | Float32x16 -> typ_float32
   | Float16x32 -> Misc.fatal_error "float16x32: scalar type not supported"
@@ -221,17 +221,17 @@ let reinterpret_cast_arg_type : reinterpret_cast -> machtype = function
   | V128_of_vec width | V256_of_vec width | V512_of_vec width ->
     machtype_of_vector_width width
 
-let static_cast_arg_type : static_cast -> machtype = function
-  | Float_of_int (_ : float_width) -> typ_int
+let static_cast_arg_type = function
+  | Float_of_int _ -> typ_int
   | Int_of_float width -> machtype_of_float_width width
   | Float_of_float32 -> typ_float32
   | Float32_of_float -> typ_float
   | V128_of_scalar ty -> machtype_of_vec128_scalar ty
-  | Scalar_of_v128 (_ : vec128_type) -> typ_vec128
+  | Scalar_of_v128 _ -> typ_vec128
   | V256_of_scalar ty -> machtype_of_vec256_scalar ty
-  | Scalar_of_v256 (_ : vec256_type) -> typ_vec256
+  | Scalar_of_v256 _ -> typ_vec256
   | V512_of_scalar ty -> machtype_of_vec512_scalar ty
-  | Scalar_of_v512 (_ : vec512_type) -> typ_vec512
+  | Scalar_of_v512 _ -> typ_vec512
 
 type expected_arg_type =
   | Exactly of machtype
@@ -251,7 +251,7 @@ type expected_arg_types =
 
 (* The machtypes an operation expects for its arguments, in the style of
    [Select_utils.oper_result_type]. *)
-let oper_arg_types : operation -> expected_arg_types = function
+let oper_arg_types = function
   | Capply _ ->
     Args_then_any_number_of
       ([Exactly typ_val (* closure or code pointer *)], Any_machtype)
@@ -261,7 +261,7 @@ let oper_arg_types : operation -> expected_arg_types = function
   | Cextcall { ty_args = _ :: _ as ty_args; _ } ->
     Args
       (List.map
-         (fun (ty_arg : exttype) ->
+         (fun ty_arg ->
            match ty_arg with
            | XInt ->
              (* [XInt] is used for values as well as word-sized integers. *)
@@ -376,7 +376,7 @@ let dbg_suffix dbg =
   else Format.asprintf " at %a" Debuginfo.print_compact dbg
 
 (* [what] is only evaluated on error. *)
-let check_machtype ~dbg ~what ~expected (actual : inferred_machtype) =
+let check_machtype ~dbg ~what ~expected actual =
   match actual with
   | Never_returns -> ()
   | Machtype actual ->
@@ -420,7 +420,7 @@ let join_inferred_machtypes ~dbg ty1 ty2 =
            machtype %a"
           (dbg_suffix dbg) Printcmm.machtype ty1 Printcmm.machtype ty2
 
-let join_all_inferred_machtypes ~dbg tys =
+let join_inferred_machtype_list ~dbg tys =
   List.fold_left (join_inferred_machtypes ~dbg) Never_returns tys
 
 type typechecking_env =
@@ -433,13 +433,11 @@ let concat_inferred_machtypes tys =
   List.fold_left
     (fun acc ty ->
       match acc, ty with
-      | Never_returns, (Machtype _ | Never_returns) | Machtype _, Never_returns
-        ->
-        Never_returns
-      | Machtype tys, Machtype ty -> Machtype (Array.append tys ty))
+      | Machtype tys, Machtype ty -> Machtype (Array.append tys ty)
+      | Never_returns, _ | _, Never_returns -> Never_returns)
     (Machtype typ_void) tys
 
-let rec infer_machtype env (expr : expression) : inferred_machtype =
+let rec infer_machtype env expr =
   match expr with
   | Cconst_int _ | Cconst_natint _ -> Machtype typ_int
   | Cconst_symbol _ -> Machtype typ_val
@@ -489,7 +487,7 @@ let rec infer_machtype env (expr : expression) : inferred_machtype =
       ~what:(fun () -> "switch scrutinee")
       ~expected:typ_int scrutinee_ty;
     let cases_ty =
-      join_all_inferred_machtypes ~dbg
+      join_inferred_machtype_list ~dbg
         (Array.to_list
            (Array.map
               (fun (case, _) -> infer_machtype env case)
@@ -513,7 +511,7 @@ let rec infer_machtype env (expr : expression) : inferred_machtype =
     let body_ty = infer_machtype env body in
     let handler_tys =
       List.map
-        (fun (handler : static_handler) ->
+        (fun handler ->
           let env =
             { env with
               vars =
@@ -525,7 +523,7 @@ let rec infer_machtype env (expr : expression) : inferred_machtype =
           infer_machtype env handler.body)
         handlers
     in
-    join_all_inferred_machtypes ~dbg:Debuginfo.none (body_ty :: handler_tys)
+    join_inferred_machtype_list ~dbg:Debuginfo.none (body_ty :: handler_tys)
   | Cexit (label, args, _) ->
     (* Compare exit arguments and handler parameters after flattening their
        machtypes into components. *)
@@ -552,7 +550,7 @@ let rec infer_machtype env (expr : expression) : inferred_machtype =
     Never_returns
   | Cinvalid _ -> Never_returns
 
-and typecheck_cop env op args dbg : inferred_machtype =
+and typecheck_cop env op args dbg =
   let arg_tys = List.map (infer_machtype env) args in
   let check_arg arg_index expected actual =
     match expected with
@@ -628,7 +626,7 @@ and typecheck_cop env op args dbg : inferred_machtype =
     | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause ->
       Machtype (Select_utils.oper_result_type op)
 
-let check_machtypes (fundecl : fundecl) =
+let check_machtypes fundecl =
   let vars =
     List.fold_left
       (fun vars (var, ty) -> V.Map.add (VP.var var) ty vars)
