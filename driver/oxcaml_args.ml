@@ -218,6 +218,16 @@ let mk_cfg_merge_blocks f =
 let mk_no_cfg_merge_blocks f =
   ("-no-cfg-merge-blocks", Arg.Unit f, " Do not merge equivalent CFG blocks")
 
+let mk_cfg_cse_join_points f =
+  ( "-cfg-cse-join-points",
+    Arg.Unit f,
+    " Propagate CSE information across join points in the CFG" )
+
+let mk_no_cfg_cse_join_points f =
+  ( "-no-cfg-cse-join-points",
+    Arg.Unit f,
+    " Do not propagate CSE information across join points in the CFG" )
+
 let mk_cfg_value_propagation f =
   ("-cfg-value-propagation", Arg.Unit f, " Propagate value to simplify CFG")
 
@@ -1336,6 +1346,8 @@ module type Oxcaml_options = sig
   val no_omit_leaf_frame_pointers : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
+  val cfg_cse_join_points : unit -> unit
+  val no_cfg_cse_join_points : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit
@@ -1531,6 +1543,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_omit_leaf_frame_pointers F.no_omit_leaf_frame_pointers;
       mk_cfg_merge_blocks F.cfg_merge_blocks;
       mk_no_cfg_merge_blocks F.no_cfg_merge_blocks;
+      mk_cfg_cse_join_points F.cfg_cse_join_points;
+      mk_no_cfg_cse_join_points F.no_cfg_cse_join_points;
       mk_cfg_value_propagation F.cfg_value_propagation;
       mk_no_cfg_value_propagation F.no_cfg_value_propagation;
       mk_cfg_value_propagation_float F.cfg_value_propagation_float;
@@ -1888,6 +1902,8 @@ module Oxcaml_options_impl = struct
   let no_omit_leaf_frame_pointers = clear' Oxcaml_flags.omit_leaf_frame_pointers
   let cfg_merge_blocks = set' Oxcaml_flags.cfg_merge_blocks
   let no_cfg_merge_blocks = clear' Oxcaml_flags.cfg_merge_blocks
+  let cfg_cse_join_points = set' Oxcaml_flags.cfg_cse_join_points
+  let no_cfg_cse_join_points = clear' Oxcaml_flags.cfg_cse_join_points
   let cfg_value_propagation = set' Oxcaml_flags.cfg_value_propagation
   let no_cfg_value_propagation = clear' Oxcaml_flags.cfg_value_propagation
 
@@ -1913,6 +1929,7 @@ module Oxcaml_options_impl = struct
     regalloc_param "BIT_MATRIX_THRESHOLD:8192";
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
+    cfg_cse_join_points ();
     cfg_eliminate_dead_trap_handlers ();
     cfg_value_propagation_flow ()
 
@@ -2457,6 +2474,7 @@ module Extra_params = struct
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
+    | "cfg-cse-join-points" -> set' Oxcaml_flags.cfg_cse_join_points
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
     | "cfg-value-propagation-float" ->
         set' Oxcaml_flags.cfg_value_propagation_float
