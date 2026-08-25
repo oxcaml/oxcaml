@@ -223,7 +223,7 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
       related_uids;
       module_facts =
         if module_implementation_facts_present then
-          Some (link_module_facts Module_facts_compact.empty)
+          Some (link_module_facts facts_run)
         else into.module_facts;
       root_directory = into.root_directory
     },
@@ -313,11 +313,8 @@ let facts_of_index_input ~file (index : index) =
   match index.module_facts with
   | None -> (Module_implementation_facts.empty, false)
   | Some module_facts -> (
-    match Module_facts_compact.to_facts (module_facts_block module_facts) with
-    | Ok facts -> (facts, true)
-    | Error message ->
-      Log.error "Cannot read the module facts of %s: %s" file message;
-      (Module_implementation_facts.empty, false)
+    match fetch_module_facts module_facts with
+    | facts -> (facts, true)
     | exception exn ->
       Log.error "Cannot read the module facts of %s: %s" file
         (Printexc.to_string exn);
@@ -421,7 +418,7 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
       module_facts =
         Option.map
           (fun _ ->
-            inline_module_facts
+            link_module_facts
               (Module_implementation_facts.merge_many (List.rev facts_runs)))
           final_index.module_facts
     }
@@ -479,7 +476,7 @@ let gather_shapes ~output_file files =
       module_facts =
         Option.map
           (fun _ ->
-            inline_module_facts
+            link_module_facts
               (Module_implementation_facts.merge_many (List.rev facts_runs)))
           final_index.module_facts
     }
