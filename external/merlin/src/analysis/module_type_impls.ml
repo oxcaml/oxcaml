@@ -187,7 +187,7 @@ end = struct
     match key with
     | Named { context; family_uid } ->
       Named (find t (intern t context), family_uid)
-    | Anon { key_uid } -> Anon key_uid
+    | Anon uid -> Anon uid
 
   let key_id t (key : Key.t) =
     let repr = key_repr t key in
