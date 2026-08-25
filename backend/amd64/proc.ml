@@ -431,10 +431,10 @@ let destroyed_at_alloc =
   if X86_proc.use_plt then destroyed_by_plt_stub else [| r11 |]
 
 let destroyed_at_poll =
-  (* Under faulting safepoints a poll overwrites %rcx (see the
+  (* Under faulting polls a poll overwrites %rcx (see the
      [Lop Poll] case in emit.ml); the register must have a REX-free 32-bit
      load so that the faulting instruction is 2/3 bytes long. *)
-  if Config.faulting_safepoints
+  if Config.faulting_polls
   then [| rcx |]
   else destroyed_at_alloc
 
