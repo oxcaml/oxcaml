@@ -1,4 +1,4 @@
-    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_start(param=() : unit @ value)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float(x=#4.1 : float# @ float64)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float(x=#0.0 : float# @ float64)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_unboxed_float(x=-#3.14 : float# @ float64)

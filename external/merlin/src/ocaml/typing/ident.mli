@@ -49,6 +49,9 @@ val rename: t -> t
             stamp, and no scope.
             @raise [Fatal_error] if called on a persistent / predef ident. *)
 
+val rename_with_stamp: int -> t -> t
+        (** Like {!rename}, but with the given stamp rather than a fresh one. *)
+
 val name: t -> string
 val unique_name: t -> string
 val canonical_name: t -> string
