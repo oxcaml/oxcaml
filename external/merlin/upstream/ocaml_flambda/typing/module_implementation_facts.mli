@@ -54,7 +54,8 @@ module Key : sig
               (** The location of this specific module-type occurrence *)
           family_uid : Shape.Uid.t  (** The original module-type declaration *)
         }
-    | Anon of { key_uid : Shape.Uid.t }
+    | Anon of Shape.Uid.t
+      (** [Anon uid] represents an anonymous module with uid [uid]. *)
 
   val compare : t -> t -> int
 

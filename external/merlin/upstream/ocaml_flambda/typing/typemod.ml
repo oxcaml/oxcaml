@@ -4627,10 +4627,10 @@ let type_implementation target modulename initial_env ast =
   in
   let save_cmt_and_cms ~unit_interface ?argument_interface
       target annots initial_env cmi shape =
-      let decl_deps =
-        (* This is cleared after saving the cmt so we have to save is before *)
-        Cmt_format.get_declaration_dependencies ()
-      in
+    let decl_deps =
+      (* This is cleared after saving the cmt so we have to save it before *)
+      Cmt_format.get_declaration_dependencies ()
+    in
     let facts =
       module_implementation_facts_if_saved ~unit_interface ~argument_interface
         modulename annots decl_deps
