@@ -141,7 +141,7 @@ let emit_signature info alerts ?argument_interface tsg =
       (Compilation_unit.name info.module_name) kind
       (Unit_info.cmi info.target)
   in
-  Typemod.save_signature ?argument_interface info.target info.module_name tsg
+  Typemod.save_signature ~argument_interface info.target info.module_name tsg
     info.env sg
 
 let interface ~hook_parse_tree ~hook_typed_tree info =

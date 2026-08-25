@@ -1296,9 +1296,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       { id = None;
         name = loc;
         presence = Mp_present;
+        uid = _;
         module_expr = modl;
         body;
-        _
       } ->
       let mod_scopes = enter_anonymous_module ~scopes ~loc:loc.loc in
       let lam = !transl_module ~scopes:mod_scopes Tcoerce_none None modl in

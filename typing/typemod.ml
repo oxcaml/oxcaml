@@ -1463,7 +1463,8 @@ let rec approx_modtype env smty =
   match smty.pmty_desc with
     Pmty_ident lid ->
       let path =
-        Env.lookup_modtype_path ~use:false ~loc:smty.pmty_loc lid.txt env
+        fst
+          (Env.lookup_modtype_path ~use:false ~loc:smty.pmty_loc lid.txt env)
       in
       Mty_ident path
   | Pmty_alias lid ->
@@ -2022,7 +2023,7 @@ let has_remove_aliases_attribute attr =
 (* Check and translate a module type expression *)
 
 let transl_modtype_longident loc env lid =
-  Env.lookup_modtype_path ~loc lid env
+  fst (Env.lookup_modtype_path ~loc lid env)
 
 let transl_module_alias loc env lid =
   let path, _ = Env.lookup_module_path ~load:false ~loc lid env in
@@ -2062,14 +2063,10 @@ and transl_modtype_aux env smty =
   let loc = smty.pmty_loc in
   match smty.pmty_desc with
     Pmty_ident lid ->
-      let path = transl_modtype_longident loc env lid.txt in
+      let path, declaration = Env.lookup_modtype_path ~loc lid.txt env in
       (* Read the uid off the lazy declaration: forcing it here would defeat
          the laziness of module type declarations. *)
-      let uid =
-        match Env.find_modtype_lazy path env with
-        | { mtd_uid; _ } -> Some mtd_uid
-        | exception Not_found -> None
-      in
+      let uid = Some declaration.Subst.Lazy.mtd_uid in
       mkmty ?uid (Tmty_ident (path, lid)) (Mty_ident path) env loc
         smty.pmty_attributes
   | Pmty_alias lid ->
@@ -3552,7 +3549,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         mod_loc = funct.mod_loc },
       Shape.app funct_shape ~arg:Shape.dummy_mod
   | Mty_functor
-      (Named (param, mty_param, _param_uid, mm_param), mty_res, mm_res)
+      (Named (param, mty_param, _param_mty_uid, mm_param), mty_res, mm_res)
       as mty_functor ->
       let mm_param = alloc_as_value mm_param in
       let mm_res = alloc_as_value mm_res in
@@ -4625,7 +4622,7 @@ let type_implementation target modulename initial_env ast =
   let error e =
     raise (Error (Location.in_file sourcefile, initial_env, e))
   in
-  let save_cmt_and_cms ~unit_interface ?argument_interface
+  let save_cmt_and_cms ~unit_interface ~argument_interface
       target annots initial_env cmi shape =
     let decl_deps =
       (* This is cleared after saving the cmt so we have to save it before *)
@@ -4763,7 +4760,7 @@ let type_implementation target modulename initial_env ast =
           Profile.record_call "save_cmt" (fun () ->
             let shape = Shape_reduce.local_reduce Env.empty shape in
             let annots = Cmt_format.Implementation str in
-            save_cmt_and_cms ~unit_interface:true ?argument_interface
+            save_cmt_and_cms ~unit_interface:true ~argument_interface
               target annots initial_env None (Some shape));
           { structure = str;
             coercion;
@@ -4825,7 +4822,7 @@ let type_implementation target modulename initial_env ast =
             in
             Profile.record_call "save_cmt" (fun () ->
               let annots = Cmt_format.Implementation str in
-              save_cmt_and_cms ~unit_interface:false ?argument_interface
+              save_cmt_and_cms ~unit_interface:false ~argument_interface
                 target annots initial_env (Some cmi) (Some shape));
           end;
           { structure = str;
@@ -4843,11 +4840,11 @@ let type_implementation target modulename initial_env ast =
             Cmt_format.Partial_implementation
               (Array.of_list (Cmt_format.get_saved_types ()))
           in
-          save_cmt_and_cms ~unit_interface:false target annots initial_env
-            None None)
+          save_cmt_and_cms ~unit_interface:false ~argument_interface:None target
+            annots initial_env None None)
       )
 
-let save_signature ?argument_interface target modname tsg initial_env cmi =
+let save_signature ~argument_interface target modname tsg initial_env cmi =
   let decl_deps =
     (* This is cleared after saving the cmt so we have to save is before *)
     Cmt_format.get_declaration_dependencies ()
