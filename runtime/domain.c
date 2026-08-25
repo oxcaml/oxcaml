@@ -392,11 +392,9 @@ Caml_inline bool domain_in_blocking_section(dom_internal *d)
    interrupters that can afford to wait set the [young_limit] alone,
    give victims time to notice it at an allocation check, and set the
    faulting trigger only for any domain that has not acked by
-   then. Delays are in nanoseconds. Set with tweaks Xstw_poll_delay
-   and Xtick_poll_delay. 0 (the default) keeps the previous behaviour
-   of setting the trigger immediately. */
-uintnat caml_stw_poll_delay_ns = 0;
-uintnat caml_tick_poll_delay_ns = 0;
+   then. Delays are in nanoseconds. */
+#define POLL_STW_DELAY_NS 200
+#define POLL_TICK_DELAY_NS 200
 
 /* Diagnostic counters. [fault_count] is incremented in the SEGV
    handler; [trigger_count] on a cross-domain trigger setting. Printed
@@ -1903,19 +1901,12 @@ int caml_try_run_on_all_domains_with_spin_work(
   }
 #endif
 
-  /* Next, interrupt all domains. When staged interrupts are enabled,
-     interrupt only their allocation checks here; stage 2 below sets
-     the faulting triggers of the slow ones. */
-  bool staged = false;
-#ifdef FAULTING_POLLS
-  staged = should_sync && caml_stw_poll_delay_ns > 0;
-#endif
   for(i = 0; i < stw_domains.participating_domains; i++) {
     dom_internal * d = stw_domains.domains[i];
     stw_request.participating[i] = d->state;
     CAMLassert(!domain_has_pending(d));
     atomic_store_relaxed(&d->stw_acked, 0);
-    if (d->state != domain_state) caml_send_interrupt(d, !staged);
+    if (d->state != domain_state) caml_send_interrupt(d, should_sync);
   }
 
 
@@ -1936,10 +1927,10 @@ int caml_try_run_on_all_domains_with_spin_work(
   caml_plat_unlock(&all_domains_lock);
 
 #ifdef FAULTING_POLLS
-  /* Interrupt stage 2: busy-wait for up to [caml_stw_poll_delay_ns]
+  /* Interrupt stage 2: busy-wait for up to [POLL_STW_DELAY_NS]
      to acknowledge, then set the faulting trigger for the rest. */
-  if (staged) {
-    uint64_t deadline = caml_time_counter() + caml_stw_poll_delay_ns;
+  if (should_sync) {
+    uint64_t deadline = caml_time_counter() + POLL_STW_DELAY_NS;
     bool trigger = true;
     while (trigger && caml_time_counter() < deadline) {
       trigger = false;
@@ -2505,46 +2496,36 @@ static void caml_do_tick_all_domains(void)
        caml_state isn't freed or otherwise invalidated on domain
        termination. */
     atomic_store_release(&d->state->requested_tick, true);
-#ifdef FAULTING_POLLS
-    if (caml_tick_poll_delay_ns > 0)
-      interrupt_domain_alloc_checks(d);
-    else
-      interrupt_domain(d);
-#else
     interrupt_domain(d);
-#endif
   }
 #ifdef FAULTING_POLLS
-  /* Tick interrupt stage 2: busy-wait for up to
-     [caml_tick_poll_delay_ns] to acknowledge (by clearing
-     [requested_tick]), then set the faulting trigger for the rest.
-     Unlike the STW case no barrier holds the victims, so there's a
-     race condition: a domain can fault after having processed the
-     tick. That's harmless. */
-  if (caml_tick_poll_delay_ns > 0) {
-    uint64_t deadline = caml_time_counter() + caml_tick_poll_delay_ns;
-    bool trigger = true;
-    while (trigger && caml_time_counter() < deadline) {
-      trigger = false;
-      for (dom_internal *d = all_domains;
-           d < &all_domains[caml_params->max_domains]; d++) {
-        if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
-        if (atomic_load_acquire(&d->state->requested_tick) &&
-            !domain_in_blocking_section(d)) {
-          trigger = true;
-          break;
-        }
+  /* Tick interrupt stage 2: busy-wait for up to [POLL_TICK_DELAY_NS]
+     to acknowledge (by clearing [requested_tick]), then set the
+     faulting trigger for the rest.  Unlike the STW case no barrier
+     holds the victims, so there's a race condition: a domain can
+     fault after having processed the tick. That's harmless. */
+  uint64_t deadline = caml_time_counter() + POLL_TICK_DELAY_NS;
+  bool trigger = true;
+  while (trigger && caml_time_counter() < deadline) {
+    trigger = false;
+    for (dom_internal *d = all_domains;
+         d < &all_domains[caml_params->max_domains]; d++) {
+      if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
+      if (atomic_load_acquire(&d->state->requested_tick) &&
+          !domain_in_blocking_section(d)) {
+        trigger = true;
+        break;
       }
-      if (trigger) cpu_relax();
     }
-    if (trigger) {
-      for (dom_internal *d = all_domains;
-           d < &all_domains[caml_params->max_domains]; d++) {
-        if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
-        if (atomic_load_acquire(&d->state->requested_tick) &&
-            !domain_in_blocking_section(d))
-          interrupt_domain_polls(d);
-      }
+    if (trigger) cpu_relax();
+  }
+  if (trigger) {
+    for (dom_internal *d = all_domains;
+         d < &all_domains[caml_params->max_domains]; d++) {
+      if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
+      if (atomic_load_acquire(&d->state->requested_tick) &&
+          !domain_in_blocking_section(d))
+        interrupt_domain_polls(d);
     }
   }
 #endif
