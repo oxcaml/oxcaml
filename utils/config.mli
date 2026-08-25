@@ -342,8 +342,8 @@ val stack_allocation : bool
 val poll_insertion : bool
 (** Whether to insert poll points *)
 
-val faulting_safepoints : bool
-(** Whether poll points compile to a safepoint-trigger load resolved by
+val faulting_polls : bool
+(** Whether poll points compile to a poll-trigger load resolved by
     the runtime's SEGV handler, rather than a young-limit comparison
     (amd64 and arm64, on Linux and macOS) *)
 

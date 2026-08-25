@@ -160,11 +160,11 @@ void caml_redo_preempted_allocation(void)
   }
 }
 
-#if defined(STACK_GUARD_PAGES) || defined(FAULTING_SAFEPOINTS)
+#if defined(STACK_GUARD_PAGES) || defined(FAULTING_POLLS)
 
 #if !defined(POSIX_SIGNALS)
-#error "POSIX signals are required for stack guard pages and for the \
-faulting safepoints"
+#error "POSIX signals are required for stack guard pages and for \
+faulting polls"
 #endif
 
 typedef void (*sigaction_t)(int sig, siginfo_t *info, void *context);
@@ -185,7 +185,7 @@ static sigaction_t prior_segv_handler = NULL;
 static sigaction_t prior_sigbus_handler = NULL;
 #endif
 
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
 
 /* The GC entry stub common to all architectures (amd64.S, arm64.S). */
 extern void caml_call_gc(void);
@@ -212,7 +212,7 @@ typedef struct {
    si_addr in the handler. */
 #define FAULT_ADDR_RANGE 256
 
-#endif /* FAULTING_SAFEPOINTS */
+#endif /* FAULTING_POLLS */
 
 /**** AMD64: context accessors and fault instruction encodings ****/
 
@@ -231,7 +231,7 @@ Caml_inline void context_set_pc(ucontext_t* context, void (*pc)(void))
 #endif
 }
 
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
 
 Caml_inline unsigned char* context_pc(ucontext_t* context)
 {
@@ -298,7 +298,7 @@ static const fault_insn fault_insns[] = {
   {3, 3, 12, &caml_call_gc_avx512, {0x8b, 0x49, 0x0c}}, /* movl 12(%rcx),%ecx */
 };
 
-#endif /* FAULTING_SAFEPOINTS */
+#endif /* FAULTING_POLLS */
 
 #endif /* TARGET_amd64 */
 
@@ -327,7 +327,7 @@ Caml_inline void context_set_pc(ucontext_t* context, void (*pc)(void))
 #endif
 }
 
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
 
 Caml_inline uintnat context_sp(ucontext_t* context)
 {
@@ -369,13 +369,13 @@ static const fault_insn fault_insns[] = {
   {4, 4, 0, &caml_call_gc, {0x10, 0x02, 0x40, 0xb9}}, /* ldr w16, [x16] */
 };
 
-#endif /* FAULTING_SAFEPOINTS */
+#endif /* FAULTING_POLLS */
 
 #endif /* TARGET_arm64 */
 
 /**** Fault instruction recognition (architecture-independent) ****/
 
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
 
 #define FAULT_INSNS_COUNT (sizeof fault_insns / sizeof fault_insns[0])
 
@@ -401,11 +401,11 @@ static const fault_insn* fault_insn_match(const unsigned char* pc)
    crashes in the ordinary way. Runs in signal context: everything
    here is a plain load or a relaxed atomic on this domain's own
    state, and [caml_find_frame_descr] is a lock-free probe. */
-static const fault_insn* safepoint_fault_check(siginfo_t* info,
+static const fault_insn* poll_fault_check(siginfo_t* info,
                                               ucontext_t* context)
 {
   /* not an access to the trigger page */
-  if ((uintnat) info->si_addr - (uintnat) caml_safepoint_trigger_page >=
+  if ((uintnat) info->si_addr - (uintnat) caml_poll_trigger_page >=
       FAULT_ADDR_RANGE) {
     return NULL;
   }
@@ -420,8 +420,8 @@ static const fault_insn* safepoint_fault_check(siginfo_t* info,
   /* Running OCaml: domain state is set, and trigger is armed. */
   caml_domain_state* dom_st = Caml_state;
   if (dom_st == NULL) return NULL;
-  if (atomic_load_relaxed(&dom_st->safepoint_trigger) !=
-      (uintnat) caml_safepoint_trigger_page)
+  if (atomic_load_relaxed(&dom_st->poll_trigger) !=
+      (uintnat) caml_poll_trigger_page)
     return NULL;
 
   /* Recognised faulting instruction, through the right register,
@@ -430,10 +430,10 @@ static const fault_insn* safepoint_fault_check(siginfo_t* info,
   unsigned char* pc = context_pc(context);
   const fault_insn* pi = fault_insn_match(pc);
   if (pi == NULL) return NULL;
-  if (context_fault_reg(context) != (uintnat) caml_safepoint_trigger_page)
+  if (context_fault_reg(context) != (uintnat) caml_poll_trigger_page)
     return NULL;
   if ((uintnat) info->si_addr !=
-      (uintnat) caml_safepoint_trigger_page + pi->addr_offset)
+      (uintnat) caml_poll_trigger_page + pi->addr_offset)
     return NULL;
 
   /* SP is word-aligned, inside the current fiber's Caml stack, with
@@ -459,7 +459,7 @@ static const fault_insn* safepoint_fault_check(siginfo_t* info,
   return pi;
 }
 
-#endif /* FAULTING_SAFEPOINTS */
+#endif /* FAULTING_POLLS */
 
 /* This handler may acquire more duties over time (e.g.  stack
    checks), so the dispatch is strict and check-heavy: no fault is
@@ -468,11 +468,11 @@ static const fault_insn* safepoint_fault_check(siginfo_t* info,
 DECLARE_SIGNAL_HANDLER(segv_handler)
 {
   struct sigaction act;
-#ifdef FAULTING_SAFEPOINTS
-  const fault_insn* pi = safepoint_fault_check(info, context);
+#ifdef FAULTING_POLLS
+  const fault_insn* pi = poll_fault_check(info, context);
   if (pi != NULL) {
     /* Diagnostic; relaxed suffices in signal context. */
-    atomic_fetch_add_explicit(&caml_safepoint_fault_count, 1,
+    atomic_fetch_add_explicit(&caml_poll_fault_count, 1,
                               memory_order_relaxed);
     context_fake_call(context, pi);
     return; /* to a caml_call_gc stub */
@@ -516,9 +516,9 @@ DECLARE_SIGNAL_HANDLER(segv_handler)
 void caml_init_nat_signals(void)
 {
   struct sigaction act, oldact;
-#ifndef FAULTING_SAFEPOINTS
-  /* The handler is optional when it only serves stack checks; under
-     faulting safepoints poll points rely on it. */
+#ifndef FAULTING_POLLS
+  /* The handler is optional when it only serves stack checks;
+     faulting poll points rely on it. */
   extern uintnat caml_enable_segv_handler;
   if (!caml_enable_segv_handler)
     return;
@@ -532,7 +532,7 @@ void caml_init_nat_signals(void)
   }
 #ifdef SYS_macosx
   /* Darwin delivers a protection fault on a mapped page (an armed
-     safepoint trigger, a fiber guard page) as SIGBUS, reserving
+     poll trigger, a fiber guard page) as SIGBUS, reserving
      SIGSEGV for unmapped addresses, so the handler must field both. */
   sigaction(SIGBUS, &act, &oldact);
   if (oldact.sa_sigaction != (sigaction_t)SIG_DFL) {

@@ -2373,19 +2373,19 @@ let emit_instr ~first ~last ~fallthrough i =
          }
          :: !local_realloc_sites
   | Lop Poll ->
-    if Config.faulting_safepoints
+    if Config.faulting_polls
     then (
-      (* A poll is a load through [Caml_state->safepoint_trigger], which faults
-         iff the runtime has armed the trigger by pointing it at an unmapped
-         page. The SEGV handler in the runtime makes the fault behave as a call
-         to a caml_call_gc* stub, so the frame descriptor is recorded after the
-         load. The handler relies on the exact encodings of the faulting load (2
-         or 3 bytes). The load's displacement tells the handler how much SIMD
-         state is live, and so which GC entry stub to enter. Displacements are
-         nonzero (to avoid assembler optimisation to a non-displaced load),
-         positive (to hit the trigger page), and multiples of 4 (so the same
-         values could be used on ARM64 in future). The SIMD versions cost one
-         byte, only at SIMD-live polls. *)
+      (* A poll is a load through [Caml_state->poll_trigger], which faults iff
+         the runtime has armed the trigger by pointing it at an unmapped page.
+         The SEGV handler in the runtime makes the fault behave as a call to a
+         caml_call_gc* stub, so the frame descriptor is recorded after the load.
+         The handler relies on the exact encodings of the faulting load (2 or 3
+         bytes). The load's displacement tells the handler how much SIMD state
+         is live, and so which GC entry stub to enter. Displacements are nonzero
+         (to avoid assembler optimisation to a non-displaced load), positive (to
+         hit the trigger page), and multiples of 4 (so the same values could be
+         used on ARM64 in future). The SIMD versions cost one byte, only at
+         SIMD-live polls. *)
       let disp =
         match must_save_simd_regs i.live with
         | Save_none -> 0
@@ -2393,7 +2393,7 @@ let emit_instr ~first ~last ~fallthrough i =
         | Save_ymm -> 8
         | Save_zmm -> 12
       in
-      I.mov (domain_field Domainstate.Domain_safepoint_trigger) rcx;
+      I.mov (domain_field Domainstate.Domain_poll_trigger) rcx;
       I.mov (mem64 DWORD disp (Scalar RCX)) ecx;
       record_frame i.live (Dbg_alloc []))
     else (
