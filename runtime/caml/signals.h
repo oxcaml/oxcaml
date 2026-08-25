@@ -60,15 +60,15 @@ CAMLextern int caml_check_pending_actions (void);
 
 #ifdef CAML_INTERNALS
 
-#ifdef FAULTING_SAFEPOINTS
-/* A page with no access rights; [safepoint_trigger] domain-state
+#ifdef FAULTING_POLLS
+/* A page with no access rights; [poll_trigger] domain-state
    fields are pointed here to make polls fault. Allocated by
    [caml_init_signals]; never freed. */
-CAMLextern void* caml_safepoint_trigger_page;
+CAMLextern void* caml_poll_trigger_page;
 
-/* Diagnostic counters for faulting safepoints */
-CAMLextern atomic_uintnat caml_safepoint_fault_count;
-CAMLextern atomic_uintnat caml_safepoint_trigger_count;
+/* Diagnostic counters for faulting polls */
+CAMLextern atomic_uintnat caml_poll_fault_count;
+CAMLextern atomic_uintnat caml_poll_trigger_count;
 #endif
 
 value caml_process_pending_actions_with_root (value extra_root); // raises

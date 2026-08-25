@@ -386,8 +386,8 @@ Caml_inline bool domain_in_blocking_section(dom_internal *d)
          == BT_IN_BLOCKING_SECTION;
 }
 
-#ifdef FAULTING_SAFEPOINTS
-/* Staged domain interruption. A faulting safepoint takes
+#ifdef FAULTING_POLLS
+/* Staged domain interruption. A faulting poll takes
    microseconds, ~100x longer than an allocation check, so
    interrupters that can afford to wait set the [young_limit] alone,
    give victims time to notice it at an allocation check, and set the
@@ -401,19 +401,19 @@ uintnat caml_tick_poll_delay_ns = 0;
 /* Diagnostic counters. [fault_count] is incremented in the SEGV
    handler; [trigger_count] on a cross-domain trigger setting. Printed
    at exit when caml_verb_gc has STATS set. */
-CAMLexport atomic_uintnat caml_safepoint_fault_count;
-CAMLexport atomic_uintnat caml_safepoint_trigger_count;
+CAMLexport atomic_uintnat caml_poll_fault_count;
+CAMLexport atomic_uintnat caml_poll_trigger_count;
 
-/* Stage 2 of a staged interrupt: faulting safepoints */
-Caml_inline void interrupt_domain_safepoints(dom_internal *d)
+/* Stage 2 of a staged interrupt: faulting polls */
+Caml_inline void interrupt_domain_polls(dom_internal *d)
 {
-  atomic_store_release(&d->state->safepoint_trigger,
-                       (uintnat) caml_safepoint_trigger_page);
-  atomic_fetch_add_explicit(&caml_safepoint_trigger_count, 1,
+  atomic_store_release(&d->state->poll_trigger,
+                       (uintnat) caml_poll_trigger_page);
+  atomic_fetch_add_explicit(&caml_poll_trigger_count, 1,
                             memory_order_relaxed);
 }
 #else
-Caml_inline void interrupt_domain_safepoints(dom_internal *d)
+Caml_inline void interrupt_domain_polls(dom_internal *d)
 {
 }
 #endif
@@ -428,14 +428,14 @@ Caml_inline void interrupt_domain_alloc_checks(dom_internal *d)
 Caml_inline void interrupt_domain(dom_internal *d)
 {
   interrupt_domain_alloc_checks(d);
-  interrupt_domain_safepoints(d);
+  interrupt_domain_polls(d);
 }
 
 Caml_inline void interrupt_domain_local(caml_domain_state* dom_st)
 {
-#ifdef FAULTING_SAFEPOINTS
-  atomic_store_relaxed(&dom_st->safepoint_trigger,
-                       (uintnat) caml_safepoint_trigger_page);
+#ifdef FAULTING_POLLS
+  atomic_store_relaxed(&dom_st->poll_trigger,
+                       (uintnat) caml_poll_trigger_page);
 #endif
   atomic_store_relaxed(&dom_st->young_limit, CAML_UINTNAT_MAX);
 }
@@ -487,13 +487,13 @@ static void caml_bt_signal(dom_internal* dom)
     caml_domain_send_interrupt_hook(dom->state);
 }
 
-static void caml_send_interrupt(dom_internal *target, bool safepoints)
+static void caml_send_interrupt(dom_internal *target, bool polls)
 {
   /* signal that there is an interrupt pending */
   domain_set_pending(target);
   interrupt_domain_alloc_checks(target);
-  if (safepoints)
-    interrupt_domain_safepoints(target);
+  if (polls)
+    interrupt_domain_polls(target);
 
   /* see caml_bt_exit_ocaml for explanation of this fence */
   atomic_thread_fence(memory_order_seq_cst);
@@ -781,7 +781,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->young_limit = 0;
   /* Disarmed: any readable address will do, this domain_state is one. */
-  domain_state->safepoint_trigger = (uintnat) domain_state;
+  domain_state->poll_trigger = (uintnat) domain_state;
   domain_state->unique_id = d->unique_id;
   atomic_store_relaxed(&domain_state->requested_tick, false);
 
@@ -1907,7 +1907,7 @@ int caml_try_run_on_all_domains_with_spin_work(
      interrupt only their allocation checks here; stage 2 below sets
      the faulting triggers of the slow ones. */
   bool staged = false;
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
   staged = should_sync && caml_stw_poll_delay_ns > 0;
 #endif
   for(i = 0; i < stw_domains.participating_domains; i++) {
@@ -1935,7 +1935,7 @@ int caml_try_run_on_all_domains_with_spin_work(
   */
   caml_plat_unlock(&all_domains_lock);
 
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
   /* Interrupt stage 2: busy-wait for up to [caml_stw_poll_delay_ns]
      to acknowledge, then set the faulting trigger for the rest. */
   if (staged) {
@@ -1961,7 +1961,7 @@ int caml_try_run_on_all_domains_with_spin_work(
         if (d->state != domain_state &&
             !atomic_load_acquire(&d->stw_acked) &&
             !domain_in_blocking_section(d))
-          interrupt_domain_safepoints(d);
+          interrupt_domain_polls(d);
       }
     }
   }
@@ -2094,26 +2094,26 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
               (uintnat)dom_st->memprof_young_trigger);
   CAMLassert ((uintnat)dom_st->young_ptr >=
               (uintnat)dom_st->young_trigger);
-#ifdef FAULTING_SAFEPOINTS
-  /* Disarm the safepoint trigger. The exchange (an RMW) synchronises
+#ifdef FAULTING_POLLS
+  /* Disarm the poll trigger. The exchange (an RMW) synchronises
      with a concurrent arming in [interrupt_domain]: if the arming is
      consumed here, the sender's earlier [domain_set_pending] is
      visible to the [domain_has_pending] test below, which re-arms; if
      it lands after the exchange, the trigger simply stays armed. */
-  atomic_exchange(&dom_st->safepoint_trigger, (uintnat)dom_st);
+  atomic_exchange(&dom_st->poll_trigger, (uintnat)dom_st);
 #endif
   /* An interrupt might have been queued in the meanwhile; this
      achieves the proper synchronisation. */
   atomic_exchange(&dom_st->young_limit, (uintnat)trigger);
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
   /* Polls do not compare [young_ptr] with [young_limit]; if the limit
      just published is already reached (e.g. a memprof sample is due:
      at sampling rate 1.0 [memprof_young_trigger] equals [young_ptr]),
      re-arm the trigger so that the next poll delivers the attention,
      as the comparison would under the old strategy. */
   if ((uintnat)dom_st->young_ptr <= (uintnat)trigger)
-    atomic_store_relaxed(&dom_st->safepoint_trigger,
-                         (uintnat)caml_safepoint_trigger_page);
+    atomic_store_relaxed(&dom_st->poll_trigger,
+                         (uintnat)caml_poll_trigger_page);
 #endif
 
   /* For non-delayable asynchronous actions, we immediately interrupt
@@ -2505,7 +2505,7 @@ static void caml_do_tick_all_domains(void)
        caml_state isn't freed or otherwise invalidated on domain
        termination. */
     atomic_store_release(&d->state->requested_tick, true);
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
     if (caml_tick_poll_delay_ns > 0)
       interrupt_domain_alloc_checks(d);
     else
@@ -2514,7 +2514,7 @@ static void caml_do_tick_all_domains(void)
     interrupt_domain(d);
 #endif
   }
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
   /* Tick interrupt stage 2: busy-wait for up to
      [caml_tick_poll_delay_ns] to acknowledge (by clearing
      [requested_tick]), then set the faulting trigger for the rest.
@@ -2543,7 +2543,7 @@ static void caml_do_tick_all_domains(void)
         if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
         if (atomic_load_acquire(&d->state->requested_tick) &&
             !domain_in_blocking_section(d))
-          interrupt_domain_safepoints(d);
+          interrupt_domain_polls(d);
       }
     }
   }
@@ -3036,12 +3036,12 @@ bool caml_free_domains(void)
 
 void caml_domain_report_stats(void)
 {
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
   CAML_GC_MESSAGE(STATS,
-                  "safepoint stats: faults %"ARCH_INTNAT_PRINTF_FORMAT"u, "
+                  "poll stats: faults %"ARCH_INTNAT_PRINTF_FORMAT"u, "
                   "triggers set %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
-                  (uintnat)atomic_load_relaxed(&caml_safepoint_fault_count),
-                  (uintnat)atomic_load_relaxed(&caml_safepoint_trigger_count));
+                  (uintnat)atomic_load_relaxed(&caml_poll_fault_count),
+                  (uintnat)atomic_load_relaxed(&caml_poll_trigger_count));
 #endif
 }
 
