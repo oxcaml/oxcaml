@@ -73,7 +73,7 @@ module Key = struct
         { context : Context.t;
           family_uid : Uid.t
         }
-    | Anon of { key_uid : Uid.t }
+    | Anon of Uid.t
 
   let compare left right =
     match left, right with
@@ -82,15 +82,14 @@ module Key = struct
       compare_pair Context.compare Uid.compare (c1, u1) (c2, u2)
     | Named _, Anon _ -> -1
     | Anon _, Named _ -> 1
-    | Anon { key_uid = left }, Anon { key_uid = right } ->
-      Uid.compare left right
+    | Anon left, Anon right -> Uid.compare left right
 
   let equal left right = compare left right = 0
 
   let print fmt = function
     | Named { context; family_uid } ->
       Format.fprintf fmt "%a@@%a" Uid.print family_uid Context.print context
-    | Anon { key_uid } -> Format.fprintf fmt "<%a>" Uid.print key_uid
+    | Anon uid -> Format.fprintf fmt "<%a>" Uid.print uid
 
   let family = function
     | Named { family_uid; _ } -> Some family_uid
@@ -831,12 +830,12 @@ let facts_of_tree compilation_unit artifact iterate =
       with
       | Some key -> key
       | None ->
-        let key = Key.Anon { key_uid = module_type.mty_uid } in
+        let key = Key.Anon module_type.mty_uid in
         add_omission ~affected:key Omission.Reason.Unresolved_module_type;
         key)
     | Tmty_signature _ | Tmty_functor _ | Tmty_with _ | Tmty_typeof _
     | Tmty_alias _ | Tmty_strengthen _ ->
-      Key.Anon { key_uid = module_type.mty_uid }
+      Key.Anon module_type.mty_uid
   in
   let uid_of_module_path env path =
     match find_normalized_module env path with
@@ -854,7 +853,7 @@ let facts_of_tree compilation_unit artifact iterate =
     | None -> add_omission ~affected:key Omission.Reason.Unresolved_module
     | Some declaration -> (
       let uid = declaration.Types.md_uid in
-      add_dependency key (Key.Anon { key_uid = uid }) reason;
+      add_dependency key (Key.Anon uid) reason;
       Option.iter
         (fun expectation -> add_dependency key expectation reason)
         (Uid.Map.find_opt uid !binding_expectations);
@@ -1029,7 +1028,7 @@ let facts_of_tree compilation_unit artifact iterate =
       (match expectation with
       | Some parameter_uid ->
         add_dependency key
-          (Key.Anon { key_uid = parameter_uid })
+          (Key.Anon parameter_uid)
           Dependency.Reason.Instance
       | None -> ());
       key
@@ -1212,7 +1211,7 @@ let facts_of_tree compilation_unit artifact iterate =
         binding_expectations
           := Uid.Map.add uid expectation !binding_expectations;
         add_dependency
-          (Key.Anon { key_uid = uid })
+          (Key.Anon uid)
           expectation Dependency.Reason.Interface;
         Some expectation
       in
@@ -1299,7 +1298,7 @@ let facts_of_tree compilation_unit artifact iterate =
                     (if Uid.for_actual_declaration body_declaration.Types.md_uid
                      then Node.Uid body_declaration.Types.md_uid
                      else Node.Location (compilation_unit, site))
-                    (Key.Anon { key_uid = declaration.md_uid })
+                    (Key.Anon declaration.md_uid)
                     Check.Kind.Annotation site;
                 match resolve_member visited env declaration.Types.md_type with
                 | `Signature (visited, annotation_owner, annotation_members)
@@ -1372,7 +1371,7 @@ let facts_of_tree compilation_unit artifact iterate =
         add_check (Node.Uid uid) expectation Check.Kind.Package inner.mod_loc
       | None ->
         add_omission
-          ~affected:(Key.Anon { key_uid = uid })
+          ~affected:(Key.Anon uid)
           Omission.Reason.Unresolved_module_type)
     | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_apply _
     | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ -> (
@@ -1404,10 +1403,10 @@ let facts_of_tree compilation_unit artifact iterate =
                !parameter_expectations
       | None -> ()));
     let named = key_of_module_type parameter in
-    if not (Key.equal named (Key.Anon { key_uid = parameter.mty_uid }))
+    if not (Key.equal named (Key.Anon parameter.mty_uid))
     then
       add_dependency
-        (Key.Anon { key_uid = parameter.mty_uid })
+        (Key.Anon parameter.mty_uid)
         named Dependency.Reason.Alias
   in
   let register_include_functor ~site env (functor_type : Types.module_type) =
@@ -1552,7 +1551,7 @@ let facts_of_tree compilation_unit artifact iterate =
                 if is_relevant_expectation include_.incl_mod
                 then
                   add_dependency
-                    (Key.Anon { key_uid = unit_uid })
+                    (Key.Anon unit_uid)
                     (key_of_module_type include_.incl_mod)
                     Dependency.Reason.Interface);
             match include_.incl_mod.mty_desc with
@@ -1589,8 +1588,8 @@ let facts_of_tree compilation_unit artifact iterate =
                     if is_relevant_expectation declaration.md_type
                     then
                       add_dependency
-                        (Key.Anon { key_uid = unit_uid })
-                        (Key.Anon { key_uid = declaration.md_uid })
+                        (Key.Anon unit_uid)
+                        (Key.Anon declaration.md_uid)
                         Dependency.Reason.Interface)
                   declarations)
           | Tsig_module declaration ->
@@ -1598,13 +1597,13 @@ let facts_of_tree compilation_unit artifact iterate =
                 if is_relevant_expectation declaration.md_type
                 then
                   add_dependency
-                    (Key.Anon { key_uid = unit_uid })
-                    (Key.Anon { key_uid = declaration.md_uid })
+                    (Key.Anon unit_uid)
+                    (Key.Anon declaration.md_uid)
                     Dependency.Reason.Interface)
           | Tsig_modtype declaration | Tsig_modtypesubst declaration ->
             when_interface_root (fun unit_uid ->
                 add_dependency
-                  (Key.Anon { key_uid = unit_uid })
+                  (Key.Anon unit_uid)
                   (Key.Named
                      { context = enclosing_context ();
                        family_uid = declaration.mtd_uid
@@ -1787,7 +1786,7 @@ let facts_of_tree compilation_unit artifact iterate =
           if is_relevant_expectation declaration.md_type
           then
             add_dependency
-              (Key.Anon { key_uid = declaration.md_uid })
+              (Key.Anon declaration.md_uid)
               (key_of_module_type declaration.md_type)
               Dependency.Reason.Interface;
           with_enclosing
@@ -1820,7 +1819,7 @@ let facts_of_tree compilation_unit artifact iterate =
               if is_relevant_expectation body
               then
                 add_dependency key
-                  (Key.Anon { key_uid = body.mty_uid })
+                  (Key.Anon body.mty_uid)
                   Dependency.Reason.Definition));
           with_enclosing (Context.Body declaration.mtd_uid) (fun () ->
               Tast_iterator.default_iterator.module_type_declaration iterator
@@ -1829,7 +1828,7 @@ let facts_of_tree compilation_unit artifact iterate =
         (fun iterator module_type ->
           let traverse () =
             let env = module_type.mty_env in
-            let key = Key.Anon { key_uid = module_type.mty_uid } in
+            let key = Key.Anon module_type.mty_uid in
             (match module_type.mty_desc with
             | Tmty_ident (path, _) ->
               ignore
@@ -1849,7 +1848,7 @@ let facts_of_tree compilation_unit artifact iterate =
                     if is_relevant_expectation declaration.md_type
                     then
                       add_dependency key
-                        (Key.Anon { key_uid = declaration.md_uid })
+                        (Key.Anon declaration.md_uid)
                         Dependency.Reason.Interface
                   | Tsig_recmodule declarations ->
                     List.iter
@@ -1857,7 +1856,7 @@ let facts_of_tree compilation_unit artifact iterate =
                         if is_relevant_expectation declaration.md_type
                         then
                           add_dependency key
-                            (Key.Anon { key_uid = declaration.md_uid })
+                            (Key.Anon declaration.md_uid)
                             Dependency.Reason.Interface)
                       declarations
                   | Tsig_modtype declaration | Tsig_modtypesubst declaration ->
@@ -1904,8 +1903,7 @@ let facts_of_tree compilation_unit artifact iterate =
                     | Some component_declaration ->
                       let node = node_of_module_path env ~loc:lid.loc rhs in
                       add_check node
-                        (Key.Anon
-                           { key_uid = component_declaration.Types.md_uid })
+                        (Key.Anon component_declaration.Types.md_uid)
                         Check.Kind.Annotation lid.loc
                     | None ->
                       add_omission ~affected:key
@@ -1934,7 +1932,7 @@ let facts_of_tree compilation_unit artifact iterate =
                 if is_relevant_expectation parameter_type
                 then
                   add_dependency key
-                    (Key.Anon { key_uid = parameter_type.mty_uid })
+                    (Key.Anon parameter_type.mty_uid)
                     Dependency.Reason.Functor_type
               | Unit -> ());
               if is_relevant_expectation result
@@ -1962,7 +1960,7 @@ let facts_of_tree compilation_unit artifact iterate =
                     with
                     | Some parameter_uid ->
                       add_dependency key
-                        (Key.Anon { key_uid = parameter_uid })
+                        (Key.Anon parameter_uid)
                         Dependency.Reason.Module_type_of
                     | None ->
                       add_omission ~affected:key
@@ -1997,7 +1995,7 @@ let facts_of_tree compilation_unit artifact iterate =
 
 let interface_check ~implementation ~expectation =
   { Check.implementation = Node.Uid implementation;
-    expectation = Key.Anon { key_uid = expectation };
+    expectation = Key.Anon expectation;
     kind = Check.Kind.Interface;
     site = Location.none
   }
