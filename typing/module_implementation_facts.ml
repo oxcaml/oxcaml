@@ -275,6 +275,13 @@ type frozen = t
 
 let map_checks t ~f = { t with checks = Check_set.map f t.checks }
 
+let union left right =
+  { checks = Check_set.union left.checks right.checks;
+    dependencies = Dependency_set.union left.dependencies right.dependencies;
+    equalities = Context_equality_set.union left.equalities right.equalities;
+    omissions = Omission_set.union left.omissions right.omissions
+  }
+
 module Builder = struct
   type nonrec t =
     { mutable checks : Check_set.t;
