@@ -16,13 +16,16 @@ module Context : sig
   (** A path-like identity for a module/signature instance *)
   type t =
     | Def of Shape.Uid.t
-        (** A root module/signature instance identified directly by its UID *)
+        (** The module or signature instance introduced directly by the
+            declaration. For a functor, this is the functor value itself; [Body]
+            identifies the interior of its result. *)
     | App of t * t  (** An applicative functor instance, e.g., [F(A)] *)
     | Proj of t * Shape.Uid.t
         (** A module member projected from another context, e.g., [M.N] *)
     | Body of Shape.Uid.t
-        (** The interior associated with a named module-type or functor
-            declaration *)
+        (** The interior of a named module-type or functor declaration. Members
+            of a named module type or functor result are projected from this
+            context, rather than from the declaration instance [Def]. *)
     | Site of Compilation_unit.t * Artifact.t * Site_id.t
         (** An instance with no stable module path, e.g., anonymous module
             instances *)
@@ -61,7 +64,7 @@ module Key : sig
           family_uid : Shape.Uid.t  (** The original module-type declaration *)
         }
     | Anon of Shape.Uid.t
-      (** [Anon uid] represents an anonymous module with uid [uid]. *)
+        (** [Anon uid] represents an anonymous module with uid [uid]. *)
 
   val compare : t -> t -> int
 
@@ -99,8 +102,6 @@ module Check : sig
     }
 
   val compare : t -> t -> int
-
-  module Set : Set.S with type elt = t
 end
 
 module Dependency : sig
@@ -126,20 +127,20 @@ module Dependency : sig
     }
 
   val compare : t -> t -> int
-
-  module Set : Set.S with type elt = t
 end
 
 module Context_equality : sig
   (** A fact that the contexts denote the same module instance *)
-  type t =
-    { left : Context.t;
-      right : Context.t
-    }
+  type t
+
+  (** [create left right] orders distinct contexts canonically. *)
+  val create : Context.t -> Context.t -> t option
+
+  val left : t -> Context.t
+
+  val right : t -> Context.t
 
   val compare : t -> t -> int
-
-  module Set : Set.S with type elt = t
 end
 
 module Omission : sig
@@ -160,18 +161,31 @@ module Omission : sig
     }
 
   val compare : t -> t -> int
-
-  module Set : Set.S with type elt = t
 end
 
+module Check_set : Set.S with type elt = Check.t
+
+module Dependency_set : Set.S with type elt = Dependency.t
+
+module Context_equality_set : Set.S with type elt = Context_equality.t
+
+module Omission_set : Set.S with type elt = Omission.t
+
 type t = private
-  { checks : Check.Set.t;
-    dependencies : Dependency.Set.t;
-    equalities : Context_equality.Set.t;
-    omissions : Omission.Set.t
+  { checks : Check_set.t;
+    dependencies : Dependency_set.t;
+    equalities : Context_equality_set.t;
+    omissions : Omission_set.t
   }
 
-val merge : t -> t -> t
+(** [of_implementation compilation_unit ~module_pairs ~modtype_pairs
+     ~unit_interface_check ~argument_interface structure] extracts facts from
+    [structure]. [module_pairs] and [modtype_pairs] associate implementation
+    declaration UIDs with the corresponding interface declaration UIDs.
+    [unit_interface_check] says whether the compilation unit was checked against
+    an explicit interface. [argument_interface] identifies the parameter module
+    whose interface this unit was additionally checked against, when compiling
+    with [-as-argument-for]. *)
 
 val of_implementation :
   Compilation_unit.t ->

@@ -4907,7 +4907,7 @@ let lookup_modtype ?(use=true) ~loc lid env =
   lookup_modtype ~errors:true ~use ~loc lid env
 
 let lookup_modtype_path ?(use=true) ~loc lid env =
-  fst (lookup_modtype_lazy ~errors:true ~use ~loc lid env)
+  lookup_modtype_lazy ~errors:true ~use ~loc lid env
 
 let lookup_class ?(use=true) ~loc lid env =
   let path, desc, vmode = lookup_class ~errors:true ~use ~loc lid env in

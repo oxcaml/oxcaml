@@ -53,14 +53,6 @@ val type_interface:
 val transl_signature:
   ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
 
-val module_implementation_facts:
-  unit_interface:bool ->
-  argument_interface:Typedtree.argument_interface option ->
-  Compilation_unit.t ->
-  Cmt_format.binary_annots ->
-  (Cmt_format.dependency_kind * Shape.Uid.t * Shape.Uid.t) list ->
-  Module_implementation_facts.t option
-
 (* If the [.mli] file has any file-level staticity modality (whether
    [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].
    The presence of either annotation is treated as opt-in to staticity.
@@ -81,8 +73,11 @@ val modtype_of_package:
 
 val path_of_module : Typedtree.module_expr -> Path.t option
 
+(** [save_signature ~argument_interface] writes the typed interface artifacts.
+    [argument_interface] records the additional parameter interface used by
+    [-as-argument-for], when present. *)
 val save_signature:
-  ?argument_interface:Typedtree.argument_interface ->
+  argument_interface:Typedtree.argument_interface option ->
   Unit_info.t -> Compilation_unit.t -> Typedtree.signature ->
   Env.t -> Cmi_format.cmi_infos_lazy -> unit
 

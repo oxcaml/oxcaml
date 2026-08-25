@@ -349,6 +349,7 @@ val lookup_module_path:
     Path.t * mode_with_locks
 val lookup_modtype_path:
   ?use:bool -> loc:Location.t -> Longident.t -> t -> Path.t
+    * Subst.Lazy.modtype_declaration
 val lookup_module_instance_path:
   ?use:bool -> loc:Location.t -> load:bool -> Global_module.Name.t -> t ->
     Path.t * mode_with_locks

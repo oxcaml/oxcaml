@@ -1024,9 +1024,9 @@ and module_type_constraint =
   | Tmodtype_implicit
   | Tmodtype_package of {
       package_module_type_path : Path.t;
-      (** The module type path named by the package type. This constraint
-          allows consumers to associate the check with the named module
-          type declaration. *)
+      (** The module type path named by the package type. This constraint allows
+          consumers to associate the check with the named module type
+          declaration. *)
     }
   | Tmodtype_explicit of module_type * Mode.Value.lr modes
   (** The module type was in the source file. *)
@@ -1565,6 +1565,7 @@ type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;
   ai_parameter_uid : Shape.Uid.t;
+  (** The UID of parameter compilation unit [P], not of [P]'s module type. *)
 }
 (** For a module [M] compiled with [-as-argument-for P] for some parameter
     module [P], the signature of [P] along with the coercion from [M]'s

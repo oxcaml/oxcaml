@@ -25,7 +25,9 @@ module Context = struct
     type t = int
 
     let of_int value = value
+
     let compare = Int.compare
+
     let print = Format.pp_print_int
   end
 
@@ -154,12 +156,6 @@ module Check = struct
       else
         let c = Kind.compare left.kind right.kind in
         if c <> 0 then c else Location.compare left.site right.site
-
-  module Set = Set.Make (struct
-    type nonrec t = t
-
-    let compare = compare
-  end)
 end
 
 module Dependency = struct
@@ -206,12 +202,6 @@ module Dependency = struct
     else
       let c = Key.compare left.source right.source in
       if c <> 0 then c else Reason.compare left.reason right.reason
-
-  module Set = Set.Make (struct
-    type nonrec t = t
-
-    let compare = compare
-  end)
 end
 
 module Context_equality = struct
@@ -220,11 +210,7 @@ module Context_equality = struct
       right : Context.t
     }
 
-  let compare e1 e2 =
-    compare_pair Context.compare Context.compare (e1.left, e1.right)
-      (e2.left, e2.right)
-
-  let oriented { left; right } =
+  let create left right =
     let c = Context.compare left right in
     if c < 0
     then Some { left; right }
@@ -232,11 +218,13 @@ module Context_equality = struct
     then Some { left = right; right = left }
     else None
 
-  module Set = Set.Make (struct
-    type nonrec t = t
+  let left t = t.left
 
-    let compare = compare
-  end)
+  let right t = t.right
+
+  let compare e1 e2 =
+    compare_pair Context.compare Context.compare (e1.left, e1.right)
+      (e2.left, e2.right)
 end
 
 module Omission = struct
@@ -269,58 +257,47 @@ module Omission = struct
     else
       let c = Option.compare Uid.compare left.source right.source in
       if c <> 0 then c else Reason.compare left.reason right.reason
-
-  module Set = Set.Make (struct
-    type nonrec t = t
-
-    let compare = compare
-  end)
 end
 
+module Check_set = Set.Make (Check)
+module Dependency_set = Set.Make (Dependency)
+module Context_equality_set = Set.Make (Context_equality)
+module Omission_set = Set.Make (Omission)
+
 type t =
-  { checks : Check.Set.t;
-    dependencies : Dependency.Set.t;
-    equalities : Context_equality.Set.t;
-    omissions : Omission.Set.t
+  { checks : Check_set.t;
+    dependencies : Dependency_set.t;
+    equalities : Context_equality_set.t;
+    omissions : Omission_set.t
   }
 
 type frozen = t
 
-let merge left right =
-  { checks = Check.Set.union left.checks right.checks;
-    dependencies = Dependency.Set.union left.dependencies right.dependencies;
-    equalities = Context_equality.Set.union left.equalities right.equalities;
-    omissions = Omission.Set.union left.omissions right.omissions
-  }
-
 module Builder = struct
   type nonrec t =
-    { mutable checks : Check.Set.t;
-      mutable dependencies : Dependency.Set.t;
-      mutable equalities : Context_equality.Set.t;
-      mutable omissions : Omission.Set.t
+    { mutable checks : Check_set.t;
+      mutable dependencies : Dependency_set.t;
+      mutable equalities : Context_equality_set.t;
+      mutable omissions : Omission_set.t
     }
 
   let create () =
-    { checks = Check.Set.empty;
-      dependencies = Dependency.Set.empty;
-      equalities = Context_equality.Set.empty;
-      omissions = Omission.Set.empty
+    { checks = Check_set.empty;
+      dependencies = Dependency_set.empty;
+      equalities = Context_equality_set.empty;
+      omissions = Omission_set.empty
     }
 
-  let add_check t check = t.checks <- Check.Set.add check t.checks
+  let add_check t check = t.checks <- Check_set.add check t.checks
 
   let add_dependency t dependency =
-    t.dependencies <- Dependency.Set.add dependency t.dependencies
+    t.dependencies <- Dependency_set.add dependency t.dependencies
 
   let add_equality t equality =
-    match Context_equality.oriented equality with
-    | None -> ()
-    | Some equality ->
-      t.equalities <- Context_equality.Set.add equality t.equalities
+    t.equalities <- Context_equality_set.add equality t.equalities
 
   let add_omission t omission =
-    t.omissions <- Omission.Set.add omission t.omissions
+    t.omissions <- Omission_set.add omission t.omissions
 
   let freeze t : frozen =
     { checks = t.checks;
@@ -437,8 +414,8 @@ let declared_module_type_path env path =
   in
   follow [] path
 
-module String_map = Map.Make (String)
-module Path_map = Map.Make (Path)
+module String_map = Misc.Stdlib.String.Map
+module Path_map = Path.Map
 
 type signature_index =
   { modtype_members : Types.modtype_declaration String_map.t;
@@ -554,11 +531,11 @@ let named_modtype_uids env (module_type : Types.module_type) =
 
 let is_relevant_expectation cache (module_type : Typedtree.module_type) =
   let rec relevant (module_type : Typedtree.module_type) =
-    match Uid.Map.find_opt module_type.mty_uid !cache with
+    match Uid.Tbl.find_opt cache module_type.mty_uid with
     | Some relevant -> relevant
     | None ->
       let result = compute module_type in
-      cache := Uid.Map.add module_type.mty_uid result !cache;
+      Uid.Tbl.replace cache module_type.mty_uid result;
       result
   and compute (module_type : Typedtree.module_type) =
     match module_type.mty_desc with
@@ -605,27 +582,28 @@ let is_relevant_expectation cache (module_type : Typedtree.module_type) =
 let facts_of_tree compilation_unit artifact iterate =
   let unit_uid = Uid.of_compilation_unit_id compilation_unit in
   let facts = Builder.create () in
-  let module_contexts : Context.t Uid.Map.t ref = ref Uid.Map.empty in
-  let modtype_contexts : Context.t Uid.Map.t ref = ref Uid.Map.empty in
-  let modtype_declaration_contexts : Context.t Uid.Map.t ref =
-    ref Uid.Map.empty
-  in
-  let parameter_expectations : Uid.t Uid.Map.t ref = ref Uid.Map.empty in
-  let binding_expectations : Key.t Uid.Map.t ref = ref Uid.Map.empty in
+  let module_contexts : Context.t Uid.Tbl.t = Uid.Tbl.create 16 in
+  let modtype_contexts : Context.t Uid.Tbl.t = Uid.Tbl.create 16 in
+  let modtype_declaration_contexts : Context.t Uid.Tbl.t = Uid.Tbl.create 16 in
+  let parameter_expectations : Uid.t Uid.Tbl.t = Uid.Tbl.create 16 in
+  let binding_expectations : Key.t Uid.Tbl.t = Uid.Tbl.create 16 in
   let site_counter = ref 0 in
   let fresh_site () =
     let occurrence = !site_counter in
     site_counter := occurrence + 1;
-    Context.Site
-      (compilation_unit, artifact, Context.Site_id.of_int occurrence)
+    Context.Site (compilation_unit, artifact, Context.Site_id.of_int occurrence)
   in
   let scoped f =
-    let saved_module_contexts = !module_contexts
-    and saved_modtype_contexts = !modtype_contexts in
+    let saved_module_contexts = Uid.Tbl.copy module_contexts
+    and saved_modtype_contexts = Uid.Tbl.copy modtype_contexts in
+    let restore table saved =
+      Uid.Tbl.clear table;
+      Uid.Tbl.iter (Uid.Tbl.replace table) saved
+    in
     Fun.protect
       ~finally:(fun () ->
-        module_contexts := saved_module_contexts;
-        modtype_contexts := saved_modtype_contexts)
+        restore module_contexts saved_module_contexts;
+        restore modtype_contexts saved_modtype_contexts)
       f
   in
   let enclosing = ref [Context.Def unit_uid] in
@@ -639,25 +617,26 @@ let facts_of_tree compilation_unit artifact iterate =
   let add_check implementation expectation kind site =
     Builder.add_check facts { Check.implementation; expectation; kind; site }
   in
-  let add_dependency derived source reason =
+  let add_dependency ~derived ~source reason =
     if not (Key.equal derived source)
     then Builder.add_dependency facts { Dependency.derived; source; reason }
   in
   let add_equality a b =
-    if not (Context.equal a b)
-    then Builder.add_equality facts { Context_equality.left = a; right = b }
+    match Context_equality.create a b with
+    | None -> ()
+    | Some equality -> Builder.add_equality facts equality
   in
-  let add_omission ?affected ?source reason =
+  let add_omission ~affected ~source reason =
     Builder.add_omission facts { Omission.affected; source; reason }
   in
   let record_module_context uid context =
-    module_contexts := Uid.Map.add uid context !module_contexts
+    Uid.Tbl.replace module_contexts uid context
   in
   let record_modtype_context uid context =
-    modtype_contexts := Uid.Map.add uid context !modtype_contexts
+    Uid.Tbl.replace modtype_contexts uid context
   in
   let module_context uid =
-    match Uid.Map.find_opt uid !module_contexts with
+    match Uid.Tbl.find_opt module_contexts uid with
     | Some context -> context
     | None -> Context.Def uid
   in
@@ -691,7 +670,7 @@ let facts_of_tree compilation_unit artifact iterate =
       (Shape.for_persistent_unit (Ident.name id)).Shape.uid
     | Path.Pident _ | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ -> None
   in
-  let rec context_of_path ?site env (path : Path.t) : Context.t option =
+  let rec context_of_path_inner ~site env (path : Path.t) : Context.t option =
     match persistent_unit_uid path with
     | Some uid -> Some (module_context uid)
     | None -> (
@@ -704,21 +683,21 @@ let facts_of_tree compilation_unit artifact iterate =
         | Path.Pdot (prefix, _) ->
           Option.map
             (fun prefix -> Context.Proj (prefix, uid))
-            (context_of_path ?site env prefix)
+            (context_of_path_inner ~site env prefix)
         | Path.Papply (functor_, argument) -> (
           (match site with
           | Some site -> !path_application_hook ~site env functor_ argument
           | None -> ());
           match
-            ( context_of_path ?site env functor_,
-              context_of_path ?site env argument )
+            ( context_of_path_inner ~site env functor_,
+              context_of_path_inner ~site env argument )
           with
           | Some functor_, Some argument ->
             Some (Context.App (functor_, argument))
           | (Some _ | None), _ -> None)
         | Path.Pextra_ty _ -> None))
   in
-  let context_of_path ?site env path =
+  let context_of_path ~site env path =
     let path =
       (* Normalizing would load the interface too, for no gain: a compilation
          unit is never an alias. *)
@@ -726,7 +705,7 @@ let facts_of_tree compilation_unit artifact iterate =
       | Some _ -> path
       | None -> normalize_module_path env path
     in
-    context_of_path ?site env path
+    context_of_path_inner ~site env path
   in
   let rec report_path_applications ~site env (path : Path.t) =
     match path with
@@ -738,7 +717,9 @@ let facts_of_tree compilation_unit artifact iterate =
       report_path_applications ~site env argument;
       !path_application_hook ~site env functor_ argument
   in
-  let report_longident_applications ~site env (lid : Longident.t) =
+  (* Record applications in the module-path prefix of an [Ldot] whose final
+     component is a record label or variant constructor. *)
+  let report_projected_longident_applications ~site env (lid : Longident.t) =
     match lid with
     | Longident.Ldot (prefix, _) when longident_contains_apply prefix.txt -> (
       match
@@ -788,7 +769,7 @@ let facts_of_tree compilation_unit artifact iterate =
       | (Some _ | None), _ -> None)
     | Path.Pident _ | Path.Pdot _ | Path.Pextra_ty _ -> None
   in
-  let named_key ?family context uid =
+  let named_key ~family context uid =
     let key = Key.Named { context; family_uid = uid } in
     (match
        match family with
@@ -796,8 +777,8 @@ let facts_of_tree compilation_unit artifact iterate =
        | None -> family_context context
      with
     | Some family ->
-      add_dependency key
-        (Key.Named { context = family; family_uid = uid })
+      add_dependency ~derived:key
+        ~source:(Key.Named { context = family; family_uid = uid })
         Dependency.Reason.Instance
     | None -> ());
     key
@@ -805,7 +786,7 @@ let facts_of_tree compilation_unit artifact iterate =
   let key_of_modtype_path ~site env (path : Path.t) : Key.t option =
     match path with
     | Path.Papply _ | Path.Pextra_ty _ ->
-      add_omission Omission.Reason.Unsupported_path;
+      add_omission ~affected:None ~source:None Omission.Reason.Unsupported_path;
       None
     | Path.Pdot (prefix, _) -> (
       match find_modtype env path with
@@ -813,13 +794,13 @@ let facts_of_tree compilation_unit artifact iterate =
       | Some declaration -> (
         let uid = declaration.Types.mtd_uid in
         let prefix = normalize_module_path env prefix in
-        match context_of_path ~site env prefix with
+        match context_of_path ~site:(Some site) env prefix with
         | Some context ->
           Some
-            (named_key ?family:(family_context_of_path env prefix) context uid)
+            (named_key ~family:(family_context_of_path env prefix) context uid)
         | None ->
-          let key = named_key (Context.Def uid) uid in
-          add_omission ~affected:key ~source:uid
+          let key = named_key ~family:None (Context.Def uid) uid in
+          add_omission ~affected:(Some key) ~source:(Some uid)
             Omission.Reason.Unresolved_module;
           Some key))
     | Path.Pident _ -> (
@@ -827,9 +808,9 @@ let facts_of_tree compilation_unit artifact iterate =
       | None -> None
       | Some declaration -> (
         let uid = declaration.Types.mtd_uid in
-        match Uid.Map.find_opt uid !modtype_contexts with
-        | Some context -> Some (named_key context uid)
-        | None -> Some (named_key (Context.Def uid) uid)))
+        match Uid.Tbl.find_opt modtype_contexts uid with
+        | Some context -> Some (named_key ~family:None context uid)
+        | None -> Some (named_key ~family:None (Context.Def uid) uid)))
   in
   let key_of_module_type (module_type : Typedtree.module_type) =
     match module_type.mty_desc with
@@ -840,7 +821,8 @@ let facts_of_tree compilation_unit artifact iterate =
       | Some key -> key
       | None ->
         let key = Key.Anon module_type.mty_uid in
-        add_omission ~affected:key Omission.Reason.Unresolved_module_type;
+        add_omission ~affected:(Some key) ~source:None
+          Omission.Reason.Unresolved_module_type;
         key)
     | Tmty_signature _ | Tmty_functor _ | Tmty_with _ | Tmty_typeof _
     | Tmty_alias _ | Tmty_strengthen _ ->
@@ -859,19 +841,23 @@ let facts_of_tree compilation_unit artifact iterate =
   let add_subject_expectation_edges key ~site env reason path =
     let path = normalize_module_path env path in
     match find_module env path with
-    | None -> add_omission ~affected:key Omission.Reason.Unresolved_module
+    | None ->
+      add_omission ~affected:(Some key) ~source:None
+        Omission.Reason.Unresolved_module
     | Some declaration -> (
       let uid = declaration.Types.md_uid in
-      add_dependency key (Key.Anon uid) reason;
+      add_dependency ~derived:key ~source:(Key.Anon uid) reason;
       Option.iter
-        (fun expectation -> add_dependency key expectation reason)
-        (Uid.Map.find_opt uid !binding_expectations);
+        (fun expectation ->
+          add_dependency ~derived:key ~source:expectation reason)
+        (Uid.Tbl.find_opt binding_expectations uid);
       match declared_module_type_path env path with
       | Some declared -> (
         match key_of_modtype_path ~site env declared with
-        | Some source -> add_dependency key source reason
+        | Some source -> add_dependency ~derived:key ~source reason
         | None ->
-          add_omission ~affected:key Omission.Reason.Unresolved_module_type)
+          add_omission ~affected:(Some key) ~source:None
+            Omission.Reason.Unresolved_module_type)
       | None -> ())
   in
   let node_of_module_expr (module_expr : module_expr) =
@@ -895,7 +881,7 @@ let facts_of_tree compilation_unit artifact iterate =
   let mark_handled expectation site =
     handled_checks := Handled.add (expectation, site) !handled_checks
   in
-  let relevance_cache : bool Uid.Map.t ref = ref Uid.Map.empty in
+  let relevance_cache : bool Uid.Tbl.t = Uid.Tbl.create 16 in
   let is_relevant_expectation (module_type : Typedtree.module_type) =
     is_relevant_expectation relevance_cache module_type
   in
@@ -905,8 +891,11 @@ let facts_of_tree compilation_unit artifact iterate =
         match classify_signature_member item with
         | Modtype_member (_, declaration) ->
           add_dependency
-            (Key.Named { context = instance; family_uid = declaration.mtd_uid })
-            (Key.Named { context = family; family_uid = declaration.mtd_uid })
+            ~derived:
+              (Key.Named
+                 { context = instance; family_uid = declaration.mtd_uid })
+            ~source:
+              (Key.Named { context = family; family_uid = declaration.mtd_uid })
             Dependency.Reason.Instance
         | Module_member (_, declaration) ->
           let instance = Context.Proj (instance, declaration.md_uid) in
@@ -992,20 +981,20 @@ let facts_of_tree compilation_unit artifact iterate =
                   with
                   | Some source_declaration -> (
                     let uid = source_declaration.Types.mtd_uid in
-                    match Uid.Map.find_opt uid !modtype_contexts with
-                    | Some context -> Some (named_key context uid)
+                    match Uid.Tbl.find_opt modtype_contexts uid with
+                    | Some context -> Some (named_key ~family:None context uid)
                     | None ->
-                      add_omission ~affected:derived ~source:uid
+                      add_omission ~affected:(Some derived) ~source:(Some uid)
                         Omission.Reason.Unresolved_module;
                       None)
                   | None -> None)
               in
               match source_key with
               | Some source_key ->
-                add_dependency derived source_key
+                add_dependency ~derived ~source:source_key
                   Dependency.Reason.Argument_member
               | None ->
-                add_omission ~affected:derived
+                add_omission ~affected:(Some derived) ~source:None
                   Omission.Reason.Unresolved_module_type)
             | Module_member (name, declaration) -> (
               let member_source =
@@ -1022,8 +1011,8 @@ let facts_of_tree compilation_unit artifact iterate =
               | Some member_source ->
                 walk ~source:member_source declaration.md_type
               | None ->
-                add_omission ~affected:derived Omission.Reason.Unresolved_module
-              )
+                add_omission ~affected:(Some derived) ~source:None
+                  Omission.Reason.Unresolved_module)
             | Other_member -> ())
           signature
       | None -> ()
@@ -1036,8 +1025,7 @@ let facts_of_tree compilation_unit artifact iterate =
       let key = Key.Named { context = anchor (); family_uid = uid } in
       (match expectation with
       | Some parameter_uid ->
-        add_dependency key
-          (Key.Anon parameter_uid)
+        add_dependency ~derived:key ~source:(Key.Anon parameter_uid)
           Dependency.Reason.Instance
       | None -> ());
       key
@@ -1049,7 +1037,7 @@ let facts_of_tree compilation_unit artifact iterate =
       then
         List.iter
           (fun source ->
-            add_omission ~affected:expectation_key ~source
+            add_omission ~affected:(Some expectation_key) ~source:(Some source)
               Omission.Reason.Missing_parameter_expectation)
           (named_modtype_uids env parameter_type);
       expectation_key
@@ -1066,14 +1054,18 @@ let facts_of_tree compilation_unit artifact iterate =
         | Some key ->
           add_check argument_node key Check.Kind.Argument site;
           (match key_of_modtype_path ~site env path with
-          | Some base -> add_dependency key base Dependency.Reason.Strengthening
+          | Some base ->
+            add_dependency ~derived:key ~source:base
+              Dependency.Reason.Strengthening
           | None ->
-            add_omission ~affected:key Omission.Reason.Unresolved_module_type);
+            add_omission ~affected:(Some key) ~source:None
+              Omission.Reason.Unresolved_module_type);
           add_subject_expectation_edges key ~site env
             Dependency.Reason.Strengthening subject;
           Some key
         | None ->
-          add_omission Omission.Reason.Missing_parameter_expectation;
+          add_omission ~affected:None ~source:None
+            Omission.Reason.Missing_parameter_expectation;
           None)
       | Mty_ident path -> (
         match key_of_modtype_path ~site env path, find_modtype env path with
@@ -1082,7 +1074,8 @@ let facts_of_tree compilation_unit artifact iterate =
           then begin
             let key = instance_key declaration.Types.mtd_uid in
             add_check argument_node key Check.Kind.Argument site;
-            add_dependency key named_key Dependency.Reason.Instance;
+            add_dependency ~derived:key ~source:named_key
+              Dependency.Reason.Instance;
             Some key
           end
           else begin
@@ -1093,7 +1086,8 @@ let facts_of_tree compilation_unit artifact iterate =
           match expectation with
           | Some parameter_uid -> Some (instance_scoped parameter_uid)
           | None ->
-            add_omission Omission.Reason.Missing_parameter_expectation;
+            add_omission ~affected:None ~source:None
+              Omission.Reason.Missing_parameter_expectation;
             None))
       | Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ -> (
         match expectation with
@@ -1101,7 +1095,8 @@ let facts_of_tree compilation_unit artifact iterate =
         | None ->
           List.iter
             (fun source ->
-              add_omission ~source Omission.Reason.Missing_parameter_expectation)
+              add_omission ~affected:None ~source:(Some source)
+                Omission.Reason.Missing_parameter_expectation)
             (named_modtype_uids env parameter_type);
           None)
     in
@@ -1123,7 +1118,7 @@ let facts_of_tree compilation_unit artifact iterate =
                in
                let anchor () =
                  match
-                   context_of_path env
+                   context_of_path ~site:None env
                      (Path.Papply (functor_path, argument_path))
                  with
                  | Some context -> context
@@ -1158,14 +1153,16 @@ let facts_of_tree compilation_unit artifact iterate =
                 String_map.find_opt name interface_index.modtype_members
               with
               | Some interface_declaration ->
-                add_dependency derived
-                  (Key.Named
-                     { context = interface_context;
-                       family_uid = interface_declaration.Types.mtd_uid
-                     })
+                add_dependency ~derived
+                  ~source:
+                    (Key.Named
+                       { context = interface_context;
+                         family_uid = interface_declaration.Types.mtd_uid
+                       })
                   Dependency.Reason.Interface
               | None ->
-                add_omission ~affected:derived ~source:declaration.mtd_uid
+                add_omission ~affected:(Some derived)
+                  ~source:(Some declaration.mtd_uid)
                   Omission.Reason.Unresolved_module_type)
             | Module_member (name, declaration) -> (
               match String_map.find_opt name interface_index.module_members with
@@ -1199,7 +1196,7 @@ let facts_of_tree compilation_unit artifact iterate =
         | None ->
           List.iter
             (fun uid ->
-              add_omission ~source:uid
+              add_omission ~affected:None ~source:(Some uid)
                 Omission.Reason.Missing_parameter_expectation)
             (named_modtype_uids inner.mod_env body_parameter.mty_type));
         loop body result
@@ -1213,15 +1210,13 @@ let facts_of_tree compilation_unit artifact iterate =
     loop inner interface_type
   in
   let register_binding_expectation uid (implementation : module_expr) =
-    match Uid.Map.find_opt uid !binding_expectations with
+    match Uid.Tbl.find_opt binding_expectations uid with
     | Some expectation -> Some expectation
     | None -> (
       let register expectation =
-        binding_expectations
-          := Uid.Map.add uid expectation !binding_expectations;
-        add_dependency
-          (Key.Anon uid)
-          expectation Dependency.Reason.Interface;
+        Uid.Tbl.replace binding_expectations uid expectation;
+        add_dependency ~derived:(Key.Anon uid) ~source:expectation
+          Dependency.Reason.Interface;
         Some expectation
       in
       match implementation.mod_desc with
@@ -1288,11 +1283,14 @@ let facts_of_tree compilation_unit artifact iterate =
                          (Uid.equal body_declaration.Types.mtd_uid
                             declaration.mtd_uid) ->
                   add_dependency
-                    (Key.Named
-                       { context = annotation_context;
-                         family_uid = declaration.mtd_uid
-                       })
-                    (named_key body_context body_declaration.Types.mtd_uid)
+                    ~derived:
+                      (Key.Named
+                         { context = annotation_context;
+                           family_uid = declaration.mtd_uid
+                         })
+                    ~source:
+                      (named_key ~family:None body_context
+                         body_declaration.Types.mtd_uid)
                     Dependency.Reason.Interface
                 | Some _ | None -> ()))
             | Module_member (name, declaration) -> (
@@ -1307,8 +1305,7 @@ let facts_of_tree compilation_unit artifact iterate =
                     (if Uid.for_actual_declaration body_declaration.Types.md_uid
                      then Node.Uid body_declaration.Types.md_uid
                      else Node.Location (compilation_unit, site))
-                    (Key.Anon declaration.md_uid)
-                    Check.Kind.Annotation site;
+                    (Key.Anon declaration.md_uid) Check.Kind.Annotation site;
                 match resolve_member visited env declaration.Types.md_type with
                 | `Signature (visited, annotation_owner, annotation_members)
                   -> (
@@ -1333,9 +1330,11 @@ let facts_of_tree compilation_unit artifact iterate =
                     pair_members visited env ~body_context ~annotation_context
                       body_members annotation_members
                   | `Abstract | `Unresolved | `Other ->
-                    add_omission Omission.Reason.Unresolved_module)
+                    add_omission ~affected:None ~source:None
+                      Omission.Reason.Unresolved_module)
                 | `Unresolved ->
-                  add_omission Omission.Reason.Unresolved_module_type
+                  add_omission ~affected:None ~source:None
+                    Omission.Reason.Unresolved_module_type
                 | `Abstract | `Other -> ())
               | Some _ | None -> ())
             | Other_member -> ());
@@ -1353,7 +1352,7 @@ let facts_of_tree compilation_unit artifact iterate =
         let body_context =
           match path_of_module_expr inner with
           | Some path -> (
-            match context_of_path inner.mod_env path with
+            match context_of_path ~site:None inner.mod_env path with
             | Some subject -> subject
             | None -> context)
           | None -> context
@@ -1379,15 +1378,14 @@ let facts_of_tree compilation_unit artifact iterate =
         mark_handled expectation inner.mod_loc;
         add_check (Node.Uid uid) expectation Check.Kind.Package inner.mod_loc
       | None ->
-        add_omission
-          ~affected:(Key.Anon uid)
+        add_omission ~affected:(Some (Key.Anon uid)) ~source:None
           Omission.Reason.Unresolved_module_type)
     | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_apply _
     | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ -> (
       let unwrapped = unwrap_implicit_constraint implementation in
       match path_of_module_expr unwrapped with
       | Some path -> (
-        match context_of_path unwrapped.mod_env path with
+        match context_of_path ~site:None unwrapped.mod_env path with
         | Some target -> add_equality (module_context uid) target
         | None -> ())
       | None -> (
@@ -1407,16 +1405,14 @@ let facts_of_tree compilation_unit artifact iterate =
       | Some declaration ->
         record_module_context declaration.Types.md_uid
           (Context.Def parameter.mty_uid);
-        parameter_expectations
-          := Uid.Map.add declaration.Types.md_uid parameter.mty_uid
-               !parameter_expectations
+        Uid.Tbl.replace parameter_expectations declaration.Types.md_uid
+          parameter.mty_uid
       | None -> ()));
     let named = key_of_module_type parameter in
     if not (Key.equal named (Key.Anon parameter.mty_uid))
     then
-      add_dependency
-        (Key.Anon parameter.mty_uid)
-        named Dependency.Reason.Alias
+      add_dependency ~derived:(Key.Anon parameter.mty_uid) ~source:named
+        Dependency.Reason.Alias
   in
   let register_include_functor ~site env (functor_type : Types.module_type) =
     match Mtype.scrape_alias env functor_type with
@@ -1442,8 +1438,11 @@ let facts_of_tree compilation_unit artifact iterate =
             match classify_signature_member item with
             | Modtype_member (_, declaration) ->
               add_dependency
-                (Key.Named { context; family_uid = declaration.mtd_uid })
-                (Key.Named { context = root; family_uid = declaration.mtd_uid })
+                ~derived:
+                  (Key.Named { context; family_uid = declaration.mtd_uid })
+                ~source:
+                  (Key.Named
+                     { context = root; family_uid = declaration.mtd_uid })
                 Dependency.Reason.Include
             | Module_member (_, declaration) ->
               if equalities
@@ -1473,7 +1472,7 @@ let facts_of_tree compilation_unit artifact iterate =
     | Tincl_structure -> (
       match path_of_module_expr unwrapped with
       | Some path when not (path_contains_apply path) -> (
-        match context_of_path unwrapped.mod_env path with
+        match context_of_path ~site:None unwrapped.mod_env path with
         | Some root -> register_members root
         | None ->
           List.iter
@@ -1482,12 +1481,14 @@ let facts_of_tree compilation_unit artifact iterate =
               | Modtype_member (_, declaration) ->
                 add_omission
                   ~affected:
-                    (Key.Named { context; family_uid = declaration.mtd_uid })
-                  ~source:declaration.mtd_uid Omission.Reason.Unresolved_module
+                    (Some
+                       (Key.Named { context; family_uid = declaration.mtd_uid }))
+                  ~source:(Some declaration.mtd_uid)
+                  Omission.Reason.Unresolved_module
               | Module_member _ | Other_member -> ())
             include_.incl_type)
       | Some path -> (
-        match context_of_path unwrapped.mod_env path with
+        match context_of_path ~site:None unwrapped.mod_env path with
         | Some root ->
           register_members root;
           register_application_members ~root unwrapped
@@ -1530,6 +1531,8 @@ let facts_of_tree compilation_unit artifact iterate =
           (match item.str_desc with
           | Tstr_include include_ -> register_structure_include include_
           | Tstr_recmodule bindings ->
+            (* Register the whole recursive group before the default iterator
+               visits any body, so a body can refer to a later binding. *)
             List.iter
               (fun binding ->
                 record_module_context binding.mb_uid
@@ -1559,9 +1562,8 @@ let facts_of_tree compilation_unit artifact iterate =
             when_interface_root (fun unit_uid ->
                 if is_relevant_expectation include_.incl_mod
                 then
-                  add_dependency
-                    (Key.Anon unit_uid)
-                    (key_of_module_type include_.incl_mod)
+                  add_dependency ~derived:(Key.Anon unit_uid)
+                    ~source:(key_of_module_type include_.incl_mod)
                     Dependency.Reason.Interface);
             match include_.incl_mod.mty_desc with
             | Tmty_ident (path, _) -> (
@@ -1575,9 +1577,14 @@ let facts_of_tree compilation_unit artifact iterate =
                     match classify_signature_member item with
                     | Modtype_member (_, declaration) ->
                       add_dependency
-                        (Key.Named { context; family_uid = declaration.mtd_uid })
-                        (Key.Named
-                           { context = root; family_uid = declaration.mtd_uid })
+                        ~derived:
+                          (Key.Named
+                             { context; family_uid = declaration.mtd_uid })
+                        ~source:
+                          (Key.Named
+                             { context = root;
+                               family_uid = declaration.mtd_uid
+                             })
                         Dependency.Reason.Include
                     | Module_member _ | Other_member -> ())
                   include_.incl_type
@@ -1596,27 +1603,25 @@ let facts_of_tree compilation_unit artifact iterate =
                   (fun (declaration : Typedtree.module_declaration) ->
                     if is_relevant_expectation declaration.md_type
                     then
-                      add_dependency
-                        (Key.Anon unit_uid)
-                        (Key.Anon declaration.md_uid)
+                      add_dependency ~derived:(Key.Anon unit_uid)
+                        ~source:(Key.Anon declaration.md_uid)
                         Dependency.Reason.Interface)
                   declarations)
           | Tsig_module declaration ->
             when_interface_root (fun unit_uid ->
                 if is_relevant_expectation declaration.md_type
                 then
-                  add_dependency
-                    (Key.Anon unit_uid)
-                    (Key.Anon declaration.md_uid)
+                  add_dependency ~derived:(Key.Anon unit_uid)
+                    ~source:(Key.Anon declaration.md_uid)
                     Dependency.Reason.Interface)
           | Tsig_modtype declaration | Tsig_modtypesubst declaration ->
             when_interface_root (fun unit_uid ->
-                add_dependency
-                  (Key.Anon unit_uid)
-                  (Key.Named
-                     { context = enclosing_context ();
-                       family_uid = declaration.mtd_uid
-                     })
+                add_dependency ~derived:(Key.Anon unit_uid)
+                  ~source:
+                    (Key.Named
+                       { context = enclosing_context ();
+                         family_uid = declaration.mtd_uid
+                       })
                   Dependency.Reason.Interface)
           | Tsig_open open_ ->
             let path, _ = open_.open_expr in
@@ -1641,7 +1646,8 @@ let facts_of_tree compilation_unit artifact iterate =
         (fun (type k) iterator (pattern : k general_pattern) ->
           (match pattern.pat_desc with
           | Tpat_construct (lid, _, _, _, _) ->
-            report_longident_applications ~site:lid.loc pattern.pat_env lid.txt
+            report_projected_longident_applications ~site:lid.loc
+              pattern.pat_env lid.txt
           | _ -> ());
           Tast_iterator.default_iterator.pat iterator pattern);
       class_expr =
@@ -1667,11 +1673,11 @@ let facts_of_tree compilation_unit artifact iterate =
           | Texp_new (path, lid, _, _) ->
             report_path_applications ~site:lid.loc expression.exp_env path
           | Texp_construct (lid, _, _, _, _) ->
-            report_longident_applications ~site:lid.loc expression.exp_env
-              lid.txt
+            report_projected_longident_applications ~site:lid.loc
+              expression.exp_env lid.txt
           | Texp_field { lid; _ } | Texp_setfield { lid; _ } ->
-            report_longident_applications ~site:lid.loc expression.exp_env
-              lid.txt
+            report_projected_longident_applications ~site:lid.loc
+              expression.exp_env lid.txt
           | _ -> ());
           match expression.exp_desc with
           | Texp_letmodule { id = Some _; uid; module_expr; _ } ->
@@ -1711,12 +1717,14 @@ let facts_of_tree compilation_unit artifact iterate =
                 add_check
                   (Node.Location (compilation_unit, module_expr.mod_loc))
                   expectation Check.Kind.Package implementation.mod_loc
-            | None -> add_omission Omission.Reason.Unresolved_module_type)
+            | None ->
+              add_omission ~affected:None ~source:None
+                Omission.Reason.Unresolved_module_type)
           | Tmod_functor _ -> ()
           | Tmod_apply (functor_, argument, _, _, _) -> (
             (match path_of_module_expr module_expr with
             | Some path when path_contains_apply path -> (
-              match context_of_path module_expr.mod_env path with
+              match context_of_path ~site:None module_expr.mod_env path with
               | Some root -> register_application_members ~root module_expr
               | None -> ())
             | Some _ | None -> ());
@@ -1744,7 +1752,8 @@ let facts_of_tree compilation_unit artifact iterate =
               let anchor () =
                 let context =
                   match path_of_module_expr module_expr with
-                  | Some path -> context_of_path module_expr.mod_env path
+                  | Some path ->
+                    context_of_path ~site:None module_expr.mod_env path
                   | None -> None
                 in
                 match context with
@@ -1794,9 +1803,8 @@ let facts_of_tree compilation_unit artifact iterate =
             (Context.Proj (enclosing_context (), declaration.md_uid));
           if is_relevant_expectation declaration.md_type
           then
-            add_dependency
-              (Key.Anon declaration.md_uid)
-              (key_of_module_type declaration.md_type)
+            add_dependency ~derived:(Key.Anon declaration.md_uid)
+              ~source:(key_of_module_type declaration.md_type)
               Dependency.Reason.Interface;
           with_enclosing
             (Context.Proj (enclosing_context (), declaration.md_uid))
@@ -1807,9 +1815,8 @@ let facts_of_tree compilation_unit artifact iterate =
         (fun iterator declaration ->
           let context = enclosing_context () in
           record_modtype_context declaration.mtd_uid context;
-          modtype_declaration_contexts
-            := Uid.Map.add declaration.mtd_uid context
-                 !modtype_declaration_contexts;
+          Uid.Tbl.replace modtype_declaration_contexts declaration.mtd_uid
+            context;
           let key = Key.Named { context; family_uid = declaration.mtd_uid } in
           (match declaration.mtd_type with
           | None -> ()
@@ -1819,16 +1826,16 @@ let facts_of_tree compilation_unit artifact iterate =
               match
                 key_of_modtype_path ~site:body.mty_loc body.mty_env path
               with
-              | Some source -> add_dependency key source Dependency.Reason.Alias
+              | Some source ->
+                add_dependency ~derived:key ~source Dependency.Reason.Alias
               | None ->
-                add_omission ~affected:key
+                add_omission ~affected:(Some key) ~source:None
                   Omission.Reason.Unresolved_module_type)
             | Tmty_signature _ | Tmty_functor _ | Tmty_with _ | Tmty_typeof _
             | Tmty_alias _ | Tmty_strengthen _ ->
               if is_relevant_expectation body
               then
-                add_dependency key
-                  (Key.Anon body.mty_uid)
+                add_dependency ~derived:key ~source:(Key.Anon body.mty_uid)
                   Dependency.Reason.Definition));
           with_enclosing (Context.Body declaration.mtd_uid) (fun () ->
               Tast_iterator.default_iterator.module_type_declaration iterator
@@ -1844,36 +1851,40 @@ let facts_of_tree compilation_unit artifact iterate =
                 (key_of_modtype_path ~site:module_type.mty_loc env path
                   : Key.t option)
             | Tmty_signature signature ->
+              (* Record the containing module type's edges to its immediate
+                 members here. The default iterator below still traverses the
+                 items, but its [signature_item] callback does not know [key]. *)
               List.iter
                 (fun item ->
                   match item.sig_desc with
                   | Tsig_include (include_, _) ->
                     if is_relevant_expectation include_.incl_mod
                     then
-                      add_dependency key
-                        (key_of_module_type include_.incl_mod)
+                      add_dependency ~derived:key
+                        ~source:(key_of_module_type include_.incl_mod)
                         Dependency.Reason.Include
                   | Tsig_module declaration ->
                     if is_relevant_expectation declaration.md_type
                     then
-                      add_dependency key
-                        (Key.Anon declaration.md_uid)
+                      add_dependency ~derived:key
+                        ~source:(Key.Anon declaration.md_uid)
                         Dependency.Reason.Interface
                   | Tsig_recmodule declarations ->
                     List.iter
                       (fun (declaration : module_declaration) ->
                         if is_relevant_expectation declaration.md_type
                         then
-                          add_dependency key
-                            (Key.Anon declaration.md_uid)
+                          add_dependency ~derived:key
+                            ~source:(Key.Anon declaration.md_uid)
                             Dependency.Reason.Interface)
                       declarations
                   | Tsig_modtype declaration | Tsig_modtypesubst declaration ->
-                    add_dependency key
-                      (Key.Named
-                         { context = enclosing_context ();
-                           family_uid = declaration.mtd_uid
-                         })
+                    add_dependency ~derived:key
+                      ~source:
+                        (Key.Named
+                           { context = enclosing_context ();
+                             family_uid = declaration.mtd_uid
+                           })
                       Dependency.Reason.Interface
                   | Tsig_value _ | Tsig_type _ | Tsig_typesubst _
                   | Tsig_typext _ | Tsig_exception _ | Tsig_modsubst _
@@ -1884,7 +1895,7 @@ let facts_of_tree compilation_unit artifact iterate =
             | Tmty_with (base, constraints) ->
               if is_relevant_expectation base
               then
-                add_dependency key (key_of_module_type base)
+                add_dependency ~derived:key ~source:(key_of_module_type base)
                   Dependency.Reason.With_constraint;
               let base_index =
                 lazy (signature_index_of_module_type env base.mty_type)
@@ -1895,12 +1906,12 @@ let facts_of_tree compilation_unit artifact iterate =
                    ->
                   match constraint_ with
                   | Twith_modtype constraint_type ->
-                    add_dependency key
-                      (key_of_module_type constraint_type)
+                    add_dependency ~derived:key
+                      ~source:(key_of_module_type constraint_type)
                       Dependency.Reason.With_constraint
                   | Twith_modtypesubst constraint_type ->
-                    add_dependency key
-                      (key_of_module_type constraint_type)
+                    add_dependency ~derived:key
+                      ~source:(key_of_module_type constraint_type)
                       Dependency.Reason.Destructive_substitution
                   | Twith_module (rhs, _) | Twith_modsubst (rhs, _) -> (
                     add_subject_expectation_edges key ~site:lid.loc env
@@ -1915,7 +1926,7 @@ let facts_of_tree compilation_unit artifact iterate =
                         (Key.Anon component_declaration.Types.md_uid)
                         Check.Kind.Annotation lid.loc
                     | None ->
-                      add_omission ~affected:key
+                      add_omission ~affected:(Some key) ~source:None
                         Omission.Reason.Unresolved_module)
                   | Twith_type _ | Twith_typesubst _ | Twith_jkind _
                   | Twith_jkindsubst _ ->
@@ -1931,7 +1942,7 @@ let facts_of_tree compilation_unit artifact iterate =
                 Dependency.Reason.Strengthening path;
               if is_relevant_expectation base
               then
-                add_dependency key (key_of_module_type base)
+                add_dependency ~derived:key ~source:(key_of_module_type base)
                   Dependency.Reason.Strengthening
             | Tmty_functor (parameter, result, _) ->
               (match parameter with
@@ -1940,14 +1951,14 @@ let facts_of_tree compilation_unit artifact iterate =
                   parameter_type;
                 if is_relevant_expectation parameter_type
                 then
-                  add_dependency key
-                    (Key.Anon parameter_type.mty_uid)
+                  add_dependency ~derived:key
+                    ~source:(Key.Anon parameter_type.mty_uid)
                     Dependency.Reason.Functor_type
               | Unit -> ());
               if is_relevant_expectation result
               then
-                add_dependency key
-                  (key_of_module_type result)
+                add_dependency ~derived:key
+                  ~source:(key_of_module_type result)
                   Dependency.Reason.Functor_type
             | Tmty_typeof implementation ->
               (let subject =
@@ -1958,24 +1969,26 @@ let facts_of_tree compilation_unit artifact iterate =
                  add_subject_expectation_edges key ~site:module_type.mty_loc
                    subject.mod_env Dependency.Reason.Module_type_of path
                | None ->
-                 add_omission ~affected:key Omission.Reason.Unresolved_module);
+                 add_omission ~affected:(Some key) ~source:None
+                   Omission.Reason.Unresolved_module);
               List.iter
                 (fun root ->
                   match find_module env (Path.Pident root) with
                   | Some declaration -> (
                     match
-                      Uid.Map.find_opt declaration.Types.md_uid
-                        !parameter_expectations
+                      Uid.Tbl.find_opt parameter_expectations
+                        declaration.Types.md_uid
                     with
                     | Some parameter_uid ->
-                      add_dependency key
-                        (Key.Anon parameter_uid)
+                      add_dependency ~derived:key
+                        ~source:(Key.Anon parameter_uid)
                         Dependency.Reason.Module_type_of
                     | None ->
-                      add_omission ~affected:key
+                      add_omission ~affected:(Some key) ~source:None
                         Omission.Reason.Unresolved_module)
                   | None ->
-                    add_omission ~affected:key Omission.Reason.Unresolved_module)
+                    add_omission ~affected:(Some key) ~source:None
+                      Omission.Reason.Unresolved_module)
                 (functor_argument_roots env module_type.mty_type)
             | Tmty_alias (path, lid) ->
               add_subject_expectation_edges key ~site:lid.loc env
@@ -2000,7 +2013,7 @@ let facts_of_tree compilation_unit artifact iterate =
     }
   in
   iterate iterator;
-  facts, fun uid -> Uid.Map.find_opt uid !modtype_declaration_contexts
+  facts, fun uid -> Uid.Tbl.find_opt modtype_declaration_contexts uid
 
 let interface_check ~implementation ~expectation =
   { Check.implementation = Node.Uid implementation;
