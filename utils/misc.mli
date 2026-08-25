@@ -496,6 +496,18 @@ val string_of_file: in_channel -> string
        (** [string_of_file ic] reads the contents of file [ic] and copies
            them to a string. It stops when encountering EOF on [ic]. *)
 
+val input_lines_in_buffer: in_channel -> string list
+       (** [input_lines_in_buffer ic] consumes all complete lines currently
+           available in the channel buffer and returns them in order, without
+           their terminating newlines, acquiring the channel mutex only once.
+           The buffer is refilled as needed until it contains at least one
+           newline or the end of file is reached. At end of file, any bytes
+           not terminated by a newline are returned as a final line, and the
+           empty list is returned once the channel is exhausted.
+
+           Raises [Failure] if a single line is longer than the channel
+           buffer. *)
+
 val output_to_file_via_temporary:
       ?mode:open_flag list -> string -> (string -> out_channel -> 'a) -> 'a
        (** Produce output in temporary file, then rename it

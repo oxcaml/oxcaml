@@ -1053,6 +1053,9 @@ let string_of_file ic =
       (Buffer.add_subbytes b buff 0 n; copy())
   in copy()
 
+external input_lines_in_buffer : in_channel -> string list
+  = "caml_oxcaml_input_lines_in_buffer"
+
 let output_to_file_via_temporary ?(mode = [Open_text]) filename fn =
   let (temp_filename, oc) =
     Filename.open_temp_file

@@ -39,6 +39,8 @@
 
 (copy_files# utils/*.ml{,i})
 
+(copy_files utils/channel_stubs.c)
+
 (copy_files# parsing/*.ml{,i})
 
 (copy_files parsing/parser.mly)
@@ -111,6 +113,7 @@
 (library
  (name ocamlcommon)
  (wrapped false)
+ (foreign_stubs (language c) (names channel_stubs))
  (flags
   (:standard
    -strict-sequence

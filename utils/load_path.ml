@@ -172,16 +172,15 @@ end = struct
   ;;
 
   let iter_lines ~f path =
-    In_channel.with_open_text
+    In_channel.with_open_bin
       (Path.Cwd_relative.to_string path)
       (fun ic ->
         let rec loop () =
-          try
-            let line = String.trim (input_line ic) in
-            f line;
+          match Misc.input_lines_in_buffer ic with
+          | [] -> ()
+          | lines ->
+            List.iter (fun line -> f (String.trim line)) lines;
             loop ()
-          with
-          | End_of_file -> ()
         in
         loop ())
   ;;
