@@ -1,0 +1,13 @@
+break @ Debuggee 23
+run
+delete 1
+finish
+backtrace
+print r
+print a
+step
+step
+step
+step
+run
+quit

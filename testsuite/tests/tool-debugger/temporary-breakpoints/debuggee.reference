@@ -1,0 +1,14 @@
+Loading program... done.
+Breakpoint: 1
+27 let f x = <|b|>x + 1
+33     <|b|>r := a + 1
+Backtrace:
+#0 Debuggee debuggee.ml:33:5
+r: int ref = {contents = 0}
+a: int = 1
+32     <|b|>let a = f !r in
+27 let f x = <|b|>x + 1
+33     <|b|>r := a + 1
+32     <|b|>let a = f !r in
+10
+Program exit.
