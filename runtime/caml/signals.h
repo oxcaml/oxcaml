@@ -66,8 +66,7 @@ CAMLextern int caml_check_pending_actions (void);
    [caml_init_signals]; never freed. */
 CAMLextern void* caml_safepoint_trigger_page;
 
-/* Diagnostic counters for faulting safepoints, printed at exit when
-   CAML_SP_STATS is set (see domain.c). */
+/* Diagnostic counters for faulting safepoints */
 CAMLextern atomic_uintnat caml_safepoint_fault_count;
 CAMLextern atomic_uintnat caml_safepoint_trigger_count;
 #endif
