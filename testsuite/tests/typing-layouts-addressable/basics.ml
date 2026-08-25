@@ -385,6 +385,60 @@ Error: Signature mismatch:
          because of the definition of t at line 2, characters 2-29.
 |}]
 
+(**** Test [Jkind.equate] by unifying univars ****)
+
+type pa = { f : ('a : bits8 addressable). 'a -> 'a }
+type pb = { f : ('b : bits8 addressable). 'b -> 'b }
+let ok (x : pa) : pb = { f = x.f }
+[%%expect{|
+type pa = { f : ('a : bits8 addressable). 'a -> 'a; }
+type pb = { f : ('b : bits8 addressable). 'b -> 'b; }
+val ok : pa -> pb = <fun>
+|}]
+
+type pc = { f : ('c : bits16 addressable). 'c -> 'c }
+let bad (x : pa) : pc = { f = x.f }
+[%%expect{|
+type pc = { f : ('c : bits16 addressable). 'c -> 'c; }
+Line 2, characters 30-33:
+2 | let bad (x : pa) : pc = { f = x.f }
+                                  ^^^
+Error: The field access "x.f" has type "'a -> 'a"
+       but an expression was expected of type "'b -> 'b"
+       The layout of 'a is bits16 addressable
+         because of the definition of pc at line 1, characters 0-53.
+       But the layout of 'a must overlap with bits8 addressable
+         because of the definition of pa at line 1, characters 0-52.
+|}]
+
+type pd = { f : ('d : bits8). 'd -> 'd }
+let bad (x : pa) : pd = { f = x.f }
+[%%expect{|
+type pd = { f : ('d : bits8). 'd -> 'd; }
+Line 2, characters 30-33:
+2 | let bad (x : pa) : pd = { f = x.f }
+                                  ^^^
+Error: The field access "x.f" has type "'a -> 'a"
+       but an expression was expected of type "'b -> 'b"
+       The layout of 'a is bits8
+         because of the definition of pd at line 1, characters 0-40.
+       But the layout of 'a must overlap with bits8 addressable
+         because of the definition of pa at line 1, characters 0-52.
+|}]
+
+let bad (x : pd) : pa = { f = x.f }
+[%%expect{|
+Line 1, characters 30-33:
+1 | let bad (x : pd) : pa = { f = x.f }
+                                  ^^^
+Error: The field access "x.f" has type "'a -> 'a"
+       but an expression was expected of type "'b -> 'b"
+       The layout of 'a is bits8 addressable
+         because of the definition of pa at line 1, characters 0-52.
+       But the layout of 'a must overlap with bits8
+         because of the definition of pd at line 1, characters 0-40.
+|}]
+
 (**** [any addressable] is a superkind of exactly the addressable kinds ****)
 
 type ('a : any addressable) req
