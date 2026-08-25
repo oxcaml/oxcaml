@@ -429,6 +429,11 @@ module Jkind0 : sig
       Jkind_types.Scannable_axes.t ->
       Jkind_types.Layout.Const.t jkind_base
 
+    val apply_operator :
+      Jkind_types.Layout.Const.t jkind_base ->
+      Jkind_types.Kind_operator.t ->
+      Jkind_types.Layout.Const.t jkind_base
+
     val try_allow_l :
       ('layout, 'l * 'r) base_and_axes ->
       ('layout, allowed * 'r) base_and_axes option

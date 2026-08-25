@@ -662,6 +662,8 @@ and print_out_jkind ppf ojkind =
     | Ojkind_product ts ->
       let pp_sep ppf () = fprintf ppf "@ & " in
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+    | Ojkind_addressable t ->
+      fprintf ppf "%a addressable" (pp_element ~nested:true) t
   in
   pp_element ~nested:false ppf ojkind
 

@@ -196,7 +196,7 @@ module Type_shape = struct
     let open Shape in
     let unknown_shape_any = Shape.unknown_type () in
     let unknown_shape_value =
-      Shape.at_layout (Shape.unknown_type ()) (Base Scannable)
+      Shape.at_layout (Shape.unknown_type ()) Shape.Layout.scannable
     in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
@@ -302,27 +302,28 @@ module Type_decl_shape = struct
     (* CR layouts-scannable: We forget about the stored scannable axes when
        converting, since a [Layout.t] (which is a [Sort.Const.t]) doesn't have
        a place to put them. See the CR on [Layout] at the top of this file. *)
-    | Types.Scannable _ -> Layout.Base Scannable
+    | Types.Scannable _ -> Layout.base Scannable
     | Types.Float_boxed ->
-      Layout.Base Float64
+      Layout.base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,
          contrary to the name.*)
-    | Types.Float64 -> Layout.Base Float64
-    | Types.Float32 -> Layout.Base Float32
-    | Types.Bits8 -> Layout.Base Bits8
-    | Types.Bits16 -> Layout.Base Bits16
-    | Types.Bits32 -> Layout.Base Bits32
-    | Types.Untagged_immediate -> Layout.Base Untagged_immediate
-    | Types.Bits64 -> Layout.Base Bits64
-    | Types.Vec128 -> Layout.Base Vec128
-    | Types.Vec256 -> Layout.Base Vec256
-    | Types.Vec512 -> Layout.Base Vec512
-    | Types.Mask -> Layout.Base Mask
-    | Types.Word -> Layout.Base Word
-    | Types.Void -> Layout.Base Void
+    | Types.Float64 -> Layout.base Float64
+    | Types.Float32 -> Layout.base Float32
+    | Types.Bits8 -> Layout.base Bits8
+    | Types.Bits16 -> Layout.base Bits16
+    | Types.Bits32 -> Layout.base Bits32
+    | Types.Untagged_immediate -> Layout.base Untagged_immediate
+    | Types.Bits64 -> Layout.base Bits64
+    | Types.Vec128 -> Layout.base Vec128
+    | Types.Vec256 -> Layout.base Vec256
+    | Types.Vec512 -> Layout.base Vec512
+    | Types.Mask -> Layout.base Mask
+    | Types.Word -> Layout.base Word
+    | Types.Void -> Layout.base Void
     | Types.Product args ->
-      Layout.Product
+      Layout.product
         (Array.to_list (Array.map mixed_block_shape_to_layout args))
+    | Types.Addressable e -> Layout.addressable (mixed_block_shape_to_layout e)
 
   let of_constructor type_subst name (cstr_args : Types.constructor_declaration)
       arg_layout shape_for_constr =
