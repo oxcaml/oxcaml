@@ -2021,7 +2021,7 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
   in
   let unit_uid = Uid.of_compilation_unit_id compilation_unit in
   List.iter
-    (fun (implementation, interface) ->
+    (fun (~implementation, ~interface) ->
       Builder.add_check facts
         (interface_check ~implementation ~expectation:interface))
     module_pairs;
@@ -2037,7 +2037,7 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
   let interface_uid_of_impl =
     let table =
       List.fold_left
-        (fun table (implementation, interface) ->
+        (fun table (~implementation, ~interface) ->
           Uid.Map.add implementation interface table)
         Uid.Map.empty module_pairs
     in
@@ -2053,7 +2053,7 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
     | Context.App _ | Context.Body _ | Context.Site _ -> None
   in
   List.iter
-    (fun (implementation, interface) ->
+    (fun (~implementation, ~interface) ->
       let unrepresentable reason =
         List.iter
           (Builder.add_omission facts)
