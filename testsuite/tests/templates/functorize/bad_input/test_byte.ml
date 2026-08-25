@@ -110,12 +110,9 @@
    compiler_reference = "bad_dup_input.reference";
    check-ocamlc.byte-output;
  }{
-   (* Case 5: a failing [-functorize] should not delete a pre-existing
+   (* Case 5: a failing [-functorize] must not delete a pre-existing
       file at the [-o] path that it would never have written (the real
-      outputs are [out.cmo]/[out.cmi]).
-
-      CURRENT BEHAVIOR (bug): the error-path cleanup removes the raw
-      [-o] target, deleting the unrelated pre-existing file. *)
+      outputs are [out.cmo]/[out.cmi]). *)
 
    script = "sh -c 'echo precious > out.txt'";
    script;
@@ -127,7 +124,7 @@
    ocamlc_byte_exit_status = "2";
    ocamlc.byte;
 
-   script = "sh -c '! test -f out.txt'";
+   script = "sh -c 'test -f out.txt'";
    script;
  }
 *)
