@@ -139,6 +139,11 @@ let rewrite_module_facts ~root ~rewrite_root
             site = add_root_loc ~root check.site
           })
 
+let union_facts left right =
+  match (left, right) with
+  | None, facts | facts, None -> facts
+  | Some left, Some right -> Some (Module_implementation_facts.union left right)
+
 let index_of_artifact ~into ~root ~rewrite_root ~build_path
     ~do_not_use_cmt_loadpath ~shapes ~store_shapes ~cmt_loadpath ~cmt_impl_shape
     ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
@@ -171,9 +176,9 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
       (defs, into.approximated) cmt_ident_occurrences
   in
   let facts_run =
-    match module_implementation_facts with
-    | None -> Module_implementation_facts.empty
-    | Some facts -> rewrite_module_facts ~root ~rewrite_root facts
+    Option.map
+      (rewrite_module_facts ~root ~rewrite_root)
+      module_implementation_facts
   in
   let cu_shape = into.cu_shape in
   if store_shapes then
@@ -218,9 +223,9 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
       stats;
       related_uids;
       module_facts =
-        (match module_implementation_facts with
+        (match facts_run with
         | None -> into.module_facts
-        | Some _ -> Some (link_module_facts facts_run));
+        | Some facts -> Some (link_module_facts facts));
       root_directory = into.root_directory
     },
     facts_run )
@@ -303,14 +308,14 @@ let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
 
 let facts_of_index_input ~file (index : index) =
   match index.module_facts with
-  | None -> (Module_implementation_facts.empty, false)
+  | None -> None
   | Some module_facts -> (
     match fetch_module_facts module_facts with
-    | facts -> (facts, true)
+    | facts -> Some facts
     | exception exn ->
       Log.error "Cannot read the module facts of %s: %s" file
         (Printexc.to_string exn);
-      (Module_implementation_facts.empty, false))
+      None)
 
 let read_index_input_uncached ~file =
   match read ~file with
@@ -355,11 +360,11 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
       module_facts = None
     }
   in
-  let final_index, facts_runs =
+  let final_index, facts =
     Ocaml_utils.Local_store.with_store (Ocaml_utils.Local_store.fresh ())
     @@ fun () ->
     List.fold_left
-      (fun (into, facts_runs) file ->
+      (fun (into, facts) file ->
         let store_shapes =
           (* Merlin-jst: We add the shapes into `into` because we need to collect them so
              we can use them for shape reduction, regardless of whether store_shapes is
@@ -374,47 +379,42 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
         Log.debug "Indexing from file: %s" file;
         match Cms_cache.read file with
         | cms_item ->
-          let index, facts_run =
+          let index, artifact_facts =
             index_of_cms ~into ~root ~rewrite_root ~build_path ~store_shapes
               ~do_not_use_cmt_loadpath ~shapes:into.cu_shape cms_item.cms_infos
           in
-          (index, facts_run :: facts_runs)
+          (index, union_facts artifact_facts facts)
         | exception _ -> (
           match Cmt_cache.read file with
           | cmt_item ->
-            let index, facts_run =
+            let index, artifact_facts =
               index_of_cmt ~into ~root ~rewrite_root ~build_path ~store_shapes
                 ~do_not_use_cmt_loadpath ~shapes:into.cu_shape
                 cmt_item.cmt_infos
             in
-            (index, facts_run :: facts_runs)
+            (index, union_facts artifact_facts facts)
           | exception _ -> (
             match read_index_input_uncached ~file with
             | Some index ->
-              let facts_run, decoded = facts_of_index_input ~file index in
+              let index_facts = facts_of_index_input ~file index in
               ( merge_index ~store_shapes
                   { index with
                     module_facts =
-                      (if decoded then index.module_facts else None)
+                      (match index_facts with
+                      | None -> None
+                      | Some _ -> index.module_facts)
                   }
                   ~into,
-                facts_run :: facts_runs )
+                union_facts index_facts facts )
             | None ->
               Log.error "Unknown file type: %s" file;
               exit 1)))
-      (initial_index, []) files
+      (initial_index, None) files
   in
   (* The facts of every input are copied into the output, so that it stands
      alone even if its inputs are removed. *)
   let final_index =
-    { final_index with
-      module_facts =
-        Option.map
-          (fun _ ->
-            link_module_facts
-              (Module_implementation_facts.merge_many (List.rev facts_runs)))
-          final_index.module_facts
-    }
+    { final_index with module_facts = Option.map link_module_facts facts }
   in
   let final_index =
     (* Don't save the collected shapes if store_shapes is false *)
@@ -434,44 +434,38 @@ let gather_shapes ~output_file files =
       module_facts = None
     }
   in
-  let final_index, facts_runs =
+  let final_index, facts =
     List.fold_left
-      (fun ((into, facts_runs) as acc) file ->
+      (fun ((into, facts) as acc) file ->
         match Cache.read file with
         | Cmt cmt_infos ->
-          ( merge_index ~store_shapes:true (shape_of_cmt cmt_infos) ~into,
-            facts_runs )
+          (merge_index ~store_shapes:true (shape_of_cmt cmt_infos) ~into, facts)
         | Cms cms_infos ->
-          ( merge_index ~store_shapes:true (shape_of_cms cms_infos) ~into,
-            facts_runs )
+          (merge_index ~store_shapes:true (shape_of_cms cms_infos) ~into, facts)
         | Index _ -> (
           (* Read the index again without the cache: the facts are a lazy link
              into the file, so they must be decoded from a live channel. *)
           match read_index_input_uncached ~file with
           | Some index ->
-            let facts_run, decoded = facts_of_index_input ~file index in
+            let index_facts = facts_of_index_input ~file index in
             ( merge_index ~store_shapes:true
                 { index with
-                  module_facts = (if decoded then index.module_facts else None)
+                  module_facts =
+                    (match index_facts with
+                    | None -> None
+                    | Some _ -> index.module_facts)
                 }
                 ~into,
-              facts_run :: facts_runs )
+              union_facts index_facts facts )
           | None ->
             Log.error "Not a valid file %S" file;
             acc)
         | Unknown | (exception _) ->
           Log.error "Not a valid file %S" file;
           acc)
-      (initial_index, []) files
+      (initial_index, None) files
   in
   let final_index =
-    { final_index with
-      module_facts =
-        Option.map
-          (fun _ ->
-            link_module_facts
-              (Module_implementation_facts.merge_many (List.rev facts_runs)))
-          final_index.module_facts
-    }
+    { final_index with module_facts = Option.map link_module_facts facts }
   in
   write ~file:output_file final_index
