@@ -366,6 +366,10 @@ type inferred_machtype =
   | Machtype of machtype
   | Never_returns
 
+let print_inferred_machtype ppf = function
+  | Machtype ty -> Printcmm.machtype ppf ty
+  | Never_returns -> Format.pp_print_string ppf "never_returns"
+
 let dbg_suffix dbg =
   if Debuginfo.is_none dbg
   then ""
@@ -391,7 +395,7 @@ let check_machtype ~dbg ~what ~expected (actual : inferred_machtype) =
     if not compatible
     then
       Misc.fatal_errorf
-        "Cmm machtype check failed%s: %s has machtype %a but %a was expected"
+        "Cmm machtype check failed%s:\n  %s has machtype %a but %a was expected"
         (dbg_suffix dbg) (what ()) Printcmm.machtype actual Printcmm.machtype
         expected
 
@@ -558,8 +562,13 @@ and typecheck_cop env op args dbg : inferred_machtype =
     | Any_machtype -> ()
     | Exactly expected ->
       check_machtype ~dbg ~expected actual ~what:(fun () ->
-          Printf.sprintf "argument %d of operation %s" (arg_index + 1)
-            (Printcmm.operation dbg op))
+          Format.asprintf
+            "operation: %s\n  argument machtypes: [%a]\n  argument %d"
+            (Printcmm.operation dbg op)
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.pp_print_string ppf "; ")
+               print_inferred_machtype)
+            arg_tys (arg_index + 1))
   in
   let arity_error expected_arity =
     Misc.fatal_errorf
