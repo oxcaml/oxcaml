@@ -165,8 +165,8 @@ type t = private
 
 val of_implementation :
   Compilation_unit.t ->
-  module_pairs:(Shape.Uid.t * Shape.Uid.t) list ->
-  modtype_pairs:(Shape.Uid.t * Shape.Uid.t) list ->
+  module_pairs:(implementation:Shape.Uid.t * interface:Shape.Uid.t) list ->
+  modtype_pairs:(implementation:Shape.Uid.t * interface:Shape.Uid.t) list ->
   unit_interface_check:bool ->
   argument_interface:Shape.Uid.t option ->
   Typedtree.structure ->
