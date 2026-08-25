@@ -45,9 +45,8 @@ val compose :
 let flip f x y = f y x
 [%%expect{|
 val flip :
-  ('a @ [< past('m) > 'q] ->
-   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('n) & global] ->
-  'b @ [< 'p & global] -> 'a @ [< 'q] -> 'c @ [> 'o | dynamic] = <fun>
+  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
+  'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] = <fun>
 |}]
 
 let add a b = a + b
@@ -140,7 +139,6 @@ val unique_cell :
 let stack_args g = g (stack_ (1, 2)) (stack_ (3, 4)); ()
 [%%expect{|
 val stack_args :
-  (int * int @ [< past('m) > local] ->
-   (int * int @ [> local] -> 'a @ 'o) @ [> past('m) | past('n) | local]) @ [< past('n)] ->
-  unit @ 'p = <fun>
+  (int * int @ [> local] -> int * int @ [> local] -> 'a @ 'm) @ 'o ->
+  unit @ 'n = <fun>
 |}]

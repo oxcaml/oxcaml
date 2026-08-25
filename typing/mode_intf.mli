@@ -1054,11 +1054,6 @@ module type S = sig
           [c]. see notes on [get_floor] in [solver_intf.mli] for cautions. *)
       val check_const : (allowed * allowed) t -> Const.t option
 
-      (** Returns the precise bounds of a mode, as close to legacy as possible.
-          see notes on [get_floor] in [solver_intf.mli] for cautions. See
-          [zap_to_legacy] for an explanation of [arg]. *)
-      val get_legacy : arg:bool -> (allowed * allowed) t -> Const.t
-
       (** Returns the precise ceiling of a mode. see notes on [get_ceil] in
           [solver_intf.mli] for cautions. *)
       val get_ceil : ('l * allowed) t -> Const.t

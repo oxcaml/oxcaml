@@ -198,9 +198,8 @@ val foo : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm | dynamic] = <fun>
 let foo f = fun x -> fun y -> f x y
 [%%expect{|
 val foo :
-  ('a @ [< past('m) > 'q] ->
-   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('n) & global] ->
-  'a @ [< 'q & global] -> 'b @ [< 'p] -> 'c @ [> 'o | dynamic] = <fun>
+  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
+  'a @ [< 'o & global] -> 'b @ [< 'n] -> 'c @ [> 'm | dynamic] = <fun>
 |}]
 
 let fst x = fun y -> x
@@ -594,16 +593,14 @@ val flip :
 let flip f x y = f y x
 [%%expect{|
 val flip :
-  ('a @ [< past('m) > 'q] ->
-   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('n) & global] ->
-  'b @ [< 'p & global] -> 'a @ [< 'q] -> 'c @ [> 'o | dynamic] = <fun>
+  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
+  'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] = <fun>
 |}]
 
 
 let flip f = fun x -> fun y -> f y x
 [%%expect{|
 val flip :
-  ('a @ [< past('m) > 'q] ->
-   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('n) & global] ->
-  'b @ [< 'p & global] -> 'a @ [< 'q] -> 'c @ [> 'o | dynamic] = <fun>
+  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
+  'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] = <fun>
 |}]

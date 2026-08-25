@@ -992,65 +992,69 @@ end = struct
 
 end
 
-let zap_to_legacy : arg:bool -> Alloc.lr -> Alloc.Const.t =
-  fun ~arg m ->
-    match Alloc.zap_to_legacy ~arg m with
-    | Some c -> c
-    | None ->
-      if mode_polymorphism_printing_enabled ()
-      then Alloc.Guts.get_legacy ~arg m
-      else Alloc.zap_to_legacy_force ~arg m
+(** A mode as seen by printing: either a determined constant, or a
+    comonadic mode kept generic. Along an arrow chain, the accumulated curry
+    mode is a constant until a generic mode variable is encountered. *)
+type const_or_generic =
+  | Const of Alloc.Const.t
+  | Generic of Alloc.Comonadic.l
 
-(** The curry mode accumulated along an arrow chain: a constant until a
-    generic mode variable is encountered, then the [Ctype.curry_mode]
-    join. *)
-type curry_acc =
-  | Acc_const of Alloc.Const.t
-  | Acc_var of Alloc.Comonadic.l
-
-(** The floor of the accumulator *)
-let curry_acc_floor : curry_acc -> Alloc.Const.t = function
-  | Acc_const c -> c
-  | Acc_var acc ->
+(** The constant content: exact for [Const], the floor (with legacy
+    monadic) for [Generic]. *)
+let floor_const : const_or_generic -> Alloc.Const.t = function
+  | Const c -> c
+  | Generic acc ->
     Alloc.Const.merge
       { comonadic = Alloc.Comonadic.Guts.get_floor acc;
         monadic = Alloc.Monadic.Const.legacy }
 
-(** Extends the accumulator with the argument mode [marg] of an arrow. *)
-let curry_acc_mode : curry_acc -> Alloc.lr -> curry_acc =
+(** Extends the curry accumulator with the argument mode [marg] of an
+    arrow. *)
+let curry_acc : const_or_generic -> Alloc.lr -> const_or_generic =
   fun acc marg ->
     match acc, Alloc.zap_to_legacy ~arg:true marg with
-    | Acc_const acc, Some arg -> Acc_const (Ctype.curry_mode_const acc arg)
-    | Acc_var acc, _ -> Acc_var (Ctype.curry_mode acc marg)
-    | Acc_const acc, None ->
+    | Const acc, Some arg -> Const (Ctype.curry_mode_const acc arg)
+    | Generic acc, _ -> Generic (Ctype.curry_mode acc marg)
+    | Const acc, None ->
       if mode_polymorphism_printing_enabled ()
       then
-        Acc_var
+        Generic
           (Ctype.curry_mode
              (Alloc.Comonadic.of_const (Alloc.Const.partial_apply acc))
              marg)
       else
-        Acc_const
+        Const
           (Ctype.curry_mode_const acc
              (Alloc.zap_to_legacy_force ~arg:true marg))
 
+(** The view of a mode occurrence [m]; zaps [m] when it has to be a
+    constant. *)
+let const_or_generic_of_mode : arg:bool -> Alloc.lr -> const_or_generic =
+  fun ~arg m ->
+    match Alloc.zap_to_legacy ~arg m with
+    | Some c -> Const c
+    | None ->
+      if mode_polymorphism_printing_enabled ()
+      then Generic (Alloc.Comonadic.disallow_right m.comonadic)
+      else Const (Alloc.zap_to_legacy_force ~arg m)
+
 (** Whether the return mode [m] of an arrow agrees with the constant
     content of [acc_mode]. Mutating when [m] must be zapped: [m] is equated
-    with the constant (an [Acc_var] contains generic variables and cannot
+    with the constant (a [Generic] contains generic variables and cannot
     be equated with directly); otherwise a pure bounds check.
 
     [equate_with_const] additionally checks [m]'s edges;
     [Variable_names.equate_curry] calls this function alone, so that the
     mutations happen during preprocessing, before bounds and edges are
     computed. *)
-let equate_with_curry_bounds : Alloc.lr -> curry_acc -> bool =
+let equate_with_curry_bounds : Alloc.lr -> const_or_generic -> bool =
   fun m acc_mode ->
     if not (Alloc.check_generic m)
        || not (mode_polymorphism_printing_enabled ())
     then
       Result.is_ok
-        (Alloc.equate m (Alloc.of_const (curry_acc_floor acc_mode)))
-    else Alloc.Guts.in_bounds (curry_acc_floor acc_mode) m
+        (Alloc.equate m (Alloc.of_const (floor_const acc_mode)))
+    else Alloc.Guts.in_bounds (floor_const acc_mode) m
 
 let erase_implied_axes (modes : Mode.Alloc.Const.t) :
     Mode.Alloc.Const.Option.t =
@@ -1118,7 +1122,7 @@ module Variable_names : sig
       [m] are suppressed (not printed by the other modes) only when both
       hold, since [m] is then elided. Must be called after [reserve]. *)
   val curry_edges_implied :
-    bounds_implied:bool -> acc:curry_acc -> Alloc.lr -> bool
+    bounds_implied:bool -> acc:const_or_generic -> Alloc.lr -> bool
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
@@ -1370,42 +1374,39 @@ end = struct
   (* The following preprocessing step zaps non-generic
     modes to legacy, while equating a derived curry mode
     with the inferred non-generic return modes. This step
-    should exactly mirror the behavior of
-    [tree_of_typexp]. It is needed so we get the correct
-    precise bounds of mode descriptions
+    should exactly mirror the mutations performed by
+    [tree_of_modal_typexp]. It is needed so we get the
+    correct precise bounds of mode descriptions
   *)
-  let rec zap_non_generic_modes : Alloc.Const.t -> type_expr -> unit =
-    fun alloc_mode ty ->
+  let rec zap_non_generic_modes : const_or_generic -> type_expr -> unit =
+    fun acc_mode ty ->
     let px = proxy ty in
     if List.memq px !visited_for_modes then () else begin
       visited_for_modes := px :: !visited_for_modes;
       let tty = Transient_expr.repr ty in
       match tty.desc with
-      | Tarrow ((_l, marg, mret), _ty1, ty2, _) ->
-        let _ = zap_to_legacy ~arg:true marg in
-        let acc_mode = curry_acc_mode (Acc_const alloc_mode) marg in
+      | Tarrow ((_l, marg, mret), ty1, ty2, _) ->
+        zap_non_generic_modes (const_or_generic_of_mode ~arg:true marg) ty1;
+        let acc_mode = curry_acc acc_mode marg in
         equate_curry acc_mode mret ty2
+      | Tpoly (ty, []) | Trepr (ty, []) ->
+        zap_non_generic_modes acc_mode ty
       | _ ->
-        printer_iter_type_expr (zap_non_generic_modes Alloc.Const.legacy)
+        printer_iter_type_expr
+          (zap_non_generic_modes (Const Alloc.Const.legacy))
           (Fun.const ()) ty
     end
 
-  and equate_curry : curry_acc -> Alloc.lr -> type_expr -> unit =
+  and equate_curry : const_or_generic -> Alloc.lr -> type_expr -> unit =
     fun acc_mode mret ty ->
       match get_desc ty with
-      | Tarrow _ ->
-          if equate_with_curry_bounds mret acc_mode then
-            zap_non_generic_modes (curry_acc_floor acc_mode) ty
-          else begin
-            let mret = zap_to_legacy ~arg:false mret in
-            zap_non_generic_modes mret ty
-          end
+      | Tarrow _ when equate_with_curry_bounds mret acc_mode ->
+          zap_non_generic_modes acc_mode ty
       | _ ->
-        let mret = zap_to_legacy ~arg:false mret in
-        zap_non_generic_modes mret ty
+        zap_non_generic_modes (const_or_generic_of_mode ~arg:false mret) ty
 
   let zap_non_generic_modes ty =
-    zap_non_generic_modes Alloc.Const.legacy ty
+    zap_non_generic_modes (Const Alloc.Const.legacy) ty
 
   let eq_pair :
       visible_pair
@@ -2136,10 +2137,10 @@ end = struct
     { monadic; comonadic }
 
   (* The variable heads of the curry accumulator. *)
-  let acc_heads (acc : curry_acc) : boxedhead list =
+  let acc_heads (acc : const_or_generic) : boxedhead list =
     match acc with
-    | Acc_const _ -> []
-    | Acc_var mode ->
+    | Const _ -> []
+    | Generic mode ->
       let head (Desc.Amorphvar (v, _)) = H v in
       (match Alloc.get_comonadic_desc mode with
        | Amode _ -> []
@@ -2147,7 +2148,8 @@ end = struct
        | Amodejoin (_, mvs) -> List.map head mvs)
 
   (* See the signature for the specification. *)
-  let curry_edges_implied ~bounds_implied ~(acc : curry_acc) (m : Alloc.lr) =
+  let curry_edges_implied ~bounds_implied ~(acc : const_or_generic)
+      (m : Alloc.lr) =
     let pair = pair_of_mode m in
     let implied =
       bounds_implied
@@ -2375,7 +2377,7 @@ end
 (** Whether the return mode [m] of an arrow can be elided: the arrow is
     then printed without parens and [m] is not printed. Mutates [m] when it
     must be zapped (see [equate_with_curry_bounds]). *)
-let equate_with_const : Alloc.lr -> curry_acc -> bool =
+let equate_with_const : Alloc.lr -> const_or_generic -> bool =
   fun m acc_mode ->
     if not (Alloc.check_generic m)
        || not (mode_polymorphism_printing_enabled ())
@@ -2580,20 +2582,19 @@ let tree_of_modes_const (modes : Mode.Alloc.Const.t) =
       |> Option.map (Fmt.asprintf "%a" (Mode.Alloc.Const.print_axis ax)))
     Mode.Alloc.Axis.all
 
-let tree_of_modes : Alloc.lr -> zapped:Alloc.Const.t -> string list =
-  fun modes ~zapped ->
-    if Alloc.check_generic modes &&
-      mode_polymorphism_printing_enabled () then
+let tree_of_modes : Alloc.lr -> const_or_generic -> string list =
+  fun modes acc ->
+    match acc with
+    | Generic _ ->
       [ (Fmt.asprintf "%s"
             (Variable_names.name_of_mode modes))]
-    else
-      tree_of_modes_const zapped
+    | Const c -> tree_of_modes_const c
 
 (** The modal context on a type when printing it. This is to reproduce the mode
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
 type modal =
   | Arrow_return of
-    { acc : curry_acc;
+    { acc : const_or_generic;
       mode : Mode.Alloc.lr; }
     (** This is the RHS (say [r]) of an arrow type, where [mode] is the real
         mode of [r]. and:
@@ -2611,7 +2612,7 @@ type modal =
     If [r] is [Tpoly (Tarrow_, [])], it will be treated as NOT an arrow type.
     This gives tedious (but still correct) printing. *)
 
-  | Other of Mode.Alloc.Const.t
+  | Other of const_or_generic
     (** In other cases, the caller has already printed the modes (as the
         constructor argument) on the type. *)
 
@@ -2630,8 +2631,8 @@ let rec tree_of_modal_typexp mode modal ty =
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
-        let mode = zap_to_legacy ~arg:false mode in
-        Otyp_ret (Orm_any (tree_of_modes_const mode), tree)
+        let acc = const_or_generic_of_mode ~arg:false mode in
+        Otyp_ret (Orm_any (tree_of_modes mode acc), tree)
     | Other _ -> tree
   in
   let ty =
@@ -2645,7 +2646,6 @@ let rec tree_of_modal_typexp mode modal ty =
    not_arrow (Otyp_var (non_gen, name)) else
 
   let pr_typ acc_mode =
-    let alloc_mode = curry_acc_floor acc_mode in
     let tty = Transient_expr.repr ty in
     match tty.desc with
     | Tvar _ ->
@@ -2661,7 +2661,7 @@ let rec tree_of_modal_typexp mode modal ty =
            don't print anything for those axes, since user would interpret that
            as legacy. The best we can do is to zap to legacy and if they do land
            at legacy, we will be able to omit printing them. *)
-        let arg_mode = zap_to_legacy ~arg:true marg in
+        let arg_acc = const_or_generic_of_mode ~arg:true marg in
         let t1 =
           if is_optional l then
             match
@@ -2669,15 +2669,15 @@ let rec tree_of_modal_typexp mode modal ty =
             with
             | Tconstr(path, [ty], _)
               when Path.same path Predef.path_option ->
-                tree_of_typexp mode arg_mode ty
+                tree_of_acc_typexp mode arg_acc ty
             | _ -> Otyp_stuff "<hidden>"
           else
-            tree_of_typexp mode arg_mode ty1
+            tree_of_acc_typexp mode arg_acc ty1
         in
-        let acc_mode = curry_acc_mode acc_mode marg in
+        let acc_mode = curry_acc acc_mode marg in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
-        Otyp_arrow (lab, tree_of_modes marg ~zapped:arg_mode, t1, t2)
+        Otyp_arrow (lab, tree_of_modes marg arg_acc, t1, t2)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
@@ -2719,16 +2719,16 @@ let rec tree_of_modal_typexp mode modal ty =
         tree_of_typobject mode fi !nm
     | Tmod (ty, mod_bounds) ->
         Otyp_mod
-          ( tree_of_typexp mode alloc_mode ty,
+          ( tree_of_acc_typexp mode acc_mode ty,
             out_modalities_of_mod_bounds mod_bounds )
     | Tquote ty ->
         wrap_printing_env_unguarded
           (Env.enter_quote !printing_env)
-          (fun () -> Otyp_quote (tree_of_typexp mode alloc_mode ty))
+          (fun () -> Otyp_quote (tree_of_acc_typexp mode acc_mode ty))
     | Tsplice ty ->
         wrap_printing_env_unguarded
           (Env.enter_splice ~loc:Location.none !printing_env)
-          (fun () -> Otyp_splice (tree_of_typexp mode alloc_mode ty))
+          (fun () -> Otyp_splice (tree_of_acc_typexp mode acc_mode ty))
     | Tquote_eval ty ->
         (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
         let ty = newgenty (Tquote ty) in
@@ -2749,7 +2749,7 @@ let rec tree_of_modal_typexp mode modal ty =
     | Tlink _ ->
         fatal_error "Out_type.tree_of_typexp"
     | Tpoly (ty, []) | Trepr (ty, []) ->
-        tree_of_typexp mode alloc_mode ty
+        tree_of_acc_typexp mode acc_mode ty
     | Tpoly (ty, tyl) ->
         (*let print_names () =
           List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
@@ -2760,7 +2760,7 @@ let rec tree_of_modal_typexp mode modal ty =
            printed once when used as proxy *)
         List.iter Aliases.add_delayed tyl;
         let tl = tree_of_univars tyl in
-        let tr = Otyp_poly (tl, tree_of_typexp mode alloc_mode ty) in
+        let tr = Otyp_poly (tl, tree_of_acc_typexp mode acc_mode ty) in
         (* Forget names when we leave scope *)
         Variable_names.remove_names tyl;
         Aliases.delayed := old_delayed; tr
@@ -2795,17 +2795,18 @@ let rec tree_of_modal_typexp mode modal ty =
                List.iter Aliases.add_delayed tyl;
                let sort_names = tree_of_qsvs tyl in
                let tr =
-                Otyp_repr (sort_names, tree_of_typexp mode alloc_mode inner_ty)
-              in
+                 Otyp_repr
+                   (sort_names, tree_of_acc_typexp mode acc_mode inner_ty)
+               in
                Variable_names.remove_names tyl;
                Aliases.delayed := old_delayed;
                tr
              end else
                (* Mismatch: print Trepr and Tpoly separately *)
-               tree_of_typexp mode alloc_mode ty
+               tree_of_acc_typexp mode acc_mode ty
          | _ ->
              (* No type variables, just print the body *)
-             tree_of_typexp mode alloc_mode ty)
+             tree_of_acc_typexp mode acc_mode ty)
     | Tunivar _ ->
         Otyp_var (false, Variable_names.(name_of_type new_name) tty)
     | Tpackage pack ->
@@ -2831,7 +2832,7 @@ let rec tree_of_modal_typexp mode modal ty =
     let alias = Variable_names.(name_of_type (new_var_name ~non_gen ty)) px in
     let tree =
       Otyp_alias
-        {non_gen; aliased = pr_typ (Acc_const Mode.Alloc.Const.legacy); alias}
+        {non_gen; aliased = pr_typ (Const Mode.Alloc.Const.legacy); alias}
     in
     not_arrow tree end
   else
@@ -2840,10 +2841,13 @@ let rec tree_of_modal_typexp mode modal ty =
         let rm, acc_mode = tree_of_ret_typ_mutating acc mode ty in
         let ty = pr_typ acc_mode in
         Otyp_ret (rm, ty)
-    | Other m -> pr_typ (Acc_const m)
+    | Other acc_mode -> pr_typ acc_mode
+
+and tree_of_acc_typexp mode acc_mode ty =
+  tree_of_modal_typexp mode (Other acc_mode) ty
 
 and tree_of_typexp mode alloc_mode ty =
-  tree_of_modal_typexp mode (Other alloc_mode) ty
+  tree_of_acc_typexp mode (Const alloc_mode) ty
 
 and tree_of_qtv v jkind =
     (* CR layouts: We ignore nullability here to avoid needlessly printing
@@ -2918,7 +2922,7 @@ and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
 
 (** NB: This function might mutate states; the caller is responsible for
     reverting them. *)
-and tree_of_ret_typ_mutating (acc_mode : curry_acc) m ty=
+and tree_of_ret_typ_mutating (acc_mode : const_or_generic) m ty=
   match get_desc ty with
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
@@ -2928,13 +2932,13 @@ and tree_of_ret_typ_mutating (acc_mode : curry_acc) m ty=
       end else begin
         (* In this branch we need to print parens. [m] might have undetermined
         axes and we adopt a similar logic to the [marg] above. *)
-        let zapped = zap_to_legacy ~arg:false m in
-        (Orm_parens (tree_of_modes m ~zapped), Acc_const zapped)
+        let acc_mode = const_or_generic_of_mode ~arg:false m in
+        (Orm_parens (tree_of_modes m acc_mode), acc_mode)
       end
     end
   | _ ->
-    let acc = zap_to_legacy ~arg:false m in
-    (Orm_any (tree_of_modes m ~zapped:acc), Acc_const acc)
+    let acc_mode = const_or_generic_of_mode ~arg:false m in
+    (Orm_any (tree_of_modes m acc_mode), acc_mode)
 
 and tree_of_typobject_repr fi =
   let (fields, rest) = flatten_fields fi in
@@ -3926,7 +3930,7 @@ let rec tree_of_modtype ?abbrev = function
       in
       let res = wrap_env env (tree_of_modtype ?abbrev) ty_res in
       let mres =
-        m_res |> zap_to_legacy ~arg:false |> tree_of_modes_const
+        m_res |> Alloc.zap_to_legacy_exn ~arg:false |> tree_of_modes_const
       in
       Omty_functor (param, res, mres))
   | Mty_alias p ->
@@ -3957,7 +3961,7 @@ and tree_of_functor_parameter ?abbrev = function
             fun k -> Env.add_module ~arg:true id Mp_present ty_arg k
       in
       let marg =
-        m_arg |> zap_to_legacy ~arg:true |> tree_of_modes_const
+        m_arg |> Alloc.zap_to_legacy_exn ~arg:true |> tree_of_modes_const
       in
       Some (name, tree_of_modtype ?abbrev ty_arg, marg), env
 

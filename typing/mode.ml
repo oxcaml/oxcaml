@@ -7531,11 +7531,6 @@ module Value_with (Areality : Areality) = struct
       let* comonadic = Comonadic.Guts.check_const comonadic in
       Some (merge { comonadic; monadic })
 
-    let get_legacy ~arg { monadic; comonadic } =
-      let monadic = Monadic.zap_to_legacy_force ~commit:false ~arg monadic in
-      let comonadic = Comonadic.zap_to_legacy_force ~commit:false comonadic in
-      merge { monadic; comonadic }
-
     let get_ceil { monadic; comonadic } =
       let monadic = Monadic.Guts.get_ceil monadic in
       let comonadic = Comonadic.Guts.get_ceil comonadic in
