@@ -13,8 +13,7 @@ let refine (type output) (w : output t) =
 [%%expect{|
 type _ t = A : bool t
 val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
-val refine : 'output t @ 'm -> (bool -> 'output) @ [> stateful dynamic] =
-  <fun>
+val refine : 'output t @ 'm -> bool -> 'output = <fun>
 |}]
 
 type _ arr = F : (int -> int) arr
@@ -24,7 +23,7 @@ let apply (type a) (w : a arr) (g : a) =
   | F -> g 3
 [%%expect{|
 type _ arr = F : (int -> int) arr
-val apply : 'a arr @ 'o -> ('a @ 'n -> int @ [> dynamic]) @ 'm = <fun>
+val apply : 'a arr @ 'n -> 'a @ 'm -> int @ [> dynamic] = <fun>
 |}, Principal{|
 type _ arr = F : (int -> int) arr
 Line 5, characters 9-12:
@@ -40,14 +39,12 @@ let pin (w : 'x arr) (g : 'x) =
   | F -> g
 [%%expect{|
 val pin :
-  (int -> int) arr @ 'o ->
-  ((int -> int) @ [< 'n mod aliased contended immutable] ->
-   (int -> int) @ [> 'n]) @ 'm =
-  <fun>
+  (int -> int) arr @ 'n ->
+  (int -> int) @ [< 'm mod aliased contended immutable] -> int -> int = <fun>
 |}, Principal{|
 val pin :
-  (int -> int) arr @ [< past('m) & global] ->
-  ((int -> int) @ [< 'n] -> (int -> int) @ [> 'n]) @ [> past('m)] = <fun>
+  (int -> int) arr @ [< past('n) & global] ->
+  (int -> int) @ [< 'm] -> int -> int = <fun>
 |}]
 
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
@@ -59,9 +56,8 @@ let local_arg_ok (type a) (w : a dom) (g : a) (s : string @ local) =
 [%%expect{|
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
 val local_arg_ok :
-  'a dom @ 'o ->
-  ('a @ [< past('n) & global] ->
-   (string @ [> local] -> int @ [> dynamic]) @ [> past('n)]) @ 'm =
+  'a dom @ 'n ->
+  'a @ [< past('m) & global] -> string @ [> local] -> int @ [> dynamic] =
   <fun>
 |}, Principal{|
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
@@ -92,13 +88,13 @@ let crosses (type a) (w : a cross) (x : a @ local) : a @ global =
   | Str -> assert false
 [%%expect{|
 type _ cross = Int : int cross | Str : string cross
-val crosses :
-  'a cross @ 'n -> ('a @ [> local] -> 'a @ [< global > dynamic]) @ 'm = <fun>
+val crosses : 'a cross @ 'm -> 'a @ [> local] -> 'a @ [< global > dynamic] =
+  <fun>
 |}, Principal{|
 type _ cross = Int : int cross | Str : string cross
 val crosses :
   'a cross @ [< past('m) & global] ->
-  ('a @ [> local] -> 'a @ [< global > dynamic]) @ [> past('m)] = <fun>
+  'a @ [> local] -> 'a @ [< global > dynamic] = <fun>
 |}]
 
 let escapes (type a) (w : a cross) (x : a @ local) : a @ global =
@@ -120,7 +116,6 @@ let unpack (P f) = f
 [%%expect{|
 type packed = P : (int -> int) -> packed
 val pack : packed = P <fun>
-val unpack :
-  packed @ [< 'm mod aliased contended immutable] -> (int -> int) @ [> 'm] =
+val unpack : packed @ [< 'm mod aliased contended immutable] -> int -> int =
   <fun>
 |}]

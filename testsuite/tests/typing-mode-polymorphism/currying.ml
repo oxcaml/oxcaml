@@ -33,8 +33,7 @@ val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 
 let fst x y = x
 [%%expect{|
-val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
-  <fun>
+val fst : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
 |}]
 
 (* n-ary functions will impose locality bounds on arguments, since the middle end
@@ -62,9 +61,8 @@ Error: This value is "local" but is expected to be "global".
 let bar (x @ once) =
   fst x
 [%%expect{|
-val bar :
-  'a @ [< 'm & global > once] ->
-  ('b @ 'n -> 'a @ [> 'm | once]) @ [> close('m) | once dynamic] = <fun>
+val bar : 'a @ [< 'm & global > once] -> 'b @ 'n -> 'a @ [> 'm | once] =
+  <fun>
 |}]
 
 let bar (x @ unique) =
@@ -83,10 +81,9 @@ let check_tuple x y z =
 [%%expect{|
 type box = { mutable x : int; }
 val check_tuple :
-  'a @ [< past('o) & past('m) & global unique] ->
-  ('b @ [< 'n & global many] ->
-   ('c @ 'p -> unit * 'b * 'b @ [> 'n | aliased dynamic]) @ [> close('n) | past('o) | once stateful]) @ [> past('m) | once stateful] =
-  <fun>
+  'a @ [< past('o) & past('p) & global unique] ->
+  'b @ [< 'm & global many] ->
+  'c @ 'n -> unit * 'b * 'b @ [> 'm | aliased dynamic] = <fun>
 |}]
 
 let foo () =
@@ -126,12 +123,10 @@ Error: The value "bar1" is "nonportable"
 let many_arguments x y z s t = y
 [%%expect{|
 val many_arguments :
-  'a @ [< past('mm2) & past('q) & past('o) & past('m) & global] ->
-  ('b @ [< 'n & global] ->
-   ('c @ [< past('mm1) & past('p) & global] ->
-    ('d @ [< past('mm0) & global] ->
-     ('e @ 'mm3 -> 'b @ [> 'n]) @ [> close('n) | past('mm0) | past('mm1) | past('mm2)]) @ [> close('n) | past('p) | past('q)]) @ [> close('n) | past('o)]) @ [> past('m)] =
-  <fun>
+  'a @ [< past('mm0) & past('mm1) & past('mm2) & past('mm3) & global] ->
+  'b @ [< 'm & global] ->
+  'c @ [< past('p) & past('q) & global] ->
+  'd @ [< past('o) & global] -> 'e @ 'n -> 'b @ [> 'm] = <fun>
 |}]
 
 let foo (x @ portable) (y @ uncontended) =
@@ -140,8 +135,7 @@ let foo (x @ portable) (y @ uncontended) =
 [%%expect{|
 val foo :
   'a @ [< past('m) & global portable] ->
-  ('b @ [< global uncontended] -> unit @ [> dynamic]) @ [> past('m) | stateful] =
-  <fun>
+  'b @ [< global uncontended] -> unit @ [> dynamic] = <fun>
 |}]
 
 let foo (x @ portable) (y @ uncontended) =
@@ -150,8 +144,7 @@ let foo (x @ portable) (y @ uncontended) =
 [%%expect{|
 val foo :
   'a @ [< past('m) & global portable] ->
-  ('b @ [< global portable uncontended] -> unit @ [> dynamic]) @ [> past('m) | stateful] =
-  <fun>
+  'b @ [< global portable uncontended] -> unit @ [> dynamic] = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -189,8 +182,7 @@ val foo : unit = ()
 
 let fst x = fun y -> x
 [%%expect{|
-val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
-  <fun>
+val fst : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
 |}]
 
 (* x is < global as before *)
@@ -300,9 +292,7 @@ Error: The value "bar1" is "nonportable"
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
 val nest :
-  'a @ [< 'm & global] ->
-  (unit @ 'p ->
-   (unit @ 'o -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [> close('m)]) @ [> close('m)] =
+  'a @ [< 'm & global] -> unit @ 'p -> unit @ 'o -> unit @ 'n -> 'a @ [> 'm] =
   <fun>
 |}]
 

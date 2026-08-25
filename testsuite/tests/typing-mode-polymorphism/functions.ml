@@ -67,7 +67,7 @@ let apply f = fun x -> f x
 [%%expect{|
 val apply :
   ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
-  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o)] = <fun>
+  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
 let foo (x @ unique) (y @ aliased) =
@@ -100,10 +100,9 @@ Error: This value is "nonportable" but is expected to be "portable".
 let compose f g x = f (g x)
 [%%expect{|
 val compose :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('mm0) & past('o) & global] ->
-  (('c @ [> 'p] -> 'a @ [< 'n & global]) @ [< past('q) & global] ->
-   ('c @ [< 'p] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0)]) @ [> past('o)] =
-  <fun>
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('q) & past('mm0) & global] ->
+  ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< past('p) & global] ->
+  'c @ [< 'o] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
 (* mode polymorphism propagates through composition *)
@@ -148,7 +147,7 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  (int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic]) @ [> close('m) | stateful] =
+  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
   <fun>
 |}]
 
@@ -163,7 +162,7 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  (int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic]) @ [> close('m) | stateful] =
+  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
   <fun>
 |}]
 
@@ -183,8 +182,7 @@ let rec map f = function
 [%%expect{|
 val map :
   ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & past('p) & global many > aliased] ->
-  ('a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic]) @ [> past('o) | past('p) | stateful] =
-  <fun>
+  'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
 |}]
 
 let foo (y @ portable) =

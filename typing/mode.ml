@@ -5837,12 +5837,12 @@ module Monadic_gen (Obj : Obj) = struct
     let check_const m =
       let floor = get_floor m in
       let ceil = get_ceil m in
-      if C.le obj ceil floor then Some ceil else None
+      if C.le obj floor ceil then Some ceil else None
 
     let in_bounds c m =
       let floor = get_floor m in
       let ceil = get_ceil m in
-      C.le obj floor c && C.le obj c ceil
+      C.le obj c floor && C.le obj ceil c
   end
 end
 [@@inline]
