@@ -1565,6 +1565,7 @@ type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;
   ai_parameter_uid : Shape.Uid.t;
+  (** The UID of parameter compilation unit [P], not of [P]'s module type. *)
 }
 (** For a module [M] compiled with [-as-argument-for P] for some parameter
     module [P], the signature of [P] along with the coercion from [M]'s
