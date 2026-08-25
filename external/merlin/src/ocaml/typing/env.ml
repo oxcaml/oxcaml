@@ -745,7 +745,10 @@ and module_components =
   }
 
 and components_maker = {
-  cm_env: t;
+  cm_env: t ref;
+      (** Initially the (incomplete) enclosing env; overwritten with the full
+          env once the enclosing signature is fully processed, so lazies
+          forced later see all items in the signature. *)
   cm_prefixing_subst: Subst.t;
   cm_path: Path.t;
   cm_addr: address_lazy;
@@ -789,7 +792,8 @@ and address_unforced =
     { parent : address_lazy;
       module_repr: module_representation;
       pos : int }
-  | ModAlias of { env : t; path : Path.t; }
+  | ModAlias of { env : t ref; path : Path.t; }
+      (** Same lazy-env pattern as [components_maker.cm_env]. *)
 
 and address_lazy = (address_unforced, address) Lazy_backtrack.t
 
@@ -961,6 +965,10 @@ type error =
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t }
   | Initial_stage_splice of Location.t
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
+  | Cmi_not_found of
+      { modname : Compilation_unit.Name.t;
+        chain : Compilation_unit.Name.t list;
+      }
 
 exception Error of error
 
@@ -1291,7 +1299,7 @@ let read_sign_of_cmi (sign, mda_mode) name uid ~shape ~address:addr ~flags =
   let mda_components =
     let mty = md.md_type in
     components_of_module ~alerts ~uid:md.md_uid
-      empty Subst.identity
+      (ref empty) Subst.identity
       path mda_address mty mda_mode mda_shape
   in
   {
@@ -1785,7 +1793,7 @@ and find_ident_module_address id env =
 and force_address = function
   | Projection { parent; module_repr; pos } ->
     Adot(get_address parent, module_repr, pos)
-  | ModAlias { env; path } -> find_module_address path env
+  | ModAlias { env; path } -> find_module_address path !env
 
 and get_address a =
   Lazy_backtrack.force force_address a
@@ -2424,7 +2432,8 @@ let module_declaration_address env id presence md =
   | Mp_absent -> begin
       let open Subst.Lazy in
       match md.md_type with
-      | Mty_alias path -> Lazy_backtrack.create (ModAlias {env; path})
+      | Mty_alias path ->
+          Lazy_backtrack.create (ModAlias {env; path})
       | _ -> Misc.fatal_error "Env.module_declaration_address"
     end
   | Mp_present ->
@@ -2433,6 +2442,7 @@ let module_declaration_address env id presence md =
 let rec components_of_module_maker
           {cm_env; cm_prefixing_subst;
            cm_path; cm_addr; cm_mty; cm_mode; cm_shape} : _ result =
+  let cm_env = !cm_env in
   match !scrape_alias cm_env cm_mty with
     Mty_signature sg ->
       let c =
@@ -2447,7 +2457,11 @@ let rec components_of_module_maker
       let items_and_paths, sub =
         prefix_idents cm_path cm_prefixing_subst sg
       in
+      (* [env] is write-only in the loop; its final value is published
+         to [inner_full_env] after the loop so lazies forced later see
+         all items in the signature. *)
       let env = ref cm_env in
+      let inner_full_env = ref cm_env in
       let pos = ref 0 in
       let module_repr =
         List.filter_map
@@ -2570,7 +2584,8 @@ let rec components_of_module_maker
               | Mp_absent -> begin
                   match md.md_type with
                   | Mty_alias path ->
-                      Lazy_backtrack.create (ModAlias {env = !env; path})
+                      Lazy_backtrack.create
+                        (ModAlias {env = inner_full_env; path})
                   | _ -> assert false
                 end
               | Mp_present -> next_address ()
@@ -2580,7 +2595,7 @@ let rec components_of_module_maker
             in
             let shape = Shape.proj cm_shape (Shape.Item.module_ id) in
             let comps =
-              components_of_module ~alerts ~uid:md.md_uid !env
+              components_of_module ~alerts ~uid:md.md_uid inner_full_env
                 sub path addr md.md_type mode shape
             in
             let mda =
@@ -2592,8 +2607,12 @@ let rec components_of_module_maker
             in
             c.comp_modules <-
               NameMap.add (Ident.name id) mda c.comp_modules;
+            (* Share [inner_full_env] with [store_module]'s
+               [components_of_module] so mda lazies see the fully-
+               populated env when forced. *)
             env :=
-              store_module ~update_summary:false ~check:None
+              store_module ~update_summary:false ~full_env:inner_full_env
+                ~check:None
                 id addr pres md mode shape locks_empty !env
         | Sig_modtype(id, decl, _) ->
             let final_decl =
@@ -2633,7 +2652,8 @@ let rec components_of_module_maker
             c.comp_jkinds <- NameMap.add (Ident.name id) jkda c.comp_jkinds
       )
         items_and_paths;
-        Ok (Structure_comps c)
+      inner_full_env := !env;
+      Ok (Structure_comps c)
   | Mty_functor(arg, ty_res, _) ->
       let sub = cm_prefixing_subst in
       let scoping = Subst.Rescope (Path.scope cm_path) in
@@ -2915,7 +2935,7 @@ and store_extension ~check ~rebind id addr ext shape env =
     constrs = TycompTbl.add id cda env.constrs;
     summary = Env_extension(env.summary, id, ext) }
 
-and store_module ?(update_summary=true) ~check
+and store_module ?(update_summary=true) ~full_env ~check
                  id addr presence md mode shape alias_locks env =
   let open Subst.Lazy in
   let loc = md.md_loc in
@@ -2926,7 +2946,7 @@ and store_module ?(update_summary=true) ~check
   let md, mode = Normalize_mode.md Normalize md mode in
   let comps =
     components_of_module ~alerts ~uid:md.md_uid
-      env Subst.identity (Pident id) addr md.md_type mode shape
+      full_env Subst.identity (Pident id) addr md.md_type mode shape
   in
   let mda =
     { mda_declaration = md;
@@ -3031,8 +3051,8 @@ let components_of_functor_appl ~loc ~f_path ~f_comp ~arg env =
       components_of_module ~alerts:Misc.Stdlib.String.Map.empty
         ~uid:Uid.internal_not_actually_unique
         (*???*)
-        env Subst.identity p addr (Subst.Lazy.of_modtype mty)
-        fcomp_res_mode shape
+        (ref env) Subst.identity p addr
+        (Subst.Lazy.of_modtype mty) fcomp_res_mode shape
     in
     if can_load_cmis then stamped_path_add f_comp.fcomp_cache arg comps;
     comps
@@ -3068,7 +3088,7 @@ and add_extension ~check ?shape ~rebind id ext env =
   store_extension ~check ~rebind id addr ext shape env
 
 and add_module_declaration_lazy
-      ~update_summary ?(arg=false) ?shape ~check id presence md
+      ~update_summary ?(arg=false) ?shape ?full_env ~check id presence md
       ?(mode = Mode.Value.(allow_right max)) ?(locks = []) env =
   let check =
     if not check then
@@ -3078,11 +3098,15 @@ and add_module_declaration_lazy
     else
       Some (fun s -> Warnings.Unused_module s)
   in
-  let addr = module_declaration_address env id presence md in
+  let full_env =
+    match full_env with Some r -> r | None -> ref env
+  in
+  let addr = module_declaration_address full_env id presence md in
   let shape = shape_or_leaf md.Subst.Lazy.md_uid shape in
   let mode = Mode.Value.disallow_right mode in
   let env =
-    store_module ~update_summary ~check id addr presence md mode shape locks env
+    store_module ~update_summary ~full_env ~check id addr presence md mode shape
+      locks env
   in
   if arg then add_functor_arg id env else env
 
@@ -3287,7 +3311,8 @@ let proj_shape map mod_shape item =
 module Add_signature(T : Types.Wrapped)(M : sig
   val add_value: ?shape:Shape.t -> mode:(Mode.allowed * 'r0) Mode.Value.t -> Ident.t ->
     T.value_description  -> t -> t
-  val add_module_declaration: ?arg:bool -> ?shape:Shape.t -> check:bool
+  val add_module_declaration: ?arg:bool -> ?shape:Shape.t
+    -> full_env:t ref -> check:bool
     -> Ident.t -> module_presence -> T.module_declaration
     -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks ->
     t -> t
@@ -3295,7 +3320,7 @@ module Add_signature(T : Types.Wrapped)(M : sig
 end) = struct
   open T
 
-  let add_item map mod_shape comp mode env =
+  let add_item map mod_shape comp mode ~full_env env =
     match comp with
     | Sig_value(id, decl, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.value id) in
@@ -3309,8 +3334,8 @@ end) = struct
         map, add_extension ~check:false ?shape ~rebind:false id ext env
     | Sig_module(id, presence, md, _, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.module_ id) in
-        map, M.add_module_declaration ~check:false ?shape id presence md ~mode
-          env
+        map, M.add_module_declaration ~check:false ?shape ~full_env id presence
+          md ~mode env
     | Sig_modtype(id, decl, _)  ->
         let map, shape = proj_shape map mod_shape (Shape.Item.module_type id) in
         map, M.add_modtype ?shape id decl env
@@ -3324,20 +3349,28 @@ end) = struct
         let map, shape = proj_shape map mod_shape (Shape.Item.jkind id) in
         map, add_jkind ~check:false ?shape id decl env
 
-  let rec add_signature map mod_shape sg ?(mode = Mode.Value.(allow_right max))
+  let add_signature map mod_shape sg ?(mode = Mode.Value.(allow_right max))
     env =
-    match sg with
-        [] -> map, env
-    | comp :: rem ->
-        let map, env = add_item map mod_shape comp mode env in
-        add_signature map mod_shape rem ~mode env
+    let full_env = ref env in
+    let rec go map env = function
+      | [] -> map, env
+      | comp :: rem ->
+          let map, env = add_item map mod_shape comp mode ~full_env env in
+          go map env rem
+    in
+    let map, env = go map env sg in
+    full_env := env;
+    map, env
 end
 
 let add_signature map mod_shape sg ?mode env =
   let module M = Add_signature(Types)(struct
     let add_value ?shape ~mode id vd =
       add_value_lazy ?shape ~mode id (Subst.Lazy.of_value_description vd)
-    let add_module_declaration = add_module_declaration
+    let add_module_declaration ?arg ?shape ~full_env ~check id presence md
+      ?mode ?locks env =
+      add_module_declaration_lazy ~update_summary:true ?arg ?shape ~full_env
+        ~check id presence (Subst.Lazy.of_module_decl md) ?mode ?locks env
     let add_modtype = add_modtype
   end)
   in
@@ -3346,9 +3379,10 @@ let add_signature map mod_shape sg ?mode env =
 let add_signature_lazy =
   let module M = Add_signature(Subst.Lazy)(struct
     let add_value ?shape ~mode = add_value_lazy ?check:None ?shape ~mode
-    let add_module_declaration ?arg ?shape ~check id pres md ?mode ?locks env =
-      add_module_declaration_lazy ~update_summary:true ?arg ?shape ~check id
-        pres md ?mode ?locks env
+    let add_module_declaration ?arg ?shape ~full_env ~check id pres md
+      ?mode ?locks env =
+      add_module_declaration_lazy ~update_summary:true ?arg ?shape ~full_env
+        ~check id pres md ?mode ?locks env
     let add_modtype = add_modtype_lazy ~update_summary:true
   end)
   in
@@ -3377,7 +3411,7 @@ let add_cltype = add_cltype ?shape:None
 let add_modtype_lazy = add_modtype_lazy ?shape:None
 let add_modtype = add_modtype ?shape:None
 let add_module_declaration_lazy ?(arg=false) =
-  add_module_declaration_lazy ~arg ?shape:None ~check:false
+  add_module_declaration_lazy ~arg ?shape:None ?full_env:None ~check:false
 let add_signature sg env =
   let _, env = add_signature Shape.Map.empty None sg env in
   env
@@ -3404,6 +3438,10 @@ let read_signature modname cmi =
   let mty, mode = read_pers_mod modname cmi in
   (* [mode] read from the cmi is always a constant *)
   Subst.Lazy.force_signature mty, (Mode.Value.zap_to_floor mode).staticity
+
+let find_import ~chain modname =
+  try Persistent_env.find_import !persistent_env modname
+  with Not_found -> error (Cmi_not_found { modname; chain })
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -5668,6 +5706,18 @@ let report_error_doc = function
          as seen at %a.@]"
         print_unsupported_quotation context
         (Location.Doc.loc ~capitalize_first:false) loc
+  | Cmi_not_found { modname; chain } ->
+      let pp_referenced_from ppf chain =
+        List.iter
+          (fun loader ->
+            Format_doc.fprintf ppf ",@ referenced from %a"
+              (Style.as_inline_code Compilation_unit.Name.print) loader)
+          chain
+      in
+      Location.errorf ~loc:Location.none
+        "@[<hov>Cannot find the compiled interface for %a%a@]"
+        (Style.as_inline_code Compilation_unit.Name.print) modname
+        pp_referenced_from chain
 
 let () =
   Location.register_error_of_exn

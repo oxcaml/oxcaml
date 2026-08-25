@@ -768,6 +768,7 @@ let ocaml_ignored_flags =
     "-fno-trap-notes";
     "-ftrap-notes";
     "-function-sections";
+    "-functorize";
     "-gdwarf-may-alter-codegen-experimental";
     "-gno-dwarf-may-alter-codegen-experimental";
     "-gno-startup";

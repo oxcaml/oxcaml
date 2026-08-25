@@ -236,8 +236,6 @@ module Acc : sig
     machine_width:Target_system.Machine_width.t ->
     t
 
-  val manufacture_symbol_short_name : t -> t * Linkage_name.t
-
   val declared_symbols : t -> (Symbol.t * Static_const.t) list
 
   val lifted_sets_of_closures :

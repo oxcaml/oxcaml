@@ -36,6 +36,8 @@ module type S = sig
 
   val name : t -> string
 
+  val canonical_name : t -> string
+
   val kind : t -> Flambda_kind.t
 
   val is_always_immediate : t -> bool

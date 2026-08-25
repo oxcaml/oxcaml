@@ -103,16 +103,16 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
-                      reaper_rebuild; reaper_solve; Compenv.stop_early;
-                      output_c_object]) > 1
+                      functorize; reaper_rebuild; reaper_solve;
+                      Compenv.stop_early; output_c_object]) > 1
     then
     begin
       let module P = Clflags.Compiler_pass in
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate, -reaper-rebuild, \
-                         -reaper-solve";
+                         -output-obj, -instantiate, -functorize, \
+                         -reaper-rebuild, -reaper-solve";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -154,6 +154,16 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
           src, args
       in
       Compiler.instantiate ~src ~args target;
+      Warnings.check_fatal ();
+    end
+    else if !functorize then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let input_module_names =
+        Compenv.get_objfiles ~with_ocamlparam:false
+        |> Functorizer.validate_inputs
+      in
+      Compiler.functorize input_module_names target;
       Warnings.check_fatal ();
     end
     else if !reaper_rebuild then begin

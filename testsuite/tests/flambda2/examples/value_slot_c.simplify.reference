@@ -1,21 +1,21 @@
-let $camlValue_slot_c__immstring130 = "value_slot_c.ml" in
-let $camlValue_slot_c__const_block132 =
-  Block 0 ($camlValue_slot_c__immstring130, 24, 2)
+let $camlValue_slot_c__immstring_5 = "value_slot_c.ml" in
+let $camlValue_slot_c__const_block_6 =
+  Block 0 ($camlValue_slot_c__immstring_5, 24, 2)
 in
-let $camlValue_slot_c__Pmakeblock135 =
+let $camlValue_slot_c__Pmakeblock_7 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlValue_slot_c__const_block132)
+           $camlValue_slot_c__const_block_6)
 in
-let $camlValue_slot_c__const_block143 =
-  Block 0 ($camlValue_slot_c__immstring130, 25, 2)
+let $camlValue_slot_c__const_block_8 =
+  Block 0 ($camlValue_slot_c__immstring_5, 25, 2)
 in
-let $camlValue_slot_c__Pmakeblock146 =
+let $camlValue_slot_c__Pmakeblock_9 =
   Block 0 ($`*predef*`.caml_exn_Assert_failure,
-           $camlValue_slot_c__const_block143)
+           $camlValue_slot_c__const_block_8)
 in
-let code f_3 deleted in
-let code loopify(never) size(59) newer_version_of(f_3)
-      f_3_1 (b : imm tagged)
+let code f_2 deleted in
+let code loopify(never) size(59) newer_version_of(f_2)
+      f_2_1 (b : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -41,16 +41,15 @@ let code loopify(never) size(59) newer_version_of(f_3)
                  let prim_1 = %phys_eq (x, 1) in
                  switch prim_1
                    | 0 ->
-                     k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock135)
+                     k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_7)
                    | 1 -> k2)
               where k2 =
                 let Pfield = %block_load.[`1`] (`*match*`) in
                 let prim = %phys_eq (Pfield, 3) in
                 switch prim
-                  | 0 ->
-                    k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock146)
+                  | 0 -> k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_9)
                   | 1 -> k (0)))
 in
-let $camlValue_slot_c__f_4 = closure f_3_1 @f &toplevel.alloc_region in
-let $camlValue_slot_c = Block 0 ($camlValue_slot_c__f_4) in
+let $camlValue_slot_c__f_10 = closure f_2_1 @f &toplevel.alloc_region in
+let $camlValue_slot_c = Block 0 ($camlValue_slot_c__f_10) in
 cont done ($camlValue_slot_c)

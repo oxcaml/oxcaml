@@ -39,10 +39,10 @@ let code loopify(never) size(57) newer_version_of(f_0)
                (Pmakeblock, `fn[wrong_allocation_moving.ml:21,15--28]`, diff)
                -> k * k1)
 in
-let $camlWrong_allocation_moving__f_2 =
+let $camlWrong_allocation_moving__f_1 =
   closure f_0_1 @f &toplevel.alloc_region
 in
 let $camlWrong_allocation_moving =
-  Block 0 ($camlWrong_allocation_moving__f_2)
+  Block 0 ($camlWrong_allocation_moving__f_1)
 in
 cont done ($camlWrong_allocation_moving)
