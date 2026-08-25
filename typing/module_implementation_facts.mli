@@ -7,6 +7,12 @@ module Artifact : sig
 end
 
 module Context : sig
+  module Site_id : sig
+    type t
+
+    val print : Format.formatter -> t -> unit
+  end
+
   (** A path-like identity for a module/signature instance *)
   type t =
     | Def of Shape.Uid.t
@@ -17,7 +23,7 @@ module Context : sig
     | Body of Shape.Uid.t
         (** The interior associated with a named module-type or functor
             declaration *)
-    | Site of Compilation_unit.t * Artifact.t * int
+    | Site of Compilation_unit.t * Artifact.t * Site_id.t
         (** An instance with no stable module path, e.g., anonymous module
             instances *)
 

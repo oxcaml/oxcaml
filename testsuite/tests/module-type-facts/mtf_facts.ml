@@ -73,10 +73,10 @@ let rec string_of_context t (context : Facts.Context.t) =
       then projected
       else inner ^ "." ^ projected
   | Site (unit_, artifact, occurrence) ->
-      Printf.sprintf "site(%s.%s#%d)"
+      Format.asprintf "site(%s.%s#%a)"
         (Compilation_unit.full_path_as_string unit_)
         (match artifact with Implementation -> "ml" | Interface -> "mli")
-        occurrence
+        Facts.Context.Site_id.print occurrence
 
 let string_of_key t (key : Facts.Key.t) =
   match key with
