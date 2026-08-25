@@ -8,12 +8,19 @@
        annotations ([.cmti]/[.cmsi]) and the [.cmx] target the
        implementation ones ([.cmt]/[.cms]).
     2. Negative: a [-cmi-file] declaring [Make] as a plain structure
-       fails the inclusion check against the inferred functor. *)
+       fails the inclusion check against the inferred functor.
+    3. A valid [-cmi-file] declaring a narrower signature than the
+       inferred one (only [Make], exposing only [Basic]): the coerced
+       module block has fewer fields than the inferred [Intf; Make]
+       pair. *)
 
  readonly_files = "\
    main_functorize.ml test_functorize.reference \
    bundle_bad.mli \
    bad_cmi_file_struct.reference \
+   bundle_narrow.mli \
+   main_narrow.ml \
+   narrow_native.reference \
    bundle.cmi.objinfo.reference \
    bundle.cms.objinfo_native.reference \
  ";
@@ -23,7 +30,7 @@
  set OCAMLPARAM = "";
 
  script = "mkdir p basic util p_int \
-                 bundle_cmifile bundle_bad";
+                 bundle_cmifile bundle_bad bundle_narrow";
  script;
 
  src = "${test_source_directory}/../p.mli \
@@ -51,6 +58,10 @@
 
  src = "bundle_bad.mli";
  dst = "bundle_bad/";
+ copy;
+
+ src = "bundle_narrow.mli";
+ dst = "bundle_narrow/";
  copy;
 
  set flg_base = "-w -53";
@@ -202,5 +213,56 @@
 
    compiler_reference = "bad_cmi_file_struct.reference";
    check-ocamlopt.byte-output;
+ }{
+   (* (3) A valid [-cmi-file] may declare a narrower signature than the
+      inferred one (here: only [Make], with its result spelled out and
+      exposing only [Basic] of the two bundled modules).  The coerced
+      module block then has one field instead of the inferred
+      [Intf; Make] pair.
+
+      CURRENT BEHAVIOR (bug): [transl_functorization] hardcodes a
+      2-field main module block format regardless of the coercion.
+      Bytecode ignores the declared field count and works; in native
+      code flambda2 materialises the out-of-bounds load of field 1
+      from the 1-field block, which traps at run time (see
+      [narrow_native.reference]). *)
+
+   flags = "";
+   module = "bundle_narrow/bundle_narrow.mli";
+   ocamlopt.byte;
+
+   flags = "$flg -functorize -I p -I basic -I util \
+     -cmi-file bundle_narrow/bundle_narrow.cmi Basic Util";
+   module = "";
+   program = "bundle_narrow/bundle_narrow.cmx";
+   all_modules = "";
+   ocamlopt.byte;
+
+   flags = "$flg -I bundle_narrow -I p -I p_int -I basic";
+   module = "main_narrow.ml";
+   ocamlopt.byte;
+
+   flags = "$flg_link";
+   module = "";
+   program = "$test_build_directory/test_narrow.exe";
+   all_modules = "\
+     basic/basic__.cmx \
+     util/util__.cmx \
+     basic/basic.cmx \
+     util/util.cmx \
+     p_int/p_int__.cmx \
+     p_int/p_int.cmx \
+     bundle_narrow/bundle_narrow.cmx \
+     main_narrow.cmx \
+   ";
+   ocamlopt.byte;
+
+   script = "sh -c './test_narrow.exe > narrow.result 2>&1; \
+                    echo exit=$? >> narrow.result'";
+   script;
+
+   output = "narrow.result";
+   reference = "narrow_native.reference";
+   check-program-output;
  }
 *)

@@ -1,0 +1,11 @@
+[ocaml] [flambda2] Invalid code:
+(Defining_expr_of_let (bound_pattern field_1/156N)
+ (defining_expr
+  (((Block_load (Values (tag 0) (size 2) (field_kind Any_value)) Immutable 1)
+    module_block/47N))))
+
+This might have arisen from a wrong use of [%identity],
+for example confusing arrays and records, or non-mixed and
+mixed blocks.
+Consider using [Obj.magic], [Obj.repr] and/or [Obj.obj].
+exit=134
