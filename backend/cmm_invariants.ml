@@ -351,7 +351,7 @@ let oper_arg_types : operation -> expected_arg_types = function
        handler on the trap stack, whose machtypes are not known here. *)
     Args_then_any_number_of ([Exactly typ_val], Any_machtype)
   | Cprobe _ -> Any_number_of Any_machtype
-  | Copaque -> Any_number_of Any_machtype
+  | Copaque -> Args [Any_machtype]
   | Cprobe_is_enabled _ | Cbeginregion | Cdls_get | Ctls_get | Cdomain_index
   | Cpoll | Cpause ->
     Args []
@@ -520,9 +520,8 @@ let rec infer_machtype env (expr : expression) : inferred_machtype =
     in
     join_all_inferred_machtypes ~dbg:Debuginfo.none (body_ty :: handler_tys)
   | Cexit (label, args, _) ->
-    (* Exit arguments are matched to handler parameters by machtype component,
-       not one-to-one: a single argument of a product machtype can fill
-       several parameters. *)
+    (* Compare exit arguments and handler parameters after flattening their
+       machtypes into components. *)
     let args_ty =
       concat_inferred_machtypes (List.map (infer_machtype env) args)
     in
@@ -534,7 +533,7 @@ let rec infer_machtype env (expr : expression) : inferred_machtype =
     | Lbl label -> (
       match Static_label.Map.find_opt label env.handlers with
       | None ->
-        (* Exits to out-of-scope handlers are reported by [run]. *)
+        (* Exits to out-of-scope handlers are reported during selection. *)
         ()
       | Some param_tys ->
         check_machtype ~dbg:Debuginfo.none
