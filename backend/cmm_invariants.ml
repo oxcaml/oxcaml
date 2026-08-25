@@ -416,7 +416,7 @@ let join_all_inferred_machtypes ~dbg tys =
 type typechecking_env =
   { vars : machtype V.Map.t;
     handlers : machtype list Static_label.Map.t;
-    return_type : machtype option
+    return_type : machtype
   }
 
 let concat_inferred_machtypes tys =
@@ -527,13 +527,10 @@ let rec infer_machtype env (expr : expression) : inferred_machtype =
       concat_inferred_machtypes (List.map (infer_machtype env) args)
     in
     (match label with
-    | Return_lbl -> (
-      match env.return_type with
-      | None -> ()
-      | Some expected ->
-        check_machtype ~dbg:Debuginfo.none
-          ~what:(fun () -> "return")
-          ~expected args_ty)
+    | Return_lbl ->
+      check_machtype ~dbg:Debuginfo.none
+        ~what:(fun () -> "return")
+        ~expected:env.return_type args_ty
     | Lbl label -> (
       match Static_label.Map.find_opt label env.handlers with
       | None ->
@@ -629,7 +626,7 @@ let check_machtypes (fundecl : fundecl) =
   let env =
     { vars;
       handlers = Static_label.Map.empty;
-      return_type = Some fundecl.fun_ret_type
+      return_type = fundecl.fun_ret_type
     }
   in
   try
