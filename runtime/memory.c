@@ -799,6 +799,33 @@ void caml_region_end(caml_region_t r)
   Caml_state->local_sp = r;
 }
 
+/* If direct allocations since the last major slice exceed this
+   * percentage of the minor heap size, request a major
+   * slice. Prevents major collection starvation when allocation is
+   * dominated by major-heap direct allocation. */
+
+#define DIRECT_WORDS_REQUEST_PERCENT 20
+
+static void update_direct_words(caml_domain_state *dom_st, mlsize_t whsize)
+{
+  caml_update_major_allocated_words(dom_st, whsize, 1 /* direct */);
+  if (dom_st->allocated_words_direct >
+      dom_st->minor_heap_wsz / 100 * DIRECT_WORDS_REQUEST_PERCENT) {
+    CAML_EV_COUNTER (EV_C_REQUEST_MAJOR_ALLOC_SHR, 1);
+    caml_request_major_slice(1);
+  }
+}
+
+void caml_add_blocks_to_heap(void *base, size_t size,
+                             void (*free_callback)(void *, size_t))
+{
+  Caml_check_caml_state();
+  struct caml_heap_state *local = Caml_state->shared_heap;
+  caml_add_extent(local, base, size, free_callback);
+
+  update_direct_words(Caml_state, Wsize_bsize(size));
+}
+
 Caml_inline value alloc_shr(mlsize_t wosize, tag_t tag, reserved_t reserved,
                             int noexc)
 {
@@ -813,12 +840,7 @@ Caml_inline value alloc_shr(mlsize_t wosize, tag_t tag, reserved_t reserved,
       return (value)NULL;
   }
 
-  caml_update_major_allocated_words(
-    dom_st, Whsize_wosize(wosize), 1 /* direct */);
-  if (dom_st->allocated_words_direct > dom_st->minor_heap_wsz / 5) {
-    CAML_EV_COUNTER (EV_C_REQUEST_MAJOR_ALLOC_SHR, 1);
-    caml_request_major_slice(1);
-  }
+  update_direct_words(dom_st, Whsize_wosize(wosize));
 
 #ifdef DEBUG
   if (Scannable_tag(tag)) {

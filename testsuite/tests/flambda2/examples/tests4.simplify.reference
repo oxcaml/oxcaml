@@ -28,7 +28,7 @@ let code loopify(never) size(34) newer_version_of(pr2162_2_first_0)
       let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
       cont k (float_sub)
 in
-let $camlTests4__pr2162_2_first_4 =
+let $camlTests4__pr2162_2_first_6 =
   closure pr2162_2_first_0_1 @pr2162_2_first &toplevel.alloc_region
 in
 let code loopify(never) size(34) newer_version_of(pr2162_2_1)
@@ -57,7 +57,7 @@ let code loopify(never) size(34) newer_version_of(pr2162_2_1)
       let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
       cont k (float_sub)
 in
-let $camlTests4__pr2162_2_5 =
+let $camlTests4__pr2162_2_7 =
   closure pr2162_2_1_1 @pr2162_2 &toplevel.alloc_region
 in
 let code loopify(never) size(34) newer_version_of(pr2162_3_2)
@@ -86,7 +86,7 @@ let code loopify(never) size(34) newer_version_of(pr2162_3_2)
       let float_sub = %box_num.`float`.my_alloc_region (prim_1) in
       cont k (float_sub)
 in
-let $camlTests4__pr2162_3_6 =
+let $camlTests4__pr2162_3_8 =
   closure pr2162_3_2_1 @pr2162_3 &toplevel.alloc_region
 in
 let code loopify(never) size(49) newer_version_of(pr2162_3_as_int64_3)
@@ -124,13 +124,13 @@ let code loopify(never) size(49) newer_version_of(pr2162_3_as_int64_3)
       let Pmakeblock = %block.[`0`].my_alloc_region (int64_sub, int32_sub) in
       cont k (Pmakeblock)
 in
-let $camlTests4__pr2162_3_as_int64_7 =
+let $camlTests4__pr2162_3_as_int64_9 =
   closure pr2162_3_as_int64_3_1 @pr2162_3_as_int64 &toplevel.alloc_region
 in
 let $camlTests4 =
-  Block 0 ($camlTests4__pr2162_2_first_4,
-           $camlTests4__pr2162_2_5,
-           $camlTests4__pr2162_3_6,
-           $camlTests4__pr2162_3_as_int64_7)
+  Block 0 ($camlTests4__pr2162_2_first_6,
+           $camlTests4__pr2162_2_7,
+           $camlTests4__pr2162_3_8,
+           $camlTests4__pr2162_3_as_int64_9)
 in
 cont done ($camlTests4)

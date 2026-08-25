@@ -319,13 +319,17 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
         create_range_list_attributes_and_summarise state ~start_of_code_symbol
           ~dwarf_4_base_address_entry range all_summaries
       in
+      (* [prefix] is ordered outermost first and always starts with [fundecl]'s
+         own item, so its last element describes the frame into which the
+         current block was inlined, i.e. the current block's call site. *)
       let call_site_item =
-        match List.rev prefix with
-        | call_site_item :: _ -> call_site_item
-        | [] ->
+        match Misc.last prefix with
+        | Some call_site_item -> call_site_item
+        | None ->
           Misc.fatal_errorf
-            "Empty prefix when creating DIE for inlined frame %a"
-            Debuginfo.print_compact_extended block
+            "Dwarf_inlined_frames.create_down_to_innermost_frame:@ empty \
+             prefix when creating DIE for %a in function %s"
+            Debuginfo.print_compact_extended block fundecl.L.fun_name
       in
       let inlined_subroutine_die =
         die_for_inlined_frame state ~compilation_unit_proto_die

@@ -99,31 +99,45 @@ module Unboxed_or_untagged_array_tags = struct
     | _ -> unboxed_float32_array_one_tag
 end
 
-let check_equal_1 name f1 f2 arg1 =
-  let r1 = f1 arg1 in
-  let r2 = f2 arg1 in
-  if P.Cmm_comparator.equivalent r1 r2
-  then r1
+(* The non-engine implementations of the helpers checked by [check_equal_*]
+   below do not handle [Cphantom_let] or [Cname_for_debugger], whereas the
+   [Cmm_peephole_engine] versions skip over such constructs, re-placing them
+   around any rewritten result. In the presence of these constructs the results
+   of the two implementations may therefore differ legitimately, in which case
+   the engine's result is used without checking. *)
+let check_equal_1 name f ~engine arg1 =
+  let r = f arg1 in
+  let r_engine = engine arg1 in
+  if P.Cmm_comparator.equivalent r r_engine
+  then r
+  else if
+    contains_debug_only_constructs r || contains_debug_only_constructs r_engine
+  then r_engine
   else
-    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
-      Printcmm.expression r2
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r
+      Printcmm.expression r_engine
 
-let check_equal_3 name f1 f2 arg1 arg2 arg3 =
-  let r1 = f1 arg1 arg2 arg3 in
-  let r2 = f2 arg1 arg2 arg3 in
-  if P.Cmm_comparator.equivalent r1 r2
-  then r1
+let check_equal_3 name f ~engine arg1 arg2 arg3 =
+  let r = f arg1 arg2 arg3 in
+  let r_engine = engine arg1 arg2 arg3 in
+  if P.Cmm_comparator.equivalent r r_engine
+  then r
+  else if
+    contains_debug_only_constructs r || contains_debug_only_constructs r_engine
+  then r_engine
   else
-    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
-      Printcmm.expression r2
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r
+      Printcmm.expression r_engine
 
-let check_equal_int_1 name f1 f2 arg1 =
-  let r1 : int = f1 arg1 in
-  let r2 = f2 arg1 in
-  if r1 = r2
-  then r1
+let check_equal_int_1 name f ~engine arg1 =
+  let r : int = f arg1 in
+  let r_engine = engine arg1 in
+  if r = r_engine
+  then r
+  else if contains_debug_only_constructs arg1
+  then r_engine
   else
-    Misc.fatal_errorf "Mismatch on %s:@ %d@ vs@ %d@ Arg is %a" name r1 r2
+    Misc.fatal_errorf "Mismatch on %s:@ %d@ vs@ %d@ Arg is %a" name r r_engine
       Printcmm.expression arg1
 
 let arch_bits = Arch.size_int * 8
@@ -565,7 +579,7 @@ let rec add_const' arg const dbg =
               }
           => fun env -> add_const' env#.c (env#.n - env#.x) dbg ) ])
 
-let add_const = check_equal_3 "add_const" add_const add_const'
+let add_const = check_equal_3 "add_const" add_const ~engine:add_const'
 
 let incr_int c dbg = add_const c 1 dbg
 
@@ -595,7 +609,7 @@ let rec add_int' arg1 arg2 dbg =
           ( Binop (Add, Any c1, Binop (Add, Any c2, Const_int n2)) => fun env ->
             add_const (add_int' env#.c1 env#.c2 dbg) env#.n2 dbg ) ])
 
-let add_int = check_equal_3 "add_int" add_int add_int'
+let add_int = check_equal_3 "add_int" add_int ~engine:add_int'
 
 let rec sub_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -626,7 +640,7 @@ let rec sub_int' arg1 arg2 dbg =
           ( Binop (Sub, Binop (Add, Any c1, Const_int n1), Any c2) => fun env ->
             add_const (sub_int' env#.c1 env#.c2 dbg) env#.n1 dbg ) ])
 
-let sub_int = check_equal_3 "sub_int" sub_int sub_int'
+let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
 
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
@@ -695,7 +709,7 @@ let rec max_signed_bit_length' e =
 
 let max_signed_bit_length =
   check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
-    max_signed_bit_length'
+    ~engine:max_signed_bit_length'
 
 let rec ignore_low_bit_int = function
   | Cop
@@ -731,7 +745,8 @@ let rec ignore_low_bit_int' arg =
       => fun env -> ignore_low_bit_int' env#.c ) ]
 
 let ignore_low_bit_int =
-  check_equal_1 "ignore_low_bit_int" ignore_low_bit_int ignore_low_bit_int'
+  check_equal_1 "ignore_low_bit_int" ignore_low_bit_int
+    ~engine:ignore_low_bit_int'
 
 let[@inline] get_const = function
   | Cconst_int (i, _) -> Some (Nativeint.of_int i)
