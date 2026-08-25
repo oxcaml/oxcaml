@@ -56,6 +56,10 @@ extern uintnat caml_percent_sweep_per_mark; /* see major_gc.c */
 extern uintnat caml_gc_overhead_adjustment; /* see major_gc.c */
 extern uintnat caml_nohugepage_stacks;    /* see fiber.c */
 extern uintnat caml_enable_segv_handler;  /* see signals.c / signals_nat.c */
+#ifdef FAULTING_SAFEPOINTS
+extern uintnat caml_stw_poll_delay_ns; /* see domain.c */
+extern uintnat caml_tick_poll_delay_ns; /* see domain.c */
+#endif
 uintnat caml_measure_frametables = 0; /* see frame_descriptors.c */
 
 /* runtime config parameters set with caml_gc_set */
@@ -473,6 +477,11 @@ static struct gc_tweak gc_tweaks[] = {
   { "cache_stacks_per_class", &caml_cache_stacks_per_class, 0 },
   { "tick_use_usleep", &caml_tick_use_usleep, 0 },
   { "measure_frametables", &caml_measure_frametables, 0 },
+#ifdef FAULTING_SAFEPOINTS
+  { "tick_poll_delay", &caml_tick_poll_delay_ns, 0 },
+  { "stw_poll_delay", &caml_stw_poll_delay_ns, 0 },
+#endif
+
 };
 
 enum {N_GC_TWEAKS = sizeof(gc_tweaks)/sizeof(gc_tweaks[0])};
