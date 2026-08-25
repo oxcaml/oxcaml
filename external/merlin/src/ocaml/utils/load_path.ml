@@ -459,7 +459,6 @@ let get_paths () =
   { visible = List.rev_map visible_dir_to_include !visible_dirs;
     hidden = List.rev_map Dir.path !hidden_dirs }
 
-<<<<<<< Merlin:manifest-read-profiling
 (* CR-someday: init_manifests is not currently relevant because Merlin can safely ignore
    the -I-manifest and -H-manifest flags due to current build rules. But at some point,
    this will change, and manifest files will need to be handled properly. This will also
@@ -467,14 +466,6 @@ let get_paths () =
    -I-manifest and -H-manifest. Internal ticket 5767 *)
 let () = ignore Path_cache.prepend_add_single;;
 (*
-||||||| Compiler:last-imported
-=======
-(* CR-soon zqian: manifests are re-read from disk on every [init], even though
-   [Clflags.include_manifests] and [Clflags.hidden_include_manifests] cannot
-   change within an invocation. When multiple units are compiled (or at phase
-   boundaries such as linking), the whole manifest tree is read again each
-   time. *)
->>>>>>> Compiler:HEAD
 let init_manifests () =
   Profile.record_call ~accumulate:true "read_manifests" @@ fun () ->
   let manifests_reader = Dune_manifests_reader.create () in
