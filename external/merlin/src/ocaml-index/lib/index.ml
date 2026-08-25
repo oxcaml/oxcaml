@@ -143,7 +143,7 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
     ~do_not_use_cmt_loadpath ~shapes ~store_shapes ~cmt_loadpath ~cmt_impl_shape
     ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
     ~cmt_sourcefile ~cmt_source_digest ~cmt_declaration_dependencies
-    ~module_implementation_facts ~module_implementation_facts_present =
+    ~module_implementation_facts =
   init_load_path_once ~do_not_use_cmt_loadpath ~dirs:build_path cmt_loadpath;
   let module Reduce = Shape_reduce.Make (Reduce_conf (struct
     let shapes = shapes
@@ -171,7 +171,9 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
       (defs, into.approximated) cmt_ident_occurrences
   in
   let facts_run =
-    rewrite_module_facts ~root ~rewrite_root module_implementation_facts
+    match module_implementation_facts with
+    | None -> Module_implementation_facts.empty
+    | Some facts -> rewrite_module_facts ~root ~rewrite_root facts
   in
   let cu_shape = into.cu_shape in
   if store_shapes then
@@ -216,9 +218,9 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
       stats;
       related_uids;
       module_facts =
-        (if module_implementation_facts_present then
-           Some (link_module_facts facts_run)
-         else into.module_facts);
+        (match module_implementation_facts with
+        | None -> into.module_facts
+        | Some _ -> Some (link_module_facts facts_run));
       root_directory = into.root_directory
     },
     facts_run )
@@ -253,7 +255,6 @@ let index_of_cmt ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
         cmt_source_digest;
         cmt_declaration_dependencies;
         cmt_module_implementation_facts;
-        cmt_module_implementation_facts_present;
         _
       } =
     cmt_infos
@@ -269,7 +270,6 @@ let index_of_cmt ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~cmt_modname ~uid_to_loc ~cmt_ident_occurrences ~cmt_initial_env
     ~cmt_sourcefile ~cmt_source_digest ~cmt_declaration_dependencies
     ~module_implementation_facts:cmt_module_implementation_facts
-    ~module_implementation_facts_present:cmt_module_implementation_facts_present
 
 let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~shapes ~store_shapes cms_infos =
@@ -282,7 +282,6 @@ let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
         cms_initial_env;
         cms_declaration_dependencies;
         cms_module_implementation_facts;
-        cms_module_implementation_facts_present;
         _
       } =
     cms_infos
@@ -301,7 +300,6 @@ let index_of_cms ~into ~root ~rewrite_root ~build_path ~do_not_use_cmt_loadpath
     ~cmt_sourcefile:cms_sourcefile ~cmt_source_digest:cms_source_digest
     ~cmt_declaration_dependencies:cms_declaration_dependencies
     ~module_implementation_facts:cms_module_implementation_facts
-    ~module_implementation_facts_present:cms_module_implementation_facts_present
 
 let facts_of_index_input ~file (index : index) =
   match index.module_facts with
