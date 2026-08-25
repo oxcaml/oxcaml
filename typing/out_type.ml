@@ -1001,26 +1001,56 @@ let zap_to_legacy : arg:bool -> Alloc.lr -> Alloc.Const.t =
       then Alloc.Guts.get_legacy ~arg m
       else Alloc.zap_to_legacy_force ~arg m
 
-let curry_mode_const : Alloc.Const.t -> Alloc.lr -> Alloc.Const.t =
-  fun alloc_mode marg ->
-    let arg_mode =
-      match Alloc.zap_to_legacy ~arg:true marg with
-      | Some c -> c
-      | None ->
-        if mode_polymorphism_printing_enabled ()
-        then Alloc.Guts.get_ceil marg
-        else Alloc.zap_to_legacy_force ~arg:true marg
-    in
-    curry_mode_const alloc_mode arg_mode
+(** The curry mode accumulated along an arrow chain: a constant until a
+    generic mode variable is encountered, then the [Ctype.curry_mode]
+    join. *)
+type curry_acc =
+  | Acc_const of Alloc.Const.t
+  | Acc_var of Alloc.Comonadic.l
 
-let equate_with_const : Alloc.lr -> Alloc.Const.t -> bool =
-  fun m c ->
+(** The floor of the accumulator *)
+let curry_acc_floor : curry_acc -> Alloc.Const.t = function
+  | Acc_const c -> c
+  | Acc_var acc ->
+    Alloc.Const.merge
+      { comonadic = Alloc.Comonadic.Guts.get_floor acc;
+        monadic = Alloc.Monadic.Const.legacy }
+
+(** Extends the accumulator with the argument mode [marg] of an arrow. *)
+let curry_acc_mode : curry_acc -> Alloc.lr -> curry_acc =
+  fun acc marg ->
+    match acc, Alloc.zap_to_legacy ~arg:true marg with
+    | Acc_const acc, Some arg -> Acc_const (Ctype.curry_mode_const acc arg)
+    | Acc_var acc, _ -> Acc_var (Ctype.curry_mode acc marg)
+    | Acc_const acc, None ->
+      if mode_polymorphism_printing_enabled ()
+      then
+        Acc_var
+          (Ctype.curry_mode
+             (Alloc.Comonadic.of_const (Alloc.Const.partial_apply acc))
+             marg)
+      else
+        Acc_const
+          (Ctype.curry_mode_const acc
+             (Alloc.zap_to_legacy_force ~arg:true marg))
+
+(** Whether the return mode [m] of an arrow agrees with the constant
+    content of [acc_mode]. Mutating when [m] must be zapped: [m] is equated
+    with the constant (an [Acc_var] contains generic variables and cannot
+    be equated with directly); otherwise a pure bounds check.
+
+    [equate_with_const] additionally checks [m]'s edges;
+    [Variable_names.equate_curry] calls this function alone, so that the
+    mutations happen during preprocessing, before bounds and edges are
+    computed. *)
+let equate_with_curry_bounds : Alloc.lr -> curry_acc -> bool =
+  fun m acc_mode ->
     if not (Alloc.check_generic m)
        || not (mode_polymorphism_printing_enabled ())
     then
-      Result.is_ok (Alloc.equate m (Alloc.of_const c))
-    else
-      Alloc.Guts.in_bounds c m
+      Result.is_ok
+        (Alloc.equate m (Alloc.of_const (curry_acc_floor acc_mode)))
+    else Alloc.Guts.in_bounds (curry_acc_floor acc_mode) m
 
 let erase_implied_axes (modes : Mode.Alloc.Const.t) :
     Mode.Alloc.Const.Option.t =
@@ -1080,6 +1110,15 @@ module Variable_names : sig
 
   val name_of_type : (unit -> string) -> transient_expr -> string
   val name_of_mode : Alloc.lr -> string
+
+  (** Whether the edges on the curry mode [m] are exactly the
+      [past]/[close] edges from [acc], i.e. implied by the currying
+      interpretation. [bounds_implied] says whether the constant bounds of
+      [m] are implied as well ([equate_with_curry_bounds]); the edges into
+      [m] are suppressed (not printed by the other modes) only when both
+      hold, since [m] is then elided. Must be called after [reserve]. *)
+  val curry_edges_implied :
+    bounds_implied:bool -> acc:curry_acc -> Alloc.lr -> bool
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
@@ -1344,19 +1383,19 @@ end = struct
       match tty.desc with
       | Tarrow ((_l, marg, mret), _ty1, ty2, _) ->
         let _ = zap_to_legacy ~arg:true marg in
-        let acc_mode = curry_mode_const alloc_mode marg in
+        let acc_mode = curry_acc_mode (Acc_const alloc_mode) marg in
         equate_curry acc_mode mret ty2
       | _ ->
         printer_iter_type_expr (zap_non_generic_modes Alloc.Const.legacy)
           (Fun.const ()) ty
     end
 
-  and equate_curry : Alloc.Const.t -> Alloc.lr -> type_expr -> unit =
+  and equate_curry : curry_acc -> Alloc.lr -> type_expr -> unit =
     fun acc_mode mret ty ->
       match get_desc ty with
       | Tarrow _ ->
-          if equate_with_const mret acc_mode then
-            zap_non_generic_modes acc_mode ty
+          if equate_with_curry_bounds mret acc_mode then
+            zap_non_generic_modes (curry_acc_floor acc_mode) ty
           else begin
             let mret = zap_to_legacy ~arg:false mret in
             zap_non_generic_modes mret ty
@@ -2039,6 +2078,21 @@ end = struct
 
   let edge_table = ref ([] : (visible_pair * edges) list)
 
+  type boxedhead = H : 'a Desc.Var.Head.t -> boxedhead
+
+  (* Comonadic heads of elided curry modes; edges into them must not be
+     printed. *)
+  let suppressed_curry_heads = ref ([] : boxedhead list)
+
+  let heads_of_mode (m : Alloc.lr) =
+    match Alloc.get_comonadic_desc m.comonadic with
+    | Amode _ -> []
+    | Amodevar (Amorphvar (v, _)) -> [H v]
+
+  let mem_head : boxedhead list -> 'a Desc.Var.Head.t -> bool =
+    fun heads v ->
+      List.exists (fun (H u) -> Desc.Var.Head.equal u v) heads
+
   let reset_names () =
     names := [];
     name_subst := [];
@@ -2052,11 +2106,13 @@ end = struct
     printed_aliased_visible_pairs := [];
     modenames := [];
     edge_table := [];
+    suppressed_curry_heads := [];
     Paths.reset visible_paths;
     VarTbl.reset visible_vars;
     modename_counter := 0
 
   let add_visible_edges () =
+    suppressed_curry_heads := [];
     edge_table :=
       List.map (fun pair ->
         let lower, upper =
@@ -2074,8 +2130,62 @@ end = struct
     | Some (_, edges) -> edges
     | None -> { lower = []; upper = [] }
 
+  let pair_of_mode ({ monadic; comonadic } : Alloc.lr) =
+    let monadic = Alloc.get_monadic_desc monadic in
+    let comonadic = Alloc.get_comonadic_desc comonadic in
+    { monadic; comonadic }
+
+  (* The variable heads of the curry accumulator. *)
+  let acc_heads (acc : curry_acc) : boxedhead list =
+    match acc with
+    | Acc_const _ -> []
+    | Acc_var mode ->
+      let head (Desc.Amorphvar (v, _)) = H v in
+      (match Alloc.get_comonadic_desc mode with
+       | Amode _ -> []
+       | Amodevar mv -> [head mv]
+       | Amodejoin (_, mvs) -> List.map head mvs)
+
+  (* See the signature for the specification. *)
+  let curry_edges_implied ~bounds_implied ~(acc : curry_acc) (m : Alloc.lr) =
+    let pair = pair_of_mode m in
+    let implied =
+      bounds_implied
+      (* an aliased mode is printed at every occurrence *)
+      && (not (List.exists (eq_pair pair) !aliased_visible_pairs))
+      &&
+      let { lower; upper } = find_edges pair in
+      let acc_heads = acc_heads acc in
+      let from_acc = function
+        | Simple_name { src; _ } -> mem_head acc_heads src
+        | Comonadic_name { src; _ } -> mem_head acc_heads src
+      in
+      (* no edges from [m]... *)
+      List.is_empty upper
+      (* ...and every edge into [m] is a [past]/[close] edge from [acc] *)
+      && List.for_all
+           (function
+             | Lower_simple _ -> false
+             | Lower_comonadic { c_name; _ } -> from_acc c_name
+             | Lower_closing_over_to { cls_edge = { name; _ }; _ } ->
+               from_acc name)
+           lower
+    in
+    if implied then
+      suppressed_curry_heads := heads_of_mode m @ !suppressed_curry_heads;
+    implied
+
   let print_raw_constraints { lo; hi } ppf pair =
     let { lower = edges_lower; upper = edges_upper } = find_edges pair in
+    let edges_upper =
+      List.filter
+        (function
+          | Upper_comonadic { c_name = Comonadic_name { target; _ }; _ } ->
+            not (mem_head !suppressed_curry_heads target)
+          | Upper_comonadic { c_name = Simple_name _; _ }
+          | Upper_simple _ -> true)
+        edges_upper
+    in
     if List.is_empty edges_lower && List.is_empty edges_upper
        && lo = "" && hi = ""
     then begin
@@ -2261,6 +2371,19 @@ end = struct
       Btype.backtrack snap
     end
 end
+
+(** Whether the return mode [m] of an arrow can be elided: the arrow is
+    then printed without parens and [m] is not printed. Mutates [m] when it
+    must be zapped (see [equate_with_curry_bounds]). *)
+let equate_with_const : Alloc.lr -> curry_acc -> bool =
+  fun m acc_mode ->
+    if not (Alloc.check_generic m)
+       || not (mode_polymorphism_printing_enabled ())
+    then equate_with_curry_bounds m acc_mode
+    else
+      Variable_names.curry_edges_implied
+        ~bounds_implied:(equate_with_curry_bounds m acc_mode)
+        ~acc:acc_mode m
 
 module Aliases = struct
   let visited_objects = ref ([] : transient_expr list)
@@ -2470,7 +2593,7 @@ let tree_of_modes : Alloc.lr -> zapped:Alloc.Const.t -> string list =
     currying logic in [typetexp.ml], so that parsing and printing roundtrip. *)
 type modal =
   | Arrow_return of
-    { acc : Mode.Alloc.Const.t;
+    { acc : curry_acc;
       mode : Mode.Alloc.lr; }
     (** This is the RHS (say [r]) of an arrow type, where [mode] is the real
         mode of [r]. and:
@@ -2521,7 +2644,8 @@ let rec tree_of_modal_typexp mode modal ty =
    let name = Variable_names.(name_of_type (new_var_name ~non_gen ty)) px in
    not_arrow (Otyp_var (non_gen, name)) else
 
-  let pr_typ alloc_mode =
+  let pr_typ acc_mode =
+    let alloc_mode = curry_acc_floor acc_mode in
     let tty = Transient_expr.repr ty in
     match tty.desc with
     | Tvar _ ->
@@ -2550,7 +2674,7 @@ let rec tree_of_modal_typexp mode modal ty =
           else
             tree_of_typexp mode arg_mode ty1
         in
-        let acc_mode = curry_mode_const alloc_mode marg in
+        let acc_mode = curry_acc_mode acc_mode marg in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
         Otyp_arrow (lab, tree_of_modes marg ~zapped:arg_mode, t1, t2)
@@ -2706,16 +2830,17 @@ let rec tree_of_modal_typexp mode modal ty =
        doesn't matter.*)
     let alias = Variable_names.(name_of_type (new_var_name ~non_gen ty)) px in
     let tree =
-      Otyp_alias {non_gen;  aliased = pr_typ Mode.Alloc.Const.legacy; alias }
+      Otyp_alias
+        {non_gen; aliased = pr_typ (Acc_const Mode.Alloc.Const.legacy); alias}
     in
     not_arrow tree end
   else
     match modal with
     | Arrow_return {acc; mode} ->
-        let rm, alloc_mode = tree_of_ret_typ_mutating acc mode ty in
-        let ty = pr_typ alloc_mode in
+        let rm, acc_mode = tree_of_ret_typ_mutating acc mode ty in
+        let ty = pr_typ acc_mode in
         Otyp_ret (rm, ty)
-    | Other m -> pr_typ m
+    | Other m -> pr_typ (Acc_const m)
 
 and tree_of_typexp mode alloc_mode ty =
   tree_of_modal_typexp mode (Other alloc_mode) ty
@@ -2793,7 +2918,7 @@ and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
 
 (** NB: This function might mutate states; the caller is responsible for
     reverting them. *)
-and tree_of_ret_typ_mutating (acc_mode : Alloc.Const.t) m ty=
+and tree_of_ret_typ_mutating (acc_mode : curry_acc) m ty=
   match get_desc ty with
   | Tarrow _ -> begin
       (* We first try to equate [m] with the [acc_mode]; if that succeeds, we
@@ -2804,12 +2929,12 @@ and tree_of_ret_typ_mutating (acc_mode : Alloc.Const.t) m ty=
         (* In this branch we need to print parens. [m] might have undetermined
         axes and we adopt a similar logic to the [marg] above. *)
         let zapped = zap_to_legacy ~arg:false m in
-        (Orm_parens (tree_of_modes m ~zapped), zapped)
+        (Orm_parens (tree_of_modes m ~zapped), Acc_const zapped)
       end
     end
   | _ ->
     let acc = zap_to_legacy ~arg:false m in
-    (Orm_any (tree_of_modes m ~zapped:acc), acc)
+    (Orm_any (tree_of_modes m ~zapped:acc), Acc_const acc)
 
 and tree_of_typobject_repr fi =
   let (fields, rest) = flatten_fields fi in

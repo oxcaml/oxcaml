@@ -81,7 +81,7 @@ let check_tuple x y z =
 [%%expect{|
 type box = { mutable x : int; }
 val check_tuple :
-  'a @ [< past('o) & past('p) & global unique] ->
+  'a @ [< global unique] ->
   'b @ [< 'm & global many] ->
   'c @ 'n -> unit * 'b * 'b @ [> 'm | aliased dynamic] = <fun>
 |}]
@@ -123,10 +123,9 @@ Error: The value "bar1" is "nonportable"
 let many_arguments x y z s t = y
 [%%expect{|
 val many_arguments :
-  'a @ [< past('mm0) & past('mm1) & past('mm2) & past('mm3) & global] ->
+  'a @ [< global] ->
   'b @ [< 'm & global] ->
-  'c @ [< past('p) & past('q) & global] ->
-  'd @ [< past('o) & global] -> 'e @ 'n -> 'b @ [> 'm] = <fun>
+  'c @ [< global] -> 'd @ [< global] -> 'e @ 'n -> 'b @ [> 'm] = <fun>
 |}]
 
 let foo (x @ portable) (y @ uncontended) =
@@ -134,7 +133,7 @@ let foo (x @ portable) (y @ uncontended) =
   use_uncontended y
 [%%expect{|
 val foo :
-  'a @ [< past('m) & global portable] ->
+  'a @ [< global portable] ->
   'b @ [< global uncontended] -> unit @ [> dynamic] = <fun>
 |}]
 
@@ -143,7 +142,7 @@ let foo (x @ portable) (y @ uncontended) =
   use_portable f
 [%%expect{|
 val foo :
-  'a @ [< past('m) & global portable] ->
+  'a @ [< global portable] ->
   'b @ [< global portable uncontended] -> unit @ [> dynamic] = <fun>
 |}]
 

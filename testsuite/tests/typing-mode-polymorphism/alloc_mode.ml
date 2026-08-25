@@ -24,8 +24,8 @@ let foo r x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/0 x/0)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/0))
 val foo :
-  'a myref @ [< past('n) & global write] ->
-  'a @ [< global many read_write] -> unit @ 'm = <fun>
+  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
+  <fun>
 |}]
 
 let foo (r @ local) x = r.i <- x
@@ -36,7 +36,7 @@ let foo (r @ local) x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/1 x/1)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/1))
 val foo :
-  'a myref @ [< past('n) & write > local] ->
+  'a myref @ [< write > local] ->
   'a @ [< global many read_write] -> unit @ 'm = <fun>
 |}]
 
@@ -46,8 +46,8 @@ let foo (r @ global) x = r.i <- x
 (let (foo/2 = (function {nlocal = 0} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/2))
 val foo :
-  'a myref @ [< past('n) & global write] ->
-  'a @ [< global many read_write] -> unit @ 'm = <fun>
+  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
+  <fun>
 |}]
 
 let foo () =
@@ -161,7 +161,8 @@ let foo () =
      (function {nlocal = 1} param/5[L][value<int>] : stack
        (apply[L] fst_local/0 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/7))
-val foo : unit @ 'n -> 'a @ 'm -> int @ [> local] = <fun>
+val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local dynamic] =
+  <fun>
 |}]
 
 
@@ -218,7 +219,7 @@ let app f x = f x
   (app/0 = (function {nlocal = 1} f/0[L] x/8[L]? (apply[yielding] f/0 x/8)))
   (apply (field_imm 1 (global Toploop!)) "app" app/0))
 val app :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
   'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
@@ -231,7 +232,7 @@ let app_yielding (f @ yielding) (x @ yielding) = app f x
      (function {nlocal = 1} f/1 x/9[L]? (apply[yielding] app/0 f/1 x/9)))
   (apply (field_imm 1 (global Toploop!)) "app_yielding" app_yielding/0))
 val app_yielding :
-  ('a @ [> 'n | yielding] -> 'b @ [< 'm & global]) @ [< past('o) & global > yielding] ->
+  ('a @ [> 'n | yielding] -> 'b @ [< 'm & global]) @ [< global > yielding] ->
   'a @ [< 'n > yielding] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
@@ -292,7 +293,7 @@ let forward_yielding (y @ yielding) =
   (apply (field_imm 1 (global Toploop!)) "forward_yielding"
     forward_yielding/0))
 val forward_yielding :
-  'a @ [< past('m) & global many > yielding] ->
+  'a @ [< global many > yielding] ->
   int @ [< many read_write > dynamic] -> int @ [< global > dynamic] = <fun>
 |}]
 

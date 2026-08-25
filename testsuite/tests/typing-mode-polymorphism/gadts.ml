@@ -39,12 +39,8 @@ let pin (w : 'x arr) (g : 'x) =
   | F -> g
 [%%expect{|
 val pin :
-  (int -> int) arr @ 'n ->
-  (int -> int) @ [< 'm mod aliased contended immutable] -> int -> int = <fun>
-|}, Principal{|
-val pin :
-  (int -> int) arr @ [< past('n) & global] ->
-  (int -> int) @ [< 'm] -> int -> int = <fun>
+  (int -> int) arr @ [< global] ->
+  (int -> int) @ [< 'm] -> (int -> int) @ [> 'm] = <fun>
 |}]
 
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
@@ -54,12 +50,6 @@ let local_arg_ok (type a) (w : a dom) (g : a) (s : string @ local) =
   | L -> g s
   | G -> 0
 [%%expect{|
-type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
-val local_arg_ok :
-  'a dom @ 'n ->
-  'a @ [< past('m) & global] -> string @ [> local] -> int @ [> dynamic] =
-  <fun>
-|}, Principal{|
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
 Line 5, characters 9-12:
 5 |   | L -> g s
@@ -88,13 +78,9 @@ let crosses (type a) (w : a cross) (x : a @ local) : a @ global =
   | Str -> assert false
 [%%expect{|
 type _ cross = Int : int cross | Str : string cross
-val crosses : 'a cross @ 'm -> 'a @ [> local] -> 'a @ [< global > dynamic] =
-  <fun>
-|}, Principal{|
-type _ cross = Int : int cross | Str : string cross
 val crosses :
-  'a cross @ [< past('m) & global] ->
-  'a @ [> local] -> 'a @ [< global > dynamic] = <fun>
+  'a cross @ [< global] -> 'a @ [> local] -> 'a @ [< global > dynamic] =
+  <fun>
 |}]
 
 let escapes (type a) (w : a cross) (x : a @ local) : a @ global =
@@ -116,6 +102,7 @@ let unpack (P f) = f
 [%%expect{|
 type packed = P : (int -> int) -> packed
 val pack : packed = P <fun>
-val unpack : packed @ [< 'm mod aliased contended immutable] -> int -> int =
+val unpack :
+  packed @ [< 'm mod aliased contended immutable] -> (int -> int) @ [> 'm] =
   <fun>
 |}]

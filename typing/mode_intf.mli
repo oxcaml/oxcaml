@@ -692,6 +692,12 @@ module type S = sig
         val zap_to_ceil : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
       end
 
+      module Guts : sig
+        (** Returns the precise floor of a mode. see notes on [get_floor] in
+            [solver_intf.mli] for cautions. *)
+        val get_floor : (allowed * 'r) t -> Const.t
+      end
+
       val max_with : 'a Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'r) t
     end
 

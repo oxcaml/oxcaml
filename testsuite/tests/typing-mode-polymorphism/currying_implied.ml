@@ -5,7 +5,7 @@
 
 let const2 x y = 0
 [%%expect{|
-val const2 : 'a @ [< past('o) & global] -> 'b @ 'n -> int @ 'm = <fun>
+val const2 : 'a @ [< global] -> 'b @ 'n -> int @ 'm = <fun>
 |}]
 
 let fst2 x y = x
@@ -17,8 +17,7 @@ let three x y z = (x, z)
 [%%expect{|
 val three :
   'a @ [< 'n & global] ->
-  'b @ [< past('o) & global] -> 'c @ [< 'm & global] -> 'a * 'c @ [> 'm | 'n] =
-  <fun>
+  'b @ [< global] -> 'c @ [< 'm & global] -> 'a * 'c @ [> 'm | 'n] = <fun>
 |}]
 
 let pair x y = (x, y)
@@ -31,29 +30,29 @@ val pair :
 let apply f x = f x
 [%%expect{|
 val apply :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
   'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
 let compose f g x = f (g x)
 [%%expect{|
 val compose :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('q) & past('mm0) & global] ->
-  ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< past('p) & global] ->
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
+  ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
   'c @ [< 'o] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
 let flip f x y = f y x
 [%%expect{|
 val flip :
-  ('a @ [< past('o) > 'p] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< past('q) & past('mm0) & past('mm1) & global] ->
-  'b @ [< 'n & global] -> 'a @ [< 'p] -> 'c @ [> 'm | dynamic] = <fun>
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('n) & global] ->
+  'b @ [< 'p & global] -> 'a @ [< 'q] -> 'c @ [> 'o | dynamic] = <fun>
 |}]
 
 let add a b = a + b
 [%%expect{|
-val add : int @ [< past('n) & global] -> int @ 'm -> int @ [> dynamic] =
-  <fun>
+val add : int @ [< global] -> int @ 'm -> int @ [> dynamic] = <fun>
 |}]
 
 let once_closure (x @ once) = fun y -> (x, y)
@@ -94,14 +93,15 @@ let use_and_return g x = ignore (g x); g
 [%%expect{|
 val use_and_return :
   ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [< 'n & global many] ->
-  'a @ [< 'm] -> 'a @ [> 'm] -> 'b @ [< global many read_write] = <fun>
+  'a @ [< 'm] ->
+  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [> 'n | aliased] = <fun>
 |}]
 
 let both_branches g x = if x then g else (fun y -> y)
 [%%expect{|
 val both_branches :
-  ('a @ [< 'm] -> 'a @ [> 'm]) @ [< 'o & global] ->
-  bool @ 'n -> 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
+  ('a @ [< 'm] -> 'a @ [> 'm]) @ [< 'n & global] ->
+  bool @ 'o -> ('a @ [< 'm] -> 'a @ [> 'm]) @ [> 'n | dynamic] = <fun>
 |}]
 
 type 'a cell = { mutable v : 'a }
@@ -112,9 +112,10 @@ type 'a cell = { mutable v : 'a; }
 let store_and_call c g x = c.v <- g; c.v x
 [%%expect{|
 val store_and_call :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('q) & past('mm0) & global read_write] ->
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & past('p) & global many read_write] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('mm0) & past('p) & global read_write] ->
+  (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('q) & past('o) & global many read_write] ->
+   ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) | stateful]) @ [> past('o) | past('p) | stateful] =
+  <fun>
 |}]
 
 let unique_fst (x @ unique) y = x
@@ -139,6 +140,7 @@ val unique_cell :
 let stack_args g = g (stack_ (1, 2)) (stack_ (3, 4)); ()
 [%%expect{|
 val stack_args :
-  (int * int @ [< past('n) > local] -> int * int @ [> local] -> 'a @ 'm) @ [< past('p)] ->
-  unit @ 'o = <fun>
+  (int * int @ [< past('m) > local] ->
+   (int * int @ [> local] -> 'a @ 'o) @ [> past('m) | past('n) | local]) @ [< past('n)] ->
+  unit @ 'p = <fun>
 |}]

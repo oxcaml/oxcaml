@@ -240,8 +240,8 @@ let foo (x : int @ portable) (y : int @ nonportable) =
   use_portable y
 [%%expect{|
 val foo :
-  int @ [< past('m) & global portable] ->
-  int @ [> nonportable] -> unit @ [> dynamic] = <fun>
+  int @ [< global portable] -> int @ [> nonportable] -> unit @ [> dynamic] =
+  <fun>
 |}]
 
 (* LOCAL AND MODE POLYMORPHISM *)

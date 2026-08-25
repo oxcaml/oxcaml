@@ -66,7 +66,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 let apply f = fun x -> f x
 [%%expect{|
 val apply :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
   'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
@@ -100,8 +100,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 let compose f g x = f (g x)
 [%%expect{|
 val compose :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('q) & past('mm0) & global] ->
-  ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< past('p) & global] ->
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
+  ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
   'c @ [< 'o] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
@@ -181,7 +181,7 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & past('p) & global many > aliased] ->
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global many > aliased] ->
   'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
 |}]
 

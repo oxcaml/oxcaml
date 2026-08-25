@@ -39,8 +39,8 @@ let foo (x @ portable) (y @ portable) =
   use_portable a
 [%%expect{|
 val foo :
-  'a @ [< past('m) & global portable] ->
-  'b @ [< global portable] -> unit @ [> dynamic] = <fun>
+  'a @ [< global portable] -> 'b @ [< global portable] -> unit @ [> dynamic] =
+  <fun>
 |}]
 
 (* But the returned tuple will be the meet of its arguments *)
@@ -129,8 +129,8 @@ let foo (x @ portable) (y @ portable) =
   use_portable p
 [%%expect{|
 val foo :
-  'a @ [< past('m) & global portable] ->
-  'b @ [< global portable] -> unit @ [> dynamic] = <fun>
+  'a @ [< global portable] -> 'b @ [< global portable] -> unit @ [> dynamic] =
+  <fun>
 |}]
 
 let foo (x @ local) (y @ local) =
