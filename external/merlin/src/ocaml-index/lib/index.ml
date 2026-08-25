@@ -136,7 +136,7 @@ let rewrite_module_facts ~root ~rewrite_root
       ensure_normalized
         { facts with
           checks =
-            List.map
+            Check_set.map
               (fun (check : Check.t) ->
                 { check with
                   implementation = rewrite_node check.implementation;
@@ -222,9 +222,9 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
       stats;
       related_uids;
       module_facts =
-        if module_implementation_facts_present then
-          Some (link_module_facts facts_run)
-        else into.module_facts;
+        (if module_implementation_facts_present then
+           Some (link_module_facts facts_run)
+         else into.module_facts);
       root_directory = into.root_directory
     },
     facts_run )
@@ -402,7 +402,8 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
               let facts_run, decoded = facts_of_index_input ~file index in
               ( merge_index ~store_shapes
                   { index with
-                    module_facts = if decoded then index.module_facts else None
+                    module_facts =
+                      (if decoded then index.module_facts else None)
                   }
                   ~into,
                 facts_run :: facts_runs )
@@ -459,7 +460,7 @@ let gather_shapes ~output_file files =
             let facts_run, decoded = facts_of_index_input ~file index in
             ( merge_index ~store_shapes:true
                 { index with
-                  module_facts = if decoded then index.module_facts else None
+                  module_facts = (if decoded then index.module_facts else None)
                 }
                 ~into,
               facts_run :: facts_runs )
