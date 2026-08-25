@@ -29,6 +29,14 @@ module V = Backend_var
 module VP = Backend_var.With_provenance
 open SU.Or_never_returns.Syntax
 
+(* Marking a handler's blocks as cold is gated by [-cfg-block-layout] out of an
+   abundance of caution: the [cold] flag also influences prologue placement
+   under shrink-wrapping, and the behaviour with the flag disabled should be
+   exactly the historical one. *)
+let mark_sub_cfg_as_cold sub_cfg =
+  if !Oxcaml_flags.cfg_block_layout
+  then Sub_cfg.iter_basic_blocks sub_cfg ~f:(fun block -> block.cold <- true)
+
 let which_parameter_of_provenance provenance =
   match (provenance : V.Provenance.t option) with
   | None -> None
@@ -1159,7 +1167,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let r_body, sub_body = emit_new_sub_cfg env body ~bound_name in
     let translate_one_handler _nfail
-        (trap_info, (ids, rs, e2, dbg, _is_cold, label)) =
+        (trap_info, (ids, rs, e2, dbg, is_cold, label)) =
       assert (List.length ids = List.length rs);
       let trap_stack, e2 =
         match (!trap_info : SU.trap_stack_info) with
@@ -1194,7 +1202,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                     [||] [||])
               ids_and_rs)
       in
-      (rs, label, dbg, SU.phantom_vars_from_env new_env), (r, sub)
+      (rs, label, dbg, SU.phantom_vars_from_env new_env, is_cold), (r, sub)
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
@@ -1233,9 +1241,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let sub_handlers =
       List.map
-        (fun ((rs, label, dbg, phantom_available_before), (r, sub_handler)) ->
+        (fun ( (rs, label, dbg, phantom_available_before, is_cold),
+               (r, sub_handler) ) ->
           Sub_cfg.add_empty_block_at_start sub_handler ~label;
           setup_catch_handler flag rs sub_handler ~dbg ~phantom_available_before;
+          if is_cold then mark_sub_cfg_as_cold sub_handler;
           join_branch r sub_handler)
         l
     in
@@ -1450,7 +1460,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let s_body = emit_tail_new_sub_cfg env e1 in
     let translate_one_handler _nfail
-        (trap_info, (ids, rs, e2, dbg, _is_cold, label)) =
+        (trap_info, (ids, rs, e2, dbg, is_cold, label)) =
       assert (List.length ids = List.length rs);
       let trap_stack, e2 =
         match (!trap_info : SU.trap_stack_info) with
@@ -1486,6 +1496,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               ids_and_rs)
       in
       Sub_cfg.add_empty_block_at_start seq ~label;
+      if is_cold then mark_sub_cfg_as_cold seq;
       rs, seq, dbg, SU.phantom_vars_from_env new_env
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =

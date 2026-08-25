@@ -427,19 +427,34 @@ let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
       (* This block has a single predecessor which appears in the layout
          immediately prior to this block. *)
       (* No need for the label, unless the predecessor's terminator is [Switch]
-         when the label is needed for the jump table. *)
+         when the label is needed for the jump table, or [Tailcall_self] when
+         the label is the target of the tail call and the predecessor cannot
+         fall through. *)
+      let fatal_follows_non_returning () =
+        Misc.fatal_errorf
+          "Cfg_to_linear.need_starting_label: block follows non-returning \
+           terminator %a"
+          Printcfg.terminator prev_block.terminator
+      in
       match prev_block.terminator.desc with
       | Switch _ -> true
+      | Tailcall_self _ ->
+        (* The label is the target of the tail call, so it must be emitted. Out
+           of an abundance of caution, this is restricted to [-cfg-block-layout]
+           (the only pass creating such layouts), so that the behaviour with the
+           flag disabled is exactly the historical one. *)
+        if !Oxcaml_flags.cfg_block_layout
+        then true
+        else fatal_follows_non_returning ()
       | Never -> Misc.fatal_error "Cannot linearize terminator: Never"
       | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
       | Call _ | Prim _ | Invalid _ ->
         false
-      | Return | Raise _ | Tailcall_func _ | Tailcall_self _ | Call_no_return _
-        ->
-        Misc.fatal_errorf
-          "Cfg_to_linear.need_starting_label: block follows non-returning \
-           terminator %a"
-          Printcfg.terminator prev_block.terminator)
+      | Return | Raise _ | Tailcall_func _ | Call_no_return _ ->
+        (* Unreachable for a consistent CFG: these terminators have no normal
+           successors, and their exceptional successors are trap handlers,
+           handled above. *)
+        fatal_follows_non_returning ())
 
 let adjust_stack_offset body (block : Cfg.basic_block)
     ~(prev_block : Cfg.basic_block) =
