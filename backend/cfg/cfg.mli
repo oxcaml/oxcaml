@@ -82,7 +82,7 @@ type phantom_defining_expr = private
       }
   | Cphantom_block of
       { tag : int;
-        fields : Backend_var.t list
+        fields : Cmm.phantom_block_field list
       }
   | Cphantom_optimised_out
 

@@ -219,6 +219,14 @@ type symbol =
 
 val equal_symbol : symbol -> symbol -> bool
 
+type phantom_block_field =
+  | Cphantom_field_var of Backend_var.t
+  | Cphantom_field_const_int of Targetint.t
+      (** The tagged representation, as for [Cphantom_const_int]. *)
+  | Cphantom_field_const_symbol of symbol
+  | Cphantom_field_unavailable
+      (** A field whose value is unavailable (optimised out). *)
+
 type phantom_defining_expr =
   (* CR-soon mshinwell: Convert this to [Targetint.OCaml.t] (or whatever the
      representation of "target-width OCaml integers of type [int]" becomes when
@@ -253,7 +261,7 @@ type phantom_defining_expr =
           symbol. *)
   | Cphantom_block of
       { tag : int;
-        fields : Backend_var.t list
+        fields : phantom_block_field list
       }
       (** The phantom-let-bound variable points at a block with the given
           structure. *)
@@ -571,7 +579,11 @@ and expression =
   | Clet of Backend_var.With_provenance.t * expression * expression
   | Cphantom_let of
       Backend_var.With_provenance.t * phantom_defining_expr option * expression
-  | Cname_for_debugger of Backend_var.With_provenance.t * expression
+  | Cname_for_debugger of Backend_var.Provenance.t * expression
+      (** Annotation recording that the wrapped expression's value was bound to
+          the variable described by the provenance, from which instruction
+          selection produces a naming operation. No [Backend_var.t] is involved:
+          the variable itself may no longer be bound anywhere. *)
   | Ctuple of expression list
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression

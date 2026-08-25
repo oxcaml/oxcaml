@@ -1,0 +1,144 @@
+(data global "camlPhantom_positioning__gc_roots": int 0)
+(data
+ int 3840
+ global "camlPhantom_positioning":
+ addr G:"camlPhantom_positioning__precise_3"
+ addr G:"camlPhantom_positioning__fork_4"
+ addr G:"camlPhantom_positioning__refine_5")
+(data
+ int 4087
+ global "camlPhantom_positioning__refine_5":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlPhantom_positioning__refine_2_5_code")
+(data
+ int 4087
+ global "camlPhantom_positioning__fork_4":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlPhantom_positioning__fork_1_4_code")
+(data
+ int 4087
+ global "camlPhantom_positioning__precise_3":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlPhantom_positioning__precise_0_3_code")
+(function{phantom_positioning.ml:38,42-125}
+ camlPhantom_positioning__precise_0_3_code
+     (g/527[((module_path g/527) (location ) (original_ident g/527)
+             (is_parameter local))]: val
+      x/528[((module_path x/528) (location ) (original_ident x/528)
+             (is_parameter local))]: int) : int
+ (let
+   (region/529 (beginregion)
+    a1/530[((module_path a1/530) (location ) (original_ident a1/530)
+            (is_parameter local))]
+      (app{phantom_positioning.ml:39,11-14} (load_mut int g/527) x/528 g/527
+        int)
+    b1/532[((module_path b1/532) (location ) (original_ident b1/532)
+            (is_parameter local))]
+      (app{phantom_positioning.ml:40,11-20} (load_mut int g/527) (+ x/528 2)
+        g/527 int))
+   (let?
+     pair1/533[((module_path pair1/533) (location )
+                (original_ident pair1/533) (is_parameter local))]
+       [0: a1/530; b1/532; ]
+     (let
+       (int_add/534 (+ (+ a1/530 b1/532) -1)
+        unit/535 (seq (endregion region/529) 1))
+       int_add/534))) )
+
+(function{phantom_positioning.ml:44,39-145}
+ camlPhantom_positioning__fork_1_4_code
+     (p/537[((module_path p/537) (location ) (original_ident p/537)
+             (is_parameter local))]: val
+      x/538[((module_path x/538) (location ) (original_ident x/538)
+             (is_parameter local))]: int) : int
+ (let region/539 (beginregion)
+   (catch
+     (if (>s x/538 1)
+       (let?
+         (a2/542[((module_path a2/542) (location ) (original_ident a2/542)
+                  (is_parameter local))]
+            p/537[0]
+          pair2/549[((module_path pair2/544) (location )
+                     (original_ident pair2/544) (is_parameter local))]
+            [0: a2/542; ?; ])
+         (exit 11
+           (name_for_debugger
+             ((module_path a2/542) (location ) (original_ident a2/542)
+              (is_parameter local))
+             (+ (load val p/537) 2))))
+       (let?
+         (b2/543[((module_path b2/543) (location ) (original_ident b2/543)
+                  (is_parameter local))]
+            p/537[1]
+          pair2/547[((module_path pair2/544) (location )
+                     (original_ident pair2/544) (is_parameter local))]
+            [0: ?; b2/543; ])
+         (exit 11
+           (name_for_debugger
+             ((module_path b2/543) (location ) (original_ident b2/543)
+              (is_parameter local))
+             (+ (load val (+a p/537 8)) 4)))))
+   with(11 region_return/540: int)
+     (let unit/541 (seq (endregion region/539) 1) region_return/540))) )
+
+(function{phantom_positioning.ml:50,41-167}
+ camlPhantom_positioning__refine_2_5_code
+     (g/551[((module_path g/551) (location ) (original_ident g/551)
+             (is_parameter local))]: val
+      x/552[((module_path x/552) (location ) (original_ident x/552)
+             (is_parameter local))]: int) : int
+ (let region/553 (beginregion)
+   (catch
+     (let
+       param/556
+         (app{phantom_positioning.ml:51,11-14} (load_mut int g/551) x/552
+           g/551 val)
+       (let?
+         a3/557[((module_path a3/557) (location ) (original_ident a3/557)
+                 (is_parameter local))]
+           ()
+         (let
+           (Pmakeblock/558
+              (alloc_local{phantom_positioning.ml:52,36-42} 2816 x/552 x/552)
+            Popaque/559 (opaque Pmakeblock/558))
+           (let?
+             pair3/561[((module_path pair3/561) (location )
+                        (original_ident pair3/561) (is_parameter local))]
+               [0: a3/557; ?; ]
+             (if (>s x/552 1)
+               (let?
+                 (b3/560[((module_path b3/560) (location )
+                          (original_ident b3/560) (is_parameter local))]
+                    Popaque/559[0]
+                  pair3/564[((module_path pair3/561) (location )
+                             (original_ident pair3/561) (is_parameter local))]
+                    [0: a3/557; b3/560; ])
+                 (exit 12
+                   (name_for_debugger
+                     ((module_path b3/560) (location )
+                      (original_ident b3/560) (is_parameter local))
+                     (+ (load val Popaque/559) 2))))
+               (exit 12 1))))))
+   with(12 region_return/554: int)
+     (let unit/555 (seq (endregion region/553) 1) region_return/554))) )
+
+(function no_cse reduce_code_size linscan camlPhantom_positioning__entry
+     () : val
+ (catch
+   (let?
+     (precise/536[((module_path precise/536) (location )
+                   (original_ident precise/536) (is_parameter local))]
+        camlPhantom_positioning__precise_3
+      fork/550[((module_path fork/550) (location ) (original_ident fork/550)
+                (is_parameter local))]
+        camlPhantom_positioning__fork_4
+      refine/565[((module_path refine/565) (location )
+                  (original_ident refine/565) (is_parameter local))]
+        camlPhantom_positioning__refine_5)
+     (exit 10 G:"camlPhantom_positioning"))
+ with(10 *ret*/525: val) 1) )
+
+(data)

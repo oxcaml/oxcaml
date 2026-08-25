@@ -93,6 +93,18 @@ type arity =
     [fn arg] if [arg] is simple enough *)
 val bind : string -> expression -> (expression -> expression) -> expression
 
+(** Convert a Cmm expression into a phantom defining expression, when it has
+    one of the forms expressible in DWARF. *)
+val phantom_defining_expr_of_expr :
+  expression -> phantom_defining_expr option
+
+(** [make_phantom_let var def body] creates a phantom let binding *)
+val make_phantom_let :
+  Backend_var.With_provenance.t ->
+  phantom_defining_expr option ->
+  expression ->
+  expression
+
 (** Headers *)
 
 (** A constant equal to the tag for float arrays *)

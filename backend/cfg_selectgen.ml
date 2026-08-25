@@ -799,23 +799,23 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cphantom_let (var, defining_expr, body) ->
       let env = SU.env_add_phantom_let var defining_expr env in
       emit_expr env sub_cfg body ~bound_name
-    | Cname_for_debugger (var, body) -> (
+    | Cname_for_debugger (provenance, body) -> (
       match emit_expr env sub_cfg body ~bound_name with
       | Never_returns -> Never_returns
       | Ok regs ->
-        let provenance = VP.provenance var in
-        (if Option.is_some provenance
-         then
-           let ident = VP.var var in
-           let naming_op =
-             Operation.Name_for_debugger
-               { ident;
-                 provenance;
-                 which_parameter = which_parameter_of_provenance provenance;
-                 regs
-               }
-           in
-           insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
+        (* The provenance's original ident is used as the operation's [ident]:
+           copies of phantom lets arising from the same source binding share
+           their provenance, so their naming operations are keyed to the same
+           variable by the availability analyses. *)
+        let naming_op =
+          Operation.Name_for_debugger
+            { ident = V.Provenance.original_ident provenance;
+              provenance = Some provenance;
+              which_parameter = which_parameter_of_provenance (Some provenance);
+              regs
+            }
+        in
+        insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||];
         Ok regs)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (

@@ -39,7 +39,7 @@ type phantom_defining_expr =
       }
   | Lphantom_block of
       { tag : int;
-        fields : Backend_var.t list
+        fields : Cmm.phantom_block_field list
       }
   | Lphantom_optimised_out
 

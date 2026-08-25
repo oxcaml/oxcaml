@@ -157,6 +157,39 @@ let bind name arg fn =
     let id = V.create_local name in
     Clet (VP.create id, arg, fn (Cvar id))
 
+let make_phantom_let var def body = Cphantom_let (var, def, body)
+
+(* Convert a Cmm expression (about to be substituted for the sole use of a
+   variable) into a phantom defining expression for that variable, when the
+   expression has one of the forms expressible in DWARF. Only [Global] symbols
+   are accepted: local symbols may never be emitted (see [To_cmm_phantom]). *)
+let rec phantom_defining_expr_of_expr (expr : expression) :
+    phantom_defining_expr option =
+  match expr with
+  | Cconst_int (i, _) -> Some (Cphantom_const_int (Targetint.of_int i))
+  | Cconst_natint (i, _) ->
+    Some (Cphantom_const_int (Targetint.of_int64 (Int64.of_nativeint i)))
+  | Cconst_symbol (({ sym_global = Global; _ } as sym), _) ->
+    Some (Cphantom_const_symbol sym)
+  | Cconst_symbol ({ sym_global = Local; _ }, _) -> None
+  | Cvar var -> Some (Cphantom_var var)
+  | Cop (Cadda, [Cvar var; Cconst_int (offset, _)], _)
+    when offset mod Arch.size_addr = 0 ->
+    Some (Cphantom_offset_var { var; offset_in_words = offset / Arch.size_addr })
+  | Cop
+      ( Cload { memory_chunk = Word_int | Word_val; mutability = _; is_atomic },
+        [addr],
+        _ )
+    when not is_atomic -> (
+    match addr with
+    | Cvar var -> Some (Cphantom_read_field { var; field = 0 })
+    | Cop (Cadda, [Cvar var; Cconst_int (offset, _)], _)
+      when offset mod Arch.size_addr = 0 ->
+      Some (Cphantom_read_field { var; field = offset / Arch.size_addr })
+    | _ -> None)
+  | Cname_for_debugger (_, body) -> phantom_defining_expr_of_expr body
+  | _ -> None
+
 let bind_list name args fn =
   let rec aux bound_args = function
     | [] -> fn bound_args
