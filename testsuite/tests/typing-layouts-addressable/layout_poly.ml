@@ -198,6 +198,14 @@ Error: The value "y" has type "('a : bits8)"
          representable at call sites).
 |}]
 
+(* okay if we constrain the kind earlier *)
+let bad (y : b8a) =
+  let _ : (_ : bits8 addressable) = magic_to_addressable y in
+  (y : b8a)
+[%%expect{|
+val bad : b8a -> b8a = <fun>
+|}]
+
 (* [@layout_poly] still requires a variable at layout [any] (possibly made
    addressable) *)
 external bad_ext : ('a : value addressable). 'a -> 'a = "%identity"
