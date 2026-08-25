@@ -165,7 +165,7 @@ module Serialisable : sig
     t ->
     cmr_format
 
-  val deserialise_deps : t -> Global_flow_graph.graph
+  val deserialise_deps_only : t -> Global_flow_graph.graph
 
   val compilation_unit : t -> Compilation_unit.t
 end = struct
@@ -285,7 +285,7 @@ end = struct
       rebuild_data
     }
 
-  let deserialise_deps
+  let deserialise_deps_only
       { original_compilation_unit;
         table_data;
         used_value_slots;

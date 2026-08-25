@@ -425,7 +425,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     List.fold_left
       (fun combined cmr ->
         Flambda2_reaper.Global_flow_graph.union combined
-          (Flambda2_reaper.Cmr_format.Serialisable.deserialise_deps cmr))
+          (Flambda2_reaper.Cmr_format.Serialisable.deserialise_deps_only cmr))
       (Flambda2_reaper.Global_flow_graph.create ())
       cmrs
   in

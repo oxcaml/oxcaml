@@ -57,9 +57,10 @@ module Serialisable : sig
 
   (** Like [deserialise], but only deserialises the dependency graph (including
       the hashcons restore and rename process). *)
-  val deserialise_deps : t -> Global_flow_graph.graph
+  val deserialise_deps_only : t -> Global_flow_graph.graph
 
-  (** The unit that was being compiled when the file was saved. *)
+  (** Get the unit that was being compiled when the file was saved. This is a
+      pure projection. *)
   val compilation_unit : t -> Compilation_unit.t
 end
 
