@@ -522,12 +522,13 @@ let run cfg_with_layout =
       next := { Linear_utils.label; insn });
   let fun_contains_calls = cfg.fun_contains_calls in
   let fun_num_stack_slots = cfg.fun_num_stack_slots in
-  let fun_frame_required =
-    Proc.frame_required ~fun_contains_calls ~fun_num_stack_slots
-  in
-  let fun_prologue_required =
-    Proc.prologue_required ~fun_contains_calls ~fun_num_stack_slots
-  in
+  (* Use the decisions made by [Cfg_prologue] rather than recomputing them:
+     [Proc.frame_required] and [Proc.prologue_required] depend on global state
+     (frame-pointers configuration and flags) which may differ when the CFG has
+     been marshalled and reloaded in another process (e.g. for FDO), whereas the
+     [Prologue] instructions are already placed in the body. *)
+  let fun_frame_required = cfg.fun_frame_required in
+  let fun_prologue_required = cfg.fun_prologue_required in
   let fun_section_name =
     if !Oxcaml_flags.basic_block_sections
     then CL.get_section cfg_with_layout cfg.entry_label

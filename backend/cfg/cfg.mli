@@ -135,6 +135,16 @@ type t =
         (** Precomputed during selection and poll insertion. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
         (** Precomputed at register allocation time *)
+    mutable fun_frame_required : bool;
+        (** Whether the function needs a stack frame. Set by [Cfg_prologue],
+            like [fun_prologue_required] below, and stored for the same reason.
+        *)
+    mutable fun_prologue_required : bool;
+        (** Whether the function needs a prologue. [false] until [Cfg_prologue]
+            runs; set there to the value used to decide prologue placement, so
+            that later stages (notably [Cfg_to_linear], possibly running in
+            another process on a marshalled CFG, e.g. for FDO) use the decision
+            that was applied to the instructions instead of recomputing it. *)
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
     next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
     fun_ret_type : Cmm.machtype;
