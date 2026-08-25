@@ -4619,7 +4619,7 @@ let module_implementation_facts ~unit_interface ~argument_interface
           | Definition_to_declaration
             when Uid.Set.mem implementation uids
                  && is_interface_item interface ->
-            Some (implementation, interface)
+            Some (~implementation, ~interface)
           | Definition_to_declaration | Declaration_to_declaration -> None)
         declaration_dependencies
     in
