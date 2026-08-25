@@ -26,7 +26,7 @@ let code inline(never) loopify(never) size(11) newer_version_of(add_int64_0)
   let int64_add = %box_num.`int64`.my_alloc_region (prim_2) in
   cont k (int64_add)
 in
-let $camlUnbox_boxed_numbers__add_int64_17 =
+let $camlUnbox_boxed_numbers__add_int64_1 =
   closure add_int64_0_1 @add_int64 &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(12) newer_version_of(add_int32_1)
@@ -40,7 +40,7 @@ let code inline(never) loopify(never) size(12) newer_version_of(add_int32_1)
   let int32_add = %box_num.`int32`.my_alloc_region (prim_2) in
   cont k (int32_add)
 in
-let $camlUnbox_boxed_numbers__add_int32_18 =
+let $camlUnbox_boxed_numbers__add_int32_2 =
   closure add_int32_1_1 @add_int32 &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(11) newer_version_of(add_nativeint_2)
@@ -54,7 +54,7 @@ let code inline(never) loopify(never) size(11) newer_version_of(add_nativeint_2)
   let nativeint_add = %box_num.`nativeint`.my_alloc_region (prim_2) in
   cont k (nativeint_add)
 in
-let $camlUnbox_boxed_numbers__add_nativeint_19 =
+let $camlUnbox_boxed_numbers__add_nativeint_3 =
   closure add_nativeint_2_1 @add_nativeint &toplevel.alloc_region
 in
 let code loopify(never) size(21) newer_version_of(test_int64_3)
@@ -69,7 +69,7 @@ let code loopify(never) size(21) newer_version_of(test_int64_3)
    let prim_3 = %num_conv.[`imm`].[`int64`] (prim_2) in
    let int64_of_int_1 = %box_num.`int64`.my_alloc_region (prim_3) in
    apply direct(add_int64_0_1 &my_alloc_region)
-     ($camlUnbox_boxed_numbers__add_int64_17 : _ -> int64 boxed)
+     ($camlUnbox_boxed_numbers__add_int64_1 : _ -> int64 boxed)
        (int64_of_int_1, int64_of_int)
        -> k2 * k1)
     where k2 (apply_result : int64 boxed) =
@@ -78,7 +78,7 @@ let code loopify(never) size(21) newer_version_of(test_int64_3)
       let int_of_int64 = %tag_imm (prim_1) in
       cont k (int_of_int64)
 in
-let $camlUnbox_boxed_numbers__test_int64_20 =
+let $camlUnbox_boxed_numbers__test_int64_4 =
   closure test_int64_3_1 @test_int64 &toplevel.alloc_region
 in
 let code loopify(never) size(25) newer_version_of(test_int32_4)
@@ -93,7 +93,7 @@ let code loopify(never) size(25) newer_version_of(test_int32_4)
    let prim_3 = %num_conv.[`imm`].[`int32`] (prim_2) in
    let int32_of_int_1 = %box_num.`int32`.my_alloc_region (prim_3) in
    apply direct(add_int32_1_1 &my_alloc_region)
-     ($camlUnbox_boxed_numbers__add_int32_18 : _ -> int32 boxed)
+     ($camlUnbox_boxed_numbers__add_int32_2 : _ -> int32 boxed)
        (int32_of_int_1, int32_of_int)
        -> k2 * k1)
     where k2 (apply_result : int32 boxed) =
@@ -102,7 +102,7 @@ let code loopify(never) size(25) newer_version_of(test_int32_4)
       let int_of_int32 = %tag_imm (prim_1) in
       cont k (int_of_int32)
 in
-let $camlUnbox_boxed_numbers__test_int32_21 =
+let $camlUnbox_boxed_numbers__test_int32_5 =
   closure test_int32_4_1 @test_int32 &toplevel.alloc_region
 in
 let code loopify(never) size(22) newer_version_of(test_nativeint_5)
@@ -117,7 +117,7 @@ let code loopify(never) size(22) newer_version_of(test_nativeint_5)
    let prim_3 = %num_conv.[`imm`].[`nativeint`] (prim_2) in
    let nativeint_of_int_1 = %box_num.`nativeint`.my_alloc_region (prim_3) in
    apply direct(add_nativeint_2_1 &my_alloc_region)
-     ($camlUnbox_boxed_numbers__add_nativeint_19 : _ -> nativeint boxed)
+     ($camlUnbox_boxed_numbers__add_nativeint_3 : _ -> nativeint boxed)
        (nativeint_of_int_1, nativeint_of_int)
        -> k2 * k1)
     where k2 (apply_result : nativeint boxed) =
@@ -126,7 +126,7 @@ let code loopify(never) size(22) newer_version_of(test_nativeint_5)
       let int_of_nativeint = %tag_imm (prim_1) in
       cont k (int_of_nativeint)
 in
-let $camlUnbox_boxed_numbers__test_nativeint_22 =
+let $camlUnbox_boxed_numbers__test_nativeint_6 =
   closure test_nativeint_5_1 @test_nativeint &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(10) newer_version_of(add_float_6)
@@ -140,7 +140,7 @@ let code inline(never) loopify(never) size(10) newer_version_of(add_float_6)
   let float_add = %box_num.`float`.my_alloc_region (prim_2) in
   cont k (float_add)
 in
-let $camlUnbox_boxed_numbers__add_float_23 =
+let $camlUnbox_boxed_numbers__add_float_7 =
   closure add_float_6_1 @add_float &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(10) newer_version_of(add_float32_7)
@@ -154,7 +154,7 @@ let code inline(never) loopify(never) size(10) newer_version_of(add_float32_7)
   let float32_add = %box_num.fnt32.my_alloc_region (prim_2) in
   cont k (float32_add)
 in
-let $camlUnbox_boxed_numbers__add_float32_24 =
+let $camlUnbox_boxed_numbers__add_float32_8 =
   closure add_float32_7_1 @add_float32 &toplevel.alloc_region
 in
 let code loopify(never) size(23) newer_version_of(test_float_8)
@@ -169,7 +169,7 @@ let code loopify(never) size(23) newer_version_of(test_float_8)
    let prim_3 = %num_conv.[`imm`].[`float`] (prim_2) in
    let float_of_int_1 = %box_num.`float`.my_alloc_region (prim_3) in
    apply direct(add_float_6_1 &my_alloc_region)
-     ($camlUnbox_boxed_numbers__add_float_23 : _ -> float boxed)
+     ($camlUnbox_boxed_numbers__add_float_7 : _ -> float boxed)
        (float_of_int_1, float_of_int)
        -> k2 * k1)
     where k2 (apply_result : float boxed) =
@@ -178,7 +178,7 @@ let code loopify(never) size(23) newer_version_of(test_float_8)
       let int_of_float = %tag_imm (prim_1) in
       cont k (int_of_float)
 in
-let $camlUnbox_boxed_numbers__test_float_25 =
+let $camlUnbox_boxed_numbers__test_float_9 =
   closure test_float_8_1 @test_float &toplevel.alloc_region
 in
 let code loopify(never) size(23) newer_version_of(test_float32_9)
@@ -193,7 +193,7 @@ let code loopify(never) size(23) newer_version_of(test_float32_9)
    let prim_3 = %num_conv.[`imm`].[`float32`] (prim_2) in
    let float32_of_int_1 = %box_num.fnt32.my_alloc_region (prim_3) in
    apply direct(add_float32_7_1 &my_alloc_region)
-     ($camlUnbox_boxed_numbers__add_float32_24 : _ -> float32 boxed)
+     ($camlUnbox_boxed_numbers__add_float32_8 : _ -> float32 boxed)
        (float32_of_int_1, float32_of_int)
        -> k2 * k1)
     where k2 (apply_result : float32 boxed) =
@@ -202,7 +202,7 @@ let code loopify(never) size(23) newer_version_of(test_float32_9)
       let int_of_float32 = %tag_imm (prim_1) in
       cont k (int_of_float32)
 in
-let $camlUnbox_boxed_numbers__test_float32_26 =
+let $camlUnbox_boxed_numbers__test_float32_10 =
   closure test_float32_9_1 @test_float32 &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(6) newer_version_of(read_11)
@@ -235,7 +235,7 @@ let code loopify(never) size(29) newer_version_of(test_value_slot_10)
       let `unit` = %end_region (`region`) in
       cont k (int_add)
 in
-let $camlUnbox_boxed_numbers__test_value_slot_27 =
+let $camlUnbox_boxed_numbers__test_value_slot_11 =
   closure test_value_slot_10_1 @test_value_slot &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(6) newer_version_of(indirect_14)
@@ -244,7 +244,7 @@ let code inline(never) loopify(never) size(6) newer_version_of(indirect_14)
         -> k * k1 =
   apply &my_alloc_region read (0) -> k * k1
 in
-let $camlUnbox_boxed_numbers__indirect_29 =
+let $camlUnbox_boxed_numbers__indirect_13 =
   closure indirect_14_1 @indirect &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(6) newer_version_of(read_13)
@@ -271,7 +271,7 @@ let code loopify(never) size(29) newer_version_of(test_value_slot_not_unboxed_12
   with { b_1 = b }
   in
   apply direct(indirect_14_1 &my_alloc_region)
-    ($camlUnbox_boxed_numbers__indirect_29 : _ -> imm tagged)
+    ($camlUnbox_boxed_numbers__indirect_13 : _ -> imm tagged)
       (read)
       -> k2 * k1
     where k2 (apply_result : imm tagged) =
@@ -279,7 +279,7 @@ let code loopify(never) size(29) newer_version_of(test_value_slot_not_unboxed_12
       let `unit` = %end_region (`region`) in
       cont k (int_add)
 in
-let $camlUnbox_boxed_numbers__test_value_slot_not_unboxed_28 =
+let $camlUnbox_boxed_numbers__test_value_slot_not_unboxed_12 =
   closure test_value_slot_not_unboxed_12_1 @test_value_slot_not_unboxed
     &toplevel.alloc_region
 in
@@ -294,7 +294,7 @@ let code inline(never) loopify(never) size(6) newer_version_of(pair_first_15)
   let int_of_int64 = %tag_imm (prim_1) in
   cont k (int_of_int64)
 in
-let $camlUnbox_boxed_numbers__pair_first_30 =
+let $camlUnbox_boxed_numbers__pair_first_14 =
   closure pair_first_15_1 @pair_first &toplevel.alloc_region
 in
 let code loopify(never) size(23) newer_version_of(test_pair_16)
@@ -312,21 +312,21 @@ let code loopify(never) size(23) newer_version_of(test_pair_16)
     %block.[`0`].my_alloc_region (int64_of_int_1, int64_of_int)
   in
   apply direct(pair_first_15_1 &my_alloc_region)
-    ($camlUnbox_boxed_numbers__pair_first_30 : _ -> imm tagged)
+    ($camlUnbox_boxed_numbers__pair_first_14 : _ -> imm tagged)
       (Pmakeblock)
       -> k * k1
 in
-let $camlUnbox_boxed_numbers__test_pair_31 =
+let $camlUnbox_boxed_numbers__test_pair_15 =
   closure test_pair_16_1 @test_pair &toplevel.alloc_region
 in
 let $camlUnbox_boxed_numbers =
-  Block 0 ($camlUnbox_boxed_numbers__test_int64_20,
-           $camlUnbox_boxed_numbers__test_int32_21,
-           $camlUnbox_boxed_numbers__test_nativeint_22,
-           $camlUnbox_boxed_numbers__test_float_25,
-           $camlUnbox_boxed_numbers__test_float32_26,
-           $camlUnbox_boxed_numbers__test_value_slot_27,
-           $camlUnbox_boxed_numbers__test_value_slot_not_unboxed_28,
-           $camlUnbox_boxed_numbers__test_pair_31)
+  Block 0 ($camlUnbox_boxed_numbers__test_int64_4,
+           $camlUnbox_boxed_numbers__test_int32_5,
+           $camlUnbox_boxed_numbers__test_nativeint_6,
+           $camlUnbox_boxed_numbers__test_float_9,
+           $camlUnbox_boxed_numbers__test_float32_10,
+           $camlUnbox_boxed_numbers__test_value_slot_11,
+           $camlUnbox_boxed_numbers__test_value_slot_not_unboxed_12,
+           $camlUnbox_boxed_numbers__test_pair_15)
 in
 cont done ($camlUnbox_boxed_numbers)

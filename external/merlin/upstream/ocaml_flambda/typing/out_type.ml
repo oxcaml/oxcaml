@@ -1499,7 +1499,7 @@ let rec tree_of_modal_typexp mode modal ty =
             out_modalities_of_mod_bounds mod_bounds )
     | Tquote ty ->
         wrap_printing_env_unguarded
-          (Env.enter_quotation !printing_env)
+          (Env.enter_quote !printing_env)
           (fun () -> Otyp_quote (tree_of_typexp mode alloc_mode ty))
     | Tsplice ty ->
         wrap_printing_env_unguarded
@@ -1513,7 +1513,7 @@ let rec tree_of_modal_typexp mode modal ty =
         Internal_names.add p';
         let tyl =
           wrap_printing_env_unguarded
-            (Env.enter_quotation !printing_env)
+            (Env.enter_quote !printing_env)
             (fun () -> tree_of_typlist mode tyl)
         in
         Otyp_constr (tree_of_path (Some Type) p', tyl)
@@ -2093,7 +2093,8 @@ let tree_of_type_decl id decl =
         (Option.is_some umc)
     | Type_record_unboxed_product(lbls,
                                   (Record_unboxed_product
-                                  | Record_unboxed_product_variable),
+                                  | Record_unboxed_product_undetermined
+                                  | Record_unboxed_product_variable _),
                                   umc) ->
         tree_of_manifest
           (Otyp_record_unboxed_product (List.map tree_of_label lbls)),
