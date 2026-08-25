@@ -867,6 +867,13 @@ module Sort = struct
     | Equal_mutated_second -> Equal_mutated_first
     | (Unequal | Equal_no_mutation | Equal_mutated_both) as r -> r
 
+  let rec var_occurs v = function
+    | Var v' -> (
+      v == v'
+      || match v'.contents with None -> false | Some s -> var_occurs v s)
+    | Base _ | Univar _ -> false
+    | Product ts -> List.exists (var_occurs v) ts
+
   let[@inline] sorts_of_product s =
     (* In the equate functions, it's useful to pass around lists of sorts inside
        the product constructor they came from to avoid re-allocating it if we
@@ -941,8 +948,11 @@ module Sort = struct
     | Some s1 -> equate_sort_product s1 s2
     | None when is_rigidvar v1 -> Unequal
     | None ->
-      set v1 (Some s2);
-      Equal_mutated_first
+      if var_occurs v1 s2
+      then Unequal
+      else (
+        set v1 (Some s2);
+        Equal_mutated_first)
 
   and equate_sort_product s1 s2 =
     match s1 with
