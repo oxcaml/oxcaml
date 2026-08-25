@@ -64,7 +64,7 @@ function merlin-target () {
     parsing/unit_info.ml*)
       echo "${base/#parsing/typing}";;
 
-    .gitattributes|base-rev.txt) ;;
+    .gitattributes) ;;
 
     # Most cases are simple
     *) echo "$base";;
@@ -98,7 +98,6 @@ fi
 
 
 # Used for patch output
-old_base_rev="$(cat upstream/ocaml_flambda/base-rev.txt)"
 current_head="$(git symbolic-ref --short HEAD)"
 
 # Get the new oxcaml sources and copy every file without the merlin-exclude
@@ -111,7 +110,6 @@ else
 fi
 new_files=()
 cd upstream/ocaml_flambda
-echo $rev > base-rev.txt
 dirs=(*/)
 dirs=("${dirs[@]%/}")
 if [[ "$subdirectory" = "." ]]; then
@@ -161,7 +159,7 @@ cd ../..
 # Annotations for diff3 regions; "@" would be more natural than ":" but confuses
 # smerge-mode's highlighting
 old_marker="Merlin:$current_head"
-parent_marker="Compiler:$old_base_rev"
+parent_marker="Compiler:last-imported"
 new_marker="Compiler:$commitish"
 
 # Then patch src/ocaml using the changes you just imported. Newly-imported
@@ -250,4 +248,4 @@ git add .
 # Also add any .rej files that were created by patch, even though they're
 # ignored.
 git add "*.rej" --force &> /dev/null || true
-git commit -m "Automated commit: Import compiler changes from $old_base_rev to $rev"
+git commit -m "Automated commit: Import compiler changes from $rev"

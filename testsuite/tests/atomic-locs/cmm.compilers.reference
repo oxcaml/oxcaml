@@ -2,43 +2,43 @@
 (data
  int 6912
  global "camlCmm":
- addr G:"camlCmm__standard_atomic_get_8"
- addr G:"camlCmm__get_9"
- addr G:"camlCmm__set_10"
- addr G:"camlCmm__get_imm_11"
- addr G:"camlCmm__set_imm_12"
- addr G:"camlCmm__cas_13")
+ addr G:"camlCmm__standard_atomic_get_2"
+ addr G:"camlCmm__get_3"
+ addr G:"camlCmm__set_4"
+ addr G:"camlCmm__get_imm_5"
+ addr G:"camlCmm__set_imm_6"
+ addr G:"camlCmm__cas_7")
 (data
  int 4087
- global "camlCmm__cas_13":
+ global "camlCmm__cas_7":
  addr G:"caml_curry3"
  int 252201579132747783
  addr G:"camlCmm__cas_6_13_code")
 (data
  int 4087
- global "camlCmm__set_imm_12":
+ global "camlCmm__set_imm_6":
  addr G:"caml_curry2"
  int 180143985094819847
  addr G:"camlCmm__set_imm_5_12_code")
 (data
  int 3063
- global "camlCmm__get_imm_11":
+ global "camlCmm__get_imm_5":
  addr G:"camlCmm__get_imm_4_11_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlCmm__set_10":
+ global "camlCmm__set_4":
  addr G:"caml_curry2"
  int 180143985094819847
  addr G:"camlCmm__set_3_10_code")
 (data
  int 3063
- global "camlCmm__get_9":
+ global "camlCmm__get_3":
  addr G:"camlCmm__get_2_9_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlCmm__standard_atomic_get_8":
+ global "camlCmm__standard_atomic_get_2":
  addr G:"caml_curry2"
  int 180143985094819847
  addr G:"camlCmm__standard_atomic_get_1_8_code")

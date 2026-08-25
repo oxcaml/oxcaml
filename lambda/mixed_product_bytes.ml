@@ -91,6 +91,9 @@ let shape_is_all_value shape = all_value (count (Product shape))
 
 let value_prefix_len t = Byte_count.on_64_bit_arch t.value / 8
 
+let size_in_words t =
+  Byte_count.on_64_bit_arch (Byte_count.add t.value t.flat) / 8
+
 let types_shape_is_all_value shape = all_value (count_types_shape shape)
 
 module Wrt_path = struct

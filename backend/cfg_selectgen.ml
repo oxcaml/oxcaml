@@ -528,6 +528,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           function. *)
        Uncaught, Csequence (segfault, dummy_raise))
 
+  let join_branch (r : _ Or_never_returns.t) sub_cfg : Sub_cfg.join_branch =
+    { sub_cfg;
+      may_fall_through = (match r with Ok _ -> true | Never_returns -> false)
+    }
+
   (* The following two functions, [emit_parts] and [emit_parts_list], force
      right-to-left evaluation order as required by the Flambda [Un_anf] pass
      (and to be consistent with the bytecode compiler). *)
@@ -1090,8 +1095,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let phantom_available_before = SU.phantom_vars_from_env env in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg ~dbg
         ~phantom_available_before;
-      Sub_cfg.join ~from:[sub_if; sub_else] ~to_:sub_cfg
-        ~phantom_available_before;
+      Sub_cfg.join
+        ~from:[join_branch rif sub_if; join_branch relse sub_else]
+        ~to_:sub_cfg ~phantom_available_before;
       r
 
   and emit_expr_switch env sub_cfg bound_name esel index ecases
@@ -1113,8 +1119,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let phantom_available_before = SU.phantom_vars_from_env env in
       Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel ~dbg
         ~phantom_available_before;
-      Sub_cfg.join ~from:(Array.to_list subs) ~to_:sub_cfg
-        ~phantom_available_before;
+      Sub_cfg.join
+        ~from:
+          (Array.to_list
+             (Array.map (fun (r, sub) -> join_branch r sub) sub_cases))
+        ~to_:sub_cfg ~phantom_available_before;
       r
 
   and emit_expr_catch env sub_cfg bound_name (flag : Cmm.ccatch_flag) handlers
@@ -1222,17 +1231,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let sub_handlers =
       List.map
-        (fun ((rs, label, dbg, phantom_available_before), (_, sub_handler)) ->
+        (fun ((rs, label, dbg, phantom_available_before), (r, sub_handler)) ->
           Sub_cfg.add_empty_block_at_start sub_handler ~label;
           setup_catch_handler flag rs sub_handler ~dbg ~phantom_available_before;
-          sub_handler)
+          join_branch r sub_handler)
         l
     in
     let term_desc = Cfg.Always (Sub_cfg.start_label sub_body) in
     let phantom_available_before = SU.phantom_vars_from_env env in
     Sub_cfg.update_exit_terminator sub_cfg term_desc ~phantom_available_before;
-    Sub_cfg.join ~from:(sub_body :: sub_handlers) ~to_:sub_cfg
-      ~phantom_available_before;
+    Sub_cfg.join
+      ~from:(join_branch r_body sub_body :: sub_handlers)
+      ~to_:sub_cfg ~phantom_available_before;
     r
 
   and emit_expr_exit env sub_cfg (lbl : Cmm.exit_label) args traps :

@@ -8,7 +8,7 @@ let code loopify(never) size(1) newer_version_of(`fn[tests8.ml:20,49--61]_3`)
         : val =
   cont k (x)
 in
-let $`camlTests8__fn[tests8.ml:20,49--61]_6` =
+let $`camlTests8__fn[tests8.ml:20,49--61]_3` =
   closure `fn[tests8.ml:20,49--61]_3_1` @`fn[tests8.ml:20,49--61]`
     &toplevel.alloc_region
 in
@@ -19,11 +19,11 @@ let code loopify(never) size(1) newer_version_of(`fn[tests8.ml:20,62--77]_2`)
         : [ 0 | 0 of val * val ] =
   cont k (0)
 in
-let $`camlTests8__fn[tests8.ml:20,62--77]_5` =
+let $`camlTests8__fn[tests8.ml:20,62--77]_2` =
   closure `fn[tests8.ml:20,62--77]_2_1` @`fn[tests8.ml:20,62--77]`
     &toplevel.alloc_region
 in
-let $camlTests8__map_foo_4 =
+let $camlTests8__map_foo_1 =
   closure map_foo_0_1 @map_foo &toplevel.alloc_region
 and code rec loopify(never) size(44) newer_version_of(map_foo_0)
       map_foo_0_1 (f : val, seq : val, param : imm tagged)
@@ -42,7 +42,7 @@ and code rec loopify(never) size(44) newer_version_of(map_foo_0)
                &my_alloc_region
            with {
              my_closure =
-               $camlTests8__map_foo_4 ~ depth my_depth -> succ my_depth
+               $camlTests8__map_foo_1 ~ depth my_depth -> succ my_depth
            }
            in
            ((let Pfield = %block_load.[`0`] (`*match*`) in
@@ -59,12 +59,12 @@ and code loopify(never) size(4) newer_version_of(`fn[tests8.ml:20,12--80]_1`)
         -> k * k1
         : [ 0 | 0 of val * val ] =
   apply direct(map_foo_0_1 &my_alloc_region) inlined(never)
-    ($camlTests8__map_foo_4 ~ depth do_not_inline -> do_not_inline
+    ($camlTests8__map_foo_1 ~ depth do_not_inline -> do_not_inline
      : _ -> [ 0 | 0 of val * val ])
-      ($`camlTests8__fn[tests8.ml:20,49--61]_6`,
-       $`camlTests8__fn[tests8.ml:20,62--77]_5`,
+      ($`camlTests8__fn[tests8.ml:20,49--61]_3`,
+       $`camlTests8__fn[tests8.ml:20,62--77]_2`,
        0)
       -> k * k1
 in
-let $camlTests8 = Block 0 ($camlTests8__map_foo_4) in
+let $camlTests8 = Block 0 ($camlTests8__map_foo_1) in
 cont done ($camlTests8)

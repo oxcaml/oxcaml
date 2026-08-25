@@ -295,16 +295,6 @@ let mk_dasm_comments f =
 let mk_dno_asm_comments f =
   ("-dno-asm-comments", Arg.Unit f, " Do not add comments in .s files")
 
-let mk_frametables_in_rodata f =
-  ( "-frametables-in-rodata",
-    Arg.Unit f,
-    " Emit GC frametables into the .rodata section (default)" )
-
-let mk_no_frametables_in_rodata f =
-  ( "-no-frametables-in-rodata",
-    Arg.Unit f,
-    " Do not emit GC frametables into the .rodata section" )
-
 let mk_heap_reduction_threshold f =
   ( "-heap-reduction-threshold",
     Arg.Int f,
@@ -1186,17 +1176,6 @@ module Debugging = Dwarf_flags
 
 (* CR mshinwell: These help texts should show the default values. *)
 
-let mk_restrict_to_upstream_dwarf f =
-  ( "-gupstream-dwarf",
-    Arg.Unit f,
-    " Only emit the same DWARF information as the upstream compiler" )
-
-let mk_no_restrict_to_upstream_dwarf f =
-  ( "-gno-upstream-dwarf",
-    Arg.Unit f,
-    " Emit potentially more DWARF information than the upstream compiler. \
-     Implies -shape-format debugging-shapes." )
-
 let mk_dwarf_inlined_frames f =
   ("-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information")
 
@@ -1369,8 +1348,6 @@ module type Oxcaml_options = sig
   val module_entry_functions_section : unit -> unit
   val dasm_comments : unit -> unit
   val dno_asm_comments : unit -> unit
-  val frametables_in_rodata : unit -> unit
-  val no_frametables_in_rodata : unit -> unit
   val heap_reduction_threshold : int -> unit
   val zero_alloc_check : string -> unit
   val zero_alloc_assert : string -> unit
@@ -1566,8 +1543,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_module_entry_functions_section F.module_entry_functions_section;
       mk_dasm_comments F.dasm_comments;
       mk_dno_asm_comments F.dno_asm_comments;
-      mk_frametables_in_rodata F.frametables_in_rodata;
-      mk_no_frametables_in_rodata F.no_frametables_in_rodata;
       mk_heap_reduction_threshold F.heap_reduction_threshold;
       mk_zero_alloc_check F.zero_alloc_check;
       mk_zero_alloc_assert F.zero_alloc_assert;
@@ -1951,8 +1926,6 @@ module Oxcaml_options_impl = struct
 
   let dasm_comments = set' Oxcaml_flags.dasm_comments
   let dno_asm_comments = clear' Oxcaml_flags.dasm_comments
-  let frametables_in_rodata = set' Oxcaml_flags.frametables_in_rodata
-  let no_frametables_in_rodata = clear' Oxcaml_flags.frametables_in_rodata
   let dump_inlining_paths = set' Oxcaml_flags.dump_inlining_paths
   let davail = set' Oxcaml_flags.davail
   let dranges = set' Oxcaml_flags.dranges
@@ -2316,8 +2289,6 @@ module Oxcaml_options_impl = struct
 end
 
 module type Debugging_options = sig
-  val restrict_to_upstream_dwarf : unit -> unit
-  val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
   val ddebug_avail_sets : unit -> unit
@@ -2336,8 +2307,6 @@ end
 module Make_debugging_options (F : Debugging_options) = struct
   let list3 =
     [
-      mk_restrict_to_upstream_dwarf F.restrict_to_upstream_dwarf;
-      mk_no_restrict_to_upstream_dwarf F.no_restrict_to_upstream_dwarf;
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
       mk_ddebug_avail_sets F.ddebug_avail_sets;
@@ -2357,18 +2326,6 @@ module Make_debugging_options (F : Debugging_options) = struct
 end
 
 module Debugging_options_impl = struct
-  let restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := true;
-    Clflags.shape_format := Clflags.Old_merlin
-
-  let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false;
-    Clflags.shape_format := Clflags.Debugging_shapes
-  (* CR sspies: We should only enable OxCaml DWARF on the compiler once we are
-     ready to switch, since it leads to a new format of shapes in the .cms and
-     .cmt files. Merlin should continue to work, but we should be careful and
-     probably should switch over to debugging shapes in general first. *)
-
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
   let ddebug_avail_sets () = Debugging.debug_avail_sets := true
@@ -2600,7 +2557,6 @@ module Extra_params = struct
     | "caml-apply-inline-fast-path" ->
         set' Oxcaml_flags.caml_apply_inline_fast_path
     | "dasm-comments" -> set' Oxcaml_flags.dasm_comments
-    | "gupstream-dwarf" -> set' Debugging.restrict_to_upstream_dwarf
     | "gdwarf-inlined-frames" -> set' Debugging.dwarf_inlined_frames
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gdwarf-may-alter-codegen-experimental" ->

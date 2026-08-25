@@ -9,7 +9,7 @@ let code loopify(never) size(8) newer_version_of(f_0)
   let Pstringlength = %tag_imm (prim) in
   cont k (Pstringlength)
 in
-let $camlInlining_cost_of_primitive_on_parameters__f_2 =
+let $camlInlining_cost_of_primitive_on_parameters__f_1 =
   closure f_0_1 @f &toplevel.alloc_region
 in
 let code loopify(never) size(4) newer_version_of(g_1)
@@ -18,15 +18,15 @@ let code loopify(never) size(4) newer_version_of(g_1)
         -> k * k1
         : imm tagged =
   apply direct(f_0_1 &my_alloc_region)
-    ($camlInlining_cost_of_primitive_on_parameters__f_2 : _ -> imm tagged)
+    ($camlInlining_cost_of_primitive_on_parameters__f_1 : _ -> imm tagged)
       (x)
       -> k * k1
 in
-let $camlInlining_cost_of_primitive_on_parameters__g_3 =
+let $camlInlining_cost_of_primitive_on_parameters__g_2 =
   closure g_1_1 @g &toplevel.alloc_region
 in
 let $camlInlining_cost_of_primitive_on_parameters =
-  Block 0 ($camlInlining_cost_of_primitive_on_parameters__f_2,
-           $camlInlining_cost_of_primitive_on_parameters__g_3)
+  Block 0 ($camlInlining_cost_of_primitive_on_parameters__f_1,
+           $camlInlining_cost_of_primitive_on_parameters__g_2)
 in
 cont done ($camlInlining_cost_of_primitive_on_parameters)
