@@ -1161,7 +1161,14 @@ type runtime_param =
   | Rp_argument_block of Global_module.t  (* [Rp_argument_block P] means take
                                              the argument being passed for the
                                              parameter [P] and pass in its
-                                             argument block *)
+                                             argument block
+
+                                             CR-soon zqian: this should carry a
+                                             [Global_module.Parameter_name.t] —
+                                             the slot is a parameter by
+                                             construction, and consumers
+                                             currently have to compare it in
+                                             [Global_module.Name] space. *)
   | Rp_main_module_block of Global_module.t
                                           (* [Rp_main_module_block M] means that
                                              [M] is a parameterised module (not
@@ -1246,7 +1253,12 @@ type program =
 type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
                                         (* The parameter implemented (the [P] in
-                                           [-as-argument-for P]) *)
+                                           [-as-argument-for P]).
+
+                                           CR-soon zqian: this duplicates the
+                                           cmi's [cmi_arg_for]; remove it and
+                                           have consumers read the cmi
+                                           instead. *)
     arg_block_idx: int;                 (* The index within the main module
                                            block of the _argument block_. If
                                            this compilation unit is used as an
