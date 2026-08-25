@@ -1025,7 +1025,8 @@ and module_type_constraint =
   | Tmodtype_package of {
       package_module_type_path : Path.t;
       (** The module type path named by the package type. This constraint allows
-          consumers to associate the check with the named module type declaration. *)
+          consumers to associate the check with the named module type
+          declaration. *)
     }
   | Tmodtype_explicit of module_type * Mode.Value.lr modes
   (** The module type was in the source file. *)
