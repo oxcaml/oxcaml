@@ -85,7 +85,7 @@ let string_of_key t (key : Facts.Key.t) =
       uid_name t family_uid
   | Named { context; family_uid } ->
       uid_name t family_uid ^ "@" ^ string_of_context t context
-  | Anon { key_uid } -> "<" ^ uid_name t key_uid ^ ">"
+  | Anon uid -> "<" ^ uid_name t uid ^ ">"
 
 (* The implementation of a check that is not a declaration is only a location;
    it prints as [<location>], so that the output stays independent of the
