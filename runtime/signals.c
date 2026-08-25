@@ -748,25 +748,25 @@ static void * caml_signal_stack_0 = NULL;
 static size_t caml_signal_stack_0_size = 0;
 #endif
 
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
 /* Loading through a pointer to this page faults; the SEGV handler
    recognizes the address and enters the GC (see signals_nat.c).
-   Arming a domain's [safepoint_trigger] means pointing it here. */
-CAMLexport void* caml_safepoint_trigger_page = NULL;
+   Arming a domain's [poll_trigger] means pointing it here. */
+CAMLexport void* caml_poll_trigger_page = NULL;
 #endif
 
 void caml_init_signals(void)
 {
-#ifdef FAULTING_SAFEPOINTS
+#ifdef FAULTING_POLLS
   /* Allocated once and never freed, so that re-initialization after
      [caml_terminate_signals] is harmless. */
-  if (caml_safepoint_trigger_page == NULL) {
-    caml_safepoint_trigger_page =
+  if (caml_poll_trigger_page == NULL) {
+    caml_poll_trigger_page =
       caml_mem_map(caml_plat_pagesize, CAML_MAP_RESERVE_ONLY,
-                   "safepoint trigger page");
-    if (caml_safepoint_trigger_page == NULL)
+                   "poll trigger page");
+    if (caml_poll_trigger_page == NULL)
       caml_fatal_error("caml_init_signals: "
-                       "cannot allocate the safepoint trigger page");
+                       "cannot allocate the poll trigger page");
   }
 #endif
 
