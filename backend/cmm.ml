@@ -160,6 +160,7 @@ type exttype =
   | XInt16
   | XInt32
   | XInt64
+  | XMask
   | XFloat32
   | XFloat
   | XVec128
@@ -175,6 +176,7 @@ let machtype_of_exttype = function
   | XInt16 -> typ_int
   | XInt32 -> typ_int
   | XInt64 -> typ_int
+  | XMask -> typ_mask
   | XFloat -> typ_float
   | XFloat32 -> typ_float32
   | XVec128 -> typ_vec128
@@ -952,8 +954,8 @@ let equal_machtype left right =
   Misc.Stdlib.Array.equal equal_machtype_component left right
 
 let equal_exttype
-    (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
-     | XVec256 | XVec512 ) as left) right =
+    (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat32 | XFloat
+     | XVec128 | XVec256 | XVec512 ) as left) right =
   (* we can use polymorphic compare as long as exttype is all constant
      constructors *)
   Stdlib.( = ) left right

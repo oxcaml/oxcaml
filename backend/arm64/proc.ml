@@ -193,7 +193,7 @@ let external_calling_conventions
   List.iteri (fun i (ty_arg : Cmm.exttype) ->
     let (ty : Cmm.machtype_component), registers, divisor, size =
       match ty_arg with
-      | XInt | XInt64 -> Int, int_registers, 1, size_int
+      | XInt | XInt64 | XMask -> Int, int_registers, 1, size_int
       | XInt32 -> Int, int_registers, 2, size_int
       | XInt16 -> Int, int_registers, 4, size_int
       | XInt8 -> Int, int_registers, 8, size_int

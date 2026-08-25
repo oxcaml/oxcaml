@@ -266,8 +266,8 @@ let oper_arg_types : operation -> expected_arg_types = function
            | XInt ->
              (* [XInt] is used for values as well as word-sized integers. *)
              Exactly typ_val
-           | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
-           | XVec256 | XVec512 ->
+           | XInt8 | XInt16 | XInt32 | XInt64 | XMask | XFloat32 | XFloat
+           | XVec128 | XVec256 | XVec512 ->
              Exactly (machtype_of_exttype ty_arg))
          ty_args)
   | Cload _ -> Args [Exactly typ_addr]

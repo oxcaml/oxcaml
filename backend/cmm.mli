@@ -97,6 +97,7 @@ type exttype =
   | XInt16  (**r 16-bit integer *)
   | XInt32  (**r 32-bit integer *)
   | XInt64  (**r 64-bit integer *)
+  | XMask  (**r mask passed as a 64-bit integer according to the C ABI *)
   | XFloat32  (**r single-precision FP number *)
   | XFloat  (**r double-precision FP number *)
   | XVec128  (**r 128-bit vector *)
