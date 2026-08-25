@@ -178,6 +178,8 @@ type t = private
     omissions : Omission_set.t
   }
 
+val map_checks : t -> f:(Check.t -> Check.t) -> t
+
 (** [of_implementation compilation_unit ~module_pairs ~modtype_pairs
      ~unit_interface_check ~argument_interface structure] extracts facts from
     [structure]. [module_pairs] and [modtype_pairs] associate implementation
