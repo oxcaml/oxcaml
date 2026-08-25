@@ -45,7 +45,7 @@ type index =
     stats : stat Stats.t;
     root_directory : string option;
     related_uids : Union_find.t Uid_map.t;
-    module_facts : module_facts option;
+    module_facts : module_facts option
   }
 
 let lidset_schema iter lidset = Lid_set.schema iter Lid.schema lidset

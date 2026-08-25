@@ -22,8 +22,7 @@ end
 
 (** The module facts of an index, stored separately so consumers that do not
     use them do not load them. *)
-type module_facts =
-  Module_implementation_facts.t Granular_marshal.link
+type module_facts = Module_implementation_facts.t Granular_marshal.link
 
 val fetch_module_facts : module_facts -> Module_implementation_facts.t
 val link_module_facts : Module_implementation_facts.t -> module_facts
@@ -37,7 +36,7 @@ type index =
     stats : stat Stats.t;
     root_directory : string option;
     related_uids : Union_find.t Uid_map.t;
-    module_facts : module_facts option;
+    module_facts : module_facts option
   }
 
 val pp : Format.formatter -> index -> unit
