@@ -55,12 +55,12 @@ module Serialisable : sig
     t ->
     cmr_format
 
+  (** Like [deserialise], but only deserialises the dependency graph (including
+      the hashcons restore and rename process). *)
+  val deserialise_deps : t -> Global_flow_graph.graph
+
   (** The unit that was being compiled when the file was saved. *)
   val compilation_unit : t -> Compilation_unit.t
-
-  (** Get just the renamed dependency graph from the .cmr file, for use in
-      solving. *)
-  val deserialise_deps : t -> Global_flow_graph.graph
 end
 
 type error =

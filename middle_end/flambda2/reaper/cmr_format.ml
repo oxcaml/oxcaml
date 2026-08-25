@@ -165,9 +165,9 @@ module Serialisable : sig
     t ->
     cmr_format
 
-  val compilation_unit : t -> Compilation_unit.t
-
   val deserialise_deps : t -> Global_flow_graph.graph
+
+  val compilation_unit : t -> Compilation_unit.t
 end = struct
   type cmr_format = t
 
@@ -285,8 +285,6 @@ end = struct
       rebuild_data
     }
 
-  let compilation_unit t = t.original_compilation_unit
-
   let deserialise_deps
       { original_compilation_unit;
         table_data;
@@ -306,6 +304,8 @@ end = struct
         ~original_compilation_unit
     in
     Deps_with_fields.deserialise deps renaming
+
+  let compilation_unit t = t.original_compilation_unit
 end
 
 type error =
