@@ -42,6 +42,13 @@ module Serialisable : sig
   (** The unit that was being compiled when the file was saved. *)
   val compilation_unit : t -> Compilation_unit.t
 
+  (** The slot offsets computed by [Slot_offsets.finalize_offsets] in the paused
+      process, restricted to slots defined in the unit that was being compiled.
+      Other units' rebuild data may still reference these slots even when the
+      Reaper's rebuild of this unit no longer defines them, so the resuming
+      invocation must re-export these offsets from its .cmx file. *)
+  val exported_offsets : t -> Exported_offsets.t
+
   (** Get just the renamed dependency graph from the .cmr file, for use in
       solving. *)
   val deserialise_deps : t -> Global_flow_graph.graph
@@ -55,9 +62,15 @@ type error =
 
 exception Error of error
 
-(** [used_value_slots] is the set computed by [Slot_offsets.finalize_offsets]
-    for the unit being stored; it describes the data written alongside it. *)
-val save : filename:string -> used_value_slots:Value_slot.Set.t -> t -> unit
+(** [used_value_slots] and [exported_offsets] are the results computed by
+    [Slot_offsets.finalize_offsets] for the unit being stored;
+    [used_value_slots] describes the data written alongside it. *)
+val save :
+  filename:string ->
+  used_value_slots:Value_slot.Set.t ->
+  exported_offsets:Exported_offsets.t ->
+  t ->
+  unit
 
 (** Read and unmarshal a cmr file from disk. *)
 val load : string -> Serialisable.t * Id_stamp_counters.t

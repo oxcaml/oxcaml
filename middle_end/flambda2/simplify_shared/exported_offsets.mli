@@ -83,6 +83,14 @@ val imported_offsets : unit -> t
 (** Merge the offsets from two files *)
 val merge : t -> t -> t
 
+(** Union of two sets of offsets. For slots present in both arguments, the entry
+    from the first argument is kept, unless that entry is dead and the second
+    argument's entry is live, in which case the live entry is kept. *)
+val union_prefer_live : t -> t -> t
+
+(** Restrict the offsets to slots defined in the current compilation unit. *)
+val restrict_to_current_compilation_unit : t -> t
+
 (** Ensure the offsets for the given function slots are in the given exported
     offsets. *)
 val reexport_function_slots : Function_slot.Set.t -> t -> t

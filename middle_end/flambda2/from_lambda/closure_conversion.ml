@@ -4203,7 +4203,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
           }
       in
       Slot_offsets.finalize_offsets (Acc.slot_offsets acc) ~get_code_metadata
-        ~used_slots
+        ~used_slots ~offsets_from_previous_assignment:Exported_offsets.empty
     in
     let reachable_names, cmx =
       Flambda_cmx.prepare_cmx_from_approx ~machine_width:(Acc.machine_width acc)

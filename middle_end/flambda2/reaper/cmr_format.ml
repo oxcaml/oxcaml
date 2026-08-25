@@ -90,7 +90,11 @@ module Serialisable : sig
 
   type t
 
-  val create : used_value_slots:Value_slot.Set.t -> cmr_format -> t
+  val create :
+    used_value_slots:Value_slot.Set.t ->
+    exported_offsets:Exported_offsets.t ->
+    cmr_format ->
+    t
 
   val deserialise :
     machine_width:Target_system.Machine_width.t ->
@@ -100,6 +104,8 @@ module Serialisable : sig
 
   val compilation_unit : t -> Compilation_unit.t
 
+  val exported_offsets : t -> Exported_offsets.t
+
   val deserialise_deps : t -> Global_flow_graph.graph
 end = struct
   type cmr_format = t
@@ -108,6 +114,7 @@ end = struct
     { original_compilation_unit : Compilation_unit.t;
       table_data : Flambda_cmx_format.table_data;
       used_value_slots : Value_slot.Set.t;
+      exported_offsets : Exported_offsets.t;
       unit_metadata : Flambda_unit.Metadata.t;
       final_typing_env : Typing_env.Serializable.t option;
       all_code : All_code_with_sections.t;
@@ -115,7 +122,7 @@ end = struct
       rebuild_data : Reaper.Staged.Traverse_rebuild.t
     }
 
-  let create ~used_value_slots
+  let create ~used_value_slots ~exported_offsets
       ({ unit_metadata; final_typing_env; all_code; deps; rebuild_data } :
         cmr_format) : t =
     (* The resuming invocation reads imported code metadata from the
@@ -161,6 +168,12 @@ end = struct
     { original_compilation_unit = Current_unit.get_cu_exn ();
       table_data = Flambda_cmx_format.create_table_data exported_ids;
       used_value_slots;
+      (* Only this unit's own slots are stored: offsets for other units' slots
+         are read by the resuming invocation from those units' (rebuilt) .cmx
+         files, and storing them here could preserve assignments that their
+         rebuilds have since changed. *)
+      exported_offsets =
+        Exported_offsets.restrict_to_current_compilation_unit exported_offsets;
       unit_metadata;
       final_typing_env;
       all_code;
@@ -172,6 +185,7 @@ end = struct
       { original_compilation_unit;
         table_data;
         used_value_slots;
+        exported_offsets = _;
         unit_metadata;
         final_typing_env;
         all_code;
@@ -210,10 +224,16 @@ end = struct
 
   let compilation_unit t = t.original_compilation_unit
 
+  (* Function and value slots are structural values rather than hashconsed table
+     entries, so, as with offsets read from .cmx files, no renaming is required
+     here. *)
+  let exported_offsets t = t.exported_offsets
+
   let deserialise_deps
       { original_compilation_unit;
         table_data;
         used_value_slots;
+        exported_offsets = _;
         unit_metadata = _;
         final_typing_env = _;
         all_code = _;
@@ -238,8 +258,10 @@ type error =
 
 exception Error of error
 
-let save ~filename ~used_value_slots t =
-  let serialisable = Serialisable.create ~used_value_slots t in
+let save ~filename ~used_value_slots ~exported_offsets t =
+  let serialisable =
+    Serialisable.create ~used_value_slots ~exported_offsets t
+  in
   (* We need to store ID stamp counters so that stamp-based identifiers in the
      resumed process don't conflict with the ones created in this process. *)
   let id_stamp_counters = Id_stamp_counters.save () in
