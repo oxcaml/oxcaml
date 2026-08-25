@@ -475,12 +475,17 @@ module Helpers = struct
 
   let module_facts (mconfig : Mconfig.t) =
     let index_files = mconfig.merlin.index_files in
-    Module_facts_reader.fold ~index_files ~init:None
-      ~f:(fun facts ~path:_ source ->
-        Some
-          (match facts with
-          | None -> source
-          | Some facts -> Facts.merge facts source))
+    List.fold_left index_files ~init:(Some None)
+      ~f:(fun accumulator path ->
+        match accumulator, (Index_cache.read path).module_facts with
+        | None, _ | _, None -> None
+        | Some facts, Some source ->
+          let source = Index_format.fetch_module_facts source in
+          Some
+            (Some
+               (match facts with
+               | None -> source
+               | Some facts -> Facts.merge facts source)))
 
   let own_file (mconfig : Mconfig.t) =
     Misc.canonicalize_filename
