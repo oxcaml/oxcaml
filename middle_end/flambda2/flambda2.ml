@@ -393,11 +393,57 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
   Profile.record_call "flambda2" run
 
 let reaper_lto_solve ~cmr_files ~ltosol_file =
-  (* CR mvellacott: combine the dependency graphs from [cmr_files], run the
-     Reaper solve stage on the combined graph, and write the solution to
-     [ltosol_file]. *)
-  Format.eprintf "reaper_lto_solve: cmr files: [%s]; ltosol output: %s@."
-    (String.concat "; " cmr_files)
+  (* ID stamp counters are process-global monotonically increasing counters that
+     give us an easy way of creating fresh identifiers. These identifiers get
+     persisted across processes, and we need to prevent collisions when this
+     happens. There are two cases:
+
+     (1) Different processes that operate on different compilation units,
+     potentially in parallel. Collisions are prevented here by the fact that
+     identifiers are scoped to compilation units, as (CU, number) pairs.
+
+     (2) Different processes that operate on the same compilation units, which
+     must always happen in sequence. Collisions are prevented here by saving
+     stamp counters in the earlier processes and restoring them in the later
+     processes.
+
+     Here we're resuming from many processes that operated on different CUs, and
+     we're operating on all of those CUs, so we need to restore stamp counters
+     from all of those processes. However stamp counters are global for the
+     process, not per-CU. To make this work, we take the maximum across all the
+     processes we've resumed from. It is okay that this makes some unused stamps
+     get jumped over, the important thing is that they increase monotonically.
+
+     After we're done, rebuild processes will be created to do more work on the
+     CUs we touched. To keep counters monotonically increasing, we need to save
+     them after our work so that the rebuild processes can restore them. *)
+  let cmrs, counters =
+    List.split (List.map Flambda2_reaper.Cmr_format.load cmr_files)
+  in
+  Flambda2_reaper.Cmr_format.Id_stamp_counters.restore_for_merge counters;
+  let combined_graph =
+    List.fold_left
+      (fun combined cmr ->
+        Flambda2_reaper.Global_flow_graph.union combined
+          (Flambda2_reaper.Cmr_format.Serialisable.deserialise_deps_only cmr))
+      (Flambda2_reaper.Global_flow_graph.create ())
+      cmrs
+  in
+  (* CR mvellacott: serialise the solution to [ltosol_filename] instead of
+     discarding it. *)
+  (* CR mvellacott: split the resulting solution into per-compilation-unit
+     portions. *)
+  (* CR mvellacott: store the new stamp counters to the solution file. *)
+  let (_solution : Flambda2_reaper.Unboxing_analysis.result) =
+    Flambda2_reaper.Reaper.Staged.solve combined_graph
+  in
+  Format.eprintf "reaper_lto_solve: solved units: [%s]; ltosol output: %s@."
+    (String.concat "; "
+       (List.map
+          (fun cmr ->
+            Compilation_unit.full_path_as_string
+              (Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr))
+          cmrs))
     ltosol_file
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width

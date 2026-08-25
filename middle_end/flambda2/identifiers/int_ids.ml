@@ -482,14 +482,14 @@ module Variable = struct
 
   let previous_name_stamp = ref (-1)
 
-  let create ?user_visible name kind =
+  let create_in_compilation_unit ~compilation_unit ?user_visible name kind =
     let name_stamp =
       (* CR mshinwell: check for overflow on 32 bit *)
       incr previous_name_stamp;
       !previous_name_stamp
     in
     let data : Variable_data.t =
-      { compilation_unit = Compilation_unit.get_current_exn ();
+      { compilation_unit;
         name;
         name_stamp;
         kind;
@@ -497,6 +497,11 @@ module Variable = struct
       }
     in
     Table.add !grand_table_of_variables data
+
+  let create ?user_visible name kind =
+    create_in_compilation_unit
+      ~compilation_unit:(Compilation_unit.get_current_exn ())
+      ?user_visible name kind
 
   module T0 = struct
     let compare = Id.compare
@@ -507,7 +512,10 @@ module Variable = struct
 
     let print ppf t =
       let cu = compilation_unit t in
-      if Compilation_unit.equal cu (Compilation_unit.get_current_exn ())
+      (* CR mvellacott: We've had to change the implementation here to prevent
+         an exception when no CU is set. This change is independent of LTO, so
+         could be a separate PR. *)
+      if Compilation_unit.is_current cu
       then
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")

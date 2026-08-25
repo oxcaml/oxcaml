@@ -90,9 +90,10 @@ end) : S = struct
 
     let print ppf t =
       Format.fprintf ppf "@[%t(" P.colour;
-      if
-        Compilation_unit.equal t.compilation_unit
-          (Compilation_unit.get_current_exn ())
+      (* CR mvellacott: We've had to change the implementation here to prevent
+         an exception when no CU is set. This change is independent of LTO, so
+         could be a separate PR. *)
+      if Compilation_unit.is_current t.compilation_unit
       then Format.fprintf ppf "%s/%d" t.name t.name_stamp
       else
         Format.fprintf ppf "%a.%s/%d"
