@@ -273,6 +273,8 @@ type t =
 
 type frozen = t
 
+let map_checks t ~f = { t with checks = Check_set.map f t.checks }
+
 module Builder = struct
   type nonrec t =
     { mutable checks : Check_set.t;
