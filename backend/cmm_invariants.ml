@@ -237,8 +237,7 @@ type expected_arg_type =
   | Exactly of machtype
   | Any_machtype
       (** For argument slots whose machtype is not determined by the operation,
-          e.g. addresses, which may legitimately be [Val], [Addr] or naked
-          pointers outside the heap. *)
+          e.g. arguments to an application whose signature is not known. *)
 
 type expected_arg_types =
   | Args of expected_arg_type list
@@ -255,10 +254,10 @@ type expected_arg_types =
 let oper_arg_types : operation -> expected_arg_types = function
   | Capply _ ->
     Args_then_any_number_of
-      ([Any_machtype (* closure or code pointer *)], Any_machtype)
+      ([Exactly typ_val (* closure or code pointer *)], Any_machtype)
   | Cextcall { ty_args = []; _ } ->
     (* An empty [ty_args] means "all arguments are machine words". *)
-    Any_number_of Any_machtype
+    Any_number_of (Exactly typ_addr)
   | Cextcall { ty_args = _ :: _ as ty_args; _ } ->
     Args
       (List.map
@@ -266,12 +265,12 @@ let oper_arg_types : operation -> expected_arg_types = function
            match ty_arg with
            | XInt ->
              (* [XInt] is used for values as well as word-sized integers. *)
-             Any_machtype
+             Exactly typ_val
            | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128
            | XVec256 | XVec512 ->
              Exactly (machtype_of_exttype ty_arg))
          ty_args)
-  | Cload _ -> Args [Any_machtype]
+  | Cload _ -> Args [Exactly typ_addr]
   | Calloc (_, kind) ->
     let field =
       match kind with
@@ -299,7 +298,7 @@ let oper_arg_types : operation -> expected_arg_types = function
            element. *)
         Any_machtype
     in
-    Args_then_any_number_of ([Any_machtype (* header *)], field)
+    Args_then_any_number_of ([Exactly typ_int (* header *)], field)
   | Cstore (memory_chunk, _) ->
     let value =
       match memory_chunk with
@@ -314,7 +313,7 @@ let oper_arg_types : operation -> expected_arg_types = function
       | Fivetwelve_aligned ->
         Exactly (machtype_of_memory_chunk memory_chunk)
     in
-    Args [Any_machtype; value]
+    Args [Exactly typ_addr; value]
   | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
   | Clsl | Clsr | Casr | Ccmpi _ ->
     (* Under [ge_component], [typ_addr] accepts any word in a general-purpose
@@ -327,12 +326,12 @@ let oper_arg_types : operation -> expected_arg_types = function
     Args [Exactly typ_int; Exactly typ_int; Exactly typ_int; Exactly typ_int]
   | Cmuli64 _ -> Args [Exactly typ_int; Exactly typ_int]
   | Ccsel ty -> Args [Exactly typ_int; Exactly ty; Exactly ty]
-  | Cprefetch _ -> Args [Any_machtype]
+  | Cprefetch _ -> Args [Exactly typ_addr]
   | Catomic
       { op = Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange; _ } ->
-    Args [Exactly typ_int; Any_machtype (* address *)]
+    Args [Exactly typ_int; Exactly typ_addr (* address *)]
   | Catomic { op = Compare_set | Compare_exchange; _ } ->
-    Args [Exactly typ_int; Exactly typ_int; Any_machtype (* address *)]
+    Args [Exactly typ_int; Exactly typ_int; Exactly typ_addr (* address *)]
   | Caddv -> Args [Exactly typ_val; Exactly typ_int]
   | Cadda -> Args [Exactly typ_addr; Exactly typ_int]
   | Cnegf width | Cabsf width -> Args [Exactly (machtype_of_float_width width)]
