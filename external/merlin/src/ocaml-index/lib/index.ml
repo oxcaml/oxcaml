@@ -126,24 +126,18 @@ let rewrite_module_facts ~root ~rewrite_root
   else
     let open Module_implementation_facts in
     match root with
-    | None -> ensure_normalized facts
+    | None -> facts
     | Some _ ->
       let rewrite_node : Node.t -> Node.t = function
         | Node.Uid _ as node -> node
         | Node.Location (compilation_unit, loc) ->
           Node.Location (compilation_unit, add_root_loc ~root loc)
       in
-      ensure_normalized
-        { facts with
-          checks =
-            Check_set.map
-              (fun (check : Check.t) ->
-                { check with
-                  implementation = rewrite_node check.implementation;
-                  site = add_root_loc ~root check.site
-                })
-              facts.checks
-        }
+      map_checks facts ~f:(fun (check : Check.t) ->
+          { check with
+            implementation = rewrite_node check.implementation;
+            site = add_root_loc ~root check.site
+          })
 
 let index_of_artifact ~into ~root ~rewrite_root ~build_path
     ~do_not_use_cmt_loadpath ~shapes ~store_shapes ~cmt_loadpath ~cmt_impl_shape
