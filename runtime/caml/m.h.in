@@ -97,7 +97,7 @@
 
 #undef MULTIDOMAIN
 
-#undef FAULTING_SAFEPOINTS
+#undef FAULTING_POLLS
 
 #undef HAS_POPCNT
 
