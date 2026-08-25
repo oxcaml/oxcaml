@@ -443,13 +443,9 @@ Lines 8-11, characters 0-11:
  9 |   | Null_noncrossing_void of nonportable_void
 10 |   | This_noncrossing_void of int
 11 | [@@or_null]
-Error: The kind of type "noncrossing_void_null" is
-           immediate_or_null with nonportable_void
-         because an [@@or_null] type gets the kind of or_null
-         applied to its payload type.
-       But the kind of type "noncrossing_void_null" must be a subkind of
-           value_or_null mod portable
-         because of the annotation on the declaration of the type noncrossing_void_null.
+Error: This type definition does not satisfy its kind annotation
+         value_or_null mod portable,
+       because nonportable_void is not mod portable.
 |}]
 
 type two_nullary =

@@ -794,7 +794,7 @@ let decl_of_type_constr type_constr =
       match sorts with
       | Some sorts ->
         Cstr_layout_known { shape = Constructor_uniform_value; sorts }
-      | None -> Cstr_layout_variable
+      | None -> Cstr_layout_undetermined
     in
     Type_variant (
       constrs,

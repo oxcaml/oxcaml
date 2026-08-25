@@ -717,28 +717,43 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         match check_depth depth obj ty with
         | Some x -> x
         | None ->
+            let sorts_and_types () =
+              let label_params_and_types, record_params =
+                Ctype.instance_label_declarations ~fixed:false
+                  (lbl_list |> Array.of_list) ~params:type_params
+              in
+              List.iter2 (Ctype.unify env) record_params
+                (Ctype.instance_list ty_list);
+              let try_map_all a f =
+                Misc.Stdlib.Array.all_somes (Array.map f a)
+              in
+              let with_sort ty =
+                Option.map (fun s -> s, ty)
+                  (Jkind.sort_option_of_jkind env (Ctype.type_jkind env ty))
+              in
+              try_map_all label_params_and_types (fun (_, ty) -> with_sort ty)
+            in
+            (* Finalize the representation just to be able to print it *)
+            let finalize rep =
+              Typedecl.finalize_record_representation env Location.none rep
+            in
             let rep =
               match rep with
-              | (Record_variable | Record_inlined (_, Constructor_variable, _))
-                as old_repres ->
-                  let label_params_and_types, record_params =
-                    Ctype.instance_label_declarations ~fixed:false
-                      (lbl_list |> Array.of_list) ~params:type_params
-                  in
-                  List.iter2 (Ctype.unify env) record_params
-                    (Ctype.instance_list ty_list);
-                  let lds_and_types =
-                    List.map2 (fun lbl (_params, ty) -> lbl, ty)
-                      lbl_list (label_params_and_types |> Array.to_list)
-                  in
-                  (match
-                     Typedecl.update_record_representation env Location.none
-                       Legacy ~old_repres lds_and_types ~why:Field_projection
-                   with
-                   | Ok (_sorts, rep) -> rep
-                   | Error _ -> Misc.fatal_error "unrepresentable record")
-              | rep -> rep
+              | Record_undetermined ->
+                Option.map
+                  (fun l -> finalize (Record_variable l))
+                  (sorts_and_types ())
+              | Record_inlined (tag, Constructor_undetermined, vrep) ->
+                Option.map
+                  (fun l ->
+                     finalize
+                       (Record_inlined (tag, Constructor_variable l, vrep)))
+                  (sorts_and_types ())
+              | _ -> Some rep
             in
+            match rep with
+            | None -> Oval_stuff "<abstr>"
+            | Some rep ->
             let pos =
               match rep with
               | Record_inlined (_, _, Variant_extensible) -> 1
@@ -767,7 +782,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     else Outval_record_boxed
               | Record_dummy _ ->
                   Misc.fatal_error "dummy record representation"
-              | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+              | Record_undetermined | Record_variable _
+              | Record_inlined (_, (Constructor_undetermined
+                                   | Constructor_variable _), _) ->
                   Misc.fatal_error "variable record representation"
             in
             tree_of_record_fields depth

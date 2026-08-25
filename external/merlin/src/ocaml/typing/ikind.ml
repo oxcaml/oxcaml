@@ -38,6 +38,104 @@ let fresh_unknown_uid () : Types.Uid.t =
   in
   Types.Uid.mk ~current_unit
 
+module Provenance = struct
+  module Id : sig
+    type t = private int
+
+    val create : unit -> t
+
+    val equal : t -> t -> bool
+  end = struct
+    type t = int
+
+    let next = ref 0
+
+    let create () =
+      let id = !next in
+      incr next;
+      id
+
+    let equal = Int.equal
+  end
+
+  type t =
+    { id : Id.t;
+      ty : Format_doc.doc;
+          (** The subject as printed in the error message: a type-expression
+              head (["u"], ["'a"]) or a class-of-types phrase (["functions"]).
+          *)
+      plural : bool;
+          (** Whether [ty] is a plural phrase, for verb agreement ("functions
+              are ..." vs "[u] is ..."). *)
+      source_type_id : int option;
+          (** [Types.get_id] of the type expression this entry was registered
+              for; residual entries sharing it are merged into one message. *)
+      is_decl_under_check : bool;
+          (** The subject is the declaration whose bound is being checked; such
+              self-occurrences are never reported as causes. *)
+      parent : Id.t option
+          (** The entry for the enclosing subject on the same nesting path, or
+              [None] at the top level. Used to drop a nested entry whose
+              requirement is entailed by an ancestor's. *)
+    }
+
+  let entries : t list ref = ref []
+
+  let name { id; ty; plural; _ } =
+    Ldd.Name.provenance ~id:(id :> int) ~ty ~plural
+
+  let make ~plural ~source_type_id ~is_decl_under_check ~parent ty =
+    let provenance =
+      { id = Id.create ();
+        ty;
+        plural;
+        source_type_id;
+        is_decl_under_check;
+        parent
+      }
+    in
+    entries := provenance :: !entries;
+    provenance
+
+  let register ~is_decl_under_check ~parent (ty : Types.type_expr) =
+    (* A surviving residual for an occurrence reflects only the head
+       constructor's own contribution (the decomposition zeroes anything
+       flowing through a separately-tracked inner type or parameter), so
+       name the head rather than the full type expression: the constructor
+       for [Tconstr], a class-of-types phrase for the built-in shapes. *)
+    let register_type ~source_type ty =
+      Format_doc.doc_printf "@[<hov>%a@]" Jkind.format_type_expr ty
+      |> make ~plural:false
+           ~source_type_id:(Some (Types.get_id source_type))
+           ~is_decl_under_check ~parent
+    in
+    let register_text text =
+      make ~plural:true
+        ~source_type_id:(Some (Types.get_id ty))
+        ~is_decl_under_check ~parent
+        (Format_doc.doc_printf "%s" text)
+    in
+    match Types.get_desc ty with
+    | Types.Tarrow _ -> register_text "functions"
+    | Types.Ttuple _ -> register_text "tuples"
+    | Types.Tunboxed_tuple _ -> register_text "unboxed tuples"
+    | Types.Tobject _ -> register_text "objects"
+    | Types.Tvariant _ -> register_text "polymorphic variants"
+    | Types.Tpackage _ -> register_text "first-class modules"
+    | Types.Tconstr (path, _ :: _, _) ->
+      register_type ~source_type:ty
+        (Btype.newgenty (Types.Tconstr (path, [], ref Types.Mnil)))
+    | _ -> register_type ~source_type:ty ty
+
+  let register_phrase ~parent text =
+    make ~plural:true ~source_type_id:None ~is_decl_under_check:false ~parent
+      (Format_doc.doc_printf "%s" text)
+
+  let reset () = entries := []
+
+  let all () = List.rev !entries
+end
+
 (** A kind solver specialized to [Types.Ldd] and [Types.type_expr].
 
     The solver computes LDD polynomials of the form base ⊔ Σ_i (arg_i ⊓ coeff_i)
@@ -47,6 +145,12 @@ module Solver = struct
   type mode =
     | Normal
     | Round_up
+
+  let rec uid_is_reliable_identity = function
+    | Types.Uid.Internal -> false
+    | Types.Uid.Unboxed_version uid -> uid_is_reliable_identity uid
+    | Types.Uid.Compilation_unit _ | Types.Uid.Item _ | Types.Uid.Predef _ ->
+      true
 
   (* Hash tables avoiding polymorphic structural comparison on deep values.
      [Btype.TypeHash] keys by the representative of a [type_expr], so
@@ -77,10 +181,17 @@ module Solver = struct
         }
     | Poly of Ldd.node * Ldd.node array
 
+  and provenance_ctx =
+    { parent : Provenance.Id.t option;
+      decl_uid_under_check : Types.Uid.t option;
+      kinds : (type_id:int * parent:Provenance.Id.t option, Ldd.node) Hashtbl.t
+    }
+
   and ctx =
     { env : Env.t option;
       lookup_of_env : Env.t -> Path.t -> constr_decl;
       mode : mode;
+      provenance : provenance_ctx option;
       ty_to_kind : Ldd.node TyTbl.t;
       constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
     }
@@ -97,21 +208,74 @@ module Solver = struct
     { env;
       lookup_of_env;
       mode;
+      provenance = None;
       ty_to_kind = global_ty_to_kind;
       constr_to_coeffs = global_constr_to_coeffs
     }
 
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
 
+  let with_provenance ~(decl_uid_under_check : Types.Uid.t option) (ctx : ctx) :
+      ctx =
+    { ctx with
+      provenance =
+        Some { parent = None; decl_uid_under_check; kinds = Hashtbl.create 1 };
+      ty_to_kind = TyTbl.create 1
+    }
+
+  let without_provenance (ctx : ctx) : ctx =
+    { ctx with provenance = None; ty_to_kind = TyTbl.create 1 }
+
+  let find_provenance_kind (ctx : ctx) (ty : Types.type_expr) =
+    match ctx.provenance with
+    | None -> None
+    | Some { parent; kinds } ->
+      Hashtbl.find_opt kinds (~type_id:(Types.get_id ty), ~parent)
+
+  let cache_provenance_kind (ctx : ctx) (ty : Types.type_expr) kind =
+    match ctx.provenance with
+    | None -> ()
+    | Some { parent; kinds } ->
+      Hashtbl.replace kinds (~type_id:(Types.get_id ty), ~parent) kind
+
   let rigid_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
-    match ctx.mode with
-    | Normal -> Ldd.node_of_var (Ldd.rigid name)
-    | Round_up -> Ldd.const Axis_lattice.top
+    match ctx.mode, name with
+    | Normal, _ | Round_up, Provenance _ -> Ldd.node_of_var (Ldd.rigid name)
+    | Round_up, _ -> Ldd.const Axis_lattice.top
 
   (** A rigid variable corresponding to a type parameter [t]. *)
   let rigid (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     let param_id = Types.get_id ty in
     rigid_name ctx (Ldd.Name.param param_id)
+
+  let provenance_and_child_ctx (ctx : ctx) (ty : Types.type_expr) =
+    match ctx.provenance with
+    | None -> Fun.id, ctx
+    | Some ({ parent; _ } as provenance_ctx) ->
+      let is_decl_under_check =
+        match
+          provenance_ctx.decl_uid_under_check, ctx.env, Types.get_desc ty
+        with
+        | Some decl_uid, Some env, Types.Tconstr (path, _, _)
+          when uid_is_reliable_identity decl_uid -> (
+          match Env.find_type path env with
+          | exception Not_found -> false
+          | decl -> Types.Uid.equal decl_uid decl.type_uid)
+        | None, _, _ | Some _, None, _ | Some _, Some _, _ -> false
+      in
+      let provenance = Provenance.register ~is_decl_under_check ~parent ty in
+      ( (fun poly -> Ldd.meet poly (rigid_name ctx (Provenance.name provenance))),
+        { ctx with
+          provenance = Some { provenance_ctx with parent = Some provenance.id }
+        } )
+
+  let with_provenance_text (ctx : ctx) (text : unit -> string) (poly : Ldd.node)
+      : Ldd.node =
+    match ctx.provenance with
+    | None -> poly
+    | Some { parent; _ } ->
+      let provenance = Provenance.register_phrase ~parent (text ()) in
+      Ldd.meet poly (rigid_name ctx (Provenance.name provenance))
 
   let rec type_may_be_circular (ty : Types.type_expr) : bool =
     match Types.get_desc ty with
@@ -165,7 +329,7 @@ module Solver = struct
            [c] are kept rigid to avoid infinite expansion. *)
         let instantiate (name : Ldd.Name.t) : Ldd.node =
           match name with
-          | Param _ | Unknown _ -> rigid_name ctx name
+          | Param _ | Provenance _ | Unknown _ -> rigid_name ctx name
           | KAtom kpath -> (
             match ctx.env with
             | None -> rigid_name ctx name
@@ -278,16 +442,22 @@ module Solver = struct
         base_poly, coeffs_poly)
 
   (* Apply a constructor polynomial to argument types. *)
-  and constr (ctx : ctx) (path : Path.t) (args : Types.type_expr list) :
-      Ldd.node =
-    let base, coeffs = constr_kind ctx ~min_arity:(List.length args) path in
+  and constr ~self_provenance ~arg_ctx (ctx : ctx) (path : Path.t)
+      (args : Types.type_expr list) : Ldd.node =
+    let constr_ctx =
+      match ctx.provenance with None -> ctx | Some _ -> without_provenance ctx
+    in
+    let base, coeffs =
+      constr_kind constr_ctx ~min_arity:(List.length args) path
+    in
+    let base = self_provenance base in
     let rec loop acc remaining i =
       if i = Array.length coeffs
       then acc
       else
         match remaining with
         | arg :: rest ->
-          let arg_kind = kind ~use_tables:true ctx arg in
+          let arg_kind = kind ~use_tables:true arg_ctx arg in
           loop (Ldd.join acc (Ldd.meet arg_kind coeffs.(i))) rest (i + 1)
         | [] -> failwith "Missing arg"
     in
@@ -398,23 +568,34 @@ module Solver = struct
     else
       match TyTbl.find_opt ctx.ty_to_kind ty with
       | Some kind_poly -> kind_poly
-      | None ->
-        if not use_tables
-        then kind_uncached ctx ty
-        else if type_may_be_circular ty
-        then (
-          let var = Ldd.new_var () in
-          let placeholder = Ldd.node_of_var var in
-          TyTbl.add ctx.ty_to_kind ty placeholder;
-          let kind_rhs = kind_uncached ctx ty in
-          Ldd.solve_lfp var kind_rhs;
-          let kind_inlined = Ldd.inline_solved_vars placeholder in
-          TyTbl.replace ctx.ty_to_kind ty kind_inlined;
-          kind_inlined)
-        else
-          let kind_rhs = kind_uncached ctx ty in
-          TyTbl.add ctx.ty_to_kind ty kind_rhs;
-          kind_rhs
+      | None -> (
+        let cached_provenance_kind =
+          if use_tables then find_provenance_kind ctx ty else None
+        in
+        match cached_provenance_kind with
+        | Some kind_poly -> kind_poly
+        | None ->
+          if not use_tables
+          then kind_uncached ctx ty
+          else if type_may_be_circular ty
+          then (
+            let var = Ldd.new_var () in
+            let placeholder = Ldd.node_of_var var in
+            TyTbl.add ctx.ty_to_kind ty placeholder;
+            let kind_rhs = kind_uncached ctx ty in
+            Ldd.solve_lfp var kind_rhs;
+            let kind_inlined = Ldd.inline_solved_vars placeholder in
+            if Option.is_some ctx.provenance
+            then TyTbl.remove ctx.ty_to_kind ty
+            else TyTbl.replace ctx.ty_to_kind ty kind_inlined;
+            cache_provenance_kind ctx ty kind_inlined;
+            kind_inlined)
+          else
+            let kind_rhs = kind_uncached ctx ty in
+            if Option.is_none ctx.provenance
+            then TyTbl.add ctx.ty_to_kind ty kind_rhs;
+            cache_provenance_kind ctx ty kind_rhs;
+            kind_rhs)
 
   (* Worker for [kind]; does not memoize.
      Only call from [kind] so caching and LFP handling apply. *)
@@ -422,87 +603,94 @@ module Solver = struct
     (* Compute the ikind polynomial for an arbitrary [type_expr]. This is the
        semantic counterpart of [Jkind.jkind_of_type], but expressed in LDD
        form. *)
-    let kind_poly =
-      (* [ty] is expected to be representative: no links/substs/fields/nil. *)
-      match Types.get_desc ty with
-      | Types.Tvar { name = _name; jkind }
-      | Types.Tunivar { name = _name; jkind } ->
-        (* Keep a rigid param, but cap it by its annotated jkind. *)
-        Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
-      | Types.Tconstr (path, args, _abbrev_memo) -> constr ctx path args
-      | Types.Tmod (ty, mod_bounds) ->
-        Ldd.meet
-          (kind ~use_tables:true ctx ty)
-          (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
-      | Types.Ttuple elts ->
-        (* Boxed tuples: immutable_data base + per-element contributions
-           under id modality. *)
-        let base = Ldd.const Axis_lattice.immutable_data in
-        Ldd.sum elts ~base ~f:(fun (_lbl, t) -> kind ~use_tables:true ctx t)
-      | Types.Tunboxed_tuple elts ->
-        (* Unboxed tuples: per-element contributions; shallow axes relevant
-           only for arity = 1. *)
-        Ldd.sum elts ~base:Ldd.bot ~f:(fun (_lbl, t) ->
-            kind ~use_tables:true ctx t)
-      | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
-        (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
-        Ldd.const Axis_lattice.arrow
-      | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
-      | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
-      | Types.Trepr (ty, _sort_vars) -> kind ~use_tables:true ctx ty
-      | Types.Tpoly (ty, univars) ->
-        (* CR ikinds: this is sound but not fully precise.
-          Internal ticket 5746. *)
-        let ty = !instance_poly_for_jkind' univars ty in
-        (* We intentionally skip the principality check here. Enforcing it
-           breaks the stdlib build, and the old env-var escape hatch never had
-           a viable setting in practice. Track removing this workaround as part
-           of internal ticket 5746. *)
-        kind ~check_principality:false ~use_tables:true ctx ty
-      | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
-      | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
-      | Types.Tbox t ->
-        let base = Ldd.const Axis_lattice.mutable_data in
-        Ldd.join base (kind ~use_tables:true ctx t)
-      | Types.Tfield _ -> failwith "Tfield shouldn't appear in kind"
-      | Types.Tnil -> failwith "Tnil shouldn't appear in kind"
-      | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ ->
-        (* Treat quoted/spliced/evaluated quoted types conservatively as
-           boxed values. *)
-        Ldd.const Axis_lattice.value
-      | Types.Tvariant row ->
-        if Btype.tvariant_not_immediate row
-        then
-          if Btype.static_row row
-          then
-            (* Closed, boxed polymorphic variant: immutable_data base plus
-               per-constructor args. *)
-            let base = Ldd.const Axis_lattice.immutable_data in
-            Btype.fold_row
-              (fun acc ty ->
-                let ty_kind = kind ~use_tables:true ctx ty in
-                Ldd.join acc ty_kind)
-              base row
-          else
-            (* CR ikinds: open rows get conservative non-float value (boxed)
-               intersected with an unknown rigid so the solver treats it as an
-               unknown element. This can be improved. Internal ticket 6205. *)
-            let unknown =
-              rigid_name ctx (Ldd.Name.unknown (fresh_unknown_uid ()))
-            in
-            Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
-        else
-          (* All-constant (immediate) polymorphic variant. *)
-          Ldd.const Axis_lattice.immediate
-      | Types.Tpackage _ ->
-        (* Like open polymorphic variants, model first-class modules as boxed
-           values intersected with an unknown so they behave as not-best. *)
-        let unknown =
-          rigid_name ctx (Ldd.Name.unknown (fresh_unknown_uid ()))
-        in
-        Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
+    (* [ty] is expected to be representative: no links/substs/fields/nil.
+       Provenance is attached only to the contribution introduced by this
+       node, not to recursive child contributions. *)
+    let desc = Types.get_desc ty in
+    let self_provenance, child_ctx =
+      match desc with
+      | Types.Tlink _ | Types.Tsubst _ | Types.Trepr _ | Types.Tpoly _
+      | Types.Tmod _ | Types.Tfield _ | Types.Tnil ->
+        Fun.id, ctx
+      | _ -> provenance_and_child_ctx ctx ty
     in
-    kind_poly
+    match desc with
+    | Types.Tvar { name = _name; jkind } | Types.Tunivar { name = _name; jkind }
+      ->
+      (* Keep a rigid param, but cap it by its annotated jkind. *)
+      self_provenance (Ldd.meet (rigid ctx ty) (ckind_of_jkind child_ctx jkind))
+    | Types.Tconstr (path, args, _abbrev_memo) ->
+      constr ~self_provenance ~arg_ctx:child_ctx ctx path args
+    | Types.Tmod (ty, mod_bounds) ->
+      Ldd.meet
+        (kind ~use_tables:true ctx ty)
+        (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
+    | Types.Ttuple elts ->
+      (* Boxed tuples: immutable_data base + per-element contributions
+         under id modality. *)
+      let base = self_provenance (Ldd.const Axis_lattice.immutable_data) in
+      Ldd.sum elts ~base ~f:(fun (_lbl, t) -> kind ~use_tables:true child_ctx t)
+    | Types.Tunboxed_tuple elts ->
+      (* Unboxed tuples: per-element contributions; shallow axes relevant
+         only for arity = 1. *)
+      Ldd.sum elts ~base:Ldd.bot ~f:(fun (_lbl, t) ->
+          kind ~use_tables:true child_ctx t)
+    | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
+      (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
+      self_provenance (Ldd.const Axis_lattice.arrow)
+    | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
+    | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
+    | Types.Trepr (ty, _sort_vars) -> kind ~use_tables:true ctx ty
+    | Types.Tpoly (ty, univars) ->
+      (* CR ikinds: this is sound but not fully precise.
+        Internal ticket 5746. *)
+      let ty = !instance_poly_for_jkind' univars ty in
+      (* We intentionally skip the principality check here. Enforcing it
+         breaks the stdlib build, and the old env-var escape hatch never had
+         a viable setting in practice. Track removing this workaround as part
+         of internal ticket 5746. *)
+      kind ~check_principality:false ~use_tables:true ctx ty
+    | Types.Tof_kind jkind -> self_provenance (ckind_of_jkind child_ctx jkind)
+    | Types.Tobject _ -> self_provenance (Ldd.const Axis_lattice.object_legacy)
+    | Types.Tbox t ->
+      let base = self_provenance (Ldd.const Axis_lattice.mutable_data) in
+      Ldd.join base (kind ~use_tables:true child_ctx t)
+    | Types.Tfield _ -> failwith "Tfield shouldn't appear in kind"
+    | Types.Tnil -> failwith "Tnil shouldn't appear in kind"
+    | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ ->
+      (* Treat quoted/spliced/evaluated quoted types conservatively as
+         boxed values. *)
+      self_provenance (Ldd.const Axis_lattice.value)
+    | Types.Tvariant row ->
+      if Btype.tvariant_not_immediate row
+      then
+        if Btype.static_row row
+        then
+          (* Closed, boxed polymorphic variant: immutable_data base plus
+             per-constructor args. *)
+          let base = self_provenance (Ldd.const Axis_lattice.immutable_data) in
+          Btype.fold_row
+            (fun acc ty ->
+              let ty_kind = kind ~use_tables:true child_ctx ty in
+              Ldd.join acc ty_kind)
+            base row
+        else
+          (* CR ikinds: open rows get conservative non-float value (boxed)
+             intersected with an unknown rigid so the solver treats it as an
+             unknown element. This can be improved. Internal ticket 6205. *)
+          let unknown =
+            rigid_name ctx (Ldd.Name.unknown (fresh_unknown_uid ()))
+          in
+          self_provenance
+            (Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown)
+      else
+        (* All-constant (immediate) polymorphic variant. *)
+        self_provenance (Ldd.const Axis_lattice.immediate)
+    | Types.Tpackage _ ->
+      (* Like open polymorphic variants, model first-class modules as boxed
+         values intersected with an unknown so they behave as not-best. *)
+      let unknown = rigid_name ctx (Ldd.Name.unknown (fresh_unknown_uid ())) in
+      self_provenance (Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown)
 
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
   let normalize (kind_poly : Ldd.node) : Ldd.node =
@@ -547,18 +735,376 @@ let pp_axes (axes : Jkind_axis.Axis.packed list) : string =
   |> List.map (fun (Jkind_axis.Axis.Pack ax) -> Jkind_axis.Axis.name ax)
   |> String.concat ", "
 
+let axis_name (Jkind_axis.Axis.Pack ax) = Jkind_axis.Axis.name ax
+
+let pp_axis_name ppf axis = Format_doc.fprintf ppf "%s" (axis_name axis)
+
+let pp_axis_list_prose ppf (axes : Jkind_axis.Axis.packed list) =
+  match axes with
+  | [] -> Format_doc.fprintf ppf "<none>"
+  | [axis] -> pp_axis_name ppf axis
+  | [axis1; axis2] ->
+    Format_doc.fprintf ppf "%a and %a" pp_axis_name axis1 pp_axis_name axis2
+  | _ ->
+    let rec split_last = function
+      | [] -> assert false
+      | [last] -> [], last
+      | x :: xs ->
+        let init, last = split_last xs in
+        x :: init, last
+    in
+    let init, last = split_last axes in
+    Format_doc.fprintf ppf "%a,@ and %a"
+      (Format_doc.pp_print_list
+         ~pp_sep:(fun ppf () -> Format_doc.fprintf ppf ",@ ")
+         pp_axis_name)
+      init pp_axis_name last
+
+let is_bot_poly poly = Axis_lattice.equal (Ldd.round_up poly) Axis_lattice.bot
+
+let axes_in_violation_order ~violating_axes axes =
+  (* Keep only axes that the overall comparison actually failed on, ordered as
+     in [violating_axes]. A fragment residual can be non-top on a non-violating
+     axis because [round_down] under-approximates the symbolic implication, so
+     intersecting here prevents blaming a fragment on an axis the whole
+     comparison passes on. *)
+  List.filter
+    (fun violating_axis ->
+      List.exists (Jkind_axis.Axis.equal violating_axis) axes)
+    violating_axes
+
+type provenance_residual =
+  { provenance : Provenance.t;
+    mode_bounds : Axis_lattice.t;
+    axes : Jkind_axis.Axis.packed list
+  }
+
+type mode_crossing_error =
+  { printing_env : Env.t;
+    super_jkind : Types.jkind_l;
+    sub_poly : Ldd.node;
+    super_poly : Ldd.node;
+    provenances : Provenance.t list;
+    violating_axes : Jkind_axis.Axis.packed list;
+    provenance_residuals : provenance_residual list option
+  }
+
+type subjkind_error =
+  | Jkind_error of Jkind.Violation.t
+  | Mode_crossing_error of mode_crossing_error
+
+let subjkind_error_printing_env = function
+  | Jkind_error _ -> None
+  | Mode_crossing_error { printing_env; _ } -> Some printing_env
+
+let map_jkind_error result =
+  Result.map_error (fun error -> Jkind_error error) result
+
+let add_provenance_residual entries
+    ({ provenance = { ty; plural; _ }; mode_bounds; axes } as entry) =
+  (* Deduplicate identical entries (e.g. two fields of type [int ref] under
+     the same bound), keeping first-occurrence order. Entries that merely
+     share a printed name (e.g. two constructor-local existentials both
+     rendered ['a]) can have different requirements and must stay separate. *)
+  let duplicate other =
+    String.equal
+      (Format_doc.asprintf "%a" Format_doc.pp_doc other.provenance.ty)
+      (Format_doc.asprintf "%a" Format_doc.pp_doc ty)
+    && Bool.equal other.provenance.plural plural
+    && Axis_lattice.equal other.mode_bounds mode_bounds
+    && List.length other.axes = List.length axes
+    && List.for_all
+         (fun axis -> List.exists (Jkind_axis.Axis.equal axis) other.axes)
+         axes
+  in
+  if List.exists duplicate entries then entries else entries @ [entry]
+
+let axis_set_of_axes axes =
+  List.fold_left
+    (fun set (Jkind_axis.Axis.Pack axis) -> Jkind_axis.Axis_set.add set axis)
+    Jkind_axis.Axis_set.empty axes
+
+let restrict_mode_bounds_to_axes mode_bounds axes =
+  Axis_lattice.join mode_bounds
+    (Axis_lattice.of_axis_set
+       (Jkind_axis.Axis_set.complement (axis_set_of_axes axes)))
+
+let merge_same_source entries entry =
+  match entry.provenance.source_type_id with
+  | None -> entries @ [entry]
+  | Some source_type_id -> (
+    match
+      List.find_opt
+        (fun other ->
+          Option.equal Int.equal other.provenance.source_type_id
+            (Some source_type_id))
+        entries
+    with
+    | None -> entries @ [entry]
+    | Some other ->
+      let axes =
+        List.fold_left
+          (fun axes axis ->
+            if List.exists (Jkind_axis.Axis.equal axis) axes
+            then axes
+            else axes @ [axis])
+          other.axes entry.axes
+      in
+      let merged =
+        { other with
+          mode_bounds = Axis_lattice.meet other.mode_bounds entry.mode_bounds;
+          axes
+        }
+      in
+      List.map
+        (fun candidate ->
+          if Provenance.Id.equal candidate.provenance.id other.provenance.id
+          then merged
+          else candidate)
+        entries)
+
+let provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly =
+  let provenance_names = List.map Provenance.name provenances in
+  let provenance_vars = List.map Ldd.rigid provenance_names in
+  (* For a declaration [type t : bound = rhs], ikind checking compares the
+     inferred ikind polynomial for [rhs] against the polynomial for [bound].
+     When that comparison fails, we recompute [rhs] with provenance variables
+     inserted by meeting a fresh variable into each local contribution. For a
+     contribution [coeff] tagged by provenance variable [p], the error
+     reporting question is:
+
+       What is the largest assignment to [p] that would make this contribution
+       satisfy the required bound?
+
+     This is the right question because the provenance variable stands for the
+     mode-crossing behavior we need from the source type. Before rounding, its
+     answer is the least restrictive bound that would make this contribution
+     satisfy the required bound. Rounding down may strengthen that answer when
+     converting it to a concrete mode bound for printing.
+
+     We answer the question by first decomposing the provenance-annotated
+     polynomial into an untracked base plus one coefficient per provenance
+     variable. If the base alone does not satisfy [super_poly], then provenance
+     cannot explain the error. Otherwise, for each coefficient [coeff], we need
+     the greatest [h] such that:
+
+       meet coeff h <= super_poly
+
+     This is exactly [Ldd.imply coeff super_poly]. The result may still contain
+     symbolic variables, so we round it down to a conservative concrete mode
+     bound for printing. *)
+  let base, coeffs =
+    Ldd.decompose_into_linear_terms ~universe:provenance_vars sub_poly
+  in
+  match Ldd.leq_with_reason base super_poly with
+  | _ :: _ -> None
+  | [] ->
+    (* Self occurrences stay in the decomposition universe and provenance
+       forest, but are not independent causes to report for their own
+       declaration. Filtering here also prevents them from hiding nested
+       causes as enclosing residuals. *)
+    let entries =
+      List.combine provenances coeffs
+      |> List.filter_map (fun ((provenance : Provenance.t), coeff) ->
+          if provenance.is_decl_under_check || is_bot_poly coeff
+          then None
+          else
+            let mode_bounds = Ldd.imply coeff super_poly |> Ldd.round_down in
+            let non_top_bounds =
+              Axis_lattice.co_sub Axis_lattice.top mode_bounds
+            in
+            if Axis_lattice.equal non_top_bounds Axis_lattice.bot
+            then None
+            else
+              let axes =
+                non_top_bounds |> Axis_lattice.non_bot_axes
+                |> List.map Axis_lattice.axis_number_to_axis_packed
+                |> axes_in_violation_order ~violating_axes
+              in
+              (* [round_down] under-approximation can leave a residual
+                 non-top only on non-violating axes; such an entry has no
+                 axes left to report. *)
+              match axes with
+              | [] -> None
+              | _ :: _ -> Some { provenance; mode_bounds; axes })
+    in
+    (* [raw_bounds_by_id] holds, per surviving raw entry, its requirement
+       restricted to its reported axes (top elsewhere): the exact per-axis
+       VALUES the entry's message will demand of its subject. *)
+    let raw_bounds_by_id = Hashtbl.create (List.length entries) in
+    List.iter
+      (fun entry ->
+        Hashtbl.add raw_bounds_by_id entry.provenance.id
+          (restrict_mode_bounds_to_axes entry.mode_bounds entry.axes))
+      entries;
+    let provenances_by_id = Hashtbl.create (List.length provenances) in
+    List.iter
+      (fun (provenance : Provenance.t) ->
+        Hashtbl.add provenances_by_id provenance.id provenance)
+      provenances;
+    let exception Missing_provenance_parent of Provenance.Id.t in
+    let find_provenance id =
+      match Hashtbl.find_opt provenances_by_id id with
+      | Some provenance -> provenance
+      | None -> raise (Missing_provenance_parent id)
+    in
+    (* An enclosing entry only explains a nested requirement it ENTAILS:
+       same axis and an at-least-as-strong required value. Requirements
+       are kept as a list per ancestor rather than meet-collapsed into a
+       single lattice element: on the diamond axes (portability,
+       contention) the meet of two incomparable ancestor requirements
+       (e.g. shareable and corruptible) would wrongly claim to cover a
+       strictly stronger nested one (portable) that neither ancestor
+       explains. The [parent] links form an acyclic forest, so the walk
+       terminates. *)
+    let covered_bounds_by_id = Hashtbl.create (List.length provenances) in
+    let rec covered_bounds (provenance : Provenance.t) =
+      match Hashtbl.find_opt covered_bounds_by_id provenance.id with
+      | Some bounds -> bounds
+      | None ->
+        let parent_bounds =
+          match provenance.parent with
+          | None -> []
+          | Some parent -> covered_bounds (find_provenance parent)
+        in
+        let bounds =
+          match Hashtbl.find_opt raw_bounds_by_id provenance.id with
+          | None -> parent_bounds
+          | Some own -> own :: parent_bounds
+        in
+        Hashtbl.add covered_bounds_by_id provenance.id bounds;
+        bounds
+    in
+    (* [ancestor] entails [entry] on an axis iff its required value there
+       is below (at least as strong as) the entry's: [co_sub] is bot
+       exactly on those axes. Axes where [ancestor] reports nothing are
+       top after restriction and thus never entail a reported axis. *)
+    let entailed_axes ~ancestor entry =
+      Axis_lattice.co_sub ancestor entry.mode_bounds
+      |> Axis_lattice.non_bot_axes
+      |> List.map Axis_lattice.axis_number_to_axis_packed
+      |> axis_set_of_axes |> Jkind_axis.Axis_set.complement
+    in
+    entries
+    |> List.filter_map (fun entry ->
+        let parent_bounds =
+          match entry.provenance.parent with
+          | None -> []
+          | Some parent -> covered_bounds (find_provenance parent)
+        in
+        let covered =
+          List.fold_left
+            (fun covered ancestor ->
+              Jkind_axis.Axis_set.union covered (entailed_axes ~ancestor entry))
+            Jkind_axis.Axis_set.empty parent_bounds
+        in
+        let axes =
+          List.filter
+            (fun (Jkind_axis.Axis.Pack axis) ->
+              not (Jkind_axis.Axis_set.mem covered axis))
+            entry.axes
+        in
+        match axes with
+        | [] -> None
+        | _ :: _ ->
+          Some
+            { entry with
+              axes;
+              mode_bounds = restrict_mode_bounds_to_axes entry.mode_bounds axes
+            })
+    |> List.fold_left merge_same_source []
+    |> List.fold_left add_provenance_residual []
+    |> Option.some
+
+let residual_mode_strings { mode_bounds; axes; _ } =
+  (* Restrict the required bounds to the reported axes (the residual can be
+     non-top on other axes; see [axes_in_violation_order]), then let
+     [Typemode] drop implied modes (e.g. [aliased] when [global] is
+     required) the same way jkind annotations are printed. *)
+  let restricted = restrict_mode_bounds_to_axes mode_bounds axes in
+  Jkind.Mod_bounds.of_axis_lattice restricted
+  |> Typemode.close_implied_mod_bounds
+  |> Typemode.untransl_mod_bounds ~verbose:false
+  |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
+
+let pp_provenance_residual ppf
+    ({ provenance = { ty; plural; _ }; _ } as residual) =
+  (* Phrase subjects ("mutable fields", "boxed records") are plural noun
+     phrases; type-expression subjects read as singular. *)
+  let verb = if plural then "are" else "is" in
+  let modes = residual_mode_strings residual in
+  Format_doc.fprintf ppf "@[<hov 2>%a %s not mod %a@]" Format_doc.pp_doc ty verb
+    (Format_doc.pp_print_list
+       ~pp_sep:(fun ppf () -> Format_doc.fprintf ppf "@ ")
+       Format_doc.pp_print_string)
+    modes
+
+let pp_provenance_residual_bullets ppf entries =
+  List.iteri
+    (fun i entry ->
+      if i > 0 then Format_doc.fprintf ppf "@;";
+      Format_doc.fprintf ppf "- %a" pp_provenance_residual entry)
+    entries
+
+let pp_type_definition_kind_annotation env ppf super_jkind =
+  Format_doc.fprintf ppf
+    "@[<hov 2>This type definition does not satisfy its kind annotation@ %a,@]"
+    (Jkind.format env) super_jkind
+
+let report_provenance_mode_crossing_error env ppf
+    { super_jkind; provenance_residuals; _ } =
+  match provenance_residuals with
+  | None | Some [] -> None
+  | Some [entry] ->
+    Some
+      (Format_doc.fprintf ppf "@[<v>%a@;because %a.@]"
+         (pp_type_definition_kind_annotation env)
+         super_jkind pp_provenance_residual entry)
+  | Some entries ->
+    Some
+      (Format_doc.fprintf ppf "@[<v>%a@;because@;%a@]"
+         (pp_type_definition_kind_annotation env)
+         super_jkind pp_provenance_residual_bullets entries)
+
+let report_mode_crossing_error ~offender ppf err =
+  match report_provenance_mode_crossing_error err.printing_env ppf err with
+  | Some () -> ()
+  | None ->
+    Format_doc.fprintf ppf
+      "@[<v>The mode crossing of %t is not allowed here.@;\
+       @[<hov 2>The inferred kind is not below the required kind along %a.@]@]"
+      offender pp_axis_list_prose err.violating_axes
+
+let report_subjkind_error_with_offender ~offender env ppf = function
+  | Jkind_error err ->
+    Jkind.Violation.report_with_offender ~offender env ppf err
+  | Mode_crossing_error err -> report_mode_crossing_error ~offender ppf err
+
+let report_subjkind_error_with_name ~name env ppf err =
+  report_subjkind_error_with_offender
+    ~offender:(fun ppf -> Format_doc.fprintf ppf "%s" name)
+    env ppf err
+
 let axis_disagreement_reasons (axes : Jkind_axis.Axis.packed list) :
     Jkind.Sub_failure_reason.t list =
   List.map (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis) axes
 
-let label_mutability_contribution (lbl : Types.label_declaration) =
-  Ldd.const
-    (match lbl.ld_mutable with
-    | Immutable -> Axis_lattice.immediate
-    | Mutable { atomic = Atomic; _ } -> Axis_lattice.sync_data
-    | Mutable { atomic = Nonatomic; _ } -> Axis_lattice.mutable_data)
+let label_mutability_contribution (ctx : Solver.ctx)
+    (lbl : Types.label_declaration) =
+  match lbl.ld_mutable with
+  (* [immediate] is below every base this is summed into, so omitting it keeps
+     immutable fields out of the untracked part of a provenance residual. *)
+  | Immutable -> Ldd.bot
+  | Mutable { atomic = Atomic; _ } ->
+    Solver.with_provenance_text ctx
+      (fun () -> "atomic mutable fields")
+      (Ldd.const Axis_lattice.sync_data)
+  | Mutable { atomic = Nonatomic; _ } ->
+    Solver.with_provenance_text ctx
+      (fun () -> "mutable fields")
+      (Ldd.const Axis_lattice.mutable_data)
 
-let sum_record_label_contributions ~(base : Ldd.node)
+let sum_record_label_contributions ~(ctx : Solver.ctx) ~(base : Ldd.node)
     ~(payload_kind : Types.type_expr -> Ldd.node)
     ~(validate_label : Types.label_declaration -> unit)
     (lbls : Types.label_declaration list) : Ldd.node =
@@ -566,7 +1112,7 @@ let sum_record_label_contributions ~(base : Ldd.node)
       validate_label lbl;
       let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
       Ldd.join
-        (label_mutability_contribution lbl)
+        (label_mutability_contribution ctx lbl)
         (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
 
 let no_validation (_ : Types.label_declaration) = ()
@@ -576,6 +1122,9 @@ let validate_immutable_unboxed_label (lbl : Types.label_declaration) =
   | Immutable -> ()
   | Mutable _ ->
     failwith "ikind: mutable fields in unboxed records are not supported"
+
+let decl_base_provenance (ctx : Solver.ctx) source poly =
+  Solver.with_provenance_text ctx (fun () -> source) poly
 
 (* Gather constructor-local vars from [tys]. *)
 let collect_type_vars (tys : Types.type_expr list) :
@@ -688,7 +1237,8 @@ let make_gadt_payload_projector ~(decl_params : Types.type_expr list)
                   | Some bound -> bound
                   | None -> Ldd.const Axis_lattice.top
                 else Solver.node_of_name ctx name)
-            | Ldd.Name.Unknown _ | Ldd.Name.Atom _ | Ldd.Name.KAtom _ ->
+            | Ldd.Name.Unknown _ | Ldd.Name.Provenance _ | Ldd.Name.Atom _
+            | Ldd.Name.KAtom _ ->
               Solver.node_of_name ctx name
           in
           fun ty ->
@@ -697,6 +1247,115 @@ let make_gadt_payload_projector ~(decl_params : Types.type_expr list)
       | _ ->
         failwith
           "ikind: expected GADT constructor result to be a type constructor")
+
+let type_decl_allows_any_crossing (decl : Types.type_declaration) =
+  match decl.type_kind with
+  | Types.Type_record (_, _, umc_opt)
+  | Types.Type_record_unboxed_product (_, _, umc_opt)
+  | Types.Type_variant (_, _, umc_opt) ->
+    Option.is_some umc_opt
+  | Types.Type_abstract _ | Types.Type_open -> false
+
+let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
+    Ldd.node =
+  match decl.type_manifest with
+  | Some body_ty -> Solver.kind ~use_tables:true ctx body_ty
+  | None -> (
+    let use_decl_jkind () = Solver.ckind_of_jkind ctx decl.type_jkind in
+    match decl.type_kind with
+    (* For abstract types and allow_any_crossing types, derive the ikind from
+       the jkind annotation instead of computing it from the type declaration's
+       body. *)
+    | _ when type_decl_allows_any_crossing decl -> use_decl_jkind ()
+    | Types.Type_abstract _ | Types.Type_open -> use_decl_jkind ()
+    | Types.Type_record (lbls, rep, _umc_opt) ->
+      let base =
+        let base_lat, source =
+          match rep with
+          | Types.Record_unboxed -> Axis_lattice.immediate, "unboxed records"
+          (* CR box: This will no longer be [non_float] once we update the
+             representation of singleton float64 records *)
+          | _ -> Axis_lattice.immutable_data, "boxed records"
+        in
+        Ldd.const base_lat |> decl_base_provenance ctx source
+      in
+      sum_record_label_contributions ~ctx ~base
+        ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
+        ~validate_label:no_validation lbls
+    | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
+      let base =
+        Ldd.const Axis_lattice.immediate
+        |> decl_base_provenance ctx "unboxed records"
+      in
+      sum_record_label_contributions ~ctx ~base
+        ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
+        ~validate_label:validate_immutable_unboxed_label lbls
+    | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
+      (* [Variant_with_null] (i.e. [or_null]) has semantics that are not
+         captured by its constructors: nullability/separability and
+         mode-crossing are baked into its representation. We defer to jkinds
+         because ikinds cannot express this today. This deferral can be removed
+         once separability and nullability become layout properties rather than
+         modal axes. *)
+      use_decl_jkind ()
+    | Types.Type_variant (cstrs, rep, _umc_opt) ->
+      (* Choose base: immediate for void-only variants; otherwise immutable. *)
+      let all_args_void =
+        List.for_all
+          (fun (c : Types.constructor_declaration) ->
+            match c.cd_args with
+            | Types.Cstr_tuple args ->
+              List.for_all
+                (fun (arg : Types.constructor_argument) ->
+                  match arg.ca_sort with
+                  | Some sort -> Jkind_types.Sort.Const.all_void sort
+                  | None -> false)
+                args
+            | Types.Cstr_record lbls ->
+              List.for_all
+                (fun (lbl : Types.label_declaration) ->
+                  match lbl.ld_sort with
+                  | Some sort -> Jkind_types.Sort.Const.all_void sort
+                  | None -> false)
+                lbls)
+          cstrs
+      in
+      let base =
+        let base_lat, source =
+          match rep with
+          | Types.Variant_unboxed -> Axis_lattice.immediate, "unboxed variants"
+          | _ ->
+            if all_args_void
+            then Axis_lattice.immediate, "enumeration variants"
+            else Axis_lattice.immutable_data, "boxed variants"
+        in
+        Ldd.const base_lat |> decl_base_provenance ctx source
+      in
+      let payload_kind_of_constructor =
+        make_gadt_payload_projector ~decl_params:decl.type_params ctx
+      in
+      let constructor_contrib (c : Types.constructor_declaration) =
+        let payload_kind = payload_kind_of_constructor c in
+        match c.cd_args with
+        | Types.Cstr_tuple args ->
+          Ldd.sum args ~base:Ldd.bot
+            ~f:(fun (arg : Types.constructor_argument) ->
+              let mask = Axis_lattice.mask_of_modality arg.ca_modalities in
+              Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
+        | Types.Cstr_record lbls ->
+          sum_record_label_contributions ~ctx ~base:Ldd.bot ~payload_kind
+            ~validate_label:no_validation lbls
+      in
+      Ldd.sum cstrs ~base ~f:constructor_contrib)
+
+let type_decl_constr_decl (decl : Types.type_declaration) : Solver.constr_decl =
+  let abstract =
+    match decl.type_manifest, decl.type_kind with
+    | None, Types.Type_abstract _ -> not (Jkind.is_best decl.type_jkind)
+    | _ -> false
+  in
+  let kind ctx = type_decl_rhs_kind_poly ctx decl in
+  Solver.Ty { args = decl.type_params; kind; abstract }
 
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
@@ -718,144 +1377,9 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
   | type_decl ->
     (* Here we can switch to using the cached ikind or not. *)
     let fallback () =
-      (* When we have no stored ikind, we go to this fallback and compute. *)
-      match type_decl.type_manifest with
-      | Some body_ty ->
-        (* Concrete: compute kind of body. *)
-        let args = type_decl.type_params in
-        let kind : Solver.ckind =
-         fun ctx -> Solver.kind ~use_tables:true ctx body_ty
-        in
-        Solver.Ty { args; kind; abstract = false }
-      | None -> (
-        (* No manifest: may still be "concrete" (record/variant/...).
-           Build ckind. *)
-        let allow_any_crossing =
-          match type_decl.type_kind with
-          | Types.Type_record (_, _, umc_opt)
-          | Types.Type_record_unboxed_product (_, _, umc_opt)
-          | Types.Type_variant (_, _, umc_opt) ->
-            Option.is_some umc_opt
-          | Types.Type_abstract _ | Types.Type_open -> false
-        in
-        let use_decl_jkind ~treat_as_abstract =
-          let kind : Solver.ckind =
-           fun ctx -> Solver.ckind_of_jkind ctx type_decl.type_jkind
-          in
-          Solver.Ty
-            { args = type_decl.type_params; kind; abstract = treat_as_abstract }
-        in
-        match type_decl.type_kind with
-        (* For abstract types and allow_any_crossing types, we derive the
-           ikind from the jkind annotation, instead of computing it from
-           the type declaration's body: *)
-        | _ when allow_any_crossing -> use_decl_jkind ~treat_as_abstract:false
-        | Types.Type_abstract _ ->
-          use_decl_jkind
-            ~treat_as_abstract:(not (Jkind.is_best type_decl.type_jkind))
-        (* For other cases, we compute the ikind from the type definition{} *)
-        | Types.Type_record (lbls, rep, _umc_opt) ->
-          (* Build from components: base (non-float value) + per-label
-             contributions. *)
-          let immutable_base =
-            Ldd.const
-              (match rep with
-              | Types.Record_unboxed -> Axis_lattice.immediate
-              (* CR box: This will no longer be [non_float] once we update the
-                 representation of singleton float64 records *)
-              | _ -> Axis_lattice.immutable_data)
-          in
-          let kind : Solver.ckind =
-           fun (ctx : Solver.ctx) ->
-            sum_record_label_contributions ~base:immutable_base
-              ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-              ~validate_label:no_validation lbls
-          in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
-        | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
-          let kind : Solver.ckind =
-           fun (ctx : Solver.ctx) ->
-            let base = Ldd.const Axis_lattice.immediate in
-            sum_record_label_contributions ~base
-              ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-              ~validate_label:validate_immutable_unboxed_label lbls
-          in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
-        | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
-          (* [Variant_with_null] (i.e. [or_null]) has semantics that are not
-             captured by its constructors: nullability/separability and
-             mode-crossing are baked into its representation. We defer to
-             jkinds because ikinds cannot express this today. This deferral
-             can be removed once separability and nullability become layout
-             properties rather than modal axes. *)
-          use_decl_jkind ~treat_as_abstract:false
-        | Types.Type_variant (cstrs, rep, _umc_opt) ->
-          (* Choose base: immediate for void-only variants; sync if any record
-             field is atomic; mutable if any non-atomic mutable field appears;
-             otherwise immutable. *)
-          let all_args_void =
-            List.for_all
-              (fun (c : Types.constructor_declaration) ->
-                match c.cd_args with
-                | Types.Cstr_tuple args ->
-                  List.for_all
-                    (fun (arg : Types.constructor_argument) ->
-                      match arg.ca_sort with
-                      | Some sort -> Jkind_types.Sort.Const.all_void sort
-                      | None -> false)
-                    args
-                | Types.Cstr_record lbls ->
-                  List.for_all
-                    (fun (lbl : Types.label_declaration) ->
-                      match lbl.ld_sort with
-                      | Some sort -> Jkind_types.Sort.Const.all_void sort
-                      | None -> false)
-                    lbls)
-              cstrs
-          in
-          let kind : Solver.ckind =
-           fun (ctx : Solver.ctx) ->
-            let base_lat0 =
-              match rep with
-              | Types.Variant_unboxed -> Axis_lattice.immediate
-              | _ ->
-                if all_args_void
-                then Axis_lattice.immediate
-                else Axis_lattice.immutable_data
-            in
-            let payload_kind_of_constructor =
-              make_gadt_payload_projector ~decl_params:type_decl.type_params ctx
-            in
-            let constructor_contrib (c : Types.constructor_declaration) =
-              let payload_kind = payload_kind_of_constructor c in
-              match c.cd_args with
-              | Types.Cstr_tuple args ->
-                Ldd.sum args ~base:Ldd.bot
-                  ~f:(fun (arg : Types.constructor_argument) ->
-                    let mask =
-                      Axis_lattice.mask_of_modality arg.ca_modalities
-                    in
-                    Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
-              | Types.Cstr_record lbls ->
-                sum_record_label_contributions ~base:Ldd.bot ~payload_kind
-                  ~validate_label:no_validation lbls
-            in
-            Ldd.sum cstrs ~base:(Ldd.const base_lat0) ~f:constructor_contrib
-          in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
-        | Types.Type_open ->
-          (* Use the stored jkind here in case it is `exn`,
-             which is special. *)
-          use_decl_jkind ~treat_as_abstract:false
-        (*
-           (* This is the code we'd use otherwise *)
-           let kind : Solver.ckind =
-            fun _ctx ->
-             Ldd.const Axis_lattice.nonfloat_value
-           in
-           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
-        *)
-        )
+      (* When we have no stored ikind, compute from the declaration through the
+         same RHS builder used for bound diagnostics. *)
+      type_decl_constr_decl type_decl
     in
     (* Prefer a stored constructor ikind if one is present and enabled. *)
     let ikind =
@@ -959,13 +1483,10 @@ type subcheck_polys =
     fast_path : subcheck_fast_path
   }
 
-(* Compute polynomials for a subcheck:
-   - compute [super] in Normal mode
-   - fast path: if [super] is constant top, no need to compute [sub]
-   - otherwise, if [super] is constant, try the lhs mod-bounds floor fast path
-   - otherwise, only round up [sub] if [super] is constant *)
-let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
-    (super : ('l2 * 'r2) Types.jkind) : subcheck_polys =
+let compute_bound_polys env (super : ('l2 * 'r2) Types.jkind)
+    ~(lhs_floor : (Solver.ctx -> Ldd.node option) option)
+    ~(lhs : Solver.ctx -> Ldd.node) : subcheck_polys =
+  Provenance.reset ();
   let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
   let super_poly = Solver.ckind_of_jkind ctx super in
   let super_is_constant =
@@ -984,16 +1505,19 @@ let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
     let floor_fast_path =
       if super_is_constant
       then
-        match Solver.mod_bounds_floor_of_jkind ctx sub with
+        match lhs_floor with
         | None -> None
-        | Some lhs_floor ->
-          let lhs_floor_or_super = Ldd.join lhs_floor super_poly in
-          if
-            Axis_lattice.equal
-              (Ldd.round_up lhs_floor_or_super)
-              Axis_lattice.top
-          then Some lhs_floor
-          else None
+        | Some lhs_floor -> (
+          match lhs_floor ctx with
+          | None -> None
+          | Some lhs_floor ->
+            let lhs_floor_or_super = Ldd.join lhs_floor super_poly in
+            if
+              Axis_lattice.equal
+                (Ldd.round_up lhs_floor_or_super)
+                Axis_lattice.top
+            then Some lhs_floor
+            else None)
       else None
     in
     match floor_fast_path with
@@ -1003,36 +1527,126 @@ let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
         fast_path = Lhs_mod_bounds_floor_fast_path
       }
     | None ->
-      let sub_ctx =
+      let lhs_ctx =
         if super_is_constant
         then Solver.reset_for_mode ctx ~mode:Solver.Round_up
         else ctx
       in
-      let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
-      { lhs_for_leq = sub_poly;
+      let lhs_poly = lhs lhs_ctx in
+      { lhs_for_leq = lhs_poly;
         rhs_for_leq = super_poly;
         fast_path = No_fast_path
       }
 
-let sub_jkind_l ?allow_any_crossing ?origin
+(* Compute polynomials for a subcheck:
+   - compute [super] in Normal mode
+   - fast path: if [super] is constant top, no need to compute [sub]
+   - otherwise, if [super] is constant, try the lhs mod-bounds floor fast path
+   - otherwise, only round up [sub] if [super] is constant *)
+let compute_subcheck_polys ~context:_ env (sub : ('l1 * 'r1) Types.jkind)
+    (super : ('l2 * 'r2) Types.jkind) : subcheck_polys =
+  compute_bound_polys env super
+    ~lhs_floor:(Some (fun ctx -> Solver.mod_bounds_floor_of_jkind ctx sub))
+    ~lhs:(fun ctx -> Solver.ckind_of_jkind ctx sub)
+
+let compute_provenance_bound_polys ~decl_uid_under_check env
+    ~(lhs : Solver.ctx -> Ldd.node) (bound : Types.jkind_l) : subcheck_polys =
+  compute_bound_polys env bound ~lhs_floor:None ~lhs:(fun ctx ->
+      let ctx = Solver.with_provenance ~decl_uid_under_check ctx in
+      lhs ctx)
+
+let check_mode_crossing_polys ~origin:_ ~sub_jkind:_ ~super_jkind ~printing_env
+    { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path = _ } =
+  let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
+  match violating_axes with
+  | [] -> Ok ()
+  | _ ->
+    Error
+      (Mode_crossing_error
+         { printing_env;
+           super_jkind;
+           sub_poly;
+           super_poly;
+           provenances = Provenance.all ();
+           violating_axes;
+           provenance_residuals = None
+         })
+
+let subjkind_error_with_provenance_residuals = function
+  | Jkind_error _ -> None
+  | Mode_crossing_error
+      ({ sub_poly; super_poly; provenances; violating_axes; _ } as error) -> (
+    match
+      provenance_residuals ~provenances ~violating_axes ~sub_poly ~super_poly
+    with
+    | None | Some [] -> None
+    | Some (_ :: _ as provenance_residuals) ->
+      Some
+        (Mode_crossing_error
+           { error with provenance_residuals = Some provenance_residuals }))
+
+let same_axis_set axes1 axes2 =
+  let of_list =
+    List.fold_left
+      (fun set (Jkind_axis.Axis.Pack axis) -> Jkind_axis.Axis_set.add set axis)
+      Jkind_axis.Axis_set.empty
+  in
+  Jkind_axis.Axis_set.equal (of_list axes1) (of_list axes2)
+
+let subjkind_errors_have_same_violating_axes error1 error2 =
+  match error1, error2 with
+  | ( Mode_crossing_error { violating_axes = axes1; _ },
+      Mode_crossing_error { violating_axes = axes2; _ } ) ->
+    same_axis_set axes1 axes2
+  | Jkind_error _, _ | _, Jkind_error _ -> false
+
+let best_effort_provenance_error ~fallback_error ~origin ~sub_jkind ~super_jkind
+    ~printing_env actual_error make_polys =
+  let fallback error =
+    match fallback_error () with
+    | None -> Error error
+    | Some fallback_error -> Error fallback_error
+  in
+  let select_provenance_error () =
+    match
+      check_mode_crossing_polys ~origin ~sub_jkind ~super_jkind ~printing_env
+        (make_polys ())
+    with
+    | Ok () -> None
+    | Error provenance_error ->
+      if subjkind_errors_have_same_violating_axes actual_error provenance_error
+      then subjkind_error_with_provenance_residuals provenance_error
+      else None
+  in
+  let provenance_error =
+    match select_provenance_error () with
+    | provenance_error -> provenance_error
+    | exception
+        ((Misc.Fatal_error _ | Stack_overflow | Out_of_memory | Sys.Break) as exn)
+      ->
+      raise exn
+    | exception _ -> None
+  in
+  match provenance_error with
+  | None -> fallback actual_error
+  | Some provenance_error -> Error provenance_error
+
+let sub_jkind_l ?(allow_any_crossing = false) ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) env (sub : Types.jkind_l)
-    (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
+    (super : Types.jkind_l) : (unit, subjkind_error) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
   if not (enable_sub_jkind_l && !Clflags.ikinds)
-  then Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context env sub super
+  then
+    Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env sub super
+    |> map_jkind_error
   else
     (* Check layouts first; if that fails, print both sides with full
        info and return the error. *)
     let* () =
-      match Jkind.sub_layout_or_error ~context env sub super with
-      | Ok () -> Ok ()
-      | Error v -> Error v
+      Jkind.sub_layout_or_error ~context env sub super |> map_jkind_error
     in
-    let allow_any =
-      match allow_any_crossing with Some true -> true | _ -> false
-    in
-    if allow_any
+    if allow_any_crossing
     then (
       (if !Clflags.ikinds_debug
        then
@@ -1040,40 +1654,77 @@ let sub_jkind_l ?allow_any_crossing ?origin
          Format.eprintf "[ikind-subjkind] call%s allow_any=true@." origin_suffix);
       Ok ())
     else
-      let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; fast_path } =
-        compute_subcheck_polys ~context env sub super
-      in
-      let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
-      (if !Clflags.ikinds_debug
-       then
-         let origin_suffix = origin_suffix_of origin in
-         let fast_path =
-           match fast_path with
-           | No_fast_path -> "none"
-           | Rhs_top_fast_path -> "rhs_top"
-           | Lhs_mod_bounds_floor_fast_path -> "lhs_mod_bounds_floor"
-         in
-         Format.eprintf
-           "[ikind-subjkind] call%s allow_any=false fast_path=%s@;\
-            @;\
-            sub_poly=%s@;\
-            super_poly=%s@."
-           origin_suffix fast_path (Ldd.pp sub_poly) (Ldd.pp super_poly));
-      match violating_axes with
-      | [] -> Ok ()
-      | _ ->
-        let () =
-          if !Clflags.ikinds_debug
-          then
-            let axes = pp_axes violating_axes in
-            Format.eprintf "[ikind-subjkind] failure on axes: %s@." axes
+      let subcheck_polys = compute_subcheck_polys ~context env sub super in
+      match
+        check_mode_crossing_polys ~origin ~sub_jkind:sub ~super_jkind:super
+          ~printing_env:env subcheck_polys
+      with
+      | Ok () -> Ok ()
+      | Error ikind_error -> (
+        if !Clflags.ikinds_debug
+        then Error ikind_error
+        else
+          match
+            Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env sub
+              super
+          with
+          | Ok () -> Error ikind_error
+          | Error jkind_error -> Error (Jkind_error jkind_error))
+
+let check_bound ?(allow_any_crossing = false) ?origin ~decl_uid_under_check
+    ~type_equal ~context env ~actual ~bound ~provenance_lhs =
+  if not (enable_sub_jkind_l && !Clflags.ikinds)
+  then
+    sub_jkind_l ~allow_any_crossing ?origin ~type_equal ~context env actual
+      bound
+  else
+    let open Misc.Stdlib.Monad.Result.Syntax in
+    let* () =
+      Jkind.sub_layout_or_error ~context env actual bound |> map_jkind_error
+    in
+    if allow_any_crossing
+    then Ok ()
+    else
+      let actual_polys = compute_subcheck_polys ~context env actual bound in
+      match
+        check_mode_crossing_polys ~origin ~sub_jkind:actual ~super_jkind:bound
+          ~printing_env:env actual_polys
+      with
+      | Ok () -> Ok ()
+      | Error actual_error ->
+        let fallback_error () =
+          match
+            Jkind.sub_jkind_l ~allow_any_crossing ~type_equal ~context env
+              actual bound
+          with
+          | Ok () ->
+            let violating_axes =
+              match actual_error with
+              | Mode_crossing_error { violating_axes; _ } -> violating_axes
+              | Jkind_error _ -> []
+            in
+            let axis_reasons = axis_disagreement_reasons violating_axes in
+            Some
+              (Jkind_error
+                 (Jkind.Violation.of_ ~context env
+                    (Jkind.Violation.Not_a_subjkind (actual, bound, axis_reasons))))
+          | Error jkind_error -> Some (Jkind_error jkind_error)
         in
-        (* Do not try to adjust allowances; Violation.Not_a_subjkind
-           accepts an r-jkind. *)
-        let axis_reasons = axis_disagreement_reasons violating_axes in
-        Error
-          (Jkind.Violation.of_ ~context env
-             (Jkind.Violation.Not_a_subjkind (sub, super, axis_reasons)))
+        best_effort_provenance_error ~fallback_error ~origin ~sub_jkind:actual
+          ~super_jkind:bound ~printing_env:env actual_error (fun () ->
+            compute_provenance_bound_polys ~decl_uid_under_check env
+              ~lhs:provenance_lhs bound)
+
+let check_type_expr_bound ?origin ~type_equal ~context env ~ty ~actual ~bound =
+  check_bound ?origin ~decl_uid_under_check:None ~type_equal ~context env
+    ~actual ~bound ~provenance_lhs:(fun ctx ->
+      Solver.kind ~use_tables:true ctx ty)
+
+let check_type_decl_bound ?allow_any_crossing ?origin ~type_equal ~context env
+    ~decl ~actual ~bound =
+  check_bound ?allow_any_crossing ?origin
+    ~decl_uid_under_check:(Some decl.Types.type_uid) ~type_equal ~context env
+    ~actual ~bound ~provenance_lhs:(fun ctx -> type_decl_rhs_kind_poly ctx decl)
 
 let crossing_of_jkind ~(context : Jkind.jkind_context) env
     (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
@@ -1308,6 +1959,7 @@ let substitute_decl_ikind_with_lookup
     and map_name (expanding : Path.Set.t) (name : Ldd.Name.t) : Ldd.node =
       match name with
       | Param _ -> Ldd.node_of_var (Ldd.rigid name)
+      | Provenance _ -> Ldd.node_of_var (Ldd.rigid name)
       | Unknown _ -> Ldd.node_of_var (Ldd.rigid name)
       | KAtom path -> (
         match lookup_jkind path with

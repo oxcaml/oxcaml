@@ -13,7 +13,7 @@ let code inline(always) loopify(never) size(14) newer_version_of(min_0)
     | 0 -> k (y)
     | 1 -> k (x)
 in
-let $camlRay__min_4 = closure min_0_1 @min &toplevel.alloc_region in
+let $camlRay__min_2 = closure min_0_1 @min &toplevel.alloc_region in
 let code inline(always) loopify(never) size(14) newer_version_of(max_1)
       max_1_1 (x : float boxed, y : float boxed)
         my_closure &my_alloc_region my_depth
@@ -26,7 +26,7 @@ let code inline(always) loopify(never) size(14) newer_version_of(max_1)
     | 0 -> k (y)
     | 1 -> k (x)
 in
-let $camlRay__max_5 = closure max_1_1 @max &toplevel.alloc_region in
+let $camlRay__max_3 = closure max_1_1 @max &toplevel.alloc_region in
 let code loopify(never) size(222) newer_version_of(aabb_hit_2)
       aabb_hit_2_1
         (aabb : [ 0 of float ^ 3 * float ^ 3 ],
@@ -195,10 +195,10 @@ let code loopify(never) size(222) newer_version_of(aabb_hit_2)
                                          in
                                          cont k (Pnot))))))))
 in
-let $camlRay__aabb_hit_6 =
+let $camlRay__aabb_hit_4 =
   closure aabb_hit_2_1 @aabb_hit &toplevel.alloc_region
 in
 let $camlRay =
-  Block 0 ($camlRay__min_4, $camlRay__max_5, $camlRay__aabb_hit_6)
+  Block 0 ($camlRay__min_2, $camlRay__max_3, $camlRay__aabb_hit_4)
 in
 cont done ($camlRay)

@@ -2781,7 +2781,8 @@ exception Not_a_path
 let rec path_of_module mexp =
   match mexp.mod_desc with
   | Tmod_ident (p,_) -> p
-  | Tmod_apply(funct, arg, _coercion, _) when !Clflags.applicative_functors ->
+  | Tmod_apply (funct, arg, _coercion, _, _)
+    when !Clflags.applicative_functors ->
       Papply(path_of_module funct, path_of_module arg)
   | Tmod_constraint (mexp, _, _, _) ->
       path_of_module mexp
@@ -3278,14 +3279,25 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           (smod.pmod_loc, Functor)
           closed_over_mode.comonadic env
       in
+      let staticity = Value.proj_monadic Staticity closed_over_mode in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
         | Unit ->
+          Staticity.submode_err (smod.pmod_loc, Functor)
+            (Staticity.of_const ~hint:(Always_dynamic Generative_functor)
+               Dynamic)
+            staticity;
           Unit, Types.Unit, newenv, Shape.for_unnamed_functor_param, false
         | Named (param, smty, smode) ->
           (* unspecified mode axes defaults to legacy *)
           let tmode = Typemode.transl_alloc_mode smode in
           let mode = Alloc.of_const tmode.mode_modes in
+          let param_st =
+            Staticity.apply_hint (Parameter_to_functor param.loc)
+              (Alloc.proj_monadic Staticity mode)
+          in
+          (* See Note [Staticity of functors] in [typedtree.mli] *)
+          Staticity.equate_err (smod.pmod_loc, Functor) staticity param_st;
           let mty = transl_modtype_functor_arg env smty in
           let scope = Ctype.create_scope () in
           let (id, newenv, var) =
@@ -3329,7 +3341,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             Alloc.submode_exn (Alloc.close_over param_mode) ret_mode);
          Alloc.submode_exn (Alloc.partial_apply alloc_mode) ret_mode
        | _ -> ());
-      { mod_desc = Tmod_functor(t_arg, body);
+      { mod_desc =
+          Tmod_functor (t_arg, body, Staticity.disallow_left staticity);
         mod_type = Mty_functor(ty_arg, body.mod_type, ret_mode);
         mod_mode = Value.disallow_right closed_over_mode, None;
         mod_env = env;
@@ -3691,13 +3704,30 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_curried_application_complete
         ~loc:app_loc ~mty_res:mty_appl ~mode_res:mm_res
         ~mode_arg:(Some mm_param);
+      let mode_funct = mode_without_locks_exn funct.mod_mode in
+      let funct_staticity = Value.proj_monadic Staticity mode_funct in
+      (* The following [submode] recovers the functor's original staticity [m].
+         See Note [Staticity of functors] in [typedtree.mli] *)
+      let staticity =
+        Staticity.apply_hint (Parameter_to_functor Location.none)
+          (Value.proj_monadic Staticity mm_param)
+      in
+      Staticity.submode_err (funct.mod_loc, Functor) funct_staticity staticity;
+      let mm_res =
+        Value.join
+          [ Value.disallow_right mm_res;
+            Value.min_with_monadic Staticity
+              (Staticity.apply_hint (Functor_to_application funct.mod_loc)
+                 funct_staticity) ]
+      in
       { mod_desc =
           Tmod_apply
             (funct, arg, coercion,
              functor_application_yielding ~funct
-               ~arg_mode:(fst arg.mod_mode));
+               ~arg_mode:(fst arg.mod_mode),
+             Staticity.disallow_left staticity);
         mod_type = mty_appl;
-        mod_mode = Value.disallow_right mm_res, None;
+        mod_mode = mm_res, None;
         mod_env = env;
         mod_attributes = app_attributes;
         mod_loc = app_loc },
@@ -4355,25 +4385,29 @@ and normalize_signature_item = function
 
 let type_module_type_of env smod =
   let remove_aliases = has_remove_aliases_attribute smod.pmod_attributes in
-  let tmty =
+  let tmty, skip_nongen_check =
     match smod.pmod_desc with
     | Pmod_ident lid -> (* turn off strengthening in this case *)
         let path, md, (mode, locks) =
           Env.lookup_module ~loc:smod.pmod_loc lid.txt env
+        in
+        let skip_nongen_check =
+          List.for_all Ident.is_global (Path.heads path)
         in
           { mod_desc = Tmod_ident (path, lid);
             mod_type = md.md_type;
             mod_mode = mode, Some (locks, lid.txt, lid.loc);
             mod_env = env;
             mod_attributes = smod.pmod_attributes;
-            mod_loc = smod.pmod_loc }
+            mod_loc = smod.pmod_loc },
+          skip_nongen_check
     | _ ->
         let me, _shape = type_module env smod in
-        me
+        me, false
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
   (* PR#5036: must not contain non-generalized type variables *)
-  check_nongen_modtype env smod.pmod_loc mty;
+  if not skip_nongen_check then check_nongen_modtype env smod.pmod_loc mty;
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
@@ -4867,6 +4901,173 @@ let type_interface ~sourcefile modulename env ast =
 
 (* "Packaging" of several compilation units into one unit
    having them as sub-modules.  *)
+
+(* Build the signature exposed by a [-functorize] bundle. Roughly:
+
+   {[
+     module Intf : functor (P1) ... (Pn) -> sig
+       module type S = sig
+         module M1 : <sig of M1>
+         ...
+         module Mk : <sig of Mk>
+       end
+     end
+     module Make : functor (P1) ... (Pn) (_ : unit) -> Intf(P1)...(Pn).S
+   ]}
+
+   where [P1..Pn] are the bundle's parameters and [M1..Mk] are the bundled
+   modules. *)
+let functorize_signature ~params ~modules : Types.signature =
+  let make_md md_type : Types.module_declaration =
+    { md_type;
+      md_modalities = Modality.(Const.id |> of_const);
+      md_attributes = [];
+      md_loc = Location.none;
+      md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+    }
+  in
+  let wrap_in_named_functor_layers params (body : Types.module_type)
+        : Types.module_type =
+    List.fold_right
+      (fun (p_name, param_id) body ->
+        let impl, param_params, (swg : Signature_with_global_bindings.t) =
+          Env.find_import ~chain:[]
+            (Compilation_unit.Name.of_parameter_name p_name)
+        in
+        assert (Option.is_none impl);
+        assert (List.is_empty param_params);
+        assert (Array.length swg.bound_globals = 0);
+        let sign, _ = swg.sign in
+        let param_type = Mty_signature (Subst.Lazy.force_signature sign) in
+        Mty_functor
+          (Named (Some param_id, param_type, Alloc.legacy), body, Alloc.legacy))
+      params body
+  in
+  let body =
+    List.map
+      (fun (id, sign) ->
+        Sig_module
+          (id, Mp_present, make_md (Mty_signature sign), Trec_not, Exported))
+      modules
+  in
+  let intf_id = Ident.create_local "Intf" in
+  let make_id = Ident.create_local "Make" in
+  let s_id = Ident.create_local "S" in
+  let s_decl : Types.modtype_declaration =
+    { mtd_type = Some (Mty_signature body);
+      mtd_attributes = [];
+      mtd_loc = Location.none;
+      mtd_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+    }
+  in
+  let intf_result = [ Sig_modtype (s_id, s_decl, Exported) ] in
+  let intf_mty =
+    wrap_in_named_functor_layers params (Mty_signature intf_result)
+  in
+  (* Fresh idents so [Make]'s binders are distinct from [Intf]'s. *)
+  let make_params =
+    List.map (fun (p_name, id) -> (p_name, Ident.rename id)) params
+  in
+  let intf_applied_path =
+    List.fold_left
+      (fun p (_p_name, arg_id) -> Path.Papply (p, Path.Pident arg_id))
+      (Path.Pident intf_id) make_params
+  in
+  let make_result = Mty_ident (Path.Pdot (intf_applied_path, "S")) in
+  let make_with_unit = Mty_functor (Unit, make_result, Alloc.legacy) in
+  let make_mty = wrap_in_named_functor_layers make_params make_with_unit in
+  [
+    Sig_module (intf_id, Mp_present, make_md intf_mty, Trec_not, Exported);
+    Sig_module (make_id, Mp_present, make_md make_mty, Trec_not, Exported);
+  ]
+
+let functorize_interface initial_env ~params ~module_sigs unit_info
+      modulename =
+  let sg = functorize_signature ~params ~modules:module_sigs in
+  Ident.reinit ();
+  if not !Clflags.dont_write_files then begin
+    let name = Compilation_unit.name modulename in
+    let kind =
+      Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+    in
+    let cmi =
+      Env.save_signature ~alerts:Misc.Stdlib.String.Map.empty
+        (sg, Staticity.Dynamic) name kind (Unit_info.cmi unit_info)
+    in
+    let decl_deps = Cmt_format.get_declaration_dependencies () in
+    Cmt_format.save_cmt (Unit_info.cmti unit_info) modulename
+      Cmt_format.Functorize initial_env (Some cmi) None;
+    Cms_format.save_cms (Unit_info.cmsi unit_info) modulename
+      Cmt_format.Functorize initial_env None decl_deps
+  end
+
+let functorize_implementation initial_env ~params ~modules ~module_sigs
+      unit_info modulename =
+  let sg = functorize_signature ~params ~modules:module_sigs in
+  Ident.reinit ();
+  if !Clflags.dont_write_files then Tcoerce_none
+  else begin
+    (* Build cmt/cms artifacts directly via [Artifact.from_filename] so they
+       get [raw_source_file = None].  The bundle has no source [.ml]; passing
+       the output (the [source_file] [unit_info] was built with) would make
+       [save_cmt]/[save_cms] [Digest.file] it, which doesn't exist yet at
+       type-check time.  The cmt's [Functorize] binary_annots variant already
+       records that this was a functorize output. *)
+    let for_pack_prefix = Compilation_unit.for_pack_prefix modulename in
+    let target_artifact ext =
+      let filename = Unit_info.prefix unit_info ^ ext in
+      Unit_info.Artifact.from_filename ~for_pack_prefix filename
+    in
+    let save_cmt_cms cmi_opt =
+      let decl_deps = Cmt_format.get_declaration_dependencies () in
+      Cmt_format.save_cmt (target_artifact ".cmt") modulename
+        Cmt_format.Functorize initial_env cmi_opt None;
+      Cms_format.save_cms (target_artifact ".cms") modulename
+        Cmt_format.Functorize initial_env None decl_deps
+    in
+    match !Clflags.cmi_file with
+    | Some cmi_file ->
+        let shape =
+          let uid = Uid.of_compilation_unit_id modulename in
+          List.fold_left
+            (fun map gm ->
+              let name =
+                Global_module.Name.to_string (Global_module.to_name gm)
+              in
+              let id = Ident.create_persistent name in
+              Shape.Map.add_module map id (Shape.for_persistent_unit name))
+            Shape.Map.empty modules
+          |> Shape.str ~uid
+        in
+        let cmi_artifact =
+          Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
+        in
+        let name = Compilation_unit.to_global_name_without_prefix modulename in
+        let dclsig, staticity = Env.read_signature name cmi_artifact in
+        let cc, _shape =
+          let modes =
+            Includecore.Specific
+              ((Persistent_env.mode_pers_mod Staticity.Dynamic, None),
+               Persistent_env.mode_pers_mod staticity)
+          in
+          Includemod.compunit initial_env ~mark:true
+            "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
+        in
+        save_cmt_cms None;
+        cc
+    | None ->
+        let name = Compilation_unit.name modulename in
+        let kind =
+          Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
+        in
+        let cmi =
+          Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
+            (sg, Staticity.Dynamic) name kind (Unit_info.cmi unit_info)
+            (Array.of_list (Env.imports ()))
+        in
+        save_cmt_cms (Some cmi);
+        Tcoerce_none
+  end
 
 let package_signatures units =
   let units_with_ids =

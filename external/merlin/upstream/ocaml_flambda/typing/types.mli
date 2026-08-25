@@ -111,6 +111,20 @@ module Rigid_name : sig
         (** [Param id] only occurs in formulas for type constructors. Refers to
             a type-parameter of the constructor, where [id] is the
             [Types.get_id] of the type variable representing the parameter. *)
+    | Provenance of
+        { id : int;
+          (** Identifies this provenance occurrence. *)
+
+          ty : Format_doc.doc;
+          (** The type expression or descriptive noun phrase, retained as a
+              formatting document so its line-breaking instructions survive
+              until the diagnostic is printed. *)
+
+          plural : bool
+          (** Whether [ty] is a plural noun phrase rather than a type. *)
+        }
+        (** A diagnostic-only provenance variable. These variables must not
+            appear in stored [type_ikind]s. *)
     | Unknown of unknown_id
         (** An unknown quantity with a given id. Used to model not-best in
             ikinds. This is used when we couldn't compute a precise ikind,
@@ -127,6 +141,8 @@ module Rigid_name : sig
   val katom : Path.t -> t
 
   val param : int -> t
+
+  val provenance : id:int -> ty:Format_doc.doc -> plural:bool -> t
 
   val unknown : Shape.Uid.t -> t
 
@@ -970,16 +986,21 @@ and record_representation =
      until we know the kinds of the fields.
 
      After [update_decls_jkind], no record should have this representation. *)
-  | Record_variable
+  | Record_undetermined
   (* Used after [update_decls_jkind] for non-inlined records whose
      representation cannot be determined because at least one field has layout
-     [any]. The actual representation is decided at construction sites. *)
+     [any]. When typing uses, this is replaced by [Record_variable]. *)
+  | Record_variable of (Jkind_types.Sort.t * type_expr) array
+  (* What [Record_undetermined] becomes after typechecking a use of the record.
+     In translation, this refines to [Record_{boxed,mixed}]. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
-  | Record_unboxed_product_variable
-  (* Counterpart of [Record_variable] for unboxed product records that have at
-     least one field of layout [any]. *)
+  | Record_unboxed_product_undetermined
+  (* Counterpart of [Record_undetermined] for unboxed records. When typing uses,
+     this is replaced by [Record_unboxed_product_variable].*)
+  | Record_unboxed_product_variable of Jkind_types.Sort.t array
+  (* Counterpart of [Record_variable] for unboxed records. *)
 
 and variant_representation =
   | Variant_unboxed
@@ -1003,10 +1024,10 @@ and cstr_layout =
            [Constructor_mixed] if the inlined record has any unboxed fields.
         *)
       }
-  | Cstr_layout_variable
+  | Cstr_layout_undetermined
   (* The constructor's payload contains a field of layout [any], so neither
      its [shape] nor the [sorts] of its arguments can be determined at
-     typedecl time. Counterpart of [Record_variable] for variants. *)
+     typedecl time. Counterpart of [Record_undetermined] for variants. *)
   (* CR layouts v3.5: A custom variant representation for ['a or_null].
      Eventually, it should likely be merged into [Variant_unboxed], with
      [Variant_unboxed] allowing either one ordinary constructor, or one
@@ -1020,9 +1041,13 @@ and constructor_representation =
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
-  | Constructor_variable
+  | Constructor_undetermined
   (* The constructor has an inlined record argument with a field of layout
      [any], so its shape cannot be determined at typedecl time. *)
+  | Constructor_variable of (Jkind_types.Sort.t * type_expr) array
+  (* What [Constructor_undetermined] becomes after typechecking a use of the
+     constructor. Like [Record_variable], only ever appears in the typedtree,
+     never in a type declaration. *)
 
 and label_declaration =
   {

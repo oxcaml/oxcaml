@@ -43,8 +43,6 @@ let dummy_record_repres = Record_boxed
 
 let dummy_record_unboxed_product_repres = Record_unboxed_product
 
-let dummy_record_sorts = Fixed
-
 let mkTvar name = Tvar { name; jkind = dummy_jkind }
 
 let mkTarrow (label, t1, t2, comm) =
@@ -410,27 +408,24 @@ type tpat_construct_type_arg =
 let mkTpat_construct ?id:(repres = dummy_ctor_repres) (id, ctor, args, ty) =
   Tpat_construct (id, ctor, repres, args, ty)
 
-type tpat_record_identifier =
-  Typedtree.record_sorts * Types.record_representation
+type tpat_record_identifier = Types.record_representation
 
 let mkTpat_record ?id (args, closed) =
-  let sorts, repres =
-    match id with
-    | Some (sorts, repres) -> sorts, repres
-    | None -> dummy_record_sorts, dummy_record_repres
+  let repres =
+    match id with Some repres -> repres | None -> dummy_record_repres
   in
-  Tpat_record (args, sorts, repres, closed)
+  Tpat_record (args, repres, closed)
 
 type tpat_record_unboxed_product_identifier =
-  Typedtree.record_sorts * Types.record_unboxed_product_representation
+  Types.record_unboxed_product_representation
 
 let mkTpat_record_unboxed_product ?id (args, closed) =
-  let sorts, repres =
+  let repres =
     match id with
-    | Some (sorts, repres) -> sorts, repres
-    | None -> dummy_record_sorts, dummy_record_unboxed_product_repres
+    | Some repres -> repres
+    | None -> dummy_record_unboxed_product_repres
   in
-  Tpat_record_unboxed_product (args, sorts, repres, closed)
+  Tpat_record_unboxed_product (args, repres, closed)
 
 type 'a matched_pattern_desc =
   | Tpat_var :
@@ -488,10 +483,9 @@ let view_tpat (type a) (p : a pattern_desc) : a matched_pattern_desc =
     Tpat_tuple (pats, labels)
   | Tpat_construct (id, ctor, repres, args, ty) ->
     Tpat_construct (id, ctor, args, ty, repres)
-  | Tpat_record (args, sorts, repres, closed) ->
-    Tpat_record (args, closed, (sorts, repres))
-  | Tpat_record_unboxed_product (args, sorts, repres, closed) ->
-    Tpat_record_unboxed_product (args, closed, (sorts, repres))
+  | Tpat_record (args, repres, closed) -> Tpat_record (args, closed, repres)
+  | Tpat_record_unboxed_product (args, repres, closed) ->
+    Tpat_record_unboxed_product (args, closed, repres)
   | _ -> O p
 
 type tstr_eval_identifier = Jkind.sort
