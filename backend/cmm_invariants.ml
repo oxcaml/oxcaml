@@ -474,28 +474,24 @@ let rec infer_machtype env expr =
     check_machtype ~dbg
       ~what:(fun () -> "if-then-else condition")
       ~expected:typ_int cond_ty;
-    let branches_ty =
-      join_inferred_machtypes ~dbg (infer_machtype env ifso)
-        (infer_machtype env ifnot)
-    in
     match cond_ty with
     | Never_returns -> Never_returns
-    | Machtype _ -> branches_ty)
+    | Machtype _ ->
+      join_inferred_machtypes ~dbg (infer_machtype env ifso)
+        (infer_machtype env ifnot))
   | Cswitch (scrutinee, _, cases, dbg) -> (
     let scrutinee_ty = infer_machtype env scrutinee in
     check_machtype ~dbg
       ~what:(fun () -> "switch scrutinee")
       ~expected:typ_int scrutinee_ty;
-    let cases_ty =
+    match scrutinee_ty with
+    | Never_returns -> Never_returns
+    | Machtype _ ->
       join_inferred_machtype_list ~dbg
         (Array.to_list
            (Array.map
               (fun (case, _) -> infer_machtype env case)
-              cases))
-    in
-    match scrutinee_ty with
-    | Never_returns -> Never_returns
-    | Machtype _ -> cases_ty)
+              cases)))
   | Ccatch (_, handlers, body) ->
     let env =
       { env with
