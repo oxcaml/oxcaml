@@ -89,6 +89,9 @@ val lub_component :
     or equal to the second under the relation used by [lub_component]. *)
 val ge_component : machtype_component -> machtype_component -> bool
 
+(** Version of [ge_component] that doesn't raise for uncomparable components. *)
+val ge_component_bool : machtype_component -> machtype_component -> bool
+
 (** A variant of [machtype] used to describe arguments to external C functions
 *)
 type exttype =

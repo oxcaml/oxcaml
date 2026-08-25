@@ -384,11 +384,8 @@ let check_machtype ~dbg ~what ~expected (actual : inferred_machtype) =
                 while generic loads and calls produce them as [Val], so [Val]
                 flows into [Int] positions routinely. *)
              (equal_machtype_component expected_comp Int
-             && equal_machtype_component actual_comp Val)
-             ||
-             (* [ge_component] is fatal on incomparable components *)
-             (try ge_component expected_comp actual_comp
-              with Misc.Fatal_error -> false))
+               && equal_machtype_component actual_comp Val)
+             || ge_component_bool expected_comp actual_comp)
            expected actual
     in
     if not compatible
@@ -628,11 +625,7 @@ let check_machtypes (fundecl : fundecl) =
       return_type = fundecl.fun_ret_type
     }
   in
-  try
-    check_machtype ~dbg:fundecl.fun_dbg ~expected:fundecl.fun_ret_type
-      ~what:(fun () ->
-        Printf.sprintf "the body of %s" fundecl.fun_name.sym_name)
-      (infer_machtype env fundecl.fun_body)
-  with Misc.Fatal_error ->
-    Misc.fatal_errorf "Error happened while typechecking function %s; body:\n%a"
-      fundecl.fun_name.sym_name Printcmm.expression fundecl.fun_body
+  check_machtype ~dbg:fundecl.fun_dbg ~expected:fundecl.fun_ret_type
+    ~what:(fun () ->
+      Printf.sprintf "the body of %s" fundecl.fun_name.sym_name)
+    (infer_machtype env fundecl.fun_body)

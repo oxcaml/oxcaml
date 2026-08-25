@@ -122,7 +122,9 @@ let lub_component comp1 comp2 =
   | Valx2, _ | _, Valx2 ->
     Misc.fatal_errorf "Unexpected machtype_component Valx2"
 
-let ge_component comp1 comp2 =
+exception Incomparable_components
+
+let ge_component_result comp1 comp2 =
   match comp1, comp2 with
   | Int, Int -> true
   | Int, Addr -> false
@@ -147,12 +149,20 @@ let ge_component comp1 comp2 =
   | (Float | Float32), Mask
   | Float32, Float
   | Float, Float32 ->
+    raise Incomparable_components
+  | Valx2, _ | _, Valx2 ->
+    Misc.fatal_error "Unexpected machtype_component Valx2"
+
+let ge_component comp1 comp2 =
+  try ge_component_result comp1 comp2
+  with Incomparable_components ->
     Misc.fatal_errorf
       "Cmm.ge_component: unexpected machtype_component combination (%s, %s)"
       (string_of_machtype_component comp1)
       (string_of_machtype_component comp2)
-  | Valx2, _ | _, Valx2 ->
-    Misc.fatal_error "Unexpected machtype_component Valx2"
+
+let ge_component_bool comp1 comp2 =
+  try ge_component_result comp1 comp2 with Incomparable_components -> false
 
 type exttype =
   | XInt
