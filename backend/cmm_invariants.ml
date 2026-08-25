@@ -405,7 +405,16 @@ let join_inferred_machtypes ~dbg ty1 ty2 =
         "Cmm machtype check failed%s: join of machtype %a and machtype %a, \
          which do not have the same number of components"
         (dbg_suffix dbg) Printcmm.machtype ty1 Printcmm.machtype ty2
-    else Machtype (Array.map2 lub_component ty1 ty2)
+    else
+      match
+        Misc.Stdlib.Array.all_somes (Array.map2 lub_component_opt ty1 ty2)
+      with
+      | Some lub -> Machtype lub
+      | None ->
+        Misc.fatal_errorf
+          "Cmm machtype check failed%s: join of uncomparable machtype %a and \
+           machtype %a"
+          (dbg_suffix dbg) Printcmm.machtype ty1 Printcmm.machtype ty2
 
 let join_all_inferred_machtypes ~dbg tys =
   List.fold_left (join_inferred_machtypes ~dbg) Never_returns tys

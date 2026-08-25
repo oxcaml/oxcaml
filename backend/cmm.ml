@@ -89,7 +89,9 @@ let string_of_machtype_component (comp : machtype_component) =
     result.) The order is used only in selection, Valx2 is generated after
     selection. *)
 
-let lub_component comp1 comp2 =
+exception Incomparable_components
+
+let lub_component_result comp1 comp2 =
   match comp1, comp2 with
   | Int, Int -> Int
   | Int, Val -> Val
@@ -114,15 +116,22 @@ let lub_component comp1 comp2 =
   | (Float | Float32), Mask
   | Float32, Float
   | Float, Float32 ->
+    raise Incomparable_components
+  | Valx2, _ | _, Valx2 ->
+    Misc.fatal_errorf "Unexpected machtype_component Valx2"
+
+let lub_component comp1 comp2 =
+  try lub_component_result comp1 comp2
+  with Incomparable_components ->
     (* Float unboxing code must be sure to avoid this case. *)
     Misc.fatal_errorf
       "Cmm.lub_component: unexpected machtype_component combination (%s, %s)"
       (string_of_machtype_component comp1)
       (string_of_machtype_component comp2)
-  | Valx2, _ | _, Valx2 ->
-    Misc.fatal_errorf "Unexpected machtype_component Valx2"
 
-exception Incomparable_components
+let lub_component_opt comp1 comp2 =
+  try Some (lub_component_result comp1 comp2)
+  with Incomparable_components -> None
 
 let ge_component_result comp1 comp2 =
   match comp1, comp2 with

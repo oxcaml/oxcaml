@@ -85,6 +85,11 @@ val typ_int128 : machtype
 val lub_component :
   machtype_component -> machtype_component -> machtype_component
 
+(** Version of [lub_component] that returns [None] for uncomparable
+    components. *)
+val lub_component_opt :
+  machtype_component -> machtype_component -> machtype_component option
+
 (** Returns [true] iff the first supplied [machtype_component] is greater than
     or equal to the second under the relation used by [lub_component]. *)
 val ge_component : machtype_component -> machtype_component -> bool
