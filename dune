@@ -709,6 +709,7 @@
   regalloc_utils
   regalloc_validate
   ;; file_formats/
+  ir_config_fingerprint
   linear_format
   cfg_format
   ;; backend/debug/
