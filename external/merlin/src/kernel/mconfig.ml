@@ -585,6 +585,7 @@ let ocaml_ignored_flags =
     "-disable-poll-insertion";
     "-gdwarf-may-alter-codegen";
     "-gno-dwarf-may-alter-codegen";
+    "-gno-ocamldebug-types";
     "-davail";
     "-dranges";
     "-ddebug-invariants";
@@ -610,6 +611,7 @@ let ocaml_ignored_flags =
     "-fno-simd-regalloc";
     "-fclmul";
     "-fno-clmul";
+    "-fcssc";
     "-no-auto-include-otherlibs";
     "-fbmi2";
     "-fno-bmi2";
@@ -623,6 +625,7 @@ let ocaml_ignored_flags =
     "-fno-popcnt";
     "-disable-zero-alloc-checker";
     "-disable-precise-zero-alloc-checker";
+    "-no-x86-peephole-remove-redundant-test";
     "-cfg-stack-checks";
     "-no-cfg-stack-checks";
     "-gdwarf-inlined-frames";
@@ -670,6 +673,8 @@ let ocaml_ignored_flags =
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
     "-no-cfg-prologue-shrink-wrap";
+    "-omit-leaf-frame-pointers";
+    "-no-omit-leaf-frame-pointers";
     "-cfg-merge-blocks";
     "-no-cfg-merge-blocks";
     "-cfg-value-propagation";
@@ -748,9 +753,18 @@ let ocaml_ignored_flags =
     "-dump-inlining-paths";
     "-enable-poll-insertion";
     "-fno-asan";
+    "-favx512vl";
+    "-fno-avx512vl";
+    "-favx512bw";
+    "-fno-avx512bw";
+    "-favx512cd";
+    "-fno-avx512cd";
+    "-favx512dq";
+    "-fno-avx512dq";
     "-fno-trap-notes";
     "-ftrap-notes";
     "-function-sections";
+    "-functorize";
     "-gdwarf-may-alter-codegen-experimental";
     "-gno-dwarf-may-alter-codegen-experimental";
     "-gno-startup";
@@ -860,7 +874,7 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-max-cms-files-per-unit";
     "-name-mangling-scheme";
     "-gdwarf-config-max-cms-files-per-variable";
-    "-gdwarf-config-max-type-to-shape-depth";
+    "-type-to-shape-max-depth";
     "-gdwarf-config-max-shape-reduce-steps-per-variable";
     "-gdwarf-config-max-evaluation-steps-per-variable";
     "-gdwarf-config-shape-reduce-fuel";

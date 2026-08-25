@@ -107,9 +107,7 @@ let env_find_static_exception id env =
 let env_set_trap_stack env trap_stack = { env with trap_stack }
 
 let phantom_vars_from_env env =
-  if !Dwarf_flags.restrict_to_upstream_dwarf
-  then None
-  else Some env.phantom_lets
+  if !Clflags.restrict_to_upstream_dwarf then None else Some env.phantom_lets
 
 let rec combine_traps trap_stack = function
   | [] -> trap_stack
@@ -173,7 +171,7 @@ let env_create ~tailrec_label =
   }
 
 let env_add_phantom_let var defining_expr env =
-  if !Dwarf_flags.restrict_to_upstream_dwarf
+  if !Clflags.restrict_to_upstream_dwarf
   then env
   else
     (* Information about phantom lets is split at this stage:

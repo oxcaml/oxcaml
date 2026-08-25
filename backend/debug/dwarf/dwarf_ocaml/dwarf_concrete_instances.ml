@@ -108,7 +108,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   (match value_type_proto_die with
   | None -> ()
   | Some value_type_proto_die ->
-    assert (not !Dwarf_flags.restrict_to_upstream_dwarf);
+    assert (not !Clflags.restrict_to_upstream_dwarf);
     Profile.record "dwarf_variables_and_parameters"
       (fun () ->
         Dwarf_variables_and_parameters.dwarf state ~value_type_proto_die
@@ -124,7 +124,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
           ~function_proto_die:concrete_instance_proto_die ~proto_dies_for_vars
           ~vars_at_entry ~fun_end_label available_ranges_all_vars)
       ~accumulate:true ());
-  if not !Dwarf_flags.restrict_to_upstream_dwarf
+  if not !Clflags.restrict_to_upstream_dwarf
   then
     Profile.record "dwarf_call_sites"
       (fun () ->
