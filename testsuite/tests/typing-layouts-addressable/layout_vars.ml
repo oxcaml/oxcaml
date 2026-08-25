@@ -132,3 +132,147 @@ Error: The value "b" has type "b8" but an expression was expected of type
        But the layout of b8 must be a sublayout of bits8 addressable
          because of the definition of f at line 2, characters 2-68.
 |}]
+
+(** Inclusion checks with [addressable] **)
+
+(* CR-soon jbachurski: Module coercion errors still show that [moregen]
+   succeeded and will go away soon. *)
+
+(* succeeds *)
+module type Inclusion_narrowing = module type of struct
+  module F (M : sig
+    val g : layout_ x. ('a : x). 'a -> 'a
+  end @ static) : sig
+    val g : layout_ x. ('a : x addressable). 'a -> 'a
+  end = M
+end
+[%%expect{|
+Line 12, characters 8-9:
+12 |   end = M
+             ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ g : 'a -> 'a end
+       is not included in
+         sig val g : layout_ l. ('a : l addressable). 'a -> 'a end
+       Values do not match:
+         val poly_ g : 'a -> 'a
+       is not included in
+         val g : layout_ l. ('a : l addressable). 'a -> 'a
+       The layout parameter at position 1 in the first
+       is instantiated with an unconstrained layout variable,
+       which is not supported yet.
+|}]
+
+(* fails *)
+module type Inclusion_widening = module type of struct
+  module F (M : sig
+    val g : layout_ x. ('a : x addressable). 'a -> 'a
+  end @ static) : sig
+    val g : layout_ x. ('a : x). 'a -> 'a
+  end = M
+end
+[%%expect{|
+Line 6, characters 8-9:
+6 |   end = M
+            ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : layout_ l. ('a : l addressable). 'a -> 'a end
+       is not included in
+         sig val poly_ g : 'a -> 'a end
+       Values do not match:
+         val g : layout_ l. ('a : l addressable). 'a -> 'a
+       is not included in
+         val poly_ g : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The kind of 'a is 's1 addressable
+         because of the definition of g at line 5, characters 4-41.
+       But the kind of 'a must be addressable
+         because of the definition of g at line 3, characters 4-53.
+|}]
+
+(* incomplete -- commits to [x = bits8] instead of [x = bits8 addressable] *)
+module type Inclusion_incomplete = module type of struct
+  module F (M : sig
+    val g : layout_ x. ('a : x addressable) ('b : x). 'a -> 'b
+  end @ static) : sig
+    val g : ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
+  end = M
+end
+[%%expect{|
+Line 6, characters 8-9:
+6 |   end = M
+            ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b end
+       is not included in
+         sig
+           val g :
+             ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
+         end
+       Values do not match:
+         val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b
+       is not included in
+         val g : ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
+       The type "'a -> 'b" is not compatible with the type "'a -> 'c"
+       The layout of 'a is bits8 addressable
+         because of the definition of g at line 5, characters 4-71.
+       But the layout of 'a must be a sublayout of bits8
+         because of the definition of g at line 3, characters 4-62.
+|}]
+
+(* fine -- we choose [x = bits8] anyway *)
+module type Inclusion_incomplete_but_ok = module type of struct
+  module F (M : sig
+    val g : layout_ x. ('a : x addressable) ('b : x). 'a -> 'b
+  end @ static) : sig
+    val g : ('a : bits8 addressable) ('b : bits8). 'a -> 'b
+  end = M
+end
+[%%expect{|
+Line 6, characters 8-9:
+6 |   end = M
+            ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b end
+       is not included in
+         sig val g : ('a : bits8 addressable) ('b : bits8). 'a -> 'b end
+       Values do not match:
+         val g : layout_ l. ('a : l addressable) ('b : l). 'a -> 'b
+       is not included in
+         val g : ('a : bits8 addressable) ('b : bits8). 'a -> 'b
+       the first has 1 more layout parameter that is not used,
+       which is not supported yet.
+|}]
+
+(* fine -- correct in this order, since we set [x = bits8 addressable] first *)
+module type Inclusion_incomplete_but_swapped_ok = module type of struct
+  module F (M : sig
+    val g : layout_ x. ('a : x) ('b : x addressable). 'a -> 'b
+  end @ static) : sig
+    val g : ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
+  end = M
+end
+[%%expect{|
+Line 6, characters 8-9:
+6 |   end = M
+            ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : layout_ l. ('a : l) ('b : l addressable). 'a -> 'b end
+       is not included in
+         sig
+           val g :
+             ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
+         end
+       Values do not match:
+         val g : layout_ l. ('a : l) ('b : l addressable). 'a -> 'b
+       is not included in
+         val g : ('a : bits8 addressable) ('b : bits8 addressable). 'a -> 'b
+       the first has 1 more layout parameter that is not used,
+       which is not supported yet.
+|}]
+
