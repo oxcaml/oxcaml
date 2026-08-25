@@ -21,12 +21,20 @@ module Artifact = struct
 end
 
 module Context = struct
+  module Site_id = struct
+    type t = int
+
+    let of_int value = value
+    let compare = Int.compare
+    let print = Format.pp_print_int
+  end
+
   type t =
     | Def of Uid.t
     | App of t * t
     | Proj of t * Uid.t
     | Body of Uid.t
-    | Site of Compilation_unit.t * Artifact.t * int
+    | Site of Compilation_unit.t * Artifact.t * Site_id.t
 
   let rec compare left right =
     match left, right with
@@ -50,7 +58,7 @@ module Context = struct
       then c
       else
         let c = Artifact.compare a1 a2 in
-        if c <> 0 then c else Int.compare o1 o2
+        if c <> 0 then c else Site_id.compare o1 o2
 
   let equal left right = compare left right = 0
 
@@ -61,10 +69,10 @@ module Context = struct
       Format.fprintf fmt "%a.%a" print context Uid.print uid
     | Body uid -> Format.fprintf fmt "body(%a)" Uid.print uid
     | Site (unit_, artifact, occurrence) ->
-      Format.fprintf fmt "site(%s.%s#%d)"
+      Format.fprintf fmt "site(%s.%s#%a)"
         (Compilation_unit.full_path_as_string unit_)
         (Artifact.extension artifact)
-        occurrence
+        Site_id.print occurrence
 end
 
 module Key = struct
@@ -608,7 +616,8 @@ let facts_of_tree compilation_unit artifact iterate =
   let fresh_site () =
     let occurrence = !site_counter in
     site_counter := occurrence + 1;
-    Context.Site (compilation_unit, artifact, occurrence)
+    Context.Site
+      (compilation_unit, artifact, Context.Site_id.of_int occurrence)
   in
   let scoped f =
     let saved_module_contexts = !module_contexts
