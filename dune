@@ -446,12 +446,12 @@
  (modules jsmaindriver jscompile jslibrarian))
 
 (executable
- (name boot_ocamlj)
+ (name ocamlj)
  (modes native)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (libraries ocamljcomp ocamlfrontend flambda2)
- (modules boot_ocamlj))
+ (modules ocamlj))
 
 ; Disabled since there can be only one (data_only_dirs) declaration
 ;(data_only_dirs yacc)
@@ -520,7 +520,7 @@
 
 (install
  (files
-  (boot_ocamlj.exe as ocamlj.opt))
+  (ocamlj.exe as ocamlj.opt))
  (section bin)
  (package ocaml))
 
