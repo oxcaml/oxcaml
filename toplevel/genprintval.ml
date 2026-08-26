@@ -432,7 +432,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
               | Tconstr (path, [_], _)
                 when Path.same path Predef.path_expr ->
-                Oval_quote (O.obj obj : CamlinternalQuote.Code.t)
+                let quote : CamlinternalQuote.Code.t = O.obj obj in
+                Oval_printer (Format_doc.deprecated_printer (fun ppf ->
+                  CamlinternalQuote.Code.print ppf quote))
 
               | _ ->
                 match Env.find_type path env with
