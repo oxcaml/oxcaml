@@ -15,6 +15,8 @@ file_formats/cmo_format.mli merlin-exclude
 file_formats/cmx_format.mli merlin-exclude
 file_formats/cmxs_format.mli merlin-exclude
 file_formats/linear_format.ml* merlin-exclude
+file_formats/ir_config_fingerprint.ml merlin-exclude
+file_formats/ir_config_fingerprint.mli merlin-exclude
 
 parsing/ast_invariants.ml* merlin-exclude
 parsing/depend.ml* merlin-exclude
@@ -46,5 +48,3 @@ utils/symbol.ml* merlin-exclude
 utils/target_system.ml* merlin-exclude
 utils/targetint.ml* merlin-exclude
 utils/terminfo.ml* merlin-exclude
-file_formats/ir_config_fingerprint.ml merlin-exclude
-file_formats/ir_config_fingerprint.mli merlin-exclude
