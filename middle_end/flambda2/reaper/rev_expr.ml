@@ -231,7 +231,8 @@ and apply_renaming_holed (holed : rev_expr_holed) renaming : rev_expr_holed =
     let renamed_handlers_as_list =
       List.map
         (fun (cont, handler) ->
-          cont, apply_renaming_cont_handler handler renaming)
+          ( Renaming.apply_continuation renaming cont,
+            apply_renaming_cont_handler handler renaming ))
         (Continuation.Lmap.bindings handlers)
     in
     Let_cont_rec
