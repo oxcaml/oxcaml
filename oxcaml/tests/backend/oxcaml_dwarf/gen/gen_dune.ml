@@ -120,5 +120,6 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
   print_dwarf_test "test_large_data_dwarf";
   print_dwarf_test "test_tailrec_dwarf";
   print_dwarf_test "test_ocaml_and_c_dwarf" ~extra_deps:["frames.py"];
+  print_dwarf_test "test_addressable_dwarf";
   print_dwarf_python_test "test_inlined_frames_dwarf";
   ()

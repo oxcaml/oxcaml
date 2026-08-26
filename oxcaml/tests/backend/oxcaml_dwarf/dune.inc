@@ -423,6 +423,40 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (action (diff test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)))
 
 (executable
+ (name test_addressable_dwarf)
+ (modules test_addressable_dwarf)
+ (enabled_if (= %{context_name} "main"))
+ (libraries stdlib_stable)
+ (ocamlopt_flags (:standard (:include ocamlopt_flags.sexp)))
+ (foreign_archives simd_stubs))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{env:OXCAML_LLDB=} "")))
+ (targets test_addressable_dwarf.output.corrected)
+ (deps test_addressable_dwarf.exe test_addressable_dwarf.lldb filter_for_function_call_only.sh)
+ (action
+  (progn
+   (bash
+    "sed -e 's/^(lldb) //' -e '/^[[:space:]]*$/d' test_addressable_dwarf.lldb > \
+     test_addressable_dwarf_clean.lldb")
+   (with-outputs-to test_addressable_dwarf.output.corrected
+    (pipe-outputs
+     (run %{env:OXCAML_LLDB=} -s test_addressable_dwarf_clean.lldb ./test_addressable_dwarf.exe)
+     (run sh ./filter_for_function_call_only.sh))))))
+
+(rule
+ (alias runtest-dwarf)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (<> %{env:OXCAML_LLDB=} "")))
+ (deps test_addressable_dwarf.output test_addressable_dwarf.output.corrected)
+ (action (diff test_addressable_dwarf.output test_addressable_dwarf.output.corrected)))
+
+(executable
  (name test_inlined_frames_dwarf)
  (modules test_inlined_frames_dwarf)
  (enabled_if (= %{context_name} "main"))

@@ -414,7 +414,8 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
+  | Kconstr of
+      Path.t * Jkind_types.Scannable_axes.t * Jkind_types.Kind_operator.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -947,6 +948,7 @@ and mixed_block_element =
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
   | Void
+  | Addressable of mixed_block_element
 
 and mixed_product_shape = mixed_block_element array
 

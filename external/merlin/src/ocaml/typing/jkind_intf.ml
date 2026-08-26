@@ -57,7 +57,29 @@ module type Sort = sig
   type var
 
   module Const : sig
-    type t =
+    (* Note [Addressable kinds]
+       ~~~~~~~~~~~~~~~~~~~~~~~~
+       We consider a kind to be *addressable* if, when boxed, all of its
+       information is stored in the data portion of the block. This property is
+       encoded by the [addressable] kind operator: [k addressable] is "[k] made
+       addressable", which is like [k] but may change how it is boxed.
+
+       (Currently, [addressable] does not yet actually affect boxed
+       representations. It will always be the case that it does not change how a
+       sort is represented outside of a block.)
+
+       The core properties of [addressable] are reflected in
+       [Sort.constrain_addressable]. We also provide the following notes:
+       - Some base sorts are inherently addressable.
+       - If all the components of a product are addressable, then so is the
+         product.
+       - Addressability is idempotent: [k] is addressable iff
+         [k addressable = k].
+       - The addressable kinds are all subkinds of [any addressable].
+       - There is no inherent subkinding relationship between [k] and
+         [k addressable].
+   *)
+    type t = private
       | Base of base
       | Product of t list
       | Univar of univar
@@ -67,6 +89,17 @@ module type Sort = sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
+          (** Invariant: this constructor is never redundantly applied. I.e.,
+              given [Addressable t], [not (is_surely_addressable t)] *)
+
+    val base : base -> t
+
+    val product : t list -> t
+
+    val univar : univar -> t
+
+    val genvar : var -> t
 
     val equal : t -> t -> bool
 
@@ -86,6 +119,10 @@ module type Sort = sig
         CR layout-polymorphism: This function should be deleted once we support
         layout-poly any-fields *)
     val is_concrete : t -> bool
+
+    val is_surely_addressable : t -> bool
+
+    val addressable : t -> t
 
     val scannable : t
 
