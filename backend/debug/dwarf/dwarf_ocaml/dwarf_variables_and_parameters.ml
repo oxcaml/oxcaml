@@ -118,22 +118,23 @@ let location_list_entry state ~start_of_code_symbol ~subrange
     in
     Dwarf_4 location_list_entry
   | Five ->
-    let start_inclusive =
-      Address_table.add (DS.address_table state) start_pos
-        ~adjustment:start_pos_offset
-    in
-    let end_exclusive =
-      Address_table.add (DS.address_table state) end_pos
-        ~adjustment:end_pos_offset
-    in
     let loc_desc =
       Counted_location_description.create single_location_description
     in
     let location_list_entry : Location_list_entry.entry =
-      (* DWARF-5 spec page 45 line 1. *)
-      Startx_endx { start_inclusive; end_exclusive; payload = loc_desc }
+      (* DWARF-5 spec page 44 line 30. The offsets are relative to
+         [start_of_code_symbol], which the enclosing location list establishes
+         as its base address (see [dwarf_for_variable] below). *)
+      Offset_pair_between_labels
+        { start_inclusive = start_pos;
+          start_adjustment = start_pos_offset;
+          end_exclusive = end_pos;
+          end_adjustment = end_pos_offset;
+          payload = loc_desc
+        }
     in
-    Dwarf_5 (Location_list_entry.create location_list_entry)
+    Dwarf_5
+      (Location_list_entry.create location_list_entry ~start_of_code_symbol)
 
 let dwarf_for_variable state ~value_type_proto_die ~function_symbol
     ~function_proto_die ~proto_dies_for_vars (var : Backend_var.t)
@@ -186,18 +187,38 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
     (* Determine start_of_code_symbol and whether we need a base address entry
        based on the code layout. *)
     let start_of_code_symbol, dwarf_4_base_address_entry =
-      match DS.code_layout state with
-      | Function_sections ->
-        let base_address_entry =
-          Dwarf_4_location_list_entry.create_base_address_selection_entry
-            ~base_address_symbol:function_symbol
+      match !Dwarf_flags.gdwarf_version with
+      | Five ->
+        (* The offsets in DWARF-5 location list entries are relative to the
+           function symbol (established as the base address of each list),
+           keeping their ULEB128 encodings small. *)
+        function_symbol, []
+      | Four -> (
+        match DS.code_layout state with
+        | Function_sections ->
+          let base_address_entry =
+            Dwarf_4_location_list_entry.create_base_address_selection_entry
+              ~base_address_symbol:function_symbol
+          in
+          function_symbol, [base_address_entry]
+        | Continuous_code_section { code_begin; _ } -> code_begin, [])
+    in
+    let location_list_init =
+      match !Dwarf_flags.gdwarf_version with
+      | Four -> Location_list.create ()
+      | Five ->
+        (* The offsets in the [Offset_pair_between_labels] entries added below
+           are relative to [start_of_code_symbol]; establish it as the base
+           address of the list. *)
+        let base_index =
+          Address_table.add_symbol (DS.address_table state) start_of_code_symbol
         in
-        function_symbol, [base_address_entry]
-      | Continuous_code_section { code_begin; _ } -> code_begin, []
+        Location_list.add (Location_list.create ())
+          (Location_list_entry.create (Base_addressx base_index)
+             ~start_of_code_symbol)
     in
     let dwarf_4_location_list_entries, location_list =
-      ARV.Range.fold range
-        ~init:([], Location_list.create ())
+      ARV.Range.fold range ~init:([], location_list_init)
         ~f:(fun (dwarf_4_location_list_entries, location_list) subrange ->
           let single_location_description =
             single_location_description state ~parent:(Some function_proto_die)

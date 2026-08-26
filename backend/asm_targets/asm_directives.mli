@@ -296,6 +296,13 @@ val between_labels_64_bit :
     value. Supported only on the GAS text backend. *)
 val delta_uleb128 : upper:Asm_label.t -> lower:Asm_label.t -> unit
 
+(** The ULEB128-encoded distance from the [lower] symbol to the [upper] label
+    plus [upper_offset]. The value must be a non-negative assembly-time
+    constant; the [lower] symbol must be in the current compilation unit and in
+    the same section as [upper]. Supported only on the GAS text backend. *)
+val delta_uleb128_label_minus_symbol :
+  upper:Asm_label.t -> upper_offset:Int64.t -> lower:Asm_symbol.t -> unit
+
 (** Like [between_symbols], but for two labels with additional offsets, emitting
     a 32-bit-wide reference. The assembler checks that the value does not
     overflow. The labels must be in the same section. *)

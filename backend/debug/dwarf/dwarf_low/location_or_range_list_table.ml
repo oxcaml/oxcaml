@@ -29,15 +29,13 @@ end) =
 struct
   type one_list =
     { list : Location_or_range_list.t;
-      offset_from_first_list : Dwarf_int.t;
       label : Asm_label.t
     }
 
   type t =
     { base_addr : Asm_label.t;
       mutable num_lists : int;
-      mutable current_offset_from_first_list : Dwarf_int.t;
-      mutable lists : one_list list
+      mutable lists : one_list list (* in reverse order of addition *)
     }
 
   module Index = struct
@@ -53,24 +51,15 @@ struct
   let create () =
     { base_addr = Asm_label.create (DWARF Location_or_range_list.section);
       num_lists = 0;
-      current_offset_from_first_list = Dwarf_int.zero ();
       lists = []
     }
 
   let add t list =
     let which_index = t.num_lists in
     let one_list =
-      { list;
-        offset_from_first_list = t.current_offset_from_first_list;
-        label = Asm_label.create (DWARF Location_or_range_list.section)
-      }
+      { list; label = Asm_label.create (DWARF Location_or_range_list.section) }
     in
     t.lists <- one_list :: t.lists;
-    let next_offset_from_first_list =
-      let list_size = Location_or_range_list.size list in
-      Dwarf_int.add list_size t.current_offset_from_first_list
-    in
-    t.current_offset_from_first_list <- next_offset_from_first_list;
     t.num_lists <- t.num_lists + 1;
     Index.create one_list.label which_index
 
@@ -83,33 +72,34 @@ struct
     then Uint32.of_nonnegative_int_exn (List.length t.lists)
     else Uint32.zero
 
-  let offset_array_size t =
-    if offset_array_supported ()
-    then
-      Dwarf_int.of_int64_exn
-        (Int64.mul
-           (Dwarf_int.width_as_int64 ())
-           (Uint32.to_int64 (offset_entry_count t)))
-    else Dwarf_int.zero ()
-
-  let initial_length t =
-    let lists_size =
-      List.fold_left
-        (fun lists_size { list; _ } ->
-          Dwarf_int.add lists_size (Location_or_range_list.size list))
-        (Dwarf_int.eight ()) (* DWARF-5 spec page 242 lines 12--20. *)
-        t.lists
-    in
-    Initial_length.create (Dwarf_int.add (offset_array_size t) lists_size)
-
-  let size t =
-    let initial_length = initial_length t in
-    Dwarf_int.add
-      (Initial_length.size initial_length)
-      (Initial_length.to_dwarf_int initial_length)
+  let size _t =
+    (* The sizes of some list entries (those whose operands are label
+       differences encoded as ULEB128) are only known at assembly time, so the
+       table is emitted using assembler-computed lengths and offsets; see [emit]
+       below. *)
+    Misc.fatal_error
+      "The sizes of location or range list tables are not known at compile time"
 
   let emit ~asm_directives t =
-    Initial_length.emit ~asm_directives (initial_length t);
+    let unit_start = Asm_label.create (DWARF Location_or_range_list.section) in
+    let unit_end = Asm_label.create (DWARF Location_or_range_list.section) in
+    (* The unit length is the distance from just after the unit length field
+       itself to the end of the table (DWARF-5 spec page 242 lines 12--20). It
+       is computed by the assembler since the sizes of some list entries are not
+       known at compile time. *)
+    (match Dwarf_format.get () with
+    | Thirty_two ->
+      Dwarf_value.emit ~asm_directives
+        (Dwarf_value.distance_between_labels_32_bit
+           ~comment:"32-bit initial length" ~upper:unit_end ~lower:unit_start ())
+    | Sixty_four ->
+      Dwarf_value.emit ~asm_directives
+        (Dwarf_value.int32 ~comment:"64-bit indicator"
+           Initial_length.sixty_four_bit_indicator);
+      Dwarf_value.emit ~asm_directives
+        (Dwarf_value.distance_between_labels_64_bit
+           ~comment:"64-bit initial length" ~upper:unit_end ~lower:unit_start ()));
+    A.define_label unit_start;
     Dwarf_version.emit ~asm_directives Dwarf_version.five;
     A.uint8 ~comment:"Dwarf_arch_sizes.size_addr"
       (Uint8.of_nonnegative_int_exn Dwarf_arch_sizes.size_addr);
@@ -117,24 +107,35 @@ struct
     A.uint32 ~comment:"Offset entry count" (offset_entry_count t);
     A.comment "Base label:";
     A.define_label t.base_addr;
+    let lists = List.rev t.lists in
     if offset_array_supported ()
     then (
       A.comment "Offset array:";
-      let offset_array_size = offset_array_size t in
       List.iteri
-        (fun index { offset_from_first_list; _ } ->
-          let offset = Dwarf_int.add offset_array_size offset_from_first_list in
+        (fun index { label; _ } ->
           let comment =
             if !Clflags.keep_asm_file
             then Some (Printf.sprintf "offset to list number %d" index)
             else None
           in
-          Dwarf_int.emit ~asm_directives ?comment offset)
-        t.lists);
+          (* Offsets are relative to the first byte after the header, i.e. the
+             position of [t.base_addr] (DWARF-5 spec page 242 line 28 and page
+             243 line 1). *)
+          match Dwarf_format.get () with
+          | Thirty_two ->
+            Dwarf_value.emit ~asm_directives
+              (Dwarf_value.distance_between_labels_32_bit ?comment ~upper:label
+                 ~lower:t.base_addr ())
+          | Sixty_four ->
+            Dwarf_value.emit ~asm_directives
+              (Dwarf_value.distance_between_labels_64_bit ?comment ~upper:label
+                 ~lower:t.base_addr ()))
+        lists);
     A.comment "Range or location list(s):";
     List.iter
-      (fun { list; label; _ } ->
+      (fun { list; label } ->
         A.define_label label;
         Location_or_range_list.emit ~asm_directives list)
-      t.lists
+      lists;
+    A.define_label unit_end
 end

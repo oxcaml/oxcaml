@@ -39,6 +39,22 @@ type 'payload entry =
       }
       (** We emit [Default_location] since it is only applicable for location
           lists and we have no use for it at present. *)
+  | Offset_pair_between_labels of
+      { start_inclusive : Asm_label.t;
+        start_adjustment : int;
+        end_exclusive : Asm_label.t;
+        end_adjustment : int;
+        payload : 'payload
+      }
+      (** As [Offset_pair] (also emitted with the [DW_LLE_offset_pair] or
+          [DW_RLE_offset_pair] code), but with the offsets computed by the
+          assembler as the distances from the enclosing entry's
+          [start_of_code_symbol] (which must correspond to the base address
+          established for the list, and lie in the same section as the labels)
+          to the given labels plus adjustments. Such entries have no
+          compile-time-computable size, so lists containing them may only be
+          used with emission strategies that do not require sizes (see
+          [Location_or_range_list_table]). *)
   | Base_address of Asm_symbol.t
   | Start_end of
       { start_inclusive : Asm_label.t;
@@ -62,7 +78,7 @@ module type S = sig
 
   type t
 
-  val create : entry -> t
+  val create : entry -> start_of_code_symbol:Asm_symbol.t -> t
 
   val section : Asm_section.dwarf_section
 

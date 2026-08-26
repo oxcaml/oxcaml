@@ -20,23 +20,37 @@ module Uint8 = Numbers.Uint8
 module A = Asm_directives
 
 module Entry = struct
+  type address =
+    | Label of Asm_label.t
+    | Symbol of Asm_symbol.t
+
   type t =
-    { addr : Asm_label.t;
+    { addr : address;
       adjustment : int
     }
+
+  let compare_address addr1 addr2 =
+    match addr1, addr2 with
+    | Label lbl1, Label lbl2 -> Asm_label.compare lbl1 lbl2
+    | Symbol sym1, Symbol sym2 -> Asm_symbol.compare sym1 sym2
+    | Label _, Symbol _ -> -1
+    | Symbol _, Label _ -> 1
+
+  let hash_address = function
+    | Label lbl -> Hashtbl.hash (0, Asm_label.hash lbl)
+    | Symbol sym -> Hashtbl.hash (1, Asm_symbol.hash sym)
 
   include Identifiable.Make (struct
     type nonrec t = t
 
     let compare { addr = addr1; adjustment = adjustment1 }
         { addr = addr2; adjustment = adjustment2 } =
-      let c = Asm_label.compare addr1 addr2 in
+      let c = compare_address addr1 addr2 in
       if c <> 0 then c else Stdlib.compare adjustment1 adjustment2
 
     let equal t1 t2 = compare t1 t2 = 0
 
-    let hash { addr; adjustment } =
-      Hashtbl.hash (Asm_label.hash addr, adjustment)
+    let hash { addr; adjustment } = Hashtbl.hash (hash_address addr, adjustment)
 
     let print _ _ = Misc.fatal_error "Not yet implemented"
 
@@ -58,8 +72,7 @@ let create () =
     rev_table = Entry.Map.empty
   }
 
-let add ?(adjustment = 0) t addr =
-  let entry : Entry.t = { addr; adjustment } in
+let add_entry t (entry : Entry.t) =
   match Entry.Map.find entry t.rev_table with
   | exception Not_found ->
     let index = t.next_index in
@@ -68,6 +81,11 @@ let add ?(adjustment = 0) t addr =
     t.table <- Address_index.Map.add index entry t.table;
     index
   | index -> index
+
+let add ?(adjustment = 0) t addr =
+  add_entry t { addr = Label addr; adjustment }
+
+let add_symbol t symbol = add_entry t { addr = Symbol symbol; adjustment = 0 }
 
 let base_addr t = t.base_addr
 
@@ -85,14 +103,19 @@ let size t =
     (Initial_length.to_dwarf_int initial_length)
 
 let entry_to_dwarf_value (entry : Entry.t) =
-  (* DWARF-5 spec section 7.27: the entries in [.debug_addr] are relocatable
-     absolute addresses, not offsets from a base. *)
-  match entry.adjustment with
-  | 0 -> Dwarf_value.code_address_from_label ~comment:"address" entry.addr
-  | adjustment ->
-    Dwarf_value.code_address_from_label_plus_offset ~comment:"address"
-      entry.addr
-      ~offset_in_bytes:(Targetint.of_int_exn adjustment)
+  (* The table must contain relocatable absolute addresses: on ELF the static
+     linker relocates them directly, and DWARF linkers such as dsymutil
+     translate them using the debug map. (Previously a label-minus-start-of-code
+     difference was emitted here, which produced correct results with dsymutil
+     only because the start-of-code symbols lie at offset zero of their object
+     files' text sections, and would never have been relocated on ELF.) *)
+  let adjustment = Targetint.of_int_exn entry.adjustment in
+  match entry.addr with
+  | Label label ->
+    Dwarf_value.code_address_from_label_plus_offset ~comment:"address" label
+      ~offset_in_bytes:adjustment
+  | Symbol symbol ->
+    Dwarf_value.code_address_from_symbol_plus_bytes symbol adjustment
 
 let emit ~asm_directives t =
   Initial_length.emit ~asm_directives (initial_length t);
