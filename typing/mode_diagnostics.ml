@@ -5009,7 +5009,8 @@ let diagnostic_of_exception report exn =
 let json_emitter ppf exn report =
   let diagnostic =
     match exn with
-    | Some exn -> (match diagnostic_of_exception report exn with
+    | Some exn -> (
+      match diagnostic_of_exception report exn with
       | Some diagnostic -> diagnostic
       | None -> diagnostic_of_report report)
     | None -> diagnostic_of_report report
