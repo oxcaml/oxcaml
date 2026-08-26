@@ -623,7 +623,6 @@ module Structured_errors = struct
   let diagnostic (diagnostic : Diagnostic.t) =
     `Assoc
       [ ("loc", location diagnostic.loc);
-        ("title", `String diagnostic.title);
         ( "entities",
           `List
             (List.map ~f:entity

@@ -21,12 +21,6 @@ Each diagnostic is reported at the span the compiler reports the error at, as a
   >   | jq -c '.value.diagnostics[0].loc'
   {"file":"x.ml","start":{"line":4,"col":36},"end":{"line":4,"col":39}}
 
-The title names the failing axes
-
-  $ $MERLIN single structured-errors -filename x.ml < x.ml \
-  >   | jq -r '.value.diagnostics[0].title'
-  Explain mode error (portability)
-
 Every mention resolves to an entity the response defines, and every term to a
 glossary entry
 
