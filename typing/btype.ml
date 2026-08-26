@@ -1063,7 +1063,7 @@ module Jkind0 = struct
 
     let mask_of_modality ~modality = Axis_lattice.mask_of_modality modality
 
-    let cap_by_mask_l t mask =
+    let apply_mask t mask =
       Axis_lattice.meet (to_axis_lattice t) mask |> of_axis_lattice
   end
 
@@ -1146,14 +1146,14 @@ module Jkind0 = struct
 
     let add_modality ~modality ~type_expr
         (t : (allowed * 'r) t) : (allowed * 'r) t =
-      let relevant_bounds = Mod_bounds.mask_of_modality ~modality in
+      let bounds_mask = Mod_bounds.mask_of_modality ~modality in
       match t with
       | No_with_bounds ->
         With_bounds
           (With_bounds_types.singleton type_expr
-             ({ relevant_bounds } : With_bounds_type_info.t))
+             ({ bounds_mask } : With_bounds_type_info.t))
       | With_bounds tys ->
-        With_bounds (add_bound type_expr { relevant_bounds } tys)
+        With_bounds (add_bound type_expr { bounds_mask } tys)
 
   let is_empty (type l r) (t : (l * r) t) : bool =
     match t with
@@ -1879,7 +1879,7 @@ module Jkind0 = struct
         { t with
           mod_bounds =
             Mod_bounds.join t.mod_bounds
-              (Mod_bounds.cap_by_mask_l Mod_bounds.for_arrow
+              (Mod_bounds.apply_mask Mod_bounds.for_arrow
                  (Mod_bounds.mask_of_modality ~modality))
         }
       | false ->

@@ -154,20 +154,27 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type 'a t : value mod shared with 'a @@ corrupted end
+         sig type 'a t : value mod shared with 'a end
        is not included in
          sig type 'a t : value mod shared end
        Type declarations do not match:
-         type 'a t : value mod shared with 'a @@ corrupted
+         type 'a t : value mod shared with 'a
        is not included in
          type 'a t : value mod shared
-       The kind of the first is value mod shared with 'a @@ corrupted
+       The kind of the first is value mod shared with 'a
          because of the definition of t at line 4, characters 2-51.
        But the kind of the first must be a subkind of value mod shared
          because of the definition of t at line 2, characters 2-30.
+|}]
 
-       The first mode-crosses less than the second along:
-         contention: mod shared with 'a @@ corrupted ≰ mod shared
+module Incomparable_middle_bounds_with_constrained_parameter : sig
+  type ('a : value mod shared) t : value mod contended
+end = struct
+  type ('a : value mod shared) t : value mod contended with 'a @@ corrupted
+end
+[%%expect{|
+module Incomparable_middle_bounds_with_constrained_parameter :
+  sig type ('a : value mod shared) t : value mod contended end
 |}]
 
 module External64_with_bound_is_middle : sig
@@ -202,6 +209,20 @@ Error: Signature mismatch:
 
        The first mode-crosses less than the second along:
          externality: mod external_ with 'a @@ external64 ≰ mod external_
+|}]
+
+module Type_parameter_bound_saturates_with_bound : sig
+  type ('a : value mod external64) t : value mod external_
+    with 'a @@ external64
+end = struct
+  type ('a : value mod external64) t : value mod external_ with 'a
+end
+[%%expect{|
+module Type_parameter_bound_saturates_with_bound :
+  sig
+    type ('a : value mod external64) t
+      : value mod external_ with 'a @@ external64
+  end
 |}]
 
 module M : sig

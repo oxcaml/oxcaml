@@ -445,77 +445,97 @@ Error: This variant or record definition does not match that of type
          portable contended with 'a
 |}]
 
-type 'a unsafe_saturated : value mod shared with 'a = { x : 'a }
+type 'a unsafe_saturated : value mod shared with 'a = { mutable x : 'a }
 [@@unsafe_allow_any_mode_crossing]
 
 type 'a unsafe_saturated_reexport
-  : value mod shared with 'a @@ corrupted = 'a unsafe_saturated = { x : 'a }
+  : value mod shared with 'a @@ corrupted = 'a unsafe_saturated = { mutable x : 'a }
 [@@unsafe_allow_any_mode_crossing]
 
 type ('a : value mod shared) unsafe_parameter_saturated
-  : value with 'a = { x : 'a }
+  : immutable_data with 'a = { mutable x : 'a }
 [@@unsafe_allow_any_mode_crossing]
 
 type ('a : value mod shared) unsafe_parameter_saturated_reexport
-  : value with 'a @@ shared = 'a unsafe_parameter_saturated = { x : 'a }
+  : immutable_data with 'a @@ shared = 'a unsafe_parameter_saturated =
+  { mutable x : 'a }
 [@@unsafe_allow_any_mode_crossing]
 
 type 'a unsafe_externality_saturated
-  : value with 'a @@ external64 = { x : 'a }
+  : value mod shared with 'a @@ external64 = { mutable x : 'a }
 [@@unsafe_allow_any_mode_crossing]
 
 type 'a unsafe_externality_saturated_reexport
-  : value with 'a = 'a unsafe_externality_saturated = { x : 'a }
+  : value mod shared with 'a = 'a unsafe_externality_saturated = { mutable x : 'a }
 [@@unsafe_allow_any_mode_crossing]
 
 [%%expect{|
-type 'a unsafe_saturated : value non_float mod shared with 'a = { x : 'a; }
-[@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_saturated
+  : value non_float mod shared with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
 type 'a unsafe_saturated_reexport
-  : value non_float mod shared with 'a @@ corrupted =
+  : value non_float mod shared with 'a =
   'a unsafe_saturated = {
-  x : 'a;
+  mutable x : 'a;
 } [@@unsafe_allow_any_mode_crossing]
 type ('a : value mod shared) unsafe_parameter_saturated
-  : value non_float with 'a = {
-  x : 'a;
+  : immutable_data with 'a = {
+  mutable x : 'a;
 } [@@unsafe_allow_any_mode_crossing]
 type ('a : value mod shared) unsafe_parameter_saturated_reexport
-  : value non_float with 'a =
+  : immutable_data with 'a @@ shared =
   'a unsafe_parameter_saturated = {
-  x : 'a;
+  mutable x : 'a;
 } [@@unsafe_allow_any_mode_crossing]
-type 'a unsafe_externality_saturated : value non_float with 'a = { x : 'a; }
-[@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_externality_saturated
+  : value non_float mod shared with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
 type 'a unsafe_externality_saturated_reexport
-  : value non_float with 'a =
+  : value non_float mod shared with 'a =
   'a unsafe_externality_saturated = {
-  x : 'a;
+  mutable x : 'a;
 } [@@unsafe_allow_any_mode_crossing]
 |}]
 
-type unsafe_middle_alias = int
+type safe_middle : immutable_data with int = { mutable x : int }
+[%%expect{|
+Line 1, characters 0-64:
+1 | type safe_middle : immutable_data with int = { mutable x : int }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data with int,
+       because mutable fields are not mod immutable.
+|}]
+
+type unsafe_middle_payload
+type unsafe_middle_alias = unsafe_middle_payload
 
 type unsafe_middle_original
   : immutable_data
-    with int @@ shared
-    with unsafe_middle_alias @@ corrupted = { x : int }
+    with unsafe_middle_payload @@ shared
+    with unsafe_middle_alias @@ corrupted = { mutable x : unsafe_middle_payload }
 [@@unsafe_allow_any_mode_crossing]
 
 type unsafe_middle_reexport
-  : immutable_data with int = unsafe_middle_original = { x : int }
+  : immutable_data with unsafe_middle_payload = unsafe_middle_original =
+  { mutable x : unsafe_middle_payload }
 [@@unsafe_allow_any_mode_crossing]
 
 [%%expect{|
-type unsafe_middle_alias = int
+type unsafe_middle_payload
+type unsafe_middle_alias = unsafe_middle_payload
 type unsafe_middle_original
-  : immutable_data with int @@ shared with unsafe_middle_alias @@ corrupted = {
-  x : int;
+  : immutable_data
+      with unsafe_middle_alias @@ corrupted
+      with unsafe_middle_payload @@ shared = {
+  mutable x : unsafe_middle_payload;
 } [@@unsafe_allow_any_mode_crossing]
 type unsafe_middle_reexport
-  : immutable_data with int =
+  : immutable_data with unsafe_middle_payload =
   unsafe_middle_original = {
-  x : int;
+  mutable x : unsafe_middle_payload;
 } [@@unsafe_allow_any_mode_crossing]
 |}]
 

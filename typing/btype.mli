@@ -385,7 +385,9 @@ module Jkind0 : sig
     val meet : t -> t -> t
 
     val mask_of_modality : modality:Mode.Modality.Const.t -> Axis_lattice.t
-    val cap_by_mask_l : t -> Axis_lattice.t -> t
+
+    (** [apply_mask bounds mask] takes the meet of [bounds] and [mask]. *)
+    val apply_mask : t -> Axis_lattice.t -> t
 
     val debug_print : Format.formatter -> t -> unit
   end

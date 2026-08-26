@@ -138,10 +138,10 @@ type mod_bounds =
   }
 
 module With_bounds_type_info = struct
-  type t = {relevant_bounds : Axis_lattice.t } [@@unboxed]
+  type t = { bounds_mask : Axis_lattice.t } [@@unboxed]
 
-  let join { relevant_bounds = bounds1 } { relevant_bounds = bounds2 } =
-    { relevant_bounds = Axis_lattice.join bounds1 bounds2 }
+  let join { bounds_mask = bounds1 } { bounds_mask = bounds2 } =
+    { bounds_mask = Axis_lattice.join bounds1 bounds2 }
 end
 
 type transient_expr =

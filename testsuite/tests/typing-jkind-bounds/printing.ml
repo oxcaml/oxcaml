@@ -60,6 +60,17 @@ Error: The kind of type "t" is immutable_data with 'a @@ portable
          visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
+type 'a shared_direct : value mod shared with 'a
+type 'a shareable_direct : value mod shareable with 'a
+type 'a reading_direct : value mod reading with 'a
+type 'a read_direct : value mod read with 'a
+[%%expect{|
+type 'a shared_direct : value mod shared with 'a
+type 'a shareable_direct : value mod shareable with 'a
+type 'a reading_direct : value mod reading with 'a
+type 'a read_direct : value mod read with 'a
+|}]
+
 type middle_payload
 type shared_with : immutable_data with middle_payload @@ shared
 type corrupted_with : immutable_data with middle_payload @@ corrupted

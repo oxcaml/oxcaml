@@ -680,8 +680,9 @@ val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
 val apply_modality_l :
   Mode.Modality.Const.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
 
-(** Relax direct bounds so applying the modality on the left meets the original
-    expectation. With-bounds are unchanged. *)
+(** Change a jkind to be appropriate for an expectation of a type under a
+    modality. Relax direct bounds so applying the modality on the left meets the
+    original expectation. With-bounds are unchanged. *)
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 

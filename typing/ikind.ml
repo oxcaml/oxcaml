@@ -513,7 +513,7 @@ module Solver = struct
     Jkind.With_bounds.to_seq with_bounds
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
-           let mask = bound_info.Types.With_bounds_type_info.relevant_bounds in
+           let mask = bound_info.Types.With_bounds_type_info.bounds_mask in
            let ty_kind = kind ~use_tables:true ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
          base

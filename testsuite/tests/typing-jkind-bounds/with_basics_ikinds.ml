@@ -737,7 +737,7 @@ type 'a outer : value mod shareable with 'a
 type bad : value
 type t : value mod portable = { x : bad outer }
 [%%expect {|
-type 'a outer : value mod shareable with 'a @@ corruptible
+type 'a outer : value mod shareable with 'a
 type bad
 Line 3, characters 0-47:
 3 | type t : value mod portable = { x : bad outer }
@@ -754,7 +754,7 @@ type 'a outer : value mod shared with 'a
 type bad : value
 type t : value mod contended = { x : bad outer }
 [%%expect {|
-type 'a outer : value mod shared with 'a @@ corrupted
+type 'a outer : value mod shared with 'a
 type bad
 Line 3, characters 0-48:
 3 | type t : value mod contended = { x : bad outer }
@@ -775,8 +775,8 @@ type 'a o2 : value mod corruptible with 'a
 type bad : value
 type t : value mod portable = { x : bad o2 o1 }
 [%%expect {|
-type 'a o1 : value mod shareable with 'a @@ corruptible
-type 'a o2 : value mod corruptible with 'a @@ shareable
+type 'a o1 : value mod shareable with 'a
+type 'a o2 : value mod corruptible with 'a
 type bad
 Line 4, characters 0-47:
 4 | type t : value mod portable = { x : bad o2 o1 }
@@ -812,7 +812,7 @@ type 'a outer : value mod shareable with 'a
 type bad : value
 type t : value mod portable contended = { x : bad outer }
 [%%expect {|
-type 'a outer : value mod shareable with 'a @@ corruptible
+type 'a outer : value mod shareable with 'a
 type bad
 Line 3, characters 0-57:
 3 | type t : value mod portable contended = { x : bad outer }

@@ -700,22 +700,19 @@ module With_bounds = struct
   module Type_info = struct
     include With_bounds_type_info
 
-    let print ppf { relevant_bounds } =
+    let print ppf { bounds_mask } =
       let open Format in
-      fprintf ppf "@[{ relevant_bounds = %a }@]" Bounds_mask.print
-        relevant_bounds
+      fprintf ppf "@[{ bounds_mask = %a }@]" Bounds_mask.print bounds_mask
 
-    let printable_relevant_bounds ~mod_bounds
-        ~type_info:{ relevant_bounds = explicit_relevant_bounds } =
-      (* A max direct bound makes its axis fully relevant even when [type_info]
-         omits the axis as an optimization. *)
-      Mod_bounds.get_max_axes mod_bounds
-      |> Bounds_mask.of_axis_set
-      |> Bounds_mask.join explicit_relevant_bounds
+    let printable_bounds_mask ~mod_bounds
+        ~type_info:{ bounds_mask = explicit_bounds_mask } =
+      (* Contributions covered by direct bounds can be restored for printing. *)
+      Mod_bounds.to_axis_lattice mod_bounds
+      |> Bounds_mask.join explicit_bounds_mask
 
     let has_non_id_modalities ~mod_bounds ~type_info =
-      let relevant_bounds = printable_relevant_bounds ~mod_bounds ~type_info in
-      not (Bounds_mask.equal relevant_bounds Axis_lattice.top)
+      let bounds_mask = printable_bounds_mask ~mod_bounds ~type_info in
+      not (Bounds_mask.equal bounds_mask Axis_lattice.top)
   end
 
   let to_best_eff_map = function
@@ -779,11 +776,11 @@ module With_bounds = struct
       With_bounds (With_bounds_types.singleton type_expr type_info)
     | With_bounds bounds -> With_bounds (add_bound type_expr type_info bounds)
 
-  let modalities_of_relevant_bounds relevant_bounds =
+  let modalities_of_bounds_mask bounds_mask =
     let modal_modality =
-      relevant_bounds |> Axis_lattice.to_mode_crossing |> Crossing.to_modality
+      bounds_mask |> Axis_lattice.to_mode_crossing |> Crossing.to_modality
     in
-    let externality = Axis_lattice.externality relevant_bounds in
+    let externality = Axis_lattice.externality bounds_mask in
     let nonmodal_axes =
       if Externality.equal externality Externality.max
       then []
@@ -791,10 +788,8 @@ module With_bounds = struct
     in
     modal_modality, nonmodal_axes
 
-  let format_relevant_bounds ppf relevant_bounds =
-    let modal_modality, nonmodal_axes =
-      modalities_of_relevant_bounds relevant_bounds
-    in
+  let format_bounds_mask ppf bounds_mask =
+    let modal_modality, nonmodal_axes = modalities_of_bounds_mask bounds_mask in
     let modal_axes =
       Modality.Const.diff Modality.Const.id modal_modality
       |> List.map (fun (Modality.Atom (axis, modality)) ->
@@ -813,9 +808,9 @@ module With_bounds = struct
     | With_bounds wbs ->
       let bounds =
         wbs |> With_bounds_types.to_seq
-        |> Seq.map (fun (ty, ({ relevant_bounds } : With_bounds_type_info.t)) ->
-            Fmt.asprintf "with %a%a" !print_type_expr ty format_relevant_bounds
-              relevant_bounds)
+        |> Seq.map (fun (ty, ({ bounds_mask } : With_bounds_type_info.t)) ->
+            Fmt.asprintf "with %a%a" !print_type_expr ty format_bounds_mask
+              bounds_mask)
         |> List.of_seq
         (* HACK: we pre-format the types as strings so we so we can sort them
            lexicographically, because otherwise the order of printed [with]s is
@@ -1148,10 +1143,10 @@ module Base_and_axes = struct
             seen_args : type_expr list;
                 (** The arguments the type constructor was most recently seen
                     with. *)
-            relevant_bounds_when_seen : Bounds_mask.t
+            bounds_mask_when_seen : Bounds_mask.t
           }
 
-        type seen_row_var = { relevant_bounds_when_seen : Bounds_mask.t }
+        type seen_row_var = { bounds_mask_when_seen : Bounds_mask.t }
         [@@unboxed]
 
         type t =
@@ -1238,12 +1233,12 @@ module Base_and_axes = struct
            cutting off the recursion, it continues until it runs out of fuel.
         *)
 
-        let rec check ~relevant_bounds
+        let rec check ~bounds_mask
             ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
             ty =
           match Types.get_desc ty with
-          | Tmod (ty, _) -> check ~relevant_bounds t ty
-          | Tpoly (ty, _) | Trepr (ty, _) -> check ~relevant_bounds t ty
+          | Tmod (ty, _) -> check ~bounds_mask t ty
+          | Tpoly (ty, _) | Trepr (ty, _) -> check ~bounds_mask t ty
           | Ttuple _ ->
             if tuple_fuel > 0
             then
@@ -1262,13 +1257,13 @@ module Base_and_axes = struct
                         Path.Map.add p
                           { fuel = initial_fuel_per_ty;
                             seen_args = args;
-                            relevant_bounds_when_seen = relevant_bounds
+                            bounds_mask_when_seen = bounds_mask
                           }
                           seen_constrs
                     };
                   skippable_bounds = Bounds_mask.bot
                 }
-            | Some { fuel; seen_args; relevant_bounds_when_seen } ->
+            | Some { fuel; seen_args; bounds_mask_when_seen } ->
               let args_equal =
                 List.for_all2
                   (fun ty1 ty2 ->
@@ -1278,10 +1273,10 @@ module Base_and_axes = struct
               in
               let skippable_bounds =
                 if args_equal && not (context.is_abstract p)
-                then relevant_bounds_when_seen
+                then bounds_mask_when_seen
                 else Bounds_mask.bot
               in
-              if Bounds_mask.le relevant_bounds skippable_bounds
+              if Bounds_mask.le bounds_mask skippable_bounds
               then Skip
               else if fuel > 0
               then
@@ -1292,15 +1287,15 @@ module Base_and_axes = struct
                           Path.Map.add p
                             { fuel = fuel - 1;
                               seen_args = args;
-                              relevant_bounds_when_seen =
+                              bounds_mask_when_seen =
                                 (* Matching arguments let us join relevance:
                                    their subtrees have been visited under both
                                    masks. *)
                                 (if args_equal
                                  then
-                                   Bounds_mask.join relevant_bounds
-                                     relevant_bounds_when_seen
-                                 else relevant_bounds)
+                                   Bounds_mask.join bounds_mask
+                                     bounds_mask_when_seen
+                                 else bounds_mask)
                             }
                             seen_constrs
                       };
@@ -1309,14 +1304,14 @@ module Base_and_axes = struct
               else Stop { t with fuel_status = Ran_out_of_fuel })
           | Tvariant _ ->
             let row_var_id = get_id (Btype.proxy ty) in
-            let { relevant_bounds_when_seen } =
+            let { bounds_mask_when_seen } =
               Numbers.Int.Map.find_opt row_var_id seen_row_vars
               |> Option.value
-                   ~default:{ relevant_bounds_when_seen = Bounds_mask.bot }
+                   ~default:{ bounds_mask_when_seen = Bounds_mask.bot }
             in
             (* For our purposes, row variables are like constructors with no arguments,
                so if we saw one already, we don't need to expand it again. *)
-            if Bounds_mask.le relevant_bounds relevant_bounds_when_seen
+            if Bounds_mask.le bounds_mask bounds_mask_when_seen
             then Skip
             else
               Continue
@@ -1324,13 +1319,12 @@ module Base_and_axes = struct
                     { t with
                       seen_row_vars =
                         Numbers.Int.Map.add row_var_id
-                          { relevant_bounds_when_seen =
-                              Bounds_mask.join relevant_bounds_when_seen
-                                relevant_bounds
+                          { bounds_mask_when_seen =
+                              Bounds_mask.join bounds_mask_when_seen bounds_mask
                           }
                           seen_row_vars
                     };
-                  skippable_bounds = relevant_bounds_when_seen
+                  skippable_bounds = bounds_mask_when_seen
                 }
           (* CR metaprogramming jbachurski: Since quotes/splices inherit
              (quoted/spliced) with-bounds from their operand, they do not
@@ -1346,7 +1340,7 @@ module Base_and_axes = struct
           | Tlink _ | Tsubst _ ->
             Misc.fatal_error "Tlink or Tsubst in normalize"
       end in
-      let rec loop (ctl : Loop_control.t) bounds_so_far relevant_bounds :
+      let rec loop (ctl : Loop_control.t) bounds_so_far bounds_mask :
           (type_expr * With_bounds_type_info.t) list ->
           Mod_bounds.t * (l * disallowed) with_bounds * Loop_control.t =
         function
@@ -1354,7 +1348,7 @@ module Base_and_axes = struct
         | [] -> bounds_so_far, No_with_bounds, ctl
         | _
           when (not t_has_abstract_base)
-               && Mod_bounds.is_max_within_mask bounds_so_far relevant_bounds ->
+               && Mod_bounds.is_max_within_mask bounds_so_far bounds_mask ->
           (* CR layouts v2.8: we can do better by early-terminating on a per-axis
              basis *)
           ( bounds_so_far,
@@ -1367,50 +1361,49 @@ module Base_and_axes = struct
             | None -> ti
             | Some map_type_info -> map_type_info ty ti
           in
-          let relevant_bounds_for_ty =
+          let bounds_mask_for_ty =
             let from_ti =
               if t_has_abstract_base
-              then ti.relevant_bounds
+              then ti.bounds_mask
               else
-                Bounds_mask.residual ti.relevant_bounds
-                  (Mod_bounds.saturated_mask bounds_so_far ti.relevant_bounds)
+                Bounds_mask.residual ti.bounds_mask
+                  (Mod_bounds.saturated_mask bounds_so_far ti.bounds_mask)
             in
-            Bounds_mask.meet from_ti relevant_bounds
+            Bounds_mask.meet from_ti bounds_mask
           in
-          match Bounds_mask.is_empty relevant_bounds_for_ty with
-          | true -> loop ctl bounds_so_far relevant_bounds bs
+          match Bounds_mask.is_empty bounds_mask_for_ty with
+          | true -> loop ctl bounds_so_far bounds_mask bs
           | false -> (
             match get_desc ty with
             | Tmod (ty, mod_bounds) ->
-              let relevant_bounds_for_inner =
-                Bounds_mask.meet relevant_bounds_for_ty
+              let bounds_mask_for_inner =
+                Bounds_mask.meet bounds_mask_for_ty
                   (Mod_bounds.to_axis_lattice mod_bounds)
               in
-              if Bounds_mask.is_empty relevant_bounds_for_inner
-              then loop ctl bounds_so_far relevant_bounds bs
+              if Bounds_mask.is_empty bounds_mask_for_inner
+              then loop ctl bounds_so_far bounds_mask bs
               else
                 let ti : With_bounds_type_info.t =
-                  { relevant_bounds = relevant_bounds_for_inner }
+                  { bounds_mask = bounds_mask_for_inner }
                 in
-                loop ctl bounds_so_far relevant_bounds ((ty, ti) :: bs)
+                loop ctl bounds_so_far bounds_mask ((ty, ti) :: bs)
             | _ -> (
               let found_jkind_for_ty ctl b_upper_bounds b_with_bounds quality
                   skippable_bounds :
                   Mod_bounds.t * (l * disallowed) with_bounds * Loop_control.t =
-                let relevant_bounds_for_ty =
-                  Bounds_mask.residual relevant_bounds_for_ty skippable_bounds
+                let bounds_mask_for_ty =
+                  Bounds_mask.residual bounds_mask_for_ty skippable_bounds
                 in
                 match quality, mode, t_has_abstract_base with
                 | Best, _, _ | Not_best, Ignore_best, false -> (
                   let bounds_so_far =
                     Mod_bounds.join bounds_so_far
-                      (Mod_bounds.cap_by_mask_l b_upper_bounds
-                         relevant_bounds_for_ty)
+                      (Mod_bounds.apply_mask b_upper_bounds bounds_mask_for_ty)
                   in
                   (* Descend into the with-bounds of each of our with-bounds types'
                     with-bounds *)
                   let bounds_so_far, nested_with_bounds, ctl =
-                    loop ctl bounds_so_far relevant_bounds_for_ty
+                    loop ctl bounds_so_far bounds_mask_for_ty
                       (With_bounds.to_list b_with_bounds)
                   in
                   match ctl.fuel_status, mode with
@@ -1424,7 +1417,7 @@ module Base_and_axes = struct
                      Ideally, this whole problem goes away once we rethink fuel.
                   *)
                     let bounds, bs', ctl =
-                      loop ctl bounds_so_far relevant_bounds bs
+                      loop ctl bounds_so_far bounds_mask bs
                     in
                     bounds, With_bounds.join nested_with_bounds bs', ctl
                   | Ran_out_of_fuel, Require_best ->
@@ -1436,17 +1429,14 @@ module Base_and_axes = struct
                    local. Bizarre. Investigate. *)
                   let bounds_so_far, (bs' : (l * disallowed) With_bounds.t), ctl
                       =
-                    loop ctl bounds_so_far relevant_bounds bs
+                    loop ctl bounds_so_far bounds_mask bs
                   in
                   ( bounds_so_far,
-                    With_bounds.add ty
-                      { relevant_bounds = relevant_bounds_for_ty }
-                      bs',
+                    With_bounds.add ty { bounds_mask = bounds_mask_for_ty } bs',
                     ctl )
               in
               match
-                Loop_control.check ~relevant_bounds:relevant_bounds_for_ty ctl
-                  ty
+                Loop_control.check ~bounds_mask:bounds_mask_for_ty ctl ty
               with
               | Stop ctl -> (
                 match mode with
@@ -1457,7 +1447,7 @@ module Base_and_axes = struct
                 | Require_best ->
                   (* See Note [Ran out of fuel when requiring best]. *)
                   Mod_bounds.max, No_with_bounds, ctl)
-              | Skip -> loop ctl bounds_so_far relevant_bounds bs
+              | Skip -> loop ctl bounds_so_far bounds_mask bs
               | Continue { ctl; skippable_bounds } -> (
                 match context.jkind_of_type ty with
                 | Some b_jkind ->
@@ -1970,12 +1960,12 @@ module Const = struct
           let otys = !outcometrees_of_types (List.map fst with_bounds) in
           List.map2
             (fun (_, type_info) out_type ->
-              let relevant_bounds =
-                With_bounds.Type_info.printable_relevant_bounds
+              let bounds_mask =
+                With_bounds.Type_info.printable_bounds_mask
                   ~mod_bounds:actual.mod_bounds ~type_info
               in
               let modal_modality, nonmodal_axes =
-                With_bounds.modalities_of_relevant_bounds relevant_bounds
+                With_bounds.modalities_of_bounds_mask bounds_mask
               in
               let modal =
                 !outcometree_of_modalities Types.Immutable modal_modality
@@ -2333,7 +2323,7 @@ module Const = struct
           let modality, externality =
             Typemode.transl_with_bound_modifiers modalities
           in
-          let relevant_bounds =
+          let bounds_mask =
             let bounds = Mod_bounds.mask_of_modality ~modality in
             match externality with
             | None -> bounds
@@ -2347,8 +2337,7 @@ module Const = struct
           in
           { base = base.base;
             mod_bounds = base.mod_bounds;
-            with_bounds =
-              With_bounds.add type_ { relevant_bounds } base.with_bounds
+            with_bounds = With_bounds.add type_ { bounds_mask } base.with_bounds
           }
         | Overapproximate_to_top ->
           (* A with-bound weakens the mod-bounds, so a safe approximation is to
@@ -2595,8 +2584,8 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
   let jkind = type_jkind_purely ty in
   let with_bounds_types =
-    let relevant_bounds = Mod_bounds.mask_of_modality ~modality in
-    With_bounds_types.singleton ty { relevant_bounds }
+    let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+    With_bounds_types.singleton ty { bounds_mask }
   in
   fresh_jkind_poly
     { base = jkind.jkind.base;
@@ -2867,25 +2856,19 @@ let set_layout jk layout =
   { jk with jkind = { jk.jkind with base = Layout layout } }
 
 let apply_modality_l modality jk =
-  let relevant_bounds = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds =
-    Mod_bounds.cap_by_mask_l jk.jkind.mod_bounds relevant_bounds
-  in
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
   let with_bounds =
     With_bounds.map
-      (fun ti ->
-        { relevant_bounds = Bounds_mask.meet ti.relevant_bounds relevant_bounds
-        })
+      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
       jk.jkind.with_bounds
   in
   { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
   |> disallow_right
 
 let apply_modality_r modality jk =
-  let relevant_bounds = Mod_bounds.mask_of_modality ~modality in
-  let mod_bounds =
-    Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds relevant_bounds
-  in
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let apply_or_null_l env jkind =
@@ -3549,11 +3532,9 @@ module Violation = struct
                   in
                   With_bounds.to_list jkind.with_bounds
                   |> List.filter_map
-                       (fun
-                         (ty, ({ relevant_bounds } : With_bounds_type_info.t))
-                       ->
+                       (fun (ty, ({ bounds_mask } : With_bounds_type_info.t)) ->
                          let axis_bounds =
-                           Bounds_mask.meet relevant_bounds axis_mask
+                           Bounds_mask.meet bounds_mask axis_mask
                          in
                          if Bounds_mask.is_empty axis_bounds
                          then None
@@ -3563,7 +3544,7 @@ module Violation = struct
                            in
                            let modal_modality, nonmodal_axes =
                              Bounds_mask.join axis_bounds other_axes
-                             |> With_bounds.modalities_of_relevant_bounds
+                             |> With_bounds.modalities_of_bounds_mask
                            in
                            let modalities =
                              !outcometree_of_modalities Types.Immutable
@@ -4091,26 +4072,26 @@ let equal_unsafe_mode_crossing ~type_equal ~context env umc1 umc2 =
   let wb2 = With_bounds.to_best_eff_map umc2.unsafe_with_bounds in
   (* Best-effort maps may contain equivalent keys. Aggregate them after capping
      each occurrence by the bound type's direct bounds. *)
-  let relevant_bounds_for_type ty bounds =
+  let bounds_mask_for_type ty bounds =
     With_bounds_types.to_seq bounds
     |> Seq.fold_left
-         (fun relevant_bounds (ty', (info : With_bounds_type_info.t)) ->
+         (fun bounds_mask (ty', (info : With_bounds_type_info.t)) ->
            if type_equal ty ty'
            then
-             Bounds_mask.join relevant_bounds
-               (Bounds_mask.meet info.relevant_bounds
+             Bounds_mask.join bounds_mask
+               (Bounds_mask.meet info.bounds_mask
                   (direct_bounds_for_type ~context env ty'))
-           else relevant_bounds)
+           else bounds_mask)
          Bounds_mask.bot
-    |> fun relevant_bounds -> Bounds_mask.residual relevant_bounds direct_bounds
+    |> fun bounds_mask -> Bounds_mask.residual bounds_mask direct_bounds
   in
-  let same_relevant_bounds ty =
+  let same_bounds_mask ty =
     Bounds_mask.equal
-      (relevant_bounds_for_type ty wb1)
-      (relevant_bounds_for_type ty wb2)
+      (bounds_mask_for_type ty wb1)
+      (bounds_mask_for_type ty wb2)
   in
-  With_bounds_types.for_all (fun ty _info -> same_relevant_bounds ty) wb1
-  && With_bounds_types.for_all (fun ty _info -> same_relevant_bounds ty) wb2
+  With_bounds_types.for_all (fun ty _info -> same_bounds_mask ty) wb1
+  && With_bounds_types.for_all (fun ty _info -> same_bounds_mask ty) wb2
 
 let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
     =
@@ -4161,12 +4142,12 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
       Base_and_axes.normalize env sub_jkind ~skip_axes:axes_max_on_right
         ~previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
         ~context ~mode:Ignore_best
-        ~map_type_info:(fun ty { relevant_bounds = left_relevant_bounds } ->
+        ~map_type_info:(fun ty { bounds_mask = left_bounds_mask } ->
           let direct_bounds_for_type = direct_bounds_for_type ~context env ty in
-          let left_relevant_bounds =
-            Bounds_mask.meet left_relevant_bounds direct_bounds_for_type
+          let left_bounds_mask =
+            Bounds_mask.meet left_bounds_mask direct_bounds_for_type
           in
-          let right_relevant_bounds =
+          let right_bounds_mask =
             right_bounds_seq
             (* CR layouts v2.8: maybe it's worth memoizing using a best-effort
                type map? Internal ticket 5086. *)
@@ -4174,22 +4155,21 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
                  (fun acc (ty2, ti) ->
                    match type_equal ty ty2 with
                    | true ->
-                     Bounds_mask.join acc
-                       ti.With_bounds_type_info.relevant_bounds
+                     Bounds_mask.join acc ti.With_bounds_type_info.bounds_mask
                    | false -> acc)
                  Bounds_mask.bot
-            |> fun bounds -> Bounds_mask.meet bounds direct_bounds_for_type
+            |> Bounds_mask.meet direct_bounds_for_type
           in
           let saturated_by_right_direct_bounds =
-            Mod_bounds.saturated_mask best_super.mod_bounds left_relevant_bounds
+            Mod_bounds.saturated_mask best_super.mod_bounds left_bounds_mask
           in
-          let remaining_relevant_bounds =
-            Bounds_mask.residual left_relevant_bounds
-              (Bounds_mask.join right_relevant_bounds
+          let remaining_bounds_mask =
+            Bounds_mask.residual left_bounds_mask
+              (Bounds_mask.join right_bounds_mask
                  saturated_by_right_direct_bounds)
           in
           (* MB_WITH : drop types from the left that appear on the right *)
-          { relevant_bounds = remaining_relevant_bounds })
+          { bounds_mask = remaining_bounds_mask })
     in
     match sub with
     | { base = _; mod_bounds = sub_upper_bounds; with_bounds = No_with_bounds }
