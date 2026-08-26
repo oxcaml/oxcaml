@@ -125,11 +125,21 @@ end = struct
   let create ~used_value_slots ~exported_offsets
       ({ unit_metadata; final_typing_env; all_code; deps; rebuild_data } :
         cmr_format) : t =
-    (* The resuming invocation reads imported code metadata from the
-       dependencies' .cmx files so only this unit's own code needs storing. *)
+    (* The resuming invocation needs at least the metadata of every code ID the
+       rebuild data references. For other units' code IDs it cannot rely on
+       those units' .cmx files: for LTO participants those are rebuilt, and a
+       rebuild may prune code that was still present when this unit was
+       simplified (e.g. code the Reaper deleted whose enclosing set of closures
+       was inlined here). [all_code] as produced by simplification contains
+       metadata-only entries for all imported code, so we keep the referenced
+       ones; only this unit's own code is stored in full. *)
+    let code_ids_referenced_by_rebuild_data =
+      (Reaper.Staged.Traverse_rebuild.ids_for_export rebuild_data).code_ids
+    in
     let all_code =
       Exported_code.filter all_code ~f:(fun code_id ->
-          Current_unit.is_current (Code_id.get_compilation_unit code_id))
+          Current_unit.is_current (Code_id.get_compilation_unit code_id)
+          || Code_id.Set.mem code_id code_ids_referenced_by_rebuild_data)
     in
     let final_typing_env, canonicalise =
       match final_typing_env with
