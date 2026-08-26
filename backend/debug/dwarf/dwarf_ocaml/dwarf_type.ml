@@ -1209,7 +1209,6 @@ let create_boxed_simd_type ?name ~reference ~parent_proto_die split =
 
 module Die_gen_ctx = DS.Die_gen_ctx
 module Rec_var_env = Die_gen_ctx.Rec_var_env
-module Cache = Die_gen_ctx.Cache
 module Name_cache = Die_gen_ctx.Name_cache
 
 let partition_constructors constructors ~f =
@@ -1234,11 +1233,15 @@ let partition_constructors constructors ~f =
    below. *)
 let rec runtime_shape_to_dwarf_die ~ctx (t : RS.t) ~parent_proto_die
     ~fallback_value_die ~rec_env =
-  match Cache.find (Die_gen_ctx.cache ctx) ~inp:t ~rec_env with
+  (* The cache key only includes the binders that [t] can reference (see
+     [Die_gen_ctx.find_cached_die]); in particular closed shapes are keyed with
+     the empty environment, so that e.g. a shape appearing both at top level and
+     inside (unrelated) recursive types is only expanded once. *)
+  match Die_gen_ctx.find_cached_die ctx ~inp:t ~rec_env with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    Cache.add (Die_gen_ctx.cache ctx) ~inp:t ~rec_env ~outp:reference;
+    Die_gen_ctx.add_cached_die ctx ~inp:t ~rec_env ~outp:reference;
     let name = None in
     (* Instead of omitting the name argument below, we fix it to be [None] here
        such that it is easier to change this code if in the future we want to

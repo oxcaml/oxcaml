@@ -467,6 +467,14 @@ end
 
 type complex_shape = t
 
+(* Cache keys here include the full recursive-binder environment, so a shape
+   occurring under several different environments is converted once per
+   environment even if it uses none of the binders. Unlike for the DWARF type
+   DIE cache (see [Dwarf_state.Die_gen_ctx]), this only costs compilation time,
+   not DWARF size: the resulting [Runtime_shape.t]s are structurally equal, so
+   the DIE cache still deduplicates the output. Restricting the keys as the DIE
+   cache does would require computing the free recursive variables of a
+   [Shape.t], which carries no such summary. *)
 module Shape_cache : sig
   type complex_shape := t
 
