@@ -2732,6 +2732,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
             let tmmode = Typemode.transl_mode_annots smmode in
             let mmode =
               tmmode.mode_modes
+              |> Typemode.apply_mode_implications
               (* CR zqian: mode annotations on rec modules default to legacy for
               now. We can remove this workaround once [module type of] doesn't
               require zapping. *)
@@ -2863,10 +2864,10 @@ let check_nongen_signature env sg =
 
 let remove_functor_mode_variables = function
   | Mty_functor (arg_opt, _, mres) ->
-      Mode.Alloc.zap_to_legacy mres |> ignore;
+      Mode.Alloc.zap_to_legacy ~arg:false mres |> ignore;
       begin match arg_opt with
       | Unit -> ()
-      | Named (_, _, marg) -> Mode.Alloc.zap_to_legacy marg |> ignore
+      | Named (_, _, marg) -> Mode.Alloc.zap_to_legacy ~arg:true marg |> ignore
       end
   | _ -> ()
 

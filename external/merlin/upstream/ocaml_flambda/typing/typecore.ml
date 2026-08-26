@@ -8046,7 +8046,7 @@ and type_expect_
       let (ty, exp_extra) =
         let alloc_mode =
           Mode.Alloc.Const.Option.value
-            modes.mode_modes
+            (Typemode.apply_mode_implications modes.mode_modes)
             ~default:Mode.Alloc.Const.legacy
         in
         type_constraint env sty alloc_mode
@@ -9117,7 +9117,10 @@ and type_constraint_expect
   =
   fun constraint_arg env expected_mode loc ~loc_arg type_mode constraint_ ty_expected ->
   let ret, ty, exp_extra =
-    let type_mode = Alloc.Const.Option.value ~default:Alloc.Const.legacy type_mode in
+    let type_mode =
+      Alloc.Const.Option.value ~default:Alloc.Const.legacy
+        (Typemode.apply_mode_implications type_mode)
+    in
     match constraint_ with
     | Pcoerce (ty_constrain, ty_coerce) ->
         type_coerce constraint_arg env expected_mode loc ty_constrain ty_coerce
