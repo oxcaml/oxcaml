@@ -443,17 +443,20 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (enabled_if (= %{context_name} "main"))
  (targets test_cross_unit_paths_dwarf.exe)
- (deps cross_unit_dir/cu_lib_inner.ml cross_unit_dir/cu_lib_outer.ml test_cross_unit_paths_dwarf.ml ocamlopt_flags.sexp)
+ (deps cross_unit_dir/cu_lib_inner.ml cross_unit_dir/cu_lib_outer.ml cross_unit_dir/test_cross_unit_paths_dwarf.ml test_cross_unit_paths_dwarf.mli test_cross_unit_paths_dwarf.ml test_cross_unit_paths_dwarf_main.ml ocamlopt_flags.sexp)
  (action
   (no-infer
    (progn
     (system "grep -v '^;' ocamlopt_flags.sexp | tr -d '()' > flags.txt")
     (chdir cross_unit_dir
      (progn
-      (system "%{bin:ocamlopt.opt} $(cat ../flags.txt) -directory oxcaml_dwarf/cross_unit_dir -I . -c cu_lib_inner.ml")
-      (system "%{bin:ocamlopt.opt} $(cat ../flags.txt) -directory oxcaml_dwarf/cross_unit_dir -I . -c cu_lib_outer.ml")))
+      (system "%{bin:ocamlopt.opt} $(cat ../flags.txt) -directory oxcaml_dwarf/cross_unit_dir -I . -o cu_lib_inner.cmx -c cu_lib_inner.ml")
+      (system "%{bin:ocamlopt.opt} $(cat ../flags.txt) -directory oxcaml_dwarf/cross_unit_dir -I . -o cu_lib_outer.cmx -c cu_lib_outer.ml")
+      (system "%{bin:ocamlopt.opt} $(cat ../flags.txt) -directory oxcaml_dwarf/cross_unit_dir -I . -o cu_prim.cmx -c test_cross_unit_paths_dwarf.ml")))
+    (system "%{bin:ocamlopt.opt} $(cat flags.txt) -directory oxcaml_dwarf -I cross_unit_dir -c test_cross_unit_paths_dwarf.mli")
     (system "%{bin:ocamlopt.opt} $(cat flags.txt) -directory oxcaml_dwarf -I cross_unit_dir -c test_cross_unit_paths_dwarf.ml")
-    (system "%{bin:ocamlopt.opt} $(cat flags.txt) cross_unit_dir/cu_lib_inner.cmx cross_unit_dir/cu_lib_outer.cmx test_cross_unit_paths_dwarf.cmx -o test_cross_unit_paths_dwarf.exe")))))
+    (system "%{bin:ocamlopt.opt} $(cat flags.txt) -directory oxcaml_dwarf -I cross_unit_dir -c test_cross_unit_paths_dwarf_main.ml")
+    (system "%{bin:ocamlopt.opt} $(cat flags.txt) cross_unit_dir/cu_lib_inner.cmx cross_unit_dir/cu_lib_outer.cmx cross_unit_dir/cu_prim.cmx test_cross_unit_paths_dwarf.cmx test_cross_unit_paths_dwarf_main.cmx -o test_cross_unit_paths_dwarf.exe")))))
 
 (rule
  (alias runtest-dwarf)
@@ -461,6 +464,6 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
   (and
    (= %{context_name} "main")
    (<> %{env:OXCAML_LLDB=} "")))
- (deps test_cross_unit_paths_dwarf.exe test_cross_unit_paths_dwarf.py test_cross_unit_paths_dwarf.ml cross_unit_dir/cu_lib_inner.ml cross_unit_dir/cu_lib_outer.ml lldb_test_utils.py)
+ (deps test_cross_unit_paths_dwarf.exe test_cross_unit_paths_dwarf.py test_cross_unit_paths_dwarf.mli test_cross_unit_paths_dwarf.ml test_cross_unit_paths_dwarf_main.ml cross_unit_dir/cu_lib_inner.ml cross_unit_dir/cu_lib_outer.ml cross_unit_dir/test_cross_unit_paths_dwarf.ml lldb_test_utils.py)
  (action
   (run %{env:OXCAML_LLDB=} --batch -o "command script import test_cross_unit_paths_dwarf.py")))

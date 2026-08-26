@@ -9,7 +9,9 @@ each frame's line entry must resolve to the defining unit's real source
 directory: a regression that records the foreign files' bare names, leaving
 them to be resolved against the consuming unit's directory, puts the
 cu_lib_*.ml frames at nonexistent .../oxcaml_dwarf/cu_lib_*.ml paths
-instead of .../cross_unit_dir/cu_lib_*.ml.
+instead of .../cross_unit_dir/cu_lib_*.ml.  The test also checks that a
+primitive-to-value wrapper imported from a foreign unit with the same source
+basename is located at the matching declaration in this unit's interface.
 """
 
 import os
@@ -27,6 +29,7 @@ NOT_INLINED = False
 INNER_SOURCE = "cross_unit_dir/cu_lib_inner.ml"
 OUTER_SOURCE = "cross_unit_dir/cu_lib_outer.ml"
 MAIN_SOURCE = "test_cross_unit_paths_dwarf.ml"
+INTERFACE_SOURCE = "test_cross_unit_paths_dwarf.mli"
 
 
 def expected_frames():
@@ -98,6 +101,37 @@ def main():
                 f"    expected {describe(name, inlined, '.../' + path_suffix, line, column)}\n"
                 f"    got      {describe(*actual)}")
     assert not problems, "backtrace mismatch:\n" + "\n".join(problems)
+
+    process.Kill()
+    bp.SetEnabled(False)
+
+    primitive_bp = target.BreakpointCreateByName("caml_sys_time")
+    assert primitive_bp.GetNumLocations() > 0, \
+        "breakpoint on caml_sys_time did not resolve"
+    process = target.LaunchSimple(None, None, ".")
+    assert process and process.GetState() == lldb.eStateStopped, \
+        "process did not stop in caml_sys_time"
+    stopped = [
+        thread for thread in process
+        if thread.GetStopReason() == lldb.eStopReasonBreakpoint
+    ]
+    assert len(stopped) == 1, f"expected 1 stopped thread, got {len(stopped)}"
+
+    expected_path_suffix = "/oxcaml_dwarf/" + INTERFACE_SOURCE
+    expected_line, _ = lldb_test_utils.source_pos(
+        INTERFACE_SOURCE, "val prim_time")
+    wrapper_frames = [
+        frame for frame in stopped[0]
+        if frame_path(frame).endswith(expected_path_suffix)
+        and frame.GetLineEntry().GetLine() == expected_line
+    ]
+    assert len(wrapper_frames) == 1, (
+        "expected one primitive-coercion wrapper at "
+        f"...{expected_path_suffix}:{expected_line}, got "
+        + "; ".join(
+            f"{frame_path(frame)}:{frame.GetLineEntry().GetLine()}"
+            for frame in stopped[0]
+        ))
 
     process.Kill()
 

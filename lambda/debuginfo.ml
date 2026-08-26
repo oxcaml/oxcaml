@@ -398,8 +398,10 @@ let build_root_for_relative_directory =
         let cwd = Sys.getcwd () in
         let suffix = Filename.dir_sep ^ dir in
         if String.ends_with ~suffix cwd
-           && String.length cwd > String.length suffix
-        then Some (String.sub cwd 0 (String.length cwd - String.length suffix))
+        then
+          match String.length cwd - String.length suffix with
+          | 0 -> Some Filename.dir_sep
+          | root_length -> Some (String.sub cwd 0 root_length)
         else None
       else None)
 

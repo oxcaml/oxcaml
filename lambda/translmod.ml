@@ -736,40 +736,9 @@ and transl_structure ~scopes loc
                     (fun (pos, cc) ->
                       match cc with
                       | Tcoerce_primitive p ->
-                          (* When the primitive is declared in the unit being
-                             compiled, locate the wrapper at its declaration,
-                             so that diagnostics arising from the coercion
-                             (e.g. [@@zero_alloc] errors; see
-                             tests/typing-zero-alloc/primitive_coercion*.ml)
-                             point precisely at the offending [external].
-                             When it instead reaches us from another
-                             compilation unit's interface, its file name is
-                             not resolvable relative to this unit's directory
-                             and would yield dangling paths in the debugging
-                             information, so use the coercion site (as
-                             [apply_coercion] does), which is both resolvable
-                             and the more useful location here.  If in doubt
-                             (e.g. ghost locations), treat the primitive as
-                             declared in the current unit.  *)
-                          let wrapper_loc =
-                            let declared_in_current_unit =
-                              let file =
-                                p.pc_loc.Location.loc_start.Lexing.pos_fname
-                              in
-                              let module_name f =
-                                Filename.remove_extension (Filename.basename f)
-                              in
-                              Location.is_none p.pc_loc
-                              || String.equal file !Location.input_name
-                              || String.equal (module_name file)
-                                   (module_name !Location.input_name)
-                            in
-                            if declared_in_current_unit
-                            then of_location ~scopes p.pc_loc
-                            else loc
-                          in
                           Translprim.transl_primitive
-                            wrapper_loc p.pc_desc p.pc_env p.pc_type
+                            (of_location ~scopes p.pc_loc)
+                            p.pc_desc p.pc_env p.pc_type
                             ~poly_mode:p.pc_poly_mode
                             ~poly_sort:p.pc_poly_sort
                             ~yielding:p.pc_yielding

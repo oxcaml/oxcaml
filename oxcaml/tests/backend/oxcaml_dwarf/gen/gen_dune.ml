@@ -115,7 +115,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      The custom rule below instead compiles the modules of [lib_modules] from
      within [lib_dir] -- each unit with a [-directory] argument identifying its
      source directory, as directory-at-a-time build systems do -- and then
-     compiles and links [name] manually. *)
+     compiles and links [name] manually.  Each [lib_modules] entry pairs a
+     source basename with the compilation-unit name to pass to [-o]. *)
   let print_cross_unit_dwarf_python_test name ~lib_dir ~lib_modules =
     (* [(:include ...)] is only available in field position, so the flags in
        ocamlopt_flags.sexp cannot be spliced directly into the rule's action.
@@ -130,21 +131,26 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
     let flags_from path = Printf.sprintf "$(cat %s)" path in
     let lib_mls =
       String.concat " "
-        (List.map (fun m -> Printf.sprintf "%s/%s.ml" lib_dir m) lib_modules)
+        (List.map
+           (fun (source, _unit) -> Printf.sprintf "%s/%s.ml" lib_dir source)
+           lib_modules)
     in
     let lib_cmxs =
       String.concat " "
-        (List.map (fun m -> Printf.sprintf "%s/%s.cmx" lib_dir m) lib_modules)
+        (List.map
+           (fun (_source, unit_name) ->
+             Printf.sprintf "%s/%s.cmx" lib_dir unit_name)
+           lib_modules)
     in
     let lib_compile_runs =
       String.concat "\n"
         (List.map
-           (fun m ->
+           (fun (source, unit_name) ->
              Printf.sprintf
                "      (system \"%%{bin:ocamlopt.opt} %s -directory \
-                oxcaml_dwarf/%s -I . -c %s.ml\")"
+                oxcaml_dwarf/%s -I . -o %s.cmx -c %s.ml\")"
                (flags_from "../flags.txt")
-               lib_dir m)
+               lib_dir unit_name source)
            lib_modules)
     in
     let subst = function
@@ -161,7 +167,7 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  ${enabled_if}
  (targets ${name}.exe)
- (deps ${lib_mls} ${name}.ml ocamlopt_flags.sexp)
+ (deps ${lib_mls} ${name}.mli ${name}.ml ${name}_main.ml ocamlopt_flags.sexp)
  (action
   (no-infer
    (progn
@@ -169,13 +175,15 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
     (chdir ${lib_dir}
      (progn
 ${lib_compile_runs}))
+    (system "%{bin:ocamlopt.opt} ${flags} -directory oxcaml_dwarf -I ${lib_dir} -c ${name}.mli")
     (system "%{bin:ocamlopt.opt} ${flags} -directory oxcaml_dwarf -I ${lib_dir} -c ${name}.ml")
-    (system "%{bin:ocamlopt.opt} ${flags} ${lib_cmxs} ${name}.cmx -o ${name}.exe")))))
+    (system "%{bin:ocamlopt.opt} ${flags} -directory oxcaml_dwarf -I ${lib_dir} -c ${name}_main.ml")
+    (system "%{bin:ocamlopt.opt} ${flags} ${lib_cmxs} ${name}.cmx ${name}_main.cmx -o ${name}.exe")))))
 
 (rule
  (alias runtest-dwarf)
  ${enabled_if_with_lldb}
- (deps ${name}.exe ${name}.py ${name}.ml ${lib_mls} lldb_test_utils.py)
+ (deps ${name}.exe ${name}.py ${name}.mli ${name}.ml ${name}_main.ml ${lib_mls} lldb_test_utils.py)
  (action
   (run %{env:OXCAML_LLDB=} --batch -o "command script import ${name}.py")))
 |};
@@ -198,5 +206,9 @@ ${lib_compile_runs}))
   print_dwarf_python_test "test_inlined_frames_dwarf";
   print_cross_unit_dwarf_python_test "test_cross_unit_paths_dwarf"
     ~lib_dir:"cross_unit_dir"
-    ~lib_modules:["cu_lib_inner"; "cu_lib_outer"];
+    ~lib_modules:
+      [ "cu_lib_inner", "cu_lib_inner";
+        "cu_lib_outer", "cu_lib_outer";
+        "test_cross_unit_paths_dwarf", "cu_prim"
+      ];
   ()

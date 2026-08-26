@@ -117,7 +117,9 @@ val to_location : t -> Location.t
     is relative, so that the result remains meaningful outside the directory
     in which the item's compilation unit was compiled -- in particular in the
     debugging information of other units into which its code is inlined.
-    Used when emitting DWARF line tables and file attributes. *)
+    Relative directory values are interpreted against the current unit's build
+    root, which assumes that linked units were built from the same root.  Used
+    when emitting DWARF line tables and file attributes. *)
 val item_file_path : item -> string
 
 (** [item_file_path] applied to the item that determines [to_location]. *)

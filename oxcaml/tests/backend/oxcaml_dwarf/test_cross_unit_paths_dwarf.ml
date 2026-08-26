@@ -1,3 +1,7 @@
+(* [Cu_prim] was compiled from a foreign source with this file's basename.
+   The interface's ordinary [val] forces a whole-unit primitive wrapper. *)
+include Cu_prim
+
 let[@inline never] [@local never] f_start () = ()
 
 let _ = f_start ()
@@ -21,7 +25,7 @@ let[@inline never] [@local never] f_caller x =
   let result = Cu_lib_outer.outer (Sys.opaque_identity x) in
   Sys.opaque_identity result
 
-let () =
+let run () =
   let result = f_caller 11 in
   print_int result;
   print_newline ()
