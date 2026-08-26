@@ -56,3 +56,8 @@ TRACK(atomic_lor, P(value obj, value incr), P(obj, incr))
 TRACK(atomic_lor_field, P(value obj, value vfield, value incr), P(obj, vfield, incr))
 TRACK(atomic_lxor, P(value obj, value incr), P(obj, incr))
 TRACK(atomic_lxor_field, P(value obj, value vfield, value incr), P(obj, vfield, incr))
+
+intnat caml_native_pointer_of_value (value v)
+{
+  return (intnat) v;
+}

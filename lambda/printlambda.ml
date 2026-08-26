@@ -975,6 +975,31 @@ let primitive ppf = function
   | Patomic_land_ptr -> fprintf ppf "atomic_land_ptr"
   | Patomic_lor_ptr -> fprintf ppf "atomic_lor_ptr"
   | Patomic_lxor_ptr -> fprintf ppf "atomic_lxor_ptr"
+  | Patomic_load_ext_ptr {layout = l} ->
+      fprintf ppf "atomic_load_ext_ptr %a"
+        layout l
+  | Patomic_set_ext_ptr {layout = l; mode} ->
+      fprintf ppf "atomic_set_ext_ptr%s %a"
+        (modify_mode mode)
+        layout l
+  | Patomic_exchange_ext_ptr {layout = l; mode} ->
+      fprintf ppf "atomic_exchange_ext_ptr%s %a"
+        (modify_mode mode)
+        layout l
+  | Patomic_compare_exchange_ext_ptr {layout = l; mode} ->
+      fprintf ppf "atomic_compare_exchange_ext_ptr%s %a"
+        (modify_mode mode)
+        layout l
+  | Patomic_compare_set_ext_ptr {layout = l; mode} ->
+      fprintf ppf "atomic_compare_set_ext_ptr%s %a"
+        (modify_mode mode)
+        layout l
+  | Patomic_fetch_add_ext_ptr -> fprintf ppf "atomic_fetch_add_ext_ptr"
+  | Patomic_add_ext_ptr -> fprintf ppf "atomic_add_ext_ptr"
+  | Patomic_sub_ext_ptr -> fprintf ppf "atomic_sub_ext_ptr"
+  | Patomic_land_ext_ptr -> fprintf ppf "atomic_land_ext_ptr"
+  | Patomic_lor_ext_ptr -> fprintf ppf "atomic_lor_ext_ptr"
+  | Patomic_lxor_ext_ptr -> fprintf ppf "atomic_lxor_ext_ptr"
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ppoll -> fprintf ppf "poll"
@@ -1210,6 +1235,17 @@ let name_of_primitive = function
   | Patomic_land_ptr -> "Patomic_land_ptr"
   | Patomic_lor_ptr -> "Patomic_lor_ptr"
   | Patomic_lxor_ptr -> "Patomic_lxor_ptr"
+  | Patomic_load_ext_ptr _ -> "Patomic_load_ext_ptr"
+  | Patomic_set_ext_ptr _ -> "Patomic_set_ext_ptr"
+  | Patomic_exchange_ext_ptr _ -> "Patomic_exchange_ext_ptr"
+  | Patomic_compare_exchange_ext_ptr _ -> "Patomic_compare_exchange_ext_ptr"
+  | Patomic_compare_set_ext_ptr _ -> "Patomic_compare_set_ext_ptr"
+  | Patomic_fetch_add_ext_ptr -> "Patomic_fetch_add_ext_ptr"
+  | Patomic_add_ext_ptr -> "Patomic_add_ext_ptr"
+  | Patomic_sub_ext_ptr -> "Patomic_sub_ext_ptr"
+  | Patomic_land_ext_ptr -> "Patomic_land_ext_ptr"
+  | Patomic_lor_ext_ptr -> "Patomic_lor_ext_ptr"
+  | Patomic_lxor_ext_ptr -> "Patomic_lxor_ext_ptr"
   | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
   | Pwith_stack -> "Pwith_stack"

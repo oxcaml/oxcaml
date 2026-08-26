@@ -1843,6 +1843,9 @@ let idx_atomic_offset_and_field_kind ~machine_width primitive dbg layout ~idx =
   let field_kind = P.Block_access_field_kind.from_kind full_kind in
   H.Prim offset, field_kind
 
+let null_base : H.simple_or_prim =
+  H.Simple (Simple.const Reg_width_const.const_null)
+
 let convert_pget_indirect ~machine_width ~dbg primitive layout
     (mut : Asttypes.mutable_flag) ~ptr ~idx : H.expr_primitive list =
   needs_64_bit_target primitive dbg;
@@ -3602,6 +3605,95 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       "Closure_convertion.convert_primitive: Expected unboxed product of \
        length 2 as first arg to ptr primitive %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
+  | Patomic_load_ext_ptr { layout }, [[idx]] ->
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
+    in
+    [Binary (Atomic_load (Byte_offset, field_kind), null_base, offset)]
+  | Patomic_set_ext_ptr { layout; mode }, [[idx]; [new_value]] ->
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
+    in
+    [ Ternary
+        ( Atomic_set
+            ( Byte_offset,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
+          null_base,
+          offset,
+          new_value ) ]
+  | Patomic_exchange_ext_ptr { layout; mode }, [[idx]; [new_value]] ->
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
+    in
+    [ Ternary
+        ( Atomic_exchange
+            ( Byte_offset,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
+          null_base,
+          offset,
+          new_value ) ]
+  | ( Patomic_compare_exchange_ext_ptr { layout; mode },
+      [[idx]; [comparison_value]; [new_value]] ) ->
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
+    in
+    [ Quaternary
+        ( Atomic_compare_exchange
+            { offset_units = Byte_offset;
+              atomic_kind = field_kind;
+              args_kind = field_kind;
+              mode = Alloc_mode.For_assignments.from_lambda mode
+            },
+          null_base,
+          offset,
+          comparison_value,
+          new_value ) ]
+  | ( Patomic_compare_set_ext_ptr { layout; mode },
+      [[idx]; [old_value]; [new_value]] ) ->
+    let offset, field_kind =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
+    in
+    [ Quaternary
+        ( Atomic_compare_and_set
+            ( Byte_offset,
+              field_kind,
+              Alloc_mode.For_assignments.from_lambda mode ),
+          null_base,
+          offset,
+          old_value,
+          new_value ) ]
+  | Patomic_fetch_add_ext_ptr, [[idx]; [i]] ->
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
+    in
+    [Ternary (Atomic_int_arith (Byte_offset, Fetch_add), null_base, offset, i)]
+  | Patomic_add_ext_ptr, [[idx]; [i]] ->
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
+    in
+    [Ternary (Atomic_int_arith (Byte_offset, Add), null_base, offset, i)]
+  | Patomic_sub_ext_ptr, [[idx]; [i]] ->
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
+    in
+    [Ternary (Atomic_int_arith (Byte_offset, Sub), null_base, offset, i)]
+  | Patomic_land_ext_ptr, [[idx]; [i]] ->
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
+    in
+    [Ternary (Atomic_int_arith (Byte_offset, And), null_base, offset, i)]
+  | Patomic_lor_ext_ptr, [[idx]; [i]] ->
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
+    in
+    [Ternary (Atomic_int_arith (Byte_offset, Or), null_base, offset, i)]
+  | Patomic_lxor_ext_ptr, [[idx]; [i]] ->
+    let offset, _ =
+      idx_atomic_offset_and_field_kind ~machine_width prim dbg L.layout_int ~idx
+    in
+    [Ternary (Atomic_int_arith (Byte_offset, Xor), null_base, offset, i)]
   | Pcpu_relax, _ -> [Nullary Cpu_relax]
   | Pdls_get, _ -> [Nullary Dls_get]
   | Ptls_get, _ -> [Nullary Tls_get]
@@ -3651,11 +3743,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        length 2 as first arg to ptr primitive %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | Pget_ext_ptr (layout, mut), [[idx]] ->
-    let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pget_indirect ~machine_width ~dbg prim layout mut ~ptr:null_base
       ~idx
   | Pset_ext_ptr (layout, mode), [[idx]; new_values] ->
-    let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
   | (Praise _ | Pccall _), _ ->
@@ -3684,7 +3774,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
-      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ ),
+      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _
+      | Patomic_load_ext_ptr _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \
@@ -3727,7 +3818,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Patomic_load_idx _ | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _
       | Patomic_set_ptr _ | Patomic_exchange_ptr _ | Patomic_fetch_add_ptr
       | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr
-      | Patomic_lxor_ptr ),
+      | Patomic_lxor_ptr | Patomic_set_ext_ptr _ | Patomic_exchange_ext_ptr _
+      | Patomic_fetch_add_ext_ptr | Patomic_add_ext_ptr | Patomic_sub_ext_ptr
+      | Patomic_land_ext_ptr | Patomic_lor_ext_ptr | Patomic_lxor_ext_ptr ),
       ( []
       | [_]
       | _ :: _ :: _ :: _
@@ -3766,7 +3859,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Patomic_lor_field | Patomic_exchange_idx _ | Patomic_fetch_add_idx
       | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx | Patomic_lxor_idx
       | Patomic_lor_idx | Patomic_set_idx _ | Pset_idx _
-      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _ ),
+      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
+      | Patomic_compare_exchange_ext_ptr _ | Patomic_compare_set_ext_ptr _ ),
       ( []
       | [_]
       | [_; _]
