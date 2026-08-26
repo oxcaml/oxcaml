@@ -135,6 +135,10 @@ type t =
         (** Precomputed during selection and poll insertion. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
         (** Precomputed at register allocation time *)
+    mutable fun_frame_required : bool;
+        (** Whether the function needs a stack frame, set by [Cfg_prologue]. *)
+    mutable fun_prologue_required : bool;
+        (** Whether the function needs a prologue, set by [Cfg_prologue]. *)
     fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
     next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
     fun_ret_type : Cmm.machtype;

@@ -131,6 +131,8 @@ type t =
     fun_contains_calls : bool;
     (* CR-someday gyorsh: compute locally. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
+    mutable fun_frame_required : bool;
+    mutable fun_prologue_required : bool;
     fun_poll : Lambda.poll_attribute;
     next_instruction_id : InstructionId.sequence;
     fun_ret_type : Cmm.machtype;
@@ -154,6 +156,8 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     blocks = Label.Tbl.create 31;
     fun_contains_calls;
     fun_num_stack_slots;
+    fun_frame_required = false;
+    fun_prologue_required = false;
     fun_poll;
     next_instruction_id;
     fun_ret_type;
