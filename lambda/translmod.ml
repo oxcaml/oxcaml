@@ -928,7 +928,8 @@ and transl_structure ~scopes loc
           let let_kind, modl =
             match incl.incl_kind with
             | Tincl_structure ->
-                pure_module modl, transl_module ~scopes Tcoerce_none rootpath modl
+                pure_module modl, transl_module ~scopes Tcoerce_none
+                  rootpath modl
             | Tincl_functor { input_coercion; input_repr; yielding } ->
                 Strict, transl_include_functor ~generative:false modl
                           input_coercion scopes loc ~input_repr ~yielding
@@ -978,7 +979,8 @@ and transl_structure ~scopes loc
                 rebind_idents 0 fields ids_with_sorts
               in
               Llet(pure, Lambda.layout_module, mid, mid_duid,
-                   transl_module ~scopes Tcoerce_none rootpath od.open_expr, body),
+                   transl_module ~scopes Tcoerce_none rootpath od.open_expr,
+                   body),
               repr
           end
       | Tstr_modtype _
