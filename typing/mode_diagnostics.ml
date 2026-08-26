@@ -241,6 +241,12 @@ module Access = struct
     | Read, Write | Write, Read -> false
 end
 
+type argument_requirement =
+  { callee : Mode.Hint.pinpoint;
+    argument : Mode.Hint.pinpoint;
+    parameter : Mode.Hint.parameter
+  }
+
 module Meaning = struct
   type fact =
     | Mutable_access of
@@ -284,7 +290,7 @@ module Meaning = struct
     | Unexplained
     | User_annotation of Location.t
     | Capture of Mode.Hint.closure_details
-    | Signature_argument of Mode.Hint.function_argument
+    | Signature_argument of argument_requirement
     | Fact of fact
     | Reroute of reroute
 
@@ -317,7 +323,10 @@ module Meaning = struct
     | Hint_chain.Morph (Contains_l (_, contains)) -> Reroute (Contains contains)
     | Hint_chain.Morph (Contains_r (_, contains)) -> Reroute (Contains contains)
     | Hint_chain.Morph (Is_contained_by (_, c)) -> Reroute (Contained_by c)
-    | Hint_chain.Morph (Function_argument fa) -> Signature_argument fa
+    | Hint_chain.Morph (Parameter_to_argument (_, { parameter; callee })) ->
+      Signature_argument { parameter; callee; argument = s.pinpoint }
+    | Hint_chain.Morph (Argument_to_parameter (_, { parameter; argument })) ->
+      Signature_argument { parameter; callee = s.pinpoint; argument }
     | Hint_chain.Const Unknown -> Unexplained
     | Hint_chain.Const (Annotation { written_modes; _ }) -> (
       let mode_name = Step_mode.name s.mode in
@@ -649,8 +658,8 @@ let labelled_argument_words label =
   [txt " "; code label; txt " argument"]
 
 let argument_phrase ~callee
-    ({ label; index_in_callee_arrow_type; _ } : Mode.Hint.function_argument) :
-    term Phrase.segment list =
+    ({ parameter = { label; index_in_callee_arrow_type }; _ } :
+      argument_requirement) : term Phrase.segment list =
   let open Nlg in
   let position : term Phrase.segment list =
     match label with
@@ -865,15 +874,16 @@ let cause_sentences ~source ~(subject : subject) ?next (m : Message.t) =
           (phrase
              ([subj; txt " uses "; Nlg.mention ~case:Subject closed] @ use_mode))
       end
-    | Signature_argument { callee; _ } ->
-      let desugared = desugared_access_callee callee m.pinpoint in
+    | Signature_argument { callee; argument; _ } ->
+      let desugared = desugared_access_callee callee argument in
       let callee = subject_of_pinpoint ~source callee in
       let source_words =
         if desugared
         then [Nlg.mention ~case:Subject callee]
         else [txt "the signature of "; Nlg.mention ~case:Subject callee]
       in
-      let argument_words = [Nlg.mention ~case:Subject subject] in
+      let argument = subject_of_pinpoint ~source argument in
+      let argument_words = [Nlg.mention ~case:Subject argument] in
       Some
         (phrase
            (source_words
@@ -1218,12 +1228,16 @@ let plan_partial_application_hint ~(axis : Mode.Alloc.Axis.packed)
   | Mode.Alloc.Axis.P _ -> []
 
 let signature_origin (origin : Message.t) (next : Message.t) :
-    Mode.Hint.function_argument option =
+    argument_requirement option =
   match origin.meaning with
   | Unexplained | User_annotation _ ->
     begin match next.meaning with
     | Signature_argument fa ->
-      if same_chars (fst origin.pinpoint) (fst fa.callee) then Some fa else None
+      if
+        same_chars (fst origin.pinpoint) (fst fa.callee)
+        || same_chars (fst origin.pinpoint) (fst fa.argument)
+      then Some fa
+      else None
     | Nothing_to_say | Unexplained | User_annotation _ | Capture _ | Fact _
     | Reroute _ ->
       None
@@ -1357,7 +1371,7 @@ let plan_expected ~source ~axis_mode ~description (chain : Message.t list) =
       begin match signature_origin origin arg_step with
       | Some fa ->
         let callee = subject_of_pinpoint ~source fa.callee in
-        let argument = subject_of_pinpoint ~source arg_step.pinpoint in
+        let argument = subject_of_pinpoint ~source fa.argument in
         let annotation_spans =
           match origin.meaning with
           | User_annotation annotation -> [annotation]
@@ -1366,7 +1380,7 @@ let plan_expected ~source ~axis_mode ~description (chain : Message.t list) =
           | Reroute _ ->
             []
         in
-        let desugared = desugared_access_callee fa.callee arg_step.pinpoint in
+        let desugared = desugared_access_callee fa.callee fa.argument in
         let argument_part =
           if desugared
           then [Nlg.mention ~case:Subject argument]
@@ -1676,9 +1690,9 @@ let plan_origin_lift ~source ~anchor_loc ~signature_modality
         | Fact _ | Reroute _ ->
           []
       in
-      let desugared = desugared_access_callee callee arg_step.pinpoint in
+      let desugared = desugared_access_callee callee fa.argument in
       let callee_subject = subject_of_pinpoint ~source callee in
-      let argument = subject_of_pinpoint ~source arg_step.pinpoint in
+      let argument = subject_of_pinpoint ~source fa.argument in
       let source_words =
         let words =
           if desugared
@@ -1893,12 +1907,14 @@ let requirement_key (expected : Message.t list) : requirement_key option =
   match List.rev expected with
   | [origin; arg_step] ->
     begin match signature_origin origin arg_step with
-    | Some { callee; label; index_in_callee_arrow_type; _ } ->
+    | Some
+        { callee; argument; parameter = { label; index_in_callee_arrow_type } }
+      ->
       Some
         { callee_loc = fst callee;
           label;
           index = index_in_callee_arrow_type;
-          argument_loc = fst arg_step.pinpoint
+          argument_loc = fst argument
         }
     | None -> None
     end
