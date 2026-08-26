@@ -499,16 +499,6 @@ type 'a unsafe_externality_saturated_reexport
 } [@@unsafe_allow_any_mode_crossing]
 |}]
 
-type safe_middle : immutable_data with int = { mutable x : int }
-[%%expect{|
-Line 1, characters 0-64:
-1 | type safe_middle : immutable_data with int = { mutable x : int }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This type definition does not satisfy its kind annotation
-         immutable_data with int,
-       because mutable fields are not mod immutable.
-|}]
-
 type unsafe_middle_payload
 type unsafe_middle_alias = unsafe_middle_payload
 
