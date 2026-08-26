@@ -666,10 +666,6 @@ let facts_of_tree compilation_unit artifact iterate =
         | Other_member -> ())
       signature
   in
-  let path_application_hook :
-      (site:Location.t -> Env.t -> Path.t -> Path.t -> unit) ref =
-    ref (fun ~site:_ _ _ _ -> ())
-  in
   (* Naming another compilation unit must not read that unit's interface:
      [Env.find_module] loads the .cmi to recover [md_uid], which would make the
      facts of a unit depend on which interfaces happen to sit on the load path
@@ -683,65 +679,6 @@ let facts_of_tree compilation_unit artifact iterate =
       when Ident.is_global id && not (Current_unit.Name.is_ident id) ->
       (Shape.for_persistent_unit (Ident.name id)).Shape.uid
     | Path.Pident _ | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ -> None
-  in
-  let rec context_of_path_inner ~site env (path : Path.t) : Context.t option =
-    match persistent_unit_uid path with
-    | Some uid -> Some (module_context uid)
-    | None -> (
-      match find_module env path with
-      | None -> None
-      | Some declaration -> (
-        let uid = declaration.Types.md_uid in
-        match path with
-        | Path.Pident _ -> Some (module_context uid)
-        | Path.Pdot (prefix, _) ->
-          Option.map
-            (fun prefix -> Context.Proj (prefix, uid))
-            (context_of_path_inner ~site env prefix)
-        | Path.Papply (functor_, argument) -> (
-          (match site with
-          | Some site -> !path_application_hook ~site env functor_ argument
-          | None -> ());
-          match
-            ( context_of_path_inner ~site env functor_,
-              context_of_path_inner ~site env argument )
-          with
-          | Some functor_, Some argument ->
-            Some (Context.App (functor_, argument))
-          | (Some _ | None), _ -> None)
-        | Path.Pextra_ty _ -> None))
-  in
-  let context_of_path ~site env path =
-    let path =
-      (* Normalizing would load the interface too, for no gain: a compilation
-         unit is never an alias. *)
-      match persistent_unit_uid path with
-      | Some _ -> path
-      | None -> normalize_module_path env path
-    in
-    context_of_path_inner ~site env path
-  in
-  let rec report_path_applications ~site env (path : Path.t) =
-    match path with
-    | Path.Pident _ -> ()
-    | Path.Pdot (prefix, _) | Path.Pextra_ty (prefix, _) ->
-      report_path_applications ~site env prefix
-    | Path.Papply (functor_, argument) ->
-      report_path_applications ~site env functor_;
-      report_path_applications ~site env argument;
-      !path_application_hook ~site env functor_ argument
-  in
-  (* Record applications in the module-path prefix of an [Ldot] whose final
-     component is a record label or variant constructor. *)
-  let report_projected_longident_applications ~site env (lid : Longident.t) =
-    match lid with
-    | Longident.Ldot (prefix, _) when longident_contains_apply prefix.txt -> (
-      match
-        Env.lookup_module_path ~use:false ~loc:site ~load:false prefix.txt env
-      with
-      | path, _ -> report_path_applications ~site env path
-      | exception _ -> ())
-    | Longident.Lident _ | Longident.Ldot _ | Longident.Lapply _ -> ()
   in
   let named_signature_owner env (module_type : Types.module_type) =
     let owner_of_modtype_path path =
@@ -799,7 +736,52 @@ let facts_of_tree compilation_unit artifact iterate =
     | None -> ());
     key
   in
-  let key_of_modtype_path ~site env (path : Path.t) : Key.t option =
+  let uid_of_module_path env path =
+    match find_normalized_module env path with
+    | Some declaration -> Some declaration.Types.md_uid
+    | None -> None
+  in
+  let node_of_module_path env ~loc path =
+    match uid_of_module_path env path with
+    | Some uid -> Node.Uid uid
+    | None -> Node.Location (compilation_unit, loc)
+  in
+  let rec context_of_path_inner ~site env (path : Path.t) : Context.t option =
+    match persistent_unit_uid path with
+    | Some uid -> Some (module_context uid)
+    | None -> (
+      match find_module env path with
+      | None -> None
+      | Some declaration -> (
+        let uid = declaration.Types.md_uid in
+        match path with
+        | Path.Pident _ -> Some (module_context uid)
+        | Path.Pdot (prefix, _) ->
+          Option.map
+            (fun prefix -> Context.Proj (prefix, uid))
+            (context_of_path_inner ~site env prefix)
+        | Path.Papply (functor_, argument) -> (
+          Option.iter
+            (fun site -> record_path_application ~site env functor_ argument)
+            site;
+          match
+            ( context_of_path_inner ~site env functor_,
+              context_of_path_inner ~site env argument )
+          with
+          | Some functor_, Some argument ->
+            Some (Context.App (functor_, argument))
+          | (Some _ | None), _ -> None)
+        | Path.Pextra_ty _ -> None))
+  and context_of_path ~site env path =
+    let path =
+      (* Normalizing would load the interface too, for no gain: a compilation
+         unit is never an alias. *)
+      match persistent_unit_uid path with
+      | Some _ -> path
+      | None -> normalize_module_path env path
+    in
+    context_of_path_inner ~site env path
+  and key_of_modtype_path ~site env (path : Path.t) : Key.t option =
     match path with
     | Path.Papply _ | Path.Pextra_ty _ ->
       add_omission ~affected:None ~source:None Omission.Reason.Unsupported_path;
@@ -827,34 +809,7 @@ let facts_of_tree compilation_unit artifact iterate =
         match Uid.Tbl.find_opt modtype_contexts uid with
         | Some context -> Some (named_key ~family:None context uid)
         | None -> Some (named_key ~family:None (Context.Def uid) uid)))
-  in
-  let key_of_module_type (module_type : Typedtree.module_type) =
-    match module_type.mty_desc with
-    | Tmty_ident (path, _) -> (
-      match
-        key_of_modtype_path ~site:module_type.mty_loc module_type.mty_env path
-      with
-      | Some key -> key
-      | None ->
-        let key = Key.Anon module_type.mty_uid in
-        add_omission ~affected:(Some key) ~source:None
-          Omission.Reason.Unresolved_module_type;
-        key)
-    | Tmty_signature _ | Tmty_functor _ | Tmty_with _ | Tmty_typeof _
-    | Tmty_alias _ | Tmty_strengthen _ ->
-      Key.Anon module_type.mty_uid
-  in
-  let uid_of_module_path env path =
-    match find_normalized_module env path with
-    | Some declaration -> Some declaration.Types.md_uid
-    | None -> None
-  in
-  let node_of_module_path env ~loc path =
-    match uid_of_module_path env path with
-    | Some uid -> Node.Uid uid
-    | None -> Node.Location (compilation_unit, loc)
-  in
-  let add_subject_expectation_edges key ~site env reason path =
+  and add_subject_expectation_edges key ~site env reason path =
     let path = normalize_module_path env path in
     match find_module env path with
     | None ->
@@ -875,6 +830,7 @@ let facts_of_tree compilation_unit artifact iterate =
           add_omission ~affected:(Some key) ~source:None
             Omission.Reason.Unresolved_module_type)
       | None -> ())
+<<<<<<< Merlin:ggray/mti/dev
   in
   let node_of_module_expr (module_expr : module_expr) =
     let module_expr = unwrap_implicit_constraint module_expr in
@@ -974,6 +930,109 @@ let facts_of_tree compilation_unit artifact iterate =
         (signature_component env ~prefix_indexes index prefix)
   in
   let register_argument_members ~derived ~parameter_type env argument_source =
+||||||| Compiler:last-imported
+  in
+  let node_of_module_expr (module_expr : module_expr) =
+    let module_expr = unwrap_implicit_constraint module_expr in
+    match module_expr.mod_desc with
+    | Tmod_ident (path, _) ->
+      node_of_module_path module_expr.mod_env ~loc:module_expr.mod_loc path
+    | Tmod_structure _ | Tmod_functor _ | Tmod_apply _ | Tmod_apply_unit _
+    | Tmod_constraint _ | Tmod_unpack _ ->
+      Node.Location (compilation_unit, module_expr.mod_loc)
+  in
+  let module Handled = Set.Make (struct
+    type t = Key.t * Location.t
+
+    let compare = compare_pair Key.compare Location.compare
+  end) in
+  let handled_checks = ref Handled.empty in
+  let handled expectation site =
+    Handled.mem (expectation, site) !handled_checks
+  in
+  let mark_handled expectation site =
+    handled_checks := Handled.add (expectation, site) !handled_checks
+  in
+  let relevance_cache : bool Uid.Tbl.t = Uid.Tbl.create 16 in
+  let is_relevant_expectation (module_type : Typedtree.module_type) =
+    is_relevant_expectation relevance_cache module_type
+  in
+  let rec instance_members env ~instance ~family (signature : Types.signature) =
+    List.iter
+      (fun item ->
+        match classify_signature_member item with
+        | Modtype_member (_, declaration) ->
+          add_dependency
+            ~derived:
+              (Key.Named
+                 { context = instance; family_uid = declaration.mtd_uid })
+            ~source:
+              (Key.Named { context = family; family_uid = declaration.mtd_uid })
+            Dependency.Reason.Instance
+        | Module_member (_, declaration) ->
+          let instance = Context.Proj (instance, declaration.md_uid) in
+          let family =
+            match named_signature_owner env declaration.md_type with
+            | Some owner -> owner
+            | None -> Context.Proj (family, declaration.md_uid)
+          in
+          Option.iter
+            (instance_members env ~instance ~family)
+            (scraped_signature env declaration.md_type)
+        | Other_member -> ())
+      signature
+  in
+  let register_application_members ~root (module_expr : module_expr) =
+    let module_expr = unwrap_implicit_constraint module_expr in
+    let functor_path =
+      match module_expr.mod_desc with
+      | Tmod_apply (functor_, _, _, _, _) | Tmod_apply_unit (functor_, _) ->
+        path_of_module_expr (unwrap_implicit_constraint functor_)
+      | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_constraint _
+      | Tmod_unpack _ ->
+        None
+    in
+    match functor_path with
+    | None -> ()
+    | Some functor_path -> (
+      match find_normalized_module module_expr.mod_env functor_path with
+      | None -> ()
+      | Some functor_declaration -> (
+        let family =
+          functor_result_family module_expr.mod_env functor_declaration
+        in
+        match scraped_signature module_expr.mod_env module_expr.mod_type with
+        | Some signature ->
+          instance_members module_expr.mod_env ~instance:root ~family signature;
+          record_member_contexts root signature
+        | None -> ()))
+  in
+  let rec signature_component env ~prefix_indexes index (path : Path.t) =
+    match path with
+    | Path.Pident id -> String_map.find_opt (Ident.name id) index.module_members
+    | Path.Pdot (prefix, name) -> (
+      match prefix_index env ~prefix_indexes index prefix with
+      | Some prefix_index ->
+        String_map.find_opt name prefix_index.module_members
+      | None -> None)
+    | Path.Papply _ | Path.Pextra_ty _ -> None
+  and prefix_index env ~prefix_indexes index (prefix : Path.t) =
+    match Path_map.find_opt prefix !prefix_indexes with
+    | Some prefix_index -> Some prefix_index
+    | None ->
+      Option.map
+        (fun (declaration : Types.module_declaration) ->
+          let built =
+            signature_index_of_module_type env declaration.Types.md_type
+          in
+          prefix_indexes := Path_map.add prefix built !prefix_indexes;
+          built)
+        (signature_component env ~prefix_indexes index prefix)
+  in
+  let register_argument_members ~derived ~parameter_type env argument_source =
+=======
+  and register_argument_members ~derived ~parameter_type env argument_source =
+>>>>>>> Compiler:HEAD
     let rec walk ~source (parameter_type : Types.module_type) =
       match scraped_signature env parameter_type with
       | Some signature ->
@@ -1034,8 +1093,7 @@ let facts_of_tree compilation_unit artifact iterate =
       | None -> ()
     in
     walk ~source:argument_source parameter_type
-  in
-  let emit_argument_check ~site ~anchor env ~parameter_type ~expectation
+  and emit_argument_check ~site ~anchor env ~parameter_type ~expectation
       ~functor_instance argument_node argument_source =
     let instance_key uid =
       let key = Key.Named { context = anchor (); family_uid = uid } in
@@ -1121,7 +1179,29 @@ let facts_of_tree compilation_unit artifact iterate =
     | Some derived ->
       register_argument_members ~derived ~parameter_type env argument_source
     | None -> ()
+  and record_path_application ~site env functor_path argument_path =
+    match find_normalized_module env functor_path with
+    | None -> ()
+    | Some functor_declaration -> (
+      match Mtype.scrape_alias env functor_declaration.Types.md_type with
+      | Mty_functor (Named (_, parameter_type, expectation, _), _, _) ->
+        let argument_node = node_of_module_path env ~loc:site argument_path in
+        let anchor () =
+          match
+            context_of_path ~site:None env
+              (Path.Papply (functor_path, argument_path))
+          with
+          | Some context -> context
+          | None -> fresh_site ()
+        in
+        emit_argument_check ~site ~anchor env ~parameter_type ~expectation
+          ~functor_instance:(path_contains_apply functor_path)
+          argument_node (`Path argument_path)
+      | Mty_functor (Unit, _, _)
+      | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _ ->
+        ())
   in
+<<<<<<< Merlin:ggray/mti/dev
   let () =
     path_application_hook
       := fun ~site env functor_path argument_path ->
@@ -1149,6 +1229,169 @@ let facts_of_tree compilation_unit artifact iterate =
              | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _
              | Mty_for_hole ->
                ())
+||||||| Compiler:last-imported
+  let () =
+    path_application_hook
+      := fun ~site env functor_path argument_path ->
+           match find_normalized_module env functor_path with
+           | None -> ()
+           | Some functor_declaration -> (
+             match Mtype.scrape_alias env functor_declaration.Types.md_type with
+             | Mty_functor (Named (_, parameter_type, expectation, _), _, _) ->
+               let argument_node =
+                 node_of_module_path env ~loc:site argument_path
+               in
+               let anchor () =
+                 match
+                   context_of_path ~site:None env
+                     (Path.Papply (functor_path, argument_path))
+                 with
+                 | Some context -> context
+                 | None -> fresh_site ()
+               in
+               emit_argument_check ~site ~anchor env ~parameter_type
+                 ~expectation
+                 ~functor_instance:(path_contains_apply functor_path)
+                 argument_node (`Path argument_path)
+             | Mty_functor (Unit, _, _)
+             | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _ ->
+               ())
+=======
+  let rec report_path_applications ~site env (path : Path.t) =
+    match path with
+    | Path.Pident _ -> ()
+    | Path.Pdot (prefix, _) | Path.Pextra_ty (prefix, _) ->
+      report_path_applications ~site env prefix
+    | Path.Papply (functor_, argument) ->
+      report_path_applications ~site env functor_;
+      report_path_applications ~site env argument;
+      record_path_application ~site env functor_ argument
+  in
+  (* Record applications in the module-path prefix of an [Ldot] whose final
+     component is a record label or variant constructor. *)
+  let report_projected_longident_applications ~site env (lid : Longident.t) =
+    match lid with
+    | Longident.Ldot (prefix, _) when longident_contains_apply prefix.txt -> (
+      match
+        Env.lookup_module_path ~use:false ~loc:site ~load:false prefix.txt env
+      with
+      | path, _ -> report_path_applications ~site env path
+      | exception _ -> ())
+    | Longident.Lident _ | Longident.Ldot _ | Longident.Lapply _ -> ()
+  in
+  let key_of_module_type (module_type : Typedtree.module_type) =
+    match module_type.mty_desc with
+    | Tmty_ident (path, _) -> (
+      match
+        key_of_modtype_path ~site:module_type.mty_loc module_type.mty_env path
+      with
+      | Some key -> key
+      | None ->
+        let key = Key.Anon module_type.mty_uid in
+        add_omission ~affected:(Some key) ~source:None
+          Omission.Reason.Unresolved_module_type;
+        key)
+    | Tmty_signature _ | Tmty_functor _ | Tmty_with _ | Tmty_typeof _
+    | Tmty_alias _ | Tmty_strengthen _ ->
+      Key.Anon module_type.mty_uid
+  in
+  let node_of_module_expr (module_expr : module_expr) =
+    let module_expr = unwrap_implicit_constraint module_expr in
+    match module_expr.mod_desc with
+    | Tmod_ident (path, _) ->
+      node_of_module_path module_expr.mod_env ~loc:module_expr.mod_loc path
+    | Tmod_structure _ | Tmod_functor _ | Tmod_apply _ | Tmod_apply_unit _
+    | Tmod_constraint _ | Tmod_unpack _ ->
+      Node.Location (compilation_unit, module_expr.mod_loc)
+  in
+  let module Handled = Set.Make (struct
+    type t = Key.t * Location.t
+
+    let compare = compare_pair Key.compare Location.compare
+  end) in
+  let handled_checks = ref Handled.empty in
+  let handled expectation site =
+    Handled.mem (expectation, site) !handled_checks
+  in
+  let mark_handled expectation site =
+    handled_checks := Handled.add (expectation, site) !handled_checks
+  in
+  let relevance_cache : bool Uid.Tbl.t = Uid.Tbl.create 16 in
+  let is_relevant_expectation (module_type : Typedtree.module_type) =
+    is_relevant_expectation relevance_cache module_type
+  in
+  let rec instance_members env ~instance ~family (signature : Types.signature) =
+    List.iter
+      (fun item ->
+        match classify_signature_member item with
+        | Modtype_member (_, declaration) ->
+          add_dependency
+            ~derived:
+              (Key.Named
+                 { context = instance; family_uid = declaration.mtd_uid })
+            ~source:
+              (Key.Named { context = family; family_uid = declaration.mtd_uid })
+            Dependency.Reason.Instance
+        | Module_member (_, declaration) ->
+          let instance = Context.Proj (instance, declaration.md_uid) in
+          let family =
+            match named_signature_owner env declaration.md_type with
+            | Some owner -> owner
+            | None -> Context.Proj (family, declaration.md_uid)
+          in
+          Option.iter
+            (instance_members env ~instance ~family)
+            (scraped_signature env declaration.md_type)
+        | Other_member -> ())
+      signature
+  in
+  let register_application_members ~root (module_expr : module_expr) =
+    let module_expr = unwrap_implicit_constraint module_expr in
+    let functor_path =
+      match module_expr.mod_desc with
+      | Tmod_apply (functor_, _, _, _, _) | Tmod_apply_unit (functor_, _) ->
+        path_of_module_expr (unwrap_implicit_constraint functor_)
+      | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_constraint _
+      | Tmod_unpack _ ->
+        None
+    in
+    match functor_path with
+    | None -> ()
+    | Some functor_path -> (
+      match find_normalized_module module_expr.mod_env functor_path with
+      | None -> ()
+      | Some functor_declaration -> (
+        let family =
+          functor_result_family module_expr.mod_env functor_declaration
+        in
+        match scraped_signature module_expr.mod_env module_expr.mod_type with
+        | Some signature ->
+          instance_members module_expr.mod_env ~instance:root ~family signature;
+          record_member_contexts root signature
+        | None -> ()))
+  in
+  let rec signature_component env ~prefix_indexes index (path : Path.t) =
+    match path with
+    | Path.Pident id -> String_map.find_opt (Ident.name id) index.module_members
+    | Path.Pdot (prefix, name) -> (
+      match prefix_index env ~prefix_indexes index prefix with
+      | Some prefix_index ->
+        String_map.find_opt name prefix_index.module_members
+      | None -> None)
+    | Path.Papply _ | Path.Pextra_ty _ -> None
+  and prefix_index env ~prefix_indexes index (prefix : Path.t) =
+    match Path_map.find_opt prefix !prefix_indexes with
+    | Some prefix_index -> Some prefix_index
+    | None ->
+      Option.map
+        (fun (declaration : Types.module_declaration) ->
+          let built =
+            signature_index_of_module_type env declaration.Types.md_type
+          in
+          prefix_indexes := Path_map.add prefix built !prefix_indexes;
+          built)
+        (signature_component env ~prefix_indexes index prefix)
+>>>>>>> Compiler:HEAD
   in
   let register_functor_annotation (inner : module_expr)
       (interface_type : Types.module_type) =
