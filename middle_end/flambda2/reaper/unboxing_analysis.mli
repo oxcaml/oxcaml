@@ -29,6 +29,8 @@ module Unboxed_fields : sig
 
   val map_u : ('a -> 'b) -> 'a u -> 'b u
 
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
   val fold2_subset : ('a -> 'b -> 'c -> 'c) -> 'a t -> 'b t -> 'c -> 'c
 
   val fold2_subset_u : ('a -> 'b -> 'c -> 'c) -> 'a u -> 'b u -> 'c -> 'c

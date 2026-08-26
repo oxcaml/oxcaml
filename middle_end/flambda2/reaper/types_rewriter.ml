@@ -755,7 +755,18 @@ module Rewriter = struct
       List.iter
         (function
           | UA.Closure_representation (vs, fs, _) ->
-            if vs != value_slots_reprs || fs != function_slots_reprs
+            (* CR mvellacott: This used to be pointer equality, which broke
+               during LTO because sharing is not preserved during
+               deserialisation. We probably don't need to do type rewriting at
+               all during LTO rebuild, so we may be able to revert this. *)
+            let vs_equal =
+              Unboxed_fields.equal Value_slot.equal vs value_slots_reprs
+            in
+            let fs_equal =
+              Function_slot.Map.equal Function_slot.equal fs
+                function_slots_reprs
+            in
+            if not (vs_equal && fs_equal)
             then
               Misc.fatal_errorf
                 "In set of closures, all closures do not have the same \

@@ -119,6 +119,18 @@ module Unboxed_fields = struct
     | Not_unboxed x -> Not_unboxed (f x)
     | Unboxed fields -> Unboxed (map f fields)
 
+  (* CR mvellacott: These structural equality functions are only used because
+     after deserialisation we can't rely on pointer equality. They may be
+     deleted in the future, see the CR in
+     [get_set_of_closures_changed_representation] in [types_rewriter.ml]. *)
+  let rec equal_u eq u1 u2 =
+    match u1, u2 with
+    | Not_unboxed x1, Not_unboxed x2 -> eq x1 x2
+    | Unboxed fields1, Unboxed fields2 -> equal eq fields1 fields2
+    | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ -> false
+
+  and equal eq fields1 fields2 = Field.Map.equal (equal_u eq) fields1 fields2
+
   (* This is not symmetrical!! [fields1] must define a subset of [fields2], but
      does not have to define all of them. *)
   let rec fold2_subset_u f fields1 fields2 acc =
