@@ -1,3 +1,4 @@
 (executable
  (name backend_fuzzer)
- (libraries ocamloptcomp))
+ (flags (:standard -open Backend_fuzzer_lib))
+ (libraries backend_fuzzer_lib))
