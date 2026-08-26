@@ -414,8 +414,7 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of
-      Path.t * Jkind_types.Scannable_axes.t * Jkind_types.Kind_operator.t
+  | Kconstr of Path.t * Jkind_types.Prop.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;

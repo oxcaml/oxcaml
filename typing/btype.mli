@@ -425,14 +425,9 @@ module Jkind0 : sig
       ('a -> 'b option) -> ('a, 'd) base_and_axes ->
       ('b, 'd) base_and_axes option
 
-    val meet_scannable_axes :
+    val apply_prop :
       Jkind_types.Layout.Const.t jkind_base ->
-      Jkind_types.Scannable_axes.t ->
-      Jkind_types.Layout.Const.t jkind_base
-
-    val apply_operator :
-      Jkind_types.Layout.Const.t jkind_base ->
-      Jkind_types.Kind_operator.t ->
+      Jkind_types.Prop.t ->
       Jkind_types.Layout.Const.t jkind_base
 
     val try_allow_l :

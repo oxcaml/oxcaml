@@ -57,27 +57,45 @@ module type Sort = sig
   type var
 
   module Const : sig
-    (* Note [Addressable kinds]
-       ~~~~~~~~~~~~~~~~~~~~~~~~
-       We consider a kind to be *addressable* if, when boxed, all of its
-       information is stored in the data portion of the block. This property is
-       encoded by the [addressable] kind operator: [k addressable] is "[k] made
-       addressable", which is like [k] but may change how it is boxed.
+    (* Note [Kind properties]
+       ~~~~~~~~~~~~~~~~~~~~~~
+       Several kind features are *property-enforcing operators*: functions on
+       kinds whose fixed points are exactly the kinds satisfying some property.
+       [Jkind_types.Prop] bundles the ones we have:
 
-       (Currently, [addressable] does not yet actually affect boxed
-       representations. It will always be the case that it does not change how a
-       sort is represented outside of a block.)
+       - *Addressability*. A kind is *addressable* if, when boxed, all of its
+         information is stored in the data portion of the block; [k addressable]
+         is "[k] made addressable", which is like [k] but may change how it is
+         boxed. (Currently [addressable] does not yet actually affect boxed
+         representations. It will always be the case that it does not change how
+         a sort is represented outside of a block.) Some base sorts are
+         inherently addressable, and a product is addressable exactly when all
+         of its components are.
 
-       The core properties of [addressable] are reflected in
-       [Sort.constrain_addressable]. We also provide the following notes:
-       - Some base sorts are inherently addressable.
-       - If all the components of a product are addressable, then so is the
-         product.
-       - Addressability is idempotent: [k] is addressable iff
-         [k addressable = k].
-       - The addressable kinds are all subkinds of [any addressable].
-       - There is no inherent subkinding relationship between [k] and
-         [k addressable].
+       - *Scannable axes*. [Jkind_types.Scannable_axes] lowers the nullability
+         and separability of a kind that might be scannable. On a kind that
+         cannot be [scannable] (a product, or a base sort other than
+         [Scannable]) lowering them does nothing, so such kinds are already
+         fixed points.
+
+       Each operator [a] is idempotent and monotone, so [k] satisfies the
+       property exactly when [k = a k], and the kinds satisfying it are exactly
+       the subkinds of [a any]. How [a k] and [k] compare is
+       operator-specific: lowering scannable axes always gives a subkind, so
+       [a k <= k], whereas there is no inherent subkinding relationship between
+       [k] and [k addressable]. In both cases [a any < any].
+
+       Any two of the operators commute, so composing them is a meet computed
+       componentwise, and a constraint on a composition decomposes into
+       independent constraints on the components. Inference then rests on three
+       judgments: [k = a k], [k <= a k] and [a k <= k], implemented by
+       [Sort.constrain_fixpoint] and, at the layout level, by [constrain_below]
+       and [constrain_above] in [Jkind.Layout]. Given those, a relation
+       [a k <= b k'] is decided by constraining each side to be a fixed point of
+       the other's operator and then relating [k] and [k'] directly. That last
+       step is an approximation when a side is a variable: for [a x = a k] we
+       commit to [x = k], even though [x = a k] would also do and neither is
+       more general.
    *)
     type t = private
       | Base of base

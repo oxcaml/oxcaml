@@ -1256,24 +1256,31 @@ let out_jkind_of_const_jkind env jkind =
    be overhauled with [with]-types. Internal ticket 5096. *)
 let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
   match desc.base with
-  | Layout (Sort (Var n, sa)) ->
-    Ojkind_var ("'_representable_layout_" ^
-                Int.to_string (Jkind.Sort.Var.get_print_number n),
-                Jkind.Scannable_axes.to_string_list sa)
   (* Analyze structure (products and addressability) before calling
      [get_const]: the machinery in [Jkind.Const.to_out_jkind_const] works
      better for atomic layouts. *)
-  | Layout (Product lays) ->
+  | Layout { prop; data }
+    when Jkind.Prop.is_addressable prop
+         && not (Jkind.Layout.is_surely_addressable_flat
+                   { prop = Jkind.Prop.id; data }) ->
+    let stripped =
+      { desc with
+        base =
+          Layout { Jkind.Layout.prop =
+                     Jkind.Prop.of_scannable_axes prop.scannable_axes;
+                   data } }
+    in
+    Ojkind_addressable (out_jkind_of_desc env stripped)
+  | Layout { prop; data = Sort (Var n) } ->
+    Ojkind_var ("'_representable_layout_" ^
+                Int.to_string (Jkind.Sort.Var.get_print_number n),
+                Jkind.Prop.to_string_list prop)
+  | Layout { prop = _; data = Product lays } ->
     Ojkind_product
       (List.map
          (fun layout ->
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
-  | Layout (Addressable lay) ->
-    if Jkind.Layout.is_surely_addressable_flat lay then
-      out_jkind_of_desc env { desc with base = Layout lay }
-    else
-      Ojkind_addressable (out_jkind_of_desc env { desc with base = Layout lay })
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)
@@ -1290,7 +1297,8 @@ let out_jkind_option_of_jkind ~ignore_null env jkind =
   let elide =
     Jkind.is_value_for_printing ~ignore_null env jkind (* C2.1 *)
     || (match desc.base with
-        | Layout (Sort (Var _, _)) -> not !Clflags.verbose_types (* X1 *)
+        | Layout { data = Sort (Var _); _ } ->
+          not !Clflags.verbose_types (* X1 *)
         | _ -> false)
   in
   if elide then None else Some (out_jkind_of_desc env desc)

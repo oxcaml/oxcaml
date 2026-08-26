@@ -867,7 +867,7 @@ Line 2, characters 22-23:
 Error: The value "y" has type "#('b * 'c)" but an expression was expected of type
          "('a : (float64 & value) addressable)"
        The layout of #('b * 'c) is
-           '_representable_layout_2 addressable & value_or_null
+           '_representable_layout_2 addressable & value
          because it is an unboxed tuple.
        But the layout of #('b * 'c) must be a sublayout of
            (float64 & value) addressable

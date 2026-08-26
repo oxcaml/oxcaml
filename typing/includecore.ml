@@ -191,12 +191,16 @@ let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
             let extra = List.length pat_refs - i + 1 in
             raise (Dont_match (Layout_poly_coercion (Extra_lhs { extra })))
         in
-        (match r with
-        | Some (Jkind_types.Sort.Var v') when v' == v -> ()
-        | Some (Jkind_types.Sort.Var v') ->
-          let j = List.assq v' subj_index in
-          raise (Dont_match (Layout_poly_coercion
-            (Instantiate_lhs_to_rhs { index_lhs = i; index_rhs = j })))
+        (* A sort variable under a kind operator (e.g. ['s addressable]) is
+           not one of the RHS sort poly vars, so it counts as an
+           instantiation. *)
+        (match (r : Jkind_types.Sort.t option) with
+        | Some { prop; data = Var v' }
+            when Jkind_types.Prop.is_id prop && v == v' -> ()
+        | Some { prop = _; data = Var v' } ->
+            let j = List.assq v' subj_index in
+            raise (Dont_match (Layout_poly_coercion
+              (Instantiate_lhs_to_rhs { index_lhs = i; index_rhs = j })))
         | _ ->
           raise (Dont_match (Layout_poly_coercion
             (Instantiate_lhs { index_lhs = i; arg = r }))));

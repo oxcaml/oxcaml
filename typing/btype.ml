@@ -483,7 +483,7 @@ let type_iterators_without_type_expr =
   and it_jkind_declaration it jkd =
     match jkd.jkind_manifest with
     | None -> ()
-    | Some { base = Kconstr (p, _, _); mod_bounds = _;
+    | Some { base = Kconstr (p, _); mod_bounds = _;
              with_bounds = No_with_bounds } ->
       it.it_path p
     | Some { base = Layout _; mod_bounds = _; with_bounds = No_with_bounds } ->
@@ -571,11 +571,10 @@ let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 let instance_jkind (t : jkind_lr) : jkind_lr =
   let rec instance_layout (l : Jkind_types.Sort.t Jkind_types.Layout.t)
       : Jkind_types.Sort.t Jkind_types.Layout.t =
-    match l with
-    | Any _ -> l
-    | Sort (s, sa) -> Sort (Jkind_types.Sort.instance s, sa)
-    | Product ts -> Product (List.map instance_layout ts)
-    | Addressable l -> Addressable (instance_layout l)
+    match l.data with
+    | Any -> l
+    | Sort s -> { l with data = Sort (Jkind_types.Sort.instance s) }
+    | Product ts -> { l with data = Product (List.map instance_layout ts) }
   in
   match t.jkind.base with
   | Kconstr _ -> t
@@ -1265,21 +1264,22 @@ module Jkind0 = struct
       | Layout l -> (
         match f l with None -> None | Some l -> Some { t with base = Layout l })
 
-    let meet_scannable_axes (base : Jkind_types.Layout.Const.t jkind_base) sa :
-        Jkind_types.Layout.Const.t jkind_base =
-      match base with
-      | Kconstr (p, sa', op) ->
-        Kconstr (p, Jkind_types.Scannable_axes.meet sa sa', op)
-      | Layout l ->
-        Layout (Jkind_types.Layout.Const.meet_root_scannable_axes l sa)
-
-    let apply_operator (base : Jkind_types.Layout.Const.t jkind_base)
-        (op : Jkind_types.Kind_operator.t) :
-        Jkind_types.Layout.Const.t jkind_base =
-      match base with
-      | Layout l -> Layout (Jkind_types.Layout.Const.apply_operator l op)
-      | Kconstr (p, sa, op') ->
-        Kconstr (p, sa, Jkind_types.Kind_operator.compose op op')
+    let apply_prop (base : Jkind_types.Layout.Const.t jkind_base)
+        (prop : Jkind_types.Prop.t) : Jkind_types.Layout.Const.t jkind_base =
+      if Jkind_types.Prop.is_id prop
+      then base
+      else
+        (* Preserve physical equality when nothing changes; callers use it to
+           avoid reallocating jkinds. *)
+        match base with
+        | Kconstr (p, prop') ->
+          let prop'' = Jkind_types.Prop.compose prop prop' in
+          if Jkind_types.Prop.equal prop'' prop'
+          then base
+          else Kconstr (p, prop'')
+        | Layout l ->
+          let l' = Jkind_types.Layout.Const.apply_prop l prop in
+          if l' == l then base else Layout l'
 
     let map_type_expr f t =
       { t with with_bounds = With_bounds.map_type_expr f t.with_bounds }
@@ -1311,11 +1311,7 @@ module Jkind0 = struct
     end)
 
     let of_path path =
-      { base =
-          Kconstr
-            (path,
-             Jkind_types.Scannable_axes.max,
-             Jkind_types.Kind_operator.Id);
+      { base = Kconstr (path, Jkind_types.Prop.id);
         mod_bounds = Mod_bounds.max;
         with_bounds = No_with_bounds
       }
@@ -1344,10 +1340,9 @@ module Jkind0 = struct
       | None -> false
       | Some (t1, t2) -> (
         match t1.base, t2.base with
-        | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2) ->
+        | Kconstr (p1, prop1), Kconstr (p2, prop2) ->
           Path.same p1 p2 &&
-          Jkind_types.Scannable_axes.equal sa1 sa2 &&
-          Jkind_types.Kind_operator.equal op1 op2 &&
+          Jkind_types.Prop.equal prop1 prop2 &&
           Mod_bounds.equal t1.mod_bounds t2.mod_bounds
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
@@ -2023,6 +2018,13 @@ module Jkind0 = struct
   end
 
   module Jkind = struct
+    (* [scannable] with the given scannable axes. *)
+    let scannable_layout nullability separability =
+      Jkind_types.Layout.apply_prop
+        (Jkind_types.Prop.of_scannable_axes
+           { Jkind_types.Scannable_axes.nullability; separability })
+        (Jkind_types.Layout.of_sort Jkind_types.Sort.scannable)
+
     include Allowance.Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd jkind
 
@@ -2127,8 +2129,9 @@ module Jkind0 = struct
           { Jkind_desc.Builtin.any with
             base =
               Layout
-                (Jkind_types.Layout.Any
-                   { Jkind_types.Scannable_axes.max with nullability })
+                (Jkind_types.Layout.any
+                   (Jkind_types.Prop.of_scannable_axes
+                      { Jkind_types.Scannable_axes.max with nullability }))
           }
           ~annotation:None ~why:(Any_creation why)
 
@@ -2138,8 +2141,9 @@ module Jkind0 = struct
           { Jkind_desc.Builtin.any with
             base =
               Layout
-                (Jkind_types.Layout.Any
-                   { Jkind_types.Scannable_axes.max with separability })
+                (Jkind_types.Layout.any
+                   (Jkind_types.Prop.of_scannable_axes
+                      { Jkind_types.Scannable_axes.max with separability }))
           }
           ~annotation:None ~why:(Any_creation why)
 
@@ -2208,7 +2212,7 @@ module Jkind0 = struct
         let layout =
           Jkind_types.Layout.product
             (List.init arity (fun _ ->
-               Jkind_types.Layout.Any Jkind_types.Scannable_axes.max))
+               Jkind_types.Layout.any Jkind_types.Prop.id))
         in
         let desc : _ jkind_desc =
           { base = Layout layout;
@@ -2313,10 +2317,7 @@ module Jkind0 = struct
       in
       fresh_jkind
         { base =
-            Layout
-              (Sort
-                 (Base Scannable,
-                  { nullability = Non_null; separability = Non_float }));
+            Layout (scannable_layout Non_null Non_float);
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2588,10 +2589,7 @@ module Jkind0 = struct
       in
       fresh_jkind
         { base =
-            Layout
-              (Sort
-                 (Base Scannable,
-                  { nullability = Non_null; separability = Separable }));
+            Layout (scannable_layout Non_null Separable);
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2600,8 +2598,8 @@ module Jkind0 = struct
 
     let for_expr =
       fresh_jkind
-        { base = Layout (Sort (Base Scannable, { nullability = Non_null;
-                                                 separability = Separable }));
+        { base =
+            Layout (scannable_layout Non_null Separable);
           mod_bounds = Mod_bounds.for_arrow;
           with_bounds = No_with_bounds
         }
@@ -2616,7 +2614,9 @@ module Jkind0 = struct
       fresh_jkind
         { base =
             Layout
-              (Any { nullability = Maybe_null; separability = Separable });
+              (Jkind_types.Layout.any
+                 (Jkind_types.Prop.of_scannable_axes
+                    { nullability = Maybe_null; separability = Separable }));
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2629,11 +2629,7 @@ module Jkind0 = struct
       in
       fresh_jkind
         { base =
-            Layout
-              (Sort
-                 (Base Scannable,
-                  { nullability = Non_null;
-                    separability = Maybe_separable }));
+            Layout (scannable_layout Non_null Maybe_separable);
           mod_bounds;
           with_bounds = No_with_bounds
         }

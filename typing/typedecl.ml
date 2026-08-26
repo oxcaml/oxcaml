@@ -2417,7 +2417,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
                   match Jkind.extract_layout env jkind with
                   | Ok layout -> layout
                   | Error _ ->
-                      Jkind.Layout.Any Jkind_types.Scannable_axes.max
+                      Jkind.Layout.any Jkind_types.Prop.id
                 in
                 lbl, ty, layout)
             lbls jkinds
@@ -3285,7 +3285,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
   match decl.Types.jkind_manifest with
   | None -> ()
   | Some { base = Layout _; _ } -> ()
-  | Some ({ base = Kconstr (kpath, _, _); mod_bounds = _;
+  | Some ({ base = Kconstr (kpath, _); mod_bounds = _;
             with_bounds = No_with_bounds }
           as manifest) ->
     if not (Path.exists_free recmod_ids kpath) then ()
@@ -3300,7 +3300,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
         | [] -> [expand]
         | _ :: _ ->
           (match manifest.base with
-           | Kconstr (base_path, _, _) ->
+           | Kconstr (base_path, _) ->
              [Contains (manifest, base_path); expand]
            | Layout _ -> assert false)
       in
@@ -3313,7 +3313,7 @@ let check_well_founded_jkind_decl env loc recmod_ids path decl =
           None
         else
           match (Env.find_jkind current env).jkind_manifest with
-          | Some ({ base = Kconstr (next, _, _); mod_bounds = _;
+          | Some ({ base = Kconstr (next, _); mod_bounds = _;
                     with_bounds = No_with_bounds } as m) ->
             follow next ((steps_of current m) @ acc) (current :: visited)
           | Some { base = Layout _; _ } | None -> None
@@ -5506,13 +5506,8 @@ module Reaching_path = struct
          : jkind_const_desc_lr ) =
     let pp_base ppf = function
       | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
-      | Kconstr (p, sa, op) ->
-        let op_strs : string list =
-          match (op : Jkind_types.Kind_operator.t) with
-          | Id -> []
-          | Addressable -> ["addressable"]
-        in
-        (match Jkind.Scannable_axes.to_string_list sa @ op_strs with
+      | Kconstr (p, prop) ->
+        (match Jkind.Prop.to_string_list prop with
          | [] -> Printtyp.path ppf p
          | _ :: _ as strs ->
            Fmt.fprintf ppf "%a %s" Printtyp.path p

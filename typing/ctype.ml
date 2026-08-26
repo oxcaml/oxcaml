@@ -2087,17 +2087,12 @@ let instance_prim_layout env (desc : Primitive.description) ty =
       new_sort := Some sort;
       sort
   in
-  (* Instantiate a jkind with layout
-     [any <scannable axes> <addressability>] to one with
-     ['s <scannable axes> <addressability>], where all ['s] are shared. *)
+  (* Instantiate a jkind whose layout is [any] under some kind operator to one
+     with ['s] under the same operator, where all ['s] are shared. *)
   let instance_sort_var_for_lpoly_jkind jkind =
-    let rec instance_layout
-      : Jkind.Sort.t Jkind.Layout.t -> _ option = function
-      | Any sa -> Some (Jkind.Layout.Sort (get_sort (), sa))
-      | Addressable layout ->
-        Option.map
-          (fun l -> Jkind.Layout.Addressable l)
-          (instance_layout layout)
+    let instance_layout (l : Jkind.Sort.t Jkind.Layout.t) =
+      match l.data with
+      | Any -> Some { l with data = Jkind.Layout.Sort (get_sort ()) }
       | Sort _ | Product _ -> None
     in
     match Jkind.extract_layout env jkind with
@@ -2967,7 +2962,7 @@ let apply_layout_wrapping_l ~env
   let get_layout jkind =
     match Jkind.extract_layout env jkind with
     | Ok l -> l
-    | Error _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max
+    | Error _ -> Jkind_types.Layout.any Jkind_types.Prop.id
   in
   match or_null with
   | Some { prev; _ } ->
@@ -3405,7 +3400,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                         apply_jkind_wrapping_r ~env jkind ~unwrapped_ty
                       in
                       match Jkind.extract_layout env ty's_jkind with
-                      | Ok (Any _) ->
+                      | Ok { data = Any; _ } ->
                         (* We re-estimate in this case rather than reuse the
                            components of [ty's_jkind] because an unboxed record
                            with an [any] field has a product-of-[any]s kind on
@@ -6765,7 +6760,7 @@ let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
              the originals so that the returned [pat_sort_refs] refer to
              [subj_sort_vars], not to the short-lived rigid instances. *)
           let subj_sort_vars =
-            List.map (fun v -> Jkind_types.Sort.Var v) subj_sort_vars
+            List.map Jkind_types.Sort.of_var subj_sort_vars
           in
           let subst_map = List.combine subj_sorts subj_sort_vars in
           let sorts =
@@ -8377,7 +8372,7 @@ let clear_hash ()   =
    [jkind_const_desc]s. *)
 let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
   match jkind_desc.base with
-  | Kconstr (p, _sa, _op) -> begin
+  | Kconstr (p, _prop) -> begin
       match Path.find_free_opt ids p with
       | None -> jkind_desc
       | Some id ->

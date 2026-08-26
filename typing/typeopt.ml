@@ -1407,8 +1407,8 @@ let lazy_val_requires_forward env loc ty =
     Jkind.Layout.Const.of_sort_const
       Jkind.Sort.Const.for_lazy_body
       (* The scannable axes don't matter for the rest of the computation, so
-         setting them to [max] is totally fine. *)
-      Jkind_types.Scannable_axes.max
+         applying the identity operator is totally fine. *)
+      Jkind_types.Prop.id
   in
   let classify_product _ layouts =
     let layout = Jkind_types.Layout.Const.product layouts in

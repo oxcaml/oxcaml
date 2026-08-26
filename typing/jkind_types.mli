@@ -41,6 +41,84 @@
 
    All definitions here are commented in jkind.ml or jkind.mli. *)
 
+(** See Note [Kind properties] in [jkind_intf.ml]. *)
+module type Property = sig
+  type t
+
+  val id : t
+
+  val is_id : t -> bool
+
+  val equal : t -> t -> bool
+
+  (** [compose t1 t2] denotes [t1 ° t2] (equivalently [t2 ° t1]). *)
+  val compose : t -> t -> t
+
+  (** The order for which [compose] is the meet and [id] is the top. *)
+  val less_or_equal : t -> t -> Misc.Le_result.t
+
+  (** [residual ~have t] is the part of [t] that [have] does not already
+      enforce. [is_id (residual ~have t)] exactly when [have x] is a fixed point
+      of [t] for every [x]. *)
+  val residual : have:t -> t -> t
+
+  (** The kind modifiers spelling out [t], in the order they are printed. *)
+  val to_string_list : t -> string list
+end
+
+module Addressability : sig
+  type t =
+    | Id
+    | Addressable
+
+  include Property with type t := t
+end
+
+module Scannable_axes : sig
+  type t =
+    { nullability : Jkind_axis.Nullability.t;
+      separability : Jkind_axis.Separability.t
+    }
+
+  include Property with type t := t
+
+  val max : t
+
+  val value_axes : t
+
+  val le : t -> t -> bool
+
+  val meet : t -> t -> t
+
+  (** [to_string_list_diff ~base t] lists the modifiers needed to get from
+      [base] to [t]; [None] if [t] is not below [base] on every axis. *)
+  val to_string_list_diff : base:t -> t -> string list option
+end
+
+(** The property-enforcing operators a kind may carry, bundled together. The
+    components commute, so everything is computed componentwise. *)
+module Prop : sig
+  type t =
+    { addressability : Addressability.t;
+      scannable_axes : Scannable_axes.t
+    }
+
+  include Property with type t := t
+
+  val create :
+    addressability:Addressability.t -> scannable_axes:Scannable_axes.t -> t
+
+  val addressable : t
+
+  val of_scannable_axes : Scannable_axes.t -> t
+
+  val is_addressable : t -> bool
+
+  (** The residual of [t] for a term that can never be [Scannable]: such a term
+      is automatically a fixed point of the scannable-axes component. *)
+  val on_unscannable : t -> t
+end
+
 module Sort : sig
   (* We need to expose these details for use in [Jkind] *)
 
@@ -67,14 +145,22 @@ module Sort : sig
 
   val base_is_addressable : base -> bool
 
+  val base_is_scannable : base -> bool
+
   type univar = { name : string option }
 
-  type t =
+  (** A sort [{ prop; data }] denotes the operator [prop] applied to [data]. See
+      Note [Kind properties] in [jkind_intf.ml]. *)
+  type data =
     | Var of var
     | Base of base
     | Product of t list
     | Univar of univar
-    | Addressable of t
+
+  and t =
+    { prop : Prop.t;
+      data : data
+    }
 
   and var
 
@@ -96,15 +182,40 @@ module Sort : sig
 
   val equate_tracking_mutation : t -> t -> equate_result
 
-  type constrain_addressable_result =
-    | Addressable_mutated
-    | Addressable_no_mutation
-    | Not_known_addressable
+  type constrain_result =
+    | Constrained_mutated
+    | Constrained_no_mutation
+    | Not_constrained
 
-  val constrain_addressable :
-    allow_mutation:bool -> t -> constrain_addressable_result
+  (** [constrain_fixpoint ~prop t] establishes [t = prop t], mutating sort
+      variables when that is allowed and necessary. *)
+  val constrain_fixpoint :
+    allow_mutation:bool -> prop:Prop.t -> t -> constrain_result
 
-  val strip_head_addressable : t -> t
+  val is_surely_fixpoint : prop:Prop.t -> t -> bool
+
+  val is_surely_addressable : t -> bool
+
+  (** Applies an operator to a sort; this is just composition. *)
+  val apply_prop : Prop.t -> t -> t
+
+  val of_data : data -> t
+
+  val of_univar : univar -> t
+
+  (** Splits the sort into the operator applied at its head — following through
+      filled variables, whose contents may apply further operators — and the
+      operator-free remainder. *)
+  val split_head_prop : t -> Prop.t * t
+
+  val strip_head_prop : t -> t
+
+  (** The operator applied at the head of the sort. *)
+  val head_prop : t -> Prop.t
+
+  (** The part of the head operator that is not already implied by the sort's
+      structure: the modifiers that need printing. *)
+  val visible_prop : t -> Prop.t
 
   (** Post-condition (which holds deeply within the sort): If the result is a
       [Var v], then [!v] is [None]. *)
@@ -128,33 +239,6 @@ module Sort : sig
   end
 end
 
-module Kind_operator : sig
-  type t =
-    | Id
-    | Addressable
-
-  val equal : t -> t -> bool
-
-  val compose : t -> t -> t
-end
-
-module Scannable_axes : sig
-  type t =
-    { nullability : Jkind_axis.Nullability.t;
-      separability : Jkind_axis.Separability.t
-    }
-
-  val max : t
-
-  val value_axes : t
-
-  val equal : t -> t -> bool
-
-  val less_or_equal : t -> t -> Misc.Le_result.t
-
-  val meet : t -> t -> t
-end
-
 module Layout : sig
   (** Note that:
 
@@ -167,14 +251,24 @@ module Layout : sig
       layouts they are ignored, so e.g. [float64 non_pointer] is equivalent to
       [float64]. See [Layout.Const.get_root_scannable_axes].
 
-      3. Like products, [Addressable] has two possible encodings: at the layout
-      level or within a sort. [Addressable (Any _)] can only be encoded at the
-      layout level. *)
-  type 'sort t =
-    | Sort of 'sort * Scannable_axes.t
+      3. Like products, the operators in [prop] have two possible encodings: at
+      the layout level or within a sort. Operators on [Any] can only be encoded
+      at the layout level. *)
+  type 'sort data =
+    | Sort of 'sort
     | Product of 'sort t list
-    | Any of Scannable_axes.t
-    | Addressable of 'sort t
+    | Any
+
+  and 'sort t =
+    { prop : Prop.t;
+      data : 'sort data
+    }
+
+  val of_data : 'sort data -> 'sort t
+
+  val of_sort : 'sort -> 'sort t
+
+  val any : Prop.t -> 'sort t
 
   module Const : sig
     type t = private
@@ -189,7 +283,7 @@ module Layout : sig
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
       | Addressable of t
-          (** See Note [Addressable kinds].
+          (** See Note [Kind properties].
 
               Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)]. *)
@@ -218,7 +312,9 @@ module Layout : sig
 
     val addressable : t -> t
 
-    val apply_operator : t -> Kind_operator.t -> t
+    val apply_addressability : t -> Addressability.t -> t
+
+    val apply_prop : t -> Prop.t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)
@@ -235,7 +331,7 @@ module Layout : sig
 
   val of_const : Const.t -> Sort.t t
 
-  val of_new_sort_var : level:int -> Scannable_axes.t -> Sort.t t * Sort.t
+  val of_new_sort_var : level:int -> Prop.t -> Sort.t t * Sort.t
 
   val get_const : Sort.t t -> Const.t option
 
@@ -243,5 +339,5 @@ module Layout : sig
 
   val product : 'a t list -> 'a t
 
-  val apply_operator : 'a t -> Kind_operator.t -> 'a t
+  val apply_prop : Prop.t -> 'a t -> 'a t
 end

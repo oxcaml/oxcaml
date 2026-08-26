@@ -2424,12 +2424,11 @@ Error: Layout mismatch in checking consistency of mutually recursive groups.
        clever enough to propagate layouts through variables in different
        declarations. It is also not clever enough to produce a good error
        message, so we'll say this instead:
-         The layout of 'a t2 is value
+         The kind of 'a t2 is value non_pointer
            because it instantiates an unannotated type parameter of t2,
-           chosen to have layout value.
-         But the layout of 'a t2 must be a sublayout of value non_pointer
+           chosen to have kind value non_pointer.
+         But the kind of 'a t2 must be a subkind of immediate
            because of the annotation on the wildcard _ at line 1, characters 27-36.
-         Note: The layout of immediate is value non_pointer.
        A good next step is to add a layout annotation on a parameter to
        the declaration where this error is reported.
 |}]
