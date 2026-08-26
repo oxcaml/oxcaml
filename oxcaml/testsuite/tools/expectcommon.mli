@@ -56,6 +56,9 @@ val register_compilation_unit_callback :
 
 val read_anonymous_arg : object_extensions:string list -> string -> unit
 
+val format_structured_diagnostic :
+  Format.formatter -> Structured_diagnostic.t -> unit
+
 val run
   :  read_anonymous_arg:(string -> unit)
   -> extra_args:(Arg.key * Arg.spec * Arg.doc) list

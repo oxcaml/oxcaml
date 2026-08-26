@@ -788,3 +788,362 @@ let of_json text =
 
 let to_json diagnostic =
   String.concat "" (String.split_on_char '\n' (diagnostic_to_json diagnostic))
+
+module Json = struct
+  exception Malformed of string
+
+  type t =
+    | Null
+    | Bool of bool
+    | Number of string
+    | String of string
+    | Array of t list
+    | Object of (string * t) list
+
+  let parse text =
+    let length = String.length text in
+    let position = ref 0 in
+    let fail message =
+      raise
+        (Malformed
+           (Printf.sprintf "at byte %d: %s" !position message))
+    in
+    let peek () =
+      if !position < length then Some text.[!position] else None
+    in
+    let peek_ahead offset =
+      let position = !position + offset in
+      if position < length then Some text.[position] else None
+    in
+    let advance () = incr position in
+    let rec skip_whitespace () =
+      match peek () with
+      | Some (' ' | '\t' | '\r' | '\n') ->
+        advance ();
+        skip_whitespace ()
+      | Some _ | None -> ()
+    in
+    let expect character =
+      match peek () with
+      | Some found when Char.equal found character -> advance ()
+      | Some found ->
+        fail (Printf.sprintf "expected %c, found %c" character found)
+      | None ->
+        fail (Printf.sprintf "expected %c, found end of input" character)
+    in
+    let hexadecimal character =
+      match character with
+      | '0' .. '9' -> Char.code character - Char.code '0'
+      | 'a' .. 'f' -> Char.code character - Char.code 'a' + 10
+      | 'A' .. 'F' -> Char.code character - Char.code 'A' + 10
+      | _ -> fail "expected a hexadecimal digit"
+    in
+    let code_unit () =
+      let code = ref 0 in
+      for _ = 1 to 4 do
+        match peek () with
+        | None -> fail "unterminated escape"
+        | Some digit ->
+          code := (!code * 16) + hexadecimal digit;
+          advance ()
+      done;
+      !code
+    in
+    let is_leading_surrogate code = code >= 0xd800 && code <= 0xdbff in
+    let is_trailing_surrogate code = code >= 0xdc00 && code <= 0xdfff in
+    let scalar_value () =
+      let code = code_unit () in
+      if is_trailing_surrogate code then fail "lone trailing surrogate";
+      if not (is_leading_surrogate code) then code
+      else begin
+        (match peek (), peek_ahead 1 with
+        | Some '\\', Some 'u' -> position := !position + 2
+        | _ -> fail "lone leading surrogate");
+        let trailing = code_unit () in
+        if not (is_trailing_surrogate trailing) then
+          fail "expected a trailing surrogate";
+        0x10000 + ((code - 0xd800) * 0x400) + (trailing - 0xdc00)
+      end
+    in
+    let parse_string () =
+      expect '"';
+      let buffer = Buffer.create 32 in
+      let rec loop () =
+        match peek () with
+        | None -> fail "unterminated string"
+        | Some ('\000' .. '\031') ->
+          fail "unescaped control character in string"
+        | Some '"' ->
+          advance ();
+          Buffer.contents buffer
+        | Some '\\' ->
+          advance ();
+          (match peek () with
+          | None -> fail "unterminated escape"
+          | Some 'u' ->
+            advance ();
+            Buffer.add_utf_8_uchar buffer (Uchar.of_int (scalar_value ()))
+          | Some escaped ->
+            advance ();
+            Buffer.add_char buffer
+              (match escaped with
+              | 'n' -> '\n'
+              | 't' -> '\t'
+              | 'r' -> '\r'
+              | 'b' -> '\b'
+              | 'f' -> '\012'
+              | '"' -> '"'
+              | '\\' -> '\\'
+              | '/' -> '/'
+              | _ -> fail "unknown escape"));
+          loop ()
+        | Some character ->
+          advance ();
+          Buffer.add_char buffer character;
+          loop ()
+      in
+      loop ()
+    in
+    let parse_literal spelling value =
+      let width = String.length spelling in
+      let stop = !position + width in
+      if stop > length
+         || not (String.equal (String.sub text !position width) spelling)
+      then fail (Printf.sprintf "expected %s" spelling);
+      position := stop;
+      value
+    in
+    let parse_number () =
+      let start = !position in
+      let rec loop () =
+        match peek () with
+        | Some ('-' | '+' | '.' | 'e' | 'E' | '0' .. '9') ->
+          advance ();
+          loop ()
+        | Some _ | None -> ()
+      in
+      loop ();
+      if Int.equal !position start then fail "expected a number";
+      Number (String.sub text start (!position - start))
+    in
+    let rec parse_value () =
+      skip_whitespace ();
+      match peek () with
+      | None -> fail "expected a value"
+      | Some '"' -> String (parse_string ())
+      | Some '{' -> parse_object ()
+      | Some '[' -> parse_array ()
+      | Some 't' -> parse_literal "true" (Bool true)
+      | Some 'f' -> parse_literal "false" (Bool false)
+      | Some 'n' -> parse_literal "null" Null
+      | Some _ -> parse_number ()
+    and parse_object () =
+      expect '{';
+      skip_whitespace ();
+      match peek () with
+      | Some '}' ->
+        advance ();
+        Object []
+      | Some _ | None ->
+        let rec loop fields =
+          skip_whitespace ();
+          let name = parse_string () in
+          skip_whitespace ();
+          expect ':';
+          let value = parse_value () in
+          let fields = (name, value) :: fields in
+          skip_whitespace ();
+          match peek () with
+          | Some ',' ->
+            advance ();
+            loop fields
+          | Some '}' ->
+            advance ();
+            Object (List.rev fields)
+          | Some _ | None -> fail "expected , or } in object"
+        in
+        loop []
+    and parse_array () =
+      expect '[';
+      skip_whitespace ();
+      match peek () with
+      | Some ']' ->
+        advance ();
+        Array []
+      | Some _ | None ->
+        let rec loop items =
+          let items = parse_value () :: items in
+          skip_whitespace ();
+          match peek () with
+          | Some ',' ->
+            advance ();
+            loop items
+          | Some ']' ->
+            advance ();
+            Array (List.rev items)
+          | Some _ | None -> fail "expected , or ] in array"
+        in
+        loop []
+    in
+    let value = parse_value () in
+    skip_whitespace ();
+    if not (Int.equal !position length) then fail "unexpected trailing input";
+    value
+end
+
+let malformed format =
+  Printf.ksprintf (fun message -> raise (Json.Malformed message)) format
+
+let object_fields = function
+  | Json.Object fields -> fields
+  | _ -> malformed "expected an object"
+
+let field name json =
+  match List.assoc_opt name (object_fields json) with
+  | Some value -> value
+  | None -> malformed "missing field %S" name
+
+let optional_field name json = List.assoc_opt name (object_fields json)
+
+let string = function
+  | Json.String string -> string
+  | _ -> malformed "expected a string"
+
+let int = function
+  | Json.Number number -> (match int_of_string_opt number with
+    | Some int -> int
+    | None -> malformed "expected an integer, found %S" number)
+  | _ -> malformed "expected an integer"
+
+let array = function
+  | Json.Array values -> values
+  | _ -> malformed "expected an array"
+
+let position_of_json ~file json =
+  let line = int (field "line" json) in
+  let column = int (field "col" json) in
+  { Lexing.pos_fname = file;
+    pos_lnum = line;
+    pos_bol = 0;
+    pos_cnum = column
+  }
+
+let location_of_json json =
+  let file = string (field "file" json) in
+  { Location.loc_start = position_of_json ~file (field "start" json);
+    loc_end = position_of_json ~file (field "end" json);
+    loc_ghost = false
+  }
+
+let id ids kind json =
+  let serialized = int json in
+  match List.assoc_opt serialized ids with
+  | Some id -> id
+  | None -> malformed "unknown %s id %d" kind serialized
+
+let entities_of_json json =
+  List.fold_left
+    (fun (entities, ids) json ->
+      let serialized = int (field "id" json) in
+      let entities, entity =
+        Diagnostic.Entities.intern entities
+          (location_of_json (field "loc" json))
+      in
+      if not (Int.equal serialized (Diagnostic.Entities.Id.to_int entity)) then
+        malformed "invalid entity id %d" serialized;
+      entities, (serialized, entity) :: ids)
+    (Diagnostic.Entities.empty, []) (array json)
+
+let glossary_of_json json =
+  List.fold_left
+    (fun (glossary, ids) json ->
+      let serialized = int (field "id" json) in
+      let entry : Diagnostic.Glossary.Entry.t =
+        { term = string (field "term" json);
+          category = string (field "category" json);
+          description = string (field "description" json);
+          url = Option.map string (optional_field "url" json)
+        }
+      in
+      let glossary, term = Diagnostic.Glossary.intern glossary entry in
+      if not (Int.equal serialized (Diagnostic.Glossary.Id.to_int term)) then
+        malformed "invalid glossary id %d" serialized;
+      glossary, (serialized, term) :: ids)
+    (Diagnostic.Glossary.empty, []) (array json)
+
+let form_of_json json =
+  match string json with
+  | "name" -> Diagnostic.Form.Name
+  | "pronoun" -> Diagnostic.Form.Pronoun
+  | form -> malformed "unknown mention form %S" form
+
+let annotation_of_json ~entities ~glossary json =
+  match string (field "kind" json) with
+  | "code" -> Diagnostic.Annotation.Code
+  | "source" ->
+    Diagnostic.Annotation.Source (location_of_json (field "loc" json))
+  | "mention" ->
+    Diagnostic.Annotation.Mention
+      { entity = id entities "entity" (field "entity" json);
+        form = form_of_json (field "form" json)
+      }
+  | "term" ->
+    Diagnostic.Annotation.Term (id glossary "glossary" (field "term" json))
+  | kind -> malformed "unknown annotation kind %S" kind
+
+let rec inline_of_json ~entities ~glossary json =
+  match string (field "kind" json) with
+  | "text" -> Diagnostic.Inline.Text (string (field "text" json))
+  | "annotated" ->
+    Diagnostic.Inline.Annotated
+      { annotation =
+          annotation_of_json ~entities ~glossary (field "annotation" json);
+        content =
+          List.map (inline_of_json ~entities ~glossary)
+            (array (field "content" json))
+      }
+  | kind -> malformed "unknown inline kind %S" kind
+
+let kind_of_json json =
+  match string json with
+  | "explanation" -> Diagnostic.Kind.Explanation
+  | "background" -> Diagnostic.Kind.Background
+  | "suggestion" -> Diagnostic.Kind.Suggestion
+  | kind -> malformed "unknown block kind %S" kind
+
+let relation_of_json json =
+  match string json with
+  | "claim" -> Diagnostic.Relation.Claim
+  | "elaboration" -> Diagnostic.Relation.Elaboration
+  | relation -> malformed "unknown block relation %S" relation
+
+let rec block_of_json ~entities ~glossary json : Diagnostic.Block.t =
+  { kind = kind_of_json (field "kind" json);
+    content =
+      List.map (inline_of_json ~entities ~glossary)
+        (array (field "content" json));
+    children =
+      List.map (child_of_json ~entities ~glossary)
+        (array (field "children" json))
+  }
+
+and child_of_json ~entities ~glossary json =
+  relation_of_json (field "relation" json),
+  block_of_json ~entities ~glossary (field "block" json)
+
+let of_json text =
+  match
+    let json = Json.parse text in
+    let loc = location_of_json (field "loc" json) in
+    let entities, entity_ids = entities_of_json (field "entities" json) in
+    let glossary, glossary_ids = glossary_of_json (field "glossary" json) in
+    let body =
+      List.map (block_of_json ~entities:entity_ids ~glossary:glossary_ids)
+        (array (field "body" json))
+    in
+    let diagnostic : Diagnostic.t = { loc; entities; glossary; body } in
+    diagnostic
+  with
+  | diagnostic -> Ok diagnostic
+  | exception Json.Malformed message -> Error message
+  | exception Invalid_argument message -> Error message
