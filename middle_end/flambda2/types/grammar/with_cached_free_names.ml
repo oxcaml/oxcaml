@@ -37,21 +37,27 @@ let[@inline always] free_names_no_cache ~free_names_descr t =
   free_names_descr descr
 
 let apply_renaming ~apply_renaming_descr ~free_names_descr t renaming =
-  let free_names = free_names ~free_names_descr t in
-  if
-    (not (Renaming.has_import_map renaming))
-    && not (Name_occurrences.affected_by_renaming free_names renaming)
-  then t
+  if not (Renaming.has_import_map renaming)
+  then
+    let free_names = free_names ~free_names_descr t in
+    if not (Name_occurrences.affected_by_renaming free_names renaming)
+    then t
+    else
+      let descr = apply_renaming_descr t.descr renaming in
+      let free_names =
+        (* CR lmaurer: Make extra-sure that [Name_occurrences.apply_renaming]
+           returns a [phys_equal] result if no change, then consider moving this
+           call in place of [affected_by_renaming] above to avoid traversing
+           twice. *)
+        Some (Name_occurrences.apply_renaming free_names renaming)
+      in
+      { descr; free_names }
   else
-    let descr = apply_renaming_descr t.descr renaming in
-    let free_names =
-      (* CR lmaurer: Make extra-sure that [Name_occurrences.apply_renaming]
-         returns a [phys_equal] result if no change, then consider moving this
-         call in place of [affected_by_renaming] above to avoid traversing
-         twice. *)
-      Some (Name_occurrences.apply_renaming free_names renaming)
-    in
-    { descr; free_names }
+    (* If [Renaming.has_import_map] then we are currently importing data from a
+       previous process. We can't traverse [descr] before renaming it because
+       its IDs might not be in our tables yet. In this case we just drop the
+       cache and let it get recomputed on demand. *)
+    { descr = apply_renaming_descr t.descr renaming; free_names = None }
 
 let remove_unused_value_slots_and_shortcut_aliases
     ~remove_unused_value_slots_and_shortcut_aliases_descr t ~used_value_slots
