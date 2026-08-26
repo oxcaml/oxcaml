@@ -661,10 +661,6 @@ let facts_of_tree compilation_unit artifact iterate =
         | Other_member -> ())
       signature
   in
-  let path_application_hook :
-      (site:Location.t -> Env.t -> Path.t -> Path.t -> unit) ref =
-    ref (fun ~site:_ _ _ _ -> ())
-  in
   (* Naming another compilation unit must not read that unit's interface:
      [Env.find_module] loads the .cmi to recover [md_uid], which would make the
      facts of a unit depend on which interfaces happen to sit on the load path
@@ -678,65 +674,6 @@ let facts_of_tree compilation_unit artifact iterate =
       when Ident.is_global id && not (Current_unit.Name.is_ident id) ->
       (Shape.for_persistent_unit (Ident.name id)).Shape.uid
     | Path.Pident _ | Path.Pdot _ | Path.Papply _ | Path.Pextra_ty _ -> None
-  in
-  let rec context_of_path_inner ~site env (path : Path.t) : Context.t option =
-    match persistent_unit_uid path with
-    | Some uid -> Some (module_context uid)
-    | None -> (
-      match find_module env path with
-      | None -> None
-      | Some declaration -> (
-        let uid = declaration.Types.md_uid in
-        match path with
-        | Path.Pident _ -> Some (module_context uid)
-        | Path.Pdot (prefix, _) ->
-          Option.map
-            (fun prefix -> Context.Proj (prefix, uid))
-            (context_of_path_inner ~site env prefix)
-        | Path.Papply (functor_, argument) -> (
-          (match site with
-          | Some site -> !path_application_hook ~site env functor_ argument
-          | None -> ());
-          match
-            ( context_of_path_inner ~site env functor_,
-              context_of_path_inner ~site env argument )
-          with
-          | Some functor_, Some argument ->
-            Some (Context.App (functor_, argument))
-          | (Some _ | None), _ -> None)
-        | Path.Pextra_ty _ -> None))
-  in
-  let context_of_path ~site env path =
-    let path =
-      (* Normalizing would load the interface too, for no gain: a compilation
-         unit is never an alias. *)
-      match persistent_unit_uid path with
-      | Some _ -> path
-      | None -> normalize_module_path env path
-    in
-    context_of_path_inner ~site env path
-  in
-  let rec report_path_applications ~site env (path : Path.t) =
-    match path with
-    | Path.Pident _ -> ()
-    | Path.Pdot (prefix, _) | Path.Pextra_ty (prefix, _) ->
-      report_path_applications ~site env prefix
-    | Path.Papply (functor_, argument) ->
-      report_path_applications ~site env functor_;
-      report_path_applications ~site env argument;
-      !path_application_hook ~site env functor_ argument
-  in
-  (* Record applications in the module-path prefix of an [Ldot] whose final
-     component is a record label or variant constructor. *)
-  let report_projected_longident_applications ~site env (lid : Longident.t) =
-    match lid with
-    | Longident.Ldot (prefix, _) when longident_contains_apply prefix.txt -> (
-      match
-        Env.lookup_module_path ~use:false ~loc:site ~load:false prefix.txt env
-      with
-      | path, _ -> report_path_applications ~site env path
-      | exception _ -> ())
-    | Longident.Lident _ | Longident.Ldot _ | Longident.Lapply _ -> ()
   in
   let named_signature_owner env (module_type : Types.module_type) =
     let owner_of_modtype_path path =
@@ -792,7 +729,52 @@ let facts_of_tree compilation_unit artifact iterate =
     | None -> ());
     key
   in
-  let key_of_modtype_path ~site env (path : Path.t) : Key.t option =
+  let uid_of_module_path env path =
+    match find_normalized_module env path with
+    | Some declaration -> Some declaration.Types.md_uid
+    | None -> None
+  in
+  let node_of_module_path env ~loc path =
+    match uid_of_module_path env path with
+    | Some uid -> Node.Uid uid
+    | None -> Node.Location (compilation_unit, loc)
+  in
+  let rec context_of_path_inner ~site env (path : Path.t) : Context.t option =
+    match persistent_unit_uid path with
+    | Some uid -> Some (module_context uid)
+    | None -> (
+      match find_module env path with
+      | None -> None
+      | Some declaration -> (
+        let uid = declaration.Types.md_uid in
+        match path with
+        | Path.Pident _ -> Some (module_context uid)
+        | Path.Pdot (prefix, _) ->
+          Option.map
+            (fun prefix -> Context.Proj (prefix, uid))
+            (context_of_path_inner ~site env prefix)
+        | Path.Papply (functor_, argument) -> (
+          Option.iter
+            (fun site -> record_path_application ~site env functor_ argument)
+            site;
+          match
+            ( context_of_path_inner ~site env functor_,
+              context_of_path_inner ~site env argument )
+          with
+          | Some functor_, Some argument ->
+            Some (Context.App (functor_, argument))
+          | (Some _ | None), _ -> None)
+        | Path.Pextra_ty _ -> None))
+  and context_of_path ~site env path =
+    let path =
+      (* Normalizing would load the interface too, for no gain: a compilation
+         unit is never an alias. *)
+      match persistent_unit_uid path with
+      | Some _ -> path
+      | None -> normalize_module_path env path
+    in
+    context_of_path_inner ~site env path
+  and key_of_modtype_path ~site env (path : Path.t) : Key.t option =
     match path with
     | Path.Papply _ | Path.Pextra_ty _ ->
       add_omission ~affected:None ~source:None Omission.Reason.Unsupported_path;
@@ -820,34 +802,7 @@ let facts_of_tree compilation_unit artifact iterate =
         match Uid.Tbl.find_opt modtype_contexts uid with
         | Some context -> Some (named_key ~family:None context uid)
         | None -> Some (named_key ~family:None (Context.Def uid) uid)))
-  in
-  let key_of_module_type (module_type : Typedtree.module_type) =
-    match module_type.mty_desc with
-    | Tmty_ident (path, _) -> (
-      match
-        key_of_modtype_path ~site:module_type.mty_loc module_type.mty_env path
-      with
-      | Some key -> key
-      | None ->
-        let key = Key.Anon module_type.mty_uid in
-        add_omission ~affected:(Some key) ~source:None
-          Omission.Reason.Unresolved_module_type;
-        key)
-    | Tmty_signature _ | Tmty_functor _ | Tmty_with _ | Tmty_typeof _
-    | Tmty_alias _ | Tmty_strengthen _ ->
-      Key.Anon module_type.mty_uid
-  in
-  let uid_of_module_path env path =
-    match find_normalized_module env path with
-    | Some declaration -> Some declaration.Types.md_uid
-    | None -> None
-  in
-  let node_of_module_path env ~loc path =
-    match uid_of_module_path env path with
-    | Some uid -> Node.Uid uid
-    | None -> Node.Location (compilation_unit, loc)
-  in
-  let add_subject_expectation_edges key ~site env reason path =
+  and add_subject_expectation_edges key ~site env reason path =
     let path = normalize_module_path env path in
     match find_module env path with
     | None ->
@@ -868,6 +823,211 @@ let facts_of_tree compilation_unit artifact iterate =
           add_omission ~affected:(Some key) ~source:None
             Omission.Reason.Unresolved_module_type)
       | None -> ())
+  and register_argument_members ~derived ~parameter_type env argument_source =
+    let rec walk ~source (parameter_type : Types.module_type) =
+      match scraped_signature env parameter_type with
+      | Some signature ->
+        let source_index =
+          match source with
+          | `Path _ -> empty_signature_index
+          | `Type module_type -> signature_index_of_module_type env module_type
+        in
+        List.iter
+          (fun item ->
+            match classify_signature_member item with
+            | Modtype_member (name, _) -> (
+              let source_key =
+                match source with
+                | `Path path ->
+                  key_of_modtype_path ~site:Location.none env
+                    (Path.Pdot (path, name))
+                | `Type _ -> (
+                  match
+                    String_map.find_opt name source_index.modtype_members
+                  with
+                  | Some source_declaration -> (
+                    let uid = source_declaration.Types.mtd_uid in
+                    match Uid.Tbl.find_opt modtype_contexts uid with
+                    | Some context -> Some (named_key ~family:None context uid)
+                    | None ->
+                      add_omission ~affected:(Some derived) ~source:(Some uid)
+                        Omission.Reason.Unresolved_module;
+                      None)
+                  | None -> None)
+              in
+              match source_key with
+              | Some source_key ->
+                add_dependency ~derived ~source:source_key
+                  Dependency.Reason.Argument_member
+              | None ->
+                add_omission ~affected:(Some derived) ~source:None
+                  Omission.Reason.Unresolved_module_type)
+            | Module_member (name, declaration) -> (
+              let member_source =
+                match source with
+                | `Path path -> Some (`Path (Path.Pdot (path, name)))
+                | `Type _ -> (
+                  match
+                    String_map.find_opt name source_index.module_members
+                  with
+                  | Some member -> Some (`Type member.Types.md_type)
+                  | None -> None)
+              in
+              match member_source with
+              | Some member_source ->
+                walk ~source:member_source declaration.md_type
+              | None ->
+                add_omission ~affected:(Some derived) ~source:None
+                  Omission.Reason.Unresolved_module)
+            | Other_member -> ())
+          signature
+      | None -> ()
+    in
+    walk ~source:argument_source parameter_type
+  and emit_argument_check ~site ~anchor env ~parameter_type ~expectation
+      ~functor_instance argument_node argument_source =
+    let instance_key uid =
+      let key = Key.Named { context = anchor (); family_uid = uid } in
+      (match expectation with
+      | Some parameter_uid ->
+        add_dependency ~derived:key ~source:(Key.Anon parameter_uid)
+          Dependency.Reason.Instance
+      | None -> ());
+      key
+    in
+    let instance_scoped parameter_uid =
+      let expectation_key = instance_key parameter_uid in
+      add_check argument_node expectation_key Check.Kind.Argument site;
+      if functor_instance
+      then
+        List.iter
+          (fun source ->
+            add_omission ~affected:(Some expectation_key) ~source:(Some source)
+              Omission.Reason.Missing_parameter_expectation)
+          (named_modtype_uids env parameter_type);
+      expectation_key
+    in
+    let derived =
+      match (parameter_type : Types.module_type) with
+      | Mty_strengthen (Mty_ident path, subject, _) -> (
+        let key =
+          match find_modtype env path with
+          | Some declaration -> Some (instance_key declaration.Types.mtd_uid)
+          | None -> Option.map instance_key expectation
+        in
+        match key with
+        | Some key ->
+          add_check argument_node key Check.Kind.Argument site;
+          (match key_of_modtype_path ~site env path with
+          | Some base ->
+            add_dependency ~derived:key ~source:base
+              Dependency.Reason.Strengthening
+          | None ->
+            add_omission ~affected:(Some key) ~source:None
+              Omission.Reason.Unresolved_module_type);
+          add_subject_expectation_edges key ~site env
+            Dependency.Reason.Strengthening subject;
+          Some key
+        | None ->
+          add_omission ~affected:None ~source:None
+            Omission.Reason.Missing_parameter_expectation;
+          None)
+      | Mty_ident path -> (
+        match key_of_modtype_path ~site env path, find_modtype env path with
+        | Some named_key, Some declaration ->
+          if has_argument_members env parameter_type
+          then begin
+            let key = instance_key declaration.Types.mtd_uid in
+            add_check argument_node key Check.Kind.Argument site;
+            add_dependency ~derived:key ~source:named_key
+              Dependency.Reason.Instance;
+            Some key
+          end
+          else begin
+            add_check argument_node named_key Check.Kind.Argument site;
+            Some named_key
+          end
+        | (Some _ | None), _ -> (
+          match expectation with
+          | Some parameter_uid -> Some (instance_scoped parameter_uid)
+          | None ->
+            add_omission ~affected:None ~source:None
+              Omission.Reason.Missing_parameter_expectation;
+            None))
+      | Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ -> (
+        match expectation with
+        | Some parameter_uid -> Some (instance_scoped parameter_uid)
+        | None ->
+          List.iter
+            (fun source ->
+              add_omission ~affected:None ~source:(Some source)
+                Omission.Reason.Missing_parameter_expectation)
+            (named_modtype_uids env parameter_type);
+          None)
+    in
+    match derived with
+    | Some derived ->
+      register_argument_members ~derived ~parameter_type env argument_source
+    | None -> ()
+  and record_path_application ~site env functor_path argument_path =
+    match find_normalized_module env functor_path with
+    | None -> ()
+    | Some functor_declaration -> (
+      match Mtype.scrape_alias env functor_declaration.Types.md_type with
+      | Mty_functor (Named (_, parameter_type, expectation, _), _, _) ->
+        let argument_node = node_of_module_path env ~loc:site argument_path in
+        let anchor () =
+          match
+            context_of_path ~site:None env
+              (Path.Papply (functor_path, argument_path))
+          with
+          | Some context -> context
+          | None -> fresh_site ()
+        in
+        emit_argument_check ~site ~anchor env ~parameter_type ~expectation
+          ~functor_instance:(path_contains_apply functor_path)
+          argument_node (`Path argument_path)
+      | Mty_functor (Unit, _, _)
+      | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _ ->
+        ())
+  in
+  let rec report_path_applications ~site env (path : Path.t) =
+    match path with
+    | Path.Pident _ -> ()
+    | Path.Pdot (prefix, _) | Path.Pextra_ty (prefix, _) ->
+      report_path_applications ~site env prefix
+    | Path.Papply (functor_, argument) ->
+      report_path_applications ~site env functor_;
+      report_path_applications ~site env argument;
+      record_path_application ~site env functor_ argument
+  in
+  (* Record applications in the module-path prefix of an [Ldot] whose final
+     component is a record label or variant constructor. *)
+  let report_projected_longident_applications ~site env (lid : Longident.t) =
+    match lid with
+    | Longident.Ldot (prefix, _) when longident_contains_apply prefix.txt -> (
+      match
+        Env.lookup_module_path ~use:false ~loc:site ~load:false prefix.txt env
+      with
+      | path, _ -> report_path_applications ~site env path
+      | exception _ -> ())
+    | Longident.Lident _ | Longident.Ldot _ | Longident.Lapply _ -> ()
+  in
+  let key_of_module_type (module_type : Typedtree.module_type) =
+    match module_type.mty_desc with
+    | Tmty_ident (path, _) -> (
+      match
+        key_of_modtype_path ~site:module_type.mty_loc module_type.mty_env path
+      with
+      | Some key -> key
+      | None ->
+        let key = Key.Anon module_type.mty_uid in
+        add_omission ~affected:(Some key) ~source:None
+          Omission.Reason.Unresolved_module_type;
+        key)
+    | Tmty_signature _ | Tmty_functor _ | Tmty_with _ | Tmty_typeof _
+    | Tmty_alias _ | Tmty_strengthen _ ->
+      Key.Anon module_type.mty_uid
   in
   let node_of_module_expr (module_expr : module_expr) =
     let module_expr = unwrap_implicit_constraint module_expr in
@@ -965,181 +1125,6 @@ let facts_of_tree compilation_unit artifact iterate =
           prefix_indexes := Path_map.add prefix built !prefix_indexes;
           built)
         (signature_component env ~prefix_indexes index prefix)
-  in
-  let register_argument_members ~derived ~parameter_type env argument_source =
-    let rec walk ~source (parameter_type : Types.module_type) =
-      match scraped_signature env parameter_type with
-      | Some signature ->
-        let source_index =
-          match source with
-          | `Path _ -> empty_signature_index
-          | `Type module_type -> signature_index_of_module_type env module_type
-        in
-        List.iter
-          (fun item ->
-            match classify_signature_member item with
-            | Modtype_member (name, _) -> (
-              let source_key =
-                match source with
-                | `Path path ->
-                  key_of_modtype_path ~site:Location.none env
-                    (Path.Pdot (path, name))
-                | `Type _ -> (
-                  match
-                    String_map.find_opt name source_index.modtype_members
-                  with
-                  | Some source_declaration -> (
-                    let uid = source_declaration.Types.mtd_uid in
-                    match Uid.Tbl.find_opt modtype_contexts uid with
-                    | Some context -> Some (named_key ~family:None context uid)
-                    | None ->
-                      add_omission ~affected:(Some derived) ~source:(Some uid)
-                        Omission.Reason.Unresolved_module;
-                      None)
-                  | None -> None)
-              in
-              match source_key with
-              | Some source_key ->
-                add_dependency ~derived ~source:source_key
-                  Dependency.Reason.Argument_member
-              | None ->
-                add_omission ~affected:(Some derived) ~source:None
-                  Omission.Reason.Unresolved_module_type)
-            | Module_member (name, declaration) -> (
-              let member_source =
-                match source with
-                | `Path path -> Some (`Path (Path.Pdot (path, name)))
-                | `Type _ -> (
-                  match
-                    String_map.find_opt name source_index.module_members
-                  with
-                  | Some member -> Some (`Type member.Types.md_type)
-                  | None -> None)
-              in
-              match member_source with
-              | Some member_source ->
-                walk ~source:member_source declaration.md_type
-              | None ->
-                add_omission ~affected:(Some derived) ~source:None
-                  Omission.Reason.Unresolved_module)
-            | Other_member -> ())
-          signature
-      | None -> ()
-    in
-    walk ~source:argument_source parameter_type
-  in
-  let emit_argument_check ~site ~anchor env ~parameter_type ~expectation
-      ~functor_instance argument_node argument_source =
-    let instance_key uid =
-      let key = Key.Named { context = anchor (); family_uid = uid } in
-      (match expectation with
-      | Some parameter_uid ->
-        add_dependency ~derived:key ~source:(Key.Anon parameter_uid)
-          Dependency.Reason.Instance
-      | None -> ());
-      key
-    in
-    let instance_scoped parameter_uid =
-      let expectation_key = instance_key parameter_uid in
-      add_check argument_node expectation_key Check.Kind.Argument site;
-      if functor_instance
-      then
-        List.iter
-          (fun source ->
-            add_omission ~affected:(Some expectation_key) ~source:(Some source)
-              Omission.Reason.Missing_parameter_expectation)
-          (named_modtype_uids env parameter_type);
-      expectation_key
-    in
-    let derived =
-      match (parameter_type : Types.module_type) with
-      | Mty_strengthen (Mty_ident path, subject, _) -> (
-        let key =
-          match find_modtype env path with
-          | Some declaration -> Some (instance_key declaration.Types.mtd_uid)
-          | None -> Option.map instance_key expectation
-        in
-        match key with
-        | Some key ->
-          add_check argument_node key Check.Kind.Argument site;
-          (match key_of_modtype_path ~site env path with
-          | Some base ->
-            add_dependency ~derived:key ~source:base
-              Dependency.Reason.Strengthening
-          | None ->
-            add_omission ~affected:(Some key) ~source:None
-              Omission.Reason.Unresolved_module_type);
-          add_subject_expectation_edges key ~site env
-            Dependency.Reason.Strengthening subject;
-          Some key
-        | None ->
-          add_omission ~affected:None ~source:None
-            Omission.Reason.Missing_parameter_expectation;
-          None)
-      | Mty_ident path -> (
-        match key_of_modtype_path ~site env path, find_modtype env path with
-        | Some named_key, Some declaration ->
-          if has_argument_members env parameter_type
-          then begin
-            let key = instance_key declaration.Types.mtd_uid in
-            add_check argument_node key Check.Kind.Argument site;
-            add_dependency ~derived:key ~source:named_key
-              Dependency.Reason.Instance;
-            Some key
-          end
-          else begin
-            add_check argument_node named_key Check.Kind.Argument site;
-            Some named_key
-          end
-        | (Some _ | None), _ -> (
-          match expectation with
-          | Some parameter_uid -> Some (instance_scoped parameter_uid)
-          | None ->
-            add_omission ~affected:None ~source:None
-              Omission.Reason.Missing_parameter_expectation;
-            None))
-      | Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ -> (
-        match expectation with
-        | Some parameter_uid -> Some (instance_scoped parameter_uid)
-        | None ->
-          List.iter
-            (fun source ->
-              add_omission ~affected:None ~source:(Some source)
-                Omission.Reason.Missing_parameter_expectation)
-            (named_modtype_uids env parameter_type);
-          None)
-    in
-    match derived with
-    | Some derived ->
-      register_argument_members ~derived ~parameter_type env argument_source
-    | None -> ()
-  in
-  let () =
-    path_application_hook
-      := fun ~site env functor_path argument_path ->
-           match find_normalized_module env functor_path with
-           | None -> ()
-           | Some functor_declaration -> (
-             match Mtype.scrape_alias env functor_declaration.Types.md_type with
-             | Mty_functor (Named (_, parameter_type, expectation, _), _, _) ->
-               let argument_node =
-                 node_of_module_path env ~loc:site argument_path
-               in
-               let anchor () =
-                 match
-                   context_of_path ~site:None env
-                     (Path.Papply (functor_path, argument_path))
-                 with
-                 | Some context -> context
-                 | None -> fresh_site ()
-               in
-               emit_argument_check ~site ~anchor env ~parameter_type
-                 ~expectation
-                 ~functor_instance:(path_contains_apply functor_path)
-                 argument_node (`Path argument_path)
-             | Mty_functor (Unit, _, _)
-             | Mty_ident _ | Mty_signature _ | Mty_alias _ | Mty_strengthen _ ->
-               ())
   in
   let register_functor_annotation (inner : module_expr)
       (interface_type : Types.module_type) =
