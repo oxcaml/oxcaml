@@ -237,6 +237,10 @@ let sharedobjext =
   Variables.make ("sharedobjext",
     "Extension of shared object files")
 
+let structured_diagnostics =
+  Variables.make ("structured_diagnostics",
+    "Whether expect tests should include structured diagnostics for errors")
+
 let use_runtime =
   Variables.make ("use_runtime",
     "Whether the -use-runtime option should be used" )
@@ -312,6 +316,7 @@ let init () =
     plugins;
     shared_library_cflags;
     sharedobjext;
+    structured_diagnostics;
     use_runtime;
     fexpr_dump_files;
     fexpr_reference_suffix;

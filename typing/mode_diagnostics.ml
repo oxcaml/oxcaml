@@ -3629,18 +3629,12 @@ let typetexp_scope : Typetexp.error -> Scope.t = function
   | Val_poly_and_layout ->
     Not_about_modes
 
-let title (axes : string list) : string =
-  match axes with
-  | [] -> "Explain mode error"
-  | axes -> "Explain mode error (" ^ String.concat ", " axes ^ ")"
-
 let realize ~documentation ~reported_loc stories =
   match stories with
   | [] -> None
   | stories ->
     Some
       (Nlg.realize ~loc:reported_loc
-         ~title:(title (blamed_axes stories))
          ~term_entry:(term_entry ~documentation)
          ~term_words (frames stories))
 
@@ -4078,7 +4072,7 @@ module Explanation = struct
       { term = term_display t; category = ""; description = ""; url = None }
     in
     let realized =
-      Nlg.realize ~loc:Location.none ~title:"" ~term_entry ~term_words
+      Nlg.realize ~loc:Location.none ~term_entry ~term_words
         [{ Nlg.statement = None; children }]
     in
     realized.body
@@ -4960,3 +4954,68 @@ let error ~source ~context ~pronouns ~loc exn : Diagnostic.t option =
   in
   realize ~documentation:context.documentation
     ~reported_loc:request.reported_loc body
+
+let documentation_unavailable : Documentation.lookup =
+  { of_mode = (fun _ -> None); of_modality = (fun _ -> None) }
+
+let context_unavailable : context =
+  { inclusion_site_at = (fun _ -> None);
+    declared_modalities_at = (fun _ ~argument:_ -> None);
+    constructor_arguments_at = (fun _ _ -> None);
+    documentation = documentation_unavailable
+  }
+
+let diagnostic_of_report report : Diagnostic.t =
+  let printer = Location.batch_mode_printer in
+  let text =
+    Format.asprintf "%a"
+      (fun ppf report -> printer.pp printer ppf report)
+      report
+    |> String.trim
+  in
+  { loc = report.Location.main.loc;
+    entities = Diagnostic.Entities.empty;
+    glossary = Diagnostic.Glossary.empty;
+    body =
+      [ { kind = Diagnostic.Kind.Explanation;
+          content = [Diagnostic.Inline.Text text];
+          children = []
+        } ]
+  }
+
+let source_of_report report =
+  let file = report.Location.main.loc.loc_start.pos_fname in
+  match In_channel.with_open_bin file In_channel.input_all with
+  | text -> Some (Source.create ~file ~text)
+  | exception Sys_error _ -> None
+
+let diagnostic_of_exception report exn =
+  match source_of_report report with
+  | None -> None
+  | Some source ->
+    let snapshot = Btype.snapshot () in
+    Fun.protect
+      ~finally:(fun () -> Btype.backtrack snapshot)
+      (fun () ->
+        match
+          error ~source ~context:context_unavailable ~pronouns:Use_pronouns
+            ~loc:report.Location.main.loc exn
+        with
+        | diagnostic -> diagnostic
+        | exception ((Out_of_memory | Stack_overflow) as unrecoverable) ->
+          raise unrecoverable
+        | exception _ -> None)
+
+let json_emitter ppf exn report =
+  let diagnostic =
+    match exn with
+    | Some exn -> (match diagnostic_of_exception report exn with
+      | Some diagnostic -> diagnostic
+      | None -> diagnostic_of_report report)
+    | None -> diagnostic_of_report report
+  in
+  Format.fprintf ppf "%s@." (Diagnostic.to_json diagnostic)
+
+let enable_structured_diagnostics () =
+  Clflags.structured_diagnostics := true;
+  Location.set_emitter json_emitter
