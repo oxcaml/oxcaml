@@ -115,6 +115,8 @@ let create (section : Asm_section.t) = !new_label_ref section
 
 let debug_info_label = lazy (create (DWARF Debug_info))
 
+let debug_types_label = lazy (create (DWARF Debug_types))
+
 let debug_abbrev_label = lazy (create (DWARF Debug_abbrev))
 
 let debug_aranges_label = lazy (create (DWARF Debug_aranges))
@@ -136,6 +138,7 @@ let debug_line_label = lazy (create (DWARF Debug_line))
 let for_dwarf_section (dwarf_section : Asm_section.dwarf_section) =
   match dwarf_section with
   | Debug_info -> Lazy.force debug_info_label
+  | Debug_types -> Lazy.force debug_types_label
   | Debug_abbrev -> Lazy.force debug_abbrev_label
   | Debug_aranges -> Lazy.force debug_aranges_label
   | Debug_addr -> Lazy.force debug_addr_label

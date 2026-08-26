@@ -77,6 +77,25 @@ module Die_gen_ctx = struct
       RS.DeBruijn_env.get_opt (value rec_env) ~de_bruijn_index
   end
 
+  (* How to reference the DWARF type description generated for a shape: either a
+     DIE referenced by label, or (when type units are being emitted, for closed
+     shapes) a type unit in .debug_types referenced by its 8-byte signature. *)
+  module Type_die_ref = struct
+    type t =
+      | Local of Proto_die.reference
+      | Type_unit_signature of Int64.t
+  end
+
+  (* A type unit destined for the .debug_types section. *)
+  module Type_unit = struct
+    type t =
+      { root : Proto_die.t;
+        header_label : Asm_label.t;
+        signature : Int64.t;
+        primary : Proto_die.reference
+      }
+  end
+
   module Cache = struct
     type key =
       { runtime_shape : RS.t;
@@ -94,7 +113,7 @@ module Die_gen_ctx = struct
         Hashtbl.hash (RS.hash runtime_shape, Rec_var_env.hash rec_env)
     end)
 
-    type t = Proto_die.reference Tbl.t
+    type t = Type_die_ref.t Tbl.t
 
     let create ~initial_size = Tbl.create initial_size
 
@@ -136,13 +155,28 @@ module Die_gen_ctx = struct
   type t =
     { cache : Cache.t;
       name_cache : Name_cache.t;
-      rec_env_table : Rec_var_env.table
+      rec_env_table : Rec_var_env.table;
+      (* Type units generated so far, in reverse creation order; the signatures
+         of those already created, so that a shape reached more than once only
+         produces one unit; and the memoized signature of the type unit
+         describing the fallback "ocaml_value" type. *)
+      mutable type_units_rev : Type_unit.t list;
+      type_unit_signatures : (Int64.t, unit) Hashtbl.t;
+      mutable value_type_unit_signature : Int64.t option;
+      (* [Some] whilst DIEs are being generated inside a type unit, in which
+         case intra-unit references must be emitted relative to this label (the
+         first byte of the unit's header). *)
+      mutable current_unit_header : Asm_label.t option
     }
 
   let create ~initial_size =
     { cache = Cache.create ~initial_size;
       name_cache = Name_cache.create ~initial_size;
-      rec_env_table = Rec_var_env.create_table ~initial_size
+      rec_env_table = Rec_var_env.create_table ~initial_size;
+      type_units_rev = [];
+      type_unit_signatures = Hashtbl.create 16;
+      value_type_unit_signature = None;
+      current_unit_header = None
     }
 
   let cache t = t.cache
@@ -153,6 +187,30 @@ module Die_gen_ctx = struct
 
   let push_rec_binder t rec_env ref =
     Rec_var_env.push t.rec_env_table rec_env ref
+
+  let add_type_unit t (type_unit : Type_unit.t) =
+    Hashtbl.replace t.type_unit_signatures type_unit.signature ();
+    t.type_units_rev <- type_unit :: t.type_units_rev
+
+  let type_unit_exists t ~signature =
+    Hashtbl.mem t.type_unit_signatures signature
+
+  let current_unit_header t = t.current_unit_header
+
+  let with_unit_header t header_label ~f =
+    let saved = t.current_unit_header in
+    t.current_unit_header <- Some header_label;
+    Fun.protect ~finally:(fun () -> t.current_unit_header <- saved) f
+
+  let type_units t = List.rev t.type_units_rev
+
+  let value_type_unit_signature t ~create =
+    match t.value_type_unit_signature with
+    | Some signature -> signature
+    | None ->
+      let signature = create () in
+      t.value_type_unit_signature <- Some signature;
+      signature
 end
 
 type t =

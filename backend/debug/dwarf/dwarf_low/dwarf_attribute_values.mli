@@ -70,6 +70,20 @@ module Value : sig
     unit ->
     Dwarf_attributes.Form.data8 t
 
+  (** A [DW_FORM_ref4] reference: the offset of the referenced DIE from the
+      start of the header of the unit containing it. Both labels must be in the
+      same section. *)
+  val unit_relative_reference_32_bit :
+    ?comment:string ->
+    die_label:Asm_label.t ->
+    unit_header_label:Asm_label.t ->
+    unit ->
+    Dwarf_attributes.Form.ref4 t
+
+  (** A [DW_FORM_ref_sig8] reference to a type unit via its 8-byte signature. *)
+  val type_signature_reference :
+    ?comment:string -> Int64.t -> Dwarf_attributes.Form.ref_sig8 t
+
   val distance_between_labels_64_bit_with_offsets :
     ?comment:string ->
     upper:Asm_label.t ->

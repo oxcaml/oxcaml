@@ -1184,6 +1184,17 @@ let mk_no_dwarf_inlined_frames f =
     Arg.Unit f,
     " Do not emit DWARF inlined frame information" )
 
+let mk_dwarf_type_units f =
+  ( "-gdwarf-type-units",
+    Arg.Unit f,
+    " Emit DWARF type information as type units in .debug_types\n\
+    \     (DWARF-4 only)" )
+
+let mk_no_dwarf_type_units f =
+  ( "-gno-dwarf-type-units",
+    Arg.Unit f,
+    " Do not emit DWARF type information as type units (default)" )
+
 let mk_ddebug_avail_sets f =
   ( "-ddebug-avail-sets",
     Arg.Unit f,
@@ -2291,6 +2302,8 @@ end
 module type Debugging_options = sig
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val dwarf_type_units : unit -> unit
+  val no_dwarf_type_units : unit -> unit
   val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
@@ -2309,6 +2322,8 @@ module Make_debugging_options (F : Debugging_options) = struct
     [
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
+      mk_dwarf_type_units F.dwarf_type_units;
+      mk_no_dwarf_type_units F.no_dwarf_type_units;
       mk_ddebug_avail_sets F.ddebug_avail_sets;
       mk_dwarf_for_startup_file F.dwarf_for_startup_file;
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
@@ -2328,6 +2343,8 @@ end
 module Debugging_options_impl = struct
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+  let dwarf_type_units () = Debugging.gdwarf_type_units := true
+  let no_dwarf_type_units () = Debugging.gdwarf_type_units := false
   let ddebug_avail_sets () = Debugging.debug_avail_sets := true
   let dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := true
   let no_dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := false

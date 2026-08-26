@@ -30,6 +30,7 @@
 (** Sections that hold DWARF debugging information. *)
 type dwarf_section =
   | Debug_info
+  | Debug_types
   | Debug_abbrev
   | Debug_aranges
   | Debug_addr
