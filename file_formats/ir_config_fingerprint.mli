@@ -18,11 +18,6 @@ type mismatch =
     current_value : string;
   }
 
-(* [mismatches ~saved ~current] returns one element per configuration item
-   on which the two fingerprints disagree; the empty list means the file is
-   compatible. *)
-val mismatches : saved:t -> current:t -> mismatch list
-
 (* The payload of the error raised when a file cannot be reloaded because
    its fingerprint disagrees with the current process. *)
 type configuration_mismatch =
@@ -31,3 +26,13 @@ type configuration_mismatch =
   }
 
 val print_configuration_mismatch : configuration_mismatch Format_doc.printer
+
+(* [read_and_check ic ~filename ~raise_configuration_mismatch] reads the
+   fingerprint stored in [ic] (as written by [current]) and compares it with
+   the current process's configuration; on any disagreement it calls
+   [raise_configuration_mismatch], which is expected to raise. *)
+val read_and_check :
+  in_channel ->
+  filename:string ->
+  raise_configuration_mismatch:(configuration_mismatch -> unit) ->
+  unit

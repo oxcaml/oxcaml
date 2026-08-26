@@ -52,6 +52,12 @@ type configuration_mismatch =
     entries : mismatch list;
   }
 
+let read_and_check ic ~filename ~raise_configuration_mismatch =
+  let saved = (input_value ic : t) in
+  match mismatches ~saved ~current:(current ()) with
+  | [] -> ()
+  | entries -> raise_configuration_mismatch { filename; entries }
+
 let print_configuration_mismatch ppf { filename; entries } =
   Format_doc.fprintf ppf
     "%a@ was saved with a configuration incompatible with the current \

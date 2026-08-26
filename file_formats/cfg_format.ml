@@ -68,19 +68,9 @@ let restore filename =
        let buffer = really_input_string ic (String.length magic) in
        if String.equal buffer magic then begin
          try
-           let saved_fingerprint =
-             (input_value ic : Ir_config_fingerprint.t)
-           in
-           (match
-              Ir_config_fingerprint.mismatches ~saved:saved_fingerprint
-                ~current:(Ir_config_fingerprint.current ())
-            with
-            | [] -> ()
-            | entries ->
-              raise
-                (Error
-                   (Configuration_mismatch
-                      { Ir_config_fingerprint.filename; entries })));
+           Ir_config_fingerprint.read_and_check ic ~filename
+             ~raise_configuration_mismatch:(fun configuration_mismatch ->
+               raise (Error (Configuration_mismatch configuration_mismatch)));
            let cfg_unit_info = (input_value ic : cfg_unit_info) in
            let last_label = (input_value ic : Cmm.label) in
            Cmm.reset ();
