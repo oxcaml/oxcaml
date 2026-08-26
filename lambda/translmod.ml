@@ -1821,9 +1821,17 @@ let transl_functorization compilation_unit
            [intf_func; make_func],
            Loc_unknown ))
   in
-  let main_module_block_format =
-    Mb_struct { mb_repr = Module_value_only { field_count = 2 } }
+  let mb_repr =
+    match (coercion : Typedtree.module_coercion) with
+    | Tcoerce_none -> Module_value_only { field_count = 2 }
+    | Tcoerce_structure { output_repr; _ } ->
+        transl_module_representation output_repr
+    | Tcoerce_functor _ | Tcoerce_primitive _ | Tcoerce_alias _
+    | Tcoerce_invalid ->
+        Misc.fatal_error
+          "transl_functorization: unexpected compilation-unit coercion"
   in
+  let main_module_block_format = Mb_struct { mb_repr } in
   { compilation_unit;
     main_module_block_format;
     arg_block_idx = None;

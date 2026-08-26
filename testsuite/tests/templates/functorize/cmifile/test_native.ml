@@ -20,7 +20,7 @@
    bad_cmi_file_struct.reference \
    bundle_narrow.mli \
    main_narrow.ml \
-   narrow_native.reference \
+   test_narrow.reference \
    bundle.cmi.objinfo.reference \
    bundle.cms.objinfo_native.reference \
  ";
@@ -218,14 +218,8 @@
       inferred one (here: only [Make], with its result spelled out and
       exposing only [Basic] of the two bundled modules).  The coerced
       module block then has one field instead of the inferred
-      [Intf; Make] pair.
-
-      CURRENT BEHAVIOR (bug): [transl_functorization] hardcodes a
-      2-field main module block format regardless of the coercion.
-      Bytecode ignores the declared field count and works; in native
-      code flambda2 materialises the out-of-bounds load of field 1
-      from the 1-field block, which traps at run time (see
-      [narrow_native.reference]). *)
+      [Intf; Make] pair; the declared main module block format must
+      match it. *)
 
    flags = "";
    module = "bundle_narrow/bundle_narrow.mli";
@@ -257,12 +251,12 @@
    ";
    ocamlopt.byte;
 
-   script = "sh -c './test_narrow.exe > narrow.result 2>&1; \
-                    echo exit=$? >> narrow.result'";
-   script;
+   stdout = "test_narrow.output";
+   stderr = "test_narrow.output";
+   output = "test_narrow.output";
+   run;
 
-   output = "narrow.result";
-   reference = "narrow_native.reference";
+   reference = "test_narrow.reference";
    check-program-output;
  }
 *)
