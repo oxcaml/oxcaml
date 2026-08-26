@@ -73,9 +73,9 @@ val modtype_of_package:
 
 val path_of_module : Typedtree.module_expr -> Path.t option
 
-(** [save_signature ~argument_interface] writes the typed interface artifacts.
-    [argument_interface] records the additional parameter interface used by
-    [-as-argument-for], when present. *)
+(** [save_signature ~argument_interface unit_info comp_unit typedtree env cmi]
+    writes the typed interface artifacts. [argument_interface] records the
+    additional parameter interface used by [-as-argument-for], when present. *)
 val save_signature:
   argument_interface:Typedtree.argument_interface option ->
   Unit_info.t -> Compilation_unit.t -> Typedtree.signature ->

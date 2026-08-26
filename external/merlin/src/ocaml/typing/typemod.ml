@@ -2073,10 +2073,8 @@ and transl_modtype_aux env smty =
   match smty.pmty_desc with
     Pmty_ident lid ->
       let path, declaration = Env.lookup_modtype_path ~loc lid.txt env in
-      (* Read the uid off the lazy declaration: forcing it here would defeat
-         the laziness of module type declarations. *)
-      let uid = Some declaration.Subst.Lazy.mtd_uid in
-      mkmty ?uid (Tmty_ident (path, lid)) (Mty_ident path) env loc
+      mkmty ~uid:declaration.mtd_uid (Tmty_ident (path, lid)) (Mty_ident path)
+        env loc
         smty.pmty_attributes
   | Pmty_alias lid ->
       let path = transl_module_alias loc env lid.txt in
