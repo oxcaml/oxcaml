@@ -99,31 +99,45 @@ module Unboxed_or_untagged_array_tags = struct
     | _ -> unboxed_float32_array_one_tag
 end
 
-let check_equal_1 name f1 f2 arg1 =
-  let r1 = f1 arg1 in
-  let r2 = f2 arg1 in
-  if P.Cmm_comparator.equivalent r1 r2
-  then r1
+(* The non-engine implementations of the helpers checked by [check_equal_*]
+   below do not handle [Cphantom_let] or [Cname_for_debugger], whereas the
+   [Cmm_peephole_engine] versions skip over such constructs, re-placing them
+   around any rewritten result. In the presence of these constructs the results
+   of the two implementations may therefore differ legitimately, in which case
+   the engine's result is used without checking. *)
+let check_equal_1 name f ~engine arg1 =
+  let r = f arg1 in
+  let r_engine = engine arg1 in
+  if P.Cmm_comparator.equivalent r r_engine
+  then r
+  else if
+    contains_debug_only_constructs r || contains_debug_only_constructs r_engine
+  then r_engine
   else
-    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
-      Printcmm.expression r2
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r
+      Printcmm.expression r_engine
 
-let check_equal_3 name f1 f2 arg1 arg2 arg3 =
-  let r1 = f1 arg1 arg2 arg3 in
-  let r2 = f2 arg1 arg2 arg3 in
-  if P.Cmm_comparator.equivalent r1 r2
-  then r1
+let check_equal_3 name f ~engine arg1 arg2 arg3 =
+  let r = f arg1 arg2 arg3 in
+  let r_engine = engine arg1 arg2 arg3 in
+  if P.Cmm_comparator.equivalent r r_engine
+  then r
+  else if
+    contains_debug_only_constructs r || contains_debug_only_constructs r_engine
+  then r_engine
   else
-    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
-      Printcmm.expression r2
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r
+      Printcmm.expression r_engine
 
-let check_equal_int_1 name f1 f2 arg1 =
-  let r1 : int = f1 arg1 in
-  let r2 = f2 arg1 in
-  if r1 = r2
-  then r1
+let check_equal_int_1 name f ~engine arg1 =
+  let r : int = f arg1 in
+  let r_engine = engine arg1 in
+  if r = r_engine
+  then r
+  else if contains_debug_only_constructs arg1
+  then r_engine
   else
-    Misc.fatal_errorf "Mismatch on %s:@ %d@ vs@ %d@ Arg is %a" name r1 r2
+    Misc.fatal_errorf "Mismatch on %s:@ %d@ vs@ %d@ Arg is %a" name r r_engine
       Printcmm.expression arg1
 
 let arch_bits = Arch.size_int * 8
@@ -495,6 +509,7 @@ let rec map_tail1 e ~f =
   match e with
   | Clet (id, exp, body) -> Clet (id, exp, map_tail1 body ~f)
   | Cphantom_let (id, exp, body) -> Cphantom_let (id, exp, map_tail1 body ~f)
+  | Cname_for_debugger (var, body) -> Cname_for_debugger (var, map_tail1 body ~f)
   | Csequence (e1, e2) -> Csequence (e1, map_tail1 e2 ~f)
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
@@ -564,7 +579,7 @@ let rec add_const' arg const dbg =
               }
           => fun env -> add_const' env#.c (env#.n - env#.x) dbg ) ])
 
-let add_const = check_equal_3 "add_const" add_const add_const'
+let add_const = check_equal_3 "add_const" add_const ~engine:add_const'
 
 let incr_int c dbg = add_const c 1 dbg
 
@@ -594,7 +609,7 @@ let rec add_int' arg1 arg2 dbg =
           ( Binop (Add, Any c1, Binop (Add, Any c2, Const_int n2)) => fun env ->
             add_const (add_int' env#.c1 env#.c2 dbg) env#.n2 dbg ) ])
 
-let add_int = check_equal_3 "add_int" add_int add_int'
+let add_int = check_equal_3 "add_int" add_int ~engine:add_int'
 
 let rec sub_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -625,7 +640,7 @@ let rec sub_int' arg1 arg2 dbg =
           ( Binop (Sub, Binop (Add, Any c1, Const_int n1), Any c2) => fun env ->
             add_const (sub_int' env#.c1 env#.c2 dbg) env#.n1 dbg ) ])
 
-let sub_int = check_equal_3 "sub_int" sub_int sub_int'
+let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
 
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
@@ -694,7 +709,7 @@ let rec max_signed_bit_length' e =
 
 let max_signed_bit_length =
   check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
-    max_signed_bit_length'
+    ~engine:max_signed_bit_length'
 
 let rec ignore_low_bit_int = function
   | Cop
@@ -730,7 +745,8 @@ let rec ignore_low_bit_int' arg =
       => fun env -> ignore_low_bit_int' env#.c ) ]
 
 let ignore_low_bit_int =
-  check_equal_1 "ignore_low_bit_int" ignore_low_bit_int ignore_low_bit_int'
+  check_equal_1 "ignore_low_bit_int" ignore_low_bit_int
+    ~engine:ignore_low_bit_int'
 
 let[@inline] get_const = function
   | Cconst_int (i, _) -> Some (Nativeint.of_int i)
@@ -3847,7 +3863,10 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
       let app =
         Cop
           ( Capply { result_type = result; region = Rc_normal; callees = None },
-            [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
+            (* The code pointer and closure info of a closure are write-once;
+               reading them immutably is correct and lets the debugger describe
+               the call target (and closure projections) for call sites. *)
+            [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
               Cvar arg;
               Cvar clos ],
             dbg () )
@@ -3867,7 +3886,7 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
           Cop
             ( Capply
                 { result_type = typ_val; region = Rc_normal; callees = None },
-              [ get_field_codepointer Asttypes.Mutable (Cvar clos) 0 (dbg ());
+              [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
               dbg () ),
@@ -3890,7 +3909,7 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
             ( Ccmpi Ceq,
               [ Cop
                   ( Casr,
-                    [ get_field_gen Asttypes.Mutable (Cvar clos) 1 (dbg ());
+                    [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
                       Cconst_int (pos_arity_in_closinfo, dbg ()) ],
                     dbg () );
                 Cconst_int (List.length arity, dbg ()) ],
@@ -3898,7 +3917,7 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
           dbg (),
           Cop
             ( Capply { result_type = result; region = Rc_normal; callees = None },
-              get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
+              get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
           dbg (),
@@ -4027,7 +4046,9 @@ let tuplify_function arity return =
       fun_body =
         Cop
           ( Capply { result_type = return; region = Rc_normal; callees = None },
-            get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ())
+            (* The closure code pointer is write-once; see
+               [apply_function_body]. *)
+            get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
             :: access_components 0
             @ [Cvar clos],
             dbg () );
@@ -4130,7 +4151,11 @@ let value_slot_given_machtype vs =
 
 let read_from_closure_given_machtype t clos base_offset dbg =
   let load chunk offset =
-    Cop (mk_load_mut chunk, [field_address clos offset dbg], dbg)
+    (* Closure value slots are write-once (a partial-application closure is
+       never back-patched), so these reads are immutable. Besides being correct,
+       this lets the debugger describe the recovered arguments as projections of
+       the closure for call site information. *)
+    Cop (mk_load_immut chunk, [field_address clos offset dbg], dbg)
   in
   let _, l =
     List.fold_left_map
@@ -4174,7 +4199,10 @@ let rec make_curry_apply result narity args_type args clos n =
   | [] ->
     Cop
       ( Capply { result_type = result; region = Rc_normal; callees = None },
-        (get_field_codepointer Asttypes.Mutable (Cvar clos) 2 (dbg ()) :: args)
+        (* Code pointer and chain links of a partial-application closure are
+           write-once; reading them immutably lets the debugger describe the
+           call target and the recovered arguments as closure projections. *)
+        (get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ()) :: args)
         @ [Cvar clos],
         dbg () )
   | arg_type :: args_type ->
@@ -4183,7 +4211,7 @@ let rec make_curry_apply result narity args_type args clos n =
     let clos_pos = arg_pos + machtype_stored_size arg_type in
     Clet
       ( VP.create newclos,
-        get_field_gen Asttypes.Mutable (Cvar clos) clos_pos (dbg ()),
+        get_field_gen Asttypes.Immutable (Cvar clos) clos_pos (dbg ()),
         make_curry_apply result narity args_type
           (read_from_closure_given_machtype arg_type (Cvar clos) arg_pos
              (dbg ())
@@ -4972,8 +5000,9 @@ let letin v ~defining_expr ~body =
     defining_expr
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
-  | Cconst_mask _ | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _
-  | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Cconst_mask _ | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _
+  | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _
+  | Cinvalid _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -5327,8 +5356,8 @@ let cmm_arith_size (e : Cmm.expression) =
   | Cconst_vec512 _ | Cconst_mask _ ->
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
-  | Clet _ | Cphantom_let _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _
-  | Ccatch _ | Cexit _ | Cinvalid _ ->
+  | Clet _ | Cphantom_let _ | Cname_for_debugger _ | Ctuple _ | Csequence _
+  | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     None
 
 (* Atomics *)
@@ -5341,10 +5370,15 @@ let atomic_load_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block
   Cop
     (mk_load_atomic memory_chunk, [field_address_computed block field dbg], dbg)
 
-let atomic_exchange_extcall ~dbg block ~field ~new_value =
+let atomic_extcall_name base_name (mode : Lambda.modify_mode) =
+  match mode with
+  | Modify_heap -> base_name
+  | Modify_maybe_stack -> base_name ^ "_local"
+
+let atomic_exchange_extcall ~dbg ~mode block ~field ~new_value =
   Cop
     ( Cextcall
-        { func = "caml_atomic_exchange_field";
+        { func = atomic_extcall_name "caml_atomic_exchange_field" mode;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -5356,15 +5390,15 @@ let atomic_exchange_extcall ~dbg block ~field ~new_value =
       [block; field; new_value],
       dbg )
 
-let atomic_exchange_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block
-    ~field ~new_value =
+let atomic_exchange_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode
+    block ~field ~new_value =
   match imm_or_ptr with
   | Immediate ->
     let op = Catomic { op = Exchange; size = Word } in
     if Proc.operation_supported op
     then Cop (op, [new_value; field_address_computed block field dbg], dbg)
-    else atomic_exchange_extcall ~dbg block ~field ~new_value
-  | Pointer -> atomic_exchange_extcall ~dbg block ~field ~new_value
+    else atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
+  | Pointer -> atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
 
 let atomic_arith ~dbg ~op ~untag ~ext_name block ~field i =
   let i = if untag then decr_int i dbg else i in
@@ -5417,10 +5451,11 @@ let atomic_lxor_field ~dbg atomic ~field i =
     atomic ~field i
   |> return_unit dbg
 
-let atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value =
+let atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
+    =
   Cop
     ( Cextcall
-        { func = "caml_atomic_cas_field";
+        { func = atomic_extcall_name "caml_atomic_cas_field" mode;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -5433,7 +5468,7 @@ let atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value =
       dbg )
 
 let atomic_compare_and_set_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
-    block ~field ~old_value ~new_value =
+    ~mode block ~field ~old_value ~new_value =
   match imm_or_ptr with
   | Immediate ->
     let op = Catomic { op = Compare_set; size = Word } in
@@ -5446,14 +5481,17 @@ let atomic_compare_and_set_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
              [old_value; new_value; field_address_computed block field dbg],
              dbg ))
         (fun a2 -> tag_int a2 dbg)
-    else atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value
+    else
+      atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value
+        ~new_value
   | Pointer ->
-    atomic_compare_and_set_extcall ~dbg block ~field ~old_value ~new_value
+    atomic_compare_and_set_extcall ~dbg ~mode block ~field ~old_value ~new_value
 
-let atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value =
+let atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+    ~new_value =
   Cop
     ( Cextcall
-        { func = "caml_atomic_compare_exchange_field";
+        { func = atomic_extcall_name "caml_atomic_compare_exchange_field" mode;
           builtin = false;
           returns = true;
           effects = Arbitrary_effects;
@@ -5466,7 +5504,7 @@ let atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value =
       dbg )
 
 let atomic_compare_exchange_field ~dbg
-    (imm_or_ptr : Lambda.immediate_or_pointer) block ~field ~old_value
+    (imm_or_ptr : Lambda.immediate_or_pointer) ~mode block ~field ~old_value
     ~new_value =
   match imm_or_ptr with
   | Immediate ->
@@ -5475,9 +5513,12 @@ let atomic_compare_exchange_field ~dbg
     then
       Cop
         (op, [old_value; new_value; field_address_computed block field dbg], dbg)
-    else atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value
+    else
+      atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+        ~new_value
   | Pointer ->
-    atomic_compare_exchange_extcall ~dbg block ~field ~old_value ~new_value
+    atomic_compare_exchange_extcall ~dbg ~mode block ~field ~old_value
+      ~new_value
 
 let pack_small_ints_into_word ~bits int_list dbg =
   if bits * List.length int_list > arch_bits

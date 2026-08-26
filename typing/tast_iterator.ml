@@ -311,9 +311,9 @@ let pat
           vs;
         sub.typ sub ct) vto
   | Tpat_variant (_, po, _) -> Option.iter (sub.pat sub) po
-  | Tpat_record (l, _, _, _) ->
+  | Tpat_record (l, _, _) ->
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
-  | Tpat_record_unboxed_product (l, _, _, _) ->
+  | Tpat_record_unboxed_product (l, _, _) ->
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
@@ -652,10 +652,10 @@ let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =
   match mod_desc with
   | Tmod_ident (_, lid) -> iter_loc_lid sub lid
   | Tmod_structure st -> sub.structure sub st
-  | Tmod_functor (arg, mexpr) ->
+  | Tmod_functor (arg, mexpr, _) ->
       functor_parameter sub arg;
       sub.module_expr sub mexpr
-  | Tmod_apply (mexp1, mexp2, c, _) ->
+  | Tmod_apply (mexp1, mexp2, c, _, _) ->
       sub.module_expr sub mexp1;
       sub.module_expr sub mexp2;
       sub.module_coercion sub c

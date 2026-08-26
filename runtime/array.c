@@ -1120,6 +1120,14 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
   CAMLreturn (res);
 }
 
+CAMLprim value caml_get_idx_atomic_bytecode(value base, value idx) {
+  CAMLparam2 (base, idx);
+  CAMLassert (Tag_val(idx) == 0);
+  CAMLassert (Wosize_val(idx) == 1); /* Nested atomic accesses not supported */
+  CAMLassert (Tag_val(base) != Double_array_tag);
+  CAMLreturn (caml_atomic_load_field(base, Field(idx, 0)));
+}
+
 CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
 {
   CAMLparam3 (base, idx, v);
@@ -1140,6 +1148,16 @@ CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
     dst = &Field(*dst, pos);
   }
   caml_modify(dst, v);
+  CAMLreturn (Val_unit);
+}
+
+CAMLprim value caml_set_idx_atomic_bytecode(value base, value idx, value v)
+{
+  CAMLparam3 (base, idx, v);
+  CAMLassert (Tag_val(idx) == 0);
+  CAMLassert (Wosize_val(idx) == 1); /* Nested atomic accesses not supported */
+  CAMLassert (Tag_val(base) != Double_array_tag);
+  caml_atomic_exchange_field(base, Field(idx, 0), v);
   CAMLreturn (Val_unit);
 }
 

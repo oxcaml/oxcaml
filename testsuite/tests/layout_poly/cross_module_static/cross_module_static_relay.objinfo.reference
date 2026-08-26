@@ -24,7 +24,7 @@ Static data:
       (let (#body/3 =
          { c = (missing)
          ; r =
-           ⟪(function {nlocal = 0} x/318[$layout_6] : $layout_6
+           ⟪(function {nlocal = 0} x/334[$layout_6] : $layout_6
               $(let (#body/2 =
                   { c = (missing)
                   ; r =
@@ -37,7 +37,7 @@ Static data:
                             ⟪(apply[L] $#app/1
                                (field_imm 0
                                  (global static Cross_module_static_lib!)))⟫ })
-                       x/318)⟫ })
+                       x/334)⟫ })
                  { c = #body/2.c; r = ⟪(region $#body/2)⟫ }))⟫ })
         { c = #body/3.c
-        ; r = ⟪(function {nlocal = 1} closure/325[L] $#body/3)⟫ })))
+        ; r = ⟪(function {nlocal = 1} closure/341[L] $#body/3)⟫ })))

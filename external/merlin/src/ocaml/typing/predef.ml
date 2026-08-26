@@ -69,6 +69,7 @@ type abstract_non_value_type_constr = [
   | `Unativeint_u
   | `Idx_imm
   | `Idx_mut
+  | `Idx_atomic
   | `Int8x16
   | `Int16x8
   | `Int32x4
@@ -136,6 +137,7 @@ let base_type_constrs : type_constr list = [
   `Int64_u;
   `Idx_imm;
   `Idx_mut;
+  `Idx_atomic;
 ]
 
 let or_null_extension_type_constrs : type_constr list = [
@@ -159,9 +161,7 @@ let simd_stable_extension_type_constrs : type_constr list = [
   `Float64x4;
 ]
 
-let simd_beta_extension_type_constrs : type_constr list = []
-
-let simd_alpha_extension_type_constrs : type_constr list = [
+let simd_beta_extension_type_constrs : type_constr list = [
   `Int8x64;
   `Int16x32;
   `Int32x16;
@@ -195,7 +195,6 @@ let all_type_constrs = (
   @ small_number_extension_type_constrs
   @ simd_stable_extension_type_constrs
   @ simd_beta_extension_type_constrs
-  @ simd_alpha_extension_type_constrs
   @ metaprogramming_extension_type_constrs
 )
 
@@ -240,6 +239,7 @@ and ident_unativeint_u = ident_create "unativeint_u"
 and ident_or_null = ident_create "or_null"
 and ident_idx_imm = ident_create "idx_imm"
 and ident_idx_mut = ident_create "idx_mut"
+and ident_idx_atomic = ident_create "idx_atomic"
 
 and ident_int8x16 = ident_create "int8x16"
 and ident_int16x8 = ident_create "int16x8"
@@ -304,6 +304,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Unativeint_u -> ident_unativeint_u
   | `Idx_imm -> ident_idx_imm
   | `Idx_mut -> ident_idx_mut
+  | `Idx_atomic -> ident_idx_atomic
   | `Int8x16 -> ident_int8x16
   | `Int16x8 -> ident_int16x8
   | `Int32x4 -> ident_int32x4
@@ -364,6 +365,7 @@ and path_uint64_u = Pident ident_uint64_u
 and path_unativeint_u = Pident ident_unativeint_u
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
+and path_idx_atomic = Pident ident_idx_atomic
 and path_expr = Pident ident_expr
 and path_eval = Pident ident_eval
 and path_box = Pident ident_box
@@ -482,6 +484,7 @@ and type_unativeint_u = tconstr path_unativeint_u []
 and type_or_null t = tconstr path_or_null [t]
 and type_idx_imm t1 t2 = tconstr path_idx_imm [t1; t2]
 and type_idx_mut t1 t2 = tconstr path_idx_mut [t1; t2]
+and type_idx_atomic t1 t2 = tconstr path_idx_atomic [t1; t2]
 
 and type_int8x16 = tconstr path_int8x16 []
 and type_int16x8 = tconstr path_int16x8 []
@@ -791,7 +794,7 @@ let decl_of_type_constr type_constr =
       match sorts with
       | Some sorts ->
         Cstr_layout_known { shape = Constructor_uniform_value; sorts }
-      | None -> Cstr_layout_variable
+      | None -> Cstr_layout_undetermined
     in
     Type_variant (
       constrs,
@@ -990,6 +993,21 @@ let decl_of_type_constr type_constr =
          }))
        ~jkind:(builtin2 Jkind.Const.Builtin.kind_of_idx)
        ()
+  | `Idx_atomic ->
+    decl2 ~variance:(Variance.full, Variance.full)
+       ~param_jkinds:(
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_atomic;
+           position = 1;
+           arity = 2;
+         }),
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
+           parent_path = Path.Pident ident_idx_atomic;
+           position = 2;
+           arity = 2;
+         }))
+       ~jkind:(builtin2 Jkind.Const.Builtin.kind_of_idx)
+       ()
   | `Lexing_position ->
     decl0
        ~kind:(
@@ -1181,7 +1199,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
         | Base Scannable -> ()
         | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
               Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask)
-        | Univar _ | Genvar _ | Product _ -> raise_error ())
+        | Univar _ | Genvar _ | Product _ | Addressable _ -> raise_error ())
       l;
     add_extension id
       { ext_type_path = path_exn;
@@ -1250,12 +1268,12 @@ let add_simd_stable_extension_types add_type env =
     add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
   ) env simd_stable_extension_type_constrs
 
-let add_simd_beta_extension_types _add_type env = env
-
-let add_simd_alpha_extension_types add_type env =
+let add_simd_beta_extension_types add_type env =
   List.fold_left (fun env tconstr ->
     add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
-  ) env simd_alpha_extension_type_constrs
+  ) env simd_beta_extension_type_constrs
+
+let add_simd_alpha_extension_types _add_type env = env
 
 let add_small_number_extension_types add_type env =
   List.fold_left (fun env tconstr ->

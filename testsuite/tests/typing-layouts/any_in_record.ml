@@ -559,3 +559,30 @@ let project_int_via_index (t : _ t2) =
 [%%expect {|
 val project_int_via_index : 'a t2 -> int = <fun>
 |}]
+
+(* A record field abstracted as [any] is printed as <abstr> as we can't tell its
+   sort. *)
+
+type ('a : any) r = { id : int; value : 'a }
+module M : sig
+  type t : any
+  val x : t r
+end = struct
+  type t = string
+  let x = { id = 0; value = "s" }
+end
+[%%expect{|
+type ('a : any) r = { id : int; value : 'a; }
+module M : sig type t : any val x : t r end
+|}]
+
+let z = M.x
+[%%expect{|
+val z : M.t r = <abstr>
+|}]
+
+(* When the field's sort is visible, the record prints as usual *)
+let w = { id = 1; value = "visible" }
+[%%expect{|
+val w : string r = {id = 1; value = "visible"}
+|}]

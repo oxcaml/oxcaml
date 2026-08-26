@@ -1366,14 +1366,16 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
     | And -> C.atomic_land_field ~dbg x ~field:y z |> C.return_unit dbg
     | Or -> C.atomic_lor_field ~dbg x ~field:y z |> C.return_unit dbg
     | Xor -> C.atomic_lxor_field ~dbg x ~field:y z |> C.return_unit dbg)
-  | Atomic_set_field block_access_kind ->
+  | Atomic_set_field (block_access_kind, mode) ->
     C.atomic_exchange_field ~dbg
       (imm_or_ptr block_access_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
       x ~field:y ~new_value:z
     |> C.return_unit dbg
-  | Atomic_exchange_field block_access_kind ->
+  | Atomic_exchange_field (block_access_kind, mode) ->
     C.atomic_exchange_field ~dbg
       (imm_or_ptr block_access_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
       x ~field:y ~new_value:z
   | Write_offset (write_offset_kind, kind, mode) ->
     let memory_chunk = C.memory_chunk_of_kind kind in
@@ -1413,13 +1415,15 @@ let quaternary_primitive _env dbg f (_x_simple : Simple.t option)
     (_w_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression)
     (z : Cmm.expression) (w : Cmm.expression) =
   match (f : P.quaternary_primitive) with
-  | Atomic_compare_and_set_field block_access_kind ->
+  | Atomic_compare_and_set_field (block_access_kind, mode) ->
     C.atomic_compare_and_set_field ~dbg
       (imm_or_ptr block_access_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
       x ~field:y ~old_value:z ~new_value:w
-  | Atomic_compare_exchange_field { atomic_kind = _; args_kind } ->
-    C.atomic_compare_exchange_field ~dbg (imm_or_ptr args_kind) x ~field:y
-      ~old_value:z ~new_value:w
+  | Atomic_compare_exchange_field { atomic_kind = _; args_kind; mode } ->
+    C.atomic_compare_exchange_field ~dbg (imm_or_ptr args_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
+      x ~field:y ~old_value:z ~new_value:w
 
 let variadic_primitive _env dbg f args =
   match (f : P.variadic_primitive) with

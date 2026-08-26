@@ -103,6 +103,12 @@ let fmt_mutable_flag f x =
   | Immutable -> fprintf f "Immutable"
   | Mutable -> fprintf f "Mutable"
 
+let fmt_access_flag f x =
+  match x with
+  | Immutable_access -> fprintf f "Immutable"
+  | Mutable_access -> fprintf f "Mutable"
+  | Atomic_access -> fprintf f "Atomic"
+
 let fmt_mutable_mode_flag f (x : Types.mutability) =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -240,8 +246,8 @@ let variant_representation i ppf = let open Types in function
     line i ppf "Variant_boxed %a\n"
       (array (i+1) (fun _ ppf l ->
          match (l : Types.cstr_layout) with
-         | Cstr_layout_variable ->
-           line (i+1) ppf "Cstr_layout_variable\n"
+         | Cstr_layout_undetermined ->
+           line (i+1) ppf "Cstr_layout_undetermined\n"
          | Cstr_layout_known { sorts; _ } ->
            sort_array (i+1) ppf sorts))
       layouts
@@ -267,13 +273,17 @@ let record_representation i ppf = let open Types in function
     line i ppf "Record_dummy%s%s\n"
       (if represent_as_float_array then " [@@represent_as_float_array]" else "")
       (if flatten_floats then " [@@flatten_floats]" else "")
-  | Record_variable ->
+  | Record_undetermined ->
+    line i ppf "Record_undetermined\n"
+  | Record_variable _ ->
     line i ppf "Record_variable\n"
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->
     line i ppf "Record_unboxed_product\n"
-  | Record_unboxed_product_variable ->
+  | Record_unboxed_product_undetermined ->
+    line i ppf "Record_unboxed_product_undetermined\n"
+  | Record_unboxed_product_variable _ ->
     line i ppf "Record_unboxed_product_variable\n"
 
 let attribute i ppf k a =
@@ -517,10 +527,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_variant (l, po, _) ->
       line i ppf "Tpat_variant \"%s\"\n" l;
       option i pattern ppf po;
-  | Tpat_record (l, _, _, _c) ->
+  | Tpat_record (l, _, _c) ->
       line i ppf "Tpat_record\n";
       list i longident_x_pattern ppf l;
-  | Tpat_record_unboxed_product (l, _, _, _c) ->
+  | Tpat_record_unboxed_product (l, _, _c) ->
       line i ppf "Tpat_record_unboxed_product\n";
       list i longident_x_pattern ppf l;
   | Tpat_array (am, arg_sort, l) ->
@@ -883,11 +893,11 @@ and expression i ppf x =
     expression i ppf e2
   | Texp_hole _ ->
     line i ppf "Texp_hole"
-  | Texp_quotation e ->
-    line i ppf "Texp_quotation";
+  | Texp_quote e ->
+    line i ppf "Texp_quote";
       expression i ppf e
-  | Texp_antiquotation e ->
-    line i ppf "Texp_antiquotation";
+  | Texp_splice e ->
+    line i ppf "Texp_splice";
     expression i ppf e
 
 and value_description i ppf x =
@@ -1294,15 +1304,15 @@ and module_expr i ppf x =
   | Tmod_structure (s) ->
       line i ppf "Tmod_structure\n";
       structure i ppf s;
-  | Tmod_functor (Unit, me) ->
+  | Tmod_functor (Unit, me, _) ->
       line i ppf "Tmod_functor ()\n";
       module_expr i ppf me;
-  | Tmod_functor (Named (s, _, mt, ma), me) ->
+  | Tmod_functor (Named (s, _, mt, ma), me, _) ->
       line i ppf "Tmod_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt;
       module_expr i ppf me;
       alloc_modes i ppf ma;
-  | Tmod_apply (me1, me2, _, _) ->
+  | Tmod_apply (me1, me2, _, _, _) ->
       line i ppf "Tmod_apply\n";
       module_expr i ppf me1;
       module_expr i ppf me2;
@@ -1421,7 +1431,7 @@ and block_access i ppf = function
       line i ppf "Baccess_field %a\n" fmt_longident li
   | Baccess_block (mut, index) ->
       line i ppf "Baccess_block %a\n"
-        fmt_mutable_flag mut;
+        fmt_access_flag mut;
       expression i ppf index
 
 and unboxed_access i ppf = function

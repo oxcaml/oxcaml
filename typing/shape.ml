@@ -146,7 +146,16 @@ module Rec_var_ident = struct
     | comp_unit -> Format.fprintf fmt "rv%s.%d" comp_unit id
 end
 
-module Rec_var_env = Map.Make (Rec_var_ident)
+module Rec_var_env = struct
+  include Map.Make (Rec_var_ident)
+
+  let hash hash_value m =
+    fold
+      (fun k v acc -> Hashtbl.hash (Rec_var_ident.hash k, hash_value v, acc))
+      m 0
+
+  let equal eq_value m1 m2 = m1 == m2 || equal eq_value m1 m2
+end
 
 module Sig_component_kind = struct
   type t =
@@ -450,7 +459,7 @@ module Predef = struct
         Scannable
       | Unboxed u -> unboxed_type_to_base_layout u
 
-    let to_layout (t: t) : Layout.t = Base (to_base_layout t)
+    let to_layout (t: t) : Layout.t = Layout.base (to_base_layout t)
 
     let equal_simd_vec_split s1 s2 =
       match s1, s2 with
@@ -546,7 +555,7 @@ and desc =
   | Rec_var of Rec_var_ident.t
 
   (* constructors for type declarations *)
-  | Variant of (t * Layout.t option) complex_constructors
+  | Variant of (t * Layout.t option) constructors
   | Variant_unboxed of
     { name : string;
       variant_uid : Uid.t option;
@@ -578,16 +587,16 @@ and record_kind =
   | Record_mixed of mixed_product_shape
   | Record_floats
 
-and 'a complex_constructors = 'a complex_constructor list
+and 'a constructors = 'a constructor list
 
-and 'a complex_constructor =
+and 'a constructor =
   { name : string;
     constr_uid: Uid.t option;
     kind : constructor_representation;
-    args : 'a complex_constructor_argument list
+    args : 'a constructor_argument list
   }
 
-and 'a complex_constructor_argument =
+and 'a constructor_argument =
   { field_name : string option;
     field_uid: Uid.t option;
     field_value : 'a
@@ -602,7 +611,7 @@ let poly_variant_constructors_map f pvs =
     (fun pv -> { pv with pv_constr_args = List.map f pv.pv_constr_args })
     pvs
 
-let complex_constructor_map f { name; constr_uid; kind; args } =
+let constructor_map f { name; constr_uid; kind; args } =
   let args =
     List.map
       (fun { field_name; field_uid; field_value } ->
@@ -611,20 +620,20 @@ let complex_constructor_map f { name; constr_uid; kind; args } =
   in
   { name; constr_uid; kind; args }
 
-let complex_constructors_map f = List.map (complex_constructor_map f)
+let constructors_map f = List.map (constructor_map f)
 
-let equal_complex_constructor_arguments eq
+let equal_constructor_arguments eq
     { field_name = field_name1; field_value = field_value1 }
     { field_name = field_name2; field_value = field_value2 } =
   Option.equal String.equal field_name1 field_name2 &&
   eq field_value1 field_value2
 
-let equal_complex_constructor eq
+let equal_constructor eq
     { name = name1; kind = kind1; args = args1 }
     { name = name2; kind = kind2; args = args2 } =
   String.equal name1 name2 &&
   Misc.Stdlib.Array.equal (Option.equal Layout.equal) kind1 kind2 &&
-  List.equal (equal_complex_constructor_arguments eq) args1 args2
+  List.equal (equal_constructor_arguments eq) args1 args2
 
 let rec equal_desc0 d1 d2 =
   match d1, d2 with
@@ -642,7 +651,7 @@ let rec equal_desc0 d1 d2 =
     Rec_var_ident.equal rv1 rv2 && equal t1_body t2_body
   | Rec_var rv1, Rec_var rv2 -> Rec_var_ident.equal rv1 rv2
   | Struct t1, Struct t2 ->
-    Item.Map.equal equal t1 t2
+    t1 == t2 || Item.Map.equal equal t1 t2
   | Proj (t1, i1), Proj (t2, i2) ->
     if Item.compare i1 i2 <> 0 then false
     else equal t1 t2
@@ -651,7 +660,7 @@ let rec equal_desc0 d1 d2 =
     Ident.equal c1 c2
     && List.equal equal ts1 ts2
   | Mutrec t1, Mutrec t2 ->
-    Ident.Map.equal equal t1 t2
+    t1 == t2 || Ident.Map.equal equal t1 t2
   | Proj_decl (t1, i1), Proj_decl (t2, i2) ->
     if Ident.equal i1 i2 then
       equal t1 t2
@@ -666,7 +675,7 @@ let rec equal_desc0 d1 d2 =
     List.equal equal_poly_variant_constructor pvs1 pvs2
   | Variant c1, Variant c2 ->
     List.equal
-         (equal_complex_constructor (fun (t1, l1) (t2, l2) ->
+         (equal_constructor (fun (t1, l1) (t2, l2) ->
            equal t1 t2 && Option.equal Layout.equal l1 l2))
          c1 c2
   | Variant_unboxed c1, Variant_unboxed c2 ->
@@ -719,6 +728,8 @@ and equal_poly_variant_constructor
   { pv_constr_name = name2; pv_constr_args = args2 } =
   String.equal name1 name2 &&
   List.equal equal args1 args2
+
+let hash t = t.hash
 
 let rec print fmt t =
   let print_uid_opt =
@@ -793,24 +804,26 @@ let rec print fmt t =
     | Error s ->
         Format.fprintf fmt "Error %s" s
     | Constr (id, args) ->
-        Format.fprintf fmt "@[%a@ %a@]"
+        Format.fprintf fmt "@[%a%a@ %a@]"
           Ident.print id
+          print_uid_opt uid
           (Format.pp_print_list print_nested) args
     | Tuple shapes ->
-      Format.fprintf fmt "@[%a@]"
+      Format.fprintf fmt "@[%a%a@]" print_uid_opt uid
         (Format.pp_print_list
             ~pp_sep:(fun fmt () -> Format.pp_print_string fmt " * ")
             print_nested)
         shapes
     | Unboxed_tuple shapes ->
-      Format.fprintf fmt "Unboxed_tuple (%a)"
+      Format.fprintf fmt "Unboxed_tuple%a (%a)" print_uid_opt uid
         (Format.pp_print_list
             ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
             print)
         shapes
     | Predef (predef, args) ->
-      Format.fprintf fmt "%a%a"
+      Format.fprintf fmt "%a%a%a"
         Predef.print predef
+        print_uid_opt uid
         (fun fmt -> function
           | [] -> ()
           | args -> Format.fprintf fmt "(@[%a@])"
@@ -818,9 +831,9 @@ let rec print fmt t =
                 ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",@ ")
                 print) args) args
     | Arrow ->
-      Format.fprintf fmt "Arrow"
+      Format.fprintf fmt "Arrow%a" print_uid_opt uid
     | Poly_variant fields ->
-      Format.fprintf fmt "Poly_variant (%a)"
+      Format.fprintf fmt "Poly_variant%a (%a)" print_uid_opt uid
         (Format.pp_print_list
             ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
             (fun fmt { pv_constr_name; pv_constr_args } ->
@@ -835,7 +848,8 @@ let rec print fmt t =
         print_constructor (fun fmt (t, _) -> print_nested fmt t)
       in
       Format.fprintf fmt
-        "Variant %a"
+        "Variant%a %a"
+        print_uid_opt uid
         (Format.pp_print_list ~pp_sep:(fun fmt () -> Format.fprintf fmt "@ | ")
             print_constructor)
         constructors
@@ -850,7 +864,8 @@ let rec print fmt t =
             print_uid_opt arg_uid
         | None -> print fmt arg_shape) arg_name
   | Record { fields; kind } ->
-    Format.fprintf fmt "Record%s { %a }" (print_record_type kind)
+    Format.fprintf fmt "Record%s%a { %a }" (print_record_type kind)
+      print_uid_opt uid
       (Format.pp_print_list ~pp_sep:(print_sep_string "; ") print_field)
       fields
   | Mutrec m ->
@@ -861,15 +876,24 @@ let rec print fmt t =
               aux t
           )
       in
-    Format.fprintf fmt "Mutrec @[%a@]" print_decls m
+    Format.fprintf fmt "Mutrec%a @[%a@]" print_uid_opt uid print_decls m
   | Proj_decl (t, id) ->
-    Format.fprintf fmt "%a.%a"
-      print_nested t
-      Ident.print id
-  | Unknown_type -> Format.fprintf fmt "?"
+    begin match uid with
+    | None ->
+      Format.fprintf fmt "%a.%a"
+        print_nested t
+        Ident.print id
+    | Some uid ->
+      Format.fprintf fmt "(%a.%a)<%a>"
+        print_nested t
+        Ident.print id
+        Uid.print uid
+    end
+  | Unknown_type -> Format.fprintf fmt "?%a" print_uid_opt uid
   | At_layout (shape, layout) ->
-    Format.fprintf fmt "(%a : %a)" print_nested shape
+    Format.fprintf fmt "(%a : %a)%a" print_nested shape
       (Format_doc.compat Layout.format) layout
+      print_uid_opt uid
   in
   if t.approximated then
     Format.fprintf fmt "@[(approx)@ %a@]@;" aux t
@@ -1071,8 +1095,7 @@ let poly_variant ?uid t =
 let variant ?uid constructors =
   { uid; desc = Variant constructors;
     hash = Hashtbl.hash (hash_variant, uid,
-      complex_constructors_map
-        (fun (t, ly) -> (t.hash, ly)) constructors);
+      constructors_map (fun (t, ly) -> (t.hash, ly)) constructors);
     approximated = false }
 
 let variant_unboxed ?uid ~variant_uid ~arg_uid name arg_name arg_shape
@@ -1161,12 +1184,11 @@ let for_persistent_unit s =
 
 let leaf_for_unpack = leaf' None
 
-let set_uid_if_none t uid =
+let set_uid t uid =
   (* CR sspies: This function clears the approximated field of the shape.
      However, the alternative is setting the record field, which will result in
      wrong hash values. Perhaps we should fix this instead by removing the UIDs
      from the hash value computation. *)
-  let uid = Option.value ~default:uid t.uid in
   match t.desc with
   | Var v -> var uid v
   | Abs (x, t) -> abs ~uid x t
@@ -1194,6 +1216,10 @@ let set_uid_if_none t uid =
   | Proj_decl (t, i) -> proj_decl ~uid t i
   | Unknown_type -> unknown_type ~uid ()
   | At_layout (shape, layout) -> at_layout ~uid shape layout
+
+let set_uid_if_none t uid =
+  let uid = Option.value ~default:uid t.uid in
+  set_uid t uid
 
 
 module Map = struct
@@ -1262,11 +1288,3 @@ module Map = struct
     let item = Item.jkind id in
     Item.Map.add item (proj shape item) t
 end
-
-module Cache = Hashtbl.Make (struct
-  type nonrec t = t
-
-  let hash t = t.hash
-
-  let equal = equal
-end)

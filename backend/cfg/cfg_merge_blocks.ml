@@ -20,6 +20,12 @@ end = struct
       bool =
    fun ~equal_desc ~equal_reg left right ->
     (* CR xclerc for xclerc: consider using other fields *)
+    (* CR mshinwell: [available_before], [available_across] and
+       [phantom_available_before] are ignored here, meaning that blocks that
+       disagree on availability may be merged, with only the representative
+       block's availability information being kept.  Consider reconciling the
+       availability sets (presumably by intersection) when merging blocks that
+       disagree. *)
     match left, right with
     | ( { desc = left_desc;
           id = _;
@@ -30,7 +36,8 @@ end = struct
           live = _;
           stack_offset = left_stack_offset;
           available_before = _;
-          available_across = _
+          available_across = _;
+          phantom_available_before = _
         },
         { desc = right_desc;
           id = _;
@@ -41,7 +48,8 @@ end = struct
           live = _;
           stack_offset = right_stack_offset;
           available_before = _;
-          available_across = _
+          available_across = _;
+          phantom_available_before = _
         } ) ->
       Int.equal left_stack_offset right_stack_offset
       && Misc.Stdlib.Array.equal equal_reg left_arg right_arg

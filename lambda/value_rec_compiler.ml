@@ -73,12 +73,14 @@ let update_lazy_prim =
 
 (** {1. Sizing} *)
 
+type mixed_block_size = { size : int; value_prefix_len : int }
+
 (* Simple blocks *)
 type block_size =
   | Regular_block of int
   | Float_record of int
   | Lazy_block
-  | Mixed_record of Lambda.mixed_block_shape
+  | Mixed_block of mixed_block_size
 
 type size =
   | Unreachable
@@ -171,7 +173,23 @@ let find_size_of_alloc_prim prim args =
     Option.map (fun n -> Float_record n) int_arg
   else if same_as alloc_lazy_prim then
     Some Lazy_block
+  else if same_as alloc_mixed_record_prim then
+    match args with
+    | [Lconst (Const_base (Const_int size));
+       Lconst (Const_base (Const_int value_prefix_len))] ->
+      Some (Mixed_block { size; value_prefix_len })
+    | _ -> None
   else None
+
+let compute_mixed_block_size shape =
+  if !Clflags.native_code then
+    let bytes = Mixed_product_bytes.count (Product shape) in
+    let value_prefix_len = Mixed_product_bytes.value_prefix_len bytes in
+    let size = Mixed_product_bytes.size_in_words bytes in
+    { size; value_prefix_len }
+  else
+    let size = Array.length shape in
+    { size; value_prefix_len = size }
 
 let compute_static_size lam =
   let rec compute_expression_size env lam =
@@ -295,6 +313,8 @@ let compute_static_size lam =
     | Pbigstring_set_f32 _
     | Pbigstring_set_64 _
     | Ppoll
+    | Patomic_set_field _
+    | Patomic_set_mixed_field _
     | Patomic_add_field
     | Patomic_sub_field
     | Patomic_land_field
@@ -322,14 +342,20 @@ let compute_static_size lam =
               Block (Regular_block
                 (all_value_mixed_block_size_types shape))
             else
-              Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
+              let size =
+                compute_mixed_block_size
+                  (Lambda.transl_mixed_product_shape shape)
+              in
+              Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
         | Record_dummy _ ->
             Misc.fatal_error
               "size_of_primitive: unexpected dummy representation"
-        | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+        | Record_undetermined | Record_variable _
+        | Record_inlined (_, (Constructor_undetermined
+                             | Constructor_variable _), _) ->
             Misc.fatal_error
               "size_of_primitive: unexpected variable representation"
         end
@@ -339,7 +365,7 @@ let compute_static_size lam =
            Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
         (* CR layout poly: This is no longer known before slambda eval, we
-           should merge Regular_block and Mixed_record (and fix the error
+           should merge Regular_block and Mixed_block (and fix the error
            produced by [mixed_block_of_block_shape]). *)
         (match Lambda.mixed_block_of_block_shape shape with
          | None ->
@@ -348,7 +374,7 @@ let compute_static_size lam =
              | Shape shape -> all_value_mixed_block_size shape
            in
            Block (Regular_block size)
-         | Some arr -> Block (Mixed_record arr))
+         | Some arr -> Block (Mixed_block (compute_mixed_block_size arr)))
     | Pmakelazyblock _ ->
         Block Lazy_block
     | Pmakearray (kind, _, _) ->
@@ -437,8 +463,6 @@ let compute_static_size lam =
     | Pint_as_pointer _
     | Patomic_load_field _
     | Patomic_load_mixed_field _
-    | Patomic_set_field _
-    | Patomic_set_mixed_field _
     | Patomic_exchange_field _
     | Patomic_compare_exchange_field _
     | Patomic_compare_set_field _
@@ -982,25 +1006,13 @@ let compile_alloc size =
       Lprim(Pccall alloc_lazy_prim,
             [Lambda.lambda_unit],
             no_loc)
-  | Mixed_record shape ->
-      if !Clflags.native_code then
-        let shape =
-          Mixed_block_shape.of_mixed_block_elements
-            ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-            shape
-        in
-        let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
-        let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
-        let size = value_prefix_len + flat_suffix_len in
-        alloc alloc_mixed_record_prim [size; value_prefix_len]
-      else
-        let size = Array.length shape in
-        alloc alloc_mixed_record_prim [size; size]
+  | Mixed_block { size; value_prefix_len } ->
+    alloc alloc_mixed_record_prim [size; value_prefix_len]
 
 let compile_update size dummy newval =
   let prim, newval =
     match size with
-    | Regular_block _ | Float_record _ | Mixed_record _ ->
+    | Regular_block _ | Float_record _ | Mixed_block _ ->
       update_prim, newval
     | Lazy_block ->
       (* Consider the following example from Vincent Laviron:

@@ -2079,17 +2079,36 @@ let instance_prim_layout env (desc : Primitive.description) ty =
   then ty, None
   else
   let new_sort = ref None in
-  let get_jkind jkind sa =
-    let sort = match !new_sort with
+  let get_sort () =
+    match !new_sort with
     | Some sort -> sort
     | None ->
       let sort = Jkind.Sort.(of_var (new_var ~level:!current_level)) in
       new_sort := Some sort;
       sort
+  in
+  (* Instantiate a jkind with layout
+     [any <scannable axes> <addressability>] to one with
+     ['s <scannable axes> <addressability>], where all ['s] are shared. *)
+  let instance_sort_var_for_lpoly_jkind jkind =
+    let rec instance_layout
+      : Jkind.Sort.t Jkind.Layout.t -> _ option = function
+      | Any sa -> Some (Jkind.Layout.Sort (get_sort (), sa))
+      | Addressable layout ->
+        Option.map
+          (fun l -> Jkind.Layout.Addressable l)
+          (instance_layout layout)
+      | Sort _ | Product _ -> None
     in
-    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa)) in
-    Jkind.History.update_reason
-      jkind (Concrete_creation Layout_poly_in_external)
+    match Jkind.extract_layout env jkind with
+    | Error _ -> None
+    | Ok layout ->
+      Option.map
+        (fun layout ->
+          Jkind.History.update_reason
+            (Jkind.set_layout jkind layout)
+            (Concrete_creation Layout_poly_in_external))
+        (instance_layout layout)
   in
   For_copy.with_scope (fun copy_scope ->
     let rec inner mark ty =
@@ -2099,17 +2118,15 @@ let instance_prim_layout env (desc : Primitive.description) ty =
       if level = generic_level && try_mark_node mark ty then begin
         begin match get_desc ty with
         | Tvar ({ jkind; _ } as r) -> (
-          match Jkind.extract_layout env jkind with
-          | Ok (Any sa) ->
-            For_copy.redirect_desc copy_scope ty
-              (Tvar {r with jkind = get_jkind jkind sa})
-          | _ -> ())
+          match instance_sort_var_for_lpoly_jkind jkind with
+          | Some jkind ->
+            For_copy.redirect_desc copy_scope ty (Tvar {r with jkind})
+          | None -> ())
         | Tunivar ({ jkind; _ } as r) -> (
-          match Jkind.extract_layout env jkind with
-          | Ok (Any sa) ->
-            For_copy.redirect_desc copy_scope ty
-              (Tunivar {r with jkind = get_jkind jkind sa})
-          | _ -> ())
+          match instance_sort_var_for_lpoly_jkind jkind with
+          | Some jkind ->
+            For_copy.redirect_desc copy_scope ty (Tunivar {r with jkind})
+          | None -> ())
         | _ -> ()
         end;
         iter_type_expr (inner mark) ty
@@ -2871,6 +2888,16 @@ let contained_without_boxing env ty =
    allowing us to return a type for which a definition was found even if
    we eventually bottom out at a missing cmi file, or otherwise. *)
 let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
+  match get_desc ty with
+  | Tmod (ty, _) ->
+    (* Mode bounds do not affect the runtime representation, so [Tmod]
+       wrappers are transparent here, at no fuel cost. In particular a [Tmod]
+       must never be returned from this function: it carries no definition, so
+       it may not become [ty_prev] (the missing-cmi fallback, whose kind could
+       then only be estimated as [any]), and representation-oriented consumers
+       such as [Typeopt.classify] expect never to see one. *)
+    get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel
+  | _ ->
   if fuel < 0 then Error { ty; modality; or_null }
   else
     (* We use expand_head_opt version of expand_head to get access
@@ -3038,7 +3065,8 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
       let type_decl = Env.find_type p env in
       let jkind =
         match type_decl.type_kind with
-        | Type_record_unboxed_product (lbls, Record_unboxed_product_variable, _)
+        | Type_record_unboxed_product
+            (lbls, Record_unboxed_product_undetermined, _)
           when expand_components ->
           (* This is an unboxed product with at least one [any] field, so we
              need to recompute the jkind if we want it to be precise *)
@@ -8349,7 +8377,7 @@ let clear_hash ()   =
    [jkind_const_desc]s. *)
 let rec nondep_jkind_desc_base env ids ~desc_of_const jkind_desc =
   match jkind_desc.base with
-  | Kconstr (p, _sa) -> begin
+  | Kconstr (p, _sa, _op) -> begin
       match Path.find_free_opt ids p with
       | None -> jkind_desc
       | Some id ->
@@ -8804,11 +8832,13 @@ let constrain_decl_jkind env decl jkind =
       Ikind.sub_or_error ~type_equal ~context env
         decl.type_jkind jkind
     with
-    | Ok () as ok -> ok
-    | Error _ as err ->
+    | Ok () -> Ok ()
+    | Error err ->
         match decl.type_manifest with
-        | None -> err
-        | Some ty -> constrain_type_jkind env ty jkind
+        | None -> Error (Ikind.Jkind_error err)
+        | Some ty ->
+          constrain_type_jkind env ty jkind
+          |> Result.map_error (fun err -> Ikind.Jkind_error err)
 
 let exn_constructor_crossing env lid ~args locks =
   let vmode =

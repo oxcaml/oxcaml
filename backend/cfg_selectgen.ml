@@ -29,6 +29,14 @@ module V = Backend_var
 module VP = Backend_var.With_provenance
 open SU.Or_never_returns.Syntax
 
+let which_parameter_of_provenance provenance =
+  match (provenance : V.Provenance.t option) with
+  | None -> None
+  | Some provenance -> (
+    match V.Provenance.is_parameter provenance with
+    | Local -> None
+    | Parameter { index } -> Some index)
+
 type error = Builtin_not_recognized of string
 
 exception Error of error * Debuginfo.t
@@ -56,6 +64,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> List.for_all is_simple_expr el
     | Clet (_id, arg, body) -> is_simple_expr arg && is_simple_expr body
     | Cphantom_let (_var, _defining_expr, body) -> is_simple_expr body
+    | Cname_for_debugger (_, body) -> is_simple_expr body
     | Csequence (e1, e2) -> is_simple_expr e1 && is_simple_expr e2
     | Cop (op, args, _) -> (
       match op with
@@ -107,6 +116,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Ctuple el -> EC.join_list_map el effects_of
     | Clet (_id, arg, body) -> EC.join (effects_of arg) (effects_of body)
     | Cphantom_let (_var, _defining_expr, body) -> effects_of body
+    | Cname_for_debugger (_, body) -> effects_of body
     | Csequence (e1, e2) -> EC.join (effects_of e1) (effects_of e2)
     | Cifthenelse (cond, _ifso_dbg, ifso, _ifnot_dbg, ifnot, _dbg) ->
       EC.join (effects_of cond) (EC.join (effects_of ifso) (effects_of ifnot))
@@ -201,7 +211,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     (if Option.is_some provenance
      then
        let naming_op =
-         SU.make_name_for_debugger ~ident:(VP.var v) ~which_parameter:None
+         SU.make_name_for_debugger ~ident:(VP.var v)
+           ~which_parameter:(which_parameter_of_provenance provenance)
            ~provenance ~regs:r1
        in
        SU.insert_debug env sub_cfg naming_op Debuginfo.none [||] [||]);
@@ -457,7 +468,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               in
               Cfg.Poptrap { lbl_handler }
           in
-          Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none)
+          let phantom_available_before = SU.phantom_vars_from_env env in
+          Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
+            ~phantom_available_before)
         traps;
       let loc = Proc.loc_results_return (Reg.typv r) in
       SU.insert_moves env sub_cfg r loc;
@@ -465,15 +478,20 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
 
   (* Buffering of instruction sequences *)
 
-  let insert_debug _env sub_cfg basic dbg arg res =
-    Sub_cfg.add_instruction sub_cfg basic arg res dbg
+  let insert_debug env sub_cfg basic dbg arg res =
+    let phantom_available_before = SU.phantom_vars_from_env env in
+    Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
 
-  let insert_op_debug_returning_id _env sub_cfg op dbg arg res =
-    let instr = Sub_cfg.make_instr (Cfg.Op op) arg res dbg in
+  let insert_op_debug_returning_id env sub_cfg op dbg arg res =
+    let phantom_available_before = SU.phantom_vars_from_env env in
+    let instr =
+      Sub_cfg.make_instr (Cfg.Op op) arg res dbg ~phantom_available_before
+    in
     Sub_cfg.add_instruction' sub_cfg instr;
     instr.id
 
-  let setup_catch_handler (flag : Cmm.ccatch_flag) rs sub_cfg =
+  let setup_catch_handler (flag : Cmm.ccatch_flag) rs sub_cfg ~dbg
+      ~phantom_available_before =
     match flag with
     | Normal | Recursive -> ()
     | Exn_handler ->
@@ -484,7 +502,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | r :: _ -> r
       in
       Sub_cfg.add_instruction_at_start sub_cfg (Cfg.Op Move)
-        [| Proc.loc_exn_bucket |] exn_bucket_in_handler Debuginfo.none
+        [| Proc.loc_exn_bucket |] exn_bucket_in_handler dbg
+        ~phantom_available_before
 
   let unreachable_handler : (Operation.trap_stack * Cmm.expression) Lazy.t =
     lazy
@@ -508,6 +527,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           that we don't introduce spurious control-flow edges inside the
           function. *)
        Uncaught, Csequence (segfault, dummy_raise))
+
+  let join_branch (r : _ Or_never_returns.t) sub_cfg : Sub_cfg.join_branch =
+    { sub_cfg;
+      may_fall_through = (match r with Ok _ -> true | Never_returns -> false)
+    }
 
   (* The following two functions, [emit_parts] and [emit_parts_list], force
      right-to-left evaluation order as required by the Flambda [Un_anf] pass
@@ -772,8 +796,27 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:(Some v) with
       | Never_returns -> Never_returns
       | Ok r1 -> emit_expr (bind_let env sub_cfg v r1) sub_cfg e2 ~bound_name)
-    | Cphantom_let (_var, _defining_expr, body) ->
+    | Cphantom_let (var, defining_expr, body) ->
+      let env = SU.env_add_phantom_let var defining_expr env in
       emit_expr env sub_cfg body ~bound_name
+    | Cname_for_debugger (var, body) -> (
+      match emit_expr env sub_cfg body ~bound_name with
+      | Never_returns -> Never_returns
+      | Ok regs ->
+        let provenance = VP.provenance var in
+        (if Option.is_some provenance
+         then
+           let ident = VP.var var in
+           let naming_op =
+             Operation.Name_for_debugger
+               { ident;
+                 provenance;
+                 which_parameter = which_parameter_of_provenance provenance;
+                 regs
+               }
+           in
+           insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]);
+        Ok regs)
     | Ctuple [] -> Ok [||]
     | Ctuple exp_list -> (
       match emit_parts_list env sub_cfg exp_list with
@@ -824,7 +867,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> ()
       | Ok r1 -> emit_tail (bind_let env sub_cfg v r1) sub_cfg e2)
-    | Cphantom_let (_var, _defining_expr, body) -> emit_tail env sub_cfg body
+    | Cphantom_let (var, defining_expr, body) ->
+      let env = SU.env_add_phantom_let var defining_expr env in
+      emit_tail env sub_cfg body
+    | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
     | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
       ->
       emit_tail_apply env sub_cfg ty op args dbg
@@ -915,10 +961,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           let provenance = VP.provenance bound_name in
           if Option.is_some provenance
           then
+            let which_parameter = which_parameter_of_provenance provenance in
             let bound_name = VP.var bound_name in
             let naming_op =
               Operation.Name_for_debugger
-                { ident = bound_name; provenance; which_parameter = None; regs }
+                { ident = bound_name; provenance; which_parameter; regs }
             in
             insert_debug env sub_cfg (Op naming_op) Debuginfo.none [||] [||]
       in
@@ -1046,8 +1093,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ~label_true:(Sub_cfg.start_label sub_if)
           ~label_false:(Sub_cfg.start_label sub_else)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg;
-      Sub_cfg.join ~from:[sub_if; sub_else] ~to_:sub_cfg;
+      let phantom_available_before = SU.phantom_vars_from_env env in
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg
+        ~phantom_available_before;
+      Sub_cfg.join
+        ~from:[join_branch rif sub_if; join_branch relse sub_else]
+        ~to_:sub_cfg ~phantom_available_before;
       r
 
   and emit_expr_switch env sub_cfg bound_name esel index ecases
@@ -1067,8 +1118,14 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let term_desc : Cfg.terminator =
         Switch (Array.map (fun idx -> Sub_cfg.start_label subs.(idx)) index)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel;
-      Sub_cfg.join ~from:(Array.to_list subs) ~to_:sub_cfg;
+      let phantom_available_before = SU.phantom_vars_from_env env in
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel
+        ~phantom_available_before;
+      Sub_cfg.join
+        ~from:
+          (Array.to_list
+             (Array.map (fun (r, sub) -> join_branch r sub) sub_cases))
+        ~to_:sub_cfg ~phantom_available_before;
       r
 
   and emit_expr_catch env sub_cfg bound_name (flag : Cmm.ccatch_flag) handlers
@@ -1102,7 +1159,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     let r_body, sub_body = emit_new_sub_cfg env body ~bound_name in
     let translate_one_handler _nfail
-        (trap_info, (ids, rs, e2, _dbg, _is_cold, label)) =
+        (trap_info, (ids, rs, e2, dbg, _is_cold, label)) =
       assert (List.length ids = List.length rs);
       let trap_stack, e2 =
         match (!trap_info : SU.trap_stack_info) with
@@ -1125,20 +1182,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 let provenance = VP.provenance var in
                 if Option.is_some provenance
                 then
+                  let which_parameter =
+                    which_parameter_of_provenance provenance
+                  in
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        regs = r
-                      }
+                      { ident = var; provenance; which_parameter; regs = r }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])
               ids_and_rs)
       in
-      (rs, label), (r, sub)
+      (rs, label, dbg, SU.phantom_vars_from_env new_env), (r, sub)
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
@@ -1177,15 +1233,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let sub_handlers =
       List.map
-        (fun ((rs, label), (_, sub_handler)) ->
+        (fun ((rs, label, dbg, phantom_available_before), (r, sub_handler)) ->
           Sub_cfg.add_empty_block_at_start sub_handler ~label;
-          setup_catch_handler flag rs sub_handler;
-          sub_handler)
+          setup_catch_handler flag rs sub_handler ~dbg ~phantom_available_before;
+          join_branch r sub_handler)
         l
     in
     let term_desc = Cfg.Always (Sub_cfg.start_label sub_body) in
-    Sub_cfg.update_exit_terminator sub_cfg term_desc;
-    Sub_cfg.join ~from:(sub_body :: sub_handlers) ~to_:sub_cfg;
+    let phantom_available_before = SU.phantom_vars_from_env env in
+    Sub_cfg.update_exit_terminator sub_cfg term_desc ~phantom_available_before;
+    Sub_cfg.join
+      ~from:(join_branch r_body sub_body :: sub_handlers)
+      ~to_:sub_cfg ~phantom_available_before;
     r
 
   and emit_expr_exit env sub_cfg (lbl : Cmm.exit_label) args traps :
@@ -1235,9 +1294,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 in
                 Cfg.Poptrap { lbl_handler }
             in
-            Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none)
+            let phantom_available_before = SU.phantom_vars_from_env env in
+            Sub_cfg.add_instruction sub_cfg instr_desc [||] [||] Debuginfo.none
+              ~phantom_available_before)
           traps;
-        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label);
+        Sub_cfg.update_exit_terminator sub_cfg (Always handler.label)
+          ~phantom_available_before:(SU.phantom_vars_from_env env);
         SU.set_traps nfail handler.SU.traps_ref env.SU.trap_stack traps;
         Never_returns
       | Return_lbl -> (
@@ -1338,7 +1400,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ~label_true:(Sub_cfg.start_label sub_if)
           ~label_false:(Sub_cfg.start_label sub_else)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rarg
+        ~phantom_available_before:(SU.phantom_vars_from_env env);
       Sub_cfg.join_tail ~from:[sub_if; sub_else] ~to_:sub_cfg
 
   and emit_tail_switch env sub_cfg esel index ecases (_dbg : Debuginfo.t) =
@@ -1354,7 +1417,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Switch
           (Array.map (fun idx -> Sub_cfg.start_label sub_cases.(idx)) index)
       in
-      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel;
+      Sub_cfg.update_exit_terminator sub_cfg term_desc ~arg:rsel
+        ~phantom_available_before:(SU.phantom_vars_from_env env);
       Sub_cfg.join_tail ~from:(Array.to_list sub_cases) ~to_:sub_cfg
 
   and emit_tail_catch env sub_cfg (flag : Cmm.ccatch_flag) handlers e1 =
@@ -1386,7 +1450,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let s_body = emit_tail_new_sub_cfg env e1 in
     let translate_one_handler _nfail
-        (trap_info, (ids, rs, e2, _dbg, _is_cold, label)) =
+        (trap_info, (ids, rs, e2, dbg, _is_cold, label)) =
       assert (List.length ids = List.length rs);
       let trap_stack, e2 =
         match (!trap_info : SU.trap_stack_info) with
@@ -1409,21 +1473,20 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 let provenance = VP.provenance var in
                 if Option.is_some provenance
                 then
+                  let which_parameter =
+                    which_parameter_of_provenance provenance
+                  in
                   let var = VP.var var in
                   let naming_op =
                     Operation.Name_for_debugger
-                      { ident = var;
-                        provenance;
-                        which_parameter = None;
-                        regs = r
-                      }
+                      { ident = var; provenance; which_parameter; regs = r }
                   in
                   insert_debug new_env sub_cfg (Op naming_op) Debuginfo.none
                     [||] [||])
               ids_and_rs)
       in
       Sub_cfg.add_empty_block_at_start seq ~label;
-      rs, seq
+      rs, seq, dbg, SU.phantom_vars_from_env new_env
     in
     let rec build_all_reachable_handlers ~already_built ~not_built =
       let not_built, to_build =
@@ -1443,7 +1506,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         in
         build_all_reachable_handlers ~already_built ~not_built
     in
-    let new_handlers : (Reg.t array list * Sub_cfg.t) list =
+    let new_handlers :
+        (Reg.t array list * Sub_cfg.t * Debuginfo.t * V.Set.t option) list =
       match flag with
       | Normal | Recursive ->
         build_all_reachable_handlers ~already_built:[] ~not_built:handlers_map
@@ -1459,11 +1523,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     in
     assert (Sub_cfg.exit_has_never_terminator sub_cfg);
     let term_desc = Cfg.Always (Sub_cfg.start_label s_body) in
-    Sub_cfg.update_exit_terminator sub_cfg term_desc;
+    Sub_cfg.update_exit_terminator sub_cfg term_desc
+      ~phantom_available_before:(SU.phantom_vars_from_env env);
     let s_handlers =
       List.map
-        (fun (rs, s) ->
-          setup_catch_handler flag rs s;
+        (fun (rs, s, dbg, phantom_available_before) ->
+          setup_catch_handler flag rs s ~dbg ~phantom_available_before;
           s)
         new_handlers
     in
@@ -1475,7 +1540,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     emit_tail env sub_cfg exp;
     sub_cfg
 
-  let insert_param_name_for_debugger block fun_args loc_arg num_regs_per_arg =
+  let insert_param_name_for_debugger env block fun_args loc_arg num_regs_per_arg
+      =
+    (* No phantom lets are in scope at the start of the function, so the phantom
+       availability comes from the initial environment. *)
+    let phantom_available_before = SU.phantom_vars_from_env env in
     let loc_arg_index = ref 0 in
     List.iteri
       (fun param_index (var, _ty) ->
@@ -1498,7 +1567,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               }
           in
           DLL.add_end block.Cfg.body
-            (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||] Debuginfo.none))
+            (Sub_cfg.make_instr (Cfg.Op naming_op) [||] [||] Debuginfo.none
+               ~phantom_available_before))
       fun_args
 
   (* Sequentialization of a function definition *)
@@ -1545,14 +1615,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         ~fun_dbg:f.Cmm.fun_dbg ~fun_contains_calls:true
         ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:f.Cmm.fun_poll
         ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:f.Cmm.fun_ret_type
+        ~fun_phantom_lets:(SU.phantom_lets_for_fundecl env)
         ~allowed_to_be_irreducible:false
     in
     let layout = DLL.make_empty () in
     let entry_block =
       Cfg.make_empty_block ~label:(Cfg.entry_label cfg)
-        (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none)
+        (Sub_cfg.make_instr (Cfg.Always tailrec_label) [||] [||] Debuginfo.none
+           ~phantom_available_before:None)
     in
-    insert_param_name_for_debugger entry_block f.Cmm.fun_args loc_arg
+    insert_param_name_for_debugger env entry_block f.Cmm.fun_args loc_arg
       num_regs_per_arg;
     Cfg.add_block_exn cfg entry_block;
     DLL.add_end layout entry_block.start;
@@ -1560,9 +1632,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       Cfg.make_empty_block ~label:tailrec_label
         (Sub_cfg.make_instr
            (Cfg.Always (Sub_cfg.start_label body))
-           [||] [||] Debuginfo.none)
+           [||] [||] Debuginfo.none ~phantom_available_before:None)
     in
-    insert_param_name_for_debugger tailrec_block f.Cmm.fun_args loc_arg
+    insert_param_name_for_debugger env tailrec_block f.Cmm.fun_args loc_arg
       num_regs_per_arg;
     Cfg.add_block_exn cfg tailrec_block;
     DLL.add_end layout tailrec_block.start;
@@ -1573,7 +1645,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           if Cfg.is_return_terminator block.terminator.desc
           then
             DLL.add_end block.body
-              (Sub_cfg.make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none);
+              (Sub_cfg.make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none
+                 ~phantom_available_before:None);
           Cfg.add_block_exn cfg block;
           DLL.add_end layout block.start)
         else assert (DLL.is_empty block.body));

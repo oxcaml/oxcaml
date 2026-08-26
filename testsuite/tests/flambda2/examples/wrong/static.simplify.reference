@@ -45,6 +45,6 @@ let code loopify(never) size(58) newer_version_of(f_0)
               where k2 (apply_result) =
                 cont `self` (apply_result, Pfield)))
 in
-let $camlStatic__f_3 = closure f_0_1 @f &toplevel.alloc_region in
-let $camlStatic = Block 0 ($camlStatic__f_3) in
+let $camlStatic__f_1 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlStatic = Block 0 ($camlStatic__f_1) in
 cont done ($camlStatic)
