@@ -119,6 +119,14 @@ module Unboxed_fields = struct
     | Not_unboxed x -> Not_unboxed (f x)
     | Unboxed fields -> Unboxed (map f fields)
 
+  let rec equal_u eq u1 u2 =
+    match u1, u2 with
+    | Not_unboxed x1, Not_unboxed x2 -> eq x1 x2
+    | Unboxed fields1, Unboxed fields2 -> equal eq fields1 fields2
+    | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ -> false
+
+  and equal eq fields1 fields2 = Field.Map.equal (equal_u eq) fields1 fields2
+
   (* This is not symmetrical!! [fields1] must define a subset of [fields2], but
      does not have to define all of them. *)
   let rec fold2_subset_u f fields1 fields2 acc =
@@ -260,7 +268,9 @@ let changed_representation_apply_renaming changed_representation renaming
   let rename_id = Renaming.apply_code_id_or_name renaming in
   let rename_repr (repr : changed_representation) : changed_representation =
     (* Ints, block access kinds and slots are structural data, not hashconsed
-       identifiers, so they are not renamed. *)
+       identifiers, so they are not renamed. Note that rebuilding the trees here
+       destroys their physical sharing across the entries of a single set of
+       closures, so consumers must not rely on it. *)
     match repr with
     | Block_representation (tree, size) ->
       Block_representation
