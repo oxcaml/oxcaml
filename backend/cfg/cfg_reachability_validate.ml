@@ -128,6 +128,9 @@ module Z3 = struct
     Buffer.contents buffer
 end
 
+let check_reachability (cfg : Cfg.t) =
+  Internal.validate (Cfg_validation_facts.Graph.create cfg)
+
 let fallback cfg internal_failure z3_code =
   let z3_result = Cfg_z3.run_validation_fallback z3_code in
   Misc.fatal_errorf
