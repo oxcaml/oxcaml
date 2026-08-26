@@ -1531,17 +1531,26 @@ let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
         "cu_of_impl: %a has no implementation (parameter module)"
         Global_module.print gm
 
-(* [gm] must have been compiled with [-as-argument-for]. *)
+(* [gm] must have been compiled with [-as-argument-for].
+
+   CR-someday zqian: the fatal error below is reachable with stale
+   [.cmo]/[.cmx] artifacts, which are read without consistency checks;
+   it should be a user error. *)
 let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
       main_block =
-  let _fmt, arg_descr = find_impl_by_name ~chain (cu_of_impl gm) in
-  let arg_block_idx, main_repr =
+  let fmt, arg_descr = find_impl_by_name ~chain (cu_of_impl gm) in
+  let arg_block_idx =
     match (arg_descr : Lambda.arg_descr option) with
-    | Some { arg_block_idx; main_repr; _ } -> arg_block_idx, main_repr
+    | Some { arg_block_idx; _ } -> arg_block_idx
     | None ->
         Misc.fatal_errorf_doc
           "project_arg_block: %a was not compiled with -as-argument-for"
           Global_module.print gm
+  in
+  let main_repr =
+    match (fmt : main_module_block_format) with
+    | Mb_struct { mb_repr } -> mb_repr
+    | Mb_instantiating_functor { mb_returned_repr; _ } -> mb_returned_repr
   in
   Lprim (mod_field arg_block_idx main_repr, [main_block], Loc_unknown)
 

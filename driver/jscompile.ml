@@ -32,10 +32,9 @@ let interface ~source_file ~output_prefix =
 
 (** Js_of_ocaml IR compilation backend for .ml files. *)
 
-let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option =
+let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
   match (param, arg_block_idx) with
-  | Some arg_param, Some arg_block_idx ->
-      Some { arg_param; arg_block_idx; main_repr }
+  | Some arg_param, Some arg_block_idx -> Some { arg_param; arg_block_idx }
   | None, None -> None
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
@@ -58,9 +57,6 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          |> fun lambda ->
          let arg_descr =
            make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
-             ~main_repr:
-               (Lambda.main_module_representation
-                  program.main_module_block_format)
          in
          lambda |> fun code ->
          Flambda2.lambda_to_flambda ~machine_width:Thirty_two_no_gc_tag_bit

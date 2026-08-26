@@ -1414,8 +1414,7 @@ type program =
 
 type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
-    arg_block_idx: int;
-    main_repr: module_representation; }
+    arg_block_idx: int; }
 
 let const_int n = Const_base (Const_int n)
 

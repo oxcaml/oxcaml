@@ -1258,9 +1258,6 @@ type arg_descr =
                                            that of the parameter, which is in
                                            general a supertype of this
                                            compilation unit's signature. *)
-    main_repr: module_representation;   (* The representation of the main
-                                           module, which is required to index
-                                           into it *)
   }
 
 (* Sharing key *)

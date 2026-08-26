@@ -78,7 +78,16 @@ let instantiate
                { compilation_unit = unit_info.ui_unit;
                  filename = cm_path;
                  base_unit = base_unit_info.ui_unit; })
-    | Some { arg_param; arg_block_idx; main_repr } ->
+    | Some { arg_param; arg_block_idx } ->
+      let main_repr =
+        match unit_info.ui_format with
+        | Mb_struct { mb_repr } -> mb_repr
+        | Mb_instantiating_functor _ ->
+          (* CR-someday zqian: should be a user error, like
+             [Not_compiled_as_argument]. *)
+          Misc.fatal_errorf_doc "Argument unit %a is parameterised"
+            CU.print unit_info.ui_unit
+      in
       arg_param, (unit_info.ui_unit, arg_block_idx, main_repr)
   in
   let arg_infos = List.map arg_info_of_cm_path args in
