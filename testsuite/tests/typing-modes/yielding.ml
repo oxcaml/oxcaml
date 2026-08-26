@@ -213,10 +213,7 @@ val f1 : 'a -> unit = <fun>
 let f2 (x @ local) = exclave_ requires_unyielding x
 
 [%%expect{|
-Line 1, characters 50-51:
-1 | let f2 (x @ local) = exclave_ requires_unyielding x
-                                                      ^
-Error: This value is "yielding" but is expected to be "unyielding".
+val f2 : 'a @ local unyielding -> unit @ local = <fun>
 |}]
 
 let f3 (x @ yielding) = requires_unyielding x
