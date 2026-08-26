@@ -879,9 +879,28 @@ let cc =
     ~does_something:true
     run_cc
 
-let run_expect_once input_file principal log env ~backend =
+type expect_mode =
+  | Normal
+  | Principal
+  | Structured
+
+let run_expect_once input_file mode log env ~backend =
   let expect_flags = Sys.safe_getenv "EXPECT_FLAGS" in
-  let principal_flag = if principal then "-principal" else "" in
+  let automatic_structured_diagnostics =
+    match
+      mode,
+      Environments.lookup_as_bool Ocaml_variables.structured_diagnostics env
+    with
+    | (Normal | Structured), Some true ->
+      "-automatic-structured-diagnostics"
+    | (Normal | Structured), (None | Some false) | Principal, _ -> ""
+  in
+  let mode_flag =
+    match mode with
+    | Normal -> ""
+    | Principal -> "-principal"
+    | Structured -> "-structured-diagnostics"
+  in
   let command =
     match (backend : Ocaml_backends.t) with
     | Bytecode -> Ocaml_commands.expect
@@ -898,7 +917,8 @@ let run_expect_once input_file principal log env ~backend =
     directory_flags env;
     Ocaml_flags.include_toplevel_directory;
     flags env;
-    principal_flag;
+    automatic_structured_diagnostics;
+    mode_flag;
     libraries backend env;
     binary_modules backend env;
     input_file
@@ -907,42 +927,60 @@ let run_expect_once input_file principal log env ~backend =
   let exit_status =
     Actions_helpers.run_cmd ~environment:default_ocaml_env log env commandline
   in
-  if exit_status=0 then (Result.pass, env, ~needs_principal:false)
-  else if exit_status=3 then (Result.pass, env, ~needs_principal:true)
-  else begin
+  match exit_status with
+  | 0 ->
+    (Result.pass, env, ~needs_principal:false, ~needs_structured:false)
+  | 3 ->
+    (Result.pass, env, ~needs_principal:true, ~needs_structured:false)
+  | 4 ->
+    (Result.pass, env, ~needs_principal:false, ~needs_structured:true)
+  | 7 ->
+    (Result.pass, env, ~needs_principal:true, ~needs_structured:true)
+  | _ ->
     let reason = (Actions_helpers.mkreason
       "expect" (String.concat " " commandline) exit_status) in
-    (Result.fail_with_reason reason, env, ~needs_principal:false)
-  end
+    (Result.fail_with_reason reason, env, ~needs_principal:false,
+     ~needs_structured:false)
 
-let run_expect_twice input_file log env ~backend =
+let run_expect_passes input_file log env ~backend =
   let corrected filename = Filename.make_filename filename "corrected" in
-  let (result1, env1, ~needs_principal) =
-    run_expect_once input_file false log env ~backend
+  let (result1, env1, ~needs_principal, ~needs_structured) =
+    run_expect_once input_file Normal log env ~backend
   in
   if Result.is_pass result1 then begin
     let intermediate_file = corrected input_file in
-    let (result2, env2, output_file) =
+    let (result2, env2, structured_input) =
       if needs_principal then
         let (result2, env2, ..) =
-          run_expect_once intermediate_file true log env1 ~backend
+          run_expect_once intermediate_file Principal log env1 ~backend
         in
         (result2, env2, corrected intermediate_file)
       else (result1, env1, intermediate_file)
     in
     if Result.is_pass result2 then begin
-      let output_env = Environments.add_bindings
-      [
-        Builtin_variables.reference, input_file;
-        Builtin_variables.output, output_file
-      ] env2 in
-      (Result.pass, output_env)
+      let (result3, env3, output_file) =
+        if needs_structured then
+          let (result3, env3, ..) =
+            run_expect_once structured_input Structured log env2 ~backend
+          in
+          (result3, env3, corrected structured_input)
+        else (result2, env2, structured_input)
+      in
+      if not (Result.is_pass result3) then (result3, env3)
+      else begin
+        let output_env = Environments.add_bindings
+        [
+          Builtin_variables.reference, input_file;
+          Builtin_variables.output, output_file
+        ] env3 in
+        (Result.pass, output_env)
+      end
     end else (result2, env2)
   end else (result1, env1)
 
 let run_expect_with ~backend log env =
   let input_file = Actions_helpers.testfile env in
-  run_expect_twice input_file log env ~backend
+  run_expect_passes input_file log env ~backend
 
 let run_expect =
   Actions.make ~name:"run-expect" ~description:"Run expect test"
