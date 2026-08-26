@@ -4618,11 +4618,13 @@ and mcomp_unsafe_mode_crossing type_pairs env umc1 umc2 =
   | None, Some _ -> raise Incompatible
   | Some umc1, Some umc2 ->
     if
-      equal_unsafe_mode_crossing
+      Jkind.equal_unsafe_mode_crossing
         ~type_equal:(fun ty1 ty2 ->
           match mcomp type_pairs env ty1 ty2 with
           | () -> true
           | exception Incompatible -> false)
+        ~context:(mk_jkind_context_always_principal env)
+        env
         umc1 umc2
       then ()
       else raise Incompatible
