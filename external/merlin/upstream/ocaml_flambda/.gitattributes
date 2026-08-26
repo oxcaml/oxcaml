@@ -46,3 +46,5 @@ utils/symbol.ml* merlin-exclude
 utils/target_system.ml* merlin-exclude
 utils/targetint.ml* merlin-exclude
 utils/terminfo.ml* merlin-exclude
+file_formats/ir_config_fingerprint.ml merlin-exclude
+file_formats/ir_config_fingerprint.mli merlin-exclude
