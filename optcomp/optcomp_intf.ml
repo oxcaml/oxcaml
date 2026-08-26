@@ -32,16 +32,31 @@ open Compilenv
 
 type emit = Compile_common.info -> unit
 
-(* CR mvellacott: once implemented, document the effect of [keep_symbol_tables]
-   in the signature below. *)
+(** Rebuild one reaped compilation unit of a batch from its reaped Flambda data.
+    [paused_unit_infos] is the contents of the unit's paused .cmx file.
+    [Compilenv.reset] must have been called for the unit first.
 
-(** Rebuild a reaped compilation unit from its reaped Flambda data. *)
-type compile_from_reaped_flambda =
+    The identifier tables are shared by the whole batch, so [keep_symbol_tables]
+    must be [true] for all but the last unit of the batch. [may_reduce_heap]
+    permits compacting the heap before running the external assembler; it should
+    only be set for the last unit, since compaction is expensive and the shared
+    state stays live until the batch is finished. *)
+type rebuild_unit_from_reaped_flambda =
   keep_symbol_tables:bool ->
-  ltosol_file:string ->
+  may_reduce_heap:bool ->
   cmr_file:string ->
+  paused_unit_infos:Cmx_format.unit_infos ->
   Compile_common.info ->
   unit
+
+(** Create the state shared by a batch of reaped compilation unit rebuilds,
+    resumed from the given .ltosol file. [batch_members] must be the compilation
+    units of the batch, and the returned function must be called once per
+    member, in dependency order (dependencies first). *)
+type compile_from_reaped_flambda =
+  ltosol_file:string ->
+  batch_members:Compilation_unit.t list ->
+  rebuild_unit_from_reaped_flambda
 
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular

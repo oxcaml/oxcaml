@@ -84,10 +84,13 @@ let current_generic_fns () = current_unit.uib_generic_fns
 
 let current_sections () = current_unit.uib_file_sections
 
-let reset unit_info =
+let reset ?(keep_cmx_caches = false) unit_info =
   let compilation_unit = Unit_info.modname unit_info in
-  Infos_table.clear global_infos_table;
-  Zero_alloc_info.reset cached_zero_alloc_info;
+  if not keep_cmx_caches
+  then begin
+    Infos_table.clear global_infos_table;
+    Zero_alloc_info.reset cached_zero_alloc_info
+  end;
   Env.set_current_unit unit_info;
   current_unit.uib_unit <- compilation_unit;
   current_unit.uib_defines <- [compilation_unit];

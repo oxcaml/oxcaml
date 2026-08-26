@@ -465,96 +465,135 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
     ~solution
 
-let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
-    ~keep_symbol_tables ~ltosol_filename ~cmr_filename ~paused_imports_cmx =
+let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
+  (* Everything up to the function returned below is computed once and shared by
+     the whole batch of rebuilds. *)
   let { Flambda2_reaper.Ltosol_format.File_contents.id_stamp_counters;
         participants;
         solution = ltosol_solution
       } =
-    Flambda2_reaper.Ltosol_format.load ltosol_filename
+    Profile.record_call ~accumulate:true "ltosol_load" (fun () ->
+        Flambda2_reaper.Ltosol_format.load ltosol_filename)
   in
   Flambda2_reaper.Id_stamp_counters.restore_for_resume id_stamp_counters;
   Compilenv.set_lto_participants participants;
-  (* We expect the stamp counters in the .cmr file to be less than the counters
-     in the .ltosol file, because the -reaper-solve invocation begins by taking
-     the maximum counters across the .cmr files it reads. Therefore, we can
-     ignore these counters. *)
-  let cmr_serialisable, (_ : Flambda2_reaper.Id_stamp_counters.t) =
-    Flambda2_reaper.Cmr_format.load cmr_filename
+  (* Deserialised on first use, which is after the first member's .cmr has been
+     deserialised. This matches the identifier creation order of the
+     pre-batching rebuild, keeping the first member's output identical to what
+     separate invocations produce (under -dcanonical-ids, this makes a reaped
+     unit that the Reaper didn't change byte-identical to a plain compile, see
+     testsuite/tests/lto). Later members share the already-forced solution. *)
+  let solved_dep =
+    lazy
+      (Profile.record_call ~accumulate:true "ltosol_deserialise" (fun () ->
+           Flambda2_reaper.Ltosol_format.Serialisable_solution.deserialise
+             ltosol_solution))
   in
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
-  let { Flambda2_reaper.Cmr_format.unit_metadata;
-        final_typing_env;
-        all_code;
-        deps = _;
-        rebuild_data
-      } =
-    Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
-      ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
-      cmr_serialisable
+  (* Members of the batch whose rebuild has not started yet. Their .reaped.cmx
+     files have not been written by this batch (any such file present on disk is
+     stale), so needing one means the batch was not in dependency order. The
+     direct imports of each member are checked upfront by the driver code; this
+     check also catches violations via indirect dependencies. *)
+  let pending_members = ref (Compilation_unit.Set.of_list batch_members) in
+  let load_cmx_file_contents comp_unit =
+    if Compilation_unit.Set.mem comp_unit !pending_members
+    then
+      Misc.fatal_errorf
+        "-reaper-rebuild: unit %a is needed before its own rebuild; the .cmr \
+         files were not given in dependency order"
+        (Format_doc.compat Compilation_unit.print)
+        comp_unit;
+    Flambda_cmx.load_cmx_file_contents cmx_loader comp_unit
   in
-  (* We need post-rebuild exported offsets, code metadata and value slot usage
-     from our dependencies that participate in LTO. To make sure we get the
-     right version, we load all our transitive dependencies eagerly before
-     resuming compilation.
-
-     CR mvellacott: For performance, we should look at alternatives to eagerly
-     loading everything. *)
-  let () =
-    let rec load_transitively loaded imports =
-      List.fold_left
-        (fun loaded import ->
-          let comp_unit = Import_info.cu import in
-          if Compilation_unit.Set.mem comp_unit loaded
-          then loaded
-          else
-            let loaded = Compilation_unit.Set.add comp_unit loaded in
-            let (_ : Flambda2_types.Typing_env.Serializable.t option) =
-              Flambda_cmx.load_cmx_file_contents cmx_loader comp_unit
-            in
-            load_transitively loaded (Compilenv.get_unit_imports comp_unit))
-        loaded imports
+  (* Visited set for the eager transitive loading below, shared across the batch
+     so that each dependency is only visited once. *)
+  let loaded_transitively = ref Compilation_unit.Set.empty in
+  fun ~keep_symbol_tables
+    ~cmr_filename
+    ~paused_imports_cmx
+    ~ppf_dump:_
+    ~prefixname:_
+  ->
+    pending_members
+      := Compilation_unit.Set.remove
+           (Current_unit.get_cu_exn ())
+           !pending_members;
+    (* We expect the stamp counters in the .cmr file to be less than the
+       counters in the .ltosol file, because the -reaper-solve invocation begins
+       by taking the maximum counters across the .cmr files it reads. Therefore,
+       we can ignore these counters. *)
+    let cmr_serialisable, (_ : Flambda2_reaper.Id_stamp_counters.t) =
+      Profile.record_call ~accumulate:true "cmr_load" (fun () ->
+          Flambda2_reaper.Cmr_format.load cmr_filename)
     in
-    ignore
-      (load_transitively Compilation_unit.Set.empty paused_imports_cmx
-        : Compilation_unit.Set.t)
-  in
-  (* CR mvellacott: add profiling and debug printing code. *)
-  let solved_dep =
-    Flambda2_reaper.Ltosol_format.Serialisable_solution.deserialise
-      ltosol_solution
-  in
-  let flambda, free_names, all_code, slot_offsets, final_typing_env =
-    Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
-      ~traverse_rebuild:rebuild_data ~solved_dep ~machine_width ~cmx_loader
-      ~all_code ~final_typing_env
-  in
-  let { unit = flambda;
-        exported_offsets = offsets;
-        cmx;
-        all_code;
-        used_value_slots = _;
-        reachable_names
-      } =
-    build_run_result flambda ~free_names
-      ~final_typing_env
-        (* Pass a mutable reference to the (currently empty) list of .cmx
-           sections so that [build_run_result] can append the sections that it
-           creates. *)
-      ~sections:(Compilenv.current_sections ())
-      ~all_code
-        (* The rebuild may have renamed or eliminated slots that the paused
-           process assigned offsets to, but other participants' rebuild data may
-           still reference those slots (e.g. via sets of closures inlined from
-           this unit before the rebuild), and this unit's .cmx file is the only
-           place they can find the offsets. *)
-      ~offsets_from_paused_process:
-        (Some
-           (Flambda2_reaper.Cmr_format.Serialisable.exported_offsets
-              cmr_serialisable))
-      slot_offsets
-  in
-  Option.iter Compilenv.set_export_info cmx;
-  Compiler_hooks.execute Reaped_flambda2 flambda;
-  flambda_result_to_cmm ~keep_symbol_tables
-    { flambda; all_code; offsets; reachable_names }
+    let { Flambda2_reaper.Cmr_format.unit_metadata;
+          final_typing_env;
+          all_code;
+          deps = _;
+          rebuild_data
+        } =
+      Profile.record_call ~accumulate:true "cmr_deserialise" (fun () ->
+          Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
+            ~resolver:load_cmx_file_contents cmr_serialisable)
+    in
+    (* We need post-rebuild exported offsets, code metadata and value slot usage
+       from our dependencies that participate in LTO. To make sure we get the
+       right version, we load all our transitive dependencies eagerly before
+       resuming compilation.
+
+       CR mvellacott: For performance, we should look at alternatives to eagerly
+       loading everything. *)
+    let () =
+      let rec load_transitively imports =
+        List.iter
+          (fun import ->
+            let comp_unit = Import_info.cu import in
+            if not (Compilation_unit.Set.mem comp_unit !loaded_transitively)
+            then (
+              loaded_transitively
+                := Compilation_unit.Set.add comp_unit !loaded_transitively;
+              let (_ : Flambda2_types.Typing_env.Serializable.t option) =
+                load_cmx_file_contents comp_unit
+              in
+              load_transitively (Compilenv.get_unit_imports comp_unit)))
+          imports
+      in
+      load_transitively paused_imports_cmx
+    in
+    let solved_dep = Lazy.force solved_dep in
+    (* CR mvellacott: add debug printing code. *)
+    let flambda, free_names, all_code, slot_offsets, final_typing_env =
+      Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
+        ~traverse_rebuild:rebuild_data ~solved_dep ~machine_width ~cmx_loader
+        ~all_code ~final_typing_env
+    in
+    let { unit = flambda;
+          exported_offsets = offsets;
+          cmx;
+          all_code;
+          used_value_slots = _;
+          reachable_names
+        } =
+      build_run_result flambda ~free_names
+        ~final_typing_env
+          (* Pass a mutable reference to the (currently empty) list of .cmx
+             sections so that [build_run_result] can append the sections that it
+             creates. *)
+        ~sections:(Compilenv.current_sections ())
+        ~all_code
+          (* The rebuild may have renamed or eliminated slots that the paused
+             process assigned offsets to, but other participants' rebuild data
+             may still reference those slots (e.g. via sets of closures inlined
+             from this unit before the rebuild), and this unit's .cmx file is
+             the only place they can find the offsets. *)
+        ~offsets_from_paused_process:
+          (Some
+             (Flambda2_reaper.Cmr_format.Serialisable.exported_offsets
+                cmr_serialisable))
+        slot_offsets
+    in
+    Option.iter Compilenv.set_export_info cmx;
+    Compiler_hooks.execute Reaped_flambda2 flambda;
+    flambda_result_to_cmm ~keep_symbol_tables
+      { flambda; all_code; offsets; reachable_names }

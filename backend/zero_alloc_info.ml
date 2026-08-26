@@ -10,8 +10,14 @@ let create () = { zero_alloc = String.Map.empty }
 let reset t = t.zero_alloc <- String.Map.empty
 
 let merge src ~into:dst =
+  (* Equal bindings for the same function can legitimately be merged twice, e.g.
+     during a batched reaper rebuild, where a unit's info is recorded when the
+     unit is compiled and read back when a later unit of the batch imports the
+     freshly written .cmx. Conflicting bindings indicate a bug. *)
   let join key b1 b2 =
-    Misc.fatal_errorf "Unexpected merge %s %d %d" key b1 b2
+    if b1 = b2
+    then Some b1
+    else Misc.fatal_errorf "Unexpected merge %s %d %d" key b1 b2
   in
   dst.zero_alloc <- String.Map.union join dst.zero_alloc src.zero_alloc
 
