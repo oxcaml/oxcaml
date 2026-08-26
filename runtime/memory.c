@@ -323,13 +323,9 @@ CAMLprim value caml_atomic_make(value v)
 CAMLprim value caml_atomic_load_field (value obj, value vfield)
 {
   intnat field = Long_val(vfield);
-  if (caml_domain_alone()) {
-    return Field(obj, field);
-  } else {
-    /* See Note [MM] above */
-    atomic_thread_fence(memory_order_acquire);
-    return atomic_load(&Op_atomic_val(obj)[field]);
-  }
+  /* See Note [MM] above */
+  atomic_thread_fence(memory_order_acquire);
+  return atomic_load(&Op_atomic_val(obj)[field]);
 }
 
 CAMLprim value caml_atomic_load (value ref)
@@ -365,15 +361,10 @@ Caml_inline void write_barrier_local(
 static value atomic_exchange_field (value obj, intnat field, value v)
 {
   value ret;
-  if (caml_domain_alone()) {
-    ret = Field(obj, field);
-    Field(obj, field) = v;
-  } else {
-    /* See Note [MM] above */
-    atomic_thread_fence(memory_order_acquire);
-    ret = atomic_exchange(&Op_atomic_val(obj)[field], v);
-    atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
-  }
+  /* See Note [MM] above */
+  atomic_thread_fence(memory_order_acquire);
+  ret = atomic_exchange(&Op_atomic_val(obj)[field], v);
+  atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return ret;
 }
 
@@ -381,9 +372,12 @@ CAMLprim value caml_atomic_exchange_field (value obj, value vfield, value v)
 {
   intnat field = Long_val(vfield);
   value ret;
-  CAMLassert(Color_val(obj) != NOT_MARKABLE);
+  /* if [obj] is null, then [field] lives off-heap and is not scanned by GC */
+  CAMLassert(Is_null(obj) || Color_val(obj) != NOT_MARKABLE);
   ret = atomic_exchange_field(obj, field, v);
-  write_barrier(obj, field, ret, v);
+  if (!Is_null(obj))
+    /* [obj->field] is externally-managed memory */
+    write_barrier(obj, field, ret, v);
   return ret;
 }
 
@@ -392,7 +386,8 @@ CAMLprim value caml_atomic_exchange_field_local (value obj, value vfield,
 {
   intnat field = Long_val(vfield);
   value ret = atomic_exchange_field(obj, field, v);
-  write_barrier_local(obj, field, ret, v);
+  if (!Is_null(obj))
+    write_barrier_local(obj, field, ret, v);
   return ret;
 }
 
@@ -416,22 +411,10 @@ CAMLprim value caml_atomic_set(value ref, value v)
 static value atomic_compare_exchange_field (
   value obj, intnat field, value oldv, value newv, int* success)
 {
-  if (caml_domain_alone()) {
-    value* p = &Op_val(obj)[field];
-    if (*p == oldv) {
-      *p = newv;
-      *success = 1;
-      return oldv;
-    } else {
-      *success = 0;
-      return *p;
-    }
-  } else {
-    atomic_value* p = &Op_atomic_val(obj)[field];
-    *success = atomic_compare_exchange_strong(p, &oldv, newv);
-    atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
-    return oldv;
-  }
+  atomic_value* p = &Op_atomic_val(obj)[field];
+  *success = atomic_compare_exchange_strong(p, &oldv, newv);
+  atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
+  return oldv;
 }
 
 CAMLprim value caml_atomic_compare_exchange_field (
@@ -440,9 +423,9 @@ CAMLprim value caml_atomic_compare_exchange_field (
   intnat field = Long_val(vfield);
   int success;
   value ret;
-  CAMLassert(Color_val(obj) != NOT_MARKABLE);
+  CAMLassert(Is_null(obj) || Color_val(obj) != NOT_MARKABLE);
   ret = atomic_compare_exchange_field(obj, field, oldv, newv, &success);
-  if (success) {
+  if (success && !Is_null(obj)) {
     write_barrier(obj, field, ret, newv);
   }
   return ret;
@@ -454,7 +437,7 @@ CAMLprim value caml_atomic_compare_exchange_field_local (
   intnat field = Long_val(vfield);
   int success;
   value ret = atomic_compare_exchange_field(obj, field, oldv, newv, &success);
-  if (success) {
+  if (success && !Is_null(obj)) {
     write_barrier_local(obj, field, ret, newv);
   }
   return ret;
@@ -494,18 +477,9 @@ CAMLprim value caml_atomic_cas(value ref, value oldv, value newv)
 CAMLprim value caml_atomic_fetch_add_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
-  value ret;
-  if (caml_domain_alone()) {
-    value* p = &Op_val(obj)[field];
-    ret = *p;
-    CAMLassert(Is_long(ret));
-    *p = Val_long(Long_val(ret) + Long_val(incr));
-    /* no write barrier needed, integer write */
-  } else {
-    atomic_value *p = &Op_atomic_val(obj)[field];
-    ret = atomic_fetch_add(p, 2 * Long_val(incr));
-    atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
-  }
+  atomic_value *p = &Op_atomic_val(obj)[field];
+  value ret = atomic_fetch_add(p, 2 * Long_val(incr));
+  atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return ret;
 }
 
@@ -517,16 +491,9 @@ CAMLprim value caml_atomic_fetch_add (value ref, value incr)
 CAMLprim value caml_atomic_add_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
-  if (caml_domain_alone()) {
-    value* p = &Op_val(obj)[field];
-    CAMLassert(Is_long(*p));
-    *p = Val_long(Long_val(*p) + Long_val(incr));
-    /* no write barrier needed, integer write */
-  } else {
-    atomic_value *p = &Op_atomic_val(obj)[field];
-    atomic_fetch_add(p, 2*Long_val(incr)); /* ignore the result */
-    atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
-  }
+  atomic_value *p = &Op_atomic_val(obj)[field];
+  atomic_fetch_add(p, 2*Long_val(incr)); /* ignore the result */
+  atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
 }
 
@@ -538,16 +505,9 @@ CAMLprim value caml_atomic_add(value obj, value incr)
 CAMLprim value caml_atomic_sub_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
-  if (caml_domain_alone()) {
-    value* p = &Op_val(obj)[field];
-    CAMLassert(Is_long(*p));
-    *p = Val_long(Long_val(*p) - Long_val(incr));
-    /* no write barrier needed, integer write */
-  } else {
-    atomic_value *p = &Op_atomic_val(obj)[field];
-    atomic_fetch_sub(p, 2*Long_val(incr)); /* ignore the result */
-    atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
-  }
+  atomic_value *p = &Op_atomic_val(obj)[field];
+  atomic_fetch_sub(p, 2*Long_val(incr)); /* ignore the result */
+  atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
 }
 
@@ -559,16 +519,9 @@ CAMLprim value caml_atomic_sub(value obj, value incr)
 CAMLprim value caml_atomic_land_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
-  if (caml_domain_alone()) {
-    value* p = &Op_val(obj)[field];
-    CAMLassert(Is_long(*p));
-    *p = Val_long(Long_val(*p) & Long_val(incr));
-    /* no write barrier needed, integer write */
-  } else {
-    atomic_value *p = &Op_atomic_val(obj)[field];
-    atomic_fetch_and(p, incr); /* ignore the result */
-    atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
-  }
+  atomic_value *p = &Op_atomic_val(obj)[field];
+  atomic_fetch_and(p, incr); /* ignore the result */
+  atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
 }
 
@@ -580,16 +533,9 @@ CAMLprim value caml_atomic_land(value obj, value incr)
 CAMLprim value caml_atomic_lor_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
-  if (caml_domain_alone()) {
-    value* p = &Op_val(obj)[field];
-    CAMLassert(Is_long(*p));
-    *p = Val_long(Long_val(*p) | Long_val(incr));
-    /* no write barrier needed, integer write */
-  } else {
-    atomic_value *p = &Op_atomic_val(obj)[field];
-    atomic_fetch_or(p, incr); /* ignore the result */
-    atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
-  }
+  atomic_value *p = &Op_atomic_val(obj)[field];
+  atomic_fetch_or(p, incr); /* ignore the result */
+  atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
 }
 
@@ -601,16 +547,9 @@ CAMLprim value caml_atomic_lor(value obj, value incr)
 CAMLprim value caml_atomic_lxor_field (value obj, value vfield, value incr)
 {
   intnat field = Long_val(vfield);
-  if (caml_domain_alone()) {
-    value* p = &Op_val(obj)[field];
-    CAMLassert(Is_long(*p));
-    *p = Val_long(Long_val(*p) ^ Long_val(incr));
-    /* no write barrier needed, integer write */
-  } else {
-    atomic_value *p = &Op_atomic_val(obj)[field];
-    atomic_fetch_xor(p, 2*Long_val(incr)); /* ignore the result */
-    atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
-  }
+  atomic_value *p = &Op_atomic_val(obj)[field];
+  atomic_fetch_xor(p, 2*Long_val(incr)); /* ignore the result */
+  atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   return Val_unit;
 }
 

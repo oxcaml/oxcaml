@@ -578,6 +578,10 @@ and fracture_prim lambda prim args loc =
   | Patomic_set_ptr _ | Patomic_exchange_ptr _ | Patomic_compare_exchange_ptr _
   | Patomic_compare_set_ptr _ | Patomic_fetch_add_ptr | Patomic_add_ptr
   | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr
+  | Patomic_load_ext_ptr _ | Patomic_set_ext_ptr _ | Patomic_exchange_ext_ptr _
+  | Patomic_compare_exchange_ext_ptr _ | Patomic_compare_set_ext_ptr _
+  | Patomic_fetch_add_ext_ptr | Patomic_add_ext_ptr | Patomic_sub_ext_ptr
+  | Patomic_land_ext_ptr | Patomic_lor_ext_ptr | Patomic_lxor_ext_ptr
   | Popaque _ | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _ | Punbox_unit
   | Punbox_vector _ | Pbox_vector _ | Punbox_mask | Pbox_mask _ | Pjoin_vec256
   | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _

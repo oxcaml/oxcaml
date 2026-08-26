@@ -1320,8 +1320,13 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
       | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
       | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr
-      | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr | Pdls_get
-      | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
+      | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr
+      | Patomic_load_ext_ptr _ | Patomic_set_ext_ptr _
+      | Patomic_exchange_ext_ptr _ | Patomic_compare_exchange_ext_ptr _
+      | Patomic_compare_set_ext_ptr _ | Patomic_fetch_add_ext_ptr
+      | Patomic_add_ext_ptr | Patomic_sub_ext_ptr | Patomic_land_ext_ptr
+      | Patomic_lor_ext_ptr | Patomic_lxor_ext_ptr | Pdls_get | Ptls_get
+      | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _

@@ -1,0 +1,41 @@
+Test 1: int field (immediate), heap block
+  load: expected 20, got 20
+  set 30; load: expected 30, got 30
+  exchange 40: expected 30, got 30
+  cas 40 50: expected true, got true
+  cas 40 60: expected false, got false
+  compare_exchange 50 60: expected 50, got 50
+  compare_exchange 50 70: expected 60, got 60
+  fetch_add 5: expected 60, got 60
+  add 10; load: expected 75, got 75
+  sub 25; load: expected 50, got 50
+  land 0b011; load: expected 2, got 2
+  lor 0b101; load: expected 7, got 7
+  lxor 0b110; load: expected 1, got 1
+  final: expected (10, 1), got (10, 1)
+Test 2: string field (pointer), heap block
+  load: expected one, got one
+  set two; load: expected two, got two
+  exchange three: expected two, got two
+  cas three four: expected true, got true
+  cas three five: expected false, got false
+  compare_exchange four six: expected four, got four
+  final: expected (10, six), got (10, six)
+Test 3: int field (immediate), stack block
+  load: expected 20, got 20
+  exchange 40: expected 30, got 30
+  fetch_add 5: expected 40, got 40
+  final: expected (10, 45), got (10, 45)
+Test 4: string field (pointer), stack block
+  load: expected one, got one
+  exchange three: expected two, got two
+  cas three four: expected true, got true
+  final: expected (10, four), got (10, four)
+Test 5: mixed block (int and string fields)
+  load y: expected 20, got 20
+  exchange y 40: expected 30, got 30
+  fetch_add y 5: expected 40, got 40
+  load z: expected one, got one
+  exchange z three: expected two, got two
+  cas z three four: expected true, got true
+  final: expected (42, 10, 45, four), got (42, 10, 45, four)
