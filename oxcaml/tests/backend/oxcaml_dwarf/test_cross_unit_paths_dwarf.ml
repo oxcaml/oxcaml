@@ -1,5 +1,5 @@
-(* [Cu_prim] was compiled from a foreign source with this file's basename.
-   The interface's ordinary [val] forces a whole-unit primitive wrapper. *)
+(* [Cu_prim] was compiled from a foreign source with this file's basename. The
+   interface's ordinary [val] forces a whole-unit primitive wrapper. *)
 include Cu_prim
 
 let[@inline never] [@local never] f_start () = ()

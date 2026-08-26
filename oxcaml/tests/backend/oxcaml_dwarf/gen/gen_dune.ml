@@ -115,8 +115,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
      The custom rule below instead compiles the modules of [lib_modules] from
      within [lib_dir] -- each unit with a [-directory] argument identifying its
      source directory, as directory-at-a-time build systems do -- and then
-     compiles and links [name] manually.  Each [lib_modules] entry pairs a
-     source basename with the compilation-unit name to pass to [-o]. *)
+     compiles and links [name] manually. Each [lib_modules] entry pairs a source
+     basename with the compilation-unit name to pass to [-o]. *)
   let print_cross_unit_dwarf_python_test name ~lib_dir ~lib_modules =
     (* [(:include ...)] is only available in field position, so the flags in
        ocamlopt_flags.sexp cannot be spliced directly into the rule's action.
@@ -209,6 +209,5 @@ ${lib_compile_runs}))
     ~lib_modules:
       [ "cu_lib_inner", "cu_lib_inner";
         "cu_lib_outer", "cu_lib_outer";
-        "test_cross_unit_paths_dwarf", "cu_prim"
-      ];
+        "test_cross_unit_paths_dwarf", "cu_prim" ];
   ()
