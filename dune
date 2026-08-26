@@ -1048,6 +1048,7 @@
  (name merlin-support)
  (deps
   (glob_files .ocamlcommon.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamljcomp.objs/byte/*.{cmi,cmt,cmti})
