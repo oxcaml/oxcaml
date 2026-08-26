@@ -407,7 +407,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
         in
         let result_var_duid = Flambda_debug_uid.none in
         BP.create result_var kind_with_subkind result_var_duid)
-      (Flambda_arity.unarized_components result_arity)
+      (Flambda_arity.unarize result_arity)
     |> Bound_parameters.create
   in
   let { params;
