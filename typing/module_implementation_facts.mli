@@ -190,7 +190,6 @@ val union : t -> t -> t
     an explicit interface. [argument_interface] identifies the parameter module
     whose interface this unit was additionally checked against, when compiling
     with [-as-argument-for]. *)
-
 val of_implementation :
   Compilation_unit.t ->
   module_pairs:(implementation:Shape.Uid.t * interface:Shape.Uid.t) list ->
