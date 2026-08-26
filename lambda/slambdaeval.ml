@@ -294,8 +294,8 @@ module Ctx = struct
   type t =
     { cu_static_data : Compilation_unit.t -> CU_data.t option;
       store : Template_store.t;
-      instantiations : lambda Ident.Tbl.t;
-      mutable instantiation_order : Ident.t list
+      mutable instantiated_template_ids : Ident.Set.t;
+      mutable instantiations : (Ident.t * lambda) list
     }
 
   let create ~cu_static_data =
@@ -303,8 +303,8 @@ module Ctx = struct
     { cu_static_data =
         (fun cu -> Compilation_unit.Tbl.memoize cu_data_cache cu_static_data cu);
       store = Template_store.empty ();
-      instantiations = Ident.Tbl.create 10;
-      instantiation_order = []
+      instantiated_template_ids = Ident.Set.empty;
+      instantiations = []
     }
 
   let cu_static_data t cu =
@@ -312,7 +312,12 @@ module Ctx = struct
     | Some { cu; _ } -> cu
     | None -> Or_missing.Missing
 
-  let instantiate t (id : Template_id.t) args f : Types.value Or_missing.t =
+  (** Instantiate a template. This is memoized so if this template has already
+      been instantiated with these arguments it just returns the previously
+      computed results, otherwise it uses [eval_apply] to evaluate the closure.
+      The returned runtime half is a reference to the instantiated function. *)
+  let instantiate t ~eval_apply (id : Template_id.t) args :
+      Types.value Or_missing.t =
     let closure =
       match Template_store.find_template t.store id with
       | Some closure -> closure
@@ -338,21 +343,18 @@ module Ctx = struct
         arg_names
       |> Ident.create_persistent
     in
-    if not (Ident.Tbl.mem t.instantiations name)
+    if not (Ident.Set.mem name t.instantiated_template_ids)
     then begin
       (* f might recursively call this function so make sure to mark this name
          as visited before calling it. *)
-      Ident.Tbl.replace t.instantiations name Lambda.dummy_constant;
-      let lam = f closure args in
-      Ident.Tbl.replace t.instantiations name lam;
-      t.instantiation_order <- name :: t.instantiation_order
+      t.instantiated_template_ids
+        <- Ident.Set.add name t.instantiated_template_ids;
+      let lam = eval_apply closure args in
+      t.instantiations <- (name, lam) :: t.instantiations
     end;
     Present (SLVhalves { slv_comptime = Missing; slv_runtime = Lvar name })
 
-  let instantiations t =
-    List.map
-      (fun id -> id, Ident.Tbl.find t.instantiations id)
-      t.instantiation_order
+  let instantiations t = t.instantiations
 end
 
 include Types
@@ -442,7 +444,7 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
     let eval_arg arg = eval_slam ctx env arg |> expect_not_missing in
     let args = Array.map eval_arg sapp_args in
     Ctx.instantiate ctx closure args
-      (fun { clo_params; clo_body; clo_env } args ->
+      ~eval_apply:(fun { clo_params; clo_body; clo_env } args ->
         let env_body =
           Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
         in
