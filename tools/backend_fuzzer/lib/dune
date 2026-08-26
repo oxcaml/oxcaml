@@ -1,0 +1,3 @@
+(library
+ (name backend_fuzzer_lib)
+ (libraries ocamloptcomp))
