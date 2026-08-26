@@ -13,7 +13,7 @@
    r_int.mli r_int.ml \
    foo_r.mli foo_r.ml foo_r__.ml \
    nested_r.mli nested_r.ml nested_r__.ml \
-   main_nested_r.ml nested_r_native.reference \
+   main_nested_r.ml test_functorize_nested_r.reference \
  ";
 
  setup-ocamlopt.byte-build-env;
@@ -343,17 +343,8 @@
       block) are physically reordered ahead of the flat suffix.  When
       the bundle runs, [R_impl(P)]'s main block must be projected with
       [mod_field] at [arg_block_idx] — using the block's mixed
-      representation — to yield [R_impl]'s arg block before being
-      passed to [Foo_r]'s functor.
-
-      CURRENT BEHAVIOR (bug): the projection uses
-      [arg_descr.main_repr] from the base artifact, which for a
-      parameterised argument unit is the 1-field
-      instantiating-functor wrapper repr, not the instance block's
-      mixed repr — so a plain [Pfield] is emitted at the arg block's
-      logical index.  Bytecode is insensitive to this and works; in
-      native code flambda2 flags the value/flat mismatch and the
-      program traps at run time (see [nested_r_native.reference]). *)
+      representation ([mb_returned_repr]) — to yield [R_impl]'s arg
+      block before being passed to [Foo_r]'s functor. *)
 
    (* Parameter R and argument R_int. *)
 
@@ -436,12 +427,12 @@
    ";
    ocamlopt.byte;
 
-   script = "sh -c './test_functorize_nested_r.exe > nested_r.result 2>&1; \
-                    echo exit=$? >> nested_r.result'";
-   script;
+   stdout = "test_functorize_nested_r.output";
+   stderr = "test_functorize_nested_r.output";
+   output = "test_functorize_nested_r.output";
+   run;
 
-   output = "nested_r.result";
-   reference = "nested_r_native.reference";
+   reference = "test_functorize_nested_r.reference";
    check-program-output;
  }
 *)
