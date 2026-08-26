@@ -161,8 +161,7 @@ let foo () =
      (function {nlocal = 1} param/5[L][value<int>] : stack
        (apply[L] fst_local/0 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/7))
-val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local dynamic] =
-  <fun>
+val foo : unit @ 'n -> 'a @ 'm -> int @ [> local] = <fun>
 |}]
 
 

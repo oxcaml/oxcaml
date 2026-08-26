@@ -993,20 +993,21 @@ end = struct
 end
 
 (** A mode as seen by printing: either a determined constant, or a
-    comonadic mode kept generic. Along an arrow chain, the accumulated curry
-    mode is a constant until a generic mode variable is encountered. *)
+    generic comonadic mode. Along an arrow chain, the accumulated curry
+    mode is a constant until a generic mode variable is encountered.
+
+    A generic accumulator is the currying fold evaluated twice: the
+    argument modes themselves ([Ctype.curry_mode]), and their constant upper
+    bounds ([Ctype.curry_mode_const]). *)
 type const_or_generic =
   | Const of Alloc.Const.t
-  | Generic of Alloc.Comonadic.l
+  | Generic of Alloc.Comonadic.l * Alloc.Const.t
 
-(** The constant content: exact for [Const], the floor (with legacy
-    monadic) for [Generic]. *)
-let floor_const : const_or_generic -> Alloc.Const.t = function
+(** The upper bound of a const_or_generic: exact for [Const],
+    the constant upper bound for [Generic] *)
+let const_or_generic_upper : const_or_generic -> Alloc.Const.t = function
   | Const c -> c
-  | Generic acc ->
-    Alloc.Const.merge
-      { comonadic = Alloc.Comonadic.Guts.get_floor acc;
-        monadic = Alloc.Monadic.Const.legacy }
+  | Generic (_, bound) -> bound
 
 (** Extends the curry accumulator with the argument mode [marg] of an
     arrow. *)
@@ -1014,14 +1015,18 @@ let curry_acc : const_or_generic -> Alloc.lr -> const_or_generic =
   fun acc marg ->
     match acc, Alloc.zap_to_legacy ~arg:true marg with
     | Const acc, Some arg -> Const (Ctype.curry_mode_const acc arg)
-    | Generic acc, _ -> Generic (Ctype.curry_mode acc marg)
+    | Generic (acc, bound), _ ->
+      Generic
+        (Ctype.curry_mode acc marg,
+         Ctype.curry_mode_const bound (Alloc.Guts.get_ceil marg))
     | Const acc, None ->
       if mode_polymorphism_printing_enabled ()
       then
         Generic
           (Ctype.curry_mode
              (Alloc.Comonadic.of_const (Alloc.Const.partial_apply acc))
-             marg)
+             marg,
+           Ctype.curry_mode_const acc (Alloc.Guts.get_ceil marg))
       else
         Const
           (Ctype.curry_mode_const acc
@@ -1035,7 +1040,10 @@ let const_or_generic_of_mode : arg:bool -> Alloc.lr -> const_or_generic =
     | Some c -> Const c
     | None ->
       if mode_polymorphism_printing_enabled ()
-      then Generic (Alloc.Comonadic.disallow_right m.comonadic)
+      then
+        Generic
+          (Alloc.Comonadic.disallow_right m.comonadic,
+           Alloc.Guts.get_ceil m)
       else Const (Alloc.zap_to_legacy_force ~arg m)
 
 (** Whether the return mode [m] of an arrow agrees with the constant
@@ -1053,8 +1061,9 @@ let equate_with_curry_bounds : Alloc.lr -> const_or_generic -> bool =
        || not (mode_polymorphism_printing_enabled ())
     then
       Result.is_ok
-        (Alloc.equate m (Alloc.of_const (floor_const acc_mode)))
-    else Alloc.Guts.in_bounds (floor_const acc_mode) m
+        (Alloc.equate m (Alloc.of_const (const_or_generic_upper acc_mode)))
+    else
+      Alloc.Guts.in_bounds (const_or_generic_upper acc_mode) m
 
 let erase_implied_axes (modes : Mode.Alloc.Const.t) :
     Mode.Alloc.Const.Option.t =
@@ -2140,9 +2149,9 @@ end = struct
   let acc_heads (acc : const_or_generic) : boxedhead list =
     match acc with
     | Const _ -> []
-    | Generic mode ->
+    | Generic (acc, _) ->
       let head (Desc.Amorphvar (v, _)) = H v in
-      (match Alloc.get_comonadic_desc mode with
+      (match Alloc.get_comonadic_desc acc with
        | Amode _ -> []
        | Amodevar mv -> [head mv]
        | Amodejoin (_, mvs) -> List.map head mvs)
