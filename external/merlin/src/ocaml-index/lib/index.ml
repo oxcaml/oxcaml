@@ -382,15 +382,18 @@ let gather_shapes ~output_file files =
   let final_index =
     List.fold_left
       (fun into file ->
-        match Cache.read file with
-        | Cmt cmt_infos ->
-          merge_index ~store_shapes:true (shape_of_cmt cmt_infos) ~into
-        | Cms cms_infos ->
-          merge_index ~store_shapes:true (shape_of_cms cms_infos) ~into
-        | Index index -> merge_index ~store_shapes:true index ~into
-        | Unknown | (exception _) ->
-          Log.error "Not a valid file %S" file;
-          into)
+        let index =
+          match Cache.read file with
+          | Cmt cmt_infos -> Some (shape_of_cmt cmt_infos)
+          | Cms cms_infos -> Some (shape_of_cms cms_infos)
+          | Index index -> Some index
+          | Unknown | (exception _) ->
+            Log.error "Not a valid file %S" file;
+            None
+        in
+        match index with
+        | None -> into
+        | Some index -> merge_index ~store_shapes:true index ~into)
       initial_index files
   in
   write ~file:output_file final_index
