@@ -59,3 +59,5 @@ val error :
   loc:Location.t ->
   exn ->
   Structured_diagnostic.t option
+
+val enable_structured_diagnostics : unit -> unit

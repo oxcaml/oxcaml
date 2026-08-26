@@ -984,18 +984,26 @@ let default_report_printer () : report_printer =
 
 let report_printer = ref default_report_printer
 
-let print_report ppf report =
+type emitter = Format.formatter -> exn option -> report -> unit
+
+let text_emitter ppf _exn report =
   let printer = !report_printer () in
   printer.pp printer ppf report
+
+let emitter = ref text_emitter
+
+let set_emitter new_emitter = emitter := new_emitter
+
+let print_report_with_exn ppf exn report =
+  !emitter ppf exn report
+
+let print_report ppf report = print_report_with_exn ppf None report
 
 (******************************************************************************)
 (* Reporting errors *)
 
 type error = report
 type delayed_msg = unit -> Fmt.t option
-
-let report_error ppf err =
-  print_report ppf err
 
 let mkerror loc sub footnote txt =
   { kind = Report_error; main = { loc; txt }; sub; footnote=footnote () }
@@ -1178,7 +1186,7 @@ let report_exception ppf exn =
     match error_of_exn exn with
     | None -> reraise exn
     | Some `Already_displayed -> ()
-    | Some (`Ok err) -> report_error ppf err
+    | Some (`Ok err) -> print_report_with_exn ppf (Some exn) err
     | exception exn when n > 0 -> loop (n-1) exn
   in
   loop 5 exn

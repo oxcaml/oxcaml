@@ -94,8 +94,8 @@ let main unix argv ppf ~flambda2 =
          Compiler.ext_flambda_lib);
     with Arg.Bad msg ->
       begin
-        prerr_endline msg;
-        Clflags.print_arguments usage;
+        Compenv.report_message msg
+          ~usage:(fun () -> Clflags.print_arguments usage);
         exit 2
       end
     end;

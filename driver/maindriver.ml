@@ -40,8 +40,8 @@ let main argv ppf =
          ".cma");
     with Arg.Bad msg ->
       begin
-        prerr_endline msg;
-        Clflags.print_arguments program;
+        Compenv.report_message msg
+          ~usage:(fun () -> Clflags.print_arguments program);
         exit 2
       end
     end;
