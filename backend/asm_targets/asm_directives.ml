@@ -1188,6 +1188,19 @@ let delta_uleb128 ~upper ~lower =
   in
   emit (Delta_uleb128 { delta })
 
+(* The ULEB128-encoded distance from the [lower] symbol to the [upper] label
+   plus [upper_offset]. As for [delta_uleb128], the value must be a non-negative
+   assembly-time constant; the [lower] symbol must be in the current compilation
+   unit and in the same section as [upper]. *)
+let delta_uleb128_label_minus_symbol ~upper ~upper_offset ~lower =
+  let upper : Directive.Constant.t =
+    if Int64.equal upper_offset 0L
+    then Label upper
+    else Add (Label upper, Signed_int upper_offset)
+  in
+  let delta = Directive.Constant.Sub (upper, Symbol lower) in
+  emit (Delta_uleb128 { delta })
+
 let between_labels_32_bit_with_offsets ?comment:_comment ~upper ~upper_offset
     ~lower ~lower_offset () =
   Option.iter comment _comment;

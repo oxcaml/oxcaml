@@ -31,6 +31,11 @@ val create : unit -> t
     location list entry. *)
 val add : ?adjustment:int -> t -> Asm_label.t -> Address_index.t
 
+(** As [add], but for the address of a symbol defined in the current compilation
+    unit (for example a base address for location or range list entries encoded
+    as offsets). *)
+val add_symbol : t -> Asm_symbol.t -> Address_index.t
+
 (** The label to be used as the value of the [DW_AT_base] attribute (DWARF-5
     spec page 66 line 14). *)
 val base_addr : t -> Asm_label.t

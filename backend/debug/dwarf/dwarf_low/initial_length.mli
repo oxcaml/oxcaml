@@ -22,4 +22,7 @@ val create : Dwarf_int.t -> t
 
 val to_dwarf_int : t -> Dwarf_int.t
 
+(** The escape value emitted before a 64-bit initial length. *)
+val sixty_four_bit_indicator : Int32.t
+
 include Dwarf_emittable.S with type t := t
