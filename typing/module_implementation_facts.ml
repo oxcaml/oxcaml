@@ -538,56 +538,6 @@ let named_modtype_uids env (module_type : Types.module_type) =
       iterators.it_module_type iterators module_type);
   Uid.Set.elements !uids
 
-let is_relevant_expectation cache (module_type : Typedtree.module_type) =
-  let rec relevant (module_type : Typedtree.module_type) =
-    match Uid.Tbl.find_opt cache module_type.mty_uid with
-    | Some relevant -> relevant
-    | None ->
-      let result = compute module_type in
-      Uid.Tbl.replace cache module_type.mty_uid result;
-      result
-  and compute (module_type : Typedtree.module_type) =
-    match module_type.mty_desc with
-    | Tmty_ident _ | Tmty_typeof _ | Tmty_alias _ -> true
-    | Tmty_signature signature ->
-      List.exists
-        (fun item ->
-          match item.sig_desc with
-          | Tsig_include (include_, _) -> relevant include_.incl_mod
-          | Tsig_modtype _ | Tsig_modtypesubst _ -> true
-          | Tsig_module declaration -> relevant declaration.md_type
-          | Tsig_recmodule declarations ->
-            List.exists
-              (fun (declaration : module_declaration) ->
-                relevant declaration.md_type)
-              declarations
-          | Tsig_value _ | Tsig_type _ | Tsig_typesubst _ | Tsig_typext _
-          | Tsig_exception _ | Tsig_modsubst _ | Tsig_open _ | Tsig_class _
-          | Tsig_class_type _ | Tsig_attribute _ | Tsig_jkind _ ->
-            false)
-        signature.sig_items
-    | Tmty_with (base, constraints) ->
-      relevant base
-      || List.exists
-           (fun (_, _, constraint_) ->
-             match constraint_ with
-             | Twith_modtype _ | Twith_modtypesubst _ | Twith_module _
-             | Twith_modsubst _ ->
-               true
-             | Twith_type _ | Twith_typesubst _ | Twith_jkind _
-             | Twith_jkindsubst _ ->
-               false)
-           constraints
-    | Tmty_strengthen _ -> true
-    | Tmty_functor (parameter, result, _) -> (
-      relevant result
-      ||
-      match parameter with
-      | Unit -> false
-      | Named (_, _, parameter_type, _) -> relevant parameter_type)
-  in
-  relevant module_type
-
 let facts_of_tree compilation_unit artifact iterate =
   let unit_uid = Uid.of_compilation_unit_id compilation_unit in
   let facts = Builder.create () in
@@ -1050,10 +1000,6 @@ let facts_of_tree compilation_unit artifact iterate =
   let mark_handled expectation site =
     handled_checks := Handled.add (expectation, site) !handled_checks
   in
-  let relevance_cache : bool Uid.Tbl.t = Uid.Tbl.create 16 in
-  let is_relevant_expectation (module_type : Typedtree.module_type) =
-    is_relevant_expectation relevance_cache module_type
-  in
   let rec instance_members env ~instance ~family (signature : Types.signature) =
     List.iter
       (fun item ->
@@ -1215,9 +1161,7 @@ let facts_of_tree compilation_unit artifact iterate =
       in
       match implementation.mod_desc with
       | Tmod_constraint (_, _, Tmodtype_explicit (module_type, _), _) ->
-        if is_relevant_expectation module_type
-        then register (key_of_module_type module_type)
-        else None
+        register (key_of_module_type module_type)
       | Tmod_constraint
           (inner, _, Tmodtype_package { package_module_type_path = path }, _)
         -> (
@@ -1554,11 +1498,9 @@ let facts_of_tree compilation_unit artifact iterate =
                 include_.incl_mod.mty_env include_.incl_mod.mty_type
             | Tincl_structure -> ());
             when_interface_root (fun unit_uid ->
-                if is_relevant_expectation include_.incl_mod
-                then
-                  add_dependency ~derived:(Key.Anon unit_uid)
-                    ~source:(key_of_module_type include_.incl_mod)
-                    Dependency.Reason.Interface);
+                add_dependency ~derived:(Key.Anon unit_uid)
+                  ~source:(key_of_module_type include_.incl_mod)
+                  Dependency.Reason.Interface);
             match include_.incl_mod.mty_desc with
             | Tmty_ident (path, _) -> (
               match find_modtype include_.incl_mod.mty_env path with
@@ -1595,19 +1537,15 @@ let facts_of_tree compilation_unit artifact iterate =
             when_interface_root (fun unit_uid ->
                 List.iter
                   (fun (declaration : Typedtree.module_declaration) ->
-                    if is_relevant_expectation declaration.md_type
-                    then
-                      add_dependency ~derived:(Key.Anon unit_uid)
-                        ~source:(Key.Anon declaration.md_uid)
-                        Dependency.Reason.Interface)
+                    add_dependency ~derived:(Key.Anon unit_uid)
+                      ~source:(Key.Anon declaration.md_uid)
+                      Dependency.Reason.Interface)
                   declarations)
           | Tsig_module declaration ->
             when_interface_root (fun unit_uid ->
-                if is_relevant_expectation declaration.md_type
-                then
-                  add_dependency ~derived:(Key.Anon unit_uid)
-                    ~source:(Key.Anon declaration.md_uid)
-                    Dependency.Reason.Interface)
+                add_dependency ~derived:(Key.Anon unit_uid)
+                  ~source:(Key.Anon declaration.md_uid)
+                  Dependency.Reason.Interface)
           | Tsig_modtype declaration | Tsig_modtypesubst declaration ->
             when_interface_root (fun unit_uid ->
                 add_dependency ~derived:(Key.Anon unit_uid)
@@ -1685,16 +1623,13 @@ let facts_of_tree compilation_unit artifact iterate =
           (match module_expr.mod_desc with
           | Tmod_constraint
               (implementation, _, Tmodtype_explicit (module_type, _), _) ->
-            if is_relevant_expectation module_type
+            let expectation = key_of_module_type module_type in
+            if not (handled expectation implementation.mod_loc)
             then begin
-              let expectation = key_of_module_type module_type in
-              if not (handled expectation implementation.mod_loc)
-              then begin
-                register_functor_annotation implementation module_type.mty_type;
-                add_check
-                  (Node.Location (compilation_unit, module_expr.mod_loc))
-                  expectation Check.Kind.Annotation implementation.mod_loc
-              end
+              register_functor_annotation implementation module_type.mty_type;
+              add_check
+                (Node.Location (compilation_unit, module_expr.mod_loc))
+                expectation Check.Kind.Annotation implementation.mod_loc
             end
           | Tmod_constraint
               ( implementation,
@@ -1795,11 +1730,9 @@ let facts_of_tree compilation_unit artifact iterate =
         (fun iterator declaration ->
           record_module_context declaration.md_uid
             (Context.Proj (enclosing_context (), declaration.md_uid));
-          if is_relevant_expectation declaration.md_type
-          then
-            add_dependency ~derived:(Key.Anon declaration.md_uid)
-              ~source:(key_of_module_type declaration.md_type)
-              Dependency.Reason.Interface;
+          add_dependency ~derived:(Key.Anon declaration.md_uid)
+            ~source:(key_of_module_type declaration.md_type)
+            Dependency.Reason.Interface;
           with_enclosing
             (Context.Proj (enclosing_context (), declaration.md_uid))
             (fun () ->
@@ -1827,10 +1760,8 @@ let facts_of_tree compilation_unit artifact iterate =
                   Omission.Reason.Unresolved_module_type)
             | Tmty_signature _ | Tmty_functor _ | Tmty_with _ | Tmty_typeof _
             | Tmty_alias _ | Tmty_strengthen _ ->
-              if is_relevant_expectation body
-              then
-                add_dependency ~derived:key ~source:(Key.Anon body.mty_uid)
-                  Dependency.Reason.Definition));
+              add_dependency ~derived:key ~source:(Key.Anon body.mty_uid)
+                Dependency.Reason.Definition));
           with_enclosing (Context.Body declaration.mtd_uid) (fun () ->
               Tast_iterator.default_iterator.module_type_declaration iterator
                 declaration));
@@ -1852,25 +1783,19 @@ let facts_of_tree compilation_unit artifact iterate =
                 (fun item ->
                   match item.sig_desc with
                   | Tsig_include (include_, _) ->
-                    if is_relevant_expectation include_.incl_mod
-                    then
-                      add_dependency ~derived:key
-                        ~source:(key_of_module_type include_.incl_mod)
-                        Dependency.Reason.Include
+                    add_dependency ~derived:key
+                      ~source:(key_of_module_type include_.incl_mod)
+                      Dependency.Reason.Include
                   | Tsig_module declaration ->
-                    if is_relevant_expectation declaration.md_type
-                    then
-                      add_dependency ~derived:key
-                        ~source:(Key.Anon declaration.md_uid)
-                        Dependency.Reason.Interface
+                    add_dependency ~derived:key
+                      ~source:(Key.Anon declaration.md_uid)
+                      Dependency.Reason.Interface
                   | Tsig_recmodule declarations ->
                     List.iter
                       (fun (declaration : module_declaration) ->
-                        if is_relevant_expectation declaration.md_type
-                        then
-                          add_dependency ~derived:key
-                            ~source:(Key.Anon declaration.md_uid)
-                            Dependency.Reason.Interface)
+                        add_dependency ~derived:key
+                          ~source:(Key.Anon declaration.md_uid)
+                          Dependency.Reason.Interface)
                       declarations
                   | Tsig_modtype declaration | Tsig_modtypesubst declaration ->
                     add_dependency ~derived:key
@@ -1887,10 +1812,8 @@ let facts_of_tree compilation_unit artifact iterate =
                     ())
                 signature.sig_items
             | Tmty_with (base, constraints) ->
-              if is_relevant_expectation base
-              then
-                add_dependency ~derived:key ~source:(key_of_module_type base)
-                  Dependency.Reason.With_constraint;
+              add_dependency ~derived:key ~source:(key_of_module_type base)
+                Dependency.Reason.With_constraint;
               let base_index =
                 lazy (signature_index_of_module_type env base.mty_type)
               in
@@ -1934,26 +1857,20 @@ let facts_of_tree compilation_unit artifact iterate =
                  module_type.mty_loc);
               add_subject_expectation_edges key ~site:module_type.mty_loc env
                 Dependency.Reason.Strengthening path;
-              if is_relevant_expectation base
-              then
-                add_dependency ~derived:key ~source:(key_of_module_type base)
-                  Dependency.Reason.Strengthening
+              add_dependency ~derived:key ~source:(key_of_module_type base)
+                Dependency.Reason.Strengthening
             | Tmty_functor (parameter, result, _) ->
               (match parameter with
               | Named (ident, _, parameter_type, _) ->
                 register_functor_parameter ~body_env:result.mty_env ident
                   parameter_type;
-                if is_relevant_expectation parameter_type
-                then
-                  add_dependency ~derived:key
-                    ~source:(Key.Anon parameter_type.mty_uid)
-                    Dependency.Reason.Functor_type
-              | Unit -> ());
-              if is_relevant_expectation result
-              then
                 add_dependency ~derived:key
-                  ~source:(key_of_module_type result)
+                  ~source:(Key.Anon parameter_type.mty_uid)
                   Dependency.Reason.Functor_type
+              | Unit -> ());
+              add_dependency ~derived:key
+                ~source:(key_of_module_type result)
+                Dependency.Reason.Functor_type
             | Tmty_typeof implementation ->
               (let subject =
                  unwrap_implicit_constraint (typeof_subject implementation)
