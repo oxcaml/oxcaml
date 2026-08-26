@@ -97,12 +97,17 @@ let create_ignore ?reference ?sort_priority ?location_list_in_debug_loc_table
   ()
 
 let add_or_replace_attribute_value t attribute_value =
+  let spec = AV.attribute_spec attribute_value in
+  (* The map is keyed on (attribute, form) pairs, but a DIE must never contain
+     two attributes with the same name: any existing value for the attribute
+     must be replaced even if its form differs (for example a [Data8] high PC
+     value being replaced by a [Data4] one). *)
   let attribute_values =
-    ASS.Map.add
-      (AV.attribute_spec attribute_value)
-      attribute_value t.attribute_values
+    ASS.Map.filter
+      (fun spec' _value -> not (ASS.equal_attributes spec spec'))
+      t.attribute_values
   in
-  t.attribute_values <- attribute_values
+  t.attribute_values <- ASS.Map.add spec attribute_value attribute_values
 
 let replace_all_attribute_values t attribute_values =
   (* Note that [t] must be mutated: it has already been linked into its parent's

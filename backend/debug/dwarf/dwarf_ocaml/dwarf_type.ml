@@ -980,10 +980,14 @@ let create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
         DAH.create_type ~proto_die:structure_type ]
     ();
   let tag_type =
+    (* The tag byte must be read as unsigned so that the comparison against the
+       [DW_AT_discr_value] of 248 ([Object_tag]) below can ever succeed: with a
+       signed 1-byte type, a conforming consumer would read the byte 0xF8 as
+       -8. *)
     Proto_die.create ~parent:(Some parent_proto_die)
       ~attribute_values:
         [ DAH.create_byte_size_exn ~byte_size:1;
-          DAH.create_encoding ~encoding:Encoding_attribute.signed ]
+          DAH.create_encoding ~encoding:Encoding_attribute.unsigned ]
       ~tag:Dwarf_tag.Base_type ()
   in
   let exception_tag_discriminant_ref = Proto_die.create_reference () in

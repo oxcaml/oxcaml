@@ -397,6 +397,11 @@ module Attribute_specification : sig
     include Identifiable.S with type t := t
 
     include Dwarf_emittable.S with type t := t
+
+    (** Whether the two specifications are for the same attribute, irrespective
+        of their forms. (Note that [compare] and [equal] distinguish
+        specifications by form as well as by attribute.) *)
+    val equal_attributes : t -> t -> bool
   end
 
   val seal : _ t -> Sealed.t
