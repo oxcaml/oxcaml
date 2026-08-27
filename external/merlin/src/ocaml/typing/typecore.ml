@@ -937,17 +937,18 @@ let dynamic_pat_mode pat_mode =
   in
   {pat_mode with mode}
 
-let allocations : Alloc.r list ref = Local_store.s_ref []
+let allocations : Locality.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
 
 let register_allocation_mode alloc_mode =
-  let alloc_mode = Alloc.disallow_left alloc_mode in
   allocations := alloc_mode :: !allocations
 
 let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
-  let alloc_mode = value_to_alloc_r2g mode in
+  let alloc_mode =
+    Alloc.proj_comonadic Areality (value_to_alloc_r2g mode)
+  in
   register_allocation_mode alloc_mode;
   (* We must apply each morphism separately so that their hints correspond to
      the correct morphism *)
@@ -963,16 +964,18 @@ let register_allocation_value_mode ~loc
    parameter function needs to be made global if its partial application
    to one argument must be global. As a result, a function gets an
    [Alloc.lr] allocation mode that can be further constrained. *)
-let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
+let register_closure_allocation (mode : Value.r) ~loc
+  : Locality.lr * Alloc.lr * Value.r =
   let allocation : Hint.allocation = {loc; txt = Unknown} in
-  let (alloc_mode : Alloc.lr), _ =
+  let (mode : Alloc.lr), _ =
     Alloc.newvar_below (value_to_alloc_r2g ~allocation mode)
   in
-  register_allocation_mode (Alloc.disallow_left alloc_mode);
+  let alloc_mode = Alloc.proj_comonadic Areality mode in
   let closed_over_mode =
-    alloc_as_value ~allocation (Alloc.disallow_left alloc_mode)
+    alloc_as_value ~allocation (Alloc.disallow_left mode)
   in
-  alloc_mode, closed_over_mode
+  register_allocation_mode (Locality.disallow_left alloc_mode);
+  alloc_mode, mode, closed_over_mode
 
 (** Register as allocation the expression constrained by the given
     [expected_mode]. Returns the mode of the allocation, and the expected mode
@@ -992,7 +995,7 @@ let optimise_allocations () =
   - Add it back when middle-end can really utilize this information. *)
   List.iter
     (fun mode ->
-      Locality.zap_to_ceil (Alloc.proj_comonadic Areality mode)
+      Locality.zap_to_ceil mode
       |> ignore)
     !allocations;
   reset_allocations ()
@@ -3685,7 +3688,9 @@ and type_pat_aux
               sp.ppat_attributes sort
           in
           Tpat_fun_layout { id; name; uid; sort;
-                            mode = alloc_mode; lpoly; env_alloc_mode }
+                            mode = alloc_mode; lpoly;
+                            env_alloc_mode =
+                              Typedtree.create_alloc_mode_r env_alloc_mode }
         | None ->
           let lpoly = Lpoly.determined [] in
           let id, uid =
@@ -5302,21 +5307,35 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              let open_args = [] in
              let mode_closed_args = List.map Alloc.close_over closed_args in
              let mode_partial_fun = Alloc.partial_apply mode_fun in
-             let mode_closure, _ =
+             let mode_cls, _ =
                Alloc.newvar_above (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
+             in
+             let mode_closure =
+               Alloc.disallow_left mode_cls
+               |> Alloc.proj_comonadic Areality
+             in
+             let mode_arg =
+               Alloc.disallow_right mode_arg
+               |> Alloc.proj_comonadic Areality
+               |> Typedtree.create_alloc_mode_l
+             in
+             let mode_ret =
+               Alloc.disallow_right mode_ret
+               |> Alloc.proj_comonadic Areality
+               |> Typedtree.create_return_mode
              in
              register_allocation_mode mode_closure;
              let arg =
               Omitted {
-                mode_closure = Alloc.disallow_left mode_closure;
-                mode_arg = Alloc.disallow_right mode_arg;
-                mode_ret = Alloc.disallow_right mode_ret;
+                mode_closure = Typedtree.create_alloc_mode_r mode_closure;
+                mode_arg;
+                mode_ret;
                 sort_arg;
                 sort_ret }
              in
              let args = (lbl, arg, None) :: args in
-             (ty_ret, mode_closure, open_args, closed_args, args))
+             (ty_ret, mode_cls, open_args, closed_args, args))
       (ty_ret, mode_ret, [], [], []) (List.rev args)
   in
   ty_ret, mode_ret, args
@@ -6424,10 +6443,14 @@ type split_function_ty =
       *)
     expected_pat_mode: expected_pat_mode;
     expected_inner_mode: expected_mode;
-    (* [alloc_mode] is the mode of [fun x_i ... x_n -> e].
-       This needs to be a left mode for the construction of the [fp_curry] field
-       of the outer function. *)
-    alloc_mode: Mode.Alloc.lr;
+    (* [closure_mode] is the mode of [fun x_i ... x_n -> e].
+       This needs to be a left mode for making sure that nested
+       closures have a mode greater than outer closures, and it
+       needs to be a right mode for making sure
+       arguments generate a lower bound for subsequent closures.
+       [alloc_mode] tracks the locality component to store in the Typedtree. *)
+    closure_mode: Mode.Alloc.lr;
+    alloc_mode: Locality.lr;
     really_poly: bool
   }
 
@@ -6449,12 +6472,12 @@ let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
-  let alloc_mode, closed_over_mode =
+  let alloc_mode, closure_mode, closed_over_mode =
     register_closure_allocation ~loc (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local
-      (Alloc.proj_comonadic Areality alloc_mode);
+      (Alloc.proj_comonadic Areality closure_mode);
   let { ty = ty_fun; explanation }, loc_fun = in_function in
   let separate = !Clflags.principal || Env.has_local_constraints env in
   let { ty_arg; ty_ret; arg_mode; ret_mode } as filtered_arrow =
@@ -6537,14 +6560,20 @@ let split_function_ty
   let ret_sort = type_sort ~why:Function_result ty_ret in
   env,
   { filtered_arrow; arg_sort; ret_sort;
-    alloc_mode; ty_arg_mono;
+    alloc_mode; closure_mode; ty_arg_mono;
     expected_inner_mode; expected_pat_mode;
     really_poly
   }
 
 type type_function_result_param =
   { param : function_param;
+    param_yielding : Mode.Yielding.l;
     has_poly : bool;
+  }
+
+type fun_alloc_mode =
+  { alloc_mode: Locality.lr;
+    fun_closure_mode: Mode.Alloc.lr;
   }
 
 module Calling_convention_sort : sig
@@ -6640,10 +6669,11 @@ type type_function_result =
     params_contain_gadt: contains_gadt;
     (* The alloc mode of the "rest of the function". None only for recursive
        calls to [type_function] when there are no parameters left. This needs to
-       be a left mode for the construction of the [fp_curry] field of the outer
-       function.
+       carry the full [Alloc] closure mode, against which the curry constraints
+       are checked, together with the locality component stored as [fp_curry]'s
+       [partial_mode].
     *)
-    fun_alloc_mode: Mode.Alloc.lr option;
+    fun_alloc_mode: fun_alloc_mode option;
     (* Information about the return of the function. None only for
        recursive calls to [type_function] when there are no parameters
        left.
@@ -6658,6 +6688,7 @@ and type_function_ret_info =
     ret_mode: Mode.Alloc.l modes;
     (* The sort returned by the function. *)
     ret_sort: Jkind.sort;
+    cases_arg_yielding: Mode.Yielding.l option;
   }
 
 (* value binding elaboration *)
@@ -6986,7 +7017,7 @@ and type_expect_
           let alloc_mode, record_mode =
             register_allocation ~loc expected_mode
           in
-          Some alloc_mode, record_mode
+          Some (Typedtree.create_alloc_mode_r alloc_mode), record_mode
         else
           None, expected_mode
       in
@@ -7620,7 +7651,8 @@ and type_expect_
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       let exp = rue {
-        exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode,
+        exp_desc = Texp_apply(funct, args, pm.apply_position,
+                              Typedtree.create_return_mode ap_mode,
                               ap_yielding, zero_alloc);
         exp_loc = loc; exp_extra;
         exp_type = ty_ret;
@@ -7793,6 +7825,7 @@ and type_expect_
               let arg =
                 type_argument ~overwrite:No_overwrite env argument_mode sarg ty ty0
               in
+              let alloc_mode = Typedtree.create_alloc_mode_r alloc_mode in
               re { exp_desc = Texp_variant(l, Some (arg, alloc_mode));
                    exp_loc = loc; exp_extra = [];
                    exp_type = ty_expected0;
@@ -7814,7 +7847,7 @@ and type_expect_
             let arg =
               type_expect env argument_mode sarg (mk_expected ty_expected)
             in
-            Some (arg, alloc_mode)
+            Some (arg, Typedtree.create_alloc_mode_r alloc_mode)
         in
         let arg_type = Option.map (fun (arg, _) -> arg.exp_type) arg in
         let row =
@@ -7881,7 +7914,7 @@ and type_expect_
           let uu =
             unique_use ~loc ~env mode (as_single_mode argument_mode)
           in
-          Boxing (alloc_mode, uu)
+          Boxing (Typedtree.create_alloc_mode_r alloc_mode, uu)
         | false ->
           let mode = cross_left env ty_arg mode in
           submode ~loc ~env mode expected_mode;
@@ -8039,6 +8072,7 @@ and type_expect_
         | Immutable -> Immutable
       in
       let alloc_mode, array_mode = register_allocation ~loc expected_mode in
+      let alloc_mode = Typedtree.create_alloc_mode_r alloc_mode in
       let modalities = Typemode.mutable_modalities mutability in
       let is_contained_by : Mode.Hint.is_contained_by =
         {containing = Array Modality; container = (loc, Expression)}
@@ -8949,7 +8983,7 @@ and type_expect_
                   record_repres;
                   lid;
                   label;
-                  alloc_mode
+                  alloc_mode = Typedtree.create_alloc_mode_r alloc_mode
                 };
               exp_loc = loc;
               exp_extra = [];
@@ -8989,11 +9023,9 @@ and type_expect_
             Value.(of_const ~hint_comonadic:Stack_expression
               { Const.min with areality = Local })
             expected_mode;
-          let local =
-            Alloc.(of_const ~hint_comonadic:Stack_expression
-              { Const.min with areality = Local })
-          in
-          Alloc.submode_err (exp.exp_loc, Allocation) local alloc_mode
+          Typedtree.alloc_mode_r_submode_err (exp.exp_loc, Allocation)
+            (Locality.of_const ~hint:Stack_expression Local)
+            alloc_mode
         end
       | Texp_list_comprehension _ -> always_heap List_comprehension
       | Texp_array_comprehension _ -> always_heap Array_comprehension
@@ -9551,7 +9583,8 @@ and type_ident env ?(recarg=Rejected) lid =
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
        | (Prim_poly, _), Some mode ->
-           register_allocation_mode (Alloc.max_with_comonadic Areality mode)
+           let mode = Locality.disallow_left mode in
+           register_allocation_mode mode
        | _ -> ()
        end;
        let yielding =
@@ -9772,7 +9805,7 @@ and type_function_
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
             arg_sort; ret_sort;
             ty_arg_mono; expected_pat_mode; expected_inner_mode;
-            alloc_mode; really_poly
+            alloc_mode; closure_mode; really_poly
           } =
         split_function_ty env expected_mode ty_expected loc
           ~is_first_val_param:first ~is_final_val_param
@@ -9855,7 +9888,7 @@ and type_function_
                 | None ->
                   assert(is_final_val_param);
                   Final_arg
-                | Some fun_alloc_mode ->
+                | Some { fun_closure_mode; alloc_mode } ->
                   assert(not is_final_val_param);
                   (* Handle mode crossing of [arg_mode]. Note that [close_over]
                      uses the [arg_mode.comonadic] as a left mode, and
@@ -9863,20 +9896,25 @@ and type_function_
                      mode-crossed differently. *)
                   let arg_mode = alloc_mode_cross_to_max_min env ty_arg arg_mode in
                   begin match
-                    Alloc.submode (Alloc.close_over arg_mode) fun_alloc_mode
+                    Alloc.submode (Alloc.close_over arg_mode) fun_closure_mode
                   with
                     | Ok () -> ()
                     | Error e ->
                       raise (error(loc, env, Uncurried_function_escapes e))
                   end;
                   begin match
-                    Alloc.submode (Alloc.partial_apply alloc_mode) fun_alloc_mode
+                    Alloc.submode
+                      (Alloc.partial_apply closure_mode)
+                      fun_closure_mode
                   with
                     | Ok () -> ()
                     | Error e ->
                       raise (error(loc, env, Uncurried_function_escapes e))
                   end;
-                  More_args {partial_mode = Alloc.disallow_right fun_alloc_mode}
+                  More_args
+                    { partial_mode =
+                        Typedtree.create_alloc_mode_l
+                          (Locality.disallow_right alloc_mode) }
               in
               pat, params_suffix, body, ret_info, newtypes, contains_gadt,
               curry, ext_env, calling_convention_sorts
@@ -9968,8 +10006,17 @@ and type_function_
             param,
             param_uid
       in
+      let param_yielding =
+        Alloc.proj_comonadic Yielding (Alloc.disallow_right arg_mode)
+      in
+      let arg_locality =
+        Alloc.disallow_right arg_mode
+        |> Alloc.proj_comonadic Areality
+        |> Typedtree.create_alloc_mode_l
+      in
       let param =
         { has_poly;
+          param_yielding;
           param =
             { fp_kind;
               fp_arg_label = typed_arg_label;
@@ -9980,7 +10027,8 @@ and type_function_
                 List.map (fun (id, t, loc, uid) -> (id, t, loc, uid)) newtypes;
               fp_sort = arg_sort;
               fp_mode =
-                { mode_annots with mode_modes = Alloc.disallow_right arg_mode };
+                { mode_annots with
+                  mode_modes = arg_locality };
               fp_curry = curry;
               fp_loc = pparam_loc;
             };
@@ -10017,11 +10065,15 @@ and type_function_
           let ret_mode =
             {ret_mode_annots with mode_modes = Alloc.disallow_right ret_mode }
           in
-          Some { ret_sort ; ret_mode }
+          Some { ret_sort ; ret_mode; cases_arg_yielding = None }
+      in
+      let fun_alloc_mode =
+        { fun_closure_mode = closure_mode;
+          alloc_mode }
       in
       { function_ = exp_type, param :: params, body;
         newtypes = []; params_contain_gadt = contains_gadt;
-        ret_info; fun_alloc_mode = Some alloc_mode;
+        ret_info; fun_alloc_mode = Some fun_alloc_mode;
         calling_convention_sorts;
       }
   | [] ->
@@ -10506,7 +10558,7 @@ and type_option_some env expected_mode sarg ty ty0 =
   let sort = Jkind.Sort.scannable in
   let repres = Types.Constructor_uniform_value in
   mkexp (Texp_construct(mknoloc lid , csome, repres, [sort, arg],
-                        Some alloc_mode))
+                        Some (Typedtree.create_alloc_mode_r alloc_mode)))
     (type_option arg.exp_type) arg.exp_loc arg.exp_env
 
 (* [expected_mode] is the expected mode of the field. It's already adjusted for
@@ -10724,6 +10776,15 @@ and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sa
       let arg_sort = type_sort ~why:Function_argument ty_arg in
       let ret_sort = type_sort ~why:Function_result ty_res in
       let eta_pat, eta_var = var_pair ~mode:eta_mode "eta" ty_arg arg_sort in
+      let fc_arg_mode =
+        Alloc.disallow_right marg
+        |> Alloc.proj_comonadic Areality
+        |> Typedtree.create_alloc_mode_l
+      in
+      let fc_ret_mode =
+        Alloc.proj_comonadic Areality (Alloc.disallow_right mret)
+        |> Typedtree.create_return_mode
+      in
       (* CR layouts v10: When we add abstract jkinds, the eta expansion here
          becomes impossible in some cases - we'll need better errors.  For test
          cases, look toward the end of
@@ -10735,7 +10796,7 @@ and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sa
              (texp,
               args @ [Nolabel, Arg (eta_var, arg_sort)],
               Nontail,
-              Alloc.proj_comonadic Areality (Alloc.disallow_right mret),
+              fc_ret_mode,
               Yielding.disallow_right Yielding.yielding,
               None)}
         in
@@ -10754,13 +10815,14 @@ and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sa
                     fc_param_debug_uid = param_uid; fc_env = env;
                     fc_ret_type = ty_res; fc_loc = cases_loc;
                     fc_exp_extra = []; fc_attributes = [];
-                    fc_arg_mode = Alloc.disallow_right marg;
+                    fc_arg_mode;
                     fc_arg_sort = arg_sort;
                   };
               ret_mode =
-                { mode_modes = Alloc.disallow_right mret; mode_desc = [] };
+                { mode_modes = fc_ret_mode;
+                  mode_desc = [] };
               ret_sort;
-              alloc_mode;
+              alloc_mode = Typedtree.create_alloc_mode_r alloc_mode;
               yielding = Yielding.disallow_right Yielding.yielding;
               zero_alloc = Zero_alloc.default
             }
@@ -11088,7 +11150,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
       sexpl types_and_modes overwrites
   in
   re {
-    exp_desc = Texp_tuple (expl, alloc_mode);
+    exp_desc =
+      Texp_tuple (expl, Typedtree.create_alloc_mode_r alloc_mode);
     exp_loc = loc; exp_extra = [];
     (* Keep sharing *)
     exp_type = newty (Ttuple (List.map (fun (label, e) -> label, e.exp_type) expl));
@@ -11279,7 +11342,7 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
        let alloc_mode, argument_mode =
          register_allocation ~loc:sexp.pexp_loc expected_mode
        in
-       argument_mode, Some alloc_mode
+       argument_mode, Some (Typedtree.create_alloc_mode_r alloc_mode)
   in
   begin match overwrite, constr.cstr_repr with
   | Overwriting(_, _, _), Variant_unboxed ->
@@ -11750,7 +11813,7 @@ and type_function_cases_expect
   Builtin_attributes.warning_scope attrs begin fun () ->
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
-          arg_sort; ret_sort;
+          arg_sort; ret_sort; closure_mode;
           ty_arg_mono; expected_pat_mode; expected_inner_mode; alloc_mode;
         } =
       split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
@@ -11768,7 +11831,22 @@ and type_function_cases_expect
         (newgenty
            (Tarrow ((Nolabel, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
     in
+<<<<<<< Merlin:ageorges/mode-polymorphism-alloc-mode
     let param, param_uid =
+||||||| Compiler:last-imported
+    unify_exp_types loc env ty_fun (instance ty_expected);
+    let param , param_uid =
+=======
+    unify_exp_types loc env ty_fun (instance ty_expected);
+    let fc_arg_mode =
+      Alloc.proj_comonadic Areality (Alloc.disallow_right arg_mode)
+      |> Typedtree.create_alloc_mode_l
+    in
+    let yielding_mode =
+      Alloc.proj_comonadic Yielding (Alloc.disallow_right arg_mode)
+    in
+    let param , param_uid =
+>>>>>>> Compiler:HEAD
       name_cases ~pattern_kind:Value_pattern_in_argument "param" cases
     in
     let cases =
@@ -11781,10 +11859,11 @@ and type_function_cases_expect
         fc_env = env;
         fc_ret_type = ty_ret;
         fc_attributes = [];
-        fc_arg_mode = Alloc.disallow_right arg_mode;
+        fc_arg_mode;
         fc_arg_sort = arg_sort;
       }
     in
+<<<<<<< Merlin:ageorges/mode-polymorphism-alloc-mode
     let () =
       try unify_exp_types loc env ty_fun (instance ty_expected)
       with exn ->
@@ -11808,16 +11887,24 @@ and type_function_cases_expect
             exp_env = env;
           }
     in
+||||||| Compiler:last-imported
+=======
+    let fun_alloc_mode =
+      { fun_closure_mode = closure_mode;
+        alloc_mode }
+    in
+>>>>>>> Compiler:HEAD
     let calling_convention_sorts =
       [ { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
           ccs_env = env; ccs_loc = loc; ccs_kind = `Argument };
         { Calling_convention_sort.ccs_ty = ty_ret; ccs_sort = ret_sort;
           ccs_env = env; ccs_loc = loc; ccs_kind = `Result } ]
     in
-    cases, ty_fun, alloc_mode,
+    cases, ty_fun, fun_alloc_mode,
       { ret_sort;
         ret_mode =
-          {mode_modes = Alloc.disallow_right ret_mode; mode_desc = []} },
+          {mode_modes = Alloc.disallow_right ret_mode; mode_desc = []};
+        cases_arg_yielding = Some yielding_mode },
       calling_convention_sorts
   end
 
@@ -12362,7 +12449,7 @@ and type_n_ary_function
       type_function env expected_mode ty_expected params constraint_ body
         ~in_function ~first:true
     in
-    let fun_alloc_mode, { ret_mode; ret_sort } =
+    let fun_alloc_mode, { ret_mode; ret_sort; cases_arg_yielding } =
       match fun_alloc_mode, ret_info with
       | Some x, Some y -> x, y
       | None, _ ->
@@ -12459,31 +12546,45 @@ and type_n_ary_function
       | (Check _ | Assume _ | Ignore_assert_all) ->
         Zero_alloc.create_const zero_alloc
     in
-    let alloc_mode = Mode.Alloc.disallow_left fun_alloc_mode in
+    let ret_mode_modes =
+      Alloc.proj_comonadic Areality ret_mode.mode_modes
+      |> Typedtree.create_return_mode
+    in
+    let ret_mode =
+      { ret_mode with
+        mode_modes = ret_mode_modes }
+    in
     (* [yielding] records whether *fully applying* this function can perform a
        free effect: the closure may yield if it closes over a yielding value
        (its own mode), or if any argument it is given is yielding (the
        parameter modes). [Value_rec_compiler]'s eta-expanding wrapper uses
        this, since the wrapper is exactly a full application. *)
-    let param_alloc_modes =
-      List.map (fun (p : function_param) -> p.fp_mode.mode_modes) params
+    let param_yieldings =
+      List.map
+        (fun (p : type_function_result_param) -> p.param_yielding)
+        result_params
     in
     (* A [function | ...] body takes an extra implicit parameter that is not in
        [params]; if that argument is yielding then the closure is yielding. *)
-    let param_alloc_modes =
-      match body with
-      | Tfunction_body _ -> param_alloc_modes
-      | Tfunction_cases fc -> fc.fc_arg_mode :: param_alloc_modes
+    let param_yieldings =
+      match cases_arg_yielding with
+      | None -> param_yieldings
+      | Some yielding -> yielding :: param_yieldings
     in
     let yielding =
-      Alloc.proj_comonadic Yielding
-        (Alloc.join (Alloc.disallow_right fun_alloc_mode :: param_alloc_modes))
+      Yielding.join
+        (Alloc.proj_comonadic Yielding
+           (Alloc.disallow_right fun_alloc_mode.fun_closure_mode)
+         :: param_yieldings)
     in
     re
       { exp_desc =
           Texp_function
             { params; body; ret_sort;
-              alloc_mode; ret_mode; yielding;
+              alloc_mode =
+                Typedtree.create_alloc_mode_r
+                  (Locality.disallow_left fun_alloc_mode.alloc_mode);
+              ret_mode; yielding;
               zero_alloc
             };
         exp_loc = loc;

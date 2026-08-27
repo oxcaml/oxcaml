@@ -132,10 +132,40 @@ let print_unique_use ppf (u,l) =
     (Format_doc.compat (Mode.Uniqueness.print ())) u
     (Format_doc.compat (Mode.Linearity.print ())) l
 
-type alloc_mode = Mode.Alloc.r
+type alloc_mode_r = Mode.Locality.r
+
+let create_alloc_mode_r m =
+  assert (Mode.Locality.check_const_or_level_0 m); m
+
+let alloc_mode_r_zap_to_ceil m = Mode.Locality.zap_to_ceil m
+
+let alloc_mode_r_submode_err pp m t = Mode.Locality.submode_err pp m t
+
+let print_alloc_mode_r ppf m =
+  Format_doc.compat (Mode.Locality.print ()) ppf m
+
+type alloc_mode_l = Mode.Locality.l
+
+let create_alloc_mode_l m =
+  assert (Mode.Locality.check_const_or_level_0 m); m
+
+let alloc_mode_l_zap_to_floor m = Mode.Locality.zap_to_floor m
+
+let print_alloc_mode_l ppf m =
+  Format_doc.compat (Mode.Locality.print ()) ppf m
+
+type return_mode = Mode.Locality.l
+
+let create_return_mode m =
+  assert (Mode.Locality.check_const_or_level_0 m); m
+
+let return_mode_zap_to_floor m = Mode.Locality.zap_to_floor m
+
+let print_return_mode ppf m =
+  Format_doc.compat (Mode.Locality.print ()) ppf m
 
 type texp_field_boxing =
-  | Boxing of alloc_mode * unique_use
+  | Boxing of alloc_mode_r * unique_use
   | Non_boxing of unique_use
 
 let aliased_many_use =
@@ -202,7 +232,7 @@ and 'k pattern_desc =
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
       lpoly: Lpoly.t;
-      env_alloc_mode: alloc_mode;
+      env_alloc_mode: alloc_mode_r;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
@@ -287,9 +317,9 @@ and expression_desc =
   | Texp_function of
       { params : function_param list;
         body : function_body;
-        ret_mode : Mode.Alloc.l modes;
+        ret_mode : return_mode modes;
         ret_sort : Jkind.sort;
-        alloc_mode : alloc_mode;
+        alloc_mode : alloc_mode_r;
         yielding : Mode.Yielding.l;
         zero_alloc : Zero_alloc.t;
       }
@@ -302,19 +332,20 @@ and expression_desc =
   | Texp_try of expression * value case list * value case list
   | Texp_unboxed_unit
   | Texp_unboxed_bool of bool
-  | Texp_tuple of (string option * expression) list * alloc_mode
+  | Texp_tuple of (string option * expression) list * alloc_mode_r
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
       Longident.t loc * constructor_description * constructor_representation *
-      (Jkind.sort * expression) list * alloc_mode option
-  | Texp_variant of label * (expression * alloc_mode) option
+      (Jkind.sort * expression) list
+      * alloc_mode_r option
+  | Texp_variant of label * (expression * alloc_mode_r) option
   | Texp_record of {
       fields :
         ( Data_types.label_description * Jkind.sort * record_label_definition )
           array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
-      alloc_mode : alloc_mode option
+      alloc_mode : alloc_mode_r option
     }
   | Texp_record_unboxed_product of {
       fields :
@@ -329,7 +360,7 @@ and expression_desc =
       record_repres : Types.record_representation;
       lid : Longident.t loc;
       label : Data_types.label_description;
-      alloc_mode : alloc_mode;
+      alloc_mode : alloc_mode_r;
     }
   | Texp_field of {
       record : expression;
@@ -356,7 +387,7 @@ and expression_desc =
       label : Data_types.label_description;
       newval : expression;
     }
-  | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode
+  | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode_r
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of mutability * Jkind.sort * comprehension
@@ -473,7 +504,7 @@ and 'k case =
     }
 
 and function_curry =
-  | More_args of { partial_mode : Mode.Alloc.l }
+  | More_args of { partial_mode : alloc_mode_l }
   | Final_arg
 
 and function_param =
@@ -484,7 +515,7 @@ and function_param =
     fp_partial: partial;
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
-    fp_mode: Mode.Alloc.l modes;
+    fp_mode: alloc_mode_l modes;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
                   Parsetree.jkind_annotation option * Uid.t) list;
@@ -502,7 +533,7 @@ and function_body =
 and function_cases =
   { fc_cases: value case list;
     fc_env : Env.t;
-    fc_arg_mode: Mode.Alloc.l;
+    fc_arg_mode: alloc_mode_l;
     fc_arg_sort: Jkind.sort;
     fc_ret_type : Types.type_expr;
     fc_partial: partial;
@@ -534,9 +565,9 @@ and ('a, 'b) arg_or_omitted =
   | Omitted of 'b
 
 and omitted_parameter =
-  { mode_closure : Mode.Alloc.r;
-    mode_arg : Mode.Alloc.l;
-    mode_ret : Mode.Alloc.l;
+  { mode_closure : alloc_mode_r;
+    mode_arg : alloc_mode_l;
+    mode_ret : return_mode;
     sort_arg : Jkind.sort;
     sort_ret : Jkind.sort }
 
