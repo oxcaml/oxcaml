@@ -68,6 +68,7 @@ autom4te.cache
 _install/
 _coverage/
 _profile/
+/external/js_of_ocaml/vendor
 /Makefile.build_config
 /Makefile.config
 /autom4te.cache

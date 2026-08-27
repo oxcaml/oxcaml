@@ -207,6 +207,24 @@ _compare/config.status: ocaml/config.status
 promote:
 	$(dune) promotion apply $(ws_main)
 
+# js_of_ocaml, built by this tree's compiler; dependencies come from the nix
+# shell (see jsoo.nix).
+
+jsoo_targets = \
+  compiler/bin-js_of_ocaml/js_of_ocaml.exe \
+  compiler/bin-jsoo_minify/jsoo_minify.exe \
+  compiler/bin-wasm_of_ocaml/wasm_of_ocaml.exe \
+  compiler/bin-wasm_of_ocaml/wasmoo_link_wasm.exe
+
+.PHONY: jsoo-build
+jsoo-build:
+	@test -n "$(JSOO_VENDOR)" || \
+	  { echo 'JSOO_VENDOR is not set; enter the nix shell with withJsoo=true'; exit 1; }
+	ln -sfn "$(JSOO_VENDOR)" external/js_of_ocaml/vendor
+	@test -x _install/bin/ocamlc.opt || $(MAKE) _install
+	PATH="$(CURDIR)/_install/bin:$$PATH" OCAMLPATH= OCAMLFIND_CONF=/dev/null \
+	  $(dune) build --root=external/js_of_ocaml --profile release $(jsoo_targets)
+
 .PHONY: merlin-build
 merlin-build:
 	$(MAKE) -C external/merlin build

@@ -2,7 +2,7 @@
   description = "OxCaml - A performance-focused fork of OCaml";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/ca534a76c4afb2bdc07b681dbc11b453bab21af8";
+    nixpkgs.url = "github:NixOS/nixpkgs/fcb8fcd6bf2d0adecae5bd491afaaaf8311b758d";
     flake-utils.url = "github:numtide/flake-utils";
     nix-github-actions = {
       url = "github:nix-community/nix-github-actions";
@@ -29,6 +29,7 @@
           inherit oxcaml;
           oxcaml-fp = oxcaml.override { framePointers = true; };
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
+          jsoo = oxcaml.jsoo.binaries;
           default = oxcaml;
         };
 
@@ -37,6 +38,7 @@
             oxcaml
             oxcaml-fp
             oxcaml-asan
+            jsoo
             ;
         };
 

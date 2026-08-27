@@ -68,7 +68,14 @@ end = struct
              x)
           ~f:int_of_string
 
-  let current = split Sys.ocaml_version
+  (* Overridable: the driver may be built with a different compiler than the
+     one consuming its output. *)
+  let version_string =
+    match Sys.getenv_opt "JSOO_PPX_OCAML_VERSION" with
+    | Some v -> v
+    | None -> Sys.ocaml_version
+
+  let current = split version_string
 
   let compint (a : int) b = compare a b
 
@@ -87,21 +94,18 @@ end = struct
     | Plus
     | Tilde
 
-  type release_info = { extra : (extra_prefix * string) option }
-
   let extra =
-    (* Sys.ocaml_release is only available since OCaml 4.14. For older
-       version of OCaml, [ocaml_release.extra] will evaluate to
-       [None]. *)
-    let ocaml_release = { extra = None } in
-    ignore ocaml_release.extra;
-    match
-      let open! Sys in
-      ocaml_release.extra
-    with
-    | None -> None
-    | Some (Plus, tag) -> Some (Plus, tag)
-    | Some (Tilde, tag) -> Some (Tilde, tag)
+    let len = String.length version_string in
+    let rec find i =
+      if i >= len
+      then None
+      else
+        match version_string.[i] with
+        | '+' -> Some (Plus, String.sub version_string ~pos:(i + 1) ~len:(len - i - 1))
+        | '~' -> Some (Tilde, String.sub version_string ~pos:(i + 1) ~len:(len - i - 1))
+        | _ -> find (i + 1)
+    in
+    find 0
 end
 
 exception Invalid of Location.t

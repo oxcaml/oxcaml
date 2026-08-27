@@ -6,4 +6,5 @@
  (flags
   (:standard -w -7-37 -safe-string -open Js_of_ocaml_compiler))
  (preprocess
-  (pps ppx_optcomp_light sedlex.ppx)))
+  (action
+   (run jsoo_ppx %{input-file}))))

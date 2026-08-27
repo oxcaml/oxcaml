@@ -1,0 +1,3 @@
+(executable
+ (name jsoo_ppx)
+ (libraries unix ppxlib ppx_optcomp_light sedlex.ppx))
