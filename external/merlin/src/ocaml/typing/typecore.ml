@@ -1338,25 +1338,7 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
-<<<<<<< Merlin:ggray/ah/dev
-(* CR-someday: This function should be migrated to use the new mode
-   error system instead of the ad-hoc [Mode_mismatch] error variant. *)
-let apply_mode_annots ~loc ~env kind
-    (m : Alloc.Const.Option.t Typemode.modes) mode =
-  let error axis =
-    raise (error(loc, env, Mode_mismatch (kind, axis)))
-  in
-||||||| Compiler:last-imported
-(* CR-someday: This function should be migrated to use the new mode
-   error system instead of the ad-hoc [Mode_mismatch] error variant. *)
-let apply_mode_annots ~loc ~env kind
-    (m : Alloc.Const.Option.t Typemode.modes) mode =
-  let error axis =
-    raise (Error(loc, env, Mode_mismatch (kind, axis)))
-  in
-=======
 let apply_mode_annots ~loc (m : Alloc.Const.Option.t Typemode.modes) mode =
->>>>>>> Compiler:HEAD
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
   let annot_loc =
