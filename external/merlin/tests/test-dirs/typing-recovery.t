@@ -95,12 +95,12 @@
           pattern (test.ml[2,15+4]..test.ml[2,15+5])
             Tpat_var \"f\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test.ml[2,15+6]..test.ml[6,69+12]) ghost
             Texp_function
-            alloc_mode id(modevar#6[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode id(modevar#6<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             yielding_mode unyielding
-            id(modevar#a[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,dynamic])
+            id(modevar#a<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,dynamic])
             []
             [
               Nolabel
@@ -116,8 +116,8 @@
                     []
                   Tpat_var \"x\"
                   sort value
-                  value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                  value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#9<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                id(modevar#8<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#9<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 []
             ]
             Tfunction_body
@@ -282,12 +282,12 @@
           pattern (test2.ml[2,15+4]..test2.ml[2,15+5])
             Tpat_var \"f\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test2.ml[2,15+6]..test2.ml[2,15+24]) ghost
             Texp_function
-            alloc_mode id(modevar#6[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode id(modevar#6<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             yielding_mode unyielding
-            id(modevar#a[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            id(modevar#a<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             []
             [
               Nolabel
@@ -304,7 +304,7 @@
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_any
-                id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                id(modevar#8<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#9<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 []
             ]
             Tfunction_body
@@ -627,7 +627,7 @@ make sure we also handle that correctly in structures:
               []
             Tpat_var \"foo1\"
             sort value
-            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test_ct.ml[1,0+17]..test_ct.ml[1,0+18])
             extra (test_ct.ml[1,0+4]..test_ct.ml[1,0+18]) ghost
               Texp_constraint
@@ -660,7 +660,7 @@ make sure we also handle that correctly in structures:
               []
             Tpat_var \"foo2\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+28])
             extra (test_ct.ml[3,20+4]..test_ct.ml[3,20+28]) ghost
               Texp_constraint
@@ -677,7 +677,7 @@ make sure we also handle that correctly in structures:
                     None
                 ]
             Texp_tuple
-            alloc_mode meet(local,once,nonportable,unforkable,yielding,stateful,regional_to_global_full . imply(local,once,nonportable,unforkable,yielding,stateful)(modevar#9[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]));meet(unique,uncontended,read_write,static)(modevar#a[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode meet(local,once,nonportable,unforkable,yielding,stateful,regional_to_global_full . imply(local,once,nonportable,unforkable,yielding,stateful)(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]));meet(unique,uncontended,read_write,static)(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             [
               Label: None
                 expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+25])
@@ -711,7 +711,7 @@ make sure we also handle that correctly in structures:
               []
             Tpat_var \"foo3\"
             sort value
-            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(unique,contended,immutable,static)(modevar#11[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+            value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(unique,contended,immutable,static)(modevar#11<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+27])
             extra (test_ct.ml[5,50+4]..test_ct.ml[5,50+27]) ghost
               Texp_constraint
@@ -728,7 +728,7 @@ make sure we also handle that correctly in structures:
                     []
                 ]
             Texp_tuple
-            alloc_mode global,once,nonportable,unforkable,yielding,stateful;meet(unique,contended,immutable,static)(modevar#11[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global,once,nonportable,unforkable,yielding,stateful;meet(unique,contended,immutable,static)(modevar#11<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             [
               Label: None
                 expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+24])
