@@ -395,18 +395,6 @@ type bad_5 = bad_3 with_i64s
 type bad_6 =
     #(float * #(float * float) * #(float * #(float * float * float)))
 type bad_7 = #{ i : int64#; bad_4 : bad_4; j : int64#; }
-|}, Principal{|
-type ('a : any separable) with_i64s = #(int64# * 'a * int64#)
-type ok_1 = #(int64# * int32#)
-type ok_2 = float# with_i64s
-type bad_1 = #(int * int32#)
-type bad_2 = int
-type bad_3 = A | B | C
-type bad_4 = #{ a : int64#; enum : bad_3; }
-type bad_5 = bad_3 with_i64s
-type bad_6 =
-    #(float * #(float * float) * #(float * #(float * float * float)))
-type bad_7 = #{ i : int64#; bad_4 : bad_4; j : int64#; }
 |}]
 
 (* Allowed usages *)

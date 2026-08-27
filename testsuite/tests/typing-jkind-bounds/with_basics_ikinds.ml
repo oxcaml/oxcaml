@@ -1150,8 +1150,6 @@ val foo : int t @ contended -> unit = <fun>
 let foo (t : _ t @ contended) = use_uncontended t
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
-|}, Principal{|
-val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 |}]
 
 let foo (t : int t @ nonportable) = use_portable t
@@ -1321,8 +1319,6 @@ val foo : int t -> unit = <fun>
 
 let foo (t : _ t @ nonportable) = use_portable t
 [%%expect {|
-val foo : ('a : immutable_data). 'a t -> unit = <fun>
-|}, Principal{|
 val foo : ('a : immutable_data). 'a t -> unit = <fun>
 |}]
 
