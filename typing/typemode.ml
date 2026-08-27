@@ -303,14 +303,19 @@ let transl_mode_atoms atoms =
 
 let transl_mode_annots annots = transl_mode_atoms (mode_consts annots)
 
-let untransl_const_mode s ~loc : Parsetree.mode Location.loc =
-  { txt = Parsetree.Mode [{ txt = s; loc }]; loc }
+let untransl_const_mode s ~loc : string Location.loc = { txt = s; loc }
+
+let const_mode_strings (atoms : Parsetree.mode_const) =
+  List.map (fun { Location.txt = s; _ } -> s) atoms
 
 let untransl_mode modes =
   let untransl_annot { txt = (Atom (ax, mode) : Mode.Alloc.atom); loc } =
-    untransl_const_mode
-      (Format_doc.asprintf "%a" (Mode.Alloc.Const.print_axis ax) mode)
-      ~loc
+    let atom =
+      untransl_const_mode
+        (Format_doc.asprintf "%a" (Mode.Alloc.Const.print_axis ax) mode)
+        ~loc
+    in
+    { Location.txt = Parsetree.Mode [atom]; loc }
   in
   List.map untransl_annot modes.mode_desc
 
@@ -827,7 +832,7 @@ let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
   Jkind.Mod_bounds.set_crossing crossing bounds
 
 let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
-    Parsetree.modes =
+    Parsetree.mode_const =
   let crossing = Jkind.Mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
   let least_modalities =

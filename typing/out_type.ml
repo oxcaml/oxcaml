@@ -2610,8 +2610,7 @@ let tree_of_modalities mut t =
       Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
 
 let out_modalities_of_mod_bounds mod_bounds =
-  Typemode.untransl_mod_bounds mod_bounds
-  |> List.map (fun { Location.txt; _ } -> Printast.string_of_mode txt)
+  Typemode.untransl_mod_bounds mod_bounds |> Typemode.const_mode_strings
 
 let tree_of_modes_const (modes : Mode.Alloc.Const.t) =
   (* Step 1: Compute the modes to print *)
