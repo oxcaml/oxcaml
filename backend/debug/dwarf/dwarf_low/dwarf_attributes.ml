@@ -856,8 +856,7 @@ module Attribute_specification = struct
       let output _ = failwith "Sealed.output unsupported"
     end)
 
-    let equal_attributes (T1 (T (attr1, _form1))) (T1 (T (attr2, _form2))) =
-      Stdlib.compare (Attribute.encode attr1) (Attribute.encode attr2) = 0
+    let attribute (T1 (T (attr, _form))) = Attribute.seal attr
 
     let emit ~asm_directives t =
       match t with
