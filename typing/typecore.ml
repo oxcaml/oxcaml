@@ -1222,16 +1222,10 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
-(* CR-someday: This function should be migrated to use the new mode
-   error system instead of the ad-hoc [Mode_mismatch] error variant. *)
-let apply_mode_annots ~loc ~env kind
-    (m : Alloc.Const.Option.t Typemode.modes) mode =
-  let error axis =
-    raise (Error(loc, env, Mode_mismatch (kind, axis)))
-  in
+let apply_mode_annots ~loc (m : Alloc.Const.Option.t Typemode.modes) mode =
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
-  let loc =
+  let annot_loc =
     if List.is_empty m.mode_desc then loc else
     Location.merge (List.map (fun a -> a.loc) m.mode_desc)
   in
@@ -1241,15 +1235,12 @@ let apply_mode_annots ~loc ~env kind
          Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode))
       m.mode_desc
   in
-  let hint = Hint.Annotation { loc; written_modes } in
+  let hint = Hint.Annotation { loc = annot_loc; written_modes } in
   let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
   let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
-  (match Alloc.submode min mode with
-  | Ok () -> ()
-  | Error e -> error (Left_le_right, e));
-  (match Alloc.submode mode max with
-  | Ok () -> ()
-  | Error e -> error (Right_le_left, e))
+  let pp : Hint.pinpoint = loc, Hint.Unknown in
+  Alloc.submode_err pp min mode;
+  Alloc.submode_err pp mode max
 
 (** Takes the mutability, the type and the modalities of a field, and expected
     mode of the record (adjusted for allocation), check that the construction
@@ -5685,7 +5676,7 @@ let type_approx_fun_one_param
   in
   Option.iter
     (fun mode_annots ->
-      apply_mode_annots ~loc ~env Parameter mode_annots arg_mode)
+      apply_mode_annots ~loc mode_annots arg_mode)
     mode_annots;
   if has_poly then begin
     match spato with
@@ -6357,8 +6348,8 @@ let split_function_ty
         raise (Error(loc_fun, env, err))
     end
   in
-  apply_mode_annots ~loc:loc_fun ~env Parameter mode_annots arg_mode;
-  apply_mode_annots ~loc:loc_fun ~env Return ret_mode_annots ret_mode;
+  apply_mode_annots ~loc:loc_fun mode_annots arg_mode;
+  apply_mode_annots ~loc:loc_fun ret_mode_annots ret_mode;
   let really_poly =
     not has_poly && not (tpoly_is_mono ty_arg) && is_really_poly ~env ty_arg
   in
