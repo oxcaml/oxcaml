@@ -469,13 +469,7 @@ let get_paths () =
   { visible = List.rev_map visible_dir_to_include !visible_dirs;
     hidden = List.rev_map Dir.path !hidden_dirs }
 
-(* CR-soon zqian: manifests are re-read from disk on every [init], even though
-   [Clflags.include_manifests] and [Clflags.hidden_include_manifests] cannot
-   change within an invocation. When multiple units are compiled (or at phase
-   boundaries such as linking), the whole manifest tree is read again each
-   time. *)
 let init_manifests () =
-  Profile.record_call ~accumulate:true "read_manifests" @@ fun () ->
   let init_manifest f manifest_path =
     let manifest_path =
       Dune_manifests_reader.Path.Load_root_relative.of_string manifest_path in
@@ -498,14 +492,16 @@ let init_manifests () =
   let enqueue_hidden_manifest manifest_path =
     Queue.add manifest_path !pending_hidden_manifests
   in
-  List.iter
-    (init_manifest load_visible_manifest)
-    !Clflags.include_manifests;
+  Profile.record_call ~accumulate:true "load_visible_manifests" (fun () ->
+    List.iter
+      (init_manifest load_visible_manifest)
+      !Clflags.include_manifests);
   (* Enqueue in command-line order, so that the first flag takes
      precedence. *)
-  List.iter
-    (init_manifest enqueue_hidden_manifest)
-    (List.rev !Clflags.hidden_include_manifests)
+  Profile.record_call ~accumulate:true "enqueue_hidden_manifests" (fun () ->
+    List.iter
+      (init_manifest enqueue_hidden_manifest)
+      (List.rev !Clflags.hidden_include_manifests))
 
 let basename_matches ~uncap fn basename =
   if uncap then
@@ -549,6 +545,11 @@ let find_uncap_loading_manifests fn_uncap =
   | result -> result
   | exception Not_found -> find_in_pending_manifests ~uncap:true fn_uncap
 
+(* CR-soon zqian: the whole load path (directories and manifests) is re-read
+   from disk and the cache rebuilt on every [init], even though the flags they
+   are computed from cannot change within an invocation. When multiple units
+   are compiled (or at phase boundaries such as linking), all of this work is
+   redone each time. *)
 let init ~auto_include ~visible ~hidden =
   reset ();
   visible_dirs :=
@@ -557,8 +558,10 @@ let init ~auto_include ~visible ~hidden =
         Dir.create (Visible { cmx_guaranteed }) path)
       visible;
   hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
-  List.iter Path_cache.prepend_add !hidden_dirs;
-  List.iter Path_cache.prepend_add !visible_dirs;
+  Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
+    List.iter Path_cache.prepend_add !hidden_dirs);
+  Profile.record_call ~accumulate:true "load_visible_dirs" (fun () ->
+    List.iter Path_cache.prepend_add !visible_dirs);
   init_manifests ();
   auto_include_callback := auto_include
 
