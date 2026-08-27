@@ -10081,7 +10081,6 @@ and type_function
                 Typedtree.create_return_mode
                   (Locality.newvar 0);
               mode_desc = [] };
-          ret_sort = Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ()));
           cases_arg_yielding = None;
         }
       in
@@ -10093,7 +10092,12 @@ and type_function
                  fun_closure_mode =
                    Alloc.Comonadic.newvar (get_current_level ()) };
         ret_info = Some ret_info;
-        calling_convention_sorts = []
+        body_ret_sort =
+          Function_returns
+            (Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())));
+        calling_convention =
+          Calling_convention.add_result ~ty:fun_ty ~env ~loc
+            Calling_convention.empty
       })
 
 (* Typecheck parameters one at a time followed by the body. Later parameters
@@ -10150,15 +10154,14 @@ and type_function_
           record_exp_and_reraise ~exn
             { exp_desc =
                (let params = List.map (fun { param; _ } -> param) params in
-                let ret_mode, ret_sort =
+                let ret_mode =
                   match ret_info with
-                  | Some { ret_mode; ret_sort; _ } -> ret_mode, ret_sort
+                  | Some { ret_mode; _ } -> ret_mode
                   | None ->
-                    ({ mode_modes =
-                         Typedtree.create_return_mode
-                           (Locality.newvar 0);
-                       mode_desc = [] },
-                     Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())))
+                    { mode_modes =
+                        Typedtree.create_return_mode
+                          (Locality.newvar 0);
+                      mode_desc = [] }
                 in
                 let alloc_mode =
                   Typedtree.create_alloc_mode_r @@ Locality.disallow_left @@
@@ -10170,7 +10173,7 @@ and type_function_
                   { params;
                     body;
                     ret_mode;
-                    ret_sort;
+                    ret_sort = body_ret_sort;
                     alloc_mode;
                     zero_alloc=Zero_alloc.default;
                     yielding = Yielding.newvar 0
@@ -10406,18 +10409,17 @@ and type_function_
           record_exp_and_reraise ~exn
             { exp_desc =
                (let params = List.map (fun { param; _ } -> param) params in
-                let ret_mode, ret_sort =
+                let ret_mode =
                   match ret_info with
-                  | Some { ret_mode; ret_sort; _ } -> ret_mode, ret_sort
+                  | Some { ret_mode; _ } -> ret_mode
                   | None ->
-                    ( { mode_modes =
-                          create_allocation_mode_l ret_mode
-                          |> Typedtree.create_return_mode;
-                        mode_desc = [] }
-                    , ret_sort )
+                    { mode_modes =
+                        create_allocation_mode_l ret_mode
+                        |> Typedtree.create_return_mode;
+                      mode_desc = [] }
                 in
                 Texp_function
-                  { params; body; ret_mode; ret_sort;
+                  { params; body; ret_mode; ret_sort = body_ret_sort;
                     alloc_mode =
                       Typedtree.create_alloc_mode_r
                         (Locality.disallow_left alloc_mode);
@@ -12384,8 +12386,10 @@ and type_function_cases_expect
         fc_arg_sort = arg_sort;
       }
     in
-    let () =
-      try unify_exp_types loc env ty_fun (instance ty_expected)
+    let ret_sort =
+      try
+        unify_exp_types loc env ty_fun (instance ty_expected);
+        Return_sort.classify ~body:(Tfunction_cases cases)
       with exn ->
         (* Merlin: We recover from this error in [type_function]. *)
         record_exp_and_reraise ~exn
@@ -12398,7 +12402,11 @@ and type_function_cases_expect
                         create_allocation_mode_l ret_mode
                         |> Typedtree.create_return_mode;
                       mode_desc = []};
-                  ret_sort;
+                  ret_sort =
+                    Function_returns
+                      (Var
+                         (Jkind.Sort.new_var
+                            ~level:(Ctype.get_current_level ())));
                   alloc_mode =
                     Typedtree.create_alloc_mode_r
                       (Locality.disallow_left alloc_mode);
@@ -12416,7 +12424,6 @@ and type_function_cases_expect
       { fun_closure_mode = closure_mode;
         alloc_mode }
     in
-    let ret_sort = Return_sort.classify ~body:(Tfunction_cases cases) in
     let calling_convention =
       Calling_convention.empty
       |> Calling_convention.add_argument ~ty:ty_arg ~sort:arg_sort ~env ~loc
