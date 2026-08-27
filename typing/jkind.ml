@@ -1942,14 +1942,6 @@ module Const = struct
       'd t ->
       Outcometree.out_jkind_const
   end = struct
-    type printable_jkind =
-      { base : string;
-        operators : string list;  (** Scannable axes and [addressable] *)
-        modal_bounds : string list;
-        printable_with_bounds :
-          (Outcometree.out_type * Outcometree.out_modality list) list
-      }
-
     (** [diff base actual] returns the axes on which [actual] is strictly
         stronger than [base], represented as a mod-bounds where unchanged axes
         are set to [max]. Returns [None] if [actual] isn't stronger than [base].
@@ -2011,6 +2003,84 @@ module Const = struct
       | Some base, Some actual ->
         Scannable_axes.to_string_list_diff ~base actual
 
+    module Kind_abbrev_and_ops = struct
+      type 'a kind = 'a t
+
+      type t =
+        | Abbreviation of string * mod_bounds
+        (* The mod bounds are tracked just to implement [mod_bounds] below *)
+        | Addressable of t
+        | Scannable_axes of t * string list
+
+      let synthesize_layout ~base ~base_layout ~(target_layout : Layout.Const.t)
+          =
+        let rec go (l : Layout.Const.t) =
+          if Layout.Const.equal_up_to_scannable_axes base_layout l
+          then
+            get_scannable_axes_diff
+              ~base:(Layout.Const.get_root_scannable_axes base_layout)
+              (Layout.Const.get_root_scannable_axes l)
+            |> Option.map (fun axes -> Scannable_axes (base, axes))
+          else
+            match l with
+            | Addressable inner ->
+              go inner |> Option.map (fun t -> Addressable t)
+            | Any _ | Base _ | Product _ | Univar _ | Genvar _ -> None
+        in
+        go target_layout
+
+      (* Synthesize a kind-abbreviation-and-ops with some [target_layout], by
+         applying operators to [base]. E.g.:
+         - base [value], target [immediate]: [value non_pointer]
+         - base [immediate], target [(value non_pointer) box]: [immediate box]
+         - base [k], target [k non_null]: [k non_null]
+
+         Note that the target layout is a kind so that we can support abstract
+         kinds (there's no way to write [layout_of k] in [Layout.t]).
+      *)
+      let synthesize (type l r) ~env ~(base : Builtin.t)
+          ~(target_layout : (l * r) kind) =
+        let base_jkind =
+          Base_and_axes.fully_expand_aliases_const env base.jkind
+        in
+        let base = Abbreviation (base.name, base_jkind.mod_bounds) in
+        match base_jkind.base, target_layout.base with
+        | Kconstr (p1, _, op1), Kconstr (p2, _, op2) ->
+          if Path.same p1 p2 && Jkind_types.Kind_operator.equal op1 op2
+          then
+            get_scannable_axes_diff
+              ~base:(get_scannable_axes_of_fully_expanded base_jkind)
+              (get_scannable_axes_of_fully_expanded target_layout)
+            |> Option.map (fun axes -> Scannable_axes (base, axes))
+          else None
+        | Layout base_layout, Layout target_layout ->
+          synthesize_layout ~base ~base_layout ~target_layout
+        | (Kconstr _ | Layout _), _ -> None
+
+      let rec mod_bounds = function
+        | Abbreviation (_, bounds) -> bounds
+        | Addressable t -> mod_bounds t
+        | Scannable_axes (t, _) -> mod_bounds t
+
+      let rec print = function
+        | Abbreviation (base, _) -> ~base, ~operators:[]
+        | Addressable t ->
+          let ~base, ~operators = print t in
+          let operators = operators @ ["addressable"] in
+          ~base, ~operators
+        | Scannable_axes (t, axes) ->
+          let ~base, ~operators = print t in
+          let operators = operators @ axes in
+          ~base, ~operators
+    end
+
+    type printable_jkind =
+      { kind_abbrev_and_ops : Kind_abbrev_and_ops.t;
+        modal_bounds : string list;
+        printable_with_bounds :
+          (Outcometree.out_type * Outcometree.out_modality list) list
+      }
+
     (** Write [actual] in terms of [base] *)
     let convert_with_base (type l r) env ~verbosity ~(base : Builtin.t)
         (actual : (l * r) t) =
@@ -2021,31 +2091,14 @@ module Const = struct
          until we can tell all the mod bounds are redundant - but we expect
          redundant mod bounds to be uncommon, and maximizing efficiency in
          printing code isn't essential. *)
-      let base_jkind =
-        Base_and_axes.fully_expand_aliases_const env base.jkind
-      in
       let actual = Base_and_axes.fully_expand_aliases_const env actual in
-      let matching_layouts, addressable =
-        match base_jkind.base, actual.base with
-        | Kconstr (p1, _, op1), Kconstr (p2, _, op2) ->
-          Path.same p1 p2 && Jkind_types.Kind_operator.equal op1 op2, false
-        | Layout l1, Layout l2 -> (
-          if Layout.Const.equal_up_to_scannable_axes l1 l2
-          then true, false
-          else
-            match l2 with
-            | Addressable l2 ->
-              Layout.Const.equal_up_to_scannable_axes l1 l2, true
-            | Any _ | Base _ | Product _ | Univar _ | Genvar _ -> false, false)
-        | (Kconstr _ | Layout _), _ -> false, false
+      let open Misc.Stdlib.Monad.Option.Syntax in
+      let* kind_abbrev_and_ops =
+        Kind_abbrev_and_ops.synthesize ~env ~base ~target_layout:actual
       in
-      let scannable_axes =
-        get_scannable_axes_diff
-          ~base:(get_scannable_axes_of_fully_expanded base_jkind)
-          (get_scannable_axes_of_fully_expanded actual)
-      in
-      let modal_bounds =
-        get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
+      let* modal_bounds =
+        get_modal_bounds ~verbosity
+          ~base:(Kind_abbrev_and_ops.mod_bounds kind_abbrev_and_ops)
           actual.mod_bounds
       in
       let printable_with_bounds =
@@ -2080,31 +2133,24 @@ module Const = struct
               out_type, modal @ nonmodal_axes)
             with_bounds otys
       in
-      match matching_layouts, modal_bounds, scannable_axes with
-      | true, Some modal_bounds, Some scannable_axes ->
-        Some
-          { base = base.name;
-            operators =
-              (scannable_axes @ if addressable then ["addressable"] else []);
-            modal_bounds;
-            printable_with_bounds
-          }
-      | false, _, _ | _, None, _ | _, _, None -> None
+      Some { kind_abbrev_and_ops; modal_bounds; printable_with_bounds }
 
     (** Select the out_jkind_const with the least number of modal bounds and
         operators to print *)
-    let rec select_simplest = function
-      | a :: b :: tl ->
-        let simpler =
-          if
-            List.length a.modal_bounds + List.length a.operators
-            < List.length b.modal_bounds + List.length b.operators
-          then a
-          else b
+    let select_simplest ks =
+      let cost { kind_abbrev_and_ops; modal_bounds; _ } =
+        let ~base:_, ~operators =
+          Kind_abbrev_and_ops.print kind_abbrev_and_ops
         in
-        select_simplest (simpler :: tl)
-      | [out] -> Some out
+        List.length modal_bounds + List.length operators
+      in
+      match ks with
       | [] -> None
+      | k :: ks ->
+        Some
+          (List.fold_left
+             (fun acc k -> if cost acc < cost k then acc else k)
+             k ks)
 
     let convert ~(verbosity : Format_verbosity.t) env (jkind : _ t) =
       let jkind =
@@ -2126,7 +2172,7 @@ module Const = struct
           |> select_simplest
         | Expanded | Expanded_with_all_mod_bounds -> None
       in
-      let { base; operators; modal_bounds; printable_with_bounds } =
+      let { kind_abbrev_and_ops; modal_bounds; printable_with_bounds } =
         match simplest with
         | Some simplest -> simplest
         | None -> (
@@ -2182,6 +2228,7 @@ module Const = struct
                layout matches and the modal bounds are all max *)
             Option.get out_jkind_verbose)
       in
+      let ~base, ~operators = Kind_abbrev_and_ops.print kind_abbrev_and_ops in
       let base = Outcometree.Ojkind_const_abbreviation (base, operators) in
       (* Add on [mod] bounds, if there are any *)
       let base =
