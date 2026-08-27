@@ -197,3 +197,29 @@ let rec x = A (let _ = ref x in #())
 type blk = A of unit#
 val x : blk = A <void>
 |}]
+
+(* Mode-crossing *)
+
+type imm : immediate = A of unit# [@immediate_all_void_constructor]
+let crosses_local (x : imm @ local) = (x : imm @ global)
+[%%expect{|
+type imm = A of unit# [@immediate_all_void_constructor]
+val crosses_local : imm @ local -> imm = <fun>
+|}]
+
+(* We could likely make this cross more if we choose to guarantee it's either
+   immediate or statically-allocated. *)
+type blk = A of unit#
+let crosses_local (x : blk @ local) = (x : blk @ global)
+[%%expect{|
+type blk = A of unit#
+Line 2, characters 39-40:
+2 | let crosses_local (x : blk @ local) = (x : blk @ global)
+                                           ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+type blk : immutable_data = A of unit#
+[%%expect{|
+type blk = A of unit#
+|}]
