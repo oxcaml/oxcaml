@@ -7668,7 +7668,7 @@ and type_expect_
                   funct,
                   args,
                   pm.apply_position,
-                  ap_mode,
+                  Typedtree.create_return_mode ap_mode,
                   Mode.Yielding.newvar (),
                   None
                 );
@@ -9665,12 +9665,15 @@ and type_function
       let ret_info =
         { ret_mode = { mode_modes = Alloc.newvar (); mode_desc = [] };
           ret_sort = Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ()));
+          cases_arg_yielding = None;
         }
       in
       { function_ = fun_ty, [], fun_body;
         newtypes = [];
         params_contain_gadt = No_gadt;
-        fun_alloc_mode = Some (Alloc.newvar ());
+        fun_alloc_mode =
+          Some { alloc_mode = Locality.newvar ();
+                 fun_closure_mode = Alloc.newvar () };
         ret_info = Some ret_info;
         calling_convention_sorts = []
       })
@@ -9731,15 +9734,23 @@ and type_function_
                (let params = List.map (fun { param; _ } -> param) params in
                 let ret_mode, ret_sort =
                   match ret_info with
-                  | Some { ret_mode; ret_sort } -> ret_mode, ret_sort
+                  | Some { ret_mode; ret_sort; _ } ->
+                    { ret_mode with
+                      mode_modes =
+                        Alloc.proj_comonadic Areality ret_mode.mode_modes
+                        |> Typedtree.create_return_mode },
+                    ret_sort
                   | None ->
-                    ({ mode_modes = Alloc.newvar (); mode_desc = [] },
+                    ({ mode_modes =
+                         Typedtree.create_return_mode (Locality.newvar ());
+                       mode_desc = [] },
                      Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())))
                 in
-                let alloc_mode = Alloc.disallow_left @@
+                let alloc_mode =
+                  Typedtree.create_alloc_mode_r @@ Locality.disallow_left @@
                   match fun_alloc_mode with
-                  | Some alloc_mode -> alloc_mode
-                  | None -> Alloc.newvar ()
+                  | Some { alloc_mode; _ } -> alloc_mode
+                  | None -> Locality.newvar ()
                 in
                 Texp_function
                   { params;
@@ -9948,14 +9959,25 @@ and type_function_
                (let params = List.map (fun { param; _ } -> param) params in
                 let ret_mode, ret_sort =
                   match ret_info with
-                  | Some { ret_mode; ret_sort } -> ret_mode, ret_sort
+                  | Some { ret_mode; ret_sort; _ } ->
+                    { ret_mode with
+                      mode_modes =
+                        Alloc.proj_comonadic Areality ret_mode.mode_modes
+                        |> Typedtree.create_return_mode },
+                    ret_sort
                   | None ->
-                    ( { mode_modes = Alloc.disallow_right ret_mode; mode_desc = [] }
+                    ( { mode_modes =
+                          Alloc.proj_comonadic Areality
+                            (Alloc.disallow_right ret_mode)
+                          |> Typedtree.create_return_mode;
+                        mode_desc = [] }
                     , ret_sort )
                 in
                 Texp_function
                   { params; body; ret_mode; ret_sort;
-                    alloc_mode = Alloc.disallow_left alloc_mode;
+                    alloc_mode =
+                      Typedtree.create_alloc_mode_r
+                        (Locality.disallow_left alloc_mode);
                     zero_alloc = Zero_alloc.default;
                     yielding = Yielding.newvar () });
               exp_loc = loc;
@@ -11831,13 +11853,6 @@ and type_function_cases_expect
         (newgenty
            (Tarrow ((Nolabel, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
     in
-<<<<<<< Merlin:ageorges/mode-polymorphism-alloc-mode
-    let param, param_uid =
-||||||| Compiler:last-imported
-    unify_exp_types loc env ty_fun (instance ty_expected);
-    let param , param_uid =
-=======
-    unify_exp_types loc env ty_fun (instance ty_expected);
     let fc_arg_mode =
       Alloc.proj_comonadic Areality (Alloc.disallow_right arg_mode)
       |> Typedtree.create_alloc_mode_l
@@ -11845,8 +11860,7 @@ and type_function_cases_expect
     let yielding_mode =
       Alloc.proj_comonadic Yielding (Alloc.disallow_right arg_mode)
     in
-    let param , param_uid =
->>>>>>> Compiler:HEAD
+    let param, param_uid =
       name_cases ~pattern_kind:Value_pattern_in_argument "param" cases
     in
     let cases =
@@ -11863,7 +11877,6 @@ and type_function_cases_expect
         fc_arg_sort = arg_sort;
       }
     in
-<<<<<<< Merlin:ageorges/mode-polymorphism-alloc-mode
     let () =
       try unify_exp_types loc env ty_fun (instance ty_expected)
       with exn ->
@@ -11874,9 +11887,15 @@ and type_function_cases_expect
                 { params = [];
                   body = Tfunction_cases cases;
                   ret_mode =
-                    { mode_modes = Alloc.disallow_right ret_mode; mode_desc = []};
+                    { mode_modes =
+                        Alloc.proj_comonadic Areality
+                          (Alloc.disallow_right ret_mode)
+                        |> Typedtree.create_return_mode;
+                      mode_desc = []};
                   ret_sort;
-                  alloc_mode = Alloc.disallow_left alloc_mode;
+                  alloc_mode =
+                    Typedtree.create_alloc_mode_r
+                      (Locality.disallow_left alloc_mode);
                   zero_alloc = Zero_alloc.default;
                   yielding = Yielding.newvar ()
                 };
@@ -11887,13 +11906,10 @@ and type_function_cases_expect
             exp_env = env;
           }
     in
-||||||| Compiler:last-imported
-=======
     let fun_alloc_mode =
       { fun_closure_mode = closure_mode;
         alloc_mode }
     in
->>>>>>> Compiler:HEAD
     let calling_convention_sorts =
       [ { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;
           ccs_env = env; ccs_loc = loc; ccs_kind = `Argument };

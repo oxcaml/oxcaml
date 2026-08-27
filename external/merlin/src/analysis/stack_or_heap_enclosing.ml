@@ -4,7 +4,7 @@ let log_section = "stack-or-heap-enclosing"
 let { Logger.log = _ } = Logger.for_section log_section
 
 type stack_or_heap =
-  | Alloc_mode of Mode.Alloc.r
+  | Alloc_mode of Typedtree.alloc_mode_r
   | No_alloc of { reason : string }
   | Unexpected_no_alloc
 
@@ -118,7 +118,7 @@ let from_nodes ~lsp_compat ~pos ~path =
         | Non_boxing _ -> None)
       | Texp_variant (_, maybe_exp_and_alloc_mode) ->
         maybe_exp_and_alloc_mode
-        |> Option.map ~f:(fun (_, (alloc_mode : Typedtree.alloc_mode)) ->
+        |> Option.map ~f:(fun (_, (alloc_mode : Typedtree.alloc_mode_r)) ->
             alloc_mode)
         |> ret_maybe_alloc "variant without argument"
       | _ -> None)
