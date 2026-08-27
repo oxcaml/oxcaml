@@ -1184,7 +1184,6 @@ Line 3, characters 2-8:
       ^^^^^^
 Error: This local-returning application is in a tail position that is not
        enclosed in an exclave_ expression.
-       Hint: Use exclave_ to return a local value.
 |}]
 
 let bar () : int @ local = foo ()
@@ -1194,7 +1193,6 @@ Line 1, characters 27-33:
                                ^^^^^^
 Error: This local-returning application is in a tail position that is not
        enclosed in an exclave_ expression.
-       Hint: Use exclave_ to return a local value.
 |}]
 
 let bar () = exclave_
@@ -1233,7 +1231,6 @@ Line 1, characters 46-50:
                                                   ^^^^
 Error: This local-returning application is in a tail position that is not
        enclosed in an exclave_ expression.
-       Hint: Use exclave_ to return a local value.
 |}]
 
 (* Parameter modes must be matched by the type *)
@@ -2142,7 +2139,6 @@ Line 2, characters 27-35:
                                ^^^^^^^^
 Error: This local-returning application is in a tail position that is not
        enclosed in an exclave_ expression.
-       Hint: Use exclave_ to return a local value.
 |}]
 (* since the tailcall calls a local-returning function, it will only type-check
    under an exclave_ *)
