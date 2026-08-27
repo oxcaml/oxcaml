@@ -60,7 +60,7 @@ type value =
       { upper : Asm_symbol.t;
         lower : Asm_symbol.t
       }
-  | Code_address_from_symbol_plus_bytes of
+  | Code_address_from_symbol_plus_offset of
       { sym : Asm_symbol.t;
         offset_in_bytes : Targetint.t
       }
@@ -136,7 +136,7 @@ let print ppf { value; comment = _ } =
       offset_upper Asm_symbol.print lower
   | Code_address_from_symbol_diff { upper; lower } ->
     Format.fprintf ppf "%a - %a" Asm_symbol.print upper Asm_symbol.print lower
-  | Code_address_from_symbol_plus_bytes { sym; offset_in_bytes } ->
+  | Code_address_from_symbol_plus_offset { sym; offset_in_bytes } ->
     Format.fprintf ppf "%a + %a" Asm_symbol.print sym Targetint.print
       offset_in_bytes
   | Offset_into_debug_info lbl ->
@@ -230,10 +230,18 @@ let code_address_from_label_symbol_diff ?comment ~upper ~lower ~offset_upper ()
 let code_address_from_symbol_diff ?comment ~upper ~lower () =
   { value = Code_address_from_symbol_diff { upper; lower }; comment }
 
-let code_address_from_symbol_plus_bytes sym offset_in_bytes =
-  { value = Code_address_from_symbol_plus_bytes { sym; offset_in_bytes };
-    comment = None
+let code_address_from_symbol_plus_offset ?comment sym ~offset_in_bytes =
+  { value = Code_address_from_symbol_plus_offset { sym; offset_in_bytes };
+    comment
   }
+
+let code_address_from_label_or_symbol_plus_offset ?comment
+    (label_or_symbol : Asm_label_or_symbol.t) ~offset_in_bytes =
+  match label_or_symbol with
+  | Label label ->
+    code_address_from_label_plus_offset ?comment label ~offset_in_bytes
+  | Symbol sym ->
+    code_address_from_symbol_plus_offset ?comment sym ~offset_in_bytes
 
 let offset_into_debug_info ?comment lbl =
   { value = Offset_into_debug_info lbl; comment }
@@ -336,7 +344,7 @@ let size { value; comment = _ } =
   | Absolute_address _ | Code_address_from_label _
   | Code_address_from_label_plus_offset _ | Code_address_from_symbol _
   | Code_address_from_label_symbol_diff _ | Code_address_from_symbol_diff _
-  | Code_address_from_symbol_plus_bytes _ -> (
+  | Code_address_from_symbol_plus_offset _ -> (
     match Targetint.size with
     | 32 -> Dwarf_int.four ()
     | 64 -> Dwarf_int.eight ()
@@ -405,7 +413,7 @@ let emit ~asm_directives:_ { value; comment } =
       ~offset_upper ()
   | Code_address_from_symbol_diff { upper; lower } ->
     A.between_symbols_in_current_unit ~upper ~lower
-  | Code_address_from_symbol_plus_bytes { sym; offset_in_bytes } ->
+  | Code_address_from_symbol_plus_offset { sym; offset_in_bytes } ->
     A.symbol_plus_offset sym ~offset_in_bytes
   | Offset_into_debug_line label ->
     A.offset_into_dwarf_section_label ?comment Debug_line label

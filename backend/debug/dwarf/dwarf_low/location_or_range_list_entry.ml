@@ -39,9 +39,9 @@ type 'payload entry =
       }
   | Offset_pair_between_labels of
       { start_inclusive : Asm_label.t;
-        start_adjustment : int;
+        start_adjustment_in_bytes : int;
         end_exclusive : Asm_label.t;
-        end_adjustment : int;
+        end_adjustment_in_bytes : int;
         payload : 'payload
       }
   | Base_address of Asm_symbol.t
@@ -203,16 +203,16 @@ struct
       Payload.emit ~asm_directives payload
     | Offset_pair_between_labels
         { start_inclusive;
-          start_adjustment;
+          start_adjustment_in_bytes;
           end_exclusive;
-          end_adjustment;
+          end_adjustment_in_bytes;
           payload
         } ->
       A.delta_uleb128_label_minus_symbol ~upper:start_inclusive
-        ~upper_offset:(Int64.of_int start_adjustment)
+        ~upper_offset:(Int64.of_int start_adjustment_in_bytes)
         ~lower:t.start_of_code_symbol;
       A.delta_uleb128_label_minus_symbol ~upper:end_exclusive
-        ~upper_offset:(Int64.of_int end_adjustment)
+        ~upper_offset:(Int64.of_int end_adjustment_in_bytes)
         ~lower:t.start_of_code_symbol;
       Payload.emit ~asm_directives payload
     | Base_address sym -> A.symbol sym

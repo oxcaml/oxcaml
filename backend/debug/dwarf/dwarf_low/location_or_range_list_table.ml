@@ -72,14 +72,6 @@ struct
     then Uint32.of_nonnegative_int_exn (List.length t.lists)
     else Uint32.zero
 
-  let size _t =
-    (* The sizes of some list entries (those whose operands are label
-       differences encoded as ULEB128) are only known at assembly time, so the
-       table is emitted using assembler-computed lengths and offsets; see [emit]
-       below. *)
-    Misc.fatal_error
-      "The sizes of location or range list tables are not known at compile time"
-
   let emit ~asm_directives t =
     let unit_start = Asm_label.create (DWARF Location_or_range_list.section) in
     let unit_end = Asm_label.create (DWARF Location_or_range_list.section) in
