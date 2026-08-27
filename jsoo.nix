@@ -121,6 +121,7 @@ rec {
       oxcaml = import ./default.nix {
         inherit pkgs;
         withJsoo = false;
+        withMerlin = false;
         src = lib.cleanSourceWith {
           name = "oxcaml-src";
           src = lib.cleanSource ./.;

@@ -337,6 +337,10 @@ module Stdlib = struct
   module Option = struct
     type 'a t = 'a option
 
+    let exists p t = match t with
+      | Some x -> p x
+      | None -> false
+
     let first_some a b = match a with
       | Some _ -> a
       | None -> b ()

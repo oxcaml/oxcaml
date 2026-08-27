@@ -1260,15 +1260,20 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
                 Jkind.Scannable_axes.to_string_list sa)
-  (* Analyze a product before calling [get_const]: the machinery in
-     [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
-     products. *)
+  (* Analyze structure (products and addressability) before calling
+     [get_const]: the machinery in [Jkind.Const.to_out_jkind_const] works
+     better for atomic layouts. *)
   | Layout (Product lays) ->
     Ojkind_product
       (List.map
          (fun layout ->
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
+  | Layout (Addressable lay) ->
+    if Jkind.Layout.is_surely_addressable_flat lay then
+      out_jkind_of_desc env { desc with base = Layout lay }
+    else
+      Ojkind_addressable (out_jkind_of_desc env { desc with base = Layout lay })
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)
@@ -1407,7 +1412,7 @@ let rec tree_of_modal_typexp mode modal ty =
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
-        let mode = Alloc.zap_to_legacy mode in
+        let mode = Alloc.zap_to_legacy ~arg:false mode in
         Otyp_ret (Orm_any (tree_of_modes mode), tree)
     | Other _ -> tree
   in
@@ -1437,7 +1442,7 @@ let rec tree_of_modal_typexp mode modal ty =
            don't print anything for those axes, since user would interpret that
            as legacy. The best we can do is to zap to legacy and if they do land
            at legacy, we will be able to omit printing them. *)
-        let arg_mode = Alloc.zap_to_legacy marg in
+        let arg_mode = Alloc.zap_to_legacy ~arg:true marg in
         let t1 =
           if is_optional l then
             match
@@ -1704,11 +1709,11 @@ and tree_of_ret_typ_mutating acc_mode m ty=
       | Error _ ->
         (* In this branch we need to print parens. [m] might have undetermined
         axes and we adopt a similar logic to the [marg] above. *)
-        let m = Alloc.zap_to_legacy m in
+        let m = Alloc.zap_to_legacy ~arg:false m in
         (Orm_parens (tree_of_modes m), m)
       end
   | _ ->
-    let m = Alloc.zap_to_legacy m in
+    let m = Alloc.zap_to_legacy ~arg:false m in
     (Orm_any (tree_of_modes m), m)
 
 and tree_of_typobject_repr fi =
@@ -2093,7 +2098,8 @@ let tree_of_type_decl id decl =
         (Option.is_some umc)
     | Type_record_unboxed_product(lbls,
                                   (Record_unboxed_product
-                                  | Record_unboxed_product_variable),
+                                  | Record_unboxed_product_undetermined
+                                  | Record_unboxed_product_variable _),
                                   umc) ->
         tree_of_manifest
           (Otyp_record_unboxed_product (List.map tree_of_label lbls)),
@@ -2255,7 +2261,7 @@ let prepared_extension_constructor id ppf ext =
 let maybe_val_poly_shorthand lpoly_vars qtvs =
   let module Sort_const = Jkind.Sort.Const in
   let same_genvar a b =
-    Sort_const.equal (Sort_const.Genvar a) (Sort_const.Genvar b)
+    Sort_const.equal (Sort_const.genvar a) (Sort_const.genvar b)
   in
   let top_genvar (_, jkind) =
     match Jkind.get_layout !printing_env jkind with
@@ -2699,7 +2705,9 @@ let rec tree_of_modtype ?abbrev = function
         tree_of_functor_parameter ?abbrev param
       in
       let res = wrap_env env (tree_of_modtype ?abbrev) ty_res in
-      let mres = m_res |> Mode.Alloc.zap_to_legacy |> tree_of_modes in
+      let mres =
+        m_res |> Mode.Alloc.zap_to_legacy ~arg:false |> tree_of_modes
+      in
       Omty_functor (param, res, mres))
   | Mty_alias p ->
       Omty_alias (tree_of_path (Some Module) p)
@@ -2728,7 +2736,9 @@ and tree_of_functor_parameter ?abbrev = function
             Some (Ident.name id),
             fun k -> Env.add_module ~arg:true id Mp_present ty_arg k
       in
-      let marg = m_arg |> Mode.Alloc.zap_to_legacy |> tree_of_modes in
+      let marg =
+        m_arg |> Mode.Alloc.zap_to_legacy ~arg:true |> tree_of_modes
+      in
       Some (name, tree_of_modtype ?abbrev ty_arg, marg), env
 
 and tree_of_signature ?abbrev = function

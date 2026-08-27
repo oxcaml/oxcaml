@@ -1,4 +1,4 @@
-    frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_start(param=() : unit @ value)
     frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_inline_closure_map(lst=:: (1, :: (2, :: (3, []))) : int list @ value, f=test_closures_dwarf.exe`Test_closures_dwarf.(fun) at test_closures_dwarf.ml:10:49 : int -> int @ value)
     frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_inline_closure_map(lst=:: (4, :: (5, :: (6, []))) : int list @ value, f=test_closures_dwarf.exe`Test_closures_dwarf.(fun) at test_closures_dwarf.ml:12:49 : int -> int @ value)
     frame #N: <ADDRESS> test_closures_dwarf.exe`Test_closures_dwarf.f_inline_closure_filter(lst=:: (1, :: (2, :: (3, :: (4, :: (5, []))))) : int list @ value, pred=test_closures_dwarf.exe`Test_closures_dwarf.(fun) at test_closures_dwarf.ml:21:58 : int -> bool @ value)

@@ -109,7 +109,8 @@ let from_nodes ~lsp_compat ~pos ~path =
             | Record_float
             | Record_ufloat
             | Record_mixed _
-            | Record_variable
+            | Record_undetermined
+            | Record_variable _
             | Record_dummy _ ) ) -> ret Unexpected_no_alloc)
       | Texp_field { boxing; _ } -> (
         match boxing with

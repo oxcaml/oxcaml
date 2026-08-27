@@ -13,6 +13,7 @@
   oxcamlClang ? false,
   oxcamlLldb ? false,
   syntaxQuotations ? false,
+  withMerlin ? true,
   withJsoo ? true,
 }:
 let
@@ -29,7 +30,12 @@ let
     [
       "--cache-file=/dev/null"
       "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
-      "--enable-assembler-suitable-for-dissector=${pkgs.llvm}/bin/llvm-mc"
+      (
+        if pkgs.stdenv.isDarwin then
+          "--disable-assembler-suitable-for-dissector"
+        else
+          "--enable-assembler-suitable-for-dissector=${pkgs.llvm}/bin/llvm-mc"
+      )
       (mkFlag addressSanitizer "address-sanitizer")
       (mkFlag dev "dev")
       (mkFlag flambdaInvariants "flambda-invariants")
@@ -51,14 +57,14 @@ let
     ];
   };
 
-  ocaml_5_4_0 = (pkgs.callPackage (
+  mkBootOcaml_5_4_0 = bootStdenv: (pkgs.callPackage (
     import (pkgs.path + "/pkgs/development/compilers/ocaml/generic.nix") {
       major_version = "5";
       minor_version = "4";
       patch_version = "0";
       sha256 = "sha256-36qKLhHHmbwXZdi+9EkRQG7l9IAwJxkDgqk5+IyRImY=";
     }) {
-      inherit stdenv;
+      stdenv = bootStdenv;
     }).overrideAttrs {
       # This patch fixes an issue in the upstream compiler that we use to
       # bootstrap ourselves on ARM64
@@ -66,14 +72,17 @@ let
         ./tools/ci/local-opam/packages/ocaml-base-compiler/ocaml-base-compiler.5.4.0+oxcaml/files/ocaml-base-compiler.5.4.0+oxcaml.patch
       ];
 
-      # Skip the upstream testsuite for this bootstrap compiler. Built with
-      # our clang-based stdenv on the 26.05 toolchain, testsuite/tests/unicode
-      # fails: it compiles modules with non-ASCII source filenames and the
-      # UTF-8 bytes of the object filenames reach clang octal-escaped (e.g.
-      # '$350246213.o'), so linking fails. This compiler only exists to
-      # bootstrap oxcaml, which runs its own `make ci` afterwards.
+      # Skip the upstream testsuite for this bootstrap compiler. When built
+      # with our clang-based stdenv on the 26.05 toolchain,
+      # testsuite/tests/unicode fails: it compiles modules with non-ASCII
+      # source filenames and the UTF-8 bytes of the object filenames reach
+      # clang octal-escaped (e.g. '$350246213.o'), so linking fails. This
+      # compiler only exists to bootstrap oxcaml, which runs its own `make ci`
+      # afterwards.
       doCheck = false;
     };
+
+  ocaml_5_4_0 = mkBootOcaml_5_4_0 stdenv;
 
   # CR sspies: For the time being, we use dune built with the vanilla 4.14.2 compiler.
   # Over time, we should probably define something like a "boot environment" and build
@@ -130,6 +139,132 @@ let
         '';
       }
     );
+
+  mkMerlinPackages =
+    testOcaml:
+    let
+      # nixpkgs does not yet provide an OCaml 5.4 package set at the pinned
+      # revision, so construct one around the compiler used to bootstrap
+      # OxCaml. Pin the plain pkgs.stdenv for this compiler rather than the
+      # variant stdenv: a clangStdenv-built compiler records `clang` as its C
+      # compiler, which isn't on PATH when the scope's packages build under
+      # the default gcc stdenv (e.g. findlib's `ocamlc -custom` link of
+      # ocamlfind). Pinning also keeps the dev-tool closure identical across
+      # oxcaml variants, so they share cached builds.
+      merlinBootOcaml = mkBootOcaml_5_4_0 pkgs.stdenv;
+      ocamlPackages =
+        (pkgs.ocaml-ng.mkOcamlPackages merlinBootOcaml).overrideScope (
+          _: osuper: {
+            dune_3 = dune;
+
+            # ounit2's own test suite has a flaky threads test that can hit
+            # its 600s timeout on loaded CI runners; skip upstream's tests.
+            ounit2 = osuper.ounit2.overrideAttrs (_: { doCheck = false; });
+
+            # Merlin relies on generated parser sources matching this version.
+            menhirLib = osuper.menhirLib.overrideAttrs (_: {
+              version = menhirVersion;
+              src = menhirSrc;
+            });
+
+            # menhirGLR inherits menhirLib's pinned src, which predates the
+            # menhirGLR package; menhir builds fine without it.
+            menhirGLR = null;
+
+            # nixpkgs' suggest-menhirLib patch doesn't apply to the pinned
+            # menhir source (same reason the 4.14 menhir above drops it).
+            menhir = osuper.menhir.overrideAttrs (_: { patches = [ ]; });
+
+            inherit (packages) merlin-lib dot-merlin-reader merlin;
+          }
+        );
+
+      inherit (ocamlPackages) buildDunePackage;
+      merlinSrc = "${src}/external/merlin";
+
+      packages = rec {
+        merlin-lib = buildDunePackage {
+          pname = "merlin-lib";
+          version = "dev";
+          src = merlinSrc;
+          duneVersion = "3";
+          propagatedBuildInputs = [ ocamlPackages.csexp ];
+          checkInputs = [ ocamlPackages.alcotest ];
+          doCheck = true;
+        };
+
+        dot-merlin-reader = buildDunePackage {
+          pname = "dot-merlin-reader";
+          version = "dev";
+          src = merlinSrc;
+          duneVersion = "3";
+          propagatedBuildInputs = [ ocamlPackages.findlib ];
+          buildInputs = [ merlin-lib ];
+          checkInputs = [ ocamlPackages.alcotest ];
+          doCheck = true;
+        };
+
+        merlin = buildDunePackage {
+          pname = "merlin";
+          version = "dev";
+          src = merlinSrc;
+          duneVersion = "3";
+          buildInputs = [
+            merlin-lib
+            dot-merlin-reader
+            ocamlPackages.menhirLib
+            ocamlPackages.menhirSdk
+            ocamlPackages.yojson
+          ];
+          nativeBuildInputs = [
+            ocamlPackages.menhir
+            pkgs.jq
+          ];
+          nativeCheckInputs = [
+            dot-merlin-reader
+            pkgs.python3
+            pkgs.which
+            testOcaml
+          ];
+          checkInputs = [ ocamlPackages.alcotest ];
+          doCheck = true;
+          checkPhase = ''
+            runHook preCheck
+            patchShebangs \
+              tests/merlin-wrapper \
+              tests/ocamlc-wrapper \
+              tests/dune-wrapper \
+              scripts/combine-merge-conflicts.py \
+              src/ocaml-index/tests/ocamlobjinfo-wrapper
+            DUNE_CACHE=disabled MERLIN_TEST_OCAML_PATH=${testOcaml} \
+              dune build @check @runtest
+            runHook postCheck
+          '';
+          meta.mainProgram = "ocamlmerlin";
+          passthru = {
+            devBuildInputs = [
+              ocamlPackages.alcotest
+              ocamlPackages.csexp
+              ocamlPackages.findlib
+              ocamlPackages.menhirLib
+              ocamlPackages.menhirSdk
+              ocamlPackages.yojson
+            ];
+            devNativeBuildInputs = [
+              ocamlPackages.menhir
+              pkgs.jq
+              pkgs.python3
+              pkgs.which
+            ];
+          };
+        };
+      };
+    in
+    packages;
+
+  # Only the passthru dev-input lists are used here, which don't depend on the
+  # testOcaml argument (it only feeds the merlin package's check phase).
+  merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
   # `make jsoo-build` inputs; see jsoo.nix.
   jsoo = import ./jsoo.nix { inherit pkgs dune menhirSrc; };
@@ -253,11 +388,13 @@ stdenv.mkDerivation {
   ]
   ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
   ++ lib.optional oxcamlLldb pkgs.python312
+  ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs
   ++ lib.optionals withJsoo jsoo.shellInputs;
 
   buildInputs = [
     pkgs.llvm # llvm-objcopy is used for debuginfo
-  ];
+  ]
+  ++ lib.optionals withMerlin merlinDev.devBuildInputs;
 
   preConfigure = ''
     rm -rf _build _install _runtest
@@ -302,6 +439,14 @@ stdenv.mkDerivation {
 
   shellHook =
     let
+      merlinCommands =
+        if withMerlin then
+          "  make merlin-build        - Build Merlin\n"
+          + "  make merlin-test         - Run the Merlin tests\n"
+          + "  make merlin-promote      - Promote Merlin test output\n"
+        else
+          "  (make merlin-* targets need this shell built with withMerlin=true,\n"
+          + "   as the flake's devShell does)\n";
       jsooCommands = lib.optionalString withJsoo "  make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml\n";
     in
     ''
@@ -320,7 +465,7 @@ stdenv.mkDerivation {
         make install             - Install
         make test                - Run all tests
         make test-one TEST=...   - Run a single test
-      ${jsooCommands}EOF
+      ${merlinCommands}${jsooCommands}EOF
     '';
 
   meta =
@@ -332,6 +477,7 @@ stdenv.mkDerivation {
       ocaml_5_4_0
       ocamlformat
       lldb
+      mkMerlinPackages
       jsoo
       ;
   };

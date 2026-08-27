@@ -570,6 +570,10 @@ let rec sort s srt =
     let var' = sort_var s var in
     if var == var' then srt
     else Var var'
+  | Addressable srt' ->
+    let srt'' = sort s srt' in
+    if srt' == srt'' then srt
+    else Addressable srt''
 
 let rec layout s l =
   let open Jkind_types.Layout in
@@ -583,17 +587,22 @@ let rec layout s l =
     let sort_l' = sort s sort_l in
     if sort_l == sort_l' then l
     else Sort (sort_l', ax)
+  | Addressable l' ->
+    let l'' = layout s l' in
+    if l' == l'' then l
+    else Addressable l''
 
 let jkind_desc s jkind =
   match jkind.base with
-  | Kconstr (p, sa) ->
+  | Kconstr (p, sa, op) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr (p', sa) }
-    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
+        { jkind with base = Kconstr (p', sa, op) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa, op) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      let base = Jkind.Base_and_axes.apply_operator base op in
       let const =
         { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
@@ -609,14 +618,15 @@ let jkind_desc s jkind =
 let jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
   match jkind.base with
-  | Kconstr (p, sa) ->
+  | Kconstr (p, sa, op) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr (p', sa) }
-    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
+        { jkind with base = Kconstr (p', sa, op) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa, op) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      let base = Jkind.Base_and_axes.apply_operator base op in
       { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }

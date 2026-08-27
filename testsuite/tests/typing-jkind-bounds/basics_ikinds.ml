@@ -1984,9 +1984,7 @@ Line 4, characters 0-77:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
          value mod portable contended,
-       because
-       - 'a is not mod portable
-       - b is not mod portable
+       because b is not mod portable.
 |}]
 
 type 'a t : value mod contended portable with 'a

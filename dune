@@ -357,38 +357,14 @@
   makedepend
   compile_common
   instantiator
+  functorizer
   ; manual update: mli only files
   annot
   value_rec_types
   cmo_format
   cmj_format
   outcometree
-  debug_event
-  ; See note below about camlinternalQuote
-  (:include
-   %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
-
-; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
-; we need to compile it as an additional target, but only for the first
-; stage build.  See also duneconf/dune.
-
-(rule
- (targets camlinternalQuote.ml)
- (enabled_if
-  (= %{context_name} "default"))
- (action
-  (copy#
-   %{project_root}/stdlib/camlinternalQuote.ml
-   %{project_root}/camlinternalQuote.ml)))
-
-(rule
- (targets camlinternalQuote.mli)
- (enabled_if
-  (= %{context_name} "default"))
- (action
-  (copy#
-   %{project_root}/stdlib/camlinternalQuote.mli
-   %{project_root}/camlinternalQuote.mli)))
+  debug_event))
 
 (library
  (name ocamlbytecomp)
@@ -405,6 +381,8 @@
   blambda_of_lambda
   bytegen
   byteinstantiator
+  bytefunctorizer
+  cmo_io
   bytelibrarian
   bytelink
   bytepackager
@@ -443,12 +421,12 @@
  (modules jsmaindriver jscompile jslibrarian))
 
 (executable
- (name boot_ocamlj)
+ (name ocamlj)
  (modes native)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
  (libraries ocamljcomp ocamlfrontend flambda2)
- (modules boot_ocamlj))
+ (modules ocamlj))
 
 ; Disabled since there can be only one (data_only_dirs) declaration
 ;(data_only_dirs yacc)
@@ -517,7 +495,7 @@
 
 (install
  (files
-  (boot_ocamlj.exe as ocamlj.opt))
+  (ocamlj.exe as ocamlj.opt))
  (section bin)
  (package ocaml))
 
@@ -1045,6 +1023,7 @@
  (name merlin-support)
  (deps
   (glob_files .ocamlcommon.objs/byte/*.{cmi,cmt,cmti})
+  (glob_files .ocamlfrontend.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamlbytecomp.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamloptcomp.objs/byte/*.{cmi,cmt,cmti})
   (glob_files .ocamljcomp.objs/byte/*.{cmi,cmt,cmti})

@@ -1123,7 +1123,12 @@ let mark_stack_non_executable () =
 let new_temp_var () =
   let id = !temp_var_counter in
   incr temp_var_counter;
-  Printf.sprintf "temp%d" id
+  (* The "L" prefix keeps the temporary assembler-local (these are only emitted
+     on macOS, via [force_assembly_time_constant]; compare
+     [new_delta_temp_var]). Without it every temporary becomes a symbol in the
+     object file, and the linker copies each one into the final executable's
+     symbol table along with a debug-map stab entry. *)
+  Printf.sprintf "Ltemp%d" id
 
 let force_assembly_time_constant expr =
   if not (TS.is_macos ())

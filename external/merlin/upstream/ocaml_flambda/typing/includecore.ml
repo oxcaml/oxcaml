@@ -228,6 +228,20 @@ let value_descriptions_zero_alloc
   | Ok () -> prim_coercion_zero_alloc_check
   | Error e -> raise (Dont_match (Zero_alloc e))
 
+let rec compilation_unit_of_uid = function
+  | Uid.Compilation_unit comp_unit
+  | Uid.Item { comp_unit; _ } ->
+    Some comp_unit
+  | Uid.Unboxed_version uid -> compilation_unit_of_uid uid
+  | Uid.Internal | Uid.Predef _ -> None
+
+let uid_is_from_current_unit uid =
+  match compilation_unit_of_uid uid, Env.get_current_unit () with
+  | Some declared_in, Some current_unit ->
+    String.equal declared_in
+      (Compilation_unit.full_path_as_string (Unit_info.modname current_unit))
+  | None, _ | _, None -> false
+
 let value_descriptions ~loc env name
     ~mmodes
     (vd1 : Types.value_description)
@@ -289,6 +303,16 @@ let value_descriptions ~loc env name
         in
         (try moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
+        let pc_loc =
+          (* Prefer a declaration from the current unit.  A foreign primitive
+             or signature location may not resolve against this unit's source
+             directory, so otherwise use the local inclusion site. *)
+          if uid_is_from_current_unit vd1.Types.val_uid
+          then vd1.Types.val_loc
+          else if uid_is_from_current_unit vd2.Types.val_uid
+          then vd2.Types.val_loc
+          else loc
+        in
         let pc =
           {pc_desc = p1; pc_type = vd2.Types.val_type;
            pc_poly_mode = Option.map Mode.Locality.disallow_right mode_l1;
@@ -297,7 +321,9 @@ let value_descriptions ~loc env name
              Ctype.prim_params_yielding env vd2.Types.val_type
                ~arity:p1.prim_arity;
            pc_zero_alloc_check = prim_coercion_zero_alloc_check;
-           pc_env = env; pc_loc = vd1.Types.val_loc; } in
+           pc_env = env;
+           pc_loc;
+          } in
         Tcoerce_primitive pc
      end
   | _ ->
@@ -1083,9 +1109,9 @@ module Record_diffing = struct
       match record_form with
       | Legacy ->
         begin match rep1, rep2 with
-        | Record_variable, Record_variable -> None
-        | Record_variable, _ -> Some (Fixed_representation Second)
-        | _, Record_variable -> Some (Fixed_representation First)
+        | Record_undetermined, Record_undetermined -> None
+        | Record_undetermined, _ -> Some (Fixed_representation Second)
+        | _, Record_undetermined -> Some (Fixed_representation First)
 
         | Record_unboxed, Record_unboxed -> None
         | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
@@ -1126,16 +1152,25 @@ module Record_diffing = struct
         | Record_dummy _, _ | _, Record_dummy _ ->
           Misc.fatal_error
             "compare_with_representation: dummy record representation"
+        | Record_variable _, _
+        | _, Record_variable _ ->
+          Misc.fatal_error
+            "compare_with_representation: instantiated record representation"
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
-        | Record_unboxed_product_variable, Record_unboxed_product_variable
+        | Record_unboxed_product_undetermined,
+          Record_unboxed_product_undetermined
         | Record_unboxed_product, Record_unboxed_product ->
             None
-        | Record_unboxed_product, Record_unboxed_product_variable ->
+        | Record_unboxed_product, Record_unboxed_product_undetermined ->
             Some (Fixed_representation First)
-        | Record_unboxed_product_variable, Record_unboxed_product ->
+        | Record_unboxed_product_undetermined, Record_unboxed_product ->
             Some (Fixed_representation Second)
+        | Record_unboxed_product_variable _, _
+        | _, Record_unboxed_product_variable _ ->
+            Misc.fatal_error
+              "compare_with_representation: instantiated record representation"
         end
 end
 
@@ -1307,7 +1342,7 @@ module Variant_diffing = struct
     =
     let shape_of_layout = function
       | Cstr_layout_known { shape; _ } -> Some shape
-      | Cstr_layout_variable -> None
+      | Cstr_layout_undetermined -> None
     in
     let shapes1, shapes2 =
       match rep1, rep2 with

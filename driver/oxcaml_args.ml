@@ -1176,17 +1176,6 @@ module Debugging = Dwarf_flags
 
 (* CR mshinwell: These help texts should show the default values. *)
 
-let mk_restrict_to_upstream_dwarf f =
-  ( "-gupstream-dwarf",
-    Arg.Unit f,
-    " Only emit the same DWARF information as the upstream compiler" )
-
-let mk_no_restrict_to_upstream_dwarf f =
-  ( "-gno-upstream-dwarf",
-    Arg.Unit f,
-    " Emit potentially more DWARF information than the upstream compiler. \
-     Implies -shape-format debugging-shapes." )
-
 let mk_dwarf_inlined_frames f =
   ("-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information")
 
@@ -2300,8 +2289,6 @@ module Oxcaml_options_impl = struct
 end
 
 module type Debugging_options = sig
-  val restrict_to_upstream_dwarf : unit -> unit
-  val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
   val ddebug_avail_sets : unit -> unit
@@ -2320,8 +2307,6 @@ end
 module Make_debugging_options (F : Debugging_options) = struct
   let list3 =
     [
-      mk_restrict_to_upstream_dwarf F.restrict_to_upstream_dwarf;
-      mk_no_restrict_to_upstream_dwarf F.no_restrict_to_upstream_dwarf;
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
       mk_ddebug_avail_sets F.ddebug_avail_sets;
@@ -2341,18 +2326,6 @@ module Make_debugging_options (F : Debugging_options) = struct
 end
 
 module Debugging_options_impl = struct
-  let restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := true;
-    Clflags.shape_format := Clflags.Old_merlin
-
-  let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false;
-    Clflags.shape_format := Clflags.Debugging_shapes
-  (* CR sspies: We should only enable OxCaml DWARF on the compiler once we are
-     ready to switch, since it leads to a new format of shapes in the .cms and
-     .cmt files. Merlin should continue to work, but we should be careful and
-     probably should switch over to debugging shapes in general first. *)
-
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
   let ddebug_avail_sets () = Debugging.debug_avail_sets := true
@@ -2584,7 +2557,6 @@ module Extra_params = struct
     | "caml-apply-inline-fast-path" ->
         set' Oxcaml_flags.caml_apply_inline_fast_path
     | "dasm-comments" -> set' Oxcaml_flags.dasm_comments
-    | "gupstream-dwarf" -> set' Debugging.restrict_to_upstream_dwarf
     | "gdwarf-inlined-frames" -> set' Debugging.dwarf_inlined_frames
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gdwarf-may-alter-codegen-experimental" ->
