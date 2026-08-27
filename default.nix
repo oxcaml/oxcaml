@@ -253,7 +253,6 @@ let
               ocamlPackages.alcotest
               ocamlPackages.menhirLib
               ocamlPackages.menhirSdk
-              ocamlPackages.yojson
             ];
             devNativeBuildInputs = [
               ocamlPackages.menhir
