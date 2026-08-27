@@ -789,7 +789,8 @@ let rec expression : Typedtree.expression -> term_judg =
            (match shape with
             | Constructor_uniform_value
             | Constructor_mixed _
-            | Constructor_variable _ ->
+            | Constructor_variable _
+            | Constructor_immediate_all_void ->
               Guard
             | Constructor_undetermined ->
                 Misc.fatal_error
@@ -820,6 +821,9 @@ let rec expression : Typedtree.expression -> term_judg =
               Guard
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
+          | Record_inlined (_, Constructor_immediate_all_void, _) ->
+            Misc.fatal_error
+              "value_rec_check: unexpected immediate representation"
           | Record_inlined (_, Constructor_undetermined, _)
           | Record_undetermined ->
             Misc.fatal_error

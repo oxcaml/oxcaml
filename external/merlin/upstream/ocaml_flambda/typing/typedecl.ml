@@ -158,7 +158,6 @@ type error =
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
-  | Missing_immediate_all_void_constructor_attribute of string
 
 open Typedtree
 
@@ -2596,7 +2595,8 @@ let finalize_instantiated_constructor env loc sorts_and_types kind
 let finalize_constructor_representation env loc
     (shape : Types.constructor_representation) =
   match shape with
-  | Constructor_uniform_value | Constructor_mixed _ -> shape
+  | Constructor_uniform_value | Constructor_mixed _
+  | Constructor_immediate_all_void -> shape
   | Constructor_variable sorts_and_types ->
       finalize_instantiated_constructor env loc sorts_and_types Cstr_tuple
   | Constructor_undetermined ->
@@ -2778,17 +2778,18 @@ let rec update_decl_jkind env dpath decl =
                 | Cstr_tuple (_ :: _) -> true
                 | Cstr_tuple [] | Cstr_record _ -> false)
           in
-          if is_nonempty_all_void
-          && not (Builtin_attributes.has_immediate_all_void_constructor
-                    cstr.Types.cd_attributes)
-          then
-            raise
-              (Error (cstr.Types.cd_loc,
-                      Missing_immediate_all_void_constructor_attribute
-                        (Ident.name cstr.Types.cd_id)));
+          let immediate_all_void =
+            is_nonempty_all_void
+            && Builtin_attributes.has_immediate_all_void_constructor
+                 cstr.Types.cd_attributes
+          in
           let () =
             match cstr_repr, arg_sorts with
             | Ok shape, Some sorts ->
+                let shape =
+                  if immediate_all_void then Constructor_immediate_all_void
+                  else shape
+                in
                 cstr_layouts.(idx) <- Cstr_layout_known { shape; sorts }
             | Ok _, None ->
                 Misc.fatal_error "Representation but no arg sorts?"
@@ -2806,6 +2807,7 @@ let rec update_decl_jkind env dpath decl =
           ~decl_params:decl.type_params
           ~type_apply:(Ctype.apply env)
           ~get_free_vars:(Ctype.free_variable_set_of_list env)
+          ~cstr_layouts
           (List.rev cstrs)
       in
       cstrs, Variant_boxed cstr_layouts, jkind
@@ -6150,12 +6152,6 @@ let report_error ~loc = function
       "%a can only be used on records whose fields \
        are all float64."
       Style.inline_code "[@@represent_as_float_array]"
-  | Missing_immediate_all_void_constructor_attribute name ->
-    Location.errorf ~loc
-      "All arguments of the constructor %a are void, so it must be@ \
-       annotated with %a."
-      Style.inline_code name
-      Style.inline_code "[@immediate_all_void_constructor]"
 
 let () =
   Location.register_error_of_exn

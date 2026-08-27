@@ -1299,33 +1299,22 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
          modal axes. *)
       use_decl_jkind ()
     | Types.Type_variant (cstrs, rep, _umc_opt) ->
-      (* Choose base: immediate for void-only variants; otherwise immutable. *)
-      let all_args_void =
-        List.for_all
-          (fun (c : Types.constructor_declaration) ->
-            match c.cd_args with
-            | Types.Cstr_tuple args ->
-              List.for_all
-                (fun (arg : Types.constructor_argument) ->
-                  match arg.ca_sort with
-                  | Some sort -> Jkind_types.Sort.Const.all_void sort
-                  | None -> false)
-                args
-            | Types.Cstr_record lbls ->
-              List.for_all
-                (fun (lbl : Types.label_declaration) ->
-                  match lbl.ld_sort with
-                  | Some sort -> Jkind_types.Sort.Const.all_void sort
-                  | None -> false)
-                lbls)
-          cstrs
+      (* Choose base: immediate for constant-only variants; otherwise
+         immutable. *)
+      let all_immediate =
+        match rep with
+        | Types.Variant_boxed layouts ->
+          Array.for_all Types.cstr_layout_is_constant layouts
+        | Types.Variant_unboxed | Types.Variant_extensible
+        | Types.Variant_with_null ->
+          false
       in
       let base =
         let base_lat, source =
           match rep with
           | Types.Variant_unboxed -> Axis_lattice.immediate, "unboxed variants"
           | _ ->
-            if all_args_void
+            if all_immediate
             then Axis_lattice.immediate, "enumeration variants"
             else Axis_lattice.immutable_data, "boxed variants"
         in

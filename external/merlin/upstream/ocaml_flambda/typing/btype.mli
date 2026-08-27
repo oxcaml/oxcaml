@@ -757,6 +757,7 @@ module Jkind0 : sig
         Types.type_expr list ->
         Types.type_expr) ->
       get_free_vars:(Types.type_expr list -> TypeSet.t) ->
+      cstr_layouts:Types.cstr_layout array ->
       Types.constructor_declaration list ->
       Types.jkind_l
 

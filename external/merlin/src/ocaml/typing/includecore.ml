@@ -389,6 +389,8 @@ type constructor_mismatch =
   | Explicit_return_type of position
   | Modality of int * Modality.equate_error
   | Fixed_representation of position
+  | Immediate_representation of position
+  | Constructor_representation_shape_mismatch
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -690,6 +692,14 @@ let report_constructor_mismatch first second decl env ppf err =
           but has layout any in %s?@]"
         (choose ord first second)
         (choose_other ord first second)
+  | Immediate_representation ord ->
+      pr "%s is annotated with %a and %s isn't."
+        (String.capitalize_ascii (choose ord first second))
+        Style.inline_code "[@immediate_all_void_constructor]"
+        (choose_other ord first second)
+  | Constructor_representation_shape_mismatch ->
+      pr "@[<hv>Their internal representations differ:@;\
+          This is likely caused by a layout mismatch in a later definition.@]"
 
 let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
   match x with
@@ -1199,13 +1209,19 @@ module Variant_diffing = struct
     | None, None -> None
     | Some _, None -> Some (Fixed_representation First)
     | None, Some _ -> Some (Fixed_representation Second)
-    | Some _, Some _ ->
-        (* Currently the only way for the representations to be different but
-           the types the same is for the layout information to be different
-           between the two sides, which is only possible if the layout is
-           [any] on one side or the other. So if neither representation is
-           [None] then we must be okay. *)
-        None
+    | Some Constructor_immediate_all_void,
+      Some Constructor_immediate_all_void -> None
+    | Some Constructor_immediate_all_void, Some _ ->
+        Some (Immediate_representation First)
+    | Some _, Some Constructor_immediate_all_void ->
+        Some (Immediate_representation Second)
+    | Some shape1, Some shape2 ->
+        if equal_constructor_representation_up_to_scannable_axes shape1 shape2
+        then None
+        else
+          (* Analogous to where [find_mismatch_in_mixed_record_representations]
+             returns [Representation_shape_mismatch] *)
+          Some Constructor_representation_shape_mismatch
 
   let compare_constructors ~loc env params1 params2 res1 res2 args1 args2
         shape1 shape2 =

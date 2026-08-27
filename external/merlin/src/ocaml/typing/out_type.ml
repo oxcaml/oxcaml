@@ -2023,7 +2023,7 @@ let extension_constructor_args_and_ret_type_subtree args ret_type =
       in
       (out_args, Some (qtvs, out_ret))
 
-let tree_of_single_constructor ~all_void cd =
+let tree_of_single_constructor ~immediate_all_void cd =
   let name = Ident.name cd.cd_id in
   let args, ret =
     extension_constructor_args_and_ret_type_subtree cd.cd_args cd.cd_res
@@ -2032,25 +2032,8 @@ let tree_of_single_constructor ~all_void cd =
       ocstr_name = name;
       ocstr_args = args;
       ocstr_return_type = ret;
-      ocstr_all_void = all_void;
+      ocstr_immediate_all_void = immediate_all_void;
   }
-
-(* A constructor takes [@immediate_all_void_constructor] iff it belongs to a
-   boxed variant and has at least one argument, all of which are void. *)
-let constructor_is_all_void rep cd =
-  match (rep : Types.variant_representation) with
-  | Variant_boxed _ -> begin
-      match cd.cd_args with
-      | Cstr_tuple ((_ :: _) as args) ->
-          List.for_all
-            (fun (ca : Types.constructor_argument) ->
-               match ca.ca_sort with
-               | Some s -> Jkind.Sort.Const.all_void s
-               | None -> false)
-            args
-      | Cstr_tuple [] | Cstr_record _ -> false
-    end
-  | Variant_unboxed | Variant_extensible | Variant_with_null -> false
 
 (* When printing GADT constructor, we need to forget the naming decision we took
   for the type parameters and constraints. Indeed, in
@@ -2060,12 +2043,12 @@ let constructor_is_all_void rep cd =
   It is fine to print both the type parameter ['a] and the existentially
   quantified ['a] in the definition of the constructor X as ['a]
  *)
-let tree_of_constructor_in_decl ~all_void cd =
+let tree_of_constructor_in_decl ~immediate_all_void cd =
   match cd.cd_res with
-  | None -> tree_of_single_constructor ~all_void cd
+  | None -> tree_of_single_constructor ~immediate_all_void cd
   | Some _ ->
       Variable_names.with_local_names
-        (fun () -> tree_of_single_constructor ~all_void cd)
+        (fun () -> tree_of_single_constructor ~immediate_all_void cd)
 
 let prepare_decl id decl =
   let params = filter_params decl.type_params in
@@ -2200,12 +2183,28 @@ let tree_of_type_decl ?(print_non_value_inferred_jkind = false) id decl =
           then Some "or_null_reexport"
           else None
         in
+        let immediate_all_void idx =
+          match rep with
+          | Variant_boxed layouts -> begin
+              match layouts.(idx) with
+              | Cstr_layout_known { shape = Constructor_immediate_all_void; _ }
+                -> true
+              | Cstr_layout_known
+                  { shape =
+                      ( Constructor_uniform_value
+                      | Constructor_mixed _ | Constructor_undetermined
+                      | Constructor_variable _ );
+                    _ }
+              | Cstr_layout_undetermined -> false
+            end
+          | Variant_unboxed | Variant_extensible | Variant_with_null -> false
+        in
         tree_of_manifest
           (Otyp_sum
-             (List.map
-                (fun cd ->
-                   tree_of_constructor_in_decl
-                     ~all_void:(constructor_is_all_void rep cd) cd)
+             (List.mapi
+                (fun idx cd ->
+                   let immediate_all_void = immediate_all_void idx in
+                   tree_of_constructor_in_decl ~immediate_all_void cd)
                 cstrs)),
         decl.type_private,
         unboxed,
@@ -2281,7 +2280,8 @@ let add_constructor_to_preparation c =
   Option.iter prepare_type c.cd_res
 
 let prepared_constructor ppf c =
-  !Oprint.out_constr ppf (tree_of_single_constructor ~all_void:false c)
+  !Oprint.out_constr ppf
+    (tree_of_single_constructor ~immediate_all_void:false c)
 
 
 let tree_of_type_declaration ?print_non_value_inferred_jkind id decl rs =

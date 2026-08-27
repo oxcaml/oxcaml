@@ -1350,6 +1350,8 @@ let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
   | Record_undetermined | Record_variable _
   | Record_inlined
       (_, (Constructor_undetermined | Constructor_variable _), _)
+  (* Inline records are never immediate. *)
+  | Record_inlined (_, Constructor_immediate_all_void, _)
   (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
   | Record_unboxed
   (* [@atomic] fields disable float record optimization. *)
@@ -3131,7 +3133,9 @@ type unrepresentable_arg =
 let instance_constructor_representation env constr ~types ~why
     : _ Result.t =
   match constr.cstr_shape with
-  | (Constructor_uniform_value | Constructor_mixed _) as shape ->
+  | (Constructor_uniform_value | Constructor_mixed _
+    | Constructor_immediate_all_void)
+    as shape ->
       begin match
         Misc.Stdlib.List.map_option
           (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)

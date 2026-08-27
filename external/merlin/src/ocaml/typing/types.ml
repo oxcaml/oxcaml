@@ -562,6 +562,7 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   | Constructor_mixed of mixed_product_shape
+  | Constructor_immediate_all_void
   | Constructor_undetermined
   | Constructor_variable of (Jkind_types.Sort.t * type_expr) array
 
@@ -965,6 +966,7 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
+  | Constructor_immediate_all_void, Constructor_immediate_all_void -> true
   | Constructor_undetermined, Constructor_undetermined -> true
   (* [Constructor_variable] only appears in the typedtree, never in a decl. *)
   | Constructor_variable _, _ | _, Constructor_variable _ ->
@@ -972,7 +974,7 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
         "equal_constructor_representation_up_to_scannable_axes: variable \
          representation"
   | (Constructor_mixed _ | Constructor_uniform_value
-    | Constructor_undetermined), _
+    | Constructor_immediate_all_void | Constructor_undetermined), _
     -> false
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
@@ -1042,7 +1044,23 @@ let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
          variable representation"
   | (Record_unboxed_product | Record_unboxed_product_undetermined), _ -> false
 
+<<<<<<< Merlin:rtjoa.all-void-variant-block
 (* The scannable axes in the resulting  are always [max] *)
+||||||| Compiler:last-imported
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
+=======
+let cstr_layout_is_constant (layout : cstr_layout) =
+  match layout with
+  | Cstr_layout_known { shape = Constructor_immediate_all_void; _ } -> true
+  | Cstr_layout_known
+      { shape = Constructor_uniform_value | Constructor_mixed _
+              | Constructor_undetermined | Constructor_variable _;
+        sorts } ->
+    Array.length sorts = 0
+  | Cstr_layout_undetermined -> false
+
+(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
+>>>>>>> Compiler:HEAD
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
   (* CR layouts-scannable: since sorts do not store scannable axis information,
