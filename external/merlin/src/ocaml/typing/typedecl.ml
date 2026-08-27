@@ -4000,19 +4000,11 @@ let transl_type_decl env rec_flag sdecl_list =
   List.iter2
     (fun sdecl tdecl ->
       let decl = tdecl.typ_type in
-<<<<<<< Merlin:ageorges/mode-polymorphism-integrate
-       match Ctype.closed_type_decl decl with
+       match Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+          Ctype.closed_type_decl ~zap_scope decl) with
          Some ty ->
           if not (Msupport.erroneous_type_check ty) then
             raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
-||||||| Compiler:last-imported
-       match Ctype.closed_type_decl decl with
-         Some ty -> raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
-=======
-       match Mode.Alloc.with_zap_scope (fun ~zap_scope ->
-          Ctype.closed_type_decl ~zap_scope decl) with
-         Some ty -> raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
->>>>>>> Compiler:HEAD
        | None   -> ())
     sdecl_list tdecls;
   (* Check that constraints are enforced *)

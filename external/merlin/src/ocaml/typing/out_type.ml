@@ -2533,17 +2533,11 @@ module Aliases = struct
           if List.memq px !visited_objects then add_proxy px else begin
             if not (static_row row) then
               visited_objects := px :: !visited_objects;
-<<<<<<< Merlin:ageorges/mode-polymorphism-integrate
             match row_name row with
             | Some(_p, tyl) when nameable_row row ->
                 List.iter (mark_loops_rec visited) tyl
             | _ ->
                 iter_row (mark_loops_rec visited) row
-||||||| Compiler:last-imported
-            printer_iter_type_expr (mark_loops_rec visited) ty
-=======
-            printer_iter_type_expr (mark_loops_rec visited) (Fun.const ()) ty
->>>>>>> Compiler:HEAD
           end
       | Tobject (fi, nm) ->
           if List.memq px !visited_objects then add_proxy px else begin
@@ -2577,15 +2571,7 @@ module Aliases = struct
       | Tpoly(ty, tyl) ->
           List.iter add tyl;
           mark_loops_rec visited ty
-<<<<<<< Merlin:ageorges/mode-polymorphism-integrate
       | Tunivar _ -> Variable_names.reserve ty
-||||||| Compiler:last-imported
-      | _ ->
-          printer_iter_type_expr (mark_loops_rec visited) ty
-=======
-      | _ ->
-          printer_iter_type_expr (mark_loops_rec visited) (Fun.const ()) ty
->>>>>>> Compiler:HEAD
 
   let mark_loops ty =
     mark_loops_rec [] ty

@@ -5225,8 +5225,8 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
                     extra_arg_loc = sarg.pexp_loc; }))
     with Msupport.Resume ->
       let ty_arg, kind_arg = new_rep_var ~why:Function_argument () in
-      kind_arg, Mode.Alloc.newvar (), ty_arg,
-      Mode.Alloc.newvar (), ty_fun
+      kind_arg, Mode.Alloc.newvar (get_current_level ()), ty_arg,
+      Mode.Alloc.newvar (get_current_level ()), ty_fun
     in
     let arg = Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg } in
     loop ty_res mode_ret ((lbl, Arg arg) :: rev_args) rest
@@ -6636,9 +6636,9 @@ let split_function_ty
         let arg_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         let ret_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         { ty_arg = newty (Tpoly (newvar2 level arg_kind, []))
-        ; arg_mode = Mode.Alloc.newvar ()
+        ; arg_mode = Mode.Alloc.newvar level
         ; ty_ret = newvar2 level ret_kind
-        ; ret_mode = Mode.Alloc.newvar ()
+        ; ret_mode = Mode.Alloc.newvar level
         }
     end
   in
@@ -6905,14 +6905,8 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
     | None -> begin
         match pat_tuple_arity spat with
         | Not_local_tuple | Maybe_local_tuple ->
-<<<<<<< Merlin:ageorges/mode-polymorphism-integrate
             (* TODO: mode can be more relaxed than this if fields are global *)
-            let mode = Value.newvar () in
-||||||| Compiler:last-imported
-            let mode = Value.newvar () in
-=======
             let mode = Value.newvar (get_current_level ()) in
->>>>>>> Compiler:HEAD
             simple_pat_mode mode, mode_default mode
         | Local_tuple locs ->
             let modes =
@@ -6966,9 +6960,10 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
                 val_modalities = Modality.of_const Modality.Const.id
               };
             kind = Id_value;
-            unique_use = (Uniqueness.newvar (), Linearity.newvar ());
-            mode = Mode.Value.newvar ();
-            staticity = Staticity.newvar ()
+            unique_use = (Uniqueness.newvar (get_current_level ()),
+                          Linearity.newvar (get_current_level ()));
+            mode = Mode.Value.newvar (get_current_level ());
+            staticity = Staticity.newvar (get_current_level ())
           };
       exp_loc = loc;
       exp_extra = [];
@@ -7832,7 +7827,7 @@ and type_expect_
                   args,
                   pm.apply_position,
                   Typedtree.create_return_mode ap_mode,
-                  Mode.Yielding.newvar (),
+                  Mode.Yielding.newvar 0,
                   None
                 );
               exp_loc = loc;
@@ -9852,7 +9847,11 @@ and type_function
              ~attributes:(Msupport.recovery_attributes []))
       in
       let ret_info =
-        { ret_mode = { mode_modes = Alloc.newvar (); mode_desc = [] };
+        { ret_mode =
+            { mode_modes =
+                Typedtree.create_return_mode
+                  (Locality.newvar 0);
+              mode_desc = [] };
           ret_sort = Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ()));
           cases_arg_yielding = None;
         }
@@ -9861,8 +9860,9 @@ and type_function
         newtypes = [];
         params_contain_gadt = No_gadt;
         fun_alloc_mode =
-          Some { alloc_mode = Locality.newvar ();
-                 fun_closure_mode = Alloc.Comonadic.newvar () };
+          Some { alloc_mode = Locality.newvar 0;
+                 fun_closure_mode =
+                   Alloc.Comonadic.newvar (get_current_level ()) };
         ret_info = Some ret_info;
         calling_convention_sorts = []
       })
@@ -9923,15 +9923,11 @@ and type_function_
                (let params = List.map (fun { param; _ } -> param) params in
                 let ret_mode, ret_sort =
                   match ret_info with
-                  | Some { ret_mode; ret_sort; _ } ->
-                    { ret_mode with
-                      mode_modes =
-                        Alloc.proj_comonadic Areality ret_mode.mode_modes
-                        |> Typedtree.create_return_mode },
-                    ret_sort
+                  | Some { ret_mode; ret_sort; _ } -> ret_mode, ret_sort
                   | None ->
                     ({ mode_modes =
-                         Typedtree.create_return_mode (Locality.newvar ());
+                         Typedtree.create_return_mode
+                           (Locality.newvar 0);
                        mode_desc = [] },
                      Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())))
                 in
@@ -9939,7 +9935,7 @@ and type_function_
                   Typedtree.create_alloc_mode_r @@ Locality.disallow_left @@
                   match fun_alloc_mode with
                   | Some { alloc_mode; _ } -> alloc_mode
-                  | None -> Locality.newvar ()
+                  | None -> Locality.newvar 0
                 in
                 Texp_function
                   { params;
@@ -9948,7 +9944,7 @@ and type_function_
                     ret_sort;
                     alloc_mode;
                     zero_alloc=Zero_alloc.default;
-                    yielding = Yielding.newvar ()
+                    yielding = Yielding.newvar 0
                   });
               exp_loc = loc;
               exp_extra = [];
@@ -10135,6 +10131,7 @@ and type_function_
                         alloc_mode
                     | Error e ->
 <<<<<<< HEAD
+<<<<<<< HEAD
                       raise (error(loc, env,
                         Uncurried_function_escapes_comonadic e))
 =======
@@ -10149,6 +10146,10 @@ and type_function_
                         Uncurried_function_escapes_comonadic e));
 >>>>>>> Compiler:HEAD
 >>>>>>> 468626124c (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
+=======
+                      raise
+                        (error(loc, env, Uncurried_function_escapes_comonadic e))
+>>>>>>> d8098fdfb0 (Fix merlin to build under mode polymorphism)
                   end;
                   More_args
                     { partial_mode =
@@ -10187,16 +10188,10 @@ and type_function_
                (let params = List.map (fun { param; _ } -> param) params in
                 let ret_mode, ret_sort =
                   match ret_info with
-                  | Some { ret_mode; ret_sort; _ } ->
-                    { ret_mode with
-                      mode_modes =
-                        Alloc.proj_comonadic Areality ret_mode.mode_modes
-                        |> Typedtree.create_return_mode },
-                    ret_sort
+                  | Some { ret_mode; ret_sort; _ } -> ret_mode, ret_sort
                   | None ->
                     ( { mode_modes =
-                          Alloc.proj_comonadic Areality
-                            (Alloc.disallow_right ret_mode)
+                          create_allocation_mode_l ret_mode
                           |> Typedtree.create_return_mode;
                         mode_desc = [] }
                     , ret_sort )
@@ -10207,7 +10202,7 @@ and type_function_
                       Typedtree.create_alloc_mode_r
                         (Locality.disallow_left alloc_mode);
                     zero_alloc = Zero_alloc.default;
-                    yielding = Yielding.newvar () });
+                    yielding = Yielding.newvar 0 });
               exp_loc = loc;
               exp_extra = [];
               exp_type;
@@ -12162,8 +12157,7 @@ and type_function_cases_expect
                   body = Tfunction_cases cases;
                   ret_mode =
                     { mode_modes =
-                        Alloc.proj_comonadic Areality
-                          (Alloc.disallow_right ret_mode)
+                        create_allocation_mode_l ret_mode
                         |> Typedtree.create_return_mode;
                       mode_desc = []};
                   ret_sort;
@@ -12171,7 +12165,7 @@ and type_function_cases_expect
                     Typedtree.create_alloc_mode_r
                       (Locality.disallow_left alloc_mode);
                   zero_alloc = Zero_alloc.default;
-                  yielding = Yielding.newvar ()
+                  yielding = Yielding.newvar 0
                 };
             exp_loc = loc;
             exp_extra = [];

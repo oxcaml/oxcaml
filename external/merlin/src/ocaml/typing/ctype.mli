@@ -613,17 +613,9 @@ val remove_mode_and_jkind_variables:
   zap_scope:Alloc.zap_scope -> type_expr -> unit
         (* Ensure mode and jkind variables are fully determined *)
 
-<<<<<<< Merlin:ageorges/mode-polymorphism-integrate
-val nongen_vars_in_schema: Env.t -> type_expr -> Btype.TypeSet.t option
-        (* Return any non-generic variables in the type scheme. Also ensures
-||||||| Compiler:last-imported
-val nongen_vars_in_schema: Env.t -> type_expr -> Btype.TypeSet.t option
-        (* Return any non-generic variables in the type scheme.  Also ensures
-=======
 val nongen_vars_in_schema:
   zap_scope:Alloc.zap_scope -> Env.t -> type_expr -> Btype.TypeSet.t option
         (* Return any non-generic variables in the type scheme.  Also ensures
->>>>>>> Compiler:HEAD
            mode variables are fully determined. *)
 
 val nongen_vars_in_class_declaration:class_declaration -> Btype.TypeSet.t option
