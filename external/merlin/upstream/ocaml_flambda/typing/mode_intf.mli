@@ -998,6 +998,8 @@ module type S = sig
 
     val zap_to_legacy_force : ?commit:bool -> lr -> Const.t
 
+    val zap_to_floor_force : (allowed * 'r) t -> Const.t
+
     val zap_to_ceil_exn : ('l * allowed) t -> Const.t
 
     val zap_to_floor_exn : (allowed * 'r) t -> Const.t
