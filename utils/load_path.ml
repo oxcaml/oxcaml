@@ -82,10 +82,11 @@ module Dune_manifests_reader : sig
 
   val create : unit -> t
 
-  val iter_manifest
+  val read_manifest
     :  t
     -> f:(filename:string -> location:Path.Cwd_relative.t ->
           cmx_guaranteed:bool -> unit)
+    -> on_manifest:(Path.Load_root_relative.t -> unit)
     -> manifest_path:Path.Load_root_relative.t
     -> unit
 end = struct
@@ -213,7 +214,7 @@ end = struct
     | _ -> raise (Parse_error ("Cannot parse manifest file line: " ^ line))
   ;;
 
-  let rec iter_manifest t ~f ~manifest_path =
+  let read_manifest t ~f ~on_manifest ~manifest_path =
     let buffer = Buffer.create 16 in
     visit t manifest_path ~f:(fun manifest_path ->
       iter_lines manifest_path ~f:(fun line ->
@@ -222,7 +223,7 @@ end = struct
         | Some (Entry.File { filename; location; cmx_guaranteed }) ->
           visit t location ~f:(fun location ->
             f ~filename ~location ~cmx_guaranteed)
-        | Some (Manifest manifest_path) -> iter_manifest t ~f ~manifest_path))
+        | Some (Manifest manifest_path) -> on_manifest manifest_path))
   ;;
 end
 
@@ -324,6 +325,8 @@ module Path_cache : sig
   val prepend_add_single : hidden:bool -> cmx_guaranteed:bool ->
     string -> string -> unit
 
+  val add_hidden_single : string -> string -> unit
+
   (* Search for a basename in cache by exact name. *)
   val find : string -> string * visibility
 
@@ -360,6 +363,14 @@ end = struct
           STbl.replace !visible_files_uncap ubase
             { Clflags.path = fn; cmx_guaranteed }
         end)
+      (Misc.normalized_unit_filename base)
+
+  let add_hidden_single base fn =
+    Result.iter (fun ubase ->
+        if not (STbl.mem !hidden_files base) then
+          STbl.replace !hidden_files base fn;
+        if not (STbl.mem !hidden_files_uncap ubase) then
+          STbl.replace !hidden_files_uncap ubase fn)
       (Misc.normalized_unit_filename base)
 
   let prepend_add dir =
@@ -411,18 +422,24 @@ type auto_include_callback =
 let visible_dirs = s_ref []
 let visible_basenames = s_ref []
 let hidden_dirs = s_ref []
-let hidden_basenames = s_ref []
 let no_auto_include _ _ = raise Not_found
 let auto_include_callback = ref no_auto_include
+
+let pending_hidden_manifests
+  : Dune_manifests_reader.Path.Load_root_relative.t Queue.t ref
+  = s_table Queue.create ()
+
+let manifests_reader = s_table Dune_manifests_reader.create ()
 
 let reset () =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.reset ();
   hidden_dirs := [];
-  hidden_basenames := [];
   visible_dirs := [];
   visible_basenames := [];
-  auto_include_callback := no_auto_include
+  auto_include_callback := no_auto_include;
+  Queue.clear !pending_hidden_manifests;
+  manifests_reader := Dune_manifests_reader.create ()
 ;;
 
 type dirs_and_files =
@@ -459,28 +476,78 @@ let get_paths () =
    time. *)
 let init_manifests () =
   Profile.record_call ~accumulate:true "read_manifests" @@ fun () ->
-  let manifests_reader = Dune_manifests_reader.create () in
-  let load_manifest ~hidden ~basenames manifest_path =
+  let init_manifest f manifest_path =
     let manifest_path =
       Dune_manifests_reader.Path.Load_root_relative.of_string manifest_path in
-    Dune_manifests_reader.iter_manifest
-      manifests_reader
+    f manifest_path
+  in
+  let rec load_visible_manifest manifest_path =
+    Dune_manifests_reader.read_manifest
+      !manifests_reader
       ~manifest_path
+      ~on_manifest:load_visible_manifest
       ~f:(fun ~filename ~location ~cmx_guaranteed ->
           let basename = Filename.basename filename in
-          basenames := basename :: !basenames;
+          visible_basenames := basename :: !visible_basenames;
           Path_cache.prepend_add_single
-            ~hidden
+            ~hidden:false
             ~cmx_guaranteed
             basename
             (Dune_manifests_reader.Path.Cwd_relative.to_string location))
   in
+  let enqueue_hidden_manifest manifest_path =
+    Queue.add manifest_path !pending_hidden_manifests
+  in
   List.iter
-    (load_manifest ~hidden:false ~basenames:visible_basenames)
+    (init_manifest load_visible_manifest)
     !Clflags.include_manifests;
+  (* Enqueue in command-line order, so that the first flag takes
+     precedence. *)
   List.iter
-    (load_manifest ~hidden:true ~basenames:hidden_basenames)
-    !Clflags.hidden_include_manifests
+    (init_manifest enqueue_hidden_manifest)
+    (List.rev !Clflags.hidden_include_manifests)
+
+let basename_matches ~uncap fn basename =
+  if uncap then
+    match Misc.normalized_unit_filename basename with
+    | Ok normalized -> String.equal normalized fn
+    | Error _ -> false
+  else
+    String.equal basename fn
+
+let load_one_pending_manifest ~uncap fn =
+  match Queue.take_opt !pending_hidden_manifests with
+  | None -> raise Not_found
+  | Some manifest_path ->
+    let found = ref None in
+    Dune_manifests_reader.read_manifest
+      !manifests_reader
+      ~manifest_path
+      ~on_manifest:(fun manifest_path ->
+        Queue.add manifest_path !pending_hidden_manifests)
+      ~f:(fun ~filename ~location ~cmx_guaranteed:_ ->
+        let basename = Filename.basename filename in
+        let location =
+          Dune_manifests_reader.Path.Cwd_relative.to_string location in
+        if Option.is_none !found && basename_matches ~uncap fn basename
+        then found := Some (location, Hidden);
+        Path_cache.add_hidden_single basename location);
+    !found
+
+let rec find_in_pending_manifests ~uncap fn =
+  match load_one_pending_manifest ~uncap fn with
+  | Some result -> result
+  | None -> find_in_pending_manifests ~uncap fn
+
+let find_loading_manifests fn =
+  match Path_cache.find fn with
+  | result -> result
+  | exception Not_found -> find_in_pending_manifests ~uncap:false fn
+
+let find_uncap_loading_manifests fn_uncap =
+  match Path_cache.find_uncap ~fn_already_uncapped:fn_uncap with
+  | result -> result
+  | exception Not_found -> find_in_pending_manifests ~uncap:true fn_uncap
 
 let init ~auto_include ~visible ~hidden =
   reset ();
@@ -561,7 +628,7 @@ let find fn =
   assert (not Config.merlin || Local_store.is_bound ());
   try
     if is_basename fn && not !Sys.interactive then
-      fst (Path_cache.find fn)
+      fst (find_loading_manifests fn)
     else
       Misc.find_in_path (get_path_list ()) fn
   with Not_found ->
@@ -582,7 +649,7 @@ let find_normalized_with_visibility fn =
   | Ok fn_uncap ->
   try
     if is_basename fn && not !Sys.interactive then
-      Path_cache.find_uncap ~fn_already_uncapped:fn_uncap
+      find_uncap_loading_manifests fn_uncap
     else
       match search_dirs (List.rev !visible_dirs) fn with
       | Some result -> result
