@@ -3304,7 +3304,7 @@ let enter_unbound_module name reason env =
 let read_signature modname cmi =
   let mty, mode = read_pers_mod modname cmi in
   (* [mode] read from the cmi is always a constant *)
-  Subst.Lazy.force_signature mty, (Mode.Value.zap_to_floor mode).staticity
+  Subst.Lazy.force_signature mty, (Mode.Value.zap_to_floor_exn mode).staticity
 
 let find_import ~chain modname =
   try Persistent_env.find_import !persistent_env modname
