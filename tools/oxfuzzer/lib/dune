@@ -1,3 +1,3 @@
 (library
- (name backend_fuzzer_lib)
+ (name oxfuzzer_lib)
  (libraries ocamloptcomp))
