@@ -553,6 +553,19 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   then
     Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print
       ssa;
+  let ssa =
+    if !Oxcaml_flags.ssa_delete_empty_loops
+    then begin
+      let ssa, deleted = Delete_empty_loops.run ssa in
+      if !Oxcaml_flags.dump_ssa && deleted > 0
+      then
+        Format.fprintf ppf_dump
+          "*** SSA after Delete_empty_loops (%d deleted)@.@.%a" deleted
+          Ssa_print.print ssa;
+      ssa
+    end
+    else ssa
+  in
   try
     (* Before creating the final CFG that will actually go through register
        allocation, make sure to clear the global list of relocatable registers

@@ -67,6 +67,8 @@
 
 (copy_files# backend/ssa/*.ml{,i})
 
+(copy_files# backend/ssa/loop/*.ml{,i})
+
 (copy_files# backend/debug/*.ml{,i})
 
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
@@ -708,6 +710,16 @@
   ssa_tail_call
   ssa_of_cmm
   cfg_of_ssa
+  ;; backend/ssa/loop/
+  fourier_motzkin
+  affine_expr
+  loop_comparisons
+  natural_loop
+  induction_var
+  affine_ssa
+  termination
+  dead_induction_var
+  delete_empty_loops
   ;; backend/debug/
   available_ranges_vars
   compute_ranges
