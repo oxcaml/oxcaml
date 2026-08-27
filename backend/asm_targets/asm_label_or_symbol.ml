@@ -4,7 +4,7 @@
 (*                                                                        *)
 (*                  Mark Shinwell, Jane Street Europe                     *)
 (*                                                                        *)
-(*   Copyright 2018 Jane Street Group LLC                                 *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -12,31 +12,25 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Management of the .debug_addr table (DWARF-5 spec section 7.2.7, page 241).
-*)
-
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
-open Asm_targets
+type t =
+  | Label of Asm_label.t
+  | Symbol of Asm_symbol.t
 
-type t
+let compare t1 t2 =
+  match t1, t2 with
+  | Label lbl1, Label lbl2 -> Asm_label.compare lbl1 lbl2
+  | Symbol sym1, Symbol sym2 -> Asm_symbol.compare sym1 sym2
+  | Label _, Symbol _ -> -1
+  | Symbol _, Label _ -> 1
 
-val create : unit -> t
+let equal t1 t2 = compare t1 t2 = 0
 
-(** [add ~adjustment t addr] adds to the table the address of the label [addr]
-    plus the [adjustment]. If the [adjustment] is omitted then it is taken to be
-    zero.
+let hash = function
+  | Label lbl -> Hashtbl.hash (0, Asm_label.hash lbl)
+  | Symbol sym -> Hashtbl.hash (1, Asm_symbol.hash sym)
 
-    The returned address index may be used for referencing the address e.g. in a
-    location list entry. *)
-val add : ?adjustment:int -> t -> Asm_label.t -> Address_index.t
-
-(** As [add], but for the address of a symbol (for example a base address for
-    location or range list entries encoded as offsets). *)
-val add_symbol : t -> Asm_symbol.t -> Address_index.t
-
-(** The label to be used as the value of the [DW_AT_base] attribute (DWARF-5
-    spec page 66 line 14). *)
-val base_addr : t -> Asm_label.t
-
-include Dwarf_emittable.S with type t := t
+let print ppf = function
+  | Label lbl -> Asm_label.print ppf lbl
+  | Symbol sym -> Asm_symbol.print ppf sym

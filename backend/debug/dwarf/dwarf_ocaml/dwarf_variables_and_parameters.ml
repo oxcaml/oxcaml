@@ -127,9 +127,9 @@ let location_list_entry state ~start_of_code_symbol ~subrange
          as its base address (see [dwarf_for_variable] below). *)
       Offset_pair_between_labels
         { start_inclusive = start_pos;
-          start_adjustment = start_pos_offset;
+          start_adjustment_in_bytes = start_pos_offset;
           end_exclusive = end_pos;
-          end_adjustment = end_pos_offset;
+          end_adjustment_in_bytes = end_pos_offset;
           payload = loc_desc
         }
     in
@@ -190,8 +190,8 @@ let dwarf_for_variable state ~value_type_proto_die ~function_symbol
       match !Dwarf_flags.gdwarf_version with
       | Five ->
         (* The offsets in DWARF-5 location list entries are relative to the
-           function symbol (established as the base address of each list),
-           keeping their ULEB128 encodings small. *)
+           function symbol, which is established as the base address of each
+           list. *)
         function_symbol, []
       | Four -> (
         match DS.code_layout state with

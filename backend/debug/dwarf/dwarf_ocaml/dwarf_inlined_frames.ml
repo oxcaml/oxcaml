@@ -37,23 +37,38 @@ module K = IF.Inlined_frames.Key
 module L = Linear
 module String = Misc.Stdlib.String
 
-(* Keys identifying subranges (start label and adjustment, end label and
-   adjustment) for the deduplication of range lists via "summaries" below. *)
-module Subrange_summary = Identifiable.Make (struct
-  type t = int * int * int * int
+(* Keys identifying subranges for the deduplication of range lists via
+   "summaries" below. *)
+module Subrange_summary = struct
+  module T0 = struct
+    type t =
+      { start_label : int;
+        start_adjustment_in_bytes : int;
+        end_label : int;
+        end_adjustment_in_bytes : int
+      }
 
-  let compare = Stdlib.compare
+    let compare = Stdlib.compare
 
-  let equal t1 t2 = compare t1 t2 = 0
+    let equal t1 t2 = compare t1 t2 = 0
 
-  let hash = Hashtbl.hash
+    let hash = Hashtbl.hash
 
-  let print ppf (start_label, start_adj, end_label, end_adj) =
-    Format.fprintf ppf "(L%d+%d, L%d+%d)" start_label start_adj end_label
-      end_adj
+    let print ppf
+        { start_label;
+          start_adjustment_in_bytes;
+          end_label;
+          end_adjustment_in_bytes
+        } =
+      Format.fprintf ppf "(L%d+%d, L%d+%d)" start_label
+        start_adjustment_in_bytes end_label end_adjustment_in_bytes
 
-  let output _ _ = Misc.fatal_error "Not yet implemented"
-end)
+    let output _ _ = Misc.fatal_error "Not yet implemented"
+  end
+
+  include T0
+  include Identifiable.Make (T0)
+end
 
 type ranges =
   | Contiguous of
@@ -77,7 +92,7 @@ let create_contiguous_range_list_and_summarise subrange =
       end_pos_offset
     }
 
-let create_discontiguous_range_list_entry _state ~start_of_code_symbol
+let create_discontiguous_range_list_entry ~start_of_code_symbol
     dwarf_4_range_list_entries range_list summary subrange =
   let start_pos = IF.Subrange.start_pos subrange in
   let start_pos_offset = IF.Subrange.start_pos_offset subrange in
@@ -85,10 +100,11 @@ let create_discontiguous_range_list_entry _state ~start_of_code_symbol
   let end_pos_offset = IF.Subrange.end_pos_offset subrange in
   let summary =
     Subrange_summary.Set.add
-      ( Label.to_int start_pos,
-        start_pos_offset,
-        Label.to_int end_pos,
-        end_pos_offset )
+      { start_label = Label.to_int start_pos;
+        start_adjustment_in_bytes = start_pos_offset;
+        end_label = Label.to_int end_pos;
+        end_adjustment_in_bytes = end_pos_offset
+      }
       summary
   in
   match !Dwarf_flags.gdwarf_version with
@@ -112,9 +128,9 @@ let create_discontiguous_range_list_entry _state ~start_of_code_symbol
          below). *)
       Offset_pair_between_labels
         { start_inclusive = Asm_label.create_int Text (start_pos |> Label.to_int);
-          start_adjustment = start_pos_offset;
+          start_adjustment_in_bytes = start_pos_offset;
           end_exclusive = Asm_label.create_int Text (end_pos |> Label.to_int);
-          end_adjustment = end_pos_offset;
+          end_adjustment_in_bytes = end_pos_offset;
           payload = ()
         }
     in
@@ -144,7 +160,7 @@ let create_discontiguous_range_list_and_summarise state ~start_of_code_symbol
   let dwarf_4_range_list_entries, range_list, summary =
     IF.Range.fold range ~init:([], range_list_init, Subrange_summary.Set.empty)
       ~f:(fun (dwarf_4_range_list_entries, range_list, summary) subrange ->
-        create_discontiguous_range_list_entry state ~start_of_code_symbol
+        create_discontiguous_range_list_entry ~start_of_code_symbol
           dwarf_4_range_list_entries range_list summary subrange)
   in
   let base_address_entry =
@@ -361,8 +377,7 @@ let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~function_symbol
     match !Dwarf_flags.gdwarf_version with
     | Five ->
       (* The offsets in DWARF-5 range list entries are relative to the function
-         symbol (established as the base address of each list), keeping their
-         ULEB128 encodings small. *)
+         symbol, which is established as the base address of each list. *)
       function_symbol, []
     | Four -> (
       match DS.code_layout state with
