@@ -59,6 +59,18 @@ module Value = struct
   let distance_between_labels_32_bit ?comment ~upper ~lower () =
     Dwarf_value (V.distance_between_labels_32_bit ?comment ~upper ~lower ())
 
+  (* A DW_FORM_ref4 reference: the offset of the referenced DIE from the start
+     of the header of the unit containing it. Both labels must be in the same
+     section. *)
+  let unit_relative_reference_32_bit ?comment ~die_label ~unit_header_label () =
+    Dwarf_value
+      (V.distance_between_labels_32_bit ?comment ~upper:die_label
+         ~lower:unit_header_label ())
+
+  (* A DW_FORM_ref_sig8 reference to a type unit via its 8-byte signature. *)
+  let type_signature_reference ?comment signature =
+    Dwarf_value (V.int64 ?comment signature)
+
   let distance_between_labels_64_bit ?comment ~upper ~lower () =
     Dwarf_value (V.distance_between_labels_64_bit ?comment ~upper ~lower ())
 

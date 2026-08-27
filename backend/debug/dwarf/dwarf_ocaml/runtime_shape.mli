@@ -328,6 +328,17 @@ val rec_var : DeBruijn_index.t -> Runtime_layout.t -> t
 (** Project the runtime layout of a shape. *)
 val runtime_layout : t -> Runtime_layout.t
 
+(** Number of enclosing [Mu] binders that the shape can reference: one more than
+    the largest free de Bruijn index, or zero if the shape is closed. A shape's
+    meaning depends only on the first [free_depth] entries of any enclosing
+    environment. O(size of the shape). *)
+val free_depth : t -> int
+
+(** An 8-byte signature identifying the shape for use as a DWARF type unit
+    signature: equal for structurally equal shapes, including across compilation
+    units. Only meaningful for closed shapes ([free_depth t = 0]). *)
+val type_unit_signature : t -> Int64.t
+
 val print : Format.formatter -> t -> unit
 
 val equal : t -> t -> bool

@@ -116,6 +116,26 @@ val create_type_from_reference :
   proto_die_reference:Proto_die.reference ->
   Dwarf_attribute_values.Attribute_value.t
 
+(** A [DW_AT_type] attribute referencing a type unit by signature
+    ([DW_FORM_ref_sig8]). *)
+val create_type_from_signature :
+  signature:Int64.t -> Dwarf_attribute_values.Attribute_value.t
+
+(** A [DW_AT_type] attribute referencing a DIE in the same unit via
+    [DW_FORM_ref4]. [unit_header_label] must be the label on the first byte of
+    the header of the unit containing both the attribute and the referenced DIE.
+*)
+val create_type_unit_relative :
+  proto_die_reference:Proto_die.reference ->
+  unit_header_label:Asm_targets.Asm_label.t ->
+  Dwarf_attribute_values.Attribute_value.t
+
+(** As [create_type_unit_relative], but for [DW_AT_discr]. *)
+val create_discr_unit_relative :
+  proto_die_reference:Asm_targets.Asm_label.t ->
+  unit_header_label:Asm_targets.Asm_label.t ->
+  Dwarf_attribute_values.Attribute_value.t
+
 val create_import :
   proto_die:Proto_die.t -> Dwarf_attribute_values.Attribute_value.t
 

@@ -18,10 +18,21 @@
 open Asm_targets
 open Dwarf_low
 
+(** A type unit to be emitted into .debug_types (DWARF-4 only). [root] must be a
+    proto-DIE with tag [Type_unit] and no parent, whose label (and those of all
+    its descendants, including [primary]) lies in the .debug_types section. *)
+type type_unit =
+  { root : Proto_die.t;
+    header_label : Asm_label.t;
+    signature : Int64.t;
+    primary : Proto_die.reference
+  }
+
 val emit :
   asm_directives:Asm_directives_dwarf.t ->
   compilation_unit_proto_die:Proto_die.t ->
   compilation_unit_header_label:Asm_label.t ->
+  type_units:type_unit list ->
   debug_loc_table:Debug_loc_table.t ->
   debug_ranges_table:Debug_ranges_table.t ->
   address_table:Address_table.t ->

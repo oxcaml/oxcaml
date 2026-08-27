@@ -30,6 +30,7 @@ open! Int_replace_polymorphic_compare
 
 type dwarf_section =
   | Debug_info
+  | Debug_types
   | Debug_abbrev
   | Debug_aranges
   | Debug_addr
@@ -74,7 +75,11 @@ let dwarf_sections_in_order () =
   in
   let dwarf_version_dependent_sections =
     match !Dwarf_flags.gdwarf_version with
-    | Four -> [DWARF Debug_loc; DWARF Debug_ranges]
+    | Four ->
+      let type_units =
+        if !Dwarf_flags.gdwarf_type_units then [DWARF Debug_types] else []
+      in
+      type_units @ [DWARF Debug_loc; DWARF Debug_ranges]
     | Five -> [DWARF Debug_addr; DWARF Debug_loclists; DWARF Debug_rnglists]
   in
   sections @ dwarf_version_dependent_sections
@@ -84,8 +89,9 @@ let is_delayed = function
      be emitted directly. See PR #1719. *)
   | DWARF Debug_line -> true
   | DWARF
-      ( Debug_info | Debug_abbrev | Debug_aranges | Debug_str | Debug_loclists
-      | Debug_rnglists | Debug_addr | Debug_loc | Debug_ranges )
+      ( Debug_info | Debug_types | Debug_abbrev | Debug_aranges | Debug_str
+      | Debug_loclists | Debug_rnglists | Debug_addr | Debug_loc | Debug_ranges
+        )
   | Data | Read_only_data | Eight_byte_literals | Sixteen_byte_literals
   | Thirtytwo_byte_literals | Sixtyfour_byte_literals | Jump_tables | Text
   | Function_text _ | Stapsdt_base | Stapsdt_note | Probes | Note_ocaml_eh
@@ -97,6 +103,7 @@ let print ppf t =
   let str =
     match t with
     | DWARF Debug_info -> "(DWARF Debug_info)"
+    | DWARF Debug_types -> "(DWARF Debug_types)"
     | DWARF Debug_abbrev -> "(DWARF Debug_abbrev)"
     | DWARF Debug_aranges -> "(DWARF Debug_aranges)"
     | DWARF Debug_addr -> "(DWARF Debug_addr)"
@@ -179,6 +186,7 @@ let details t first_occurrence =
       let name =
         match dwarf with
         | Debug_info -> "__debug_info"
+        | Debug_types -> "__debug_types"
         | Debug_abbrev -> "__debug_abbrev"
         | Debug_aranges -> "__debug_aranges"
         | Debug_addr -> "__debug_addr"
@@ -194,6 +202,7 @@ let details t first_occurrence =
       let name =
         match dwarf with
         | Debug_info -> ".debug_info"
+        | Debug_types -> ".debug_types"
         | Debug_abbrev -> ".debug_abbrev"
         | Debug_aranges -> ".debug_aranges"
         | Debug_addr -> ".debug_addr"
@@ -292,6 +301,7 @@ let of_names names =
   | [".rodata.cst32"] -> Some Thirtytwo_byte_literals
   | [".rodata.cst64"] -> Some Sixtyfour_byte_literals
   | [".debug_info"] -> Some (DWARF Debug_info)
+  | [".debug_types"] -> Some (DWARF Debug_types)
   | [".debug_abbrev"] -> Some (DWARF Debug_abbrev)
   | [".debug_aranges"] -> Some (DWARF Debug_aranges)
   | [".debug_addr"] -> Some (DWARF Debug_addr)
@@ -314,6 +324,7 @@ let of_names names =
   | ["__TEXT"; "__literal16"] -> Some Sixteen_byte_literals
   | ["__TEXT"; "__probes"] -> Some Probes
   | ["__DWARF"; "__debug_info"] -> Some (DWARF Debug_info)
+  | ["__DWARF"; "__debug_types"] -> Some (DWARF Debug_types)
   | ["__DWARF"; "__debug_abbrev"] -> Some (DWARF Debug_abbrev)
   | ["__DWARF"; "__debug_aranges"] -> Some (DWARF Debug_aranges)
   | ["__DWARF"; "__debug_addr"] -> Some (DWARF Debug_addr)

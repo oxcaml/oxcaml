@@ -302,6 +302,25 @@ let create_type_from_reference ~proto_die_reference:label =
   AV.create spec
     (V.offset_into_debug_info ~comment:"reference to type DIE" label)
 
+let create_type_from_signature ~signature =
+  let spec = AS.create Type Ref_sig8 in
+  AV.create spec
+    (V.type_signature_reference ~comment:"type unit signature" signature)
+
+let create_type_unit_relative ~proto_die_reference ~unit_header_label =
+  let spec = AS.create Type Ref4 in
+  AV.create spec
+    (V.unit_relative_reference_32_bit
+       ~comment:"unit-relative reference to type DIE"
+       ~die_label:proto_die_reference ~unit_header_label ())
+
+let create_discr_unit_relative ~proto_die_reference ~unit_header_label =
+  let spec = AS.create Discr Ref4 in
+  AV.create spec
+    (V.unit_relative_reference_32_bit
+       ~comment:"unit-relative reference to discriminant DIE"
+       ~die_label:proto_die_reference ~unit_header_label ())
+
 (* CR-soon mshinwell: remove "_exn" prefix. *)
 let create_byte_size_exn ~byte_size =
   let spec = AS.create Byte_size Data8 in

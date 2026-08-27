@@ -26,6 +26,10 @@ type reference = Asm_label.t
 
 let create_reference () = Asm_label.create (DWARF Debug_info)
 
+(* For DIEs that will be emitted in a section other than .debug_info (for
+   example type units in .debug_types). *)
+let create_reference_in_section section = Asm_label.create section
+
 type t =
   { parent : t option;
     mutable children_by_sort_priority : t list Int.Map.t;
@@ -55,12 +59,21 @@ let create ?reference ?(sort_priority = -1) ?location_list_in_debug_loc_table
     ~parent ~tag ~attribute_values () =
   (match parent with
   | None ->
-    if Dwarf_tag.compare tag Dwarf_tag.Compile_unit <> 0
-    then failwith "only compilation unit proto-DIEs may be without parents"
+    if
+      Dwarf_tag.compare tag Dwarf_tag.Compile_unit <> 0
+      && Dwarf_tag.compare tag Dwarf_tag.Type_unit <> 0
+    then
+      failwith
+        "only compilation unit and type unit proto-DIEs may be without parents"
   | Some _parent -> ());
   let reference =
     match reference with
-    | None -> Asm_label.create (DWARF Debug_info)
+    | None -> (
+      (* Labels of children must be in the same section as the root of their
+         unit (e.g. .debug_types for DIEs inside type units). *)
+      match parent with
+      | Some parent -> Asm_label.create (Asm_label.section parent.label)
+      | None -> Asm_label.create (DWARF Debug_info))
     | Some reference -> reference
   in
   let attribute_values = attribute_values_map attribute_values in

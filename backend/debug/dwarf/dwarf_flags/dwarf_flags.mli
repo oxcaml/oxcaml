@@ -73,6 +73,10 @@ val default_ddwarf_types : bool
 
 val ddwarf_types : bool ref
 
+val default_gdwarf_type_units : bool
+
+val gdwarf_type_units : bool ref
+
 val gdwarf_may_alter_codegen : bool ref
 
 val gdwarf_may_alter_codegen_experimental : bool ref

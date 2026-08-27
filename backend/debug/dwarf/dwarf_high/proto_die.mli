@@ -34,6 +34,11 @@ type reference = Asm_label.t
 
 val create_reference : unit -> reference
 
+(** As [create_reference], but for a DIE that will be emitted in the given
+    section (for example [DWARF Debug_types] for type units) rather than in
+    .debug_info. *)
+val create_reference_in_section : Asm_section.t -> reference
+
 (* It is an error for [parent] to be [None] unless the [tag] is that for a
    compilation unit (which is a top-level entity). *)
 val create :

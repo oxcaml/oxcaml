@@ -458,7 +458,11 @@ let hash_array_kind = function
   | Regular s -> Hashtbl.hash (0, hash s)
   | Packed lst -> Hashtbl.hash (1, List.map hash lst)
 
-let hash_predef predef =
+(* Note: named so as not to shadow the [hash_predef] constant above; the
+   shadowed constant previously caused [Hashtbl.hash] to be applied to this
+   function itself in [predef] below, making the resulting hash depend on the
+   closure's code pointer and hence vary from process to process. *)
+let hash_of_predef predef =
   match predef with
   | Array kind -> Hashtbl.hash (hash_predef_array, hash_array_kind kind)
   | Bytes -> hash_predef_bytes
@@ -501,7 +505,7 @@ let predef p =
   let desc = Predef p in
   { desc;
     runtime_layout = runtime_layout_of_predef p;
-    hash = Hashtbl.hash (hash_predef, hash_predef p)
+    hash = Hashtbl.hash (hash_predef, hash_of_predef p)
   }
 
 let mixed_block_field ~field_type ~label = { field_type; label }
@@ -913,3 +917,55 @@ let constructor_args = function
     List.map
       (fun { field_type; label } -> { field_type; label = Some label })
       args
+
+(* Number of enclosing [Mu] binders that the shape can reference: one more than
+   the largest free de Bruijn index, or zero if the shape is closed. *)
+let rec free_depth t =
+  match t.desc with
+  | Unknown _ | Func -> 0
+  | Predef p -> free_depth_predef p
+  | Tuple { args; kind = Tuple_boxed } -> free_depth_list args
+  | Variant { constructors; kind = _ } -> free_depth_constructors constructors
+  | Record { fields; kind = _ } -> free_depth_fields fields
+  | Mu shape -> Int.max 0 (free_depth shape - 1)
+  | Rec_var (var, _) -> var + 1
+
+and free_depth_predef = function
+  | Array (Regular s) -> free_depth s
+  | Array (Packed l) -> free_depth_list l
+  | Lazy_t s -> free_depth s
+  | Bytes | Char | Extension_constructor | Float | Float32 | Floatarray | Int
+  | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint | String | Simd _
+  | Exception | Unboxed _ ->
+    0
+
+and free_depth_list ts =
+  List.fold_left (fun acc t -> Int.max acc (free_depth t)) 0 ts
+
+and free_depth_fields : 'a. 'a mixed_block_field list -> int =
+ fun fields ->
+  List.fold_left
+    (fun acc { field_type; _ } -> Int.max acc (free_depth field_type))
+    0 fields
+
+and free_depth_constructor = function
+  | Constructor_with_tuple_arg { args; _ } -> free_depth_fields args
+  | Constructor_with_record_arg { args; _ } -> free_depth_fields args
+
+and free_depth_constructors constructors =
+  List.fold_left
+    (fun acc constr -> Int.max acc (free_depth_constructor constr))
+    0 constructors
+
+let type_unit_signature t =
+  (* The DWARF-4 specification (section 7.27) defines a flattening procedure for
+     computing type signatures from C-family declarations; consumers do not
+     recompute signatures but simply match the producer's values, so any
+     deterministic function of the type's structure suffices. Marshalling with
+     [No_sharing] gives a canonical byte string for structurally equal shapes
+     (which are immutable trees). *)
+  let digest =
+    Digest.string
+      ("oxcaml-type-unit-v1:" ^ Marshal.to_string t [Marshal.No_sharing])
+  in
+  Stdlib.String.get_int64_le digest 0

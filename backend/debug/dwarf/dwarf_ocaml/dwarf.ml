@@ -199,9 +199,17 @@ let emit t ~binary_backend_available =
     ~code_layout:(DS.code_layout t.state)
     ~ranges:(DS.function_ranges t.state)
     ~debug_ranges_table:(DS.debug_ranges_table t.state);
+  let type_units =
+    List.map
+      (fun ({ root; header_label; signature; primary } :
+             DS.Die_gen_ctx.Type_unit.t) : Dwarf_world.type_unit ->
+        { root; header_label; signature; primary })
+      (DS.Die_gen_ctx.type_units (DS.die_gen_ctx t.state))
+  in
   Dwarf_world.emit ~asm_directives:t.asm_directives
     ~compilation_unit_proto_die:(DS.compilation_unit_proto_die t.state)
     ~compilation_unit_header_label:(DS.compilation_unit_header_label t.state)
+    ~type_units
     ~debug_loc_table:(DS.debug_loc_table t.state)
     ~debug_ranges_table:(DS.debug_ranges_table t.state)
     ~address_table:(DS.address_table t.state)

@@ -163,6 +163,10 @@ let default_ddwarf_types = false
 
 let ddwarf_types = ref default_ddwarf_types
 
+let default_gdwarf_type_units = false
+
+let gdwarf_type_units = ref default_gdwarf_type_units
+
 type dwarf_format =
   | Thirty_two
   | Sixty_four

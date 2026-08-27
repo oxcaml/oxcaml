@@ -66,6 +66,26 @@ module Die_gen_ctx : sig
       Proto_die.reference option
   end
 
+  (** How to reference the DWARF type description generated for a shape: either
+      a DIE referenced by label, or (when type units are being emitted, for
+      closed shapes) a type unit in .debug_types referenced by its 8-byte
+      signature. *)
+  module Type_die_ref : sig
+    type t =
+      | Local of Proto_die.reference
+      | Type_unit_signature of Int64.t
+  end
+
+  (** A type unit destined for the .debug_types section. *)
+  module Type_unit : sig
+    type t =
+      { root : Proto_die.t;
+        header_label : Asm_label.t;
+        signature : Int64.t;
+        primary : Proto_die.reference
+      }
+  end
+
   (** Cache memoizing [runtime_shape_to_dwarf_die] results. *)
   module Cache : sig
     type t
@@ -73,16 +93,13 @@ module Die_gen_ctx : sig
     val create : initial_size:int -> t
 
     val find :
-      t ->
-      inp:Runtime_shape.t ->
-      rec_env:Rec_var_env.t ->
-      Proto_die.reference option
+      t -> inp:Runtime_shape.t -> rec_env:Rec_var_env.t -> Type_die_ref.t option
 
     val add :
       t ->
       inp:Runtime_shape.t ->
       rec_env:Rec_var_env.t ->
-      outp:Proto_die.reference ->
+      outp:Type_die_ref.t ->
       unit
   end
 
@@ -119,6 +136,28 @@ module Die_gen_ctx : sig
       cache key. *)
   val push_rec_binder :
     t -> Rec_var_env.t -> Proto_die.reference -> Rec_var_env.t
+
+  (** Record a type unit for emission into .debug_types. *)
+  val add_type_unit : t -> Type_unit.t -> unit
+
+  (** Whether a type unit with the given signature has already been recorded. *)
+  val type_unit_exists : t -> signature:Int64.t -> bool
+
+  (** All type units recorded so far, in creation order. *)
+  val type_units : t -> Type_unit.t list
+
+  (** The signature of the type unit describing the fallback "ocaml_value" type,
+      creating that unit with [create] on first use. *)
+  val value_type_unit_signature : t -> create:(unit -> Int64.t) -> Int64.t
+
+  (** [Some] whilst DIEs are being generated inside a type unit (see
+      [with_unit_header]), in which case intra-unit references must be emitted
+      relative to the returned label (the first byte of the unit's header). *)
+  val current_unit_header : t -> Asm_label.t option
+
+  (** Run [f] with [current_unit_header] set to the given label, restoring the
+      previous value afterwards. *)
+  val with_unit_header : t -> Asm_label.t -> f:(unit -> 'a) -> 'a
 end
 
 type t
