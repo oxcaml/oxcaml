@@ -268,7 +268,6 @@ let
               ocamlPackages.findlib
               ocamlPackages.menhirLib
               ocamlPackages.menhirSdk
-              ocamlPackages.yojson
             ];
             devNativeBuildInputs = [
               ocamlPackages.menhir
