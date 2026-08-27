@@ -431,17 +431,12 @@ let hidden_dirs = s_ref []
 let no_auto_include _ _ = raise Not_found
 let auto_include_callback = ref no_auto_include
 
-<<<<<<< Merlin:manifest-lazy-loading
-
-||||||| Compiler:last-imported
-=======
 let pending_hidden_manifests
   : Dune_manifests_reader.Path.Load_root_relative.t Queue.t ref
   = s_table Queue.create ()
 
 let manifests_reader = s_table Dune_manifests_reader.create ()
 
->>>>>>> Compiler:HEAD
 let reset () =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.reset ();
@@ -480,7 +475,6 @@ let get_paths () =
   { visible = List.rev_map visible_dir_to_include !visible_dirs;
     hidden = List.rev_map Dir.path !hidden_dirs }
 
-<<<<<<< Merlin:manifest-lazy-loading
 (* CR-someday: init_manifests is not currently relevant because Merlin can safely ignore
    the -I-manifest and -H-manifest flags due to current build rules. But at some point,
    this will change, and manifest files will need to be handled properly. This will also
@@ -488,14 +482,6 @@ let get_paths () =
    -I-manifest and -H-manifest. Internal ticket 5767 *)
 let () = ignore Path_cache.prepend_add_single;;
 (*
-||||||| Compiler:last-imported
-(* CR-soon zqian: manifests are re-read from disk on every [init], even though
-   [Clflags.include_manifests] and [Clflags.hidden_include_manifests] cannot
-   change within an invocation. When multiple units are compiled (or at phase
-   boundaries such as linking), the whole manifest tree is read again each
-   time. *)
-=======
->>>>>>> Compiler:HEAD
 let init_manifests () =
   let init_manifest f manifest_path =
     let manifest_path =
@@ -516,24 +502,6 @@ let init_manifests () =
             basename
             (Dune_manifests_reader.Path.Cwd_relative.to_string location))
   in
-<<<<<<< Merlin:manifest-lazy-loading
-  List.iter
-    (load_manifest ~hidden:false ~basenames:visible_basenames)
-    !Clflags.include_manifests;
-  List.iter
-    (load_manifest ~hidden:true ~basenames:hidden_basenames)
-    !Clflags.hidden_include_manifests
-*)
-
-||||||| Compiler:last-imported
-  List.iter
-    (load_manifest ~hidden:false ~basenames:visible_basenames)
-    !Clflags.include_manifests;
-  List.iter
-    (load_manifest ~hidden:true ~basenames:hidden_basenames)
-    !Clflags.hidden_include_manifests
-
-=======
   let enqueue_hidden_manifest manifest_path =
     Queue.add manifest_path !pending_hidden_manifests
   in
@@ -547,6 +515,7 @@ let init_manifests () =
     List.iter
       (init_manifest enqueue_hidden_manifest)
       (List.rev !Clflags.hidden_include_manifests))
+*)
 
 let basename_matches ~uncap fn basename =
   if uncap then
@@ -590,14 +559,7 @@ let find_uncap_loading_manifests fn_uncap =
   | result -> result
   | exception Not_found -> find_in_pending_manifests ~uncap:true fn_uncap
 
-(* CR-soon zqian: the whole load path (directories and manifests) is re-read
-   from disk and the cache rebuilt on every [init], even though the flags they
-   are computed from cannot change within an invocation. When multiple units
-   are compiled (or at phase boundaries such as linking), all of this work is
-   redone each time. *)
->>>>>>> Compiler:HEAD
 let init ~auto_include ~visible ~hidden =
-<<<<<<< Merlin:manifest-lazy-loading
   assert (not Config.merlin || Local_store.is_bound ());
   let get_new_dirs ~get_visibility ~get_path new_entries old_dirs =
     let create_dir entry = Dir.create (get_visibility entry) (get_path entry) in
@@ -646,33 +608,6 @@ let init ~auto_include ~visible ~hidden =
     List.iter Path_cache.prepend_add new_visible;
     (*= init_manifests (); *)
     auto_include_callback := auto_include
-||||||| Compiler:last-imported
-  reset ();
-  visible_dirs :=
-    List.rev_map
-      (fun ({ path; cmx_guaranteed } : Clflags.visible_include) ->
-        Dir.create (Visible { cmx_guaranteed }) path)
-      visible;
-  hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
-  List.iter Path_cache.prepend_add !hidden_dirs;
-  List.iter Path_cache.prepend_add !visible_dirs;
-  init_manifests ();
-  auto_include_callback := auto_include
-=======
-  reset ();
-  visible_dirs :=
-    List.rev_map
-      (fun ({ path; cmx_guaranteed } : Clflags.visible_include) ->
-        Dir.create (Visible { cmx_guaranteed }) path)
-      visible;
-  hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
-  Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !hidden_dirs);
-  Profile.record_call ~accumulate:true "load_visible_dirs" (fun () ->
-    List.iter Path_cache.prepend_add !visible_dirs);
-  init_manifests ();
-  auto_include_callback := auto_include
->>>>>>> Compiler:HEAD
 
 let remove_dir dir =
   assert (not Config.merlin || Local_store.is_bound ());
