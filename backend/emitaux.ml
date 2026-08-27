@@ -648,16 +648,14 @@ let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
   then
     match List.rev dbg with
     | [] -> ()
-    | { Debuginfo.dinfo_line = line;
-        dinfo_char_start = col;
-        dinfo_file = file_name;
-        _
-      }
-      :: _ ->
+    | ({ Debuginfo.dinfo_line = line; dinfo_char_start = col; _ } as item) :: _
+      ->
       if line > 0
       then
         (* PR#6243 *)
-        let file_num = get_file_num ~file_emitter file_name in
+        let file_num =
+          get_file_num ~file_emitter (Debuginfo.item_file_path item)
+        in
         loc_emitter ~file_num ~line ~col ?discriminator ()
 
 let binary_backend_available = ref false

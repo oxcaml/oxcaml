@@ -736,9 +736,9 @@ and transl_structure ~scopes loc
                     (fun (pos, cc) ->
                       match cc with
                       | Tcoerce_primitive p ->
-                          let loc = of_location ~scopes p.pc_loc in
                           Translprim.transl_primitive
-                            loc p.pc_desc p.pc_env p.pc_type
+                            (of_location ~scopes p.pc_loc)
+                            p.pc_desc p.pc_env p.pc_type
                             ~poly_mode:p.pc_poly_mode
                             ~poly_sort:p.pc_poly_sort
                             ~yielding:p.pc_yielding
