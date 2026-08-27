@@ -57,7 +57,7 @@ module type S = sig
 
   type t
 
-  val create : entry -> start_of_code_symbol:Asm_symbol.t -> t
+  val create : entry -> t
 
   val section : Asm_section.dwarf_section
 
@@ -78,17 +78,9 @@ struct
 
   type nonrec entry = Payload.t entry
 
-  type t =
-    { entry : entry;
-      start_of_code_symbol : Asm_symbol.t
-    }
+  type t = { entry : entry }
 
-  let create entry ~start_of_code_symbol = { entry; start_of_code_symbol }
-
-  let label_address ~comment t label ~adjustment =
-    let adjustment = Targetint.of_int_exn adjustment in
-    Dwarf_value.code_address_from_label_symbol_diff ~comment ~upper:label
-      ~lower:t.start_of_code_symbol ~offset_upper:adjustment ()
+  let create entry = { entry }
 
   let section = P.section
 
@@ -186,17 +178,20 @@ struct
       Payload.emit ~asm_directives payload
     | Base_address sym -> A.symbol sym
     | Start_end { start_inclusive; end_exclusive; end_adjustment; payload } ->
+      (* The addresses in [DW_LLE/RLE_start_end] and [DW_LLE/RLE_start_length]
+         entries are absolute (and relocatable), not offsets from a base. *)
       Dwarf_value.emit ~asm_directives
-        (label_address ~comment:"start_inclusive" t start_inclusive
-           ~adjustment:0);
+        (Dwarf_value.code_address_from_label ~comment:"start_inclusive"
+           start_inclusive);
       Dwarf_value.emit ~asm_directives
-        (label_address ~comment:"end_exclusive" t end_exclusive
-           ~adjustment:end_adjustment);
+        (Dwarf_value.code_address_from_label_plus_offset
+           ~comment:"end_exclusive" end_exclusive
+           ~offset_in_bytes:(Targetint.of_int_exn end_adjustment));
       Payload.emit ~asm_directives payload
     | Start_length { start_inclusive; length; payload } ->
       Dwarf_value.emit ~asm_directives
-        (label_address ~comment:"start_inclusive" t start_inclusive
-           ~adjustment:0);
+        (Dwarf_value.code_address_from_label ~comment:"start_inclusive"
+           start_inclusive);
       Dwarf_value.emit ~asm_directives
         (Dwarf_value.uleb128 ~comment:"length"
            (Targetint.nonnegative_to_uint64_exn length));

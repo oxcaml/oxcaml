@@ -135,8 +135,7 @@ let location_list_entry state ~start_of_code_symbol ~subrange
       (* DWARF-5 spec page 45 line 1. *)
       Startx_endx { start_inclusive; end_exclusive; payload = loc_desc }
     in
-    Dwarf_5
-      (Location_list_entry.create location_list_entry ~start_of_code_symbol)
+    Dwarf_5 (Location_list_entry.create location_list_entry)
 
 let dwarf_for_variable state ~value_type_proto_die ~function_symbol
     ~function_proto_die ~proto_dies_for_vars (var : Backend_var.t)
