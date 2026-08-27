@@ -1320,6 +1320,22 @@ let layout_or_sort env loc sort ty =
   try layout env loc sort ty
   with Error (_, Non_value_layout _) -> layout_of_sort loc sort
 
+let layout_or_top env loc sort ty =
+  let snapshot = Btype.snapshot () in
+  let representability =
+    Fun.protect ~finally:(fun () -> Btype.backtrack snapshot) (fun () ->
+      match Ctype.type_sort ~why:Function_result ~fixed:true env ty with
+      | Ok _ -> `Representable
+      | Error violation ->
+          if Jkind.Violation.is_missing_cmi violation
+          then `Missing_cmi
+          else `Not_representable)
+  in
+  match representability with
+  | `Representable -> layout_or_sort env loc sort ty
+  | `Missing_cmi -> layout_of_sort loc sort
+  | `Not_representable -> Lambda.Ptop
+
 let function_return_layout env loc sort ty =
   match is_function_type env ty with
   | Some (_lhs, rhs) -> layout env loc sort rhs

@@ -4273,7 +4273,10 @@ let is_upstream_compatible_non_value_unbox env ty =
   | _ ->
     false
 
-type sort_or_poly = Sort of Jkind.Sort.Const.t | Poly
+type sort_or_poly =
+  | Sort of Jkind.Sort.Const.t
+  | Poly
+  | Never_returns
 
 let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
   match kind, get_desc (Ctype.expand_head_opt env ty) with
@@ -4285,7 +4288,7 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
     let is_scannable =
       match sort_or_poly with
-      | Poly -> false
+      | Poly | Never_returns -> false
       | Sort (Base Scannable) -> true
       | Sort (Base _ | Product _) -> false
       | Sort (Univar _) -> Misc.fatal_error "typedecl: Univar in native repr"
@@ -4390,8 +4393,17 @@ let type_sort_external ~is_layout_poly ~why env loc typ =
     raise(Error (loc, Jkind_sort {env; kloc; typ; err}))
 
 let make_native_repr
-      env core_type ty ~global_repr ~is_layout_poly ~why ~is_return =
+      env core_type ty ~global_repr ~is_layout_poly ~prim_name ~why
+      ~is_return =
   error_if_has_deep_native_repr_attributes core_type;
+  let never_returns_layout_any jkind =
+    match prim_name with
+    | None -> false
+    | Some name ->
+      Primitive.prim_name_never_returns name
+      && Jkind.has_layout_any env jkind
+      && get_level ty = Btype.generic_level
+  in
   let sort_or_poly =
     match get_desc (Ctype.get_unboxed_type_approximation env ty).ty with
     (* This only captures tvars with layout [any] explicitly quantified within
@@ -4405,6 +4417,8 @@ let make_native_repr
     | Tvar {jkind} when is_layout_poly
                       && Jkind.has_layout_any env jkind
                       && get_level ty = Btype.generic_level -> Poly
+    | Tvar {jkind} when is_return && never_returns_layout_any jkind ->
+      Never_returns
     | _ ->
       let sort =
         type_sort_external ~is_layout_poly ~why env core_type.ptyp_loc ty
@@ -4414,6 +4428,10 @@ let make_native_repr
   match get_native_repr_attribute
           core_type.ptyp_attributes ~global_repr,
         sort_or_poly with
+  | Native_repr_attr_absent, Never_returns ->
+    Repr_never_returns
+  | Native_repr_attr_present kind, Never_returns ->
+    raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type kind))
   | Native_repr_attr_absent, Poly ->
     Repr_poly
   | Native_repr_attr_absent, Sort (Base (Scannable | Void) as base) ->
@@ -4511,7 +4529,7 @@ let prim_const_mode m =
   | None -> assert false
 
 let rec parse_native_repr_attributes env core_type ty rmode
-        ~global_repr ~is_layout_poly =
+        ~global_repr ~is_layout_poly ~prim_name =
   match core_type.ptyp_desc, get_desc ty,
     get_native_repr_attribute core_type.ptyp_attributes ~global_repr:None
   with
@@ -4523,7 +4541,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
     let repr_arg =
       make_native_repr
         env ct1 t1 ~global_repr
-        ~is_layout_poly ~why:External_argument ~is_return:false
+        ~is_layout_poly ~prim_name ~why:External_argument ~is_return:false
     in
     let mode =
       if Builtin_attributes.has_local_opt ct1.ptyp_attributes
@@ -4533,11 +4551,12 @@ let rec parse_native_repr_attributes env core_type ty rmode
     let repr_args, repr_res =
       parse_native_repr_attributes env ct2 t2
         (prim_const_mode (Mode.Alloc.proj_comonadic Areality mret))
-        ~global_repr ~is_layout_poly
+        ~global_repr ~is_layout_poly ~prim_name
     in
     ((mode, repr_arg) :: repr_args, repr_res)
   | (Ptyp_poly (_, t) | Ptyp_alias (t, _, _)), _, _ ->
      parse_native_repr_attributes env t ty rmode ~global_repr ~is_layout_poly
+       ~prim_name
   | _ ->
      let rmode =
        if Builtin_attributes.has_local_opt core_type.ptyp_attributes
@@ -4547,7 +4566,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
      let repr_res =
        make_native_repr
         env core_type ty ~global_repr
-        ~is_layout_poly ~why:External_result ~is_return:true
+        ~is_layout_poly ~prim_name ~why:External_result ~is_return:true
      in
      ([], (rmode, repr_res))
 
@@ -4801,9 +4820,15 @@ let transl_value_decl env loc ~modal ~why valdecl =
       if is_layout_poly &&
          not (has_ty_var_with_layout_any env ty) then
         raise(Error(valdecl.pval_type.ptyp_loc, Useless_layout_poly));
+      let prim_name =
+        match valdecl.pval_prim with
+        | name :: _ -> Some name
+        | [] -> None
+      in
       let native_repr_args, native_repr_res =
         parse_native_repr_attributes
           env valdecl.pval_type ty Prim_global ~global_repr ~is_layout_poly
+          ~prim_name
       in
       let prim =
         Primitive.parse_declaration valdecl

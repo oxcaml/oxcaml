@@ -39,6 +39,122 @@ val array_kind_of_elt :
 val array_kind : Typedtree.expression -> Lambda.array_kind
 val array_pattern_kind : Typedtree.pattern -> Lambda.array_kind
 
+<<<<<<< Merlin:merlin-typing-import
+||||||| Compiler:last-imported
+(* If [kind] or [layout] is unknown, attempt to specialize it by examining the
+   type parameters of the bigarray. If [kind] or [length] is not unknown, returns
+   it unmodified. *)
+val bigarray_specialize_kind_and_layout :
+  Env.t -> kind:Lambda.bigarray_kind -> layout:Lambda.bigarray_layout ->
+  Types.type_expr -> Lambda.bigarray_kind * Lambda.bigarray_layout
+
+(* CR layouts v7: [layout], [function_return_layout], [function2_return_layout],
+   and [layout_of_sort] have had location arguments added just to support the
+   void check error message.  These arguments can be removed when we're happy to
+   take that check out.
+*)
+val layout :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Find the layout of an ident in the given environment. Returns [None] if the
+   ident refers to a primitive. *)
+val layout_of_ident : Env.t -> Ident.t -> Lambda.layout option
+
+(* These translate a type system sort to a lambda layout.  The function [layout]
+   gives a more precise result---this should only be used when the kind is
+   needed for compilation but the precise Lambda.layout isn't needed for
+   optimization.  [layout_of_sort] gracefully errors on void, while
+   [layout_of_non_void_sort] loudly fails on void. *)
+val layout_of_sort : Location.t -> Jkind.Sort.Const.t -> Lambda.layout
+val layout_of_non_void_sort : Jkind.Sort.Const.t -> Lambda.layout
+
+(* Like [layout], but falls back to the sort when the type does not determine a
+   value kind (e.g. has jkind [any]) *)
+val layout_or_sort :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Given a function type and the sort of its return type, compute the layout of
+   its return type. *)
+val function_return_layout :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Given a function type with two arguments and the sort of its return type,
+   compute the layout of its return type. *)
+val function2_return_layout :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Given a function type and the sort of its argument, compute the layout
+   of its argument.  Fails loudly if the type isn't a function type. *)
+val function_arg_layout :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
+
+val transl_mixed_block_element :
+  Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
+  -> unit Lambda.mixed_block_element
+
+=======
+(* If [kind] or [layout] is unknown, attempt to specialize it by examining the
+   type parameters of the bigarray. If [kind] or [length] is not unknown, returns
+   it unmodified. *)
+val bigarray_specialize_kind_and_layout :
+  Env.t -> kind:Lambda.bigarray_kind -> layout:Lambda.bigarray_layout ->
+  Types.type_expr -> Lambda.bigarray_kind * Lambda.bigarray_layout
+
+(* CR layouts v7: [layout], [function_return_layout], [function2_return_layout],
+   and [layout_of_sort] have had location arguments added just to support the
+   void check error message.  These arguments can be removed when we're happy to
+   take that check out.
+*)
+val layout :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Find the layout of an ident in the given environment. Returns [None] if the
+   ident refers to a primitive. *)
+val layout_of_ident : Env.t -> Ident.t -> Lambda.layout option
+
+(* These translate a type system sort to a lambda layout.  The function [layout]
+   gives a more precise result---this should only be used when the kind is
+   needed for compilation but the precise Lambda.layout isn't needed for
+   optimization.  [layout_of_sort] gracefully errors on void, while
+   [layout_of_non_void_sort] loudly fails on void. *)
+val layout_of_sort : Location.t -> Jkind.Sort.Const.t -> Lambda.layout
+val layout_of_non_void_sort : Jkind.Sort.Const.t -> Lambda.layout
+
+(* Like [layout], but falls back to the sort when the type does not determine a
+   value kind (e.g. has jkind [any]) *)
+val layout_or_sort :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Like [layout], but falls back to [Ptop] when the type's jkind is not
+   representable (e.g. is [any]).  A failure caused by a missing cmi falls
+   back to the sort instead, like [layout_or_sort]. *)
+val layout_or_top :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Given a function type and the sort of its return type, compute the layout of
+   its return type. *)
+val function_return_layout :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Given a function type with two arguments and the sort of its return type,
+   compute the layout of its return type. *)
+val function2_return_layout :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+(* Given a function type and the sort of its argument, compute the layout
+   of its argument.  Fails loudly if the type isn't a function type. *)
+val function_arg_layout :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
+val value_kind : Env.t -> Location.t -> Types.type_expr -> Lambda.value_kind
+
+val transl_mixed_block_element :
+  Env.t -> Location.t -> Types.type_expr -> Types.mixed_block_element
+  -> unit Lambda.mixed_block_element
+
+>>>>>>> Compiler:HEAD
 val classify_lazy_argument : Typedtree.expression ->
                              [ `Constant_or_function
                              | `Float_that_cannot_be_shortcut

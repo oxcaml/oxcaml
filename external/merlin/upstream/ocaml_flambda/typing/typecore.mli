@@ -240,6 +240,11 @@ type always_static_allocation =
   | Unboxed_unit
   | Unboxed_bool
 
+type match_result_context =
+  | Try
+  | Match_with_exception
+  | Match_with_effects
+
 type existential_binding =
   | Bind_already_bound
   | Bind_not_in_scope
@@ -393,6 +398,15 @@ type error =
         match_loc : Location.t;
         kind : [`Argument | `Result];
         why : [`Partial_match | `Optional_argument];
+      }
+  | Function_return_not_rep of type_expr * Jkind.Violation.t
+  | Effect_handler_result_not_value of type_expr * Jkind.Violation.t
+  | Match_result_not_rep of
+      match_result_context * type_expr * Jkind.Violation.t
+  | Function_return_sort_conflict of
+      { site_sort : Jkind.sort;
+        fun_ret_sort : Jkind.sort;
+        first_return_site : Location.t
       }
   | Record_projection_not_rep of type_expr * Jkind.Violation.t
   | Record_not_rep of type_expr * Jkind.Violation.t

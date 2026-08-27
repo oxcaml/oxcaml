@@ -316,6 +316,7 @@ module History = struct
   type concrete_creation_reason =
     | Merlin
     | Match
+    | Match_or_try_result
     | Extension_constructor_declaration of int
     | Extension_label_declaration of Ident.t
     | Record_projection
@@ -390,6 +391,7 @@ module History = struct
     | Probe
     | Captured_in_object
     | Let_rec_variable of Ident.t
+    | Effect_handler_result
     | Type_argument of
         { parent_path : Path.t;
           position : int;
