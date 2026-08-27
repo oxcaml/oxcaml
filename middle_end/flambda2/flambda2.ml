@@ -406,10 +406,11 @@ let reset_symbol_tables () =
   Flambda2_identifiers.Continuation.reset ();
   Flambda2_identifiers.Int_ids.reset ()
 
-let flambda_result_to_cmm ~keep_symbol_tables
+let flambda_result_to_cmm ~keep_symbol_tables ~localise_unreachable_symbols
     ({ flambda; all_code; offsets; reachable_names } : flambda_result) =
   let cmm =
     Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
+      ~localise_unreachable_symbols
   in
   if not keep_symbol_tables then reset_symbol_tables ();
   cmm
@@ -417,8 +418,17 @@ let flambda_result_to_cmm ~keep_symbol_tables
 let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     (program : Lambda.program) =
   let run () =
+    (* Keep unreachable symbols global whenever the Reaper is involved. The
+       staged rebuild must (see [reaped_flambda2_to_cmm]); the other Reaper
+       modes follow suit so that a staged rebuild of a unit produces the same
+       object file as a direct Reaper compilation of it. *)
+    let localise_unreachable_symbols =
+      match Reaper_mode.of_flags () with
+      | Disabled -> true
+      | Single_unit_run | Lto_support -> false
+    in
     lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
-    |> flambda_result_to_cmm ~keep_symbol_tables
+    |> flambda_result_to_cmm ~keep_symbol_tables ~localise_unreachable_symbols
   in
   Profile.record_call "flambda2" run
 
@@ -595,5 +605,14 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
     in
     Option.iter Compilenv.set_export_info cmx;
     Compiler_hooks.execute Reaped_flambda2 flambda;
+    (* Symbols that are unreachable from this unit's own exports must still be
+       emitted as global symbols. Other participants' rebuild data was frozen
+       when this unit still exported code mentioning such symbols (which is how
+       they learned the names, by inlining that code), so their rebuilt objects
+       may reference symbols that only the paused process's exports could reach.
+       The rebuild has already deleted definitions that the whole-program
+       analysis found dead, so everything emitted here may have live references
+       elsewhere. *)
     flambda_result_to_cmm ~keep_symbol_tables
+      ~localise_unreachable_symbols:false
       { flambda; all_code; offsets; reachable_names }

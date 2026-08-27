@@ -14,10 +14,12 @@
 
 (* Translate Flambda compilation units into Cmm *)
 
-(** Translate a compilation unit. *)
+(** Translate a compilation unit. For [localise_unreachable_symbols], see
+    [To_cmm_result.create]. *)
 val unit :
   offsets:Exported_offsets.t ->
   all_code:Exported_code.t ->
   reachable_names:Name_occurrences.t ->
+  localise_unreachable_symbols:bool ->
   Flambda_unit.t ->
   Cmm.phrase list
