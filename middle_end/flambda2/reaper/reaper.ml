@@ -217,17 +217,40 @@ module Staged = struct
       Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
     in
     let Rebuild.
-          { body; free_names; all_code; code_ids_to_remember; slot_offsets } =
+          { body;
+            free_names;
+            all_code = rebuilt_code;
+            code_ids_to_remember;
+            slot_offsets
+          } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
         ~fixed_arity_continuations ~continuation_info ~final_typing_env
         ~types_rewrite_context solved_dep get_code_metadata toplevel_expr code
     in
+    let imported_code =
+      Exported_code.mark_as_imported
+        (Flambda_cmx.get_imported_code cmx_loader ())
+    in
+    (* The [all_code] we were given contains metadata for every code ID the
+       rebuild data references (see [Cmr_format.Serialisable.create]). The cmx
+       loader may lack some of these: in the staged pipeline it serves other
+       participants' rebuilt .cmx files, which can prune code that this unit's
+       rebuilt code still references (e.g. via an inlined copy of a set of
+       closures whose original definition the Reaper removed). Keep such
+       metadata available for Cmm translation, preferring the loader's
+       (post-rebuild) entries when both exist. *)
+    let metadata_fallback =
+      Exported_code.mark_as_imported
+        (Exported_code.filter all_code ~f:(fun code_id ->
+             (not
+                (Current_unit.is_current (Code_id.get_compilation_unit code_id)))
+             && not (Exported_code.mem code_id imported_code)))
+    in
     let all_code =
       Exported_code.add_code
         ~keep_code:(fun code_id -> Code_id.Set.mem code_id code_ids_to_remember)
-        all_code
-        (Exported_code.mark_as_imported
-           (Flambda_cmx.get_imported_code cmx_loader ()))
+        rebuilt_code
+        (Exported_code.merge imported_code metadata_fallback)
     in
     let final_typing_env =
       Option.map
