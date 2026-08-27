@@ -606,6 +606,7 @@ let _ =
   let lower_mode_extension = function
   | Pair (Mode, Alpha) -> Pair (Mode, Beta)
   | Pair (Layouts, Alpha) -> Pair (Layouts, Beta)
+  | Pair (Mode_polymorphism, Alpha) -> Pair (Mode_polymorphism, Beta)
   | _ as pair -> pair
 in
   extensions := List.map lower_mode_extension !extensions

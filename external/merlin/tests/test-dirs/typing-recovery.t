@@ -100,7 +100,7 @@
             Texp_function
             alloc_mode global
             yielding_mode unyielding
-            return_mode proj_Locality(modevar#a<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
+            return_mode proj_Locality(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -116,8 +116,8 @@
                     []
                   Tpat_var \"x\"
                   sort value
-                  value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#9<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                proj_Locality(modevar#8<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
+                  value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                proj_Locality(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
@@ -287,7 +287,7 @@
             Texp_function
             alloc_mode global
             yielding_mode unyielding
-            return_mode proj_Locality(modevar#a<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
+            return_mode proj_Locality(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -304,7 +304,7 @@
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_any
-                proj_Locality(modevar#8<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
+                proj_Locality(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
