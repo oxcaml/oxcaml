@@ -21,6 +21,7 @@ type t =
     functions : Cmm.fundecl list;
     current_data : Cmm.data_item list;
     reachable_names : Name_occurrences.t;
+    localise_unreachable_symbols : bool;
     symbols : Cmm.symbol String.Map.t;
     (* This map is only used for symbols not directly translated from
        [Symbol.t], e.g. module entry point names. *)
@@ -29,12 +30,13 @@ type t =
     invalid_message_symbols : Symbol.t String.Map.t
   }
 
-let create ~module_symbol ~reachable_names =
+let create ~module_symbol ~reachable_names ~localise_unreachable_symbols =
   { gc_roots = [];
     data_list = [];
     functions = [];
     current_data = [];
     reachable_names;
+    localise_unreachable_symbols;
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
@@ -62,7 +64,8 @@ let symbol res sym =
   let sym_name = Linkage_name.to_string (Symbol.linkage_name sym) in
   let sym_global =
     if
-      Current_unit.is_current (Symbol.compilation_unit sym)
+      res.localise_unreachable_symbols
+      && Current_unit.is_current (Symbol.compilation_unit sym)
       && not (Name_occurrences.mem_symbol res.reachable_names sym)
     then Cmm.Local
     else Cmm.Global
@@ -84,7 +87,8 @@ let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
   in
   let sym_global =
     if
-      Current_unit.is_current (Code_id.get_compilation_unit code_id)
+      res.localise_unreachable_symbols
+      && Current_unit.is_current (Code_id.get_compilation_unit code_id)
       && not (Name_occurrences.mem_code_id res.reachable_names code_id)
     then Cmm.Local
     else Cmm.Global
