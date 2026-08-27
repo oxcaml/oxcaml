@@ -461,7 +461,7 @@ We try several places in the identifier to check the result stability
             Texp_function
             alloc_mode global
             yielding_mode unyielding
-            return_mode proj_Locality(modevar#1d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
+            return_mode proj_Locality(modevar#1e<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -469,7 +469,7 @@ We try several places in the identifier to check the result stability
                 pattern (under.ml[2,13+6]..under.ml[2,13+9])
                   Tpat_var \"x\"
                   sort '_representable_layout_1
-                  value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#e<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                  value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#11<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
                 proj_Locality(modevar#d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]

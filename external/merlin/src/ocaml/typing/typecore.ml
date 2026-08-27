@@ -9683,7 +9683,7 @@ and type_function
         params_contain_gadt = No_gadt;
         fun_alloc_mode =
           Some { alloc_mode = Locality.newvar ();
-                 fun_closure_mode = Alloc.newvar () };
+                 fun_closure_mode = Alloc.Comonadic.newvar () };
         ret_info = Some ret_info;
         calling_convention_sorts = []
       })
@@ -9938,14 +9938,8 @@ and type_function_
                   with
                     | Ok () -> ()
                     | Error e ->
-<<<<<<< Merlin:ageorges/close-over-monadic
-                      raise (error(loc, env, Uncurried_function_escapes e))
-||||||| Compiler:last-imported
-                      raise (Error(loc_fun, env, Uncurried_function_escapes e))
-=======
-                      raise (Error(loc_fun, env,
-                        Uncurried_function_escapes_comonadic e))
->>>>>>> Compiler:HEAD
+                      raise
+                        (error(loc, env, Uncurried_function_escapes_comonadic e))
                   end;
                   begin match
                     Alloc.Comonadic.submode
@@ -9954,14 +9948,8 @@ and type_function_
                   with
                     | Ok () -> ()
                     | Error e ->
-<<<<<<< Merlin:ageorges/close-over-monadic
-                      raise (error(loc, env, Uncurried_function_escapes e))
-||||||| Compiler:last-imported
-                      raise (Error(loc_fun, env, Uncurried_function_escapes e))
-=======
-                      raise (Error(loc_fun, env,
-                        Uncurried_function_escapes_comonadic e))
->>>>>>> Compiler:HEAD
+                      raise
+                        (error(loc, env, Uncurried_function_escapes_comonadic e))
                   end;
                   More_args
                     { partial_mode =
