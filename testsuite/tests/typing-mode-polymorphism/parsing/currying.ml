@@ -48,6 +48,18 @@ end
 module M_local_id : Local_id
 |}]
 
+let use_global (x @ global) = ()
+let () = use_global (M_local_id.local_id 42)
+[%%expect{|
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
+Line 2, characters 20-44:
+2 | let () = use_global (M_local_id.local_id 42)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "local" but is expected to be "global".
+Hint: This is a partial application
+      Adding 1 more argument may make the value non-local
+|}]
+
 module type Local_prefix = sig
   val local_prefix : 'a @ local -> 'b @ [< 'm & global] -> 'c @ 'n -> 'b @ [> 'm]
 end
@@ -90,6 +102,26 @@ module type Apply =
     val apply :
       ('a @ [> 'n] -> 'b @ [< 'm]) @ 'o -> 'a @ [< 'n] -> 'b @ [> 'm]
   end
+|}]
+
+(* Bare-variable arguments: a printed curry mode must not mention the head of
+   an elided curry mode. A suppressed variable is suppressed at every
+   occurrence. *)
+
+module type Bare_vars_3 = sig
+  val f : 'a @ 'm -> 'b @ 'n -> 'c @ 'k -> unit @ 's
+end
+[%%expect{|
+module type Bare_vars_3 =
+  sig val f : 'a @ 'p -> 'b @ 'o -> 'c @ 'n -> unit @ 'm end
+|}]
+
+module type Bare_vars_4 = sig
+  val f : 'a @ 'm -> 'b @ 'n -> 'c @ 'k -> 'd @ 'l -> unit @ 's
+end
+[%%expect{|
+module type Bare_vars_4 =
+  sig val f : 'a @ 'q -> 'b @ 'p -> 'c @ 'o -> 'd @ 'n -> unit @ 'm end
 |}]
 
 (* currying in argument position *)
