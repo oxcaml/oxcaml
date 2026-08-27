@@ -1,26 +1,25 @@
 (* TEST
- reference = "${test_source_directory}/all_void_block_runtime.reference";
  flambda2;
  {
    flags = "-extension layouts_beta";
-   native;
+   { expect; expect.opt; }
  }{
    flags = "-extension layouts_beta -Oclassic";
-   native;
+   expect.opt;
  }{
    flags = "-extension layouts_beta -O3";
-   native;
- }{
-   flags = "-extension layouts_beta";
-   bytecode;
+   expect.opt;
  }
 *)
 
-let describe name x =
+let describe x =
   let o = Obj.repr x in
   if Obj.is_int o
-  then Printf.printf "%s: imm %d\n" name (Obj.obj o : int)
-  else Printf.printf "%s: block tag %d\n" name (Obj.tag o)
+  then Printf.sprintf "imm %d" (Obj.obj o : int)
+  else Printf.sprintf "block tag %d" (Obj.tag o)
+[%%expect{|
+val describe : 'a -> string = <fun>
+|}]
 
 (* All-void constructors with the attribute are immediates. *)
 
@@ -29,30 +28,63 @@ type imm =
   | B of #(unit# * unit#) [@immediate_all_void_constructor]
   | C
   | D of int
+[%%expect{|
+type imm =
+    A of unit# [@immediate_all_void_constructor]
+  | B of #(unit# * unit#) [@immediate_all_void_constructor]
+  | C
+  | D of int
+|}]
 
-let () =
-  describe "imm A" (A #());
-  describe "imm B" (B #(#(), #()));
-  describe "imm C" C;
-  describe "imm D" (D 3);
-  (match A #() with
-   | A v -> let #() = v in print_endline "imm match: A"
-   | B _ | C | D _ -> assert false);
-  (match B #(#(), #()) with
-   | B #(v, _) -> let #() = v in print_endline "imm match: B"
-   | A _ | C | D _ -> assert false);
-  let eff s = print_endline s; #() in
-  let a = A (eff "imm effect: A arg") in
+let imm_reprs =
+  [describe (A #()); describe (B #(#(), #())); describe C; describe (D 3)]
+[%%expect{|
+val imm_reprs : string list = ["imm 0"; "imm 1"; "imm 2"; "block tag 0"]
+|}]
+
+let imm_match_a =
+  match A #() with
+  | A v -> let #() = v in "matched A"
+  | B _ | C | D _ -> assert false
+[%%expect{|
+val imm_match_a : string = "matched A"
+|}]
+
+let imm_match_b =
+  match B #(#(), #()) with
+  | B #(v, _) -> let #() = v in "matched B"
+  | A _ | C | D _ -> assert false
+[%%expect{|
+val imm_match_b : string = "matched B"
+|}]
+
+let imm_arg_effects =
+  let log = ref [] in
+  let eff s = log := s :: !log; #() in
+  let a = A (eff "A arg") in
   let _ : imm = a in
-  let b = B #(eff "imm effect: B arg 1", eff "imm effect: B arg 2") in
+  let b = B #(eff "B arg 1", eff "B arg 2") in
   let _ : imm = b in
-  Printf.printf "imm equal: %b\n" (A #() = A #());
-  Printf.printf "imm hash equal: %b\n"
-    (Hashtbl.hash (A #()) = Hashtbl.hash (A #()));
-  let round_tripped : imm =
-    Marshal.from_string (Marshal.to_string (A #()) []) 0
-  in
-  describe "imm A marshalled" round_tripped
+  List.rev !log
+[%%expect{|
+val imm_arg_effects : string list = ["A arg"; "B arg 2"; "B arg 1"]
+|}]
+
+let imm_structural_equal = (A #() = A #())
+[%%expect{|
+val imm_structural_equal : bool = true
+|}]
+
+let imm_hash_equal = Hashtbl.hash (A #()) = Hashtbl.hash (A #())
+[%%expect{|
+val imm_hash_equal : bool = true
+|}]
+
+let imm_marshal_round_trip =
+  describe (Marshal.from_string (Marshal.to_string (A #()) []) 0 : imm)
+[%%expect{|
+val imm_marshal_round_trip : string = "imm 0"
+|}]
 
 (* All-void constructors without the attribute are blocks. *)
 
@@ -61,39 +93,79 @@ type blk =
   | B2 of #(unit# * unit#)
   | C2
   | D2 of int
+[%%expect{|
+type blk = A2 of unit# | B2 of #(unit# * unit#) | C2 | D2 of int
+|}]
 
-let () =
-  describe "blk A2" (A2 #());
-  describe "blk B2" (B2 #(#(), #()));
-  describe "blk C2" C2;
-  describe "blk D2" (D2 3);
-  (match A2 #() with
-   | A2 v -> let #() = v in print_endline "blk match: A2"
-   | B2 _ | C2 | D2 _ -> assert false);
-  (match B2 #(#(), #()) with
-   | B2 #(v, _) -> let #() = v in print_endline "blk match: B2"
-   | A2 _ | C2 | D2 _ -> assert false);
-  let eff s = print_endline s; #() in
-  let a = A2 (eff "blk effect: A2 arg") in
+let blk_reprs =
+  [describe (A2 #()); describe (B2 #(#(), #())); describe C2; describe (D2 3)]
+[%%expect{|
+val blk_reprs : string list =
+  ["block tag 0"; "block tag 1"; "imm 0"; "block tag 2"]
+|}]
+
+let blk_match_a =
+  match A2 #() with
+  | A2 v -> let #() = v in "matched A2"
+  | B2 _ | C2 | D2 _ -> assert false
+[%%expect{|
+val blk_match_a : string = "matched A2"
+|}]
+
+let blk_match_b =
+  match B2 #(#(), #()) with
+  | B2 #(v, _) -> let #() = v in "matched B2"
+  | A2 _ | C2 | D2 _ -> assert false
+[%%expect{|
+val blk_match_b : string = "matched B2"
+|}]
+
+let blk_arg_effects =
+  let log = ref [] in
+  let eff s = log := s :: !log; #() in
+  let a = A2 (eff "A2 arg") in
   let _ : blk = a in
-  let b = B2 #(eff "blk effect: B2 arg 1", eff "blk effect: B2 arg 2") in
+  let b = B2 #(eff "B2 arg 1", eff "B2 arg 2") in
   let _ : blk = b in
-  Printf.printf "blk equal: %b\n" (A2 #() = A2 #());
-  Printf.printf "blk hash equal: %b\n"
-    (Hashtbl.hash (A2 #()) = Hashtbl.hash (A2 #()));
-  let round_tripped : blk =
-    Marshal.from_string (Marshal.to_string (A2 #()) []) 0
-  in
-  describe "blk A2 marshalled" round_tripped
+  List.rev !log
+[%%expect{|
+val blk_arg_effects : string list = ["A2 arg"; "B2 arg 2"; "B2 arg 1"]
+|}]
+
+let blk_structural_equal = (A2 #() = A2 #())
+[%%expect{|
+val blk_structural_equal : bool = true
+|}]
+
+let blk_hash_equal = Hashtbl.hash (A2 #()) = Hashtbl.hash (A2 #())
+[%%expect{|
+val blk_hash_equal : bool = true
+|}]
+
+let blk_marshal_round_trip =
+  describe (Marshal.from_string (Marshal.to_string (A2 #()) []) 0 : blk)
+[%%expect{|
+val blk_marshal_round_trip : string = "block tag 0"
+|}]
 
 (* An any-arg constructor refined to void is a block. *)
 
 type ('a : any) refined = R of 'a | S
+[%%expect{|
+type ('a : any) refined = R of 'a | S
+|}]
 
-let () =
+let refined_reprs =
   let r : unit# refined = R #() in
-  describe "refined R" r;
-  describe "refined S" S;
-  (match r with
-   | R v -> let #() = v in print_endline "refined match: R"
-   | S -> assert false)
+  [describe r; describe (S : unit# refined)]
+[%%expect{|
+val refined_reprs : string list = ["block tag 0"; "imm 0"]
+|}]
+
+let refined_match =
+  match (R #() : unit# refined) with
+  | R v -> let #() = v in "matched R"
+  | S -> assert false
+[%%expect{|
+val refined_match : string = "matched R"
+|}]
