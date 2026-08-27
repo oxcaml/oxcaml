@@ -1217,9 +1217,9 @@ let partition_constructors constructors ~f =
     (fun (constr : RS.constructor) ->
       let constr_name = RS.constructor_name constr in
       let args = RS.constructor_args constr in
-      match args with
-      | [] -> Left constr_name
-      | _ :: _ ->
+      if RS.constructor_is_constant constr
+      then Left constr_name
+      else
         let args =
           List.map (fun { RS.label; field_type } -> f label field_type) args
         in

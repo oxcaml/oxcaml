@@ -246,10 +246,12 @@ and 'label mixed_block_field =
 and constructor =
   | Constructor_with_tuple_arg of
       { name : string;
+        is_constant : bool;
         args : unit mixed_block_field list
       }
   | Constructor_with_record_arg of
       { name : string;
+        is_constant : bool;
         args : string mixed_block_field list
       }
 
@@ -449,10 +451,15 @@ let hash_mixed_block_field (type label) (hash_label : label -> int)
   Hashtbl.hash (hash field_type, hash_label label)
 
 let hash_constructor = function
-  | Constructor_with_tuple_arg { name; args } ->
-    Hashtbl.hash (0, name, List.map (hash_mixed_block_field (fun () -> 0)) args)
-  | Constructor_with_record_arg { name; args } ->
-    Hashtbl.hash (1, name, List.map (hash_mixed_block_field Hashtbl.hash) args)
+  | Constructor_with_tuple_arg { name; is_constant; args } ->
+    Hashtbl.hash
+      ( 0,
+        name,
+        is_constant,
+        List.map (hash_mixed_block_field (fun () -> 0)) args )
+  | Constructor_with_record_arg { name; is_constant; args } ->
+    Hashtbl.hash
+      (1, name, is_constant, List.map (hash_mixed_block_field Hashtbl.hash) args)
 
 let hash_array_kind = function
   | Regular s -> Hashtbl.hash (0, hash s)
@@ -517,11 +524,11 @@ let tuple args =
       Hashtbl.hash (hash_tuple, hash_tuple_kind Tuple_boxed, List.map hash args)
   }
 
-let constructor_with_tuple_arg ~name ~args =
-  Constructor_with_tuple_arg { name; args }
+let constructor_with_tuple_arg ~name ~is_constant ~args =
+  Constructor_with_tuple_arg { name; is_constant; args }
 
-let constructor_with_record_arg ~name ~args =
-  Constructor_with_record_arg { name; args }
+let constructor_with_record_arg ~name ~is_constant ~args =
+  Constructor_with_record_arg { name; is_constant; args }
 
 let variant constructors =
   let desc = Variant { constructors; kind = Variant_boxed } in
@@ -553,11 +560,13 @@ let variant_attribute_unboxed ~constructor_name
     | None ->
       Constructor_with_tuple_arg
         { name = constructor_name;
+          is_constant = false;
           args = [{ field_type = constructor_arg.field_type; label = () }]
         }
     | Some label ->
       Constructor_with_record_arg
         { name = constructor_name;
+          is_constant = false;
           args = [{ field_type = constructor_arg.field_type; label }]
         }
   in
@@ -678,7 +687,7 @@ let rec print fmt { desc } =
       | Variant_polymorphic -> "poly"
     in
     let print_constructor fmt = function
-      | Constructor_with_tuple_arg { name; args } ->
+      | Constructor_with_tuple_arg { name; is_constant = _; args } ->
         Format.fprintf fmt "%s (%a)" name
           (Format.pp_print_list
              ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
@@ -687,7 +696,7 @@ let rec print fmt { desc } =
                  print_runtime_layout
                  (runtime_layout field_type)))
           args
-      | Constructor_with_record_arg { name; args } ->
+      | Constructor_with_record_arg { name; is_constant = _; args } ->
         Format.fprintf fmt "%s { %a }" name
           (Format.pp_print_list
              ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
@@ -857,12 +866,20 @@ and equal_record_field { field_type = type1; label = label1 }
 
 and equal_constructor c1 c2 =
   match c1, c2 with
-  | ( Constructor_with_tuple_arg { name = name1; args = args1 },
-      Constructor_with_tuple_arg { name = name2; args = args2 } ) ->
-    String.equal name1 name2 && List.equal equal_tuple_field args1 args2
-  | ( Constructor_with_record_arg { name = name1; args = args1 },
-      Constructor_with_record_arg { name = name2; args = args2 } ) ->
-    String.equal name1 name2 && List.equal equal_record_field args1 args2
+  | ( Constructor_with_tuple_arg
+        { name = name1; is_constant = is_constant1; args = args1 },
+      Constructor_with_tuple_arg
+        { name = name2; is_constant = is_constant2; args = args2 } ) ->
+    String.equal name1 name2
+    && Bool.equal is_constant1 is_constant2
+    && List.equal equal_tuple_field args1 args2
+  | ( Constructor_with_record_arg
+        { name = name1; is_constant = is_constant1; args = args1 },
+      Constructor_with_record_arg
+        { name = name2; is_constant = is_constant2; args = args2 } ) ->
+    String.equal name1 name2
+    && Bool.equal is_constant1 is_constant2
+    && List.equal equal_record_field args1 args2
   | Constructor_with_tuple_arg _, Constructor_with_record_arg _ -> false
   | Constructor_with_record_arg _, Constructor_with_tuple_arg _ -> false
 
@@ -913,3 +930,8 @@ let constructor_args = function
     List.map
       (fun { field_type; label } -> { field_type; label = Some label })
       args
+
+let constructor_is_constant = function
+  | Constructor_with_tuple_arg { is_constant; _ }
+  | Constructor_with_record_arg { is_constant; _ } ->
+    is_constant

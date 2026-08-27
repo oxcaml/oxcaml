@@ -177,10 +177,12 @@ and 'label mixed_block_field = private
 and constructor = private
   | Constructor_with_tuple_arg of
       { name : string;
+        is_constant : bool;
         args : unit mixed_block_field list
       }
   | Constructor_with_record_arg of
       { name : string;
+        is_constant : bool;
         args : string mixed_block_field list
       }
 
@@ -266,14 +268,20 @@ val map_mixed_block_field_label :
     Note that in [args], the order matters for the runtime memory layout. Ensure
     fields are in the correct order (i.e., values occur before non-values). *)
 val constructor_with_tuple_arg :
-  name:string -> args:unit mixed_block_field list -> constructor
+  name:string ->
+  is_constant:bool ->
+  args:unit mixed_block_field list ->
+  constructor
 
 (** Create a constructor with record-style arguments for use in variants.
 
     Note that in [args], the order matters for the runtime memory layout. Ensure
     fields are in the correct order (i.e., values occur before non-values). *)
 val constructor_with_record_arg :
-  name:string -> args:string mixed_block_field list -> constructor
+  name:string ->
+  is_constant:bool ->
+  args:string mixed_block_field list ->
+  constructor
 
 (** Get the name of a constructor. *)
 val constructor_name : constructor -> string
@@ -282,6 +290,10 @@ val constructor_name : constructor -> string
     Tuple-style constructors have [None] labels, record-style constructors have
     [Some name] labels. *)
 val constructor_args : constructor -> string option mixed_block_field list
+
+(** Whether the constructor is represented as a runtime constant (a tagged
+    immediate) rather than a block. *)
+val constructor_is_constant : constructor -> bool
 
 (** Create an unknown shape with the given runtime layout. Used when more
     precise type information is unavailable. *)

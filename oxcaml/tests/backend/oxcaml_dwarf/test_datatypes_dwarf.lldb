@@ -144,4 +144,9 @@
 (lldb) c
 (lldb) b Test_datatypes_dwarf.f_bigarray3_int32
 (lldb) c
+(lldb) b Test_datatypes_dwarf.f_all_void_variant
+(lldb) c
+(lldb) c
+(lldb) c
+(lldb) c
 (lldb) quit

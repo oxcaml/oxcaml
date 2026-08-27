@@ -687,7 +687,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     try
       let constructors =
         List.map
-          (fun { S.name; kind = _; args; constr_uid = _ } ->
+          (fun { S.name; kind = _; is_constant; args; constr_uid = _ } ->
             (* We first compute complex shapes for the fields. Then we unarize
                using the mixed block helpers defined above. *)
             let is_tuple_constructor =
@@ -718,12 +718,14 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
             if is_tuple_constructor
             then
               (* We clear the field names for tuple constructors. *)
-              RS.constructor_with_tuple_arg ~name
+              RS.constructor_with_tuple_arg ~name ~is_constant
                 ~args:
                   (List.map
                      (RS.map_mixed_block_field_label (fun _ -> ()))
                      constr_args)
-            else RS.constructor_with_record_arg ~name ~args:constr_args)
+            else
+              RS.constructor_with_record_arg ~name ~is_constant
+                ~args:constr_args)
           constructors
       in
       runtime (RS.variant constructors)
@@ -751,6 +753,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
               lay_out_into_mixed_block_exn ~source_level_fields
             in
             RS.constructor_with_tuple_arg ~name:pv_constr_name
+              ~is_constant:(List.compare_length_with constr_args 0 = 0)
               ~args:
                 (List.map
                    (RS.map_mixed_block_field_label (fun _ -> ()))
