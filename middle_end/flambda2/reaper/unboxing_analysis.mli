@@ -47,11 +47,23 @@ type changed_representation =
       * Function_slot.t Function_slot.Map.t
       * Function_slot.t
 
+type param_decision =
+  | Keep of Variable.t * Flambda_kind.With_subkind.t
+  | Delete
+  | Unbox of Variable.t Unboxed_fields.t
+
+type my_closure_param_decision =
+  | Keep_my_closure
+  | Unbox_my_closure of Variable.t Unboxed_fields.t
+
 type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
+    my_closure_decisions : my_closure_param_decision Code_id.Map.t;
+    function_params_to_keep : param_decision list Code_id.Map.t;
+    function_return_decision : param_decision list Code_id.Map.t
   }
 
 val pp_result : Format.formatter -> result -> unit
@@ -59,4 +71,7 @@ val pp_result : Format.formatter -> result -> unit
 val cannot_change_calling_convention : result -> Code_id.t -> bool
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> result
+  Datalog.database ->
+  code_deps:Traverse_acc.code_dep Code_id.Map.t ->
+  stats:Datalog.Schedule.stats ->
+  result

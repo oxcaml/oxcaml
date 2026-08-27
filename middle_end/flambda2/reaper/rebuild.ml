@@ -40,12 +40,12 @@ module P = Flambda_primitive
 module RE = Rebuilt_expr
 module SC = Static_const
 
-type param_decision =
-  | Keep of Variable.t * KS.t
+type param_decision = Unboxing_analysis.param_decision =
+  | Keep of Variable.t * Flambda_kind.With_subkind.t
   | Delete
   | Unbox of Variable.t Unboxed_fields.t
 
-type my_closure_param_decision =
+type my_closure_param_decision = Unboxing_analysis.my_closure_param_decision =
   | Keep_my_closure
   | Unbox_my_closure of Variable.t Unboxed_fields.t
 
@@ -75,11 +75,6 @@ type env =
     cont_params_to_keep : param_decision list Continuation.Map.t;
     should_keep_param : Continuation.t -> Variable.t -> KS.t -> param_decision;
     (* TODO same here *)
-    my_closure_decisions : my_closure_param_decision Code_id.Map.t;
-    function_params_to_keep : param_decision list Code_id.Map.t;
-    should_keep_function_param :
-      Code_id.t -> Variable.t -> KS.t -> param_decision;
-    function_return_decision : param_decision list Code_id.Map.t;
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
@@ -1269,7 +1264,7 @@ let rebuild_apply env apply =
          code_id Apply.print apply; *)
       let original_callee = Apply.callee apply in
       let args_from_unboxed_callee, callee =
-        match Code_id.Map.find_opt code_id env.my_closure_decisions with
+        match Code_id.Map.find_opt code_id env.uses.my_closure_decisions with
         | None ->
           Misc.fatal_errorf
             "No my_closure_decisions found for code id %a in direct apply \
@@ -1301,7 +1296,7 @@ let rebuild_apply env apply =
           get_args_with_kinds env [Unbox fields] [callee], None
       in
       let params_decisions =
-        match Code_id.Map.find_opt code_id env.function_params_to_keep with
+        match Code_id.Map.find_opt code_id env.uses.function_params_to_keep with
         | None ->
           Misc.fatal_errorf
             "No parameter decisions found for code id %a in direct apply \
@@ -1379,7 +1374,7 @@ let rebuild_apply env apply =
         Flambda_arity.create (List.map components_for args)
       in
       let return_decisions =
-        Code_id.Map.find code_id env.function_return_decision
+        Code_id.Map.find code_id env.uses.function_return_decision
       in
       let return_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
       let args = List.map fst (List.flatten args) in
@@ -2234,10 +2229,10 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                   List.map (fun p -> p, Points_to_analysis.Keep) results_vars )
               | Changing_calling_convention code_id ->
                 let return_decisions =
-                  Code_id.Map.find code_id env.function_return_decision
+                  Code_id.Map.find code_id env.uses.function_return_decision
                 in
                 let params_decision =
-                  Code_id.Map.find code_id env.function_params_to_keep
+                  Code_id.Map.find code_id env.uses.function_params_to_keep
                 in
                 ( List.map2
                     (fun p -> function
@@ -2282,10 +2277,10 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       res )
   | Changing_calling_convention code_id ->
     let return_decisions =
-      Code_id.Map.find code_id env.function_return_decision
+      Code_id.Map.find code_id env.uses.function_return_decision
     in
     let params_decision =
-      Code_id.Map.find code_id env.function_params_to_keep
+      Code_id.Map.find code_id env.uses.function_params_to_keep
     in
     let result_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
     let code_metadata =
@@ -2461,96 +2456,6 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
     ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
     (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
-  let should_keep_function_param code_id =
-    let cannot_change_calling_convention =
-      Analysis.cannot_change_calling_convention solved_dep code_id
-    in
-    if cannot_change_calling_convention
-    then (
-      fun var kind ->
-        assert (
-          Option.is_none
-            (Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var var)));
-        Keep (var, kind))
-    else
-      fun param kind ->
-        match
-          Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var param)
-        with
-        | None ->
-          let is_var_used =
-            raw_is_var_used solved_dep param (K.With_subkind.kind kind)
-          in
-          if is_var_used then Keep (param, kind) else Delete
-        | Some fields -> Unbox fields
-  in
-  let function_params_to_keep =
-    Code_id.Map.mapi
-      (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let kinds = Flambda_arity.unarize code_dep.arity in
-        List.map2 (should_keep_function_param code_id) code_dep.params kinds)
-      code_deps
-  in
-  let my_closure_decisions =
-    Code_id.Map.mapi
-      (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let unboxed_fields =
-          Analysis.get_unboxed_fields solved_dep
-            (Code_id_or_name.var code_dep.my_closure)
-        in
-        match unboxed_fields with
-        | None -> Keep_my_closure
-        | Some unboxed_fields ->
-          if Analysis.cannot_change_calling_convention solved_dep code_id
-          then
-            Misc.fatal_errorf
-              "For code_id %a, we cannot change calling convention but closure \
-               is expected to be unboxed"
-              Code_id.print code_id;
-          Unbox_my_closure unboxed_fields)
-      code_deps
-  in
-  let should_keep_function_param code_id =
-    match Code_id.Map.find_opt code_id code_deps with
-    | None -> fun var kind -> Keep (var, kind)
-    | Some _ -> should_keep_function_param code_id
-  in
-  let function_return_decision =
-    Code_id.Map.mapi
-      (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let cannot_change_calling_convention =
-          Analysis.cannot_change_calling_convention solved_dep code_id
-        in
-        let metadata = get_code_metadata code_id in
-        let result_kinds =
-          Flambda_arity.unarized_components
-            (Code_metadata.result_arity metadata)
-        in
-        if cannot_change_calling_convention
-        then
-          List.map2 (fun v kind -> Keep (v, kind)) code_dep.return result_kinds
-        else
-          (* Format.eprintf "DIRECT: %a@." Code_id.print code_id; *)
-          List.map2
-            (fun v kind ->
-              match
-                Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var v)
-              with
-              | None ->
-                let is_var_used =
-                  raw_is_var_used solved_dep v (K.With_subkind.kind kind)
-                in
-                let kind =
-                  Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
-                    (Name.var v) kind
-                in
-                (* TODO: fix this, needs the mapping between code ids of
-                   functions and their return continuations *)
-                if true || is_var_used then Keep (v, kind) else Delete
-              | Some fields -> Unbox fields)
-            code_dep.return result_kinds)
-      code_deps
-  in
   let should_keep_param cont param kind =
     let keep_all_parameters =
       Continuation.Set.mem cont fixed_arity_continuations
@@ -2596,10 +2501,6 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
-      my_closure_decisions;
-      function_params_to_keep;
-      should_keep_function_param;
-      function_return_decision;
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
       inside_code_definition = false;

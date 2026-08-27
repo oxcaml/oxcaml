@@ -36,7 +36,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   in
   let solved_dep =
     Profile.record_call ~accumulate:true "solver" (fun () ->
-        Analysis.fixpoint deps)
+        Analysis.fixpoint deps code_deps)
   in
   let () =
     if Flambda_features.debug_reaper "print-solved"

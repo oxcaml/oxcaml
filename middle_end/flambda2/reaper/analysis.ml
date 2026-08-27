@@ -20,12 +20,13 @@ open Unboxing_analysis
 
 type result = Unboxing_analysis.result
 
-let fixpoint (graph : Global_flow_graph.graph) =
+let fixpoint (graph : Global_flow_graph.graph)
+    (code_deps : Traverse_acc.code_dep Code_id.Map.t) =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
   let db = Points_to_analysis.perform_analysis datalog ~stats in
-  let result = Unboxing_analysis.perform_analysis db ~stats in
+  let result = Unboxing_analysis.perform_analysis db ~code_deps ~stats in
   if with_provenance || Flambda_features.debug_reaper "stats"
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Flambda_features.debug_reaper "db"
