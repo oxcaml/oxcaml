@@ -122,6 +122,8 @@ val alloc_mode_r_zap_to_ceil : alloc_mode_r -> Mode.Locality.Const.t
 val alloc_mode_r_submode_err :
   Mode.Hint.pinpoint -> Mode.Locality.l -> alloc_mode_r -> unit
 
+val alloc_mode_r_map : (Mode.Locality.r -> 'a) -> alloc_mode_r -> 'a
+
 val print_alloc_mode_r : Format.formatter -> alloc_mode_r -> unit
 
 type alloc_mode_l
@@ -129,6 +131,8 @@ type alloc_mode_l
 val create_alloc_mode_l : Mode.Locality.l -> alloc_mode_l
 
 val alloc_mode_l_zap_to_floor : alloc_mode_l -> Mode.Locality.Const.t
+
+val alloc_mode_l_map : (Mode.Locality.l -> 'a) -> alloc_mode_l -> 'a
 
 val print_alloc_mode_l : Format.formatter -> alloc_mode_l -> unit
 

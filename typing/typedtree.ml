@@ -141,6 +141,8 @@ let alloc_mode_r_zap_to_ceil m = Mode.Locality.zap_to_ceil m
 
 let alloc_mode_r_submode_err pp m t = Mode.Locality.submode_err pp m t
 
+let alloc_mode_r_map f m = f m
+
 let print_alloc_mode_r ppf m =
   Format_doc.compat (Mode.Locality.print ()) ppf m
 
@@ -150,6 +152,8 @@ let create_alloc_mode_l m =
   assert (Mode.Locality.check_const_or_level_0 m); m
 
 let alloc_mode_l_zap_to_floor m = Mode.Locality.zap_to_floor m
+
+let alloc_mode_l_map f m = f m
 
 let print_alloc_mode_l ppf m =
   Format_doc.compat (Mode.Locality.print ()) ppf m
