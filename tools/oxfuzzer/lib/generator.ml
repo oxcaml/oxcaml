@@ -2,6 +2,7 @@
 module Bin_op = Ir.Bin_op
 module Expr = Ir.Expr
 module Function = Ir.Function
+module Inline = Ir.Inline
 module Name = Ir.Name
 module Number = Ir.Number
 module NumberTy = Ir.NumberTy
@@ -48,17 +49,24 @@ end
    Config. *)
 (* CR-someday hwasilewski: Make [Config] controlled by swarm testing. *)
 module Config = struct
-  let max_function_count = 5
+  let max_function_count = 10
 
-  let fun_min_param_count = 1
+  let fun_min_param_count = 0
 
   let fun_max_param_count = 5
 
-  let max_block_depth = 3
+  let max_block_depth = 4
 
-  let max_expression_complexity = 10
+  let max_expression_complexity = 20
 
   let toplevel_var_count = 5
+
+  (* Percentages. *)
+  let opaque_initializer_probability = 50
+
+  let opaque_leaf_probability = 5
+
+  let opaque_loop_bound_probability = 50
 end
 
 (* CR-someday hwasilewski: We should consider changing this to be a monad, which
@@ -125,6 +133,12 @@ let random_int_in_range (st : State.t) ~min ~max =
 
 let with_expression_complexity f = f ~complexity:(ref 0)
 
+let with_probability (st : State.t) ~probability =
+  Random.State.int st.random_state 100 < probability
+
+let maybe_opaque st ~probability expr =
+  if with_probability st ~probability then Expr.Opaque expr else expr
+
 let can_recurse ~complexity =
   !complexity + 2 <= Config.max_expression_complexity
 
@@ -172,11 +186,15 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
       | (Int | Nativeint | Int64 | Int32 | Int16 | Int8) as base ->
         gen_const_int base
     in
-    if nty.unboxed
-    then
-      Gen.map boxed ~f:(fun expr ->
-          Expr.Convert { expr; from = NumberTy.boxed nty.base; to_ = nty })
-    else boxed
+    let const =
+      if nty.unboxed
+      then
+        Gen.map boxed ~f:(fun expr ->
+            Expr.Convert { expr; from = NumberTy.boxed nty.base; to_ = nty })
+      else boxed
+    in
+    Gen.map const
+      ~f:(maybe_opaque st ~probability:Config.opaque_leaf_probability)
   in
   let gen_var nty =
     let vars =
@@ -186,7 +204,8 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
       (not (List.is_empty vars))
       (fun () ->
         let name, _ty = random_element st vars in
-        record_complexity (Expr.Var name) ~complexity)
+        maybe_opaque st ~probability:Config.opaque_leaf_probability
+          (record_complexity (Expr.Var name) ~complexity))
   in
   let gen_ty nty =
     Gen.run_exn
@@ -205,16 +224,15 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
             expr = Expr.Bin_op { ty = Ty.Number inner_ty; op = binop; lhs; rhs }
           })
   in
-  let standard =
-    Gen.weighted st.random_state
-      [2, gen_var nty; 1, gen_const nty; 4, gen_binop nty]
-  in
+  let leaf = Gen.weighted st.random_state [2, gen_var nty; 1, gen_const nty] in
   Gen.run_exn
     (Gen.weighted st.random_state
-       [8, standard; 2, gen_fun_call st env nty ~complexity])
+       [5, leaf; 3, gen_binop nty; 1, gen_fun_call st env nty ~complexity])
 
 and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
-  if not (can_recurse ~complexity)
+  if
+    (not (can_recurse ~complexity))
+    || not (State.can_create_function st ~max:Config.max_function_count)
   then Gen.unavailable
   else
     let gen_arguments params =
@@ -243,8 +261,7 @@ and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
         call_existing_function
     in
     let new_function =
-      Gen.when_ (State.can_create_function st ~max:Config.max_function_count)
-        (fun () ->
+      Gen.create (fun () ->
           let name = State.reserve_function st in
           let parameter_types =
             List.init
@@ -258,13 +275,21 @@ and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
                 Env.extend env (name, Ty.Number nty), (name, Ty.Number nty))
               Env.empty parameter_types
           in
+          let inline : Inline.t =
+            match Random.State.int st.random_state 3 with
+            | 0 -> Never
+            | 1 -> Always
+            | _ -> Default
+          in
           let args = gen_arguments params in
           let _callee_env, body = gen_fun_body st callee_env 0 in
           let result =
             with_expression_complexity (fun ~complexity ->
                 gen_number st callee_env return_ty ~complexity)
           in
-          let function_ = { Function.name; params; body; return_ty; result } in
+          let function_ =
+            { Function.name; params; inline; body; return_ty; result }
+          in
           (* Creating a function after its full body was successfully generated
              ensures that all the functions called by [function_] were already
              added to [st.top_level_functions]. This means that functions are
@@ -274,7 +299,7 @@ and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
             (Expr.Call_toplevel { fun_name = name; args })
             ~complexity)
     in
-    Gen.weighted st.random_state [1, existing_function; 1, new_function]
+    Gen.weighted st.random_state [2, existing_function; 1, new_function]
 
 and gen_bool (st : State.t) env ~complexity =
   let gen_binop op arg_ty gen_arg =
@@ -293,7 +318,7 @@ and gen_bool (st : State.t) env ~complexity =
   in
   Gen.run_exn
     (Gen.weighted st.random_state
-       [ 1, gen_binop Bin_op.Eq (Ty.Number nty) gen_number_arg;
+       [ 5, gen_binop Bin_op.Eq (Ty.Number nty) gen_number_arg;
          1, gen_bool_binop Bin_op.Eq;
          1, gen_bool_binop Bin_op.And;
          1, gen_bool_binop Bin_op.Or ])
@@ -304,6 +329,9 @@ and gen_decl st env =
   let expr =
     with_expression_complexity (fun ~complexity ->
         gen_number st env nty ~complexity)
+  in
+  let expr =
+    maybe_opaque st ~probability:Config.opaque_initializer_probability expr
   in
   let env = Env.extend env (name, Ty.Number nty) in
   env, (name, Ty.Number nty, expr)
@@ -354,13 +382,21 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
       let gen_bounded_loop =
         Gen.create (fun () ->
             let name = State.fresh st in
-            let times = 1 + Random.State.int st.random_state 3 in
+            let times =
+              maybe_opaque st ~probability:Config.opaque_loop_bound_probability
+                (Expr.Const
+                   (Number.Int (1 + Random.State.int st.random_state 3)))
+            in
             let _, inner = gen_fun_body st env (depth + 1) in
             continue env (Statement.Bounded_loop (name, times, inner)))
       in
+      let gen_empty =
+        Gen.when_ (List.is_empty env.Env.bindings) (fun () ->
+            env, Statement.Seq [])
+      in
       let allowed =
         if depth >= Config.max_block_depth
-        then [1, gen_assign]
+        then [1, gen_assign; 1, gen_empty]
         else [4, gen_assign; 1, gen_if; 1, gen_bounded_loop; 1, gen_local_decl]
       in
       Gen.run_exn (Gen.weighted st.random_state allowed)

@@ -198,6 +198,7 @@ module Expr = struct
   type t =
     | Const of Number.t
     | Var of Name.t
+    | Opaque of t
     | Bin_op of
         { ty : Ty.t;
           op : Bin_op.t;
@@ -223,12 +224,19 @@ module Expr = struct
     | Const n -> Number.to_code n
     | Var name ->
       Exp.ident { Location.txt = Longident.Lident name; loc = Location.none }
+    | Opaque expr ->
+      apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
     | Bin_op { ty; op; lhs; rhs } ->
       Exp.apply (Bin_op.to_code ty op)
         [Nolabel, to_code lhs; Nolabel, to_code rhs]
     | Convert { expr; from; to_ } -> convert_num (to_code expr) ~from ~to_
     | Call_toplevel { fun_name; args } ->
-      apply (ident (Name.to_string fun_name)) (List.map to_code args)
+      let args =
+        match args with
+        | [] -> [unit_]
+        | _ -> List.map to_code args
+      in
+      apply (ident (Name.to_string fun_name)) args
 end
 
 module Statement = struct
@@ -237,7 +245,7 @@ module Statement = struct
     | Seq of t list
     | If of Expr.t * t * t
     | Let_mutable of Name.t * Expr.t * t
-    | Bounded_loop of Name.t * int * t
+    | Bounded_loop of Name.t * Expr.t * t
 
   let let_mutable name expr body =
     Exp.let_ Mutable Nonrecursive
@@ -253,8 +261,7 @@ module Statement = struct
       Exp.setinstvar (Name.to_string name |> loc) (Expr.to_code expr)
     | Bounded_loop (loop_var, times, stmt) ->
       let var = ident (Name.to_string loop_var) in
-      let_mutable loop_var
-        (opaque_identity (int times))
+      let_mutable loop_var (Expr.to_code times)
         (Exp.while_
            (op ">" [var; int 0])
            (Exp.sequence (to_code stmt)
@@ -270,17 +277,33 @@ module Statement = struct
         (Some (to_code if_false))
 end
 
+module Inline = struct
+  type t =
+    | Never
+    | Always
+    | Default
+
+  let to_attributes inline =
+    let attribute payload =
+      [Attr.mk (loc "inline") (PStr [Str.eval (ident payload)])]
+    in
+    match inline with
+    | Default -> []
+    | Never -> attribute "never"
+    | Always -> attribute "always"
+end
+
 module Function = struct
   type t =
     { name : Name.t;
       params : (Name.t * Ty.t) list;
+      inline : Inline.t;
       body : Statement.t;
       return_ty : NumberTy.t;
       result : Expr.t
     }
 
-  let to_code { name; params; body; return_ty = _; result } =
-    let names = List.map (fun (name, _ty) -> name) params in
+  let to_code { name; params; inline; body; return_ty = _; result } =
     let to_param (name, _ty) = value_param (Pat.var (loc name)) in
     let function_params =
       match params with
@@ -290,14 +313,11 @@ module Function = struct
     let body = Exp.sequence (Statement.to_code body) (Expr.to_code result) in
     let body =
       List.fold_right
-        (fun name body ->
-          Statement.let_mutable name (opaque_identity (ident name)) body)
-        names body
+        (fun (name, _ty) body -> Statement.let_mutable name (ident name) body)
+        params body
     in
     Str.value Nonrecursive
-      [ Vb.mk
+      [ Vb.mk ~attrs:(Inline.to_attributes inline)
           (Pat.var (loc name))
-          (* CR-soon hwasilewski: With some probability add either the inline
-             never or inline always attribute. *)
           (function_ function_params body) ]
 end
