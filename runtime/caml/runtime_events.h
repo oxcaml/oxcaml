@@ -126,6 +126,7 @@ typedef enum {
     EV_EMPTY_MINOR,
     EV_MINOR_EPHE_CLEAN,
     EV_MINOR_DEPENDENT,
+    EV_EXPLICIT_GC_RAMP_UP,
 } ev_runtime_phase;
 
 typedef enum {
@@ -165,6 +166,8 @@ typedef enum {
     EV_C_STACK_WOKEN,
 
     EV_C_MAJOR_DIRECT_ALLOCATED_WORDS,
+    EV_C_MAJOR_SUSPENDED_ALLOCATED_WORDS,
+    EV_C_MAJOR_RESUMED_ALLOCATED_WORDS,
 } ev_runtime_counter;
 
 typedef enum {

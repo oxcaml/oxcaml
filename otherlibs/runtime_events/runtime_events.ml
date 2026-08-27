@@ -45,6 +45,8 @@ type runtime_counter =
 | EV_C_STACK_IDLED
 | EV_C_STACK_WOKEN
 | EV_C_MAJOR_DIRECT_ALLOCATED_WORDS
+| EV_C_MAJOR_SUSPENDED_ALLOCATED_WORDS
+| EV_C_MAJOR_RESUMED_ALLOCATED_WORDS
 
 type runtime_phase =
 | EV_EXPLICIT_GC_SET
@@ -98,6 +100,7 @@ type runtime_phase =
 | EV_EMPTY_MINOR
 | EV_MINOR_EPHE_CLEAN
 | EV_MINOR_DEPENDENT
+| EV_EXPLICIT_GC_RAMP_UP
 
 type lifecycle =
   EV_RING_START
@@ -160,6 +163,10 @@ let runtime_counter_name counter =
     "stack_woken"
   | EV_C_MAJOR_DIRECT_ALLOCATED_WORDS ->
     "major_direct_allocated_words"
+  | EV_C_MAJOR_SUSPENDED_ALLOCATED_WORDS ->
+    "major_suspended_allocated_words"
+  | EV_C_MAJOR_RESUMED_ALLOCATED_WORDS ->
+    "major_resumed_allocated_words"
 
 let runtime_phase_name phase =
   match phase with
@@ -214,6 +221,7 @@ let runtime_phase_name phase =
   | EV_EMPTY_MINOR -> "empty_minor"
   | EV_MINOR_EPHE_CLEAN -> "minor_ephe_clean"
   | EV_MINOR_DEPENDENT -> "minor_dependent"
+  | EV_EXPLICIT_GC_RAMP_UP -> "explicit_gc_ramp_up"
 
 let lifecycle_name lifecycle =
   match lifecycle with

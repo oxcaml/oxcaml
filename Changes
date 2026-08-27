@@ -3,9 +3,12 @@ OCaml 5.4.1
 
 ### Runtime system:
 
-- #15001: Add EV_C_MAJOR_DIRECT_ALLOCATED_WORDS runtime events counter,
+- #15001: Add runtime events counters EV_C_MAJOR_DIRECT_ALLOCATED_WORDS,
+  EV_C_MAJOR_SUSPENDED_ALLOCATED_WORDS and EV_C_MAJOR_RESUMED_ALLOCATED_WORDS,
   reporting the words allocated directly in the major heap as opposed to
-  promoted from the minor heap.
+  promoted from the minor heap, the words suspended during a GC ramp-up phase
+  and the words returned by Gc.ramp_down. Add the span
+  EV_EXPLICIT_GC_RAMP_UP covering a call to Gc.ramp_up.
   (Tim McGilchrist, review by Sadiq Jaffer and Gabriel Scherer)
 
 ### Bug fixes:
