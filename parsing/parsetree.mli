@@ -68,9 +68,11 @@ type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
 
 type mode =
-  | Mode of string loc list
+  | Mode of mode_const
   | Mode_var of string loc
   | Mode_bounds of mode_bounds
+
+and mode_const = string loc list
 
 and mode_bounds =
   { upper : mode_bound;

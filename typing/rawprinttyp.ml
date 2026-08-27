@@ -59,8 +59,7 @@ let string_of_label : Types.arg_label -> string = function
   | Optional s -> "?"^s
 
 let out_modalities_of_mod_bounds mod_bounds =
-  Typemode.untransl_mod_bounds mod_bounds
-  |> List.map (fun { Location.txt; _ } -> Printast.string_of_mode txt)
+  Typemode.untransl_mod_bounds mod_bounds |> Typemode.const_mode_strings
 
 let visited = ref []
 let rec raw_type ppf ty =

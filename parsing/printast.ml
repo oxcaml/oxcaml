@@ -175,8 +175,11 @@ let string_of_mode_bound sep { bound_vars; bound_const } =
   in
   String.concat sep (vars @ consts)
 
+let string_of_mode_const consts =
+  String.concat " " (List.map (fun c -> c.txt) consts)
+
 let string_of_mode = function
-  | Mode consts -> String.concat " " (List.map (fun c -> c.txt) consts)
+  | Mode consts -> string_of_mode_const consts
   | Mode_var v -> "'" ^ v.txt
   | Mode_bounds { upper; lower } ->
     let upper =

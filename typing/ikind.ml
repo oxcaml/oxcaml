@@ -1022,10 +1022,7 @@ let residual_mode_strings { mode_bounds; axes; _ } =
   Jkind.Mod_bounds.of_axis_lattice restricted
   |> Typemode.close_implied_mod_bounds
   |> Typemode.untransl_mod_bounds ~verbose:false
-  |> List.concat_map (fun { Location.txt = mode; _ } ->
-       match (mode : Parsetree.mode) with
-       | Mode atoms -> List.map (fun { Location.txt = s; _ } -> s) atoms
-       | Mode_var _ | Mode_bounds _ -> assert false)
+  |> Typemode.const_mode_strings
 
 let pp_provenance_residual ppf
     ({ provenance = { ty; plural; _ }; _ } as residual) =

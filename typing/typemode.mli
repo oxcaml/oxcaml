@@ -121,6 +121,10 @@ val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
 
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)
-val untransl_mod_bounds : ?verbose:bool -> Jkind.Mod_bounds.t -> Parsetree.modes
+val untransl_mod_bounds :
+  ?verbose:bool -> Jkind.Mod_bounds.t -> Parsetree.mode_const
+
+(** The atoms of a constant mode annotation, as strings. *)
+val const_mode_strings : Parsetree.mode_const -> string list
 
 val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
