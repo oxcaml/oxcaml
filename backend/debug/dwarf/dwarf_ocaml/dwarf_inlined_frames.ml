@@ -79,9 +79,7 @@ let create_discontiguous_range_list_entry state ~start_of_code_symbol
     (* DWARF-5 spec page 54 line 1. *)
     Startx_endx { start_inclusive; end_exclusive; payload = () }
   in
-  let range_list_entry =
-    Range_list_entry.create range_list_entry ~start_of_code_symbol
-  in
+  let range_list_entry = Range_list_entry.create range_list_entry in
   (* We still use the [Range_list] when emitting DWARF-4 (even though it is a
      DWARF-5 structure) for the purposes of de-duplicating ranges. *)
   let range_list = Range_list.add range_list range_list_entry in

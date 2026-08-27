@@ -62,7 +62,7 @@ module type S = sig
 
   type t
 
-  val create : entry -> start_of_code_symbol:Asm_symbol.t -> t
+  val create : entry -> t
 
   val section : Asm_section.dwarf_section
 
