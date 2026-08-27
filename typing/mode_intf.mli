@@ -1006,6 +1006,8 @@ module type S = sig
         caution. See [zap_to_legacy] for an explanation of [arg]. *)
     val zap_to_legacy_force : ?commit:bool -> arg:bool -> lr -> Const.t
 
+    val zap_to_floor_force : (allowed * 'r) t -> Const.t
+
     val zap_to_ceil_exn : ('l * allowed) t -> Const.t
 
     val zap_to_floor_exn : (allowed * 'r) t -> Const.t
