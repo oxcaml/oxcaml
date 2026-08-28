@@ -4699,6 +4699,8 @@ module Report = struct
             (Misc.Style.as_inline_code !print_longident)
             lid)
     | Function -> Some (print_article_noun Consonant "function")
+    | Parameter -> Some (print_article_noun Consonant "parameter")
+    | Return -> Some (print_article_noun Consonant "function return")
     | Functor -> Some (print_article_noun Consonant "functor")
     | Functor_parameter ->
       Some (print_article_noun Consonant "functor parameter")
