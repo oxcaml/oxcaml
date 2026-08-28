@@ -285,7 +285,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let var_map_to_list t = VarMap.fold (fun _ a xs -> a :: xs) t []
 
   type 'a var =
-    { level : int;
+    { mutable level : int;
           (** The level of the variable. This has the same meaning as the level
               field of a [type_expr]. *)
       mutable vlower : 'a lmorphvar VarMap.t;
@@ -351,6 +351,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Clower : 'a var * 'a * ('a, left_only) Comp_hint.t -> change
     | Cvlower : 'a var * 'a lmorphvar VarMap.t -> change
     | Cvupper : 'a var * 'a rmorphvar VarMap.t -> change
+    | Clevel : 'a var * int -> change
 
   type changes = change list
 
@@ -363,6 +364,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       v.lower_hint <- lower_hint
     | Cvlower (v, vlower) -> v.vlower <- vlower
     | Cvupper (v, vupper) -> v.vupper <- vupper
+    | Clevel (v, level) -> v.level <- level
 
   let empty_changes = []
 
@@ -677,6 +679,13 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Some log -> log := Cvupper (v, v.vupper) :: !log);
     v.vupper <- vupper
 
+  (** When called, graph must be fixed so maintain INVARIANT *)
+  let set_level ~log v level =
+    (match log with
+    | None -> ()
+    | Some log -> log := Clevel (v, v.level) :: !log);
+    v.level <- level
+
   (** Returns [Ok ()] if success; [Error x] if failed, and [x] is the next best
       (read: strictly lower) guess to replace the constant argument that MIGHT
       succeed. *)
@@ -947,6 +956,249 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         v.vlower
     end
 
+  (* Tighten the lower bound of [u] based on the lower bound of [f' v].
+  No recursion into [u.vuppers] *)
+  let push_lower_bound : type a b r.
+      log:_ ->
+      b C.obj ->
+      a var ->
+      (a, b, allowed * r) C.morph ->
+      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
+      b var ->
+      unit =
+   fun ~log dst v f' f'_hint u ->
+    let mv = Amorphvar (v, f', f'_hint) in
+    let mlower = mlower dst mv in
+    let mlower_hint = mlower_hint mv in
+    if not (C.le dst mlower u.lower)
+    then update_lower ~log dst u mlower mlower_hint
+
+  (* Tighten the upper bound of [u] based on the upper bound of [f' v].
+  No recursion into [u.vlowers] *)
+  let push_upper_bound : type a b l.
+      log:_ ->
+      b C.obj ->
+      a var ->
+      (a, b, l * allowed) C.morph ->
+      (a, b, l * allowed) Comp_hint.Morph_hint.t ->
+      b var ->
+      unit =
+   fun ~log dst v f' f'_hint u ->
+    let mv = Amorphvar (v, f', f'_hint) in
+    let mupper = mupper dst mv in
+    let mupper_hint = mupper_hint mv in
+    if not (C.le dst u.upper mupper)
+    then update_upper ~log dst u mupper mupper_hint
+
+  let add_vlower_nocheck : type a b r.
+      log:_ ->
+      a C.obj ->
+      a var ->
+      b var ->
+      (b, a, allowed * r) C.morph ->
+      (b, a, allowed * r) Comp_hint.Morph_hint.t ->
+      unit =
+   fun ~log dst v u f f_hint ->
+    let x =
+      Amorphvar
+        (u, C.disallow_right f, Comp_hint.Morph_hint.disallow_right f_hint)
+    in
+    if C.le dst (mupper dst x) v.lower
+    then ()
+    else
+      let key = get_key dst x in
+      if VarMap.mem key v.vlower
+      then ()
+      else set_vlower ~log v (VarMap.add key x v.vlower)
+
+  let add_vupper_nocheck : type a b l.
+      log:_ ->
+      a C.obj ->
+      a var ->
+      b var ->
+      (b, a, l * allowed) C.morph ->
+      (b, a, l * allowed) Comp_hint.Morph_hint.t ->
+      unit =
+   fun ~log dst v u f f_hint ->
+    let x =
+      Amorphvar (u, C.disallow_left f, Comp_hint.Morph_hint.disallow_left f_hint)
+    in
+    if C.le dst v.upper (mlower dst x)
+    then ()
+    else
+      let key = get_key dst x in
+      if VarMap.mem key v.vupper
+      then ()
+      else set_vupper ~log v (VarMap.add key x v.vupper)
+
+  (* Proof of soundness for [add_vlower_reversed].
+
+    [add_vlower_reversed] is not safe to call in general: its soundness
+    depends on being called from [update_level_finalize].
+
+    Let's recall the solver variable invariant, denoted INV(v):
+
+     1) v.lower < v.upper
+     2) ∀ (f, u) ∈ v.vlower: u.level ≤ v.level
+     3) ∀ (f, u) ∈ v.vupper: u.level < v.level
+     4) ∀ (f, u) ∈ v.vlower: f u.upper ≤ v.upper
+     5) ∀ (f, u) ∈ v.vupper: v.lower ≤ f u.lower
+     6) ∀ (f, u) ∈ v.vlower, (g, w) ∈ v.vupper:
+       (g'f, u) ∈ w.vlower
+     ∨ (f'g, w) ∈ u.vupper
+
+    PRECONDITION: must be called from update_level_finalize where the
+    following holds:
+    1) u.level < v.level
+    2) f v.upper < u.upper
+    3) ∀ (g,w') ∈ u.vupper:
+       w'.level < v.level ⇒ (f'g,w') ∈ v.vupper
+       w'.level ≥ v.level ⇒ (g'f,v) ∈ w'.vlower
+
+    ARGUMENT 1:
+    We are tightening u.lower to f v.lower.
+    PROOF OBLIGATION: ∀ (g,w’) ∈ u.vupper: f v.lower < g w’.lower
+
+    By INV.3 we know that w’.level < u.level.
+    By transitivity with P.1 we then know that w’level < v.level
+    By P.3 we then know that (f’g,w’) ∈ v.vupper
+    By INV.5 we then know that v.lower < f’g w’.lower
+    By left adjoint we conclude: f v.lower < g w’.lower
+
+    ARGUMENT 2:
+    We are adding (fh,w) to u.vlower, (where `(h,w) ∈  without propagating
+    or checking bounds.
+    PROOF OBLIGATION:
+       fh w.upper < u.upper
+       ∀ (g,w’) ∈ u.vupper: (g’fh,w) ∈ w’.vlower ∨
+                           (h’f’g,w’) ∈ w.vupper
+
+    By P.2 we know that f v.upper < u.upper
+    By INV.4 we know that h w.upper < v.upper
+    By right adjoint we know that v.upper < f’ u.upper
+    By transitivity we know that h w.upper < f’ u.upper
+    By left adjoint we know that fh w.upper < u.upper
+
+    The second proof obligation follows similarly.
+    We know that (h,w) ∈ v.vlower.
+    Introduce an arbitrary (g,w’) ∈ u.vupper.
+    By P.3 and w’.level < v.level we know that (f’g,w’) ∈ v.vupper
+    By P.6 we conclude our proof obligation holds.
+
+  *)
+
+  (* Add a vlower entry for the relation [f' u <= v], tighten the upper bound of [u],
+  and recursively add relations to maintain invariant.
+  The lower and upper bounds of [u] and [v] are not checked, upper bound is not pushed
+  down [u.vlower] *)
+  let rec add_vlower_reversed : type a b l.
+      log:_ ->
+      H.Pinpoint.t ->
+      b C.obj ->
+      a var ->
+      b var ->
+      (a, b, l * allowed) C.morph ->
+      (a, b, l * allowed) Comp_hint.Morph_hint.t ->
+      unit =
+   fun ~log pp dst v u f f_hint ->
+    let f' = C.left_adjoint dst f in
+    let _, src, f'_hint = Comp_hint.Morph_hint.left_adjoint pp dst f_hint in
+    let x = Amorphvar (u, f', f'_hint) in
+    let key = get_key src x in
+    if VarMap.mem key v.vlower
+    then ()
+    else begin
+      push_upper_bound ~log dst v f f_hint u;
+      (* We are tightening u.lower to f v.lower.
+           This is sound by ARGUMENT 1 above *)
+      set_vlower ~log v (VarMap.add key x v.vlower);
+      VarMap.iter
+        (fun _ (Amorphvar (w, h, h_hint)) ->
+          let fh = C.compose dst (C.disallow_left f) h in
+          let fh_hint =
+            Comp_hint.Morph_hint.Compose
+              (Comp_hint.Morph_hint.disallow_left f_hint, h_hint)
+          in
+          if w.level < u.level
+          then add_vupper_nocheck ~log dst u w fh fh_hint
+          else add_vlower_reversed ~log pp dst w u fh fh_hint)
+          (* We are adding (fh,w) to u.vlower without propagating or
+               checking bounds. This is soud by ARGUMENT 2 above *)
+        v.vupper
+    end
+
+  (* Add a vupper entry for the relation [v <= f' u], tighten the lower bound of [u],
+    and recursively add relations to maintain invariant.
+    The lower and upper bounds of [u] and [v] are not checked, lower bound is not pushed
+    down [u.vupper] *)
+  let rec add_vupper_reversed : type a b r.
+      log:_ ->
+      H.Pinpoint.t ->
+      b C.obj ->
+      a var ->
+      b var ->
+      (a, b, allowed * r) C.morph ->
+      (a, b, allowed * r) Comp_hint.Morph_hint.t ->
+      unit =
+   fun ~log pp dst v u f f_hint ->
+    let f' = C.right_adjoint dst f in
+    let _, src, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
+    let x = Amorphvar (u, f', f'_hint) in
+    let key = get_key src x in
+    if VarMap.mem key v.vupper
+    then ()
+    else begin
+      push_lower_bound ~log dst v f f_hint u;
+      set_vupper ~log v (VarMap.add key x v.vupper);
+      VarMap.iter
+        (fun _ (Amorphvar (w, h, h_hint)) ->
+          let fh = C.compose dst (C.disallow_right f) h in
+          let fh_hint =
+            Comp_hint.Morph_hint.Compose
+              (Comp_hint.Morph_hint.disallow_right f_hint, h_hint)
+          in
+          if u.level < w.level
+          then add_vupper_reversed ~log pp dst w u fh fh_hint
+          else add_vlower_nocheck ~log dst u w fh fh_hint)
+        v.vlower
+    end
+
+  let update_level_finalize : type a. log:_ -> a C.obj -> int -> a var -> unit =
+   fun ~log dst level u ->
+    let vupper_lt, vupper_ge =
+      VarMap.partition (fun _ (Amorphvar (v, _, _)) -> v.level < level) u.vupper
+    in
+    let vlower_le, vlower_gt =
+      VarMap.partition
+        (fun _ (Amorphvar (v, _, _)) -> v.level <= level)
+        u.vlower
+    in
+    set_vlower ~log u vlower_le;
+    set_vupper ~log u vupper_lt;
+    VarMap.iter
+      (fun _ (Amorphvar (v, f, f_hint)) ->
+        add_vupper_reversed ~log H.Pinpoint.unknown dst v u f f_hint)
+      vlower_gt;
+    VarMap.iter
+      (fun _ (Amorphvar (v, f, f_hint)) ->
+        add_vlower_reversed ~log H.Pinpoint.unknown dst v u f f_hint)
+      vupper_ge;
+    (* optimization: if lower = upper, we can remove vuppers and vlowers since the
+      information is as precise as it can get *)
+    if C.le dst u.upper u.lower
+    then begin
+      set_vlower ~log u VarMap.empty;
+      set_vupper ~log u VarMap.empty
+    end
+
+  let update_level_v : type a. log:_ -> a C.obj -> int -> a var -> unit =
+   fun ~log dst level u ->
+    if u.level > level
+    then begin
+      set_level ~log u level;
+      update_level_finalize ~log dst level u
+    end
+
   let vars = ref (0, [])
 
   let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper ~level obj =
@@ -994,6 +1246,26 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       right : 'a;
       right_hint : ('a, right_only) hint_raw
     }
+
+  let update_level (type a l r) (level : int) (obj : a C.obj)
+      (a : (a, l * r) mode) ~log =
+    match a with
+    | Amodevar (Amorphvar (v, f, _)) ->
+      let obj = C.src obj f in
+      update_level_v ~log obj level v
+    | Amode _ -> ()
+    | Amodejoin (_, _, mvs) ->
+      VarMap.iter
+        (fun _ (Amorphvar (v, f, _)) ->
+          let obj = C.src obj f in
+          update_level_v ~log obj level v)
+        mvs
+    | Amodemeet (_, _, mvs) ->
+      VarMap.iter
+        (fun _ (Amorphvar (v, f, _)) ->
+          let obj = C.src obj f in
+          update_level_v ~log obj level v)
+        mvs
 
   let submode (type a r l) (pp : H.Pinpoint.t) (obj : a C.obj)
       (a : (a, allowed * r) mode) (b : (a, l * allowed) mode) ~log =
