@@ -85,7 +85,13 @@ let simple_to_node t ~all_constants simple =
     ~const:(fun _ -> Code_id_or_name.name all_constants)
     ~var:(fun v ~coercion:_ -> Code_id_or_name.var v)
     ~symbol:(fun s ~coercion:_ ->
-      if not (Current_unit.is_current (Symbol.compilation_unit s))
+      (* In whole-program (LTO) mode the defining unit's graph carries the facts
+         about an imported symbol; symbols of units outside the participating
+         set are marked [any_source] at solve time instead (see
+         [Lto_combine]). *)
+      if
+        (not (Current_unit.is_current (Symbol.compilation_unit s)))
+        && not (Flambda_features.support_lto ())
       then Graph.add_any_source t.deps (Code_id_or_name.symbol s);
       Code_id_or_name.symbol s)
 
@@ -133,6 +139,8 @@ let add_any_source t x = Graph.add_any_source t.deps x
 let add_zero_alloc_source t x = Graph.add_zero_alloc_source t.deps x
 
 let add_any_usage t x = Graph.add_any_usage t.deps x
+
+let add_keep_alive t x = Graph.add_keep_alive t.deps x
 
 let add_code_id_my_closure t code_id my_closure =
   Graph.add_code_id_my_closure t.deps code_id my_closure
@@ -431,6 +439,11 @@ let record_set_of_closures_deps_one_closure t
     (* The code comes from another compilation unit, so we don't know what
        happens once it is applied. As such, it must cause the whole block to
        escape. *)
+    (* CR mvellacott: in whole-program (LTO) mode, when the code id's unit
+       participates in the whole-program solve, this set of closures could
+       instead be linked to that unit's call witnesses at solve time (like the
+       [Some code_dep] case below), keeping this escape as the fallback for
+       code ids defined outside the participating set. *)
     let witness =
       Code_id_or_name.var
         (Variable.create

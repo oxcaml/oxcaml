@@ -145,6 +145,10 @@ val add_any_usage : t -> Code_id_or_name.t -> unit
 *)
 val add_any_source : t -> Code_id_or_name.t -> unit
 
+(** Mark a node as needing to exist at runtime without making its fields escape.
+    See {!Global_flow_graph.Relations.keep_alive}. *)
+val add_keep_alive : t -> Code_id_or_name.t -> unit
+
 (** Mark a node as a "magic" source for zero-alloc checking purposes. This is a
     hack to mostly preserve zero_alloc correctness before we have zero_alloc
     regions. *)

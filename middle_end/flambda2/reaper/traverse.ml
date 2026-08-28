@@ -382,6 +382,15 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       in
       if is_external
       then (
+        (* CR mvellacott: in whole-program (LTO) mode, these facts keep direct
+           calls across unit boundaries conservative even when the callee's unit
+           participates in the whole-program solve: the callee escapes and the
+           call's results could be anything. Instead, record such calls as
+           pending boundary records and resolve them at solve time against the
+           callee unit's call witnesses, falling back to this treatment for code
+           ids defined outside the participating set. (Joining through the code
+           id's own graph node does not work: code ids are deliberately
+           [any_source].) *)
         Acc.add_cond_any_source acc ~denv call_widget;
         match callee with
         | None -> ()
@@ -844,7 +853,23 @@ let run0 unit acc ~all_constants () =
   in
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
-  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
+  if Flambda_features.support_lto ()
+  then
+    (* In whole-program (LTO) mode, uses of this unit's exports appear in the
+       dependency graphs of the units that import them, and the whole-program
+       solve combines those graphs with this one, so the toplevel return value
+       (the module block) does not escape through the boundary. However, the
+       module block is registered as a GC root via [caml_globals], so it must
+       exist at runtime even if no participating unit reads from it. Its unused
+       fields get poisoned during rebuild. *)
+    Acc.add_keep_alive acc
+      (Code_id_or_name.symbol (Flambda_unit.module_symbol unit))
+  else
+    (* The module block returned at toplevel escapes: compilation units outside
+       this compilation can use it in ways this analysis cannot see. *)
+    Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
+  (* The value of an uncaught exception escapes to the runtime, which can print
+     it. *)
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
   let return_continuation = Flambda_unit.return_continuation unit in
   let exn_continuation = Flambda_unit.exn_continuation unit in

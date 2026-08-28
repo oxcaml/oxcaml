@@ -100,6 +100,12 @@ let freshen_decisions = function
 
 let is_used (env : env) cn = Analysis.has_use env.uses cn
 
+(* CR mvellacott: audit the [is_current] checks in this file (and the slot
+   locality checks in [Types_rewriter]) for whole-program (LTO) rebuilds. A
+   whole-program solution is applied by several rebuild processes, each with a
+   different current unit; any decision that the defining and importing units'
+   rebuilds must agree on has to be derived from the shared solution, not from
+   which unit is currently being rebuilt. *)
 let is_code_id_used (env : env) code_id =
   is_used env (Code_id_or_name.code_id code_id)
   || not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
