@@ -1,0 +1,42 @@
+; DWARF-5 variants of the tests in the parent directory. The sources, LLDB
+; scripts and support files are copied verbatim so that module names, symbol
+; names and executable names match the parent directory exactly, then compiled
+; with -gdwarf-version 5. The filtered LLDB output must be identical to the
+; DWARF-4 expected outputs, so these tests share the parent's .output files.
+
+(copy_files
+ (files ../test_*.ml))
+
+(copy_files
+ (files ../test_*.lldb))
+
+(copy_files
+ (files ../*.py))
+
+(copy_files
+ (files ../filter_for_function_call_only.sh))
+
+(copy_files
+ (files ../ocamlopt_flags.sexp))
+
+(copy_files
+ (files ../simd_stubs.c))
+
+; Foreign library for SIMD functions
+(foreign_library
+ (archive_name simd_stubs)
+ (language c)
+ (names simd_stubs)
+ (flags (:standard -msse4.2 -mavx2 -mf16c)))
+
+(include dune.inc)
+
+(rule
+ (with-stdout-to
+  dune.inc.gen
+  (run ../gen/gen_dune.exe --dwarf-5)))
+
+(rule
+ (alias runtest-dwarf)
+ (action
+  (diff dune.inc dune.inc.gen)))
