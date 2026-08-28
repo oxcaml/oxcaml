@@ -458,20 +458,22 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     List.split (List.map Flambda2_reaper.Cmr_format.load cmr_files)
   in
   Flambda2_reaper.Id_stamp_counters.restore_for_merge counters;
+  let participants =
+    List.map Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmrs
+  in
   let combined_graph =
-    List.fold_left
-      (fun combined cmr ->
-        Flambda2_reaper.Global_flow_graph.union combined
-          (Flambda2_reaper.Cmr_format.Serialisable.deserialise_deps cmr))
-      (Flambda2_reaper.Global_flow_graph.create ())
-      cmrs
+    (* The lists are in command-line order, which is deterministic, as required
+       for reproducible .ltosol output. *)
+    Flambda2_reaper.Lto_combine.combine
+      (List.map2
+         (fun participant cmr ->
+           ( participant,
+             Flambda2_reaper.Cmr_format.Serialisable.deserialise_deps cmr ))
+         participants cmrs)
   in
   (* CR mvellacott: split the resulting solution into per-compilation-unit
      portions. *)
   let solution = Flambda2_reaper.Reaper.Staged.solve combined_graph in
-  let participants =
-    List.map Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmrs
-  in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
     ~solution
 
