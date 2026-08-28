@@ -3304,6 +3304,100 @@ let call_switcher kind loc fail arg ?low ?high int_lambda_list =
   let edges, (cases, actions) = as_interval fail ?low ?high int_lambda_list in
   Switcher.zyva loc kind edges arg cases actions
 
+(* Dispatch on naked (untagged or unboxed) integer constants through the
+   tagged-integer switch machinery of [call_switcher], by casting the
+   scrutinee to a tagged integer.  The cast is a no-op for scrutinee widths
+   narrower than the tagged-integer width; for wider scrutinees (int64#,
+   nativeint#, and int32# on 32-bit targets) it truncates, so the switch is
+   wrapped in a range test at the scrutinee's own width, routing values that
+   the truncation could alias onto a matched constant to the failure action
+   instead.  Returns [None] when a matched constant is not representable
+   both as a tagged integer on the target and as a host [int] (switch keys
+   are host integers); the caller then falls back to a comparison tree. *)
+let call_switcher_naked_integral value_kind loc fail arg size ~scrutinee_bits
+    const_key_lambda_list =
+  let representable key =
+    let bound = Int64.shift_left 1L (Targetint.size - 2) in
+    Int64.equal (Int64.of_int (Int64.to_int key)) key
+    && Int64.compare (Int64.neg bound) key <= 0
+    && Int64.compare key bound < 0
+  in
+  if
+    List.exists
+      (fun (_, key, _) -> not (representable key))
+      const_key_lambda_list
+  then
+    None
+  else
+    let int_lambda_list =
+      List.map
+        (fun (_, key, act) -> (Int64.to_int key, act))
+        const_key_lambda_list
+    in
+    let switch ?low ?high () =
+      let tagged = Ident.create_local "switcher" in
+      let cast =
+        static_cast
+          ~src:(Scalar.integral size)
+          ~dst:(Scalar.integral Lambda.int)
+          arg ~loc
+      in
+      bind_with_layout Alias
+        (tagged, Lambda.debug_uid_none, Lambda.layout_int) cast
+        (call_switcher value_kind loc fail (Lvar tagged) ?low ?high
+           int_lambda_list)
+    in
+    let cast_truncates = scrutinee_bits > Targetint.size - 1 in
+    match fail with
+    | Some _ when cast_truncates && List.length int_lambda_list < 4 ->
+        (* The range test below costs two comparisons: for a handful of
+           constants, the comparison tree is at least as good. *)
+        None
+    | Some fail_act when cast_truncates ->
+        let lo_hi =
+          List.fold_left
+            (fun lo_hi (cst, key, _) ->
+              match lo_hi with
+              | None -> Some ((key, cst), (key, cst))
+              | Some (((lo, _) as lo_p), ((hi, _) as hi_p)) ->
+                  Some
+                    ( (if Int64.compare key lo < 0 then (key, cst) else lo_p),
+                      (if Int64.compare key hi > 0 then (key, cst) else hi_p)
+                    ))
+            None const_key_lambda_list
+        in
+        let (lo, lo_cst), (hi, hi_cst) =
+          match lo_hi with
+          | Some lo_hi -> lo_hi
+          | None -> fatal_error "Matching.call_switcher_naked_integral"
+        in
+        let out_of_range cmp bound_cst =
+          icmp cmp size arg (Lconst (Const_base bound_cst)) ~loc
+        in
+        Some
+          (Lifthenelse
+             ( out_of_range Clt lo_cst,
+               fail_act,
+               Lifthenelse
+                 ( out_of_range Cgt hi_cst,
+                   fail_act,
+                   switch ~low:(Int64.to_int lo) ~high:(Int64.to_int hi) (),
+                   value_kind ),
+               value_kind ))
+    | Some _ | None ->
+        (* Here either the cast is exact, or [fail] is [None]; the latter
+           means the scrutinee is statically known to be one of the matched
+           constants, in which case a truncating cast cannot alias another
+           value onto them. *)
+        let low, high =
+          if scrutinee_bits <= 16 then
+            let max_excl = 1 lsl (scrutinee_bits - 1) in
+            (Some (-max_excl), Some (max_excl - 1))
+          else
+            (None, None)
+        in
+        Some (switch ?low ?high ())
+
 let rec list_as_pat = function
   | [] -> fatal_error "Matching.list_as_pat"
   | [ pat ] -> pat
@@ -3590,23 +3684,44 @@ let combine_constant value_kind loc arg cst partial ctx def
     | Const_nativeint _ ->
         make_scalar_test_sequence
           (Scalar.integral (Value (Boxable (Nativeint Any_locality_mode))))
-    | Const_untagged_char _ ->
-        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
-    | Const_untagged_int _ ->
-        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int)))
-    | Const_untagged_int8 _ ->
-        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int8)))
-    | Const_untagged_int16 _ ->
-        make_scalar_test_sequence (Scalar.integral (Naked (Taggable Int16)))
-    | Const_unboxed_int32 _ ->
-        make_scalar_test_sequence
-          (Scalar.integral (Naked (Boxable (Int32 Any_locality_mode))))
-    | Const_unboxed_int64 _ ->
-        make_scalar_test_sequence
-          (Scalar.integral (Naked (Boxable (Int64 Any_locality_mode))))
-    | Const_unboxed_nativeint _ ->
-        make_scalar_test_sequence
-          (Scalar.integral (Naked (Boxable (Nativeint Any_locality_mode))))
+    | Const_untagged_char _ | Const_untagged_int _ | Const_untagged_int8 _
+    | Const_untagged_int16 _ | Const_unboxed_int32 _ | Const_unboxed_int64 _
+    | Const_unboxed_nativeint _ -> (
+        let (size : _ Scalar.Integral.t), scrutinee_bits =
+          match cst with
+          | Const_untagged_char _ | Const_untagged_int8 _ ->
+              (Naked (Taggable Int8), 8)
+          | Const_untagged_int16 _ -> (Naked (Taggable Int16), 16)
+          | Const_untagged_int _ ->
+              (Naked (Taggable Int), Targetint.size - 1)
+          | Const_unboxed_int32 _ ->
+              (Naked (Boxable (Int32 Any_locality_mode)), 32)
+          | Const_unboxed_int64 _ ->
+              (Naked (Boxable (Int64 Any_locality_mode)), 64)
+          | Const_unboxed_nativeint _ ->
+              (Naked (Boxable (Nativeint Any_locality_mode)), Targetint.size)
+          | _ -> assert false
+        in
+        let key64 = function
+          | Const_untagged_char n
+          | Const_untagged_int n
+          | Const_untagged_int8 n
+          | Const_untagged_int16 n ->
+              Int64.of_int n
+          | Const_unboxed_int32 n -> Int64.of_int32 n
+          | Const_unboxed_int64 n -> n
+          | Const_unboxed_nativeint n -> Int64.of_nativeint n
+          | _ -> assert false
+        in
+        let const_key_lambda_list =
+          List.map (fun (c, act) -> (c, key64 c, act)) const_lambda_list
+        in
+        match
+          call_switcher_naked_integral value_kind loc fail arg size
+            ~scrutinee_bits const_key_lambda_list
+        with
+        | Some lam -> lam
+        | None -> make_scalar_test_sequence (Scalar.integral size))
   in
   (lambda1, Jumps.union local_jumps total)
 

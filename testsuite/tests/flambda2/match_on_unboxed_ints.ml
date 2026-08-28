@@ -4,7 +4,11 @@
  expect.opt with dump-simplify;
 *)
 
-(* CR lambda/flambda: Improve match compilation when matching unboxed ints. *)
+(* Matches over unboxed-integer constants are dispatched through the
+   tagged-integer switch machinery, behind a range test at the scrutinee's
+   own width when the scrutinee is wider than a tagged integer.  Each
+   unboxed function below should compile like its tagged twin, modulo that
+   range test. *)
 
 let map_ints_to_float_constants = function
   | #0n -> #0.
@@ -15,35 +19,34 @@ let map_ints_to_float_constants = function
 ;;
 [%%expect_fexpr Simplify{|
 let code map_ints_to_float_constants_0 deleted in
-let code loopify(never) size(60) newer_version_of(map_ints_to_float_constants_0)
+let $camlTOP1__switch_block_2 =
+  Float_array [|0x0p+0;
+  0x1p+0;
+  0x1p+1;
+  0x1.8p+1|]
+in
+let code loopify(never) size(29) newer_version_of(map_ints_to_float_constants_0)
       map_ints_to_float_constants_0_1 (param : nativeint)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : float =
-  let prim = %int_comp.`nativeint`.lt (param, 2n) in
+  let prim = %int_comp.`nativeint`.lt (param, 0n) in
   switch prim
     | 0 -> k2
-    | 1 -> k3
-    where k3 =
-      let prim_1 = %int_comp.`nativeint`.ne (param, 0n) in
-      (switch prim_1
-         | 0 -> k (0x0p+0)
-         | 1 -> k3
-         where k3 =
-           let prim_2 = %int_comp.`nativeint`.ne (param, 1n) in
-           switch prim_2
-             | 0 -> k (0x1p+0)
-             | 1 -> k (0x1p+2))
+    | 1 -> k (0x1p+2)
     where k2 =
-      let prim_1 = %int_comp.`nativeint`.ne (param, 2n) in
+      let prim_1 = %int_comp.`nativeint`.gt (param, 3n) in
       (switch prim_1
-         | 0 -> k (0x1p+1)
-         | 1 -> k2
+         | 0 -> k2
+         | 1 -> k (0x1p+2)
          where k2 =
-           let prim_2 = %int_comp.`nativeint`.ne (param, 3n) in
-           switch prim_2
-             | 0 -> k (0x1.8p+1)
-             | 1 -> k (0x1p+2))
+           let prim_2 = %num_conv.[`nativeint`].[`imm`] (param) in
+           let tagged_scrutinee = %tag_imm (prim_2) in
+           let arg =
+             %array_load.`float`
+               ($camlTOP1__switch_block_2, tagged_scrutinee)
+           in
+           cont k (arg))
 in
 let $camlTOP1__map_ints_to_float_constants_1 =
   closure map_ints_to_float_constants_0_1 @map_ints_to_float_constants
@@ -62,7 +65,7 @@ let map_tagged_ints_to_float_constants = function
 ;;
 [%%expect_fexpr Simplify{|
 let code map_tagged_ints_to_float_constants_1 deleted in
-let $camlTOP2__switch_block_5 =
+let $camlTOP2__switch_block_6 =
   Float_array [|0x0p+0;
   0x1p+0;
   0x1p+1;
@@ -78,14 +81,14 @@ let code loopify(never) size(14) newer_version_of(map_tagged_ints_to_float_const
     | 0 -> k2
     | 1 -> k (0x1p+2)
     where k2 =
-      let arg = %array_load.`float` ($camlTOP2__switch_block_5, param) in
+      let arg = %array_load.`float` ($camlTOP2__switch_block_6, param) in
       cont k (arg)
 in
-let $camlTOP2__map_tagged_ints_to_float_constants_4 =
+let $camlTOP2__map_tagged_ints_to_float_constants_5 =
   closure map_tagged_ints_to_float_constants_1_1
     @map_tagged_ints_to_float_constants &toplevel.alloc_region
 in
-let $camlTOP2 = Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_4) in
+let $camlTOP2 = Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_5) in
 cont done ($camlTOP2)
 |}]
 
@@ -108,61 +111,53 @@ let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6) in
 let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
 let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
 let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
-let $camlTOP7__match_on_ints_20 =
+let $camlTOP7__match_on_ints_21 =
   closure match_on_ints_6_1 @match_on_ints &toplevel.alloc_region
-and code loopify(never) size(88) newer_version_of(match_on_ints_6)
+and code loopify(never) size(73) newer_version_of(match_on_ints_6)
       match_on_ints_6_1 (param : nativeint)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   let opaque_fun1_1 =
     %project_value_slot.[match_on_ints].[opaque_fun1]
-      ($camlTOP7__match_on_ints_20)
+      ($camlTOP7__match_on_ints_21)
   in
   let opaque_fun2_1 =
     %project_value_slot.[match_on_ints].[opaque_fun2]
-      ($camlTOP7__match_on_ints_20)
+      ($camlTOP7__match_on_ints_21)
   in
   let opaque_fun3_1 =
     %project_value_slot.[match_on_ints].[opaque_fun3]
-      ($camlTOP7__match_on_ints_20)
+      ($camlTOP7__match_on_ints_21)
   in
   let opaque_fun4_1 =
     %project_value_slot.[match_on_ints].[opaque_fun4]
-      ($camlTOP7__match_on_ints_20)
+      ($camlTOP7__match_on_ints_21)
   in
-  let prim = %int_comp.`nativeint`.lt (param, 2n) in
+  let prim = %int_comp.`nativeint`.lt (param, 0n) in
   switch prim
     | 0 -> k2
-    | 1 -> k3
-    where k3 =
-      let prim_1 = %int_comp.`nativeint`.ne (param, 0n) in
-      (switch prim_1
-         | 0 -> k3
-         | 1 -> k4
-         where k4 =
-           let prim_2 = %int_comp.`nativeint`.ne (param, 1n) in
-           (switch prim_2
-              | 0 -> k4
-              | 1 -> k (0)
-              where k4 =
-                apply &my_alloc_region opaque_fun2_1 (0) -> k * k1)
-         where k3 =
-           apply &my_alloc_region opaque_fun1_1 (0) -> k * k1)
+    | 1 -> k (0)
     where k2 =
-      let prim_1 = %int_comp.`nativeint`.ne (param, 2n) in
+      let prim_1 = %int_comp.`nativeint`.gt (param, 3n) in
       (switch prim_1
          | 0 -> k2
-         | 1 -> k3
-         where k3 =
-           let prim_2 = %int_comp.`nativeint`.ne (param, 3n) in
-           (switch prim_2
-              | 0 -> k3
-              | 1 -> k (0)
-              where k3 =
-                apply &my_alloc_region opaque_fun4_1 (0) -> k * k1)
+         | 1 -> k (0)
          where k2 =
-           apply &my_alloc_region opaque_fun3_1 (0) -> k * k1)
+           let prim_2 = %num_conv.[`nativeint`].[`imm`] (param) in
+           (switch prim_2
+              | 0 -> k2
+              | 1 -> k3
+              | 2 -> k4
+              | 3 -> k5
+              where k5 =
+                apply &my_alloc_region opaque_fun4_1 (0) -> k * k1
+              where k4 =
+                apply &my_alloc_region opaque_fun3_1 (0) -> k * k1
+              where k3 =
+                apply &my_alloc_region opaque_fun2_1 (0) -> k * k1
+              where k2 =
+                apply &my_alloc_region opaque_fun1_1 (0) -> k * k1))
   with {
     opaque_fun1 = opaque_fun1;
     opaque_fun2 = opaque_fun2;
@@ -170,7 +165,7 @@ and code loopify(never) size(88) newer_version_of(match_on_ints_6)
     opaque_fun4 = opaque_fun4
   }
 in
-let $camlTOP7 = Block 0 ($camlTOP7__match_on_ints_20) in
+let $camlTOP7 = Block 0 ($camlTOP7__match_on_ints_21) in
 cont done ($camlTOP7)
 |}]
 
@@ -188,7 +183,7 @@ let opaque_fun4 = %block_load.[`0`] ($TOP6.camlTOP6) in
 let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
 let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
 let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
-let $camlTOP8__match_on_tagged_ints_23 =
+let $camlTOP8__match_on_tagged_ints_24 =
   closure match_on_tagged_ints_7_1 @match_on_tagged_ints
     &toplevel.alloc_region
 and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_7)
@@ -198,19 +193,19 @@ and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_7)
         : imm tagged =
   let opaque_fun1_1 =
     %project_value_slot.[match_on_tagged_ints].[opaque_fun1]
-      ($camlTOP8__match_on_tagged_ints_23)
+      ($camlTOP8__match_on_tagged_ints_24)
   in
   let opaque_fun2_1 =
     %project_value_slot.[match_on_tagged_ints].[opaque_fun2]
-      ($camlTOP8__match_on_tagged_ints_23)
+      ($camlTOP8__match_on_tagged_ints_24)
   in
   let opaque_fun3_1 =
     %project_value_slot.[match_on_tagged_ints].[opaque_fun3]
-      ($camlTOP8__match_on_tagged_ints_23)
+      ($camlTOP8__match_on_tagged_ints_24)
   in
   let opaque_fun4_1 =
     %project_value_slot.[match_on_tagged_ints].[opaque_fun4]
-      ($camlTOP8__match_on_tagged_ints_23)
+      ($camlTOP8__match_on_tagged_ints_24)
   in
   let prim = %int_comp.unsigned.lt (3, param) in
   switch prim
@@ -238,6 +233,6 @@ and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_7)
     opaque_fun4 = opaque_fun4
   }
 in
-let $camlTOP8 = Block 0 ($camlTOP8__match_on_tagged_ints_23) in
+let $camlTOP8 = Block 0 ($camlTOP8__match_on_tagged_ints_24) in
 cont done ($camlTOP8)
 |}]
