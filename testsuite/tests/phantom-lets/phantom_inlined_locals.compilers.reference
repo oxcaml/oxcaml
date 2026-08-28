@@ -1,47 +1,47 @@
 (function{phantom_inlined_locals.ml:30,26-118}
  camlPhantom_inlined_locals__inner_0_2_code
-     (a/356[((module_path a/356) (location ()) (original_ident a/356)
-             (is_parameter local))]: int) : int
+     (a/0[((module_path a/0) (location ()) (original_ident a/0)
+           (is_parameter local))]: int) : int
  (normal_var_optimised_out
-   ((module_path diff/359) (location ()) (original_ident diff/359)
+   ((module_path diff/0) (location ()) (original_ident diff/0)
     (is_parameter local))
    (normal_var_optimised_out
-     ((module_path doubled/358) (location ()) (original_ident doubled/358)
+     ((module_path doubled/0) (location ()) (original_ident doubled/0)
       (is_parameter local))
      (normal_var_optimised_out
-       ((module_path sum1/357) (location ()) (original_ident sum1/357)
+       ((module_path sum1/0) (location ()) (original_ident sum1/0)
         (is_parameter local))
-       (+ (+ (- (<< a/356 1) a/356) a/356) 3)))) )
+       (+ (+ (- (<< a/0 1) a/0) a/0) 3)))) )
 
 (function{phantom_inlined_locals.ml:36,41-83}
  camlPhantom_inlined_locals__caller_1_3_code
-     (x/362[((module_path x/362) (location ()) (original_ident x/362)
-             (is_parameter local))]: int) : int
+     (x/0[((module_path x/0) (location ()) (original_ident x/0)
+           (is_parameter local))]: int) : int
  (let?
-   a/363[((module_path a/363) (location ()) (original_ident a/363)
-          (is_parameter local))]
-     x/362
+   a/1[((module_path a/1) (location ()) (original_ident a/1)
+        (is_parameter local))]
+     x/0
    (normal_var_optimised_out
-     ((module_path diff/366) (location ()) (original_ident diff/366)
+     ((module_path diff/1) (location ()) (original_ident diff/1)
       (is_parameter local))
      (normal_var_optimised_out
-       ((module_path doubled/365) (location ()) (original_ident doubled/365)
+       ((module_path doubled/1) (location ()) (original_ident doubled/1)
         (is_parameter local))
        (normal_var_optimised_out
-         ((module_path sum1/364) (location ()) (original_ident sum1/364)
+         ((module_path sum1/1) (location ()) (original_ident sum1/1)
           (is_parameter local))
-         (+ (+ (- (<< x/362 1) x/362) x/362) 5))))) )
+         (+ (+ (- (<< x/0 1) x/0) x/0) 5))))) )
 
 (function no_cse reduce_code_size linscan camlPhantom_inlined_locals__entry
      () : val
  (catch
    (let?
-     (inner/361[((module_path inner/361) (location ())
-                 (original_ident inner/361) (is_parameter local))]
-        camlPhantom_inlined_locals__inner_2
-      caller/369[((module_path caller/369) (location ())
-                  (original_ident caller/369) (is_parameter local))]
-        camlPhantom_inlined_locals__caller_3)
+     (inner/0[((module_path inner/0) (location ()) (original_ident inner/0)
+               (is_parameter local))]
+        camlPhantom_inlined_locals__inner_1
+      caller/0[((module_path caller/0) (location ())
+                (original_ident caller/0) (is_parameter local))]
+        camlPhantom_inlined_locals__caller_2)
      (exit 3 G:"camlPhantom_inlined_locals"))
- with(3 *ret*/354: val) 1) )
+ with(3 *ret*/0: val) 1) )
 

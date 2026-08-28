@@ -1,126 +1,121 @@
 (function{phantom_add_equality.ml:75,47-128}
  camlPhantom_add_equality__materialised_0_5_code
-     (p/549[((module_path p/549) (location ()) (original_ident p/549)
-             (is_parameter local))]: val
-      x/550[((module_path x/550) (location ()) (original_ident x/550)
-             (is_parameter local))]: int) : int
- (let region/551 (beginregion)
+     (p/0[((module_path p/0) (location ()) (original_ident p/0)
+           (is_parameter local))]: val
+      x/0[((module_path x/0) (location ()) (original_ident x/0)
+           (is_parameter local))]: int) : int
+ (let region/0 (beginregion)
    (catch
      (let
-       a1/554[((module_path a1/554) (location ()) (original_ident a1/554)
-               (is_parameter local))]
-         (load val p/549)
+       a1/0[((module_path a1/0) (location ()) (original_ident a1/0)
+             (is_parameter local))]
+         (load val p/0)
        (let?
-         (a1_pproxy/555 a1/554
-          pair1/556[((module_path pair1/556) (location ())
-                     (original_ident pair1/556) (is_parameter local))]
-            [0: a1_pproxy/555; x/550])
-         (if (>s x/550 1) (exit 12 (+ (+ a1/554 a1/554) -1)) (exit 12 1))))
-   with(12 region_return/552: int)
-     (let unit/553 (seq (endregion region/551) 1) region_return/552))) )
+         (a1_pproxy/0 a1/0
+          pair1/0[((module_path pair1/0) (location ())
+                   (original_ident pair1/0) (is_parameter local))]
+            [0: a1_pproxy/0; x/0])
+         (if (>s x/0 1) (exit 12 (+ (+ a1/0 a1/0) -1)) (exit 12 1))))
+   with(12 region_return/0: int)
+     (let unit/0 (seq (endregion region/0) 1) region_return/0))) )
 
 (function{phantom_add_equality.ml:80,48-95}
  camlPhantom_add_equality__combined_temp_1_6_code
-     (q/560[((module_path q/560) (location ()) (original_ident q/560)
-             (is_parameter local))]: val
-      x/561[((module_path x/561) (location ()) (original_ident x/561)
-             (is_parameter local))]: val) : val
+     (q/0[((module_path q/0) (location ()) (original_ident q/0)
+           (is_parameter local))]: val
+      x/1[((module_path x/1) (location ()) (original_ident x/1)
+           (is_parameter local))]: val) : val
  (let
-   (region/562 (beginregion)
-    Pfield/563[((module_path Pfield/563) (location ())
-                (original_ident Pfield/563) (is_parameter local))]
-      (load val q/560))
+   (region/1 (beginregion)
+    Pfield/0[((module_path Pfield/0) (location ()) (original_ident Pfield/0)
+              (is_parameter local))]
+      (load val q/0))
    (let?
-     (Pfield_pproxy/564 Pfield/563
-      unused_pair/565[((module_path unused_pair/565) (location ())
-                       (original_ident unused_pair/565) (is_parameter local))]
-        [0: Pfield_pproxy/564; x/561])
-     (let unit/566 (seq (endregion region/562) 1) Pfield/563))) )
+     (Pfield_pproxy/0 Pfield/0
+      unused_pair/0[((module_path unused_pair/0) (location ())
+                     (original_ident unused_pair/0) (is_parameter local))]
+        [0: Pfield_pproxy/0; x/1])
+     (let unit/1 (seq (endregion region/1) 1) Pfield/0))) )
 
 (function{phantom_add_equality.ml:84,46-144}
  camlPhantom_add_equality__inlined_out_2_7_code
-     (p/568[((module_path p/568) (location ()) (original_ident p/568)
-             (is_parameter local))]: val
-      x/569[((module_path x/569) (location ()) (original_ident x/569)
-             (is_parameter local))]: int) : val
- (let region/570 (beginregion)
+     (p/1[((module_path p/1) (location ()) (original_ident p/1)
+           (is_parameter local))]: val
+      x/2[((module_path x/2) (location ()) (original_ident x/2)
+           (is_parameter local))]: int) : val
+ (let region/2 (beginregion)
    (catch
      (let?
-       (a2_pproxy/575 () b2_pproxy/576 ()
-        pair2/577[((module_path pair2/577) (location ())
-                   (original_ident pair2/577) (is_parameter local))]
-          [0: a2_pproxy/575; b2_pproxy/576])
-       (if (>s x/569 1)
+       (a2_pproxy/0 () b2_pproxy/0 ()
+        pair2/0[((module_path pair2/0) (location ()) (original_ident pair2/0)
+                 (is_parameter local))]
+          [0: a2_pproxy/0; b2_pproxy/0])
+       (if (>s x/2 1)
          (exit 13
-           (phantom_add_equality a2_pproxy/575
+           (phantom_add_equality a2_pproxy/0
              (normal_var_optimised_out
-               ((module_path a2/573) (location ()) (original_ident a2/573)
+               ((module_path a2/0) (location ()) (original_ident a2/0)
                 (is_parameter local))
-               (load val p/568))))
+               (load val p/1))))
          (exit 13
-           (phantom_add_equality b2_pproxy/576
+           (phantom_add_equality b2_pproxy/0
              (normal_var_optimised_out
-               ((module_path b2/574) (location ()) (original_ident b2/574)
+               ((module_path b2/0) (location ()) (original_ident b2/0)
                 (is_parameter local))
-               (load val (+a p/568 8)))))))
-   with(13 region_return/571: val)
-     (let unit/572 (seq (endregion region/570) 1) region_return/571))) )
+               (load val (+a p/1 8)))))))
+   with(13 region_return/1: val)
+     (let unit/2 (seq (endregion region/2) 1) region_return/1))) )
 
 (function{phantom_add_equality.ml:90,48-131}
  camlPhantom_add_equality__bare_equality_3_8_code
-     (q/580[((module_path q/580) (location ()) (original_ident q/580)
-             (is_parameter local))]: val
-      x/581[((module_path x/581) (location ()) (original_ident x/581)
-             (is_parameter local))]: val) : val
- (let region/582 (beginregion)
+     (q/1[((module_path q/1) (location ()) (original_ident q/1)
+           (is_parameter local))]: val
+      x/3[((module_path x/3) (location ()) (original_ident x/3)
+           (is_parameter local))]: val) : val
+ (let region/3 (beginregion)
    (let?
-     (Pfield_pproxy/584 ()
-      unused_pair/585[((module_path unused_pair/585) (location ())
-                       (original_ident unused_pair/585) (is_parameter local))]
-        [0: Pfield_pproxy/584; x/581])
+     (Pfield_pproxy/1 ()
+      unused_pair/1[((module_path unused_pair/1) (location ())
+                     (original_ident unused_pair/1) (is_parameter local))]
+        [0: Pfield_pproxy/1; x/3])
      (let
-       (Popaque/586
-          (opaque (phantom_add_equality Pfield_pproxy/584 (load val q/580)))
-        unit/587 (seq (endregion region/582) 1))
-       x/581))) )
+       (Popaque/0
+          (opaque (phantom_add_equality Pfield_pproxy/1 (load val q/1)))
+        unit/3 (seq (endregion region/3) 1))
+       x/3))) )
 
 (function{phantom_add_equality.ml:95,40-97}
  camlPhantom_add_equality__arith_4_9_code
-     (x/589[((module_path x/589) (location ()) (original_ident x/589)
-             (is_parameter local))]: int) : int
- (let region/590 (beginregion)
+     (x/4[((module_path x/4) (location ()) (original_ident x/4)
+           (is_parameter local))]: int) : int
+ (let region/4 (beginregion)
    (let?
-     (s4_pproxy/592 ()
-      pair4/593[((module_path pair4/593) (location ())
-                 (original_ident pair4/593) (is_parameter local))]
-        [0: s4_pproxy/592; x/589])
-     (let
-       (int_mul/594 (+ (<< x/589 1) 3)
-        unit/595 (seq (endregion region/590) 1))
-       int_mul/594))) )
+     (s4_pproxy/0 ()
+      pair4/0[((module_path pair4/0) (location ()) (original_ident pair4/0)
+               (is_parameter local))]
+        [0: s4_pproxy/0; x/4])
+     (let (int_mul/0 (+ (<< x/4 1) 3) unit/4 (seq (endregion region/4) 1))
+       int_mul/0))) )
 
 (function no_cse reduce_code_size linscan camlPhantom_add_equality__entry
      () : val
  (catch
    (let?
-     (materialised/559[((module_path materialised/559) (location ())
-                        (original_ident materialised/559)
-                        (is_parameter local))]
-        camlPhantom_add_equality__materialised_5
-      combined_temp/567[((module_path combined_temp/567) (location ())
-                         (original_ident combined_temp/567)
-                         (is_parameter local))]
-        camlPhantom_add_equality__combined_temp_6
-      inlined_out/579[((module_path inlined_out/579) (location ())
-                       (original_ident inlined_out/579) (is_parameter local))]
-        camlPhantom_add_equality__inlined_out_7
-      bare_equality/588[((module_path bare_equality/588) (location ())
-                         (original_ident bare_equality/588)
-                         (is_parameter local))]
-        camlPhantom_add_equality__bare_equality_8
-      arith/596[((module_path arith/596) (location ())
-                 (original_ident arith/596) (is_parameter local))]
-        camlPhantom_add_equality__arith_9)
+     (materialised/0[((module_path materialised/0) (location ())
+                      (original_ident materialised/0) (is_parameter local))]
+        camlPhantom_add_equality__materialised_1
+      combined_temp/0[((module_path combined_temp/0) (location ())
+                       (original_ident combined_temp/0) (is_parameter local))]
+        camlPhantom_add_equality__combined_temp_2
+      inlined_out/0[((module_path inlined_out/0) (location ())
+                     (original_ident inlined_out/0) (is_parameter local))]
+        camlPhantom_add_equality__inlined_out_3
+      bare_equality/0[((module_path bare_equality/0) (location ())
+                       (original_ident bare_equality/0) (is_parameter local))]
+        camlPhantom_add_equality__bare_equality_4
+      arith/0[((module_path arith/0) (location ()) (original_ident arith/0)
+               (is_parameter local))]
+        camlPhantom_add_equality__arith_5)
      (exit 11 G:"camlPhantom_add_equality"))
- with(11 *ret*/547: val) 1) )
+ with(11 *ret*/0: val) 1) )
 

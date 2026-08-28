@@ -1,11 +1,11 @@
 (function{phantom_disabled.ml:22,36-132} camlPhantom_disabled__f_0_1_code
-     (x/355[((module_path x/355) (location ()) (original_ident x/355)
-             (is_parameter local))]: int
-      y/356[((module_path y/356) (location ()) (original_ident y/356)
-             (is_parameter local))]: int) : int
- (+ (+ x/355 y/356) -1) )
+     (x/0[((module_path x/0) (location ()) (original_ident x/0)
+           (is_parameter local))]: int
+      y/0[((module_path y/0) (location ()) (original_ident y/0)
+           (is_parameter local))]: int) : int
+ (+ (+ x/0 y/0) -1) )
 
 (function no_cse reduce_code_size linscan camlPhantom_disabled__entry
      () : val
- (catch (exit 3 G:"camlPhantom_disabled") with(3 *ret*/353: val) 1) )
+ (catch (exit 3 G:"camlPhantom_disabled") with(3 *ret*/0: val) 1) )
 

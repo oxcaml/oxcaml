@@ -1,31 +1,31 @@
 (function{phantom_splittable.ml:25,45-135}
  camlPhantom_splittable__splittable_0_1_code
-     (x/488[((module_path x/488) (location ()) (original_ident x/488)
-             (is_parameter local))]: int) : int
- (let region/489 (beginregion)
+     (x/0[((module_path x/0) (location ()) (original_ident x/0)
+           (is_parameter local))]: int) : int
+ (let region/0 (beginregion)
    (let?
-     (s_pproxy/491 ()
-      unused_pair/492[((module_path unused_pair/492) (location ())
-                       (original_ident unused_pair/492) (is_parameter local))]
-        [0: s_pproxy/491; x/488])
+     (s_pproxy/0 ()
+      unused_pair/0[((module_path unused_pair/0) (location ())
+                     (original_ident unused_pair/0) (is_parameter local))]
+        [0: s_pproxy/0; x/0])
      (let
-       (Popaque/493
+       (Popaque/0
           (opaque
-            (phantom_add_equality s_pproxy/491
+            (phantom_add_equality s_pproxy/0
               (normal_var_optimised_out
-                ((module_path s/490) (location ()) (original_ident s/490)
+                ((module_path s/0) (location ()) (original_ident s/0)
                  (is_parameter local))
-                (+ x/488 2))))
-        unit/494 (seq (endregion region/489) 1))
+                (+ x/0 2))))
+        unit/0 (seq (endregion region/0) 1))
        1))) )
 
 (function no_cse reduce_code_size linscan camlPhantom_splittable__entry
      () : val
  (catch
    (let?
-     splittable/495[((module_path splittable/495) (location ())
-                     (original_ident splittable/495) (is_parameter local))]
+     splittable/0[((module_path splittable/0) (location ())
+                   (original_ident splittable/0) (is_parameter local))]
        camlPhantom_splittable__splittable_1
      (exit 2 G:"camlPhantom_splittable"))
- with(2 *ret*/486: val) 1) )
+ with(2 *ret*/0: val) 1) )
 
