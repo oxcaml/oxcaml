@@ -390,6 +390,9 @@ module type Solver_mono = sig
   val print :
     ?verbose:bool -> 'a obj -> Fmt.formatter -> ('a, 'l * 'r) mode -> unit
 
+  (** Returns true if the mode is a constant or a mode variable at level 0 *)
+  val check_const_or_level_0 : ('a, 'l * 'r) mode -> bool
+
   (** Apply a monotone morphism explained by an optional hint *)
   val apply :
     'b obj ->
