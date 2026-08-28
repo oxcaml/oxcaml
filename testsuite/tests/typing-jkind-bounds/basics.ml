@@ -2040,8 +2040,7 @@ Lines 5-7, characters 0-43:
 6 |   | Foo of int * (t * (bool -> string)) portable
 7 |   | Bar of string * (int ref * q) contended
 Error: The kind of type "r" is
-           value
-             non_float
+           value non_float
              mod portable contended
              with q @@ contended
              with t @@ portable
@@ -2072,8 +2071,7 @@ Lines 5-7, characters 0-43:
 6 |   | Foo of int * (t * (bool -> string)) portable
 7 |   | Bar of string * (int ref * q) contended
 Error: The kind of type "r" is
-           value
-             non_float
+           value non_float
              mod portable contended
              with q @@ contended
              with t @@ portable
