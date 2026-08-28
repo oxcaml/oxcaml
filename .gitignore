@@ -87,8 +87,8 @@ _profile/
 /ocamlopt.opt
 /ocamlnat
 /dirs-to-ignore.inc
-/dune-project
 /*.sexp
+!/build_ocaml_compiler.sexp
 /_install
 /_runtest
 /_opam
