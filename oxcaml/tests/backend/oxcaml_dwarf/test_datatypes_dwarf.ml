@@ -357,5 +357,20 @@ let _ = for i = 0 to 1 do for j = 0 to 1 do for k = 0 to 1 do
 done done done
 let _ = f_bigarray3_int32 bigarray3_int32
 
+(* Unboxed versions of boxed types *)
+type record_for_unboxing = { rfu_i : int; rfu_s : string }
+let[@inline never] [@local never] f_unboxed_version_record (x : record_for_unboxing#) =
+  let #{ rfu_i; rfu_s } = x in #{ rfu_i; rfu_s }
+let _ = f_unboxed_version_record #{ rfu_i = 42; rfu_s = "hello" }
+
+type mixed_record_for_unboxing = { mrfu_f : float#; mrfu_i : int }
+let[@inline never] [@local never] f_unboxed_version_mixed_record (x : mixed_record_for_unboxing#) =
+  let #{ mrfu_f; mrfu_i } = x in #{ mrfu_f; mrfu_i }
+let _ = f_unboxed_version_mixed_record #{ mrfu_f = #2.5; mrfu_i = 7 }
+
+type variant_with_void_field = Void_and_int of unit# * int | No_field
+let[@inline never] [@local never] f_variant_with_void_field (x : variant_with_void_field) = x
+let _ = f_variant_with_void_field (Void_and_int (#(), 42))
+let _ = f_variant_with_void_field No_field
 
 (* CR sspies: Add testing for Maps and Hashtables once oxcaml dwarf is enabled on the compiler. *)

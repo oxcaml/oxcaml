@@ -103,3 +103,7 @@
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray2_int(x=<bigarray2|data=<ADDRESS>> : (int, Bigarray.int_elt, Bigarray.c_layout) Bigarray.Array2.t @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray2_float(x=<bigarray2|data=<ADDRESS>> : (float, Bigarray.float64_elt, Bigarray.fortran_layout) Bigarray.Array2.t @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray3_int32(x=<bigarray3|data=<ADDRESS>> : (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array3.t @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_version_record(x_XXX_unboxed0=42 : record_for_unboxing#_unboxed0 @ value, x_XXX_unboxed1="hello" : record_for_unboxing#_unboxed1 @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_unboxed_version_mixed_record(x_XXX_unboxed0=#2.5 : mixed_record_for_unboxing#_unboxed0 @ float64, x_XXX_unboxed1=7 : mixed_record_for_unboxing#_unboxed1 @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_variant_with_void_field(x=Void_and_int 42 : variant_with_void_field @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_variant_with_void_field(x=No_field : variant_with_void_field @ value)
