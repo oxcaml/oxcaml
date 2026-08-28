@@ -48,17 +48,9 @@ val type_implementation:
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
   sourcefile:string -> Compilation_unit.t -> Env.t ->
-<<<<<<< Merlin:ggray/mti/dev
-  Parsetree.signature ->
-  Typedtree.signature * Typedtree.argument_interface option
+  Parsetree.signature -> Typedtree.interface
 val transl_signature:
   ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
-||||||| Compiler:last-imported
-  Parsetree.signature ->
-  Typedtree.signature * Typedtree.argument_interface option
-=======
-  Parsetree.signature -> Typedtree.interface
->>>>>>> Compiler:HEAD
 
 (* If the [.mli] file has any file-level staticity modality (whether
    [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].
