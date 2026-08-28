@@ -1124,6 +1124,11 @@ type argument_interface = {
   ai_parameter_uid : Shape.Uid.t;
 }
 
+type interface = {
+  signature: signature;
+  argument_interface: argument_interface option;
+}
+
 type implementation = {
   structure: structure;
   coercion: module_coercion;
