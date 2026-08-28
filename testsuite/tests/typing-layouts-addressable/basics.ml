@@ -779,20 +779,20 @@ type ('a : any non_null addressable) refined = 'a req
    [addressable] is not ignored *)
 type t : bits8 addressable non_null
 [%%expect{|
-Line 1, characters 9-35:
+Line 1, characters 27-35:
 1 | type t : bits8 addressable non_null
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_null" have no effect on the kind "bits8".
+                               ^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_null" has no effect on the kind "bits8".
 
 type t : bits8 addressable
 |}]
 
 type t : bits8 non_null addressable
 [%%expect{|
-Line 1, characters 9-35:
+Line 1, characters 15-23:
 1 | type t : bits8 non_null addressable
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_null" have no effect on the kind "bits8".
+                   ^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_null" has no effect on the kind "bits8".
 
 type t : bits8 addressable
 |}]
