@@ -332,7 +332,7 @@ Line 1, characters 0-78:
 1 | type t3 : value non_float mod everything with [ `A of string] t1 = C of string  (* should be accepted *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
-         value mod everything non_float with [ `A of string ] t1,
+         (value mod everything) non_float with [ `A of string ] t1,
        because
        - boxed variants are not mod global external_
        - string is not mod global external_
@@ -364,7 +364,7 @@ Line 1, characters 0-96:
 1 | type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type definition does not satisfy its kind annotation
-         value mod everything non_float
+         (value mod everything) non_float
            with [ `A of string | `B of int | `C ] t1,
        because
        - boxed variants are not mod global external_
