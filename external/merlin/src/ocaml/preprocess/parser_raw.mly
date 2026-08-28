@@ -1864,17 +1864,10 @@ module_expr [@recovery default_module_expr ()]:
     | (* An extension. *)
       ex = extension
         { Pmod_extension ex }
-<<<<<<< Merlin:dallsopp/Pmod_hole
     | (* A hole. *)
       UNDERSCORE
         { let id = mkrhs Ast_helper.hole_txt $loc in
           Pmod_extension (id, PStr []) }
-||||||| Compiler:last-imported
-=======
-    | (* A hole. *)
-      UNDERSCORE
-        { Pmod_hole }
->>>>>>> Compiler:HEAD
     )
     { $1 }
 ;

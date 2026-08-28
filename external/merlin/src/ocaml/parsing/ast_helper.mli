@@ -347,7 +347,6 @@ module Mod:
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> module_expr
     val hole: ?loc:loc -> ?attrs:attrs -> unit -> module_expr
     val instance: ?loc:loc -> ?attrs:attrs -> module_instance -> module_expr
-    val hole: ?loc:loc -> ?attrs:attrs -> unit -> module_expr
   end
 
 (** Signature items *)
