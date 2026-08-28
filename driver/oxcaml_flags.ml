@@ -52,6 +52,8 @@ let omit_leaf_frame_pointers = ref false (* -[no-]omit-leaf-frame-pointers *)
 
 let cfg_merge_blocks = ref false        (* -[no]-cfg-merge-blocks *)
 
+let cfg_block_layout = ref false        (* -[no]-cfg-block-layout *)
+
 let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)
 let cfg_value_propagation_float = ref false
                                         (* -[no]-cfg-value-propagation-float *)
