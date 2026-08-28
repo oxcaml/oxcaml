@@ -166,6 +166,9 @@ struct
     | Startx_length { start_inclusive; length; payload } ->
       Address_index.emit ~asm_directives ~comment:"start_inclusive"
         start_inclusive;
+      (* CR mshinwell: DWARF-5 defines this length operand as ULEB128, so it
+         should be emitted as in [Start_length] below, with [size0] updated to
+         match. There are currently no users of [Startx_length]. *)
       A.targetint ~comment:"length" length;
       Payload.emit ~asm_directives payload
     | Offset_pair { start_offset_inclusive; end_offset_exclusive; payload } ->
