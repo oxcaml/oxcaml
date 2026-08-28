@@ -96,36 +96,30 @@ type run_result =
     reachable_names : NO.t
   }
 
-(* [offsets_from_paused_process], when provided, contains the slot offsets that
-   were assigned by [Slot_offsets.finalize_offsets] in the paused process for
-   the current unit's own slots. They are used in two ways:
-
-   - They seed this run's offset assignment, so that slots surviving the rebuild
-   keep the offsets the paused process gave them. Other units' rebuild data may
-   hold copies of this unit's sets of closures laid out by the paused process,
-   and mixing paused-process offsets (for slots this rebuild dropped) with
-   freshly assigned ones (for surviving slots) within one such copy could
-   otherwise produce contradictory layouts.
-
-   - They are re-exported (underneath this run's own assignments, which take
-   precedence) because other units' rebuild data may still reference original
-   slots that the Reaper's rebuild of this unit has renamed or eliminated; those
-   units can only find the offsets for such slots in this unit's .cmx file. A
-   slot marked dead by this run only records that the rebuilt code no longer
-   keeps the slot in any set of closures (e.g. [used_value_slots] shrinks when
-   the Reaper removes uses), so a live entry from the paused process takes
-   precedence over a dead entry from this run. *)
-let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
-    ~offsets_from_paused_process slot_offsets : run_result =
+let build_run_result unit ~free_names ~final_typing_env ~extra_static_roots
+    ~extra_used_value_slots ~extra_used_function_slots ~sections ~all_code
+    slot_offsets : run_result =
   let module_symbol = Flambda_unit.module_symbol unit in
   let function_slots_in_normal_projections =
-    NO.function_slots_in_normal_projections free_names
+    Flambda2_identifiers.Function_slot.Set.union
+      (NO.function_slots_in_normal_projections free_names)
+      extra_used_function_slots
   in
   let value_slots_in_normal_projections =
-    NO.value_slots_in_normal_projections free_names
+    Flambda2_identifiers.Value_slot.Set.union
+      (NO.value_slots_in_normal_projections free_names)
+      extra_used_value_slots
   in
-  let all_function_slots = NO.all_function_slots_at_normal_mode free_names in
-  let all_value_slots = NO.all_value_slots_at_normal_mode free_names in
+  let all_function_slots =
+    Flambda2_identifiers.Function_slot.Set.union
+      (NO.all_function_slots_at_normal_mode free_names)
+      extra_used_function_slots
+  in
+  let all_value_slots =
+    Flambda2_identifiers.Value_slot.Set.union
+      (NO.all_value_slots_at_normal_mode free_names)
+      extra_used_value_slots
+  in
   let ({ used_value_slots; exported_offsets } : Slot_offsets.result) =
     let used_slots : Slot_offsets.used_slots =
       { function_slots_in_normal_projections;
@@ -150,7 +144,7 @@ let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
   in
   let reachable_names, cmx =
     Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-      ~used_value_slots ~exported_offsets ~sections all_code
+      ~extra_static_roots ~used_value_slots ~exported_offsets ~sections all_code
   in
   { cmx; unit; all_code; exported_offsets; used_value_slots; reachable_names }
 
@@ -315,8 +309,12 @@ let flambda_to_flambda0 : type m.
             used_value_slots;
             reachable_names
           } =
-        build_run_result flambda ~free_names ~final_typing_env ~sections
-          ~all_code ~offsets_from_paused_process:None slot_offsets
+        build_run_result flambda ~free_names ~final_typing_env
+          ~extra_static_roots:NO.empty
+          ~extra_used_value_slots:Flambda2_identifiers.Value_slot.Set.empty
+          ~extra_used_function_slots:
+            Flambda2_identifiers.Function_slot.Set.empty ~sections ~all_code
+          slot_offsets
       in
       Option.iter
         (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr")
@@ -418,17 +416,9 @@ let flambda_result_to_cmm ~keep_symbol_tables ~localise_unreachable_symbols
 let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     (program : Lambda.program) =
   let run () =
-    (* Keep unreachable symbols global whenever the Reaper is involved. The
-       staged rebuild must (see [reaped_flambda2_to_cmm]); the other Reaper
-       modes follow suit so that a staged rebuild of a unit produces the same
-       object file as a direct Reaper compilation of it. *)
-    let localise_unreachable_symbols =
-      match Reaper_mode.of_flags () with
-      | Disabled -> true
-      | Single_unit_run | Lto_support -> false
-    in
     lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
-    |> flambda_result_to_cmm ~keep_symbol_tables ~localise_unreachable_symbols
+    |> flambda_result_to_cmm ~keep_symbol_tables
+         ~localise_unreachable_symbols:true
   in
   Profile.record_call "flambda2" run
 
@@ -605,6 +595,22 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
         ~traverse_rebuild:rebuild_data ~solved_dep ~machine_width ~cmx_loader
         ~all_code ~final_typing_env
     in
+    let unit_compilation_unit =
+      Flambda2_identifiers.Symbol.compilation_unit
+        (Flambda_unit.Metadata.module_symbol unit_metadata)
+    in
+    (* Definitions that other units still use must be emitted and exported even
+       if this unit no longer references them. *)
+    let extra_static_roots =
+      Flambda2_reaper.Analysis.used_code_ids_and_symbols_in_unit solved_dep
+        ~compilation_unit:unit_compilation_unit
+    in
+    (* Likewise, slots that other units still read must not be marked dead by
+       slot offset finalisation. *)
+    let extra_used_value_slots, extra_used_function_slots =
+      Flambda2_reaper.Analysis.slots_used_in_unit solved_dep
+        ~compilation_unit:unit_compilation_unit
+    in
     let { unit = flambda;
           exported_offsets = offsets;
           cmx;
@@ -612,34 +618,17 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
           used_value_slots = _;
           reachable_names
         } =
-      build_run_result flambda ~free_names
-        ~final_typing_env
+      build_run_result flambda ~free_names ~final_typing_env
+        ~extra_static_roots ~extra_used_value_slots
+        ~extra_used_function_slots
           (* Pass a mutable reference to the (currently empty) list of .cmx
              sections so that [build_run_result] can append the sections that it
              creates. *)
         ~sections:(Compilenv.current_sections ())
-        ~all_code
-          (* The rebuild may have renamed or eliminated slots that the paused
-             process assigned offsets to, but other participants' rebuild data
-             may still reference those slots (e.g. via sets of closures inlined
-             from this unit before the rebuild), and this unit's .cmx file is
-             the only place they can find the offsets. *)
-        ~offsets_from_paused_process:
-          (Some
-             (Flambda2_reaper.Cmr_format.Serialisable.exported_offsets
-                cmr_serialisable))
-        slot_offsets
+        ~all_code slot_offsets
     in
     Option.iter Compilenv.set_export_info cmx;
     Compiler_hooks.execute Reaped_flambda2 flambda;
-    (* Symbols that are unreachable from this unit's own exports must still be
-       emitted as global symbols. Other participants' rebuild data was frozen
-       when this unit still exported code mentioning such symbols (which is how
-       they learned the names, by inlining that code), so their rebuilt objects
-       may reference symbols that only the paused process's exports could reach.
-       The rebuild has already deleted definitions that the whole-program
-       analysis found dead, so everything emitted here may have live references
-       elsewhere. *)
     flambda_result_to_cmm ~keep_symbol_tables
-      ~localise_unreachable_symbols:false
+      ~localise_unreachable_symbols:true
       { flambda; all_code; offsets; reachable_names }

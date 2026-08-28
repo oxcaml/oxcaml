@@ -40,6 +40,57 @@ let get_changed_representation uses cn =
 
 let has_use uses v = PTA.has_use uses.db v
 
+let slots_used_in_unit uses ~compilation_unit =
+  Code_id_or_name.Map.fold
+    (fun _base fields acc ->
+      Field.Map.fold
+        (fun field () ((value_slots, function_slots) as acc) ->
+          match Field.view field with
+          | Value_slot value_slot
+            when Compilation_unit.equal
+                   (Value_slot.get_compilation_unit value_slot)
+                   compilation_unit ->
+            Value_slot.Set.add value_slot value_slots, function_slots
+          | Function_slot function_slot
+            when Compilation_unit.equal
+                   (Function_slot.get_compilation_unit function_slot)
+                   compilation_unit ->
+            value_slots, Function_slot.Set.add function_slot function_slots
+          | Value_slot _ | Function_slot _ | Block _ | Call_witness _ | Is_int
+          | Get_tag | Boxed_number _ | Return_of_call _
+          | Code_id_of_call_witness ->
+            acc)
+        fields acc)
+    (Datalog.get_table PTA.Relations.field_of_constructor_is_used_tbl uses.db)
+    (Value_slot.Set.empty, Function_slot.Set.empty)
+
+let used_code_ids_and_symbols_in_unit uses ~compilation_unit =
+  Code_id_or_name.Map.fold
+    (fun code_id_or_name () roots ->
+      Code_id_or_name.pattern_match' code_id_or_name
+        ~code_id:(fun code_id ->
+          if Code_id.in_compilation_unit code_id compilation_unit
+          then Name_occurrences.add_code_id roots code_id Name_mode.normal
+          else roots)
+        ~name:(fun name ->
+          Name.pattern_match name
+            ~var:(fun _ -> roots)
+            ~symbol:(fun symbol ->
+              (* The reaper's synthetic boundary symbols ([le_monde_extérieur]
+                 and [all_constants]) belong to the unit but are not real
+                 definitions, so they must not become roots. They are exactly
+                 the current-unit symbols with [any_source]: real definitions of
+                 the unit never carry that fact. *)
+              if
+                Compilation_unit.equal
+                  (Symbol.compilation_unit symbol)
+                  compilation_unit
+                && not (PTA.any_source uses.db code_id_or_name)
+              then Name_occurrences.add_symbol roots symbol Name_mode.normal
+              else roots)))
+    (Datalog.get_table PTA.Relations.has_usage_table uses.db)
+    Name_occurrences.empty
+
 let any_usage uses v = PTA.any_usage uses.db v
 
 let field_used uses v f = PTA.field_used uses.db v f
