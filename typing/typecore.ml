@@ -6335,6 +6335,7 @@ let split_function_ty
         in
         Env.add_region_lock env
   in
+  (* This [alloc_as_value] cuts the hint chain *)
   let ret_value_mode = alloc_as_value ret_mode in
   let expected_inner_mode =
     if not is_final_val_param then
@@ -6357,6 +6358,7 @@ let split_function_ty
       end
     end
   in
+  (* This [alloc_to_value_l2r] cuts the hint chain *)
   let arg_value_mode = alloc_to_value_l2r arg_mode in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =

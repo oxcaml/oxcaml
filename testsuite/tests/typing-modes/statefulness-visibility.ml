@@ -1505,17 +1505,17 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
+         sig val f : 'a -> 'b @ write -> 'a * 'b @ immutable end
        is not included in
          sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ read end
        Values do not match:
-         val f : 'a -> 'b @ write -> 'a * 'b @ write
+         val f : 'a -> 'b @ write -> 'a * 'b @ immutable
        is not included in
          val f : 'a @ read -> 'b @ write -> 'a * 'b @ read
-       The type "'a -> 'b @ write -> 'a * 'b @ write"
+       The type "'a -> 'b @ write -> 'a * 'b @ immutable"
        is not compatible with the type
          "'a @ read -> 'b @ write -> 'a * 'b @ read"
-       Type "'b @ write -> 'a * 'b @ write" is not compatible with type
+       Type "'b @ write -> 'a * 'b @ immutable" is not compatible with type
          "'b @ write -> 'a * 'b @ read"
 |}]
 
@@ -1558,17 +1558,17 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
+         sig val f : 'a -> 'b @ read -> 'a * 'b @ immutable end
        is not included in
          sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ write end
        Values do not match:
-         val f : 'a -> 'b @ read -> 'a * 'b @ read
+         val f : 'a -> 'b @ read -> 'a * 'b @ immutable
        is not included in
          val f : 'a @ write -> 'b @ read -> 'a * 'b @ write
-       The type "'a -> 'b @ read -> 'a * 'b @ read"
+       The type "'a -> 'b @ read -> 'a * 'b @ immutable"
        is not compatible with the type
          "'a @ write -> 'b @ read -> 'a * 'b @ write"
-       Type "'b @ read -> 'a * 'b @ read" is not compatible with type
+       Type "'b @ read -> 'a * 'b @ immutable" is not compatible with type
          "'b @ read -> 'a * 'b @ write"
 |}]
 
@@ -1653,14 +1653,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing end
+         sig val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing end
        is not included in
          sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing end
        Values do not match:
-         val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing
+         val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing
        is not included in
          val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing
-       The type "'a @ writing -> 'b @ writing -> 'a * 'b @ writing"
+       The type "'a @ stateless -> 'b @ writing -> 'a * 'b @ writing"
        is not compatible with the type
          "'a @ reading -> 'b @ writing -> 'a * 'b @ writing"
 |}]
@@ -1704,16 +1704,17 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'b -> 'a * 'b end
+         sig val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing end
        is not included in
          sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless end
        Values do not match:
-         val f : 'a -> 'b -> 'a * 'b
+         val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing
        is not included in
          val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless
-       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
+       The type "'a @ writing -> 'b @ writing -> 'a * 'b @ writing"
+       is not compatible with the type
          "'a @ reading -> 'b @ writing -> 'a * 'b @ stateless"
-       Type "'b -> 'a * 'b" is not compatible with type
+       Type "'b @ writing -> 'a * 'b @ writing" is not compatible with type
          "'b @ writing -> 'a * 'b @ stateless"
 |}]
 
@@ -1756,14 +1757,14 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading end
+         sig val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading end
        is not included in
          sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading end
        Values do not match:
-         val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
+         val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading
        is not included in
          val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading
-       The type "'a @ reading -> 'b @ reading -> 'a * 'b @ reading"
+       The type "'a @ stateless -> 'b @ reading -> 'a * 'b @ reading"
        is not compatible with the type
          "'a @ writing -> 'b @ reading -> 'a * 'b @ reading"
 |}]
@@ -1781,16 +1782,17 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'b -> 'a * 'b end
+         sig val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading end
        is not included in
          sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless end
        Values do not match:
-         val f : 'a -> 'b -> 'a * 'b
+         val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
        is not included in
          val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless
-       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
+       The type "'a @ reading -> 'b @ reading -> 'a * 'b @ reading"
+       is not compatible with the type
          "'a @ writing -> 'b @ reading -> 'a * 'b @ stateless"
-       Type "'b -> 'a * 'b" is not compatible with type
+       Type "'b @ reading -> 'a * 'b @ reading" is not compatible with type
          "'b @ reading -> 'a * 'b @ stateless"
 |}]
 
