@@ -420,7 +420,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   let cmrs, counters =
     List.split (List.map Flambda2_reaper.Cmr_format.load cmr_files)
   in
-  Flambda2_reaper.Cmr_format.Id_stamp_counters.restore_for_merge counters;
+  Flambda2_reaper.Id_stamp_counters.restore_for_merge counters;
   let combined_graph =
     List.fold_left
       (fun combined cmr ->
@@ -429,14 +429,12 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
       (Flambda2_reaper.Global_flow_graph.create ())
       cmrs
   in
-  (* CR mvellacott: serialise the solution to [ltosol_filename] instead of
-     discarding it. *)
   (* CR mvellacott: split the resulting solution into per-compilation-unit
      portions. *)
-  (* CR mvellacott: store the new stamp counters to the solution file. *)
-  let (_solution : Flambda2_reaper.Unboxing_analysis.result) =
-    Flambda2_reaper.Reaper.Staged.solve combined_graph
-  in
+  let solution = Flambda2_reaper.Reaper.Staged.solve combined_graph in
+  Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~solution;
+  (* CR mvellacott: remove this debug print once we can test useful
+     functionality. *)
   Format.eprintf "reaper_lto_solve: solved units: [%s]; ltosol output: %s@."
     (String.concat "; "
        (List.map
@@ -447,12 +445,27 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     ltosol_file
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
-    ~keep_symbol_tables ~cmr_filename =
-  let cmr_serialisable, id_stamp_counters =
+    ~keep_symbol_tables ~ltosol_filename ~cmr_filename =
+  let { Flambda2_reaper.Ltosol_format.File_contents.id_stamp_counters;
+        solution = ltosol_solution
+      } =
+    Flambda2_reaper.Ltosol_format.load ltosol_filename
+  in
+  Flambda2_reaper.Id_stamp_counters.restore_for_resume id_stamp_counters;
+  (* We expect the stamp counters in the .cmr file to be less than the counters
+     in the .ltosol file, because the -reaper-solve invocation begins by taking
+     the maximum counters across the .cmr files it reads. Therefore, we can
+     ignore these counters. *)
+  let cmr_serialisable, cmr_stamp_counters =
     Flambda2_reaper.Cmr_format.load cmr_filename
   in
-  Flambda2_reaper.Cmr_format.Id_stamp_counters.restore_for_resume
-    id_stamp_counters;
+  if
+    Flambda2_reaper.Id_stamp_counters.any_greater_than cmr_stamp_counters
+      id_stamp_counters
+  then
+    Misc.fatal_error
+      "The rebuild data contains ID stamp counters greater than those in the \
+       the solution file. Stamp counter monotonicity is broken.";
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
@@ -468,6 +481,11 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   (* Make the paused compilation's imported offsets available to
      [Slot_offsets.finalize_offsets]. *)
   Exported_offsets.import_offsets imported_offsets;
+  (* CR mvellacott: use this solution instead of solving again. *)
+  let (_solved_dep : Flambda2_reaper.Unboxing_analysis.result) =
+    Flambda2_reaper.Ltosol_format.Serialisable_solution.deserialise
+      ltosol_solution
+  in
   (* CR mvellacott: add profiling and debug printing code. *)
   let solved_dep = Flambda2_reaper.Reaper.Staged.solve deps in
   let flambda, free_names, all_code, slot_offsets, final_typing_env =

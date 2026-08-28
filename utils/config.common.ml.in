@@ -47,6 +47,7 @@ and cmj_magic_number = {magic|@CMJ_MAGIC_NUMBER@|magic}
 and cmja_magic_number = {magic|@CMJA_MAGIC_NUMBER@|magic}
 and linear_magic_number = {magic|@LINEAR_MAGIC_NUMBER@|magic}
 and cfg_magic_number = {magic|@CFG_MAGIC_NUMBER@|magic}
+and ltosol_magic_number = {magic|@LTOSOL_MAGIC_NUMBER@|magic}
 
 let safe_string = true
 let default_safe_string = true
