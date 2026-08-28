@@ -179,9 +179,10 @@ jobs:
           # `inputs.prompt` expands to the empty string, which the action treats
           # as "no prompt" (the mode detector in src/modes/detector.ts checks
           # truthiness), so those runs fall through to @claude-trigger detection
-          # as usual; workflow_dispatch runs carry the manual prompt and run in
-          # automation mode.
-          prompt: ${{ inputs.prompt }}
+          # as usual. workflow_dispatch runs carry the manual prompt and run in
+          # automation mode; they have no PR to comment on, so the appended
+          # sentence directs the report to the run's step-summary page.
+          prompt: ${{ inputs.prompt && format('{0} When finished, write your final report as markdown to the file named by $GITHUB_STEP_SUMMARY.', inputs.prompt) || '' }}
 
           # Tools Claude may use, additive on top of the action's tag-mode
           # baseline (see "Tag mode vs. agent mode" in
@@ -193,10 +194,7 @@ jobs:
           # tightness was illusory). Broad Bash is what lets Claude inspect
           # sibling PRs (gh pr view/diff, git fetch), run the compiler it just
           # built, and use binary-inspection tools (readelf, llvm-dwarfdump,
-          # objdump) on this ephemeral runner. WebFetch/WebSearch are left out
-          # as policy: nothing here should need general web access, and not
-          # listing them avoids implying it was provided for a reason (curl
-          # existing anyway is incidental, not an endorsement).
+          # objdump) on this ephemeral runner.
           # The inline-comment entry is double duty -- the action only mounts
           # the inline-comment MCP server when this exact tool name appears in
           # --allowedTools, and it is what carries suggestion blocks. The
