@@ -96,9 +96,28 @@ type run_result =
     reachable_names : NO.t
   }
 
+(* [offsets_from_paused_process], when provided, contains the slot offsets that
+   [Slot_offsets.finalize_offsets] assigned in the paused (pass 1) compilation
+   of this unit, restricted to the unit's own slots. They are used in two ways:
+
+   - They seed this run's offset assignment, so that slots surviving the rebuild
+   keep the offsets the paused process gave them. Other participating units'
+   rebuild data may hold inlined copies of this unit's sets of closures laid out
+   by the paused process, and mixing paused-process offsets with freshly
+   assigned ones within one such copy could otherwise produce contradictory
+   layouts.
+
+   - They are re-exported (underneath this run's own assignments, which take
+   precedence) because another participant's rebuilt term can retain an inlined
+   copy of a set of closures whose every occurrence in this unit the Reaper
+   deleted (e.g. the set is allocated only inside dead code). This unit's
+   finalisation then has no set from which to assign offsets to the copy's
+   slots, so it would export them as dead, or not at all, and the other
+   participant's rebuild would fail; only the paused process' assignment still
+   describes such slots. *)
 let build_run_result unit ~free_names ~final_typing_env ~extra_static_roots
-    ~extra_used_value_slots ~extra_used_function_slots ~sections ~all_code
-    slot_offsets : run_result =
+    ~extra_used_value_slots ~extra_used_function_slots
+    ~offsets_from_paused_process ~sections ~all_code slot_offsets : run_result =
   let module_symbol = Flambda_unit.module_symbol unit in
   let function_slots_in_normal_projections =
     Flambda2_identifiers.Function_slot.Set.union
@@ -132,7 +151,15 @@ let build_run_result unit ~free_names ~final_typing_env ~extra_static_roots
       Exported_code.find_exn all_code code_id |> Code_or_metadata.code_metadata
     in
     Slot_offsets.finalize_offsets slot_offsets ~get_code_metadata ~used_slots
-      ~offsets_from_previous_assignment:Exported_offsets.empty
+      ~offsets_from_previous_assignment:
+        (Option.value offsets_from_paused_process
+           ~default:Exported_offsets.empty)
+  in
+  let exported_offsets =
+    match offsets_from_paused_process with
+    | None -> exported_offsets
+    | Some paused_offsets ->
+      Exported_offsets.union_prefer_live exported_offsets paused_offsets
   in
   let reachable_names, cmx =
     Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
@@ -305,8 +332,8 @@ let flambda_to_flambda0 : type m.
           ~extra_static_roots:NO.empty
           ~extra_used_value_slots:Flambda2_identifiers.Value_slot.Set.empty
           ~extra_used_function_slots:
-            Flambda2_identifiers.Function_slot.Set.empty ~sections ~all_code
-          slot_offsets
+            Flambda2_identifiers.Function_slot.Set.empty
+          ~offsets_from_paused_process:None ~sections ~all_code slot_offsets
       in
       Option.iter
         (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr")
@@ -605,8 +632,11 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
           reachable_names
         } =
       build_run_result flambda ~free_names ~final_typing_env ~extra_static_roots
-        ~extra_used_value_slots
-        ~extra_used_function_slots
+        ~extra_used_value_slots ~extra_used_function_slots
+        ~offsets_from_paused_process:
+          (Some
+             (Flambda2_reaper.Cmr_format.Serialisable.exported_offsets
+                cmr_serialisable))
           (* Pass a mutable reference to the (currently empty) list of .cmx
              sections so that [build_run_result] can append the sections that it
              creates. *)
