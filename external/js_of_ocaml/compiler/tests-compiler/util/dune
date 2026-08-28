@@ -1,3 +1,0 @@
-(library
- (name jsoo_compiler_expect_tests_helper)
- (libraries js_of_ocaml_compiler unix str sedlex))

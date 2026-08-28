@@ -1,3 +1,0 @@
-(tests
- (names fma)
- (modes js wasm))
