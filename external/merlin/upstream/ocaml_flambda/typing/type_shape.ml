@@ -134,6 +134,7 @@ module Type_shape = struct
       | p when Path.same p Predef.path_unboxed_int8 -> Some Unboxed_int8
       | p when Path.same p Predef.path_unboxed_int16 -> Some Unboxed_int16
       | p when Path.same p Predef.path_unboxed_mask -> Some Unboxed_mask
+      | p when Path.same p Predef.path_unboxed_unit -> Some Unboxed_unit
       | p -> Option.map (fun s -> Unboxed_simd s) (simd_vec_split_of_path p)
 
     let of_path : Path.t -> t option = function
@@ -704,6 +705,17 @@ module Type_decl_shape = struct
       (* This case is ruled out by the invariant on [of_type_declarations],
          which for one declaration must return a list with exactly one shape. *)
       assert false
+
+  let of_unboxed_version_declaration (decl : Types.type_declaration) ~args
+      shape_for_constr =
+    if List.compare_lengths decl.type_params args = 0
+    then
+      let shape_for_constr =
+        Type_shape.Predef.shape_for_constr_with_predefs shape_for_constr
+      in
+      let definition = of_type_declaration_go decl args shape_for_constr in
+      Shape.set_uid definition decl.type_uid
+    else Type_shape.unknown_shape_from_jkind decl.type_jkind
 
   let of_extension_constructor_merlin_only (ext : Types.extension_constructor) =
     match ext.ext_args with

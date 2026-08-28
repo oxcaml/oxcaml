@@ -44,6 +44,14 @@ module Type_decl_shape : sig
   val of_type_declaration :
     Ident.t -> Types.type_declaration -> path_lookup -> Shape.t
 
+  (** [of_unboxed_version_declaration decl ~args lookup] is the shape of the
+      unboxed-version declaration [decl] instantiated at the type argument
+      shapes [args]. Unlike [of_type_declaration], it substitutes [args]
+      directly rather than abstracting over the type parameters, and it does not
+      support self-recursion, which unboxed versions cannot have. *)
+  val of_unboxed_version_declaration :
+    Types.type_declaration -> args:Shape.t list -> path_lookup -> Shape.t
+
   (* CR sspies: The treatment of extension constructors for the debugger has to
      be revised if we want to support them properly. The extension constructor
      declarations allocate new runtime objects that we would then have to find

@@ -1920,9 +1920,21 @@ let shape_of_path_opt ~namespace env path =
   | shape -> Some shape
   | exception Not_found -> None
 
-let shape_for_constr env path ~args =
-  Option.map (fun sh -> Shape.app_list sh args)
-    (shape_of_path_opt ~namespace:Type env path)
+let rec shape_for_constr env path ~args =
+  if Path.is_unboxed_version path then
+    (* [shape_of_path] resolves an unboxed-version path [p#] to the shape of
+       the boxed type [p]. Instead, compute the shape from the unboxed
+       version's own declaration, which [find_type] derives from the boxed
+       one. *)
+    match find_type path env with
+    | exception Not_found -> None
+    | decl ->
+      Some
+        (Type_shape.Type_decl_shape.of_unboxed_version_declaration decl ~args
+           (shape_for_constr env))
+  else
+    Option.map (fun sh -> Shape.app_list sh args)
+      (shape_of_path_opt ~namespace:Type env path)
 
 let shape_or_leaf uid = function
   | None -> Shape.leaf uid
