@@ -9938,8 +9938,8 @@ and type_function_
                   with
                     | Ok () -> ()
                     | Error e ->
-                      raise
-                        (error(loc, env, Uncurried_function_escapes_comonadic e))
+                      raise (error(loc, env,
+                        Uncurried_function_escapes_comonadic e))
                   end;
                   begin match
                     Alloc.Comonadic.submode
@@ -9948,8 +9948,8 @@ and type_function_
                   with
                     | Ok () -> ()
                     | Error e ->
-                      raise
-                        (error(loc, env, Uncurried_function_escapes_comonadic e))
+                      raise (error(loc, env,
+                        Uncurried_function_escapes_comonadic e))
                   end;
                   More_args
                     { partial_mode =
