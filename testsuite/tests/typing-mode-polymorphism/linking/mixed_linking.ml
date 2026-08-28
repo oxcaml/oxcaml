@@ -11,20 +11,17 @@
 
 let x = Lib.id 42
 [%%expect{|
-Uncaught exception: File "typing/typedtree.ml", line 160, characters 2-8: Assertion failed
-
+val x : int = 42
 |}]
 
 let y = Lib.apply (fun n -> n + 1) 41
 [%%expect{|
-Uncaught exception: File "typing/typedtree.ml", line 150, characters 2-8: Assertion failed
-
+val y : int = 42
 |}]
 
 let f = Lib.id
 let z = f 42
 [%%expect{|
 val f : 'a -> 'a = <fun>
-Uncaught exception: File "typing/typedtree.ml", line 160, characters 2-8: Assertion failed
-
+val z : int = 42
 |}]

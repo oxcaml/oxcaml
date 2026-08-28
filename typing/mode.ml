@@ -5589,8 +5589,6 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let print ?verbose () ppf m = S.print ?verbose obj ppf m
 
-  let check_const_or_level_0 m = S.check_const_or_level_0 m
-
   let check_generic a = S.check_generic a
 
   let iter_covariant a iter = S.iter_covariant obj a iter
@@ -5787,8 +5785,6 @@ module Monadic_gen (Obj : Obj) = struct
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
   let print ?verbose () ppf m = S.print ?verbose obj ppf m
-
-  let check_const_or_level_0 m = S.check_const_or_level_0 m
 
   let check_generic a = S.check_generic a
 
@@ -7092,10 +7088,6 @@ module Value_with (Areality : Areality) = struct
       match Monadic.submode_log ?pp monadic1 monadic2 ~log with
       | Error e -> Error (Monadic e)
       | Ok () -> Ok ())
-
-  let check_const_or_level_0 { monadic = monadic0; comonadic = comonadic0 } =
-    Monadic.check_const_or_level_0 monadic0
-    && Comonadic.check_const_or_level_0 comonadic0
 
   let submode ?pp a b = try_with_log (submode_log ?pp a b)
 
