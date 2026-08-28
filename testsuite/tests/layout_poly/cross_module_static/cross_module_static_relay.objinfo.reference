@@ -18,7 +18,8 @@ Apply functions:
 Send functions:
 Force link: no
 Static data:
-  [
+  [ Cross_module_static_relay/relay_id/0; ]
+  (Cross_module_static_relay/relay_id/0
     (closure ⟨env⟩ layout_6 ->
       (let (#body/3 =
          { c = (missing)
@@ -39,5 +40,4 @@ Static data:
                        x/334)⟫ })
                  { c = #body/2.c; r = ⟪(region $#body/2)⟫ }))⟫ })
         { c = #body/3.c
-        ; r = ⟪(function {nlocal = 1} closure/341[L] $#body/3)⟫ }));
-    ]
+        ; r = ⟪(function {nlocal = 1} closure/341[L] $#body/3)⟫ })))
