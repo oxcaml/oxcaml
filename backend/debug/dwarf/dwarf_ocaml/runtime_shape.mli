@@ -54,6 +54,11 @@ module DeBruijn_env : sig
 
   val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
 
+  val length : 'a t -> int
+
+  (** [truncate t ~depth] keeps only the innermost [depth] binders. *)
+  val truncate : 'a t -> depth:int -> 'a t
+
   val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
   val hash : ('a -> int) -> 'a t -> int
@@ -133,7 +138,8 @@ end
 type t = private
   { desc : desc;
     runtime_layout : Runtime_layout.t;
-    hash : int
+    hash : int;
+    free_depth : int  (** See the [free_depth] accessor below. *)
   }
 
 and desc = private
@@ -327,6 +333,12 @@ val rec_var : DeBruijn_index.t -> Runtime_layout.t -> t
 
 (** Project the runtime layout of a shape. *)
 val runtime_layout : t -> Runtime_layout.t
+
+(** Number of enclosing [Mu] binders that the shape can reference: one more than
+    the largest free de Bruijn index, or zero if the shape is closed. A shape's
+    meaning depends only on the first [free_depth] entries of any enclosing
+    environment. O(1). *)
+val free_depth : t -> int
 
 val print : Format.formatter -> t -> unit
 
