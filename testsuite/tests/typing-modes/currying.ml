@@ -520,8 +520,6 @@ let f (g @ unique) x =
   g x x [@nontail]
 [%%expect{|
 val f : ('a -> 'a -> 'b) @ unique -> ('a -> 'b) = <fun>
-|}, Principal{|
-val f : ('a -> 'a -> 'b) @ unique -> ('a -> 'b) = <fun>
 |}]
 
 let f (g @ once) x =
