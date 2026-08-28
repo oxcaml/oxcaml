@@ -3,16 +3,14 @@
    "${test_source_directory}/unboxed_record_any_field_inference.reference";
  flambda2;
  {
-   flags = "-extension layouts_beta";
    native;
  }{
-   flags = "-extension layouts_beta -Oclassic";
+   flags = "-Oclassic";
    native;
  }{
-   flags = "-extension layouts_beta -O3";
+   flags = "-O3";
    native;
  }{
-   flags = "-extension layouts_beta";
    bytecode;
  }
 *)
