@@ -564,6 +564,12 @@ module Layout = struct
     | Product ts ->
       List.fold_left (fun acc t -> min acc (get_level t)) Btype.generic_level ts
     | Addressable t -> get_level t
+
+  let of_new_sort_var ~level sa =
+    let layout, var = of_new_sort_var ~level sa in
+    let sort = Sort.of_var var in
+    Btype.add_to_sort_pool ~level sort;
+    layout, sort
 end
 
 module Externality = Externality

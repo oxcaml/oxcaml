@@ -587,9 +587,33 @@ Error: Signature mismatch:
        The layout of "'d" is not polymorphic.
 |}]
 
-(* Both functions are polymorphic over the number of sort variables,
-   but one only has it in the argument type, with a weak one in the result. *)
-module N : sig
+module Weak_type : sig
+  val f : 'a list -> 'a list
+end = struct
+  let cell = ref []
+  let poly_ f _ = !cell
+end
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   let cell = ref []
+5 |   let poly_ f _ = !cell
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val cell : '_weak1 list ref val poly_ f : 'a -> '_weak1 list end
+       is not included in
+         sig val f : 'a list -> 'a list end
+       Values do not match:
+         val poly_ f : 'a -> '_weak1 list
+       is not included in
+         val f : 'a list -> 'a list
+       The type "'a list -> '_weak1 list" is not compatible with the type
+         "'a list -> 'a list"
+       Type "'_weak1" is not compatible with type "'a"
+|}]
+
+module Weak_prim : sig
   val f : layout_ x. ('a : x). 'a -> 'a -> 'a
 end = struct
   external[@layout_poly] id : ('a : any). 'a -> 'a = "%opaque"
@@ -605,16 +629,41 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-           val poly_ f : 'a -> 'b -> 'a
+           val poly_ f : 'a. 'a -> 'b -> 'a
          end
        is not included in
          sig val poly_ f : 'a -> 'a -> 'a end
        Values do not match:
-         val poly_ f : 'a -> 'b -> 'a
+         val poly_ f : 'a. 'a -> 'b -> 'a
        is not included in
          val poly_ f : 'a -> 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'c -> 'c"
+       The layout of "'c" is not polymorphic.
+|}]
+
+module Weak_sort : sig
+  val f : layout_ x. ('a : x). 'a -> 'a -> 'a
+end = struct
+  let g x = x
+  let poly_ f x y = g x
+end
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   let g x = x
+5 |   let poly_ f x y = g x
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val g : 'a -> 'a val poly_ f : 'a. 'a -> 'b -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a. 'a -> 'b -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a -> 'a
+       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'c -> 'c"
+       The layout of "'c" is not polymorphic.
 |}]
 
 (* Ordering: both use first var on both sides - same position, should succeed *)

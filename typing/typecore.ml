@@ -2199,7 +2199,7 @@ let solve_Ppat_unboxed_tuple ~alloc_mode loc env args expected_ty =
       (fun (label, _) mode ->
          let jkind, sort =
            Jkind.of_new_sort_var ~why:Jkind.History.Unboxed_tuple_element
-             ~level:(Ctype.get_current_level ())
+             ~level:generic_level
          in
         ( label,
           newgenvar jkind,
@@ -11000,8 +11000,7 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   let labels_types_and_sorts =
     List.map (fun (label, _) ->
       let jkind, sort =
-        Jkind.of_new_sort_var ~why:Unboxed_tuple_element
-          ~level:(Ctype.get_current_level ())
+        Jkind.of_new_sort_var ~why:Unboxed_tuple_element ~level:generic_level
       in
       label, newgenvar jkind, sort)
     sexpl

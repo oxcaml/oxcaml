@@ -97,9 +97,15 @@ module Sort : sig
       [Var v], then [!v] is [None]. *)
   val get : t -> t
 
+  val iter_var : (var -> unit) -> t -> unit
+
   val update_level : int -> t -> unit
 
+  val update_level_var : int -> var -> unit
+
   val get_level : t -> int
+
+  val get_level_var : var -> int
 
   (** Determines if the sort is [Scannable] or an unfilled sort variable,
       possibly under [Addressable] wrappers *)
@@ -221,7 +227,7 @@ module Layout : sig
 
   val of_const : Const.t -> Sort.t t
 
-  val of_new_sort_var : level:int -> Scannable_axes.t -> Sort.t t * Sort.t
+  val of_new_sort_var : level:int -> Scannable_axes.t -> Sort.t t * Sort.var
 
   val get_const : Sort.t t -> Const.t option
 
