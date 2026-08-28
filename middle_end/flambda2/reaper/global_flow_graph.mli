@@ -101,6 +101,14 @@ module Relations : sig
 
   val any_source : Code_id_or_name.t term -> _ atom
 
+  (** [keep_alive x] means that [x] must continue to exist at runtime even if
+      the graph records no use of it. It marks [x] as used shallowly: unlike
+      [any_usage], the fields of [x] stay live only if they have uses of their
+      own. This is used in whole-program (LTO) mode for module blocks, which are
+      registered as GC roots via [caml_globals] and so must be kept even when no
+      participating compilation unit reads from them. *)
+  val keep_alive : Code_id_or_name.t term -> _ atom
+
   (* [zero_alloc_source x] means that [x] has any source, but furthermore, that
      all fields read from [x] are themselves [zero_alloc_source] (and hence
      [any_source]), even if they are local fields. This is not fully tracked,
@@ -152,6 +160,9 @@ val add_alias_if_any_source_dep :
 val add_any_usage : graph -> Code_id_or_name.t -> unit
 
 val add_any_source : graph -> Code_id_or_name.t -> unit
+
+(** See {!Relations.keep_alive}. *)
+val add_keep_alive : graph -> Code_id_or_name.t -> unit
 
 val add_zero_alloc_source : graph -> Code_id_or_name.t -> unit
 

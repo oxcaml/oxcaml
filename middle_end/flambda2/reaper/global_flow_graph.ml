@@ -33,6 +33,7 @@ type graph =
     mutable alias_if_any_source : NNN.t;
     mutable any_usage : N.t;
     mutable any_source : N.t;
+    mutable keep_alive : N.t;
     mutable zero_alloc_source : N.t;
     mutable code_id_my_closure : NN.t
   }
@@ -88,6 +89,8 @@ let any_usage = N.create ~name:"any_usage"
 
 let any_source = N.create ~name:"any_source"
 
+let keep_alive = N.create ~name:"keep_alive"
+
 let zero_alloc_source = N.create ~name:"zero_alloc_source"
 
 let code_id_my_closure = NN.create ~name:"code_id_my_closure"
@@ -103,6 +106,7 @@ let to_datalog graph =
   @@ Datalog.set_table alias_if_any_source graph.alias_if_any_source
   @@ Datalog.set_table any_usage graph.any_usage
   @@ Datalog.set_table any_source graph.any_source
+  @@ Datalog.set_table keep_alive graph.keep_alive
   @@ Datalog.set_table zero_alloc_source graph.zero_alloc_source
   @@ Datalog.set_table code_id_my_closure graph.code_id_my_closure
   @@ Datalog.empty
@@ -143,6 +147,8 @@ module Relations = struct
 
   let any_source var = Datalog.atom any_source [var]
 
+  let keep_alive var = Datalog.atom keep_alive [var]
+
   let zero_alloc_source var = Datalog.atom zero_alloc_source [var]
 
   let code_id_my_closure ~code_id ~my_closure =
@@ -160,6 +166,7 @@ let create () =
     alias_if_any_source = NNN.empty;
     any_usage = N.empty;
     any_source = N.empty;
+    keep_alive = N.empty;
     zero_alloc_source = N.empty;
     code_id_my_closure = NN.empty
   }
@@ -185,6 +192,7 @@ let union g1 g2 =
       NNN.union keep g1.alias_if_any_source g2.alias_if_any_source;
     any_usage = N.union keep g1.any_usage g2.any_usage;
     any_source = N.union keep g1.any_source g2.any_source;
+    keep_alive = N.union keep g1.keep_alive g2.keep_alive;
     zero_alloc_source = N.union keep g1.zero_alloc_source g2.zero_alloc_source;
     code_id_my_closure =
       NN.union keep g1.code_id_my_closure g2.code_id_my_closure
@@ -231,6 +239,9 @@ let add_any_usage t (var : Code_id_or_name.t) =
 let add_any_source t (var : Code_id_or_name.t) =
   t.any_source <- N.add_or_replace [var] () t.any_source
 
+let add_keep_alive t (var : Code_id_or_name.t) =
+  t.keep_alive <- N.add_or_replace [var] () t.keep_alive
+
 let add_zero_alloc_source t var =
   t.zero_alloc_source <- N.add_or_replace [var] () t.zero_alloc_source
 
@@ -253,6 +264,7 @@ let ids_for_export graph =
   let ids = Maps.Nnn.add_ids graph.alias_if_any_source ids in
   let ids = Maps.N.add_ids graph.any_usage ids in
   let ids = Maps.N.add_ids graph.any_source ids in
+  let ids = Maps.N.add_ids graph.keep_alive ids in
   let ids = Maps.N.add_ids graph.zero_alloc_source ids in
   let ids = Maps.Nn.add_ids graph.code_id_my_closure ids in
   ids
@@ -277,6 +289,7 @@ let apply_renaming graph renaming ~rename_field =
     alias_if_any_source = Maps.Nnn.rename graph.alias_if_any_source ~rename_id;
     any_usage = Maps.N.rename graph.any_usage ~rename_id;
     any_source = Maps.N.rename graph.any_source ~rename_id;
+    keep_alive = Maps.N.rename graph.keep_alive ~rename_id;
     zero_alloc_source = Maps.N.rename graph.zero_alloc_source ~rename_id;
     code_id_my_closure = Maps.Nn.rename graph.code_id_my_closure ~rename_id
   }

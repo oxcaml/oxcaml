@@ -288,7 +288,8 @@ module Relations = struct
   let has_usage_table = Datalog.create_relation ~name:"has_usage" Cols.[n]
 
   (* [has_usage x] means that [x] must continue to exist at runtime, that is,
-     either it has [any_usage], or some field of [x] is itself [has_usage]. *)
+     either it has [any_usage], or it is [keep_alive], or some field of [x] is
+     itself [has_usage]. *)
   let has_usage x = has_usage_table % [x]
 
   let has_source_table = Datalog.create_relation ~name:"has_source" Cols.[n]
@@ -454,6 +455,8 @@ module Datalog_schedule = struct
   let has_usage_rules =
     [ (let$ [x] = ["x"] in
        [any_usage x] ==> has_usage x);
+      (let$ [x] = ["x"] in
+       [keep_alive x] ==> has_usage x);
       (let$ [to_; from] = ["to_"; "from"] in
        [has_usage to_; alias ~to_ ~from] ==> has_usage from);
       (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
