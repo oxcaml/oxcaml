@@ -1835,11 +1835,6 @@ let tagged_field_index_of_offset ~machine_width offset : H.simple_or_prim =
   Prim
     (Unary (Num_conv { src = Naked_int64; dst = Tagged_immediate }, Prim index))
 
-let access_flag_of_mutable_flag : Asttypes.mutable_flag -> L.access_flag =
-  function
-  | Immutable -> Immutable_access
-  | Mutable -> Mutable_access
-
 let check_single_element offsets kinds =
   let offset, full_kind =
     match offsets, kinds with
@@ -1865,60 +1860,36 @@ let convert_atomic_idx_field ~machine_width primitive dbg layout ~idx =
   field, field_kind
 
 let convert_pget_indirect ~machine_width ~dbg primitive layout
-    (access : L.access_flag) ~ptr ~idx : H.expr_primitive list =
+    (mut : Asttypes.mutable_flag) ~ptr ~idx : H.expr_primitive list =
   needs_64_bit_target primitive dbg;
-  match Lambda.access_atomicity access with
-  | Nonatomic ->
-    let offsets, kinds =
-      block_index_access_offsets_and_kinds ~machine_width layout idx
-    in
-    let mut =
-      match access with
-      | Immutable_access -> Asttypes.Immutable
-      | Mutable_access -> Asttypes.Mutable
-      | Atomic_access ->
-        Misc.fatal_error "convert_pget_indirect: expected nonatomic access"
-    in
-    let reads =
-      List.map2
-        (fun kind offset ->
-          H.Binary (Read_offset (kind, mut), ptr, Prim offset))
-        kinds offsets
-    in
-    [H.maybe_create_unboxed_product reads]
-  | Atomic ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width primitive dbg layout ~idx
-    in
-    [Binary (Atomic_load_field field_kind, ptr, field)]
+  let offsets, kinds =
+    block_index_access_offsets_and_kinds ~machine_width layout idx
+  in
+  let reads =
+    List.map2
+      (fun kind offset -> H.Binary (Read_offset (kind, mut), ptr, Prim offset))
+      kinds offsets
+  in
+  [H.maybe_create_unboxed_product reads]
 
 let convert_pset_indirect ~machine_width ~dbg primitive write_offset_kind layout
-    mode (atomicity : L.atomic_flag) ~ptr ~idx ~new_values :
-    H.expr_primitive list =
+    mode ~ptr ~idx ~new_values : H.expr_primitive list =
   needs_64_bit_target primitive dbg;
   let mode = Alloc_mode.For_assignments.from_lambda mode in
-  match atomicity with
-  | Nonatomic ->
-    let offsets, kinds =
-      block_index_access_offsets_and_kinds ~machine_width layout idx
-    in
-    let writes =
-      Misc.Stdlib.List.map3
-        (fun kind offset new_value ->
-          H.Ternary
-            ( Write_offset (write_offset_kind, kind, mode),
-              ptr,
-              Prim offset,
-              new_value ))
-        kinds offsets new_values
-    in
-    [H.Sequence writes]
-  | Atomic ->
-    let field, field_kind =
-      convert_atomic_idx_field ~machine_width primitive dbg layout ~idx
-    in
-    let new_value = List.hd new_values in
-    [Ternary (Atomic_set_field (field_kind, mode), ptr, field, new_value)]
+  let offsets, kinds =
+    block_index_access_offsets_and_kinds ~machine_width layout idx
+  in
+  let writes =
+    Misc.Stdlib.List.map3
+      (fun kind offset new_value ->
+        H.Ternary
+          ( Write_offset (write_offset_kind, kind, mode),
+            ptr,
+            Prim offset,
+            new_value ))
+      kinds offsets new_values
+  in
+  [H.Sequence writes]
 
 let string_or_bytes_checks (size : Flambda_primitive.string_accessor_width)
     unsafe =
@@ -3436,6 +3407,21 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [Ternary (Atomic_field_int_arith Or, atomic, field, i)]
   | Patomic_lxor_field, [[atomic]; [field]; [i]] ->
     [Ternary (Atomic_field_int_arith Xor, atomic, field, i)]
+  | Patomic_load_idx { layout }, [[ptr]; [idx]] ->
+    let field, field_kind =
+      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    in
+    [Binary (Atomic_load_field field_kind, ptr, field)]
+  | Patomic_set_idx { layout; mode }, [[ptr]; [idx]; [new_value]] ->
+    let field, field_kind =
+      convert_atomic_idx_field ~machine_width prim dbg layout ~idx
+    in
+    [ Ternary
+        ( Atomic_set_field
+            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+          ptr,
+          field,
+          new_value ) ]
   | Patomic_exchange_idx { layout; mode }, [[ptr]; [idx]; [new_value]] ->
     let field, field_kind =
       convert_atomic_idx_field ~machine_width prim dbg layout ~idx
@@ -3531,23 +3517,21 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Ppoke layout, [[ptr]; [new_value]] ->
     let kind = standard_int_or_float_of_peek_or_poke layout in
     [Binary (Poke kind, ptr, new_value)]
-  | Pget_idx (layout, access), [[ptr]; [idx]] ->
-    convert_pget_indirect ~machine_width ~dbg prim layout access ~ptr ~idx
+  | Pget_idx (layout, mut), [[ptr]; [idx]] ->
+    convert_pget_indirect ~machine_width ~dbg prim layout mut ~ptr ~idx
   | Pget_ptr (layout, mut), [[ptr; idx]] ->
-    convert_pget_indirect ~machine_width ~dbg prim layout
-      (access_flag_of_mutable_flag mut)
-      ~ptr ~idx
+    convert_pget_indirect ~machine_width ~dbg prim layout mut ~ptr ~idx
   | Pget_ptr _, [([] | [_] | _ :: _ :: _ :: _)] ->
     Misc.fatal_errorf
       "Closure_convertion.convert_primitive: The argument to Pget_ptr should \
        be an unboxed product of length 2"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
-  | Pset_idx (layout, mode, atomicity), [[ptr]; [idx]; new_values] ->
-    convert_pset_indirect ~machine_width ~dbg prim Into_block layout mode
-      atomicity ~ptr ~idx ~new_values
+  | Pset_idx (layout, mode), [[ptr]; [idx]; new_values] ->
+    convert_pset_indirect ~machine_width ~dbg prim Into_block layout mode ~ptr
+      ~idx ~new_values
   | Pset_ptr (layout, mode), [[ptr; idx]; new_values] ->
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
-      mode Nonatomic ~ptr ~idx ~new_values
+      mode ~ptr ~idx ~new_values
   | Pset_ptr _, [([] | [_] | _ :: _ :: _ :: _); _] ->
     Misc.fatal_errorf
       "Closure_convertion.convert_primitive: The first argument to Pset_ptr \
@@ -3555,13 +3539,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | Pget_ext_ptr (layout, mut), [[idx]] ->
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
-    convert_pget_indirect ~machine_width ~dbg prim layout
-      (access_flag_of_mutable_flag mut)
-      ~ptr:null_base ~idx
+    convert_pget_indirect ~machine_width ~dbg prim layout mut ~ptr:null_base
+      ~idx
   | Pset_ext_ptr (layout, mode), [[idx]; new_values] ->
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
-      mode Nonatomic ~ptr:null_base ~idx ~new_values
+      mode ~ptr:null_base ~idx ~new_values
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3628,7 +3611,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Patomic_load_field _ | Patomic_set_mixed_field _ | Ppoke _
       | Pphys_equal _
       | Pscalar (Binary _)
-      | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _ ),
+      | Patomic_load_idx _ | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _ ),
       ( []
       | [_]
       | _ :: _ :: _ :: _
@@ -3666,7 +3649,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Patomic_sub_field | Patomic_land_field | Patomic_lxor_field
       | Patomic_lor_field | Patomic_exchange_idx _ | Patomic_fetch_add_idx
       | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx | Patomic_lxor_idx
-      | Patomic_lor_idx | Pset_idx _ ),
+      | Patomic_lor_idx | Patomic_set_idx _ | Pset_idx _ ),
       ( []
       | [_]
       | [_; _]
