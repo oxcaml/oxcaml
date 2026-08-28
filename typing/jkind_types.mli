@@ -197,8 +197,6 @@ module Layout : sig
 
     val get_sort : t -> Sort.Const.t option
 
-    val is_scannable_or_any : t -> bool
-
     val implied_externality : t -> Jkind_axis.Externality.t
 
     val is_surely_addressable : t -> bool
