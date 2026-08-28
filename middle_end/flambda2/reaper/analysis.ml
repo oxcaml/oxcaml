@@ -78,14 +78,19 @@ let used_code_ids_and_symbols_in_unit uses ~compilation_unit =
             ~symbol:(fun symbol ->
               (* The reaper's synthetic boundary symbols ([le_monde_extérieur]
                  and [all_constants]) belong to the unit but are not real
-                 definitions, so they must not become roots. They are exactly
-                 the current-unit symbols with [any_source]: real definitions of
-                 the unit never carry that fact. *)
+                 definitions, so they must not become roots. They cannot be
+                 recognised by their [any_source] facts: real definitions can
+                 carry [any_source] too, because constants (strings, boxed
+                 numbers, ...) are aliased to [all_constants] during traversal
+                 and [any_source] propagates through aliases. Filtering on
+                 [any_source] would drop such constants from the roots even
+                 though other units' rebuilt code still references them, causing
+                 their symbols to be localised away. *)
               if
                 Compilation_unit.equal
                   (Symbol.compilation_unit symbol)
                   compilation_unit
-                && not (PTA.any_source uses.db code_id_or_name)
+                && not (Global_flow_graph.is_synthetic_boundary_symbol symbol)
               then Name_occurrences.add_symbol roots symbol Name_mode.normal
               else roots)))
     (Datalog.get_table PTA.Relations.has_usage_table uses.db)

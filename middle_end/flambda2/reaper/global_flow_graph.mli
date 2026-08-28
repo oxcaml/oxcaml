@@ -191,3 +191,15 @@ val fields_for_export : graph -> Field.Set.t
     data will be lost otherwise. *)
 val apply_renaming :
   graph -> Renaming.t -> rename_field:(Field.t -> Field.t) -> graph
+
+(** The linkage names of the synthetic boundary symbols that [Traverse.run]
+    creates for a unit's dependency graph. *)
+val le_monde_exterieur_name : string
+
+val all_constants_name : string
+
+(** Whether [symbol] is one of the synthetic boundary symbols
+    ([le_monde_extérieur] or [all_constants]). They belong to their unit and
+    carry [any_source] facts, but they are not definitions: nothing must treat
+    them as symbols the unit defines. *)
+val is_synthetic_boundary_symbol : Symbol.t -> bool

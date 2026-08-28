@@ -291,3 +291,20 @@ let apply_renaming graph renaming ~rename_field =
     zero_alloc_source = Maps.N.rename graph.zero_alloc_source ~rename_id;
     code_id_my_closure = Maps.Nn.rename graph.code_id_my_closure ~rename_id
   }
+
+(* The synthetic boundary symbols created (per unit) by [Traverse.run]. They
+   belong to the unit and carry [any_source] facts, but they are not
+   definitions: nothing must treat them as symbols the unit defines. Real
+   symbols cannot collide with these linkage names: [le_monde_extérieur] is not
+   a valid OCaml identifier, and compiler-generated symbols for toplevel
+   bindings carry stamp suffixes. *)
+let le_monde_exterieur_name = "le_monde_extérieur"
+
+let all_constants_name = "all_constants"
+
+let is_synthetic_boundary_symbol symbol =
+  let cu = Symbol.compilation_unit symbol in
+  let is_symbol_named name =
+    Symbol.equal symbol (Symbol.create cu (Linkage_name.of_string name))
+  in
+  is_symbol_named le_monde_exterieur_name || is_symbol_named all_constants_name
