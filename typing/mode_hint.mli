@@ -29,6 +29,8 @@ type pinpoint_desc =
   | Unknown
   | Ident of ident  (** An identifier *)
   | Function  (** A function definition *)
+  | Parameter  (** A function parameter *)
+  | Return  (** A function return *)
   | Module  (** A module definition *)
   | Functor  (** A functor definition *)
   | Functor_parameter  (** A functor parameter *)
