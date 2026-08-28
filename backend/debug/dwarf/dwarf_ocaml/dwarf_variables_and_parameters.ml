@@ -118,15 +118,13 @@ let location_list_entry state ~start_of_code_symbol ~subrange
     in
     Dwarf_4 location_list_entry
   | Five ->
-    (* CR sspies: Version 5 DWARF with function sections is untested. Using
-       [start_of_code_symbol] below might not work as intended.*)
     let start_inclusive =
       Address_table.add (DS.address_table state) start_pos
-        ~adjustment:start_pos_offset ~start_of_code_symbol
+        ~adjustment:start_pos_offset
     in
     let end_exclusive =
       Address_table.add (DS.address_table state) end_pos
-        ~adjustment:end_pos_offset ~start_of_code_symbol
+        ~adjustment:end_pos_offset
     in
     let loc_desc =
       Counted_location_description.create single_location_description

@@ -24,18 +24,12 @@ type t
 val create : unit -> t
 
 (** [add ~adjustment t addr] adds to the table the address of the label [addr]
-    (which in the assembly file is referenced from the [start_of_code_symbol])
     plus the [adjustment]. If the [adjustment] is omitted then it is taken to be
     zero.
 
     The returned address index may be used for referencing the address e.g. in a
     location list entry. *)
-val add :
-  ?adjustment:int ->
-  t ->
-  start_of_code_symbol:Asm_symbol.t ->
-  Asm_label.t ->
-  Address_index.t
+val add : ?adjustment:int -> t -> Asm_label.t -> Address_index.t
 
 (** The label to be used as the value of the [DW_AT_base] attribute (DWARF-5
     spec page 66 line 14). *)

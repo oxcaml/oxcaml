@@ -68,12 +68,12 @@ let create_discontiguous_range_list_entry state ~start_of_code_symbol
   let start_inclusive =
     Address_table.add (DS.address_table state)
       (Asm_label.create_int Text (start_pos |> Label.to_int))
-      ~adjustment:start_pos_offset ~start_of_code_symbol
+      ~adjustment:start_pos_offset
   in
   let end_exclusive =
     Address_table.add (DS.address_table state)
       (Asm_label.create_int Text (end_pos |> Label.to_int))
-      ~adjustment:end_pos_offset ~start_of_code_symbol
+      ~adjustment:end_pos_offset
   in
   let range_list_entry : Range_list_entry.entry =
     (* DWARF-5 spec page 54 line 1. *)
