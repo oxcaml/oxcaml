@@ -181,6 +181,10 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global many] ->
+  'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
+|}, Principal{|
+val map :
   ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global many > aliased] ->
   'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
 |}]

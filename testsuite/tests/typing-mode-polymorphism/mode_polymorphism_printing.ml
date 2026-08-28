@@ -28,10 +28,6 @@ let foo f x = f x
 val foo :
   ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
   'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
-|}, Principal{|
-val foo :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
 let foo =
@@ -289,10 +285,9 @@ val foo : 'a @ [< global unique] -> 'b @ [< 'm & portable] -> 'b @ [> 'm] =
 let foo (x @ local) (y @ unique) (z @ portable) = exclave_ (x, y, z)
 [%%expect{|
 val foo :
-  'a @ [< 'n > local] ->
-  'b @ [< 'm & unique] ->
-  ('c @ [< 'o & portable] -> 'a * 'b * 'c @ [> 'o | 'm | 'n | local]) @ [> close('m) | close('n) | local] =
-  <fun>
+  'a @ [< 'o > local] ->
+  'b @ [< 'n & unique] ->
+  'c @ [< 'm & portable] -> 'a * 'b * 'c @ [> 'm | 'n | 'o | local] = <fun>
 |}]
 
 (* if a type is annotated, mode crossing has an effect on the bounds of mode variable *)
@@ -312,18 +307,10 @@ let foo (f : int -> int) x y = f
 val foo :
   (int -> int) @ [< 'm mod aliased contended immutable & global] ->
   'a @ [< global] -> 'b @ 'n -> (int -> int) @ [> 'm] = <fun>
-|}, Principal{|
-val foo :
-  (int -> int) @ [< 'm mod aliased contended immutable & global] ->
-  'a @ [< global] -> 'b @ 'n -> (int -> int) @ [> 'm] = <fun>
 |}]
 
 let foo (f : intref @ local -> int) (x : intref) (y : intref) = f x
 [%%expect{|
-val foo :
-  (intref @ local -> int) @ [< global] ->
-  intref @ [< global read_write] -> intref @ 'm -> int @ [> dynamic] = <fun>
-|}, Principal{|
 val foo :
   (intref @ local -> int) @ [< global] ->
   intref @ [< global read_write] -> intref @ 'm -> int @ [> dynamic] = <fun>
@@ -338,12 +325,6 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 
 let map f l = List.map f l
 [%%expect{|
-val map :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
-   'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
-  'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
-|}, Principal{|
 val map :
   ('a @ [> past('m) | aliased stateful dynamic] ->
    'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
@@ -507,6 +488,10 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global many] ->
+  'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
+|}, Principal{|
+val map :
   ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global many > aliased] ->
   'a list @ [< 'n > dynamic] -> 'b list @ [< global > 'm | dynamic] = <fun>
 |}]
@@ -515,6 +500,10 @@ val map :
 
 let choose b x y = if b then x else y
 [%%expect{|
+val choose :
+  bool @ 'o ->
+  'a @ [< 'n & global] -> 'a @ [< 'm] -> 'a @ [> 'm | 'n | dynamic] = <fun>
+|}, Principal{|
 val choose :
   bool @ [< global] ->
   'a @ [< 'n & global] -> 'a @ [< 'm] -> 'a @ [> 'm | 'n | dynamic] = <fun>

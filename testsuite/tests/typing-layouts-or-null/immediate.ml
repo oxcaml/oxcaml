@@ -1,5 +1,6 @@
 (* TEST
- flags = "-extension-universe alpha";
+ flags += "-extension-universe alpha ";
+ flags += "-no-extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -133,7 +134,7 @@ type succeeds = t_immediate_or_null accepts_nonfloat
 let f (x : int or_null @ local) (g : int or_null -> unit) = g x [@nontail]
 
 [%%expect{|
-val f : int or_null @ local -> (int or_null -> unit) -> unit = <fun>
+val f : int or_null @ local -> ((int or_null -> unit) -> unit) = <fun>
 |}, Principal{|
 val f : int or_null @ local -> (int or_null -> unit) -> unit = <fun>
 |}]

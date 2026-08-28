@@ -1,6 +1,7 @@
 (* TEST
    flags += "-extension-universe alpha ";
-   flags += "-dlambda -dcanonical-ids";
+   flags += "-dlambda -dcanonical-ids ";
+   flags += "-no-extension mode_polymorphism_alpha";
    expect;
 *)
 
@@ -274,13 +275,38 @@ let swap_inner (t : tree) =
                          (consts (0)) (non_consts ([0: *, value<int>, *]))>]))
        (catch
          (if t/0
-           (let (*match*/6 =o? (field_mut 0 t/0))
+           (let (*match*/6 =a? (field_imm 0 t/0))
              (if *match*/6
-               (let
-                 (lr/0 =o? (field_mut 2 *match*/6)
-                  *match*/7 =o? (field_mut 2 t/0))
+               (let (*match*/7 =a? (field_imm 2 t/0))
                  (if *match*/7
-                   (let (rl/0 =o? (field_mut 0 *match*/7))
+                   (makeblock 0 (value<
+                                  (consts (0))
+                                   (non_consts ([0:
+                                                 value<
+                                                  (consts (0))
+                                                   (non_consts ([0: *,
+                                                                 value<int>,
+                                                                 *]))>,
+                                                 value<int>,
+                                                 value<
+                                                  (consts (0))
+                                                   (non_consts ([0: *,
+                                                                 value<int>,
+                                                                 *]))>]))>,
+                     value<int>,value<
+                                 (consts (0))
+                                  (non_consts ([0:
+                                                value<
+                                                 (consts (0))
+                                                  (non_consts ([0: *,
+                                                                value<int>,
+                                                                *]))>,
+                                                value<int>,
+                                                value<
+                                                 (consts (0))
+                                                  (non_consts ([0: *,
+                                                                value<int>,
+                                                                *]))>]))>)
                      (makeblock 0 (value<
                                     (consts (0))
                                      (non_consts ([0:
@@ -309,67 +335,39 @@ let swap_inner (t : tree) =
                                                     (non_consts ([0: *,
                                                                   value<int>,
                                                                   *]))>]))>)
-                       (makeblock 0 (value<
-                                      (consts (0))
-                                       (non_consts ([0:
-                                                     value<
-                                                      (consts (0))
-                                                       (non_consts ([0: *,
-                                                                    value<
-                                                                    int>, *]))>,
-                                                     value<int>,
-                                                     value<
-                                                      (consts (0))
-                                                       (non_consts ([0: *,
-                                                                    value<
-                                                                    int>, *]))>]))>,
-                         value<int>,value<
-                                     (consts (0))
-                                      (non_consts ([0:
-                                                    value<
-                                                     (consts (0))
-                                                      (non_consts ([0: *,
-                                                                    value<
-                                                                    int>, *]))>,
-                                                    value<int>,
-                                                    value<
-                                                     (consts (0))
-                                                      (non_consts ([0: *,
-                                                                    value<
-                                                                    int>, *]))>]))>)
-                         (field_imm 0 *match*/6) (field_int 1 *match*/6)
-                         rl/0)
-                       (field_int 1 t/0)
-                       (makeblock 0 (value<
-                                      (consts (0))
-                                       (non_consts ([0:
-                                                     value<
-                                                      (consts (0))
-                                                       (non_consts ([0: *,
-                                                                    value<
-                                                                    int>, *]))>,
-                                                     value<int>,
-                                                     value<
-                                                      (consts (0))
-                                                       (non_consts ([0: *,
-                                                                    value<
-                                                                    int>, *]))>]))>,
-                         value<int>,value<
-                                     (consts (0))
-                                      (non_consts ([0:
-                                                    value<
-                                                     (consts (0))
-                                                      (non_consts ([0: *,
-                                                                    value<
-                                                                    int>, *]))>,
-                                                    value<int>,
-                                                    value<
-                                                     (consts (0))
-                                                      (non_consts ([0: *,
-                                                                    value<
-                                                                    int>, *]))>]))>)
-                         lr/0 (field_int 1 *match*/7)
-                         (field_imm 2 *match*/7))))
+                       (field_imm 0 *match*/6) (field_int 1 *match*/6)
+                       (field_imm 0 *match*/7))
+                     (field_int 1 t/0)
+                     (makeblock 0 (value<
+                                    (consts (0))
+                                     (non_consts ([0:
+                                                   value<
+                                                    (consts (0))
+                                                     (non_consts ([0: *,
+                                                                   value<int>,
+                                                                   *]))>,
+                                                   value<int>,
+                                                   value<
+                                                    (consts (0))
+                                                     (non_consts ([0: *,
+                                                                   value<int>,
+                                                                   *]))>]))>,
+                       value<int>,value<
+                                   (consts (0))
+                                    (non_consts ([0:
+                                                  value<
+                                                   (consts (0))
+                                                    (non_consts ([0: *,
+                                                                  value<int>,
+                                                                  *]))>,
+                                                  value<int>,
+                                                  value<
+                                                   (consts (0))
+                                                    (non_consts ([0: *,
+                                                                  value<int>,
+                                                                  *]))>]))>)
+                       (field_imm 2 *match*/6) (field_int 1 *match*/7)
+                       (field_imm 2 *match*/7)))
                    (exit 36)))
                (exit 36)))
            (exit 36))

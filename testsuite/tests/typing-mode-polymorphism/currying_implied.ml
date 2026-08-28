@@ -51,6 +51,8 @@ val flip :
 
 let add a b = a + b
 [%%expect{|
+val add : int @ 'n -> int @ 'm -> int @ [> dynamic] = <fun>
+|}, Principal{|
 val add : int @ [< global] -> int @ 'm -> int @ [> dynamic] = <fun>
 |}]
 
@@ -91,6 +93,11 @@ val local_closure :
 let use_and_return g x = ignore (g x); g
 [%%expect{|
 val use_and_return :
+  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [< 'n mod aliased contended immutable & global many] ->
+  'a @ [< 'm] ->
+  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [> 'n | aliased] = <fun>
+|}, Principal{|
+val use_and_return :
   ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [< 'n & global many] ->
   'a @ [< 'm] ->
   ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [> 'n | aliased] = <fun>
@@ -113,6 +120,12 @@ let store_and_call c g x = c.v <- g; c.v x
 val store_and_call :
   ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('mm0) & past('p) & global read_write] ->
   (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('q) & past('o) & global many read_write] ->
+   ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) mod many forkable unyielding | stateful]) @ [> past('o) | past('p) mod many forkable unyielding | stateful] =
+  <fun>
+|}, Principal{|
+val store_and_call :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('mm0) & past('p) & global read_write] ->
+  (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('q) & past('o) & global many read_write] ->
    ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) | stateful]) @ [> past('o) | past('p) | stateful] =
   <fun>
 |}]
@@ -131,6 +144,11 @@ val unique_closure : 'a @ [< 'm & global unique] -> 'b @ 'n -> 'a @ [> 'm] =
 
 let unique_cell (c @ unique) x = c.v <- x; c
 [%%expect{|
+val unique_cell :
+  'a cell @ [< 'm & global unique write] ->
+  'a @ [< global many read_write] ->
+  'a cell @ [> 'm mod many forkable unyielding] = <fun>
+|}, Principal{|
 val unique_cell :
   'a cell @ [< 'm & global unique write] ->
   'a @ [< global many read_write] -> 'a cell @ [> 'm] = <fun>

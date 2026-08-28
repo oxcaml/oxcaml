@@ -239,6 +239,9 @@ let foo (x : int @ portable) (y : int @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
+val foo : int @ [< portable] -> int @ [> nonportable] -> unit @ [> dynamic] =
+  <fun>
+|}, Principal{|
 val foo :
   int @ [< global portable] -> int @ [> nonportable] -> unit @ [> dynamic] =
   <fun>
