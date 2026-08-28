@@ -4984,7 +4984,9 @@ module Report = struct
     | Contained_by c ->
       let print_mod ppf Modality = Fmt.fprintf ppf " (with some modality)" in
       Fmt.fprintf ppf "it %t" (print_containing print_mod c)
-    | Annotation _ -> ()
+    | Annotation _ ->
+      print_bug
+        ~explanation:"Annotation should be printed by print_ahint" () ppf
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and return the
