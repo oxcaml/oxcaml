@@ -3791,15 +3791,16 @@ module Violation = struct
               sub.jkind pp_bound super.jkind))
     | No_intersection _ -> ()
 
+  type layout_display =
+    | Exact_layout
+    | A_value_layout
+
   (* CR layouts-scannable: For now, this is special-cased to print out notes
      iff the layout error message prints containing
      [value non_pointer(64)] since [immediate(64)] is such a common jkind
      abbreviation. There is probably room to print out better notes (maybe
      by looking at the full jkinds?) *)
-  (* If [print_as_value_layout] is true, we refer to the second layout simply as
-     "a value layout" instead of printing its full scannable axes. *)
-  let report_layout_notes env ppf violation mismatch_type ~print_as_value_layout
-      =
+  let report_layout_notes env ppf violation mismatch_type ~display1 ~display2 =
     match mismatch_type with
     | Kind -> ()
     | Layout ->
@@ -3818,10 +3819,13 @@ module Violation = struct
         | Layout l -> l
         | Kconstr _ -> assert false
       in
-      let check_has_component component jkind =
-        match get_layout env jkind with
-        | None -> false
-        | Some const -> Layout.Const.has_component ~component const
+      let mentions display jkind component =
+        match display with
+        | A_value_layout -> false
+        | Exact_layout -> (
+          match get_layout env jkind with
+          | None -> false
+          | Some const -> Layout.Const.has_component ~component const)
       in
       (* CR layouts-scannable: Whenever we print out "non_pointer",
          "non_pointer64", or "non_float" in an error message, we also include
@@ -3829,19 +3833,17 @@ module Violation = struct
          print a history/hints based on what the user actually wrote - see
          internal ticket 6933 *)
       let check_both_jkinds jk1 jk2 =
-        let should_check_jk2 = not print_as_value_layout in
+        let jk1_mentions = mentions display1 jk1 in
+        let jk2_mentions = mentions display2 jk2 in
         let should_note_immediate =
-          check_has_component immediate_layout jk1
-          || (should_check_jk2 && check_has_component immediate_layout jk2)
+          jk1_mentions immediate_layout || jk2_mentions immediate_layout
         in
         let should_note_immediate64 =
-          check_has_component immediate64_layout jk1
-          || (should_check_jk2 && check_has_component immediate64_layout jk2)
+          jk1_mentions immediate64_layout || jk2_mentions immediate64_layout
         in
         let should_note_non_float_abbrevs =
-          check_has_component non_float_abbrevs_layout jk1
-          || should_check_jk2
-             && check_has_component non_float_abbrevs_layout jk2
+          jk1_mentions non_float_abbrevs_layout
+          || jk2_mentions non_float_abbrevs_layout
         in
         ( ~should_note_immediate,
           ~should_note_immediate64,
@@ -3851,8 +3853,6 @@ module Violation = struct
             ~should_note_immediate64,
             ~should_note_non_float_abbrevs ) =
         match violation with
-        (* If we are printing the jkind on the right as a value layout, then
-           we should not look at it to determine whether to emit a note *)
         (* Can't use an or-pattern since the jkinds have different
            allowances *)
         | Not_a_subjkind (jkind1, jkind2, _) -> check_both_jkinds jkind1 jkind2
@@ -3921,29 +3921,32 @@ module Violation = struct
        [float64 </= value non_pointer], we simplify the error message by eliding
        the scannable axes of the right layout and instead refer to it as "a
        value layout". *)
-    let mismatch_type, print_as_value_layout =
+    let layout_mismatch l1 l2 =
+      let display1, display2 =
+        if
+          (not (Layout.is_scannable_or_var l1)) && Layout.is_scannable_or_var l2
+        then Exact_layout, A_value_layout
+        else Exact_layout, Exact_layout
+      in
+      Layout, display1, display2
+    in
+    let mismatch_type, display1, display2 =
       match base1, base2 with
-      | Kconstr _, Kconstr _ -> Kind, false
+      | Kconstr _, Kconstr _ -> Kind, Exact_layout, Exact_layout
       | Layout l1, Layout l2 -> (
         match t.violation with
         | Not_a_subjkind _ ->
           if Sub_result.is_le (Layout.sub l1 l2)
-          then Kind, false
-          else
-            ( Layout,
-              (not (Layout.is_scannable_or_var l1))
-              && Layout.is_scannable_or_var l2 )
-        | No_intersection _ ->
-          ( Layout,
-            (not (Layout.is_scannable_or_var l1))
-            && Layout.is_scannable_or_var l2 ))
-      | Kconstr _, Layout (Layout.Any _) -> Kind, false
+          then Kind, Exact_layout, Exact_layout
+          else layout_mismatch l1 l2
+        | No_intersection _ -> layout_mismatch l1 l2)
+      | Kconstr _, Layout (Layout.Any _) -> Kind, Exact_layout, Exact_layout
       | Kconstr _, Layout _ | Layout _, Kconstr _ -> (
         match t.violation with
-        | Not_a_subjkind _ -> Kind, false
-        | No_intersection _ -> Layout, false)
+        | Not_a_subjkind _ -> Kind, Exact_layout, Exact_layout
+        | No_intersection _ -> Layout, Exact_layout, Exact_layout)
     in
-    mismatch_type, print_as_value_layout, missing_cmis
+    mismatch_type, display1, display2, missing_cmis
 
   (* CR layouts-scannable: When there is a layout violation and both are
      value (scannable) layouts, a more useful error should be reported.
@@ -3955,8 +3958,11 @@ module Violation = struct
      conflicing component. Note reporting should be adjusted
      appropriately. *)
   let report_general env preamble pp_former former ppf t =
-    let mismatch_type, print_as_value_layout, missing_cmis =
+    let mismatch_type, display1, display2, missing_cmis =
       categorize_mismatch env t
+    in
+    let second_prints_as_value_layout =
+      match display2 with A_value_layout -> true | Exact_layout -> false
     in
     let layout_or_kind =
       match mismatch_type with Kind -> "kind" | Layout -> "layout"
@@ -3974,7 +3980,7 @@ module Violation = struct
       | Layout l -> has_sort_var_layout l
     in
     (* CR box: This, and other logic such as handling the message for
-       [print_as_value_layout], could likely be folded into
+       [A_value_layout], could likely be folded into
        [categorize_mismatch] to reduce duplication. *)
     let layout_to_requirement (base : Sort.Flat.t Layout.t jkind_base) =
       if has_sort_var base
@@ -3994,12 +4000,34 @@ module Violation = struct
         | Ok l -> fprintf ppf "%t%a" indent Layout.format l
         | Error p -> fprintf ppf "the abstract kind %s" (Path.name p))
     in
+    (* Print the layout of the offending (first) jkind *)
+    let format_first_base_or_kind (type l r) ppf (jkind : (l * r) jkind) =
+      match mismatch_type with
+      | Kind -> fprintf ppf "%t%a" indent (format env) jkind
+      | Layout -> (
+        match extract_layout env jkind with
+        | Ok l -> fprintf ppf "%t%a" indent Layout.format l
+        | Error p -> fprintf ppf "the abstract kind %s" (Path.name p))
+    in
+    (* [first_layout_intro] follows "The layout of t is";
+       [first_layout_format] follows "t has" *)
+    let first_layout_intro (type l r) (k1 : (l * r) jkind) =
+      match display1 with
+      | A_value_layout -> dprintf "a value %s" layout_or_kind
+      | Exact_layout -> dprintf "%a" format_first_base_or_kind k1
+    in
+    let first_layout_format (type l r) (k1 : (l * r) jkind) =
+      match display1 with
+      | A_value_layout -> dprintf "a value %s" layout_or_kind
+      | Exact_layout ->
+        dprintf "%s@ %a" layout_or_kind format_first_base_or_kind k1
+    in
     let subjkind_format verb k2 =
       let base = (get k2).base in
       match layout_to_requirement base with
       | Some requirement -> dprintf "%s %s" verb requirement
       | None ->
-        if print_as_value_layout
+        if second_prints_as_value_layout
         then
           (* avoid printing "a sublayout of a value layout" *)
           dprintf "%s@ a value layout" verb
@@ -4022,7 +4050,7 @@ module Violation = struct
         | None ->
           ( Pack_jkind k1,
             Pack_jkind k2,
-            dprintf "%s@ %a" layout_or_kind format_base_or_kind k1,
+            first_layout_format k1,
             subjkind_format "is not" k2,
             missing_cmis )
         | Some p ->
@@ -4034,13 +4062,13 @@ module Violation = struct
       | { violation = No_intersection (k1, k2); missing_cmi } ->
         assert (Option.is_none missing_cmi);
         let fmt_k2 =
-          if print_as_value_layout
+          if second_prints_as_value_layout
           then dprintf "is not@ a value layout"
           else dprintf "does not overlap with@ %a" format_base_or_kind k2
         in
         ( Pack_jkind k1,
           Pack_jkind k2,
-          dprintf "%s@ %a" layout_or_kind format_base_or_kind k1,
+          first_layout_format k1,
           fmt_k2,
           missing_cmis )
     in
@@ -4051,7 +4079,7 @@ module Violation = struct
         match layout_to_requirement base with
         | Some requirement -> dprintf "be %s" requirement
         | None -> (
-          if print_as_value_layout
+          if second_prints_as_value_layout
           then dprintf "be@ a value layout"
           else
             match t.violation with
@@ -4063,8 +4091,8 @@ module Violation = struct
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
            ~intro:
-             (dprintf "@[<hov 2>The %s of %a is@ %a@]" layout_or_kind pp_former
-                former format_base_or_kind k1)
+             (dprintf "@[<hov 2>The %s of %a is@ %t@]" layout_or_kind pp_former
+                former (first_layout_intro k1))
            ~layout_or_kind env)
         k1
         (Format_history.format_history
@@ -4079,7 +4107,7 @@ module Violation = struct
     report_missing_cmis ppf missing_cmis;
     report_reason ppf t.violation;
     (* otherwise, we get notes for layout abbreviations that get omitted. *)
-    report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
+    report_layout_notes env ppf t.violation mismatch_type ~display1 ~display2;
     if not !Clflags.ikinds then report_fuel ppf t.violation
 
   let pp_t ppf x = fprintf ppf "%t" x
