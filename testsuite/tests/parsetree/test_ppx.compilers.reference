@@ -1,7 +1,7 @@
-File "source_jane_street.ml", line 159, characters 12-39:
+File "source_jane_street.ml", line 159, characters 28-39:
 159 | type t17b : (value & value) non_pointer
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) non_pointer have no effect on the kind value & value.
+                                  ^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier non_pointer has no effect on the kind value & value.
 
 File "source_jane_street.ml", line 178, characters 0-24:
 178 | type t = #(int * float#)

@@ -1112,18 +1112,6 @@ module Layout = struct
       | Genvar v -> Some (Sort.Const.Genvar v)
       | Addressable t -> Option.map Sort.Const.addressable (get_sort t)
 
-    let rec is_scannable_or_any = function
-      | Any _ | Base (Scannable, _) -> true
-      | Base
-          ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-            | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask ),
-            _ ) ->
-        false
-      | Product _ -> false
-      | Univar _ -> false
-      | Genvar _ -> false
-      | Addressable t -> is_scannable_or_any t
-
     let rec crosses_externality = function
       | Any _ | Univar _ | Genvar _ -> false
       | Base (b, _) -> Sort.base_crosses_externality b
@@ -1145,7 +1133,8 @@ module Layout = struct
     let rec get_root_scannable_axes t =
       match t with
       | Any sa -> Some sa
-      | Base (_, sa) -> if is_scannable_or_any t then Some sa else None
+      | Base (Scannable, sa) -> Some sa
+      | Base (_, _) -> None
       | Product _ -> None
       | Univar _ -> None
       | Genvar _ -> None
@@ -1154,7 +1143,8 @@ module Layout = struct
     let rec set_root_scannable_axes t sa =
       match t with
       | Any _ -> Any sa
-      | Base (b, _) -> if is_scannable_or_any t then Base (b, sa) else t
+      | Base (Scannable, _) -> Base (Scannable, sa)
+      | Base (_, _) -> t
       | Product _ -> t
       | Univar _ -> t
       | Genvar _ -> t
