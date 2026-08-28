@@ -616,13 +616,9 @@ let facts_of_tree compilation_unit artifact iterate =
         | Other_member -> ())
       signature
   in
-  (* Naming another compilation unit must not read that unit's interface:
-     [Env.find_module] loads the .cmi to recover [md_uid], which would make the
-     facts of a unit depend on which interfaces happen to sit on the load path
-     rather than on its source (see
-     [testsuite/tests/reproducibility/cmis_on_file_system.ml]). Name persistent
-     units the way [Env.find_shape] does, from the module name alone, so that
-     the same source always produces the same facts. *)
+  (* Identify persistent units from the name alone, similar to how [Env.find_shape]
+     does. Using [Env.find_module] would load the .cmi to do the same work, which
+     we don't need to do here. *)
   let persistent_unit_uid (path : Path.t) =
     match path with
     | Path.Pident id

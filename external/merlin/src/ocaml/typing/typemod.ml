@@ -4960,15 +4960,15 @@ let type_implementation target modulename initial_env ast =
             annots initial_env None None)
       )
 
-let save_signature ~argument_interface target modname tsg initial_env cmi =
+let save_signature target modname (intf : Typedtree.interface) initial_env cmi =
   let decl_deps =
     (* This is cleared after saving the cmt so we have to save is before *)
     Cmt_format.get_declaration_dependencies ()
   in
-  let annots = Cmt_format.Interface tsg in
+  let annots = Cmt_format.Interface intf.signature in
   let facts =
     module_implementation_facts_if_saved ~unit_interface:false
-      ~argument_interface modname annots decl_deps
+      ~argument_interface:intf.argument_interface modname annots decl_deps
   in
   Cmt_format.save_cmt (Unit_info.cmti target) modname
     annots initial_env (Some cmi) None facts;
@@ -4981,7 +4981,7 @@ let cms_register_toplevel_signature_attributes ~sourcefile ~uid ast =
         | { psig_desc = Psig_attribute attr; _ } -> Some attr
         | _ -> None)
 
-let type_interface ~sourcefile modulename env ast =
+let type_interface ~sourcefile modulename env ast : Typedtree.interface =
   let error e =
     raise (Error (Location.none, Env.empty, e))
   in
@@ -5005,7 +5005,7 @@ let type_interface ~sourcefile modulename env ast =
     check_argument_type_if_given env sourcefile ~actual_staticity sg.sig_type
       arg_type
   in
-  sg, argument_interface
+  { signature = sg; argument_interface = argument_interface}
 
 (* "Packaging" of several compilation units into one unit
    having them as sub-modules.  *)
