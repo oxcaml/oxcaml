@@ -3387,11 +3387,11 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             { arg with
               mod_mode = (Mode.Value.disallow_right mode.mode_modes, None)},
             arg_shape
-<<<<<<< Merlin:ageorges/mode-polymorphism-subsumption
           | Some smty ->
               let mty = transl_modtype env smty in
-              wrap_constraint_with_shape env true arg mty.mty_type mode.mode_modes
-                arg_shape (Tmodtype_explicit (mty, mode))
+              wrap_constraint_with_shape ~self_check:false env true arg
+                mty.mty_type mode.mode_modes arg_shape
+                (Tmodtype_explicit (mty, mode))
         in
         { md with
           mod_loc = smod.pmod_loc;
@@ -3415,30 +3415,6 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             Shape.dummy_mod
         | _ -> raise exn
       end
-||||||| Compiler:last-imported
-        | Some smty ->
-            let mty = transl_modtype env smty in
-            wrap_constraint_with_shape env true arg mty.mty_type mode.mode_modes
-              arg_shape (Tmodtype_explicit (mty, mode))
-      in
-      { md with
-        mod_loc = smod.pmod_loc;
-        mod_attributes = smod.pmod_attributes;
-      },
-      final_shape
-=======
-        | Some smty ->
-            let mty = transl_modtype env smty in
-            wrap_constraint_with_shape ~self_check:false env true arg
-              mty.mty_type mode.mode_modes arg_shape
-              (Tmodtype_explicit (mty, mode))
-      in
-      { md with
-        mod_loc = smod.pmod_loc;
-        mod_attributes = smod.pmod_attributes;
-      },
-      final_shape
->>>>>>> Compiler:HEAD
   | Pmod_unpack sexp ->
       let mode = Value.newvar 0 in
       let exp =
