@@ -44,7 +44,7 @@ Error: The constructor "()" has type "unit"
        but an expression was expected of type "f64"
 |}]
 
-(* CR rtjoa: [i64] should beat [int64_u], as [f64] beats [float#]. *)
+(* [i64] beats [int64_u] *)
 let f : unit -> i64 = fun () -> ()
 
 [%%expect {|
@@ -52,7 +52,7 @@ Line 1, characters 32-34:
 1 | let f : unit -> i64 = fun () -> ()
                                     ^^
 Error: The constructor "()" has type "unit"
-       but an expression was expected of type "int64_u"
+       but an expression was expected of type "i64"
 |}]
 
 (* [U.u] beats [R.r#] *)
