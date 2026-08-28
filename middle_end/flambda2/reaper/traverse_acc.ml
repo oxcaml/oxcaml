@@ -145,14 +145,17 @@ let add_keep_alive t x = Graph.add_keep_alive t.deps x
 let add_code_id_my_closure t code_id my_closure =
   Graph.add_code_id_my_closure t.deps code_id my_closure
 
-let add_cond_any_usage t ~(denv : Env.t) simple =
-  let node = simple_to_node t ~all_constants:(Env.all_constants denv) simple in
+let add_cond_any_usage_node t ~(denv : Env.t) node =
   match Env.current_code_id denv with
   | None -> add_any_usage t node
   | Some code_id ->
     (* CR ncourant: this always makes [node] any_source, we should improve
        that. *)
     add_use_dep t ~to_:(Code_id_or_name.code_id code_id) ~from:node
+
+let add_cond_any_usage t ~(denv : Env.t) simple =
+  add_cond_any_usage_node t ~denv
+    (simple_to_node t ~all_constants:(Env.all_constants denv) simple)
 
 let add_cond_any_source t ~(denv : Env.t) v =
   match Env.current_code_id denv with
@@ -455,7 +458,16 @@ let record_set_of_closures_deps_one_closure t
       ~base:name;
     add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
       ~base:name;
-    add_constructor_dep t ~base:witness Field.code_id_of_call_witness ~from:name
+    add_constructor_dep t ~base:witness Field.code_id_of_call_witness ~from:name;
+    (* The code id itself is also a source of the witness's code id field, as in
+       [create_known_arity_call_witness]: calling this set of closures (or
+       letting it escape) must mark the foreign code id as used. Whole-program
+       solves rely on this: this set can be a copy, inlined from the code id's
+       own unit, of a set that no longer occurs over there, in which case only
+       usage facts recorded here keep the defining unit's rebuild from deleting
+       code that this unit's rebuilt sets still reference. *)
+    add_constructor_dep t ~base:witness Field.code_id_of_call_witness
+      ~from:(Code_id_or_name.code_id code_id)
   | Some code_dep ->
     add_propagate_dep t
       ~to_:(Code_id_or_name.var code_dep.my_closure)

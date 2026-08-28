@@ -392,6 +392,13 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
            id's own graph node does not work: code ids are deliberately
            [any_source].) *)
         Acc.add_cond_any_source acc ~denv call_widget;
+        (* The rebuilt apply is emitted as a direct reference to the foreign
+           code id (whether or not the callee closure survives, see
+           [Rebuild.rewrite_call_kind]), so the code id must be marked used
+           whenever the code containing this apply is. Whole-program rebuilds
+           rely on this to keep the code id's own unit from deleting code that
+           this unit's rebuilt code still calls directly. *)
+        Acc.add_cond_any_usage_node acc ~denv (Code_id_or_name.code_id code_id);
         match callee with
         | None -> ()
         | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
@@ -849,7 +856,8 @@ let create_symbol_and_add_any_source acc name =
 
 let run0 unit acc ~all_constants () =
   let le_monde_exterieur =
-    create_symbol_and_add_any_source acc "le_monde_extérieur"
+    create_symbol_and_add_any_source acc
+      Global_flow_graph.le_monde_exterieur_name
   in
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
@@ -899,7 +907,9 @@ let run0 unit acc ~all_constants () =
 
 let run (unit : Flambda_unit.t) =
   let acc = Acc.create () in
-  let all_constants = create_symbol_and_add_any_source acc "all_constants" in
+  let all_constants =
+    create_symbol_and_add_any_source acc Global_flow_graph.all_constants_name
+  in
   let holed =
     Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
   in

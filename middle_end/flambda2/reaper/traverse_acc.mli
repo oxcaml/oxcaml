@@ -166,6 +166,9 @@ val simple_to_node : t -> denv:Traverse_env.t -> Simple.t -> Code_id_or_name.t
     being used. At the top level, marks it unconditionally. *)
 val add_cond_any_usage : t -> denv:Traverse_env.t -> Simple.t -> unit
 
+val add_cond_any_usage_node :
+  t -> denv:Traverse_env.t -> Code_id_or_name.t -> unit
+
 (** Mark a node as [any_source], conditional on the current function (if any)
     being used. At the top level, marks it unconditionally. *)
 val add_cond_any_source : t -> denv:Traverse_env.t -> Code_id_or_name.t -> unit
