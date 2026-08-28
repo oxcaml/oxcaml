@@ -8,10 +8,10 @@ let code inline(never) loopify(never) size(3) newer_version_of(produce_0)
   let int_add = %int_barith.add (x, 1) in
   cont k (int_add)
 in
-let $camlNp_pair__produce_2 =
+let $camlNp_pair__produce_1 =
   closure produce_0_1 @produce &toplevel.alloc_region
 in
-let phantom produce = $camlNp_pair__produce_2 in
+let phantom produce = $camlNp_pair__produce_1 in
 let code loopify(never) size(13) newer_version_of(test_1)
       test_1_1 (x : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -19,10 +19,10 @@ let code loopify(never) size(13) newer_version_of(test_1)
         : imm tagged =
   let `region` = %begin_region () in
   apply direct(produce_0_1 &my_alloc_region)
-    ($camlNp_pair__produce_2 : _ -> imm tagged) (x) -> k2 * k1
+    ($camlNp_pair__produce_1 : _ -> imm tagged) (x) -> k2 * k1
     where k2 (np apply_result : imm tagged) =
       (apply direct(produce_0_1 &my_alloc_region)
-         ($camlNp_pair__produce_2 : _ -> imm tagged) (x) -> k2 * k1
+         ($camlNp_pair__produce_1 : _ -> imm tagged) (x) -> k2 * k1
          where k2 (np apply_result_1 : imm tagged) =
            let phantom pair =
              %block.[`0`].my_alloc_region.local[`region`]
@@ -32,7 +32,7 @@ let code loopify(never) size(13) newer_version_of(test_1)
            let `unit` = %end_region (`region`) in
            cont k (int_add))
 in
-let $camlNp_pair__test_3 = closure test_1_1 @test &toplevel.alloc_region in
-let phantom test = $camlNp_pair__test_3 in
-let $camlNp_pair = Block 0 ($camlNp_pair__produce_2, $camlNp_pair__test_3) in
+let $camlNp_pair__test_2 = closure test_1_1 @test &toplevel.alloc_region in
+let phantom test = $camlNp_pair__test_2 in
+let $camlNp_pair = Block 0 ($camlNp_pair__produce_1, $camlNp_pair__test_2) in
 cont done ($camlNp_pair)
