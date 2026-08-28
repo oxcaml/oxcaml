@@ -14,6 +14,7 @@
   oxcamlLldb ? false,
   syntaxQuotations ? false,
   withMerlin ? true,
+  withJsoo ? true,
 }:
 let
   inherit (pkgs) lib fetchpatch;
@@ -265,6 +266,13 @@ let
   # testOcaml argument (it only feeds the merlin package's check phase).
   merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
+  jsooDev = {
+    devNativeBuildInputs = [
+      pkgs.binaryen
+      pkgs.nodejs
+    ];
+  };
+
   gfortran =
     # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
     # directly to `nativeBuildInputs` overrides many `$PATH` entries from
@@ -383,6 +391,7 @@ stdenv.mkDerivation {
   ]
   ++ (if pkgs.stdenv.isDarwin then [ pkgs.cctools ] else [ pkgs.libtool ]) # cctools provides Apple libtool on macOS
   ++ lib.optional oxcamlLldb pkgs.python312
+  ++ lib.optionals withJsoo jsooDev.devNativeBuildInputs
   ++ lib.optionals withMerlin merlinDev.devNativeBuildInputs;
 
   buildInputs = [
@@ -431,6 +440,12 @@ stdenv.mkDerivation {
 
   shellHook =
     let
+      jsooCommands =
+        if withJsoo then
+          "  make jsoo-build         - Build js_of_ocaml\n"
+          + "  make jsoo-test          - Run js_of_ocaml tests\n"
+        else
+          "";
       merlinCommands =
         if withMerlin then
           "  make merlin-build        - Build Merlin\n"
@@ -456,7 +471,7 @@ stdenv.mkDerivation {
         make install             - Install
         make test                - Run all tests
         make test-one TEST=...   - Run a single test
-      ${merlinCommands}EOF
+      ${jsooCommands}${merlinCommands}EOF
     '';
 
   meta =
