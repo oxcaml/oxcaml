@@ -906,6 +906,18 @@ let cannot_change_calling_convention_query =
   let^? [x], [] = ["x"], [] in
   [cannot_change_calling_convention x]
 
+(* CR mvellacott: in whole-program (LTO) rebuilds, every rebuild must answer
+   this question identically for a given code ID, whichever unit is current: the
+   defining unit rewrites the function's calling convention according to its
+   answer, and calling units rewrite their call sites according to theirs. The
+   [is_current] test makes the answer depend on the current unit, so consistency
+   relies on [Reaper.Staged.solve_whole_program] forcing
+   [cannot_change_calling_convention] for every code id: all rebuilds agree that
+   no convention changes. To allow cross-unit calling-convention changes, make
+   this decision db-only under LTO (injecting facts into the solution for code
+   ids outside the participating set) and derive the parameter/my-closure
+   decisions for imported code IDs from the solution tables rather than from the
+   unit-local [code_deps]. *)
 let cannot_change_calling_convention uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
   || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))

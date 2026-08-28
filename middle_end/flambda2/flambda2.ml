@@ -473,7 +473,9 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   in
   (* CR mvellacott: split the resulting solution into per-compilation-unit
      portions. *)
-  let solution = Flambda2_reaper.Reaper.Staged.solve combined_graph in
+  let solution =
+    Flambda2_reaper.Reaper.Staged.solve_whole_program combined_graph
+  in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
     ~solution
 

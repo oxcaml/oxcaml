@@ -36,16 +36,22 @@
  file = "reaper_solve.reaped.cmx";
  file-exists;
 
- flags = "-flambda2-reaper";
+ flags = "";
  last_flags = "";
- compile_only = "true";
- all_modules = "reaper_solve.ml";
+ compile_only = "false";
+ program = "${test_build_directory}/reaper_solve.exe";
+ all_modules = "reaper_solve_dependency.reaped.cmx reaper_solve.reaped.cmx";
  ocamlopt.opt;
 
- script = "cmp reaper_solve.reaped.o reaper_solve.o";
- script;
+ run;
 
  check-ocamlopt.opt-output;
 *)
+
+(* Checks the solve and rebuild pipeline on a two-module program: the linked
+   reaped program runs correctly. (The rebuilt objects are not compared against
+   per-unit Reaper output: the whole-program solve intentionally treats unit
+   boundaries more precisely, so the outputs legitimately differ. Rebuild
+   determinism is checked by multi_module_rebuild.) *)
 
 let () = assert (Reaper_solve_dependency.used 41 = 42)

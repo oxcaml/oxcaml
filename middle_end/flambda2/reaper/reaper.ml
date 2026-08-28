@@ -193,6 +193,34 @@ module Staged = struct
     in
     solved_dep
 
+  let solve_whole_program deps =
+    let solved_dep = solve deps in
+    (* CR mvellacott: whole-program solutions are currently restricted to dead
+       code elimination. Transformations that need coordinated rewrites on both
+       sides of a unit boundary (unboxing, representation changes and calling
+       convention changes) are disabled, because each unit's rebuild decides
+       whether to apply them using unit-local checks (e.g. the [is_current]
+       check in [Unboxing_analysis.cannot_change_calling_convention]), so the
+       rebuilds of a defining and an importing unit can disagree. To lift this
+       restriction, make those decisions derivable from the shared solution
+       alone. *)
+    let cannot_change_calling_convention =
+      Code_id.Set.fold
+        (fun code_id acc ->
+          Code_id_or_name.Map.add (Code_id_or_name.code_id code_id) () acc)
+        (Global_flow_graph.ids_for_export deps).code_ids
+        (Datalog.get_table
+           Unboxing_analysis.cannot_change_calling_convention_table
+           solved_dep.db)
+    in
+    { Unboxing_analysis.db =
+        Datalog.set_table
+          Unboxing_analysis.cannot_change_calling_convention_table
+          cannot_change_calling_convention solved_dep.db;
+      unboxed_fields = Code_id_or_name.Map.empty;
+      changed_representation = Code_id_or_name.Map.empty
+    }
+
   let rebuild ~unit_metadata ~traverse_rebuild ~solved_dep ~machine_width
       ~cmx_loader ~all_code ~final_typing_env =
     let load_code = Flambda_cmx.get_imported_code cmx_loader in

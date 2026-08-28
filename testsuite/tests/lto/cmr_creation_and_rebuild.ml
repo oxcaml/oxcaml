@@ -27,14 +27,20 @@
  file = "cmr_creation_and_rebuild.reaped.cmx";
  file-exists;
 
- flags = "-flambda2-reaper";
- compile_only = "true";
- all_modules = "cmr_creation_and_rebuild.ml";
+ flags = "";
+ compile_only = "false";
+ program = "${test_build_directory}/cmr_creation_and_rebuild.exe";
+ all_modules = "cmr_creation_and_rebuild.reaped.cmx";
  ocamlopt.opt;
 
- script = "cmp cmr_creation_and_rebuild.reaped.o cmr_creation_and_rebuild.o";
- script;
+ run;
 *)
+
+(* End-to-end test of the split Reaper flow on a single module: emit a .cmr
+   with -support-lto, solve, rebuild from the .ltosol, then link and run the
+   result. (The rebuilt object is not compared against per-unit Reaper output:
+   the whole-program solve intentionally treats the module block's exports more
+   precisely, so the outputs legitimately differ.) *)
 
 (* CR mvellacott: the following line would cause this test to fail, because we
    don't restore [Translmod.primitive_declarations] on resume. *)
