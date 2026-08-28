@@ -324,6 +324,13 @@ type error =
 
 exception Error of error
 
+(* CR mvellacott: the -support-lto, -reaper-solve and -reaper-rebuild
+   invocations must agree on the reaper flags that influence traversal, the
+   solve and how the solved tables are queried (-reaper-local-fields,
+   -reaper-preserve-direct-calls, -reaper-unbox,
+   -reaper-change-calling-conventions). Record them in the .cmr and .ltosol
+   files and fail on mismatch instead of relying on callers passing consistent
+   command lines. *)
 let save ~filename ~participants ~solution =
   let solution = Serialisable_solution.create solution in
   (* We need to store ID stamp counters so that stamp-based ids created during

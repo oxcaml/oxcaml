@@ -3,7 +3,7 @@
  flambda2;
  setup-ocamlopt.opt-build-env;
 
- flags = "-flambda2-reaper -support-lto";
+ flags = "-flambda2-reaper -support-lto -reaper-local-fields";
  compile_only = "true";
  all_modules = "boundary_dep.ml";
  ocamlopt.opt;
@@ -12,16 +12,16 @@
  ocamlopt.opt;
 
  compile_only = "false";
- flags = "-reaper-solve boundary_dep.cmr cross_module_boundaries.cmr";
+ flags = "-reaper-local-fields -reaper-solve boundary_dep.cmr cross_module_boundaries.cmr";
  last_flags = "-o cross_module_boundaries.ltosol";
  all_modules = "";
  ocamlopt.opt;
 
- flags = "-reaper-rebuild boundary_dep.cmr cross_module_boundaries.ltosol";
+ flags = "-reaper-local-fields -reaper-rebuild boundary_dep.cmr cross_module_boundaries.ltosol";
  last_flags = "-o boundary_dep.reaped.cmx";
  ocamlopt.opt;
 
- flags = "-reaper-rebuild cross_module_boundaries.cmr cross_module_boundaries.ltosol";
+ flags = "-reaper-local-fields -reaper-rebuild cross_module_boundaries.cmr cross_module_boundaries.ltosol";
  last_flags = "-o cross_module_boundaries.reaped.cmx";
  ocamlopt.opt;
 
@@ -39,7 +39,9 @@
    and calling closures defined in another unit, exceptions defined and raised
    in another unit, passing closures to units outside the participating set
    (the stdlib), and garbage collection while the dependency's module block has
-   poisoned (dead) fields. *)
+   poisoned (dead) fields. The whole pipeline runs with -reaper-local-fields,
+   so slots of participating units are treated as local by the whole-program
+   solve and the rebuilds. *)
 
 let () =
   let f, g = Boundary_dep.adder_pair in

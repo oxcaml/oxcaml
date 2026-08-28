@@ -451,6 +451,10 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   let participants =
     List.map Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmrs
   in
+  (* All allocation and access sites of participating units' slots are in the
+     combined graph, so they are local; set this before the solve. *)
+  Flambda2_reaper.Field.set_locality_scope
+    (Compilation_unit.Set.of_list participants);
   let combined_graph =
     (* The lists are in command-line order, which is deterministic, as required
        for reproducible .ltosol output. *)
@@ -481,6 +485,9 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
   in
   Flambda2_reaper.Id_stamp_counters.restore_for_resume id_stamp_counters;
   Compilenv.set_lto_participants participants;
+  (* Query the solved tables under the same locality the solve used. *)
+  Flambda2_reaper.Field.set_locality_scope
+    (Compilation_unit.Set.of_list participants);
   (* Deserialised on first use, which is after the first member's .cmr has been
      deserialised. This matches the identifier creation order of the
      pre-batching rebuild, keeping the first member's output identical to what

@@ -104,6 +104,12 @@ val must_be_function_slot : t -> Function_slot.t
    that this relates to function/value slots? *)
 val is_local : t -> bool
 
+(** Declare the compilation units whose slots [is_local] considers local,
+    instead of the default (the current unit). Used by the whole-program (LTO)
+    solve and rebuilds, which must agree on the participating set: the solved
+    tables are queried under the same locality at rebuild time. *)
+val set_locality_scope : Compilation_unit.Set.t -> unit
+
 val print_for_variable_name : Format.formatter -> t -> unit
 
 val export_views : Set.t -> (t * view) list
