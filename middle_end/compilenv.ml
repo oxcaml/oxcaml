@@ -386,12 +386,6 @@ let save_resumed_unit_info filename ~paused =
      fields they normally produce from [paused], the unit infos saved by the
      paused compilation. Fields describing generated code are taken from
      [current_unit] so they describe the reaped code. *)
-  let paused_imports_cmx_without_crcs =
-    List.map
-      (fun import ->
-        Import_info.create_normal (Import_info.cu import) ~crc:None)
-      paused.ui_imports_cmx
-  in
   (* [static_data] is computed by the frontend, so we want the paused version.
      It includes pointers to file sections, which we must copy to the new unit.
      *)
@@ -409,10 +403,13 @@ let save_resumed_unit_info filename ~paused =
       (* Computed by the typechecker. *)
       ui_arg_descr = paused.ui_arg_descr;
       ui_imports_cmi = paused.ui_imports_cmi;
-      (* Resume reads a subset of what pause did, so take the list from pause.
-         We will link .reaped.cmx files, not the originals, so the old CRCs
-         would be wrong. *)
-      ui_imports_cmx = paused_imports_cmx_without_crcs;
+      (* The imports recorded while loading dependency cmx files during the
+         rebuild: .reaped.cmx files for participants of the whole-program
+         solution and ordinary .cmx files otherwise. Those are the files that
+         will be linked, so their CRCs make link-time consistency checking
+         meaningful; the CRCs recorded at pause time describe the unreaped
+         files and would be wrong here. *)
+      ui_imports_cmx = current_unit.uib_imports_cmx;
       (* Computed by the typechecker. *)
       ui_quoted_cmi = paused.ui_quoted_cmi;
       ui_quoted_cmx = paused.ui_quoted_cmx;
