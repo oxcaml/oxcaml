@@ -1,0 +1,93 @@
+(* Js_of_ocaml compiler
+ * http://www.ocsigen.org/js_of_ocaml/
+ * Copyright (C) 2022 Hugo Heuzard
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, with linking exception;
+ * either version 2.1 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *)
+open! Stdlib
+
+val string_of_effects_backend : Config.effects_backend -> string
+
+val effects_backend_of_string : string -> Config.effects_backend
+
+val effects_backend_of_string_result : string -> (Config.effects_backend, string) result
+
+val effects_backends_javascript :
+  (string * [ `Cps | `Double_translation | `Disabled ]) list
+
+val effects_backends_wasm : (string * [ `Jspi | `Cps | `Native | `Disabled ]) list
+
+type config_key =
+  | Bool_key of
+      { name : string
+      ; get : unit -> bool
+      ; set : bool -> unit
+      ; default : bool
+      }
+  | Enum_key of
+      { name : string
+      ; get : unit -> string
+      ; set : string -> unit
+      ; valid : string list
+      }
+
+val config_key_name : config_key -> string
+
+val config_keys : [ `JavaScript | `Wasm ] -> config_key list
+
+val config_key_values : config_key -> string list
+
+val get_non_default_values : config_key list -> (string * string) list
+
+val set_values : config_key list -> (string * string) list -> unit
+
+val to_config_string : (string * string) list -> string
+
+val parse_config_string : string -> (string * string) list
+
+type t
+
+type kind =
+  [ `Runtime
+  | `Exe
+  | `Cmo
+  | `Cma
+  | `Unknown
+  ]
+
+val create : kind -> t
+
+val to_comment : t -> string
+
+val parse_comment : string -> t option
+
+val to_map : t -> string StringMap.t
+
+val of_map : string StringMap.t -> t
+
+val with_kind : t -> kind -> t
+
+exception
+  Incompatible_build_info of
+    { key : string
+    ; first : (string * string option)
+    ; second : (string * string option)
+    }
+
+val merge : [ `JavaScript | `Wasm ] -> string -> t -> string -> t -> t
+
+val kind : t -> kind
+
+val configure : t -> unit

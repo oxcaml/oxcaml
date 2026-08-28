@@ -1,0 +1,312 @@
+;; Shared library with all backend-neutral modules
+
+(library
+ (name lwt_toplevel_lib)
+ (modules toplevel_main ppx_support graphics_dummy)
+ (libraries
+  js_of_ocaml-compiler
+  js_of_ocaml-tyxml
+  js_of_ocaml-toplevel.common
+  toplevel_examples_common
+  lwt
+  js_of_ocaml-lwt
+  ;; not used directly
+  graphics
+  js_of_ocaml.deriving
+  react
+  reactiveData
+  str
+  dynlink
+  (select
+   graphics_dummy.ml
+   from
+   (js_of_ocaml-lwt.graphics -> graphics_dummy.in.ml)
+   (-> graphics_dummy.in.ml))
+  (select
+   ppx_support.ml
+   from
+   (js_of_ocaml-ppx -> ppx_support.enabled.ml)
+   (-> ppx_support.disabled.ml)))
+ (wrapped false)
+ (flags
+  (:standard -rectypes))
+ (preprocess
+  (pps js_of_ocaml-ppx)))
+
+;; JS executable (existing, slimmed down)
+
+(executable
+ (name toplevel)
+ (modules toplevel)
+ (libraries lwt_toplevel_lib js_of_ocaml js_of_ocaml-toplevel)
+ (modes byte js)
+ ;; Embedding the cmis as JS string literals overflows OCaml's 16 MB
+ ;; max_string_length on 32-bit. OCaml >= 5.1 compresses cmis on disk so
+ ;; the embedded literal stays small enough.
+ (enabled_if
+  (or
+   (>= %{ocaml_version} 5.1.0)
+   (= %{arch_sixtyfour} true)))
+ (js_of_ocaml
+  ;; We use the generated file in the doc. Let's not bloat it with sourcemap.
+  ;; Plus, the source map would be too large on 32-bit architectures
+  (sourcemap no)
+  (build_runtime_flags
+   (:standard
+    --file
+    %{dep:examples.ml}
+    --file
+    %{dep:test_dynlink.cmo}
+    --file
+    %{dep:test_dynlink.js}
+    --file
+    %{dep:test_lib_jsoo.js}
+    --file
+    (:include html_types_path.txt)))
+  (flags
+   (:standard --toplevel)))
+ (flags
+  (:standard -rectypes))
+ (link_flags
+  (:standard -linkall))
+ (preprocess
+  (pps js_of_ocaml-ppx)))
+
+;; Wasm executable (new)
+
+(executable
+ (name toplevel_wasm)
+ (modules toplevel_wasm)
+ (libraries
+  wasm_of_ocaml-compiler.dynlink
+  lwt_toplevel_lib
+  js_of_ocaml
+  js_of_ocaml-toplevel.common)
+ ;; Embedding the cmis as JS string literals overflows OCaml's 16 MB
+ ;; max_string_length on 32-bit. OCaml >= 5.1 compresses cmis on disk so
+ ;; the embedded literal stays small enough.
+ (enabled_if
+  (or
+   (>= %{ocaml_version} 5.1.0)
+   (= %{arch_sixtyfour} true)))
+ (flags
+  (:standard -rectypes))
+ (link_flags
+  (:standard -linkall))
+ (modes byte))
+
+(rule
+ (target html_types_path.txt)
+ (action
+  (with-stdout-to
+   %{target}
+   (run
+    ocamlfind
+    query
+    tyxml.functor
+    -format
+    "%d/html_types.cmi:/static/cmis/"))))
+
+(rule
+ (targets test_dynlink.cmo test_dynlink.cmi)
+ (action
+  (run ocamlc -c %{dep:test_dynlink.ml})))
+
+(rule
+ (targets test_dynlink.js)
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   --pretty
+   --toplevel
+   %{read-strings:effects_flags.txt}
+   %{dep:test_dynlink.cmo})))
+
+(rule
+ (target test_lib_jsoo.js)
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   --pretty
+   --toplevel
+   --include-runtime
+   %{read-strings:effects_flags.txt}
+   %{dep:test_lib/stubs.js}
+   %{dep:test_lib/test_lib_jsoo.cma}
+   -o
+   %{target})))
+
+(rule
+ (targets export.txt)
+ (deps
+  (package js_of_ocaml-ppx)
+  (package js_of_ocaml)
+  (package js_of_ocaml-compiler)
+  (package js_of_ocaml-lwt)
+  (package js_of_ocaml-tyxml)
+  (package js_of_ocaml-toplevel))
+ (action
+  (run
+   jsoo_listunits
+   -o
+   %{targets}
+   stdlib
+   graphics
+   str
+   dynlink
+   js_of_ocaml-compiler.runtime
+   js_of_ocaml-lwt.graphics
+   js_of_ocaml-ppx.as-lib
+   js_of_ocaml.deriving
+   lwt
+   tyxml.functor
+   tyxml.functor:html_types.cmi
+   react
+   reactiveData
+   js_of_ocaml
+   js_of_ocaml-lwt
+   js_of_ocaml-tyxml
+   js_of_ocaml-toplevel
+   js_of_ocaml-toplevel.common)))
+
+(executable
+ (name effects_flags)
+ (modules effects_flags))
+
+(rule
+ (target effects_flags.txt)
+ (action
+  (with-stdout-to
+   %{target}
+   (run ./effects_flags.exe txt %{profile}))))
+
+(rule
+ (target javascript_runtime_files.txt)
+ (action
+  (with-stdout-to
+   %{target}
+   (pipe-stdout
+    (run
+     ocamlfind
+     query
+     -format
+     "%+(jsoo_runtime)"
+     -r
+     js_of_ocaml-ppx.as-lib)
+    (run tr -d \r)
+    (with-accepted-exit-codes
+     (or 0 1)
+     (run grep -v ^$))))))
+
+(rule
+ (targets toplevel.js)
+ ;; Embedding the cmis as JS string literals overflows OCaml's 16 MB
+ ;; max_string_length on 32-bit. OCaml >= 5.1 compresses cmis on disk so
+ ;; the embedded literal stays small enough.
+ (enabled_if
+  (or
+   (>= %{ocaml_version} 5.1.0)
+   (= %{arch_sixtyfour} true)))
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   compile
+   --pretty
+   %{read-strings:effects_flags.txt}
+   --Werror
+   --target-env
+   browser
+   --file
+   %{dep:examples.ml}
+   --file
+   %{dep:test_dynlink.cmo}
+   --file
+   %{dep:test_dynlink.js}
+   --file
+   %{dep:test_lib_jsoo.js}
+   --export
+   %{dep:export.txt}
+   --toplevel
+   --disable
+   shortvar
+   %{read-strings:javascript_runtime_files.txt}
+   %{dep:toplevel.bc}
+   -o
+   %{targets})))
+
+;; Export list for wasm
+
+(rule
+ (targets export_wasm.txt)
+ (deps
+  (package js_of_ocaml)
+  (package js_of_ocaml-compiler)
+  (package js_of_ocaml-lwt)
+  (package js_of_ocaml-tyxml)
+  (package js_of_ocaml-toplevel))
+ (action
+  (run
+   jsoo_listunits
+   -o
+   %{targets}
+   stdlib
+   graphics
+   str
+   dynlink
+   js_of_ocaml-lwt.graphics
+   js_of_ocaml.deriving
+   lwt
+   tyxml.functor
+   tyxml.functor:html_types.cmi
+   react
+   reactiveData
+   js_of_ocaml
+   js_of_ocaml-lwt
+   js_of_ocaml-tyxml
+   js_of_ocaml-toplevel.common)))
+
+;; Wasm compilation
+
+(rule
+ (targets
+  toplevel_wasm.js
+  (dir toplevel_wasm.assets))
+ (enabled_if
+  (or
+   (>= %{ocaml_version} 5.1.0)
+   (= %{arch_sixtyfour} true)))
+ (action
+  (run
+   %{bin:wasm_of_ocaml}
+   compile
+   --toplevel
+   --effects=cps
+   --file
+   %{dep:examples.ml}
+   --export
+   %{dep:export_wasm.txt}
+   %{dep:toplevel_wasm.bc}
+   -o
+   toplevel_wasm.js)))
+
+(alias
+ (name default)
+ (deps index.html))
+
+(alias
+ (name default)
+ (enabled_if
+  (or
+   (>= %{ocaml_version} 5.1.0)
+   (= %{arch_sixtyfour} true)))
+ (deps
+  toplevel_wasm.js
+  (glob_files toplevel_wasm.assets/*)))
+
+(alias
+ (name default)
+ (enabled_if
+  (or
+   (>= %{ocaml_version} 5.1.0)
+   (= %{arch_sixtyfour} true)))
+ (deps toplevel.js toplevel.bc.js))

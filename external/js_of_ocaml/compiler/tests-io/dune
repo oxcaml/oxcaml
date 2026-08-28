@@ -1,0 +1,127 @@
+(tests
+ (names cat)
+ (modes js wasm)
+ (action
+  (pipe-stdout
+   (run printf "echo ☠")
+   (run node %{test}))))
+
+(tests
+ (names cat_nat)
+ (modes
+  (best exe))
+ (action
+  (pipe-stdout
+   (run printf "echo ☠")
+   (run %{test}))))
+
+(rule
+ (copy cat.ml cat_nat.ml))
+
+(tests
+ (names md5)
+ (modes js wasm)
+ (deps
+  some-random-file
+  (sandbox preserve_file_kind))
+ (action
+  (progn
+   (run node %{test} some-random-file)
+   (run node %{test} some-random-file some-random-file)
+   (run node %{test} -offset 2000 -length 4000 some-random-file)
+   (pipe-stdout
+    (echo "tests")
+    (run node %{test}))
+   (pipe-stdout
+    (echo "teststeststests")
+    (run node %{test} -offset 5 -length 5))
+   (pipe-stdout
+    (echo "teststeststests")
+    (run node %{test} -offset 2 -length 5)))))
+
+(tests
+ (names md5_nat)
+ (modes
+  (best exe))
+ (deps some-random-file)
+ (action
+  (progn
+   (run %{test} some-random-file)
+   (run %{test} some-random-file some-random-file)
+   (run %{test} -offset 2000 -length 4000 some-random-file)
+   (pipe-stdout
+    (echo "tests")
+    (run %{test}))
+   (pipe-stdout
+    (echo "teststeststests")
+    (run %{test} -offset 5 -length 5))
+   (pipe-stdout
+    (echo "teststeststests")
+    (run %{test} -offset 2 -length 5)))))
+
+(rule
+ (copy md5.ml md5_nat.ml))
+
+(rule
+ (copy ../../manual/files/performances/time.png some-random-file))
+
+(rule
+ (alias runtest)
+ (action
+  (diff md5.expected md5_nat.expected)))
+
+(rule
+ (alias runtest)
+ (action
+  (diff cat.expected cat_nat.expected)))
+
+(rule
+ (with-stdout-to
+  "accentué"
+  (echo test)))
+
+(tests
+ (names non_ascii_filenames)
+ (deps "accentué")
+ (modes js)
+ (js_of_ocaml
+  (compilation_mode whole_program)
+  (flags
+   (:standard --file "accentué"))))
+
+(tests
+ (names non_ascii_filenames_wasm)
+ (deps "accentué")
+ (modes wasm)
+ (enabled_if
+  (<> %{env:JSOO_TEST_ENGINE=node} wasi))
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags
+   (:standard --file "accentué"))))
+
+(rule
+ (copy non_ascii_filenames.ml non_ascii_filenames_wasm.ml))
+
+(rule
+ (copy non_ascii_filenames.expected.wasm non_ascii_filenames_wasm.expected))
+
+(rule
+ (with-stdout-to
+  "file.txt"
+  (echo test)))
+
+(tests
+ (names gh1856)
+ (deps file.txt)
+ (modes js wasm)
+ (enabled_if
+  (<> %{env:JSOO_TEST_ENGINE=node} wasi))
+ (js_of_ocaml
+  (compilation_mode whole_program)
+  (flags
+   (:standard --file file.txt)))
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags
+   (:standard --file file.txt))))
