@@ -326,9 +326,15 @@ let alloc_modes_opt i ppf ms =
 
 let alloc_modes_var i ppf ms =
   let print_alloc_modes_var i ppf m =
-    line i ppf "%a\n" (Format_doc.compat (Mode.Alloc.print ())) m
+    line i ppf "%a\n" print_alloc_mode_l m
   in
   modes ~pr:print_alloc_modes_var i ppf ms
+
+let return_mode i ppf m =
+  line i ppf "return_mode %a\n" print_return_mode m
+
+let return_modes i ppf ms =
+  modes ~pr:return_mode i ppf ms
 
 let value_modes_var i ppf ms =
   let print_value_modes_var i ppf m =
@@ -604,7 +610,7 @@ and function_body i ppf (body : function_body) =
         fmt_partiality fc_partial
         fmt_location fc_loc;
       let i = i+1 in
-      alloc_mode_raw i ppf fc_arg_mode;
+      alloc_mode_l i ppf fc_arg_mode;
       line i ppf "%a\n" fmt_sort fc_arg_sort;
       attributes i ppf fc_attributes;
       List.iter (fun e -> expression_extra i ppf (e, fc_loc, [])) fc_exp_extra;
@@ -647,15 +653,16 @@ and expression_extra i ppf (extra, loc, attrs) =
       attributes i ppf attrs;
       type_inspection (i+1) ppf ti
 
-and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
-  = fun i ppf m ->
-    line i ppf "alloc_mode %a\n" (Format_doc.compat (Mode.Alloc.print ())) m
-
-and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m
+and alloc_mode i ppf (m : alloc_mode_r) =
+  line i ppf "alloc_mode %a\n" print_alloc_mode_r m
 
 and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
 
-and locality_mode i ppf m =
+and alloc_mode_l i ppf (m : alloc_mode_l) =
+  line i ppf "locality_mode %a\n" print_alloc_mode_l m
+
+and locality_mode : type l r. _ -> _ -> (l * r) Mode.Locality.t -> _ =
+ fun i ppf m ->
   line i ppf "locality_mode %a\n"
     (Format_doc.compat (Mode.Locality.print ())) m
 
@@ -701,7 +708,7 @@ and expression i ppf x =
       line i ppf "Texp_function\n";
       alloc_mode i ppf am;
       yielding_mode i ppf ym;
-      alloc_modes_var i ppf ret_mode;
+      return_modes i ppf ret_mode;
       list i function_param ppf params;
       function_body i ppf body;
   | Texp_apply (e, l, m, am, ym, za) ->
@@ -711,7 +718,7 @@ and expression i ppf x =
          | Tail -> "Tail"
          | Nontail -> "Nontail"
          | Default -> "Default");
-      locality_mode i ppf am;
+      return_mode i ppf am;
       yielding_mode i ppf ym;
       Option.iter (zero_alloc_assume i ppf) za;
       expression i ppf e;

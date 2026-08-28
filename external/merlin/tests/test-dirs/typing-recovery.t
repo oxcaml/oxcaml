@@ -98,9 +98,9 @@
             value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test.ml[2,15+6]..test.ml[6,69+12]) ghost
             Texp_function
-            alloc_mode id(modevar#6<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
             yielding_mode unyielding
-            id(modevar#a<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,dynamic])
+            return_mode proj_Locality(modevar#a<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -117,7 +117,7 @@
                   Tpat_var \"x\"
                   sort value
                   value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#9<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                id(modevar#8<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#9<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                proj_Locality(modevar#8<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
@@ -285,9 +285,9 @@
             value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#5<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (test2.ml[2,15+6]..test2.ml[2,15+24]) ghost
             Texp_function
-            alloc_mode id(modevar#6<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
             yielding_mode unyielding
-            id(modevar#a<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            return_mode proj_Locality(modevar#a<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -304,7 +304,7 @@
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_any
-                id(modevar#8<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#9<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                proj_Locality(modevar#8<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
@@ -677,7 +677,7 @@ make sure we also handle that correctly in structures:
                     None
                 ]
             Texp_tuple
-            alloc_mode meet(local,once,nonportable,unforkable,yielding,stateful,regional_to_global_full . imply(local,once,nonportable,unforkable,yielding,stateful)(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]));meet(unique,uncontended,read_write,static)(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
             [
               Label: None
                 expression (test_ct.ml[3,20+24]..test_ct.ml[3,20+25])
@@ -728,7 +728,7 @@ make sure we also handle that correctly in structures:
                     []
                 ]
             Texp_tuple
-            alloc_mode global,once,nonportable,unforkable,yielding,stateful;meet(unique,contended,immutable,static)(modevar#11<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
             [
               Label: None
                 expression (test_ct.ml[5,50+23]..test_ct.ml[5,50+24])

@@ -459,9 +459,9 @@ We try several places in the identifier to check the result stability
             value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#9<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#a<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
           expression (under.ml[2,13+6]..under.ml[5,70+17]) ghost
             Texp_function
-            alloc_mode id(modevar#b<0>[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#c<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            alloc_mode global
             yielding_mode unyielding
-            id(modevar#1d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#1e<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            return_mode proj_Locality(modevar#1e<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful])
             []
             [
               Nolabel
@@ -469,8 +469,8 @@ We try several places in the identifier to check the result stability
                 pattern (under.ml[2,13+6]..under.ml[2,13+9])
                   Tpat_var \"x\"
                   sort '_representable_layout_1
-                  value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#e<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                id(modevar#d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#e<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                  value_mode meet(local,once,nonportable,unforkable,yielding,stateful) . local_to_regional_full(modevar#d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#11<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                proj_Locality(modevar#d<0>[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful])
                 []
             ]
             Tfunction_body
