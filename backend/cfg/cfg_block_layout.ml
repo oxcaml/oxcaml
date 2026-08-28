@@ -60,10 +60,17 @@ let compute_hot_labels (cfg : Cfg.t) =
    not apply to irreducible flow. If the assumption ever broke, the layout
    would remain legal, merely rotating the loop (back edge as fallthrough). *)
 let preferred_successors (block : Cfg.basic_block) ~position =
+  let[@inline] find_position label =
+    match Label.Tbl.find_opt position label with
+    | Some index -> index
+    | None ->
+      Misc.fatal_errorf
+        "Cfg_block_layout.preferred_successors: block %a is not in the layout"
+        Label.print label
+  in
   let sorted_distinct labels =
     List.sort_uniq
-      (fun left right ->
-        compare (Label.Tbl.find position left) (Label.Tbl.find position right))
+      (fun left right -> compare (find_position left) (find_position right))
       labels
   in
   match block.terminator.desc with

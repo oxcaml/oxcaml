@@ -51,11 +51,10 @@ val is_empty : 'a t -> bool
 
 val length : 'a t -> int
 
-(* Same as [List.compare_lengths]: traverses at most [min (length left) (length
-   right)] nodes. *)
+(* Same as [List.compare_lengths]: traverses as few nodes as possible. *)
 val compare_lengths : 'a t -> 'b t -> int
 
-(* Same as [List.compare_length_with]: traverses at most [len] nodes. *)
+(* Same as [List.compare_length_with]: traverses as few nodes as possible. *)
 val compare_length_with : 'a t -> int -> int
 
 val remove_first : 'a t -> f:('a -> bool) -> unit

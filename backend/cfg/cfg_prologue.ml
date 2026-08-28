@@ -360,7 +360,7 @@ let find_prologue_and_epilogues_shrink_wrapped
        This also covers the case where all paths lead to an exception and/or are
        cold. *)
     (* CR-soon cfalas: this assumes that all descendants of a cold block are
-       also cold.*)
+       also cold, which is no longer true if `-cfg-block-layout` is passed.*)
     let all_need_prologue =
       Label.Set.for_all
         (fun label ->

@@ -219,7 +219,10 @@ let mk_no_cfg_merge_blocks f =
   ("-no-cfg-merge-blocks", Arg.Unit f, " Do not merge equivalent CFG blocks")
 
 let mk_cfg_block_layout f =
-  ("-cfg-block-layout", Arg.Unit f, " Reorder CFG blocks to improve layout")
+  ( "-cfg-block-layout",
+    Arg.Unit f,
+    " Reorder CFG blocks to improve layout (affects coldness and prologue \
+     placement)" )
 
 let mk_no_cfg_block_layout f =
   ("-no-cfg-block-layout", Arg.Unit f, " Do not reorder CFG blocks")
