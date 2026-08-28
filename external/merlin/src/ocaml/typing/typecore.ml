@@ -10130,26 +10130,8 @@ and type_function_
                         (Alloc.Comonadic.proj Areality closure_mode)
                         alloc_mode
                     | Error e ->
-<<<<<<< HEAD
-<<<<<<< HEAD
-                      raise (error(loc, env,
-                        Uncurried_function_escapes_comonadic e))
-=======
-<<<<<<< Merlin:ageorges/mode-polymorphism-integrate
                       raise
                         (error(loc, env, Uncurried_function_escapes_comonadic e))
-||||||| Compiler:last-imported
-                      raise (Error(loc_fun, env,
-                        Uncurried_function_escapes_comonadic e))
-=======
-                      raise (Error(loc_fun, env,
-                        Uncurried_function_escapes_comonadic e));
->>>>>>> Compiler:HEAD
->>>>>>> 468626124c (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
-=======
-                      raise
-                        (error(loc, env, Uncurried_function_escapes_comonadic e))
->>>>>>> d8098fdfb0 (Fix merlin to build under mode polymorphism)
                   end;
                   More_args
                     { partial_mode =
