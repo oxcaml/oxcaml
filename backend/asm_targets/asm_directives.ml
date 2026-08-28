@@ -136,7 +136,7 @@ module Directive = struct
         if force_decimal || Int64.compare i 0xFFFFL <= 0
         then print_aux_subterm ~force_decimal buf (Signed_int i)
         else
-          match TS.assembler () with
+          match TS.Assembler.get () with
           | MASM -> bprintf buf "0%LxH" i
           | MacOS | GAS_like -> bprintf buf "0x%Lx" i)
       | Add (c1, c2) ->
@@ -432,7 +432,7 @@ module Directive = struct
     | Delta_uleb128 { delta } -> (
       (* Typically a difference of two same-section labels, which the assembler
          computes; the value must be non-negative. *)
-      match TS.assembler () with
+      match TS.Assembler.get () with
       | MacOS ->
         (* Mach-O assemblers refuse a cross-atom label difference emitted
            inline, but accept one bound with .set, which forces assembly-time

@@ -145,7 +145,7 @@ let emit_frames ~debug_strings_section a =
      the symbol table we use l_caml<n> _private symbols_ instead (which the
      linker treats as local and strips). *)
   let macos_cstrings =
-    Target_system.is_macos ()
+    Target_system.System.is_macos ()
     && Asm_section.equal debug_strings_section Asm_section.Debuginfo_strings
   in
   (* References carry the frametable section (the directive layer requires a
