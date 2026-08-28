@@ -618,8 +618,15 @@ and print_out_jkind_const ppf ojkind =
     let base, withs = strip_withs ojkind in
     (match base with
     | Ojkind_const_default -> fprintf ppf "_"
-    | Ojkind_const_abbreviation (abbrev, sa) ->
-      pp_print_string ppf (String.concat " " (abbrev :: sa))
+    | Ojkind_const_abbreviation (abbrev, operators) ->
+      (* A multi-word abbreviation (e.g. "bits64 mod everything") must be
+         parenthesized before postfix operators *)
+      let abbrev =
+        if operators <> [] && String.contains abbrev ' '
+        then "(" ^ abbrev ^ ")"
+        else abbrev
+      in
+      pp_print_string ppf (String.concat " " (abbrev :: operators))
     | Ojkind_const_mod (base, modes) ->
       let pp_base ppf base =
         match base with

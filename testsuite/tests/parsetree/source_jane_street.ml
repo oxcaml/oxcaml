@@ -172,7 +172,7 @@ type t17b : value & value
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
   ('a : value mod immutable global)
 [%%expect{|
-type ('a : value mod everything non_float) t18 = 'a
+type ('a : (value mod everything) non_float) t18 = 'a
 |}]
 
 type t = #(int * float#)
