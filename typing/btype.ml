@@ -124,12 +124,16 @@ let lowest_level = Ident.lowest_scope
    the only function returning the contents of a pool is [with_new_pool],
    so that the initial pool can be added to, but never read from. *)
 
-type pool = {level: int; mutable pool: transient_expr list; next: pool}
+type pool =
+  { level: int;
+    mutable pool: transient_expr list;
+    mutable sort_pool: Jkind_types.Sort.t list;
+    next: pool}
 (* To avoid an indirection we choose to add a dummy level at the end of
    the list. It will never be accessed, as [pool_of_level] is always called
    with [level >= 0]. *)
-let rec dummy = {level = max_int; pool = []; next = dummy}
-let pool_stack = s_table (fun () -> {level = 0; pool = []; next = dummy}) ()
+let rec dummy = {level = max_int; pool = []; sort_pool = []; next = dummy}
+let pool_stack = s_table (fun () -> { dummy with level = 0 }) ()
 
 (* Lookup in the stack is linear, but the depth is the number of nested
    generalization points (e.g. lhs of let-definitions), which in ML is known
@@ -146,16 +150,22 @@ let rec pool_of_level level pool =
 
 (* Create a new pool at given level, and use it locally. *)
 let with_new_pool ~level f =
-  let pool = {level; pool = []; next = !pool_stack} in
+  let pool = {level; pool = []; sort_pool = []; next = !pool_stack} in
   let r =
     Misc.protect_refs [ R(pool_stack, pool) ] f
   in
-  (r, pool.pool)
+  (r, pool.pool, pool.sort_pool)
 
 let add_to_pool ~level ty =
   if level >= generic_level || level <= lowest_level then () else
   let pool = pool_of_level level !pool_stack in
   pool.pool <- ty :: pool.pool
+
+let add_to_sort_pool ~level v =
+  if level >= generic_level || level <= lowest_level then () else
+  let pool = pool_of_level level !pool_stack in
+  (* Format.printf "push pool %a@." Jkind_types.Sort.Debug_printers.t v; *)
+  pool.sort_pool <- v :: pool.sort_pool
 
 (**** Some type creators ****)
 
