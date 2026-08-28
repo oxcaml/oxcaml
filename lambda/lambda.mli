@@ -432,6 +432,18 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)

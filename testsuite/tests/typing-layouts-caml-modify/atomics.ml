@@ -213,7 +213,7 @@ let () = assert (atomic_lxor_field_calls () = 0)
 
 (* build a test function for a particular atomic call *)
 let gen_test ~fn ~fn_calls ~reset_fn_calls =
-  let test ~(call_pos : [%call_pos]) ~expected f =
+  let test ~(call_pos : [%call_pos]) ~expected (f : unit -> unit) =
     total_atomic_reset ();
     reset_fn_calls ();
     f ();
@@ -260,6 +260,36 @@ let test_atomic_cas_field_local =
   gen_test ~fn:"atomic_cas_field_local"
     ~fn_calls:atomic_cas_field_local_calls
     ~reset_fn_calls:atomic_cas_field_local_reset
+
+let test_atomic_fetch_add_field =
+  gen_test ~fn:"atomic_fetch_add_field"
+    ~fn_calls:atomic_fetch_add_field_calls
+    ~reset_fn_calls:atomic_fetch_add_field_reset
+
+let test_atomic_add_field =
+  gen_test ~fn:"atomic_add_field"
+    ~fn_calls:atomic_add_field_calls
+    ~reset_fn_calls:atomic_add_field_reset
+
+let test_atomic_sub_field =
+  gen_test ~fn:"atomic_sub_field"
+    ~fn_calls:atomic_sub_field_calls
+    ~reset_fn_calls:atomic_sub_field_reset
+
+let test_atomic_land_field =
+  gen_test ~fn:"atomic_land_field"
+    ~fn_calls:atomic_land_field_calls
+    ~reset_fn_calls:atomic_land_field_reset
+
+let test_atomic_lor_field =
+  gen_test ~fn:"atomic_lor_field"
+    ~fn_calls:atomic_lor_field_calls
+    ~reset_fn_calls:atomic_lor_field_reset
+
+let test_atomic_lxor_field =
+  gen_test ~fn:"atomic_lxor_field"
+    ~fn_calls:atomic_lxor_field_calls
+    ~reset_fn_calls:atomic_lxor_field_reset
 
 (* Patomic_set_field skips runtime call for immediates. *)
 module Set_field = struct
@@ -329,6 +359,52 @@ module Set_idx_atomic_mixed = struct
     )
 end
 
+(* Idx_atomic read-modify-write operations skip runtime calls for
+   immediates. *)
+module Rmw_idx_atomic_imm = struct
+  type t = { mutable imm: int [@atomic] }
+
+  let () =
+    let t = { imm = 1 } in
+    let idx = (.imm) in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      ignore (Idx_atomic.exchange t idx 2);
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_cas_field ~expected:0 (fun () ->
+      ignore (Idx_atomic.compare_and_set t idx 2 3);
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_compare_exchange_field ~expected:0 (fun () ->
+      ignore (Idx_atomic.compare_exchange t idx 3 4);
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_fetch_add_field ~expected:0 (fun () ->
+      ignore (Idx_atomic.fetch_and_add t idx 1);
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_add_field ~expected:0 (fun () ->
+      Idx_atomic.add t idx 1;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_sub_field ~expected:0 (fun () ->
+      Idx_atomic.sub t idx 1;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_land_field ~expected:0 (fun () ->
+      Idx_atomic.logand t idx 1;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_lor_field ~expected:0 (fun () ->
+      Idx_atomic.logor t idx 1;
+      ignore (Sys.opaque_identity t)
+    );
+    test_atomic_lxor_field ~expected:0 (fun () ->
+      Idx_atomic.logxor t idx 1;
+      ignore (Sys.opaque_identity t)
+    )
+end
+
 module Atomic_locality = struct
   (* atomic in global record *)
   let () =
@@ -340,10 +416,10 @@ module Atomic_locality = struct
       ignore (Atomic.exchange t "bar")
     );
     test_atomic_compare_exchange_field ~expected:1 (fun () ->
-      Atomic.compare_exchange t "foo" "bar"
+      ignore (Atomic.compare_exchange t "foo" "bar")
     );
     test_atomic_cas_field ~expected:1 (fun () ->
-      Atomic.compare_and_set t "foo" "bar"
+      ignore (Atomic.compare_and_set t "foo" "bar")
     )
 
   (* atomic in local record *)
@@ -356,10 +432,10 @@ module Atomic_locality = struct
       ignore (Atomic.exchange t "bar")
     );
     test_atomic_compare_exchange_field_local ~expected:1 (fun () ->
-      Atomic.compare_exchange t "foo" "bar"
+      ignore (Atomic.compare_exchange t "foo" "bar")
     );
     test_atomic_cas_field_local ~expected:1 (fun () ->
-      Atomic.compare_and_set t "foo" "bar"
+      ignore (Atomic.compare_and_set t "foo" "bar")
     )
 end
 
@@ -377,10 +453,10 @@ module Atomic_loc_locality = struct
       ignore (Atomic.Loc.exchange loc "bar")
     );
     test_atomic_compare_exchange_field ~expected:1 (fun () ->
-      Atomic.Loc.compare_exchange loc "foo" "bar"
+      ignore (Atomic.Loc.compare_exchange loc "foo" "bar")
     );
     test_atomic_cas_field ~expected:1 (fun () ->
-      Atomic.Loc.compare_and_set loc "foo" "bar"
+      ignore (Atomic.Loc.compare_and_set loc "foo" "bar")
     )
 
   (* atomic in local record *)
@@ -394,10 +470,10 @@ module Atomic_loc_locality = struct
       ignore (Atomic.Loc.exchange loc "bar")
     );
     test_atomic_compare_exchange_field_local ~expected:1 (fun () ->
-      Atomic.Loc.compare_exchange loc "foo" "bar"
+      ignore (Atomic.Loc.compare_exchange loc "foo" "bar")
     );
     test_atomic_cas_field_local ~expected:1 (fun () ->
-      Atomic.Loc.compare_and_set loc "foo" "bar"
+      ignore (Atomic.Loc.compare_and_set loc "foo" "bar")
     )
 end
 
@@ -410,6 +486,15 @@ module Atomic_idx_locality = struct
     let idx = (.contents) in
     test_atomic_exchange_field ~expected:1 (fun () ->
       Idx_atomic.set t idx "bar"
+    );
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      ignore (Idx_atomic.exchange t idx "bar")
+    );
+    test_atomic_compare_exchange_field ~expected:1 (fun () ->
+      ignore (Idx_atomic.compare_exchange t idx "foo" "bar")
+    );
+    test_atomic_cas_field ~expected:1 (fun () ->
+      ignore (Idx_atomic.compare_and_set t idx "foo" "bar")
     )
 
   (* atomic in local record *)
@@ -418,6 +503,15 @@ module Atomic_idx_locality = struct
     let idx = (.contents) in
     test_atomic_exchange_field_local ~expected:1 (fun () ->
       Idx_atomic.set t idx "bar"
+    );
+    test_atomic_exchange_field_local ~expected:1 (fun () ->
+      ignore (Idx_atomic.exchange t idx "bar")
+    );
+    test_atomic_compare_exchange_field_local ~expected:1 (fun () ->
+      ignore (Idx_atomic.compare_exchange t idx "foo" "bar")
+    );
+    test_atomic_cas_field_local ~expected:1 (fun () ->
+      ignore (Idx_atomic.compare_and_set t idx "foo" "bar")
     )
 end
 
@@ -432,10 +526,10 @@ module Atomic_field_locality = struct
       ignore (atomic_exchange_field t 0 "bar")
     );
     test_atomic_compare_exchange_field ~expected:1 (fun () ->
-      atomic_compare_exchange_field t 0 "foo" "bar"
+      ignore (atomic_compare_exchange_field t 0 "foo" "bar")
     );
     test_atomic_cas_field ~expected:1 (fun () ->
-      atomic_compare_and_set_field t 0 "foo" "bar"
+      ignore (atomic_compare_and_set_field t 0 "foo" "bar")
     )
 
   (* atomic in local record *)
@@ -448,9 +542,9 @@ module Atomic_field_locality = struct
       ignore (atomic_exchange_field t 0 "bar")
     );
     test_atomic_compare_exchange_field_local ~expected:1 (fun () ->
-      atomic_compare_exchange_field t 0 "foo" "bar"
+      ignore (atomic_compare_exchange_field t 0 "foo" "bar")
     );
     test_atomic_cas_field_local ~expected:1 (fun () ->
-      atomic_compare_and_set_field t 0 "foo" "bar"
+      ignore (atomic_compare_and_set_field t 0 "foo" "bar")
     )
 end

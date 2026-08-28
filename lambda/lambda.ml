@@ -457,6 +457,18 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -2939,6 +2951,15 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_exchange_idx _
+  | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -3134,7 +3155,11 @@ let primitive_can_raise prim =
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_load_mixed_field _
-  | Patomic_set_field _ | Patomic_set_mixed_field _ -> false
+  | Patomic_set_field _ | Patomic_set_mixed_field _
+  | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx
+  | Patomic_lxor_idx -> false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3639,6 +3664,10 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
+  | Patomic_exchange_idx { layout; _ } -> layout
+  | Patomic_compare_exchange_idx { layout; _ } -> layout
+  | Patomic_compare_set_idx _
+  | Patomic_fetch_add_idx -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
@@ -3646,6 +3675,11 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   | Ppoll -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64

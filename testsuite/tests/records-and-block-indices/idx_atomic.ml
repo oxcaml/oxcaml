@@ -29,6 +29,90 @@ module Basic = struct
     ()
 end
 
+(* test read-modify-write operations using block indices *)
+
+module Rmw = struct
+  type t = { mutable x: int [@atomic]; mutable y: string [@atomic] }
+
+  let () =
+    Printf.printf "== idx_atomic read-modify-write ==\n";
+    let t = { x = 1; y = "one" } in
+    Printf.printf "exchange (.x) 2 = %d\n" (Idx_atomic.exchange t (.x) 2);
+    Printf.printf "exchange (.y) two = %s\n" (Idx_atomic.exchange t (.y) "two");
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    Printf.printf "(.y) = %s\n" (Idx_atomic.get t (.y));
+    Printf.printf "compare_and_set (.x) 2 3 = %b\n"
+      (Idx_atomic.compare_and_set t (.x) 2 3);
+    Printf.printf "compare_and_set (.x) 2 4 = %b\n"
+      (Idx_atomic.compare_and_set t (.x) 2 4);
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    let y = Idx_atomic.get t (.y) in
+    Printf.printf "compare_and_set (.y) y three = %b\n"
+      (Idx_atomic.compare_and_set t (.y) y "three");
+    Printf.printf "(.y) = %s\n" (Idx_atomic.get t (.y));
+    Printf.printf "compare_exchange (.x) 3 5 = %d\n"
+      (Idx_atomic.compare_exchange t (.x) 3 5);
+    Printf.printf "compare_exchange (.x) 3 6 = %d\n"
+      (Idx_atomic.compare_exchange t (.x) 3 6);
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    Printf.printf "fetch_and_add (.x) 10 = %d\n"
+      (Idx_atomic.fetch_and_add t (.x) 10);
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    Printf.printf "add (.x) 4\n"; Idx_atomic.add t (.x) 4;
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    Printf.printf "sub (.x) 5\n"; Idx_atomic.sub t (.x) 5;
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    Printf.printf "logand (.x) 6\n"; Idx_atomic.logand t (.x) 6;
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    Printf.printf "logor (.x) 9\n"; Idx_atomic.logor t (.x) 9;
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    Printf.printf "logxor (.x) 3\n"; Idx_atomic.logxor t (.x) 3;
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    Printf.printf "incr (.x)\n"; Idx_atomic.incr t (.x);
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    Printf.printf "decr (.x)\n"; Idx_atomic.decr t (.x);
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    ()
+end
+
+(* test read-modify-write operations on a mixed record *)
+
+module RmwMixed = struct
+  type t = { x: int64#; mutable y: int [@atomic]; z: int64# }
+
+  let () =
+    Printf.printf "== idx_atomic read-modify-write (mixed record) ==\n";
+    let t = { x = #42L; y = 1; z = #67L } in
+    Printf.printf "exchange (.y) 2 = %d\n" (Idx_atomic.exchange t (.y) 2);
+    Printf.printf "compare_and_set (.y) 2 3 = %b\n"
+      (Idx_atomic.compare_and_set t (.y) 2 3);
+    Printf.printf "fetch_and_add (.y) 10 = %d\n"
+      (Idx_atomic.fetch_and_add t (.y) 10);
+    Printf.printf "(.x) = %Ld\n" (Int64_u.to_int64 t.x);
+    Printf.printf "(.y) = %d\n" (Idx_atomic.get t (.y));
+    Printf.printf "(.z) = %Ld\n" (Int64_u.to_int64 t.z);
+    ()
+end
+
+(* test read-modify-write operations on a stack-allocated record *)
+
+module RmwStack = struct
+  type t = { mutable x: int [@atomic] }
+
+  let () =
+    Printf.printf "== idx_atomic read-modify-write (stack-allocated record) ==\n";
+    let t = stack_ { x = 1 } in
+    Printf.printf "exchange (.x) 2 = %d\n" (Idx_atomic.exchange t (.x) 2);
+    Printf.printf "compare_and_set (.x) 2 3 = %b\n"
+      (Idx_atomic.compare_and_set t (.x) 2 3);
+    Printf.printf "compare_exchange (.x) 3 4 = %d\n"
+      (Idx_atomic.compare_exchange t (.x) 3 4);
+    Printf.printf "fetch_and_add (.x) 10 = %d\n"
+      (Idx_atomic.fetch_and_add t (.x) 10);
+    Printf.printf "(.x) = %d\n" (Idx_atomic.get t (.x));
+    ()
+end
+
 (* test reading/writing unboxed singleton record *)
 
 module UnboxedSingleton = struct
