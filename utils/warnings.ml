@@ -147,7 +147,7 @@ type t =
     }                                       (* 181 *)
   | Untagged_external_small_int_return      (* 182 *)
   | Redundant_kind_modifier of string       (* 183 *)
-  | Ignored_kind_modifier of string * string list (* 184 *)
+  | Ignored_kind_modifier of string * string (* 184 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
@@ -1524,9 +1524,9 @@ let message = function
       msg "This kind modifier, or a stronger one,@ \
            is already implied by the kind %a."
         Style.inline_code abbrev
-  | Ignored_kind_modifier (abbrev, modifiers) ->
-      msg "The kind modifier(s) %a have no effect on the kind %a."
-        Style.inline_code (String.concat " " modifiers) Style.inline_code abbrev
+  | Ignored_kind_modifier (modifier, abbrev) ->
+      msg "The kind modifier %a has no effect on the kind %a."
+        Style.inline_code modifier Style.inline_code abbrev
   | Incompatible_with_upstream Unpacked_attribute ->
       msg "[@@unpacked] is not supported by upstream OCaml."
   | Unnecessarily_partial_tuple_pattern ->
