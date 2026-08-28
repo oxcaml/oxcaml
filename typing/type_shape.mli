@@ -44,6 +44,9 @@ module Type_decl_shape : sig
   val of_type_declaration :
     Ident.t -> Types.type_declaration -> path_lookup -> Shape.t
 
+  val of_unboxed_version_declaration :
+    Types.type_declaration -> args:Shape.t list -> path_lookup -> Shape.t
+
   (* CR sspies: The treatment of extension constructors for the debugger has to
      be revised if we want to support them properly. The extension constructor
      declarations allocate new runtime objects that we would then have to find

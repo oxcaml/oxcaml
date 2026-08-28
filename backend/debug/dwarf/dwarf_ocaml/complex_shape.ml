@@ -191,6 +191,7 @@ let translate_unboxed : S.Predef.unboxed -> RS.unboxed RS.Or_void.t = function
   | Unboxed_int8 -> Other Unboxed_int8
   | Unboxed_mask -> Other Unboxed_mask
   | Unboxed_simd svs -> Other (Unboxed_simd (translate_simd_vec_split svs))
+  | Unboxed_unit -> Void
 
 exception Layout_missing
 
