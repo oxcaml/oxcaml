@@ -128,15 +128,46 @@ the mode drives most of the differences between the two workflows:
 
 - **Agent mode** (`claude-review.yml`, has `prompt`): runs the prompt directly.
   Creates no tracking comment and does not pre-fetch the diff, which is why the
-  review workflow needs `gh pr diff`/`gh pr view` to read the PR and
+  review workflow relies on `gh pr diff`/`gh pr view` to read the PR and
   `gh pr comment` to post its summary -- capabilities tag mode provides for
-  free. Those are narrowly scoped subcommands riding the
-  `pull-requests: write` / `contents: read` grants already held; deliberately
-  not a general `Bash(gh:*)` (which would expose `gh api` to any endpoint).
+  free. Those ride the `pull-requests: write` / `contents: read` grants already
+  held (`gh` in the job authenticates with the workflow token, so it can do no
+  more than the token allows regardless of subcommand).
 
 In both modes the CI-reading tools (`mcp__github_ci__*`) mount only when they
 appear in `--allowedTools` *and* the workflow token passes the action's runtime
 `actions: read` probe.
+
+## The Bash allowlist is not a security boundary
+
+Both workflows grant unrestricted `Bash` (plus `WebFetch`/`WebSearch`) in
+`--allowedTools`. This is deliberate, and it does not weaken the model above,
+because the shell allowlist was never the boundary:
+
+- The earlier "tight" lists already contained `Bash(make:*)`, and tag mode runs
+  with `--permission-mode acceptEdits` (file edits inside the checkout). Write
+  a makefile, run `make`: arbitrary command execution was always reachable. A
+  scoped list is a guardrail against *accidents*, not against an adversarial
+  prompt injection.
+- The runner is ephemeral and holds nothing worth stealing: no static Anthropic
+  key (WIF, minutes-lived, spend-capped), no write-capable GitHub token (see
+  above), no Cachix auth token. Exfiltrating the tree is moot on a public repo,
+  and the runner has open egress for `curl` regardless of what we allowlist.
+- What an injection can do is unchanged: post comments as
+  `github-actions[bot]` and burn the capped Anthropic budget. It still cannot
+  push code, merge, approve, or mint credentials.
+
+What broad Bash buys: Claude can inspect sibling PRs and branches
+(`gh pr view/diff`, `git fetch origin pull/N/head`), execute the compiler it
+just built and its test programs, and inspect binaries (`readelf`,
+`llvm-dwarfdump`, `objdump`, `gdb`) -- all of which the scoped lists blocked in
+practice (review sessions on real PRs were unable to verify cross-PR fixes or
+re-run empirical checks).
+
+The one genuine capability the shell has that the `permissions:` block cannot
+govern is the Actions cache; see the cache-poisoning entry below. That
+exposure predates broad Bash (reachable via `make`) and is accepted with the
+same mitigations as before.
 
 ## `.claude/settings.json` cannot widen permissions in CI
 
@@ -183,9 +214,17 @@ grant each would need, as a checklist against accidental future widening:
   dependencies are substituted from the `oxcaml` Cachix cache over HTTPS,
   read-only (no auth token in these jobs). There is no `permissions:`-level way
   to drop cache-write unconditionally (cache access uses the runner's
-  `ACTIONS_RUNTIME_TOKEN`, outside the permissions system); we rely on "writes
-  no cache" plus GitHub's read-only-cache-token behavior for
-  untrusted/default-branch triggers.
+  `ACTIONS_RUNTIME_TOKEN`, outside the permissions system), so this one is a
+  *known residual risk* rather than an absent grant: a hostile session could in
+  principle drive the cache API directly, and `merlin.yml` restores-and-runs a
+  cached compiler build (`cache-flambda-backend-*-<sha>`), making a poisoned
+  entry consequential. This was already reachable when the allowlists were
+  scoped (`Bash(make:*)` + file edits = arbitrary execution) and is unchanged
+  by the broad-Bash grant. Mitigations: triggering requires a write-access
+  human on a non-fork PR (an actor who could more easily push the same
+  compromise as a commit), issue_comment-triggered runs execute on the default
+  branch's cache scope but keys embed a specific commit SHA, and GitHub issues
+  read-only cache tokens to untrusted triggers.
 
 ## The Cachix cache
 
