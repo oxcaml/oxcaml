@@ -499,6 +499,19 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
            Flambda2_reaper.Ltosol_format.Serialisable_solution.deserialise
              ltosol_solution))
   in
+  (* We expect the stamp counters in the .cmr file to be less than the counters
+     in the .ltosol file, because the -reaper-solve invocation begins by taking
+     the maximum counters across the .cmr files it reads. If they are greater,
+     the unit was recompiled after the solve, so the solution is stale. *)
+  if
+    not
+      (Flambda2_reaper.Id_stamp_counters.le cmr_id_stamp_counters
+         id_stamp_counters)
+  then
+    Misc.fatal_errorf
+      "%s was written after %s (its identifier stamp counters are greater), so \
+       the whole-program solution is stale: re-run -reaper-solve"
+      cmr_filename ltosol_filename;
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   (* Members of the batch whose rebuild has not started yet. Their .reaped.cmx
      files have not been written by this batch (any such file present on disk is
@@ -529,14 +542,24 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
       := Compilation_unit.Set.remove
            (Current_unit.get_cu_exn ())
            !pending_members;
-    (* We expect the stamp counters in the .cmr file to be less than the
-       counters in the .ltosol file, because the -reaper-solve invocation begins
-       by taking the maximum counters across the .cmr files it reads. Therefore,
-       we can ignore these counters. *)
-    let cmr_serialisable, (_ : Flambda2_reaper.Id_stamp_counters.t) =
+    let cmr_serialisable, cmr_id_stamp_counters =
       Profile.record_call ~accumulate:true "cmr_load" (fun () ->
           Flambda2_reaper.Cmr_format.load cmr_filename)
     in
+    (* We expect the stamp counters in the .cmr file to be less than the
+       counters in the .ltosol file, because the -reaper-solve invocation begins
+       by taking the maximum counters across the .cmr files it reads. If they
+       are greater, the unit was recompiled after the solve, so the solution is
+       stale. *)
+    if
+      not
+        (Flambda2_reaper.Id_stamp_counters.le cmr_id_stamp_counters
+           id_stamp_counters)
+    then
+      Misc.fatal_errorf
+        "%s was written after %s (its identifier stamp counters are greater), \
+         so the whole-program solution is stale: re-run -reaper-solve"
+        cmr_filename ltosol_filename;
     let { Flambda2_reaper.Cmr_format.unit_metadata;
           final_typing_env;
           all_code;

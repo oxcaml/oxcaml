@@ -49,6 +49,13 @@ let restore_for_resume
   Function_slot.restore_stamp_counter function_slots;
   Value_slot.restore_stamp_counter value_slots
 
+let le t1 t2 =
+  t1.variables <= t2.variables
+  && t1.code_ids <= t2.code_ids
+  && t1.continuations <= t2.continuations
+  && t1.function_slots <= t2.function_slots
+  && t1.value_slots <= t2.value_slots
+
 (* CR mvellacott: instead of taking the maximum, consider keeping separate
    per-unit stamp counters. *)
 let restore_for_merge all_counters =

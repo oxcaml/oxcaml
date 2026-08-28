@@ -42,3 +42,7 @@ val restore_for_resume : t -> unit
     units, setting each counter to its maximum value across all of the units.
     Like [restore_for_resume], can only be called once. *)
 val restore_for_merge : t list -> unit
+
+(** [le t1 t2] is true iff every counter in [t1] is less than or equal to its
+    counterpart in [t2]. *)
+val le : t -> t -> bool
