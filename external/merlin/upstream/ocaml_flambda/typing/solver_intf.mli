@@ -247,8 +247,11 @@ module type Solver_mono = sig
   (** The maximum mode in the lattice *)
   val max : 'a obj -> ('a, 'l * 'r) mode
 
-  (** The level of generic variables *)
+  (** The level of generic variables. *)
   val generic_level : int
+
+  (** The level of rigid variables used during subsumption. *)
+  val rigid_level : int
 
   (* CR-someday zqian: [zap_*] should take optional hint, pointing to the location in
      the source code where zapping happens *)
