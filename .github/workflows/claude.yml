@@ -193,9 +193,10 @@ jobs:
           # tightness was illusory). Broad Bash is what lets Claude inspect
           # sibling PRs (gh pr view/diff, git fetch), run the compiler it just
           # built, and use binary-inspection tools (readelf, llvm-dwarfdump,
-          # objdump) on this ephemeral runner. WebFetch/WebSearch likewise:
-          # the runner has open egress for curl anyway, so allowing the
-          # dedicated tools adds capability, not exposure.
+          # objdump) on this ephemeral runner. WebFetch/WebSearch are left out
+          # as policy: nothing here should need general web access, and not
+          # listing them avoids implying it was provided for a reason (curl
+          # existing anyway is incidental, not an endorsement).
           # The inline-comment entry is double duty -- the action only mounts
           # the inline-comment MCP server when this exact tool name appears in
           # --allowedTools, and it is what carries suggestion blocks. The
@@ -204,5 +205,5 @@ jobs:
           claude_args: |
             --model claude-fable-5
             --effort xhigh
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash,WebFetch,WebSearch"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash"
             --append-system-prompt "You do NOT have push access to this repository. Never attempt to create commits, branches, or pushes; they will fail. Propose all changes for humans to review and apply. For changes to lines that appear in the PR diff, post inline review comments containing GitHub suggestion blocks. For all other changes, including new files or lines outside the diff, mention you don't have write permission to the repo and instead include a complete unified diff in a fenced diff code block in your response comment, with paths relative to the repository root, so a maintainer can apply it with git apply."

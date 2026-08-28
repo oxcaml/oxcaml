@@ -140,9 +140,9 @@ appear in `--allowedTools` *and* the workflow token passes the action's runtime
 
 ## The Bash allowlist is not a security boundary
 
-Both workflows grant unrestricted `Bash` (plus `WebFetch`/`WebSearch`) in
-`--allowedTools`. This is deliberate, and it does not weaken the model above,
-because the shell allowlist was never the boundary:
+Both workflows grant unrestricted `Bash` in `--allowedTools`. This is
+deliberate, and it does not weaken the model above, because the shell
+allowlist was never the boundary:
 
 - The earlier "tight" lists already contained `Bash(make:*)`, and tag mode runs
   with `--permission-mode acceptEdits` (file edits inside the checkout). Write
