@@ -320,8 +320,7 @@ Line 2, characters 0-68:
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
-           value mod everything
-             non_float
+           value mod everything non_float
              with [< `A of string | `B of int ] t1
          because of the annotation on the declaration of the type t2.
 |}]
@@ -340,8 +339,7 @@ Line 2, characters 0-68:
 Error: The kind of type "t2" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of
-           value mod everything
-             non_float
+           value mod everything non_float
              with [> `A of string | `B of int ] t1
          because of the annotation on the declaration of the type t2.
 |}]
