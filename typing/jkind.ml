@@ -2169,14 +2169,6 @@ module Const = struct
         { sa with nullability = Nullability.meet sa.nullability axis }
       | Separability axis ->
         { sa with separability = Separability.meet sa.separability axis }
-
-    let annot_of_nullability_annot :
-        Nullability.t Location.loc option -> t Location.loc option =
-      Option.map (Location.map (fun x -> Nullability x))
-
-    let annot_of_separability_annot :
-        Separability.t Location.loc option -> t Location.loc option =
-      Option.map (Location.map (fun x -> Separability x))
   end
 
   module Kind_operator = struct
@@ -2200,22 +2192,14 @@ module Const = struct
       (Warnings.Redundant_kind_modifier
          (Format.asprintf "%a" Pprintast.jkind_annotation annotation))
 
-  let apply_scannable_axis ?prior_annot ~warn env
-      (axis : Scannable_axis.t Location.loc option) t =
+  let apply_scannable_axis env (axis : Scannable_axis.t option) t =
     match axis with
     | None -> t
-    | Some { txt = axis; loc } -> (
-      let update_sa sa =
-        let sa' = Scannable_axis.lower_axes sa axis in
-        (match prior_annot with
-        | Some prior_annot when warn && Scannable_axes.equal sa sa' ->
-          warn_redundant_kind_modifier ~loc prior_annot
-        | _ -> ());
-        sa'
-      in
+    | Some axis -> (
       let t = Base_and_axes.fully_expand_aliases_const env t in
       match t.base with
-      | Kconstr (p, sa, op) -> { t with base = Kconstr (p, update_sa sa, op) }
+      | Kconstr (p, sa, op) ->
+        { t with base = Kconstr (p, Scannable_axis.lower_axes sa axis, op) }
       | Layout layout -> (
         match Layout.Const.get_root_scannable_axes layout with
         | None -> t
@@ -2223,38 +2207,33 @@ module Const = struct
           { t with
             base =
               Layout
-                (Layout.Const.set_root_scannable_axes layout (update_sa sa))
+                (Layout.Const.set_root_scannable_axes layout
+                   (Scannable_axis.lower_axes sa axis))
           }))
 
-  let apply_addressable ?prior_annot ~warn ~loc env t =
+  let apply_addressable env t =
     let t = Base_and_axes.fully_expand_aliases_const env t in
     match t.base with
     | Layout layout ->
-      (match prior_annot with
-      | Some prior_annot when warn && Layout.Const.is_surely_addressable layout
-        ->
-        warn_redundant_kind_modifier ~loc prior_annot
-      | _ -> ());
       { t with base = Layout (Layout.Const.addressable layout) }
-    | Kconstr (p, sa, op) ->
-      (match op, prior_annot with
-      | Addressable, Some prior_annot when warn ->
-        warn_redundant_kind_modifier ~loc prior_annot
-      | (Id | Addressable), _ -> ());
+    | Kconstr (p, sa, _) ->
       { t with base = Kconstr (p, sa, Jkind_types.Kind_operator.Addressable) }
 
-  let warn_ignored_kind_modifier ~loc env base base_jkind sa_annot =
-    if
-      sa_annot <> []
-      &&
-      match get_layout_result env base_jkind with
-      | Ok layout -> not (Layout.Const.is_scannable_or_any layout)
-      | Error _ -> false
-    then
-      Location.prerr_warning loc
-        (Warnings.Ignored_kind_modifier
-           ( Format.asprintf "%a" Pprintast.jkind_annotation base,
-             List.map Location.get_txt sa_annot ))
+  let warn_ignored_kind_modifier ~loc modifier base =
+    Location.prerr_warning loc
+      (Warnings.Ignored_kind_modifier
+         (modifier, Format.asprintf "%a" Pprintast.jkind_annotation base))
+
+  (* Both arguments must be fully expanded. *)
+  let equal_ignoring_with_bounds t t' =
+    (match t.base, t'.base with
+      | Layout l, Layout l' -> Layout.Const.equal l l'
+      | Kconstr (p, sa, op), Kconstr (p', sa', op') ->
+        Path.same p p'
+        && Scannable_axes.equal sa sa'
+        && Jkind_types.Kind_operator.equal op op'
+      | (Layout _ | Kconstr _), _ -> false)
+    && Mod_bounds.equal t.mod_bounds t'.mod_bounds
 
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
@@ -2329,10 +2308,14 @@ module Const = struct
       { base = base.base; mod_bounds; with_bounds = No_with_bounds }
       (* For scannable axes in mod bounds, we do not print redundancy warnings,
          as scannable axes in mod bounds will be deprecated anyway *)
-      |> apply_scannable_axis ~warn env
-           (Scannable_axis.annot_of_nullability_annot nullability)
-      |> apply_scannable_axis ~warn env
-           (Scannable_axis.annot_of_separability_annot separability)
+      |> apply_scannable_axis env
+           (Option.map
+              (fun (a : _ Location.loc) -> Scannable_axis.Nullability a.txt)
+              nullability)
+      |> apply_scannable_axis env
+           (Option.map
+              (fun (a : _ Location.loc) -> Scannable_axis.Separability a.txt)
+              separability)
     | Pjk_operator (base, op_annot) ->
       let base_jkind =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
@@ -2341,31 +2324,28 @@ module Const = struct
       let ops =
         List.map (fun name -> name, transl_kind_operator name) op_annot
       in
-      (if warn
-       then
-         let sa_annot =
-           List.filter_map
-             (fun (name, (op : Kind_operator.t Location.loc)) ->
-               match op.txt with
-               | Kind_operator.Scannable_axis _ -> Some name
-               | Kind_operator.Addressable -> None)
-             ops
-         in
-         warn_ignored_kind_modifier ~loc env base base_jkind sa_annot);
       let jkind, _ =
         List.fold_left
-          (fun (jkind, rev_ops) ((name : string Location.loc), op) ->
-            let jkind =
-              match (op : Kind_operator.t Location.loc) with
-              | { txt = Scannable_axis axis; loc } ->
-                apply_scannable_axis ~prior_annot:(base, rev_ops) ~warn env
-                  (Some (Location.mkloc axis loc))
-                  jkind
-              | { txt = Addressable; loc } ->
-                apply_addressable ~prior_annot:(base, rev_ops) ~warn ~loc env
-                  jkind
+          (fun (jkind, rev_ops)
+               ( (name : string Location.loc),
+                 (op : Kind_operator.t Location.loc) ) ->
+            let jkind = Base_and_axes.fully_expand_aliases_const env jkind in
+            let jkind' =
+              match op.txt with
+              | Scannable_axis axis ->
+                apply_scannable_axis env (Some axis) jkind
+              | Addressable -> apply_addressable env jkind
             in
-            jkind, name :: rev_ops)
+            (* Operators never change the with-bounds *)
+            (if warn && equal_ignoring_with_bounds jkind jkind'
+             then
+               match op.txt, jkind.base with
+               | Scannable_axis _, Layout l
+                 when Option.is_none (Layout.Const.get_root_scannable_axes l) ->
+                 warn_ignored_kind_modifier ~loc:op.loc name.txt base
+               | (Scannable_axis _ | Addressable), _ ->
+                 warn_redundant_kind_modifier ~loc:op.loc (base, rev_ops));
+            jkind', name :: rev_ops)
           (base_jkind, []) ops
       in
       jkind
