@@ -200,7 +200,7 @@ let set_locality_scope units = locality_scope := Some units
 
 let unit_is_in_locality_scope compilation_unit =
   match !locality_scope with
-  | None -> Compilation_unit.is_current compilation_unit
+  | None -> Current_unit.is_current compilation_unit
   | Some units -> Compilation_unit.Set.mem compilation_unit units
 
 let is_local f =

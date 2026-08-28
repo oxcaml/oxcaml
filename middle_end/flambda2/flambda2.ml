@@ -132,15 +132,7 @@ let build_run_result unit ~free_names ~final_typing_env ~extra_static_roots
       Exported_code.find_exn all_code code_id |> Code_or_metadata.code_metadata
     in
     Slot_offsets.finalize_offsets slot_offsets ~get_code_metadata ~used_slots
-      ~offsets_from_previous_assignment:
-        (Option.value offsets_from_paused_process
-           ~default:Exported_offsets.empty)
-  in
-  let exported_offsets =
-    match offsets_from_paused_process with
-    | None -> exported_offsets
-    | Some paused_offsets ->
-      Exported_offsets.union_prefer_live exported_offsets paused_offsets
+      ~offsets_from_previous_assignment:Exported_offsets.empty
   in
   let reachable_names, cmx =
     Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
@@ -500,19 +492,6 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
            Flambda2_reaper.Ltosol_format.Serialisable_solution.deserialise
              ltosol_solution))
   in
-  (* We expect the stamp counters in the .cmr file to be less than the counters
-     in the .ltosol file, because the -reaper-solve invocation begins by taking
-     the maximum counters across the .cmr files it reads. If they are greater,
-     the unit was recompiled after the solve, so the solution is stale. *)
-  if
-    not
-      (Flambda2_reaper.Id_stamp_counters.le cmr_id_stamp_counters
-         id_stamp_counters)
-  then
-    Misc.fatal_errorf
-      "%s was written after %s (its identifier stamp counters are greater), so \
-       the whole-program solution is stale: re-run -reaper-solve"
-      cmr_filename ltosol_filename;
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   (* Members of the batch whose rebuild has not started yet. Their .reaped.cmx
      files have not been written by this batch (any such file present on disk is
@@ -625,8 +604,8 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
           used_value_slots = _;
           reachable_names
         } =
-      build_run_result flambda ~free_names ~final_typing_env
-        ~extra_static_roots ~extra_used_value_slots
+      build_run_result flambda ~free_names ~final_typing_env ~extra_static_roots
+        ~extra_used_value_slots
         ~extra_used_function_slots
           (* Pass a mutable reference to the (currently empty) list of .cmx
              sections so that [build_run_result] can append the sections that it
@@ -636,6 +615,5 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
     in
     Option.iter Compilenv.set_export_info cmx;
     Compiler_hooks.execute Reaped_flambda2 flambda;
-    flambda_result_to_cmm ~keep_symbol_tables
-      ~localise_unreachable_symbols:true
+    flambda_result_to_cmm ~keep_symbol_tables ~localise_unreachable_symbols:true
       { flambda; all_code; offsets; reachable_names }
