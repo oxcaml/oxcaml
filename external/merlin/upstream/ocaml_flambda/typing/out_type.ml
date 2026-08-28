@@ -1013,7 +1013,7 @@ let const_or_generic_upper : const_or_generic -> Alloc.Const.t = function
     arrow. *)
 let curry_acc : const_or_generic -> Alloc.lr -> const_or_generic =
   fun acc marg ->
-    match acc, Alloc.zap_to_legacy marg with
+    match acc, Alloc.zap_to_legacy ~arg:true marg with
     | Const acc, Some arg -> Const (Ctype.curry_mode_const acc arg)
     | Generic (acc, bound), _ ->
       Generic
@@ -1029,13 +1029,14 @@ let curry_acc : const_or_generic -> Alloc.lr -> const_or_generic =
            Ctype.curry_mode_const acc (Alloc.Guts.get_ceil marg))
       else
         Const
-          (Ctype.curry_mode_const acc (Alloc.zap_to_legacy_force marg))
+          (Ctype.curry_mode_const acc
+             (Alloc.zap_to_legacy_force ~arg:true marg))
 
 (** The view of a mode occurrence [m]; zaps [m] when it has to be a
     constant. *)
-let const_or_generic_of_mode : Alloc.lr -> const_or_generic =
-  fun m ->
-    match Alloc.zap_to_legacy m with
+let const_or_generic_of_mode : arg:bool -> Alloc.lr -> const_or_generic =
+  fun ~arg m ->
+    match Alloc.zap_to_legacy ~arg m with
     | Some c -> Const c
     | None ->
       if mode_polymorphism_printing_enabled ()
@@ -1043,7 +1044,7 @@ let const_or_generic_of_mode : Alloc.lr -> const_or_generic =
         Generic
           (Alloc.Comonadic.disallow_right m.comonadic,
            Alloc.Guts.get_ceil m)
-      else Const (Alloc.zap_to_legacy_force m)
+      else Const (Alloc.zap_to_legacy_force ~arg m)
 
 (** Whether the return mode [m] of an arrow agrees with the constant
     content of [acc_mode]. Mutating when [m] must be zapped: [m] is equated
@@ -1394,7 +1395,7 @@ end = struct
       let tty = Transient_expr.repr ty in
       match tty.desc with
       | Tarrow ((_l, marg, mret), ty1, ty2, _) ->
-        zap_non_generic_modes (const_or_generic_of_mode marg) ty1;
+        zap_non_generic_modes (const_or_generic_of_mode ~arg:true marg) ty1;
         let acc_mode = curry_acc acc_mode marg in
         equate_curry acc_mode mret ty2
       | Tpoly (ty, []) | Trepr (ty, []) ->
@@ -1411,7 +1412,7 @@ end = struct
       | Tarrow _ when equate_with_curry_bounds mret acc_mode ->
           zap_non_generic_modes acc_mode ty
       | _ ->
-        zap_non_generic_modes (const_or_generic_of_mode mret) ty
+        zap_non_generic_modes (const_or_generic_of_mode ~arg:false mret) ty
 
   let zap_non_generic_modes ty =
     zap_non_generic_modes (Const Alloc.Const.legacy) ty
@@ -2639,13 +2640,8 @@ let rec tree_of_modal_typexp mode modal ty =
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
-<<<<<<< HEAD
-        let mode = Alloc.zap_to_legacy ~arg:false mode in
-        Otyp_ret (Orm_any (tree_of_modes mode), tree)
-=======
-        let acc = const_or_generic_of_mode mode in
+        let acc = const_or_generic_of_mode ~arg:false mode in
         Otyp_ret (Orm_any (tree_of_modes mode acc), tree)
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
     | Other _ -> tree
   in
   let ty =
@@ -2674,11 +2670,7 @@ let rec tree_of_modal_typexp mode modal ty =
            don't print anything for those axes, since user would interpret that
            as legacy. The best we can do is to zap to legacy and if they do land
            at legacy, we will be able to omit printing them. *)
-<<<<<<< HEAD
-        let arg_mode = Alloc.zap_to_legacy ~arg:true marg in
-=======
-        let arg_acc = const_or_generic_of_mode marg in
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
+        let arg_acc = const_or_generic_of_mode ~arg:true marg in
         let t1 =
           if is_optional l then
             match
@@ -2949,23 +2941,13 @@ and tree_of_ret_typ_mutating (acc_mode : const_or_generic) m ty=
       end else begin
         (* In this branch we need to print parens. [m] might have undetermined
         axes and we adopt a similar logic to the [marg] above. *)
-<<<<<<< HEAD
-        let m = Alloc.zap_to_legacy ~arg:false m in
-        (Orm_parens (tree_of_modes m), m)
-=======
-        let acc_mode = const_or_generic_of_mode m in
+        let acc_mode = const_or_generic_of_mode ~arg:false m in
         (Orm_parens (tree_of_modes m acc_mode), acc_mode)
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
       end
     end
   | _ ->
-<<<<<<< HEAD
-    let m = Alloc.zap_to_legacy ~arg:false m in
-    (Orm_any (tree_of_modes m), m)
-=======
-    let acc_mode = const_or_generic_of_mode m in
+    let acc_mode = const_or_generic_of_mode ~arg:false m in
     (Orm_any (tree_of_modes m acc_mode), acc_mode)
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
 
 and tree_of_typobject_repr fi =
   let (fields, rest) = flatten_fields fi in
@@ -3956,13 +3938,9 @@ let rec tree_of_modtype ?abbrev = function
         tree_of_functor_parameter ?abbrev param
       in
       let res = wrap_env env (tree_of_modtype ?abbrev) ty_res in
-<<<<<<< HEAD
       let mres =
-        m_res |> Mode.Alloc.zap_to_legacy ~arg:false |> tree_of_modes
+        m_res |> Alloc.zap_to_legacy_exn ~arg:false |> tree_of_modes_const
       in
-=======
-      let mres = m_res |> Alloc.zap_to_legacy_exn |> tree_of_modes_const in
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
       Omty_functor (param, res, mres))
   | Mty_alias p ->
       Omty_alias (tree_of_path (Some Module) p)
@@ -3991,13 +3969,9 @@ and tree_of_functor_parameter ?abbrev = function
             Some (Ident.name id),
             fun k -> Env.add_module ~arg:true id Mp_present ty_arg k
       in
-<<<<<<< HEAD
       let marg =
-        m_arg |> Mode.Alloc.zap_to_legacy ~arg:true |> tree_of_modes
+        m_arg |> Alloc.zap_to_legacy_exn ~arg:true |> tree_of_modes_const
       in
-=======
-      let marg = m_arg |> Alloc.zap_to_legacy_exn |> tree_of_modes_const in
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
       Some (name, tree_of_modtype ?abbrev ty_arg, marg), env
 
 and tree_of_signature ?abbrev = function

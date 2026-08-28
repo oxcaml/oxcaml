@@ -749,18 +749,13 @@ let remove_mode_and_jkind_variables ~zap_scope ty =
       | Tvar { jkind } -> Jkind.default_to_scannable jkind
       | Tunivar { jkind } -> Jkind.default_to_scannable jkind
       | Tarrow ((_,marg,mret),targ,tret,_) ->
-<<<<<<< HEAD
-         let _ = Alloc.zap_to_legacy ~arg:true marg in
-         let _ = Alloc.zap_to_legacy ~arg:false mret in
-=======
          if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
-          Alloc.add_mode_to_zap_scope marg zap_scope;
-          Alloc.add_mode_to_zap_scope mret zap_scope
+          Alloc.add_mode_to_zap_scope ~arg:true marg zap_scope;
+          Alloc.add_mode_to_zap_scope ~arg:false mret zap_scope
          end else begin
-          Alloc.zap_to_legacy_force marg |> ignore;
-          Alloc.zap_to_legacy_force mret |> ignore
+          Alloc.zap_to_legacy_force ~arg:true marg |> ignore;
+          Alloc.zap_to_legacy_force ~arg:false mret |> ignore
          end;
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
          go targ; go tret
       | _ -> iter_type_expr go (Fun.const ()) ty
     end

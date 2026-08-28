@@ -2844,24 +2844,17 @@ let check_nongen_signature env sg =
 
 let remove_functor_mode_variables ~zap_scope = function
   | Mty_functor (arg_opt, _, mres) ->
-<<<<<<< HEAD
-      Mode.Alloc.zap_to_legacy ~arg:false mres |> ignore;
-      begin match arg_opt with
-      | Unit -> ()
-      | Named (_, _, marg) -> Mode.Alloc.zap_to_legacy ~arg:true marg |> ignore
-=======
-      let zap_mode mode =
+      let zap_mode ~arg mode =
         if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
-          Alloc.add_mode_to_zap_scope mode zap_scope
+          Alloc.add_mode_to_zap_scope ~arg mode zap_scope
          end else begin
-          Alloc.zap_to_legacy_force mode |> ignore
+          Alloc.zap_to_legacy_force ~arg mode |> ignore
          end
       in
-      zap_mode mres;
+      zap_mode ~arg:false mres;
       begin match arg_opt with
       | Unit -> ()
-      | Named (_, _, marg) -> zap_mode marg
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
+      | Named (_, _, marg) -> zap_mode ~arg:true marg
       end
   | _ -> ()
 

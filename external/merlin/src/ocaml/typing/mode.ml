@@ -5982,26 +5982,18 @@ module Portability = struct
 
   let legacy = of_const Const.legacy
 
-<<<<<<< HEAD
-  let zap_to_ceil_clamped c m =
+  let zap_to_ceil_clamped_force ?commit c m =
     (match submode m (of_const c) with Ok () | Error _ -> ());
-    zap_to_ceil m
+    zap_to_ceil_force ?commit m
 
-  let zap_to_legacy ~statefulness m =
+  let zap_to_legacy_force ?commit ~statefulness m =
     match statefulness with
-    | Statefulness.Const.Stateful -> zap_to_ceil m
-    | Statefulness.Const.Reading -> zap_to_ceil_clamped Const.Shareable m
-    | Statefulness.Const.Writing -> zap_to_ceil_clamped Const.Corruptible m
-    | Statefulness.Const.Stateless -> zap_to_floor m
-=======
-  (* CR dkalinichenko: ideally, [reading] should zap to [shareable]. *)
-  let zap_to_legacy_force ~statefulness =
-    match statefulness with
-    | Statefulness.Const.Stateful | Statefulness.Const.Reading
+    | Statefulness.Const.Stateful -> zap_to_ceil_force ?commit m
+    | Statefulness.Const.Reading ->
+      zap_to_ceil_clamped_force ?commit Const.Shareable m
     | Statefulness.Const.Writing ->
-      zap_to_ceil_force
-    | Statefulness.Const.Stateless -> zap_to_floor_force
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
+      zap_to_ceil_clamped_force ?commit Const.Corruptible m
+    | Statefulness.Const.Stateless -> zap_to_floor_force ?commit m
 end
 
 module Uniqueness = struct
@@ -6037,28 +6029,22 @@ module Contention = struct
 
   let legacy = of_const Const.legacy
 
-<<<<<<< HEAD
-  let zap_to_floor_clamped c m =
+  let zap_to_floor_clamped_force ?commit c m =
     (match submode (of_const c) m with Ok () | Error _ -> ());
-    zap_to_floor m
+    zap_to_floor_force ?commit m
 
-  let zap_to_legacy ~visibility ~arg m =
-=======
-  (* CR dkalinichenko: ideally, [read] should zap to [shared]. *)
-  let zap_to_legacy_force ~visibility =
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
+  let zap_to_legacy_force ?commit ~visibility ~arg m =
     match visibility with
-    | Visibility.Const.Read_write -> zap_to_floor m
-    | Visibility.Const.Immutable -> zap_to_ceil m
+    | Visibility.Const.Read_write -> zap_to_floor_force ?commit m
+    | Visibility.Const.Immutable -> zap_to_ceil_force ?commit m
     | Visibility.Const.Read ->
-      if arg then zap_to_floor_clamped Const.Shared m else zap_to_floor m
+      if arg
+      then zap_to_floor_clamped_force ?commit Const.Shared m
+      else zap_to_floor_force ?commit m
     | Visibility.Const.Write ->
-<<<<<<< HEAD
-      if arg then zap_to_floor_clamped Const.Corrupted m else zap_to_floor m
-=======
-      zap_to_floor_force
-    | Visibility.Const.Immutable -> zap_to_ceil_force
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
+      if arg
+      then zap_to_floor_clamped_force ?commit Const.Corrupted m
+      else zap_to_floor_force ?commit m
 end
 
 module Forkable = struct
@@ -6080,8 +6066,10 @@ module Forkable = struct
 
   (* [forkable] is the default for [global]s and [unforkable] for [local]
      or [regional] values, so we vary [zap_to_legacy_force] accordingly. *)
-  let zap_to_legacy_force ~global =
-    match global with true -> zap_to_floor_force | false -> zap_to_ceil_force
+  let zap_to_legacy_force ?commit ~global =
+    match global with
+    | true -> zap_to_floor_force ?commit
+    | false -> zap_to_ceil_force ?commit
 end
 
 module Yielding = struct
@@ -6103,8 +6091,10 @@ module Yielding = struct
 
   (* [unyielding] is the default for [global]s and [yielding] for [local]
      or [regional] values, so we vary [zap_to_legacy_force] accordingly. *)
-  let zap_to_legacy_force ~global =
-    match global with true -> zap_to_floor_force | false -> zap_to_ceil_force
+  let zap_to_legacy_force ?commit ~global =
+    match global with
+    | true -> zap_to_floor_force ?commit
+    | false -> zap_to_ceil_force ?commit
 end
 
 module Staticity = struct
@@ -6407,23 +6397,16 @@ module Monadic = struct
   let min_with ax m =
     S.apply ~hint:Skip Obj.obj (Max_with_simple (ax, Id)) (S.disallow_left m)
 
-<<<<<<< HEAD
-  let zap_to_legacy ~arg m : Const.t =
-    let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
-    let visibility = proj Visibility m |> Visibility.zap_to_legacy in
-    let contention =
-      proj Contention m |> Contention.zap_to_legacy ~visibility ~arg
-=======
-  let zap_to_legacy_force ?commit m : Const.t =
+  let zap_to_legacy_force ?commit ~arg m : Const.t =
     let uniqueness =
       proj Uniqueness m |> Uniqueness.zap_to_legacy_force ?commit
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
     in
     let visibility =
       proj Visibility m |> Visibility.zap_to_legacy_force ?commit
     in
     let contention =
-      proj Contention m |> Contention.zap_to_legacy_force ?commit ~visibility
+      proj Contention m
+      |> Contention.zap_to_legacy_force ?commit ~visibility ~arg
     in
     let staticity = proj Staticity m |> Staticity.zap_to_legacy_force ?commit in
     { uniqueness; contention; visibility; staticity }
@@ -7255,11 +7238,6 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.zap_to_floor_force comonadic in
     merge { monadic; comonadic }
 
-<<<<<<< HEAD
-  let zap_to_legacy ~arg { comonadic; monadic } =
-    let monadic = Monadic.zap_to_legacy ~arg monadic in
-    let comonadic = Comonadic.zap_to_legacy comonadic in
-=======
   let zap_to_ceil_exn m =
     if check_generic m then raise Cannot_zap_generic;
     zap_to_ceil_force m
@@ -7274,18 +7252,17 @@ module Value_with (Areality : Areality) = struct
   let zap_to_ceil m =
     if check_generic m then None else Some (zap_to_ceil_force m)
 
-  let zap_to_legacy_force ?commit { comonadic; monadic } =
-    let monadic = Monadic.zap_to_legacy_force ?commit monadic in
+  let zap_to_legacy_force ?commit ~arg { comonadic; monadic } =
+    let monadic = Monadic.zap_to_legacy_force ?commit ~arg monadic in
     let comonadic = Comonadic.zap_to_legacy_force ?commit comonadic in
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
     merge { monadic; comonadic }
 
-  let zap_to_legacy_exn m =
+  let zap_to_legacy_exn ~arg m =
     if check_generic m then raise Cannot_zap_generic;
-    zap_to_legacy_force m
+    zap_to_legacy_force ~arg m
 
-  let zap_to_legacy m =
-    if check_generic m then None else Some (zap_to_legacy_force m)
+  let zap_to_legacy ~arg m =
+    if check_generic m then None else Some (zap_to_legacy_force ~arg m)
 
   let zap_to_legacy_obj : type a.
       a C.obj -> (a, allowed * allowed) S.mode -> unit =
@@ -7298,7 +7275,7 @@ module Value_with (Areality : Areality) = struct
     | Linearity -> Linearity.zap_to_legacy_force mode |> ignore
     | Statefulness -> Statefulness.zap_to_legacy_force mode |> ignore
     | Staticity_op -> Staticity.zap_to_legacy_force mode |> ignore
-    | Monadic_op -> Monadic.zap_to_legacy_force mode |> ignore
+    | Monadic_op -> Monadic.zap_to_legacy_force ~arg:false mode |> ignore
     | Comonadic_with_regionality ->
       let module M = Comonadic_with (Regionality) in
       M.zap_to_legacy_force mode |> ignore
@@ -7310,7 +7287,8 @@ module Value_with (Areality : Areality) = struct
         mode
       |> ignore
     | Contention_op ->
-      Contention.zap_to_legacy_force ~visibility:Visibility.Const.legacy mode
+      Contention.zap_to_legacy_force ~visibility:Visibility.Const.legacy
+        ~arg:false mode
       |> ignore
     | Forkable -> Forkable.zap_to_legacy_force ~global:true mode |> ignore
     | Yielding -> Yielding.zap_to_legacy_force ~global:true mode |> ignore
@@ -7437,7 +7415,7 @@ module Value_with (Areality : Areality) = struct
 
   type zap_scope =
     { variables : Z.zap_scope;
-      visible : (allowed * allowed) t list ref
+      visible : (bool * (allowed * allowed) t) list ref
     }
 
   let add_covariant_to_zap_scope { monadic; comonadic } scope =
@@ -7476,11 +7454,11 @@ module Value_with (Areality : Areality) = struct
             (Z.Pco (Comonadic.meet [comonadic_upper; m]))
             scope)
 
-  let add_mode_to_zap_scope m { visible } = visible := m :: !visible
+  let add_mode_to_zap_scope ~arg m { visible } = visible := (arg, m) :: !visible
 
   let resolve_zap_scope { variables; visible } =
     (* we first zap all visible non generic modes to legacy *)
-    List.iter (fun m -> zap_to_legacy m |> ignore) !visible;
+    List.iter (fun (arg, m) -> zap_to_legacy ~arg m |> ignore) !visible;
     (* we then iterate over the children of visible generic modes and zap level 0
     according to the following rules:
     1) if a mode appears only as an upper bound to generic modes, it is zapped to
@@ -7489,7 +7467,7 @@ module Value_with (Areality : Areality) = struct
       floor
     3) if it appears as both, it is zapped to legacy *)
     List.iter
-      (fun m ->
+      (fun (_, m) ->
         if check_generic m
         then begin
           add_covariant_to_zap_scope m variables;

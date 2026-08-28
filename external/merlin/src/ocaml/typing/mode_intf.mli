@@ -975,9 +975,21 @@ module type S = sig
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
-<<<<<<< HEAD
-    (** [arg] determines co-/contravariance, and is used to infer the most
-        general mode for implied middle values on monadic axes.\
+    (** Registers a mode in the scope, to be zapped to legacy when the scope is
+        resolved. See [zap_to_legacy] for an explanation of [arg]. *)
+    val add_mode_to_zap_scope :
+      arg:bool -> (allowed * allowed) t -> zap_scope -> unit
+
+    (** Zaps non-generic variables to legacy, raises a [Cannot_zap_generic]
+        exception if a variable is generic. See [zap_to_legacy] for an
+        explanation of [arg]. *)
+    val zap_to_legacy_exn : arg:bool -> lr -> Const.t
+
+    (** Zaps non-generic variables to legacy, returns [None] if a variable is
+        generic.
+
+        [arg] determines co-/contravariance, and is used to infer the most
+        general mode for implied middle values on monadic axes.
 
         Consider:
 
@@ -988,22 +1000,17 @@ module type S = sig
           (* Implies [read uncontended]. *)
           let zap_ret_read x : _ @ read = ()
         ]} *)
-    val zap_to_legacy : arg:bool -> lr -> Const.t
-=======
-    val add_mode_to_zap_scope : (allowed * allowed) t -> zap_scope -> unit
+    val zap_to_legacy : arg:bool -> lr -> Const.t option
 
-    val zap_to_legacy_exn : lr -> Const.t
-
-    val zap_to_legacy : lr -> Const.t option
-
-    val zap_to_legacy_force : ?commit:bool -> lr -> Const.t
+    (** Zaps all variables to legacy (including generic variables): use with
+        caution. See [zap_to_legacy] for an explanation of [arg]. *)
+    val zap_to_legacy_force : ?commit:bool -> arg:bool -> lr -> Const.t
 
     val zap_to_floor_force : (allowed * 'r) t -> Const.t
 
     val zap_to_ceil_exn : ('l * allowed) t -> Const.t
 
     val zap_to_floor_exn : (allowed * 'r) t -> Const.t
->>>>>>> 40e321c276 (Automated commit: Import compiler changes from e43e14fad80a80d291f5f27d80f32aa708ce98b4)
 
     val comonadic_to_monadic_min :
       ?hint:('r * disallowed) neg Hint.morph ->
