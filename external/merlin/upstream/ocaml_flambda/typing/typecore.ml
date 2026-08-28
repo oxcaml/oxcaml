@@ -306,7 +306,7 @@ type error =
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
   | Mode_mismatch of mode_mismatch_kind * Alloc.equate_error
-  | Uncurried_function_escapes of Alloc.error
+  | Uncurried_function_escapes_comonadic of Alloc.Comonadic.error
   | Function_returns_local
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
@@ -1190,13 +1190,15 @@ let has_poly_constraint spat =
     end
   | _ -> false
 
-(** Mode cross a mode whose monadic fragment is a right mode, and whose comonadic
-    fragment is a left mode. *)
-let alloc_mode_cross_to_max_min env ty { monadic; comonadic } =
+(** Mode cross a right monadic mode fragment *)
+let alloc_monadic_mode_cross_to_min (crossing : Crossing.t) monadic =
   let monadic = Alloc.Monadic.disallow_left monadic in
+  Crossing.Monadic.apply_right_alloc crossing.monadic monadic
+
+(** Mode cross a left comonadic mode fragment *)
+let alloc_comonadic_mode_cross_to_max (crossing : Crossing.t) comonadic =
   let comonadic = Alloc.Comonadic.disallow_right comonadic in
-  let crossing = crossing_of_ty env ty in
-  Crossing.apply_left_right_alloc crossing { monadic; comonadic }
+  Crossing.Comonadic.apply_left_alloc crossing.comonadic comonadic
 
 (** Mode cross a right mode *)
 (* This is very similar to Ctype.mode_cross_right. Any bugs here are likely bugs
@@ -4793,7 +4795,7 @@ let check_curried_application_complete ~env ~app_loc args =
           raise (Error(loc, env, Curried_application_complete (lbl, e, loc_kind)))
       in
       submode (Alloc.partial_apply mode_fun) mode_ret;
-      submode (Alloc.close_over mode_arg) mode_ret;
+      submode (Alloc.partial_apply mode_arg) mode_ret;
       loop has_commuted rest
   in
   loop false args
@@ -6289,7 +6291,8 @@ type split_function_ty =
        needs to be a right mode for making sure
        arguments generate a lower bound for subsequent closures.
        [alloc_mode] tracks the locality component to store in the Typedtree. *)
-    closure_mode: Mode.Alloc.lr;
+    closure_mode: Mode.Alloc.Comonadic.lr;
+    env_mode: Mode.Alloc.Monadic.r;
     alloc_mode: Locality.lr;
     really_poly: bool
   }
@@ -6380,7 +6383,14 @@ let split_function_ty
       end
     end
   in
-  let arg_value_mode = alloc_to_value_l2r arg_mode in
+  let env_monadic =
+    if is_final_val_param
+    then arg_mode.monadic
+    else fst (Alloc.Monadic.newvar_above arg_mode.monadic)
+  in
+  let arg_value_mode =
+    alloc_to_value_l2r { arg_mode with monadic = env_monadic }
+  in
   let expected_pat_mode = simple_pat_mode arg_value_mode in
   let type_sort ~why ty =
     match Ctype.type_sort ~why ~fixed:false env ty with
@@ -6391,9 +6401,9 @@ let split_function_ty
   let ret_sort = type_sort ~why:Function_result ty_ret in
   env,
   { filtered_arrow; arg_sort; ret_sort;
-    alloc_mode; closure_mode; ty_arg_mono;
+    alloc_mode; closure_mode=closure_mode.comonadic; ty_arg_mono;
     expected_inner_mode; expected_pat_mode;
-    really_poly
+    really_poly; env_mode=(Alloc.Monadic.disallow_left env_monadic)
   }
 
 type type_function_result_param =
@@ -6404,7 +6414,7 @@ type type_function_result_param =
 
 type fun_alloc_mode =
   { alloc_mode: Locality.lr;
-    fun_closure_mode: Mode.Alloc.lr;
+    fun_closure_mode: Mode.Alloc.Comonadic.lr;
   }
 
 module Calling_convention_sort : sig
@@ -9445,7 +9455,7 @@ and type_function
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
             arg_sort; ret_sort;
             ty_arg_mono; expected_pat_mode; expected_inner_mode;
-            alloc_mode; closure_mode; really_poly
+            alloc_mode; closure_mode; really_poly; env_mode
           } =
         split_function_ty env expected_mode ty_expected loc
           ~is_first_val_param:first ~is_final_val_param
@@ -9534,22 +9544,41 @@ and type_function
                      uses the [arg_mode.comonadic] as a left mode, and
                      [arg_mode.monadic] as a right mode, hence they need to be
                      mode-crossed differently. *)
-                  let arg_mode = alloc_mode_cross_to_max_min env ty_arg arg_mode in
+                  let crossing = crossing_of_ty env ty_arg in
+                  let arg_mode =
+                    alloc_comonadic_mode_cross_to_max crossing
+                      arg_mode.comonadic
+                  in
+                  let env_mode =
+                    alloc_monadic_mode_cross_to_min crossing env_mode
+                  in
+                  let cls_details : Mode.Hint.closure_details =
+                    { closure = (loc, Function);
+                      closed = (pparam_loc, Pattern) }
+                  in
+                  let hint : _ Hint.morph =
+                    Is_closed_by (Monadic, cls_details)
+                  in
+                  Alloc.Monadic.submode_err (pparam_loc, Pattern)
+                    (Alloc.comonadic_to_monadic_min ~hint fun_closure_mode)
+                    env_mode;
                   begin match
-                    Alloc.submode (Alloc.close_over arg_mode) fun_closure_mode
+                    Alloc.Comonadic.submode arg_mode fun_closure_mode
                   with
                     | Ok () -> ()
                     | Error e ->
-                      raise (Error(loc_fun, env, Uncurried_function_escapes e))
+                      raise (Error(loc_fun, env,
+                        Uncurried_function_escapes_comonadic e))
                   end;
                   begin match
-                    Alloc.submode
-                      (Alloc.partial_apply closure_mode)
+                    Alloc.Comonadic.submode
+                      (Alloc.Comonadic.disallow_right closure_mode)
                       fun_closure_mode
                   with
                     | Ok () -> ()
                     | Error e ->
-                      raise (Error(loc_fun, env, Uncurried_function_escapes e))
+                      raise (Error(loc_fun, env,
+                        Uncurried_function_escapes_comonadic e))
                   end;
                   More_args
                     { partial_mode =
@@ -12104,8 +12133,8 @@ and type_n_ary_function
     in
     let yielding =
       Yielding.join
-        (Alloc.proj_comonadic Yielding
-           (Alloc.disallow_right fun_alloc_mode.fun_closure_mode)
+        (Alloc.Comonadic.proj Yielding
+           (Alloc.Comonadic.disallow_right fun_alloc_mode.fun_closure_mode)
          :: param_yieldings)
     in
     re
@@ -13610,19 +13639,21 @@ let report_error ~loc env =
         but was expected to %s which is %a.@]"
         desc (Style.as_inline_code (Alloc.Const.print_axis ax)) actual
         desc_inf (Style.as_inline_code (Alloc.Const.print_axis ax)) expected
-  | Uncurried_function_escapes e -> begin
-      let Mode.Alloc.Error (ax, {left; right}) = Mode.Alloc.to_simple_error e in
+  | Uncurried_function_escapes_comonadic e -> begin
+      let Mode.Alloc.Comonadic.Error (ax, {left; right}) =
+        Mode.Alloc.Comonadic.to_simple_error e
+      in
       match ax with
-      | Comonadic Areality ->
-          Location.errorf ~loc
+      | Areality ->
+        Location.errorf ~loc
             "This function or one of its parameters escape their region@ \
             when it is partially applied."
       | _ ->
-          Location.errorf ~loc
+        Location.errorf ~loc
             "This function when partially applied returns a value which is %a,@ \
               but expected to be %a."
-            (Style.as_inline_code (Alloc.Const.print_axis ax)) left
-            (Style.as_inline_code (Alloc.Const.print_axis ax)) right
+            (Style.as_inline_code (Alloc.Const.print_axis (Comonadic ax))) left
+            (Style.as_inline_code (Alloc.Const.print_axis (Comonadic ax))) right
     end
   | Bad_tail_annotation err ->
       Location.errorf ~loc
