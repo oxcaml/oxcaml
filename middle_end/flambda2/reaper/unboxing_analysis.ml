@@ -91,6 +91,16 @@ module Unboxed_fields = struct
         | Unboxed fields -> fold_with_kind f fields acc)
       fields acc
 
+  let rec add_fields fields acc =
+    Field.Map.fold
+      (fun field uf acc -> add_fields_u uf (Field.Set.add field acc))
+      fields acc
+
+  and add_fields_u uf acc =
+    match uf with
+    | Not_unboxed _ -> acc
+    | Unboxed fields -> add_fields fields acc
+
   let rec mapi_u (not_unboxed : 'a -> 'b -> 'c) (unboxed : Field.t -> 'a -> 'a)
       (acc : 'a) (uf : 'b u) : 'c u =
     match uf with
@@ -181,6 +191,92 @@ let pp_changed_representation ff = function
       fields
       (Function_slot.Map.print Function_slot.print)
       function_slots Function_slot.print fs
+
+let rename_unboxed_fields_tree tree ~rename_leaf ~rename_field =
+  let rec rename_tree tree =
+    Field.Map.fold
+      (fun fld u new_tree ->
+        Field.Map.add (rename_field fld) (rename_u u) new_tree)
+      tree Field.Map.empty
+  and rename_u (u : _ Unboxed_fields.u) : _ Unboxed_fields.u =
+    match u with
+    | Not_unboxed x -> Not_unboxed (rename_leaf x)
+    | Unboxed tree -> Unboxed (rename_tree tree)
+  in
+  rename_tree tree
+
+let unboxed_fields_ids_for_export unboxed_fields ids =
+  let rec add_tree tree ids =
+    Field.Map.fold (fun (_ : Field.t) u ids -> add_u u ids) tree ids
+  and add_u (u : _ Unboxed_fields.u) ids =
+    match u with
+    | Not_unboxed var -> Ids_for_export.add_variable ids var
+    | Unboxed tree -> add_tree tree ids
+  in
+  Code_id_or_name.Map.fold
+    (fun id tree ids ->
+      add_tree tree (Ids_for_export.add_code_id_or_name ids id))
+    unboxed_fields ids
+
+let unboxed_fields_fields_for_export unboxed_fields fields =
+  Code_id_or_name.Map.fold
+    (fun (_ : Code_id_or_name.t) tree fields ->
+      Unboxed_fields.add_fields tree fields)
+    unboxed_fields fields
+
+let unboxed_fields_apply_renaming unboxed_fields renaming ~rename_field =
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  Code_id_or_name.Map.fold
+    (fun id tree new_unboxed_fields ->
+      Code_id_or_name.Map.add (rename_id id)
+        (rename_unboxed_fields_tree tree
+           ~rename_leaf:(Renaming.apply_variable renaming)
+           ~rename_field)
+        new_unboxed_fields)
+    unboxed_fields Code_id_or_name.Map.empty
+
+let changed_representation_ids_for_export changed_representation ids =
+  let add_id = Ids_for_export.add_code_id_or_name in
+  Code_id_or_name.Map.fold
+    (fun id ((_ : changed_representation), allocation_point) ids ->
+      add_id (add_id ids id) allocation_point)
+    changed_representation ids
+
+let changed_representation_fields_for_export changed_representation fields =
+  Code_id_or_name.Map.fold
+    (fun (_ : Code_id_or_name.t) (repr, (_ : Code_id_or_name.t)) fields ->
+      match (repr : changed_representation) with
+      | Block_representation (tree, (_ : int)) ->
+        Unboxed_fields.add_fields tree fields
+      | Closure_representation
+          ( tree,
+            (_ : Function_slot.t Function_slot.Map.t),
+            (_ : Function_slot.t) ) ->
+        Unboxed_fields.add_fields tree fields)
+    changed_representation fields
+
+let changed_representation_apply_renaming changed_representation renaming
+    ~rename_field =
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  let rename_repr (repr : changed_representation) : changed_representation =
+    (* Ints, block access kinds and slots are structural data, not hashconsed
+       identifiers, so they are not renamed. *)
+    match repr with
+    | Block_representation (tree, size) ->
+      Block_representation
+        (rename_unboxed_fields_tree tree ~rename_leaf:Fun.id ~rename_field, size)
+    | Closure_representation (tree, function_slots, current_function_slot) ->
+      Closure_representation
+        ( rename_unboxed_fields_tree tree ~rename_leaf:Fun.id ~rename_field,
+          function_slots,
+          current_function_slot )
+  in
+  Code_id_or_name.Map.fold
+    (fun id (repr, allocation_point) new_changed_representation ->
+      Code_id_or_name.Map.add (rename_id id)
+        (rename_repr repr, rename_id allocation_point)
+        new_changed_representation)
+    changed_representation Code_id_or_name.Map.empty
 
 let cannot_change_witness_calling_convention =
   rel1 "cannot_change_witness_calling_convention" Cols.[n]
