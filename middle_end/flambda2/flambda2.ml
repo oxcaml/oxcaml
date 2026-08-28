@@ -456,9 +456,16 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
      in the .ltosol file, because the -reaper-solve invocation begins by taking
      the maximum counters across the .cmr files it reads. Therefore, we can
      ignore these counters. *)
-  let cmr_serialisable, (_ : Flambda2_reaper.Id_stamp_counters.t) =
+  let cmr_serialisable, cmr_stamp_counters =
     Flambda2_reaper.Cmr_format.load cmr_filename
   in
+  if
+    Flambda2_reaper.Id_stamp_counters.any_greater_than cmr_stamp_counters
+      id_stamp_counters
+  then
+    Misc.fatal_error
+      "The rebuild data contains ID stamp counters greater than those in the \
+       the solution file. Stamp counter monotonicity is broken.";
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
   let { Flambda2_reaper.Cmr_format.unit_metadata;
         final_typing_env;
