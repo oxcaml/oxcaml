@@ -393,8 +393,11 @@ function caml_create_file(name, content) {
 //Provides: jsoo_create_file
 //Requires: caml_create_file, caml_string_of_jsbytes, caml_string_of_jsstring
 function jsoo_create_file(name, content) {
-  var name = caml_string_of_jsstring(name);
-  var content = caml_string_of_jsbytes(content);
+  // Callable both from JS (with JS strings) and from OCaml (with OCaml
+  // strings, which are only JS strings when js-string is enabled).
+  var name = typeof name === "string" ? caml_string_of_jsstring(name) : name;
+  var content =
+    typeof content === "string" ? caml_string_of_jsbytes(content) : content;
   return caml_create_file(name, content);
 }
 

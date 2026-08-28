@@ -308,7 +308,8 @@ module Ctx = struct
     ; share : Share.t
     ; exported_runtime : (Code.Var.t * bool ref) option
     ; should_export : bool
-    ; effect_warning : bool ref
+      (* Only read by the warning below, currently commented out. *)
+    ; effect_warning : bool ref [@warning "-unused-field"]
     ; trampolined_calls : Effects.trampolined_calls
     ; deadcode_sentinel : Var.t
     ; mutated_vars : Code.Var.Set.t Code.Addr.Map.t

@@ -20,6 +20,41 @@
    source, so it does not need to be built with the compiler consuming its
    output. *)
 
+(* Neither ppxlib's nor the compiler's pretty-printer parenthesizes class-type
+   arguments, and the output does not always reparse: OxCaml lexes [#] glued
+   to a preceding type variable as an unboxed-type hash (['a#js_array t]
+   errors, ['a #js_array t] is fine), and [(< .. > as 'a) #event t] comes out
+   as the unparseable [< .. > as 'a#event t]. Wrapping every class-type
+   argument in a no-op attribute forces both printers to parenthesize it,
+   which reparses unambiguously ([('a[@jsoo_ppx.parens ])#js_array t]). *)
+let paren_class_args =
+  object
+    inherit Ppxlib.Ast_traverse.map as super
+
+    method! core_type t =
+      let t = super#core_type t in
+      match t.ptyp_desc with
+      | Ptyp_class (name, args) ->
+          let parenthesize (a : Ppxlib.core_type) =
+            let loc = { a.ptyp_loc with loc_ghost = true } in
+            let attr : Ppxlib.attribute =
+              { attr_name = { txt = "jsoo_ppx.parens"; loc }
+              ; attr_payload = PStr []
+              ; attr_loc = loc
+              }
+            in
+            { a with ptyp_attributes = attr :: a.ptyp_attributes }
+          in
+          { t with ptyp_desc = Ptyp_class (name, List.map parenthesize args) }
+      | _ -> t
+  end
+
+let () =
+  Ppxlib.Driver.register_transformation
+    "jsoo_ppx_paren_class_args"
+    ~impl:paren_class_args#structure
+    ~intf:paren_class_args#signature
+
 (* Menhir's inference round preprocesses [*.ml.mock] files, an extension
    ppxlib rejects; re-exec with [-impl] added for them. *)
 let () =

@@ -1,10 +1,35 @@
 (library
  (name ppx_expect_light)
+ (modules ppx_expect_light)
  (kind ppx_rewriter)
  (libraries compiler-libs.common ppxlib ppx_light_predicate)
  (ppx_runtime_libraries ppx_expect_light_runtime)
  (preprocess
   (pps ppxlib.metaquot))
+ (inline_tests.backend
+  (runner_libraries ppx_expect_light_runtime)
+  (flags
+   ("inline-test-runner"
+    %{library-name}
+    -partition
+    %{partition}
+    -source-tree-root
+    %{workspace_root}
+    -diff-cmd
+    -))
+  (list_partitions_flags
+   ("inline-test-runner" %{library-name} -list-partitions))
+  (generate_runner
+   (echo "let () = Ppx_expect_light_runtime.exit ()\n"))))
+
+; Stanza-only twin of the backend above, for test libraries preprocessed by
+; the text-mode [jsoo_ppx] driver (which links ppx_expect_light): they attach
+; the runner with [(inline_tests (backend expect_light_backend))] without
+; pulling ppxlib into the build context compiling the tests.
+
+(library
+ (name expect_light_backend)
+ (modules)
  (inline_tests.backend
   (runner_libraries ppx_expect_light_runtime)
   (flags

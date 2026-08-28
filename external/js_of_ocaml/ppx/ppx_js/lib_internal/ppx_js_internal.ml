@@ -132,6 +132,17 @@ let merlin_hide =
   ; attr_loc = Location.none
   }
 
+(* The [res]/[tN] locally-abstract types and the [self] argument of object
+   literals only exist to tie types together and can end up unused. When the
+   rewritten code is compiled from printed source (text-mode preprocessing),
+   the ghost locations that normally hide them from unused-* warnings are
+   lost, so silence those warnings on the generated functions themselves. *)
+let nowarn_unused =
+  { attr_name = { txt = "ocaml.warning"; loc = Location.none }
+  ; attr_payload = PStr [ Str.eval (Exp.constant (Const.string "-27-34")) ]
+  ; attr_loc = Location.none
+  }
+
 module Js : sig
   val type_ :
     ?loc:Ast_helper.loc -> string -> Parsetree.core_type list -> Parsetree.core_type
@@ -332,6 +343,9 @@ let invoker ?(extra_types = []) uplift downlift body arguments =
               , b )
         }
     | _ -> List.fold_right local_types ~init:invoker ~f:Exp.newtype
+  in
+  let result =
+    { result with pexp_attributes = nowarn_unused :: result.pexp_attributes }
   in
   default_loc := default_loc';
   result
@@ -846,7 +860,7 @@ let literal_object self_id (fields : field_desc list) =
                    (Pat.var ~loc:gloc (mknoloc name))
                    fun_))
             with
-            pexp_attributes = [ merlin_hide ]
+            pexp_attributes = [ merlin_hide; nowarn_unused ]
           }
       ])
 

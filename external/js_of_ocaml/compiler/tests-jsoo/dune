@@ -13,12 +13,18 @@
 (library
  (name jsoo_testsuite_oxcaml)
  (modules test_ugeint test_marshal_float32)
- (libraries unix compiler-libs.common js_of_ocaml-compiler)
+ (libraries unix compiler-libs.common js_of_ocaml-compiler ppx_expect_light_runtime)
  (enabled_if %{oxcaml_supported})
  (inline_tests
+  (backend expect_light_backend)
   (modes js wasm best))
  (preprocess
-  (pps ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"jsoo_testsuite_oxcaml\""
+    %{input-file}))))
 
 (rule
  ; Guard against future OxCaml changes peepholing UGEINT away the same
@@ -39,15 +45,22 @@
  ; via `make test-md5-large`.
  (name jsoo_testsuite_md5_large)
  (modules test_md5_large)
+ (libraries ppx_expect_light_runtime)
  ; Off by default (the env opt-in stays in dune); the quickjs/wasi gating
  ; lives in the source as a [@when ...] predicate.
  (enabled_if %{env:JSOO_TEST_MD5_LARGE=false})
  (inline_tests
+  (backend expect_light_backend)
   (deps
    (sandbox preserve_file_kind))
   (modes js wasm best))
  (preprocess
-  (pps ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"jsoo_testsuite_md5_large\""
+    %{input-file}))))
 
 (library
  (name jsoo_testsuite)
@@ -77,18 +90,29 @@
    test_lwt_promise
    test_weak_gc
    toplevel_sections))
- (libraries unix compiler-libs.common js_of_ocaml-compiler str)
+ (libraries
+  unix
+  compiler-libs.common
+  js_of_ocaml-compiler
+  str
+  ppx_expect_light_runtime)
  ; bigarray_stubs backs test_bigarray; its symbols are disjoint from
  ; jsoo_runtime_stubs and the C is version-agnostic.
  (foreign_stubs
   (language c)
   (names jsoo_runtime_stubs bigarray_stubs))
  (inline_tests
+  (backend expect_light_backend)
   (deps
    (sandbox preserve_file_kind))
   (modes js wasm best))
  (preprocess
-  (pps ppx_optcomp_light ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"jsoo_testsuite\""
+    %{input-file}))))
 
 (test
  (name test_float16)
@@ -102,26 +126,38 @@
  (enabled_if
   (>= %{ocaml_version} 5.1))
  (modules runtime_events_register)
- (libraries runtime_events)
+ (libraries runtime_events ppx_expect_light_runtime)
  (inline_tests
+  (backend expect_light_backend)
   (modes js wasm best))
  (preprocess
-  (pps ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"jsoo_test_runtime_events_register\""
+    %{input-file}))))
 
 (library
  (name jsoo_test_runtime_value)
  (enabled_if
   (<> %{env:JSOO_TEST_ENGINE=node} wasi))
  (modules test_runtime_value)
- (libraries js_of_ocaml)
+ (libraries js_of_ocaml ppx_expect_light_runtime)
  (js_of_ocaml
   (javascript_files custom.js))
  (wasm_of_ocaml
   (javascript_files custom.js custom.wat))
  (inline_tests
+  (backend expect_light_backend)
   (modes js wasm))
  (preprocess
-  (pps ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"jsoo_test_runtime_value\""
+    %{input-file}))))
 
 ; compare_custom checks polymorphic comparison between an immediate and a
 ; custom block whose ops register a [compare] operation (as zarith_stubs_js
@@ -133,13 +169,19 @@
  (enabled_if
   (<> %{env:JSOO_TEST_ENGINE=node} wasi))
  (modules compare_custom)
- (libraries js_of_ocaml)
+ (libraries js_of_ocaml ppx_expect_light_runtime)
  (js_of_ocaml
   (javascript_files compare_custom.js))
  (inline_tests
+  (backend expect_light_backend)
   (modes js))
  (preprocess
-  (pps ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"jsoo_testsuite_compare_custom\""
+    %{input-file}))))
 
 ; test_sys drives the jsoo fake filesystem (Sys_js, jsoo_create_file, Unix) under
 ; the /static mount, which only exists on the JavaScript runtime, so it is
@@ -151,13 +193,19 @@
  (enabled_if
   (<> %{env:JSOO_TEST_ENGINE=node} wasi))
  (modules test_sys)
- (libraries js_of_ocaml unix)
+ (libraries js_of_ocaml unix ppx_expect_light_runtime)
  (inline_tests
+  (backend expect_light_backend)
   (deps
    (sandbox preserve_file_kind))
   (modes js))
  (preprocess
-  (pps ppx_optcomp_light ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"jsoo_testsuite_sys\""
+    %{input-file}))))
 
 ; js_of_ocaml runtime-behaviour tests with one shared signature: they use Js
 ; values / runtime features, so they run on the JavaScript and wasm runtimes
@@ -185,13 +233,19 @@
   test_list_of_js_array
   channel_refill
   test_nodejs_filesystem_errors)
- (libraries js_of_ocaml)
+ (libraries js_of_ocaml ppx_expect_light_runtime)
  (inline_tests
+  (backend expect_light_backend)
   (deps
    (sandbox preserve_file_kind))
   (modes js wasm))
  (preprocess
-  (pps ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"jsoo_testsuite_js_runtime\""
+    %{input-file}))))
 
 ; Bigstring.of_arrayBuffer produces a char bigarray; uses Js, js and wasm only.
 
@@ -201,10 +255,16 @@
   (<> %{env:JSOO_TEST_ENGINE=node} wasi))
  (modules bigstring_kind)
  (inline_tests
+  (backend expect_light_backend)
   (modes js wasm))
- (libraries js_of_ocaml)
+ (libraries js_of_ocaml ppx_expect_light_runtime)
  (preprocess
-  (pps js_of_ocaml-ppx ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"bigstring_kind\""
+    %{input-file}))))
 
 ; The js accessor lives in the optional +toplevel.js runtime fragment, so it
 ; is linked explicitly; --toplevel is deliberately NOT passed, so the bytecode
@@ -236,7 +296,8 @@
  (libraries js_of_ocaml)
  (modes js)
  (preprocess
-  (pps ppx_js_internal)))
+  (action
+   (run jsoo_ppx %{input-file}))))
 
 (test
  (name test_promise)
@@ -246,7 +307,8 @@
  (libraries js_of_ocaml)
  (modes js wasm)
  (preprocess
-  (pps ppx_js_internal)))
+  (action
+   (run jsoo_ppx %{input-file}))))
 
 (test
  (name test_lwt_promise)
@@ -257,7 +319,8 @@
  (libraries js_of_ocaml js_of_ocaml-lwt lwt)
  (modes js wasm)
  (preprocess
-  (pps ppx_js_internal)))
+  (action
+   (run jsoo_ppx %{input-file}))))
 
 ; The TextEncoder/TextDecoder fallbacks in [runtime/js/mlBytes.js] are
 ; cross-checked against the host Web Encoding API; the tests are gated in the
@@ -267,10 +330,23 @@
  (name test_text_codec_fallback)
  (modules test_text_codec_fallback)
  (inline_tests
+  (backend expect_light_backend)
   (modes js))
- (libraries js_of_ocaml)
+ (libraries js_of_ocaml ppx_expect_light_runtime)
  (preprocess
-  (pps js_of_ocaml-ppx ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"test_text_codec_fallback\""
+    %{input-file}))))
+
+; The cram tests (empty_sourcemap.t, gh1845.t) drive js_of_ocaml through
+; [dune exec]; declare the binary so it is built and available on PATH inside
+; the cram sandbox.
+
+(cram
+ (deps %{bin:js_of_ocaml}))
 
 (ocamlyacc calc_parser)
 

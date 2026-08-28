@@ -225,6 +225,22 @@ jsoo-build:
 	PATH="$(CURDIR)/_install/bin:$$PATH" OCAMLPATH= OCAMLFIND_CONF=/dev/null \
 	  $(dune) build --root=external/js_of_ocaml --profile release $(jsoo_targets)
 
+# Runs the js_of_ocaml integration tests: the code under test is compiled to
+# bytecode by the in-tree OxCaml (_install), turned into JS/wasm by the
+# freshly built js_of_ocaml/wasm_of_ocaml, and executed under node.
+.PHONY: jsoo-test
+jsoo-test:
+	@test -n "$(JSOO_VENDOR)" || \
+	  { echo 'JSOO_VENDOR is not set; enter the nix shell with withJsoo=true'; exit 1; }
+	ln -sfn "$(JSOO_VENDOR)" external/js_of_ocaml/vendor
+	@test -x _install/bin/ocamlc.opt || $(MAKE) _install
+	PATH="$(CURDIR)/_install/bin:$$PATH" OCAMLPATH= OCAMLFIND_CONF=/dev/null \
+	  $(dune) build --root=external/js_of_ocaml \
+	  @compiler/tests-jsoo/runtest @compiler/tests-jsoo/runtest-js
+	PATH="$(CURDIR)/_install/bin:$$PATH" OCAMLPATH= OCAMLFIND_CONF=/dev/null \
+	  WASM_OF_OCAML=true \
+	  $(dune) build --root=external/js_of_ocaml @compiler/tests-jsoo/runtest-wasm
+
 .PHONY: merlin-build
 merlin-build:
 	$(MAKE) -C external/merlin build

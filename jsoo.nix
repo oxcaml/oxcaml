@@ -14,6 +14,18 @@ let
   subtree = ./external/js_of_ocaml;
   version = lib.head (lib.splitString "\n" (lib.fileContents (subtree + "/VERSION")));
 
+  # Not packaged in nixpkgs; used by ppx_expect_light_runtime to capture
+  # test output. Built stock for the ppx driver, and vendored as source so
+  # the in-tree compiler can build the runtime half for the code under test.
+  outChannelRedirect = ocamlPackages.buildDunePackage {
+    pname = "out-channel-redirect";
+    version = "0.1";
+    src = pkgs.fetchurl {
+      url = "https://github.com/hhugo/out-channel-redirect/releases/download/0.1/out-channel-redirect-0.1.tbz";
+      hash = "sha256-UE7t9sJJxURlG/K30Eh8AwK8ftTqrOr8uZJm7bxOamo=";
+    };
+  };
+
   targets = [
     "compiler/bin-js_of_ocaml/js_of_ocaml.exe"
     "compiler/bin-jsoo_minify/jsoo_minify.exe"
@@ -62,6 +74,20 @@ rec {
         $out/ocaml-compiler-libs/src/read_cma/read_cma.ml
 
       ln -s ${menhirSrc} $out/menhir
+
+      # Output capture for ppx_expect_light_runtime.
+      mkdir $out/out-channel-redirect
+      tar xf ${outChannelRedirect.src} -C $out/out-channel-redirect --strip-components=1
+
+      # lwt (core library only) backs js_of_ocaml-lwt and test_lwt_promise;
+      # its cppo preprocessing runs from PATH (see shellInputs).
+      if test -d ${ocamlPackages.lwt.src}; then
+        cp -r ${ocamlPackages.lwt.src} $out/lwt
+        chmod -R u+w $out/lwt
+      else
+        mkdir $out/lwt
+        tar xf ${ocamlPackages.lwt.src} -C $out/lwt --strip-components=1
+      fi
     '';
 
   ppxDriver = pkgs.stdenv.mkDerivation {
@@ -76,6 +102,9 @@ rec {
         (subtree + "/compiler/bin-jsoo_ppx")
         (subtree + "/compiler/ppx-optcomp-light")
         (subtree + "/compiler/ppx-light-predicate")
+        (subtree + "/compiler/ppx-expect-light")
+        (subtree + "/compiler/ppx-expect-light-runtime")
+        (subtree + "/ppx/ppx_js/lib_internal")
       ];
     };
 
@@ -88,6 +117,7 @@ rec {
     buildInputs = with ocamlPackages; [
       ppxlib
       sedlex
+      outChannelRedirect
     ];
 
     buildPhase = ''
@@ -111,6 +141,8 @@ rec {
     ppxDriver
     pkgs.binaryen
     pkgs.nodejs_latest
+    # cppo preprocesses the vendored lwt sources.
+    ocamlPackages.cppo
   ];
 
   # Hermetic build of the js_of_ocaml/wasm_of_ocaml binaries. Excluding the

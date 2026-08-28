@@ -2,4 +2,5 @@
  (name gen_stubs)
  (libraries compiler-libs.common)
  (preprocess
-  (pps ppx_optcomp_light)))
+  (action
+   (run jsoo_ppx %{input-file}))))

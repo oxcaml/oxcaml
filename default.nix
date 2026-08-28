@@ -447,7 +447,10 @@ stdenv.mkDerivation {
         else
           "  (make merlin-* targets need this shell built with withMerlin=true,\n"
           + "   as the flake's devShell does)\n";
-      jsooCommands = lib.optionalString withJsoo "  make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml\n";
+      jsooCommands = lib.optionalString withJsoo (
+        "  make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml\n"
+        + "  make jsoo-test           - Run the js_of_ocaml test suite (js, wasm, native)\n"
+      );
     in
     ''
       prefix="$(pwd)/_install"

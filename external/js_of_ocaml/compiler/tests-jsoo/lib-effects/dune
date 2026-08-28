@@ -16,7 +16,9 @@
  (name jsoo_testsuite_effect)
  (enabled_if
   (>= %{ocaml_version} 5))
+ (libraries ppx_expect_light_runtime)
  (inline_tests
+  (backend expect_light_backend)
   (deps
    (sandbox preserve_file_kind))
   (modes js wasm best))
@@ -29,7 +31,12 @@
    deep_state
    test_finalise))
  (preprocess
-  (pps ppx_expect_light)))
+  (action
+   (run
+    jsoo_ppx
+    -cookie
+    "library-name=\"jsoo_testsuite_effect\""
+    %{input-file}))))
 
 (tests
  (build_if
@@ -76,4 +83,5 @@
  (libraries js_of_ocaml)
  (modes js)
  (preprocess
-  (pps ppx_js_internal)))
+  (action
+   (run jsoo_ppx %{input-file}))))

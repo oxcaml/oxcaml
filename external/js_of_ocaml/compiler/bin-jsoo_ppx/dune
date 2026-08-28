@@ -1,3 +1,9 @@
 (executable
  (name jsoo_ppx)
- (libraries unix ppxlib ppx_optcomp_light sedlex.ppx))
+ (libraries
+  unix
+  ppxlib
+  ppx_optcomp_light
+  ppx_expect_light
+  ppx_js_internal
+  sedlex.ppx))
