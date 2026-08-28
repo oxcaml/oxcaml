@@ -1338,7 +1338,7 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
-let apply_mode_annots ~loc (m : Alloc.Const.Option.t Typemode.modes) mode =
+let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
   let annot_loc =
@@ -1354,7 +1354,7 @@ let apply_mode_annots ~loc (m : Alloc.Const.Option.t Typemode.modes) mode =
   let hint = Hint.Annotation { loc = annot_loc; written_modes } in
   let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
   let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
-  let pp : Hint.pinpoint = loc, Hint.Unknown in
+  let pp : Hint.pinpoint = loc, kind in
   Alloc.submode_err pp min mode;
   Alloc.submode_err pp mode max
 
@@ -5835,7 +5835,7 @@ let type_approx_fun_one_param
   in
   Option.iter
     (fun mode_annots ->
-      apply_mode_annots ~loc mode_annots arg_mode)
+      apply_mode_annots ~loc Parameter mode_annots arg_mode)
     mode_annots;
   if has_poly then begin
     match spato with
@@ -6481,7 +6481,8 @@ type split_function_ty =
 *)
 let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
-    ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
+    ~mode_annots ~ret_mode_annots ~param_loc ~ret_loc ~in_function
+    ~is_first_val_param ~is_final_val_param
   =
   let alloc_mode, closure_mode, closed_over_mode =
     register_closure_allocation ~loc (as_single_mode expected_mode)
@@ -6517,8 +6518,8 @@ let split_function_ty
         }
     end
   in
-  apply_mode_annots ~loc:loc_fun mode_annots arg_mode;
-  apply_mode_annots ~loc:loc_fun ret_mode_annots ret_mode;
+  apply_mode_annots ~loc:param_loc Parameter mode_annots arg_mode;
+  apply_mode_annots ~loc:ret_loc Return ret_mode_annots ret_mode;
   let really_poly =
     not has_poly && not (tpoly_is_mono ty_arg) && is_really_poly ~env ty_arg
   in
@@ -9830,6 +9831,11 @@ and type_function_
         | _ :: _ ->
           { mode_modes = Alloc.Const.Option.none; mode_desc = [] }
       in
+      let ret_loc =
+        match body with
+        | Pfunction_body e -> e.pexp_loc
+        | Pfunction_cases (_, loc_cases, _) -> loc_cases
+      in
       let env,
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
             arg_sort; ret_sort;
@@ -9841,6 +9847,7 @@ and type_function_
           ~arg_label:typed_arg_label ~in_function ~has_poly
           ~mode_annots:mode_annots
           ~ret_mode_annots:ret_mode_annots
+          ~param_loc:pparam_loc ~ret_loc
       in
       (* [ty_arg_internal] is the type of the parameter viewed internally
          to the function. This is different than [ty_arg_mono] exactly for
@@ -11878,6 +11885,7 @@ and type_function_cases_expect
       split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
         ~in_function ~has_poly:false ~mode_annots:alloc_mode_annot_empty
         ~ret_mode_annots:alloc_mode_annot_empty
+        ~param_loc:loc ~ret_loc:loc
         ~is_first_val_param:first ~is_final_val_param:true
     in
     let cases, partial =
