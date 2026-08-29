@@ -681,15 +681,27 @@ module Mod_bounds = struct
          (Externality.le Externality.max (externality t))
          (Nonmodal Externality)
 
-  let saturated_mask t mask = Bounds_mask.meet (to_axis_lattice t) mask
+  let saturated_mask t mask =
+    if Bounds_mask.equal mask Axis_lattice.bot
+    then Bounds_mask.bot
+    else Bounds_mask.meet (to_axis_lattice t) mask
 
   let mask_of_externality externality =
     to_axis_lattice (create Crossing.max ~externality)
 
   let relax_by_mask_r t mask =
-    Axis_lattice.imply mask (to_axis_lattice t) |> of_axis_lattice
+    if Bounds_mask.equal mask Axis_lattice.top
+    then t
+    else if Bounds_mask.equal mask Axis_lattice.bot
+    then max
+    else Axis_lattice.imply mask (to_axis_lattice t) |> of_axis_lattice
 
-  let is_max_within_mask t mask = Bounds_mask.le mask (saturated_mask t mask)
+  let is_max_within_mask t mask =
+    if Bounds_mask.equal mask Axis_lattice.bot
+    then true
+    else if Bounds_mask.equal mask Axis_lattice.top
+    then is_max t
+    else Bounds_mask.le mask (saturated_mask t mask)
 
   let to_mode_crossing t = crossing t
 end
