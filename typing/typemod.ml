@@ -1834,7 +1834,8 @@ end = struct
     let open Sig_component_kind in
     match component with
     | Value -> names.values
-    | Type | Label | Unboxed_label | Constructor -> names.types
+    | Type | Label | Unboxed_label | Constructor | Unboxed_version ->
+        names.types
     | Module -> names.modules
     | Module_type -> names.modtypes
     | Extension_constructor -> names.typexts
@@ -5098,7 +5099,7 @@ let invalid_part_of_user_kind : Sig_component_kind.t -> string  = function
   | Type -> "kind"
   | Jkind -> "definition"
   | ( Value | Constructor | Label | Unboxed_label | Module | Module_type
-    | Extension_constructor | Class | Class_type ) ->
+    | Extension_constructor | Class | Class_type | Unboxed_version ) ->
     "type"
 
 let report_error ~loc _env = function

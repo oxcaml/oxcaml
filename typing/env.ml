@@ -1833,6 +1833,8 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       (IdTbl.find_same id env.cltypes).cltda_shape
   | Jkind ->
       (IdTbl.find_same id env.jkinds).jkda_shape
+  | Unboxed_version ->
+      raise Not_found
 
 
 let shape_of_path ~namespace env =
