@@ -9800,11 +9800,6 @@ and solve_Pexp_field
     type_label_access record_form env srecord label_usage lid
   in
   let ty_arg, record_repres =
-    (* XXX Not clear to me why this can't be done in [type_label_access] so that
-       the [Texp_setfield] case wouldn't have to have its own call to
-       [update_label], but doing it that way causes principality issues.
-       Notably, this call to [update_label] happens inside a local level and the
-       [Texp_setfield] call does not. *)
     with_local_level_generalize_structure_if_principal begin fun () ->
       (* [ty_arg] is the type of field, [ty_res] is the type of record, they
        could share type variables, which are now instantiated *)
@@ -9815,10 +9810,6 @@ and solve_Pexp_field
         (* This redundantly calculates the sort again. But calling
            [type_sort] above let us infer that the type is representable,
            and it also gives a nicer error message *)
-        (* XXX Not entirely sure why it's necessary to do this in the inner
-           level, but weird errors happen if we don't, and it's also
-           necessary to do it in _this_ inner level so that the correct type
-           hits a [generalize_structure] *)
         update_labels env record_form ~representative_label:label ~loc
           ~why:Field_projection ~containing_type:record.exp_type
       in
