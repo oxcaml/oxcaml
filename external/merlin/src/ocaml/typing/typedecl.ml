@@ -264,24 +264,15 @@ let make_params env path params =
 
 (* Enter all declared types in the environment as abstract types *)
 
-<<<<<<< Merlin:rtjoa.unboxed-shapes
-let add_type ~long_path ~check ?shape id decl env =
-||||||| Compiler:last-imported
-let add_type ~check ?shape id decl env =
-=======
-let add_type ~check ?shape ?unboxed_version_shape id decl env =
->>>>>>> Compiler:HEAD
+let add_type ~long_path ~check ?shape ?unboxed_version_shape id decl env =
   Builtin_attributes.warning_scope ~ppwarning:false decl.type_attributes
-<<<<<<< Merlin:rtjoa.unboxed-shapes
     (fun () ->
        match long_path with
-       | true -> Env.add_type_long_path ?shape ~check id decl env
-       | false -> Env.add_type ?shape ~check id decl env)
-||||||| Compiler:last-imported
-    (fun () -> Env.add_type ~check ?shape id decl env)
-=======
-    (fun () -> Env.add_type ~check ?shape ?unboxed_version_shape id decl env)
->>>>>>> Compiler:HEAD
+       | true ->
+         Env.add_type_long_path ?shape ?unboxed_version_shape ~check id decl
+           env
+       | false ->
+         Env.add_type ?shape ?unboxed_version_shape ~check id decl env)
 
 (* Add a dummy type declaration to the environment, with the given arity.
    The [type_kind] is [Type_abstract], but there is a generic [type_manifest]
@@ -3817,16 +3808,9 @@ let add_types_to_env ~shapes decls env =
       decls env
   | Some shapes ->
     List.fold_right2
-<<<<<<< Merlin:rtjoa.unboxed-shapes
-    (fun (id, decl) shape env ->
-      add_type ~long_path:false ~check:true ~shape id decl env)
-||||||| Compiler:last-imported
-    (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
-=======
     (fun (id, decl) (shape, unboxed_version_shape) env ->
-      add_type ~check:true ~shape ?unboxed_version_shape id decl env)
->>>>>>> Compiler:HEAD
+      add_type ~long_path:false ~check:true ~shape ?unboxed_version_shape
+        id decl env)
     decls shapes env
 
 (* Translate a set of type declarations, mutually recursive or not *)

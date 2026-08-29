@@ -449,16 +449,11 @@ val add_value:
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     Ident.t -> value_description -> t -> t
 val add_type:
-<<<<<<< Merlin:rtjoa.unboxed-shapes
-    check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
+    check:bool -> ?shape:Shape.t -> ?unboxed_version_shape:Shape.t ->
+    Ident.t -> type_declaration -> t -> t
 val add_type_long_path:
-    check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
-||||||| Compiler:last-imported
-  check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
-=======
-  check:bool -> ?shape:Shape.t -> ?unboxed_version_shape:Shape.t ->
-  Ident.t -> type_declaration -> t -> t
->>>>>>> Compiler:HEAD
+    check:bool -> ?shape:Shape.t -> ?unboxed_version_shape:Shape.t ->
+    Ident.t -> type_declaration -> t -> t
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t

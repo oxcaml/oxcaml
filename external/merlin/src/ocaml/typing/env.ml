@@ -2855,13 +2855,8 @@ and store_label
   end;
   add_label record_form env lbl_id lbl
 
-<<<<<<< Merlin:rtjoa.unboxed-shapes
-and store_type ~check ~long_path ~predef ~hidden id info shape env =
-||||||| Compiler:last-imported
-and store_type ~check ~hidden id info shape env =
-=======
-and store_type ~check ~hidden id info shape unboxed_version_shape env =
->>>>>>> Compiler:HEAD
+and store_type ~check ~long_path ~predef ~hidden id info shape
+      unboxed_version_shape env =
   let loc = info.type_loc in
   if check then
     check_usage loc id info.type_uid
@@ -3239,17 +3234,8 @@ let enter_value ?check ~mode name desc env =
 
 let enter_type ?(long_path = false) ~scope name info env =
   let id = Ident.create_scoped ~scope name in
-<<<<<<< Merlin:rtjoa.unboxed-shapes
   let env = store_type ~check:true ~predef:false ~long_path ~hidden:false
-    id info (Shape.leaf info.type_uid) env
-||||||| Compiler:last-imported
-  let env =
-    store_type ~check:true ~hidden:false id info (Shape.leaf info.type_uid) env
-=======
-  let env =
-    store_type ~check:true ~hidden:false id info (Shape.leaf info.type_uid)
-      None env
->>>>>>> Compiler:HEAD
+    id info (Shape.leaf info.type_uid) None env
   in
   (id, env)
 
@@ -3387,20 +3373,15 @@ end) = struct
         map, M.add_value ?shape ~mode id decl env
     | Sig_type(id, decl, _, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.type_ id) in
-<<<<<<< Merlin:rtjoa.unboxed-shapes
-        map,
-        add_type ~long_path:false ~check:false ~predef:false ?shape id decl env
-||||||| Compiler:last-imported
-        map, add_type ~check:false ?shape id decl env
-=======
         let map, unboxed_version_shape =
           match decl.type_unboxed_version with
           | None -> map, None
           | Some _ ->
               proj_shape map mod_shape (Shape.Item.unboxed_version id)
         in
-        map, add_type ~check:false ?shape ?unboxed_version_shape id decl env
->>>>>>> Compiler:HEAD
+        map,
+        add_type ~long_path:false ~check:false ~predef:false ?shape
+          ?unboxed_version_shape id decl env
     | Sig_typext(id, ext, _, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.extension_constructor id) in
         map, add_extension ~check:false ?shape ~rebind:false id ext env
@@ -3576,13 +3557,8 @@ let initial () =
         Type_shape.Type_decl_shape.of_type_declaration type_ident decl
           (shape_for_constr env)
       in
-<<<<<<< Merlin:rtjoa.unboxed-shapes
-      add_type type_ident ~shape decl env ~check:false ~predef:true ~long_path:false
-||||||| Compiler:last-imported
-      add_type type_ident ~shape decl env ~check:false
-=======
       add_type type_ident ~shape ?unboxed_version_shape decl env ~check:false
->>>>>>> Compiler:HEAD
+        ~predef:true ~long_path:false
   in
   let initial_env =
     Predef.build_initial_env add_type_and_remember_decl
@@ -3592,11 +3568,13 @@ let initial () =
   in
   initial_env
 
-let add_type_long_path ~check ?shape id info env =
-  add_type ~check ?shape ~predef:false ~long_path:true id info env
+let add_type_long_path ~check ?shape ?unboxed_version_shape id info env =
+  add_type ~check ?shape ?unboxed_version_shape ~predef:false ~long_path:true
+    id info env
 
-let add_type ~check ?shape id info env =
-  add_type ~check ?shape ~predef:false ~long_path:false id info env
+let add_type ~check ?shape ?unboxed_version_shape id info env =
+  add_type ~check ?shape ?unboxed_version_shape ~predef:false ~long_path:false
+    id info env
 
 let add_language_extension_types env =
   let add ext lvl f env  =
@@ -3608,17 +3586,9 @@ let add_language_extension_types env =
   in
   let add_or_hide ext lvl f env =
     let hidden = not (Language_extension.is_at_least ext lvl) in
-<<<<<<< Merlin:rtjoa.unboxed-shapes
-    f (add_type_maybe_hidden ?shape:None ~check:false ~hidden
-        ~long_path:false ~predef:false)
-      env
-||||||| Compiler:last-imported
-    f (add_type_maybe_hidden ?shape:None ~check:false ~hidden) env
-=======
     f (add_type_maybe_hidden ?shape:None ?unboxed_version_shape:None
-         ~check:false ~hidden)
+         ~check:false ~hidden ~long_path:false ~predef:false)
       env
->>>>>>> Compiler:HEAD
   in
   (* Small number types are hidden when [Small_numbers] is disabled since they
      can easily be shimmed and emulated upstream. This could be done for other

@@ -46,7 +46,12 @@ let by_path path (namespace : Namespace.t) env =
       | Value ->
         let vd = Env.find_value path env in
         (vd.val_loc, vd.val_uid, Value)
-      | Type | Extension_constructor | Constructor | Label | Unboxed_label ->
+      | Type
+      | Extension_constructor
+      | Constructor
+      | Label
+      | Unboxed_label
+      | Unboxed_version ->
         let td = Env.find_type path env in
         (td.type_loc, td.type_uid, Type)
       | Module ->
