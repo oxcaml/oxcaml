@@ -148,6 +148,26 @@ let blk_marshal_round_trip =
 val blk_marshal_round_trip : string = "block tag 0"
 |}]
 
+(* All-void constructors in recursive bindings keep their tag. *)
+
+let blk_letrec_reprs =
+  let rec b = B2 #(#(), #())
+  and f () = b in
+  [describe b; describe (f ())]
+[%%expect{|
+val blk_letrec_reprs : string list = ["block tag 1"; "block tag 1"]
+|}]
+
+let blk_letrec_match =
+  let rec b = B2 #(#(), #())
+  and f () = b in
+  match f () with
+  | B2 #(v, _) -> let #() = v in "matched B2"
+  | A2 _ | C2 | D2 _ -> assert false
+[%%expect{|
+val blk_letrec_match : string = "matched B2"
+|}]
+
 (* An any-arg constructor refined to void is a block. *)
 
 type ('a : any) refined = R of 'a | S

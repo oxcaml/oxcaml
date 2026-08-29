@@ -1247,21 +1247,16 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     let acc, sym =
       match prim with
       | Pmakeblock (tag, _, shape, _mode) ->
-        if tag <> 0
+        if Lambda.is_uniform_block_shape shape
         then
-          (* There should not be any way to reach this from Ocaml code. *)
-          Misc.fatal_error
-            "Non-zero tag on empty block allocation in [Closure_conversion]"
+          register_const0 acc
+            (Static_const.block
+               (Tag.Scannable.create_exn tag)
+               Immutable Value_only [])
+            "empty_block"
         else
-          begin if Lambda.is_uniform_block_shape shape
-          then
-            register_const0 acc
-              (Static_const.block Tag.Scannable.zero Immutable Value_only [])
-              "empty_block"
-          else
-            Misc.fatal_error
-              "Unexpected empty mixed block in [Closure_conversion]"
-          end
+          Misc.fatal_error
+            "Unexpected empty mixed block in [Closure_conversion]"
       | Pmakefloatblock _ ->
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
