@@ -753,7 +753,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
               lay_out_into_mixed_block_exn ~source_level_fields
             in
             RS.constructor_with_tuple_arg ~name:pv_constr_name
-              ~is_constant:(List.compare_length_with constr_args 0 = 0)
+              ~is_constant:(List.is_empty constr_args)
               ~args:
                 (List.map
                    (RS.map_mixed_block_field_label (fun _ -> ()))
