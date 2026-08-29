@@ -3882,8 +3882,12 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
           decls
         in
         let shape_map = List.fold_left2
-          (fun map { typ_id; _} shape ->
-            Shape.Map.add_type map typ_id shape)
+          (fun map { typ_id; _} (shape, unboxed_version_shape) ->
+            let map = Shape.Map.add_type map typ_id shape in
+            match unboxed_version_shape with
+            | None -> map
+            | Some shape ->
+                Shape.Map.add_unboxed_version map typ_id shape)
           shape_map
           decls
           shapes

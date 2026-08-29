@@ -264,9 +264,9 @@ let make_params env path params =
 
 (* Enter all declared types in the environment as abstract types *)
 
-let add_type ~check ?shape id decl env =
+let add_type ~check ?shape ?unboxed_version_shape id decl env =
   Builtin_attributes.warning_scope ~ppwarning:false decl.type_attributes
-    (fun () -> Env.add_type ~check ?shape id decl env)
+    (fun () -> Env.add_type ~check ?shape ?unboxed_version_shape id decl env)
 
 (* Add a dummy type declaration to the environment, with the given arity.
    The [type_kind] is [Type_abstract], but there is a generic [type_manifest]
@@ -920,7 +920,7 @@ let old_merlin_shape_extension_constructor args ext_uid =
 let shape_declarations env decls =
   match !Clflags.shape_format with
   | Clflags.Old_merlin ->
-    List.map (fun (_, decl) -> old_merlin_shape_declaration decl) decls
+    List.map (fun (_, decl) -> old_merlin_shape_declaration decl, None) decls
   | Clflags.Debugging_shapes ->
     Type_shape.Type_decl_shape.of_type_declarations decls
       (Env.shape_for_constr env)
@@ -3802,8 +3802,8 @@ let add_types_to_env ~shapes decls env =
       decls env
   | Some shapes ->
     List.fold_right2
-    (fun (id, decl) shape env ->
-      add_type ~check:true ~shape id decl env)
+    (fun (id, decl) (shape, unboxed_version_shape) env ->
+      add_type ~check:true ~shape ?unboxed_version_shape id decl env)
     decls shapes env
 
 (* Translate a set of type declarations, mutually recursive or not *)

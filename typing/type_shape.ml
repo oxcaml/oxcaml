@@ -654,7 +654,8 @@ module Type_decl_shape = struct
       type_param_shapes )
 
   (** [of_type_declarations type_declarations shape_for_constr] turns a block of
-      type declarations into a list of shapes. The number of shapes that is
+      type declarations into a list of shapes, each paired with the shape of the
+      declaration's unboxed version, if it has one. The number of shapes that is
       returned must match the length of [type_declarations]. *)
   let of_type_declarations
       (type_declarations : (Ident.t * Types.type_declaration) list)
@@ -685,27 +686,53 @@ module Type_decl_shape = struct
        use the body of the declarations instead of wrapping them in [mutrec]
        and a projection. Whether a declaration is recursive is tracked via
        the reference [recursive]. *)
-    let shape_for_constr' =
+    let shape_for_constr_boxed =
       shape_for_constr_with_declarations ~recursive decl_lookup_map
         shape_for_constr'
     in
     let individual_declarations =
       Ident.Map.mapi
         (fun id decl ->
-          let shape, _params, _param_shapes =
-            of_type_declaration_with_variables id decl shape_for_constr'
-          in
-          shape)
+          of_type_declaration_with_variables id decl shape_for_constr_boxed)
         decl_lookup_map
     in
-    if !recursive
-    then
-      let mutrec = Shape.mutrec individual_declarations in
-      List.map (fun (id, _) -> Shape.proj_decl mutrec id) type_declarations
-    else
-      List.map
-        (fun (id, _) -> Ident.Map.find id individual_declarations)
-        type_declarations
+    let boxed_shapes =
+      if !recursive
+      then
+        let mutrec =
+          Shape.mutrec
+            (Ident.Map.map (fun (shape, _, _) -> shape) individual_declarations)
+        in
+        Ident.Map.mapi
+          (fun id _ -> Shape.proj_decl mutrec id)
+          individual_declarations
+      else Ident.Map.map (fun (shape, _, _) -> shape) individual_declarations
+    in
+    (* Unboxed versions reuse the type params of their boxed declarations, so
+       that computing their shapes creates no fresh idents. In-group references
+       resolve to the final boxed shapes above (closed terms), so the unboxed
+       shapes need no recursion machinery of their own. *)
+    let unboxed_version_shape id (decl : Types.type_declaration) =
+      Option.map
+        (fun (unboxed_decl : Types.type_declaration) ->
+          let _, type_param_idents, type_param_shapes =
+            Ident.Map.find id individual_declarations
+          in
+          let lookup (path : Path.t) ~args =
+            match path with
+            | Pident id' when Ident.Map.mem id' decl_lookup_map ->
+              Some (Shape.app_list (Ident.Map.find id' boxed_shapes) args)
+            | Pident _ | Pdot _ | Papply _ | Pextra_ty _ ->
+              shape_for_constr' path ~args
+          in
+          of_type_declaration_with_params unboxed_decl ~type_param_idents
+            ~type_param_shapes lookup)
+        decl.Types.type_unboxed_version
+    in
+    List.map
+      (fun (id, decl) ->
+        Ident.Map.find id boxed_shapes, unboxed_version_shape id decl)
+      type_declarations
 
   let of_type_declaration id decl shape_for_constr =
     let decls = of_type_declarations [id, decl] shape_for_constr in
@@ -715,6 +742,17 @@ module Type_decl_shape = struct
       (* This case is ruled out by the invariant on [of_type_declarations],
          which for one declaration must return a list with exactly one shape. *)
       assert false
+
+  let of_unboxed_version_declaration (decl : Types.type_declaration) ~args
+      shape_for_constr =
+    if List.compare_lengths decl.type_params args = 0
+    then
+      let shape_for_constr =
+        Type_shape.Predef.shape_for_constr_with_predefs shape_for_constr
+      in
+      let definition = of_type_declaration_go decl args shape_for_constr in
+      Shape.set_uid definition decl.type_uid
+    else Type_shape.unknown_shape_from_jkind decl.type_jkind
 
   let of_extension_constructor_merlin_only (ext : Types.extension_constructor) =
     match ext.ext_args with

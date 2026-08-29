@@ -18,7 +18,7 @@
 open Types
 val transl_type_decl:
     Env.t -> Asttypes.rec_flag -> Parsetree.type_declaration list ->
-    Typedtree.type_declaration list * Env.t * Shape.t list
+    Typedtree.type_declaration list * Env.t * (Shape.t * Shape.t option) list
 
 val transl_exception:
     Env.t -> Parsetree.extension_constructor ->
