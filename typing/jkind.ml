@@ -3794,6 +3794,10 @@ module Violation = struct
   type layout_display =
     | Exact_layout
     | A_value_layout
+    | Value_layout_with_axes
+
+  let box_scannable_bound payload sa =
+    Layout.Sort (Sort.scannable, Layout.box_scannable_axes payload sa)
 
   (* CR layouts-scannable: For now, this is special-cased to print out notes
      iff the layout error message prints containing
@@ -3822,10 +3826,18 @@ module Violation = struct
       let mentions display jkind component =
         match display with
         | A_value_layout -> false
-        | Exact_layout -> (
+        | Exact_layout | Value_layout_with_axes -> (
           match get_layout env jkind with
           | None -> false
-          | Some const -> Layout.Const.has_component ~component const)
+          | Some const ->
+            let const =
+              match display, const with
+              | Value_layout_with_axes, Jkind_types.Layout.Const.Box (_, sa) ->
+                Layout.Const.of_sort_const (Sort.Const.base Scannable) sa
+              | (Exact_layout | Value_layout_with_axes | A_value_layout), _ ->
+                const
+            in
+            Layout.Const.has_component ~component const)
       in
       (* CR layouts-scannable: Whenever we print out "non_pointer",
          "non_pointer64", or "non_float" in an error message, we also include
@@ -3917,16 +3929,34 @@ module Violation = struct
         let base1, base2, cmis = expand k1 k2 in
         base1, base2, cmis
     in
-    (* When we have a non-value layout but expected a value layout, e.g.
-       [float64 </= value non_pointer], we simplify the error message by eliding
-       the scannable axes of the right layout and instead refer to it as "a
-       value layout". *)
+    (* We simplify error messages by eliding detail of value layouts in the
+       following ways:
+
+       1. When we have a non-value layout but expected a value layout, we elide
+          the scannable axes of the expected layout and instead refer to it as
+          "a value layout".
+
+          E.g.,   [float64 </= value non_pointer]
+          becomes [float64 </= a value layout].
+
+       2. When we have a box layout but expected a non-box, we hide the box on
+          the *left* (but still print its scannable axes).
+
+          E.g.,   [bits8 box </= word]
+          becomes [value non_pointer </= word]. *)
     let layout_mismatch l1 l2 =
       let display1, display2 =
-        if
-          (not (Layout.is_scannable_or_var l1)) && Layout.is_scannable_or_var l2
-        then Exact_layout, A_value_layout
-        else Exact_layout, Exact_layout
+        match l1 with
+        | Layout.Box _ -> (
+          match l2 with
+          | Layout.Box _ -> Exact_layout, Exact_layout
+          | _ -> Value_layout_with_axes, Exact_layout)
+        | _ ->
+          if
+            (not (Layout.is_scannable_or_var l1))
+            && Layout.is_scannable_or_var l2
+          then Exact_layout, A_value_layout
+          else Exact_layout, Exact_layout
       in
       Layout, display1, display2
     in
@@ -3962,7 +3992,9 @@ module Violation = struct
       categorize_mismatch env t
     in
     let second_prints_as_value_layout =
-      match display2 with A_value_layout -> true | Exact_layout -> false
+      match display2 with
+      | A_value_layout -> true
+      | Exact_layout | Value_layout_with_axes -> false
     in
     let layout_or_kind =
       match mismatch_type with Kind -> "kind" | Layout -> "layout"
@@ -4000,13 +4032,20 @@ module Violation = struct
         | Ok l -> fprintf ppf "%t%a" indent Layout.format l
         | Error p -> fprintf ppf "the abstract kind %s" (Path.name p))
     in
-    (* Print the layout of the offending (first) jkind *)
+    (* Print the layout of the offending (first) jkind per [display1] *)
     let format_first_base_or_kind (type l r) ppf (jkind : (l * r) jkind) =
       match mismatch_type with
       | Kind -> fprintf ppf "%t%a" indent (format env) jkind
       | Layout -> (
         match extract_layout env jkind with
-        | Ok l -> fprintf ppf "%t%a" indent Layout.format l
+        | Ok l ->
+          let l =
+            match display1, l with
+            | Value_layout_with_axes, Layout.Box (payload, sa) ->
+              box_scannable_bound payload sa
+            | (Exact_layout | Value_layout_with_axes | A_value_layout), l -> l
+          in
+          fprintf ppf "%t%a" indent Layout.format l
         | Error p -> fprintf ppf "the abstract kind %s" (Path.name p))
     in
     (* [first_layout_intro] follows "The layout of t is";
@@ -4014,12 +4053,13 @@ module Violation = struct
     let first_layout_intro (type l r) (k1 : (l * r) jkind) =
       match display1 with
       | A_value_layout -> dprintf "a value %s" layout_or_kind
-      | Exact_layout -> dprintf "%a" format_first_base_or_kind k1
+      | Exact_layout | Value_layout_with_axes ->
+        dprintf "%a" format_first_base_or_kind k1
     in
     let first_layout_format (type l r) (k1 : (l * r) jkind) =
       match display1 with
       | A_value_layout -> dprintf "a value %s" layout_or_kind
-      | Exact_layout ->
+      | Exact_layout | Value_layout_with_axes ->
         dprintf "%s@ %a" layout_or_kind format_first_base_or_kind k1
     in
     let subjkind_format verb k2 =
