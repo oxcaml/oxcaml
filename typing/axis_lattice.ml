@@ -473,8 +473,29 @@ let of_mode_crossing (crossing : Mode.Crossing.t) ~externality =
     ~visibility:(monadic Visibility) ~staticity:(monadic Staticity) ~externality
 
 let mask_of_modality (modality : Mode.Modality.Const.t) : t =
-  let crossing = Mode.Crossing.modality modality Mode.Crossing.max in
-  of_mode_crossing crossing ~externality:Jkind_axis.Externality.max
+  if Mode.Modality.Const.is_id modality
+  then top
+  else
+    let open Mode.Modality in
+    let monadic axis =
+      let (Monadic.Atom.Join_const value) =
+        Const.proj (Axis.Monadic axis) modality
+      in
+      value
+    in
+    let comonadic axis =
+      let (Comonadic.Atom.Meet_const value) =
+        Const.proj (Axis.Comonadic axis) modality
+      in
+      value
+    in
+    let open Mode.Axis in
+    create ~areality:(comonadic Areality) ~linearity:(comonadic Linearity)
+      ~uniqueness:(monadic Uniqueness) ~portability:(comonadic Portability)
+      ~contention:(monadic Contention) ~forkable:(comonadic Forkable)
+      ~yielding:(comonadic Yielding) ~statefulness:(comonadic Statefulness)
+      ~visibility:(monadic Visibility) ~staticity:(monadic Staticity)
+      ~externality:Jkind_axis.Externality.max
 
 (* Canonical lattice constants used by ikinds. *)
 let nonfloat_value : t =

@@ -1064,7 +1064,11 @@ module Jkind0 = struct
     let mask_of_modality ~modality = Axis_lattice.mask_of_modality modality
 
     let apply_mask t mask =
-      Axis_lattice.meet (to_axis_lattice t) mask |> of_axis_lattice
+      if Axis_lattice.equal mask Axis_lattice.top
+      then t
+      else if Axis_lattice.equal mask Axis_lattice.bot
+      then min
+      else Axis_lattice.meet (to_axis_lattice t) mask |> of_axis_lattice
   end
 
   module Quality = struct
