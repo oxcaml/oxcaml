@@ -620,6 +620,20 @@ module Type_decl_shape = struct
                (List.map (fun _ -> Shape.unknown_type ()) inner_args)))
       | Pdot _ | Papply _ | Pextra_ty _ -> None)
 
+  let of_type_declaration_with_params
+      (type_declaration : Types.type_declaration) ~type_param_idents
+      ~type_param_shapes shape_for_constr =
+    let definition =
+      of_type_declaration_go type_declaration type_param_shapes shape_for_constr
+    in
+    let decl_shape = Shape.abs_list definition type_param_idents in
+    (* Use the declaration's own uid even if the definition already carries
+       one: for manifests such as [type t = unit] or [type u = t], the
+       definition keeps the uid of the aliased type (or predef), and
+       uid-based tooling would attribute occurrences of the alias to the
+       aliased type instead. *)
+    Shape.set_uid decl_shape type_declaration.type_uid
+
   let of_type_declaration_with_variables (id : Ident.t)
       (type_declaration : Types.type_declaration) shape_for_constr =
     let type_param_idents =
@@ -634,16 +648,10 @@ module Type_decl_shape = struct
       List.map (fun id -> Shape.var' None id) type_param_idents
     in
     let shape_for_constr = shape_for_constr ~id ~decl_args:type_param_shapes in
-    let definition =
-      of_type_declaration_go type_declaration type_param_shapes shape_for_constr
-    in
-    let decl_shape = Shape.abs_list definition type_param_idents in
-    (* Use the declaration's own uid even if the definition already carries
-       one: for manifests such as [type t = unit] or [type u = t], the
-       definition keeps the uid of the aliased type (or predef), and
-       uid-based tooling would attribute occurrences of the alias to the
-       aliased type instead. *)
-    Shape.set_uid decl_shape type_declaration.type_uid
+    ( of_type_declaration_with_params type_declaration ~type_param_idents
+        ~type_param_shapes shape_for_constr,
+      type_param_idents,
+      type_param_shapes )
 
   (** [of_type_declarations type_declarations shape_for_constr] turns a block of
       type declarations into a list of shapes. The number of shapes that is
@@ -684,7 +692,10 @@ module Type_decl_shape = struct
     let individual_declarations =
       Ident.Map.mapi
         (fun id decl ->
-          of_type_declaration_with_variables id decl shape_for_constr')
+          let shape, _params, _param_shapes =
+            of_type_declaration_with_variables id decl shape_for_constr'
+          in
+          shape)
         decl_lookup_map
     in
     if !recursive
