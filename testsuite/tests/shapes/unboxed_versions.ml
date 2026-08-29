@@ -3,13 +3,14 @@
  expect;
 *)
 
-(* CR rtjoa: The record types below have unboxed versions, which should get
-   their own shapes ("[unboxed version]" entries). *)
-
 type t = { i : int; s : string }
 [%%expect{|
 {
  "t"[type] -> Record_boxed<.0> { i<.1>: int ; s<.2>: string  };
+ "t"[unboxed version] ->
+   Record_unboxed_product<.0#> { i<.1#>: int
+   ; s<.2#>: string
+    };
  }
 type t = { i : int; s : string; }
 |}]
@@ -26,6 +27,10 @@ type v = t = { i : int; s : string }
 [%%expect{|
 {
  "v"[type] -> Record_boxed<.4> { i<.1>: int ; s<.2>: string  };
+ "v"[unboxed version] ->
+   Record_unboxed_product<.4#> { i<.1#>: int
+   ; s<.2#>: string
+    };
  }
 type v = t = { i : int; s : string; }
 |}]
@@ -34,6 +39,8 @@ type 'a p = { a : 'a; b : int }
 [%%expect{|
 {
  "p"[type] -> Abs<.7>(a/16, Record_boxed { a<.8>: a/16 ; b<.9>: int  });
+ "p"[unboxed version] ->
+   Abs<.7#>(a/16, Record_unboxed_product { a<.8#>: a/16 ; b<.9#>: int  });
  }
 type 'a p = { a : 'a; b : int; }
 |}]
@@ -42,6 +49,10 @@ type mix = { flt : float#; i : int }
 [%%expect{|
 {
  "mix"[type] -> Record_mixed<.10> { flt<.11>: float# ; i<.12>: int  };
+ "mix"[unboxed version] ->
+   Record_unboxed_product<.10#> { flt<.11#>: float#
+   ; i<.12#>: int
+    };
  }
 type mix = { flt : float#; i : int; }
 |}]
@@ -56,6 +67,21 @@ type r = { next : r option; x : int }
              ; x<.15>: int
               };
             ).r/0;
+ "r"[unboxed version] ->
+   Record_unboxed_product<.13#> { next<.14#>: Variant None<<predef:None>>
+                                              | Some<<predef:Some>> of
+                                                ((Mutrec r/0 :=
+                                                           Record_boxed<.13> { next<.14>:
+                                                           Variant None<<predef:None>>
+                                                           | Some<<predef:Some>> of
+                                                             (r/0  )
+                                                           ; x<.15>:
+                                                           int
+                                                            };
+                                                          ).r/0
+                                                 )
+   ; x<.15#>: int
+    };
  }
 type r = { next : r option; x : int; }
 |}]
@@ -71,6 +97,21 @@ and m2 = { m1 : m1 option }
                                           | Some<<predef:Some>> of (m1/0  )
               };
             ).m1/0;
+ "m1"[unboxed version] ->
+   Record_unboxed_product<.16#> { m2<.18#>: (Mutrec m1/0 :=
+                                                      Record_boxed<.16> { m2<.18>:
+                                                      m2/0
+                                                      ; i<.19>: int
+                                                       };
+                                                    m2/0 :=
+                                                      Record_boxed<.17> { m1<.20>:
+                                                      Variant None<<predef:None>>
+                                                      | Some<<predef:Some>> of
+                                                        (m1/0  )
+                                                       };
+                                                     ).m2/0
+   ; i<.19#>: int
+    };
  "m2"[type] ->
    (Mutrec m1/0 := Record_boxed<.16> { m2<.18>: m2/0  ; i<.19>: int  };
            m2/0 :=
@@ -78,6 +119,23 @@ and m2 = { m1 : m1 option }
                                           | Some<<predef:Some>> of (m1/0  )
               };
             ).m2/0;
+ "m2"[unboxed version] ->
+   Record_unboxed_product<.17#> { m1<.20#>: Variant None<<predef:None>>
+                                            | Some<<predef:Some>> of
+                                              ((Mutrec m1/0 :=
+                                                         Record_boxed<.16> { m2<.18>:
+                                                         m2/0
+                                                         ; i<.19>: int
+                                                          };
+                                                       m2/0 :=
+                                                         Record_boxed<.17> { m1<.20>:
+                                                         Variant None<<predef:None>>
+                                                         | Some<<predef:Some>> of
+                                                           (m1/0  )
+                                                          };
+                                                        ).m1/0
+                                               )
+    };
  }
 type m1 = { m2 : m2; i : int; }
 and m2 = { m1 : m1 option; }
@@ -99,9 +157,11 @@ end = struct
 end
 [%%expect{|
 {
- "M"[module] -> {<.28>
-                 "mt"[type] -> Record_boxed<.24> { j<.25>: int  };
-                 };
+ "M"[module] ->
+   {<.28>
+    "mt"[type] -> Record_boxed<.24> { j<.25>: int  };
+    "mt"[unboxed version] -> Record_unboxed_product<.24#> { j<.25#>: int  };
+    };
  }
 module M : sig type mt = { j : int; } end
 |}]

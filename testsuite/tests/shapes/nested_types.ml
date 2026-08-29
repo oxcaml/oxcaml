@@ -25,6 +25,7 @@ end
     "Ext"[extension constructor] -> Record_boxed<.7> { lbl_ext<.6>: int  };
     "ext"[type] -> ((? ) : value)<.5>;
     "l"[type] -> Record_boxed<.3> { lbl<.4>: int  };
+    "l"[unboxed version] -> Record_unboxed_product<.3#> { lbl<.4#>: int  };
     "t"[type] -> Variant<.9> C<.11> of lbl_cstr<.10>=int ;
     };
  }
