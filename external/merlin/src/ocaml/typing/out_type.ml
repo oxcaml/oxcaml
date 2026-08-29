@@ -145,6 +145,7 @@ let human_unique n id = Printf.sprintf "%s/%d" (Ident.name id) n
     | Class
     | Class_type
     | Jkind
+    | Unboxed_version
 
 
 module Namespace = struct
@@ -155,7 +156,8 @@ module Namespace = struct
     | Module_type -> 2
     | Class -> 3
     | Class_type -> 4
-    | Extension_constructor | Value | Constructor | Label -> 5
+    | Extension_constructor | Value | Constructor | Label
+    | Unboxed_version -> 5
     | Unboxed_label -> 6
     | Jkind -> 7
      (* we do not handle those component *)
@@ -179,7 +181,8 @@ module Namespace = struct
     | Some Class_type -> to_lookup Env.find_cltype_by_name
     | Some Jkind -> to_lookup Env.find_jkind_by_name
     | None
-    | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label) ->
+    | Some(Value|Extension_constructor|Constructor|Label|Unboxed_label
+          |Unboxed_version) ->
          fun _ -> raise Not_found
 
   let location namespace id =
@@ -193,7 +196,8 @@ module Namespace = struct
         | Some Class -> (in_printing_env @@ Env.find_class path).cty_loc
         | Some Class_type -> (in_printing_env @@ Env.find_cltype path).clty_loc
         | Some Jkind -> (in_printing_env @@ Env.find_jkind path).jkind_loc
-        | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label)
+        | Some (Extension_constructor|Value|Constructor|Label|Unboxed_label
+               |Unboxed_version)
         | None ->
             Location.none
       ) with Not_found -> None

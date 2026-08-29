@@ -177,6 +177,7 @@ module Sig_component_kind = struct
     | Class
     | Class_type
     | Jkind
+    | Unboxed_version
 
   let to_string = function
     | Value -> "value"
@@ -190,6 +191,7 @@ module Sig_component_kind = struct
     | Class -> "class"
     | Class_type -> "class type"
     | Jkind -> "kind"
+    | Unboxed_version -> "unboxed version"
 
   let can_appear_in_types = function
     | Value
@@ -203,7 +205,8 @@ module Sig_component_kind = struct
     | Module_type
     | Class
     | Class_type
-    | Jkind ->
+    | Jkind
+    | Unboxed_version ->
         true
 
   let rank = function
@@ -218,6 +221,7 @@ module Sig_component_kind = struct
     | Label -> 8
     | Unboxed_label -> 9
     | Jkind -> 10
+    | Unboxed_version -> 11
 
   let compare a b =
     let a = rank a in
@@ -254,6 +258,8 @@ module Item = struct
       Ident.name id, Sig_component_kind.Class_type
     let jkind id =
       Ident.name id, Sig_component_kind.Jkind
+    let unboxed_version id =
+      Ident.name id, Sig_component_kind.Unboxed_version
 
     let print fmt (name, ns) =
       Format.fprintf fmt "%S[%s]"
@@ -1293,5 +1299,11 @@ module Map = struct
   let add_jkind t id uid = Item.Map.add (Item.jkind id) (leaf uid) t
   let add_jkind_proj t id shape =
     let item = Item.jkind id in
+    Item.Map.add item (proj shape item) t
+
+  let add_unboxed_version t id shape =
+    Item.Map.add (Item.unboxed_version id) shape t
+  let add_unboxed_version_proj t id shape =
+    let item = Item.unboxed_version id in
     Item.Map.add item (proj shape item) t
 end

@@ -117,6 +117,7 @@ module Sig_component_kind : sig
     | Class
     | Class_type
     | Jkind
+    | Unboxed_version
 
   val to_string : t -> string
 end

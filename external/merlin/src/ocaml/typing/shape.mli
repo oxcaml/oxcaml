@@ -133,6 +133,7 @@ module Sig_component_kind : sig
     | Class
     | Class_type
     | Jkind
+    | Unboxed_version
 
   val to_string : t -> string
 
@@ -162,6 +163,7 @@ module Item : sig
   val class_ : Ident.t -> t
   val class_type : Ident.t -> t
   val jkind : Ident.t -> t
+  val unboxed_version : Ident.t -> t
 
   val print : Format.formatter -> t -> unit
 
@@ -474,6 +476,9 @@ module Map : sig
 
   val add_jkind : t -> Ident.t -> Uid.t -> t
   val add_jkind_proj : t -> Ident.t -> shape -> t
+
+  val add_unboxed_version : t -> Ident.t -> shape -> t
+  val add_unboxed_version_proj : t -> Ident.t -> shape -> t
 end
 
 val dummy_mod : t

@@ -39,10 +39,15 @@ end
 
 module Type_decl_shape : sig
   val of_type_declarations :
-    (Ident.t * Types.type_declaration) list -> path_lookup -> Shape.t list
+    (Ident.t * Types.type_declaration) list ->
+    path_lookup ->
+    (Shape.t * Shape.t option) list
 
   val of_type_declaration :
-    Ident.t -> Types.type_declaration -> path_lookup -> Shape.t
+    Ident.t -> Types.type_declaration -> path_lookup -> Shape.t * Shape.t option
+
+  val of_unboxed_version_declaration :
+    Types.type_declaration -> args:Shape.t list -> path_lookup -> Shape.t
 
   (* CR sspies: The treatment of extension constructors for the debugger has to
      be revised if we want to support them properly. The extension constructor

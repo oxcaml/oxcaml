@@ -451,7 +451,8 @@ val add_value:
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     Ident.t -> Types.value_description -> t -> t
 val add_type:
-  check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
+  check:bool -> ?shape:Shape.t -> ?unboxed_version_shape:Shape.t ->
+  Ident.t -> type_declaration -> t -> t
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t

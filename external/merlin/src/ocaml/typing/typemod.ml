@@ -1843,7 +1843,8 @@ end = struct
     let open Sig_component_kind in
     match component with
     | Value -> names.values
-    | Type | Label | Unboxed_label | Constructor -> names.types
+    | Type | Label | Unboxed_label | Constructor | Unboxed_version ->
+        names.types
     | Module -> names.modules
     | Module_type -> names.modtypes
     | Extension_constructor -> names.typexts
@@ -3977,8 +3978,12 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
           decls
         in
         let shape_map = List.fold_left2
-          (fun map { typ_id; _} shape ->
-            Shape.Map.add_type map typ_id shape)
+          (fun map { typ_id; _} (shape, unboxed_version_shape) ->
+            let map = Shape.Map.add_type map typ_id shape in
+            match unboxed_version_shape with
+            | None -> map
+            | Some shape ->
+                Shape.Map.add_unboxed_version map typ_id shape)
           shape_map
           decls
           shapes
@@ -5214,7 +5219,7 @@ let invalid_part_of_user_kind : Sig_component_kind.t -> string  = function
   | Type -> "kind"
   | Jkind -> "definition"
   | ( Value | Constructor | Label | Unboxed_label | Module | Module_type
-    | Extension_constructor | Class | Class_type ) ->
+    | Extension_constructor | Class | Class_type | Unboxed_version ) ->
     "type"
 
 let report_error ~loc _env = function

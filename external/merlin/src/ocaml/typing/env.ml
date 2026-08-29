@@ -819,6 +819,7 @@ and type_data =
     tda_descriptions : type_descriptions;
     tda_shape : Shape.t;
     tda_unboxed_version_descriptions : type_descriptions option;
+    tda_unboxed_version_shape : Shape.t option;
     tda_hidden : bool }
 
 and module_data =
@@ -1547,6 +1548,7 @@ let type_of_cstr path = function
           tda_descriptions = Type_record (labels, repr, umc);
           tda_shape = Shape.leaf decl.type_uid;
           tda_unboxed_version_descriptions = None;
+          tda_unboxed_version_shape = None;
           tda_hidden = false;
         }
       | _ -> assert false
@@ -1591,6 +1593,7 @@ let rec find_type_data path env seen =
       tda_descriptions = Type_abstract (Btype.type_origin decl);
       tda_shape = Shape.leaf decl.type_uid;
       tda_unboxed_version_descriptions = None;
+      tda_unboxed_version_shape = None;
       tda_hidden = false;
     }
   | exception Not_found -> begin
@@ -1706,16 +1709,23 @@ and find_type_unboxed_version path env seen =
 *)
 and find_type_unboxed_version_data path env seen =
   let tda_declaration = find_type_unboxed_version path env seen in
+  let boxed_tda = find_type_data path env seen in
   let descrs =
-    match (find_type_data path env seen).tda_unboxed_version_descriptions with
+    match boxed_tda.tda_unboxed_version_descriptions with
     | Some descrs -> descrs
     | None -> Type_abstract Definition (* path is an alias *)
+  in
+  let shape =
+    match boxed_tda.tda_unboxed_version_shape with
+    | Some shape -> shape
+    | None -> Shape.leaf tda_declaration.type_uid
   in
   {
     tda_declaration;
     tda_descriptions = descrs;
-    tda_shape = Shape.leaf tda_declaration.type_uid;
+    tda_shape = shape;
     tda_unboxed_version_descriptions = None;
+    tda_unboxed_version_shape = None;
     tda_hidden = false;
   }
 
@@ -1910,6 +1920,13 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       (IdTbl.find_same id env.cltypes).cltda_shape
   | Jkind ->
       (IdTbl.find_same id env.jkinds).jkda_shape
+  | Unboxed_version ->
+      begin match
+        (IdTbl.find_same_without_locks id env.types).tda_unboxed_version_shape
+      with
+      | Some shape -> shape
+      | None -> raise Not_found
+      end
 
 
 let shape_of_path ~namespace env =
@@ -1920,9 +1937,27 @@ let shape_of_path_opt ~namespace env path =
   | shape -> Some shape
   | exception Not_found -> None
 
-let shape_for_constr env path ~args =
-  Option.map (fun sh -> Shape.app_list sh args)
-    (shape_of_path_opt ~namespace:Type env path)
+let rec shape_for_constr env path ~args =
+  match Path.boxed_version path with
+  | None ->
+    Option.map (fun sh -> Shape.app_list sh args)
+      (shape_of_path_opt ~namespace:Type env path)
+  | Some boxed_path ->
+    match find_type boxed_path env with
+    | exception Not_found -> None
+    | { type_unboxed_version = Some _; _ } ->
+      Option.map (fun sh -> Shape.app_list sh args)
+        (shape_of_path_opt ~namespace:Unboxed_version env boxed_path)
+    | { type_unboxed_version = None; _ } ->
+      (* The unboxed version has no stored declaration (e.g. [u#] given
+         [type u = t]), so we compute its shape from the declaration the
+         environment synthesizes on demand. *)
+      match find_type path env with
+      | exception Not_found -> None
+      | decl ->
+        Some
+          (Type_shape.Type_decl_shape.of_unboxed_version_declaration decl ~args
+             (shape_for_constr env))
 
 let shape_or_leaf uid = function
   | None -> Shape.leaf uid
@@ -2548,15 +2583,22 @@ let rec components_of_module_maker
                 final_decl.type_unboxed_version
             in
             let shape = Shape.proj cm_shape (Shape.Item.type_ id) in
+            let unboxed_shape =
+              Option.map
+                (fun _ -> Shape.proj cm_shape (Shape.Item.unboxed_version id))
+                final_decl.type_unboxed_version
+            in
             let tda =
               { tda_declaration = final_decl;
                 tda_descriptions = descrs;
                 tda_shape = shape;
                 tda_unboxed_version_descriptions = unboxed_descrs;
+                tda_unboxed_version_shape = unboxed_shape;
                 tda_hidden = false }
             in
             c.comp_types <- NameMap.add (Ident.name id) tda c.comp_types;
-            env := store_type_infos ~tda_shape:shape id decl !env
+            env := store_type_infos ~tda_shape:shape
+                     ~tda_unboxed_version_shape:unboxed_shape id decl !env
         | Sig_typext(id, ext, _, _) ->
             let ext' = Subst.extension_constructor sub ext in
             let descr =
@@ -2813,7 +2855,13 @@ and store_label
   end;
   add_label record_form env lbl_id lbl
 
+<<<<<<< Merlin:rtjoa.unboxed-shapes
 and store_type ~check ~long_path ~predef ~hidden id info shape env =
+||||||| Compiler:last-imported
+and store_type ~check ~hidden id info shape env =
+=======
+and store_type ~check ~hidden id info shape unboxed_version_shape env =
+>>>>>>> Compiler:HEAD
   let loc = info.type_loc in
   if check then
     check_usage loc id info.type_uid
@@ -2863,6 +2911,7 @@ and store_type ~check ~long_path ~predef ~hidden id info shape env =
       tda_descriptions = descrs;
       tda_shape = shape;
       tda_unboxed_version_descriptions = unboxed_descrs;
+      tda_unboxed_version_shape = unboxed_version_shape;
       tda_hidden = hidden }
   in
   Builtin_attributes.mark_alerts_used info.type_attributes;
@@ -2872,7 +2921,7 @@ and store_type ~check ~long_path ~predef ~hidden id info shape env =
     short_paths_additions =
       short_paths_type ~long_path predef id info env.short_paths_additions; }
 
-and store_type_infos ~tda_shape id info env =
+and store_type_infos ~tda_shape ~tda_unboxed_version_shape id info env =
   (* Simplified version of store_type that doesn't compute and store
      constructor and label infos, but simply record the arity and
      manifest-ness of the type.  Used in components_of_module to
@@ -2886,6 +2935,7 @@ and store_type_infos ~tda_shape id info env =
       tda_unboxed_version_descriptions =
         Option.map (fun uinfo -> Type_abstract (Btype.type_origin uinfo))
           info.type_unboxed_version;
+      tda_unboxed_version_shape;
       tda_hidden = false;
     }
   in
@@ -3076,9 +3126,10 @@ let add_value_lazy ?check ?shape ~mode id desc env =
   let mode = Mode.Value.disallow_right mode in
   store_value ?check ~mode id addr desc shape env
 
-let add_type_maybe_hidden ~check ~hidden ?shape id info env =
+let add_type_maybe_hidden ~check ~hidden ?shape ?unboxed_version_shape id info
+    env =
   let shape = shape_or_leaf info.type_uid shape in
-  store_type ~check ~hidden id info shape env
+  store_type ~check ~hidden id info shape unboxed_version_shape env
 
 let add_type = add_type_maybe_hidden ~hidden:false
 
@@ -3188,8 +3239,17 @@ let enter_value ?check ~mode name desc env =
 
 let enter_type ?(long_path = false) ~scope name info env =
   let id = Ident.create_scoped ~scope name in
+<<<<<<< Merlin:rtjoa.unboxed-shapes
   let env = store_type ~check:true ~predef:false ~long_path ~hidden:false
     id info (Shape.leaf info.type_uid) env
+||||||| Compiler:last-imported
+  let env =
+    store_type ~check:true ~hidden:false id info (Shape.leaf info.type_uid) env
+=======
+  let env =
+    store_type ~check:true ~hidden:false id info (Shape.leaf info.type_uid)
+      None env
+>>>>>>> Compiler:HEAD
   in
   (id, env)
 
@@ -3327,8 +3387,20 @@ end) = struct
         map, M.add_value ?shape ~mode id decl env
     | Sig_type(id, decl, _, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.type_ id) in
+<<<<<<< Merlin:rtjoa.unboxed-shapes
         map,
         add_type ~long_path:false ~check:false ~predef:false ?shape id decl env
+||||||| Compiler:last-imported
+        map, add_type ~check:false ?shape id decl env
+=======
+        let map, unboxed_version_shape =
+          match decl.type_unboxed_version with
+          | None -> map, None
+          | Some _ ->
+              proj_shape map mod_shape (Shape.Item.unboxed_version id)
+        in
+        map, add_type ~check:false ?shape ?unboxed_version_shape id decl env
+>>>>>>> Compiler:HEAD
     | Sig_typext(id, ext, _, _) ->
         let map, shape = proj_shape map mod_shape (Shape.Item.extension_constructor id) in
         map, add_extension ~check:false ?shape ~rebind:false id ext env
@@ -3500,11 +3572,17 @@ let initial () =
     match !Clflags.shape_format with
     | Clflags.Old_merlin -> add_type type_ident decl env ~check:false ~predef:true ~long_path:false
     | Clflags.Debugging_shapes ->
-      let shape =
+      let shape, unboxed_version_shape =
         Type_shape.Type_decl_shape.of_type_declaration type_ident decl
           (shape_for_constr env)
       in
+<<<<<<< Merlin:rtjoa.unboxed-shapes
       add_type type_ident ~shape decl env ~check:false ~predef:true ~long_path:false
+||||||| Compiler:last-imported
+      add_type type_ident ~shape decl env ~check:false
+=======
+      add_type type_ident ~shape ?unboxed_version_shape decl env ~check:false
+>>>>>>> Compiler:HEAD
   in
   let initial_env =
     Predef.build_initial_env add_type_and_remember_decl
@@ -3525,14 +3603,22 @@ let add_language_extension_types env =
     match Language_extension.is_at_least ext lvl with
     | true ->
       (* CR-someday poechsel: Pass a correct shape here *)
-      f (add_type ?shape:None ~check:false) env
+      f (add_type ?shape:None ?unboxed_version_shape:None ~check:false) env
     | false -> env
   in
   let add_or_hide ext lvl f env =
     let hidden = not (Language_extension.is_at_least ext lvl) in
+<<<<<<< Merlin:rtjoa.unboxed-shapes
     f (add_type_maybe_hidden ?shape:None ~check:false ~hidden
         ~long_path:false ~predef:false)
       env
+||||||| Compiler:last-imported
+    f (add_type_maybe_hidden ?shape:None ~check:false ~hidden) env
+=======
+    f (add_type_maybe_hidden ?shape:None ?unboxed_version_shape:None
+         ~check:false ~hidden)
+      env
+>>>>>>> Compiler:HEAD
   in
   (* Small number types are hidden when [Small_numbers] is disabled since they
      can easily be shimmed and emulated upstream. This could be done for other

@@ -1016,6 +1016,12 @@ and signature_components :
             (* Right now we don't filter hidden constructors / labels from the
             shape. *)
             let shape_map = Shape.Map.add_type_proj shape_map id1 orig_shape in
+            let shape_map =
+              match tydec2.type_unboxed_version with
+              | None -> shape_map
+              | Some _ ->
+                  Shape.Map.add_unboxed_version_proj shape_map id1 orig_shape
+            in
             id1, item, (tydec1.type_uid, tydec2.type_uid), shape_map, false
         | Sig_typext(id1, ext1, _, _), Sig_typext(_id2, ext2, _, _) ->
             let item =
