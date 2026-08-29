@@ -120,6 +120,11 @@ module Layout : sig
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
+  (** Determines if every inhabitant of the layout is ignored by the GC, so that
+      the layout's externality bound is inherently [External]. False for
+      scannable layouts, [any] and variables. *)
+  val is_surely_external : Sort.t t -> bool
+
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
 

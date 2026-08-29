@@ -831,6 +831,17 @@ module Sort = struct
   let is_scannable_or_var s =
     match get s with Base Scannable | Var _ -> true | _ -> false
 
+  let is_surely_external s =
+    let rec go = function
+      | Base Scannable | Var _ | Univar _ -> false
+      | Base
+          ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+          | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask ) ->
+        true
+      | Product ts -> List.for_all go ts
+    in
+    go (get s)
+
   (***********************)
   (* equality *)
 
@@ -1076,6 +1087,15 @@ module Layout = struct
       | Product _ -> false
       | Univar _ -> false
       | Genvar _ -> false
+
+    let rec is_surely_external = function
+      | Any _ | Base (Scannable, _) | Univar _ | Genvar _ -> false
+      | Base
+          ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+            | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask ),
+            _ ) ->
+        true
+      | Product ts -> List.for_all is_surely_external ts
 
     let get_root_scannable_axes t =
       match t with

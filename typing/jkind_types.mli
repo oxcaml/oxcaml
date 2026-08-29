@@ -100,6 +100,11 @@ module Sort : sig
   (** Determines if the sort is [Scannable] or an unfilled sort variable *)
   val is_scannable_or_var : t -> bool
 
+  (** Determines if every inhabitant of the sort is ignored by the GC, so that
+      the sort's externality bound is inherently [External]. False for
+      [Scannable] and for unfilled variables. *)
+  val is_surely_external : t -> bool
+
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
   *)
@@ -171,6 +176,11 @@ module Layout : sig
     val get_sort : t -> Sort.Const.t option
 
     val is_scannable_or_any : t -> bool
+
+    (** Determines if every inhabitant of the layout is ignored by the GC, so
+        that the layout's externality bound is inherently [External]. False for
+        [Scannable], [Any] and variables. *)
+    val is_surely_external : t -> bool
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)

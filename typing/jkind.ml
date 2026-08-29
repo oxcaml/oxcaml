@@ -273,6 +273,11 @@ module Layout = struct
     | Equal_mutated_both ->
       true
 
+  let rec is_surely_external : Sort.t t -> bool = function
+    | Any _ -> false
+    | Sort (s, _) -> Sort.is_surely_external s
+    | Product ts -> List.for_all is_surely_external ts
+
   let rec equate_or_equal ~allow_mutation t1 t2 =
     match t1, t2 with
     | Sort (s1, sa1), Sort (s2, sa2) ->
@@ -843,30 +848,61 @@ module Base_and_axes = struct
               with_bounds = t.with_bounds
             })
 
+  (* Non-scannable layouts inherently cross externality: no inhabitant is ever
+     scanned by the GC. The stored bound can still be coarser, e.g. on a jkind
+     from a fresh sort variable or after a with-bounds join, so reads clamp it
+     down to the bound implied by the layout. *)
+  let clamp_externality_mod_bounds ~layout_is_surely_external l mod_bounds =
+    match Mod_bounds.externality mod_bounds with
+    | Externality.External -> mod_bounds
+    | Externality.External64 | Externality.Internal ->
+      if layout_is_surely_external l
+      then Mod_bounds.set_externality Externality.External mod_bounds
+      else mod_bounds
+
+  let clamp_externality ~layout_is_surely_external
+      ({ base; mod_bounds; _ } as t) =
+    match base with
+    | Kconstr _ -> t
+    | Layout l ->
+      let mod_bounds' =
+        clamp_externality_mod_bounds ~layout_is_surely_external l mod_bounds
+      in
+      if mod_bounds' == mod_bounds
+      then t
+      else { t with mod_bounds = mod_bounds' }
+
+  let clamp_externality_const t =
+    clamp_externality ~layout_is_surely_external:Layout.Const.is_surely_external
+      t
+
+  let clamp_externality_desc t =
+    clamp_externality ~layout_is_surely_external:Layout.is_surely_external t
+
   let rec fully_expand_aliases_const env t : _ jkind_const_desc =
     match expand_base_once_const env t with
-    | Not_expanded -> t
-    | Missing_cmi _ -> t
+    | Not_expanded -> clamp_externality_const t
+    | Missing_cmi _ -> clamp_externality_const t
     | Expanded t -> fully_expand_aliases_const env t
 
   let fully_expand_aliases env t : _ jkind_desc =
     match expand_base_once_const env t with
-    | Not_expanded -> t
-    | Missing_cmi _ -> t
+    | Not_expanded -> clamp_externality_desc t
+    | Missing_cmi _ -> clamp_externality_desc t
     | Expanded t ->
       let const = fully_expand_aliases_const env t in
       jkind_desc_of_const const
 
   let rec fully_expand_aliases_const_report_missing_cmi env t =
     match expand_base_once_const env t with
-    | Not_expanded -> t, None
-    | Missing_cmi p -> t, Some p
+    | Not_expanded -> clamp_externality_const t, None
+    | Missing_cmi p -> clamp_externality_const t, Some p
     | Expanded t -> fully_expand_aliases_const_report_missing_cmi env t
 
   let fully_expand_aliases_report_missing_cmi env t =
     match expand_base_once_const env t with
-    | Not_expanded -> t, None
-    | Missing_cmi p -> t, Some p
+    | Not_expanded -> clamp_externality_desc t, None
+    | Missing_cmi p -> clamp_externality_desc t, Some p
     | Expanded t ->
       let const, missing_cmi =
         fully_expand_aliases_const_report_missing_cmi env t
@@ -1382,7 +1418,9 @@ module Base_and_axes = struct
       let normalized_t : (_, l * r) base_and_axes =
         match mode, ctl.fuel_status with
         | Require_best, Sufficient_fuel | Ignore_best, _ ->
-          { t with mod_bounds; with_bounds }
+          (* The with-bounds join can raise externality above the bound implied
+             by the layout; clamp it back down. *)
+          clamp_externality_desc { t with mod_bounds; with_bounds }
         | Require_best, Ran_out_of_fuel ->
           (* Note [Ran out of fuel when requiring best]
              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1478,7 +1516,13 @@ module Jkind_desc = struct
     match base1, base2 with
     | Layout l1, Layout l2 ->
       Layout.equate_or_equal ~allow_mutation l1 l2
-      && Mod_bounds.equal mod_bounds1 mod_bounds2
+      &&
+      (* Bounds differing only in a layout-implied externality are equal. *)
+      let clamp l mod_bounds =
+        Base_and_axes.clamp_externality_mod_bounds
+          ~layout_is_surely_external:Layout.is_surely_external l mod_bounds
+      in
+      Mod_bounds.equal (clamp l1 mod_bounds1) (clamp l2 mod_bounds2)
     | Kconstr (p1, sa1), Kconstr (p2, sa2)
       when Path.same p1 p2
            && Scannable_axes.equal sa1 sa2
@@ -1501,6 +1545,15 @@ module Jkind_desc = struct
     let bases = Base.sub_expanded base1 base2 in
     match with_bounds1 with
     | No_with_bounds ->
+      let bounds1 =
+        (* [Base.sub_expanded] may have just filled sort variables on the left,
+           revealing a layout with a lower inherent externality bound. *)
+        match base1 with
+        | Layout l ->
+          Base_and_axes.clamp_externality_mod_bounds
+            ~layout_is_surely_external:Layout.is_surely_external l bounds1
+        | Kconstr _ -> bounds1
+      in
       let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
       Sub_result.combine bases bounds
     | With_bounds _ -> (

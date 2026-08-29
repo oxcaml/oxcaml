@@ -124,6 +124,13 @@ module Solver = struct
   let is_principal_type (ty : Types.type_expr) : bool =
     (not !Clflags.principal) || Types.get_level ty = Btype.generic_level
 
+  (* Top on every axis except externality, which is [External]: the bound
+     implied by a surely-external layout. *)
+  let external_externality_cap : Ldd.node =
+    Ldd.const
+      (Axis_lattice.set_externality Jkind_axis.Externality.External
+         Axis_lattice.top)
+
   (* CR jujacobs: we could optimize the join with masks you see below
      using a combined [Ldd.join_with_mask left mask right] operation. *)
 
@@ -174,7 +181,10 @@ module Solver = struct
               | exception Not_found -> rigid_name ctx name
               | { jkind_manifest = None; _ } -> rigid_name ctx name
               | { jkind_manifest = Some jkind_const; _ } ->
-                ckind_of_jkind_desc ctx jkind_const))
+                ckind_of_jkind_desc
+                  ~layout_is_surely_external:
+                    Jkind_types.Layout.Const.is_surely_external ctx jkind_const)
+            )
           | Atom { constr = other_path; arg_index } ->
             if Path.same other_path path
             then rigid_name ctx name
@@ -295,41 +305,59 @@ module Solver = struct
 
   (* Converting surface jkinds to solver ckinds. *)
   and ckind_of_jkind_desc : type a l r.
-      ctx -> (a, l * r) Types.base_and_axes -> Ldd.node =
-   fun ctx jkind_desc ->
+      layout_is_surely_external:(a -> bool) ->
+      ctx ->
+      (a, l * r) Types.base_and_axes ->
+      Ldd.node =
+   fun ~layout_is_surely_external ctx jkind_desc ->
     let expand =
       match ctx.env with
       | None ->
         let expand : type b.
+            layout_is_surely_external:(b -> bool) ->
             (b, l * r) Types.base_and_axes ->
-            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
-         fun jkind_desc ->
-          let unresolved_base =
+            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option * bool
+            =
+         fun ~layout_is_surely_external jkind_desc ->
+          let unresolved_base, surely_external =
             match jkind_desc.base with
-            | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
+            | Types.Layout l -> None, layout_is_surely_external l
+            | Types.Kconstr (path, _) -> Some path, false
           in
-          jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
+          ( jkind_desc.mod_bounds,
+            jkind_desc.with_bounds,
+            unresolved_base,
+            surely_external )
         in
-        expand
+        expand ~layout_is_surely_external
       | Some env ->
         let rec expand : type b.
+            layout_is_surely_external:(b -> bool) ->
             (b, l * r) Types.base_and_axes ->
-            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
-         fun jkind_desc ->
+            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option * bool
+            =
+         fun ~layout_is_surely_external jkind_desc ->
           match Jkind.Const.expand_once env jkind_desc with
-          | Some jkind_const -> expand jkind_const
+          | Some jkind_const ->
+            expand
+              ~layout_is_surely_external:
+                Jkind_types.Layout.Const.is_surely_external jkind_const
           | None ->
-            let unresolved_base =
+            let unresolved_base, surely_external =
               match jkind_desc.base with
-              | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
+              | Types.Layout l -> None, layout_is_surely_external l
+              | Types.Kconstr (path, _) -> Some path, false
             in
-            jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
+            ( jkind_desc.mod_bounds,
+              jkind_desc.with_bounds,
+              unresolved_base,
+              surely_external )
         in
-        expand
+        expand ~layout_is_surely_external
     in
-    let mod_bounds, with_bounds, unresolved_base = expand jkind_desc in
+    let mod_bounds, with_bounds, unresolved_base, surely_external =
+      expand jkind_desc
+    in
     let base_mod_bounds =
       Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
     in
@@ -342,53 +370,75 @@ module Solver = struct
     in
     (* For each with-bound (ty, axes), contribute
        modality(axes_mask, kind ty). *)
-    Jkind.With_bounds.to_seq with_bounds
-    |> Seq.fold_left
-         (fun acc (ty, bound_info) ->
-           let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set axes in
-           let ty_kind = kind ~use_tables:true ctx ty in
-           Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
-         base
+    let result =
+      Jkind.With_bounds.to_seq with_bounds
+      |> Seq.fold_left
+           (fun acc (ty, bound_info) ->
+             let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
+             let mask = Axis_lattice.of_axis_set axes in
+             let ty_kind = kind ~use_tables:true ctx ty in
+             Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
+           base
+    in
+    (* Non-scannable layouts inherently cross externality, whatever the stored
+       mod-bounds and with-bounds say. *)
+    if surely_external then Ldd.meet result external_externality_cap else result
 
   and ckind_of_jkind : type l r. ctx -> (l * r) Types.jkind -> Ldd.node =
-   fun ctx jkind -> ckind_of_jkind_desc ctx jkind.jkind
+   fun ctx jkind ->
+    ckind_of_jkind_desc
+      ~layout_is_surely_external:Jkind.Layout.is_surely_external ctx jkind.jkind
 
   and mod_bounds_floor_of_jkind_desc : type a l r.
-      ctx -> (a, l * r) Types.base_and_axes -> Ldd.node option =
-   fun ctx jkind_desc ->
-    let mod_bounds, unresolved_base =
+      layout_is_surely_external:(a -> bool) ->
+      ctx ->
+      (a, l * r) Types.base_and_axes ->
+      Ldd.node option =
+   fun ~layout_is_surely_external ctx jkind_desc ->
+    let mod_bounds, unresolved_base, surely_external =
       let rec expand : type b.
-          (b, l * r) Types.base_and_axes -> Types.mod_bounds * Path.t option =
-       fun jkind_desc ->
-        match ctx.env with
-        | None ->
-          let unresolved_base =
+          layout_is_surely_external:(b -> bool) ->
+          (b, l * r) Types.base_and_axes ->
+          Types.mod_bounds * Path.t option * bool =
+       fun ~layout_is_surely_external jkind_desc ->
+        let terminal () =
+          let unresolved_base, surely_external =
             match jkind_desc.base with
-            | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
+            | Types.Layout l -> None, layout_is_surely_external l
+            | Types.Kconstr (path, _) -> Some path, false
           in
-          jkind_desc.mod_bounds, unresolved_base
+          jkind_desc.mod_bounds, unresolved_base, surely_external
+        in
+        match ctx.env with
+        | None -> terminal ()
         | Some env -> (
           match Jkind.Const.expand_once env jkind_desc with
-          | Some jkind_const -> expand jkind_const
-          | None ->
-            let unresolved_base =
-              match jkind_desc.base with
-              | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
-            in
-            jkind_desc.mod_bounds, unresolved_base)
+          | Some jkind_const ->
+            expand
+              ~layout_is_surely_external:
+                Jkind_types.Layout.Const.is_surely_external jkind_const
+          | None -> terminal ())
       in
-      expand jkind_desc
+      expand ~layout_is_surely_external jkind_desc
     in
     match unresolved_base with
     | Some _ -> None
-    | None -> Some (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
+    | None ->
+      let lat = Jkind.Mod_bounds.to_axis_lattice mod_bounds in
+      let lat =
+        (* Keep the floor consistent with the externality cap applied in
+           [ckind_of_jkind_desc]. *)
+        if surely_external
+        then Axis_lattice.set_externality Jkind_axis.Externality.External lat
+        else lat
+      in
+      Some (Ldd.const lat)
 
   and mod_bounds_floor_of_jkind : type l r.
       ctx -> (l * r) Types.jkind -> Ldd.node option =
-   fun ctx jkind -> mod_bounds_floor_of_jkind_desc ctx jkind.jkind
+   fun ctx jkind ->
+    mod_bounds_floor_of_jkind_desc
+      ~layout_is_surely_external:Jkind.Layout.is_surely_external ctx jkind.jkind
 
   (** Compute the kind for [t]. *)
   and kind ?(check_principality = true) ~use_tables (ctx : ctx)
@@ -1109,14 +1159,24 @@ let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
   | Types.With_bounds _ -> false
 
 let fast_sub_of_value_sub : type r.
-    Axis_lattice.t -> (Allowance.allowed * r) Types.jkind -> bool =
- fun super_lat (sub : (Allowance.allowed * r) Types.jkind) ->
+    sub_sort:Jkind_types.Sort.t ->
+    Axis_lattice.t ->
+    (Allowance.allowed * r) Types.jkind ->
+    bool =
+ fun ~sub_sort super_lat (sub : (Allowance.allowed * r) Types.jkind) ->
   if Axis_lattice.equal super_lat Axis_lattice.top
   then true
   else if not (with_bounds_is_empty sub.jkind.with_bounds)
   then false
   else
     let sub_lat = Jkind.Mod_bounds.to_axis_lattice sub.jkind.mod_bounds in
+    let sub_lat =
+      (* Non-scannable layouts inherently cross externality, whatever the
+         stored mod-bounds say. *)
+      if Jkind_types.Sort.is_surely_external sub_sort
+      then Axis_lattice.set_externality Jkind_axis.Externality.External sub_lat
+      else sub_lat
+    in
     Axis_lattice.leq sub_lat super_lat
 
 let fast_sub_of_any_super : type r.
@@ -1124,9 +1184,11 @@ let fast_sub_of_any_super : type r.
  fun mod_bounds sub ->
   match sub.jkind.base with
   | Types.Layout
-      (Jkind_types.Layout.Sort (_sub_sort, { nullability = _; separability = _ }))
+      (Jkind_types.Layout.Sort (sub_sort, { nullability = _; separability = _ }))
     ->
-    fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
+    fast_sub_of_value_sub ~sub_sort
+      (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
+      sub
   | Types.Layout _ | Types.Kconstr _ -> false
 
 let fast_sub_of_sort_super : type r.
@@ -1141,7 +1203,10 @@ let fast_sub_of_sort_super : type r.
     ->
     if not (Jkind_types.Sort.equate sub_sort super_sort)
     then false
-    else fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
+    else
+      fast_sub_of_value_sub ~sub_sort
+        (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
+        sub
   | Types.Layout _ | Types.Kconstr _ -> false
 
 let fast_sub : type r1 l2.
@@ -1318,7 +1383,10 @@ let substitute_decl_ikind_with_lookup
         | Subst.Ikind_substitution.Lookup_jkind_const jkind_const ->
           let raw =
             let ctx = create_ctx ~mode:Solver.Normal ~env:None in
-            Solver.normalize (Solver.ckind_of_jkind_desc ctx jkind_const)
+            Solver.normalize
+              (Solver.ckind_of_jkind_desc
+                 ~layout_is_surely_external:
+                   Jkind_types.Layout.Const.is_surely_external ctx jkind_const)
           in
           map_poly expanding raw)
       | Atom { constr = path; arg_index } -> (
