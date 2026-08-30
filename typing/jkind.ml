@@ -893,16 +893,18 @@ module Base_and_axes = struct
       let const = fully_expand_aliases_const env t in
       jkind_desc_of_const const
 
+  (* No externality clamping here: the only caller reads just the base and the
+     missing-cmi paths, never the bounds. *)
   let rec fully_expand_aliases_const_report_missing_cmi env t =
     match expand_base_once_const env t with
-    | Not_expanded -> clamp_externality_const t, None
-    | Missing_cmi p -> clamp_externality_const t, Some p
+    | Not_expanded -> t, None
+    | Missing_cmi p -> t, Some p
     | Expanded t -> fully_expand_aliases_const_report_missing_cmi env t
 
   let fully_expand_aliases_report_missing_cmi env t =
     match expand_base_once_const env t with
-    | Not_expanded -> clamp_externality_desc t, None
-    | Missing_cmi p -> clamp_externality_desc t, Some p
+    | Not_expanded -> t, None
+    | Missing_cmi p -> t, Some p
     | Expanded t ->
       let const, missing_cmi =
         fully_expand_aliases_const_report_missing_cmi env t
