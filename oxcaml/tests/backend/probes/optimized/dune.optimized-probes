@@ -121,3 +121,33 @@
        (= %{system} "linux")))
  (deps f2.expected f2.output)
  (action (diff f2.expected f2.output)))
+
+; BUG: tmc.ml should print 30000 and exit 0.  A [%probe] in a
+; [@@tail_mod_cons] function keeps a region alive, which stops the TMC
+; destination-passing recursive call from being a tail call, so the program
+; overflows the stack instead.  When that is fixed, tmc.expected and the
+; accepted exit code below both need updating.
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (target tmc.exe)
+ (deps tmc.ml)
+ (action (with-accepted-exit-codes 0
+         (run %{bin:ocamlopt.opt}  %{deps} -o tmc.exe))))
+
+(rule
+ (target tmc.output)
+ (deps tmc.exe)
+ (action (with-outputs-to %{target}
+         (with-accepted-exit-codes 2
+         (setenv OCAMLRUNPARAM "l=300"
+         (run %{deps}))))))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{system} "linux")))
+ (deps tmc.expected tmc.output)
+ (action (diff tmc.expected tmc.output)))
