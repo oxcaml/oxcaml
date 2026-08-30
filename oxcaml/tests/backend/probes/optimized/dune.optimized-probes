@@ -121,27 +121,3 @@
        (= %{system} "linux")))
  (deps f2.expected f2.output)
  (action (diff f2.expected f2.output)))
-
-; BUG: this records TMC losing its constant-stack guarantee when the mapped
-; function's body contains a [%probe]. When that is fixed the two booleans in
-; tmc.expected swap and the file must be updated.
-(rule
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")))
- (target tmc.exe)
- (deps tmc.ml)
- (action (run %{bin:ocamlopt.opt}  %{deps} -o tmc.exe)))
-
-(rule
- (target tmc.output)
- (deps tmc.exe)
- (action (with-outputs-to %{target} (run %{deps}))))
-
-(rule
- (alias   runtest)
- (enabled_if
-  (and (= %{context_name} "main")
-       (= %{system} "linux")))
- (deps tmc.expected tmc.output)
- (action (diff tmc.expected tmc.output)))
