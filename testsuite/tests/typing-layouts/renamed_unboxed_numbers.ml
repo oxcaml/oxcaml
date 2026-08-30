@@ -5,8 +5,8 @@
 
 (* [nativeint#], [int32#], [int64#], and [float32#] were removed in favor of
    the standalone types [nativeint_u], [int32_u], [int64_u], and
-   [float32_u]: the boxed versions are custom blocks, so they should not have
-   unboxed versions. *)
+   [float32_u]: the legacy [nativeint]/[int32]/[int64]/[float32] boxed types
+   are custom blocks, so they should not have unboxed versions. *)
 
 type t = nativeint#
 [%%expect{|
