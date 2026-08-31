@@ -123,6 +123,8 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
+  val crosses_externality : Sort.t t -> bool
+
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
 
@@ -938,7 +940,8 @@ val mod_bounds_are_obviously_max : 'd Types.jkind -> bool
 
 (** Fully expands the jkind's base - useful to avoid expanding twice for clients
     that both want to inspect the mod bounds and apply other functions to the
-    jkind that would expand it. *)
+    jkind that would expand it. Also lowers the resulting externality bound to
+    the bound implied by the layout. *)
 val fully_expand_aliases : Env.t -> 'd Types.jkind -> 'd Types.jkind
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)
