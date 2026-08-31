@@ -24,18 +24,17 @@ Types
 
   $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse types/repro2_types.cmi
   Discourse:
-  Topic: alias: Topic [Repro2_types__!.Topic] Topic [Repro2_types__!.Topic]
+  Topic: alias: Topic [Repro2_types__!.Topic] Repro2_types__!.Topic
   
   Topic_name: alias: Topic_name [Repro2_types__!.Topic_name]
-    Topic_name [Repro2_types__!.Topic_name]
+    Repro2_types__!.Topic_name
   
 
 
   $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse types/repro2_types__Topic_name.cmi
   Discourse:
-  t: Repro2_priv.Topic_name.t [Repro2_priv!.Topic_name.t]
-  of_topic: t [t/281[1]]; option [option/13!];
-    Topic.t [Repro2_types__!.Topic.t]
+  t: Repro2_priv!.Topic_name.t
+  of_topic: option/13!; t/281[1]; Repro2_types__!.Topic.t
 
 
 Main
@@ -46,10 +45,10 @@ Main
 
   $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse main/repro2_main.cmi
   Discourse:
-  Topic: alias: Topic [Repro2_types!.Topic] Topic [Repro2_types!.Topic]
+  Topic: alias: Topic [Repro2_types!.Topic] Repro2_types!.Topic
   
   Topic_name: alias: Topic_name [Repro2_types!.Topic_name]
-    Topic_name [Repro2_types!.Topic_name]
+    Repro2_types!.Topic_name
   
 
 

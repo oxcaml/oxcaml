@@ -1063,7 +1063,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
     ctyp (Ttyp_unboxed_tuple tl) ctyp_type, discourse
   | Ptyp_constr(lid, stl) ->
       let (path, decl) = Env.lookup_type ~loc:lid.loc lid.txt env in
-      let discourse = Discourse_types.singleton lid.txt (Type, path) in
+      let discourse = Discourse_types.singleton (Type, path) in
       Discourse.use_type env lid path;
       let stl =
         match stl with
@@ -1140,7 +1140,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             | (_ : _ * _) ->
                 raise (Error (styp.ptyp_loc, env, Did_you_mean_unboxed lid.txt))
       in
-      let discourse = Discourse_types.singleton lid.txt (Class_type, path) in
+      let discourse = Discourse_types.singleton (Class_type, path) in
       if List.length stl <> decl.type_arity then
         raise(Error(styp.ptyp_loc, env,
                     Type_arity_mismatch(lid.txt, decl.type_arity,
@@ -1355,8 +1355,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         !type_open Asttypes.Fresh env loc mod_ident
       in
       let cty, discourse = transl_type new_env ~policy ~row_context mode t in
-      let discourse =
-        Discourse_types.add mod_ident.txt (Module, path) discourse in
+      let discourse = Discourse_types.add (Module, path) discourse in
       ctyp (Ttyp_open (path, mod_ident, cty)) cty.ctyp_type, discourse
   | Ptyp_of_kind jkind ->
       Env.check_no_open_quotations loc env Jkind_annotation_qt;
@@ -1712,9 +1711,7 @@ and transl_package env ~policy ~row_context ptyp =
     else mty.mty_type
   in
   let path = !transl_modtype_longident loc env ptyp.ppt_path.txt in
-  let discourse =
-    Discourse_types.add ptyp.ppt_path.txt (Module_type, path) discourse
-  in
+  let discourse = Discourse_types.add (Module_type, path) discourse in
   path, mty, ptys, discourse
 
 (* Make the rows "fixed" in this type, to make universal check easier *)

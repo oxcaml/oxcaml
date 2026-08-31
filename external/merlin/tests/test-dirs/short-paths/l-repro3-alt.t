@@ -33,9 +33,9 @@ Short-paths should prefer Header.t but prints Lib_b.Header.t.
   $ $OCAMLC -o lib_b.cmi -c -impl lib_b.ml -I ../lib_a
   $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse lib_b.cmi
   Discourse:
-  Header: alias: Lib_a.Header [Lib_a!.Header] Lib_a.Header [Lib_a!.Header]
+  Header: alias: Lib_a.Header [Lib_a!.Header] Lib_a!.Header
   
-  t: Header.t [Header/280[1].t]
+  t: Header/280[1].t
 
   $ cd ..
 

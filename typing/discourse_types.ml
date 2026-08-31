@@ -83,6 +83,8 @@ module Lid_trie = struct
     in
     aux (node ?children paths) lid
 
+  let singleton lid path = trie_of_lid lid (Paths.singleton path)
+
   let rec union (Trie (p1, m1)) (Trie (p2, m2)) =
     Trie
       ( Paths.union p1 p2,
@@ -155,15 +157,14 @@ module Lid_trie = struct
       (to_seq t)
 end
 
-type t = Lid_trie.t
-let empty = Lid_trie.empty
-let add = Lid_trie.add
-let union = Lid_trie.union
-let singleton lid path = Lid_trie.trie_of_lid lid (Paths.singleton path)
+type t = Paths.t
+let empty = Paths.empty
+let singleton = Paths.singleton
+let add = Paths.add
+let union = Paths.union
+let pp = pp_paths
 
-let pp = Lid_trie.pp_seq
-
-type discourse = { paths : t; substs : Lid_set.t Lid_map.t }
+type discourse = { paths : Lid_trie.t; substs : Lid_set.t Lid_map.t }
 
 let pp_map fmt t =
   let pp_sep fmt () = Format.fprintf fmt ";@ " in

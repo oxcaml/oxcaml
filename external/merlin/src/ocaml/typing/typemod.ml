@@ -2081,13 +2081,13 @@ and transl_modtype_aux env smty =
       Discourse.use_modtype env lid path;
       mkmty (Tmty_ident (path, lid)) (Mty_ident path) env loc
         smty.pmty_attributes,
-      Discourse_types.singleton lid.txt (Module_type, path)
+      Discourse_types.singleton (Module_type, path)
   | Pmty_alias lid ->
       let path = transl_module_alias loc env lid.txt in
       Discourse.use_module env lid path;
       mkmty (Tmty_alias (path, lid)) (Mty_alias path) env loc
         smty.pmty_attributes,
-      Discourse_types.singleton lid.txt (Module, path)
+      Discourse_types.singleton (Module, path)
   | Pmty_signature ssg ->
       Env.check_no_open_quotations loc env Env.Sig_qt;
       let sg = transl_signature env [] ssg in
@@ -2151,8 +2151,7 @@ and transl_modtype_aux env smty =
       let tmty, mty = !type_module_type_of_fwd env smod in
       let discourse =
         match tmty.mod_desc with
-        | Tmod_ident (path,lid) ->
-            Discourse_types.singleton lid.txt (Module, path)
+        | Tmod_ident (path,_lid) -> Discourse_types.singleton (Module, path)
         | _ -> empty_discourse
       in
       mkmty (Tmty_typeof tmty) mty env loc smty.pmty_attributes,
@@ -2178,7 +2177,7 @@ and transl_modtype_aux env smty =
           env
           loc
           [],
-        Discourse_types.add  mod_id.txt (Module, path) discourse
+        Discourse_types.add (Module, path) discourse
       with Includemod.Error explanation ->
         raise(Error(loc, env, Strengthening_mismatch(mod_id.txt, explanation)))
       ;
@@ -2210,7 +2209,7 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg, discourse) constr =
         in
         (constr,
          Merge.merge_module ~destructive env loc sg l md path remove_aliases,
-         Discourse_types.add l'.txt (Module, path) discourse)
+         Discourse_types.add (Module, path) discourse)
 
     | Pwith_modtype (l,smty)
     | Pwith_modtypesubst (l,smty) ->
@@ -2477,9 +2476,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
           if not aliasable then
             md
           else
-            let md_discourse =
-              Discourse_types.singleton lid (Module, path)
-            in
+            let md_discourse = Discourse_types.singleton (Module, path) in
             { md_type = Mty_alias path;
               md_modalities = Mode.Modality.(Const.id |> of_const);
               md_attributes = pms.pms_attributes;
@@ -3297,8 +3294,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         path mode_with_locks lid smod in
       let discourse_item = (Sig_component_kind.Module, path) in
       let discourse_alias = Some (lid, discourse_item) in
-      me, shape,
-      Discourse_types.singleton lid.txt discourse_item, discourse_alias
+      me, shape, Discourse_types.singleton discourse_item, discourse_alias
   | Pmod_structure sstr ->
       Env.check_no_open_quotations smod.pmod_loc env Env.Struct_qt;
       let (str, sg, mode, names, shape, _finalenv) =

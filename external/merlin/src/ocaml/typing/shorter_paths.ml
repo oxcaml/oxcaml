@@ -192,7 +192,7 @@ let apply_substitutions_fixpoint t substs =
   aux ~fuel:2 t t
 
 let fill_queue (paths : Lid_trie.t) queue =
-  Discourse_types.Lid_trie.to_seq paths
+  Lid_trie.to_seq paths
   |> Seq.fold_left
        (fun acc (lid, paths) ->
          Discourse_types.Paths.fold
@@ -288,7 +288,7 @@ let improve_lid env ~canon_path table kind lid =
   find_best_lid env ~canon_path table kind
   |> Option.fold ~none:lid ~some:Option.some
 
-type state = { queue : Priority_queue.t; not_in_env : Discourse_types.t }
+type state = { queue : Priority_queue.t; not_in_env : Lid_trie.t }
 let process_queue env state ~table ~canon_path target_kind best =
   let rec fill_by_level ~compare seq state best_lid =
     log ~title:"fill_by_level" "Current best: %a" Logger.fmt (fun f ->
@@ -367,7 +367,7 @@ let process_queue env state ~table ~canon_path target_kind best =
            when printing module signatures, and they can be quite large. *)
         let queue = Priority_queue.remove item state.queue in
         let not_in_env =
-          Discourse_types.add lid (Type, path) state.not_in_env
+          Lid_trie.add lid (Type, path) state.not_in_env
         in
         { queue; not_in_env }
         end
@@ -443,7 +443,7 @@ let shorten ~env ~initial ~canon_path kind =
     in
     let paths = apply_substitutions_fixpoint paths discourse.substs in
     log_dbg ~title:"shorten" "Discourse after substitutions: %a\n%!" Logger.fmt
-      (fun fmt -> Discourse_types.pp fmt paths);
+      (fun fmt -> Lid_trie.pp_seq fmt paths);
     fill_queue paths queue
   in
 

@@ -676,9 +676,8 @@ let or_null_kind tvar =
 let decl_of_type_constr type_constr =
   let type_ident = ident_of_type_constr type_constr in
   let () =
-    let lid = Longident.Lident (Ident.name type_ident) in
     let path = Pident type_ident in
-    discourse := Discourse_types.add lid (Type, path) !discourse
+    discourse := Discourse_types.add (Type, path) !discourse
   in
   let type_uid = Uid.of_predef_id type_ident in
   (* The unboxed versions explicitly added to the predef are abstract, as they
