@@ -383,7 +383,7 @@ let labels_of_annots ?prefix (annots : Cmt_format.binary_annots) =
   | Implementation structure ->
       declaration_labels ?prefix (`Implementation structure)
   | Interface signature -> declaration_labels ?prefix (`Interface signature)
-  | Packed _ | Partial_implementation _ | Partial_interface _ -> []
+  | Packed _ | Partial_implementation _ | Partial_interface _ | Functorize -> []
 
 (* Report the facts of one implementation source, naming the uids after the
    declarations of the unit. *)
