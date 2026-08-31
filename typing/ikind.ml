@@ -288,6 +288,31 @@ module Solver = struct
   let is_principal_type (ty : Types.type_expr) : bool =
     (not !Clflags.principal) || Types.get_level ty = Btype.generic_level
 
+  type expansion_resolution =
+    | Expanded_to_kconstr of Path.t
+    | Expanded_to_layout
+
+  let rec expand_jkind_desc : type a l r.
+      ctx ->
+      (a, l * r) Types.base_and_axes ->
+      Axis_lattice.t * (l * r) Types.with_bounds * expansion_resolution =
+   fun ctx jkind_desc ->
+    let terminal () =
+      let lat = Jkind.Mod_bounds.to_axis_lattice jkind_desc.mod_bounds in
+      let resolution =
+        match jkind_desc.base with
+        | Types.Layout _ -> Expanded_to_layout
+        | Types.Kconstr (path, _, _) -> Expanded_to_kconstr path
+      in
+      lat, jkind_desc.with_bounds, resolution
+    in
+    match ctx.env with
+    | None -> terminal ()
+    | Some env -> (
+      match Jkind.Const.expand_once env jkind_desc with
+      | Some jkind_const -> expand_jkind_desc ctx jkind_const
+      | None -> terminal ())
+
   (* CR jujacobs: we could optimize the join with masks you see below
      using a combined [Ldd.join_with_mask left mask right] operation. *)
 
@@ -467,46 +492,14 @@ module Solver = struct
   and ckind_of_jkind_desc : type a l r.
       ctx -> (a, l * r) Types.base_and_axes -> Ldd.node =
    fun ctx jkind_desc ->
-    let expand =
-      match ctx.env with
-      | None ->
-        let expand : type b.
-            (b, l * r) Types.base_and_axes ->
-            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
-         fun jkind_desc ->
-          let unresolved_base =
-            match jkind_desc.base with
-            | Types.Layout _ -> None
-            | Types.Kconstr (path, _, _) -> Some path
-          in
-          jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
-        in
-        expand
-      | Some env ->
-        let rec expand : type b.
-            (b, l * r) Types.base_and_axes ->
-            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
-         fun jkind_desc ->
-          match Jkind.Const.expand_once env jkind_desc with
-          | Some jkind_const -> expand jkind_const
-          | None ->
-            let unresolved_base =
-              match jkind_desc.base with
-              | Types.Layout _ -> None
-              | Types.Kconstr (path, _, _) -> Some path
-            in
-            jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
-        in
-        expand
+    let mod_bounds_lat, with_bounds, resolution =
+      expand_jkind_desc ctx jkind_desc
     in
-    let mod_bounds, with_bounds, unresolved_base = expand jkind_desc in
-    let base_mod_bounds =
-      Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
-    in
+    let base_mod_bounds = Ldd.const mod_bounds_lat in
     let base =
-      match unresolved_base with
-      | None -> base_mod_bounds
-      | Some path ->
+      match resolution with
+      | Expanded_to_layout -> base_mod_bounds
+      | Expanded_to_kconstr path ->
         let atom = rigid_name ctx (Ldd.Name.katom path) in
         Ldd.meet base_mod_bounds atom
     in
@@ -524,34 +517,12 @@ module Solver = struct
   and mod_bounds_floor_of_jkind_desc : type a l r.
       ctx -> (a, l * r) Types.base_and_axes -> Ldd.node option =
    fun ctx jkind_desc ->
-    let mod_bounds, unresolved_base =
-      let rec expand : type b.
-          (b, l * r) Types.base_and_axes -> Types.mod_bounds * Path.t option =
-       fun jkind_desc ->
-        match ctx.env with
-        | None ->
-          let unresolved_base =
-            match jkind_desc.base with
-            | Types.Layout _ -> None
-            | Types.Kconstr (path, _, _) -> Some path
-          in
-          jkind_desc.mod_bounds, unresolved_base
-        | Some env -> (
-          match Jkind.Const.expand_once env jkind_desc with
-          | Some jkind_const -> expand jkind_const
-          | None ->
-            let unresolved_base =
-              match jkind_desc.base with
-              | Types.Layout _ -> None
-              | Types.Kconstr (path, _, _) -> Some path
-            in
-            jkind_desc.mod_bounds, unresolved_base)
-      in
-      expand jkind_desc
+    let mod_bounds_lat, _with_bounds, resolution =
+      expand_jkind_desc ctx jkind_desc
     in
-    match unresolved_base with
-    | Some _ -> None
-    | None -> Some (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
+    match resolution with
+    | Expanded_to_kconstr _ -> None
+    | Expanded_to_layout -> Some (Ldd.const mod_bounds_lat)
 
   and mod_bounds_floor_of_jkind : type l r.
       ctx -> (l * r) Types.jkind -> Ldd.node option =
