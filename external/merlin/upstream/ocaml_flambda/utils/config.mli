@@ -213,6 +213,10 @@ val asm: string
 val asm_cfi_supported: bool
 (** Whether assembler understands CFI directives *)
 
+val asm_file0_supported: bool
+(** Whether the assembler accepts the DWARF-5 [.file 0] and [.loc 0]
+    directives, which define the line table's primary source file entry *)
+
 val asm_size_type_directives: bool
 (** Whether the [.size] and [.type] assembler directives can be used
 
