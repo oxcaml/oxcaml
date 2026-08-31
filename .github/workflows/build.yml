@@ -320,7 +320,7 @@ jobs:
       - name: Set up Opam
         uses: ocaml/setup-ocaml@15d660006c1d3110d77c34b7faa3bddefe8b82f0 # v3.7.0
         with:
-          ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
+          ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0-with-merlin
           opam-repositories: |
             local: file://${{ github.workspace }}/tools/ci/local-opam
             default: https://github.com/ocaml/opam-repository.git
