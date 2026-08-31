@@ -1844,8 +1844,26 @@ let shape_of_path_opt ~namespace env path =
   | exception Not_found -> None
 
 let shape_for_constr env path ~args =
-  Option.map (fun sh -> Shape.app_list sh args)
-    (shape_of_path_opt ~namespace:Type env path)
+  let rec go ~visited path ~args =
+    let shape =
+      if Path.is_unboxed_version path then
+        (* This function recurses for unboxed paths, so we track those we've
+           visited to not loop on types such as [type t = { a : t# list }]. *)
+        if Path.Set.mem path visited then None
+        else begin
+          match find_type path env with
+          | exception Not_found -> None
+          | decl ->
+            let id = Ident.create_local (Path.last path) in
+            Some
+              (Type_shape.Type_decl_shape.of_type_declaration id decl
+                 (go ~visited:(Path.Set.add path visited)))
+        end
+      else shape_of_path_opt ~namespace:Type env path
+    in
+    Option.map (fun sh -> Shape.app_list sh args) shape
+  in
+  go ~visited:Path.Set.empty path ~args
 
 let shape_or_leaf uid = function
   | None -> Shape.leaf uid
