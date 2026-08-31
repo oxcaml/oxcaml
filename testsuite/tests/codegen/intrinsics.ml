@@ -137,6 +137,8 @@ module Nativeint_u = struct
     of_nativeint (Nativeint.shift_left (to_nativeint x) y)
   let[@inline always] shift_right x y =
     of_nativeint (Nativeint.shift_right (to_nativeint x) y)
+  let[@inline always] shift_right_logical x y =
+    of_nativeint (Nativeint.shift_right_logical (to_nativeint x) y)
   let[@inline always] of_int x =
     of_nativeint (Nativeint.of_int x)
   let[@inline always] to_int x =
