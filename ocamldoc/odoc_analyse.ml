@@ -121,11 +121,12 @@ let process_interface_file sourcefile =
     Pparse.file ~tool_name inputfile
       (no_docstring Parse.interface) Pparse.Signature
   in
-  let sg, _argument_interface =
-    Typemod.type_interface ~sourcefile compilation_unit (initial_env()) ast
+  let
+    intf = Typemod.type_interface ~sourcefile compilation_unit
+             (initial_env()) ast
   in
   Warnings.check_fatal ();
-  (ast, sg, inputfile)
+  (ast, intf.signature, inputfile)
 
 (** The module used to analyse the parsetree and signature of an implementation file.*)
 module Ast_analyser = Odoc_ast.Analyser (Odoc_comments.Basic_info_retriever)
