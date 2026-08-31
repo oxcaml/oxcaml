@@ -1,0 +1,4 @@
+(test
+ (name test)
+ (package yojson)
+ (libraries yojson alcotest))

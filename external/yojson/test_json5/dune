@@ -1,0 +1,4 @@
+(test
+ (name test)
+ (package yojson-five)
+ (libraries alcotest yojson_five))
