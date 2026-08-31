@@ -24,11 +24,12 @@ val create :
 (** The underlying variable. *)
 val var : t -> Variable.t
 
-(** Whether the variable, while not user visible, is referenced by the defining
-    expression of at least one phantom let and must therefore remain locatable
-    by the debugger. Such binders print with the visibility suffix "NP". Always
-    [false] on creation; set by [Simplify]. Not part of [compare], [equal] or
-    [hash]. *)
+(** Whether the variable is referenced by the defining expression of at least
+    one phantom let and must therefore remain locatable by the debugger (which
+    matters when it is not user visible, since such variables otherwise receive
+    no provenance). Such binders print with the visibility suffix "NP", or "UVP"
+    if also user visible. Always [false] on creation; set by [Simplify]. Not
+    part of [compare], [equal] or [hash]. *)
 val needed_by_phantom_let : t -> bool
 
 val with_needed_by_phantom_let : t -> t

@@ -535,9 +535,11 @@ module Variable = struct
 
   (* For the use of [Bound_var] and [Bound_parameter], whose binders can be
      marked as needed by phantom lets; such variables print as "NP" instead of
-     "N". *)
+     "N", or "UVP" instead of "UV". *)
   let print_as_needed_by_phantom_let ppf t =
-    T0.print_with_visibility_suffix "NP" ppf t
+    T0.print_with_visibility_suffix
+      (if user_visible t then "UVP" else "NP")
+      ppf t
 
   include T0
 

@@ -68,14 +68,13 @@ let add_set_of_closures_offsets ~is_phantom named uacc =
 (* Whether [var], bound at normal mode, also has phantom-mode occurrences in
    [free_names] (i.e. it is referenced by the defining expression of at least
    one phantom let) and its binder should therefore be marked as needed by
-   phantom lets, so that the variable remains locatable by the debugger. [false]
-   for user-visible variables (no marking is needed) and for kinds that cannot
-   be referenced by phantom defining expressions once translated to Cmm (for
-   example the region of a local allocation whose [Make_block] has been
-   phantomised). *)
+   phantom lets, so that the variable remains locatable by the debugger (which
+   matters when it is not user visible, since such variables otherwise receive
+   no provenance). [false] for kinds that cannot be referenced by phantom
+   defining expressions once translated to Cmm (for example the region of a
+   local allocation whose [Make_block] has been phantomised). *)
 let variable_needs_np_promotion free_names var =
-  (not (Variable.user_visible var))
-  && (match Variable.kind var with
+  (match Variable.kind var with
     | Region | Rec_info -> false
     | Value | Naked_number _ -> true)
   &&

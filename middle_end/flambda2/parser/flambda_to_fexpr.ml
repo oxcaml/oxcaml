@@ -348,6 +348,10 @@ and let_expr env le =
 
 and dynamic_let_expr env vars (defining_expr : Flambda.Named.t) body :
     Fexpr.expr =
+  (* All bound variables of a pattern have the same name mode (enforced by
+     [Bound_pattern.set_of_closures]), so testing the first suffices. Note that
+     a multi-binding let, i.e. one binding a whole set of closures, can itself
+     be phantom. *)
   let is_phantom =
     match vars with
     | [] -> false
