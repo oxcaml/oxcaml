@@ -2818,10 +2818,16 @@ let unbox_once env ty =
         | Type_variant (cstrs, Variant_with_null, _) ->
           begin match Datarepr.find_variant_with_null_payload cstrs with
           | Some
-              { payload_arg = { ca_type; ca_modalities = modality; _ };
-                _ } ->
+              { payload_cstr = { cd_res; _ };
+                payload_arg = { ca_type; ca_modalities = modality; _ } } ->
+            let extra_substs =
+              Btype.Jkind0.gadt_payload_subst
+                ~projected_params:args ~cstr_res:cd_res
+                ~payload_tys:[ca_type]
+                ~get_free_vars:(free_variable_set_of_list env)
+            in
             Stepped
-              { ty = apply ca_type ~extra_substs:[];
+              { ty = apply ca_type ~extra_substs;
                 modality;
                 or_null = Some { decl; args; prev = ty } }
           | None ->
@@ -2858,10 +2864,20 @@ let contained_without_boxing env ty =
         (fun (cstr : constructor_declaration) ->
            match cstr.cd_args with
            | Cstr_tuple cargs ->
+             let payload_tys =
+               List.map (fun (carg : constructor_argument) -> carg.ca_type)
+                 cargs
+             in
+             let extra_substs =
+               Btype.Jkind0.gadt_payload_subst
+                 ~projected_params:args ~cstr_res:cstr.cd_res ~payload_tys
+                 ~get_free_vars:(free_variable_set_of_list env)
+             in
+             let extra_params, extra_args = List.split extra_substs in
              List.map
-               (fun (carg : constructor_argument) ->
-                  apply env type_params carg.ca_type args)
-               cargs
+               (fun ty ->
+                  apply env (extra_params @ type_params) ty (extra_args @ args))
+               payload_tys
            | Cstr_record _ -> [])
         cstrs
     | _ | exception Not_found ->
