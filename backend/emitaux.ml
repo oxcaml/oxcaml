@@ -652,14 +652,7 @@ let get_file_num ~file_emitter file_name =
    file (the first file we register is the "none" placeholder; see
    [Asm_directives.debug_header]) and causes DWARF verifiers to warn about the
    duplicated entry. Emitting ".file 0" to name the real source file avoids both
-   problems.
-
-   Whether ".file 0" may be emitted is a property of the assembler that will
-   consume the output, not of the target system, so configure probes the
-   assembler directly (see [Config.asm_file0_supported]). LLVM-based assemblers
-   (including Apple's) accept the directive even when they default to DWARF-4
-   line tables, upgrading the table to DWARF-5; the GNU assembler only supports
-   it in DWARF-5 mode from binutils 2.34. *)
+   problems. *)
 let register_primary_file ~file_emitter ~sourcefile =
   if Config.asm_file0_supported
   then (
