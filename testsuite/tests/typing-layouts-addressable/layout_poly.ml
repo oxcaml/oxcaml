@@ -157,6 +157,18 @@ Error: This expression has type "('a : bits8 addressable)"
    [bits64], which does not unify with [b8a]'s [bits8 addressable] *)
 let bad (x : int64#) : b8a = magic_to_addressable x
 [%%expect{|
+Line 1, characters 50-51:
+1 | let bad (x : int64#) : b8a = magic_to_addressable x
+                                                      ^
+Error: The value "x" has type "int64#" but an expression was expected of type
+         "('a : bits8)"
+       The layout of int64# is bits64
+         because it is the unboxed version of the primitive type int64.
+       But the layout of int64# must be a sublayout of bits8
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 Line 1, characters 29-51:
 1 | let bad (x : int64#) : b8a = magic_to_addressable x
                                  ^^^^^^^^^^^^^^^^^^^^^^

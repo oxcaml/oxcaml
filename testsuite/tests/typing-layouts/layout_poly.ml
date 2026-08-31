@@ -536,6 +536,19 @@ let f (x: float#): int64# = id x
 
 [%%expect{|
 external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
+Line 2, characters 31-32:
+2 | let f (x: float#): int64# = id x
+                                   ^
+Error: The value "x" has type "float#" but an expression was expected of type
+         "('a : bits64)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a sublayout of bits64
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
+external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
 Line 2, characters 28-32:
 2 | let f (x: float#): int64# = id x
                                 ^^^^
