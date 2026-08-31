@@ -1905,12 +1905,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       update_level_v ~log dst generic_level u;
       let vlower_above_current =
         VarMap.filter
-          (fun _ (Amorphvar (v, _, _)) -> v.level >= current_level)
+          (fun _ (Amorphvar (v, _, _)) -> v.level > current_level)
           u.vlower
       in
       let vupper_above_current =
         VarMap.filter
-          (fun _ (Amorphvar (v, _, _)) -> v.level >= current_level)
+          (fun _ (Amorphvar (v, _, _)) -> v.level > current_level)
           u.vupper
       in
       if C.le dst u.upper u.lower
