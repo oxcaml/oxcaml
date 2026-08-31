@@ -1066,13 +1066,16 @@ let const_or_generic_of_mode : arg:bool -> Alloc.lr -> const_or_generic =
     computed. *)
 let equate_with_curry_bounds : Alloc.lr -> const_or_generic -> bool =
   fun m acc_mode ->
-    if not (Alloc.check_generic m)
-       || not (mode_polymorphism_printing_enabled ())
+    if not (mode_polymorphism_printing_enabled ())
     then
       Result.is_ok
         (Alloc.equate m (Alloc.of_const (const_or_generic_upper acc_mode)))
     else
-      Alloc.Guts.in_bounds (const_or_generic_upper acc_mode) m
+      match acc_mode, Alloc.check_generic m with
+      | Const c, false -> Result.is_ok (Alloc.equate m (Alloc.of_const c))
+      | Generic _, true ->
+        Alloc.Guts.in_bounds (const_or_generic_upper acc_mode) m
+      | Const _, true | Generic _, false -> false
 
 let erase_implied_axes (modes : Mode.Alloc.Const.t) :
     Mode.Alloc.Const.Option.t =
