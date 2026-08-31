@@ -2750,7 +2750,8 @@ let rec update_decl_jkind env dpath decl =
       in
       let sort =
         Jkind.sort_option_of_jkind env jkind
-        |> fun s -> Option.bind s Jkind.Sort.get_concrete_defaulting_to_scannable
+        |> fun s ->
+            Option.bind s Jkind.Sort.get_concrete_defaulting_to_scannable
       in
       if Option.is_none sort then assert_any_args_support loc;
       let cstr =
