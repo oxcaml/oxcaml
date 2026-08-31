@@ -243,6 +243,18 @@ let simplify_function_body context ~outer_dacc function_slot_opt
         return_continuation
     in
     let free_names_of_body = UA.name_occurrences uacc in
+    (* Function parameters referenced by phantom lets within the body must
+       remain locatable by the debugger: mark their binders (printed as "NP").
+       This arises for example with the unboxed calling convention, whose
+       unarized parameters are not user visible and are referenced by the
+       phantom binding of the corresponding boxed parameter once the latter's
+       uses have been simplified away. *)
+    (* CR mshinwell: [my_closure] is not marked yet; this will be dealt with
+       separately. *)
+    let params =
+      Expr_builder.promote_params_needed_by_phantom_lets uacc params
+        ~free_names:free_names_of_body
+    in
     let params_and_body =
       RE.Function_params_and_body.create ~free_names_of_body
         ~return_continuation ~exn_continuation params ~body ~my_closure

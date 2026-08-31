@@ -82,6 +82,20 @@ let variable_needs_np_promotion free_names var =
   | Zero -> false
   | One | More_than_one -> true
 
+(* Parameters referenced by phantom lets must remain locatable by the debugger:
+   mark their binders (printed as "NP"). *)
+let promote_params_needed_by_phantom_lets uacc params ~free_names =
+  if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
+  then params
+  else
+    Bound_parameters.create
+      (List.map
+         (fun param ->
+           if variable_needs_np_promotion free_names (BP.var param)
+           then BP.with_needed_by_phantom_let param
+           else param)
+         (Bound_parameters.to_list params))
+
 let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
     ~free_names_of_defining_expr ~body ~cost_metrics_of_defining_expr =
   (* The name occurrences component of [uacc] is expected to be in the state
