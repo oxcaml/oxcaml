@@ -90,7 +90,8 @@ let typecheck_intf info ast : _ * Typedtree.interface =
     record_call_with_counters
       ~counter_f:(fun (_alerts, (intf : Typedtree.interface)) ->
         Profile_counters_functions.(
-          count_language_extensions (Typedtree_signature_output intf.signature)))
+          count_language_extensions (
+            Typedtree_signature_output intf.signature)))
       typing)
   @@ fun () ->
   let interface =
@@ -99,7 +100,8 @@ let typecheck_intf info ast : _ * Typedtree.interface =
       info.module_name info.env ast
   in
   let tsg =
-    print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface interface.signature
+    print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
+      interface.signature
   in
   let alerts = Builtin_attributes.alerts_of_sig ~mark:true ast in
   let sg = tsg.Typedtree.sig_type in
