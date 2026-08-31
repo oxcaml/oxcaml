@@ -1,0 +1,119 @@
+(ocamllex read lexer_utils)
+
+(vendored_dirs mucppo)
+
+(rule
+ (targets t.ml)
+ (deps
+  (:out t.cppo.ml)
+  type.ml
+  monomorphic.ml
+  prettyprint.ml
+  write.ml
+  write2.ml)
+ (action
+  (run mucppo/mucppo.exe %{out} -o %{targets})))
+
+(rule
+ (targets t.mli)
+ (deps
+  (:out t.cppo.mli)
+  type.ml
+  monomorphic.mli
+  write.mli
+  write2.mli)
+ (action
+  (run mucppo/mucppo.exe %{out} -o %{targets})))
+
+(rule
+ (targets basic.ml)
+ (deps
+  (:out basic.cppo.ml)
+  type.ml
+  write.ml
+  prettyprint.ml
+  monomorphic.ml
+  write2.ml
+  read.ml
+  util.ml)
+ (action
+  (run mucppo/mucppo.exe %{out} -o %{targets})))
+
+(rule
+ (targets basic.mli)
+ (deps
+  (:out basic.cppo.mli)
+  type.ml
+  write.mli
+  monomorphic.mli
+  write2.mli
+  read.mli
+  util.mli)
+ (action
+  (run mucppo/mucppo.exe %{out} -o %{targets})))
+
+(rule
+ (targets safe.ml)
+ (deps
+  basic.ml
+  (:out safe.cppo.ml)
+  type.ml
+  safe_to_basic.ml
+  write.ml
+  prettyprint.ml
+  monomorphic.ml
+  write2.ml
+  read.ml
+  util.ml)
+ (action
+  (run mucppo/mucppo.exe %{out} -o %{targets})))
+
+(rule
+ (targets safe.mli)
+ (deps
+  basic.mli
+  (:out safe.cppo.mli)
+  type.ml
+  monomorphic.mli
+  safe_to_basic.mli
+  write.mli
+  write2.mli
+  read.mli
+  util.mli)
+ (action
+  (run mucppo/mucppo.exe %{out} -o %{targets})))
+
+(rule
+ (targets raw.ml)
+ (deps
+  (:out raw.cppo.ml)
+  type.ml
+  write.ml
+  prettyprint.ml
+  monomorphic.ml
+  write2.ml
+  read.ml
+  util.ml)
+ (action
+  (run mucppo/mucppo.exe %{out} -o %{targets})))
+
+(rule
+ (targets raw.mli)
+ (deps
+  (:out raw.cppo.mli)
+  type.ml
+  monomorphic.mli
+  write.mli
+  write2.mli
+  read.mli
+  util.mli)
+ (action
+  (run mucppo/mucppo.exe %{out} -o %{targets})))
+
+(library
+ (name yojson)
+ (public_name yojson)
+ (modules yojson t basic safe raw common codec lexer_utils)
+ (synopsis "JSON parsing and printing")
+ (flags
+  (:standard -w -27-32)))

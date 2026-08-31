@@ -1,0 +1,5 @@
+# This file helps Github suggest reviewers of pull requests based on which
+# files changed.
+# Learn more at https://help.github.com/articles/about-codeowners/
+
+* @NathanReb @panglesd @Leonidas-from-XIV
