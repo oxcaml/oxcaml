@@ -144,4 +144,28 @@
 (lldb) c
 (lldb) b Test_datatypes_dwarf.f_bigarray3_int32
 (lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_version_record
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_version_mixed_record
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_version_params
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_version_alias
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_version_cross_module
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_version_recursive
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_version_recursive_indirect
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_variant_with_void_field
+(lldb) c
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_record_with_void_field
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_version_void_field
+(lldb) c
+(lldb) b Test_datatypes_dwarf.f_unboxed_version_void_two_fields
+(lldb) c
 (lldb) quit
