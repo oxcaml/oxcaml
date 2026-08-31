@@ -11,15 +11,11 @@
 let f : 'a @ [< 'm] -> 'a @ [> 'm] = fun x -> x
 [%%expect{|
 val f : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
-|}, Principal{|
-val f : 'a @ [< past('m)] -> 'a @ [> past('m)] = <fun>
 |}]
 
 let i = (fun x -> x : 'a @ [< 'm] -> 'a @ [> 'm])
 [%%expect{|
 val i : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
-|}, Principal{|
-val i : 'a @ [< past('m)] -> 'a @ [> past('m)] = <fun>
 |}]
 
 (* Constant bounds are allowed in let binding annotations *)
@@ -27,8 +23,6 @@ val i : 'a @ [< past('m)] -> 'a @ [> past('m)] = <fun>
 let j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = fun x -> x
 [%%expect{|
 val j : 'a @ [< 'm & portable] -> 'a @ [> 'm] = <fun>
-|}, Principal{|
-val j : 'a @ [< past('m) & portable] -> 'a @ [> past('m)] = <fun>
 |}]
 
 (* Combined bounds are allowed in let binding annotations *)
