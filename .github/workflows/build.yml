@@ -514,12 +514,6 @@ jobs:
         if: matrix.merlin_only == true && env.MERLIN_EMERGENCY_SKIP != 'y'
         run: external/merlin/scripts/assert-in-sync.sh
 
-      # Merlin has additional dependencies that the compiler does not.
-      - name: Install Merlin's dependencies
-        if: matrix.merlin_only == true && env.MERLIN_EMERGENCY_SKIP != 'y'
-        working-directory: external/merlin
-        run: opam install . --deps-only --with-test --yes
-
       - name: Build merlin
         if: matrix.merlin_only == true && env.MERLIN_EMERGENCY_SKIP != 'y'
         run: make merlin-build
