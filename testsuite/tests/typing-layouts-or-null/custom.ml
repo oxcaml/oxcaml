@@ -902,8 +902,6 @@ Error: The layout of type "int t" is value_or_null
          because the payload of bad_payload has layout value.
 |}]
 
-(* CR or-null: allow GADT custom [@@or_null] types.
-   Internal ticket 6854. *)
 
 type 'a gadt =
   | A : 'a gadt
@@ -911,17 +909,8 @@ type 'a gadt =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type 'a gadt =
-2 |   | A : 'a gadt
-3 |   | B : 'a -> 'a gadt
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       GADT constructors are not supported with [@@or_null].
+type 'a gadt = A : 'a gadt | B : 'a -> 'a gadt [@@or_null]
 |}]
-
-(* CR or-null: allow GADT custom [@@or_null] types with concrete indices.
-   Internal ticket 6854. *)
 
 type 'a concrete_gadt =
   | Null : int concrete_gadt
@@ -929,13 +918,9 @@ type 'a concrete_gadt =
 [@@or_null]
 
 [%%expect{|
-Lines 1-4, characters 0-11:
-1 | type 'a concrete_gadt =
-2 |   | Null : int concrete_gadt
-3 |   | This : string -> bool concrete_gadt
-4 | [@@or_null]
-Error: Invalid [@or_null] declaration:
-       GADT constructors are not supported with [@@or_null].
+type 'a concrete_gadt =
+    Null : int concrete_gadt
+  | This : string -> bool concrete_gadt [@@or_null]
 |}]
 
 type ('a : any) widened_bad_jkind =
@@ -1344,4 +1329,539 @@ type ('a : value) t3 = 'a t2 =
 type 'a t1 = Nope | Yep of 'a [@@or_null]
 type 'a t2 = 'a t1 = Nope | Yep of 'a [@@or_null]
 type 'a t3 = 'a t2 = Nope | Yep of 'a [@@or_null]
+|}]
+
+(* GADT tests. *)
+
+type _ indexed =
+  | Indexed_null : int indexed
+  | Indexed_this : string -> string indexed
+[@@or_null]
+
+let indexed_string (x : string indexed) =
+  match x with Indexed_this s -> s
+let indexed_null (x : int indexed) =
+  match x with Indexed_null -> ()
+
+[%%expect{|
+type _ indexed =
+    Indexed_null : int indexed
+  | Indexed_this : string -> string indexed [@@or_null]
+val indexed_string : string indexed -> string = <fun>
+val indexed_null : int indexed -> unit = <fun>
+|}]
+
+let bad_index (x : string indexed) =
+  match x with Indexed_null -> ()
+
+[%%expect{|
+Line 2, characters 15-27:
+2 |   match x with Indexed_null -> ()
+                   ^^^^^^^^^^^^
+Error: This pattern matches values of type "int indexed"
+       but a pattern was expected which matches values of type "string indexed"
+       Type "int" is not compatible with type "string"
+|}]
+
+type 'a poly_gadt =
+  | Poly_null : 'a poly_gadt
+  | Poly_this : 'a -> 'a poly_gadt
+[@@or_null]
+
+let missing_gadt_payload : int poly_gadt -> unit =
+  function Poly_null -> ()
+let missing_gadt_null : int poly_gadt -> unit =
+  function Poly_this _ -> ()
+
+[%%expect{|
+type 'a poly_gadt = Poly_null : 'a poly_gadt | Poly_this : 'a -> 'a poly_gadt [@@or_null]
+Line 7, characters 2-26:
+7 |   function Poly_null -> ()
+      ^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "Poly_this _"
+
+val missing_gadt_payload : int poly_gadt -> unit = <fun>
+Line 9, characters 2-28:
+9 |   function Poly_this _ -> ()
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "Poly_null"
+
+val missing_gadt_null : int poly_gadt -> unit = <fun>
+|}]
+
+let int_gadt_array (x : int poly_gadt) = [|x|]
+
+[%%expect{|
+val int_gadt_array : int poly_gadt -> int poly_gadt array = <fun>
+|}]
+
+let float_gadt_array (x : float poly_gadt) = [|x|]
+
+[%%expect{|
+Line 1, characters 47-48:
+1 | let float_gadt_array (x : float poly_gadt) = [|x|]
+                                                   ^
+Error: The value "x" has type "float poly_gadt"
+       but an expression was expected of type "('a : value_maybe_null)"
+       The layout of float poly_gadt is value_or_null
+         because of the definition of poly_gadt at lines 1-4, characters 0-11.
+       But the layout of float poly_gadt must be a sublayout of
+           value_maybe_null
+         because it's the type of an array element.
+|}]
+
+module Gadt_ground : sig type t : immediate_or_null end = struct
+  type t = N : t | P : int -> t [@@or_null]
+end
+module Gadt_float : sig type t : value_or_null end = struct
+  type t = N : t | P : float -> t [@@or_null]
+end
+module Gadt_mixed : sig type 'a t : value_or_null end = struct
+  type 'a t = N | P : 'a -> 'a t [@@or_null]
+end
+
+[%%expect{|
+module Gadt_ground : sig type t : immediate_or_null end
+module Gadt_float : sig type t : value_or_null end
+module Gadt_mixed : sig type 'a t : value_or_null end
+|}]
+
+module Gadt_nonnull : sig type t : value end = struct
+  type t = N : t | P : int -> t [@@or_null]
+end
+
+[%%expect{|
+Lines 1-3, characters 47-3:
+1 | ...............................................struct
+2 |   type t = N : t | P : int -> t [@@or_null]
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = N : t | P : int -> t [@@or_null] end
+       is not included in
+         sig type t end
+       Type declarations do not match:
+         type t = N : t | P : int -> t [@@or_null]
+       is not included in
+         type t
+       The layout of the first is value_or_null non_pointer
+         because of the definition of t at line 2, characters 2-43.
+       But the layout of the first must be a sublayout of value
+         because of the definition of t at line 1, characters 26-40.
+|}]
+
+(* The declaration parameter remains wider than the payload variable. *)
+type ('a : any) wide_gadt =
+  | Wide_null : ('a : any). 'a wide_gadt
+  | Wide_this : 'a -> 'a wide_gadt
+[@@or_null]
+let wide_float64_null : float# wide_gadt = Wide_null
+
+[%%expect{|
+type ('a : any) wide_gadt =
+    Wide_null : ('a : any). 'a wide_gadt
+  | Wide_this : 'a -> 'a wide_gadt [@@or_null]
+val wide_float64_null : float# wide_gadt = Wide_null
+|}]
+
+let wide_float64_payload = Wide_this #1.0
+
+[%%expect{|
+Line 1, characters 37-41:
+1 | let wide_float64_payload = Wide_this #1.0
+                                         ^^^^
+Error: This constant has type "float#" but an expression was expected of type
+         "('a : value)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because of the definition of wide_gadt at lines 1-4, characters 0-11.
+|}]
+
+module Gadt_wide_crossing : sig
+  type ('a : any) t : value_or_null mod portable
+end = struct
+  type ('a : any) t =
+    | N : 'a t
+    | P : ('b : value mod portable). 'b -> 'b t
+  [@@or_null]
+end
+
+module Gadt_wide_bound : sig
+  type ('a : any) t : value_or_null mod portable with 'a
+end = struct
+  type ('a : any) t = N : 'b t | P : 'c -> 'c t [@@or_null]
+end
+
+module Gadt_modality : sig
+  type ('a : any) t : value_or_null mod portable
+end = struct
+  type ('a : any) t =
+    | N : 'a t
+    | P : 'b @@ portable -> 'b t
+  [@@or_null]
+end
+
+[%%expect{|
+module Gadt_wide_crossing :
+  sig type ('a : any) t : value_or_null mod portable end
+module Gadt_wide_bound :
+  sig type ('a : any) t : value_or_null mod portable with 'a end
+module Gadt_modality : sig type ('a : any) t : value_or_null mod portable end
+|}]
+
+module Gadt_existential : sig
+  type t : value_or_null mod portable
+end = struct
+  type t = N : t | P : ('a : value mod portable). 'a -> t [@@or_null]
+end
+
+type 'a compound_index =
+  | Compound_null : 'a compound_index
+  | Compound_this : 'b -> 'b list compound_index
+[@@or_null]
+
+type 'a existential_gadt =
+  | Existential_null : 'a existential_gadt
+  | Existential_this : ('b * ('b -> 'a)) -> 'a existential_gadt
+[@@or_null]
+
+[%%expect{|
+module Gadt_existential : sig type t : value_or_null mod portable end
+type 'a compound_index =
+    Compound_null : 'a compound_index
+  | Compound_this : 'b -> 'b list compound_index [@@or_null]
+type 'a existential_gadt =
+    Existential_null : 'a existential_gadt
+  | Existential_this : ('b * ('b -> 'a)) -> 'a existential_gadt [@@or_null]
+|}]
+
+module Gadt_void : sig type t : immediate_or_null end = struct
+  type t = N : void -> t | P : int -> t [@@or_null]
+end
+module Gadt_void_flipped : sig type t : immediate_or_null end = struct
+  type t = P : int -> t | N : #(void * void) -> t [@@or_null]
+end
+
+[%%expect{|
+module Gadt_void : sig type t : immediate_or_null end
+module Gadt_void_flipped : sig type t : immediate_or_null end
+|}]
+
+(* N accepts a nonportable_void, so t cannot cross portability. *)
+module Gadt_void_bound : sig
+  type t : value_or_null mod portable
+end = struct
+  type t = N : nonportable_void -> t | P : int -> t [@@or_null]
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = N : nonportable_void -> t | P : int -> t [@@or_null]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type t = N : nonportable_void -> t | P : int -> t [@@or_null]
+         end
+       is not included in
+         sig type t : value_or_null mod portable end
+       Type declarations do not match:
+         type t = N : nonportable_void -> t | P : int -> t [@@or_null]
+       is not included in
+         type t : value_or_null mod portable
+       The kind of the first is immediate_or_null with nonportable_void
+         because of the definition of t at line 4, characters 2-63.
+       But the kind of the first must be a subkind of
+           value_or_null mod portable
+         because of the definition of t at line 2, characters 2-37.
+|}]
+
+type portable_void : void mod portable
+
+module Gadt_portable_void_bound : sig
+  type t : value_or_null mod portable
+end = struct
+  type t = N : portable_void -> t | P : int -> t [@@or_null]
+end
+
+[%%expect{|
+type portable_void : void mod portable
+module Gadt_portable_void_bound : sig type t : value_or_null mod portable end
+|}]
+
+(* The existential 'v is not known portable. Its bound still restricts t,
+   even though P's payload is portable. *)
+module Gadt_existential_void_bound : sig
+  type ('a : any) t : value_or_null mod portable
+end = struct
+  type ('a : any) t =
+    | N : ('v : void). 'v -> int t
+    | P : ('b : value mod portable). 'b -> 'b t
+  [@@or_null]
+end
+
+[%%expect{|
+Lines 3-8, characters 6-3:
+3 | ......struct
+4 |   type ('a : any) t =
+5 |     | N : ('v : void). 'v -> int t
+6 |     | P : ('b : value mod portable). 'b -> 'b t
+7 |   [@@or_null]
+8 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type ('a : any) t =
+               N : ('v : void). 'v -> int t
+             | P : ('b : value mod portable). 'b -> 'b t [@@or_null]
+         end
+       is not included in
+         sig type ('a : any) t : value_or_null mod portable end
+       Type declarations do not match:
+         type ('a : any) t =
+             N : ('v : void). 'v -> int t
+           | P : ('b : value mod portable). 'b -> 'b t [@@or_null]
+       is not included in
+         type ('a : any) t : value_or_null mod portable
+       The kind of the first is value_or_null mod external_ with 'a
+         because of the definition of t at lines 4-7, characters 2-13.
+       But the kind of the first must be a subkind of
+           value_or_null mod portable
+         because of the definition of t at line 2, characters 2-48.
+|}]
+
+module Gadt_portable_existential_void_bound : sig
+  type ('a : any) t : value_or_null mod portable
+end = struct
+  type ('a : any) t =
+    | N : ('v : void mod portable). 'v -> int t
+    | P : ('b : value mod portable). 'b -> 'b t
+  [@@or_null]
+end
+
+[%%expect{|
+module Gadt_portable_existential_void_bound :
+  sig type ('a : any) t : value_or_null mod portable end
+|}]
+
+module Gadt_projected_void_bound : sig
+  type ('a : any) t : value_or_null mod portable with 'a
+end = struct
+  type ('a : any) t =
+    | N : ('v : void). 'v -> 'v t
+    | P : int -> 'a t
+  [@@or_null]
+end
+
+[%%expect{|
+module Gadt_projected_void_bound :
+  sig type ('a : any) t : value_or_null mod portable with 'a end
+|}]
+
+module Gadt_inclusion : sig
+  type _ t = N : int t | P : string -> string t [@@or_null]
+end = struct
+  type _ t = N : int t | P : string -> string t [@@or_null]
+end
+
+[%%expect{|
+module Gadt_inclusion :
+  sig type _ t = N : int t | P : string -> string t [@@or_null] end
+|}]
+
+module Gadt_bad_inclusion : sig
+  type _ t = N : int t | P : string -> string t [@@or_null]
+end = struct
+  type _ t = N : bool t | P : string -> string t [@@or_null]
+end
+
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type _ t = N : bool t | P : string -> string t [@@or_null]
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type _ t = N : bool t | P : string -> string t [@@or_null] end
+       is not included in
+         sig type _ t = N : int t | P : string -> string t [@@or_null] end
+       Type declarations do not match:
+         type _ t = N : bool t | P : string -> string t [@@or_null]
+       is not included in
+         type _ t = N : int t | P : string -> string t [@@or_null]
+       Constructors do not match:
+         "N : bool t"
+       is not the same as:
+         "N : int t"
+       The type "bool t" is not equal to the type "int t"
+       Type "bool" is not equal to type "int"
+|}]
+
+type _ nested_gadt =
+  | Nested_null : int nested_gadt
+  | Nested_this : string or_null -> string nested_gadt
+[@@or_null]
+
+[%%expect{|
+Line 3, characters 18-32:
+3 |   | Nested_this : string or_null -> string nested_gadt
+                      ^^^^^^^^^^^^^^
+Error: The layout of type "string or_null" is value_or_null
+         because it is the primitive type or_null.
+       But the layout of type "string or_null" must be a sublayout of
+           value_maybe_separable
+         because the payload of nested_gadt has layout value.
+|}]
+
+type _ unboxed_payload_gadt =
+  | Unboxed_null : int unboxed_payload_gadt
+  | Unboxed_this : float# -> float unboxed_payload_gadt
+[@@or_null]
+
+[%%expect{|
+Line 3, characters 19-25:
+3 |   | Unboxed_this : float# -> float unboxed_payload_gadt
+                       ^^^^^^
+Error: The layout of type "float#" is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of type "float#" must be a value layout
+         because the payload of unboxed_payload_gadt has layout value.
+|}]
+
+type _ record_payload_gadt =
+  | Record_null : int record_payload_gadt
+  | Record_this : { x : string } -> string record_payload_gadt
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type _ record_payload_gadt =
+2 |   | Record_null : int record_payload_gadt
+3 |   | Record_this : { x : string } -> string record_payload_gadt
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       each constructor must be nullary or unary.
+|}]
+
+type _ multiple_payload_gadt =
+  | Multiple_null : int multiple_payload_gadt
+  | Multiple_this : string * int -> string multiple_payload_gadt
+[@@or_null]
+
+[%%expect{|
+Lines 1-4, characters 0-11:
+1 | type _ multiple_payload_gadt =
+2 |   | Multiple_null : int multiple_payload_gadt
+3 |   | Multiple_this : string * int -> string multiple_payload_gadt
+4 | [@@or_null]
+Error: Invalid [@or_null] declaration:
+       each constructor must be nullary or unary.
+|}]
+
+module Gadt_group : sig
+  type t : immediate_or_null
+  type box = B of t
+end = struct
+  type t = N : t | P : int -> t [@@or_null]
+  and box = B of t
+end
+
+type group_gadt = GN : group_gadt | GP : group_record -> group_gadt
+[@@or_null]
+and group_record = { next : group_gadt }
+and group_void_gadt =
+  | GVN : void -> group_void_gadt
+  | GVP : group_record -> group_void_gadt
+[@@or_null]
+
+[%%expect{|
+module Gadt_group : sig type t : immediate_or_null type box = B of t end
+type group_gadt = GN : group_gadt | GP : group_record -> group_gadt [@@or_null]
+and group_record = { next : group_gadt; }
+and group_void_gadt =
+    GVN : void -> group_void_gadt
+  | GVP : group_record -> group_void_gadt [@@or_null]
+|}]
+
+(* The recursion check follows projected arguments before sorts are known. *)
+type cycle = Cycle of cycle cycle_gadt [@@unboxed]
+and ('a : value_or_null) cycle_gadt =
+  | Cycle_null : 'b cycle_gadt
+  | Cycle_this : ('c : value). 'c -> 'c cycle_gadt
+[@@or_null]
+
+[%%expect{|
+Line 1, characters 0-50:
+1 | type cycle = Cycle of cycle cycle_gadt [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The definition of "cycle" is recursive without boxing:
+         "cycle" contains "cycle cycle_gadt",
+         "cycle cycle_gadt" contains "cycle"
+|}]
+
+type cycle2 = Cycle2 of (cycle2, int) repeated_gadt [@@unboxed]
+and ('a : value_or_null, 'b : value_or_null) repeated_gadt =
+  | Repeated_null : ('d : value_or_null). ('d, int) repeated_gadt
+  | Repeated_this : ('c : value). 'c -> ('c, 'c) repeated_gadt
+[@@or_null]
+
+[%%expect{|
+Line 1, characters 0-63:
+1 | type cycle2 = Cycle2 of (cycle2, int) repeated_gadt [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The definition of "cycle2" is recursive without boxing:
+         "cycle2" contains "(cycle2, int) repeated_gadt",
+         "(cycle2, int) repeated_gadt" contains "cycle2"
+|}]
+
+(* A payload modality must not erase the null argument's bound. *)
+type gadt_null_bound =
+  | Bound_null : nonportable_void -> gadt_null_bound
+  | Bound_this : (unit -> unit) @@ portable -> gadt_null_bound
+[@@or_null]
+let require_portable_gadt (_ : gadt_null_bound @ portable) = ()
+
+[%%expect{|
+type gadt_null_bound =
+    Bound_null : nonportable_void -> gadt_null_bound
+  | Bound_this : (unit -> unit) @@ portable -> gadt_null_bound [@@or_null]
+val require_portable_gadt : gadt_null_bound @ portable -> unit = <fun>
+|}]
+
+let cannot_cross_null_bound (x : gadt_null_bound @ nonportable) =
+  require_portable_gadt x
+
+[%%expect{|
+Line 2, characters 24-25:
+2 |   require_portable_gadt x
+                            ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+type ordinary_null_bound =
+  | Ordinary_bound_null of nonportable_void
+  | Ordinary_bound_this of (unit -> unit) @@ portable
+[@@or_null]
+let require_portable_ordinary (_ : ordinary_null_bound @ portable) = ()
+
+[%%expect{|
+type ordinary_null_bound =
+    Ordinary_bound_null of nonportable_void
+  | Ordinary_bound_this of (unit -> unit) @@ portable [@@or_null]
+val require_portable_ordinary : ordinary_null_bound @ portable -> unit =
+  <fun>
+|}]
+
+let cannot_cross_ordinary_bound (x : ordinary_null_bound @ nonportable) =
+  require_portable_ordinary x
+
+[%%expect{|
+Line 2, characters 28-29:
+2 |   require_portable_ordinary x
+                                ^
+Error: This value is "nonportable" but is expected to be "portable".
 |}]
