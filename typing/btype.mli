@@ -740,10 +740,11 @@ module Jkind0 : sig
     (* Shared type-level implementation of Steps B1-B4 from
        Note [With-bounds for GADTs].  Callers choose the projection target via
        [projected_params]: declaration parameters for boxed GADTs, or the
-       already-instantiated head arguments for unboxed GADTs. *)
+       already-instantiated head arguments for unboxed GADTs.
+       [cstr_res = None] returns an empty substitution. *)
     val gadt_payload_subst :
       projected_params:Types.type_expr list ->
-      res_args:Types.type_expr list ->
+      cstr_res:Types.type_expr option ->
       payload_tys:Types.type_expr list ->
       get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       (Types.type_expr * Types.type_expr) list

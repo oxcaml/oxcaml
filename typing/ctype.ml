@@ -2788,14 +2788,9 @@ let unbox_once env ty =
             (* Unboxed GADT wrappers need the same B1-B4 projection as boxed
                GADTs, but projected onto the instantiated head arguments of the
                wrapper type rather than the declaration parameters. *)
-            let res_args =
-              match get_desc cstr.cstr_res with
-              | Tconstr (_, res_args, _) -> res_args
-              | _ -> Misc.fatal_error "Ctype.unbox_once: cstr_res"
-            in
             Btype.Jkind0.gadt_payload_subst
               ~projected_params:args
-              ~res_args
+              ~cstr_res:(Some cstr.cstr_res)
               ~payload_tys:[ty2]
               ~get_free_vars:(free_variable_set_of_list env)
           | Type_variant ([{ cstr_generalized = false }], _, _) -> []
