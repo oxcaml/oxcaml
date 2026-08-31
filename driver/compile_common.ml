@@ -85,7 +85,7 @@ let parse_intf i =
   |> Parse_result.map_ast
        ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.signature)
 
-let typecheck_intf info ast : _ * Typedtree.interface =
+let typecheck_intf info ast =
   Profile.(
     record_call_with_counters
       ~counter_f:(fun (_alerts, (intf : Typedtree.interface)) ->
