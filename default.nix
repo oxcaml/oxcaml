@@ -390,11 +390,8 @@ stdenv.mkDerivation {
   ]
   ++ lib.optionals withMerlin merlinDev.devBuildInputs;
 
-  # Stop stdenv's configurePhase from sed-editing the checked-in
-  # build-aux/ltmain.sh (it rewrites the sys_lib_search_path lines to point at
-  # nix store paths). Nothing here runs libtool -- LT_INIT is a configure-time
-  # probe only and shared libraries are linked via mkdll -- and in a dev shell
-  # the edit lands in the working tree, leaving the git checkout dirty.
+  # Nothing here runs libtool, so stop stdenv's configurePhase from rewriting
+  # sys_lib_search_path in the checked-in build-aux/ltmain.sh.
   dontFixLibtool = true;
 
   preConfigure = ''
