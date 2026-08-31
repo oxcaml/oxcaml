@@ -1072,15 +1072,18 @@ let const_or_generic_of_mode :
     computed. *)
 let equate_with_curry_bounds : With_locality.lr -> const_or_generic -> bool =
   fun m acc_mode ->
-    if not (With_locality.check_generic m)
-       || not (mode_polymorphism_printing_enabled ())
-    then
+    if not (mode_polymorphism_printing_enabled ()) then
       Result.is_ok
         (With_locality.equate
            m
            (With_locality.of_const (const_or_generic_upper acc_mode)))
     else
-      With_locality.Guts.in_bounds (const_or_generic_upper acc_mode) m
+      match acc_mode, With_locality.check_generic m with
+      | Const c, false ->
+        Result.is_ok (With_locality.equate m (With_locality.of_const c))
+      | Generic _, true ->
+        With_locality.Guts.in_bounds (const_or_generic_upper acc_mode) m
+      | Const _, true | Generic _, false -> false
 
 let erase_implied_axes (modes : Mode.With_locality.Const.t) :
     Mode.With_locality.Const.Option.t =
