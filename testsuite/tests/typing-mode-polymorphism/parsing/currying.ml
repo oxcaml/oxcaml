@@ -442,27 +442,7 @@ module M_good_explicit_curry_global : Explicit_curry_global_arg = struct
   let fst x _ = x
 end
 [%%expect{|
-Lines 1-3, characters 66-3:
-1 | ..................................................................struct
-2 |   let fst x _ = x
-3 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val fst : 'a @ [< 'm] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)]
-         end
-       is not included in
-         Explicit_curry_global_arg
-       Values do not match:
-         val fst : 'a @ [< 'm] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)]
-       is not included in
-         val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ once
-       The type
-         "'a @ [< 'm > past('o)] ->
-         ('b @ [> past('n)] -> 'a @ [> 'm]) @ [> close('m)]"
-       is not compatible with the type
-         "'a @ [< 'p & past('o) & global] ->
-         ('b @ [< past('n)] -> 'a @ [> 'p]) @ once"
+module M_good_explicit_curry_global : Explicit_curry_global_arg
 |}]
 
 (* a bare variable curry parses, but no implementation can promise an

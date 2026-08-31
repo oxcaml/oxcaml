@@ -630,8 +630,10 @@ let transl_modepoly_bound : type l r.
     Parsetree.mode_bound ->
     (l * r) modepoly_bound =
  fun ~position bound ->
+  let { mode_modes; mode_desc } = transl_mode_atoms bound.bound_const in
   { bound_vars = List.map (transl_modepoly_elem ~position) bound.bound_vars;
-    bound_const = transl_mode_atoms bound.bound_const
+    bound_const =
+      { mode_modes = apply_mode_implications mode_modes; mode_desc }
   }
 
 let has_mode_variables annots =
