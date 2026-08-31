@@ -214,7 +214,8 @@ let () =
   Printf.printf "partial implementation: %b\n"
     (match cmt.cmt_annots with
      | Partial_implementation _ -> true
-     | Implementation _ | Interface _ | Packed _ | Partial_interface _ ->
+     | Implementation _ | Interface _ | Packed _ | Partial_interface _
+     | Functorize ->
          false);
   Printf.printf "present: %b\n"
     (Option.is_some cmt.cmt_module_implementation_facts)
