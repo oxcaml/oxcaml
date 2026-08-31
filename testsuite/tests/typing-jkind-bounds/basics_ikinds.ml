@@ -1159,8 +1159,7 @@ Lines 1-2, characters 0-66:
 1 | type 'a t : value mod global immutable stateless many non_float =
 2 |   Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
 Error: The layout of type "t" is value
-         because it instantiates an unannotated type parameter of t,
-         chosen to have layout value.
+         because it's an unboxed variant type.
        But the layout of type "t" must be a sublayout of value non_float
          because of the annotation on the declaration of the type t.
        Note: The kinds mutable_data, immutable_data, and sync_data have
@@ -1209,7 +1208,7 @@ Lines 1-2, characters 0-65:
 1 | type ('a : value mod external_) t : immediate =
 2 |   Foo of 'a @@ global portable contended many aliased [@@unboxed]
 Error: The layout of type "t" is value
-         because of the annotation on 'a in the declaration of the type t.
+         because it's an unboxed variant type.
        But the layout of type "t" must be a sublayout of value non_pointer
          because of the annotation on the declaration of the type t.
        Note: The layout of immediate is value non_pointer.
