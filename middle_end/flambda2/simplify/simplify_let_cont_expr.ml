@@ -569,6 +569,20 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
   in
   rebuild_body uacc ~after_rebuild:(rebuild_let_cont data ~after_rebuild)
 
+(* Parameters referenced by phantom lets within the handler must remain
+   locatable by the debugger: mark their binders (printed as "NP"). *)
+let promote_params_needed_by_phantom_lets uacc params ~free_names =
+  if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
+  then params
+  else
+    Bound_parameters.create
+      (List.map
+         (fun param ->
+           if Expr_builder.variable_needs_np_promotion free_names (BP.var param)
+           then BP.with_needed_by_phantom_let param
+           else param)
+         (Bound_parameters.to_list params))
+
 let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let Flow_types.Alias_result.{ continuation_parameters; _ } =
     UA.continuation_param_aliases uacc
@@ -719,6 +733,9 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
         add_phantom_params_bindings uacc handler new_phantom_params
       in
       let free_names = remove_params new_phantom_params free_names in
+      let params =
+        promote_params_needed_by_phantom_lets uacc params ~free_names
+      in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
@@ -822,6 +839,16 @@ let rebuild_single_recursive_handler cont
       let free_names = remove_params new_phantom_params free_names in
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
+      in
+      (* Invariant parameters are not marked: they are shared between the
+         handlers of a recursive group, so any marking would have to happen at
+         the point where the whole group is rebuilt; and no case is currently
+         known where a non-user-visible invariant parameter is referenced by a
+         phantom let (the parameter-alias machinery removes invariant parameters
+         of single-entry loops, and phantom defining expressions reference boxed
+         carriers rather than unboxing extras). *)
+      let variant_params =
+        promote_params_needed_by_phantom_lets uacc variant_params ~free_names
       in
       let cont_handler =
         RE.Continuation_handler.create

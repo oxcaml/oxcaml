@@ -594,12 +594,12 @@ let_(body):
  *)
     value_slots = with_value_slots_opt;
     KWD_IN body = body;
-    { ({ bindings; value_slots; body } : let_) }
+    { ({ bindings; value_slots; body; is_phantom = false } : let_) }
 ;
 
 let_binding:
   | var = variable EQUAL defining_expr = named
-    { { var; defining_expr } }
+    { { var; defining_expr; needed_by_phantom_let = false } }
 ;
 
 with_value_slots_opt:
@@ -908,7 +908,8 @@ field_of_block:
 ;
 
 kinded_variable:
-  | param = variable; kind = kind_with_subkind_opt { { param; kind } }
+  | param = variable; kind = kind_with_subkind_opt
+    { { param; kind; needed_by_phantom_let = false } }
 ;
 
 kind_with_subkind_opt:

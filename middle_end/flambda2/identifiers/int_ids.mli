@@ -127,6 +127,11 @@ module Variable : sig
 
   val user_visible : t -> bool
 
+  (** Print like [print] but with the visibility suffix "NP" ("not user visible,
+      but needed by phantom let") in place of "UV"/"N". For use by [Bound_var]
+      and [Bound_parameter], where the corresponding flag lives. *)
+  val print_as_needed_by_phantom_let : Format.formatter -> t -> unit
+
   val export : Set.t -> importer
 
   val import : importer -> t -> t

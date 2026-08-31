@@ -1144,7 +1144,11 @@ and apply_expr env res apply =
         in
         let env, cmm_params =
           Env.create_bound_parameters env
-            (List.map Bound_parameter.var_and_uid params)
+            (List.map
+               (fun bp ->
+                 let var, uid = Bound_parameter.var_and_uid bp in
+                 var, uid, Bound_parameter.needed_by_phantom_let bp)
+               params)
         in
         let label = Lambda.next_raise_count () in
         let params_with_machtype =

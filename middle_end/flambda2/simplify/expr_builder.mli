@@ -25,6 +25,14 @@
 
 open! Flambda.Import
 
+(** Whether the given variable, bound at normal mode, is referenced by the
+    defining expression of at least one phantom let (per the given
+    [Name_occurrences.t]) and its binder should therefore be marked via
+    [Bound_var.with_needed_by_phantom_let] (or the [Bound_parameter]
+    equivalent). [create_let] marks let binders itself; this is exposed for
+    continuation parameters. *)
+val variable_needs_np_promotion : Name_occurrences.t -> Variable.t -> bool
+
 val create_let_binding :
   Upwards_acc.t ->
   Bound_pattern.t ->
