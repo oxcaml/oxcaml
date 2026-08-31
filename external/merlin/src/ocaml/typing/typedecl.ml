@@ -2198,7 +2198,7 @@ type unrepresentable_record =
   | Unrepresentable_field of string
 
 let compute_record_repr
-    loc reprs lbls ~warn ~refining_block_with_any
+    loc reprs lbls ~warn
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
     ~atomic_fields ~voids ~first_any
     ~represent_as_float_array
@@ -2217,19 +2217,17 @@ let compute_record_repr
     in
     Ok (Record_mixed shape)
   in
-  (* Important: If [refining_block_with_any] is true, we must use a plain
-      value block or mixed block. *)
   match
-    ( ~refining_block_with_any, ~values, ~floats, ~atomic_floats,
+    ( ~values, ~floats, ~atomic_floats,
       ~float64s, ~non_float64_unboxed_fields, ~atomic_fields, ~voids,
       ~first_any )
   with
   (* If all fields are float/float64/void, we flatten the floats only when
      opted in via [@@flatten_floats]. *)
-  | ~refining_block_with_any:false, ~values:false, ~floats:true,
+  | ~values:false, ~floats:true,
       ~atomic_floats:false, ~float64s:true,
       ~non_float64_unboxed_fields:false, ~atomic_fields:false,
-      ~first_any:None, ..  ->
+      ~first_any:None, ~voids:_ ->
     if flatten_floats then
       let rec of_repr (repr : Element_repr.t) : Types.mixed_block_element =
         match repr with
@@ -2261,16 +2259,10 @@ let compute_record_repr
     Result.Error (Unrepresentable_field (Ident.name id))
   | ~values:false, ~floats:false, ~atomic_floats:false,
     ~float64s:true, ~non_float64_unboxed_fields:false,
-    ~voids:false, ~first_any:None, .. ->
-    if represent_as_float_array then begin
-      if refining_block_with_any then
-        (* CR-soon rtjoa: This fatal error is included for an abundance of
-           caution. We should make this function more defensive as a whole *)
-        Misc.fatal_error
-          "Typedecl.compute_record_repr: refining any with \
-           [@@represent_as_float_array]";
+    ~voids:false, ~first_any:None, ~atomic_fields:_ ->
+    if represent_as_float_array then
       Ok Record_ufloat
-    end else
+    else
       mixed_record ()
   (* For other mixed blocks, float fields are stored as flat
       only when they're unboxed.
@@ -2282,19 +2274,16 @@ let compute_record_repr
   | ~values:true, ~float64s:true, ..
   | ~non_float64_unboxed_fields:true, .. ->
     mixed_record ()
-  (* value-only records are stored as boxed records, including records whose
-     declared types have fields of kind [any] *)
+  (* value-only records are stored as boxed records *)
   | ~values:true, ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:false, ..
-  | ~refining_block_with_any:true, ~float64s:false,
-      ~non_float64_unboxed_fields:false, ~voids:false, .. ->
+      ~voids:false, .. ->
     Ok Record_boxed
   (* All-nonatomic-float and all-nonatomic-float64 records are stored as
       flat float records.
   *)
   | ~values:false, ~floats:true, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:false, ~first_any:None, .. ->
+      ~voids:false, ~first_any:None, ~atomic_fields:_ ->
     Ok Record_float
   (* Records with atomic float fields cannot use flat representation *)
   | ~atomic_floats:true, ~first_any:None, .. ->
@@ -2303,8 +2292,7 @@ let compute_record_repr
     Ok Record_boxed
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:_, ~atomic_fields:_, ~first_any:None, ..
-    [@warning "+9"] ->
+      ~voids:_, ~atomic_fields:_, ~first_any:None ->
     Misc.fatal_error "Typedecl.compute_record_repr: empty record"
 
 (* For tracking what types appear in record blocks. All product layouts
@@ -2433,7 +2421,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
              non_float64_unboxed_fields; atomic_fields; voids;
              first_any } = repr_summary
       in
-      let refining_block_with_any = false in
       match form with
       | Legacy ->
         let ~represent_as_float_array, ~flatten_floats =
@@ -2444,7 +2431,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         in
         let rep =
           compute_record_repr loc reprs lbls ~represent_as_float_array
-            ~flatten_floats ~warn ~refining_block_with_any ~values ~floats
+            ~flatten_floats ~warn ~values ~floats
             ~atomic_floats ~float64s ~non_float64_unboxed_fields ~atomic_fields
             ~voids ~first_any
         in
