@@ -73,7 +73,7 @@ struct stack_info {
   intnat local_limit;
 
   /* Temporary dynamic bindings, applying only in this fiber */
-  struct dynamic_table_s dyn;
+  value dynamic;
 };
 
 #ifdef STACK_GUARD_PAGES

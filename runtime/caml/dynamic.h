@@ -30,10 +30,9 @@ CAMLprim value caml_dynamic_get(value dyn);
    Must be paired with [caml_dynamic_pop] on the same fiber. */
 CAMLprim value caml_dynamic_push(value dyn, value val);
 
-/* Pop a local binding for a dynamic variable.
+/* Pop the fiber's most recent local binding.
    Must be paired with [caml_dynamic_push] on the same fiber. */
-CAMLprim value caml_dynamic_pop(value dyn);
-
+CAMLprim value caml_dynamic_pop(value unit);
 
 typedef struct dynamic_binding_s {
   value dyn; /* Dynamic id, or Val_null if unbound */
@@ -72,39 +71,6 @@ extern void caml_dynamic_cache_flush(dynamic_cache_t);
 
 /* Apply a GC scanning action to all bindings in a dynamic cache. */
 extern void caml_dynamic_cache_scan_roots(dynamic_cache_t,
-                                          scanning_action,
-                                          scanning_action_flags,
-                                          void *);
-
-
-/* Each entry in a dynamic table is a stack that grows when full. */
-typedef struct dynamic_stack_s *dynamic_stack_t;
-
-/* Per-fiber hash table of local dynamic bindings.
-   Maps dynamic ID to a stack of bindings installed on this fiber. */
-typedef struct dynamic_table_s {
-  size_t mask; /* capacity - 1 */
-  size_t count;
-  dynamic_stack_t bindings;
-} dynamic_table_s, *dynamic_table_t;
-
-/* Initialize a dynamic table to an empty state. */
-extern void caml_dynamic_table_init(dynamic_table_t table);
-
-/* Uninitialize a dynamic table, freeing any internal allocations. */
-extern void caml_dynamic_table_free(dynamic_table_t table);
-
-/* Duplicate a dynamic table. Returns false if allocation fails. */
-extern bool caml_dynamic_table_copy(dynamic_table_t dst, dynamic_table_t src);
-
-/* Register all bindings as GC roots. */
-extern void caml_dynamic_table_register_roots(dynamic_table_t table);
-
-/* Unregister all bindings as GC roots. */
-extern void caml_dynamic_table_unregister_roots(dynamic_table_t table);
-
-/* Apply a GC scanning action to all bindings in a dynamic table. */
-extern void caml_dynamic_table_scan_roots(dynamic_table_t,
                                           scanning_action,
                                           scanning_action_flags,
                                           void *);
