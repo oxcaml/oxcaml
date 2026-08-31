@@ -48,7 +48,7 @@ val type_implementation:
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
   sourcefile:string -> Compilation_unit.t -> Env.t ->
-  Parsetree.signature -> Typedtree.signature
+  Parsetree.signature -> Typedtree.interface
 val transl_signature:
   ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
 
@@ -72,8 +72,10 @@ val modtype_of_package:
 
 val path_of_module : Typedtree.module_expr -> Path.t option
 
+(** [save_signature unit_info comp_unit intf env cmi]
+    writes the typed interface artifacts. *)
 val save_signature:
-  Unit_info.t -> Compilation_unit.t -> Typedtree.signature ->
+  Unit_info.t -> Compilation_unit.t -> Typedtree.interface ->
   Env.t -> Cmi_format.cmi_infos_lazy -> unit
 
 val package_units:
