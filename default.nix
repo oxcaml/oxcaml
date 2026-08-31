@@ -182,8 +182,7 @@ let
       merlinSrc = "${src}/external/merlin";
 
       packages = rec {
-        # The vendored csexp (external/csexp), packaged so the nix merlin
-        # build uses the same csexp as the in-repo build.
+        # The vendored csexp (external/csexp), which is used by Merlin.
         merlin-csexp = buildDunePackage {
           pname = "csexp";
           version = "dev";
