@@ -459,12 +459,12 @@ let eval_expectation expectation ~output ~success
     | (Expect_asm _ | Expect_fexpr) when !Clflags.structured_diagnostics -> None
     | Expect_asm _ ->
       let to_update =
-      List.filter
-        ~f:(fun (f, _) ->
-            match current_arch_filter () with
-            | None -> false
-            | Some arch -> List.mem ~set:f arch)
-        expectation.expected_output
+        List.filter
+          ~f:(fun (f, _) ->
+              match current_arch_filter () with
+              | None -> false
+              | Some arch -> List.mem ~set:f arch)
+          expectation.expected_output
       in
       eval_filtered_expectation expectation ~output ~to_update
     | Expect_fexpr ->

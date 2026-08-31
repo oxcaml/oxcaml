@@ -458,6 +458,8 @@ let human_desc : Mode.Hint.pinpoint_desc -> string = function
   | Unknown -> "this value"
   | Ident _ -> "this identifier"
   | Function -> "the function"
+  | Parameter -> "the parameter"
+  | Return -> "the function's return value"
   | Module -> "the module"
   | Functor -> "the functor"
   | Functor_parameter -> "the functor's parameter"
@@ -608,12 +610,14 @@ let subject_of_pinpoint ~source ((loc, desc) : Mode.Hint.pinpoint) =
   | Structure_item (_, id), (Some _ | None) ->
     subject ?span:(Some loc) [Phrase.Code (Ident.name id)]
   | ( ( Unknown | Ident _ | Function | Module | Functor | Functor_parameter
-      | Structure | Lazy | Quote | Allocation | Expression | Effect_match
-      | Effect_try | Class | Object | Loop | Letop | Cases_result | Pattern ),
+      | Parameter | Return | Structure | Lazy | Quote | Allocation | Expression
+      | Effect_match | Effect_try | Class | Object | Loop | Letop | Cases_result
+      | Pattern ),
       None )
   | ( ( Unknown | Ident _ | Module | Functor | Functor_parameter | Structure
-      | Lazy | Quote | Allocation | Expression | Effect_match | Effect_try
-      | Class | Object | Loop | Letop | Cases_result | Pattern ),
+      | Parameter | Return | Lazy | Quote | Allocation | Expression
+      | Effect_match | Effect_try | Class | Object | Loop | Letop | Cases_result
+      | Pattern ),
       Some _ ) ->
     subject_of_loc ~source ~fallback:(human_desc desc) loc
 
@@ -1254,9 +1258,9 @@ let is_explicit_function_annotation ~source (m : Message.t) =
       contains_substring prefix ("@ " ^ Step_mode.name m.mode))
   | ( _,
       ( Unknown | Ident _ | Module | Functor | Functor_parameter | Structure
-      | Lazy | Quote | Allocation | Expression | Effect_match | Effect_try
-      | Class | Object | Loop | Letop | Cases_result | Pattern
-      | Structure_item _ ) ) ->
+      | Parameter | Return | Lazy | Quote | Allocation | Expression
+      | Effect_match | Effect_try | Class | Object | Loop | Letop | Cases_result
+      | Pattern | Structure_item _ ) ) ->
     false
 
 let plan_expected ~source ~axis_mode ~description (chain : Message.t list) =
@@ -3502,7 +3506,7 @@ let typecore_scope : Typecore.error -> Scope.t = function
   | Invalid_atomic_loc_payload | Label_not_atomic _ | Atomic_in_pattern _
   | Modalities_on_atomic_field _ | Block_index_modality_mismatch _
   | Submode_failed _ | Curried_application_complete _ | Mode_mismatch _
-  | Uncurried_function_escapes _ | Tail_call_local_returning
+  | Uncurried_function_escapes_comonadic _ | Tail_call_local_returning
   | Bad_tail_annotation _ | Exclave_in_nontail_position
   | Exclave_returns_not_local | Always_heap_allocation _
   | Always_static_allocation _ | Not_allocation | Overwrite_of_invalid_term ->
@@ -3662,8 +3666,9 @@ let diagnose_env_lookup request ~loc lookup_error =
       | Mode.Hint.Structure ->
         Module, None
       | Mode.Hint.Class | Mode.Hint.Object -> Class, None
-      | Unknown | Function | Lazy | Quote | Allocation | Expression
-      | Effect_match | Effect_try | Loop | Letop | Cases_result | Pattern ->
+      | Unknown | Function | Parameter | Return | Lazy | Quote | Allocation
+      | Expression | Effect_match | Effect_try | Loop | Letop | Cases_result
+      | Pattern ->
         Value, None
     in
     let named noun fallback =
@@ -4649,7 +4654,7 @@ let diagnose_typecore request ~loc ~env err =
       | axes -> axes
     in
     mode_stories request ?subject_override axes
-  | Typecore.Uncurried_function_escapes e ->
+  | Typecore.Uncurried_function_escapes_comonadic e ->
     let subject_override : subject option =
       Some
         (subject ~span:loc [Phrase.Text "this function when partially applied"])
@@ -4668,7 +4673,7 @@ let diagnose_typecore request ~loc ~env err =
     mode_stories request ~extra_rules ?subject_override
       (Mode.Alloc.fold_error ~init:[] ~step:fold_step
          (loc, Mode.Hint.Expression)
-         e)
+         (Mode.Alloc.Comonadic e))
   | Typecore.Overwrite_of_invalid_term ->
     let open Nlg in
     plain_story
