@@ -181,16 +181,16 @@ let translate_simd_vec_split : S.Predef.simd_vec_split -> RS.simd_vec_split =
   | Float32x16 -> Float32x16
   | Float64x8 -> Float64x8
 
-let translate_unboxed : S.Predef.unboxed -> RS.unboxed = function
-  | Unboxed_float -> Unboxed_float
-  | Unboxed_float32 -> Unboxed_float32
-  | Unboxed_nativeint -> Unboxed_nativeint
-  | Unboxed_int64 -> Unboxed_int64
-  | Unboxed_int32 -> Unboxed_int32
-  | Unboxed_int16 -> Unboxed_int16
-  | Unboxed_int8 -> Unboxed_int8
-  | Unboxed_mask -> Unboxed_mask
-  | Unboxed_simd svs -> Unboxed_simd (translate_simd_vec_split svs)
+let translate_unboxed : S.Predef.unboxed -> RS.unboxed RS.Or_void.t = function
+  | Unboxed_float -> Other Unboxed_float
+  | Unboxed_float32 -> Other Unboxed_float32
+  | Unboxed_nativeint -> Other Unboxed_nativeint
+  | Unboxed_int64 -> Other Unboxed_int64
+  | Unboxed_int32 -> Other Unboxed_int32
+  | Unboxed_int16 -> Other Unboxed_int16
+  | Unboxed_int8 -> Other Unboxed_int8
+  | Unboxed_mask -> Other Unboxed_mask
+  | Unboxed_simd svs -> Other (Unboxed_simd (translate_simd_vec_split svs))
 
 exception Layout_missing
 
@@ -628,10 +628,9 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
           pp_layout type_layout pp_layout layout Shape.print shape)
   | Predef (pre, args), _ -> (
     try
-      let predef_shape =
-        predef_to_complex_shape_exn ~cache ~rec_env pre ~args
-      in
-      runtime (RS.predef predef_shape)
+      match predef_to_complex_shape_exn ~cache ~rec_env pre ~args with
+      | Other predef_shape -> runtime (RS.predef predef_shape)
+      | Void -> void
     with Layout_missing -> (
       let layout = Shape.Predef.to_base_layout pre in
       let runtime_layout = RS.Runtime_layout.of_base_layout layout in
@@ -914,7 +913,7 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     unknown_shape_exn ()
 
 and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
-    RS.predef =
+    RS.predef RS.Or_void.t =
   match predef, args with
   | Array, [elem_shape] -> (
     let elem_shape =
@@ -923,20 +922,20 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
     let children = lay_out_sequentially elem_shape in
     match children with
     | [] -> err_exn (fun f -> f "array cannot contain only void elements")
-    | [child] -> Array (Regular child)
-    | children -> Array (Packed children)
+    | [child] -> Other (Array (Regular child))
+    | children -> Other (Array (Packed children))
     (* case for an unboxed product inside *))
-  | Bytes, [] -> Bytes
-  | Char, [] -> Char
-  | Extension_constructor, [] -> Extension_constructor
-  | Float, [] -> Float
-  | Float32, [] -> Float32
-  | Floatarray, [] -> Floatarray
-  | Int, [] -> Int
-  | Int8, [] -> Int8
-  | Int16, [] -> Int16
-  | Int32, [] -> Int32
-  | Int64, [] -> Int64
+  | Bytes, [] -> Other Bytes
+  | Char, [] -> Other Char
+  | Extension_constructor, [] -> Other Extension_constructor
+  | Float, [] -> Other Float
+  | Float32, [] -> Other Float32
+  | Floatarray, [] -> Other Floatarray
+  | Int, [] -> Other Int
+  | Int8, [] -> Other Int8
+  | Int16, [] -> Other Int16
+  | Int32, [] -> Other Int32
+  | Int64, [] -> Other Int64
   | Lazy_t, [elem_shape] ->
     let elem_shape =
       type_shape_to_complex_shape_exn ~cache ~rec_env elem_shape
@@ -947,13 +946,16 @@ and predef_to_complex_shape_exn ~cache ~rec_env (predef : S.Predef.t) ~args :
       | Some s -> s
       | None -> RS.unknown Value
     in
-    Lazy_t elem_shape
-  | Nativeint, [] -> Nativeint
-  | Mask, [] -> Mask
-  | String, [] -> String
-  | Simd vec_split, [] -> Simd (translate_simd_vec_split vec_split)
-  | Exception, [] -> Exception
-  | Unboxed unb, [] -> Unboxed (translate_unboxed unb)
+    Other (Lazy_t elem_shape)
+  | Nativeint, [] -> Other Nativeint
+  | Mask, [] -> Other Mask
+  | String, [] -> Other String
+  | Simd vec_split, [] -> Other (Simd (translate_simd_vec_split vec_split))
+  | Exception, [] -> Other Exception
+  | Unboxed unb, [] -> (
+    match translate_unboxed unb with
+    | Other unb -> Other (Unboxed unb)
+    | Void -> Void)
   | ( ( Bytes | Char | Extension_constructor | Float | Float32 | Floatarray
       | Int | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint | String | Simd _
       | Exception | Unboxed _ ),
