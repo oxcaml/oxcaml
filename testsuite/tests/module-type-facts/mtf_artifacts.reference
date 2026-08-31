@@ -1,7 +1,7 @@
 == facts read back from the .cmt and the .cmti of a unit
 present: cmt true cmti true
-counts: checks 9 deps 17 equalities 1 omissions 1
-counts: checks 0 deps 22 equalities 0 omissions 0
+counts: checks 9 deps 18 equalities 1 omissions 1
+counts: checks 0 deps 24 equalities 0 omissions 0
 == the interface pairs of the unit are directional
 pair S <- [intf]S
 pair T <- [intf]T

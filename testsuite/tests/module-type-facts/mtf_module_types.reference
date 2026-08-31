@@ -1,43 +1,47 @@
 == an annotation, and the members of an annotated signature
-counts: checks 3 deps 4 equalities 0 omissions 0
+counts: checks 3 deps 5 equalities 0 omissions 0
 check annotation M : S
 check annotation Pair.Inner : <Pair.Inner'>
-check annotation Pair : <#1>
+check annotation Pair : <#2>
+dep S -definition-> <#1>
 dep <M> -interface-> S
 dep <Pair.Inner'> -interface-> S
-dep <#1> -interface-> <Pair.Inner'>
-dep <Pair> -interface-> <#1>
+dep <#2> -interface-> <Pair.Inner'>
+dep <Pair> -interface-> <#2>
 == aliases, includes, with constraints, module type of, functor types
-counts: checks 1 deps 13 equalities 0 omissions 0
+counts: checks 1 deps 14 equalities 0 omissions 0
 check annotation M : S
+dep S -definition-> <#1>
 dep A -alias-> S
-dep W -definition-> <#1>
-dep K -definition-> <#2>
-dep Fn -definition-> <#3>
-dep G -definition-> <#4>
+dep W -definition-> <#2>
+dep K -definition-> <#3>
+dep Fn -definition-> <#4>
+dep G -definition-> <#5>
 dep <S> -alias-> S
-dep <#1> -with-> S
-dep <#2> -include-> S
-dep <#3> -functor-type-> K
-dep <#3> -functor-type-> <S>
+dep <#2> -with-> S
+dep <#3> -include-> S
+dep <#4> -functor-type-> K
+dep <#4> -functor-type-> <S>
 dep <M> -interface-> S
-dep <#4> -typeof-> S
-dep <#4> -typeof-> <M>
+dep <#5> -typeof-> S
+dep <#5> -typeof-> <M>
 == destructive substitution and strengthening
-counts: checks 3 deps 11 equalities 0 omissions 0
+counts: checks 3 deps 13 equalities 0 omissions 0
 check annotation M : S
 check annotation M : Base
 check annotation N : K
-dep T -definition-> <#1>
-dep U -definition-> <#2>
-dep K -definition-> <#3>
-dep <#1> -interface-> T.X@body(T)
-dep <#2> -subst-> S
-dep <#2> -with-> T
+dep S -definition-> <#1>
+dep Base -definition-> <#2>
+dep T -definition-> <#3>
+dep U -definition-> <#4>
+dep K -definition-> <#5>
+dep <#3> -interface-> T.X@body(T)
+dep <#4> -subst-> S
+dep <#4> -with-> T
 dep <M> -interface-> S
-dep <#3> -strengthen-> S
-dep <#3> -strengthen-> Base
-dep <#3> -strengthen-> <M>
+dep <#5> -strengthen-> S
+dep <#5> -strengthen-> Base
+dep <#5> -strengthen-> <M>
 dep <N> -interface-> K
 == module type of a structure that is not a path is omitted
 counts: checks 0 deps 1 equalities 0 omissions 1
