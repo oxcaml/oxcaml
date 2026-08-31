@@ -288,29 +288,42 @@ module Solver = struct
   let is_principal_type (ty : Types.type_expr) : bool =
     (not !Clflags.principal) || Types.get_level ty = Btype.generic_level
 
+  let crossing_externality (node : Ldd.node) : Ldd.node =
+    Ldd.meet node
+      (Ldd.const (Axis_lattice.crossing_externality Axis_lattice.top))
+
   type expansion_resolution =
     | Expanded_to_kconstr of Path.t
-    | Expanded_to_layout
+    | Expanded_to_layout of { crosses_externality : bool }
 
   let rec expand_jkind_desc : type a l r.
+      crosses_externality:(a -> bool) ->
       ctx ->
       (a, l * r) Types.base_and_axes ->
       Axis_lattice.t * (l * r) Types.with_bounds * expansion_resolution =
-   fun ctx jkind_desc ->
+   fun ~crosses_externality ctx jkind_desc ->
     let terminal () =
       let lat = Jkind.Mod_bounds.to_axis_lattice jkind_desc.mod_bounds in
-      let resolution =
-        match jkind_desc.base with
-        | Types.Layout _ -> Expanded_to_layout
-        | Types.Kconstr (path, _, _) -> Expanded_to_kconstr path
-      in
-      lat, jkind_desc.with_bounds, resolution
+      match jkind_desc.base with
+      | Types.Layout l ->
+        let crosses_externality = crosses_externality l in
+        let lat =
+          if crosses_externality
+          then Axis_lattice.crossing_externality lat
+          else lat
+        in
+        lat, jkind_desc.with_bounds, Expanded_to_layout { crosses_externality }
+      | Types.Kconstr (path, _, _) ->
+        lat, jkind_desc.with_bounds, Expanded_to_kconstr path
     in
     match ctx.env with
     | None -> terminal ()
     | Some env -> (
       match Jkind.Const.expand_once env jkind_desc with
-      | Some jkind_const -> expand_jkind_desc ctx jkind_const
+      | Some jkind_const ->
+        expand_jkind_desc
+          ~crosses_externality:Jkind_types.Layout.Const.crosses_externality ctx
+          jkind_const
       | None -> terminal ())
 
   (* CR jujacobs: we could optimize the join with masks you see below
@@ -363,7 +376,10 @@ module Solver = struct
               | exception Not_found -> rigid_name ctx name
               | { jkind_manifest = None; _ } -> rigid_name ctx name
               | { jkind_manifest = Some jkind_const; _ } ->
-                ckind_of_jkind_desc ctx jkind_const))
+                ckind_of_jkind_desc
+                  ~crosses_externality:
+                    Jkind_types.Layout.Const.crosses_externality ctx jkind_const
+              ))
           | Atom { constr = other_path; arg_index } ->
             if Path.same other_path path
             then rigid_name ctx name
@@ -490,46 +506,66 @@ module Solver = struct
 
   (* Converting surface jkinds to solver ckinds. *)
   and ckind_of_jkind_desc : type a l r.
-      ctx -> (a, l * r) Types.base_and_axes -> Ldd.node =
-   fun ctx jkind_desc ->
+      crosses_externality:(a -> bool) ->
+      ctx ->
+      (a, l * r) Types.base_and_axes ->
+      Ldd.node =
+   fun ~crosses_externality ctx jkind_desc ->
     let mod_bounds_lat, with_bounds, resolution =
-      expand_jkind_desc ctx jkind_desc
+      expand_jkind_desc ~crosses_externality ctx jkind_desc
     in
     let base_mod_bounds = Ldd.const mod_bounds_lat in
     let base =
       match resolution with
-      | Expanded_to_layout -> base_mod_bounds
+      | Expanded_to_layout _ -> base_mod_bounds
       | Expanded_to_kconstr path ->
         let atom = rigid_name ctx (Ldd.Name.katom path) in
         Ldd.meet base_mod_bounds atom
     in
     (* For each with-bound (ty, axes), contribute
        modality(axes_mask, kind ty). *)
-    Jkind.With_bounds.to_seq with_bounds
-    |> Seq.fold_left
-         (fun acc (ty, bound_info) ->
-           let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set axes in
-           let ty_kind = kind ~use_tables:true ctx ty in
-           Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
-         base
+    let result =
+      Jkind.With_bounds.to_seq with_bounds
+      |> Seq.fold_left
+           (fun acc (ty, bound_info) ->
+             let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
+             let mask = Axis_lattice.of_axis_set axes in
+             let ty_kind = kind ~use_tables:true ctx ty in
+             Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
+           base
+    in
+    (* The with-bounds join can raise externality above the bound implied by
+       the layout. *)
+    match resolution with
+    | Expanded_to_layout { crosses_externality = true } ->
+      crossing_externality result
+    | Expanded_to_layout { crosses_externality = false } | Expanded_to_kconstr _
+      ->
+      result
 
   and ckind_of_jkind : type l r. ctx -> (l * r) Types.jkind -> Ldd.node =
-   fun ctx jkind -> ckind_of_jkind_desc ctx jkind.jkind
+   fun ctx jkind ->
+    ckind_of_jkind_desc ~crosses_externality:Jkind.Layout.crosses_externality
+      ctx jkind.jkind
 
   and mod_bounds_floor_of_jkind_desc : type a l r.
-      ctx -> (a, l * r) Types.base_and_axes -> Ldd.node option =
-   fun ctx jkind_desc ->
+      crosses_externality:(a -> bool) ->
+      ctx ->
+      (a, l * r) Types.base_and_axes ->
+      Ldd.node option =
+   fun ~crosses_externality ctx jkind_desc ->
     let mod_bounds_lat, _with_bounds, resolution =
-      expand_jkind_desc ctx jkind_desc
+      expand_jkind_desc ~crosses_externality ctx jkind_desc
     in
     match resolution with
     | Expanded_to_kconstr _ -> None
-    | Expanded_to_layout -> Some (Ldd.const mod_bounds_lat)
+    | Expanded_to_layout _ -> Some (Ldd.const mod_bounds_lat)
 
   and mod_bounds_floor_of_jkind : type l r.
       ctx -> (l * r) Types.jkind -> Ldd.node option =
-   fun ctx jkind -> mod_bounds_floor_of_jkind_desc ctx jkind.jkind
+   fun ctx jkind ->
+    mod_bounds_floor_of_jkind_desc
+      ~crosses_externality:Jkind.Layout.crosses_externality ctx jkind.jkind
 
   (** Compute the kind for [t]. *)
   and kind ?(check_principality = true) ~use_tables (ctx : ctx)
@@ -1730,15 +1766,23 @@ let with_bounds_is_empty : type l r. (l * r) Types.with_bounds -> bool =
   | Types.No_with_bounds -> true
   | Types.With_bounds _ -> false
 
-let fast_sub_of_value_sub : type r.
-    Axis_lattice.t -> (Allowance.allowed * r) Types.jkind -> bool =
- fun super_lat (sub : (Allowance.allowed * r) Types.jkind) ->
+let fast_sub_of_sort_sub : type r.
+    sub:(Allowance.allowed * r) Types.jkind ->
+    sub_sort:Jkind_types.Sort.t ->
+    super_lat:Axis_lattice.t ->
+    bool =
+ fun ~(sub : (Allowance.allowed * r) Types.jkind) ~sub_sort ~super_lat ->
   if Axis_lattice.equal super_lat Axis_lattice.top
   then true
   else if not (with_bounds_is_empty sub.jkind.with_bounds)
   then false
   else
     let sub_lat = Jkind.Mod_bounds.to_axis_lattice sub.jkind.mod_bounds in
+    let sub_lat =
+      if Jkind_types.Sort.crosses_externality sub_sort
+      then Axis_lattice.crossing_externality sub_lat
+      else sub_lat
+    in
     Axis_lattice.leq sub_lat super_lat
 
 let fast_sub_of_any_super : type r.
@@ -1746,9 +1790,10 @@ let fast_sub_of_any_super : type r.
  fun mod_bounds sub ->
   match sub.jkind.base with
   | Types.Layout
-      (Jkind_types.Layout.Sort (_sub_sort, { nullability = _; separability = _ }))
+      (Jkind_types.Layout.Sort (sub_sort, { nullability = _; separability = _ }))
     ->
-    fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
+    fast_sub_of_sort_sub ~sub ~sub_sort
+      ~super_lat:(Jkind.Mod_bounds.to_axis_lattice mod_bounds)
   | Types.Layout _ | Types.Kconstr _ -> false
 
 let fast_sub_of_sort_super : type r.
@@ -1763,7 +1808,9 @@ let fast_sub_of_sort_super : type r.
     ->
     if not (Jkind_types.Sort.equate sub_sort super_sort)
     then false
-    else fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
+    else
+      fast_sub_of_sort_sub ~sub ~sub_sort
+        ~super_lat:(Jkind.Mod_bounds.to_axis_lattice mod_bounds)
   | Types.Layout _ | Types.Kconstr _ -> false
 
 let fast_sub : type r1 l2.
@@ -1941,7 +1988,10 @@ let substitute_decl_ikind_with_lookup
         | Subst.Ikind_substitution.Lookup_jkind_const jkind_const ->
           let raw =
             let ctx = create_ctx ~mode:Solver.Normal ~env:None in
-            Solver.normalize (Solver.ckind_of_jkind_desc ctx jkind_const)
+            Solver.normalize
+              (Solver.ckind_of_jkind_desc
+                 ~crosses_externality:
+                   Jkind_types.Layout.Const.crosses_externality ctx jkind_const)
           in
           map_poly expanding raw)
       | Atom { constr = path; arg_index } -> (
