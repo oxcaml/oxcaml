@@ -915,7 +915,7 @@ module Mixed_blocks_rec = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_rec/803" (makeblock 0))
+(apply (field_imm 1 (global Toploop!)) "Mixed_blocks_rec/804" (makeblock 0))
 module Mixed_blocks_rec :
   sig
     type t = { padding : u; mutable field : int [@atomic]; }
@@ -1023,7 +1023,7 @@ module Atomic_float_with_float_hash = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Atomic_float_with_float_hash/837"
+(apply (field_imm 1 (global Toploop!)) "Atomic_float_with_float_hash/838"
   (let
     (disallowed =
        (function {nlocal = 0} t : float
@@ -1044,7 +1044,7 @@ module Inline_record_atomic_in_mixed = struct
 end
 
 [%%expect{|
-(apply (field_imm 1 (global Toploop!)) "Inline_record_atomic_in_mixed/850"
+(apply (field_imm 1 (global Toploop!)) "Inline_record_atomic_in_mixed/852"
   (let
     (disallowed =
        (function {nlocal = 0} t : int
