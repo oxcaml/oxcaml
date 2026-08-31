@@ -97,7 +97,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: true # zizmor: ignore[artipacked]
             # anthropics/claude-code-action runs `git fetch` before configuring
@@ -139,7 +139,7 @@ jobs:
       # Claude's build environment is the flake devShell -- the same toolchain
       # as the nix CI builds:
 
-      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
       - uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
           name: oxcaml
@@ -152,7 +152,7 @@ jobs:
         uses: nicknovitski/nix-develop@9be7cfb4b10451d3390a75dc18ad0465bed4932a # v1.2.1
 
       - name: Run Claude Code
-        uses: anthropics/claude-code-action@ba0aafd4308cbba7165f9f2cdb0cfbed5a3c99ce # v1.0.168
+        uses: anthropics/claude-code-action@be7b93b1907a4abad570368f3c74b6fe3807510b # v1.0.183
         with:
           # Workload Identity Federation identifiers, not credentials (see the
           # WIF section in .github/claude-code-security.md).
