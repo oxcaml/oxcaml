@@ -266,6 +266,115 @@ let test_chain3 () =
   (match !saved with Some k -> continue k 777 | None -> assert false);
   Printf.printf "chain3: %d\n" !result
 
+(* A deep nest of live running fibers, well past the soft bound on
+   guarded stacks. The bound-triggered minor-collection requests must
+   back off (nothing here is reclaimable), not fire per fiber creation:
+   that would cost a collection per fiber, each scanning the whole
+   chain. Count collections rather than time. *)
+let test_live_nest_gc_count () =
+  let rec nest n =
+    if n = 0
+    then 0
+    else
+      match_with (fun () -> 1 + nest (n - 1)) ()
+        { retc = Fun.id;
+          exnc = raise;
+          effc =
+            (fun (type a) (e : a Effect.t) ->
+              match e with
+              | F -> Some (fun (_ : (a, _) continuation) -> assert false)
+              | _ -> None) }
+  in
+  let before = (Gc.quick_stat ()).minor_collections in
+  let depth = nest 5000 in
+  let minors = (Gc.quick_stat ()).minor_collections - before in
+  Printf.printf "live_nest: %d %s\n" depth
+    (if minors < 50 then "ok"
+     else Printf.sprintf "too many minor collections (%d)" minors)
+
+(* Deterministic reperform-idling: pass-through handlers force a minor
+   collection while forwarding, so the continuation is promoted and its
+   stacks idled mid-perform -- after one hop with [gc_inner] (idling a
+   single stack), after two hops with only [gc_outer] (idling a
+   two-stack chain, whose in-place wake also relocates the cross-fiber
+   links). The outer handler parks the continuation, which is resumed
+   only after further collections. *)
+let test_reperform_gc ~gc_inner ~gc_outer label =
+  let saved : (int, unit) continuation option ref = ref None in
+  let result = ref 0 in
+  let pass_through gc body =
+    match_with body ()
+      { retc = Fun.id;
+        exnc = raise;
+        effc =
+          (fun (type a) (e : a Effect.t) ->
+            match e with
+            | F -> Some (fun (k : (a, _) continuation) -> continue k 0)
+            | _ ->
+              if gc then Gc.minor ();
+              None) }
+  in
+  match_with
+    (fun () ->
+      pass_through gc_outer (fun () ->
+          pass_through gc_inner (fun () -> result := perform (E 8))))
+    ()
+    { retc = (fun () -> ());
+      exnc = raise;
+      effc =
+        (fun (type a) (e : a Effect.t) ->
+          match e with
+          | E _ -> Some (fun (k : (a, _) continuation) -> saved := Some k)
+          | _ -> None) };
+  churn 100_000;
+  Gc.full_major ();
+  (match !saved with Some k -> continue k 888 | None -> assert false);
+  Printf.printf "%s: %d\n" label !result
+
+(* Reperform with GC pressure: the effect is forwarded through a middle
+   fiber that does not handle it, and the forwarding handler allocates,
+   so a minor collection can idle the continuation between the perform
+   and the reperform, invalidating the last-fiber pointer being
+   forwarded. caml_reperform must detect this and wake the chain in
+   place rather than use the stale pointer. *)
+let test_reperform_idle () =
+  let iters = 20_000 in
+  let sink = ref [||] in
+  let total = ref 0 in
+  let rec perform_all n =
+    if n > 0 then begin
+      total := !total + perform (E n);
+      perform_all (n - 1)
+    end
+  in
+  let middle () =
+    match_with perform_all iters
+      { retc = (fun () -> ());
+        exnc = raise;
+        effc =
+          (fun (type a) (e : a Effect.t) ->
+            match e with
+            | F -> Some (fun (_ : (a, _) continuation) -> assert false)
+            | _ ->
+              (* Allocate in the forwarding window: small arrays, so they
+                 come from the minor heap and dominate the loop's minor
+                 allocation, making minor collections land here. *)
+              for _ = 1 to 4 do
+                sink := Array.make 100 0
+              done;
+              None) }
+  in
+  match_with middle ()
+    { retc = (fun () -> ());
+      exnc = raise;
+      effc =
+        (fun (type a) (e : a Effect.t) ->
+          match e with
+          | E n -> Some (fun (k : (a, _) continuation) -> continue k n)
+          | _ -> None) };
+  ignore (Sys.opaque_identity !sink);
+  Printf.printf "reperform_idle: %d\n" !total
+
 let () =
   test_mass ();
   test_discontinue ();
@@ -274,4 +383,8 @@ let () =
   test_async_boundary ();
   test_dynamic ();
   test_locals ();
-  test_chain3 ()
+  test_chain3 ();
+  test_live_nest_gc_count ();
+  test_reperform_gc ~gc_inner:true ~gc_outer:true "reperform_gc_both";
+  test_reperform_gc ~gc_inner:false ~gc_outer:true "reperform_gc_outer";
+  test_reperform_idle ()

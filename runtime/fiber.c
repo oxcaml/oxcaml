@@ -21,6 +21,7 @@
 #include "caml/config.h"
 #include <string.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #ifdef HAS_UNISTD
 #include <unistd.h>
@@ -63,6 +64,10 @@
 #endif
 
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
+#ifdef TARGET_amd64
+/* amd64.S's caml_reperform reads [idled_from] at Stack_idled_from. */
+static_assert(offsetof(struct stack_info, idled_from) == 112, "");
+#endif
 
 static _Atomic int64_t fiber_id_global = 0;
 static CAMLthread_local int64_t fiber_id_local = 0;
@@ -321,6 +326,12 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
    - When such a continuation is resumed, [caml_continuation_use_noexc]
      wakes each stack: copies it onto a fresh guarded stack and relocates
      those chains by the distance the data has moved.
+   - A minor collection can also promote a continuation *mid-perform*,
+     invalidating the raw last-fiber pointer that the handler code is
+     forwarding (the [last_fiber] argument of effect handlers).
+     caml_reperform therefore checks for an idled chain and wakes it in
+     place ([caml_cont_wake_stacks]) before appending to it; the chain
+     then stays guarded until resumed.
 
    Guarded stacks are cached on three levels. Freed ones go to the
    freeing domain's cache ([Caml_state->stack_caches], one lock-free
@@ -332,7 +343,10 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
    on the total number of guarded stacks: allocating beyond it
    requests a minor collection (but still succeeds), and cached ones
    beyond it are parked on an "extra" cache whose use also requests a
-   minor collection. The global and extra caches are shared by all
+   minor collection. These requests back off geometrically (see
+   [minor_gc_request_hysteresis]) so that a large population of live
+   stacks does not force a collection per allocation. The global and
+   extra caches are shared by all
    domains, so they are multiple-consumer: lock-free popping would
    suffer from ABA, so they are protected by [stack_cache_global_lock]
    instead (they are off the fast path).
@@ -349,6 +363,8 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
    - a reload of [Cont_last_fiber] after the call to
      [caml_continuation_use_noexc] in arm64.S's DO_RESUME_SWITCH, as in
      amd64.S (waking moves the stacks, invalidating the earlier load);
+   - the same idled-chain check before the append in arm64.S's
+     caml_reperform, as in amd64.S;
    - re-deriving the suspended-context layout at [Stack_sp] assumed by
      the frame-pointer chain walk in [stack_wake] (arm64's
      SWITCH_OCAML_STACKS saves the x29/x30 pair unconditionally);
@@ -418,6 +434,39 @@ static atomic_uintnat stack_count_peak = 0;
 static atomic_uintnat stacks_created = 0;
 static atomic_uintnat stacks_freed = 0;
 
+#ifdef STACK_GUARD_PAGES
+/* The guarded-stack population when [minor_gc_request_hysteresis] last
+   requested a collection. */
+static atomic_uintnat stack_gc_requested_at = 0;
+
+/* As [minor_gc_request], with geometric hysteresis: only request once
+   the population has grown 50% beyond the last request (collections
+   evidently were not reclaiming stacks, so most must be live). A
+   shrinking population re-arms the threshold. Racing domains just skip
+   or duplicate a request, so relaxed loads suffice. */
+static void minor_gc_request_hysteresis(void)
+{
+  uintnat count = atomic_load_relaxed(&stack_count);
+  uintnat prev = atomic_load_relaxed(&stack_gc_requested_at);
+  for (;;) {
+    if (count < prev) {
+      /* Shrunk: follow it down without requesting. */
+      if (atomic_compare_exchange_weak(&stack_gc_requested_at,
+                                       &prev, count))
+        return;
+    } else if (count - prev >= prev / 2) {
+      if (atomic_compare_exchange_weak(&stack_gc_requested_at,
+                                       &prev, count)) {
+        minor_gc_request();
+        return;
+      }
+    } else {
+      return;
+    }
+  }
+}
+#endif /* STACK_GUARD_PAGES */
+
 /* Allocate a stack that the local cache could not supply: from the global
    caches when possible, otherwise a fresh one. Returns NULL on allocation
    failure. The result's [cache_bucket] is set. */
@@ -436,7 +485,7 @@ stack_alloc_uncached(mlsize_t wosize, int cache_bucket, int64_t id)
       if (stack != NULL) {
         /* Dipping into the over-bound reserve. */
         (void)caml_atomic_counter_incr(&stack_cache_hits_extra);
-        minor_gc_request();
+        minor_gc_request_hysteresis();
       }
     }
     caml_plat_unlock(&stack_cache_global_lock);
@@ -444,7 +493,7 @@ stack_alloc_uncached(mlsize_t wosize, int cache_bucket, int64_t id)
   }
   if (atomic_load_relaxed(&stack_count) >= caml_max_guarded_stacks) {
     /* The bound is soft: GC at the next safe point, but do allocate. */
-    minor_gc_request();
+    minor_gc_request_hysteresis();
   }
 #endif
   stack = alloc_for_stack(wosize, id);
@@ -1841,6 +1890,13 @@ CAMLprim value caml_continuation_use (value cont)
   if (v == Val_ptr(NULL))
     caml_raise_continuation_already_resumed();
   return v;
+}
+
+void caml_cont_wake_stacks (value cont)
+{
+  value stk = caml_continuation_use_noexc(cont);
+  CAMLassert(Ptr_val(stk) != NULL);
+  caml_continuation_replace(cont, Ptr_val(stk));
 }
 
 bool caml_continuation_is_preemption(value cont) {

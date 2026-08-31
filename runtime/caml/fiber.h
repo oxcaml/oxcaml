@@ -418,6 +418,13 @@ value caml_continuation_use (value cont);
    with [caml_continuation_replace]. */
 value caml_continuation_use_raw_noexc (value cont);
 
+/* Wake the stacks of an idled continuation in place, leaving them
+   captured in [cont]: used by caml_reperform (amd64.S), whose raw
+   last-fiber argument went stale when a minor collection idled [cont]
+   mid-perform; the assembly reloads it from [cont] afterwards. Cannot
+   raise; does not allocate on the OCaml heap. */
+void caml_cont_wake_stacks (value cont);
+
 /* Replace the stack of a continuation that was previously removed
    with caml_continuation_use. The GC must not be allowed to run
    between continuation_use and continuation_replace.

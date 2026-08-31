@@ -132,6 +132,7 @@ G(name):
 #define Stack_local_sp           64
 #define Stack_local_top          72
 #define Stack_local_limit        80
+#define Stack_idled_from        112
 
 /* struct stack_handler */
 #define Handler_value(REG)       0(REG)
@@ -1470,7 +1471,29 @@ CFI_STARTPROC
     /*  %rax: effect to reperform
         %rbx: continuation
         %rdi: last_fiber */
-        movq    Caml_state(current_stack), %rsi  /* %rsi := old stack */
+    /* If a minor collection idled the continuation's stacks during this
+       perform (moving them), %rdi is stale: wake the stacks in place
+       and reload the last fiber from the continuation. An
+       already-consumed continuation (NULL stack) is left for the
+       unhandled path to report, as before. */
+        movq    Cont_fiber(%rbx), %r10
+        subq    $1, %r10             /* %r10 := Ptr_val(fiber) */
+        testq   %r10, %r10
+        jz      1f
+        cmpq    $0, Stack_idled_from(%r10)
+        je      1f
+        movq    %rbx, C_ARG_1
+        SWITCH_OCAML_TO_C
+    /* Save %rax (the effect) across the C call. Reserve 16 bytes to
+       keep %rsp 16-byte aligned. */
+        subq    $16, %rsp; CFI_ADJUST(16)
+        movq    %rax, 0(%rsp)
+        C_call  (GCALL(caml_cont_wake_stacks))
+        movq    0(%rsp), %rax
+        addq    $16, %rsp; CFI_ADJUST(-16)
+        SWITCH_C_TO_OCAML
+        movq    Cont_last_fiber(%rbx), %rdi
+1:      movq    Caml_state(current_stack), %rsi  /* %rsi := old stack */
         movq    (Stack_handler-1)(%rdi), %r10
         movq    %rsi, Handler_parent(%r10)       /* Append to last_fiber */
         leaq    1(%rsi), %rdi  /* %rdi (last_fiber) := Val_ptr(old stack) */
