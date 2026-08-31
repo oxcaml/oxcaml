@@ -52,6 +52,8 @@ let omit_leaf_frame_pointers = ref false (* -[no-]omit-leaf-frame-pointers *)
 
 let cfg_merge_blocks = ref false        (* -[no]-cfg-merge-blocks *)
 
+let cfg_block_layout = ref false        (* -[no]-cfg-block-layout *)
+
 let cfg_value_propagation = ref true    (* -[no]-cfg-value-propagation *)
 let cfg_value_propagation_float = ref false
                                         (* -[no]-cfg-value-propagation-float *)
@@ -64,7 +66,6 @@ let module_entry_functions_section = ref false
 
 let dasm_comments = ref false (* -dasm-comments *)
 
-let frametables_in_rodata = ref true (* -frametables-in-rodata *)
 
 let default_heap_reduction_threshold = 500_000_000 / (Sys.word_size / 8)
 let heap_reduction_threshold = ref default_heap_reduction_threshold (* -heap-reduction-threshold *)

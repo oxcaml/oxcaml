@@ -19,6 +19,9 @@ open Asm_targets
 type implicit_value =
   | Int of Targetint.t
   | Symbol of Asm_symbol.t
+  | Label of Asm_label.t
+      (** For statically-allocated values whose defining symbols are
+          assembler-local labels rather than linker symbols. *)
 
 (* CR mshinwell: Remove "DW_op" prefix to be consistent *)
 type t =
@@ -203,7 +206,21 @@ type t =
       { label : Asm_label.t;
         offset_in_bytes : Targetint.t
       }
+  | DW_op_entry_value of { block : t list }
+      (** The DWARF-5 [DW_OP_entry_value] operator. The block operand holds a
+          DWARF expression describing a location (for example a register
+          location description). The operator pushes the value that this
+          location held upon entry to the current function; debuggers typically
+          recover such values by virtually unwinding to the call site. *)
+  | DW_op_GNU_entry_value of { block : t list }
+      (** As for [DW_op_entry_value], but using the pre-DWARF-5 GNU extension
+          opcode. *)
 
 val print : Format.formatter -> t -> unit
+
+(** The size of a DWARF expression: the sum of the sizes of its operators. (See
+    also [Simple_location_description.size], which is expressed in terms of this
+    function.) *)
+val size_of_expression : t list -> Dwarf_int.t
 
 include Dwarf_emittable.S with type t := t

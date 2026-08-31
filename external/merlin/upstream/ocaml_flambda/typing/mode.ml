@@ -46,6 +46,12 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Is_closed_by (Monadic, co) -> co.closure, Close_over (Monadic, co)
       | Is_closed_by (Comonadic, co) -> co.closure, Close_over (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Functor_to_parameter loc ->
+        (loc, Functor), Parameter_to_functor (fst pp)
+      | Parameter_to_functor loc ->
+        (loc, Functor_parameter), Functor_to_parameter (fst pp)
+      | Functor_to_application loc ->
+        (loc, Functor), Application_to_functor (fst pp)
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r loc -> pp, Allocation loc
       | Allocation loc -> pp, Allocation_l loc
@@ -68,6 +74,12 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Close_over (Monadic, co) -> co.closed, Is_closed_by (Monadic, co)
       | Close_over (Comonadic, co) -> co.closed, Is_closed_by (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Functor_to_parameter loc ->
+        (loc, Functor), Parameter_to_functor (fst pp)
+      | Parameter_to_functor loc ->
+        (loc, Functor_parameter), Functor_to_parameter (fst pp)
+      | Application_to_functor loc ->
+        (loc, Module), Functor_to_application (fst pp)
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l loc -> pp, Allocation loc
       | Allocation loc -> pp, Allocation_r loc
@@ -91,6 +103,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Close_over (Monadic, x) -> Close_over (Monadic, x)
         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
         | Crossing -> Crossing
+        | Functor_to_parameter p -> Functor_to_parameter p
+        | Parameter_to_functor p -> Parameter_to_functor p
+        | Application_to_functor loc -> Application_to_functor loc
         | Allocation_l loc -> Allocation_l loc
         | Allocation loc -> Allocation loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
@@ -106,6 +121,9 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Functor_to_parameter p -> Functor_to_parameter p
+        | Parameter_to_functor p -> Parameter_to_functor p
+        | Functor_to_application loc -> Functor_to_application loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation loc -> Allocation loc
         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
@@ -123,6 +141,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Functor_to_parameter p -> Functor_to_parameter p
+        | Parameter_to_functor p -> Parameter_to_functor p
+        | Functor_to_application loc -> Functor_to_application loc
+        | Application_to_functor loc -> Application_to_functor loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation_l loc -> Allocation_l loc
         | Allocation loc -> Allocation loc
@@ -143,6 +165,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Functor_to_parameter p -> Functor_to_parameter p
+        | Parameter_to_functor p -> Parameter_to_functor p
+        | Functor_to_application loc -> Functor_to_application loc
+        | Application_to_functor loc -> Application_to_functor loc
         | Allocation_l loc -> Allocation_l loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation loc -> Allocation loc
@@ -4668,6 +4694,8 @@ module Report = struct
             lid)
     | Function -> Some (print_article_noun Consonant "function")
     | Functor -> Some (print_article_noun Consonant "functor")
+    | Functor_parameter ->
+      Some (print_article_noun Consonant "functor parameter")
     | Lazy -> Some (print_article_noun Consonant "lazy expression")
     | Quote -> Some (print_article_noun Consonant "quoted expression")
     | Expression -> Some (print_article_noun Vowel "expression")
@@ -4723,6 +4751,7 @@ module Report = struct
   let print_always_dynamic = function
     | Application -> Fmt.dprintf "function applications"
     | Try_with -> Fmt.dprintf "try-with clauses"
+    | Generative_functor -> Fmt.dprintf "generative functors"
 
   let print_legacy = function
     | Toplevel -> print_article_noun Consonant "top-level clause"
@@ -4917,7 +4946,7 @@ module Report = struct
     | Module_allocated_on_heap ->
       (match pp_desc with
       | Ident { category = Module; _ }
-      | Functor | Module | Structure
+      | Functor | Functor_parameter | Module | Structure
       | Structure_item (Module, _) ->
         (* if we already said it's a module, we don't need to emphasize it again. *)
         Fmt.pp_print_string ppf "modules always need"
@@ -4992,6 +5021,32 @@ module Report = struct
               (print_pp ~definite:true ~capitalize:false),
             pp ))
     | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
+    | Functor_to_parameter loc ->
+      let funct_pp = loc, Functor in
+      print_pinpoint funct_pp
+      |> Option.map (fun print_pp ->
+          ( Fmt.dprintf "shares the staticity of %t"
+              (print_pp ~definite:true ~capitalize:false),
+            funct_pp ))
+    | Parameter_to_functor loc ->
+      let param_pp = loc, Functor_parameter in
+      print_pinpoint param_pp
+      |> Option.map (fun print_pp ->
+          ( Fmt.dprintf "shares the staticity of %t"
+              (print_pp ~definite:true ~capitalize:false),
+            param_pp ))
+    | Functor_to_application loc ->
+      Some
+        ( Fmt.dprintf "is an application of the functor at %a"
+            (Location.Doc.loc ~capitalize_first:false)
+            loc,
+          (loc, Functor) )
+    | Application_to_functor loc ->
+      Some
+        ( Fmt.dprintf "is applied at %a"
+            (Location.Doc.loc ~capitalize_first:false)
+            loc,
+          (loc, Module) )
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
     | Contains_l (_, contains) -> print_contains ~fixpoint contains
@@ -5114,7 +5169,8 @@ module Report = struct
     let fixpoint = equal_mode src obj a b in
     match hint with
     | Unknown | Close_over _ | Is_closed_by _ | Contains_l _ | Contains_r _
-    | Is_contained_by _ ->
+    | Is_contained_by _ | Functor_to_parameter _ | Parameter_to_functor _
+    | Functor_to_application _ | Application_to_functor _ ->
       (* These morphisms should never be skipped *)
       ~is_skip:false, ~fixpoint
     | Skip | Crossing ->
@@ -5333,6 +5389,7 @@ module type Common_axis_pos = sig
       with module Const := Const
        and type 'd t = (Const.t, 'd pos) mode
        and type 'd hint_const := 'd pos_hint_const
+       and type 'd hint_morph := 'd pos_hint_morph
 end
 
 module type Common_axis_neg = sig
@@ -5343,6 +5400,7 @@ module type Common_axis_neg = sig
       with module Const := Const
        and type 'd t = (Const.t, 'd neg) mode
        and type 'd hint_const := 'd neg_hint_const
+       and type 'd hint_morph := 'd neg_hint_morph
 end
 
 (** Representing a single object *)
@@ -5417,15 +5475,15 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let allow_right m = S.allow_right m
 
-  let newvar () = S.newvar obj
+  let newvar () = S.newvar obj 0
 
   let min : lr = S.min obj
 
   let max : lr = S.max obj
 
-  let newvar_above m = S.newvar_above obj m
+  let newvar_above m = S.newvar_above obj 0 m
 
-  let newvar_below m = S.newvar_below obj m
+  let newvar_below m = S.newvar_below obj 0 m
 
   let submode_log ?(pp = (Location.none, Unknown : Hint.pinpoint)) a b ~log =
     S.submode pp obj a b ~log
@@ -5448,11 +5506,18 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let submode_exn ?pp m1 m2 = submode ?pp m1 m2 |> Result.get_ok
 
-  let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
+  let equate ?pp a b = try_with_log (equate_from_submode (submode_log ?pp) a b)
+
+  let equate_err pp a b =
+    match equate ~pp a b with
+    | Ok () -> ()
+    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
   let print ?verbose () ppf m = S.print ?verbose obj ppf m
+
+  let check_const_or_level_0 m = S.check_const_or_level_0 m
 
   let zap_to_ceil m = with_log (S.zap_to_ceil obj m)
 
@@ -5519,15 +5584,15 @@ module Monadic_gen (Obj : Obj) = struct
 
   let allow_right m = S.allow_left m
 
-  let newvar () = S.newvar obj
+  let newvar () = S.newvar obj 0
 
   let min : lr = S.allow_left (S.max obj)
 
   let max : lr = S.allow_right (S.min obj)
 
-  let newvar_above m = S.newvar_below obj m
+  let newvar_above m = S.newvar_below obj 0 m
 
-  let newvar_below m = S.newvar_above obj m
+  let newvar_below m = S.newvar_above obj 0 m
 
   let submode_log ?(pp = (Location.none, Unknown : Hint.pinpoint)) a b ~log =
     S.submode pp obj b a ~log
@@ -5550,11 +5615,18 @@ module Monadic_gen (Obj : Obj) = struct
 
   let submode_exn ?pp m1 m2 = submode ?pp m1 m2 |> Result.get_ok
 
-  let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
+  let equate ?pp a b = try_with_log (equate_from_submode (submode_log ?pp) a b)
+
+  let equate_err pp a b =
+    match equate ~pp a b with
+    | Ok () -> ()
+    | Error (_, e) -> raise (Submode_error_simple_context (pp, All (obj, e)))
 
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
   let print ?verbose () ppf m = S.print ?verbose obj ppf m
+
+  let check_const_or_level_0 m = S.check_const_or_level_0 m
 
   let zap_to_ceil m = with_log (S.zap_to_floor obj m)
 
@@ -5722,13 +5794,16 @@ module Portability = struct
 
   let legacy = of_const Const.legacy
 
-  (* CR dkalinichenko: ideally, [reading] should zap to [shareable]. *)
-  let zap_to_legacy ~statefulness =
+  let zap_to_ceil_clamped c m =
+    (match submode m (of_const c) with Ok () | Error _ -> ());
+    zap_to_ceil m
+
+  let zap_to_legacy ~statefulness m =
     match statefulness with
-    | Statefulness.Const.Stateful | Statefulness.Const.Reading
-    | Statefulness.Const.Writing ->
-      zap_to_ceil
-    | Statefulness.Const.Stateless -> zap_to_floor
+    | Statefulness.Const.Stateful -> zap_to_ceil m
+    | Statefulness.Const.Reading -> zap_to_ceil_clamped Const.Shareable m
+    | Statefulness.Const.Writing -> zap_to_ceil_clamped Const.Corruptible m
+    | Statefulness.Const.Stateless -> zap_to_floor m
 end
 
 module Uniqueness = struct
@@ -5764,13 +5839,18 @@ module Contention = struct
 
   let legacy = of_const Const.legacy
 
-  (* CR dkalinichenko: ideally, [read] should zap to [shared]. *)
-  let zap_to_legacy ~visibility =
+  let zap_to_floor_clamped c m =
+    (match submode (of_const c) m with Ok () | Error _ -> ());
+    zap_to_floor m
+
+  let zap_to_legacy ~visibility ~arg m =
     match visibility with
-    | Visibility.Const.Read_write | Visibility.Const.Read
+    | Visibility.Const.Read_write -> zap_to_floor m
+    | Visibility.Const.Immutable -> zap_to_ceil m
+    | Visibility.Const.Read ->
+      if arg then zap_to_floor_clamped Const.Shared m else zap_to_floor m
     | Visibility.Const.Write ->
-      zap_to_floor
-    | Visibility.Const.Immutable -> zap_to_ceil
+      if arg then zap_to_floor_clamped Const.Corrupted m else zap_to_floor m
 end
 
 module Forkable = struct
@@ -5997,6 +6077,13 @@ module Comonadic_with (Areality : Areality) = struct
       let (Error (ax, _)) = to_simple_error e in
       raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
 
+  let equate_err pp a b =
+    match equate ~pp a b with
+    | Ok () -> ()
+    | Error (_, e) ->
+      let (Error (ax, _)) = to_simple_error e in
+      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+
   let print_error pp err =
     let (Error (ax, _)) = to_simple_error err in
     Error.print_proj pp Obj.obj ax err
@@ -6104,11 +6191,11 @@ module Monadic = struct
   let min_with ax m =
     S.apply ~hint:Skip Obj.obj (Max_with_simple (ax, Id)) (S.disallow_left m)
 
-  let zap_to_legacy m : Const.t =
+  let zap_to_legacy ~arg m : Const.t =
     let uniqueness = proj Uniqueness m |> Uniqueness.zap_to_legacy in
     let visibility = proj Visibility m |> Visibility.zap_to_legacy in
     let contention =
-      proj Contention m |> Contention.zap_to_legacy ~visibility
+      proj Contention m |> Contention.zap_to_legacy ~visibility ~arg
     in
     let staticity = proj Staticity m |> Staticity.zap_to_legacy in
     { uniqueness; contention; visibility; staticity }
@@ -6137,6 +6224,13 @@ module Monadic = struct
     match submode ~pp a b with
     | Ok () -> ()
     | Error e ->
+      let (Error (ax, _)) = to_simple_error e in
+      raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
+
+  let equate_err pp a b =
+    match equate ~pp a b with
+    | Ok () -> ()
+    | Error (_, e) ->
       let (Error (ax, _)) = to_simple_error e in
       raise (Submode_error_simple_context (pp, Proj (Obj.obj, ax, e)))
 
@@ -6629,13 +6723,21 @@ module Value_with (Areality : Areality) = struct
       | Error e -> Error (Monadic e)
       | Ok () -> Ok ())
 
+  let check_const_or_level_0 { monadic = monadic0; comonadic = comonadic0 } =
+    Monadic.check_const_or_level_0 monadic0
+    && Comonadic.check_const_or_level_0 comonadic0
+
   let submode ?pp a b = try_with_log (submode_log ?pp a b)
 
   let submode_err pp a b =
     Comonadic.submode_err pp a.comonadic b.comonadic;
     Monadic.submode_err pp a.monadic b.monadic
 
-  let equate a b = try_with_log (equate_from_submode (submode_log ?pp:None) a b)
+  let equate_err pp a b =
+    Comonadic.equate_err pp a.comonadic b.comonadic;
+    Monadic.equate_err pp a.monadic b.monadic
+
+  let equate ?pp a b = try_with_log (equate_from_submode (submode_log ?pp) a b)
 
   let submode_exn ?pp m1 m2 =
     match submode ?pp m1 m2 with
@@ -6736,8 +6838,8 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.zap_to_floor comonadic in
     merge { monadic; comonadic }
 
-  let zap_to_legacy { comonadic; monadic } =
-    let monadic = Monadic.zap_to_legacy monadic in
+  let zap_to_legacy ~arg { comonadic; monadic } =
+    let monadic = Monadic.zap_to_legacy ~arg monadic in
     let comonadic = Comonadic.zap_to_legacy comonadic in
     merge { monadic; comonadic }
 
@@ -7589,9 +7691,12 @@ module Crossing = struct
       Mode.subtract_const_unhint c
         (Mode.unhint (Mode.join [Mode.of_const c; m]))
 
-    let apply_right (Modality (Join_const c)) m =
+    let apply_right_unhint (Modality (Join_const c)) m =
       (* The right adjoint of join is a restriction of identity *)
       Mode.join_const_unhint c m
+
+    let apply_right_alloc t m =
+      Monadic.hint ~hint:Crossing (apply_right_unhint t (S.Unhint.unhint m))
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Join_const c)) : a Atom.t
         =
@@ -7620,6 +7725,14 @@ module Crossing = struct
     let print ppf (Modality m) =
       Fmt.fprintf ppf "Modality %a" Modality.Const.print m
   end
+
+  let comonadic_locality_as_regionality comonadic =
+    S.Unhint.apply Value.Comonadic.Obj.obj
+      (Simple (Core (Locality_full Locality_as_regionality))) comonadic
+
+  let comonadic_regional_to_local comonadic =
+    S.Unhint.apply Alloc.Comonadic.Obj.obj
+      (Simple (Core (Locality_full Regional_to_local))) comonadic
 
   module Comonadic = struct
     module Modality = Modality.Comonadic
@@ -7684,9 +7797,14 @@ module Crossing = struct
 
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
-    let apply_left (Modality (Meet_const c)) m =
+    let apply_left_unhint (Modality (Meet_const c)) m =
       (* The left adjoint of meet is a restriction of identity *)
       Mode.meet_const_unhint c m
+
+    let apply_left_alloc t m =
+      Alloc.Comonadic.hint ~hint:Crossing
+        (comonadic_locality_as_regionality (S.Unhint.unhint m)
+        |> apply_left_unhint t |> comonadic_regional_to_local)
 
     let apply_right (Modality (Meet_const c)) m =
       Mode.imply_const_unhint c (Mode.unhint (Mode.meet [Mode.of_const c; m]))
@@ -7805,7 +7923,7 @@ module Crossing = struct
   let apply_left_unhint t { monadic; comonadic } =
     let monadic = Monadic.apply_left t.monadic monadic in
     let comonadic =
-      Comonadic.apply_left t.comonadic (S.Unhint.unhint comonadic)
+      Comonadic.apply_left_unhint t.comonadic (S.Unhint.unhint comonadic)
     in
     { monadic; comonadic }
 
@@ -7814,7 +7932,9 @@ module Crossing = struct
       (apply_left_unhint t (Value.disallow_right m))
 
   let apply_right_unhint t { monadic; comonadic } =
-    let monadic = Monadic.apply_right t.monadic (S.Unhint.unhint monadic) in
+    let monadic =
+      Monadic.apply_right_unhint t.monadic (S.Unhint.unhint monadic)
+    in
     let comonadic = Comonadic.apply_right t.comonadic comonadic in
     { monadic; comonadic }
 
@@ -7851,14 +7971,6 @@ module Crossing = struct
     in
     { comonadic; monadic }
 
-  let comonadic_locality_as_regionality comonadic =
-    S.Unhint.apply Value.Comonadic.Obj.obj
-      (Simple (Core (Locality_full Locality_as_regionality))) comonadic
-
-  let comonadic_regional_to_local comonadic =
-    S.Unhint.apply Alloc.Comonadic.Obj.obj
-      (Simple (Core (Locality_full Regional_to_local))) comonadic
-
   let apply_left_alloc t m =
     m |> alloc_as_value |> apply_left_unhint t |> value_to_alloc_r2l_unhint
     |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
@@ -7869,10 +7981,10 @@ module Crossing = struct
 
   let apply_left_right_alloc t m =
     let { monadic; comonadic } = Alloc.unhint m in
-    let monadic = Monadic.apply_right t.monadic monadic in
+    let monadic = Monadic.apply_right_unhint t.monadic monadic in
     let comonadic =
       comonadic |> comonadic_locality_as_regionality
-      |> Comonadic.apply_left t.comonadic
+      |> Comonadic.apply_left_unhint t.comonadic
       |> comonadic_regional_to_local
       (* the left adjoint of [locality_as_regionality]*)
     in

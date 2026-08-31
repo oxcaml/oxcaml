@@ -582,6 +582,29 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         Continuation.print cont
   in
   let handler, uacc =
+    (* We might need to place lifted constants now, as they could depend on
+       continuation parameters. As such we must also compute the unused
+       parameters after placing any constants! *)
+    if not at_unit_toplevel
+    then handler, uacc
+    else
+      let uacc, lifted_constants_from_body =
+        UA.get_and_clear_lifted_constants uacc
+      in
+      EB.place_lifted_constants uacc
+        ~lifted_constants_from_defining_expr:LCS.empty
+        ~lifted_constants_from_body
+        ~put_bindings_around_body:(fun uacc ~body -> body, uacc)
+        ~body:handler
+  in
+  (* The [lets_to_introduce] rebind parameters that the alias analysis has
+     removed from the continuation. These lets must be placed outside any lifted
+     constants placed above, since such constants can reference the removed
+     parameters, which are not bound anywhere else. Conversely, each let's
+     defining expression is the parameter's canonical dominator, which must be
+     in scope at the continuation's use sites, so it cannot be bound by the
+     lifted constants placed inside. *)
+  let handler, uacc =
     Variable.Lmap.fold
       (fun var bound_to (handler, uacc) ->
         let var_duid = Flambda_debug_uid.none in
@@ -600,22 +623,6 @@ let add_lets_around_handler cont at_unit_toplevel uacc handler =
         in
         handler, uacc)
       continuation_parameters.lets_to_introduce (handler, uacc)
-  in
-  let handler, uacc =
-    (* We might need to place lifted constants now, as they could depend on
-       continuation parameters. As such we must also compute the unused
-       parameters after placing any constants! *)
-    if not at_unit_toplevel
-    then handler, uacc
-    else
-      let uacc, lifted_constants_from_body =
-        UA.get_and_clear_lifted_constants uacc
-      in
-      EB.place_lifted_constants uacc
-        ~lifted_constants_from_defining_expr:LCS.empty
-        ~lifted_constants_from_body
-        ~put_bindings_around_body:(fun uacc ~body -> body, uacc)
-        ~body:handler
   in
   let free_names = UA.name_occurrences uacc in
   let cost_metrics = UA.cost_metrics uacc in

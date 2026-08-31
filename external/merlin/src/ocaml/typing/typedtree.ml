@@ -132,10 +132,44 @@ let print_unique_use ppf (u,l) =
     (Format_doc.compat (Mode.Uniqueness.print ())) u
     (Format_doc.compat (Mode.Linearity.print ())) l
 
-type alloc_mode = Mode.Alloc.r
+type alloc_mode_r = Mode.Locality.r
+
+let create_alloc_mode_r m =
+  assert (Mode.Locality.check_const_or_level_0 m); m
+
+let alloc_mode_r_zap_to_ceil m = Mode.Locality.zap_to_ceil m
+
+let alloc_mode_r_submode_err pp m t = Mode.Locality.submode_err pp m t
+
+let alloc_mode_r_map f m = f m
+
+let print_alloc_mode_r ppf m =
+  Format_doc.compat (Mode.Locality.print ()) ppf m
+
+type alloc_mode_l = Mode.Locality.l
+
+let create_alloc_mode_l m =
+  assert (Mode.Locality.check_const_or_level_0 m); m
+
+let alloc_mode_l_zap_to_floor m = Mode.Locality.zap_to_floor m
+
+let alloc_mode_l_map f m = f m
+
+let print_alloc_mode_l ppf m =
+  Format_doc.compat (Mode.Locality.print ()) ppf m
+
+type return_mode = Mode.Locality.l
+
+let create_return_mode m =
+  assert (Mode.Locality.check_const_or_level_0 m); m
+
+let return_mode_zap_to_floor m = Mode.Locality.zap_to_floor m
+
+let print_return_mode ppf m =
+  Format_doc.compat (Mode.Locality.print ()) ppf m
 
 type texp_field_boxing =
-  | Boxing of alloc_mode * unique_use
+  | Boxing of alloc_mode_r * unique_use
   | Non_boxing of unique_use
 
 let aliased_many_use =
@@ -155,10 +189,6 @@ and _ poly_param =
   | Param : type_expr -> [`pat] poly_param
   | Arrow : (arg_label * type_expr option) list -> [`exp] poly_param
   | Method : string loc * type_expr -> [`exp] poly_param
-
-type record_sorts =
-  | Fixed
-  | Variable of Jkind.sort array
 
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
@@ -206,7 +236,7 @@ and 'k pattern_desc =
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
       lpoly: Lpoly.t;
-      env_alloc_mode: alloc_mode;
+      env_alloc_mode: alloc_mode_r;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
@@ -227,12 +257,11 @@ and 'k pattern_desc =
       value pattern_desc
   | Tpat_record :
       (Longident.t loc * label_description * value general_pattern) list *
-        record_sorts * Types.record_representation * closed_flag ->
+        Types.record_representation * closed_flag ->
       value pattern_desc
   | Tpat_record_unboxed_product :
       (Longident.t loc * unboxed_label_description *
         value general_pattern) list
-      * record_sorts
       * Types.record_unboxed_product_representation
       * closed_flag ->
       value pattern_desc
@@ -292,9 +321,9 @@ and expression_desc =
   | Texp_function of
       { params : function_param list;
         body : function_body;
-        ret_mode : Mode.Alloc.l modes;
+        ret_mode : return_mode modes;
         ret_sort : Jkind.sort;
-        alloc_mode : alloc_mode;
+        alloc_mode : alloc_mode_r;
         yielding : Mode.Yielding.l;
         zero_alloc : Zero_alloc.t;
       }
@@ -307,19 +336,20 @@ and expression_desc =
   | Texp_try of expression * value case list * value case list
   | Texp_unboxed_unit
   | Texp_unboxed_bool of bool
-  | Texp_tuple of (string option * expression) list * alloc_mode
+  | Texp_tuple of (string option * expression) list * alloc_mode_r
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
       Longident.t loc * constructor_description * constructor_representation *
-      (Jkind.sort * expression) list * alloc_mode option
-  | Texp_variant of label * (expression * alloc_mode) option
+      (Jkind.sort * expression) list
+      * alloc_mode_r option
+  | Texp_variant of label * (expression * alloc_mode_r) option
   | Texp_record of {
       fields :
         ( Data_types.label_description * Jkind.sort * record_label_definition )
           array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
-      alloc_mode : alloc_mode option
+      alloc_mode : alloc_mode_r option
     }
   | Texp_record_unboxed_product of {
       fields :
@@ -334,7 +364,7 @@ and expression_desc =
       record_repres : Types.record_representation;
       lid : Longident.t loc;
       label : Data_types.label_description;
-      alloc_mode : alloc_mode;
+      alloc_mode : alloc_mode_r;
     }
   | Texp_field of {
       record : expression;
@@ -348,7 +378,6 @@ and expression_desc =
   | Texp_unboxed_field of {
       record : expression;
       record_sort : Jkind.sort;
-      record_sorts : record_sorts;
       record_repres : Types.record_unboxed_product_representation;
       lid : Longident.t loc;
       label : unboxed_label_description;
@@ -357,13 +386,12 @@ and expression_desc =
   | Texp_setfield of {
       record : expression;
       record_repres : Types.record_representation;
-      record_sorts : record_sorts;
       modality : Mode.Locality.l;
       lid : Longident.t loc;
       label : Data_types.label_description;
       newval : expression;
     }
-  | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode
+  | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode_r
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of mutability * Jkind.sort * comprehension
@@ -419,8 +447,8 @@ and expression_desc =
   | Texp_src_pos
   | Texp_overwrite of expression * expression
   | Texp_hole of unique_use
-  | Texp_quotation of expression
-  | Texp_antiquotation of expression
+  | Texp_quote of expression
+  | Texp_splice of expression
   | Texp_typed_hole
 
 and ident_kind =
@@ -436,11 +464,12 @@ and meth =
 and block_access =
   | Baccess_field of
       Longident.t loc * label_description * Types.record_representation
-  | Baccess_block of mutable_flag * expression
+  | Baccess_block of access_flag * expression
 
 and unboxed_access =
   | Uaccess_unboxed_field of
-      Longident.t loc * unboxed_label_description * record_sorts
+      Longident.t loc * unboxed_label_description
+      * Types.record_unboxed_product_representation
 
 and comprehension =
   {
@@ -479,7 +508,7 @@ and 'k case =
     }
 
 and function_curry =
-  | More_args of { partial_mode : Mode.Alloc.l }
+  | More_args of { partial_mode : alloc_mode_l }
   | Final_arg
 
 and function_param =
@@ -490,7 +519,7 @@ and function_param =
     fp_partial: partial;
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
-    fp_mode: Mode.Alloc.l modes;
+    fp_mode: alloc_mode_l modes;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
                   Parsetree.jkind_annotation option * Uid.t) list;
@@ -508,7 +537,7 @@ and function_body =
 and function_cases =
   { fc_cases: value case list;
     fc_env : Env.t;
-    fc_arg_mode: Mode.Alloc.l;
+    fc_arg_mode: alloc_mode_l;
     fc_arg_sort: Jkind.sort;
     fc_ret_type : Types.type_expr;
     fc_partial: partial;
@@ -540,9 +569,9 @@ and ('a, 'b) arg_or_omitted =
   | Omitted of 'b
 
 and omitted_parameter =
-  { mode_closure : Mode.Alloc.r;
-    mode_arg : Mode.Alloc.l;
-    mode_ret : Mode.Alloc.l;
+  { mode_closure : alloc_mode_r;
+    mode_arg : alloc_mode_l;
+    mode_ret : return_mode;
     sort_arg : Jkind.sort;
     sort_ret : Jkind.sort }
 
@@ -635,9 +664,10 @@ and functor_parameter =
 and module_expr_desc =
     Tmod_ident of Path.t * Longident.t loc
   | Tmod_structure of structure
-  | Tmod_functor of functor_parameter * module_expr
+  | Tmod_functor of functor_parameter * module_expr * Mode.Staticity.r
   | Tmod_apply of
       module_expr * module_expr * module_coercion * Mode.Yielding.l
+      * Mode.Staticity.r
   | Tmod_apply_unit of module_expr * Mode.Yielding.l
   | Tmod_constraint of
       module_expr * Types.module_type * module_type_constraint * module_coercion
@@ -732,6 +762,7 @@ and primitive_coercion =
     pc_poly_mode: Mode.Locality.l option;
     pc_poly_sort: Jkind.Sort.t option;
     pc_yielding: Mode.Yielding.l;
+    pc_zero_alloc_check: Zero_alloc.check option;
     pc_env: Env.t;
     pc_loc : Location.t;
   }
@@ -1172,9 +1203,9 @@ let shallow_iter_pattern_desc
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
   | Tpat_construct(_, _, _, patl, _) -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_variant(_, pat, _) -> Option.iter f.f pat
-  | Tpat_record (lbl_pat_list, _, _, _) ->
+  | Tpat_record (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
-  | Tpat_record_unboxed_product (lbl_pat_list, _, _, _) ->
+  | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
   | Tpat_lazy p -> f.f p
@@ -1201,12 +1232,12 @@ let shallow_map_pattern_desc
   | Tpat_unboxed_tuple pats ->
       Tpat_unboxed_tuple
         (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
-  | Tpat_record (lpats, sorts, repr, closed) ->
+  | Tpat_record (lpats, repr, closed) ->
       Tpat_record (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats,
-                   sorts, repr, closed)
-  | Tpat_record_unboxed_product (lpats, sorts, repr, closed) ->
+                   repr, closed)
+  | Tpat_record_unboxed_product (lpats, repr, closed) ->
       Tpat_record_unboxed_product
-        (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats, sorts, repr, closed)
+        (List.map (fun (lid, l, p) -> lid, l, f.f p) lpats, repr, closed)
   | Tpat_construct (lid, c, r, pats, ty) ->
       Tpat_construct (lid, c, r, List.map (fun (s, p) -> s, f.f p) pats, ty)
   | Tpat_array (am, arg_sort, pats) ->
@@ -1322,10 +1353,10 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
       | Tpat_value p -> loop f p
       | Tpat_construct(_, _, _, patl, _) ->
           List.iter (fun (_, pat) -> loop f pat) patl
-      | Tpat_record (lbl_pat_list, _, _, _) ->
+      | Tpat_record (lbl_pat_list, _, _) ->
           List.iter (fun (_, _, pat) -> loop f pat)
             lbl_pat_list
-      | Tpat_record_unboxed_product (lbl_pat_list, _, _, _) ->
+      | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
           List.iter (fun (_, _, pat) -> loop f pat)
             lbl_pat_list
       | Tpat_variant (_, pat, _) -> Option.iter (loop f) pat
@@ -1528,203 +1559,77 @@ let mode_without_locks_exn = function
   | (_, Some _) -> assert false
   | (m, None) -> m
 
-
-(* Merlin specific *)
-
-let rec fold_antiquote_exp f  acc exp =
-  match exp.exp_desc with
-  | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _ ->
-      acc
-  | Texp_apply_layout (exp, _) -> fold_antiquote_exp f acc exp
-  | Texp_let (_, vbs, exp) ->
-      let acc = fold_antiquote_value_bindings f acc vbs in
-      fold_antiquote_exp f acc exp
-  | Texp_function { params; body; _ } ->
-      let acc = fold_antiquote_fun_params f acc params in
-      fold_antiquote_function_body f acc body
-  | Texp_apply (exp, list, _, _, _, _) ->
-      let acc = fold_antiquote_exp f acc exp in
-      fold_antiquote_args f acc list
-  | Texp_match (exp, _, cases, eff_cases, _) ->
-      let acc = fold_antiquote_exp f acc exp in
-      let acc = fold_antiquote_cases f acc cases in
-      fold_antiquote_cases f acc eff_cases
-  | Texp_try (exp, cases, eff_cases) ->
-      let acc = fold_antiquote_exp f acc exp in
-      let acc = fold_antiquote_cases f acc cases in
-      fold_antiquote_cases f acc eff_cases
-  | Texp_tuple (list, _) ->
-      List.fold_left (fun acc (_, e) -> fold_antiquote_exp f acc e) acc list
-  | Texp_unboxed_tuple list ->
-      List.fold_left (fun acc (_, e, _) -> fold_antiquote_exp f acc e) acc list
-  | Texp_construct (_, _, _, args, _) ->
-      fold_antiquote_exps f acc (List.map snd args)
-  | Texp_variant (_, expo) ->
-      Option.fold
-        ~none:acc
-        ~some:(fun (e, _) -> fold_antiquote_exp f acc e)
-        expo
-  | Texp_record { fields; extended_expression; _} ->
-      let acc = Array.fold_left (fold_antiquote_field f) acc fields in
-      Option.fold
-        ~none:acc
-        ~some:(fun (e, _, _) -> fold_antiquote_exp f acc e)
-        extended_expression
-  | Texp_record_unboxed_product { fields; extended_expression; _} ->
-      let acc = Array.fold_left (fold_antiquote_field f) acc fields in
-      Option.fold
-        ~none:acc
-        ~some:(fun (e, _) -> fold_antiquote_exp f acc e)
-        extended_expression
-  | Texp_field { record = exp; _ } ->
-      fold_antiquote_exp f acc exp
-  | Texp_unboxed_field { record = exp; } ->
-      fold_antiquote_exp f acc exp
-  | Texp_setfield { record = exp1; newval = exp2; _ } ->
-      let acc = fold_antiquote_exp f acc exp1 in
-      fold_antiquote_exp f acc exp2
-  | Texp_array (_, _, list, _) ->
-      fold_antiquote_exps f acc list
-  | Texp_list_comprehension { comp_body; comp_clauses }
-  | Texp_array_comprehension (_, _, { comp_body; comp_clauses }) ->
-      let acc = fold_antiquote_exp f acc comp_body in
-      fold_antiquote_comprehension_clauses f acc comp_clauses
-  | Texp_ifthenelse (exp1, exp2, expo) ->
-      let acc = fold_antiquote_exp f acc exp1 in
-      let acc = fold_antiquote_exp f acc exp2 in
-      fold_antiquote_exp_opt f acc expo
-  | Texp_sequence (exp1, _, exp2) ->
-      let acc = fold_antiquote_exp f acc exp1 in
-      fold_antiquote_exp f acc exp2
-  | Texp_while { wh_cond; wh_body } ->
-      let acc = fold_antiquote_exp f acc wh_cond in
-      fold_antiquote_exp f acc wh_body
-  | Texp_for {for_from; for_to; for_body} ->
-      let acc = fold_antiquote_exp f acc for_from in
-      let acc = fold_antiquote_exp f acc for_to in
-      fold_antiquote_exp f acc for_body
-  | Texp_send (exp, _, _) -> fold_antiquote_exp f acc exp
-  | Texp_new (_, _, _, _) -> acc
-  | Texp_instvar (_, _, _) -> acc
-  | Texp_setinstvar (_, _, _, exp) -> fold_antiquote_exp f acc exp
-  | Texp_override (_, list) ->
-      List.fold_left (fun acc (_, _, e) -> fold_antiquote_exp f acc e) acc list
-  | Texp_letmodule (_, _, _, _, exp) -> fold_antiquote_exp f acc exp
-  | Texp_letexception (_, exp) -> fold_antiquote_exp f acc exp
-  | Texp_assert (exp, _) -> fold_antiquote_exp f acc exp
-  | Texp_lazy exp -> fold_antiquote_exp f acc exp
-  | Texp_object (_, _) -> acc
-  | Texp_pack _ -> acc
-  | Texp_letop {let_ = l; ands; body; _} ->
-      let acc = fold_antiquote_binding_op f acc l in
-      let acc = List.fold_left (fold_antiquote_binding_op f) acc ands in
-      fold_antiquote_case f acc body
-  | Texp_unreachable -> acc
-  | Texp_extension_constructor (_, _) -> acc
-  | Texp_open (_, e) -> fold_antiquote_exp f acc e
-  | Texp_probe {handler;_} -> fold_antiquote_exp f acc handler
-  | Texp_probe_is_enabled _ -> acc
-  | Texp_exclave exp -> fold_antiquote_exp f acc exp
-  | Texp_src_pos -> acc
-  | Texp_overwrite (exp1, exp2) ->
-      let acc = fold_antiquote_exp f acc exp1 in
-      fold_antiquote_exp f acc exp2
-  | Texp_hole _ -> acc
-  | Texp_letmutable (_, exp) -> fold_antiquote_exp f acc exp
-  | Texp_mutvar _ -> acc
-  | Texp_setmutvar (_, _, exp) -> fold_antiquote_exp f acc exp
-  | Texp_atomic_loc { record = exp; _ } -> fold_antiquote_exp f acc exp
-  | Texp_idx (_, _) -> acc
-  | Texp_quotation exp ->
-      fold_antiquote_exp (fold_antiquote_exp f) acc exp
-  | Texp_antiquotation exp -> f acc exp
-  | Texp_typed_hole -> acc
-
-and fold_antiquote_exp_opt f acc = function
-  | None -> acc
-  | Some exp -> fold_antiquote_exp f acc exp
-
-and fold_antiquote_exps f acc exps =
-  List.fold_left (fold_antiquote_exp f) acc exps
-
-and fold_antiquote_value_bindings f acc vbs =
-  List.fold_left (fun acc vb -> fold_antiquote_exp f acc vb.vb_expr) acc vbs
-
-and fold_antiquote_fun_param f acc fp =
-  match fp.fp_kind with
-  | Tparam_pat _ -> acc
-  | Tparam_optional_default(_, exp, _) -> fold_antiquote_exp f acc exp
-
-and fold_antiquote_fun_params f acc fps =
-  List.fold_left (fold_antiquote_fun_param f) acc fps
-
-and fold_antiquote_function_body f acc = function
-  | Tfunction_body exp -> fold_antiquote_exp f acc exp
-  | Tfunction_cases fc -> fold_antiquote_cases f acc fc.fc_cases
-
-and fold_antiquote_case : 'k. _ -> _ -> 'k case -> _ =
-  fun f acc c ->
-    let acc = fold_antiquote_exp_opt f acc c.c_guard in
-    fold_antiquote_exp f acc c.c_rhs
-
-and fold_antiquote_cases : 'k. _ -> _ -> 'k case list -> _ =
-  fun f acc cases ->
-    List.fold_left (fold_antiquote_case f) acc cases
-
-and fold_antiquote_arg f acc (_, arg) =
-  match arg with
-  | Omitted _ -> acc
-  | Arg (exp, _) -> fold_antiquote_exp f acc exp
-
-and fold_antiquote_args f acc args =
-  List.fold_left (fold_antiquote_arg f) acc args
-
-and fold_antiquote_field : 'l. _ -> _ -> 'l * _ * _ -> _ =
-  fun f acc -> function
-  | _, _, Kept _ -> acc
-  | _, _, Overridden (_, exp) -> fold_antiquote_exp f acc exp
-
-and fold_antiquote_comprehension_clause f acc = function
-  | Texp_comp_for bindings ->
-      List.fold_left
-        (fun acc { comp_cb_iterator; _ } ->
-          match comp_cb_iterator with
-          | Texp_comp_range { ident = _; start; stop; direction = _ } ->
-              let acc = fold_antiquote_exp f acc start in
-              fold_antiquote_exp f acc stop
-          | Texp_comp_in { pattern = _; sequence } ->
-              fold_antiquote_exp f acc sequence)
-        acc bindings
-  | Texp_comp_when exp ->
-      fold_antiquote_exp f acc exp
-
-and fold_antiquote_comprehension_clauses f acc ccs =
-  List.fold_left (fold_antiquote_comprehension_clause f) acc ccs
-
-and fold_antiquote_binding_op f acc op =
-  fold_antiquote_exp f acc op.bop_exp
+let unboxed_label_sort (label : Data_types.unboxed_label_description)
+      (repres : Types.record_unboxed_product_representation) =
+  match repres with
+  | Record_unboxed_product_variable sorts -> sorts.(label.lbl_pos)
+  | Record_unboxed_product ->
+    begin match label.lbl_sort with
+    | Some sort -> Jkind.Sort.of_const sort
+    | None ->
+      Misc.fatal_errorf
+        "no sort for label %s despite non-variable representation"
+        label.lbl_name
+    end
+  | Record_unboxed_product_undetermined ->
+    Misc.fatal_error "unboxed_label_sort: unexpected undetermined \
+                      representation"
 
 let label_sort (type rep)
       (record_form : rep record_form)
-      (label : rep gen_label_description) record_sorts =
-  match record_form, label.lbl_repres with
-  | Legacy, Record_unboxed -> `Same_as_record_sort
-  | _ ->
-    begin match record_sorts, label.lbl_sort with
-    | Variable sorts, _ -> `Sort sorts.(label.lbl_pos)
-    | Fixed, Some sort -> `Sort (Jkind.Sort.of_const sort)
-    | Fixed, None ->
-      Misc.fatal_errorf "no sort for label %s in fixed-sort record"
-        label.lbl_name
+      (label : rep gen_label_description) (repres : rep) ~record_sort =
+  match record_form with
+  | Unboxed_product -> unboxed_label_sort label repres
+  | Legacy ->
+    begin match repres with
+    | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
+    | Record_variable sorts_and_types
+    | Record_inlined (_, Constructor_variable sorts_and_types, _) ->
+      fst sorts_and_types.(label.lbl_pos)
+    | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+    | Record_inlined
+        (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
+      begin match label.lbl_sort with
+      | Some sort -> Jkind.Sort.of_const sort
+      | None ->
+        Misc.fatal_errorf
+          "no sort for label %s despite non-variable representation"
+          label.lbl_name
+      end
+    | Record_undetermined
+    | Record_inlined (_, Constructor_undetermined, _) ->
+      Misc.fatal_error "label_sort: unexpected undetermined representation"
+    | Record_dummy _ ->
+      Misc.fatal_error "label_sort: unexpected dummy representation"
     end
 
-let unboxed_label_sort label record_sorts =
-  match label_sort Unboxed_product label record_sorts with
-  | `Same_as_record_sort -> assert false
-  | `Sort s -> s
+let finalized_label_sort (label : Data_types.label_description)
+      (repres : Types.record_representation) ~record_sort ~variable_sorts =
+  match repres with
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
+  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+  | Record_inlined
+      (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
+    begin match variable_sorts with
+    | Some sorts -> sorts.(label.lbl_pos)
+    | None ->
+      begin match label.lbl_sort with
+      | Some sort -> sort
+      | None ->
+        Misc.fatal_errorf
+          "no sort for label %s despite finalized representation"
+          label.lbl_name
+      end
+    end
+  | Record_undetermined | Record_variable _
+  | Record_inlined
+      (_, (Constructor_undetermined | Constructor_variable _), _) ->
+    Misc.fatal_error "finalized_label_sort: representation was not finalized"
+  | Record_dummy _ ->
+    Misc.fatal_error "finalized_label_sort: unexpected dummy representation"
 
-let unboxed_label_all_sorts label record_sorts =
-  Array.map (fun lbl -> unboxed_label_sort lbl record_sorts) label.lbl_all
+let unboxed_label_all_sorts label repres =
+  Array.map (fun lbl -> unboxed_label_sort lbl repres) label.lbl_all
 
 (* Expressions are considered nominal if they can be used as the subject of a
    sentence or action. In practice, we consider that an expression is nominal
@@ -1742,7 +1647,7 @@ let rec exp_is_nominal exp =
 
 let unpack_functor_me me =
   match me.mod_desc with
-  | Tmod_functor (fp, me) -> fp, me
+  | Tmod_functor (fp, me, _) -> fp, me
   | _ -> invalid_arg "Typedtree.unpack_functor_me (merlin)"
 
 let unpack_functor_mty mty =

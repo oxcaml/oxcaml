@@ -1177,7 +1177,22 @@ let meet_project_value_slot_simple env ~min_name_mode t value_slot =
 let meet_rec_info env t : Rec_info_expr.t meet_shortcut =
   match expand_head env t with
   | Rec_info (Ok rec_info_expr) -> Known_result rec_info_expr
-  | Rec_info Unknown -> Need_meet
+  | Rec_info Unknown -> (
+    (* [Rec_info_expr.Var] gets converted into an [Equals] type and tracked in
+       the aliases structure in [TG.this_rec_info]; we convert it back to a
+       (canonical) [Rec_info_expr.Var] here. *)
+    match TG.get_alias_exn t with
+    | exception Not_found -> Need_meet
+    | simple ->
+      let simple = TE.get_canonical_simple_ignoring_name_mode env simple in
+      Simple.pattern_match' simple
+        ~const:(fun _ -> Misc.fatal_error "Depth variable cannot be a constant")
+        ~symbol:(fun _ ~coercion:_ ->
+          Misc.fatal_error "Depth variable cannot be a symbol (of kind value)")
+        ~var:(fun var ~coercion ->
+          if not (Coercion.is_id coercion)
+          then Misc.fatal_error "Non-identity coercion on depth variable";
+          Known_result (Rec_info_expr.var var)))
   | Rec_info Bottom -> Invalid
   | Value _ | Naked_immediate _ | Naked_float _ | Naked_int8 _ | Naked_int16 _
   | Naked_float32 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _

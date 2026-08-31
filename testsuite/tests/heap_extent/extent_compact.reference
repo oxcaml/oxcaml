@@ -1,0 +1,10 @@
+strings via extent intact after compaction: ok
+compaction moved blocks pointed to from extent: ok
+keep refs reachable via extent after compaction: ok
+extent-internal pointer intact after compaction: ok
+extent not freed by compaction: ok
+survivor strings intact after compaction with free blocks: ok
+keep refs reachable after second compaction: ok
+partially-dead extent not freed by compaction: ok
+extent freed after compaction tests: ok
+compaction after extent freed: ok

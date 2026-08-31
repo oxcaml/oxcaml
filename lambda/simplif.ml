@@ -1003,6 +1003,10 @@ let simplify_local_functions lam =
            "This function cannot be compiled into a static continuation")
   in
   let enabled = function
+    (* Stubs are explicitly intended for the middle-end inliner, they should not
+       be contified. *)
+    | {stub=true; _ } when !Clflags.native_code
+      -> false
     | {local = Always_local; _}
     | {local = Default_local;
        inline = (Never_inline | Default_inline | Available_inline); _}

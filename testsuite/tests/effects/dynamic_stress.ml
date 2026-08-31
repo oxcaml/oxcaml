@@ -36,7 +36,7 @@ let test_stack_growth () =
   let down = Buffer.create 64 and up = Buffer.create 64 in
   let rec go i =
     if i <= depth then
-      Dynamic.with_temporarily d i ~f:(fun () ->
+      exclave_ Dynamic.with_temporarily d i ~f:(fun () ->
         Buffer.add_string down (get_int d ^ " ");
         go (i + 1);
         Buffer.add_string up (get_int d ^ " "))
@@ -67,7 +67,7 @@ let test_table_growth () =
       Printf.printf "bound %d, visible %d, all correct: %b\n" n !visible
         !correct
     end
-    else Dynamic.with_temporarily ds.(i) i ~f:(fun () -> bind (i + 1))
+    else exclave_ Dynamic.with_temporarily ds.(i) i ~f:(fun () -> exclave_ bind (i + 1))
   in
   bind 0;
   let leftover =

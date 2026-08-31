@@ -238,6 +238,10 @@ typedef uint64_t uintnat;
    total size of live objects. */
 #define Percent_free_def 80
 
+/* The major GC adds an Idle phase when a cycle's sweeping work is
+   smaller than this. */
+#define Small_heap_limit_def 262144
+
 /* Default setting for the compacter: 500%
    (i.e. trigger the compacter when 5/6 of the heap is free or garbage).
  */

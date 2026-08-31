@@ -794,7 +794,7 @@ let decl_of_type_constr type_constr =
       match sorts with
       | Some sorts ->
         Cstr_layout_known { shape = Constructor_uniform_value; sorts }
-      | None -> Cstr_layout_variable
+      | None -> Cstr_layout_undetermined
     in
     Type_variant (
       constrs,
@@ -1199,7 +1199,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
         | Base Scannable -> ()
         | Base (Void | Untagged_immediate | Float32 | Float64 | Word | Bits8 |
               Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask)
-        | Univar _ | Genvar _ | Product _ -> raise_error ())
+        | Univar _ | Genvar _ | Product _ | Addressable _ -> raise_error ())
       l;
     add_extension id
       { ext_type_path = path_exn;

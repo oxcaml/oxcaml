@@ -1,7 +1,7 @@
 === Testing OCaml/C boundary - string allocation ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_string(...)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.String.make [inlined]
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_allocate_string(param=[100, 120] : ocaml_value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_allocate_string(param=(100, 'x') : int * char @ value)
 === Testing OCaml/C boundary - array allocation ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_array_make(...)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_inner(x=50 : int @ value, y=100 : int @ value)
@@ -12,7 +12,7 @@
 === Testing OCaml/C boundary - polymorphic hash ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_hash_exn(...)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib.Hashtbl.add
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_hash(param="key" : ocaml_value, param=42 : ocaml_value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_hash(param="key" : string @ value, param=42 : int @ value)
 === Testing OCaml/C boundary - MD5 hash ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_md5_string(...)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_md5(s=<unavailable>)
@@ -20,7 +20,7 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_alloc_shr_check_gc(...)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_large_tuple(n=42 : int @ value)
 === Testing OCaml/C boundary - callback (C calls OCaml) ===
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback_inner(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback_inner(param=() : unit @ value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_callback(param=<unavailable>)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_start_program

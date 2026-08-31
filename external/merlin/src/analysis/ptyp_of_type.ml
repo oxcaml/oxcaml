@@ -25,10 +25,10 @@ let rec module_type =
         Parsetree.Named
           ( Location.mknoloc (Option.map ~f:Ident.name id),
             module_type type_in,
-            modes param_mode )
+            modes ~arg:true param_mode )
     in
     let out = module_type type_out in
-    Mty.functor_ ~ret_mode:(modes ret_mode) param out
+    Mty.functor_ ~ret_mode:(modes ~arg:false ret_mode) param out
   | Mty_strengthen (mty, path, _aliasability) ->
     Mty.strengthen ~loc:Location.none (module_type mty)
       (Location.mknoloc (Untypeast.lident_of_path path))
@@ -55,8 +55,8 @@ and core_type type_expr =
       | Labelled l -> (Labelled l, core_type type_expr)
       | Optional l -> (Optional l, core_type type_expr)
     in
-    let arg_modes = modes arg_alloc_mode in
-    let ret_modes = modes ret_alloc_mode in
+    let arg_modes = modes ~arg:true arg_alloc_mode in
+    let ret_modes = modes ~arg:false ret_alloc_mode in
     Typ.arrow label type_expr (core_type type_expr_out) arg_modes ret_modes
   | Ttuple type_exprs ->
     let labeled_type_exprs =
@@ -179,9 +179,9 @@ and extension_constructor id { ext_args; ext_ret_type; ext_attributes; _ } =
     ?res:(Option.map ~f:core_type ext_ret_type)
     (var_of_id id)
 
-and modes mode =
+and modes ~arg mode =
   let snapshot = Btype.snapshot () in
-  let mode = Mode.Alloc.zap_to_legacy mode in
+  let mode = Mode.Alloc.zap_to_legacy ~arg mode in
   Btype.backtrack snapshot;
   Out_type.tree_of_modes mode
   |> List.map ~f:(fun mode -> Location.mknoloc (Parsetree.Mode mode))

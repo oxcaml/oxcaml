@@ -191,6 +191,9 @@ module type Common = sig
 
   val newvar_below : ('l * allowed) t -> ('l_ * 'r) t * bool
 
+  (** Returns true if the mode is a constant or a mode variable at level 0 *)
+  val check_const_or_level_0 : ('l * 'r) t -> bool
+
   val print : ?verbose:bool -> unit -> Fmt.formatter -> ('l * 'r) t -> unit
 
   val zap_to_ceil : ('l * allowed) t -> Const.t
@@ -746,6 +749,9 @@ module type S = sig
       (** Similar to [comonadic_to_monadic_min] but for constants *)
       val comonadic_to_monadic_min : Comonadic.Const.t -> Monadic.Const.t
 
+      (** Similar to [monadic_to_comonadic_min] but for constants *)
+      val monadic_to_comonadic_min : Monadic.Const.t -> Comonadic.Const.t
+
       (** Prints a constant on any axis. *)
       val print_axis : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end
@@ -811,7 +817,19 @@ module type S = sig
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
-    val zap_to_legacy : lr -> Const.t
+    (** [arg] determines co-/contravariance, and is used to infer the most
+        general mode for implied middle values on monadic axes.\
+
+        Consider:
+
+        {[
+          (* Implies [read shared]. *)
+          let zap_arg_read (x @ read) = ()
+
+          (* Implies [read uncontended]. *)
+          let zap_ret_read x : _ @ read = ()
+        ]} *)
+    val zap_to_legacy : arg:bool -> lr -> Const.t
 
     val comonadic_to_monadic_min :
       ?hint:('r * disallowed) neg Hint.morph ->
@@ -1119,6 +1137,12 @@ module type S = sig
         visibility:Visibility.Const.t Atom.t ->
         staticity:Staticity.Const.t Atom.t ->
         t
+
+      (** Apply mode crossing on a right monadic [Alloc] fragment. *)
+      val apply_right_alloc :
+        t ->
+        (disallowed * 'r) Alloc.Monadic.t ->
+        (disallowed * 'r) Alloc.Monadic.t
     end
 
     module Comonadic : sig
@@ -1151,6 +1175,12 @@ module type S = sig
       (** Create the mode crossing for a type whose values are always
           constructed at the given mode. *)
       val always_constructed_at : Value.Comonadic.Const.t -> t
+
+      (** Apply mode crossing on a left comonadic [Alloc] fragment. *)
+      val apply_left_alloc :
+        t ->
+        ('l * disallowed) Alloc.Comonadic.t ->
+        ('l * disallowed) Alloc.Comonadic.t
     end
 
     (** The mode crossing capability on all axes, split into monadic and

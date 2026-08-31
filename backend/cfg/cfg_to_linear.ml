@@ -30,9 +30,29 @@ module CL = Cfg_with_layout
 module L = Linear
 module DLL = Doubly_linked_list
 
+let phantom_defining_expr_to_linear (expr : Cfg.phantom_defining_expr) =
+  match expr with
+  | Cphantom_const_int i -> L.lphantom_const_int i
+  | Cphantom_const_symbol s -> L.lphantom_const_symbol s
+  | Cphantom_var v -> L.lphantom_var v
+  | Cphantom_offset_var { var; offset_in_words } ->
+    L.lphantom_offset_var ~var ~offset_in_words
+  | Cphantom_read_field { var; field } -> L.lphantom_read_field ~var ~field
+  | Cphantom_read_symbol_field { sym; field } ->
+    L.lphantom_read_symbol_field ~sym ~field
+  | Cphantom_block { tag; fields } -> L.lphantom_block ~tag ~fields
+  | Cphantom_optimised_out -> L.lphantom_optimised_out
+
 let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
     L.instruction =
-  let arg, res, dbg, live, fdo, available_before, available_across =
+  let ( arg,
+        res,
+        dbg,
+        live,
+        fdo,
+        available_before,
+        available_across,
+        phantom_available_before ) =
     match like with
     | None ->
       ( [||],
@@ -41,17 +61,41 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
         Reg.Set.empty,
         Fdo_info.none,
         Reg_availability_set.Unreachable,
-        Reg_availability_set.Unreachable )
-    | Some like ->
-      ( like.arg,
-        like.res,
-        like.dbg,
-        like.live,
-        like.fdo,
-        like.available_before,
-        like.available_across )
+        Reg_availability_set.Unreachable,
+        None )
+    | Some
+        { arg;
+          res;
+          dbg;
+          live;
+          fdo;
+          available_before;
+          available_across;
+          phantom_available_before;
+          desc = _;
+          id = _;
+          stack_offset = _
+        } ->
+      ( arg,
+        res,
+        dbg,
+        live,
+        fdo,
+        available_before,
+        available_across,
+        phantom_available_before )
   in
-  { desc; next; arg; res; dbg; live; fdo; available_before; available_across }
+  { desc;
+    next;
+    arg;
+    res;
+    dbg;
+    live;
+    fdo;
+    available_before;
+    available_across;
+    phantom_available_before
+  }
 
 let basic_to_linear (i : _ Cfg.instruction) ~next =
   let desc = Cfg_to_linear_desc.from_basic i.desc in
@@ -383,19 +427,34 @@ let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
       (* This block has a single predecessor which appears in the layout
          immediately prior to this block. *)
       (* No need for the label, unless the predecessor's terminator is [Switch]
-         when the label is needed for the jump table. *)
+         when the label is needed for the jump table, or [Tailcall_self] when
+         the label is the target of the tail call and the predecessor cannot
+         fall through. *)
+      let fatal_follows_non_returning () =
+        Misc.fatal_errorf
+          "Cfg_to_linear.need_starting_label: block follows non-returning \
+           terminator %a"
+          Printcfg.terminator prev_block.terminator
+      in
       match prev_block.terminator.desc with
       | Switch _ -> true
+      | Tailcall_self _ ->
+        (* The label is the target of the tail call, so it must be emitted. Out
+           of an abundance of caution, this is restricted to [-cfg-block-layout]
+           (the only pass creating such layouts), so that the behaviour with the
+           flag disabled is exactly the historical one. *)
+        if !Oxcaml_flags.cfg_block_layout
+        then true
+        else fatal_follows_non_returning ()
       | Never -> Misc.fatal_error "Cannot linearize terminator: Never"
       | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
       | Call _ | Prim _ | Invalid _ ->
         false
-      | Return | Raise _ | Tailcall_func _ | Tailcall_self _ | Call_no_return _
-        ->
-        Misc.fatal_errorf
-          "Cfg_to_linear.need_starting_label: block follows non-returning \
-           terminator %a"
-          Printcfg.terminator prev_block.terminator)
+      | Return | Raise _ | Tailcall_func _ | Call_no_return _ ->
+        (* Unreachable for a consistent CFG: these terminators have no normal
+           successors, and their exceptional successors are trap handlers,
+           handled above. *)
+        fatal_follows_non_returning ())
 
 let adjust_stack_offset body (block : Cfg.basic_block)
     ~(prev_block : Cfg.basic_block) =
@@ -476,14 +535,6 @@ let run cfg_with_layout =
           adjust_stack_offset body block ~prev_block
       in
       next := { Linear_utils.label; insn });
-  let fun_contains_calls = cfg.fun_contains_calls in
-  let fun_num_stack_slots = cfg.fun_num_stack_slots in
-  let fun_frame_required =
-    Proc.frame_required ~fun_contains_calls ~fun_num_stack_slots
-  in
-  let fun_prologue_required =
-    Proc.prologue_required ~fun_contains_calls ~fun_num_stack_slots
-  in
   let fun_section_name =
     if !Oxcaml_flags.basic_block_sections
     then CL.get_section cfg_with_layout cfg.entry_label
@@ -495,9 +546,14 @@ let run cfg_with_layout =
     fun_tailrec_entry_point_label = !tailrec_label;
     fun_fast = not (List.mem Cfg.Reduce_code_size cfg.fun_codegen_options);
     fun_dbg = cfg.fun_dbg;
-    fun_contains_calls;
-    fun_num_stack_slots;
-    fun_frame_required;
-    fun_prologue_required;
-    fun_section_name
+    fun_contains_calls = cfg.fun_contains_calls;
+    fun_num_stack_slots = cfg.fun_num_stack_slots;
+    fun_frame_required = cfg.fun_frame_required;
+    fun_prologue_required = cfg.fun_prologue_required;
+    fun_section_name;
+    fun_phantom_lets =
+      Backend_var.Map.map
+        (fun (provenance, defining_expr) ->
+          provenance, phantom_defining_expr_to_linear defining_expr)
+        (Cfg.fun_phantom_lets cfg)
   }

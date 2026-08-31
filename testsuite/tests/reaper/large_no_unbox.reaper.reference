@@ -16,7 +16,7 @@ let code inline(never) loopify(never) size(11) newer_version_of(large_2)
   let int_add_2 = %int_barith.add (int_add_1, Pfield) in
   cont k (int_add_2)
 in
-let $camlLarge_no_unbox__large_5 =
+let $camlLarge_no_unbox__large_3 =
   closure large_2_1 @large &toplevel.alloc_region
 in
 let code inline(never) loopify(never) size(5) newer_version_of(small_1)
@@ -34,7 +34,7 @@ let code inline(never) loopify(never) size(5) newer_version_of(small_1)
   let int_add_1 = %int_barith.add (int_add, Pfield) in
   cont k (int_add_1)
 in
-let $camlLarge_no_unbox__small_4 =
+let $camlLarge_no_unbox__small_2 =
   closure small_1_1 @small &toplevel.alloc_region
 in
 let code loopify(never) size(36) newer_version_of(f_0)
@@ -52,7 +52,7 @@ let code loopify(never) size(36) newer_version_of(f_0)
        (int_add_3, int_add_2, int_add_1, int_add)
    in
    apply direct(large_2_1 &my_alloc_region)
-     ($camlLarge_no_unbox__large_5 : _ -> imm tagged) (Pmakeblock) -> k2 * k1)
+     ($camlLarge_no_unbox__large_3 : _ -> imm tagged) (Pmakeblock) -> k2 * k1)
     where k2 (apply_result : imm tagged) =
       ((let int_add = %int_barith.add (x, 3) in
         let int_add_1 = %int_barith.add (x, 2) in
@@ -61,7 +61,7 @@ let code loopify(never) size(36) newer_version_of(f_0)
         let Pmakeblock_into_Pmakeblock_field_1 = int_add_1 in
         let Pmakeblock_into_Pmakeblock_field_0 = int_add_2 in
         apply direct(small_1_1 &my_alloc_region)
-          ($camlLarge_no_unbox__small_4 : _ -> imm tagged)
+          ($camlLarge_no_unbox__small_2 : _ -> imm tagged)
             (Pmakeblock_into_Pmakeblock_field_0,
              Pmakeblock_into_Pmakeblock_field_1,
              Pmakeblock_into_Pmakeblock_field_2)
@@ -71,6 +71,6 @@ let code loopify(never) size(36) newer_version_of(f_0)
            let `unit` = %end_region (`region`) in
            cont k (int_add))
 in
-let $camlLarge_no_unbox__f_3 = closure f_0_1 @f &toplevel.alloc_region in
-let $camlLarge_no_unbox = Block 0 ($camlLarge_no_unbox__f_3) in
+let $camlLarge_no_unbox__f_1 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlLarge_no_unbox = Block 0 ($camlLarge_no_unbox__f_1) in
 cont done ($camlLarge_no_unbox)

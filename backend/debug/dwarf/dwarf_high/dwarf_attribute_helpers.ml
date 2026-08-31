@@ -168,6 +168,13 @@ let create_call_return_pc label =
   AV.create spec
     (V.code_address_from_label ~comment:"PC immediately after call site" label)
 
+let create_call_return_pc_with_offset label ~offset_in_bytes =
+  needs_dwarf_five ();
+  let spec = AS.create Call_return_pc Addr in
+  AV.create spec
+    (V.code_address_from_label_plus_offset
+       ~comment:"PC immediately after call site" label ~offset_in_bytes)
+
 let create_call_tail_call ~is_tail =
   if is_tail
   then

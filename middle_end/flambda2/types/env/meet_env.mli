@@ -161,3 +161,5 @@ val meet_type :
   Type_grammar.t ->
   meet_expanded_head:meet_expanded_head ->
   Type_grammar.t meet_result
+
+val make_bottom : t -> t

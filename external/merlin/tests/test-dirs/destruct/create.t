@@ -248,3 +248,32 @@ test 5.3 : Abstract type
     "value": "Destruct not allowed on non-destructible type: t",
     "notifications": []
   }
+
+####################
+## UNBOXED TUPLES ##
+####################
+
+Test 6.1
+
+  $ $MERLIN single case-analysis -start 2:2 -end 2:3 \
+  > -filename unboxed_tuple.ml <<EOF
+  > let f (x : #(int * float#)) =
+  >   x
+  > EOF
+  {
+    "class": "return",
+    "value": [
+      {
+        "start": {
+          "line": 2,
+          "col": 2
+        },
+        "end": {
+          "line": 2,
+          "col": 3
+        }
+      },
+      "match x with | #(_, _) -> _"
+    ],
+    "notifications": []
+  }

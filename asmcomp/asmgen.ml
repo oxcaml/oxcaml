@@ -350,6 +350,13 @@ let reorder_blocks_random ppf_dump cl =
     pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
       "After reorder_blocks_random" cl
 
+let block_layout ppf_dump cl =
+  match !Oxcaml_flags.cfg_block_layout with
+  | false -> cl
+  | true ->
+    Cfg_block_layout.run cl;
+    pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_block_layout" cl
+
 let register_allocator_gi cfg_with_infos =
   cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
     cfg_with_infos
@@ -446,12 +453,6 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Cfg_with_infos.cfg_with_layout
   ++ pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_prologue"
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
-  ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
-  match !Oxcaml_flags.cfg_merge_blocks with
-  | false -> cfg_with_layout
-  | true ->
-    Profile.record ~accumulate:true "cfg_merge_blocks"
-      Cfg_merge_blocks.run_after_register_allocation cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_simplify"
        Regalloc_utils.simplify_cfg
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)
@@ -470,7 +471,20 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
     (Cfg_with_layout.cfg cfg_with_layout).allowed_to_be_irreducible <- true;
     cfg_with_layout_profile ~accumulate:true "cfg_simplify"
       Regalloc_utils.simplify_cfg cfg_with_layout)
+  ++ (fun (cfg_with_layout : Cfg_with_layout.t) ->
+  (* note: [Cfg_merge_blocks] may make the CFG irreducible, so it must be run
+     after the last pass relying on loop infos ([Cfg_stack_checks]). *)
+  match !Oxcaml_flags.cfg_merge_blocks with
+  | false -> cfg_with_layout
+  | true ->
+    Profile.record ~accumulate:true "cfg_merge_blocks"
+      Cfg_merge_blocks.run_after_register_allocation cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
+  (* note: if [-reorder-blocks-random] is also set, the random shuffle below
+     runs after (and thus overrides) the static layout; that flag is only meant
+     for testing that any layout is correct. *)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_block_layout"
+       (block_layout ppf_dump)
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
        (reorder_blocks_random ppf_dump)
   ++ Profile.record ~accumulate:true "cfg_invariants" (cfg_invariants ppf_dump)

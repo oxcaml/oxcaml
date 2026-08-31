@@ -53,11 +53,17 @@ val record_frame_descr :
   unit
 
 (** The backends call this whenever they switch text section, with the section's
-    name; it maintains a section epoch, in preparation for a compact
-    frame-descriptor format whose return addresses are deltas from the previous
-    descriptor -- an assembly-time constant only when both lie in the same
-    section. Re-entering the current section does not bump the epoch. *)
+    name; it maintains a section epoch for the compact frame-descriptor format,
+    whose return addresses are deltas from the previous descriptor -- an
+    assembly-time constant only when both lie in the same section, so
+    descriptors at a section boundary escape to the full format. Re-entering the
+    current section does not bump the epoch. *)
 val enter_code_section : string -> unit
+
+(* When set before [emit_frames], every frame descriptor escapes to the normal
+   format instead of the short encoding. Backends set this when the short format
+   cannot be emitted (currently only MASM, which lacks .uleb128). *)
+val disable_short_descriptors : bool ref
 
 (** [with_snapshot f] runs [f] and returns its result, but also ensures that the
     state of this [Emitaux] module is unchanged after [f] returns. *)
@@ -75,11 +81,17 @@ type emit_frame_actions =
     efa_word : int -> unit;
     efa_align : int -> unit;
     efa_label_rel : Label.t -> int32 -> unit;
-    efa_def_label : Label.t -> unit;
-    efa_string : string -> unit
+    efa_label_delta : Label.t -> Label.t -> unit;
+    efa_def_label : Label.t -> unit
   }
 
-val emit_frames : emit_frame_actions -> unit
+(* Emits the frame table into the current section which must be
+   [Read_only_data]. Debuginfo strings go in [debug_strings_section]: pass
+   [Asm_section.Debuginfo_strings] so that the linker de-duplicates them, or
+   [Read_only_data] to keep them inline in the frametable (the binary emitter
+   needs this, having no relocations that can target the mergeable section). *)
+val emit_frames :
+  debug_strings_section:Asm_targets.Asm_section.t -> emit_frame_actions -> unit
 
 val is_generic_function : string -> bool
 

@@ -41,7 +41,8 @@ type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
         prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
-        prepare_modality : Mode.Modality.t -> Mode.Modality.t
+        prepare_modality : Mode.Modality.t -> Mode.Modality.t;
+        prepare_ident : Ident.t -> Ident.t
       }
     (* The [prepare_jkind] function should be applied to all jkinds when
        saving; this commons them up, truncates their histories, and runs
@@ -49,7 +50,10 @@ type additional_action =
 
        The [prepare_mode]/[prepare_modality] functions should be applied to all
        modes/modalities when saving; this ensures the saved file doesn't contain
-       mode variables. *)
+       mode variables.
+
+       The [prepare_ident] function is applied to bound identifiers when saving,
+       giving them deterministic stamps so the saved [.cmi] is reproducible. *)
   | Duplicate_variables
   | No_action
 
@@ -268,9 +272,6 @@ let with_additional_action =
      attempt to do this based on filename caused spurious "inconsistent
      assumption" errors that couldn't immediately be solved. Revisit
      with a better approach.
-
-     We'll need to revisit the Note [Preparing_for_saving always the same]
-     once we do this tailoring.
   *)
   let (additional_action, sort_var_mapping) : additional_action * sort_map =
     match config with
@@ -307,7 +308,13 @@ let with_additional_action =
         let prepare_modality modality =
           Mode.Modality.(modality |> to_const_exn|> of_const)
         in
-        Prepare_for_saving { prepare_jkind; prepare_mode; prepare_modality },
+        let bound_ident_stamp = ref 0 in
+        let prepare_ident id =
+          incr bound_ident_stamp;
+          Ident.rename_with_stamp !bound_ident_stamp id
+        in
+        Prepare_for_saving
+          { prepare_jkind; prepare_mode; prepare_modality; prepare_ident },
         Saving (Hashtbl.create 17)
   in
   { s with
@@ -557,6 +564,10 @@ let rec sort s srt =
     let var' = sort_var s var in
     if var == var' then srt
     else Var var'
+  | Addressable srt' ->
+    let srt'' = sort s srt' in
+    if srt' == srt'' then srt
+    else Addressable srt''
 
 let rec layout s l =
   let open Jkind_types.Layout in
@@ -570,17 +581,22 @@ let rec layout s l =
     let sort_l' = sort s sort_l in
     if sort_l == sort_l' then l
     else Sort (sort_l', ax)
+  | Addressable l' ->
+    let l'' = layout s l' in
+    if l' == l'' then l
+    else Addressable l''
 
 let jkind_desc s jkind =
   match jkind.base with
-  | Kconstr (p, sa) ->
+  | Kconstr (p, sa, op) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr (p', sa) }
-    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
+        { jkind with base = Kconstr (p', sa, op) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa, op) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      let base = Jkind.Base_and_axes.apply_operator base op in
       let const =
         { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
@@ -596,14 +612,15 @@ let jkind_desc s jkind =
 let jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
   match jkind.base with
-  | Kconstr (p, sa) ->
+  | Kconstr (p, sa, op) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr (p', sa) }
-    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
+        { jkind with base = Kconstr (p', sa, op) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa, op) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      let base = Jkind.Base_and_axes.apply_operator base op in
       { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }
@@ -796,9 +813,23 @@ let type_expr s ty =
   let loc = Option.value s.loc ~default:Location.none in
   For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)
 
+(* For idents that are guaranteed to be local/scoped, such as bound
+   signature items and functor parameters. *)
+let rename_ident s id =
+  match s.additional_action with
+  | Prepare_for_saving { prepare_ident; _ } -> prepare_ident id
+  | Duplicate_variables | No_action -> Ident.rename id
+
+(* For constructor/label idents, which may be predef (e.g. the constructors
+   of [bool] or [or_null], whose declarations can appear in a substituted
+   signature). Predef and global idents are kept: they cannot be renamed,
+   and they carry no volatile stamp. *)
+let rename_decl_ident s id =
+  if Ident.is_global_or_predef id then id else rename_ident s id
+
 let label_declaration copy_scope s l =
   {
-    ld_id = l.ld_id;
+    ld_id = rename_decl_ident s l.ld_id;
     ld_mutable = l.ld_mutable;
     ld_modalities = l.ld_modalities;
     ld_sort = l.ld_sort;
@@ -824,7 +855,7 @@ let constructor_arguments copy_scope s = function
 
 let constructor_declaration copy_scope s c =
   {
-    cd_id = c.cd_id;
+    cd_id = rename_decl_ident s c.cd_id;
     cd_args = constructor_arguments copy_scope s c.cd_args;
     cd_res = Option.map (typexp copy_scope s c.cd_loc) c.cd_res;
     cd_loc = loc s c.cd_loc;
@@ -1098,7 +1129,7 @@ let rename_bound_idents scoping s sg =
     let open Ident in
     match scoping with
     | Keep -> (fun id -> create_scoped ~scope:(scope id) (name id))
-    | Make_local -> Ident.rename
+    | Make_local -> rename_ident s
     | Rescope scope -> (fun id -> create_scoped ~scope (name id))
   in
   let rec rename_bound_idents s sg = function
@@ -1137,7 +1168,7 @@ let rename_bound_idents scoping s sg =
           rest
     | Sig_value(id, vd, vis) :: rest ->
         (* scope doesn't matter for value identifiers. *)
-        let id' = Ident.rename id in
+        let id' = rename_ident s id in
         rename_bound_idents s (Sig_value(id', vd, vis) :: sg) rest
     | Sig_typext(id, ec, es, vis) :: rest ->
         let id' = rename id in
@@ -1253,7 +1284,7 @@ and subst_lazy_modtype scoping s = function
       Mty_functor(Named (None, (subst_lazy_modtype scoping s) arg, marg),
                    subst_lazy_modtype scoping s res, mres)
   | Mty_functor(Named (Some id, arg, marg), res, mres) ->
-      let id' = Ident.rename id in
+      let id' = rename_ident s id in
       Mty_functor(Named (Some id', (subst_lazy_modtype scoping s) arg, marg),
                   subst_lazy_modtype scoping (add_module id (Pident id') s)
                     res,
@@ -1333,13 +1364,9 @@ and compose s1 s2 =
             | Duplicate_variables, (Prepare_for_saving _ as prepare)
                 -> prepare
 
-            (* Note [Preparing_for_saving always the same]
-               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-               The function we put in [Prepare_for_saving] is always the same,
-               so we can take either.
-            *)
-            | (Prepare_for_saving _ as prepare1), Prepare_for_saving _
-                -> prepare1
+            | Prepare_for_saving _, Prepare_for_saving _ ->
+              fatal_error
+                "compose: composing Prepare_for_saving and Prepare_for_saving"
           end;
           sort_var_mapping = begin
             match s1.sort_var_mapping, s2.sort_var_mapping with

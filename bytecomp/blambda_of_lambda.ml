@@ -749,25 +749,17 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let element_size = Prim (Lsrint, [word_size; tagged_immediate 3]) in
         Sequence (comp_expr arg, element_size)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
-    | Pget_idx (layout, access) ->
-      let prim =
-        match Lambda.access_atomicity access with
-        | Nonatomic -> Ccall "caml_get_idx_bytecode"
-        | Atomic -> Ccall "caml_get_idx_atomic_bytecode"
-      in
+    | Pget_idx (layout, _) ->
       let elt = Lambda.mixed_block_element_of_layout layout in
-      copy_mixed_block_element elt (binary prim)
-    | Pset_idx (layout, _, atomicity) -> (
+      copy_mixed_block_element elt (binary (Ccall "caml_get_idx_bytecode"))
+    | Pset_idx (layout, _) -> (
       let elt = Lambda.mixed_block_element_of_layout layout in
       match args with
       | [arr; idx; value] ->
-        let prim =
-          match atomicity with
-          | Nonatomic -> Ccall "caml_set_idx_bytecode"
-          | Atomic -> Ccall "caml_set_idx_atomic_bytecode"
-        in
         let copied_value = copy_mixed_block_element elt (comp_expr value) in
-        Prim (prim, [comp_expr arr; comp_expr idx; copied_value])
+        Prim
+          ( Ccall "caml_set_idx_bytecode",
+            [comp_expr arr; comp_expr idx; copied_value] )
       | _ -> wrong_arity ~expected:3)
     | Pget_ptr (layout, _) ->
       let elt = Lambda.mixed_block_element_of_layout layout in
@@ -1002,6 +994,32 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_land_field -> ternary (Ccall "caml_atomic_land_field")
     | Patomic_lor_field -> ternary (Ccall "caml_atomic_lor_field")
     | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
+    | Patomic_load_idx { layout } ->
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      copy_mixed_block_element elt
+        (binary (Ccall "caml_atomic_load_idx_bytecode"))
+    | Patomic_set_idx { layout; _ } -> (
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      match args with
+      | [arr; idx; value] ->
+        let copied_value = copy_mixed_block_element elt (comp_expr value) in
+        Prim
+          ( Ccall "caml_atomic_set_idx_bytecode",
+            [comp_expr arr; comp_expr idx; copied_value] )
+      | _ -> wrong_arity ~expected:3)
+    | Patomic_exchange_idx _ ->
+      ternary (Ccall "caml_atomic_exchange_idx_bytecode")
+    | Patomic_compare_exchange_idx _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_idx_bytecode")
+    | Patomic_compare_set_idx _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_cas_idx_bytecode")
+    | Patomic_fetch_add_idx ->
+      ternary (Ccall "caml_atomic_fetch_add_idx_bytecode")
+    | Patomic_add_idx -> ternary (Ccall "caml_atomic_add_idx_bytecode")
+    | Patomic_sub_idx -> ternary (Ccall "caml_atomic_sub_idx_bytecode")
+    | Patomic_land_idx -> ternary (Ccall "caml_atomic_land_idx_bytecode")
+    | Patomic_lor_idx -> ternary (Ccall "caml_atomic_lor_idx_bytecode")
+    | Patomic_lxor_idx -> ternary (Ccall "caml_atomic_lxor_idx_bytecode")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ptls_get -> unary (Ccall "caml_domain_tls_get")
     | Pdomain_index -> unary (Ccall "caml_ml_domain_index")

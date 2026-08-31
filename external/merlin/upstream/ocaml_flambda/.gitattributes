@@ -28,6 +28,7 @@ utils/arg_helper.ml* merlin-exclude
 utils/arrayset.ml* merlin-exclude
 utils/binutils.ml* merlin-exclude
 utils/ccomp.ml* merlin-exclude
+utils/clflags.ml* merlin-exclude
 utils/config.*.ml* merlin-exclude
 utils/debug.ml* merlin-exclude
 utils/domainstate.ml*.c merlin-exclude

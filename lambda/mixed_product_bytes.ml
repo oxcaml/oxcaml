@@ -79,6 +79,10 @@ let rec count_types_element (elt : Types.mixed_block_element) : t =
   | Product elts ->
     Array.fold_left (fun acc e -> add acc (count_types_element e)) zero elts
   | Void -> zero
+  | Addressable elt ->
+    (* CR box: This may have to be updated once addressability affects boxed
+       representations *)
+    count_types_element elt
 
 let count_types_shape shape =
   Array.fold_left (fun acc elt -> add acc (count_types_element elt)) zero shape
@@ -90,6 +94,9 @@ let all_value { flat; _ } = Byte_count.is_zero flat
 let shape_is_all_value shape = all_value (count (Product shape))
 
 let value_prefix_len t = Byte_count.on_64_bit_arch t.value / 8
+
+let size_in_words t =
+  Byte_count.on_64_bit_arch (Byte_count.add t.value t.flat) / 8
 
 let types_shape_is_all_value shape = all_value (count_types_shape shape)
 

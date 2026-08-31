@@ -11,7 +11,7 @@ let code inline(always) loopify(never) size(7) newer_version_of(some_0)
   let Pmakeblock = %block.[`0`].my_alloc_region (x) in
   cont k (Pmakeblock)
 in
-let $camlCross_function_cse_b__some_5 =
+let $camlCross_function_cse_b__some_1 =
   closure some_0_1 @some &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(f_1)
@@ -23,7 +23,7 @@ let code loopify(never) size(14) newer_version_of(f_1)
   let Pmakeblock = %block.[`0`].my_alloc_region (a, a) in
   cont k (Pmakeblock)
 in
-let $camlCross_function_cse_b__f_6 = closure f_1_1 @f &toplevel.alloc_region
+let $camlCross_function_cse_b__f_2 = closure f_1_1 @f &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(g_2)
       g_2_1 (x)
@@ -34,7 +34,7 @@ let code loopify(never) size(14) newer_version_of(g_2)
   let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock, Pmakeblock) in
   cont k (Pmakeblock_1)
 in
-let $camlCross_function_cse_b__g_7 = closure g_2_1 @g &toplevel.alloc_region
+let $camlCross_function_cse_b__g_3 = closure g_2_1 @g &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(f_classic_3)
       f_classic_3_1 (x)
@@ -45,7 +45,7 @@ let code loopify(never) size(14) newer_version_of(f_classic_3)
   let Pmakeblock = %block.[`0`].my_alloc_region (a, a) in
   cont k (Pmakeblock)
 in
-let $camlCross_function_cse_b__f_classic_8 =
+let $camlCross_function_cse_b__f_classic_4 =
   closure f_classic_3_1 @f_classic &toplevel.alloc_region
 in
 let code loopify(never) size(14) newer_version_of(g_classic_4)
@@ -57,14 +57,14 @@ let code loopify(never) size(14) newer_version_of(g_classic_4)
   let Pmakeblock_1 = %block.[`0`].my_alloc_region (Pmakeblock, Pmakeblock) in
   cont k (Pmakeblock_1)
 in
-let $camlCross_function_cse_b__g_classic_9 =
+let $camlCross_function_cse_b__g_classic_5 =
   closure g_classic_4_1 @g_classic &toplevel.alloc_region
 in
 let $camlCross_function_cse_b =
-  Block 0 ($camlCross_function_cse_b__some_5,
-           $camlCross_function_cse_b__f_6,
-           $camlCross_function_cse_b__g_7,
-           $camlCross_function_cse_b__f_classic_8,
-           $camlCross_function_cse_b__g_classic_9)
+  Block 0 ($camlCross_function_cse_b__some_1,
+           $camlCross_function_cse_b__f_2,
+           $camlCross_function_cse_b__g_3,
+           $camlCross_function_cse_b__f_classic_4,
+           $camlCross_function_cse_b__g_classic_5)
 in
 cont done ($camlCross_function_cse_b)

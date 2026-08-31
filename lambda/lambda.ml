@@ -45,14 +45,6 @@ type has_initializer =
   | With_initializer
   | Uninitialized
 
-type atomic_flag = Asttypes.atomic_flag
-
-type access_flag = Asttypes.access_flag
-
-let access_atomicity : access_flag -> atomic_flag = function
-  | Immutable_access | Mutable_access -> Nonatomic
-  | Atomic_access -> Atomic
-
 include (struct
 
   type locality_mode =
@@ -457,6 +449,22 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_load_idx of
+    { layout : layout }
+  | Patomic_set_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -488,8 +496,8 @@ type primitive =
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
-  | Pget_idx of layout * access_flag
-  | Pset_idx of layout * modify_mode * atomic_flag
+  | Pget_idx of layout * Asttypes.mutable_flag
+  | Pset_idx of layout * modify_mode
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
@@ -2060,40 +2068,52 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   | Product shapes ->
     Product (transl_mixed_product_shape shapes)
   | Void -> Product [||]
+  | Addressable elt ->
+    (* CR box: Addressability should be preserved here once it affects boxed
+       representations *)
+    transl_mixed_block_element elt
 
 and transl_mixed_product_shape shape =
   Array.map transl_mixed_block_element shape
 
-let rec transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi (fun i (elt : Types.mixed_block_element) ->
-    match elt with
-    | Scannable { separability; _ } ->
-      let raw_kind =
-        value_kind_of_pointerness (pointerness_of_separability separability)
-      in
-      Value { (get_value_kind i) with raw_kind }
-    | Float_boxed -> Float_boxed (get_mode i)
-    | Float64 -> Float64
-    | Float32 -> Float32
-    | Bits8 -> Bits8
-    | Bits16 -> Bits16
-    | Bits32 -> Bits32
-    | Bits64 -> Bits64
-    | Vec128 -> Vec128
-    | Vec256 ->
-      if split_vectors
-      then Product [|Vec128; Vec128|]
-      else Vec256
-    | Vec512 -> Vec512
-    | Mask -> Mask
-    | Word -> Word
-    | Untagged_immediate -> Untagged_immediate
-    | Product shapes ->
-      let get_value_kind _ = generic_value in
-      Product
-        (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-    | Void -> Product [||]
-  ) shape
+let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
+    (elt : Types.mixed_block_element) =
+  match elt with
+  | Scannable { separability; _ } ->
+    let raw_kind =
+      value_kind_of_pointerness (pointerness_of_separability separability)
+    in
+    Value { (get_value_kind i) with raw_kind }
+  | Float_boxed -> Float_boxed (get_mode i)
+  | Float64 -> Float64
+  | Float32 -> Float32
+  | Bits8 -> Bits8
+  | Bits16 -> Bits16
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Vec128 -> Vec128
+  | Vec256 ->
+    if split_vectors
+    then Product [|Vec128; Vec128|]
+    else Vec256
+  | Vec512 -> Vec512
+  | Mask -> Mask
+  | Word -> Word
+  | Untagged_immediate -> Untagged_immediate
+  | Product shapes ->
+    let get_value_kind _ = generic_value in
+    Product
+      (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+  | Void -> Product [||]
+  | Addressable elt ->
+    (* CR box: Addressability should be preserved here once it affects boxed
+       representations *)
+    transl_mixed_block_element_for_read ~get_value_kind ~get_mode i elt
+
+and transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  Array.mapi
+    (transl_mixed_block_element_for_read ~get_value_kind ~get_mode)
+    shape
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->
@@ -2113,9 +2133,10 @@ let transl_module_representation repr =
          |> Types.mixed_block_element_of_const_sort)
       repr
   in
-  let is_value (elt : Types.mixed_block_element) =
+  let rec is_value (elt : Types.mixed_block_element) =
     match elt with
     | Scannable _ -> true
+    | Addressable elt -> is_value elt
     | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
     | Product _ | Void -> false
@@ -2926,6 +2947,17 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_load_idx _
+  | Patomic_set_idx _
+  | Patomic_exchange_idx _
+  | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -3121,7 +3153,12 @@ let primitive_can_raise prim =
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_load_mixed_field _
-  | Patomic_set_field _ | Patomic_set_mixed_field _ -> false
+  | Patomic_set_field _ | Patomic_set_mixed_field _
+  | Patomic_load_idx _ | Patomic_set_idx _
+  | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx
+  | Patomic_lxor_idx -> false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3185,6 +3222,9 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Base Void -> layout_unboxed_product []
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
+  | Addressable sort ->
+    (* Addressability does not affect the non-boxed representation *)
+    layout_of_const_sort sort
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
   | Genvar _ ->
@@ -3209,6 +3249,7 @@ let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
   | Same_as_ocaml_repr (Product _)
   | Same_as_ocaml_repr (Base _)
+  | Same_as_ocaml_repr (Addressable _)
   | Unboxed_vector _ | Unboxed_mask | Unboxed_float _
   | Unboxed_or_untagged_integer _ ->
     false
@@ -3622,6 +3663,12 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
+  | Patomic_load_idx { layout } -> layout
+  | Patomic_set_idx _ -> layout_unit
+  | Patomic_exchange_idx { layout; _ } -> layout
+  | Patomic_compare_exchange_idx { layout; _ } -> layout
+  | Patomic_compare_set_idx _
+  | Patomic_fetch_add_idx -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
@@ -3629,6 +3676,11 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
   | Ppoll -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64

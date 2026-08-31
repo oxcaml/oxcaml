@@ -1343,7 +1343,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   | Ptyp_quote t ->
       if not (Language_extension.is_enabled Runtime_metaprogramming) then
         raise (Error (loc, env, Unsupported_extension Runtime_metaprogramming));
-      let new_env = Env.enter_quotation env in
+      let new_env = Env.enter_quote env in
       let cty = transl_type new_env ~policy ~row_context mode t in
       ctyp (Ttyp_quote cty) (newty (Tquote cty.ctyp_type))
   | Ptyp_splice t ->
@@ -1843,7 +1843,7 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
         | Tvar { jkind; _ } ->
           let desc = jkind.jkind in
           (match desc.base with
-          | Kconstr (Pident id, sa) ->
+          | Kconstr (Pident id, sa, op) ->
             let v_opt =
               List.find_map
                 (fun (id', v) ->
@@ -1852,8 +1852,13 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
             in
             (match v_opt with
             | Some v ->
+              let layout =
+                Jkind_types.Layout.apply_operator
+                  (Jkind_types.Layout.Sort (Jkind_types.Sort.Var v, sa))
+                  op
+              in
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
-                = Layout (Sort (Var v, sa)) in
+                = Layout layout in
               let desc = {desc with base} in
               let jkind = {jkind with jkind = desc} in
               Types.set_var_jkind t jkind
@@ -2020,7 +2025,8 @@ let report_error_doc loc env = function
                   ("a" :: Jkind.Scannable_axes.to_string_list sa)
               | Layout (Sort (Univar _, _)) ->
                 Misc.fatal_error "univar"
-              | Layout (Sort (Base _, _) | Any _ | Product _) | Kconstr _ ->
+              | Layout (Sort (Base _, _) | Any _ | Product _ | Addressable _)
+              | Kconstr _ ->
                 fprintf ppf "kind %a" (Jkind.format env)
                   inferred_jkind)))
         inferred_jkind

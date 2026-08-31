@@ -103,6 +103,7 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t  (** See Note [Addressable kinds] *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -119,6 +120,8 @@ module Layout : sig
   end
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
+
+  val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
@@ -467,7 +470,10 @@ val of_annotation_option_default :
     Raises if a disallowed or unknown jkind is present.
 
     [use_abstract_jkinds] controls whether references to other kinds here count
-    as uses of them for unused abstract kind warnings. *)
+    as uses of them for unused abstract kind warnings.
+
+    [warn] controls whether redundant-modifier and redundant-kind-modifier
+    warnings are emitted while parsing the annotation. *)
 val of_type_decl :
   ?use_abstract_jkinds:bool ->
   ?warn:bool ->
@@ -684,11 +690,15 @@ val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
     jkind is already [Non_null], fails. *)
 val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
-(** Extract out component jkinds from the product. Because there are no product
-    jkinds, this is a bit of a lie: instead, this decomposes the layout but just
-    reuses the non-layout parts of the original jkind. Never does any mutation.
-    Because it just reuses the mode information, the resulting jkinds are higher
-    in the jkind lattice than they might need to be. *)
+(** Given a jkind [k], produce a list of jkinds [ks] such that [k] is equivalent
+    to [Product ks]. In practice, [k] is the kind of, or required kind of, a
+    tuple/record being inspected in [Ctype.constrain_type_jkind].
+
+    Because there are no product jkinds, the resulting jkinds are higher in the
+    jkind lattice than they might need to be. (This decomposes the layout but
+    just reuses the non-layout parts of the original jkind.)
+
+    Never does any mutation. *)
 val decompose_product : Env.t -> 'd Types.jkind -> 'd Types.jkind list option
 
 (** Get an annotation (that a user might write) for this [t]. *)
@@ -732,6 +742,8 @@ val set_printtyp_path : (Format_doc.formatter -> Path.t -> unit) -> unit
 (** Provides the [type_expr] formatter back up the dependency chain to this
     module. *)
 val set_print_type_expr : Types.type_expr Format_doc.printer -> unit
+
+val format_type_expr : Types.type_expr Format_doc.printer
 
 (** Provides the [raw_type_expr] formatter back up the dependency chain to this
     module. *)

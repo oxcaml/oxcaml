@@ -35,6 +35,17 @@
 # changes being displayed by default in pull requests.
 /configure text eol=lf -diff linguist-generated
 
+# Generated files checked into Merlin
+/external/merlin/src/ocaml/preprocess/menhirLib.ml linguist-generated
+/external/merlin/src/ocaml/preprocess/menhirLib.mli linguist-generated
+/external/merlin/src/ocaml/preprocess/parser_explain.ml linguist-generated
+/external/merlin/src/ocaml/preprocess/parser_printer.ml linguist-generated
+/external/merlin/src/ocaml/preprocess/parser_raw.ml linguist-generated
+/external/merlin/src/ocaml/preprocess/parser_raw.mli linguist-generated
+/external/merlin/src/ocaml/preprocess/parser_recover.ml linguist-generated
+/external/merlin/src/sherlodoc/type_parser.ml linguist-generated
+/external/merlin/src/sherlodoc/type_parser.mli linguist-generated
+
 # 'union' merge driver just unions textual content in case of conflict
 #   http://krlmlr.github.io/using-gitattributes-to-avoid-merge-conflicts/
 /.mailmap                merge=union

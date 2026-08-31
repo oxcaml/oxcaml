@@ -329,7 +329,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Print_as_value (* can interpret as a value and print *)
       | Print_as of string (* can't print *)
 
-    let print_sort : Jkind.Sort.Const.t -> _ = function
+    let rec print_sort : Jkind.Sort.Const.t -> _ = function
       | Base Scannable -> Print_as_value
       | Base Void -> Print_as "<void>"
       | Base
@@ -337,6 +337,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | Vec256 | Vec512 | Mask | Word | Untagged_immediate ) ->
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
+      | Addressable sort -> print_sort sort
       | Univar _ -> Print_as "<univar>"
       | Genvar _ -> Print_as "<genvar>"
 
@@ -431,7 +432,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
               | Tconstr (path, [_], _)
                 when Path.same path Predef.path_expr ->
-                Oval_quote (O.obj obj : CamlinternalQuote.Code.t)
+                let quote : CamlinternalQuote.Code.t = O.obj obj in
+                Oval_printer (Format_doc.deprecated_printer (fun ppf ->
+                  CamlinternalQuote.Code.print ppf quote))
 
               | _ ->
                 match Env.find_type path env with
@@ -717,28 +720,43 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         match check_depth depth obj ty with
         | Some x -> x
         | None ->
+            let sorts_and_types () =
+              let label_params_and_types, record_params =
+                Ctype.instance_label_declarations ~fixed:false
+                  (lbl_list |> Array.of_list) ~params:type_params
+              in
+              List.iter2 (Ctype.unify env) record_params
+                (Ctype.instance_list ty_list);
+              let try_map_all a f =
+                Misc.Stdlib.Array.all_somes (Array.map f a)
+              in
+              let with_sort ty =
+                Option.map (fun s -> s, ty)
+                  (Jkind.sort_option_of_jkind env (Ctype.type_jkind env ty))
+              in
+              try_map_all label_params_and_types (fun (_, ty) -> with_sort ty)
+            in
+            (* Finalize the representation just to be able to print it *)
+            let finalize rep =
+              Typedecl.finalize_record_representation env Location.none rep
+            in
             let rep =
               match rep with
-              | (Record_variable | Record_inlined (_, Constructor_variable, _))
-                as old_repres ->
-                  let label_params_and_types, record_params =
-                    Ctype.instance_label_declarations ~fixed:false
-                      (lbl_list |> Array.of_list) ~params:type_params
-                  in
-                  List.iter2 (Ctype.unify env) record_params
-                    (Ctype.instance_list ty_list);
-                  let lds_and_types =
-                    List.map2 (fun lbl (_params, ty) -> lbl, ty)
-                      lbl_list (label_params_and_types |> Array.to_list)
-                  in
-                  (match
-                     Typedecl.update_record_representation env Location.none
-                       Legacy ~old_repres lds_and_types ~why:Field_projection
-                   with
-                   | Ok (_sorts, rep) -> rep
-                   | Error _ -> Misc.fatal_error "unrepresentable record")
-              | rep -> rep
+              | Record_undetermined ->
+                Option.map
+                  (fun l -> finalize (Record_variable l))
+                  (sorts_and_types ())
+              | Record_inlined (tag, Constructor_undetermined, vrep) ->
+                Option.map
+                  (fun l ->
+                     finalize
+                       (Record_inlined (tag, Constructor_variable l, vrep)))
+                  (sorts_and_types ())
+              | _ -> Some rep
             in
+            match rep with
+            | None -> Oval_stuff "<abstr>"
+            | Some rep ->
             let pos =
               match rep with
               | Record_inlined (_, _, Variant_extensible) -> 1
@@ -767,7 +785,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     else Outval_record_boxed
               | Record_dummy _ ->
                   Misc.fatal_error "dummy record representation"
-              | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+              | Record_undetermined | Record_variable _
+              | Record_inlined (_, (Constructor_undetermined
+                                   | Constructor_variable _), _) ->
                   Misc.fatal_error "variable record representation"
             in
             tree_of_record_fields depth
@@ -805,7 +825,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                       nest tree_of_val (depth - 1) fld ty_arg
                   | Outval_record_mixed_block shape ->
                       let fld =
-                        match shape.(pos) with
+                        let rec of_element
+                            : Types.mixed_block_element -> _ = function
                         | Scannable _ -> `Continue (O.field obj pos)
                         | Float_boxed | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
@@ -815,6 +836,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                             `Stop (Oval_stuff "<abstr>")
                         | Void ->
                             `Stop (Oval_stuff "<void>")
+                        | Addressable e ->
+                          (* CR box: Update this read once addressability
+                             affects how elements are stored in blocks *)
+                          of_element e
+                        in
+                        of_element shape.(pos)
                       in
                       match fld with
                       | `Continue fld ->

@@ -467,6 +467,7 @@ let get_paths () =
 let () = ignore Path_cache.prepend_add_single;;
 (*
 let init_manifests () =
+  Profile.record_call ~accumulate:true "read_manifests" @@ fun () ->
   let manifests_reader = Dune_manifests_reader.create () in
   let load_manifest ~hidden ~basenames manifest_path =
     let manifest_path =

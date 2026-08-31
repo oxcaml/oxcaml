@@ -3126,8 +3126,9 @@ block_access:
   | DOT ident _p=LPAREN i=seq_expr RPAREN
     {
       match $2 with
-      | "idx_imm" -> Baccess_block (Immutable, i)
-      | "idx_mut" -> Baccess_block (Mutable, i)
+      | "idx_imm" -> Baccess_block (Immutable_access, i)
+      | "idx_mut" -> Baccess_block (Mutable_access, i)
+      | "idx_atomic" -> Baccess_block (Atomic_access, i)
       | _ ->
         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
     }
@@ -3262,7 +3263,7 @@ labeled_simple_expr:
       { let loc = $loc(label) in
         (Labelled label, mkexpvar ~loc label) }
   | TILDE UNDERSCORE
-      { (Labelled "_", mkexp ~loc:$sloc Pexp_hole) }
+      { (Labelled "_", mkexp ~loc:$loc($2) Pexp_hole) }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN
       { (Labelled label, mkexp_type_constraint_with_modes ~loc:($startpos($2), $endpos) ~modes:[]
                            (mkexpvar ~loc:$loc(label) label) c) }
@@ -3270,7 +3271,7 @@ labeled_simple_expr:
       { let loc = $loc(label) in
         (Optional label, mkexpvar ~loc label) }
   | QUESTION UNDERSCORE
-      { (Optional "_", mkexp ~loc:$sloc Pexp_hole) }
+      { (Optional "_", mkexp ~loc:$loc($2) Pexp_hole) }
   | OPTLABEL simple_expr %prec below_HASH
       { (Optional $1, $2) }
 ;

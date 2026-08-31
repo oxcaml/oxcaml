@@ -374,12 +374,12 @@ let pat
                         vto)
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
-    | Tpat_record (l, sorts, rep, closed) ->
+    | Tpat_record (l, rep, closed) ->
         Tpat_record (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l,
-                     sorts, rep, closed)
-    | Tpat_record_unboxed_product (l, sorts, rep, closed) ->
+                     rep, closed)
+    | Tpat_record_unboxed_product (l, rep, closed) ->
         Tpat_record_unboxed_product
-          (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, sorts, rep,
+          (List.map (tuple3 (map_loc_lid sub) id (sub.pat sub)) l, rep,
            closed)
     | Tpat_array (am, arg_sort, l) ->
         Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
@@ -535,8 +535,8 @@ let expr sub x =
       Baccess_block (mut, sub.expr sub idx)
   in
   let map_unboxed_access sub = function
-    | Uaccess_unboxed_field (lid, ld, sorts) ->
-      Uaccess_unboxed_field (map_loc_lid sub lid, ld, sorts)
+    | Uaccess_unboxed_field (lid, ld, r) ->
+      Uaccess_unboxed_field (map_loc_lid sub lid, ld, r)
   in
   let exp_desc =
     match x.exp_desc with
@@ -615,19 +615,19 @@ let expr sub x =
                      lid = map_loc_lid sub lid;
                      record_sort; record_repres; label; boxing; unique_barrier;
                    }
-    | Texp_unboxed_field { record; record_sort; record_sorts; record_repres;
+    | Texp_unboxed_field { record; record_sort; record_repres;
                            lid; label; unique_use; } ->
         Texp_unboxed_field { record = sub.expr sub record;
                              lid = map_loc_lid sub lid; record_sort;
-                             record_sorts; record_repres; label; unique_use;
+                             record_repres; label; unique_use;
                            }
-    | Texp_setfield { record; record_repres; record_sorts; modality; lid; label;
+    | Texp_setfield { record; record_repres; modality; lid; label;
                       newval } ->
         Texp_setfield {
           record = sub.expr sub record;
           lid = map_loc_lid sub lid;
           newval = sub.expr sub newval;
-          record_repres; record_sorts; modality; label;
+          record_repres; modality; label;
         }
     | Texp_atomic_loc { record; record_sort; record_repres; lid; label;
                         alloc_mode; } ->
@@ -749,10 +749,10 @@ let expr sub x =
     | Texp_overwrite (exp1, exp2) ->
         Texp_overwrite (sub.expr sub exp1, sub.expr sub exp2)
     | Texp_hole use -> Texp_hole use
-    | Texp_quotation exp ->
-        Texp_quotation (sub.expr sub exp)
-    | Texp_antiquotation exp ->
-        Texp_antiquotation (sub.expr sub exp)
+    | Texp_quote exp ->
+        Texp_quote (sub.expr sub exp)
+    | Texp_splice exp ->
+        Texp_splice (sub.expr sub exp)
   in
   let exp_attributes = sub.attributes sub x.exp_attributes in
   {x with exp_loc; exp_extra; exp_desc; exp_env; exp_attributes}
@@ -911,14 +911,16 @@ let module_expr sub x =
     match x.mod_desc with
     | Tmod_ident (path, lid) -> Tmod_ident (path, map_loc_lid sub lid)
     | Tmod_structure st -> Tmod_structure (sub.structure sub st)
-    | Tmod_functor (arg, mexpr) ->
-        Tmod_functor (functor_parameter sub arg, sub.module_expr sub mexpr)
-    | Tmod_apply (mexp1, mexp2, c, yielding) ->
+    | Tmod_functor (arg, mexpr, staticity) ->
+        Tmod_functor
+          (functor_parameter sub arg, sub.module_expr sub mexpr, staticity)
+    | Tmod_apply (mexp1, mexp2, c, yielding, staticity) ->
         Tmod_apply (
           sub.module_expr sub mexp1,
           sub.module_expr sub mexp2,
           sub.module_coercion sub c,
-          yielding
+          yielding,
+          staticity
         )
     | Tmod_apply_unit (mexp1, yielding) ->
         Tmod_apply_unit (sub.module_expr sub mexp1, yielding)

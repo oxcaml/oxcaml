@@ -28,8 +28,8 @@ let interface ~source_file ~output_prefix =
   in
   with_info ~dump_ext:"cmi" unit_info @@ fun info ->
   Compile_common.interface
-    ~hook_parse_tree:(fun _ -> ())
-    ~hook_typed_tree:(fun _ -> ())
+    ~hook_parse_tree:Fun.id
+    ~hook_typed_tree:ignore
     info
 
 (** Bytecode compilation backend for .ml files. *)
@@ -101,6 +101,11 @@ let emit_bytecode i
             ~main_module_block_format ~arg_descr);
     )
 
+let emit_lambda_program info program =
+  let bytecode = tlambda_to_bytecode info program ~as_arg_for:None in
+  if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda)
+  then emit_bytecode info bytecode
+
 type starting_point =
   | Parsing
   | Instantiation of {
@@ -134,8 +139,8 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       emit_bytecode info bytecode
     in
     Compile_common.implementation
-      ~hook_parse_tree:(fun _ -> ())
-      ~hook_typed_tree:(fun _ -> ())
+      ~hook_parse_tree:Fun.id
+      ~hook_typed_tree:ignore
       info ~backend
   | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
     begin
