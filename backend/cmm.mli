@@ -230,8 +230,8 @@ type phantom_defining_expr =
   | Cphantom_const_symbol of symbol
       (** The phantom-let-bound variable is an alias for a symbol. *)
   | Cphantom_var of Backend_var.t
-      (** The phantom-let-bound variable is an alias for another variable. The
-          aliased variable must not be a bound by a phantom let. *)
+      (** The phantom-let-bound variable is an alias for another variable, which
+          may itself be bound by a phantom let (see [Cphantom_let]). *)
   | Cphantom_offset_var of
       { var : Backend_var.t;
         offset_in_words : int
@@ -505,6 +505,13 @@ type operation =
         enabled_at_init : bool option
       }
   | Copaque (* Sys.opaque_identity *)
+  | Cphantom_add_equality of { var : Backend_var.t }
+      (** Marks the phantom-let-bound variable [var] (which must be in scope)
+          such that its defining expression will henceforth be treated as the
+          result of evaluating the operation's single argument (any variables
+          therein must be in scope). The operation is transparent: it evaluates
+          to the value of its argument and generates no code of its own. The
+          marking itself is currently ignored during instruction selection. *)
   | Cbeginregion
   | Cendregion
   | Ctuple_field of int * machtype array
@@ -571,7 +578,16 @@ and expression =
   | Clet of Backend_var.With_provenance.t * expression * expression
   | Cphantom_let of
       Backend_var.With_provenance.t * phantom_defining_expr option * expression
-  | Cname_for_debugger of Backend_var.With_provenance.t * expression
+      (** Defines a new phantom variable. Phantom defining expressions are in
+          ANF form and must be closed: any free variables that would otherwise
+          be unbound must be bound to fresh phantom-let-bound variables,
+          newly-defined previously. Such variables can then be given equalities
+          to values that exist at runtime using [Cphantom_add_equality]. *)
+  | Cnormal_var_optimised_out of Backend_var.Provenance.t * expression
+      (** Annotation recording that the wrapped expression's value was bound to
+          the variable described by the provenance, from which instruction
+          selection produces a naming operation. No [Backend_var.t] is involved:
+          the variable itself may no longer be bound anywhere. *)
   | Ctuple of expression list
   | Cop of operation * expression list * Debuginfo.t
   | Csequence of expression * expression
@@ -689,7 +705,8 @@ val map_tail : (expression -> expression) -> expression -> expression
 val iter_shallow : (expression -> unit) -> expression -> unit
 
 (** Whether an expression contains constructs that only arise from debugging
-    information ([Cphantom_let] and [Cname_for_debugger]). *)
+    information ([Cphantom_let], [Cnormal_var_optimised_out] and
+    [Cphantom_add_equality]). *)
 val contains_debug_only_constructs : expression -> bool
 
 val compare_machtype_component : machtype_component -> machtype_component -> int

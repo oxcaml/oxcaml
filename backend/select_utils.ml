@@ -291,6 +291,7 @@ let oper_result_type = function
   | Cprobe _ -> typ_void
   | Cprobe_is_enabled _ -> typ_int
   | Copaque -> typ_val
+  | Cphantom_add_equality _ -> typ_void
   | Cpoll | Cpause -> typ_void
   | Cbeginregion ->
     (* This must not be typ_val; the begin-region operation returns a naked
@@ -362,7 +363,7 @@ let size_expr env exp =
     | Clet (id, arg, body) ->
       size (V.Map.add (VP.var id) (size localenv arg) localenv) body
     | Cphantom_let (_id, _defining_expr, body) -> size localenv body
-    | Cname_for_debugger (_var, body) -> size localenv body
+    | Cnormal_var_optimised_out (_var, body) -> size localenv body
     | Csequence (_e1, e2) -> size localenv e2
     | _ -> Misc.fatal_error "Selection.size_expr"
   in

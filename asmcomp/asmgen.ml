@@ -549,7 +549,11 @@ let compile_phrases ~ppf_dump ps =
     match ps with
     | [] -> ()
     | p :: ps -> (
-      if !dump_cmm then fprintf ppf_dump "%a@." Printcmm.phrase p;
+      (match p with
+      | Cdata _ when !Oxcaml_flags.dump_cmm_functions -> ()
+      | Cfunction _ | Cdata _ ->
+        if !dump_cmm || !Oxcaml_flags.dump_cmm_functions
+        then fprintf ppf_dump "%a@." Printcmm.phrase p);
       match p with
       | Cfunction fd ->
         (* Only profile if selected granularity is either function or block

@@ -191,9 +191,11 @@ let phantom_defining_expr ppf defining_expr =
   | Cphantom_read_symbol_field { sym; field } ->
     Format.fprintf ppf "%s[%d]" sym.sym_name field
   | Cphantom_block { tag; fields } ->
-    Format.fprintf ppf "[%d: " tag;
-    List.iter (fun field -> Format.fprintf ppf "%a; " V.print field) fields;
-    Format.fprintf ppf "]"
+    Format.fprintf ppf "[%d: %a]" tag
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+         V.print)
+      fields
 
 let phantom_defining_expr_opt ppf defining_expr =
   match defining_expr with
@@ -332,6 +334,8 @@ let operation d = function
       (temporal_locality locality)
   | Catomic { op; size = _ } -> Printf.sprintf "atomic %s" (atomic_op op)
   | Copaque -> "opaque"
+  | Cphantom_add_equality { var } ->
+    Format.asprintf "phantom_add_equality %a" V.print var
   | Cbeginregion -> "beginregion"
   | Cendregion -> "endregion"
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field
@@ -390,8 +394,9 @@ let rec expr ppf = function
   | Cphantom_let (var, def, body) ->
     fprintf ppf "@[<2>(let?@ @[<2>%a@ %a@]@ %a)@]" VP.print var
       phantom_defining_expr_opt def sequence body
-  | Cname_for_debugger (var, body) ->
-    fprintf ppf "@[<2>(name_for_debugger@ %a@ %a)@]" VP.print var expr body
+  | Cnormal_var_optimised_out (provenance, body) ->
+    fprintf ppf "@[<2>(normal_var_optimised_out@ %a@ %a)@]" V.Provenance.print
+      provenance expr body
   | Ctuple el ->
     let tuple ppf el =
       let first = ref true in

@@ -46,6 +46,8 @@ val atomic_bitwidth : Cmm.atomic_bitwidth -> string
 
 val operation : Debuginfo.t -> Cmm.operation -> string
 
+val phantom_defining_expr : formatter -> Cmm.phantom_defining_expr -> unit
+
 val expression : formatter -> Cmm.expression -> unit
 
 val fundecl : formatter -> Cmm.fundecl -> unit

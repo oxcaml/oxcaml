@@ -1,0 +1,41 @@
+(function{phantom_closure.ml:21,39-110} camlPhantom_closure__test_0_2_code
+     (x/0[((module_path x/0) (location ()) (original_ident x/0)
+           (is_parameter local))]: int) : int
+ (let region/0 (beginregion)
+   (let?
+     param/0[((module_path param/0) (location ()) (original_ident param/0)
+              (is_parameter local))]
+       0
+     (let
+       (int_add/0
+          (normal_var_optimised_out
+            ((module_path y/0) (location ()) (original_ident y/0)
+             (is_parameter local))
+            (+ (+ (* x/0 3) x/0) -1))
+        unit/0 (seq (endregion region/0) 1))
+       int_add/0))) )
+
+(function{phantom_closure.ml:23,24-34} camlPhantom_closure__g_1_3_code
+     (param/1[((module_path param/1) (location ()) (original_ident param/1)
+               (is_parameter local))]: int
+      my_closure/0: val) : int
+ (+
+   (+
+     (invalid
+       "[]\nUnreachable code because of\ndead function slots: (g/1 \226\136\183 \240\157\149\141)\ndead value slots: (y/1 \226\136\183 \240\157\149\141(immediate))\n"
+       L:"camlPhantom_closure__invalid_3")
+     (invalid
+       "[]\nUnreachable code because of\ndead function slots: (g/1 \226\136\183 \240\157\149\141)\ndead value slots: (x/0 \226\136\183 \240\157\149\141(immediate))\n"
+       L:"camlPhantom_closure__invalid_4"))
+   -1) )
+
+(function no_cse reduce_code_size linscan camlPhantom_closure__entry 
+ () : val
+ (catch
+   (let?
+     test/0[((module_path test/0) (location ()) (original_ident test/0)
+             (is_parameter local))]
+       camlPhantom_closure__test_1
+     (exit 3 G:"camlPhantom_closure"))
+ with(3 *ret*/0: val) 1) )
+

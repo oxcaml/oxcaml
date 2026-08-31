@@ -50,9 +50,13 @@ module Provenance = struct
     printf "@[<hov 1>(";
     printf "@[<hov 1>(module_path@ %a)@]@ "
       (Format_doc.compat Path.print) module_path;
-    if !Clflags.locations then
-      printf "@[<hov 1>(location@ %a)@]@ "
-        Debuginfo.print_compact location;
+    if !Clflags.locations then begin
+      if Debuginfo.is_none location then
+        printf "@[<hov 1>(location@ ())@]@ "
+      else
+        printf "@[<hov 1>(location@ %a)@]@ "
+          Debuginfo.print_compact location
+    end;
     printf "@[<hov 1>(original_ident@ %a%a)@]@ "
       Ident.print original_ident
       print_debug_uid debug_uid;
