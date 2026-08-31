@@ -579,6 +579,7 @@ module MenhirInterpreter : sig
     | N_label_declarations : (Parsetree.label_declaration list) nonterminal
     | N_label_declaration_semi : (Parsetree.label_declaration) nonterminal
     | N_label_declaration : (Parsetree.label_declaration) nonterminal
+    | N_jkind_subst_decl : (Parsetree.jkind_declaration) nonterminal
     | N_jkind_desc_no_with_kinds : (Parsetree.jkind_annotation_desc) nonterminal
     | N_jkind_desc_gen_jkind_desc_no_with_kinds_ : (Parsetree.jkind_annotation_desc) nonterminal
     | N_jkind_desc_gen_jkind_desc_ : (Parsetree.jkind_annotation_desc) nonterminal

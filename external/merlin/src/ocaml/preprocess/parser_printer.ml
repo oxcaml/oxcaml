@@ -381,6 +381,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_label_declarations) -> "label_declarations"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_label_declaration_semi) -> "label_declaration_semi"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_label_declaration) -> "label_declaration"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_jkind_subst_decl) -> "jkind_subst_decl"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_jkind_desc_no_with_kinds) -> "jkind_desc_no_with_kinds"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_jkind_desc_gen_jkind_desc_no_with_kinds_) -> "jkind_desc_gen_jkind_desc_no_with_kinds_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_jkind_desc_gen_jkind_desc_) -> "jkind_desc_gen_jkind_desc_"
@@ -821,6 +822,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.N MenhirInterpreter.N_label_declarations -> (fun _ -> "label_declarations")
   | MenhirInterpreter.N MenhirInterpreter.N_label_declaration_semi -> (fun _ -> "label_declaration_semi")
   | MenhirInterpreter.N MenhirInterpreter.N_label_declaration -> (fun _ -> "label_declaration")
+  | MenhirInterpreter.N MenhirInterpreter.N_jkind_subst_decl -> (fun _ -> "jkind_subst_decl")
   | MenhirInterpreter.N MenhirInterpreter.N_jkind_desc_no_with_kinds -> (fun _ -> "jkind_desc_no_with_kinds")
   | MenhirInterpreter.N MenhirInterpreter.N_jkind_desc_gen_jkind_desc_no_with_kinds_ -> (fun _ -> "jkind_desc_gen_jkind_desc_no_with_kinds_")
   | MenhirInterpreter.N MenhirInterpreter.N_jkind_desc_gen_jkind_desc_ -> (fun _ -> "jkind_desc_gen_jkind_desc_")

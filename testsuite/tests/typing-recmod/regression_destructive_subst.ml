@@ -94,3 +94,21 @@ module type No_false_dangling_reference =
     and N : sig type t = M.C.t end
   end
 |}]
+
+module type Local_kind_subst = sig
+  module rec M : sig
+    kind_ k := value
+    type t : k
+    type ('a : k) box
+  end
+  and N : sig
+    type ok = M.t M.box
+  end
+end
+[%%expect{|
+module type Local_kind_subst =
+  sig
+    module rec M : sig type t type 'a box end
+    and N : sig type ok = M.t M.box end
+  end
+|}]
