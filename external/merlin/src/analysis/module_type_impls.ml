@@ -317,13 +317,15 @@ end = struct
     }
 
   let merge_equalities t equalities =
-    Facts.Context_equality.Set.iter
-      (fun ({ left; right } : Facts.Context_equality.t) ->
-        merge t (intern t left) (intern t right))
+    Facts.Context_equality_set.iter
+      (fun equality ->
+        merge t
+          (intern t (Facts.Context_equality.left equality))
+          (intern t (Facts.Context_equality.right equality)))
       equalities
 
   let index_checks t checks =
-    Facts.Check.Set.iter
+    Facts.Check_set.iter
       (fun (check : Facts.Check.t) ->
         let id = key_id t check.expectation in
         Dynarray.set t.key_checks id (check :: Dynarray.get t.key_checks id);
@@ -331,7 +333,7 @@ end = struct
       checks
 
   let index_dependencies t dependencies =
-    Facts.Dependency.Set.iter
+    Facts.Dependency_set.iter
       (fun ({ derived; source; reason } : Facts.Dependency.t) ->
         let derived_id = key_id t derived in
         let source_id = key_id t source in
@@ -356,7 +358,7 @@ end = struct
       dependencies
 
   let index_omissions t omissions =
-    Facts.Omission.Set.iter
+    Facts.Omission_set.iter
       (fun (omission : Facts.Omission.t) ->
         (match omission.affected with
         | None -> ()
@@ -485,7 +487,7 @@ module Helpers = struct
             (Some
                (match facts with
                | None -> source
-               | Some facts -> Facts.merge facts source)))
+               | Some facts -> Facts.union facts source)))
 
   let own_file (mconfig : Mconfig.t) =
     Misc.canonicalize_filename
