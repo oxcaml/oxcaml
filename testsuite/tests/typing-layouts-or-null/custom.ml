@@ -31,6 +31,31 @@ let to_option = function
 val to_option : 'a t -> 'a option = <fun>
 |}]
 
+(* Missing-case witnesses must work from either constructor. *)
+let missing_payload : int t -> unit = function Nope -> ()
+
+[%%expect{|
+Line 1, characters 38-57:
+1 | let missing_payload : int t -> unit = function Nope -> ()
+                                          ^^^^^^^^^^^^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "Yep _"
+
+val missing_payload : int t -> unit = <fun>
+|}]
+
+let missing_null : int t -> unit = function Yep _ -> ()
+
+[%%expect{|
+Line 1, characters 35-55:
+1 | let missing_null : int t -> unit = function Yep _ -> ()
+                                       ^^^^^^^^^^^^^^^^^^^^
+Warning 8 [partial-match]: this pattern-matching is not exhaustive.
+  Here is an example of a case that is not matched: "Nope"
+
+val missing_null : int t -> unit = <fun>
+|}]
+
 let of_option = function
   | None -> Nope
   | Some x -> Yep x
