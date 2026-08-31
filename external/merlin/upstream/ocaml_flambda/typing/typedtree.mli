@@ -1581,7 +1581,7 @@ type interface = {
 
     If the unit is compiled with [-as-argument-for] and its signature is thus
     checked against the .mli of a parameter in addition to being exported as
-    its own, it has n additional signature stored in [argument_interface]. *)
+    its own, it has an additional signature stored in [argument_interface]. *)
 
 type implementation = {
   structure: structure;

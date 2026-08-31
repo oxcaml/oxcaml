@@ -192,8 +192,8 @@ val union : t -> t -> t
     with [-as-argument-for]. *)
 val of_implementation :
   Compilation_unit.t ->
-  module_pairs:(implementation:Shape.Uid.t * interface:Shape.Uid.t) list ->
-  modtype_pairs:(implementation:Shape.Uid.t * interface:Shape.Uid.t) list ->
+  module_pairs:(impl:Shape.Uid.t * intf:Shape.Uid.t) list ->
+  modtype_pairs:(impl:Shape.Uid.t * intf:Shape.Uid.t) list ->
   unit_interface_check:bool ->
   argument_interface:Shape.Uid.t option ->
   Typedtree.structure ->

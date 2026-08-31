@@ -1938,16 +1938,16 @@ let facts_of_tree compilation_unit artifact iterate =
   iterate iterator;
   facts, fun uid -> Uid.Tbl.find_opt modtype_declaration_contexts uid
 
-let interface_check ~implementation ~expectation =
-  { Check.implementation = Node.Uid implementation;
+let interface_check ~impl ~expectation =
+  { Check.implementation = Node.Uid impl;
     expectation = Key.Anon expectation;
     kind = Check.Kind.Interface;
     site = Location.none
   }
 
-let interface_pair_omissions reason ~implementation ~interface =
-  [ { Omission.affected = None; source = Some implementation; reason };
-    { Omission.affected = None; source = Some interface; reason } ]
+let interface_pair_omissions reason ~impl ~intf =
+  [ { Omission.affected = None; source = Some impl; reason };
+    { Omission.affected = None; source = Some intf; reason } ]
 
 let of_implementation compilation_unit ~module_pairs ~modtype_pairs
     ~unit_interface_check ~argument_interface structure =
@@ -1957,24 +1957,21 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
   in
   let unit_uid = Uid.of_compilation_unit_id compilation_unit in
   List.iter
-    (fun (~implementation, ~interface) ->
-      Builder.add_check facts
-        (interface_check ~implementation ~expectation:interface))
+    (fun (~impl, ~intf) ->
+      Builder.add_check facts (interface_check ~impl ~expectation:intf))
     module_pairs;
   if unit_interface_check
   then
     Builder.add_check facts
-      (interface_check ~implementation:unit_uid ~expectation:unit_uid);
+      (interface_check ~impl:unit_uid ~expectation:unit_uid);
   Option.iter
     (fun expectation ->
-      Builder.add_check facts
-        (interface_check ~implementation:unit_uid ~expectation))
+      Builder.add_check facts (interface_check ~impl:unit_uid ~expectation))
     argument_interface;
   let interface_uid_of_impl =
     let table =
       List.fold_left
-        (fun table (~implementation, ~interface) ->
-          Uid.Map.add implementation interface table)
+        (fun table (~impl, ~intf) -> Uid.Map.add impl intf table)
         Uid.Map.empty module_pairs
     in
     fun uid -> Uid.Map.find_opt uid table
@@ -1989,23 +1986,21 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
     | Context.App _ | Context.Body _ | Context.Site _ -> None
   in
   List.iter
-    (fun (~implementation, ~interface) ->
+    (fun (~impl, ~intf) ->
       let unrepresentable reason =
         List.iter
           (Builder.add_omission facts)
-          (interface_pair_omissions reason ~implementation ~interface)
+          (interface_pair_omissions reason ~impl ~intf)
       in
-      match modtype_context implementation with
+      match modtype_context impl with
       | None -> unrepresentable Omission.Reason.Unresolved_module_type
       | Some context -> (
         match translate_context context with
         | Some interface_context ->
           Builder.add_dependency facts
-            { Dependency.derived =
-                Key.Named { context; family_uid = implementation };
+            { Dependency.derived = Key.Named { context; family_uid = impl };
               source =
-                Key.Named
-                  { context = interface_context; family_uid = interface };
+                Key.Named { context = interface_context; family_uid = intf };
               reason = Dependency.Reason.Interface
             }
         | None -> unrepresentable Omission.Reason.Unresolved_module))
@@ -2021,7 +2016,7 @@ let of_interface compilation_unit ~argument_interface signature =
     (fun expectation ->
       Builder.add_check facts
         (interface_check
-           ~implementation:(Uid.of_compilation_unit_id compilation_unit)
+           ~impl:(Uid.of_compilation_unit_id compilation_unit)
            ~expectation))
     argument_interface;
   Builder.freeze facts
