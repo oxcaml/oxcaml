@@ -15,7 +15,7 @@
 (executable
  (name simdgen)
  (modes native)
- (modules simdgen amd64_simd_defs))
+ (modules simdgen simdgen_types simdgen_xml simdgen_intrins amd64_simd_defs))
 
 (rule
  (target amd64_simd_instrs.ml)
@@ -25,6 +25,24 @@
   (with-stdout-to
    amd64_simd_instrs.ml
    (run ./simdgen.exe amd64))))
+
+(rule
+ (target amd64_simd_intrins_skiplist.txt)
+ (deps simdgen.exe amd64/amd64.csv x86-intel.xml)
+ (mode promote)
+ (action
+  (with-stdout-to
+   amd64_simd_intrins_skiplist.txt
+   (run ./simdgen.exe intrins skiplist))))
+
+(rule
+ (target amd64_simd_intrins.ml)
+ (deps simdgen.exe amd64/amd64.csv x86-intel.xml)
+ (mode promote)
+ (action
+  (with-stdout-to
+   amd64_simd_intrins.ml
+   (run ./simdgen.exe intrins selection))))
 
 (rule
  (enabled_if
