@@ -335,37 +335,12 @@ end = struct
   let alloc x = { i = x }
 end
 [%%expect{|
-Lines 5-7, characters 6-3:
-5 | ......struct
-6 |   let alloc x = { i = x }
-7 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val alloc :
-             'a @ [< 'm mod aliased dynamic & global many] ->
-             'a myref @ [> 'm | stateful]
-         end
-       is not included in
-         sig
-           val alloc :
-             'a @ [< 'm mod aliased dynamic & global many] ->
-             'a myref @ [> 'm | stateful]
-         end
-       Values do not match:
-         val alloc :
-           'a @ [< 'm mod aliased dynamic & global many] ->
-           'a myref @ [> 'm | stateful]
-       is not included in
-         val alloc :
-           'a @ [< 'm mod aliased dynamic & global many] ->
-           'a myref @ [> 'm | stateful]
-       The type
-         "'a @ [< 'm mod aliased dynamic & global many] ->
-         'a myref @ [> 'm | stateful]"
-       is not compatible with the type
-         "'a @ [< 'n mod aliased dynamic & global many] ->
-         'a myref @ [> 'n | stateful]"
+module M_ref :
+  sig
+    val alloc :
+      'a @ [< 'm mod aliased dynamic & global many] ->
+      'a myref @ [> 'm | stateful]
+  end
 |}]
 
 module M_ref_no_mod : sig
@@ -374,34 +349,10 @@ end = struct
   let alloc x = { i = x }
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   let alloc x = { i = x }
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val alloc :
-             'a @ [< 'm mod aliased dynamic & global many] ->
-             'a myref @ [> 'm | stateful]
-         end
-       is not included in
-         sig
-           val alloc :
-             'a @ [< 'm & global many] -> 'a myref @ [> 'm | stateful]
-         end
-       Values do not match:
-         val alloc :
-           'a @ [< 'm mod aliased dynamic & global many] ->
-           'a myref @ [> 'm | stateful]
-       is not included in
-         val alloc :
-           'a @ [< 'm & global many] -> 'a myref @ [> 'm | stateful]
-       The type
-         "'a @ [< 'm mod aliased dynamic & global many] ->
-         'a myref @ [> 'm | stateful]"
-       is not compatible with the type
-         "'a @ [< 'n & global many] -> 'a myref @ [> 'n | stateful]"
+module M_ref_no_mod :
+  sig
+    val alloc : 'a @ [< 'm & global many] -> 'a myref @ [> 'm | stateful]
+  end
 |}]
 
 let use_unique (_ @ unique) = ()
@@ -409,18 +360,15 @@ let use_unique (_ @ unique) = ()
 let ok (x @ aliased) = use_unique (M_ref.alloc x)
 [%%expect{|
 val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
-Line 3, characters 35-40:
-3 | let ok (x @ aliased) = use_unique (M_ref.alloc x)
-                                       ^^^^^
-Error: Unbound module "M_ref"
+val ok : 'a @ [< global many > aliased] -> unit @ [> dynamic] = <fun>
 |}]
 
 let bad (x @ aliased) = use_unique (M_ref_no_mod.alloc x)
 [%%expect{|
-Line 1, characters 36-48:
+Line 1, characters 35-57:
 1 | let bad (x @ aliased) = use_unique (M_ref_no_mod.alloc x)
-                                        ^^^^^^^^^^^^
-Error: Unbound module "M_ref_no_mod"
+                                       ^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (* an [@@ contended] modality requires [mod contended] on the argument's
