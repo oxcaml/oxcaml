@@ -1972,7 +1972,7 @@ let assert_mixed_product_support =
 (* Records and variants with a field or constructor argument of kind [any] get a
    variable representation, as oxcaml/oxcaml#5461. We gate this by extension. *)
 let assert_any_args_support loc =
-  Language_extension.assert_enabled ~loc Layouts Language_extension.Beta
+  Language_extension.assert_enabled ~loc Layouts Language_extension.Stable
 
 (* [Element_repr] is used to classify whether something is a "mixed product"
    (a mixed record or mixed variant constructor), meaning that some of the
