@@ -440,7 +440,7 @@ let concat_inferred_machtypes tys =
 let rec infer_machtype env expr =
   match expr with
   | Cconst_int _ | Cconst_natint _ -> Machtype typ_int
-  | Cconst_symbol _ -> Machtype typ_val
+  | Cconst_symbol _ -> Machtype typ_int
   | Cconst_float _ -> Machtype typ_float
   | Cconst_float32 _ -> Machtype typ_float32
   | Cconst_vec128 _ -> Machtype typ_vec128
