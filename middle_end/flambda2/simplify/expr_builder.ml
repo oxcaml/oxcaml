@@ -65,36 +65,33 @@ let add_set_of_closures_offsets ~is_phantom named uacc =
   Named.fold_code_and_sets_of_closures named ~init:uacc
     ~f_code:add_offsets_from_code ~f_set:add_offsets_from_set
 
-(* Whether [var], bound at normal mode, also has phantom-mode occurrences in
-   [free_names] (i.e. it is referenced by the defining expression of at least
-   one phantom let, or by the defining expression of a binding whose binder has
-   already been marked -- see below) and its binder should therefore be marked
-   as needed by phantom lets, so that the variable remains locatable by the
-   debugger (which matters when it is not user visible, since such variables
-   otherwise receive no provenance). [false] for kinds that cannot be
-   referenced by phantom defining expressions once translated to Cmm (for
-   example the region of a local allocation whose [Make_block] has been
-   phantomised).
-
-   The marking is transitive: to display a phantom variable the debugger
-   evaluates its defining expression, which may require locating a variable
-   whose own value must be recovered from _its_ defining expression (e.g. once
-   the corresponding binding has been inlined out or its register clobbered),
-   and so on. Accordingly, when [create_let] marks a binder it also records
-   phantom-mode occurrences for the variables of the defining expression, so
-   that their binders (necessarily rebuilt later, since the upwards traversal
-   reaches them afterwards) are marked in turn. Such variables always also
-   occur at normal mode in the rebuilt term (the marked binding is a normal
-   let containing them), so the extra occurrences only affect the
-   phantom-occurrence counts consulted here. *)
-let variable_needs_np_promotion free_names var =
+(* Whether [var], bound at normal mode, must be marked as needed by phantom
+   lets, so that it remains locatable by the debugger (which matters when it is
+   not user visible, since such variables otherwise receive no provenance). This
+   is the case when [var] has phantom-mode occurrences in [free_names] (i.e. it
+   is referenced directly by the defining expression of at least one phantom
+   let), and also, for non-user-visible variables (user-visible ones already
+   receive provenance), when [var] is in the transitive requirement set computed
+   by the flow analysis (see
+   [Flow_types.Data_flow_result.required_names_for_phantom_lets]): to display a
+   phantom variable the debugger evaluates its defining expression, which may
+   require locating variables whose own values must in turn be recovered from
+   their defining expressions or, for parameters, from the arguments they were
+   passed -- including around the cycles formed by the arguments of recursive
+   continuations, which is why a fixed point (rather than a computation during
+   the upwards traversal) is needed. [false] for kinds that cannot be referenced
+   by phantom defining expressions once translated to Cmm (for example the
+   region of a local allocation whose [Make_block] has been phantomised). *)
+let variable_needs_np_promotion uacc free_names var =
   (match Variable.kind var with
     | Region | Rec_info -> false
     | Value | Naked_number _ -> true)
   &&
   match Name_occurrences.count_variable_phantom_mode free_names var with
-  | Zero -> false
   | One | More_than_one -> true
+  | Zero ->
+    (not (Variable.user_visible var))
+    && Name.Set.mem (Name.var var) (UA.required_names_for_phantom_lets uacc)
 
 (* Parameters referenced by phantom lets must remain locatable by the debugger:
    mark their binders (printed as "NP"). *)
@@ -105,7 +102,7 @@ let promote_params_needed_by_phantom_lets uacc params ~free_names =
     Bound_parameters.create
       (List.map
          (fun param ->
-           if variable_needs_np_promotion free_names (BP.var param)
+           if variable_needs_np_promotion uacc free_names (BP.var param)
            then BP.with_needed_by_phantom_let param
            else param)
          (Bound_parameters.to_list params))
@@ -120,29 +117,24 @@ let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
   (* A variable bound at normal mode may additionally be referenced by the
      defining expressions of phantom lets in the body. Mark the binders of any
      such variables (see [Bound_var.needed_by_phantom_let], printed as "NP"). *)
-  let bound_vars, np_promotion_happened =
+  let bound_vars =
     if
       (not (Name_mode.is_normal name_mode))
       || Are_rebuilding_terms.do_not_rebuild_terms
            (UA.are_rebuilding_terms uacc)
-    then bound_vars, false
+    then bound_vars
     else
-      let np_promotion_happened = ref false in
       let promote bound_var =
-        if variable_needs_np_promotion free_names_of_body (VB.var bound_var)
-        then (
-          np_promotion_happened := true;
-          VB.with_needed_by_phantom_let bound_var)
+        if
+          variable_needs_np_promotion uacc free_names_of_body (VB.var bound_var)
+        then VB.with_needed_by_phantom_let bound_var
         else bound_var
       in
       match (bound_vars : Bound_pattern.t) with
-      | Static _ -> bound_vars, false
-      | Singleton bound_var ->
-        let bound_var = promote bound_var in
-        Bound_pattern.singleton bound_var, !np_promotion_happened
+      | Static _ -> bound_vars
+      | Singleton bound_var -> Bound_pattern.singleton (promote bound_var)
       | Set_of_closures bvs ->
-        let bvs = List.map promote bvs in
-        Bound_pattern.set_of_closures bvs, !np_promotion_happened
+        Bound_pattern.set_of_closures (List.map promote bvs)
   in
   let free_names_of_defining_expr =
     if not is_phantom
@@ -158,19 +150,6 @@ let create_let uacc (bound_vars : Bound_pattern.t) (defining_expr : Named.t)
           Name_occurrences.remove_var free_names ~var:(VB.var bound_var))
     in
     Name_occurrences.union without_bound_vars free_names_of_defining_expr
-  in
-  (* Propagate the marking transitively (see the comment on
-     [variable_needs_np_promotion]): the defining expression of a binding
-     whose binder was just marked is itself needed by phantom lets, so record
-     phantom-mode occurrences for its variables in order that their binders be
-     marked in turn. *)
-  let free_names_of_let =
-    if not np_promotion_happened
-    then free_names_of_let
-    else
-      Name_occurrences.fold_variables free_names_of_defining_expr
-        ~init:free_names_of_let ~f:(fun acc var ->
-          Name_occurrences.add_variable acc var Name_mode.phantom)
   in
   let uacc =
     UA.add_cost_metrics_and_with_name_occurrences uacc

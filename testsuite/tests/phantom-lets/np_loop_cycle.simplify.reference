@@ -10,7 +10,7 @@ let code inline(never) loopify(always) size(26) newer_version_of(iter_0)
    let field_at_use_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (state) in
    cont `self` (fuel, field_at_use_1, field_at_use))
     where rec `self`
-                (fuel_1 : imm tagged, unboxed_field_1, np unboxed_field_0) =
+                (fuel_1 : imm tagged, np unboxed_field_1, np unboxed_field_0) =
       let `region` = %begin_region () in
       let prim = %phys_eq (fuel_1, 0) in
       (switch prim
@@ -27,7 +27,7 @@ let code inline(never) loopify(always) size(26) newer_version_of(iter_0)
                (unboxed_field_0, unboxed_field_0)
            in
            let t = %int_barith.add (unboxed_field_0, unboxed_field_0) in
-           let int_sub = %int_barith.sub (fuel_1, 1) in
+           let np int_sub = %int_barith.sub (fuel_1, 1) in
            let `unit` = %end_region (`region`) in
            cont `self` (int_sub, t, unboxed_field_1))
 in

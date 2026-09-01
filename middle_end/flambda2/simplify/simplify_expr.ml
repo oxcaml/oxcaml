@@ -60,6 +60,7 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
             ~used_value_slots
             ~code_ids_to_never_delete:(DA.code_ids_to_never_delete dacc)
             ~specialization_map:(DA.specialization_map dacc)
+            ~generate_phantom_lets:(DE.generate_phantom_lets (DA.denv dacc))
             ~return_continuation ~exn_continuation
             ~machine_width:(DE.machine_width (DA.denv dacc))
         in

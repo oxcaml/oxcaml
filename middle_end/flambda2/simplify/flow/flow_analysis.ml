@@ -52,7 +52,8 @@ let print_graph ~print ~print_name ~lazy_ppf ~graph =
 
 let analyze ?(speculative = false) ?print_name ~machine_width
     ~return_continuation ~exn_continuation ~code_age_relation ~used_value_slots
-    ~code_ids_to_never_delete ~specialization_map t : T.Flow_result.t =
+    ~code_ids_to_never_delete ~specialization_map ~generate_phantom_lets t :
+    T.Flow_result.t =
   Profile.record_call ~accumulate:true "data_flow" (fun () ->
       if Flambda_features.dump_flow ()
       then
@@ -80,6 +81,7 @@ let analyze ?(speculative = false) ?print_name ~machine_width
       let deps =
         Data_flow_graph.create map ~return_continuation ~exn_continuation
           ~code_age_relation ~used_value_slots ~code_ids_to_never_delete
+          ~generate_phantom_lets
       in
       if Flambda_features.dump_flow ()
       then Format.eprintf "/// graph@\n%a@\n@." Data_flow_graph.print deps;
@@ -137,7 +139,9 @@ let analyze ?(speculative = false) ?print_name ~machine_width
         T.Flow_result.
           { data_flow_result =
               { dead_variable_result with
-                required_names = required_names_after_ref_reference_analysis
+                required_names = required_names_after_ref_reference_analysis;
+                required_names_for_phantom_lets =
+                  Data_flow_graph.required_names_for_phantom_lets deps
               };
             aliases_result = { aliases_kind; continuation_parameters };
             mutable_unboxing_result = reference_result

@@ -25,13 +25,13 @@ val create :
 val var : t -> Variable.t
 
 (** Whether the variable is referenced by the defining expression of at least
-    one phantom let (possibly transitively, via the defining expressions of
-    bindings whose binders are so marked) and must therefore remain locatable
-    by the debugger (which
-    matters when it is not user visible, since such variables otherwise receive
-    no provenance). Such binders print with the visibility suffix "NP", or "UVP"
-    if also user visible. Always [false] on creation; set by [Simplify]. Not
-    part of [compare], [equal] or [hash]. *)
+    one phantom let (possibly transitively, through the defining expressions of
+    other bindings and through the arguments of continuations, per the flow
+    analysis) and must therefore remain locatable by the debugger (which matters
+    when it is not user visible, since such variables otherwise receive no
+    provenance). Such binders print with the visibility suffix "NP", or "UVP" if
+    also user visible. Always [false] on creation; set by [Simplify]. Not part
+    of [compare], [equal] or [hash]. *)
 val needed_by_phantom_let : t -> bool
 
 val with_needed_by_phantom_let : t -> t
