@@ -385,6 +385,7 @@ let eval_filtered_expectation expectation ~output ~to_update =
     Some { expectation with expected_output =
       List.map
         ~f:(fun (f, e) -> (f, if List.equal ~eq:(=) f filters then s else e))
+        expectation.expected_output
     }
   | _ :: _ :: _ ->
     Location.raise_errorf
@@ -910,7 +911,7 @@ let run ~read_anonymous_arg ~extra_args ~extra_init toplevel =
         ; "-keep-original-error-size", Arg.Set keep_original_error_size,
           " truncate long error messages as the compiler would"
         ; "-structured-diagnostics",
-          Arg.Unit Mode_diagnostics.enable_structured_diagnostics,
+          Arg.Unit Diagnostics.enable_structured_diagnostics,
           " report diagnostics as JSON"
         ; "-automatic-structured-diagnostics",
           Arg.Set automatic_structured_diagnostics,
