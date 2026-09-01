@@ -1714,9 +1714,11 @@ let assemble_line b loc ins =
             buf_int8 b 0
           done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
-    | Directive (D.Delta_uleb128 { delta }) -> (
-      (* ULEB128 difference of two points in the same section: either two
-         labels, or a label plus a constant offset and a symbol. *)
+    | Directive (D.Delta_uleb128 { delta }) ->
+      (* An assembly-time constant expression over labels and symbols, e.g. the
+         difference of two points in the same section.  Evaluated with the
+         sections of the operands tracked, so that only differences within a
+         single section (which are link-time invariant) are accepted. *)
       let resolve name =
         let local =
           match String.Tbl.find b.labels name with
@@ -1735,34 +1737,54 @@ let assemble_line b loc ins =
                    defined in any assembled section"
                   name)
       in
-      let emit_delta ~upper ~upper_offset ~lower =
-        let sec_u, pos_u = resolve upper in
-        let sec_l, pos_l = resolve lower in
-        if not (Section_name.equal sec_u sec_l) then
-          Misc.fatal_error
-            "x86_binary_emitter: Delta_uleb128 operands in different \
-             sections";
-        let delta =
-          Int64.add (Int64.of_int (pos_u - pos_l)) upper_offset
-        in
-        if Int64.compare delta 0L < 0 then
-          Misc.fatal_error "x86_binary_emitter: negative Delta_uleb128";
-        D.emit_uleb128 b.buf delta
+      (* [`Const] is a section-independent value; [`In_section] is a position
+         within the given section. *)
+      let rec eval (c : C.t) =
+        match c with
+        | C.Signed_int i -> `Const i
+        | C.Unsigned_int u -> `Const (Numbers.Uint64.to_int64 u)
+        | C.Label lbl ->
+            let sec, pos = resolve (Asm_label.encode lbl) in
+            `In_section (sec, Int64.of_int pos)
+        | C.Symbol sym ->
+            let sec, pos = resolve (Asm_symbol.encode sym) in
+            `In_section (sec, Int64.of_int pos)
+        | C.Add (c1, c2) -> (
+            match eval c1, eval c2 with
+            | `Const i1, `Const i2 -> `Const (Int64.add i1 i2)
+            | `In_section (sec, pos), `Const i
+            | `Const i, `In_section (sec, pos) ->
+                `In_section (sec, Int64.add pos i)
+            | `In_section _, `In_section _ ->
+                Misc.fatal_error
+                  "x86_binary_emitter: Delta_uleb128 adds two addresses")
+        | C.Sub (c1, c2) -> (
+            match eval c1, eval c2 with
+            | `Const i1, `Const i2 -> `Const (Int64.sub i1 i2)
+            | `In_section (sec, pos), `Const i ->
+                `In_section (sec, Int64.sub pos i)
+            | `In_section (sec1, pos1), `In_section (sec2, pos2) ->
+                if not (Section_name.equal sec1 sec2) then
+                  Misc.fatal_error
+                    "x86_binary_emitter: Delta_uleb128 operands in different \
+                     sections";
+                `Const (Int64.sub pos1 pos2)
+            | `Const _, `In_section _ ->
+                Misc.fatal_error
+                  "x86_binary_emitter: Delta_uleb128 subtracts an address \
+                   from a constant")
+        | C.This | C.Variable _ ->
+            Misc.fatal_error "x86_binary_emitter: malformed Delta_uleb128"
       in
-      match delta with
-      | C.Sub (C.Label upper, C.Label lower) ->
-          emit_delta ~upper:(Asm_label.encode upper) ~upper_offset:0L
-            ~lower:(Asm_label.encode lower)
-      | C.Sub (C.Label upper, C.Symbol lower) ->
-          emit_delta ~upper:(Asm_label.encode upper) ~upper_offset:0L
-            ~lower:(Asm_symbol.encode lower)
-      | C.Sub (C.Add (C.Label upper, C.Signed_int upper_offset),
-               C.Symbol lower) ->
-          emit_delta ~upper:(Asm_label.encode upper) ~upper_offset
-            ~lower:(Asm_symbol.encode lower)
-      | C.Signed_int _ | C.Unsigned_int _ | C.This | C.Label _ | C.Symbol _
-      | C.Variable _ | C.Add _ | C.Sub _ ->
-          Misc.fatal_error "x86_binary_emitter: malformed Delta_uleb128")
+      (match eval delta with
+      | `Const value ->
+          if Int64.compare value 0L < 0 then
+            Misc.fatal_error "x86_binary_emitter: negative Delta_uleb128";
+          D.emit_uleb128 b.buf value
+      | `In_section _ ->
+          Misc.fatal_error
+            "x86_binary_emitter: Delta_uleb128 does not evaluate to a \
+             link-time-invariant constant")
     | Directive
         (D.Reloc
           { name = D.R_X86_64_PLT32;
