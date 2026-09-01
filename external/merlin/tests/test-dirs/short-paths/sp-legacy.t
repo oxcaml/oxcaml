@@ -69,7 +69,7 @@ Base__On_error instead of On_error:
 
   $ $MERLIN single type-enclosing -log-file log -log-section short-paths -position 1:4 \
   > -filename test.ml < test.ml | jq '.value[0].type'
-  "int Or_error.t"
+  "int Base__Or_error.t"
 
   $ $MERLIN single type-enclosing -index 0 -position 1:11 \
   > -filename test.ml < test.ml | jq '.value[0].type'
@@ -83,5 +83,5 @@ Base__On_error instead of On_error:
  It works even if Or_error is not used
   $ $MERLIN single type-enclosing -index 0 -position 1:4 \
   > -filename test2.ml < test2.ml | jq '.value[0].type'
-  "int Or_error.t"
+  "int Base__Or_error.t"
 

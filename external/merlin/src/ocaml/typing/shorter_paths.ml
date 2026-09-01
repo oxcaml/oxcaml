@@ -484,9 +484,14 @@ let shorten ~env ~initial ~canon_path kind =
           Pprintast.longident lid);
     path_mask path lid
 
-type type_result = Nth of int | Path of int list option * Path.t
+type type_result = Short_paths.type_result =
+  | Nth of int
+  | Path of int list option * Path.t
 
-type type_resolution = Nth of int | Subst of int list | Id
+type type_resolution = Short_paths.type_resolution =
+  | Nth of int
+  | Subst of int list
+  | Id
 
 let find_type env initial : type_result =
   match normalize_type_path env initial with
