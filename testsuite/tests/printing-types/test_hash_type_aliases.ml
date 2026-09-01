@@ -21,6 +21,17 @@ Error: The constructor "()" has type "unit"
        but an expression was expected of type "float#"
 |}]
 
+(* [int64_u] beats [Hash_type_aliases.i64] *)
+let f : unit -> Hash_type_aliases.i64 = fun () -> ()
+
+[%%expect {|
+Line 1, characters 50-52:
+1 | let f : unit -> Hash_type_aliases.i64 = fun () -> ()
+                                                      ^^
+Error: The constructor "()" has type "unit"
+       but an expression was expected of type "int64_u"
+|}]
+
 (* [f64] beats [float#] *)
 open Hash_type_aliases
 let f : unit -> f64 = fun () -> ()
@@ -31,6 +42,17 @@ Line 2, characters 32-34:
                                     ^^
 Error: The constructor "()" has type "unit"
        but an expression was expected of type "f64"
+|}]
+
+(* [i64] beats [int64_u] *)
+let f : unit -> i64 = fun () -> ()
+
+[%%expect {|
+Line 1, characters 32-34:
+1 | let f : unit -> i64 = fun () -> ()
+                                    ^^
+Error: The constructor "()" has type "unit"
+       but an expression was expected of type "i64"
 |}]
 
 (* [U.u] beats [R.r#] *)
