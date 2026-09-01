@@ -1288,20 +1288,25 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
-(* CR-someday: This function should be migrated to use the new mode
-   error system instead of the ad-hoc [Mode_mismatch] error variant. *)
-let apply_mode_annots ~loc ~env kind (m : Alloc.Const.Option.t) mode =
-  let error axis =
-    raise (Error(loc, env, Mode_mismatch (kind, axis)))
+let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
+  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
+  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
+  let annot_loc =
+    if List.is_empty m.mode_desc then loc else
+    Location.merge (List.map (fun a -> a.loc) m.mode_desc)
   in
-  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
-  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
-  (match Alloc.submode (Alloc.of_const min) mode with
-  | Ok () -> ()
-  | Error e -> error (Left_le_right, e));
-  (match Alloc.submode mode (Alloc.of_const max) with
-  | Ok () -> ()
-  | Error e -> error (Right_le_left, e))
+  let written_modes =
+    List.map
+      (Location.map (fun (Alloc.Atom (axis, mode)) ->
+         Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode))
+      m.mode_desc
+  in
+  let hint = Hint.Annotation { loc = annot_loc; written_modes } in
+  let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
+  let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
+  let pp : Hint.pinpoint = loc, kind in
+  Alloc.submode_err pp min mode;
+  Alloc.submode_err pp mode max
 
 (** Takes the mutability, the type and the modalities of a field, and expected
     mode of the record (adjusted for allocation), check that the construction
@@ -5668,6 +5673,9 @@ let loc_rest_of_function
    this, let's talk. *)
 let approx_type_default () = newvar (Jkind.Builtin.any ~why:Dummy_jkind)
 
+let alloc_mode_annot_empty : Alloc.Const.Option.t Typemode.modes =
+  { mode_desc = []; mode_modes = Alloc.Const.Option.none }
+
 let rec approx_type env sty =
   match sty.ptyp_desc with
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
@@ -5776,7 +5784,7 @@ let type_approx_fun_one_param
   in
   Option.iter
     (fun mode_annots ->
-      apply_mode_annots ~loc ~env Parameter mode_annots.mode_modes arg_mode)
+      apply_mode_annots ~loc Parameter mode_annots arg_mode)
     mode_annots;
   if has_poly then begin
     match spato with
@@ -6443,7 +6451,8 @@ type split_function_ty =
 *)
 let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
-    ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
+    ~mode_annots ~ret_mode_annots ~param_loc ~ret_loc ~in_function
+    ~is_first_val_param ~is_final_val_param
   =
   let alloc_mode, closure_mode, closed_over_mode =
     register_closure_allocation ~loc (as_single_mode expected_mode)
@@ -6474,8 +6483,8 @@ let split_function_ty
         raise (Error(loc_fun, env, err))
     end
   in
-  apply_mode_annots ~loc:loc_fun ~env Parameter mode_annots arg_mode;
-  apply_mode_annots ~loc:loc_fun ~env Return ret_mode_annots ret_mode;
+  apply_mode_annots ~loc:param_loc Parameter mode_annots arg_mode;
+  apply_mode_annots ~loc:ret_loc Return ret_mode_annots ret_mode;
   let really_poly =
     not has_poly && not (tpoly_is_mono ty_arg) && is_really_poly ~env ty_arg
   in
@@ -9625,6 +9634,11 @@ and type_function
         | _ :: _ ->
           { mode_modes = Alloc.Const.Option.none; mode_desc = [] }
       in
+      let ret_loc =
+        match body with
+        | Pfunction_body e -> e.pexp_loc
+        | Pfunction_cases (_, loc_cases, _) -> loc_cases
+      in
       let env,
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
             arg_sort; ret_sort;
@@ -9634,8 +9648,9 @@ and type_function
         split_function_ty env expected_mode ty_expected loc
           ~is_first_val_param:first ~is_final_val_param
           ~arg_label:typed_arg_label ~in_function ~has_poly
-          ~mode_annots:mode_annots.mode_modes
-          ~ret_mode_annots:ret_mode_annots.mode_modes
+          ~mode_annots:mode_annots
+          ~ret_mode_annots:ret_mode_annots
+          ~param_loc:pparam_loc ~ret_loc
       in
       (* [ty_arg_internal] is the type of the parameter viewed internally
          to the function. This is different than [ty_arg_mono] exactly for
@@ -11635,8 +11650,9 @@ and type_function_cases_expect
           ty_arg_mono; expected_pat_mode; expected_inner_mode; alloc_mode;
         } =
       split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
-        ~in_function ~has_poly:false ~mode_annots:Mode.Alloc.Const.Option.none
-        ~ret_mode_annots:Mode.Alloc.Const.Option.none
+        ~in_function ~has_poly:false ~mode_annots:alloc_mode_annot_empty
+        ~ret_mode_annots:alloc_mode_annot_empty
+        ~param_loc:loc ~ret_loc:loc
         ~is_first_val_param:first ~is_final_val_param:true
     in
     let excl, expected_inner_mode =
