@@ -53,7 +53,10 @@ type result = value array Or_never_returns.t
 type env =
   { graph : under_construction Ssa.graph;
     vars : value array V.Map.t;
-    static_exceptions : block Static_label.Map.t
+    static_exceptions : block Static_label.Map.t;
+    (* Set while emitting the body of a [Ccatch] handler marked [is_cold], so
+       that every block created for it is marked cold. *)
+    cold : bool
   }
 
 let env_find v env =
@@ -81,19 +84,28 @@ let continue continuation args =
   Terminator.Continue
     { continuation; args = Array.map (fun arg -> Terminator.Arg arg) args }
 
-let new_block env ~params = Block.create env.graph ~params
+let new_block env ~params = Block.create env.graph ~params ~cold:env.cold
 
-let bind_let env c v args =
-  let env = env_add v args env in
-  let name = V.name (VP.var v) in
-  Array.iter (fun i -> Value.set_name i name) args;
-  (match VP.provenance v with
+(* Matches [Cfg_selectgen.mark_sub_cfg_as_cold], including its gating on
+   [-cfg-block-layout]: a block is cold iff it is emitted lexically inside the
+   body of at least one cold handler. *)
+let handler_is_cold (handler : Cmm.static_handler) =
+  handler.is_cold && !Oxcaml_flags.cfg_block_layout
+
+let emit_name_for_debugger env c v args =
+  match VP.provenance v with
   | None -> ()
   | Some _ as provenance ->
     emit_op_nores env c
       (Operation.Name_for_debugger
          { ident = VP.var v; which_parameter = None; provenance; regs = [||] })
-      Debuginfo.none args);
+      Debuginfo.none args
+
+let bind_let env c v args =
+  let env = env_add v args env in
+  let name = V.name (VP.var v) in
+  Array.iter (fun i -> Value.set_name i name) args;
+  emit_name_for_debugger env c v args;
   env
 
 let emit_branch env c (test : Operation.test) rarg ~true_block ~false_block =
@@ -228,7 +240,14 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       let* r1 = emit env c e1 ~tail:false in
       let env = bind_let env c v r1 in
       emit env c e2 ~tail
+    (* CR ttebbi: Unlike [Cfg_selectgen], we drop the phantom let instead of
+       recording the variable it brings into scope. We should track the in-scope
+       phantom set in the SSA graph (see [Cfg_of_ssa.make_instr]). *)
     | Cphantom_let (_var, _defining_expr, body) -> emit env c body ~tail
+    | Cname_for_debugger (var, body) ->
+      let* r = emit env c body ~tail:false in
+      emit_name_for_debugger env c var r;
+      Ok r
     | Csequence (e1, e2) ->
       let* _ = emit env c e1 ~tail:false in
       emit env c e2 ~tail
@@ -269,6 +288,10 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       Ok
         (emit_op env c (Operation.Const_vec512 bits) Debuginfo.none
            Cmm.typ_vec512 [||])
+    | Cconst_mask (bits, _dbg) ->
+      Ok
+        (emit_op env c (Operation.Const_mask bits) Debuginfo.none Cmm.typ_mask
+           [||])
     | Cconst_symbol (n, _dbg) ->
       Ok
         (emit_op env c (SU.make_const_symbol n) Debuginfo.none Cmm.typ_int [||])
@@ -296,11 +319,11 @@ and emit env c (exp : Cmm.expression) ~tail : result =
       let size_before = flat_size before in
       Ok (Array.sub loc_exp size_before (Array.length fields_layout.(field)))
     | Cop
-        ( (( Ctuple_field _ | Caddi | Csubi | Cmuli | Cdivi | Cmodi | Caddi128
-           | Csubi128 | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cclz | Cctz
-           | Cpopcnt | Caddv | Cadda | Cpackf32 | Cbeginregion | Cendregion
-           | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause | Capply _
-           | Cextcall _ | Cload _
+        ( (( Ctuple_field _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _
+           | Caddi128 | Csubi128 | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cclz
+           | Cctz | Cpopcnt | Caddv | Cadda | Cpackf32 | Cbeginregion
+           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
+           | Capply _ | Cextcall _ | Cload _
            | Calloc (_, _)
            | Cstore (_, _)
            | Cmulhi _ | Cmuli64 _ | Cbswap _ | Ccsel _ | Cprefetch _ | Catomic _
@@ -411,7 +434,8 @@ and emit_expr_op env c op args dbg : result =
           ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
           | Tls_get | Domain_index | Poll | Pause | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
+          | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _
+          | Load _
           | Store (_, _, _)
           | Intop _ | Int128op _
           | Intop_imm (_, _)
@@ -481,9 +505,14 @@ and emit_catch env c ~tail handlers body : result =
      will drop unreachable blocks. *)
   let static_exceptions, handler_blocks =
     List.fold_left_map
-      (fun static_exceptions Cmm.{ label = nfail; params; _ } ->
+      (fun static_exceptions (handler : Cmm.static_handler) ->
+        let Cmm.{ label = nfail; params; dbg; _ } = handler in
         let types = params |> List.map (fun (_id, ty) -> ty) |> Array.concat in
-        let handler_block = new_block env ~params:types in
+        let handler_block =
+          Block.create env.graph ~params:types
+            ~cold:(env.cold || handler_is_cold handler)
+        in
+        Block.set_handler_dbg handler_block dbg;
         ( Static_label.Map.add nfail handler_block static_exceptions,
           handler_block ))
       env.static_exceptions handlers
@@ -504,7 +533,8 @@ and emit_catch env c ~tail handlers body : result =
             Array.init n (fun i -> Block.param handler_block (param_idx + i))
           in
           bind_let env c id proj_instrs, param_idx + n)
-        (env, 0) handler.params
+        ({ env with cold = env.cold || handler_is_cold handler }, 0)
+        handler.params
     in
     emit handler_env c handler.body ~tail, c
   in
@@ -577,7 +607,11 @@ and join env c (results : (result * Cursor.t) array) : result =
 let emit_function (graph : under_construction Ssa.graph) (cmm : Cmm.fundecl) :
     finished Ssa.graph =
   let env =
-    { graph; vars = V.Map.empty; static_exceptions = Static_label.Map.empty }
+    { graph;
+      vars = V.Map.empty;
+      static_exceptions = Static_label.Map.empty;
+      cold = false
+    }
   in
   let env, _offset =
     List.fold_left

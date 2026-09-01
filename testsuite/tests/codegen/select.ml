@@ -44,16 +44,15 @@ let select_cmp_twice (x : int) (y: int) =
   (Builtins.select (x < y) x y) + (Builtins.select (x < y) 10 20)
 [%%expect_asm X86_64{|
 select_cmp_twice:
-  movq  %rax, %rsi
+  movq  %rax, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rsi
+  cmpq  %rbx, %rdi
   setl  %al
   leaq  1(%rax,%rax), %rsi
   movl  $41, %eax
   movl  $21, %edx
   cmpq  $1, %rsi
   cmovne %rdx, %rax
-  cmpq  $1, %rsi
   cmovne %rdi, %rbx
   leaq  -1(%rbx,%rax), %rax
   ret
@@ -111,17 +110,13 @@ let repeated_select_shared x y z w  a b =
 [%%expect_asm X86_64{|
 repeated_select_shared:
   cmpq  %rbx, %rax
-  cmpq  %rbx, %rax
   setl  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %r8
-  leaq  1(%rax,%rax), %r8
   movq  %rsi, %rax
-  cmpq  $1, %r8
   cmpq  $1, %r8
   cmovne %rdi, %rax
   movq  %rcx, %rbx
-  cmpq  $1, %r8
   cmovne %rdx, %rbx
   ret
 |}]
@@ -138,17 +133,13 @@ let repeated_select_repeated x y z w  a b =
 [%%expect_asm X86_64{|
 repeated_select_repeated:
   cmpq  %rbx, %rax
-  cmpq  %rbx, %rax
   setl  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %r8
-  leaq  1(%rax,%rax), %r8
   movq  %rsi, %rax
-  cmpq  $1, %r8
   cmpq  $1, %r8
   cmovne %rdi, %rax
   movq  %rcx, %rbx
-  cmpq  $1, %r8
   cmovne %rdx, %rbx
   ret
 |}]

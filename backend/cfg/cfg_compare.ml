@@ -63,7 +63,7 @@ open! Int_replace_polymorphic_compare
       live across the instruction must agree, since a [Val]/[Int] discrepancy
       there changes GC behavior. *)
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 (* A set of (old_reg, new_reg) pairs asserting that these registers hold equal
    values at a given program point. Represented as two [Reg.Set.t Reg.Map.t]
@@ -208,6 +208,9 @@ let basic_desc_match ~map_label (old_desc : Cfg.basic) (new_desc : Cfg.basic) =
     ([process_block_backward]); [id] is allowed to differ. *)
 let compare_instruction_fields ~ppf_m ~kind ~old_label ~new_label
     (old_instr : _ Cfg.instruction) (new_instr : _ Cfg.instruction) =
+  (* CR ttebbi: [phantom_available_before] is always [None] on the new side,
+     since [Ssa_of_cmm] drops [Cphantom_let]. We should compare it once the SSA
+     pipeline tracks phantom lets. *)
   let[@warning "+9"] { Cfg.desc = _;
                        id = old_id;
                        arg = _;
@@ -217,7 +220,8 @@ let compare_instruction_fields ~ppf_m ~kind ~old_label ~new_label
                        live = old_live;
                        stack_offset = old_stack_offset;
                        available_before = old_avail_before;
-                       available_across = old_avail_across
+                       available_across = old_avail_across;
+                       phantom_available_before = _
                      } =
     old_instr
   in
@@ -230,7 +234,8 @@ let compare_instruction_fields ~ppf_m ~kind ~old_label ~new_label
                        live = new_live;
                        stack_offset = new_stack_offset;
                        available_before = new_avail_before;
-                       available_across = new_avail_across
+                       available_across = new_avail_across;
+                       phantom_available_before = _
                      } =
     new_instr
   in
@@ -823,7 +828,7 @@ let compare ~old_cfg ~new_cfg ppf =
         new_cfg.fun_dbg;
     if Stdlib.( <> ) old_cfg.fun_poll new_cfg.fun_poll
     then Format.fprintf ppf_m "fun_poll mismatch@.";
-    if Cmm.equal_machtype old_cfg.fun_ret_type new_cfg.fun_ret_type
+    if not (Cmm.equal_machtype old_cfg.fun_ret_type new_cfg.fun_ret_type)
     then Format.fprintf ppf_m "fun_ret_type mismatch@."
   end;
   (* Report *)

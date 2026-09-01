@@ -143,9 +143,7 @@ bswap:
 let neg x = Int16_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  neg   %rax
   salq  $48, %rax
   sarq  $48, %rax
   ret
@@ -236,14 +234,9 @@ let compare x y = Int16_u.compare x y
 compare:
   movq  %rax, %rsi
   movq  $-1, %rdi
-  movq  %rax, %rsi
-  movq  $-1, %rdi
   xorl  %eax, %eax
   cmpq  %rbx, %rsi
-  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rdi
-  leaq  1(%rdi,%rdi), %rax
   cmovge %rax, %rdi
   leaq  1(%rdi,%rdi), %rax
   ret
@@ -294,14 +287,9 @@ let unsigned_compare x y = Int16_u.unsigned_compare x y
 unsigned_compare:
   movq  %rax, %rsi
   movq  $-1, %rdi
-  movq  %rax, %rsi
-  movq  $-1, %rdi
   xorl  %eax, %eax
   cmpq  %rbx, %rsi
-  cmpq  %rbx, %rsi
   seta  %al
-  cmovae %rax, %rdi
-  leaq  1(%rdi,%rdi), %rax
   cmovae %rax, %rdi
   leaq  1(%rdi,%rdi), %rax
   ret
@@ -696,8 +684,6 @@ shr:
 let select x y z = Int16_u.select x y z
 [%%expect_asm X86_64{|
 select:
-  cmpq  $1, %rax
-  cmovne %rbx, %rdi
   cmpq  $1, %rax
   cmovne %rbx, %rdi
   movq  %rdi, %rax

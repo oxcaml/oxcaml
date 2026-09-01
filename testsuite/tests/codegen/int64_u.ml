@@ -18,9 +18,7 @@ open Intrinsics
 let neg x = Int64_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  neg   %rax
   ret
 |}]
 
@@ -519,14 +517,9 @@ let compare x y = Int64_u.compare x y
 compare:
   movq  %rax, %rsi
   movq  $-1, %rdi
-  movq  %rax, %rsi
-  movq  $-1, %rdi
   xorl  %eax, %eax
   cmpq  %rbx, %rsi
-  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rdi
-  leaq  1(%rdi,%rdi), %rax
   cmovge %rax, %rdi
   leaq  1(%rdi,%rdi), %rax
   ret
@@ -538,11 +531,7 @@ unsigned_compare:
   movabsq $-9223372036854775808, %rdi
   subq  %rdi, %rbx
   movabsq $-9223372036854775808, %rsi
-  movabsq $-9223372036854775808, %rdi
-  subq  %rdi, %rbx
-  movabsq $-9223372036854775808, %rsi
   movq  %rax, %rdi
-  subq  %rsi, %rdi
   subq  %rsi, %rdi
   movq  $-1, %rsi
   xorl  %eax, %eax
@@ -566,14 +555,7 @@ equal:
 let equal_using_compare x y = Int64_u.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
-  movq  %rax, %rsi
-  movq  $-1, %rdi
-  xorl  %eax, %eax
-  cmpq  %rbx, %rsi
-  setg  %al
-  cmovge %rax, %rdi
-  leaq  1(%rdi,%rdi), %rax
-  cmpq  $1, %rax
+  cmpq  %rbx, %rax
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax

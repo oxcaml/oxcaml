@@ -306,8 +306,10 @@ module Make_run (R : Reducer) = struct
         let out_block =
           if Block.equal block (Ssa.entry in_graph)
           then Ssa.entry out_graph
-          else Block.create_with_names out_graph ~params
+          else
+            Block.create_with_names out_graph ~params ~cold:(Block.cold block)
         in
+        Block.set_handler_dbg out_block (Block.handler_dbg block);
         Block.Tbl.replace block_map block out_block;
         (* Index the output values by the original param index, with
            [Omitted_since_unused] in the dropped slots; the kept output params

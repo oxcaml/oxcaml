@@ -41,27 +41,26 @@ let arr_sum arr =
 ;;
 [%%expect_asm X86_64{|
 arr_sum:
-  movq  %rax, %rdi
-  movq  -8(%rdi), %rbx
+  movq  %rax, %rdx
+  movq  -8(%rdx), %rbx
   salq  $8, %rbx
   shrq  $17, %rbx
   orq   $1, %rbx
-  leaq  -2(%rbx), %rsi
-  cmpq  $1, %rsi
+  leaq  -2(%rbx), %rdi
+  cmpq  $1, %rdi
   jl    .L2
-  sarq  $1, %rsi
-  movl  $1, %ebx
-  xorl  %edx, %edx
+  sarq  $1, %rdi
+  movl  $1, %eax
+  xorl  %esi, %esi
 .L0:
-  leaq  1(%rdx,%rdx), %rcx
+  leaq  1(%rsi,%rsi), %rcx
   cmpq  %rbx, %rcx
   jae   .L1
-  movq  -4(%rdi,%rcx,4), %rcx
+  movq  -4(%rdx,%rcx,4), %rcx
   leaq  -1(%rax,%rcx), %rax
-  incq  %rdx
-  cmpq  %rsi, %rdx
+  incq  %rsi
+  cmpq  %rdi, %rsi
   jle   .L0
-  movq  %rbx, %rax
   ret
 .L1:
   movq  <hidden PC-relative offset>(%rip), %rax
@@ -99,9 +98,9 @@ search:
   jmp   .L4
 .L1:
   movq  (%rbx), %rdx
-  xorl  %esi, %esi
-  cmpq  %rdx, %rdi
-  setl  %sil
+  xorl  %edi, %edi
+  cmpq  %rdx, %rsi
+  setl  %dil
   jge   .L2
   movq  8(%rbx), %rax
   testq %rdi, %rdi
@@ -109,7 +108,7 @@ search:
   jmp   .L4
 .L2:
   movq  %rbx, %rax
-  testq %rsi, %rsi
+  testq %rdi, %rdi
   je    .L4
 .L3:
   movq  %rax, %rbx

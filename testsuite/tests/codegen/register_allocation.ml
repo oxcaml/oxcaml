@@ -174,23 +174,23 @@ spill_unspill_loop_movement:
   movl  $1, %edi
 .L0:
   movq  %rdi, 8(%rsp)
-  call  camlTOP9__f_20_23_code@PLT
+  call  camlTOP9__f_11_23_code@PLT
 .L1:
-  movq  %rax, %rsi
+  movq  %rax, %rdx
   movq  8(%rsp), %rdi
-  movq  %rdi, %rdx
-  salq  $1, %rdx
+  movq  %rdi, %rsi
+  salq  $1, %rsi
   movq  (%rsp), %rax
   movq  16(%rsp), %rbx
-  cmpq  $11, %rdx
+  cmpq  $11, %rsi
   jle   .L3
-  movq  %rsi, 24(%rsp)
+  movq  %rdx, 24(%rsp)
   movq  %rdi, 8(%rsp)
-  call  camlTOP9__f_20_23_code@PLT
+  call  camlTOP9__f_11_23_code@PLT
 .L2:
   movq  (%rsp), %rax
   movq  8(%rsp), %rdi
-  movq  24(%rsp), %rsi
+  movq  24(%rsp), %rdx
   movq  16(%rsp), %rbx
 .L3:
   incq  %rdi
@@ -199,9 +199,9 @@ spill_unspill_loop_movement:
   movq  32(%rsp), %rdi
   jmp   .L5
 .L4:
-  movl  $1, %esi
+  movl  $1, %edx
 .L5:
-  leaq  -1(%rdi,%rsi), %rax
+  leaq  -1(%rdi,%rdx), %rax
   addq  $40, %rsp
   ret
 
@@ -271,13 +271,11 @@ let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
 ;;
 [%%expect_asm X86_64{|
 unnecessary_moves:
-  movq  %rax, %r8
   movq  %rbx, %rcx
   movq  %rdx, %rbx
-  leaq  -1(%r8,%rcx), %rax
-  cmpq  %rcx, %r8
+  leaq  -1(%rax,%rcx), %rdx
+  cmpq  %rcx, %rax
   jge   .L0
-  movq  %r8, %rax
   ret
 .L0:
   cmpq  %rsi, %rdi
@@ -285,7 +283,6 @@ unnecessary_moves:
   subq  $8, %rsp
   movq  %rdx, (%rsp)
   movq  (%rbx), %rdi
-  movq  %rcx, %rax
   movq  %rcx, %rax
   call  *%rdi
 .L1:
@@ -375,7 +372,7 @@ double_loop_no_definition_at_beginning:
 .L2:
   movq  (%rdx), %rax
   movq  %rdx, 40(%rsp)
-  call  camlTOP15__f_33_37_code@PLT
+  call  camlTOP15__f_18_37_code@PLT
 .L3:
   movq  40(%rsp), %rdx
   movq  8(%rdx), %rdx
@@ -560,10 +557,7 @@ let f ~(s: int64#) (t : int64#) =
 f:
   movq  %rbx, %rdi
   imulq %rax, %rdi
-  movq  %rbx, %rdi
-  imulq %rax, %rdi
   movq  %rbx, %rax
-  subq  %rdi, %rax
   subq  %rdi, %rax
   ret
 |}]

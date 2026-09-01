@@ -286,11 +286,15 @@ module Block : sig
 
   (** Create a new block with parameters of the given types. *)
   val create :
-    under_construction graph -> params:Cmm.machtype -> under_construction t
+    under_construction graph ->
+    params:Cmm.machtype ->
+    cold:bool ->
+    under_construction t
 
   val create_with_names :
     under_construction graph ->
     params:(Cmm.machtype_component * string option) array ->
+    cold:bool ->
     under_construction t
 
   val equal : 'g t -> 'g t -> bool
@@ -355,6 +359,16 @@ module Block : sig
   val terminator : finished t -> finished Terminator.t
 
   val terminator_dbg : finished t -> Debuginfo.t
+
+  (** The [Cmm.Ccatch] handler's [dbg], for blocks that are handlers.
+      [Cfg_of_ssa] attaches it to the exception-bucket move at the entry of a
+      trap handler, matching [Cfg_selectgen.setup_catch_handler]. Defaults to
+      [Debuginfo.none]. *)
+  val handler_dbg : finished t -> Debuginfo.t
+
+  val set_handler_dbg : under_construction t -> Debuginfo.t -> unit
+
+  val cold : finished t -> bool
 end
 
 module Cursor : sig

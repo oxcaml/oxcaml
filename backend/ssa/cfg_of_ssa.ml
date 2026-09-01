@@ -52,8 +52,13 @@ open! Int_replace_polymorphic_compare
     fused-branch consumers — otherwise [fuse_comparison] splices it directly
     into the terminator and we drop the body Op. *)
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 open Ssa.Export
+
+(* CR ttebbi: [Ssa_of_cmm] drops [Cphantom_let], so there is no phantom
+   availability to attach here. We should thread it through the SSA graph. *)
+let make_instr desc arg res dbg =
+  Sub_cfg.make_instr desc arg res dbg ~phantom_available_before:None
 
 type block = finished Block.t
 
@@ -121,13 +126,11 @@ let get_block_params_regs env (block : block) =
     Misc.fatal_errorf "Cfg_of_ssa: no regs for block params of %a"
       Block.print_id block
 
-let emit_moves body ~src ~dst =
+let emit_moves ?(dbg = Debuginfo.none) body ~src ~dst =
   Array.iter2
     (fun s d ->
       if not (Reg.same s d)
-      then
-        DLL.add_end body
-          (Sub_cfg.make_instr (Cfg.Op Move) [| s |] [| d |] Debuginfo.none))
+      then DLL.add_end body (make_instr (Cfg.Op Move) [| s |] [| d |] dbg))
     src dst
 
 (* Like [emit_moves], but safe when [src] and [dst] overlap (e.g. a permutation
@@ -177,12 +180,12 @@ let emit_op body op dbg rs rd : Cfg.basic Cfg.instruction =
   match Cfg_selection.pseudoregs_for_operation op rs rd with
   | Constrained (rsrc, rdst) ->
     emit_moves body ~src:rs ~dst:(truncate rsrc (Array.length rs));
-    let main = Sub_cfg.make_instr (Cfg.Op op) rsrc rdst dbg in
+    let main = make_instr (Cfg.Op op) rsrc rdst dbg in
     DLL.add_end body main;
     emit_moves body ~src:(truncate rdst (Array.length rd)) ~dst:rd;
     main
   | Use_default_regs ->
-    let main = Sub_cfg.make_instr (Cfg.Op op) rs rd dbg in
+    let main = make_instr (Cfg.Op op) rs rd dbg in
     DLL.add_end body main;
     main
 
@@ -221,8 +224,7 @@ let move_to_extcall_arg_locs body (ty_args : Cmm.exttype list) virt_args dbg :
   if stack_ofs <> 0
   then
     DLL.add_end body
-      (Sub_cfg.make_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
-         Debuginfo.none);
+      (make_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||] Debuginfo.none);
   (* [locs] has one entry per [ty_args] element; consume the corresponding
      number of flattened registers from [virt_args] for each. *)
   let pos = ref 0 in
@@ -232,7 +234,7 @@ let move_to_extcall_arg_locs body (ty_args : Cmm.exttype list) virt_args dbg :
       pos := !pos + Array.length dst;
       match Cfg_selection.insert_move_extcall_arg ty_args_arr.(i) src dst with
       | Rewritten (basic, src, dst) ->
-        DLL.add_end body (Sub_cfg.make_instr basic src dst dbg)
+        DLL.add_end body (make_instr basic src dst dbg)
       | Use_default -> emit_moves body ~src ~dst)
     locs;
   assert (!pos = Array.length virt_args);
@@ -303,8 +305,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
     if stack_ofs <> 0
     then
       DLL.add_end body
-        (Sub_cfg.make_instr (Cfg.Op (Stackoffset (-stack_ofs))) [||] [||]
-           Debuginfo.none)
+        (make_instr (Cfg.Op (Stackoffset (-stack_ofs))) [||] [||] Debuginfo.none)
   end;
   let is_trap_handler = block_is_trap_handler block in
   if is_trap_handler
@@ -313,6 +314,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
     let exn_bucket = [| Proc.loc_exn_bucket |] in
     let first_param = [| virt_res.(0) |] in
     emit_moves body ~src:exn_bucket ~dst:first_param
+      ~dbg:(Block.handler_dbg block)
   end;
   Array.iter
     (fun (instr : instruction) ->
@@ -326,7 +328,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
            [regs] field rather than the CFG instruction's argument array. *)
         let regs = Array.map (get_reg env) args in
         DLL.add_end body
-          (Sub_cfg.make_instr
+          (make_instr
              (Cfg.Op
                 (Name_for_debugger { ident; provenance; which_parameter; regs }))
              [||] [||] Debuginfo.none)
@@ -347,12 +349,12 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
           ()
       | Push_trap { handler } ->
         DLL.add_end body
-          (Sub_cfg.make_instr
+          (make_instr
              (Cfg.Pushtrap { lbl_handler = label_of env handler })
              [||] [||] Debuginfo.none)
       | Pop_trap { handler } ->
         DLL.add_end body
-          (Sub_cfg.make_instr
+          (make_instr
              (Cfg.Poptrap { lbl_handler = label_of env handler })
              [||] [||] Debuginfo.none))
     (Block.body block);
@@ -368,7 +370,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
       let virt_args = Array.map (get_reg_of_arg env) args in
       let loc_arg = Proc.loc_parameters (Reg.typv virt_args) in
       emit_moves body ~src:virt_args ~dst:loc_arg;
-      Sub_cfg.make_instr
+      make_instr
         (Cfg.Tailcall_self { destination = label_of env start_block })
         loc_arg [||] dbg
     | Continue { continuation = Goto goto; args } ->
@@ -385,23 +387,22 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         |> Array.map (get_reg_of_arg env)
       in
       emit_parallel_moves body ~src:src_regs ~dst:dst_regs;
-      Sub_cfg.make_instr (Cfg.Always (label_of env goto)) [||] [||] dbg
+      make_instr (Cfg.Always (label_of env goto)) [||] [||] dbg
     | Continue { continuation = Return; args } ->
       (* Emit a [Poptrap] for each handler still on the trap stack at block
          exit, so the runtime trap stack is empty when the function returns. *)
       List.iter
         (fun (h : block) ->
           DLL.add_end body
-            (Sub_cfg.make_instr
+            (make_instr
                (Cfg.Poptrap { lbl_handler = label_of env h })
                [||] [||] Debuginfo.none))
         (Block.block_end_trap_stack block);
       let arg = Array.map (get_reg_of_arg env) args in
       let loc_res = Proc.loc_results_return (Reg.typv arg) in
       emit_moves body ~src:arg ~dst:loc_res;
-      DLL.add_end body
-        (Sub_cfg.make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none);
-      Sub_cfg.make_instr Cfg.Return loc_res [||] dbg
+      DLL.add_end body (make_instr Cfg.Reloadretaddr [||] [||] Debuginfo.none);
+      make_instr Cfg.Return loc_res [||] dbg
     | Continue { continuation = Raise raise_kind; args } ->
       let exn_val = Array.map (get_reg_of_arg env) args in
       let exn_bucket = [| Proc.loc_exn_bucket |] in
@@ -422,7 +423,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
          checked by [Ssa.finish_graph]. *)
       assert (Array.length exn_val = Array.length dst);
       emit_parallel_moves body ~src:exn_val ~dst;
-      Sub_cfg.make_instr (Cfg.Raise raise_kind) exn_bucket [||] dbg
+      make_instr (Cfg.Raise raise_kind) exn_bucket [||] dbg
     | Continue { continuation = Unreachable; _ } ->
       Misc.fatal_error
         "Cfg_of_ssa: a Continue continuation cannot be Unreachable"
@@ -437,16 +438,16 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         let true_label = label_of env targets.(1) in
         match fuse_comparison index ~true_label ~false_label with
         | Some (term, args) ->
-          Sub_cfg.make_instr term (Array.map (get_reg env) args) [||] dbg
+          make_instr term (Array.map (get_reg env) args) [||] dbg
         | None ->
-          Sub_cfg.make_instr
+          make_instr
             (Cfg.Truth_test { ifso = true_label; ifnot = false_label })
             [| get_reg env index |]
             [||] dbg
       else
         let index_reg = get_reg env index in
         let labels = Array.map (label_of env) targets in
-        Sub_cfg.make_instr (Cfg.Switch labels) [| index_reg |] [||] dbg
+        make_instr (Cfg.Switch labels) [| index_reg |] [||] dbg
     | Call { op; args; continuation = Return; nontail; may_raise = _ } ->
       assert (not nontail);
       let call_op : Cfg.func_call_operation =
@@ -464,7 +465,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
          would write below the stack pointer. *)
       assert (stack_ofs = 0);
       emit_moves body ~src:rarg ~dst:loc_arg;
-      Sub_cfg.make_instr (Cfg.Tailcall_func call_op)
+      make_instr (Cfg.Tailcall_func call_op)
         (call_arg_for_terminator call_op virt_args loc_arg)
         [||] dbg
     | Call { continuation = Raise _; _ } ->
@@ -476,7 +477,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         let loc_arg, stack_ofs, stack_align =
           move_to_extcall_arg_locs body ty_args virt_args dbg
         in
-        Sub_cfg.make_instr
+        make_instr
           (Cfg.Call_no_return { ext with stack_ofs; stack_align })
           loc_arg
           (Proc.loc_external_results ty_res)
@@ -498,12 +499,12 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         if stack_ofs <> 0
         then
           DLL.add_end body
-            (Sub_cfg.make_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
+            (make_instr (Cfg.Op (Stackoffset stack_ofs)) [||] [||]
                Debuginfo.none);
         emit_moves body ~src:rarg ~dst:loc_arg;
         Block.Tbl.replace env.call_result_locs continuation loc_res;
         Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
-        Sub_cfg.make_instr
+        make_instr
           (Cfg.Call { op = call_op; label_after = label_of env continuation })
           (call_arg_for_terminator call_op virt_args loc_arg)
           loc_res dbg
@@ -518,7 +519,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         let loc_res = Proc.loc_external_results (Reg.typv virt_res) in
         Block.Tbl.replace env.call_result_locs continuation loc_res;
         Block.Tbl.replace env.call_stack_ofs continuation stack_ofs;
-        Sub_cfg.make_instr
+        make_instr
           (Cfg.Prim
              { op = External { ext with stack_ofs; stack_align };
                label_after = label_of env continuation
@@ -530,7 +531,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
            the arguments to fixed registers. *)
         assert (Array.length virt_res = 0);
         Block.Tbl.replace env.call_result_locs continuation [||];
-        Sub_cfg.make_instr
+        make_instr
           (Cfg.Prim
              { op = Probe { name; handler_code_sym; enabled_at_init };
                label_after = label_of env continuation
@@ -552,7 +553,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
           Some (label_of env cont_block), loc_res
         | None -> None, [||]
       in
-      Sub_cfg.make_instr
+      make_instr
         (Cfg.Invalid { message; stack_ofs; stack_align; label_after })
         loc_arg loc_res dbg
   in
@@ -565,7 +566,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
     exn = None;
     can_raise;
     is_trap_handler;
-    cold = false
+    cold = Block.cold block
   }
 
 (** Remember comparisons that will be folded into branch terminators. The branch
@@ -613,7 +614,7 @@ let param_naming_instrs env ~fun_arg_locs =
       if Option.is_some provenance
       then
         Some
-          (Sub_cfg.make_instr
+          (make_instr
              (Cfg.Op
                 (Name_for_debugger
                    { ident;
@@ -632,7 +633,7 @@ let make_entry_block env cfg ~ssa_entry_label ~fun_arg_locs : Cfg.basic_block =
   { Cfg.start = Cfg.entry_label cfg;
     body;
     terminator =
-      Sub_cfg.make_instr (Cfg.Always ssa_entry_label) [||] [||] Debuginfo.none;
+      make_instr (Cfg.Always ssa_entry_label) [||] [||] Debuginfo.none;
     predecessors = Label.Set.empty;
     stack_offset = Cfg.invalid_stack_offset;
     exn = None;
@@ -647,14 +648,14 @@ let make_entry_block env cfg ~ssa_entry_label ~fun_arg_locs : Cfg.basic_block =
     [drop_optimistic_prologue_poll] can later remove it if unneeded). *)
 let prepend_entry_prologue env (cfg_block : Cfg.basic_block) ~fun_arg_locs
     ~fun_arg_regs : InstructionId.t =
-  let poll_instr = Sub_cfg.make_instr (Cfg.Op Poll) [||] [||] Debuginfo.none in
+  let poll_instr = make_instr (Cfg.Op Poll) [||] [||] Debuginfo.none in
   DLL.add_begin cfg_block.body poll_instr;
   List.iter2
     (fun loc reg ->
       if not (Reg.same loc reg)
       then
         DLL.add_begin cfg_block.body
-          (Sub_cfg.make_instr (Cfg.Op Move) [| loc |] [| reg |] Debuginfo.none))
+          (make_instr (Cfg.Op Move) [| loc |] [| reg |] Debuginfo.none))
     (fun_arg_locs |> Array.to_list |> List.rev)
     (fun_arg_regs |> Array.to_list |> List.rev);
   List.rev (param_naming_instrs env ~fun_arg_locs)
@@ -719,7 +720,7 @@ let convert ~future_funcnames (ssa_graph : finished Ssa.graph) :
       ~fun_dbg:function_info.dbg ~fun_contains_calls:true
       ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:function_info.poll
       ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:function_info.ret_type
-      ~allowed_to_be_irreducible:false
+      ~fun_phantom_lets:Backend_var.Map.empty ~allowed_to_be_irreducible:false
   in
   let layout = DLL.make_empty () in
   let entry_block =

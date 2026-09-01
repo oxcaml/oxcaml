@@ -70,8 +70,8 @@ open! Int_replace_polymorphic_compare
     - [check_value_invariants]: every use is dominated by its definition, and
       [Omitted_since_unused] only feeds block params scheduled for removal. *)
 
-module Block_id = Oxcaml_utils.Id_counter.Make ()
-module Instruction_id = Oxcaml_utils.Id_counter.Make ()
+module Block_id = Id_counter.Make ()
+module Instruction_id = Id_counter.Make ()
 
 (* The two construction-state tags are the same type here; the signature keeps
    them distinct. *)
@@ -132,6 +132,11 @@ type 'g block =
     mutable pending_body : 'g instruction list;
     mutable terminator : 'g terminator;
     mutable terminator_dbg : Debuginfo.t;
+    (* The [Cmm.Ccatch] handler's [dbg], for blocks that are handlers.
+       [Cfg_of_ssa] attaches it to the exception-bucket move it emits at the
+       entry of a trap handler, matching [Cfg_selectgen.setup_catch_handler]. *)
+    mutable handler_dbg : Debuginfo.t;
+    cold : bool;
     mutable dominator_info : 'g dominator_info;
     mutable block_end_trap_stack : 'g block list
   }
@@ -219,11 +224,13 @@ and dummy_block : under_construction block =
     pending_body = [];
     terminator = pending_terminator;
     terminator_dbg = Debuginfo.none;
+    handler_dbg = Debuginfo.none;
+    cold = false;
     dominator_info = { depth = -1; dominator = dummy_block };
     block_end_trap_stack = []
   }
 
-let create_block ~block_id_gen ~(params : block_param array) :
+let create_block ~block_id_gen ~(params : block_param array) ~(cold : bool) :
     under_construction block =
   { block_id = Block_id.get_and_incr block_id_gen;
     params;
@@ -232,6 +239,8 @@ let create_block ~block_id_gen ~(params : block_param array) :
     pending_body = [];
     terminator = pending_terminator;
     terminator_dbg = Debuginfo.none;
+    handler_dbg = Debuginfo.none;
+    cold;
     dominator_info = { depth = -1; dominator = dummy_block };
     block_end_trap_stack = []
   }
@@ -239,18 +248,18 @@ let create_block ~block_id_gen ~(params : block_param array) :
 module Block = struct
   type nonrec 'g t = 'g block
 
-  let create (graph : under_construction graph) ~(params : Cmm.machtype) :
-      under_construction t =
-    create_block ~block_id_gen:graph.block_id_gen
+  let create (graph : under_construction graph) ~(params : Cmm.machtype)
+      ~(cold : bool) : under_construction t =
+    create_block ~block_id_gen:graph.block_id_gen ~cold
       ~params:
         (params
         |> Array.map (fun typ ->
             { typ; name = None; usage_count = removal_sentinel }))
 
   let create_with_names (graph : under_construction graph)
-      ~(params : (Cmm.machtype_component * string option) array) :
-      under_construction t =
-    create_block ~block_id_gen:graph.block_id_gen
+      ~(params : (Cmm.machtype_component * string option) array) ~(cold : bool)
+      : under_construction t =
+    create_block ~block_id_gen:graph.block_id_gen ~cold
       ~params:
         (params
         |> Array.map (fun (typ, name) ->
@@ -373,6 +382,14 @@ module Block = struct
   let terminator (block : finished t) : finished terminator = block.terminator
 
   let terminator_dbg (block : finished t) : Debuginfo.t = block.terminator_dbg
+
+  let handler_dbg (block : finished t) : Debuginfo.t = block.handler_dbg
+
+  let set_handler_dbg (block : under_construction t) (dbg : Debuginfo.t) : unit
+      =
+    block.handler_dbg <- dbg
+
+  let cold (block : finished t) : bool = block.cold
 
   let is_finished block =
     match block.terminator with
@@ -500,7 +517,7 @@ module Instruction = struct
       match op with
       | Move | Spill | Reload -> false
       | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
+      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _ ->
         false
       | Stackoffset _ -> true
       | Load _ -> false
@@ -738,7 +755,7 @@ let create_graph (function_info : Function_info.t) ~keep_unused_ops :
   let block_id_gen = Block_id.create_generator () in
   let instruction_id_gen = Instruction_id.create_generator () in
   let entry =
-    create_block ~block_id_gen
+    create_block ~block_id_gen ~cold:false
       ~params:
         (Function_info.flattened_parameters function_info
         |> Array.map (fun typ : block_param ->

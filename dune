@@ -178,6 +178,7 @@
   doubly_linked_list
   file_sections
   lru
+  id_counter
   ;; PARSING
   location
   longident

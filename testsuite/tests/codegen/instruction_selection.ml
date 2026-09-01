@@ -138,9 +138,6 @@ bad_max:
   movq  %rax, %rsi
   movl  $1, %edi
   cmpq  %rsi, %rdi
-  movq  %rax, %rsi
-  movl  $1, %edi
-  cmpq  %rsi, %rdi
   jge   .L1
 .L0:
   movl  $1, %eax
@@ -148,19 +145,15 @@ bad_max:
 .L1:
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
-  cmpq  %rbx, %rdi
   setl  %al
   testq %rax, %rax
   je    .L3
 .L2:
   addq  $2, %rdi
   cmpq  %rsi, %rdi
-  addq  $2, %rdi
-  cmpq  %rsi, %rdi
   jge   .L1
   jmp   .L0
 .L3:
-  movq  %rdi, %rax
   movq  %rdi, %rax
   ret
 |}]
@@ -441,9 +434,7 @@ let shift_of_logand (a : int64#) =
 [%%expect_asm X86_64{|
 shift_of_logand:
   movl  $1, %ebx
-  movl  $1, %ebx
   movq  %rax, %rcx
-  andq  %rbx, %rcx
   andq  %rbx, %rcx
   movl  $3, %eax
   shrq  %cl, %rax
