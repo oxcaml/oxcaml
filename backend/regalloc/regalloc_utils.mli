@@ -103,7 +103,7 @@ module Move : sig
   val to_string : t -> string
 end
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 module Insert_skipping_name_for_debugger : sig
   val insert_after :

@@ -1,6 +1,6 @@
 [@@@ocaml.warning "+a-29-40-41-42"]
 
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 val are_equal_regs : Reg.t -> Reg.t -> bool
 
@@ -28,6 +28,15 @@ val sub_immediates :
   (Operation.integer_operation * int) option
 
 val mul_immediates :
+  Operation.integer_operation ->
+  int ->
+  int ->
+  (Operation.integer_operation * int) option
+
+(** [lsl_immediates op imm1 imm2] rewrites [imm1 lsl imm2] as an immediate for
+    [op]. [imm1] must be within range for [op] and [imm2] within range for
+    [Ilsl]. *)
+val lsl_immediates :
   Operation.integer_operation ->
   int ->
   int ->

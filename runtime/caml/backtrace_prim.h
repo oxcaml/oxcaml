@@ -69,6 +69,13 @@ debuginfo caml_debuginfo_next(debuginfo dbg);
 /* Extract locations from backtrace_slot */
 void caml_debuginfo_location(debuginfo dbg, /*out*/ struct caml_loc_info * li);
 
+/* Measuring debuginfo, when Xmeasure_frametables=1 */
+void caml_debuginfo_reset(void);
+void caml_debuginfo_measure(debuginfo dbg);
+/* Return the number of debuginfos measured, and the lowest and
+ * highest addresses seen */
+void caml_debuginfo_measurements(size_t *count_p, char **low_p, char **high_p);
+
 /* In order to prevent the GC from walking through the debug
    information (which have no headers), we transform slots to 31/63 bits
    ocaml integers by shifting them by 1 to the right. We do not lose

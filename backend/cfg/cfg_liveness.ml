@@ -57,7 +57,7 @@ module Transfer :
     match instr.desc with
     | Op _ | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
-      if Cfg.is_pure_basic instr.desc && Reg.disjoint_set_array before instr.res
+      if Cfg.is_dead_basic instr ~live_after:before
       then
         (* If the operation is without side-effects and the result is unused
            then don't mark the arguments as used because this instruction could

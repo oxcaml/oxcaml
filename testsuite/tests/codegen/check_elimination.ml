@@ -50,7 +50,7 @@ arr_sum:
   cmpq  $1, %rsi
   jl    .L2
   sarq  $1, %rsi
-  movl  $1, %eax
+  movl  $1, %ebx
   xorl  %edx, %edx
 .L0:
   leaq  1(%rdx,%rdx), %rcx
@@ -61,6 +61,7 @@ arr_sum:
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L0
+  movq  %rbx, %rax
   ret
 .L1:
   movq  <hidden PC-relative offset>(%rip), %rax
@@ -89,11 +90,11 @@ let search ~target (start : int list) =
 ;;
 [%%expect_asm X86_64{|
 search:
-  movq  %rax, %rdi
+  movq  %rax, %rsi
   testb $1, %bl
   je    .L1
 .L0:
-  xorl  %esi, %esi
+  xorl  %edi, %edi
   movl  $1, %eax
   jmp   .L4
 .L1:
@@ -103,7 +104,7 @@ search:
   setl  %sil
   jge   .L2
   movq  8(%rbx), %rax
-  testq %rsi, %rsi
+  testq %rdi, %rdi
   jne   .L3
   jmp   .L4
 .L2:

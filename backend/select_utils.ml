@@ -21,7 +21,7 @@ open! Int_replace_polymorphic_compare
 [@@@ocaml.warning "+a-4-40-41-42"]
 
 open Cmm
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Int = Numbers.Int
 module V = Backend_var
 module VP = Backend_var.With_provenance
@@ -57,7 +57,10 @@ type environment =
         (** Which registers must be populated when jumping to the given handler.
         *)
     trap_stack : Operation.trap_stack;
-    tailrec_label : Label.t
+    tailrec_label : Label.t;
+    phantom_lets : V.Set.t;
+    all_phantom_lets :
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
   }
 
 let env_add ?(mut = Asttypes.Immutable) var regs env =
@@ -102,6 +105,9 @@ let env_find_static_exception id env =
     Misc.fatal_errorf "Not found static exception id=%a" Static_label.format id
 
 let env_set_trap_stack env trap_stack = { env with trap_stack }
+
+let phantom_vars_from_env env =
+  if !Clflags.restrict_to_upstream_dwarf then None else Some env.phantom_lets
 
 let rec combine_traps trap_stack = function
   | [] -> trap_stack
@@ -159,8 +165,41 @@ let env_create ~tailrec_label =
   { vars = V.Map.empty;
     static_exceptions = Static_label.Map.empty;
     trap_stack = Uncaught;
-    tailrec_label
+    tailrec_label;
+    phantom_lets = V.Set.empty;
+    all_phantom_lets = ref V.Map.empty
   }
+
+let env_add_phantom_let var defining_expr env =
+  if !Clflags.restrict_to_upstream_dwarf
+  then env
+  else
+    (* Information about phantom lets is split at this stage:
+
+       1. The phantom variables in scope are recorded in the environment and
+       subsequently passed through CFG to Linear instructions via the
+       phantom_available_before field.
+
+       2. The defining expressions are accumulated (see [all_phantom_lets]) and
+       eventually stored in the CFG's fun_phantom_lets field. *)
+    (* A [None] defining expression means the variable has been optimised out;
+       it is still recorded (as [Cphantom_optimised_out]) so that it remains
+       consistent with [phantom_available_before] and other phantom lets may
+       refer to it. *)
+    let cfg_defining_expr : Cfg.phantom_defining_expr =
+      match (defining_expr : Cmm.phantom_defining_expr option) with
+      | None -> Cfg.phantom_optimised_out
+      | Some defining_expr -> Cfg.phantom_defining_expr_of_cmm defining_expr
+    in
+    let provenance = VP.provenance var in
+    let var = VP.var var in
+    if V.Map.mem var !(env.all_phantom_lets)
+    then Misc.fatal_errorf "Duplicate phantom let for variable %a" V.print var;
+    env.all_phantom_lets
+      := V.Map.add var (provenance, cfg_defining_expr) !(env.all_phantom_lets);
+    { env with phantom_lets = V.Set.add var env.phantom_lets }
+
+let phantom_lets_for_fundecl env = !(env.all_phantom_lets)
 
 let select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag =
   function
@@ -175,6 +214,7 @@ let oper_result_type = function
   | Cload { memory_chunk; _ } -> (
     match memory_chunk with
     | Word_val -> typ_val
+    | Word_mask -> typ_mask
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
     | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
@@ -191,8 +231,8 @@ let oper_result_type = function
       { op = Fetch_and_add | Compare_set | Exchange | Compare_exchange; _ } ->
     typ_int
   | Catomic { op = Add | Sub | Land | Lor | Lxor; _ } -> typ_void
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi | Cmodi | Cand | Cor | Cxor | Clsl
-  | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
+  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor | Cxor
+  | Clsl | Clsr | Casr | Cclz | Cctz | Cpopcnt | Cbswap _ | Ccmpi _ | Ccmpf _ ->
     typ_int
   | Caddi128 | Csubi128 | Cmuli64 _ -> typ_int128
   | Caddv -> typ_val
@@ -221,6 +261,8 @@ let oper_result_type = function
   | Creinterpret_cast (Float32_of_int32 | Float32_of_float) -> typ_float32
   | Creinterpret_cast (Int_of_value | Int64_of_float | Int32_of_float32) ->
     typ_int
+  | Creinterpret_cast Mask_of_int64 -> typ_mask
+  | Creinterpret_cast Int64_of_mask -> typ_int
   | Cstatic_cast (Float_of_float32 | Float_of_int Float64) -> typ_float
   | Cstatic_cast (Float32_of_float | Float_of_int Float32) -> typ_float32
   | Cstatic_cast (Int_of_float (Float64 | Float32)) -> typ_int
@@ -282,6 +324,9 @@ let size_component : machtype_component -> int = function
   | Vec512 ->
     assert (Int.equal (Arch.size_addr * 8) Arch.size_vec512);
     Arch.size_vec512
+  | Mask ->
+    assert (Int.equal Arch.size_int 8);
+    Arch.size_int
 
 let size_machtype mty =
   let size = ref 0 in
@@ -302,12 +347,15 @@ let size_expr_with ~size_of_var exp =
     | Cconst_vec128 _ -> Arch.size_vec128
     | Cconst_vec256 _ -> Arch.size_vec256
     | Cconst_vec512 _ -> Arch.size_vec512
+    | Cconst_mask _ -> Arch.size_int
     | Cvar id -> (
       try V.Map.find id localenv with Not_found -> size_of_var id)
     | Ctuple el -> List.fold_right (fun e sz -> size localenv e + sz) el 0
     | Cop (op, _, _) -> size_machtype (oper_result_type op)
     | Clet (id, arg, body) ->
       size (V.Map.add (VP.var id) (size localenv arg) localenv) body
+    | Cphantom_let (_id, _defining_expr, body) -> size localenv body
+    | Cname_for_debugger (_var, body) -> size localenv body
     | Csequence (_e1, e2) -> size localenv e2
     | _ -> Misc.fatal_error "Selection.size_expr"
   in
@@ -637,11 +685,11 @@ module Stack_offset_and_exn = struct
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-        | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
-        | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
-        | Alloc _ )
+        | Const_mask _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+        | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
+        | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+        | Domain_index | Poll | Pause | Alloc _ )
     | Reloadretaddr | Prologue | Epilogue ->
       stack_offset, traps
     | Stack_check _ ->
@@ -715,27 +763,37 @@ let make_const_symbol x = Operation.Const_symbol x
 
 let make_opaque () = Operation.Opaque
 
-let insert_debug (_env : environment) sub_cfg basic dbg arg res =
-  Sub_cfg.add_instruction sub_cfg basic arg res dbg
+let insert_debug (env : environment) sub_cfg basic dbg arg res =
+  let phantom_available_before = phantom_vars_from_env env in
+  Sub_cfg.add_instruction sub_cfg basic arg res dbg ~phantom_available_before
 
-let insert_op_debug_returning_id (_env : environment) sub_cfg op dbg arg res =
-  let instr = Sub_cfg.make_instr (Cfg.Op op) arg res dbg in
+let insert_op_debug_returning_id (env : environment) sub_cfg op dbg arg res =
+  let phantom_available_before = phantom_vars_from_env env in
+  let instr =
+    Sub_cfg.make_instr (Cfg.Op op) arg res dbg ~phantom_available_before
+  in
   Sub_cfg.add_instruction' sub_cfg instr;
   instr.id
 
-let insert (_env : environment) sub_cfg basic arg res =
+let insert (env : environment) sub_cfg basic arg res =
   (* CR mshinwell: fix debuginfo *)
+  let phantom_available_before = phantom_vars_from_env env in
   Sub_cfg.add_instruction sub_cfg basic arg res Debuginfo.none
+    ~phantom_available_before
 
-let insert' (_env : environment) sub_cfg term arg res =
+let insert' (env : environment) sub_cfg term arg res =
   (* CR mshinwell: fix debuginfo *)
+  let phantom_available_before = phantom_vars_from_env env in
   Sub_cfg.set_terminator sub_cfg term arg res Debuginfo.none
+    ~phantom_available_before
 
-let insert_debug' (_env : environment) sub_cfg basic dbg arg res =
-  Sub_cfg.set_terminator sub_cfg basic arg res dbg
+let insert_debug' (env : environment) sub_cfg basic dbg arg res =
+  let phantom_available_before = phantom_vars_from_env env in
+  Sub_cfg.set_terminator sub_cfg basic arg res dbg ~phantom_available_before
 
-let insert_op_debug' (_env : environment) sub_cfg op dbg rs rd =
-  Sub_cfg.set_terminator sub_cfg op rs rd dbg;
+let insert_op_debug' (env : environment) sub_cfg op dbg rs rd =
+  let phantom_available_before = phantom_vars_from_env env in
+  Sub_cfg.set_terminator sub_cfg op rs rd dbg ~phantom_available_before;
   rd
 
 let insert_move env sub_cfg src dst =
@@ -757,24 +815,41 @@ let insert_move_args env sub_cfg arg loc stacksize =
   then insert env sub_cfg (make_stack_offset stacksize) [||] [||];
   insert_moves env sub_cfg arg loc
 
+let insert_move_result env sub_cfg (src : Reg.t) (dst : Reg.t) =
+  if
+    equal_machtype_component dst.typ Mask
+    && equal_machtype_component src.typ Int
+  then
+    (* The C ABI passes masks in GPRs. *)
+    insert env sub_cfg (Op (Reinterpret_cast Mask_of_int64)) [| src |] [| dst |]
+  else insert_move env sub_cfg src dst
+
 let insert_move_results env sub_cfg loc res stacksize =
-  insert_moves env sub_cfg loc res;
+  for i = 0 to min (Array.length loc) (Array.length res) - 1 do
+    insert_move_result env sub_cfg loc.(i) res.(i)
+  done;
   if stacksize <> 0
   then insert env sub_cfg (make_stack_offset (-stacksize)) [||] [||]
 
 let maybe_emit_naming_op env sub_cfg ~bound_name regs =
   match bound_name with
   | None -> ()
-  | Some bound_name ->
+  | Some bound_name -> (
     let provenance = Backend_var.With_provenance.provenance bound_name in
-    if Option.is_some provenance
-    then
+    match provenance with
+    | None -> ()
+    | Some provenance_inner ->
+      let which_parameter =
+        match Backend_var.Provenance.is_parameter provenance_inner with
+        | Local -> None
+        | Parameter { index } -> Some index
+      in
       let bound_name = Backend_var.With_provenance.var bound_name in
       let naming_op =
         Operation.Name_for_debugger
-          { ident = bound_name; provenance; which_parameter = None; regs }
+          { ident = bound_name; provenance; which_parameter; regs }
       in
-      insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||]
+      insert_debug env sub_cfg (Cfg.Op naming_op) Debuginfo.none [||] [||])
 
 let join env (opt_r1 : _ Or_never_returns.t) sub_cfg1
     (opt_r2 : _ Or_never_returns.t) sub_cfg2 ~bound_name : _ Or_never_returns.t

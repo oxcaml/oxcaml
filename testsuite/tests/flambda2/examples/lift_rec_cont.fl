@@ -8,7 +8,7 @@
 let code f_0 deleted in
 let code loopify(never) size(50) newer_version_of(f_0)
       f_0_1 (g : val, x : [ 0 | 0 of val ])
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
   (let prim = %is_int (x) in
@@ -25,7 +25,7 @@ let code loopify(never) size(50) newer_version_of(f_0)
          | 0 -> k5 (0)
          | 1 -> k5 (1)
          where rec k5 (i : imm tagged) =
-           (apply g (i) -> k4 * k1
+           (apply &my_alloc_region g (i) -> k4 * k1
               where k4 (param) =
                 cont k3
               where k3 =
@@ -37,6 +37,6 @@ let code loopify(never) size(50) newer_version_of(f_0)
                      let Paddint = %int_barith.`add` (i, 1) in
                      cont k5 (Paddint))))
 in
-let $camlFoo__f_1 = closure f_0_1 @f in
+let $camlFoo__f_1 = closure f_0_1 @f &toplevel.alloc_region in
 let $camlLift_rec_cont = Block 0 ($camlFoo__f_1) in
 cont done ($camlLift_rec_cont)

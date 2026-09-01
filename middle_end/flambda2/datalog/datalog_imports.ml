@@ -25,26 +25,39 @@ type 'a with_names =
 
 include Heterogenous_list
 
-module Option_sender = struct
-  include Make (struct
-    type 'a t = 'a option Channel.sender
-  end)
+module Or_null_sender = struct
+  module T0 = struct
+    type 'a t = 'a Channel.or_null_sender
+  end
 
-  let rec send : type s. s hlist -> s Constant.hlist -> unit =
+  include T0
+  include Make (T0)
+
+  let[@inline] send s v = Channel.send_or_null s (Or_null.this v)
+
+  let rec send_hlist : type s. s hlist -> s Constant.hlist -> unit =
    fun refs values ->
     match refs, values with
     | [], [] -> ()
     | r :: rs, v :: vs ->
-      Channel.send r (Some v);
-      send rs vs
+      send r v;
+      send_hlist rs vs
 end
 
-module Option_receiver = struct
-  include Make (struct
-    type 'a t = 'a option Channel.receiver
-  end)
+module Or_null_receiver = struct
+  module T0 = struct
+    type 'a t = 'a Channel.or_null_receiver
+  end
 
-  let rec recv : type s. s hlist -> s Constant.hlist = function
+  include T0
+  include Make (T0)
+
+  let[@inline] recv r =
+    match Channel.recv_or_null r with
+    | Null -> Misc.fatal_error "Or_null_receiver: empty receiver"
+    | This r -> r
+
+  let rec recv_hlist : type s. s hlist -> s Constant.hlist = function
     | [] -> []
-    | r :: rs -> Option.get (Channel.recv r) :: recv rs
+    | r :: rs -> recv r :: recv_hlist rs
 end

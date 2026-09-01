@@ -1,0 +1,9 @@
+File "primitive_coercion_zero_alloc_opt.ml", line 16, characters 39-49:
+16 |   val add : int32 -> int32 -> int32 [@@zero_alloc opt] (* Should error *)
+                                            ^^^^^^^^^^
+Error: Annotation check for zero_alloc failed on function Primitive_coercion_zero_alloc_opt.Allocating_primitive.(partial) (camlPrimitive_coercion_zero_alloc_opt__fn_1_1).
+
+File "primitive_coercion_zero_alloc_opt.ml", line 18, characters 2-55:
+18 |   external add : int32 -> int32 -> int32 = "%int32_add" (* Should error *)
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: allocation of 24 bytes for boxed_int32

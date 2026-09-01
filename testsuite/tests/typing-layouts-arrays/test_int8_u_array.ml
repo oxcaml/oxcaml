@@ -46,10 +46,10 @@ module _ = Test_gen_u_array.Test (Int8_array)
 
 module Int8_u_array0 : Gen_u_array.S0
                         with type element_t = int8#
-                        and type ('a : any) array_t = 'a array = struct
+                        and type ('a : any mod separable) array_t = 'a array = struct
 
   type element_t = int8#
-  type ('a : any) array_t = 'a array
+  type ('a : any mod separable) array_t = 'a array
   type element_arg = unit -> element_t
   type t = element_t array
   let max_length = Sys.max_untagged_int8_array_length

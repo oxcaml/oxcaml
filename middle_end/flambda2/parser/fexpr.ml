@@ -49,7 +49,9 @@ type continuation_sort =
 
 type region =
   | Named of variable
-  | Toplevel
+  | Toplevel_alloc_region
+  | Toplevel_region
+  | Toplevel_ghost_region
 
 type tag_scannable = int
 
@@ -63,6 +65,7 @@ type subkind =
   | Boxed_vec128
   | Boxed_vec256
   | Boxed_vec512
+  | Boxed_mask
   | Tagged_immediate
   | Variant of
       { consts : targetint list;
@@ -83,6 +86,7 @@ type subkind =
   | Unboxed_vec128_array
   | Unboxed_vec256_array
   | Unboxed_vec512_array
+  | Unboxed_mask_array
   | Unboxed_product_array
 
 and kind_with_subkind =
@@ -104,6 +108,7 @@ type const =
   | Naked_vec128 of Vector_types.Vec128.Bit_pattern.bits
   | Naked_vec256 of Vector_types.Vec256.Bit_pattern.bits
   | Naked_vec512 of Vector_types.Vec512.Bit_pattern.bits
+  | Naked_mask of Vector_types.Mask.Bit_pattern.bits
   | Naked_nativeint of targetint
   | Null
   | Poison of kind_with_subkind * string
@@ -142,6 +147,7 @@ type static_data =
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.bits or_variable
   | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.bits or_variable
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.bits or_variable
+  | Boxed_mask of Vector_types.Mask.Bit_pattern.bits or_variable
   | Immutable_float_block of float or_variable list
   | Immutable_float_array of float or_variable list
   | Immutable_float32_array of float or_variable list
@@ -158,8 +164,8 @@ type static_data =
       Vector_types.Vec256.Bit_pattern.bits or_variable list
   | Immutable_vec512_array of
       Vector_types.Vec512.Bit_pattern.bits or_variable list
+  | Immutable_mask_array of Vector_types.Mask.Bit_pattern.bits or_variable list
   | Empty_array of empty_array_kind
-  | Mutable_string of { initial_value : string }
   | Immutable_string of string
 
 type static_data_binding =
@@ -212,15 +218,23 @@ type simple =
 type cont_extra_arg = simple * kind_with_subkind
 
 type alloc_mode_for_allocations =
-  | Heap
-  | Local of { region : region }
-
-type alloc_mode_for_applications =
-  | Heap
+  | Heap of { alloc_region : region }
   | Local of
-      { region : region;
-        ghost_region : region
+      { alloc_region : region;
+        region : region
       }
+
+type 'a alloc_mode_for_applications =
+  | Not_alloc_stack of { alloc_region : 'a }
+  | Maybe_alloc_stack of
+      { alloc_region : 'a;
+        region : 'a;
+        ghost_region : 'a
+      }
+
+type alloc_mode_for_return =
+  | Not_alloc_stack
+  | Maybe_alloc_stack
 
 type alloc_mode_for_assignments =
   | Heap
@@ -290,7 +304,7 @@ type apply =
     exn_continuation : continuation * cont_extra_arg list;
     args : simple list;
     call_kind : call_kind;
-    alloc_mode : alloc_mode_for_applications;
+    alloc_mode : region alloc_mode_for_applications;
     arities : function_arities option;
     inlined : inlined_attribute option;
     inlining_state : inlining_state option
@@ -328,7 +342,9 @@ and value_slots = one_value_slot list
 
 and one_value_slot =
   { var : value_slot;
-    value : simple
+    value : simple;
+    kind : Flambda_kind.Naked_number_kind.t option
+        (* [None] means kind [Value]. *)
   }
 
 and let_ =
@@ -399,7 +415,7 @@ and code =
     is_tupled : bool;
     stub : bool;
     loopify : loopify_attribute option;
-    result_mode : alloc_mode_for_assignments
+    result_mode : alloc_mode_for_return
   }
 
 and code_size = int
@@ -407,8 +423,7 @@ and code_size = int
 and params_and_body =
   { params : kinded_parameter list;
     closure_var : variable;
-    region_var : variable;
-    ghost_region_var : variable;
+    region_vars : variable alloc_mode_for_applications;
     depth_var : variable;
     ret_cont : continuation_id;
     exn_cont : continuation_id;

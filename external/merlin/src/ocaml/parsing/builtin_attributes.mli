@@ -80,7 +80,9 @@ val register_attr : current_phase -> string Location.loc -> unit
 val mark_payload_attrs_used : Parsetree.payload -> unit
 
 (** Issue misplaced attribute warnings for all attributes created with
-    [mk_internal] but not yet marked used. Does nothing if compilation
+    [mk_internal] but not yet marked used, and warning 221
+    [Unused_alert_disable] for all alert-disabling attributes that never
+    suppressed an occurrence of their alert. Does nothing if compilation
     is stopped before lambda due to command-line flags. *)
 val warn_unused : unit -> unit
 
@@ -200,6 +202,7 @@ val has_unboxed: Parsetree.attributes -> bool
 val has_boxed: Parsetree.attributes -> bool
 val has_flatten_floats: Parsetree.attributes -> bool
 val has_represent_as_float_array: Parsetree.attributes -> bool
+val has_immediate_all_void_constructor: Parsetree.attributes -> bool
 
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 

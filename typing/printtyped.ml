@@ -72,7 +72,7 @@ let fmt_constant f x =
   | Const_int (i) -> fprintf f "Const_int %d" i
   | Const_char (c) -> fprintf f "Const_char %02x" (Char.code c)
   | Const_untagged_char (c) ->
-      fprintf f "Const_untagged_char %02x" (Char.code c)
+      fprintf f "Const_untagged_char %02x" (c land 0xff)
   | Const_string (s, strloc, None) ->
       fprintf f "Const_string(%S,%a,None)" s fmt_location strloc
   | Const_string (s, strloc, Some delim) ->
@@ -102,6 +102,12 @@ let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable"
   | Mutable -> fprintf f "Mutable"
+
+let fmt_access_flag f x =
+  match x with
+  | Immutable_access -> fprintf f "Immutable"
+  | Mutable_access -> fprintf f "Mutable"
+  | Atomic_access -> fprintf f "Atomic"
 
 let fmt_mutable_mode_flag f (x : Types.mutability) =
   match x with
@@ -240,8 +246,8 @@ let variant_representation i ppf = let open Types in function
     line i ppf "Variant_boxed %a\n"
       (array (i+1) (fun _ ppf l ->
          match (l : Types.cstr_layout) with
-         | Cstr_layout_variable ->
-           line (i+1) ppf "Cstr_layout_variable\n"
+         | Cstr_layout_undetermined ->
+           line (i+1) ppf "Cstr_layout_undetermined\n"
          | Cstr_layout_known { sorts; _ } ->
            sort_array (i+1) ppf sorts))
       layouts
@@ -267,13 +273,17 @@ let record_representation i ppf = let open Types in function
     line i ppf "Record_dummy%s%s\n"
       (if represent_as_float_array then " [@@represent_as_float_array]" else "")
       (if flatten_floats then " [@@flatten_floats]" else "")
-  | Record_variable ->
+  | Record_undetermined ->
+    line i ppf "Record_undetermined\n"
+  | Record_variable _ ->
     line i ppf "Record_variable\n"
 
 let record_unboxed_product_representation i ppf = let open Types in function
   | Record_unboxed_product ->
     line i ppf "Record_unboxed_product\n"
-  | Record_unboxed_product_variable ->
+  | Record_unboxed_product_undetermined ->
+    line i ppf "Record_unboxed_product_undetermined\n"
+  | Record_unboxed_product_variable _ ->
     line i ppf "Record_unboxed_product_variable\n"
 
 let attribute i ppf k a =
@@ -316,9 +326,15 @@ let alloc_modes_opt i ppf ms =
 
 let alloc_modes_var i ppf ms =
   let print_alloc_modes_var i ppf m =
-    line i ppf "%a\n" (Format_doc.compat (Mode.Alloc.print ())) m
+    line i ppf "%a\n" print_alloc_mode_l m
   in
   modes ~pr:print_alloc_modes_var i ppf ms
+
+let return_mode i ppf m =
+  line i ppf "return_mode %a\n" print_return_mode m
+
+let return_modes i ppf ms =
+  modes ~pr:return_mode i ppf ms
 
 let value_modes_var i ppf ms =
   let print_value_modes_var i ppf m =
@@ -474,6 +490,8 @@ and type_inspection : type a. _ -> _ -> a type_inspection -> unit =
   | Polymorphic_parameter param ->
     line i ppf "Polymorphic_parameter\n";
     poly_param (i+1) ppf param;
+  | Module_pack pty ->
+    line i ppf "Module_pack %a\n" Rawprinttyp.type_expr pty;
 
 and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   line i ppf "pattern %a\n" fmt_location x.pat_loc;
@@ -515,10 +533,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_variant (l, po, _) ->
       line i ppf "Tpat_variant \"%s\"\n" l;
       option i pattern ppf po;
-  | Tpat_record (l, _, _, _c) ->
+  | Tpat_record (l, _, _c) ->
       line i ppf "Tpat_record\n";
       list i longident_x_pattern ppf l;
-  | Tpat_record_unboxed_product (l, _, _, _c) ->
+  | Tpat_record_unboxed_product (l, _, _c) ->
       line i ppf "Tpat_record_unboxed_product\n";
       list i longident_x_pattern ppf l;
   | Tpat_array (am, arg_sort, l) ->
@@ -565,7 +583,7 @@ and pattern_extra i ppf (extra_pat, loc, attrs) =
   | Tpat_constraint (cty, m) ->
      line i ppf "Tpat_extra_constraint\n";
      attributes i ppf attrs;
-     core_type i ppf cty;
+     option i core_type ppf cty;
      alloc_modes i ppf m;
   | Tpat_type (id, _) ->
      line i ppf "Tpat_extra_type %a\n" fmt_path id;
@@ -592,7 +610,7 @@ and function_body i ppf (body : function_body) =
         fmt_partiality fc_partial
         fmt_location fc_loc;
       let i = i+1 in
-      alloc_mode_raw i ppf fc_arg_mode;
+      alloc_mode_l i ppf fc_arg_mode;
       line i ppf "%a\n" fmt_sort fc_arg_sort;
       attributes i ppf fc_attributes;
       List.iter (fun e -> expression_extra i ppf (e, fc_loc, [])) fc_exp_extra;
@@ -635,17 +653,24 @@ and expression_extra i ppf (extra, loc, attrs) =
       attributes i ppf attrs;
       type_inspection (i+1) ppf ti
 
-and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
-  = fun i ppf m ->
-    line i ppf "alloc_mode %a\n" (Format_doc.compat (Mode.Alloc.print ())) m
-
-and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m
+and alloc_mode i ppf (m : alloc_mode_r) =
+  line i ppf "alloc_mode %a\n" print_alloc_mode_r m
 
 and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
 
-and locality_mode i ppf m =
+and alloc_mode_l i ppf (m : alloc_mode_l) =
+  line i ppf "locality_mode %a\n" print_alloc_mode_l m
+
+and locality_mode : type l r. _ -> _ -> (l * r) Mode.Locality.t -> _ =
+ fun i ppf m ->
   line i ppf "locality_mode %a\n"
     (Format_doc.compat (Mode.Locality.print ())) m
+
+and yielding_mode i ppf m =
+  line i ppf "yielding_mode %s\n"
+    (match Mode.Yielding.zap_to_floor_exn m with
+     | Mode.Yielding.Const.Unyielding -> "unyielding"
+     | Mode.Yielding.Const.Yielding -> "yielding")
 
 and value_mode i ppf m =
   line i ppf "value_mode %a\n" (Format_doc.compat (Mode.Value.print ())) m
@@ -679,20 +704,22 @@ and expression i ppf x =
       line i ppf "Texp_letmutable\n";
       value_binding Nonrecursive i ppf vb;
       expression i ppf e
-  | Texp_function { params; body; alloc_mode = am; ret_mode } ->
+  | Texp_function { params; body; alloc_mode = am; ret_mode; yielding = ym } ->
       line i ppf "Texp_function\n";
       alloc_mode i ppf am;
-      alloc_modes_var i ppf ret_mode;
+      yielding_mode i ppf ym;
+      return_modes i ppf ret_mode;
       list i function_param ppf params;
       function_body i ppf body;
-  | Texp_apply (e, l, m, am, za) ->
+  | Texp_apply (e, l, m, am, ym, za) ->
       line i ppf "Texp_apply\n";
       line i ppf "apply_mode %s\n"
         (match m with
          | Tail -> "Tail"
          | Nontail -> "Nontail"
          | Default -> "Default");
-      locality_mode i ppf am;
+      return_mode i ppf am;
+      yielding_mode i ppf ym;
       Option.iter (zero_alloc_assume i ppf) za;
       expression i ppf e;
       list i label_x_apply_arg ppf l;
@@ -768,7 +795,8 @@ and expression i ppf x =
       line i ppf "Texp_idx\n";
       block_access i ppf ba;
       List.iter (unboxed_access i ppf) uas;
-  | Texp_atomic_loc (e, sort, li, _, amode) ->
+  | Texp_atomic_loc { record = e; record_sort = sort; lid = li;
+                      alloc_mode = amode } ->
       line i ppf "Texp_atomic_loc\n";
       expression i ppf e;
       line i ppf "%a\n" fmt_sort sort;
@@ -872,11 +900,11 @@ and expression i ppf x =
     expression i ppf e2
   | Texp_hole _ ->
     line i ppf "Texp_hole"
-  | Texp_quotation e ->
-    line i ppf "Texp_quotation";
+  | Texp_quote e ->
+    line i ppf "Texp_quote";
       expression i ppf e
-  | Texp_antiquotation e ->
-    line i ppf "Texp_antiquotation";
+  | Texp_splice e ->
+    line i ppf "Texp_splice";
     expression i ppf e
 
 and value_description i ppf x =
@@ -1283,19 +1311,19 @@ and module_expr i ppf x =
   | Tmod_structure (s) ->
       line i ppf "Tmod_structure\n";
       structure i ppf s;
-  | Tmod_functor (Unit, me) ->
+  | Tmod_functor (Unit, me, _) ->
       line i ppf "Tmod_functor ()\n";
       module_expr i ppf me;
-  | Tmod_functor (Named (s, _, mt, ma), me) ->
+  | Tmod_functor (Named (s, _, mt, ma), me, _) ->
       line i ppf "Tmod_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt;
       module_expr i ppf me;
       alloc_modes i ppf ma;
-  | Tmod_apply (me1, me2, _) ->
+  | Tmod_apply (me1, me2, _, _, _) ->
       line i ppf "Tmod_apply\n";
       module_expr i ppf me1;
       module_expr i ppf me2;
-  | Tmod_apply_unit me1 ->
+  | Tmod_apply_unit (me1, _) ->
       line i ppf "Tmod_apply_unit\n";
       module_expr i ppf me1;
   | Tmod_constraint (me, _, Tmodtype_explicit (mt, modes), _) ->
@@ -1410,7 +1438,7 @@ and block_access i ppf = function
       line i ppf "Baccess_field %a\n" fmt_longident li
   | Baccess_block (mut, index) ->
       line i ppf "Baccess_block %a\n"
-        fmt_mutable_flag mut;
+        fmt_access_flag mut;
       expression i ppf index
 
 and unboxed_access i ppf = function

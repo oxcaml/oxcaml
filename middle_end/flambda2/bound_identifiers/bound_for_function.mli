@@ -41,6 +41,8 @@ val my_region : t -> Variable.t option
 
 val my_ghost_region : t -> Variable.t option
 
+val my_alloc_region : t -> Variable.t
+
 val my_alloc_mode : t -> Alloc_mode.For_applications.t
 
 val my_depth : t -> Variable.t

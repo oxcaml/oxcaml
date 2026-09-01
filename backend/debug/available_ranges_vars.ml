@@ -57,7 +57,9 @@ module Vars = struct
     type t = { stack_offset : int }
 
     let create () =
-      { (* This does not include the [Proc.initial_stack_offset] (see below). *)
+      { (* Only the dynamic stack adjustment (pushtraps, [Lstackoffset]); the
+           [Proc.initial_stack_offset] is added by [Proc.frame_size] and
+           [Proc.slot_offset] when [Subrange_info.create] consults them. *)
         stack_offset = 0
       }
 
@@ -101,13 +103,14 @@ module Vars = struct
 
     let create reg subrange_state ~fun_contains_calls ~fun_num_stack_slots =
       let reg = RD.reg reg in
-      let initial_stack_offset =
-        Proc.initial_stack_offset ~contains_calls:fun_contains_calls
-          ~num_stack_slots:fun_num_stack_slots
-      in
-      let stack_offset =
-        Subrange_state.stack_offset subrange_state + initial_stack_offset
-      in
+      (* [Proc.frame_size] and [Proc.slot_offset] below already account for
+         [Proc.initial_stack_offset], so [stack_offset] must be only the dynamic
+         adjustment (pushtraps, [Lstackoffset]) at this program point -- exactly
+         what the emitter passes to those functions. Adding the initial offset
+         here as well double-counts it, which after 16-byte frame alignment
+         yields a CFA offset that is wrong by the alignment padding whenever the
+         initial offset is not itself a multiple of 16. *)
+      let stack_offset = Subrange_state.stack_offset subrange_state in
       let offset =
         match reg.loc with
         | Stack loc ->

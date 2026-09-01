@@ -164,6 +164,9 @@ module Update_kind : sig
   (** Tightly packed (eight words each); the byte offset is [index * 64]. *)
   val naked_vec512s : t
 
+  (** Assumes each field is a word; the byte offset is [index * size_addr]. *)
+  val naked_mask_fields : t
+
   (** Assumes each field is a word; the byte offset is [index * size_addr]. Note
       that in this case the index is still based on word-width fields! *)
   val naked_vec128_fields : t
@@ -195,7 +198,7 @@ val extended_machtype_of_return_arity :
   [`Unarized] Flambda_arity.t -> Cmm_helpers.Extended_machtype.t
 
 val alloc_mode_for_applications_to_cmx :
-  Alloc_mode.For_applications.t -> Cmx_format.alloc_mode
+  Alloc_mode.For_applications.t -> Cmx_format.return_mode
 
 val alloc_mode_for_allocations_to_cmm :
   Alloc_mode.For_allocations.t -> Cmm.Alloc_mode.t

@@ -807,7 +807,7 @@ let expand_prefix ~global_modules ?(kinds = []) env prefix =
 open Typedtree
 
 let labels_of_application ~prefix = function
-  | { exp_desc = Texp_apply (f, args, _, _, _); exp_env; _ } ->
+  | { exp_desc = Texp_apply (f, args, _, _, _, _); exp_env; _ } ->
     let rec labels t =
       match Types.get_desc t with
       | Types.Tarrow ((label, _, _), lhs, rhs, _) -> (label, lhs) :: labels rhs
@@ -859,7 +859,9 @@ let application_context ~prefix path =
   let context =
     match path with
     | (_, Expression earg)
-      :: (_, Expression ({ exp_desc = Texp_apply (efun, _, _, _, _); _ } as app))
+      :: ( _,
+           Expression
+             ({ exp_desc = Texp_apply (efun, _, _, _, _, _); _ } as app) )
       :: _
       when earg != efun ->
       (* Type variables shared across arguments should all be

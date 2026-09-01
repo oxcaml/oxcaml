@@ -30,7 +30,7 @@ open! Int_replace_polymorphic_compare
 let verbose = ref false
 
 include Cfg_intf.S
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 type basic_instruction_list = basic instruction DLL.t
 
@@ -85,6 +85,42 @@ let rec of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list =
       Use_regalloc_param params :: of_cmm_codegen_option tl
     | Cold -> Cold :: of_cmm_codegen_option tl)
 
+type phantom_defining_expr =
+  | Cphantom_const_int of Targetint.t
+  | Cphantom_const_symbol of Cmm.symbol
+  | Cphantom_var of Backend_var.t
+  | Cphantom_offset_var of
+      { var : Backend_var.t;
+        offset_in_words : int
+      }
+  | Cphantom_read_field of
+      { var : Backend_var.t;
+        field : int
+      }
+  | Cphantom_read_symbol_field of
+      { sym : Cmm.symbol;
+        field : int
+      }
+  | Cphantom_block of
+      { tag : int;
+        fields : Backend_var.t list
+      }
+  | Cphantom_optimised_out
+
+let phantom_defining_expr_of_cmm (expr : Cmm.phantom_defining_expr) =
+  match expr with
+  | Cphantom_const_int i -> Cphantom_const_int i
+  | Cphantom_const_symbol s -> Cphantom_const_symbol s
+  | Cphantom_var v -> Cphantom_var v
+  | Cphantom_offset_var { var; offset_in_words } ->
+    Cphantom_offset_var { var; offset_in_words }
+  | Cphantom_read_field { var; field } -> Cphantom_read_field { var; field }
+  | Cphantom_read_symbol_field { sym; field } ->
+    Cphantom_read_symbol_field { sym; field }
+  | Cphantom_block { tag; fields } -> Cphantom_block { tag; fields }
+
+let phantom_optimised_out = Cphantom_optimised_out
+
 type t =
   { blocks : basic_block Label.Tbl.t;
     fun_name : string;
@@ -95,16 +131,21 @@ type t =
     fun_contains_calls : bool;
     (* CR-someday gyorsh: compute locally. *)
     fun_num_stack_slots : int Stack_class.Tbl.t;
+    mutable fun_frame_required : bool;
+    mutable fun_prologue_required : bool;
     fun_poll : Lambda.poll_attribute;
     next_instruction_id : InstructionId.sequence;
     fun_ret_type : Cmm.machtype;
+    fun_phantom_lets :
+      (Backend_var.Provenance.t option * phantom_defining_expr)
+      Backend_var.Map.t;
     mutable allowed_to_be_irreducible : bool;
     mutable register_locations_are_set : bool
   }
 
 let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     ~fun_num_stack_slots ~fun_poll ~next_instruction_id ~fun_ret_type
-    ~allowed_to_be_irreducible =
+    ~fun_phantom_lets ~allowed_to_be_irreducible =
   { fun_name;
     fun_args;
     fun_codegen_options;
@@ -115,9 +156,12 @@ let create ~fun_name ~fun_args ~fun_codegen_options ~fun_dbg ~fun_contains_calls
     blocks = Label.Tbl.create 31;
     fun_contains_calls;
     fun_num_stack_slots;
+    fun_frame_required = false;
+    fun_prologue_required = false;
     fun_poll;
     next_instruction_id;
     fun_ret_type;
+    fun_phantom_lets;
     allowed_to_be_irreducible;
     register_locations_are_set = false
   }
@@ -234,6 +278,8 @@ let first_instruction_stack_offset (block : basic_block) : int =
 
 let fun_name t = t.fun_name
 
+let fun_phantom_lets t = t.fun_phantom_lets
+
 let entry_label t = t.entry_label
 
 let iter_blocks t ~f = Label.Tbl.iter f t.blocks
@@ -276,8 +322,9 @@ let register_predecessors_for_all_blocks (t : t) =
             | target_block -> target_block
             | exception Not_found ->
               Misc.fatal_errorf
-                "Cfg.register_predecessors_for_all_blocks: block %a not found"
-                Label.format target
+                "Cfg.register_predecessors_for_all_blocks: block %a not found \
+                 (in function %s, target of an edge from block %a)"
+                Label.format target t.fun_name Label.format label
           in
           target_block.predecessors
             <- Label.Set.add label target_block.predecessors)
@@ -355,6 +402,9 @@ let is_pure_basic : basic -> bool = function
     (* May reallocate the stack. *)
     false
 
+let is_dead_basic (instr : basic instruction) ~live_after =
+  is_pure_basic instr.desc && Reg.disjoint_set_array live_after instr.res
+
 let same_location (r1 : Reg.t) (r2 : Reg.t) =
   Reg.same_loc_fatal_on_unknown
     ~fatal_message:"Cfg got unknown register location." r1 r2
@@ -372,9 +422,9 @@ let is_noop_move instr =
       Reg.same_loc instr.res.(0) ifso && Reg.same_loc instr.res.(0) ifnot)
   | Op
       ( Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
-      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-      | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-      | Floatop _ | Opaque | Reinterpret_cast _ | Static_cast _
+      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
+      | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+      | Intop_atomic _ | Floatop _ | Opaque | Reinterpret_cast _ | Static_cast _
       | Probe_is_enabled _ | Specific _ | Name_for_debugger _ | Begin_region
       | End_region | Dls_get | Tls_get | Domain_index | Poll | Alloc _ | Pause
         )
@@ -402,7 +452,8 @@ let set_live (instr : _ instruction) live = instr.live <- live
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
     ?(available_before = Reg_availability_set.Unreachable)
-    ?(available_across = Reg_availability_set.Unreachable) () =
+    ?(available_across = Reg_availability_set.Unreachable)
+    ?(phantom_available_before = None) () =
   { desc;
     arg;
     res;
@@ -412,7 +463,8 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     stack_offset;
     id;
     available_before;
-    available_across
+    available_across;
+    phantom_available_before
   }
 
 let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
@@ -426,7 +478,8 @@ let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
     stack_offset = copy.stack_offset;
     id;
     available_before = copy.available_before;
-    available_across = copy.available_across
+    available_across = copy.available_across;
+    phantom_available_before = copy.phantom_available_before
   }
 
 let invalid_stack_offset = -1
@@ -454,7 +507,7 @@ let is_poll (instr : basic instruction) =
       ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Begin_region
       | End_region | Dls_get | Tls_get | Domain_index | Const_int _
       | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
+      | Const_vec256 _ | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -472,7 +525,26 @@ let is_alloc (instr : basic instruction) =
       ( Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
       | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Load _
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
+      | Store (_, _, _)
+      | Intop _ | Int128op _
+      | Intop_imm (_, _)
+      | Intop_atomic _
+      | Floatop (_, _)
+      | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+      | Specific _ | Name_for_debugger _ ) ->
+    false
+
+let is_heap_alloc (instr : basic instruction) =
+  match instr.desc with
+  | Op (Alloc { mode = Heap; bytes = _; dbginfo = _ }) -> true
+  | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
+  | Op
+      ( Alloc { mode = Local; bytes = _; dbginfo = _ }
+      | Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
+      | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
+      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -490,7 +562,7 @@ let is_end_region (b : basic) =
       ( Alloc _ | Poll | Move | Spill | Reload | Opaque | Begin_region | Dls_get
       | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Load _
+      | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -560,11 +632,11 @@ let remove_trap_instructions t removed_trap_handlers =
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-        | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
-        | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
-        | Alloc _ | Pause )
+        | Const_mask _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+        | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
+        | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+        | Domain_index | Poll | Alloc _ | Pause )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =

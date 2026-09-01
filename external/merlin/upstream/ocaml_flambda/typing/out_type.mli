@@ -102,6 +102,11 @@ val tree_of_type_scheme: type_expr -> out_type
 val tree_of_modalities:
   Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
 
+(** [out_jkind_of_jkind env jkind] converts a jkind to an [out_jkind]
+    for printing. This uses the same naming scheme as error messages (e.g.,
+    ['_representable_layout_N] for sort variables). *)
+val out_jkind_of_jkind: Env.t -> 'd Types.jkind -> out_jkind
+
 
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer

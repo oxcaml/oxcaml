@@ -230,6 +230,51 @@ Error: Unbound type constructor "int16"
 Hint:              Did you mean "int", "int16x8", "int32", "int64" or "int8x16"?
 |}];;
 
+type t = uint8_u;;
+[%%expect{|
+Line 1, characters 9-16:
+1 | type t = uint8_u;;
+             ^^^^^^^
+Error: Unbound type constructor "uint8_u"
+Hint:              Did you mean "int32_u" or "int64_u"?
+|}];;
+
+type t = uint16_u;;
+[%%expect{|
+Line 1, characters 9-17:
+1 | type t = uint16_u;;
+             ^^^^^^^^
+Error: Unbound type constructor "uint16_u"
+Hint:              Did you mean "int16x8", "int32_u" or "int64_u"?
+|}];;
+
+type t = uint32_u;;
+[%%expect{|
+Line 1, characters 9-17:
+1 | type t = uint32_u;;
+             ^^^^^^^^
+Error: Unbound type constructor "uint32_u"
+Hint:              Did you mean "int32_u"?
+|}];;
+
+type t = uint64_u;;
+[%%expect{|
+Line 1, characters 9-17:
+1 | type t = uint64_u;;
+             ^^^^^^^^
+Error: Unbound type constructor "uint64_u"
+Hint:              Did you mean "int64_u"?
+|}];;
+
+type t = unativeint_u;;
+[%%expect{|
+Line 1, characters 9-21:
+1 | type t = unativeint_u;;
+             ^^^^^^^^^^^^
+Error: Unbound type constructor "unativeint_u"
+Hint:              Did you mean "nativeint_u"?
+|}];;
+
 let f () = #'a';;
 [%%expect{|
 Line 1, characters 11-15:

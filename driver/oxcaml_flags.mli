@@ -35,7 +35,9 @@ val cfg_peephole_optimize: bool ref
 val x86_peephole_optimize : bool ref
 val x86_peephole_remove_mov_to_dead_register : bool ref
 val x86_peephole_remove_redundant_cmp : bool ref
+val x86_peephole_remove_redundant_extension : bool ref
 val x86_peephole_combine_add_rsp : bool ref
+val x86_peephole_remove_redundant_test : bool ref
 
 val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
@@ -45,8 +47,11 @@ val cfg_eliminate_dead_trap_handlers : bool ref
 val cfg_prologue_validate : bool ref
 val cfg_prologue_shrink_wrap : bool ref
 val cfg_prologue_shrink_wrap_threshold : int ref
+val omit_leaf_frame_pointers : bool ref
 
 val cfg_merge_blocks : bool ref
+
+val cfg_block_layout : bool ref
 
 val cfg_value_propagation : bool ref
 val cfg_value_propagation_float : bool ref
@@ -58,7 +63,6 @@ val module_entry_functions_section : bool ref
 
 val dasm_comments : bool ref
 
-val frametables_in_rodata : bool ref
 
 val default_heap_reduction_threshold : int
 val heap_reduction_threshold : int ref
@@ -134,6 +138,8 @@ val cached_generic_functions_path : string ref
 
 val dissector_assume_lld_without_64_bit_eh_frames : bool ref
 
+val dissector_max_linker_parallelism : Misc.Maybe_bounded.t ref
+
 val manual_module_init : bool ref
 
 val symbol_visibility_protected : bool ref
@@ -162,6 +168,7 @@ module Flambda2 : sig
     val reaper_unbox : bool
     val reaper_max_unbox_size : int
     val reaper_change_calling_conventions : bool
+    val simplify_stubs : bool
     val unicode : bool
     val kind_checks : bool
     val match_in_match : bool
@@ -185,6 +192,7 @@ module Flambda2 : sig
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
     match_in_match : bool;
@@ -207,6 +215,7 @@ module Flambda2 : sig
   val reaper_unbox : bool or_default ref
   val reaper_max_unbox_size : int or_default ref
   val reaper_change_calling_conventions : bool or_default ref
+  val simplify_stubs : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
   val match_in_match : bool or_default ref

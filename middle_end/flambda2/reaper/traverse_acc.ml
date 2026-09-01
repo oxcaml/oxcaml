@@ -55,7 +55,6 @@ type t =
     mutable apply_deps : apply_dep list;
     mutable set_of_closures_deps : closure_dep list;
     deps : Graph.graph;
-    mutable kinds : K.t Name.Map.t;
     mutable fixed_arity_conts : Continuation.Set.t;
     mutable continuation_info : continuation_info Continuation.Map.t;
     mutable set_of_closures_graph : Code_id.Set.t Code_id.Map.t;
@@ -71,21 +70,11 @@ let create () =
     apply_deps = [];
     set_of_closures_deps = [];
     deps = Graph.create ();
-    kinds = Name.Map.empty;
     fixed_arity_conts = Continuation.Set.empty;
     continuation_info = Continuation.Map.empty;
     set_of_closures_graph = Code_id.Map.empty;
     all_sets_of_closures = []
   }
-
-let kinds t = t.kinds
-
-let kind t name k = t.kinds <- Name.Map.add name k t.kinds
-
-let bound_parameter_kind t (bp : Bound_parameter.t) =
-  let kind = K.With_subkind.kind (Bound_parameter.kind bp) in
-  let name = Name.var (Bound_parameter.var bp) in
-  t.kinds <- Name.Map.add name kind t.kinds
 
 (* CR-someday ncourant: it would be great if we kept constants and symbols from
    external compilation units in the graph as well, making effectively all
@@ -96,24 +85,9 @@ let simple_to_node t ~all_constants simple =
     ~const:(fun _ -> Code_id_or_name.name all_constants)
     ~var:(fun v ~coercion:_ -> Code_id_or_name.var v)
     ~symbol:(fun s ~coercion:_ ->
-      if not (Compilation_unit.is_current (Symbol.compilation_unit s))
+      if not (Current_unit.is_current (Symbol.compilation_unit s))
       then Graph.add_any_source t.deps (Code_id_or_name.symbol s);
       Code_id_or_name.symbol s)
-
-let alias_kind t name simple =
-  let kind =
-    Simple.pattern_match simple
-      ~name:(fun name ~coercion:_ ->
-        (* Symbols are always values and might not be in t.kinds *)
-        if Name.is_symbol name
-        then K.value
-        else
-          match Name.Map.find_opt name t.kinds with
-          | Some k -> k
-          | None -> Misc.fatal_errorf "Unbound name %a" Name.print name)
-      ~const:Reg_width_const.kind
-  in
-  t.kinds <- Name.Map.add name kind t.kinds
 
 let add_code_dep t code_id dep =
   t.code_deps <- Code_id.Map.add code_id dep t.code_deps
@@ -211,8 +185,7 @@ let add_set_of_closures_dep t let_bound_name_of_the_closure ~closure_code_id
   match defined_in_code_id with
   | None -> ()
   | Some defined_in_code_id ->
-    if
-      Compilation_unit.is_current (Code_id.get_compilation_unit closure_code_id)
+    if Current_unit.is_current (Code_id.get_compilation_unit closure_code_id)
     then
       t.set_of_closures_graph
         <- Code_id.Map.update closure_code_id
@@ -454,8 +427,7 @@ let record_set_of_closures_deps_one_closure t
      in code that will be rewritten for unbox-fv-closures anyway. *)
   match find_code_dep t code_id with
   | None ->
-    assert (
-      not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id)));
+    assert (not (Current_unit.is_current (Code_id.get_compilation_unit code_id)));
     (* The code comes from another compilation unit, so we don't know what
        happens once it is applied. As such, it must cause the whole block to
        escape. *)

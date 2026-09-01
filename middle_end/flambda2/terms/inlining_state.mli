@@ -24,15 +24,20 @@ val equal : t -> t -> bool
 
 val default : round:int -> t
 
-val create : arguments:Inlining_arguments.t -> depth:int -> t
+val create : arguments:Inlining_arguments.t -> depth:int -> stub_depth:int -> t
 
 val depth : t -> int
 
-val increment_depth : t -> by:int -> t
+val stub_depth : t -> int
+
+val increment_depth : t -> is_stub:bool -> by:int -> t
 
 val is_depth_exceeded : t -> bool
 
-val meet : t -> t -> t
+(** The depths are summed and the arguments are combined (see
+    [Inlining_arguments.combine]; [from_env] must be the state of the current
+    simplification environment). *)
+val combine : from_env:t -> from_metadata:t -> t
 
 val with_arguments : Inlining_arguments.t -> t -> t
 

@@ -7,5 +7,5 @@
    (:standard
     (:include %{project_root}/ocamlopt_flags.sexp)
     -O3))
-  (libraries ocamlcommon)
+  (libraries ocamlfrontend)
 )

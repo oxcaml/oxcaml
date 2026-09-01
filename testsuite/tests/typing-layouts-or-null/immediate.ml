@@ -1,5 +1,6 @@
 (* TEST
- flags = "-extension-universe alpha";
+ flags += "-extension-universe alpha ";
+ flags += "-no-extension mode_polymorphism_alpha";
  expect;
 *)
 

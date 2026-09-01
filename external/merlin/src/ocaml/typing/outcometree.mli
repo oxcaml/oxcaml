@@ -62,7 +62,6 @@ type out_value =
   | Oval_unboxed_tuple of (string option * out_value) list
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
-  | Oval_code of CamlinternalQuote.Code.t
   | Oval_floatarray of floatarray
 
 type out_modality = string
@@ -110,6 +109,7 @@ and out_jkind =
   | Ojkind_var of string * string list
   (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
+  | Ojkind_addressable of out_jkind
 
 (* should be empty if all the jkind annotations are missing *)
 and out_vars_jkinds = (string * out_jkind option) list
@@ -148,6 +148,7 @@ and out_type =
   | Otyp_newlayout of out_sort_genvar list * out_type
   | Otyp_module of out_package
   | Otyp_attribute of out_type * out_attribute
+  | Otyp_mod of out_type * out_modality list
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
          synthesized directly from the [Typedtree] *)
@@ -166,6 +167,7 @@ and out_constructor = {
   ocstr_name: string;
   ocstr_args: (out_type * out_modality list) list;
   ocstr_return_type: (out_vars_jkinds * out_type) option;
+  ocstr_all_void: bool;
 }
 
 and out_package = {
@@ -241,6 +243,7 @@ and out_type_extension =
 and out_val_decl =
   { oval_name: string;
     oval_type: out_type;
+    oval_poly: bool;
     oval_modalities : out_modality list;
     (* Modalities on value descriptions are always new, even for [global_] *)
     oval_prims: string list;

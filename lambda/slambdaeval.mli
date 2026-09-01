@@ -46,4 +46,23 @@ and value =
   | SLVrecord of value Or_missing.t array
   | SLVclosure of closure
 
-val eval : slambda -> halves
+module CU_data : sig
+  type t
+
+  type raw
+
+  val empty : unit -> t
+
+  val write : t -> sections:File_sections.Builder.t -> raw
+
+  val read : raw -> sections:File_sections.t -> t
+
+  val print : Format_doc.formatter -> t -> unit
+end
+
+val eval :
+  cu_static_data:(Compilation_unit.t -> CU_data.t option) ->
+  slambda ->
+  CU_data.t * lambda
+
+val print_value_or_missing : Format_doc.formatter -> value Or_missing.t -> unit

@@ -14,17 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type string_contents =
-  | Contents of string
-  | Unknown_or_mutable
-
-type t
-
-(* CR mshinwell: [size] shouldn't be needed when passing [Contents] *)
-val create : contents:string_contents -> size:Target_ocaml_int.t -> t
-
-val contents : t -> string_contents
-
-val size : t -> Target_ocaml_int.t
+type t = string
 
 include Container_types.S with type t := t

@@ -123,7 +123,6 @@ let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
     Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
       ~used_value_slots ~exported_offsets ~sections all_code
   in
-  let unit = Flambda_unit.with_used_value_slots unit used_value_slots in
   { cmx; unit; all_code; exported_offsets; reachable_names }
 
 type flambda_result =
@@ -150,7 +149,7 @@ let flambda_to_flambda0 : type m.
     mode:m Flambda_features.mode ->
     close_prog_metadata:m Closure_conversion.close_program_metadata ->
     code_slot_offsets:Slot_offsets.t Flambda2_identifiers.Code_id.Map.t ->
-    sections:Oxcaml_utils.File_sections.Builder.t ->
+    sections:File_sections.Builder.t ->
     Flambda_unit.t ->
     flambda_result =
  fun ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode

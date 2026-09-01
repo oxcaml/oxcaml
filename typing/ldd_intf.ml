@@ -41,10 +41,13 @@ module type S = sig
 
   val node_of_var : var -> node
 
-  (** Boolean algebra over nodes. *)
+  (** Lattice operations over nodes. *)
   val join : node -> node -> node
 
   val meet : node -> node -> node
+
+  (** [imply a b] is the greatest [h] such that [meet a h <= b]. *)
+  val imply : node -> node -> node
 
   val sum : 'a list -> base:node -> f:('a -> node) -> node
 
@@ -70,6 +73,8 @@ module type S = sig
   val leq_with_reason : node -> node -> Jkind_axis.Axis.packed list
 
   val round_up : node -> Axis_lattice.t
+
+  val round_down : node -> Axis_lattice.t
 
   val is_const : node -> bool
 

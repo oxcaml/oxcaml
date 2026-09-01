@@ -3,7 +3,7 @@
 open! Int_replace_polymorphic_compare
 module Array = ArrayLabels
 module List = ListLabels
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 module Substitution = Regalloc_substitution
 
 let fatal_callback = ref (fun () -> ())
@@ -130,7 +130,8 @@ module Instruction = struct
       stack_offset = -1;
       id = InstructionId.none;
       available_before = Reg_availability_set.Unreachable;
-      available_across = Reg_availability_set.Unreachable
+      available_across = Reg_availability_set.Unreachable;
+      phantom_available_before = None
     }
 
   let compare (left : t) (right : t) : int =

@@ -56,8 +56,6 @@ struct
 
     let max_int64 = Int64.lognot min_int64
 
-    let unsigned_min_int64 = 0L
-
     let unsigned_max_int64 =
       Int64.shift_right_logical Int64.minus_one (64 - num_bits)
 
@@ -65,30 +63,22 @@ struct
       if num_bits = 8
       then (
         assert (Int64.equal min_int64 (-128L));
-        assert (Int64.equal max_int64 127L);
-        assert (Int64.equal unsigned_max_int64 255L))
+        assert (Int64.equal max_int64 127L))
 
     let of_int64_exn i =
       if Int64.compare i min_int64 < 0 || Int64.compare i max_int64 > 0
       then Misc.fatal_errorf "Int%d: %Ld is out of range" num_bits i
       else Int64.to_int i
 
-    let unsigned_of_int64_exn i =
-      if
-        Int64.compare i unsigned_min_int64 < 0
-        || Int64.compare i unsigned_max_int64 > 0
-      then Misc.fatal_errorf "Int%d: %Ld is out of range" num_bits i
-      else Int64.to_int i
-
     let of_int_exn i = of_int64_exn (Int64.of_int i)
-
-    let unsigned_of_int_exn i = unsigned_of_int64_exn (Int64.of_int i)
 
     let of_int i =
       let extra_bits = Sys.int_size - num_bits in
       (i lsl extra_bits) asr extra_bits
 
     let to_int i = i
+
+    let unsigned_to_int i = i land Int64.to_int unsigned_max_int64
 
     let to_float = Float.of_int
 
@@ -228,6 +218,8 @@ module type Float_by_bit_pattern = sig
 
   val to_bits : t -> bits
 
+  val of_int64 : int64 -> t
+
   val of_string : string -> t
 
   val to_float : t -> float
@@ -256,6 +248,8 @@ module Float_by_bit_pattern_gen (Bits : sig
 
   val float_of_bits : t -> float
 
+  val of_int64 : int64 -> t
+
   val of_string : string -> t
 
   val compare : t -> t -> int
@@ -272,6 +266,8 @@ struct
   let of_bits bits = bits
 
   let to_bits bits = bits
+
+  let of_int64 i = Bits.of_int64 i
 
   let of_string str = Bits.of_string str
 
@@ -334,6 +330,8 @@ end
 module Float_by_bit_pattern = Float_by_bit_pattern_gen (struct
   include Int64
 
+  let of_int64 i = bits_of_float (Int64.to_float i)
+
   let of_string str = bits_of_float (float_of_string str)
 
   module IEEE_semantics = struct
@@ -368,6 +366,9 @@ end)
 module Float32_by_bit_pattern = Float_by_bit_pattern_gen (struct
   include Int32
   module F32 = Flambda2_floats.Float32
+
+  (* Carefully avoid double rounding. *)
+  let of_int64 i = F32.to_bits (F32.of_int64 i)
 
   let of_string str = F32.to_bits (F32.of_string str)
 

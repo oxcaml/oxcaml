@@ -144,7 +144,7 @@ type type_mismatch =
   | Extensible_representation of position
   | With_null_representation of position
   | Fixed_representation of position
-  | Jkind of Jkind.Violation.t
+  | Jkind of Ikind.subjkind_error
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
 type jkind_mismatch =

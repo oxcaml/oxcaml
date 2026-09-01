@@ -157,15 +157,20 @@ val set_static_row_name: type_declaration -> Path.t -> unit
 
 (**** Utilities for type traversal ****)
 
-val iter_type_expr: (type_expr -> unit) -> type_expr -> unit
+val iter_type_expr:
+  (type_expr -> unit) -> (Mode.Alloc.lr -> unit) ->
+  type_expr -> unit
         (* Iteration on types *)
-val fold_type_expr: ('a -> type_expr -> 'a) -> 'a -> type_expr -> 'a
+val fold_type_expr:
+  ('a -> type_expr -> 'a) -> ('a -> Mode.Alloc.lr -> 'a) ->
+  'a -> type_expr -> 'a
 val iter_row: (type_expr -> unit) -> row_desc -> unit
         (* Iteration on types in a row *)
 val fold_row: ('a -> type_expr -> 'a) -> 'a -> row_desc -> 'a
 val iter_abbrev: (type_expr -> unit) -> abbrev_memo -> unit
         (* Iteration on types in an abbreviation list *)
-val iter_type_expr_kind: (type_expr -> unit) -> (type_decl_kind -> unit)
+val iter_type_expr_kind: (type_expr -> unit) ->
+  (type_decl_kind -> unit)
 
 val iter_type_expr_cstr_args: (type_expr -> unit) ->
   (constructor_arguments -> unit)
@@ -200,6 +205,8 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
+    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
 type type_iterators_full = (type_expr -> unit) type_iterators
@@ -216,7 +223,8 @@ val type_iterators_without_type_expr: type_iterators_without_type_expr
 (**** Utilities for copying ****)
 
 val copy_type_desc:
-    ?keep_names:bool -> (type_expr -> type_expr) -> type_desc -> type_desc
+    ?keep_names:bool -> (type_expr -> type_expr) ->
+    (Mode.Alloc.lr -> Mode.Alloc.lr) -> type_desc -> type_desc
         (* Copy on types *)
 val copy_row:
     (type_expr -> type_expr) ->
@@ -235,6 +243,26 @@ module For_copy : sig
 
   val redirect_desc: copy_scope -> type_expr -> type_desc -> unit
         (* Temporarily change a type description *)
+
+  val mode_instantiate :
+    copy_scope -> current_level:int ->
+    Mode.Alloc.lr -> Mode.Alloc.lr
+        (* Instantiates a generic mode variable to level [current_level] *)
+
+  val mode_copy_generic :
+    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+        (* Copies the generic parts of a mode variable
+           without changing its level *)
+
+  val mode_copy_for_saving :
+    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+        (* Deeply copies a mode variable without changing its level, giving
+           the copies negative (persistent) ids, for storing in a cmi file. *)
+
+  val mode_copy_for_restoring :
+    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+        (* Deeply copies a mode variable without changing its level.
+           Asserts that the original has negative ids. *)
 
   val with_scope: (copy_scope -> 'a) -> 'a
         (* [with_scope f] calls [f] and restores saved type descriptions
@@ -430,6 +458,11 @@ module Jkind0 : sig
       Jkind_types.Scannable_axes.t ->
       Jkind_types.Layout.Const.t jkind_base
 
+    val apply_operator :
+      Jkind_types.Layout.Const.t jkind_base ->
+      Jkind_types.Kind_operator.t ->
+      Jkind_types.Layout.Const.t jkind_base
+
     val try_allow_l :
       ('layout, 'l * 'r) base_and_axes ->
       ('layout, allowed * 'r) base_and_axes option
@@ -580,6 +613,9 @@ module Jkind0 : sig
       (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
       val vec512 : t
 
+      (** The jkind of unboxed 64-bit masks with no mode crossing. *)
+      val mask : t
+
       (** The jkind of unboxed 128-bit vectors with mode crossing. *)
       val kind_of_unboxed_128bit_vectors : t
 
@@ -588,6 +624,9 @@ module Jkind0 : sig
 
       (** The jkind of unboxed 512-bit vectors with mode crossing. *)
       val kind_of_unboxed_512bit_vectors : t
+
+      (** The jkind of unboxed 64-bit masks with mode crossing. *)
+      val kind_of_unboxed_mask : t
 
       (** A list of the core builtin jkinds exposed by predef. *)
       val builtins : t list
@@ -752,7 +791,7 @@ module Jkind0 : sig
     val for_or_null_argument : Ident.t -> 'd jkind
     val for_or_null_payload : Path.t -> 'd jkind
     val for_variant_with_null_result :
-      Path.t -> modality:Mode.Modality.Const.t -> type_expr -> jkind_l
+      Path.t -> (Mode.Modality.Const.t * type_expr) list -> jkind_l
 
     val for_effect_arg : Ident.t -> 'd jkind
 

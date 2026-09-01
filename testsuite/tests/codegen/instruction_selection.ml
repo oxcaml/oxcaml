@@ -55,13 +55,11 @@ f:
   ret
 |}]
 
-(* CR ttebbi: We could merge the and and test instructions *)
 let do_intersect t1 t2 =
   Int64_u.(if equal (logand t1 t2) #0L then #100L else #200L)
 [%%expect_asm X86_64{|
 do_intersect:
   andq  %rbx, %rax
-  testq %rax, %rax
   jne   .L0
   movl  $100, %eax
   ret
@@ -109,8 +107,8 @@ combine_comparisons:
   ret
 |}]
 
-(* CR ttebbi: We branch twice on the same comparison, even though we realise
-   it is the same one. *)
+(* CR ttebbi: We branch twice on the same comparison, materializing a boolean
+   for the second branch. *)
 let repeat_comparisons r _f =
   let a = !r > 5 in
   let b = !r > 5 in
@@ -140,6 +138,9 @@ bad_max:
   movq  %rax, %rsi
   movl  $1, %edi
   cmpq  %rsi, %rdi
+  movq  %rax, %rsi
+  movl  $1, %edi
+  cmpq  %rsi, %rdi
   jge   .L1
 .L0:
   movl  $1, %eax
@@ -147,15 +148,19 @@ bad_max:
 .L1:
   xorl  %eax, %eax
   cmpq  %rbx, %rdi
+  cmpq  %rbx, %rdi
   setl  %al
   testq %rax, %rax
   je    .L3
 .L2:
   addq  $2, %rdi
   cmpq  %rsi, %rdi
+  addq  $2, %rdi
+  cmpq  %rsi, %rdi
   jge   .L1
   jmp   .L0
 .L3:
+  movq  %rdi, %rax
   movq  %rdi, %rax
   ret
 |}]
@@ -167,15 +172,15 @@ let int_compare x y =
   | r -> r
 [%%expect_asm X86_64{|
 int_compare:
-  movq  %rax, %rdi
-  cmpq  %rbx, %rdi
+  movq  %rax, %rsi
+  cmpq  %rbx, %rsi
   je    .L0
-  movq  $-1, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 .L0:
   movl  $1, %eax
@@ -259,7 +264,6 @@ external memcmp :
   = "caml_no_bytecode_impl" "memcmp"
 [@@noalloc]
 
-(* CR ttebbi: Double sign extension instructions. *)
 let int32_box_unbox_after_call (a : ptr) (b : ptr) =
   Int32_u.of_int (Int32_u.to_int (memcmp a b ~len:#5n))
 [%%expect_asm X86_64{|
@@ -269,7 +273,6 @@ int32_box_unbox_after_call:
   movq  %rax, %rdi
   movq  %rbx, %rsi
   call  memcmp@PLT
-  movslq %eax, %rax
   movslq %eax, %rax
   addq  $8, %rsp
   ret
@@ -438,7 +441,9 @@ let shift_of_logand (a : int64#) =
 [%%expect_asm X86_64{|
 shift_of_logand:
   movl  $1, %ebx
+  movl  $1, %ebx
   movq  %rax, %rcx
+  andq  %rbx, %rcx
   andq  %rbx, %rcx
   movl  $3, %eax
   shrq  %cl, %rax

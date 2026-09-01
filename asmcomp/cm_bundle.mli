@@ -33,6 +33,9 @@ type error = private
 
 exception Error of error
 
+(** Returns the path to a temporary object file containing the bundled cmi and
+    cmx data; the caller is expected to remove that file once linking has
+    completed. *)
 val make_bundled_cm_file :
   (module Compiler_owee.Unix_intf.S) ->
   ppf_dump:Format.formatter ->

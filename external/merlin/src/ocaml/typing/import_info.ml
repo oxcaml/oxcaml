@@ -79,6 +79,19 @@ let has_name t ~name:name' = CU.Name.equal (name t) name'
 
 let dummy = Intf (Alias CU.Name.dummy)
 
+let print_intf ppf = function
+  | Normal (cu, _digest) -> CU.print ppf cu
+  | Alias name -> CU.Name.print ppf name
+  | Parameter (name, _digest) -> CU.Name.print ppf name
+
+let print_impl ppf = function
+  | Loaded (cu, _digest) -> CU.print ppf cu
+  | Unloaded cu -> CU.print ppf cu
+
+let print ppf = function
+  | Intf intf -> print_intf ppf intf
+  | Impl impl -> print_impl ppf impl
+
 module Intf = struct
   (* Currently this is the same type as [Impl.t] but this will change (see PR
      #1746). *)

@@ -41,6 +41,7 @@ val cut_and_n_way_join :
   meet_expanded_head:Meet_env.meet_expanded_head ->
   cut_after:Scope.t ->
   Meet_env.t ->
+  Typing_env.t ->
   Typing_env.t list ->
   Meet_env.t
 

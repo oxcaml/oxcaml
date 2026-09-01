@@ -38,9 +38,12 @@ val with_local_level_generalize:
     before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
 val with_local_level_generalize_if:
         bool -> before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
-val with_local_level_generalize_structure: (unit -> 'a) -> 'a
-val with_local_level_generalize_structure_if: bool -> (unit -> 'a) -> 'a
-val with_local_level_generalize_structure_if_principal: (unit -> 'a) -> 'a
+val with_local_level_generalize_structure:
+    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
+val with_local_level_generalize_structure_if:
+        bool -> before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
+val with_local_level_generalize_structure_if_principal:
+    before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
 val with_local_level_generalize_for_class:
     before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
 
@@ -84,7 +87,7 @@ val restore_global_level: int -> unit
 
 val create_scope : unit -> int
 
-val mark_toplevel_in_quotations : Env.t -> Env.t
+val mark_persistent_in_quotations : Env.t -> Env.t
 
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
@@ -148,9 +151,10 @@ val merge_row_fields:
 val filter_row_fields:
         bool -> (label * row_field) list -> (label * row_field) list
 
-val contains_toplevel_splice: int -> type_expr -> bool
+val contains_initial_stage_splice: int -> type_expr -> bool
 val iter_type_expr_with_stages:
-        (Env.t -> type_expr -> unit) -> Env.t -> type_expr -> unit
+        (Env.t -> type_expr -> unit) -> Env.t -> (Mode.Alloc.lr -> unit)
+        -> type_expr -> unit
 
 val generalize: type_expr -> unit
 (* Generalize in-place the given type *)
@@ -161,8 +165,13 @@ val lower_variables_only: Env.t -> int -> type_expr -> unit
         (* Lower all variables to the given level *)
 val enforce_current_level: Env.t -> type_expr -> unit
         (* Lower whole type to !current_level *)
+val generalize_structure: type_expr -> unit
+        (* Generalize the structure of a type, lowering variables
+           to !current_level *)
 val generalize_class_signature_spine: class_signature -> unit
        (* Special function to generalize methods during inference *)
+val generalize_class_type_structure: class_type -> unit
+        (* Generalize the structure of a class type *)
 val limited_generalize: type_expr -> inside:type_expr -> unit
         (* Only generalize some part of the type
            Make the remaining of the type non-generalizable *)
@@ -201,15 +210,17 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       in_counterexample : bool;
       (* true iff checking counter examples *)
-      mutable env_alloc_mode : Mode.Alloc.r option;
+      mutable env_alloc_mode : Mode.Locality.r option;
       (** [Some m] if the pattern is under [let poly_], where [m] is the
          allocation mode of the captured environment *)
     }
-  val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
+  val make:
+    ?env_alloc_mode:Mode.Locality.r
+    -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
-  val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
+  val set_env_alloc_mode : t -> Mode.Locality.r option -> unit
 end
 
 type existential_treatment =
@@ -264,7 +275,8 @@ val instance_label_declarations:
 (* Same, but for label declarations and the type parameters from the
    type declaration *)
 val prim_mode :
-        (Mode.allowed * 'r) Mode.Locality.t option -> (Primitive.mode * Primitive.native_repr)
+        (Mode.allowed * 'r) Mode.Locality.t option ->
+        (Primitive.mode * Primitive.native_repr) -> level:int
         -> (Mode.allowed * 'r) Mode.Locality.t
 val instance_prim:
         Env.t ->
@@ -273,10 +285,23 @@ val instance_prim:
         Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
         Jkind.Sort.t option
 
+val create_yielding_mode_l : Mode.Yielding.l -> Mode.Yielding.l
+
+(** The join of the yielding modes of the first [arity] parameters of a
+    primitive of type [ty]; [Yielding.max] if [ty] has fewer arrows. *)
+val prim_params_yielding:
+        Env.t -> type_expr -> arity:int -> Mode.Yielding.l
+
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
     to have. *)
-val curry_mode : Alloc.Const.t -> Alloc.Const.t -> Alloc.Const.t
+val curry_mode_const : Alloc.Const.t -> Alloc.Const.t -> Alloc.Const.t
+
+(** Applies the same logic as [curry_mode_const] over
+    the comonadic mode for [m0] and the lr mode [m1] *)
+val curry_mode :
+  (allowed * 'r) Alloc.Comonadic.t -> Alloc.lr ->
+  Alloc.Comonadic.l
 
 val apply:
         ?use_current_level:bool ->
@@ -579,10 +604,12 @@ val nondep_jkind_declaration:
 val is_contractive: Env.t -> Path.t -> bool
 val normalize_type: type_expr -> unit
 
-val remove_mode_and_jkind_variables: type_expr -> unit
+val remove_mode_and_jkind_variables:
+  zap_scope:Alloc.zap_scope -> type_expr -> unit
         (* Ensure mode and jkind variables are fully determined *)
 
-val nongen_vars_in_schema: Env.t -> type_expr -> Btype.TypeSet.t option
+val nongen_vars_in_schema:
+  zap_scope:Alloc.zap_scope -> Env.t -> type_expr -> Btype.TypeSet.t option
         (* Return any non-generic variables in the type scheme.  Also ensures
            mode variables are fully determined. *)
 
@@ -613,10 +640,14 @@ val closed_type_expr: ?env:Env.t -> type_expr -> bool
         (* If env present, expand abbreviations to see if expansion
            eliminates the variable *)
 
-val closed_type_decl: type_declaration -> type_expr option
-val closed_extension_constructor: extension_constructor -> type_expr option
+val closed_type_decl:
+  zap_scope:Alloc.zap_scope ->
+  type_declaration -> type_expr option
+val closed_extension_constructor:
+  zap_scope:Alloc.zap_scope ->
+  extension_constructor -> type_expr option
 val closed_class:
-        type_expr list -> class_signature ->
+        zap_scope:Alloc.zap_scope -> type_expr list -> class_signature ->
         closed_class_failure option
         (* Check whether all type variables are bound *)
 
@@ -739,9 +770,9 @@ val type_jkind_and_sort :
    but correct: they are used to implement the module inclusion check, where
    we can be sure that the l-jkind has no undetermined variables. *)
 val check_decl_jkind :
-  Env.t -> type_declaration -> jkind_l -> (unit, Jkind.Violation.t) result
+  Env.t -> type_declaration -> jkind_l -> (unit, Ikind.subjkind_error) result
 val constrain_decl_jkind :
-  Env.t -> type_declaration -> jkind_l -> (unit, Jkind.Violation.t) result
+  Env.t -> type_declaration -> jkind_l -> (unit, Ikind.subjkind_error) result
 
 (* Compare two types for equality, with no renaming. This is useful for
    the [type_equal] function that must be passed to certain jkind functions. *)

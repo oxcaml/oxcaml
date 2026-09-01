@@ -63,8 +63,7 @@ let clz32 x = Builtins.int32_clz (Int32_u.to_int32 x)
 clz32:
   movl  %eax, %eax
   lzcnt %rax, %rax
-  addq  $-32, %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  -63(%rax,%rax), %rax
   ret
 |}]
 
@@ -75,8 +74,7 @@ clz32_const:
   movl  $6, %eax
   movl  %eax, %eax
   lzcnt %rax, %rax
-  addq  $-32, %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  -63(%rax,%rax), %rax
   ret
 |}]
 
@@ -195,13 +193,11 @@ ctz_native_const:
 
 (* Population count - int *)
 
-(* CR ttebbi: The -1 should be folded into the lea. *)
 let popcnt_tagged x = Builtins.int_popcnt x
 [%%expect_asm X86_64{|
 popcnt_tagged:
   popcnt %rax, %rax
-  decq  %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  -1(%rax,%rax), %rax
   ret
 |}]
 
@@ -211,8 +207,7 @@ let popcnt_tagged_const () = Builtins.int_popcnt 6
 popcnt_tagged_const:
   movl  $13, %eax
   popcnt %rax, %rax
-  decq  %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  -1(%rax,%rax), %rax
   ret
 |}]
 
@@ -756,10 +751,9 @@ let ptr_fetch_sub_int (p : nativeint#) v =
 [%%expect_asm X86_64{|
 ptr_fetch_sub_int:
   sarq  $1, %rbx
-  xorl  %edi, %edi
-  subq  %rbx, %rdi
-  lock xaddq %rdi, (%rax)
-  leaq  1(%rdi,%rdi), %rax
+  neg   %rbx
+  lock xaddq %rbx, (%rax)
+  leaq  1(%rbx,%rbx), %rax
   ret
 |}]
 
@@ -770,6 +764,7 @@ let ptr_cas_int (p : nativeint#) old_v new_v =
 ptr_cas_int:
   movq  %rax, %rsi
   sarq  $1, %rdi
+  movq  %rbx, %rax
   movq  %rbx, %rax
   sarq  $1, %rax
   lock cmpxchgq %rdi, (%rsi)
@@ -842,10 +837,9 @@ let ptr_fetch_sub_int32 (p : nativeint#) (v : int32#) =
        (Nativeint_u.to_nativeint p) (Int32_u.to_int32 v))
 [%%expect_asm X86_64{|
 ptr_fetch_sub_int32:
-  xorl  %edi, %edi
-  subq  %rbx, %rdi
-  lock xaddl %edi, (%rax)
-  movslq %edi, %rax
+  neg   %rbx
+  lock xaddl %ebx, (%rax)
+  movslq %ebx, %rax
   ret
 |}]
 
@@ -1081,7 +1075,9 @@ let ext_fetch_add_int64
 [%%expect_asm X86_64{|
 ext_fetch_add_int64:
   leaq  -1(%rax), %rdi
+  leaq  -1(%rax), %rdi
   movq  %rbx, %rax
+  lock xaddq %rax, (%rdi)
   lock xaddq %rax, (%rdi)
   ret
 |}]
@@ -1107,7 +1103,9 @@ let ext_fetch_add_nativeint
 [%%expect_asm X86_64{|
 ext_fetch_add_nativeint:
   leaq  -1(%rax), %rdi
+  leaq  -1(%rax), %rdi
   movq  %rbx, %rax
+  lock xaddq %rax, (%rdi)
   lock xaddq %rax, (%rdi)
   ret
 |}]
@@ -1136,6 +1134,9 @@ let bs_fetch_add_int64
 [%%expect_asm X86_64{|
 bs_fetch_add_int64:
   sarq  $1, %rbx
+  movq  8(%rax), %rax
+  addq  %rax, %rbx
+  movq  %rdi, %rax
   movq  8(%rax), %rax
   addq  %rax, %rbx
   movq  %rdi, %rax

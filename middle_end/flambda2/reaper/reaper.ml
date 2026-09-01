@@ -27,7 +27,6 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
           code;
           ordered_code_ids;
           deps;
-          kinds;
           fixed_arity_continuations;
           continuation_info;
           code_deps;
@@ -52,8 +51,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
       =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
       ~fixed_arity_continuations ~continuation_info ~final_typing_env
-      ~types_rewrite_context kinds solved_dep get_code_metadata toplevel_expr
-      code
+      ~types_rewrite_context solved_dep get_code_metadata toplevel_expr code
   in
   let all_code =
     Exported_code.add_code

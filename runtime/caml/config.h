@@ -191,11 +191,11 @@ typedef uint64_t uintnat;
 #define Stack_threshold (Stack_threshold_words * sizeof(value))
 
 /* Number of words used in the control structure at the start of a stack
-   (see fiber.h) */
+   (must match sizeof(struct stack_info) from fiber.h) */
 #ifdef ARCH_SIXTYFOUR
-#define Stack_ctx_words (12 + 1)
+#define Stack_ctx_words (13 + 1)
 #else
-#define Stack_ctx_words (12 + 2)
+#define Stack_ctx_words (13 + 2)
 #endif
 
 /* Whether to use guard pages for fiber stacks */
@@ -237,6 +237,10 @@ typedef uint64_t uintnat;
    the dead objects and the free list represent this percentage of the
    total size of live objects. */
 #define Percent_free_def 80
+
+/* The major GC adds an Idle phase when a cycle's sweeping work is
+   smaller than this. */
+#define Small_heap_limit_def 262144
 
 /* Default setting for the compacter: 500%
    (i.e. trigger the compacter when 5/6 of the heap is free or garbage).

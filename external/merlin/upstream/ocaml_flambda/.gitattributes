@@ -1,0 +1,48 @@
+# Files from the corresponding compiler directories that we do not import.
+# Setting the merlin-exclude attribute excludes a file; unsetting it with
+# "-merlin-exclude" re-includes a file matched by an earlier pattern.
+
+# Formatter configuration, build files and documentation are never imported,
+# from any directory.
+.ocamlformat* merlin-exclude
+dune merlin-exclude
+*.md merlin-exclude
+*.adoc merlin-exclude
+
+file_formats/cfg_format.ml* merlin-exclude
+file_formats/cmj_format.mli merlin-exclude
+file_formats/cmo_format.mli merlin-exclude
+file_formats/cmx_format.mli merlin-exclude
+file_formats/cmxs_format.mli merlin-exclude
+file_formats/linear_format.ml* merlin-exclude
+
+parsing/ast_invariants.ml* merlin-exclude
+parsing/depend.ml* merlin-exclude
+parsing/lexer.mli merlin-exclude
+parsing/parse.ml merlin-exclude
+parsing/parse.mli merlin-exclude
+
+typing/cmt2annot.ml* merlin-exclude
+
+utils/arg_helper.ml* merlin-exclude
+utils/arrayset.ml* merlin-exclude
+utils/binutils.ml* merlin-exclude
+utils/ccomp.ml* merlin-exclude
+utils/clflags.ml* merlin-exclude
+utils/config.*.ml* merlin-exclude
+utils/debug.ml* merlin-exclude
+utils/domainstate.ml*.c merlin-exclude
+utils/doubly_linked_list.ml* merlin-exclude
+utils/file_sections.ml* merlin-exclude
+utils/linkage_name.ml* merlin-exclude
+utils/lru.ml* merlin-exclude
+utils/opt_fuel.ml* merlin-exclude
+utils/priority_queue.ml* merlin-exclude
+utils/profile_counters_functions.ml* merlin-exclude
+utils/runtimetags.ml* merlin-exclude
+utils/strongly_connected_components.ml* merlin-exclude
+utils/structured_mangling.ml* merlin-exclude
+utils/symbol.ml* merlin-exclude
+utils/target_system.ml* merlin-exclude
+utils/targetint.ml* merlin-exclude
+utils/terminfo.ml* merlin-exclude

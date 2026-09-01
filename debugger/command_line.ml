@@ -975,12 +975,14 @@ let info_events _ppf lexbuf =
            end_char
            ((match ev.ev_kind with
                Event_before   -> "before"
-             | Event_after _  -> "after"
+             | Event_after _
+             | Event_after_untyped -> "after"
              | Event_pseudo   -> "pseudo")
             ^
             (match ev.ev_info with
                Event_function -> "/fun"
              | Event_return _ -> "/ret"
+             | Event_unyielding_call _ -> "/ret(unyielding)"
              | Event_other    -> ""))
            (match ev.ev_repr with
               Event_none        -> ""

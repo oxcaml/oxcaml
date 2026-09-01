@@ -1,3 +1,5 @@
+[@@@ocaml.flambda_o3]
+
 type 'a node =
   | Empty
   | Node of
@@ -187,6 +189,27 @@ let length t =
   in
   aux 0 t.first
 
+let compare_lengths left right =
+  let rec aux left right =
+    match left, right with
+    | Empty, Empty -> 0
+    | Empty, Node _ -> -1
+    | Node _, Empty -> 1
+    | ( Node { value = _; prev = _; next = left },
+        Node { value = _; prev = _; next = right } ) ->
+      aux left right
+  in
+  aux left.first right.first
+
+let compare_length_with t len =
+  let rec aux curr len =
+    match curr with
+    | Empty -> if len = 0 then 0 else if len > 0 then -1 else 1
+    | Node { value = _; prev = _; next } ->
+      if len <= 0 then 1 else aux next (len - 1)
+  in
+  aux t.first len
+
 let remove t curr =
   match curr with
   | Empty ->
@@ -329,7 +352,7 @@ let fold_right t ~f ~init =
 let fold_right_range ~right_incl ~left_excl ~f ~init =
   match right_incl with
   | None -> init
-  | Some { node = start; t } ->
+  | Some { node = start; t = _ } ->
     let rec aux f curr ~stop acc =
       if curr == stop
       then acc

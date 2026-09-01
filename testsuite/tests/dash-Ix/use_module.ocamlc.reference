@@ -1,0 +1,6 @@
+File "use_module.ml", line 4, characters 22-23:
+4 | module (M @ static) = S
+                          ^
+Error: The module is dynamic
+         because S is neither a core library nor the current library, and only those can currently be static.
+       However, the module highlighted is expected to be static.

@@ -33,8 +33,6 @@ val use_g2 : unit -> unit
 
 val use_g3 : unit -> unit
 
-val restrict_to_upstream_dwarf : bool ref
-
 val dwarf_max_function_complexity : int ref
 
 val dwarf_for_startup_file : bool ref
@@ -81,13 +79,21 @@ val gdwarf_may_alter_codegen_experimental : bool ref
 
 (** Setting this to [true] will emit sufficient DWARF to get inlined frame
     information, but won't emit information e.g. about local variables (unless
-    [restrict_to_upstream_dwarf] is set to [false], although that implies this
-    variable being set to [true]). *)
+    [Clflags.restrict_to_upstream_dwarf] is set to [false], although that
+    implies this variable being set to [true]). *)
 val dwarf_inlined_frames : bool ref
+
+(** Setting this to [true] will print availability sets (both regular and
+    phantom) when dumping CFG and Linear representations. *)
+val debug_avail_sets : bool ref
 
 val default_gdwarf_compression : string
 
-val gdwarf_compression : string ref
+(** DWARF compression format set on the command line. [None] means use the
+    default. The default is no compression for upstream DWARF. The default is
+    [default_gdwarf_compression] when [dwarf_inlined_frames] is enabled or
+    [restrict_to_upstream_dwarf] is disabled. *)
+val gdwarf_compression : string option ref
 
 val ddwarf_metrics : bool ref
 

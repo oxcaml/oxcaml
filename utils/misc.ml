@@ -329,6 +329,10 @@ module Stdlib = struct
   module Option = struct
     type 'a t = 'a option
 
+    let exists p t = match t with
+      | Some x -> p x
+      | None -> false
+
     let first_some a b = match a with
       | Some _ -> a
       | None -> b ()
@@ -363,6 +367,13 @@ module Stdlib = struct
       let r = ref x in
       for i = 0 to Array.length a1 - 1 do
         r := f !r (Array.unsafe_get a1 i) (Array.unsafe_get a2 i)
+      done;
+      !r
+
+    let fold_lefti f x a =
+      let r = ref x in
+      for i = 0 to Array.length a - 1 do
+        r := f i !r (Array.unsafe_get a i)
       done;
       !r
 
@@ -1135,15 +1146,10 @@ let letter_of_int n =
   else letter ^ Int.to_string num
 
 module Int_literal_converter = struct
-  (* To convert integer literals, allowing max_int + 1 (PR#4210) *)
-  let cvt_int_aux str neg of_string =
-    if String.length str = 0 || str.[0]= '-'
-    then of_string str
-    else neg (of_string ("-" ^ str))
-  let int s = cvt_int_aux s (~-) int_of_string
-  let int32 s = cvt_int_aux s Int32.neg Int32.of_string
-  let int64 s = cvt_int_aux s Int64.neg Int64.of_string
-  let nativeint s = cvt_int_aux s Nativeint.neg Nativeint.of_string
+  let int s = int_of_string s
+  let int32 s = Int32.of_string s
+  let int64 s = Int64.of_string s
+  let nativeint s = Nativeint.of_string s
 
   (* Follows "parse_sign_and_base" in runtime/ints.c *)
   let parse_signedness s =
@@ -1172,7 +1178,7 @@ module Int_literal_converter = struct
     let max_uint = (1 lsl bits) - 1 in
     let lower_limit, upper_limit =
       if parse_signedness str
-      then min_int, max_int + 1
+      then min_int, max_int
       else -max_uint, max_uint
     in
     if i < lower_limit || i > upper_limit
@@ -2442,4 +2448,26 @@ module Colours = struct
     if debug_push_and_pop then output ppf "\u{2191}"
 
   let none ppf = push ppf
+end
+
+module Or_null = struct
+  type 'a t = Null | This of 'a [@@or_null]
+
+  let return x = This x
+
+  let bind t f = match t with Null -> Null | This x -> f x
+
+  let ( >>= ) t f = bind t f
+
+  let map f t = match t with Null -> Null | This x -> This (f x)
+
+  let both t1 t2 =
+    match t1 with Null -> Null | This x -> map (fun y -> x, y) t2
+
+  module Syntax = struct
+    let ( let+ ) t f = map f t
+    let ( and+ ) t1 t2 = both t1 t2
+    let ( let* ) t f = bind t f
+    let ( and* ) t1 t2 = both t1 t2
+  end
 end

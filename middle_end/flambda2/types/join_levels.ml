@@ -120,7 +120,8 @@ let cut_and_n_way_join definition_typing_env ts_and_use_ids ~params ~cut_after
        Format.eprintf "@[Names with distinct types:@ %a@]" Name.Set.print
          distinct_names;
        Format.eprintf "@]@\n%s@." (String.make 60 '=')));
-    ( Meet_env.use_meet_env definition_typing_env ~f:(fun target_env ->
+    ( Meet_env.use_meet_env ~meet_expanded_head:(Meet.meet_expanded_head ())
+        definition_typing_env ~f:(fun target_env ->
           Meet_env.add_env_extension_from_level target_env new_joined_level
             ~meet_expanded_head:(Meet.meet_expanded_head ())),
       analysis )

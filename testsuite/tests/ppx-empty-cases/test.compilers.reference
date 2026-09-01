@@ -1,14 +1,14 @@
 (let
   (empty_cases_returning_string/0 =
-     (function {nlocal = 0} param/0?
+     (function {nlocal = 0} param/0
        (raise
          (makeblock 0 (getpredef Match_failure/0!!) [0: "test.ml" 28 50])))
    empty_cases_returning_float64/0 =
-     (function {nlocal = 0} param/1? : unboxed_float
+     (function {nlocal = 0} param/1 : unboxed_float
        (raise
          (makeblock 0 (getpredef Match_failure/0!!) [0: "test.ml" 29 50])))
    empty_cases_accepting_string/0 =
-     (function {nlocal = 0} param/2?
+     (function {nlocal = 0} param/2
        (raise
          (makeblock 0 (getpredef Match_failure/0!!) [0: "test.ml" 30 50])))
    empty_cases_accepting_float64/0 =

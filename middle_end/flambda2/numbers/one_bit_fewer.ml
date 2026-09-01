@@ -15,8 +15,6 @@
 module type S = sig
   type t
 
-  val machine_width : t -> Target_system.Machine_width.t
-
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
@@ -25,19 +23,19 @@ module type S = sig
 
   val print : Format.formatter -> t -> unit
 
-  val min_value : Target_system.Machine_width.t -> t
+  val min_value : t
 
-  val max_value : Target_system.Machine_width.t -> t
+  val max_value : t
 
-  val minus_one : Target_system.Machine_width.t -> t
+  val minus_one : t
 
-  val zero : Target_system.Machine_width.t -> t
+  val zero : t
 
-  val one : Target_system.Machine_width.t -> t
+  val one : t
 
-  val ten : Target_system.Machine_width.t -> t
+  val ten : t
 
-  val hex_ff : Target_system.Machine_width.t -> t
+  val hex_ff : t
 
   val ( <= ) : t -> t -> bool
 
@@ -49,22 +47,19 @@ module type S = sig
 
   val bottom_byte_to_int : t -> int
 
-  val of_char : Target_system.Machine_width.t -> char -> t
+  val of_char : char -> t
 
-  val of_int :
-    Target_system.Machine_width.t ->
-    int ->
-    t (* CR mshinwell: clarify semantics *)
+  val of_int : int -> t (* CR mshinwell: clarify semantics *)
 
-  val of_int_option : Target_system.Machine_width.t -> int -> t option
+  val of_int_option : int -> t option
 
-  val of_int32 : Target_system.Machine_width.t -> int32 -> t
+  val of_int32 : int32 -> t
 
-  val of_int64 : Target_system.Machine_width.t -> int64 -> t
+  val of_int64 : int64 -> t
 
-  val of_targetint : Target_system.Machine_width.t -> Targetint_32_64.t -> t
+  val of_targetint : Targetint_32_64.t -> t
 
-  val of_float : Target_system.Machine_width.t -> float -> t
+  val of_float : float -> t
 
   val to_float : t -> float
 
@@ -92,7 +87,11 @@ module type S = sig
 
   val mod_ : t -> t -> t
 
+  val unsigned_mod : t -> t -> t
+
   val div : t -> t -> t
+
+  val unsigned_div : t -> t -> t
 
   val and_ : t -> t -> t
 
@@ -123,8 +122,6 @@ module Make (I : S) : S with type t = I.t = struct
      range of numbers representable in {n-1} bits. *)
   type t = I.t
 
-  let machine_width = I.machine_width
-
   let compare = I.compare
 
   let equal = I.equal
@@ -139,19 +136,21 @@ module Make (I : S) : S with type t = I.t = struct
      modulo 2^{n-2} bits. *)
   let sign_extend t = I.shift_right (I.shift_left t 1) 1
 
-  let min_value machine_width = I.shift_right (I.min_value machine_width) 1
+  let zero_extend t = I.shift_right_logical (I.shift_left t 1) 1
 
-  let max_value machine_width = I.shift_right (I.max_value machine_width) 1
+  let min_value = I.shift_right I.min_value 1
 
-  let minus_one machine_width = I.minus_one machine_width
+  let max_value = I.shift_right I.max_value 1
 
-  let zero machine_width = I.zero machine_width
+  let minus_one = I.minus_one
 
-  let one machine_width = I.one machine_width
+  let zero = I.zero
 
-  let ten machine_width = I.ten machine_width
+  let one = I.one
 
-  let hex_ff machine_width = I.hex_ff machine_width
+  let ten = I.ten
+
+  let hex_ff = I.hex_ff
 
   let ( <= ) = I.( <= )
 
@@ -161,32 +160,30 @@ module Make (I : S) : S with type t = I.t = struct
 
   let ( > ) = I.( > )
 
-  let is_in_range machine_width n =
-    I.( >= ) n (min_value machine_width) && I.( <= ) n (max_value machine_width)
+  let is_in_range n = I.( >= ) n min_value && I.( <= ) n max_value
 
   let bottom_byte_to_int = I.bottom_byte_to_int
 
-  let of_char machine_width = I.of_char machine_width
+  let of_char = I.of_char
 
-  let of_int machine_width t = sign_extend (I.of_int machine_width t)
+  let of_int t = sign_extend (I.of_int t)
 
-  let of_int_option machine_width t =
-    Option.map sign_extend (I.of_int_option machine_width t)
+  let of_int_option t = Option.map sign_extend (I.of_int_option t)
 
-  let of_int32 machine_width t =
-    let x = I.of_int32 machine_width t in
+  let of_int32 t =
+    let x = I.of_int32 t in
     sign_extend x
 
-  let of_int64 machine_width t =
-    let x = I.of_int64 machine_width t in
+  let of_int64 t =
+    let x = I.of_int64 t in
     sign_extend x
 
-  let of_targetint machine_width t =
-    let x = I.of_targetint machine_width t in
+  let of_targetint t =
+    let x = I.of_targetint t in
     sign_extend x
 
-  let of_float machine_width t =
-    let x = I.of_float machine_width t in
+  let of_float t =
+    let x = I.of_float t in
     sign_extend x
 
   let to_float = I.to_float
@@ -207,7 +204,7 @@ module Make (I : S) : S with type t = I.t = struct
 
   let get_least_significant_16_bits_then_byte_swap t =
     let res = I.get_least_significant_16_bits_then_byte_swap t in
-    assert (is_in_range (machine_width t) res);
+    assert (is_in_range res);
     res
 
   let add x y = sign_extend (I.add x y)
@@ -219,7 +216,13 @@ module Make (I : S) : S with type t = I.t = struct
   (* No sign-extension: the result is always in the correct range *)
   let mod_ = I.mod_
 
+  let unsigned_mod x y =
+    sign_extend (I.unsigned_mod (zero_extend x) (zero_extend y))
+
   let div x y = sign_extend (I.div x y)
+
+  let unsigned_div x y =
+    sign_extend (I.unsigned_div (zero_extend x) (zero_extend y))
 
   let and_ = I.and_
 

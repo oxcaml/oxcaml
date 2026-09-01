@@ -102,11 +102,11 @@ let f x =
 f:
   subq  $24, %rsp
   movq  %rax, (%rsp)
-  call  camlTOP7__g_11_13_code@PLT
+  call  camlTOP7__g_6_13_code@PLT
 .L0:
   movq  %rax, 8(%rsp)
   movq  (%rsp), %rax
-  call  camlTOP7__g_11_13_code@PLT
+  call  camlTOP7__g_6_13_code@PLT
 .L1:
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
@@ -138,7 +138,7 @@ loop_readonly_use_spilled_var:
   addq  $8, %rsp
   ret
 .L1:
-  call  camlTOP8__g_15_18_code@PLT
+  call  camlTOP8__g_8_18_code@PLT
 .L2:
   movq  (%rsp), %rbx
   cmpq  $1, %rax
@@ -283,8 +283,9 @@ unnecessary_moves:
   cmpq  %rsi, %rdi
   jge   .L2
   subq  $8, %rsp
-  movq  %rax, (%rsp)
+  movq  %rdx, (%rsp)
   movq  (%rbx), %rdi
+  movq  %rcx, %rax
   movq  %rcx, %rax
   call  *%rdi
 .L1:
@@ -292,6 +293,7 @@ unnecessary_moves:
   addq  $8, %rsp
   ret
 .L2:
+  movq  %rdx, %rax
   ret
 |}]
 
@@ -336,13 +338,13 @@ let double_loop_no_definition_at_beginning array n list =
 [%%expect_asm X86_64{|
 double_loop_no_definition_at_beginning:
   subq  $72, %rsp
-  movq  %rbx, %rsi
-  movq  64(%r14), %rbx
-  cmpq  $1, %rsi
+  movq  64(%r14), %rsi
+  cmpq  $1, %rbx
   jl    .L5
-  movq  %rbx, 16(%rsp)
+  movq  %rsi, 16(%rsp)
   movq  %rdi, 32(%rsp)
   movq  %rax, 24(%rsp)
+  movq  %rbx, %rsi
   sarq  $1, %rsi
   movq  %rsi, 48(%rsp)
   xorl  %edx, %edx
@@ -390,9 +392,9 @@ double_loop_no_definition_at_beginning:
   incq  %rdx
   cmpq  %rsi, %rdx
   jle   .L0
-  movq  16(%rsp), %rbx
+  movq  16(%rsp), %rsi
 .L5:
-  movq  %rbx, 64(%r14)
+  movq  %rsi, 64(%r14)
   movl  $1, %eax
   addq  $72, %rsp
   ret
@@ -496,35 +498,35 @@ let spill_slot_lifetime () =
 spill_slot_lifetime:
   subq  $56, %rsp
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L0:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L1:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L2:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L3:
   vmovsd %xmm0, 24(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L4:
   vmovsd %xmm0, 32(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L5:
   vmovsd %xmm0, 40(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L6:
   vmovsd %xmm0, 48(%rsp)
   movl  $1, %eax
-  call  camlTOP17__get_one_39_43_code@PLT
+  call  camlTOP17__get_one_21_43_code@PLT
 .L7:
   vxorpd %xmm1, %xmm1, %xmm1
   vmovsd (%rsp), %xmm2
@@ -558,7 +560,10 @@ let f ~(s: int64#) (t : int64#) =
 f:
   movq  %rbx, %rdi
   imulq %rax, %rdi
+  movq  %rbx, %rdi
+  imulq %rax, %rdi
   movq  %rbx, %rax
+  subq  %rdi, %rax
   subq  %rdi, %rax
   ret
 |}]

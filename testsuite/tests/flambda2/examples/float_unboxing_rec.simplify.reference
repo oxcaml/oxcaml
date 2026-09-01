@@ -1,7 +1,7 @@
 let code f_0 deleted in
 let code loopify(never) size(41) newer_version_of(f_0)
       f_0_1 (n : imm tagged, x : float boxed)
-        my_closure _region _ghost_region my_depth
+        my_closure &my_alloc_region my_depth
         -> k * k1
         : float boxed =
   (let prim = %int_comp.le (0, n) in
@@ -30,9 +30,9 @@ let code loopify(never) size(41) newer_version_of(f_0)
               | 1 -> k3 (for_next_naked, prim_3)))
     where k2 (unboxed_float : float) =
       let prim = %bfloat_arith.add (unboxed_float, 0x0p+0) in
-      let float_add = %box_num.`float` (prim) in
+      let float_add = %box_num.`float`.my_alloc_region (prim) in
       cont k (float_add)
 in
-let $camlFloat_unboxing_rec__f_1 = closure f_0_1 @f in
+let $camlFloat_unboxing_rec__f_1 = closure f_0_1 @f &toplevel.alloc_region in
 let $camlFloat_unboxing_rec = Block 0 ($camlFloat_unboxing_rec__f_1) in
 cont done ($camlFloat_unboxing_rec)

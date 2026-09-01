@@ -151,6 +151,7 @@ string_get_float32:
   ret
 |}]
 
+(* CR ttebbi: The first [movslq] could be [movl] *)
 (* CR ttebbi: mov + bswap could be movbe *)
 let bytes_get_int32_bswap (buf : bytes) (i : int) =
   Int32_u.bswap (Bytes.unsafe_get_int32_ne buf i)

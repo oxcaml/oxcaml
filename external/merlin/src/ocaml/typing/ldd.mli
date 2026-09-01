@@ -14,9 +14,9 @@
 
 module type Ordered = Ldd_intf.Ordered
 
-(** Lattice polynomial terms built from joins, meets, constants, and
-    variables. The interface supports least and greatest fixpoint solving
-    over these terms. *)
+(** Lattice polynomial terms built from joins, meets, constants, and variables.
+    The interface supports least and greatest fixpoint solving over these terms.
+*)
 module Make (V : Ordered) : sig
   include Ldd_intf.S with module Name = V
 end

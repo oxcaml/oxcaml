@@ -102,6 +102,17 @@ let encode { name; already_encoded } =
     let symbol_prefix = symbol_prefix () in
     to_escaped_string ~symbol_prefix name
 
+let encode_without_prefix { name; already_encoded } =
+  if already_encoded
+  then
+    (* The name was provided in its final assembly form, so it cannot reliably
+       be determined here whether it starts with the platform symbol prefix; it
+       is returned unchanged. Such symbols (currently only section names and
+       relocation targets in the binary emitters) do not flow into DWARF
+       attributes such as [DW_AT_linkage_name]. *)
+    name
+  else to_escaped_string ~symbol_prefix:"" name
+
 (* Comparison and hashing are based on the encoded form, so two symbols that
    produce the same assembly output are considered equal regardless of how they
    were constructed. *)

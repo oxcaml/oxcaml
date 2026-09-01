@@ -720,6 +720,7 @@ module Digraph = struct
     | Types.Tquote t -> mk "[Quote]" |> std_edge t
     | Types.Tsplice t -> mk "[Splice]" |> std_edge t
     | Types.Tquote_eval t -> mk "[QuoteEval]" |> std_edge t
+    | Types.Tmod (t, _) -> mk "[Mod]" |> std_edge t
     | Types.Tlink t -> add_tynode Decoration.(make [Style Dash]) |> std_edge t
     | Types.Tsubst (t, o) ->
         let dg = add_tynode (labelr "[Subst]") |> std_edge t in
@@ -762,6 +763,8 @@ module Digraph = struct
         |> numbered types
     | Types.Tof_kind _ ->
         mk "[Kind]"
+    | Types.Tbox t ->
+        mk "[Box]" |> std_edge t
   and variant params id0 (elts,main,fields) (name,rf)  =
     let id = Index.subnode ~name id0 in
     let fnode = Node id in

@@ -14,6 +14,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* Note: there is some code in [binding_time.ml] that translates name modes to
+   integers according to this expected order of constructors. *)
 type t =
   | Normal
   | Phantom

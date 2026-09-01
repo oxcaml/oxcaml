@@ -86,7 +86,8 @@ module Printtyp = struct
         if mark ty0 then
           let open Types in
           let ty' = Ctype.full_expand ~may_forget_scope:true env ty0 in
-          if get_desc ty' == get_desc ty0 then Btype.iter_type_expr (iter d) ty0
+          if get_desc ty' == get_desc ty0 then
+            Btype.iter_type_expr (iter d) (Fun.const ()) ty0
           else begin
             let desc =
               match get_desc ty' with
@@ -95,7 +96,8 @@ module Printtyp = struct
               | desc -> desc
             in
             Types.Transient_expr.(set_desc (repr ty0) desc);
-            if d > 0 then Btype.iter_type_expr (iter (pred d)) ty0
+            if d > 0 then
+              Btype.iter_type_expr (iter (pred d)) (Fun.const ()) ty0
           end
       in
       iter

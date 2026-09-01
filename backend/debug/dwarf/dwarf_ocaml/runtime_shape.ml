@@ -32,6 +32,39 @@ module S = Shape
 module Sort = Jkind_types.Sort
 module Layout = Sort.Const
 
+module DeBruijn_index = struct
+  type t = int
+
+  let zero = 0
+
+  let move_under_binder n = n + 1
+
+  let equal n1 n2 = Int.equal n1 n2
+
+  let hash n = n
+
+  let print fmt n = Format.fprintf fmt "%d" n
+end
+
+module DeBruijn_env = struct
+  type 'a t = 'a list
+
+  let empty = []
+
+  let get_opt t ~de_bruijn_index = List.nth_opt t de_bruijn_index
+
+  let push t x = x :: t
+
+  let length t = List.length t
+
+  let truncate t ~depth = List.take depth t
+
+  let equal equal_elem = List.equal equal_elem
+
+  let hash hash_elem l =
+    List.fold_left (fun acc v -> Hashtbl.hash (hash_elem v, acc)) 0 l
+end
+
 module Or_void = struct
   type 'a t =
     | Other of 'a
@@ -60,6 +93,7 @@ module Runtime_layout = struct
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 
@@ -73,6 +107,7 @@ module Runtime_layout = struct
     | Vec128 -> 16
     | Vec256 -> 32
     | Vec512 -> 64
+    | Mask -> 8
     | Value -> Arch.size_addr
     | Word -> Arch.size_addr
     | Untagged_immediate ->
@@ -95,6 +130,7 @@ module Runtime_layout = struct
     | Vec128 -> Other Vec128
     | Vec256 -> Other Vec256
     | Vec512 -> Other Vec512
+    | Mask -> Other Mask
 
   let to_string (t : t) : string =
     match t with
@@ -108,6 +144,7 @@ module Runtime_layout = struct
     | Vec128 -> "vec128"
     | Vec256 -> "vec256"
     | Vec512 -> "vec512"
+    | Mask -> "mask"
     | Word -> "word"
     | Untagged_immediate -> "untagged_immediate"
 
@@ -124,6 +161,7 @@ module Runtime_layout = struct
     | Vec128 -> Vec128
     | Vec256 -> Vec256
     | Vec512 -> Vec512
+    | Mask -> Mask
     | Word -> Word
     | Untagged_immediate -> Untagged_immediate
 
@@ -139,11 +177,12 @@ module Runtime_layout = struct
     | Vec128, Vec128
     | Vec256, Vec256
     | Vec512, Vec512
+    | Mask, Mask
     | Word, Word
     | Untagged_immediate, Untagged_immediate ->
       true
     | ( ( Value | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-        | Vec256 | Vec512 | Word | Untagged_immediate ),
+        | Vec256 | Vec512 | Mask | Word | Untagged_immediate ),
         _ ) ->
       false
 
@@ -158,14 +197,20 @@ module Runtime_layout = struct
     | Vec128 -> 7
     | Vec256 -> 8
     | Vec512 -> 9
-    | Word -> 10
-    | Untagged_immediate -> 11
+    | Mask -> 10
+    | Word -> 11
+    | Untagged_immediate -> 12
 end
 
 type t =
   { desc : desc;
     runtime_layout : Runtime_layout.t;
-    hash : int
+    hash : int;
+    free_depth : int
+        (* Number of enclosing [Mu] binders that the shape can reference: one
+           more than the largest free de Bruijn index, or zero if the shape is
+           closed. A shape's meaning (and generated DWARF) depends only on the
+           first [free_depth] entries of any enclosing environment. *)
   }
 
 and desc =
@@ -185,7 +230,7 @@ and desc =
       }
   | Func
   | Mu of t
-  | Rec_var of Shape.DeBruijn_index.t * Runtime_layout.t
+  | Rec_var of DeBruijn_index.t * Runtime_layout.t
 (* The layout is part of [Unknown] and [Rec_var] to ensure that equality can be
    tested by simply comparing the descriptions. That is, the runtime_layout and
    hash fields are just precomputed from the desc field and carry no additional
@@ -233,6 +278,7 @@ and predef =
   | Int32
   | Int64
   | Lazy_t of t
+  | Mask
   | Nativeint
   | String
   | Simd of simd_vec_split
@@ -251,6 +297,7 @@ and unboxed =
   | Unboxed_int32
   | Unboxed_int16
   | Unboxed_int8
+  | Unboxed_mask
   | Unboxed_simd of simd_vec_split
 
 and simd_vec_split =
@@ -282,6 +329,34 @@ and simd_vec_split =
 let runtime_layout { runtime_layout; _ } = runtime_layout
 
 let hash { hash; _ } = hash
+
+let free_depth { free_depth; _ } = free_depth
+
+let free_depth_fields fields =
+  List.fold_left
+    (fun acc { field_type; _ } -> Int.max acc field_type.free_depth)
+    0 fields
+
+let free_depth_constructor = function
+  | Constructor_with_tuple_arg { args; _ } -> free_depth_fields args
+  | Constructor_with_record_arg { args; _ } -> free_depth_fields args
+
+let free_depth_constructors constructors =
+  List.fold_left
+    (fun acc constr -> Int.max acc (free_depth_constructor constr))
+    0 constructors
+
+let free_depth_list ts =
+  List.fold_left (fun acc t -> Int.max acc t.free_depth) 0 ts
+
+let free_depth_predef = function
+  | Array (Regular s) -> s.free_depth
+  | Array (Packed l) -> free_depth_list l
+  | Lazy_t s -> s.free_depth
+  | Bytes | Char | Extension_constructor | Float | Float32 | Floatarray | Int
+  | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint | String | Simd _
+  | Exception | Unboxed _ ->
+    0
 
 (* Hash constants for desc constructors *)
 let hash_unknown = 0
@@ -329,13 +404,15 @@ let hash_predef_int64 = 12
 
 let hash_predef_lazy_t = 13
 
-let hash_predef_nativeint = 14
+let hash_predef_mask = 14
 
-let hash_predef_simd = 15
+let hash_predef_nativeint = 15
 
-let hash_predef_string = 16
+let hash_predef_simd = 16
 
-let hash_predef_unboxed = 17
+let hash_predef_string = 17
+
+let hash_predef_unboxed = 18
 
 let runtime_layout_of_simd_vec_split : simd_vec_split -> Runtime_layout.t =
   function
@@ -356,6 +433,7 @@ let runtime_layout_of_unboxed : unboxed -> Runtime_layout.t = function
   | Unboxed_int32 -> Bits32
   | Unboxed_int16 -> Bits16
   | Unboxed_int8 -> Bits8
+  | Unboxed_mask -> Mask
   | Unboxed_simd vec_split -> runtime_layout_of_simd_vec_split vec_split
 
 let simd_vec_split_to_byte_size s =
@@ -365,7 +443,7 @@ let simd_vec_split_to_byte_size s =
 let runtime_layout_of_predef : predef -> Runtime_layout.t = function
   | Array _ | Bytes | Char | Extension_constructor | Exception | Float | Float32
   | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Lazy_t _ | Nativeint
-  | Simd _ | String ->
+  | Mask | Simd _ | String ->
     Value
   | Unboxed unboxed -> runtime_layout_of_unboxed unboxed
 
@@ -400,7 +478,8 @@ let hash_unboxed : unboxed -> int = function
   | Unboxed_int32 -> 4
   | Unboxed_int16 -> 5
   | Unboxed_int8 -> 6
-  | Unboxed_simd svs -> Hashtbl.hash (7, hash_simd_vec_split svs)
+  | Unboxed_mask -> 7
+  | Unboxed_simd svs -> Hashtbl.hash (8, hash_simd_vec_split svs)
 
 let hash_mixed_block_field (type label) (hash_label : label -> int)
     { field_type; label } =
@@ -431,6 +510,7 @@ let hash_predef predef =
   | Int32 -> hash_predef_int32
   | Int64 -> hash_predef_int64
   | Lazy_t s -> Hashtbl.hash (hash_predef_lazy_t, hash s)
+  | Mask -> hash_predef_mask
   | Nativeint -> hash_predef_nativeint
   | String -> hash_predef_string
   | Simd svs -> Hashtbl.hash (hash_predef_simd, hash_simd_vec_split svs)
@@ -452,13 +532,18 @@ let hash_tuple_kind = function Tuple_boxed -> 0
 
 let unknown layout =
   let desc = Unknown layout in
-  { desc; runtime_layout = layout; hash = Hashtbl.hash (hash_unknown, layout) }
+  { desc;
+    runtime_layout = layout;
+    hash = Hashtbl.hash (hash_unknown, layout);
+    free_depth = 0
+  }
 
 let predef p =
   let desc = Predef p in
   { desc;
     runtime_layout = runtime_layout_of_predef p;
-    hash = Hashtbl.hash (hash_predef, hash_predef p)
+    hash = Hashtbl.hash (hash_predef, hash_predef p);
+    free_depth = free_depth_predef p
   }
 
 let mixed_block_field ~field_type ~label = { field_type; label }
@@ -468,11 +553,10 @@ let map_mixed_block_field_label f { field_type; label } =
 
 let tuple args =
   let desc = Tuple { args; kind = Tuple_boxed } in
-  { desc;
-    runtime_layout = Value;
-    hash =
-      Hashtbl.hash (hash_tuple, hash_tuple_kind Tuple_boxed, List.map hash args)
-  }
+  let hash =
+    Hashtbl.hash (hash_tuple, hash_tuple_kind Tuple_boxed, List.map hash args)
+  in
+  { desc; runtime_layout = Value; hash; free_depth = free_depth_list args }
 
 let constructor_with_tuple_arg ~name ~args =
   Constructor_with_tuple_arg { name; args }
@@ -488,7 +572,8 @@ let variant constructors =
       Hashtbl.hash
         ( hash_variant,
           hash_variant_kind Variant_boxed,
-          List.map hash_constructor constructors )
+          List.map hash_constructor constructors );
+    free_depth = free_depth_constructors constructors
   }
 
 let polymorphic_variant constructors =
@@ -499,7 +584,8 @@ let polymorphic_variant constructors =
       Hashtbl.hash
         ( hash_variant,
           hash_variant_kind Variant_polymorphic,
-          List.map hash_constructor constructors )
+          List.map hash_constructor constructors );
+    free_depth = free_depth_constructors constructors
   }
 
 let variant_attribute_unboxed ~constructor_name
@@ -528,7 +614,8 @@ let variant_attribute_unboxed ~constructor_name
       Hashtbl.hash
         ( hash_variant,
           hash_variant_kind (Variant_attribute_unboxed layout),
-          List.map hash_constructor [constructor] )
+          List.map hash_constructor [constructor] );
+    free_depth = free_depth_constructor constructor
   }
 
 let record_attribute_unboxed ~contents =
@@ -542,7 +629,8 @@ let record_attribute_unboxed ~contents =
       Hashtbl.hash
         ( hash_record,
           hash_record_kind (Record_attribute_unboxed layout),
-          List.map (hash_mixed_block_field Hashtbl.hash) [contents] )
+          List.map (hash_mixed_block_field Hashtbl.hash) [contents] );
+    free_depth = contents.field_type.free_depth
   }
 
 let record_mixed fields =
@@ -553,23 +641,33 @@ let record_mixed fields =
       Hashtbl.hash
         ( hash_record,
           hash_record_kind Record_mixed,
-          List.map (hash_mixed_block_field Hashtbl.hash) fields )
+          List.map (hash_mixed_block_field Hashtbl.hash) fields );
+    free_depth = free_depth_fields fields
   }
 
 let func =
   let desc = Func in
-  { desc; runtime_layout = Value; hash = Hashtbl.hash hash_func }
+  { desc;
+    runtime_layout = Value;
+    hash = Hashtbl.hash hash_func;
+    free_depth = 0
+  }
 
 let mu shape =
   let desc = Mu shape in
   { desc;
     runtime_layout = runtime_layout shape;
-    hash = Hashtbl.hash (hash_mu, hash shape)
+    hash = Hashtbl.hash (hash_mu, hash shape);
+    free_depth = Int.max 0 (shape.free_depth - 1)
   }
 
 let rec_var var ly =
   let desc = Rec_var (var, ly) in
-  { desc; runtime_layout = ly; hash = Hashtbl.hash (hash_rec_var, (var, ly)) }
+  { desc;
+    runtime_layout = ly;
+    hash = Hashtbl.hash (hash_rec_var, (var, ly));
+    free_depth = var + 1
+  }
 
 let print_runtime_layout fmt (t : Runtime_layout.t) =
   Format.pp_print_string fmt (Runtime_layout.to_string t)
@@ -611,6 +709,7 @@ let print_unboxed fmt unb =
     | Unboxed_int32 -> "int32#"
     | Unboxed_int16 -> "int16#"
     | Unboxed_int8 -> "int8#"
+    | Unboxed_mask -> "mask#"
     | Unboxed_simd svs -> Format.asprintf "%a#" print_simd_vec_split svs
   in
   Format.pp_print_string fmt s
@@ -677,7 +776,7 @@ let rec print fmt { desc } =
   | Func -> Format.fprintf fmt "Func"
   | Mu shape -> Format.fprintf fmt "Mu(%a)" print shape
   | Rec_var (idx, ly) ->
-    Format.fprintf fmt "Rec_var(%a, %a)" Shape.DeBruijn_index.print idx
+    Format.fprintf fmt "Rec_var(%a, %a)" DeBruijn_index.print idx
       Runtime_layout.print ly
 
 and print_predef fmt p =
@@ -704,6 +803,7 @@ and print_predef fmt p =
   | Int32 -> Format.pp_print_string fmt "int32"
   | Int64 -> Format.pp_print_string fmt "int64"
   | Lazy_t elem -> Format.fprintf fmt "%a lazy_t" print elem
+  | Mask -> Format.pp_print_string fmt "mask"
   | Nativeint -> Format.pp_print_string fmt "nativeint"
   | String -> Format.pp_print_string fmt "string"
   | Simd svs -> Format.fprintf fmt "%a" print_simd_vec_split svs
@@ -749,11 +849,13 @@ let equal_unboxed u1 u2 =
   | Unboxed_int64, Unboxed_int64
   | Unboxed_int32, Unboxed_int32
   | Unboxed_int16, Unboxed_int16
-  | Unboxed_int8, Unboxed_int8 ->
+  | Unboxed_int8, Unboxed_int8
+  | Unboxed_mask, Unboxed_mask ->
     true
   | Unboxed_simd svs1, Unboxed_simd svs2 -> equal_simd_vec_split svs1 svs2
   | ( ( Unboxed_float | Unboxed_float32 | Unboxed_nativeint | Unboxed_int64
-      | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 | Unboxed_simd _ ),
+      | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 | Unboxed_mask
+      | Unboxed_simd _ ),
       _ ) ->
     false
 
@@ -794,7 +896,7 @@ let rec equal { desc = desc1 } { desc = desc2 } =
   | Func, Func -> true
   | Mu shape1, Mu shape2 -> equal shape1 shape2
   | Rec_var (idx1, ly1), Rec_var (idx2, ly2) ->
-    Shape.DeBruijn_index.equal idx1 idx2 && Runtime_layout.equal ly1 ly2
+    DeBruijn_index.equal idx1 idx2 && Runtime_layout.equal ly1 ly2
   | ( ( Unknown _ | Predef _ | Tuple _ | Variant _ | Record _ | Func | Mu _
       | Rec_var _ ),
       _ ) ->
@@ -839,6 +941,7 @@ and equal_predef p1 p2 =
   | Int16, Int16
   | Int32, Int32
   | Int64, Int64
+  | Mask, Mask
   | Nativeint, Nativeint
   | String, String
   | Exception, Exception ->
@@ -847,8 +950,8 @@ and equal_predef p1 p2 =
   | Simd svs1, Simd svs2 -> equal_simd_vec_split svs1 svs2
   | Unboxed u1, Unboxed u2 -> equal_unboxed u1 u2
   | ( ( Array _ | Bytes | Char | Extension_constructor | Float | Float32
-      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Nativeint | String
-      | Lazy_t _ | Simd _ | Exception | Unboxed _ ),
+      | Floatarray | Int | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint
+      | String | Lazy_t _ | Simd _ | Exception | Unboxed _ ),
       _ ) ->
     false
 
@@ -865,11 +968,3 @@ let constructor_args = function
     List.map
       (fun { field_type; label } -> { field_type; label = Some label })
       args
-
-module Cache = Hashtbl.Make (struct
-  type nonrec t = t
-
-  let equal = equal
-
-  let hash = hash
-end)

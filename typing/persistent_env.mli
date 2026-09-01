@@ -91,9 +91,15 @@ val clear_missing : 'a t -> unit
 val fold : 'a t -> (Global_module.Name.t -> 'a -> 'b -> 'b) -> 'b -> 'b
 
 type address =
-  | Aunit of Compilation_unit.t
+  | Aunit of Compilation_unit.t * Mode.Value.l
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
+
+(* The mode of a compilation unit: legacy on every axis, with the given
+   staticity. *)
+(* CR-soon zqian: all persistent modules should always be [Static], at which
+   point the [staticity] parameter can be removed. *)
+val mode_pers_mod : Mode.Staticity.Const.t -> Mode.Value.lr
 
 type 'a sig_reader =
   Subst.Lazy.persistent_signature
@@ -115,6 +121,17 @@ val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
 val read_cmi_file :
      'a t -> string
   -> Global_module.Name.t * Subst.Lazy.persistent_signature
+
+(** Read a CU and register it as an "import" of the current compilation
+    unit — i.e., type checking of the current CU relies on the content
+    of that CU.  Does NOT register it as a persistent module, which
+    would impose typing constraints between it and the current
+    persistent module, such as the "parameter subset rule". *)
+val find_import :
+  'a t -> Compilation_unit.Name.t ->
+  Compilation_unit.t option
+  * Global_module.Parameter_name.t list
+  * Signature_with_global_bindings.t
 val find : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> Global_module.Name.t -> allow_excess_args:bool -> 'a
 
@@ -163,7 +180,7 @@ val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 val make_cmi : 'a t
   -> Compilation_unit.Name.t
   -> Cmi_format.kind
-  -> Subst.Lazy.persistent_signature
+  -> Subst.Lazy.signature * Mode.Staticity.Const.t
   -> alerts
   -> Cmi_format.cmi_infos_lazy
 

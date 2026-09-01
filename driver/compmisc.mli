@@ -18,10 +18,6 @@ val init_path :
 val init_parameters : unit -> unit
 val initial_env : unit -> Env.t
 
-(* Support for flags that can also be set from an environment variable *)
-val set_from_env : 'a option ref -> 'a Clflags.env_reader -> unit
-val read_clflags_from_env : unit -> unit
-
 val with_ppf_file :
   file_prefix:string -> file_extension:string -> (Format.formatter -> 'a) -> 'a
 

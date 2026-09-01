@@ -1,0 +1,70 @@
+== Mixed record (no reordering) ==
+t.atomic: 42
+t.nonatomic: 13
+set t.atomic <- 43
+t.atomic: 43
+t.nonatomic: 13
+set t.nonatomic <- 14
+t.atomic: 43
+t.nonatomic: 14
+== Mixed record (reordering) ==
+t.atomic: 42
+t.nonatomic: 13
+set t.atomic <- 43
+t.atomic: 43
+t.nonatomic: 13
+set t.nonatomic <- 14
+t.atomic: 43
+t.nonatomic: 14
+== Mixed inline record (no reordering) ==
+t.atomic: 42
+t.nonatomic: 13
+set t.atomic <- 43
+t.atomic: 43
+t.nonatomic: 13
+set t.nonatomic <- 14
+t.atomic: 43
+t.nonatomic: 14
+== Mixed inline record (reordering) ==
+t.atomic: 42
+t.nonatomic: 13
+set t.atomic <- 43
+t.atomic: 43
+t.nonatomic: 13
+set t.nonatomic <- 14
+t.atomic: 43
+t.nonatomic: 14
+== Mixed record with non-immediate (no reordering) ==
+t.atomic: hello
+t.nonatomic: 13
+set t.atomic <- "world"
+t.atomic: world
+t.nonatomic: 13
+set t.nonatomic <- 14
+t.atomic: world
+t.nonatomic: 14
+== Mixed record with non-immediate (reordering) ==
+t.atomic: hello
+t.nonatomic: 13
+set t.atomic <- "world"
+t.atomic: world
+t.nonatomic: 13
+set t.nonatomic <- 14
+t.atomic: world
+t.nonatomic: 14
+== Mixed record (sandwiched non-value field) ==
+t.atomic1: 42
+t.nonatomic: 13
+t.atomic2: hello
+set t.atomic1 <- 43
+t.atomic1: 43
+t.nonatomic: 13
+t.atomic2: hello
+set t.nonatomic <- 14
+t.atomic1: 43
+t.nonatomic: 14
+t.atomic2: hello
+set t.atomic2 <- "world"
+t.atomic1: 43
+t.nonatomic: 14
+t.atomic2: world

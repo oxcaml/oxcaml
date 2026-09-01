@@ -39,7 +39,7 @@ let free_vars ?(param=false) ty =
             end
                 (* XXX: What about Tobject ? *)
         | _ ->
-            iter_type_expr loop ty
+            iter_type_expr loop (Fun.const ()) ty
     in
     loop ty
   end;
@@ -117,23 +117,33 @@ type variant_with_null_payload =
   }
 
 type variant_with_null_constructor =
-  | Variant_with_null_nullary
+  | Variant_with_null_null of Jkind_types.Sort.Const.t option
+      (* The sort of the null constructor's all-void argument, if any. *)
   | Variant_with_null_payload of variant_with_null_payload
 
 let classify_variant_with_null_constructor payload_cstr =
   match payload_cstr.cd_args with
-  | Cstr_tuple [] -> Variant_with_null_nullary
+  | Cstr_tuple [] -> Variant_with_null_null None
   | Cstr_tuple [payload_arg] ->
-    Variant_with_null_payload
-      { payload_cstr; payload_arg }
+    begin match payload_arg.ca_sort with
+    | Some sort when Jkind_types.Sort.Const.all_void sort ->
+      Variant_with_null_null (Some sort)
+    | Some _ | None ->
+      Variant_with_null_payload { payload_cstr; payload_arg }
+    end
   | Cstr_tuple (_ :: _ :: _) | Cstr_record _ ->
     Misc.fatal_error "Invalid constructor for Variant_with_null"
 
+(* Note: before [update_decl_jkind] has filled in the argument sorts, a
+   unary null constructor is indistinguishable from the payload constructor
+   (its [ca_sort] is still [None]), so this function can return the wrong
+   constructor. Callers must run after sorts are filled in, or tolerate
+   misclassification. *)
 let find_variant_with_null_payload cstrs =
   List.find_map
     (fun cstr ->
       match classify_variant_with_null_constructor cstr with
-      | Variant_with_null_nullary -> None
+      | Variant_with_null_null _ -> None
       | Variant_with_null_payload payload -> Some payload)
     cstrs
 
@@ -161,7 +171,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         true
       | Cstr_tuple [{ ca_sort = None }]
       | Cstr_record [{ ld_sort = None }] ->
-        [| Cstr_layout_variable |], true
+        [| Cstr_layout_undetermined |], true
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end
@@ -170,9 +180,15 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     | Variant_with_null, _ ->
       let layout cstr =
         match classify_variant_with_null_constructor cstr with
-        | Variant_with_null_nullary ->
+        | Variant_with_null_null None ->
           Cstr_layout_known
             { shape = Constructor_uniform_value; sorts = [| |] }
+        | Variant_with_null_null (Some sort) ->
+          Cstr_layout_known
+            { shape =
+                Constructor_mixed
+                  [| Types.mixed_block_element_of_const_sort sort |];
+              sorts = [| sort |] }
         | Variant_with_null_payload
             { payload_arg = { ca_sort = Some sort; _ }; _ } ->
           Cstr_layout_known
@@ -183,7 +199,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
              (see Note [Default jkinds in transl_declaration] in typedecl.ml);
              the temp-env descriptors are not consumed, and the real ones are
              recomputed after [update_decls_jkind] fills the sorts. *)
-          Cstr_layout_variable
+          Cstr_layout_undetermined
       in
       Array.of_list (List.map layout cstrs), false
   in
@@ -193,7 +209,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       (fun layout ->
          let all_void =
            match layout with
-           | Cstr_layout_variable ->
+           | Cstr_layout_undetermined ->
              (* Someday we'll want to let a constructor be constant iff the type
                 argument is void (after all, [unit# option] is [bool]), but
                 we're not there yet. For now, assume [Some #()] (so to speak) is
@@ -220,8 +236,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     in
     let cstr_shape =
       match cstr_layouts.(src_index) with
-      | Cstr_layout_known { shape; _ } -> Some shape
-      | Cstr_layout_variable -> None
+      | Cstr_layout_known { shape; _ } -> shape
+      | Cstr_layout_undetermined -> Constructor_undetermined
     in
     let cstr_constant = cstr_constant.(src_index) in
     let runtime_tag, const_tag, nonconst_tag =
@@ -235,17 +251,13 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
         begin match classify_variant_with_null_constructor
           { cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid }
         with
-        | Variant_with_null_nullary -> Null
+        | Variant_with_null_null _ -> Null
         | Variant_with_null_payload _ -> Ordinary {src_index; runtime_tag}
         end
       | _ -> Ordinary {src_index; runtime_tag}
     in
     let cstr_existentials, cstr_args, cstr_inlined =
-      let record_repr =
-        match cstr_shape with
-        | None -> Record_variable
-        | Some shape -> Record_inlined (cstr_tag, shape, rep)
-      in
+      let record_repr = Record_inlined (cstr_tag, cstr_shape, rep) in
       constructor_args ~current_unit decl.type_private cd_args cd_res
         Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) record_repr
     in
@@ -292,7 +304,7 @@ let extension_descr ~current_unit path_ext ext =
       cstr_arity = List.length cstr_args;
       cstr_tag;
       cstr_repr = Variant_extensible;
-      cstr_shape = Some ext.ext_shape;
+      cstr_shape = ext.ext_shape;
       cstr_constant = ext.ext_constant;
       cstr_consts = -1;
       cstr_nonconsts = -1;

@@ -1,0 +1,18 @@
+# stack growth: deep nesting on a single variable
+down: 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+up:   20 19 18 17 16 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1
+after all pops [expect null]: null
+
+# table growth: many simultaneous distinct variables
+bound 25, visible 25, all correct: true
+visible after unwind [expect 0]: 0
+
+# hash collision: linear probing and rehash on pop
+both bound: a=111 b=222
+after pop a: a=null [expect null]
+after pop a: b=222 [expect 222]
+
+# GC root scanning of live bindings
+top after GC [expect yyyyyy]: yyyyyy
+below after GC [expect xxxx]: xxxx
+live in fiber: e=ppp g=qqq

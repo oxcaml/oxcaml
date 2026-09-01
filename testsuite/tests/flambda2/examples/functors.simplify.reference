@@ -2,26 +2,28 @@ let code na_1 deleted in
 let code foo_2 deleted in
 let code Make_0 deleted in
 let code foo_3 deleted in
-let $camlFunctors__immstring7 = "functors.ml" in
-let $camlFunctors__const_block18 = Block 0 ($camlFunctors__immstring7, 23, 6)
+let $camlFunctors__immstring_0 = "functors.ml" in
+let $camlFunctors__const_block_4 =
+  Block 0 ($camlFunctors__immstring_0, 23, 6)
 in
-let $camlFunctors__const_block11 = Block 0 (0) in
-let $camlFunctors__const_block13 = Block 0 ($camlFunctors__const_block11) in
-let $camlFunctors__const_block9 = Block 0 ($camlFunctors__immstring7, 13, 6)
+let $camlFunctors__const_block_2 = Block 0 (0) in
+let $camlFunctors__const_block_3 = Block 0 ($camlFunctors__const_block_2) in
+let $camlFunctors__const_block_1 =
+  Block 0 ($camlFunctors__immstring_0, 13, 6)
 in
-apply direct(init_mod_4)
-  ($CamlinternalMod.camlCamlinternalMod__init_mod_10 : _ -> val)
-    ($camlFunctors__const_block9, $camlFunctors__const_block13)
+apply direct(init_mod_4 &toplevel.alloc_region)
+  ($CamlinternalMod.camlCamlinternalMod__init_mod_4_11 : _ -> val)
+    ($camlFunctors__const_block_1, $camlFunctors__const_block_3)
     -> k * error
   where k (M0 : val) =
-    (apply direct(init_mod_4)
-       ($CamlinternalMod.camlCamlinternalMod__init_mod_10 : _ -> val)
-         ($camlFunctors__const_block18, $camlFunctors__const_block13)
+    (apply direct(init_mod_4 &toplevel.alloc_region)
+       ($CamlinternalMod.camlCamlinternalMod__init_mod_4_11 : _ -> val)
+         ($camlFunctors__const_block_4, $camlFunctors__const_block_3)
          -> k * error
        where k (M : val) =
          let code loopify(never) size(27) newer_version_of(foo_2)
                foo_2_1 (_i, t : [ 0 | 0 of val ])
-                 my_closure _region _ghost_region my_depth
+                 my_closure &my_alloc_region my_depth
                  -> k * k1
                  : [ 0 | 0 of val ] =
            let X = %project_value_slot.[foo].[X] (my_closure) in
@@ -32,73 +34,77 @@ apply direct(init_mod_4)
              where k2 =
                ((let Pfield = %block_load.[`0`] (t) in
                  let Pfield_1 = %block_load.[`0`] (X) in
-                 apply Pfield_1 (Pfield) -> k2 * k1)
+                 apply &my_alloc_region Pfield_1 (Pfield) -> k2 * k1)
                   where k2 (apply_result : val) =
-                    let Pmakeblock = %block.[`0`] (apply_result) in
+                    let Pmakeblock =
+                      %block.[`0`].my_alloc_region (apply_result)
+                    in
                     cont k (Pmakeblock))
          in
          let code loopify(never) size(7) newer_version_of(na_1)
                na_1_1 (x : val)
-                 my_closure _region _ghost_region my_depth
+                 my_closure &my_alloc_region my_depth
                  -> k * k1
                  : [ 0 | 0 of val ] =
-           let Pmakeblock = %block.[`0`] (x) in
+           let Pmakeblock = %block.[`0`].my_alloc_region (x) in
            cont k (Pmakeblock)
          in
-         let $camlFunctors__na_5 = closure na_1_1 @na in
+         let $camlFunctors__na_6 = closure na_1_1 @na &toplevel.alloc_region
+         in
          let code loopify(never) size(45) newer_version_of(Make_0)
                Make_0_1 (X : val)
-                 my_closure _region _ghost_region my_depth
+                 my_closure &my_alloc_region my_depth
                  -> k * k1
                  : val =
-           let foo = closure foo_2_1 @foo with { X = X } in
-           let Pmakeblock = %block.[`0`] (0, $camlFunctors__na_5, foo) in
+           let foo = closure foo_2_1 @foo &my_alloc_region with { X = X } in
+           let Pmakeblock =
+             %block.[`0`].my_alloc_region (0, $camlFunctors__na_6, foo)
+           in
            cont k (Pmakeblock)
          in
-         let $camlFunctors__Make_4 = closure Make_0_1 @Make in
-         let $camlFunctors__Pmakeblock105 = Block 0 ($camlFunctors__Make_4)
+         let $camlFunctors__Make_5 =
+           closure Make_0_1 @Make &toplevel.alloc_region
          in
-         ((let $camlFunctors__foo_6 =
-             closure foo_3_1 @foo_1
+         let $camlFunctors__Pmakeblock_7 = Block 0 ($camlFunctors__Make_5) in
+         ((let $camlFunctors__foo_8 =
+             closure foo_3_1 @foo_1 &toplevel.alloc_region
            and code loopify(never) size(8) newer_version_of(foo_3)
                  foo_3_1 (t : val)
-                   my_closure _region _ghost_region my_depth
+                   my_closure &my_alloc_region my_depth
                    -> k1 * k2
                    : val =
-             let M_1 = %project_value_slot.[foo_1].[M] ($camlFunctors__foo_6)
+             let M_1 = %project_value_slot.[foo_1].[M] ($camlFunctors__foo_8)
              in
              let Pfield = %block_load.[`0`] (M_1) in
-             apply Pfield (42, t) -> k1 * k2
+             apply &my_alloc_region Pfield (42, t) -> k1 * k2
              with { M = M }
            in
-           let $camlFunctors__Pmakeblock115 = Block 0 ($camlFunctors__foo_6)
+           let $camlFunctors__Pmakeblock_9 = Block 0 ($camlFunctors__foo_8)
            in
-           apply direct(update_mod_7)
-             ($CamlinternalMod.camlCamlinternalMod__update_mod_13
+           apply direct(update_mod_7 &toplevel.alloc_region)
+             ($CamlinternalMod.camlCamlinternalMod__update_mod_7_15
               : _ -> imm tagged)
-               ($camlFunctors__const_block13,
-                M0,
-                $camlFunctors__Pmakeblock115)
+               ($camlFunctors__const_block_3, M0, $camlFunctors__Pmakeblock_9)
                -> k1 * error
              where k1 (param : imm tagged) =
                cont k)
             where k =
-              (apply direct(Make_0_1)
-                 ($camlFunctors__Make_4 : _ -> val) (M0) -> k1 * error
+              (apply direct(Make_0_1 &toplevel.alloc_region)
+                 ($camlFunctors__Make_5 : _ -> val) (M0) -> k1 * error
                  where k1 (include : val) =
                    let Pfield = %block_load.[`2`] (include) in
-                   let $camlFunctors__Pmakeblock123 = Block 0 (Pfield) in
-                   (apply direct(update_mod_7)
-                      ($CamlinternalMod.camlCamlinternalMod__update_mod_13
+                   let $camlFunctors__Pmakeblock_10 = Block 0 (Pfield) in
+                   (apply direct(update_mod_7 &toplevel.alloc_region)
+                      ($CamlinternalMod.camlCamlinternalMod__update_mod_7_15
                        : _ -> imm tagged)
-                        ($camlFunctors__const_block13,
+                        ($camlFunctors__const_block_3,
                          M,
-                         $camlFunctors__Pmakeblock123)
+                         $camlFunctors__Pmakeblock_10)
                         -> k1 * error
                       where k1 (param : imm tagged) =
                         cont k)
                  where k =
                    let $camlFunctors =
-                     Block 0 (M0, M, $camlFunctors__Pmakeblock105)
+                     Block 0 (M0, M, $camlFunctors__Pmakeblock_7)
                    in
                    cont done ($camlFunctors))))

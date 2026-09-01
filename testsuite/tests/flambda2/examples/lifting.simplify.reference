@@ -6,10 +6,10 @@ apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
          (apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
             where k (r2) =
               let $camlLifting__f_1 =
-                closure f_0_1 @f
+                closure f_0_1 @f &toplevel.alloc_region
               and code inline(always) loopify(never) size(10) newer_version_of(f_0)
                     f_0_1 (x : imm tagged)
-                      my_closure _region _ghost_region my_depth
+                      my_closure &my_alloc_region my_depth
                       -> k * k1
                       : imm tagged =
                 let r0_1 = %project_value_slot.[f].[r0] ($camlLifting__f_1)

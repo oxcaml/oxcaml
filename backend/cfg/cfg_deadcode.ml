@@ -2,7 +2,7 @@
 
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open! Regalloc_utils
-module DLL = Oxcaml_utils.Doubly_linked_list
+module DLL = Doubly_linked_list
 
 let live_before : type a.
     a Cfg.instruction -> Cfg_with_infos.liveness -> Reg.Set.t =
@@ -18,14 +18,7 @@ let remove_deadcode (body : Cfg.basic_instruction_list) changed liveness
   let used_after = ref used_after in
   DLL.filter_right body ~f:(fun (instr : Instruction.t) ->
       let before = live_before instr liveness in
-      let is_deadcode =
-        match instr.desc with
-        | Op _ as op ->
-          Cfg.is_pure_basic op && Reg.disjoint_set_array !used_after instr.res
-        | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
-        | Stack_check _ ->
-          false
-      in
+      let is_deadcode = Cfg.is_dead_basic instr ~live_after:!used_after in
       used_after := before;
       changed := !changed || is_deadcode;
       not is_deadcode)

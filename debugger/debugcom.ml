@@ -69,10 +69,10 @@ module Sp = struct
 end
 
 (* Identifier of the code fragment for the main program.
-   Numbering starts at 1 and the runtime registers 2 fragments before
-   the main program: one for uncaught exceptions and one for callbacks.
+   Numbering starts at 1 and the runtime registers 1 fragment before
+   the main program, for the callback code (see caml_init_callbacks).
 *)
-let main_frag = 3
+let main_frag = 2
 
 let set_event {frag; pos} =
   output_char !conn.io_out 'e';

@@ -1097,6 +1097,7 @@ runtime_COMMON_C_SOURCES = \
   extern \
   fail \
   fiber \
+  dynamic \
   finalise \
   floats \
   gc_ctrl \

@@ -25,10 +25,10 @@ let rec module_type =
         Parsetree.Named
           ( Location.mknoloc (Option.map ~f:Ident.name id),
             module_type type_in,
-            modes param_mode )
+            modes ~arg:true param_mode )
     in
     let out = module_type type_out in
-    Mty.functor_ ~ret_mode:(modes ret_mode) param out
+    Mty.functor_ ~ret_mode:(modes ~arg:false ret_mode) param out
   | Mty_strengthen (mty, path, _aliasability) ->
     Mty.strengthen ~loc:Location.none (module_type mty)
       (Location.mknoloc (Untypeast.lident_of_path path))
@@ -55,8 +55,8 @@ and core_type type_expr =
       | Labelled l -> (Labelled l, core_type type_expr)
       | Optional l -> (Optional l, core_type type_expr)
     in
-    let arg_modes = modes arg_alloc_mode in
-    let ret_modes = modes ret_alloc_mode in
+    let arg_modes = modes ~arg:true arg_alloc_mode in
+    let ret_modes = modes ~arg:false ret_alloc_mode in
     Typ.arrow label type_expr (core_type type_expr_out) arg_modes ret_modes
   | Ttuple type_exprs ->
     let labeled_type_exprs =
@@ -74,6 +74,9 @@ and core_type type_expr =
   | Tquote_eval ty ->
     let loc = Untypeast.lident_of_path Predef.path_eval |> Location.mknoloc in
     Typ.constr loc [ Typ.quote (core_type ty) ]
+  | Tbox ty ->
+    let loc = Untypeast.lident_of_path Predef.path_box |> Location.mknoloc in
+    Typ.constr loc [ core_type ty ]
   | Tobject (type_expr, _class_) ->
     let rec aux acc type_expr =
       match get_desc type_expr with
@@ -143,6 +146,9 @@ and core_type type_expr =
           (mknoloc (Longident.unflatten id |> Option.get), core_type t))
     in
     Typ.package (Typ.package_type loc args)
+  | Tmod (ty, _) ->
+    (* At the moment, there's no user syntax to represent Tmod *)
+    core_type ty
 
 and modtype_declaration id { mtd_type; mtd_attributes; _ } =
   Ast_helper.Mtd.mk ~attrs:mtd_attributes
@@ -160,7 +166,7 @@ and jkind_declaration id { jkind_manifest; jkind_attributes; _ } :
       Option.map jkind_manifest ~f:(fun _ : Parsetree.jkind_annotation ->
           (* CR modes: this is terrible. Internal ticket 6599 *)
           { pjka_desc =
-              Pjk_abbreviation ({ txt = Lident "any"; loc = Location.none }, []);
+              Pjk_abbreviation { txt = Lident "any"; loc = Location.none };
             pjka_loc = Location.none
           });
     pjkind_attributes = jkind_attributes;
@@ -173,11 +179,11 @@ and extension_constructor id { ext_args; ext_ret_type; ext_attributes; _ } =
     ?res:(Option.map ~f:core_type ext_ret_type)
     (var_of_id id)
 
-and modes mode =
+and modes ~arg mode =
   let snapshot = Btype.snapshot () in
-  let mode = Mode.Alloc.zap_to_legacy mode in
+  let mode = Mode.Alloc.zap_to_legacy_force ~arg mode in
   Btype.backtrack snapshot;
-  Out_type.tree_of_modes mode
+  Out_type.tree_of_modes_const mode
   |> List.map ~f:(fun mode -> Location.mknoloc (Parsetree.Mode mode))
 
 and const_modalities ~mut modality =

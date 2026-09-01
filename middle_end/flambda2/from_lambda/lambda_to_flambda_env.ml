@@ -90,11 +90,12 @@ type t =
     region_stack_in_cont_scope : Region_stack_element.t list Continuation.Map.t;
     region_closure_continuations :
       region_closure_continuation Region_stack_element.Map.t;
+    my_alloc_region : Ident.t;
     ident_stamp_upon_starting : int
   }
 
 let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
-    ~my_region =
+    ~my_region ~my_alloc_region =
   let mutables_needed_by_continuations =
     Continuation.Map.of_list
       [return_continuation, Ident.Set.empty; exn_continuation, Ident.Set.empty]
@@ -115,6 +116,7 @@ let create ~current_unit ~machine_width ~return_continuation ~exn_continuation
     region_stack_in_cont_scope =
       Continuation.Map.singleton return_continuation [];
     region_closure_continuations = Region_stack_element.Map.empty;
+    my_alloc_region;
     ident_stamp_upon_starting
   }
 
@@ -350,6 +352,11 @@ let current_region t =
     match t.region_stack with
     | [] -> t.my_region
     | region_stack_elt :: _ -> Some region_stack_elt
+
+(* CR alloc_regions: in the future, there will be a region stack for
+   alloc_regions. It will be used here, but this is not required for now, as we
+   have a single alloc_region for a function. *)
+let current_alloc_region t = t.my_alloc_region
 
 let parent_region t =
   if not (Flambda_features.stack_allocation_enabled ())

@@ -69,24 +69,40 @@ module Debugging_the_compiler = struct
         (Asm_targets.Asm_label.encode reference)
         desc
 
+  (* DIEs shared between functions (currently the immediate-or-pointer
+     enumerations) are parented under the compilation unit DIE, outside every
+     function's subtree, so per-function dumps would omit them; they are
+     recorded here so that every dump can include them. *)
+  let shared_dies = ref []
+
+  let add_shared ~die = if enabled () then shared_dies := die :: !shared_dies
+
+  let print_die ~die =
+    let indent = ref 0 in
+    Proto_die.depth_first_fold die ~init:() ~f:(fun () d ->
+        match d with
+        | DIE { label; tag; has_children; attribute_values = _; _ } ->
+          let indentation = String.make !indent ' ' in
+          let info =
+            (String.Tbl.find_opt die_description_table)
+              (Asm_targets.Asm_label.encode label)
+          in
+          Format.eprintf "%s+ %a(%s) %a\n" indentation
+            Asm_targets.Asm_label.print label (Dwarf_tag.tag_name tag)
+            (Format.pp_print_option Format.pp_print_string)
+            info;
+          if has_children = Child_determination.Yes then indent := !indent + 2
+        | End_of_siblings -> indent := !indent - 2)
+
   let print ~die =
     if enabled ()
-    then
-      let indent = ref 0 in
-      Proto_die.depth_first_fold die ~init:() ~f:(fun () d ->
-          match d with
-          | DIE { label; tag; has_children; attribute_values = _; _ } ->
-            let indentation = String.make !indent ' ' in
-            let info =
-              (String.Tbl.find_opt die_description_table)
-                (Asm_targets.Asm_label.encode label)
-            in
-            Format.eprintf "%s+ %a(%s) %a\n" indentation
-              Asm_targets.Asm_label.print label (Dwarf_tag.tag_name tag)
-              (Format.pp_print_option Format.pp_print_string)
-              info;
-            if has_children = Child_determination.Yes then indent := !indent + 2
-          | End_of_siblings -> indent := !indent - 2)
+    then (
+      (match !shared_dies with
+      | [] -> ()
+      | _ :: _ ->
+        Format.eprintf "shared between functions:\n";
+        List.iter (fun die -> print_die ~die) (List.rev !shared_dies));
+      print_die ~die)
 end
 
 module Shape_reduction_diagnostics : sig
@@ -487,7 +503,60 @@ let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
       ()
   done
 
-let create_complex_variant_die ~reference ~parent_proto_die ?name
+type immediate_or_pointer =
+  | Immediate
+  | Pointer
+
+let tag_bit = function Immediate -> 1 | Pointer -> 0
+
+let imm_or_ptr_name = function Immediate -> "Immediate" | Pointer -> "Pointer"
+
+(* Which variant of the enumeration distinguishing immediates from pointers: one
+   has named enumerators, the other unnamed ones. *)
+type imm_or_ptr_enumerators =
+  | Named
+  | Unnamed
+
+(* The enumerations distinguishing immediates from pointers do not depend on the
+   type being described, so a single DIE per variant is created for each
+   compilation unit (see [create_imm_or_ptr_enum_dies] below, called from
+   [Dwarf.create]) instead of one per variant type. *)
+let make_imm_or_ptr_enum ~(enumerators : imm_or_ptr_enumerators)
+    ~parent_proto_die () =
+  let enum_die =
+    Proto_die.create ~parent:(Some parent_proto_die)
+      ~tag:Dwarf_tag.Enumeration_type
+      ~attribute_values:[DAH.create_byte_size_exn ~byte_size:Arch.size_addr]
+      ()
+  in
+  Debugging_the_compiler.add_enum
+    ~reference:(Proto_die.reference enum_die)
+    ["Immediate"; "Pointer"];
+  List.iter
+    (fun elem ->
+      let name_attributes =
+        match enumerators with
+        | Named -> [DAH.create_name (imm_or_ptr_name elem)]
+        | Unnamed -> []
+      in
+      Proto_die.create_ignore ~parent:(Some enum_die) ~tag:Dwarf_tag.Enumerator
+        ~attribute_values:
+          (DAH.create_const_value ~value:(Int64.of_int (tag_bit elem))
+          :: name_attributes)
+        ())
+    [Pointer; Immediate];
+  enum_die
+
+let create_imm_or_ptr_enum_dies ~parent_proto_die :
+    DS.Die_gen_ctx.imm_or_ptr_enums =
+  let make enumerators =
+    let die = make_imm_or_ptr_enum ~enumerators ~parent_proto_die () in
+    Debugging_the_compiler.add_shared ~die;
+    die
+  in
+  { named = make Named; unnamed = make Unnamed }
+
+let create_complex_variant_die ~ctx ~reference ~parent_proto_die ?name
     ~simple_constructors
     ~(complex_constructors :
        (string * (string option * Proto_die.reference * RL.t) list) list) () =
@@ -508,27 +577,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
     Proto_die.create ~parent:(Some int_or_ptr_structure) ~attribute_values:[]
       ~tag:Dwarf_tag.Variant_part ()
   in
-  let enum_immediate_or_pointer =
-    let enum_die =
-      Proto_die.create ~parent:(Some parent_proto_die)
-        ~tag:Dwarf_tag.Enumeration_type
-        ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
-        ()
-    in
-    Debugging_the_compiler.add_enum
-      ~reference:(Proto_die.reference enum_die)
-      ["Immediate"; "Pointer"];
-    List.iteri
-      (fun i name ->
-        Proto_die.create_ignore ~parent:(Some enum_die)
-          ~tag:Dwarf_tag.Enumerator
-          ~attribute_values:
-            [ DAH.create_name name;
-              DAH.create_const_value ~value:(Int64.of_int i) ]
-          ())
-      ["Pointer"; "Immediate"];
-    enum_die
-  in
+  let enum_immediate_or_pointer = DS.Die_gen_ctx.imm_or_ptr_enum_named ctx in
   let _discriminant_immediate_or_pointer =
     let member_die =
       Proto_die.create ~parent:(Some variant_part_immediate_or_pointer)
@@ -703,14 +752,8 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
   in
   ()
 
-type immediate_or_pointer =
-  | Immediate
-  | Pointer
-
-let tag_bit = function Immediate -> 1 | Pointer -> 0
-
-let create_immediate_or_block ~reference ~parent_proto_die ?name ~immediate_type
-    ~pointer_type () =
+let create_immediate_or_block ~ctx ~reference ~parent_proto_die ?name
+    ~immediate_type ~pointer_type () =
   let value_size = Arch.size_addr in
   let int_or_ptr_structure =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
@@ -728,22 +771,7 @@ let create_immediate_or_block ~reference ~parent_proto_die ?name ~immediate_type
         [DAH.create_discr ~proto_die_reference:discriminant_reference]
       ~tag:Dwarf_tag.Variant_part ()
   in
-  let enum_die =
-    Proto_die.create ~parent:(Some parent_proto_die)
-      ~tag:Dwarf_tag.Enumeration_type
-      ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
-      ()
-  in
-  Debugging_the_compiler.add_enum
-    ~reference:(Proto_die.reference enum_die)
-    ["Immediate"; "Pointer"];
-  List.iter
-    (fun elem ->
-      Proto_die.create_ignore ~parent:(Some enum_die) ~tag:Dwarf_tag.Enumerator
-        ~attribute_values:
-          [DAH.create_const_value ~value:(Int64.of_int (tag_bit elem))]
-        ())
-    [Immediate; Pointer];
+  let enum_die = DS.Die_gen_ctx.imm_or_ptr_enum_unnamed ctx in
   let _discriminant_die =
     Proto_die.create ~reference:discriminant_reference
       ~parent:(Some variant_part_immediate_or_pointer)
@@ -807,7 +835,7 @@ let create_immediate_or_block ~reference ~parent_proto_die ?name ~immediate_type
     store the arguments of the constructor.
 *)
 
-let create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
+let create_poly_variant_dwarf_die ~ctx ~reference ~parent_proto_die ?name
     ~simple_constructors ~complex_constructors () =
   let enum_constructor_for_poly_variant ~parent name =
     let hash = Btype.hash_variant name in
@@ -901,7 +929,7 @@ let create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
           DAH.create_type ~proto_die:complex_constructors_struct ]
       ()
   in
-  create_immediate_or_block ~reference ?name ~parent_proto_die
+  create_immediate_or_block ~ctx ~reference ?name ~parent_proto_die
     ~immediate_type:simple_constructor_enum_die
     ~pointer_type:ptr_case_pointer_to_structure ()
 
@@ -1072,7 +1100,7 @@ let unboxed_base_type_to_simd_vec_split (x : RS.unboxed) =
   match x with
   | Unboxed_simd s -> Some s
   | Unboxed_float | Unboxed_float32 | Unboxed_nativeint | Unboxed_int64
-  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 ->
+  | Unboxed_int32 | Unboxed_int16 | Unboxed_int8 | Unboxed_mask ->
     None
 
 type vec_split_properties =
@@ -1154,7 +1182,7 @@ let create_runtime_layout_type ?(simd_vec_split = None) ~reference (sort : RL.t)
   | Float32 | Float64 ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
       Encoding_attribute.float
-  | Bits8 | Bits16 | Bits32 | Bits64 | Word | Untagged_immediate ->
+  | Bits8 | Bits16 | Bits32 | Bits64 | Mask | Word | Untagged_immediate ->
     create_unboxed_base_layout_die ~reference ~parent_proto_die ?name ~byte_size
       Encoding_attribute.signed
   | Vec128 | Vec256 | Vec512 ->
@@ -1207,54 +1235,9 @@ let create_boxed_simd_type ?name ~reference ~parent_proto_die split =
            DAH.create_type_from_reference ~proto_die_reference:base_ref ])
     ()
 
-module Shape_with_layout = struct
-  type t =
-    { type_shape : Shape.t;
-      type_layout : Layout.t
-    }
-
-  include Identifiable.Make (struct
-    type nonrec t = t
-
-    let compare = Stdlib.compare
-    (* CR sspies: Fix compare and equals on this type. Move the module to type
-       shape once it is more cleaned up. *)
-
-    let print fmt { type_shape; type_layout } =
-      Format.fprintf fmt "%a @ %a" Shape.print type_shape
-        (Format_doc.compat Layout.format)
-        type_layout
-
-    let hash { type_shape; type_layout } =
-      Hashtbl.hash (type_shape.hash, type_layout)
-
-    let equal ({ type_shape = x1; type_layout = y1 } : t)
-        ({ type_shape = x2; type_layout = y2 } : t) =
-      Shape.equal x1 x2 && Layout.equal y1 y2
-
-    let output _oc _t = Misc.fatal_error "unimplemented"
-  end)
-end
-
-module Dwarf_die_cache : sig
-  val find_in_cache :
-    RS.t -> rec_env:'a S.DeBruijn_env.t -> Proto_die.reference option
-
-  val add_to_cache :
-    RS.t -> Proto_die.reference -> rec_env:'a S.DeBruijn_env.t -> unit
-end = struct
-  let cache = RS.Cache.create 100
-
-  let find_in_cache (runtime_shape : RS.t) ~rec_env =
-    if S.DeBruijn_env.is_empty rec_env
-    then RS.Cache.find_opt cache runtime_shape
-    else None
-
-  let add_to_cache (runtime_shape : RS.t) reference ~rec_env =
-    (* [rec_env] being empty means that the shape is closed. *)
-    if S.DeBruijn_env.is_empty rec_env
-    then RS.Cache.add cache runtime_shape reference
-end
+module Die_gen_ctx = DS.Die_gen_ctx
+module Rec_var_env = Die_gen_ctx.Rec_var_env
+module Name_cache = Die_gen_ctx.Name_cache
 
 let partition_constructors constructors ~f =
   List.partition_map
@@ -1276,22 +1259,26 @@ let partition_constructors constructors ~f =
    [runtime_shape_to_dwarf_die] only works for types without names, and types
    with names are handled in [runtime_shape_to_dwarf_die_with_aliased_name]
    below. *)
-let rec runtime_shape_to_dwarf_die (t : RS.t) ~parent_proto_die
+let rec runtime_shape_to_dwarf_die ~ctx (t : RS.t) ~parent_proto_die
     ~fallback_value_die ~rec_env =
-  match Dwarf_die_cache.find_in_cache t ~rec_env with
+  (* The cache key only includes the binders that [t] can reference (see
+     [Die_gen_ctx.find_cached_die]); in particular closed shapes are keyed with
+     the empty environment, so that e.g. a shape appearing both at top level and
+     inside (unrelated) recursive types is only expanded once. *)
+  match Die_gen_ctx.find_cached_die ctx ~inp:t ~rec_env with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    Dwarf_die_cache.add_to_cache t reference ~rec_env;
+    Die_gen_ctx.add_cached_die ctx ~inp:t ~rec_env ~outp:reference;
     let name = None in
     (* Instead of omitting the name argument below, we fix it to be [None] here
        such that it is easier to change this code if in the future we want to
        change how the names of types are handled. *)
-    runtime_shape_to_dwarf_die_memo t ?name ~reference ~parent_proto_die
+    runtime_shape_to_dwarf_die_memo ~ctx t ?name ~reference ~parent_proto_die
       ~fallback_value_die ~rec_env;
     reference
 
-and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
+and runtime_shape_to_dwarf_die_memo ~ctx ~reference ?name (t : RS.t)
     ~parent_proto_die ~fallback_value_die ~rec_env : unit =
   let err ~fallback f =
     if !Clflags.dwarf_pedantic
@@ -1301,11 +1288,12 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
         ~fallback_value_die ()
   in
   let die sh =
-    runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die ~rec_env sh
+    runtime_shape_to_dwarf_die ~ctx ~parent_proto_die ~fallback_value_die
+      ~rec_env sh
   in
   let die_with_extended_env sh new_ref =
-    runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die
-      ~rec_env:(S.DeBruijn_env.push rec_env new_ref)
+    runtime_shape_to_dwarf_die ~ctx ~parent_proto_die ~fallback_value_die
+      ~rec_env:(Die_gen_ctx.push_rec_binder ctx rec_env new_ref)
       sh
   in
   match t.desc with
@@ -1313,8 +1301,8 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
     create_runtime_layout_type ~reference type_layout ?name ~parent_proto_die
       ~fallback_value_die ()
   | Predef p ->
-    predef_to_dwarf_die ~reference ?name p ~parent_proto_die ~fallback_value_die
-      ~rec_env
+    predef_to_dwarf_die ~ctx ~reference ?name p ~parent_proto_die
+      ~fallback_value_die ~rec_env
   | Tuple { args; kind = Tuple_boxed } ->
     (* CR sspies: In the future, tuples have to be handled like mixed
        records. *)
@@ -1359,7 +1347,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
       partition_constructors constructors ~f:(fun _label field_type ->
           die field_type)
     in
-    create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
+    create_poly_variant_dwarf_die ~ctx ~reference ~parent_proto_die ?name
       ~simple_constructors ~complex_constructors ()
   | Variant { constructors; kind = Variant_boxed } -> (
     let simple_constructors, complex_constructors =
@@ -1371,7 +1359,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
       create_simple_variant_die ~reference ~parent_proto_die ?name
         simple_constructors
     | _ :: _ ->
-      create_complex_variant_die ~reference ~parent_proto_die ?name
+      create_complex_variant_die ~ctx ~reference ~parent_proto_die ?name
         ~simple_constructors ~complex_constructors ())
   | Variant { constructors = [constr]; kind = Variant_attribute_unboxed layout }
     -> (
@@ -1406,7 +1394,7 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
              Format.pp_print_string)
           constructor_names)
   | Rec_var (de_bruijn_index, layout) -> (
-    match S.DeBruijn_env.get_opt rec_env ~de_bruijn_index with
+    match Rec_var_env.get_opt rec_env ~de_bruijn_index with
     | Some reference' ->
       create_typedef_die ~reference ~parent_proto_die ?name reference'
     | None ->
@@ -1414,17 +1402,18 @@ and runtime_shape_to_dwarf_die_memo ~reference ?name (t : RS.t)
           f
             "Recursive variable environment lookup failed: rec_env returned \
              None for de Bruijn index %a"
-            S.DeBruijn_index.print de_bruijn_index))
+            RS.DeBruijn_index.print de_bruijn_index))
   | Mu sh ->
     (* CR sspies: We are creating two typedefs for recursive types. One should
        be enough. *)
     let reference' = die_with_extended_env sh reference in
     create_typedef_die ~reference ~parent_proto_die ?name reference'
 
-and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
+and predef_to_dwarf_die ~ctx ~reference ?name (t : RS.predef) ~parent_proto_die
     ~fallback_value_die ~rec_env =
   let die sh =
-    runtime_shape_to_dwarf_die ~parent_proto_die ~fallback_value_die ~rec_env sh
+    runtime_shape_to_dwarf_die ~ctx ~parent_proto_die ~fallback_value_die
+      ~rec_env sh
   in
   match t with
   | Array (Regular s) ->
@@ -1451,16 +1440,11 @@ and predef_to_dwarf_die ~reference ?name (t : RS.predef) ~parent_proto_die
     create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
       ()
   | Bytes | Extension_constructor | Float | Float32 | Floatarray | Int | Int8
-  | Int16 | Int32 | Int64 | Lazy_t _ | Nativeint | String ->
+  | Int16 | Int32 | Int64 | Lazy_t _ | Mask | Nativeint | String ->
     create_runtime_layout_type ~reference Value ?name ~parent_proto_die
       ~fallback_value_die ()
 (* CR sspies: Create a separate block for lazy values. We now have type
    information for them. *)
-
-(** This second cache is for named type shapes. Every type name should be
-    associated with at most one DWARF die, so this cache maps type names to type
-    shapes and DWARF dies. *)
-let name_cache = String.Tbl.create 16
 
 module With_cms_reduce = Shape_reduce.Make (struct
   let fuel () = MB.of_option !Clflags.gdwarf_config_shape_reduce_fuel
@@ -1549,43 +1533,29 @@ end)
 
 module D = Shape_reduction_diagnostics
 
-(* Search for the first unused suffix-numbered version of [name] in the
-   [name_cache] cache. If we come along a type of the same name and runtime
-   shape, then we simply use that reference. *)
-let find_unused_type_name_or_cached (name : string) (runtime_shape : RS.t) :
-    (Proto_die.reference, string) Either.t =
-  let rec aux inc : _ Either.t =
-    let name_suffix = if inc = 0 then "" else "/" ^ string_of_int inc in
-    let name = name ^ name_suffix in
-    match String.Tbl.find_opt name_cache name with
-    | Some (runtime_shape', reference) ->
-      if RS.equal runtime_shape runtime_shape'
-      then Left reference
-      else aux (inc + 1)
-    | None -> Right name
-  in
-  aux 0
-
 (* We represent all types as DIE entries of the form [typedef ... type_name;]
    and use caching for types that have the same name and shape. For name
    conflicts, we search for the next available suffix-numbered version of the
    name, [type_name/n]. *)
-let runtime_shape_to_dwarf_die_with_aliased_name (type_name : string)
+let runtime_shape_to_dwarf_die_with_aliased_name ~ctx (type_name : string)
     (runtime_shape : RS.t) ~parent_proto_die ~fallback_value_die :
     Proto_die.reference =
-  match find_unused_type_name_or_cached type_name runtime_shape with
+  let name_cache = Die_gen_ctx.name_cache ctx in
+  match
+    Name_cache.find_unused_name_or_cached name_cache type_name runtime_shape
+  with
   | Left reference -> reference
   | Right name ->
     let unnamed_die =
-      runtime_shape_to_dwarf_die runtime_shape ~parent_proto_die
+      runtime_shape_to_dwarf_die ~ctx runtime_shape ~parent_proto_die
         ~fallback_value_die (* note that we do not pass the type name here *)
-        ~rec_env:S.DeBruijn_env.empty
+        ~rec_env:(Die_gen_ctx.empty_rec_env ctx)
     in
     let reference = Proto_die.create_reference () in
     let runtime_layout = RS.runtime_layout runtime_shape in
     let layout_name = RL.to_string runtime_layout in
     let full_name = name ^ " @ " ^ layout_name in
-    String.Tbl.add name_cache name (runtime_shape, reference);
+    Name_cache.add name_cache name runtime_shape reference;
     create_typedef_die ~reference ~name:full_name ~parent_proto_die unnamed_die;
     reference
 
@@ -1633,6 +1603,7 @@ let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
       Profile.record "unfold_and_evaluate"
         (fun () ->
           Type_shape.Evaluated_shape.unfold_and_evaluate
+            ~ctx:(DS.eval_context state)
             ~diagnostics:(D.shape_evaluation_diagnostics reduction_diagnostics)
             type_shape)
         ~accumulate:true ()
@@ -1699,8 +1670,9 @@ let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
         let reference =
           Profile.record "dwarf_produce_dies"
             (fun () ->
-              runtime_shape_to_dwarf_die_with_aliased_name type_name
-                runtime_shape ~parent_proto_die ~fallback_value_die)
+              runtime_shape_to_dwarf_die_with_aliased_name
+                ~ctx:(DS.die_gen_ctx state) type_name runtime_shape
+                ~parent_proto_die ~fallback_value_die)
             ~accumulate:true ()
         in
         if Debugging_the_compiler.enabled ()
