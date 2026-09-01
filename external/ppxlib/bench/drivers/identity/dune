@@ -1,0 +1,7 @@
+; A driver with no plugins
+
+(executable
+ (name driver)
+ (enabled_if
+  (>= %{ocaml_version} "4.10.0"))
+ (libraries ppxlib))
