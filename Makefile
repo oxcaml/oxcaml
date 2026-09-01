@@ -296,7 +296,7 @@ ppxlib-ast-build: \
 ppxlib-jane-build: ppxlib-ast-build
 	env OCAMLPATH="$(PPXLIB_JANE_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
 	  $(dune) build \
-	    --root="$(PPXLIB_JANE_SRC)" \
+	    --root=external/ppxlib_jane \
 	    --build-dir="$(PPXLIB_JANE_DIR)" \
 	    --only-packages=ppxlib_jane \
 	    @install
