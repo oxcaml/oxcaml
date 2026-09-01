@@ -390,6 +390,10 @@ stdenv.mkDerivation {
   ]
   ++ lib.optionals withMerlin merlinDev.devBuildInputs;
 
+  # Nothing here runs libtool, so stop stdenv's configurePhase from rewriting
+  # sys_lib_search_path in the checked-in build-aux/ltmain.sh.
+  dontFixLibtool = true;
+
   preConfigure = ''
     rm -rf _build _install _runtest
 
