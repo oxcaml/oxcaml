@@ -220,16 +220,69 @@ merlin-test:
 merlin-promote:
 	$(MAKE) -C external/merlin test-promote
 
-# Intermediary library target to build ocaml-compiler-libs-build against install
+# Intermediary library targets
+#
+# Temporary: the external-libs targets below build each library under
+# external/ as its own dune root and chain them by hand through OCAMLPATH.
+# The plan is to replace this with dune aliases in a single workspace.
+
+OCAML_COMPILER_LIBS_DIR := $(CURDIR)/_build/ocaml-compiler-libs
+PPX_DERIVERS_DIR := $(CURDIR)/_build/ppx-derivers
+SEXPLIB0_DIR := $(CURDIR)/_build/sexplib0
+STDLIB_SHIMS_DIR := $(CURDIR)/_build/stdlib-shims
+PPXLIB_AST_DIR := $(CURDIR)/_build/ppxlib-ast
+PPXLIB_DIR := $(CURDIR)/_build/ppxlib
+PPXLIB_JANE_DIR := $(CURDIR)/_build/ppxlib-jane
+
+OCAML_COMPILER_LIBS_LIB := $(OCAML_COMPILER_LIBS_DIR)/install/default/lib
+PPX_DERIVERS_LIB := $(PPX_DERIVERS_DIR)/install/default/lib
+SEXPLIB0_LIB := $(SEXPLIB0_DIR)/install/default/lib
+STDLIB_SHIMS_LIB := $(STDLIB_SHIMS_DIR)/install/default/lib
+PPXLIB_AST_LIB := $(PPXLIB_AST_DIR)/install/default/lib
+PPXLIB_JANE_LIB := $(PPXLIB_JANE_DIR)/install/default/lib
+
+PPXLIB_BASE_OCAMLPATH := $(OCAML_COMPILER_LIBS_LIB):$(PPX_DERIVERS_LIB):$(SEXPLIB0_LIB):$(STDLIB_SHIMS_LIB)
+PPXLIB_JANE_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB)
+PPXLIB_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB):$(PPXLIB_JANE_LIB)
+
+OXCAML_INSTALL ?= $(CURDIR)/_install
+
+PPXLIB_DUNE_ENV = \
+  PATH="$(OXCAML_INSTALL)/bin:$(PATH)" \
+  OCAMLLIB="$(OXCAML_INSTALL)/lib/ocaml" \
+  DUNE_CACHE=disabled
+
+.PHONY: external-libs-compiler
+external-libs-compiler:
+	@mkdir -p "$(CURDIR)/_build"
+	@test -x "$(OXCAML_INSTALL)/bin/ocamlc.opt" || $(MAKE) _install
+
+# ppx_derivers, sexplib0 and stdlib-shims are not part of this repository.
+# The nix devShell and the nix derivations provide their sources via the
+# PPXLIB_*_SRC variables.
+NIX_SOURCE_VARS := PPXLIB_PPX_DERIVERS_SRC PPXLIB_SEXPLIB0_SRC PPXLIB_STDLIB_SHIMS_SRC
+
+.PHONY: check-nix-sources
+check-nix-sources:
+	@missing=""; \
+	for v in $(NIX_SOURCE_VARS); do \
+	  eval val=\$${$$v}; \
+	  if [ -z "$$val" ] || ! [ -d "$$val" ]; then missing="$$missing $$v"; fi; \
+	done; \
+	if [ -n "$$missing" ]; then \
+	  echo "error: unset or not a directory:$$missing" >&2; \
+	  echo "error: this target needs sources provided by nix." >&2; \
+	  echo "error: run it from the nix devShell (nix develop) or via the nix derivation." >&2; \
+	  exit 1; \
+	fi
 
 .PHONY: ocaml-compiler-libs-build
-ocaml-compiler-libs-build: _install
-	env -u OCAMLPATH \
-	  PATH="$(CURDIR)/_install/bin:$(PATH)" \
-	  OCAMLLIB="$(CURDIR)/_install/lib/ocaml" \
+ocaml-compiler-libs-build: external-libs-compiler
+	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
 	  $(dune) build \
 	    --root=external/ocaml-compiler-libs \
-	    --build-dir="$(CURDIR)/_build/ocaml-compiler-libs" \
+	    --build-dir="$(OCAML_COMPILER_LIBS_DIR)" \
+	    --only-packages=ocaml-compiler-libs \
 	    @install
 
 .PHONY: ocaml-compiler-libs-build-boot
@@ -250,6 +303,64 @@ ppxlib-jane-build-boot:
 
 .PHONY: external-libs-build-boot
 external-libs-build-boot: ocaml-compiler-libs-build-boot ppxlib-jane-build-boot
+
+.PHONY: ppx-derivers-build
+ppx-derivers-build: check-nix-sources external-libs-compiler
+	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(PPXLIB_PPX_DERIVERS_SRC)" \
+	    --build-dir="$(PPX_DERIVERS_DIR)" \
+	    --only-packages=ppx_derivers \
+	    @install
+
+.PHONY: sexplib0-build
+sexplib0-build: check-nix-sources external-libs-compiler
+	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(PPXLIB_SEXPLIB0_SRC)" \
+	    --build-dir="$(SEXPLIB0_DIR)" \
+	    --only-packages=sexplib0 \
+	    @install
+
+.PHONY: stdlib-shims-build
+stdlib-shims-build: check-nix-sources external-libs-compiler
+	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(PPXLIB_STDLIB_SHIMS_SRC)" \
+	    --build-dir="$(STDLIB_SHIMS_DIR)" \
+	    --only-packages=stdlib-shims \
+	    @install
+
+.PHONY: ppxlib-ast-build
+ppxlib-ast-build: \
+  ocaml-compiler-libs-build ppx-derivers-build sexplib0-build stdlib-shims-build
+	env OCAMLPATH="$(PPXLIB_BASE_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root=external/ppxlib \
+	    --build-dir="$(PPXLIB_AST_DIR)" \
+	    --only-packages=ppxlib_ast \
+	    @install
+
+.PHONY: ppxlib-jane-build
+ppxlib-jane-build: ppxlib-ast-build
+	env OCAMLPATH="$(PPXLIB_JANE_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="external/ppxlib_jane" \
+	    --build-dir="$(PPXLIB_JANE_DIR)" \
+	    --only-packages=ppxlib_jane \
+	    @install
+
+.PHONY: ppxlib-build
+ppxlib-build: ppxlib-jane-build
+	env OCAMLPATH="$(PPXLIB_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root=external/ppxlib \
+	    --build-dir="$(PPXLIB_DIR)" \
+	    --only-packages=ppxlib \
+	    @install
+
+.PHONY: external-libs-build
+external-libs-build: ppxlib-build
 
 .PHONY: fmt
 fmt: $(dune_config_targets)
