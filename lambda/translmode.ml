@@ -24,10 +24,10 @@ let transl_ret_mode = function
   | Locality.Const.Local -> maybe_alloc_stack
 
 let transl_locality_mode_l locality =
-  Locality.zap_to_floor locality |> transl_locality_mode
+  Locality.zap_to_floor_exn locality |> transl_locality_mode
 
 let transl_return_mode_l locality =
-  Locality.zap_to_floor locality |> transl_ret_mode
+  Locality.zap_to_floor_exn locality |> transl_ret_mode
 
 let transl_alloc_mode_l mode =
   Typedtree.alloc_mode_l_zap_to_floor mode |> transl_locality_mode
@@ -38,15 +38,15 @@ let transl_alloc_mode_r mode =
   Typedtree.alloc_mode_r_zap_to_ceil mode |> transl_locality_mode
 
 let transl_yielding_mode_l yielding =
-  match Yielding.zap_to_floor yielding with
+  match Yielding.zap_to_floor_exn yielding with
   | Yielding.Const.Unyielding -> Unyielding
   | Yielding.Const.Yielding -> May_yield
 
 let transl_ret_mode mode =
-  Typedtree.return_mode_zap_to_floor mode |> transl_ret_mode
+  Typedtree.return_mode_zap_to_floor_exn mode |> transl_ret_mode
 
 let transl_modify_mode locality =
-  match Locality.zap_to_floor locality with
+  match Locality.zap_to_floor_exn locality with
   | Global -> modify_heap
   | Local -> modify_maybe_stack
 
