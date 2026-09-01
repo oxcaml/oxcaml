@@ -44,6 +44,7 @@ module Context : sig
     | Psig_extension : signature_item t
     | Rtag : row_field t
     | Object_type_field : object_field t
+    | Pfunction_cases : function_body t
 
   val label_declaration : label_declaration t
   val constructor_declaration : constructor_declaration t
@@ -73,6 +74,9 @@ module Context : sig
   val psig_extension : signature_item t
   val rtag : row_field t
   val object_type_field : object_field t
+  val pfunction_cases : function_body t
+
+  val equal : 'a t -> 'b t -> bool
 end
 
 val declare :
@@ -210,12 +214,33 @@ module Floating : sig
     'b ->
     ('a, 'c) t
 
+  val declare_with_name_loc :
+    string ->
+    'a Context.t ->
+    (payload, 'b, 'c) Ast_pattern.t ->
+    (name_loc:Location.t -> 'b) ->
+    ('a, 'c) t
+  (** Same as [declare] but the callback receives the location of the name of
+      the attribute. *)
+
+  val declare_with_attr_loc :
+    string ->
+    'a Context.t ->
+    (payload, 'b, 'c) Ast_pattern.t ->
+    (attr_loc:Location.t -> 'b) ->
+    ('a, 'c) t
+  (** Same as [declare] but the callback receives the location of the attribute.
+  *)
+
   val name : _ t -> string
 
   val convert_res :
     ('a, 'b) t list -> 'a -> ('b option, Location.Error.t NonEmptyList.t) result
 
   val convert : ('a, 'b) t list -> 'a -> 'b option
+
+  val convert_attr_res :
+    ('a, 'b) t -> attribute -> ('b option, Location.Error.t NonEmptyList.t) result
 end
 
 val explicitly_drop : Ast_traverse0.iter
