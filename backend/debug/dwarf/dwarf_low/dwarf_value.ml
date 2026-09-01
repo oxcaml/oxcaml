@@ -282,6 +282,11 @@ let distance_between_labels_32_bit ?comment ~upper ~lower () =
 let distance_between_labels_64_bit ?comment ~upper ~lower () =
   { value = Distance_between_labels_64_bit { upper; lower }; comment }
 
+let distance_between_labels_format_width ?comment ~upper ~lower () =
+  match Dwarf_format.get () with
+  | Thirty_two -> distance_between_labels_32_bit ?comment ~upper ~lower ()
+  | Sixty_four -> distance_between_labels_64_bit ?comment ~upper ~lower ()
+
 let distance_between_labels_32_bit_with_offsets ?comment ~upper ~upper_offset
     ~lower ~lower_offset () =
   { value =

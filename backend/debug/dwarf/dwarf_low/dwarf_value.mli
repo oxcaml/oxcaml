@@ -112,6 +112,11 @@ val distance_between_labels_32_bit :
 val distance_between_labels_64_bit :
   ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> t
 
+(** As [distance_between_labels_32_bit] or [distance_between_labels_64_bit],
+    according to the current DWARF format. *)
+val distance_between_labels_format_width :
+  ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> t
+
 val distance_between_labels_32_bit_with_offsets :
   ?comment:string ->
   upper:Asm_label.t ->

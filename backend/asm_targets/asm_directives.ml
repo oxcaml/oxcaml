@@ -1177,9 +1177,10 @@ let between_labels_32_bit ?comment:_comment ~upper ~lower () =
      force an assembly time constant. *)
   const expr Thirty_two
 
-let between_labels_64_bit ?comment:_ ~upper:_ ~lower:_ () =
-  (* CR poechsel: use the arguments *)
-  Misc.fatal_error "between_labels_64_bit not implemented yet"
+let between_labels_64_bit ?comment:_comment ~upper ~lower () =
+  let expr = const_sub (const_label upper) (const_label lower) in
+  (* See [between_labels_32_bit] above regarding assembly-time constants. *)
+  const expr Sixty_four
 
 let delta_uleb128 ~upper ~lower =
   let delta =

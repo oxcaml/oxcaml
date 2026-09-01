@@ -106,12 +106,13 @@ struct
         (Dwarf_int.add
            (Address_index.size end_exclusive)
            (Payload.size payload))
-    | Startx_length { start_inclusive; length = _; payload } ->
+    | Startx_length { start_inclusive; length; payload } ->
+      let length =
+        Dwarf_value.uleb128 (Targetint.nonnegative_to_uint64_exn length)
+      in
       Dwarf_int.add
         (Address_index.size start_inclusive)
-        (Dwarf_int.add
-           (Dwarf_int.of_targetint_exn Targetint.size_in_bytes_as_targetint)
-           (Payload.size payload))
+        (Dwarf_int.add (Dwarf_value.size length) (Payload.size payload))
     | Offset_pair { start_offset_inclusive; end_offset_exclusive; payload } ->
       let start_offset_inclusive =
         Dwarf_value.uleb128
@@ -186,10 +187,11 @@ struct
     | Startx_length { start_inclusive; length; payload } ->
       Address_index.emit ~asm_directives ~comment:"start_inclusive"
         start_inclusive;
-      (* CR mshinwell: DWARF-5 defines this length operand as ULEB128, so it
-         should be emitted as in [Start_length] below, with [size0] updated to
-         match. There are currently no users of [Startx_length]. *)
-      A.targetint ~comment:"length" length;
+      (* The length is unsigned LEB128 (DWARF-5 spec sections 2.6.2 and 2.17.3),
+         matching [size0] above. *)
+      Dwarf_value.emit ~asm_directives
+        (Dwarf_value.uleb128 ~comment:"length"
+           (Targetint.nonnegative_to_uint64_exn length));
       Payload.emit ~asm_directives payload
     | Offset_pair { start_offset_inclusive; end_offset_exclusive; payload } ->
       (* The offsets are unsigned LEB128 (DWARF-5 spec page 44 line 30 and page
