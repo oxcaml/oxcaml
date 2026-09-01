@@ -1026,9 +1026,7 @@ let define_data_symbol symbol =
   (* CR sspies: enable check again *)
   (* check_symbol_for_definition_in_current_section symbol; *)
   emit (New_label (Symbol symbol, Machine_width_data));
-  match TS.Assembler.get (), TS.System.is_windows () with
-  | GAS_like, false -> type_ (Symbol symbol) ~type_:Object
-  | GAS_like, true | MacOS, _ | MASM, _ -> ()
+  if Config.asm_size_type_directives then type_ (Symbol symbol) ~type_:Object
 
 (* CR mshinwell: Rename to [define_text_symbol]? *)
 let define_function_symbol symbol =
@@ -1036,9 +1034,7 @@ let define_function_symbol symbol =
   (* check_symbol_for_definition_in_current_section symbol; *)
   (* CR mshinwell: This shouldn't be called "New_label" *)
   emit (New_label (Symbol symbol, Code));
-  match TS.Assembler.get (), TS.System.is_windows () with
-  | GAS_like, false -> type_ (Symbol symbol) ~type_:Function
-  | GAS_like, true | MacOS, _ | MASM, _ -> ()
+  if Config.asm_size_type_directives then type_ (Symbol symbol) ~type_:Function
 
 let define_symbol_label ~section symbol =
   let typ : Directive.thing_after_label =
@@ -1047,14 +1043,10 @@ let define_symbol_label ~section symbol =
   emit (New_label (Symbol symbol, typ))
 
 let type_symbol symbol ~ty =
-  match TS.Assembler.get (), TS.System.is_windows () with
-  | GAS_like, false -> type_ (Symbol symbol) ~type_:ty
-  | GAS_like, true | MacOS, _ | MASM, _ -> ()
+  if Config.asm_size_type_directives then type_ (Symbol symbol) ~type_:ty
 
 let type_label label ~ty =
-  match TS.Assembler.get (), TS.System.is_windows () with
-  | GAS_like, false -> type_ (Label label) ~type_:ty
-  | GAS_like, true | MacOS, _ | MASM, _ -> ()
+  if Config.asm_size_type_directives then type_ (Label label) ~type_:ty
 
 let define_joint_label_and_symbol ~section symbol =
   define_symbol_label ~section symbol;
