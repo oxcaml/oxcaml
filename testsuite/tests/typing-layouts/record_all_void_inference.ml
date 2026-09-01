@@ -16,10 +16,7 @@ external unbox_unit : unit -> unit# = "%unbox_unit"
 (* The field's sort is determined at the use site *)
 let g () = { x = unbox_unit () }
 [%%expect{|
-Line 1, characters 11-32:
-1 | let g () = { x = unbox_unit () }
-               ^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+val g : unit -> unit# r = <fun>
 |}]
 
 (* The field's sort is determined after the use, by inference *)
@@ -28,10 +25,7 @@ let f x =
   let (_ : unit# r) = r in
   r
 [%%expect{|
-Line 2, characters 10-15:
-2 |   let r = { x } in
-              ^^^^^
-Error: Records must contain at least one runtime value.
+val f : unit# -> unit# r = <fun>
 |}]
 
 type ('a : any) w = A of { x : 'a }
@@ -44,10 +38,7 @@ let h x =
   let (_ : unit# w) = w in
   w
 [%%expect{|
-Line 2, characters 12-17:
-2 |   let w = A { x } in
-                ^^^^^
-Error: Records must contain at least one runtime value.
+val h : unit# -> unit# w = <fun>
 |}]
 
 (* All-void constructors (not inlined records) are permitted *)
