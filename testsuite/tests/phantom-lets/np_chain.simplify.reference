@@ -1,0 +1,37 @@
+let code produce_0 deleted in
+let code test_1 deleted in
+let code inline(never) loopify(never) size(3) newer_version_of(produce_0)
+      produce_0_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (x, 1) in
+  cont k (int_add)
+in
+let $camlNp_chain__produce_1 =
+  closure produce_0_1 @produce &toplevel.alloc_region
+in
+let phantom produce = $camlNp_chain__produce_1 in
+let code loopify(never) size(15) newer_version_of(test_1)
+      test_1_1 (np x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  apply direct(produce_0_1 &my_alloc_region)
+    ($camlNp_chain__produce_1 : _ -> imm tagged) (x) -> k2 * k1
+    where k2 (np apply_result : imm tagged) =
+      let np int_mul = %int_barith.mul (apply_result, 2) in
+      let np int_add = %int_barith.add (int_mul, 1) in
+      let phantom pair =
+        %block.[`0`].my_alloc_region.local[`region`] (int_add, x)
+      in
+      let int_add_1 = %int_barith.add (int_add, x) in
+      let `unit` = %end_region (`region`) in
+      cont k (int_add_1)
+in
+let $camlNp_chain__test_2 = closure test_1_1 @test &toplevel.alloc_region in
+let phantom test = $camlNp_chain__test_2 in
+let $camlNp_chain = Block 0 ($camlNp_chain__produce_1, $camlNp_chain__test_2)
+in
+cont done ($camlNp_chain)

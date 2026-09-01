@@ -829,11 +829,17 @@ let rebuild_single_recursive_handler cont
       in
       (* Invariant parameters are not marked: they are shared between the
          handlers of a recursive group, so any marking would have to happen at
-         the point where the whole group is rebuilt; and no case is currently
-         known where a non-user-visible invariant parameter is referenced by a
-         phantom let (the parameter-alias machinery removes invariant parameters
-         of single-entry loops, and phantom defining expressions reference boxed
-         carriers rather than unboxing extras). *)
+         the point where the whole group is rebuilt (by which time the
+         parameters have been removed from the handlers' recorded name
+         occurrences); and no case is currently known where a non-user-visible
+         invariant parameter is referenced by a phantom let (the
+         parameter-alias machinery removes invariant parameters of single-entry
+         loops, and phantom defining expressions reference boxed carriers
+         rather than unboxing extras). Note that the transitive propagation
+         performed by [Expr_builder.create_let] provides another route by which
+         such a reference could arise (a marked binding in a recursive handler
+         whose defining expression uses an invariant parameter); if such a case
+         appears, the marking will need to be restructured as above. *)
       let variant_params =
         Expr_builder.promote_params_needed_by_phantom_lets uacc variant_params
           ~free_names

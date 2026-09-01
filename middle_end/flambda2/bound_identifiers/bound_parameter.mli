@@ -25,7 +25,9 @@ val create :
 val var : t -> Variable.t
 
 (** Whether the variable is referenced by the defining expression of at least
-    one phantom let and must therefore remain locatable by the debugger (which
+    one phantom let (possibly transitively, via the defining expressions of
+    bindings whose binders are so marked) and must therefore remain locatable
+    by the debugger (which
     matters when it is not user visible, since such variables otherwise receive
     no provenance). Such binders print with the visibility suffix "NP", or "UVP"
     if also user visible. Always [false] on creation; set by [Simplify]. Not

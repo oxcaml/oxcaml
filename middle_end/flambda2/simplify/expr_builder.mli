@@ -27,9 +27,12 @@ open! Flambda.Import
 
 (** Mark, via [Bound_parameter.with_needed_by_phantom_let], any of the given
     parameters that are referenced by the defining expression of at least one
-    phantom let (per the given [Name_occurrences.t]), so that they remain
-    locatable by the debugger. [create_let] performs the analogous marking for
-    let binders itself; this is for continuation and function parameters. *)
+    phantom let, or transitively by the defining expression of a binding whose
+    binder is so marked (per the given [Name_occurrences.t], into which
+    [create_let] records phantom-mode occurrences for the latter case), so
+    that they remain locatable by the debugger. [create_let] performs the
+    analogous marking for let binders itself; this is for continuation and
+    function parameters. *)
 val promote_params_needed_by_phantom_lets :
   Upwards_acc.t ->
   Bound_parameters.t ->
