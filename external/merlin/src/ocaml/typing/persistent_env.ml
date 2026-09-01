@@ -23,6 +23,7 @@ module CU = Compilation_unit
 module Consistbl_data = Import_info.Intf.Nonalias.Kind
 module Consistbl = Consistbl.Make (CU.Name) (Consistbl_data)
 module Style = Misc.Style
+module String = Misc.Stdlib.String
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
 
@@ -161,6 +162,7 @@ type 'a t = {
   param_imports : Param_set.t ref;
   crc_units: Consistbl.t;
   can_load_cmis: can_load_cmis ref;
+  short_paths_basis: Short_paths.Basis.t ref;
 }
 
 let empty () = {
@@ -176,6 +178,7 @@ let empty () = {
   param_imports = ref Param_set.empty;
   crc_units = Consistbl.create ();
   can_load_cmis = ref Can_load_cmis;
+  short_paths_basis = ref (Short_paths.Basis.create ());
 }
 
 let clear penv =
@@ -192,6 +195,7 @@ let clear penv =
     param_imports;
     crc_units;
     can_load_cmis;
+    short_paths_basis;
   } = penv in
   Hashtbl.clear globals;
   Hashtbl.clear imports;
@@ -205,6 +209,7 @@ let clear penv =
   param_imports := Param_set.empty;
   Consistbl.clear crc_units;
   can_load_cmis := Can_load_cmis;
+  short_paths_basis := Short_paths.Basis.create ();
   ()
 
 let clear_missing {imports; _} =
@@ -305,6 +310,8 @@ let can_load_cmis penv =
   !(penv.can_load_cmis)
 let set_can_load_cmis penv setting =
   penv.can_load_cmis := setting
+let short_paths_basis penv =
+  !(penv.short_paths_basis)
 
 let without_cmis penv f x =
   let log = Lazy_backtrack.log () in
@@ -321,6 +328,45 @@ let fold {persistent_structures; _} f x =
     (fun name ps x -> if ps.ps_canonical then f name ps.ps_val x else x)
     persistent_structures x
 
+let register_pers_for_short_paths penv modname ps components =
+  let old_style_crcs =
+    ps.ps_name_info.pn_import.imp_crcs
+    |> Array.to_list
+    |> List.map
+         (fun import ->
+            let name = Import_info.name import in
+            let crc = Import_info.crc import in
+            name, crc)
+  in
+  let depends, alias_depends =
+    List.fold_left
+      (fun (deps, alias_deps) (name, digest) ->
+         let name_as_string = Compilation_unit.Name.to_string name in
+         Short_paths.Basis.add (short_paths_basis penv) name_as_string;
+         match digest with
+         | None -> deps, name_as_string :: alias_deps
+         | Some _ -> name_as_string :: deps, alias_deps)
+      ([], []) old_style_crcs
+  in
+  let desc =
+    Short_paths.Desc.Module.(Fresh (Signature components))
+  in
+  let is_deprecated =
+    List.exists
+      (function
+        | Alerts alerts ->
+          String.Map.mem "deprecated" alerts ||
+          String.Map.mem "ocaml.deprecated" alerts
+        | _ -> false)
+      ps.ps_name_info.pn_import.imp_flags
+  in
+  let deprecated =
+    if is_deprecated then Short_paths.Desc.Deprecated
+    else Short_paths.Desc.Not_deprecated
+  in
+  (* CR parameterized modules: [depends] and [alias_depends] are missing instantiation. *)
+  Short_paths.Basis.load (short_paths_basis penv) modname
+    ~depends ~alias_depends desc ps.ps_name_info.pn_import.imp_visibility deprecated
 (* Reading persistent structures from .cmi files *)
 
 let save_import penv crc modname impl flags filename =
@@ -842,7 +888,7 @@ type 'a sig_reader =
 (* Add a persistent structure to the hash table and bind it in the [Env].
    Checks that OCaml source is allowed to refer to this module. *)
 
-let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
+let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig short_path_comps =
   let {persistent_structures; locals_bound_to_runtime_parameters; _} = penv in
   let import = pers_name.pn_import in
   let global = pers_name.pn_global in
@@ -882,13 +928,14 @@ let acknowledge_new_pers_struct penv modname pers_name val_of_pers_sig =
     }
   in
   Hashtbl.add persistent_structures modname ps;
+  register_pers_for_short_paths penv modname ps (short_path_comps modname pm);
   begin match binding with
   | Runtime_parameter id -> Ident.Tbl.add locals_bound_to_runtime_parameters id ()
   | Constant _ -> ()
   end;
   ps
 
-let acknowledge_pers_struct penv modname pers_name val_of_pers_sig =
+let acknowledge_pers_struct penv modname pers_name val_of_pers_sig short_path_comps =
   (* This is the same dance that [acknowledge_pers_name] does. See comments
      there. *)
   let {persistent_structures; _} = penv in
@@ -898,7 +945,7 @@ let acknowledge_pers_struct penv modname pers_name val_of_pers_sig =
     | Some ps -> ps
     | None ->
         acknowledge_new_pers_struct penv canonical_modname pers_name
-          val_of_pers_sig
+          val_of_pers_sig short_path_comps
   in
   if not (Global_module.Name.equal modname canonical_modname) then
     Hashtbl.add persistent_structures modname { ps with ps_canonical = false };
@@ -911,7 +958,7 @@ let read_pers_struct penv check modname cmi =
   pers_name.pn_sign
 
 let find_pers_struct
-    ~allow_hidden penv val_of_pers_sig ~check name ~allow_excess_args =
+    ~allow_hidden penv val_of_pers_sig short_path_comps ~check name ~allow_excess_args =
   let {persistent_structures; _} = penv in
   match Hashtbl.find persistent_structures name with
   | ps -> check_visibility ~allow_hidden ps.ps_name_info.pn_import; ps
@@ -919,7 +966,7 @@ let find_pers_struct
       let pers_name =
         find_pers_name ~allow_hidden penv ~check name ~allow_excess_args
       in
-      acknowledge_pers_struct penv name pers_name val_of_pers_sig
+      acknowledge_pers_struct penv name pers_name val_of_pers_sig short_path_comps
 
 let describe_prefix ppf prefix =
   if CU.Prefix.is_empty prefix then
@@ -928,10 +975,10 @@ let describe_prefix ppf prefix =
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
 (* Emits a warning if there is no valid cmi for name *)
-let check_pers_struct ~allow_hidden penv f ~loc name =
+let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
   let name_as_string = CU.Name.to_string (CU.Name.of_head_of_global_name name) in
   try
-    ignore (find_pers_struct ~allow_hidden penv f ~check:false name
+    ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
               ~allow_excess_args:true)
   with
   | Not_found ->
@@ -1017,11 +1064,11 @@ let read_cmi_file penv filename =
   in
   modname, pers_name.pn_sign
 
-let find ~allow_hidden penv f name ~allow_excess_args =
-  (find_pers_struct ~allow_hidden ~allow_excess_args penv f ~check:true
+let find ~allow_hidden penv f1 f2 name ~allow_excess_args =
+  (find_pers_struct ~allow_hidden ~allow_excess_args penv f1 f2 ~check:true
      name).ps_val
 
-let check ~allow_hidden penv f ~loc name =
+let check ~allow_hidden penv f1 f2 ~loc name =
   let {persistent_structures; _} = penv in
   let persistent_structure_visible =
     match Hashtbl.find persistent_structures name with
@@ -1048,7 +1095,7 @@ let check ~allow_hidden penv f ~loc name =
     in
     if (Warnings.is_active (Warnings.No_cmi_file("", None))) then
       !add_delayed_check_forward
-        (fun () -> check_pers_struct ~allow_hidden penv f ~loc name)
+        (fun () -> check_pers_struct ~allow_hidden penv f1 f2 ~loc name)
   end
 
 let crc_of_unit penv name =

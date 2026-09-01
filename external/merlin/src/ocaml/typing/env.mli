@@ -701,6 +701,12 @@ val summary: t -> summary
 val keep_only_summary : t -> t
 val env_of_only_summary : (summary -> Subst.t -> t) -> t -> t
 
+(* Update the short paths table *)
+val update_short_paths : t -> t
+
+(* Return the short paths table *)
+val short_paths : t -> Short_paths.t
+
 (* Error report *)
 
 type error =
@@ -761,6 +767,10 @@ val report_jkind_violation_with_offender:
    Format_doc.formatter -> Jkind.Violation.t -> unit) ref
 
 
+
+(* Forward declaration to break mutual recursion with Printtyp *)
+val shorten_module_path : (t -> Path.t -> Path.t) ref
+
 (** Folds *)
 
 (** Folding over all identifiers (for analysis purpose) *)
@@ -817,7 +827,7 @@ val with_cmis : (unit -> 'a) -> 'a
 
 val add_merlin_extension_module: Ident.t -> module_type -> t -> t
 val cleanup_functor_caches : stamp:int -> unit
-(* val scrape_lazy: (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref *)
+val scrape_lazy: (t -> Subst.Lazy.module_type -> Subst.Lazy.module_type) ref
 val cleanup_usage_tables : stamp:int -> unit
 
 (** This value should be filled in with [Msupport.raise_error]. [Env] cannot use this
