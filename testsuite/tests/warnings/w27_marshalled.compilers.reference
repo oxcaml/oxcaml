@@ -1,0 +1,14 @@
+File "w27_source.ml", line 5, characters 14-17:
+5 | let f ({ foo; bar } : t) = foo
+                  ^^^
+Warning 27 [unused-var-strict]: unused variable bar.
+
+File "w27_source.ml", line 8, characters 36-39:
+8 | let g x = match (x : t) with { foo; bar } -> foo
+                                        ^^^
+Warning 27 [unused-var-strict]: unused variable bar.
+
+File "w27_source.ml", line 11, characters 25-28:
+11 | let h = function ({ foo; bar } : t) -> foo
+                              ^^^
+Warning 27 [unused-var-strict]: unused variable bar.
