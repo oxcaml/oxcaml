@@ -36,7 +36,6 @@ module System : sig
     | Dragonfly
     | GNU
     | BeOS
-    | Unknown
 
   val get : unit -> t
 

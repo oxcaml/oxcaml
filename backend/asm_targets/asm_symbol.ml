@@ -33,8 +33,7 @@ let symbol_prefix () =
     match Target_system.System.get () with
     | Linux
     | Windows (MinGW | MSVC)
-    | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly
-    | Unknown ->
+    | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly ->
       "" (* checked ok. *)
     | MacOS -> "_" (* checked ok. *))
   | ARM | POWER | Z | Riscv -> ""

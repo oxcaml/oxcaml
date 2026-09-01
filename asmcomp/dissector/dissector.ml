@@ -116,7 +116,7 @@ let run ~(unix : (module Compiler_owee.Unix_intf.S)) ~temp_dir ~ml_objfiles
   (match Target_system.System.get () with
   | Linux -> ()
   | Windows _ | Cygwin | MacOS | FreeBSD | NetBSD | OpenBSD | Solaris
-  | Dragonfly | GNU | BeOS | Unknown ->
+  | Dragonfly | GNU | BeOS ->
     Misc.fatal_error "The dissector pass is only supported on Linux targets");
   (* Check that we're running on a 64-bit architecture. The dissector parses
      ELF64 files and uses int64 arithmetic extensively. *)

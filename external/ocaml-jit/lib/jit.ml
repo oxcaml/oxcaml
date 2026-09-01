@@ -174,8 +174,7 @@ let symbol_prefix () =
   | MacOS -> "_"
   | Linux
   | Windows (MinGW | MSVC)
-  | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly
-  | Unknown ->
+  | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly ->
       ""
 
 let entry_points ~phrase_name symbols =

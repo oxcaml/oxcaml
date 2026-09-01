@@ -48,7 +48,6 @@ module System = struct
     | Dragonfly
     | GNU
     | BeOS
-    | Unknown
 
   let get () : t =
     match Config.system with
@@ -64,7 +63,7 @@ module System = struct
     | "dragonfly" -> Dragonfly
     | "gnu" -> GNU
     | "beos" -> BeOS
-    | "unknown" -> Unknown
+    | "unknown" -> Misc.fatal_error "Unknown system type"
     | _ ->
       Misc.fatal_errorf
         "Cannot determine system type (%s): ensure `target_system.ml' matches \
@@ -74,14 +73,14 @@ module System = struct
   let is_windows () =
     match get () with
     | Linux | Cygwin | MacOS | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly
-    | GNU | BeOS | Unknown ->
+    | GNU | BeOS ->
       false
     | Windows _ -> true
 
   let is_macos () =
     match get () with
     | Linux | Windows _ | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris
-    | Dragonfly | GNU | BeOS | Unknown ->
+    | Dragonfly | GNU | BeOS ->
       false
     | MacOS -> true
 end
@@ -98,8 +97,7 @@ module Assembler = struct
     | MacOS -> MacOS
     | Linux
     | Windows MinGW
-    | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU | BeOS
-    | Unknown ->
+    | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU | BeOS ->
       GAS_like
 
   let is_macos () = match get () with MASM | GAS_like -> false | MacOS -> true
