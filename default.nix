@@ -287,18 +287,6 @@ let
     hash = "sha256-ur9y05F7hvcHiF8MVSjjbGP8y2mPS0bPK6tcfM3W2Eo=";
   });
 
-  ppxlibJaneUpstreamSrc =
-    unpackSourceArchive "ppxlib-jane-oxcaml-source" (pkgs.fetchurl {
-      url = "https://github.com/janestreet/ppxlib_jane/archive/52e90008fbdc22fc0f880aa827faf10257a9b2a6.tar.gz";
-      hash = "sha256-uT4rFFQQxIrvoqop2cUxBoncrxqyVpPs7cTWREJw0+o=";
-    });
-
-  ppxlibJaneSrc = pkgs.applyPatches {
-    name = "ppxlib-jane-source";
-    src = ppxlibJaneUpstreamSrc;
-    patches = [ ./external/patches/ppxlib-jane-oxcaml.patch ];
-  };
-
   mkExternalLibraries =
     oxcaml:
     stdenv.mkDerivation {
@@ -309,7 +297,6 @@ let
       PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
       PPXLIB_SEXPLIB0_SRC = sexplib0Src;
       PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
-      PPXLIB_JANE_SRC = ppxlibJaneSrc;
 
       nativeBuildInputs = [
         dune
@@ -432,7 +419,6 @@ stdenv.mkDerivation {
   PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
   PPXLIB_SEXPLIB0_SRC = sexplib0Src;
   PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
-  PPXLIB_JANE_SRC = ppxlibJaneSrc;
 
   enableParallelBuilding = true;
   separateDebugInfo = false;
