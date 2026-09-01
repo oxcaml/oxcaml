@@ -117,7 +117,7 @@ let rewrite_module_facts ~root ~rewrite_root
     | Some _ ->
       let add_root_to_location loc = (add_root ~root { txt = (); loc }).loc in
       let rewrite_node : Node.t -> Node.t = function
-        | Node.Uid _ as node -> node
+        | (Node.Uid _ | Node.Whole_unit _) as node -> node
         | Node.Location (compilation_unit, loc) ->
           Node.Location (compilation_unit, add_root_to_location loc)
       in
