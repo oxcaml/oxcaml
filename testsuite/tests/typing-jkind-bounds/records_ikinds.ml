@@ -779,14 +779,14 @@ Error: This type "(unit -> unit) t" should be an instance of type
 
 type ('a : value mod contended) t_test = 'a t require_portable
 [%%expect {|
-Line 1, characters 41-45:
+Line 1, characters 6-30:
 1 | type ('a : value mod contended) t_test = 'a t require_portable
-                                             ^^^^
-Error: This type "'a t" should be an instance of type "('b : value mod portable)"
-       The kind of 'a t is immutable_data with 'a
-         because of the definition of t at line 1, characters 0-22.
-       But the kind of 'a t must be a subkind of value mod portable
-         because of the definition of require_portable at line 18, characters 0-47.
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 181 [imprecise-kind-annotation]: The type variable `'a'
+  was annotated with kind `value mod contended'
+  but was inferred to have kind `value mod portable contended'.
+
+type ('a : value mod portable contended) t_test = 'a t require_portable
 |}]
 
 type ('a : value mod external_) t_test = 'a t require_external

@@ -436,6 +436,14 @@ let test : type a. a t -> _ =
   function Int -> ky (1 : a) 1  (* fails *)
 ;;
 [%%expect{|
+Line 2, characters 29-30:
+2 |   function Int -> ky (1 : a) 1  (* fails *)
+                                 ^
+Error: The constant "1" has type "int" but an expression was expected of type
+         "a" = "int"
+       This instance of "int" is ambiguous:
+       it would escape the scope of its equation
+|}, Principal{|
 Line 2, characters 18-30:
 2 |   function Int -> ky (1 : a) 1  (* fails *)
                       ^^^^^^^^^^^^
@@ -450,6 +458,14 @@ let test : type a. a t -> a = fun x ->
   in r
 ;;
 [%%expect{|
+Line 2, characters 41-42:
+2 |   let r = match x with Int -> ky (1 : a) 1  (* fails *)
+                                             ^
+Error: The constant "1" has type "int" but an expression was expected of type
+         "a" = "int"
+       This instance of "int" is ambiguous:
+       it would escape the scope of its equation
+|}, Principal{|
 Line 2, characters 30-42:
 2 |   let r = match x with Int -> ky (1 : a) 1  (* fails *)
                                   ^^^^^^^^^^^^
@@ -464,6 +480,14 @@ let test : type a. a t -> a = fun x ->
   in r
 ;;
 [%%expect{|
+Line 2, characters 35-42:
+2 |   let r = match x with Int -> ky 1 (1 : a)  (* fails *)
+                                       ^^^^^^^
+Error: This expression has type "a" = "int"
+       but an expression was expected of type "int"
+       This instance of "int" is ambiguous:
+       it would escape the scope of its equation
+|}, Principal{|
 Line 2, characters 30-42:
 2 |   let r = match x with Int -> ky 1 (1 : a)  (* fails *)
                                   ^^^^^^^^^^^^
