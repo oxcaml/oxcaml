@@ -3,20 +3,57 @@
  (libraries str)
  (modules grep_dump))
 
+; Run the test once per name-mangling scheme using the per-unit
+; -name-mangling-scheme override (#5963), and diff each against a fixed
+; expected output.
+
 (rule
- (targets backend_attributes.output.corrected)
+ (targets backend_attributes.flat.output.corrected)
  (deps backend_attributes.ml grep_dump.exe)
  (action
   (progn
    (with-outputs-to
-    backend_attributes.output.raw
-    (run %{bin:ocamlopt.opt} -c -dcfg -color never -w +A-70 backend_attributes.ml))
+    backend_attributes.flat.output.raw
+    (run %{bin:ocamlopt.opt}
+      -c -dcfg -color never -w +A-70
+      -name-mangling-scheme=flat
+      backend_attributes.ml))
    (with-outputs-to
-    backend_attributes.output.corrected
-    (run ./grep_dump.exe backend_attributes.output.raw)))))
+    backend_attributes.flat.output.corrected
+    (run ./grep_dump.exe flat backend_attributes.flat.output.raw)))))
+
+(rule
+ (targets backend_attributes.structured.output.corrected)
+ (deps backend_attributes.ml grep_dump.exe)
+ (action
+  (progn
+   (with-outputs-to
+    backend_attributes.structured.output.raw
+    (run %{bin:ocamlopt.opt}
+      -c -dcfg -color never -w +A-70
+      -name-mangling-scheme=structured
+      backend_attributes.ml))
+   (with-outputs-to
+    backend_attributes.structured.output.corrected
+    (run ./grep_dump.exe structured
+      backend_attributes.structured.output.raw)))))
 
 (rule
  (alias runtest)
- (deps backend_attributes.output backend_attributes.output.corrected)
+ (deps
+  backend_attributes.flat.output
+  backend_attributes.flat.output.corrected)
  (action
-  (diff backend_attributes.output backend_attributes.output.corrected)))
+  (diff
+   backend_attributes.flat.output
+   backend_attributes.flat.output.corrected)))
+
+(rule
+ (alias runtest)
+ (deps
+  backend_attributes.structured.output
+  backend_attributes.structured.output.corrected)
+ (action
+  (diff
+   backend_attributes.structured.output
+   backend_attributes.structured.output.corrected)))
