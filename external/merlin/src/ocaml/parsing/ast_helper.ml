@@ -242,9 +242,6 @@ module Pat = struct
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ppat_extension a)
 end
 
-(* Merlin's holes *)
-let hole_txt = "merlin.hole"
-
 module Exp = struct
   let mk ?(loc = !default_loc) ?(attrs = []) d =
     {pexp_desc = d;
