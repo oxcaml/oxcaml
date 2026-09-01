@@ -26,7 +26,7 @@ let as_unlabeled_tuple components =
   else None
 ;;
 
-let mangle_longident ~suffix : Longident.t -> Longident.t = function
+let mangle_longident ~suffix : Astlib.Longident.t -> Astlib.Longident.t = function
   | Lident name -> Lident (name ^ suffix)
   | Ldot (path, name) -> Ldot (path, name ^ suffix)
   | Lapply _ as longident -> longident
