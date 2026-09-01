@@ -10,15 +10,18 @@ let to_extension (error : Astlib.Location.Error.t) =
   let sub_msgs = sub_msgs error in
   let main_msg = main_msg error in
   let err_extension_name loc = { Location.loc; txt = "ocaml.error" } in
-  let mk_string_constant x = Str.eval (Exp.constant (Const.string x)) in
+  let ghost loc = { loc with Location.loc_ghost = true } in
+  let mk_string_constant (msg : string Location.loc) =
+    let loc = ghost msg.loc in
+    Str.eval ~loc (Exp.constant ~loc (Const.string ~loc:msg.loc msg.txt))
+  in
   let extension_of_sub_msg (sub_msg : string Location.loc) =
     Str.extension
-      (err_extension_name sub_msg.loc, PStr [ mk_string_constant sub_msg.txt ])
+      ~loc:(ghost sub_msg.loc)
+      (err_extension_name sub_msg.loc, PStr [ mk_string_constant sub_msg ])
   in
   ( err_extension_name main_msg.loc,
-    Parsetree.PStr
-      (mk_string_constant main_msg.txt :: List.map extension_of_sub_msg sub_msgs)
-  )
+    Parsetree.PStr (mk_string_constant main_msg :: List.map extension_of_sub_msg sub_msgs) )
 
 let register_error_of_exn = Astlib.Location.register_error_of_exn
 
@@ -40,3 +43,27 @@ let get_location error =
 
 let of_exn = Astlib.Location.Error.of_exn
 let raise error = raise (Astlib.Location.Error error)
+
+let of_extension (extension : Ast.extension) =
+  let open Parsetree in
+  let parse_msg = function
+    | { pstr_desc =
+          Pstr_eval ({ pexp_desc = Pexp_constant (Pconst_string (msg, _, _)); _ }, [])
+      ; _
+      } -> msg
+    | _ -> "ppxlib: failed to extract message in ocaml.error"
+  in
+  let parse_sub_msg = function
+    | { pstr_desc =
+          Pstr_extension (({ txt = "error" | "ocaml.error"; loc }, PStr [ msg ]), [])
+      ; _
+      } -> loc, parse_msg msg
+    | { pstr_loc = loc; _ } -> loc, "ppxlib: failed to parse ocaml.error sub messages"
+  in
+  match extension with
+  | { txt = "error" | "ocaml.error"; loc }, PStr (main :: sub) ->
+    let main = parse_msg main in
+    let sub = List.map parse_sub_msg sub in
+    Some (make ~loc main ~sub)
+  | _ -> None
+;;
