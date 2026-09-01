@@ -1394,7 +1394,7 @@ Line 2, characters 12-15:
                 ^^^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "mut" (with some modality) of the record at line 2, characters 10-17.
+         because it is the field "mut" (with modality "global" in effect) of the record at line 2, characters 10-17.
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1406,7 +1406,7 @@ Line 3, characters 12-15:
                 ^^^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "mut" (with some modality) of the record at line 3, characters 10-17.
+         because it is the field "mut" (with modality "global" in effect) of the record at line 3, characters 10-17.
 |}]
 let foo (local_ gbl) =
   let _ = { gbl } in
@@ -1417,7 +1417,7 @@ Line 2, characters 12-15:
                 ^^^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "gbl" (with some modality) of the record at line 2, characters 10-17.
+         because it is the field "gbl" (with modality "global" in effect) of the record at line 2, characters 10-17.
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1429,7 +1429,7 @@ Line 3, characters 12-15:
                 ^^^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "gbl" (with some modality) of the record at line 3, characters 10-17.
+         because it is the field "gbl" (with modality "global" in effect) of the record at line 3, characters 10-17.
 |}]
 
 (* Implicit records version of the same test *)
@@ -1534,7 +1534,7 @@ Line 2, characters 13-16:
                  ^^^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "mut" (with some modality) of the record at line 2, characters 10-18.
+         because it is the field "mut" (with modality "global" in effect) of the record at line 2, characters 10-18.
 |}]
 let foo () =
   let mut = local_ ref 5 in
@@ -1546,7 +1546,7 @@ Line 3, characters 13-16:
                  ^^^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "mut" (with some modality) of the record at line 3, characters 10-18.
+         because it is the field "mut" (with modality "global" in effect) of the record at line 3, characters 10-18.
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
@@ -1557,7 +1557,7 @@ Line 2, characters 13-16:
                  ^^^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "gbl" (with some modality) of the record at line 2, characters 10-18.
+         because it is the field "gbl" (with modality "global" in effect) of the record at line 2, characters 10-18.
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1569,7 +1569,7 @@ Line 3, characters 13-16:
                  ^^^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "gbl" (with some modality) of the record at line 3, characters 10-18.
+         because it is the field "gbl" (with modality "global" in effect) of the record at line 3, characters 10-18.
 |}]
 
 (* Unboxed records version of the same test *)
@@ -1608,7 +1608,7 @@ Line 2, characters 13-16:
                  ^^^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "gbl" (with some modality) of the record at line 2, characters 10-18.
+         because it is the field "gbl" (with modality "global" in effect) of the record at line 2, characters 10-18.
 |}]
 let foo () =
   let gbl = local_ ref 5 in
@@ -1620,7 +1620,7 @@ Line 3, characters 13-16:
                  ^^^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "gbl" (with some modality) of the record at line 3, characters 10-18.
+         because it is the field "gbl" (with modality "global" in effect) of the record at line 3, characters 10-18.
 |}]
 
 (* Global fields are preserved in module inclusion *)
@@ -2635,7 +2635,7 @@ Line 2, characters 8-9:
             ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is contained (via constructor "GFoo") (with some modality) in the value at line 2, characters 2-17.
+         because it is contained (via constructor "GFoo") (with modality "global" in effect) in the value at line 2, characters 2-17.
 |}]
 
 let f =
@@ -2794,7 +2794,7 @@ Line 1, characters 40-41:
                                             ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is an element (with some modality) of the array at line 1, characters 37-44.
+         because it is an element (with modality "global" in effect) of the array at line 1, characters 37-44.
 |}]
 
 (* constructing local array from global elements is allowed *)
