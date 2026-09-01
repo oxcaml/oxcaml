@@ -132,6 +132,8 @@ CAMLprim value caml_dynamic_push(value dyn, value val)
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
 
+  // CR-someday mslater: once the gc supports cross-local-stack pointers, this
+  // could be allocated on the current fiber's local stack.
   value node = caml_alloc_small(Dynamic_node_wosize, 0);
   Dynamic_node_dyn(node) = dyn;
   Dynamic_node_val(node) = val;
