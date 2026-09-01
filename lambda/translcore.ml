@@ -792,7 +792,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       begin match arg with
         None -> (tagged_immediate tag)
       | Some (arg, alloc_mode) ->
-          let lam = transl_exp ~scopes Lambda.layout_poly_variant arg in
+          let lam = transl_exp ~scopes Lambda.layout_variant_arg arg in
           try
             Lconst(Const_block(0, [const_int tag;
                                    extract_constant lam]))
@@ -2726,7 +2726,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
           Jkind.Sort.default_for_transl_and_get init_expr_sort
         in
         let init_expr_layout = layout_exp init_expr_sort init_expr in
-        Llet(Strict, Lambda.layout_block, init_id, init_id_duid,
+        Llet(Strict, init_expr_layout, init_id, init_id_duid,
              transl_exp ~scopes init_expr_layout init_expr, lam)
     end
 
