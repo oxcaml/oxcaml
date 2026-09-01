@@ -4,6 +4,7 @@ module Nlg = Diagnostic_nlg
 module Phrase = Nlg.Phrase
 module Statement = Nlg.Statement
 module Step_mode = Mode.Reported_mode
+open Diagnostic_request
 
 module Hint_chain = struct
   type kind = Mode.Reported_hint.t =
@@ -28,21 +29,7 @@ let same_chars (left : Location.t) (right : Location.t) =
     (Location_key.of_location left)
     (Location_key.of_location right)
 
-module Source = struct
-  type t =
-    { file : string;
-      text : string
-    }
-
-  let create ~file ~text = { file; text }
-
-  let length t = String.length t.text
-
-  let sub t ~pos ~len = String.sub t.text pos len
-
-  let holds t (loc : Location.t) =
-    (not (Location.is_none loc)) && String.equal loc.loc_start.pos_fname t.file
-end
+module Source = Diagnostic_source
 
 module Documentation = struct
   type t =
@@ -56,11 +43,7 @@ module Documentation = struct
     }
 end
 
-module Pronouns = struct
-  type t =
-    | Use_pronouns
-    | Names_only
-end
+module Pronouns = Diagnostic_request.Pronouns
 
 module Side = struct
   type t =
@@ -119,9 +102,6 @@ end
 type concept =
   | Unsafe_mode_crossing
   | With_bounds
-  | Applicative_functor
-  | Generative_functor
-  | Atomic_field
 
 type mode_term =
   | Reported_mode of Step_mode.t
@@ -171,19 +151,13 @@ let term_display_parts (t : term) : string * string option =
   | Concept_term concept ->
     ( (match concept with
       | Unsafe_mode_crossing -> "unsafe mode crossing"
-      | With_bounds -> "with-bounds"
-      | Applicative_functor -> "applicative"
-      | Generative_functor -> "generative"
-      | Atomic_field -> "[@atomic]"),
+      | With_bounds -> "with-bounds"),
       None )
 
 let term_is_code (t : term) : bool =
   match t with
-  | Mode_term _ | Modality_term _ | Concept_term Atomic_field -> true
-  | Concept_term
-      ( Unsafe_mode_crossing | With_bounds | Applicative_functor
-      | Generative_functor ) ->
-    false
+  | Mode_term _ | Modality_term _ -> true
+  | Concept_term (Unsafe_mode_crossing | With_bounds) -> false
 
 let term_words (t : term) : term Phrase.segment list =
   let open Nlg in
@@ -1149,15 +1123,14 @@ let pronominalize_one (plan : term Nlg.plan) : term Nlg.plan =
 
 let elaboration (sentence : term Statement.t) :
     Diagnostic.Relation.t * term Nlg.plan =
-  Diagnostic.Relation.Elaboration, { statement = Some sentence; children = [] }
+  Diagnostic.Relation.Elaboration, Nlg.Plan.statement sentence
 
 let rec elaboration_spine (sentences : term Statement.t list) =
   match sentences with
   | [] -> []
   | sentence :: rest ->
     [ ( Diagnostic.Relation.Elaboration,
-        { Nlg.statement = Some sentence; children = elaboration_spine rest } )
-    ]
+        Nlg.Plan.statement ~children:(elaboration_spine rest) sentence ) ]
 
 let claims plans = List.map (fun plan -> Diagnostic.Relation.Claim, plan) plans
 
@@ -1526,10 +1499,8 @@ let plan_actual ~source ~description ~bound ~subject_override
       let proof =
         head_causes @ proof ~bound_stated_by_parent:first_rest_bound_stated rest
       in
-      [ { Nlg.statement =
-            Some (mode_sentence ~prefix:"but " ~bound head_subject head);
-          children = elaboration_spine proof
-        } ]
+      [ Nlg.Plan.statement ~children:(elaboration_spine proof)
+          (mode_sentence ~prefix:"but " ~bound head_subject head) ]
 
 type declared_modalities =
   { written : Mode.Modality.atom Location.loc list;
@@ -1867,33 +1838,29 @@ let plan_axis ~extra_rules ~actuality_fallback ~subject_override ~source ~axis
       plan_actual ~source ~description:actual_description ~bound:actual_bound
         ~subject_override actual
     with
-    | beat :: _ -> { beat with Nlg.children = beat.Nlg.children @ actual_rules }
+    | beat :: _ -> Nlg.Plan.add_children beat actual_rules
     | [] ->
-      { Nlg.statement =
-          Some
-            (sentence ?subject:(sentence_subject subject)
-               (phrase
-                  (txt "but "
-                  :: Nlg.mention ~case:Subject subject
-                  :: copula
-                  :: txt (" " ^ Bound.comparative actual_bound ~side:Actual)
-                  :: description_words actual_description)));
-        children = elaboration_spine actuality_explanation @ actual_rules
-      }
+      Nlg.Plan.statement
+        ~children:(elaboration_spine actuality_explanation @ actual_rules)
+        (sentence ?subject:(sentence_subject subject)
+           (phrase
+              (txt "but "
+              :: Nlg.mention ~case:Subject subject
+              :: copula
+              :: txt (" " ^ Bound.comparative actual_bound ~side:Actual)
+              :: description_words actual_description)))
   in
   let expected_beat =
-    { Nlg.statement =
-        Some
-          (sentence ?subject:(sentence_subject subject)
-             (phrase
-                (Nlg.mention ~case:Subject subject
-                :: copula
-                :: txt
-                     (" expected to be "
-                     ^ Bound.comparative expected_bound ~side:Expected)
-                :: description_words expected_description)));
-      children = expected_proof @ expected_extras
-    }
+    Nlg.Plan.statement
+      ~children:(expected_proof @ expected_extras)
+      (sentence ?subject:(sentence_subject subject)
+         (phrase
+            (Nlg.mention ~case:Subject subject
+            :: copula
+            :: txt
+                 (" expected to be "
+                 ^ Bound.comparative expected_bound ~side:Expected)
+            :: description_words expected_description)))
   in
   let beats = [expected_beat; actual_beat] in
   match (pronouns : Pronouns.t) with
@@ -1963,21 +1930,13 @@ type prepared_axis =
     has_story : bool
   }
 
-type story =
-  { frame : term Nlg.plan;
-    axes : string list
-  }
+type story = term Nlg.plan
 
-let prose frame : story = { frame; axes = [] }
-
-let frames (stories : story list) = List.map (fun s -> s.frame) stories
-
-let blamed_axes (stories : story list) =
-  List.concat_map (fun s -> s.axes) stories
+let prose frame : story = frame
 
 let render_error ?extra_rules ?actuality_fallback ?subject_override ~source
     ~error_loc ~expected_decl ~pronouns (axes : axis_input list) :
-    (axis_input list * term Nlg.plan) list =
+    term Nlg.plan list =
   let prepared =
     List.map
       (fun input ->
@@ -2017,7 +1976,7 @@ let render_error ?extra_rules ?actuality_fallback ?subject_override ~source
           let rep =
             match List.find_opt (fun j -> arr.(j).has_story) class_ with
             | Some j -> j
-            | None -> ( match class_ with j :: _ -> j | [] -> assert false)
+            | None -> ( match class_ with j :: _ -> j | [] -> i)
           in
           let ms =
             List.filter (fun j -> j <> rep && not arr.(j).has_story) class_
@@ -2069,9 +2028,8 @@ let render_error ?extra_rules ?actuality_fallback ?subject_override ~source
         let beats =
           beats @ List.concat_map (fun j -> plan_one arr.(j)) members.(i)
         in
-        let inputs = p.input :: List.map (fun j -> arr.(j).input) members.(i) in
-        let story = { Nlg.statement = None; children = claims beats } in
-        [inputs, story]
+        let story = Nlg.Plan.group (claims beats) in
+        [story]
       end)
     arr
   |> Array.to_list |> List.concat
@@ -2084,18 +2042,14 @@ type modality_subject =
         index : int
       }
 
-type side_vocabulary =
-  { expected_name : term Phrase.segment list;
-    actual_name : term Phrase.segment list
-  }
+type side_vocabulary = term Module_diagnostics.sides
 
 let side_name sides side =
-  Side.select side ~expected:sides.expected_name ~actual:sides.actual_name
+  Side.select side ~expected:sides.Module_diagnostics.expected_name
+    ~actual:sides.Module_diagnostics.actual_name
 
 let declaration_sides : side_vocabulary =
-  { expected_name = [Nlg.txt "the expected declaration"];
-    actual_name = [Nlg.txt "the actual declaration"]
-  }
+  Module_diagnostics.declaration_sides ()
 
 type modality_side =
   { atom : Mode.Modality.atom option;
@@ -2114,30 +2068,6 @@ type modality_input =
     actual : modality_side;
     requirement : modality_requirement
   }
-
-type presence_property =
-  | Mutability
-  | Atomicity
-
-type presence_input =
-  { property : presence_property;
-    subject : modality_subject;
-    declared_on : Side.t;
-    expected_loc : Location.t option;
-    actual_loc : Location.t option
-  }
-
-type functor_shape =
-  | Functor_expected of
-      { parameters : int;
-        units : int
-      }
-  | Functor_unexpected of
-      { parameters : int;
-        units : int;
-        abstract : bool
-      }
-  | Generativity of { module_parameter_on : Side.t }
 
 type crossing_difference =
   | Attribute_on_one_side of { declared_on : Side.t }
@@ -2235,13 +2165,8 @@ let render_crossing_error ~sides (input : crossing_input) : term Nlg.plan =
                    ((txt "only " :: declaring)
                    @ [txt " is marked "; code attribute]))));
         ( Diagnostic.Relation.Claim,
-          { Nlg.statement =
-              Some
-                (sentence
-                   (phrase
-                      (located other_loc
-                         ((txt "but " :: other) @ [txt " is not"]))));
-            children =
+          Nlg.Plan.statement
+            ~children:
               [ elaboration
                   (sentence ~kind:Diagnostic.Kind.Background
                      (phrase
@@ -2249,11 +2174,14 @@ let render_crossing_error ~sides (input : crossing_input) : term Nlg.plan =
                           txt
                             " is part of a type's interface: both declarations \
                              must carry it" ])) ]
-          } ) ]
+            (sentence
+               (phrase
+                  (located other_loc ((txt "but " :: other) @ [txt " is not"]))))
+        ) ]
     | Bounds_differ
         { expected_only; actual_only; differing; expected_with; actual_with } ->
-      let name_of_expected = sides.expected_name in
-      let name_of_actual = sides.actual_name in
+      let name_of_expected = sides.Module_diagnostics.expected_name in
+      let name_of_actual = sides.Module_diagnostics.actual_name in
       let axes_line ~name ~loc axes =
         match axes with
         | [] -> None
@@ -2296,16 +2224,18 @@ let render_crossing_error ~sides (input : crossing_input) : term Nlg.plan =
             in
             elaboration (sentence (phrase (located loc words)))
           in
-          [ line ~name:sides.expected_name ~loc:input.expected_loc expected_with;
-            line ~name:sides.actual_name ~loc:input.actual_loc actual_with ]
+          [ line ~name:sides.Module_diagnostics.expected_name
+              ~loc:input.expected_loc expected_with;
+            line ~name:sides.Module_diagnostics.actual_name
+              ~loc:input.actual_loc actual_with ]
       in
       let claims =
         List.filter_map
           (fun line -> line)
-          [ axes_line ~name:sides.expected_name ~loc:input.expected_loc
-              expected_only;
-            axes_line ~name:sides.actual_name ~loc:input.actual_loc actual_only
-          ]
+          [ axes_line ~name:sides.Module_diagnostics.expected_name
+              ~loc:input.expected_loc expected_only;
+            axes_line ~name:sides.Module_diagnostics.actual_name
+              ~loc:input.actual_loc actual_only ]
         @ differing_lines @ with_lines
       in
       let educate =
@@ -2318,169 +2248,7 @@ let render_crossing_error ~sides (input : crossing_input) : term Nlg.plan =
       in
       claims @ [educate]
   in
-  pronominalize_one { Nlg.statement = Some header; children }
-
-let render_functor_shape ~in_parameter (shape : functor_shape) : term Nlg.plan =
-  let open Nlg in
-  let plural n = if n = 1 then " parameter" else " parameters" in
-  let this_module =
-    if in_parameter then "the parameter's module type" else "this module"
-  in
-  let this_functor =
-    if in_parameter then "the parameter's module type" else "this functor"
-  in
-  let shape_words ~parameters ~units =
-    let count = string_of_int parameters ^ plural parameters in
-    match parameters, units with
-    | 0, _ -> [concept_word Generative_functor; txt " functor"]
-    | _, 0 -> [txt ("functor of " ^ count)]
-    | _, _ -> [concept_word Generative_functor; txt (" functor of " ^ count)]
-  in
-  let claim, contrast, extra =
-    match shape with
-    | Functor_expected { parameters; units } ->
-      ( [txt (this_module ^ " is a structure")],
-        txt "but the signature expects a " :: shape_words ~parameters ~units,
-        [] )
-    | Functor_unexpected { parameters; units; abstract } ->
-      ( txt (this_module ^ " is a ") :: shape_words ~parameters ~units,
-        [ txt
-            (if abstract
-             then
-               "but the signature expects a module of an abstract module type"
-             else "but the signature expects a structure") ],
-        if in_parameter
-        then []
-        else
-          let applied_to =
-            let count = string_of_int parameters ^ plural parameters in
-            match parameters, units with
-            | 0, _ -> [txt "apply it to "; code "()"]
-            | _, 0 -> [txt ("apply it to its " ^ count)]
-            | _, _ -> [txt ("apply it to its " ^ count ^ " and "); code "()"]
-          in
-          [ elaboration
-              (sentence ~kind:Diagnostic.Kind.Suggestion
-                 (phrase
-                    (txt "if you meant to use the functor's result, "
-                    :: applied_to))) ] )
-    | Generativity { module_parameter_on } ->
-      let claim, contrast =
-        match module_parameter_on with
-        | Side.Expected ->
-          ( [txt (this_functor ^ " takes "); code "()"; txt " as a parameter"],
-            [txt "but the signature declares a module parameter there"] )
-        | Side.Actual ->
-          ( [txt (this_functor ^ " takes a module parameter")],
-            [txt "but the signature declares "; code "()"; txt " there"] )
-      in
-      ( claim,
-        contrast,
-        [ elaboration
-            (sentence ~kind:Diagnostic.Kind.Background
-               (phrase
-                  [ txt "a functor that takes ";
-                    code "()";
-                    txt " is ";
-                    concept_word Generative_functor;
-                    txt " and one that takes a module parameter is ";
-                    concept_word Applicative_functor;
-                    txt "; its declaration fixes which" ])) ] )
-  in
-  let story =
-    { Nlg.statement = Some (sentence (phrase claim));
-      children =
-        [ ( Diagnostic.Relation.Claim,
-            { Nlg.statement = Some (sentence (phrase contrast));
-              children = extra
-            } ) ]
-    }
-  in
-  story
-
-let render_presence_error ~sides (input : presence_input) : term Nlg.plan =
-  let open Nlg in
-  let property_name =
-    match input.property with
-    | Mutability -> "mutability"
-    | Atomicity -> "atomicity"
-  in
-  let subject : subject =
-    let spans =
-      match input.actual_loc, input.expected_loc with
-      | Some l, _ | None, Some l -> [l]
-      | None, None -> []
-    in
-    match input.subject with
-    | Modality_item name -> subject ?span:(first spans) [Phrase.Code name]
-    | Modality_field name ->
-      subject ?span:(first spans) [Phrase.Text "the field "; Phrase.Code name]
-    | Modality_constructor_arg { constructor; index } ->
-      subject ?span:(first spans)
-        [ Phrase.Text ("the " ^ ordinal index ^ " argument of ");
-          Phrase.Code constructor ]
-  in
-  let side ~declares ~name loc =
-    let words =
-      match input.property, declares with
-      | Mutability, true -> [copula; txt " declared "; code "mutable"]
-      | Mutability, false -> [copula; txt " immutable"]
-      | Atomicity, true -> [copula; txt " declared "; concept_word Atomic_field]
-      | Atomicity, false -> [copula; txt " not atomic"]
-    in
-    let words = words @ (txt " in " :: name) in
-    match loc with None -> words | Some l -> [ref_source l words]
-  in
-  let header =
-    sentence ?subject:(sentence_subject subject)
-      (phrase
-         [ txt "the declarations of ";
-           Nlg.mention ~case:Subject subject;
-           txt (" disagree on " ^ property_name) ])
-  in
-  let expected_line =
-    sentence ?subject:(sentence_subject subject)
-      (phrase
-         (Nlg.mention ~case:Subject subject
-         :: side
-              ~declares:(Side.equal input.declared_on Expected)
-              ~name:sides.expected_name input.expected_loc))
-  in
-  let actual_line =
-    sentence
-      (phrase
-         (txt "but"
-         :: side
-              ~declares:(Side.equal input.declared_on Actual)
-              ~name:sides.actual_name input.actual_loc))
-  in
-  let educate =
-    let words =
-      match input.property with
-      | Mutability ->
-        [ txt "a field's ";
-          code "mutable";
-          txt
-            " keyword is part of the record's definition and must match on \
-             both sides" ]
-      | Atomicity ->
-        [ txt "a mutable field's ";
-          concept_word Atomic_field;
-          txt
-            " attribute is part of the record's definition and must match on \
-             both sides" ]
-    in
-    [elaboration (sentence ~kind:Diagnostic.Kind.Background (phrase words))]
-  in
-  let story =
-    { Nlg.statement = Some header;
-      children =
-        [ elaboration expected_line;
-          ( Diagnostic.Relation.Claim,
-            { Nlg.statement = Some actual_line; children = educate } ) ]
-    }
-  in
-  pronominalize_one story
+  pronominalize_one (Nlg.Plan.statement ~children header)
 
 let render_modality_error ~sides (input : modality_input) : term Nlg.plan =
   let open Nlg in
@@ -2543,12 +2311,16 @@ let render_modality_error ~sides (input : modality_input) : term Nlg.plan =
            txt (" disagree on " ^ axis_name) ])
   in
   let expected_line =
-    let words, clause = side ~name:sides.expected_name input.expected in
+    let words, clause =
+      side ~name:sides.Module_diagnostics.expected_name input.expected
+    in
     sentence ?subject:(sentence_subject subject) ?clause
       (phrase (Nlg.mention ~case:Subject subject :: words))
   in
   let actual_line =
-    let words, clause = side ~name:sides.actual_name input.actual in
+    let words, clause =
+      side ~name:sides.Module_diagnostics.actual_name input.actual
+    in
     sentence ?clause (phrase (Nlg.mention ~case:Subject subject :: words))
   in
   let educate =
@@ -2563,12 +2335,12 @@ let render_modality_error ~sides (input : modality_input) : term Nlg.plan =
                      exactly on both sides" ])) ]
   in
   let story =
-    { Nlg.statement = Some header;
-      children =
+    Nlg.Plan.statement
+      ~children:
         [ elaboration expected_line;
           ( Diagnostic.Relation.Claim,
-            { Nlg.statement = Some actual_line; children = educate } ) ]
-    }
+            Nlg.Plan.statement ~children:educate actual_line ) ]
+      header
   in
   pronominalize_one story
 
@@ -2598,11 +2370,6 @@ let prepare_axis ~source
         expected_bound = Bound.of_loosened expected_loosened
       }
 
-let axis_name (input : axis_input) : string =
-  match input.axis with
-  | Mode.Alloc.Axis.P axis ->
-    Format_doc.asprintf "%a" Mode.Alloc.Axis.print axis
-
 let modality_story ~declared_modalities_at ~sides (input : modality_input) :
     story =
   let argument =
@@ -2625,12 +2392,7 @@ let modality_story ~declared_modalities_at ~sides (input : modality_input) :
       actual = resolve input.actual
     }
   in
-  { frame = render_modality_error ~sides input;
-    axes =
-      [ (match input.axis with
-        | Mode.Value.Axis.P ax ->
-          Format_doc.asprintf "%a" Mode.Value.Axis.print ax) ]
-  }
+  render_modality_error ~sides input
 
 let mode_stories ?extra_rules ?actuality_fallback ?subject_override ~source
     ~error_loc ~expected_decl ~pronouns
@@ -2638,8 +2400,6 @@ let mode_stories ?extra_rules ?actuality_fallback ?subject_override ~source
   List.filter_map (prepare_axis ~source) axes
   |> render_error ?extra_rules ?actuality_fallback ?subject_override ~source
        ~error_loc ~expected_decl ~pronouns
-  |> List.map (fun (inputs, frame) ->
-      { frame; axes = List.map axis_name inputs })
 
 let term_entry ~(documentation : Documentation.lookup) (t : term) :
     Diagnostic.Glossary.Entry.t =
@@ -2681,37 +2441,11 @@ let term_entry ~(documentation : Documentation.lookup) (t : term) :
            types it contains: 'a list crosses portability only when 'a does, \
            written `with 'a`.",
           Some "https://oxcaml.org/documentation/kinds/intro/" )
-      | Applicative_functor ->
-        ( "Functor",
-          "An applicative functor takes a module parameter; applying it twice \
-           to the same module yields equal types.",
-          Some "https://ocaml.org/manual/5.2/moduleexamples.html" )
-      | Generative_functor ->
-        ( "Functor",
-          "A generative functor takes a () parameter; every application yields \
-           fresh types, so it must be applied explicitly.",
-          Some "https://ocaml.org/manual/5.2/generativefunctors.html" )
-      | Atomic_field ->
-        ( "Attribute",
-          "A mutable record field marked [@atomic] is read and written with \
-           atomic operations, so it can be accessed even when the record is \
-           contended.",
-          None )
     in
     { Diagnostic.Glossary.Entry.term; category; description; url }
 
 module Inclusion = struct
   open Includemod.Error
-
-  type parameter_kind =
-    | Unit_parameter
-    | Module_parameter
-
-  type missing_item =
-    { noun : string;
-      name : string;
-      decl_loc : Location.t
-    }
 
   type leaf =
     | Mode_leaf of
@@ -2720,25 +2454,13 @@ module Inclusion = struct
           expected_decl : expected_decl option
         }
     | Modality_leaf of modality_input
-    | Missing_leaf of missing_item
-    | Presence_leaf of presence_input
     | Crossing_leaf of crossing_input
-    | Functor_shape_leaf of functor_shape
-    | Functor_arity_leaf of
-        { position : int;
-          surplus_on : Side.t;
-          parameter : parameter_kind
-        }
-    | Zero_alloc_leaf of
-        { expected_loc : Location.t option;
-          actual_loc : Location.t option
-        }
 
-  type direction =
+  type direction = Module_diagnostics.direction =
     | Actual_not_included
     | Expected_not_included
 
-  type item =
+  type item = Module_diagnostics.item =
     | Item_module of string
     | Item_module_type of string
     | Item_type of string
@@ -2806,32 +2528,7 @@ module Inclusion = struct
                   ~actual_loc:(Some ld1.Types.ld_loc) equate))
         | Diffing_with_keys.Change
             (Type
-               { got = ld1;
-                 expected = ld2;
-                 reason = Includecore.(Mutability ord | Atomicity ord) as reason;
-                 _
-               }) ->
-          let property =
-            match reason with
-            | Includecore.Mutability _ -> Mutability
-            | Includecore.Atomicity _ | Includecore.Type _
-            | Includecore.Modality _ ->
-              Atomicity
-          in
-          let declared_on = Orientation.side_of_position orientation ord in
-          let expected_loc, actual_loc =
-            Orientation.expected_and_actual orientation
-              ~got:(Some ld1.Types.ld_loc) ~expected:(Some ld2.Types.ld_loc)
-          in
-          Some
-            (Presence_leaf
-               { property;
-                 subject = Modality_field (Ident.name ld1.Types.ld_id);
-                 declared_on;
-                 expected_loc;
-                 actual_loc
-               })
-        | Diffing_with_keys.Change (Type { reason = Includecore.Type _; _ })
+               { reason = Includecore.(Type _ | Mutability _ | Atomicity _); _ })
         | Diffing_with_keys.Change (Name _)
         | Diffing_with_keys.Swap _ | Diffing_with_keys.Move _
         | Diffing_with_keys.Insert _ | Diffing_with_keys.Delete _ ->
@@ -2943,31 +2640,14 @@ module Inclusion = struct
     match symptom with
     | Mt_core _ | Invalid_module_alias _ -> []
     | Signature s -> of_signature ~env ~fallback ~orientation s
-    | Functor (Params ({ got; expected; _ } as diff)) -> (
+    | Functor (Params ({ got; expected; _ } as diff)) -> begin
       let outer_expected, outer_got =
         Orientation.expected_and_actual orientation ~got ~expected
       in
-      let counts params =
-        List.fold_left
-          (fun (parameters, units) (param : Types.functor_parameter) ->
-            match param with
-            | Types.Unit -> parameters, units + 1
-            | Types.Named _ -> parameters + 1, units)
-          (0, 0) params
-      in
       match outer_got.params, outer_expected.params with
-      | [], expected_params ->
-        let parameters, units = counts expected_params in
-        [Leaf (Functor_shape_leaf (Functor_expected { parameters; units }))]
-      | got_params, [] ->
-        let abstract =
-          match outer_expected.res with Types.Mty_ident _ -> true | _ -> false
-        in
-        let parameters, units = counts got_params in
-        [ Leaf
-            (Functor_shape_leaf
-               (Functor_unexpected { parameters; units; abstract })) ]
-      | _ :: _, _ :: _ -> of_functor_params ~env ~fallback ~orientation diff)
+      | [], _ | _, [] -> []
+      | _ :: _, _ :: _ -> of_functor_params ~env ~fallback ~orientation diff
+      end
     | Functor (Result d) -> of_module_type_diff ~env ~fallback ~orientation d
     | After_alias_expansion d ->
       of_module_type_diff ~env ~fallback ~orientation d
@@ -2979,25 +2659,6 @@ module Inclusion = struct
                expected_decl = None
              }) ]
 
-  and missing_of_signature_item (item : Types.signature_item) : missing_item =
-    let make noun id decl_loc = { noun; name = Ident.name id; decl_loc } in
-    match item with
-    | Types.Sig_value (id, vd, _) -> make "value" id vd.val_loc
-    | Types.Sig_type (id, td, _, _) -> make "type" id td.type_loc
-    | Types.Sig_typext (id, ext, _, _) ->
-      let noun =
-        if Path.same ext.ext_type_path Predef.path_exn
-        then "exception"
-        else "extension constructor"
-      in
-      make noun id ext.ext_loc
-    | Types.Sig_module (id, _, md, _, _) -> make "module" id md.md_loc
-    | Types.Sig_modtype (id, mtd, _) -> make "module type" id mtd.mtd_loc
-    | Types.Sig_class (id, cd, _, _) -> make "class" id cd.cty_loc
-    | Types.Sig_class_type (id, cltd, _, _) ->
-      make "class type" id cltd.clty_loc
-    | Types.Sig_jkind (id, jkd, _) -> make "kind" id jkd.jkind_loc
-
   and of_functor_params ~env ~fallback ~orientation
       ({ got; expected; _ } : functor_params_diff) =
     let patch =
@@ -3005,18 +2666,6 @@ module Inclusion = struct
         (expected.params, expected.res)
     in
     let numbered = match patch with [] | [_] -> false | _ :: _ :: _ -> true in
-    let is_unit (param : Types.functor_parameter) =
-      match param with Types.Unit -> true | Types.Named _ -> false
-    in
-    let arity ~position ~surplus_on param =
-      [ Leaf
-          (Functor_arity_leaf
-             { position;
-               surplus_on;
-               parameter =
-                 (if is_unit param then Unit_parameter else Module_parameter)
-             }) ]
-    in
     List.concat
       (List.mapi
          (fun index change ->
@@ -3039,41 +2688,19 @@ module Inclusion = struct
                      expected_loc = None;
                      children
                    } ])
-           | Diffing.Change (_, _, Incompatible_params (p1, p2)) -> (
-             let expected_param, actual_param =
-               Orientation.expected_and_actual orientation ~got:p1 ~expected:p2
-             in
-             match actual_param, expected_param with
-             | Types.Unit, Types.Named _ ->
-               [ Leaf
-                   (Functor_shape_leaf
-                      (Generativity { module_parameter_on = Expected })) ]
-             | Types.Named _, Types.Unit ->
-               [ Leaf
-                   (Functor_shape_leaf
-                      (Generativity { module_parameter_on = Actual })) ]
-             | (Types.Unit | Types.Named _), (Types.Unit | Types.Named _) -> [])
-           | Diffing.Insert param ->
-             arity ~position
-               ~surplus_on:(Orientation.expected_side orientation)
-               param
-           | Diffing.Delete param ->
-             arity ~position
-               ~surplus_on:(Orientation.got_side orientation)
-               param)
+           | Diffing.Change (_, _, Incompatible_params _)
+           | Diffing.Insert _ | Diffing.Delete _ ->
+             [])
          patch)
 
   and of_signature ~env:_ ~fallback ~orientation
-      ({ env; subst; missings; incompatibles } : signature_symptom) =
+      ({ env; subst; missings = _; incompatibles } : signature_symptom) =
     let env =
       { Includemod.Functor_inclusion_diff.i_env = env; i_subst = subst }
     in
-    List.rev_map
-      (fun item -> Leaf (Missing_leaf (missing_of_signature_item item)))
-      missings
-    @ List.concat_map
-        (fun (id, symptom) -> of_sigitem ~env ~fallback ~orientation id symptom)
-        incompatibles
+    List.concat_map
+      (fun (id, symptom) -> of_sigitem ~env ~fallback ~orientation id symptom)
+      incompatibles
 
   and of_sigitem ~env ~fallback ~orientation id (symptom : sigitem_symptom) =
     match symptom with
@@ -3189,13 +2816,7 @@ module Inclusion = struct
               children = leaves children
             } ]
       end
-    | Value_descriptions
-        { got; expected; symptom = Includecore.Zero_alloc _; _ } ->
-      [ Leaf
-          (Zero_alloc_leaf
-             { expected_loc = Some expected.Types.val_loc;
-               actual_loc = Some got.Types.val_loc
-             }) ]
+    | Value_descriptions { symptom = Includecore.Zero_alloc _; _ } -> []
     | Value_descriptions
         { symptom =
             Includecore.(
@@ -3251,7 +2872,7 @@ module Inclusion = struct
       []
 end
 
-type inclusion_site =
+type inclusion_site = Module_diagnostics.inclusion_site =
   | Module of
       { name : string option;
         body : Location.t
@@ -3270,12 +2891,39 @@ type context =
     documentation : Documentation.lookup
   }
 
-type request =
-  { source : Source.t;
-    context : context;
-    pronouns : Pronouns.t;
-    reported_loc : Location.t
-  }
+type input =
+  | Typecore_error of
+      { loc : Location.t;
+        env : Env.t;
+        error : Typecore.error
+      }
+  | Typemod_error of
+      { loc : Location.t;
+        env : Env.t;
+        error : Typemod.error
+      }
+  | Includemod_apply_error of
+      { env : Env.t;
+        app_name : Includemod.application_name;
+        mty_f : Types.module_type;
+        args :
+          (Includemod.Error.functor_arg_descr
+          * Types.module_type
+          * Typedtree.mode_with_locks)
+          list
+      }
+  | Typedecl_error of
+      { loc : Location.t;
+        error : Typedecl.error
+      }
+  | Env_lookup_error of
+      { loc : Location.t;
+        error : Env.lookup_error
+      }
+  | Unique_use_during_borrowing of
+      Uniqueness_analysis.Usage.unique_use_during_borrowing_error
+  | Uniqueness_error of Uniqueness_analysis.error
+  | Embedded_mode_error of exn
 
 let rec longident_name (lid : Longident.t) : string option =
   match lid with
@@ -3291,356 +2939,22 @@ let rec leftmost_functor (lid : Longident.t) : Longident.t =
   | Lapply (f, _) -> leftmost_functor f.txt
   | (Lident _ | Ldot _) as lid -> lid
 
-let inclusion_frame ~loc frame : term Nlg.plan =
-  let open Nlg in
-  let named ?span words = subject ?span words in
-  let subject, predicate =
-    match frame with
-    | `Unit name ->
-      ( named [Phrase.Text "module "; Phrase.Code name],
-        [txt " does not match its interface"] )
-    | `Site (Module { name = Some name; body }) ->
-      ( named ~span:body [Phrase.Text "module "; Phrase.Code name],
-        [txt " does not match its signature"] )
-    | `Site (Module { name = None; body }) ->
-      ( named ~span:body [Phrase.Text "the anonymous module"],
-        [txt " does not match its signature"] )
-    | `Site (Module_type { name = Some name; body }) ->
-      ( named ~span:body [Phrase.Text "the module type "; Phrase.Code name],
-        [txt " does not match its declaration"] )
-    | `Site (Module_type { name = None; body }) ->
-      ( named ~span:body [Phrase.Text "the anonymous module type"],
-        [txt " does not match its declaration"] )
-    | `Substitution name ->
-      ( named ~span:loc
-          (match name with
-          | Some name -> [Phrase.Text "the new definition of "; Phrase.Code name]
-          | None -> [Phrase.Text "the new definition"]),
-        [txt " does not match its original definition"] )
-    | `Applicative_functor (type_name, constrained) -> (
-      ( named ~span:loc [Phrase.Text "the type "; Phrase.Code type_name],
-        match constrained with
-        | Some name ->
-          [ txt " is ill-typed after this ";
-            code "with";
-            txt " constraint on ";
-            code name ]
-        | None ->
-          [txt " is ill-typed after this "; code "with"; txt " constraint"] ))
-    | `Strengthening name ->
-      ( named ~span:loc
-          (match name with
-          | Some name -> [Phrase.Text "module "; Phrase.Code name]
-          | None -> [Phrase.Text "the strengthening module"]),
-        [txt " does not match the module type it strengthens"] )
-    | `Not_a_functor name ->
-      ( named ~span:loc
-          (match name with
-          | Some name -> [Phrase.Text "module "; Phrase.Code name]
-          | None -> [Phrase.Text "this module"]),
-        [txt " is not a functor, so it cannot be applied"] )
-    | `Ill_typed_application name ->
-      ( named ~span:loc
-          (match name with
-          | Some name -> [Phrase.Text "the application of "; Phrase.Code name]
-          | None -> [Phrase.Text "this functor application"]),
-        [txt " is ill-typed"] )
-    | `Application (functor_name, argument) -> (
-      ( named ~span:loc
-          (match argument with
-          | Some argument -> [Phrase.Text "the argument "; Phrase.Code argument]
-          | None -> [Phrase.Text "the argument"]),
-        match functor_name with
-        | Some functor_name ->
-          [txt " does not match the parameter of "; code functor_name]
-        | None -> [txt " does not match the functor's parameter"] ))
-    | `Equation (name, equated_loc) ->
-      ( named ~span:loc [Phrase.Text "this definition"],
-        txt " does not match the definition of "
-        ::
-        (match equated_loc with
-        | Some l -> [ref_source l [code name]]
-        | None -> [code name]) )
-    | `Unknown ->
-      ( named ~span:loc [Phrase.Text "the module"],
-        [txt " does not match its signature"] )
-  in
-  { Nlg.statement =
-      Some
-        (sentence ?subject:(sentence_subject subject)
-           (phrase (Nlg.mention ~case:Subject subject :: predicate)));
-    children = []
-  }
-
-let missing_frame (missing : Inclusion.missing_item) : term Nlg.plan =
-  let open Nlg in
-  let subject =
-    subject ~span:missing.decl_loc
-      [Phrase.Text ("the " ^ missing.noun ^ " "); Phrase.Code missing.name]
-  in
-  let sentence =
-    sentence ?subject:(sentence_subject subject)
-      (phrase
-         [ Nlg.mention ~case:Subject subject;
-           copula;
-           txt " required but not provided" ])
-  in
-  { statement = Some sentence; children = [] }
-
-let item_frame ~sides (item : Inclusion.item) ~got_loc ~expected_loc ~children :
-    term Nlg.plan =
-  let open Nlg in
-  let spans = List.filter_map (fun span -> span) [expected_loc; got_loc] in
-  let named noun name =
-    let subject =
-      subject ?span:(first spans) [Phrase.Text noun; Phrase.Code name]
-    in
-    sentence ?subject:(sentence_subject subject)
-      (phrase
-         [ txt "the declarations of ";
-           Nlg.mention ~case:Subject subject;
-           txt " do not match" ])
-  in
-  let header =
-    match item with
-    | Inclusion.Item_module name -> named "module " name
-    | Inclusion.Item_module_type name -> named "module type " name
-    | Inclusion.Item_type name -> named "type " name
-    | Inclusion.Item_extension_constructor { exception_; name } ->
-      named (if exception_ then "exception " else "the constructor ") name
-    | Inclusion.Item_functor_parameter None ->
-      sentence (phrase [txt "the functors' parameters do not match"])
-    | Inclusion.Item_functor_parameter (Some position) ->
-      sentence
-        (phrase
-           [ txt
-               ("the declarations of the " ^ ordinal position
-              ^ " parameter do not match") ])
-    | Inclusion.Direction direction ->
-      let not_included, container =
-        match direction with
-        | Inclusion.Actual_not_included ->
-          sides.actual_name, sides.expected_name
-        | Inclusion.Expected_not_included ->
-          sides.expected_name, sides.actual_name
-      in
-      sentence
-        (phrase (not_included @ (txt " is not included in " :: container)))
-  in
-  let educate =
-    match item with
-    | Inclusion.Item_module_type _ ->
-      [ elaboration
-          (sentence ~kind:Diagnostic.Kind.Background
-             (phrase
-                [txt "module type declarations must be equal on both sides"]))
-      ]
-    | Inclusion.Item_module _ | Inclusion.Item_type _
-    | Inclusion.Item_extension_constructor _
-    | Inclusion.Item_functor_parameter _ | Inclusion.Direction _ ->
-      []
-  in
-  { Nlg.statement = Some header; children = claims children @ educate }
-
 let plain_story ~claim ?contrast ?(educate = []) ?(suggestion = []) () :
     story list =
-  let open Nlg in
-  let tail =
-    List.map
-      (fun words ->
-        elaboration (sentence ~kind:Diagnostic.Kind.Background (phrase words)))
-      educate
-    @ List.map
-        (fun words ->
-          elaboration (sentence ~kind:Diagnostic.Kind.Suggestion (phrase words)))
-        suggestion
-  in
-  let beats =
-    match contrast with
-    | None ->
-      [{ Nlg.statement = Some (sentence (phrase claim)); children = tail }]
-    | Some contrast ->
-      [ { Nlg.statement = Some (sentence (phrase claim)); children = [] };
-        { Nlg.statement = Some (sentence (phrase contrast)); children = tail }
-      ]
-  in
-  [prose { Nlg.statement = None; children = claims beats }]
-
-let subjkind_error_crossing_axes (err : Ikind.subjkind_error) : string list =
-  Ikind.subjkind_error_violating_axes err
-  |> List.map (fun (Jkind_axis.Axis.Pack axis) -> Jkind_axis.Axis.name axis)
-
-let jkind_crossing_story ~loc ~what (err : Ikind.subjkind_error) :
-    story list option =
-  let open Nlg in
-  match subjkind_error_crossing_axes err with
-  | [] -> None
-  | axes ->
-    let plural = match axes with [_] -> " axis" | _ -> " axes" in
-    Some
-      (plain_story
-         ~claim:
-           [ ref_source loc
-               [ txt
-                   (what ^ " does not cross the " ^ String.concat ", " axes
-                  ^ plural) ] ]
-         ~contrast:[txt "but the kind it is checked against requires it to"]
-         ~educate:
-           [ [ txt "a ";
-               code "mod";
-               txt
-                 " annotation claims a type's values may be used at the \
-                  stronger mode on those axes, whatever mode they are held at"
-             ] ]
-         ())
-
-module Scope = struct
-  type t =
-    | Explained
-    | Kind_check
-    | Attribute_or_extension
-    | Not_about_modes
-end
-
-let typecore_scope : Typecore.error -> Scope.t = function
-  | Invalid_atomic_loc_payload | Label_not_atomic _ | Atomic_in_pattern _
-  | Modalities_on_atomic_field _ | Block_index_modality_mismatch _
-  | Submode_failed _ | Curried_application_complete _ | Mode_mismatch _
-  | Uncurried_function_escapes_comonadic _ | Tail_call_local_returning
-  | Bad_tail_annotation _ | Exclave_in_nontail_position
-  | Exclave_returns_not_local | Always_heap_allocation _
-  | Always_static_allocation _ | Not_allocation | Overwrite_of_invalid_term ->
-    Explained
-  | Non_value_object _ | Non_value_let_rec _ | Existential_jkind_mismatch _
-  | Function_type_not_rep _ | Record_projection_not_rep _ | Record_not_rep _
-  | Mutable_var_not_rep _ | Field_value_not_rep _
-  | Constructor_arg_projection_not_rep _ | Constructor_arg_value_not_rep _
-  | Impossible_function_jkind _ ->
-    Kind_check
-  | Label_not_mutable _ | Instance_variable_not_mutable _ | Unexpected_mutable _
-  | Illegal_mutable_pat | Function_returns_local | Atomic_in_functional_update _
-  | Mixed_record_atomic_loc _ | Polymorphic_atomic_loc _
-  | Mutable_block_index_polymorphic_field _ | Useless_lpoly ->
-    Attribute_or_extension
-  | Constructor_arity_mismatch _ | Label_mismatch _ | Pattern_type_clash _
-  | Or_pattern_type_clash _ | Multiply_bound_variable _ | Orpat_vars _
-  | Expr_type_clash _ | Function_arity_type_clash _ | Apply_non_function _
-  | Apply_wrong_label _ | Label_multiply_defined _ | Label_missing _
-  | Wrong_name _ | Name_type_mismatch _ | Invalid_format _ | Not_an_object _
-  | Undefined_method _ | Undefined_self_method _ | Virtual_class _
-  | Private_type _ | Private_label _ | Private_constructor _
-  | Unbound_instance_variable _ | Not_subtype _ | Outside_class
-  | Value_multiply_overridden _ | Coercion_failure _ | Not_a_function _
-  | Too_many_arguments _ | Abstract_wrong_label _ | Scoping_let_module _
-  | Not_a_polymorphic_variant_type _ | Incoherent_label_order | Less_general _
-  | Modules_not_allowed | Cannot_infer_signature | Not_a_packed_module _
-  | Unexpected_existential _ | Invalid_interval | Invalid_for_loop_index
-  | Invalid_comprehension_for_range_iterator_index | No_value_clauses
-  | Exception_pattern_disallowed
-  | Mixed_value_and_exception_patterns_under_guard
-  | Effect_pattern_below_toplevel | Invalid_continuation_pattern
-  | Inlined_record_escape | Inlined_record_expected | Unrefuted_pattern _
-  | Invalid_extension_constructor_payload | Not_an_extension_constructor
-  | Probe_format | Probe_name_format _ | Probe_name_undefined _
-  | Probe_is_enabled_format | Extension_not_enabled _ | Literal_overflow _
-  | Unknown_literal _ | Float32_literal _ | Int8_literal _ | Int16_literal _
-  | Untagged_char_literal _ | Illegal_letrec_pat | Illegal_letrec_expr
-  | Mixed_poly_nonpoly_bindings | Illegal_class_expr | Letop_type_clash _
-  | Andop_type_clash _ | Bindings_type_clash _ | Unbound_existential _
-  | Bind_existential _ | Missing_type_constraint | Wrong_expected_kind _
-  | Expr_not_a_record_type _ | Constructor_labeled_arg
-  | Partial_tuple_pattern_bad_type | Extra_tuple_label _ | Missing_tuple_label _
-  | Repeated_tuple_exp_label _ | Repeated_tuple_pat_label _
-  | Wrong_expected_record_boxing _ | Expr_record_type_has_wrong_boxing _
-  | Invalid_unboxed_access _ | Block_access_bad_record _ | Optional_poly_param
-  | Unboxed_int_literals_not_supported | Invalid_label_for_src_pos _
-  | Nonoptional_call_pos_label _ | Unexpected_hole
-  | Let_poly_not_yet_implemented | Let_poly_not_syntactic_value
-  | Layout_poly_inst_not_yet_supported _ | Function_type_escapes_partial_match _
-    ->
-    Not_about_modes
-
-let typemod_scope : Typemod.error -> Scope.t = function
-  | Not_included _ | Not_included_functor _ | With_mismatch _
-  | With_makes_applicative_functor_ill_typed _ | Strengthening_mismatch _ ->
-    Explained
-  | Cannot_apply _ | Cannot_eliminate_dependency _ | Signature_expected
-  | Structure_expected _ | Functor_expected _ | Signature_parameter_expected _
-  | Signature_result_expected _ | Recursive_include_functor
-  | With_no_component _ | With_changes_module_alias _
-  | With_cannot_remove_constrained_type | With_package_manifest _
-  | Repeated_name _ | Non_generalizable _ | Non_generalizable_module _
-  | Implementation_is_required _ | Interface_not_compiled _
-  | Not_allowed_in_functor_body _ | Not_includable_in_functor_body _
-  | Not_a_packed_module _ | Incomplete_packed_module _ | Scoping_pack _
-  | Recursive_module_require_explicit_type | Apply_generative
-  | Cannot_scrape_alias _ | Cannot_scrape_package_type _
-  | Badly_formed_signature _ | Cannot_hide_id _ | Invalid_type_subst_rhs
-  | Non_packable_local_modtype_subst _ | With_cannot_remove_packed_modtype _
-  | Cannot_alias _ | Cannot_pack_parameter
-  | Compiling_as_parameterised_parameter
-  | Cannot_compile_implementation_as_parameter | Cannot_implement_parameter _
-  | Argument_for_non_parameter _ | Cannot_find_argument_type _
-  | Inconsistent_argument_types _ | Duplicate_parameter_name _ ->
-    Not_about_modes
-
-let typedecl_scope : Typedecl.error -> Scope.t = function
-  | Unboxed_mutable_label | Definition_mismatch _ | Jkind_mismatch_of_type _
-  | Jkind_mismatch_of_path _ | Unsafe_mode_crossing_on_invalid_type_kind
-  | Atomic_field_must_be_mutable _ | Constructor_submode_failed _
-  | Non_value_atomic_field ->
-    Explained
-  | Jkind_mismatch_due_to_bad_inference _ | Jkind_sort _ | Jkind_empty_record
-  | Non_representable_in_module _ | Invalid_jkind_in_block _ | Illegal_baggage _
-  | Recursive_jkind_definition _ ->
-    Kind_check
-  | Local_not_enabled | Zero_alloc_attr_unsupported _
-  | Zero_alloc_attr_non_function | Zero_alloc_attr_bad_user_arity
-  | Missing_immediate_all_void_constructor_attribute _ ->
-    Attribute_or_extension
-  | Repeated_parameter | Duplicate_constructor _ | Too_many_constructors
-  | Duplicate_label _ | Recursive_abbrev _ | Cycle_in_def _
-  | Unboxed_recursion _ | Constraint_failed _ | Inconsistent_constraint _
-  | Type_clash _ | Non_regular _ | Null_arity_external | Missing_native_external
-  | Unbound_type_var _ | Cannot_extend_private_type _ | Not_extensible_type _
-  | Extension_mismatch _ | Rebind_wrong_type _ | Rebind_mismatch _
-  | Rebind_private _ | Variance _ | Unavailable_type_constructor _
-  | Unbound_type_var_ext _ | Val_in_structure | Multiple_native_repr_attributes
-  | Cannot_unbox_or_untag_type _ | Deep_unbox_or_untag_attribute _
-  | Illegal_mixed_product _ | Separability _ | Bad_unboxed_attribute _
-  | Poly_not_yet_implemented | Boxed_and_unboxed | Nonrec_gadt
-  | Invalid_private_row_declaration _ | Unexpected_layout_any_in_primitive _
-  | Useless_layout_poly | Bad_or_null_attribute _ | Invalid_reexport _
-  | Non_abstract_reexport _ | No_unboxed_version _ | Layout_poly_unsupported
-  | Layout_poly_variable_representation | Misplaced_flatten_floats
-  | Bad_represent_as_float_array_attribute ->
-    Not_about_modes
-
-let typetexp_scope : Typetexp.error -> Scope.t = function
-  | Bad_jkind_annot _ -> Explained
-  | Bad_univar_jkind _ | Non_value _ | Non_sort _
-  | Mismatched_jkind_annotation _ ->
-    Kind_check
-  | Unbound_type_variable _ | No_type_wildcards _ | Undefined_type_constructor _
-  | Type_arity_mismatch _ | Bound_type_variable _ | Recursive_type
-  | Type_mismatch _ | Alias_type_mismatch _ | Present_has_conjunction _
-  | Present_has_no_type _ | Constructor_mismatch _ | Not_a_variant _
-  | Variant_tags _ | Invalid_variable_name _ | Cannot_quantify _
-  | Multiple_constraints_on_type _ | Method_mismatch _ | Opened_object _
-  | Not_an_object _ | Repeated_tuple_label _ | Unsupported_extension _
-  | Polymorphic_optional_param | Did_you_mean_unboxed _
-  | Invalid_label_for_call_pos _ | Invalid_variable_stage _ | Lpoly_unsupported
-  | Val_poly_and_layout ->
-    Not_about_modes
+  [ prose
+      (Nlg.story ~claim:(phrase claim)
+         ?contrast:(Option.map phrase contrast)
+         ~background:(List.map phrase educate)
+         ~suggestions:(List.map phrase suggestion)
+         ()) ]
 
 let realize ~documentation ~reported_loc stories =
   match stories with
   | [] -> None
   | stories ->
     Some
-      (Nlg.realize ~loc:reported_loc
-         ~term_entry:(term_entry ~documentation)
-         ~term_words (frames stories))
+      (Nlg.realize ~term_entry:(term_entry ~documentation) ~term_words stories
+      |> Diagnostic_plan.to_diagnostic ~loc:reported_loc)
 
 let mode_stories request ?expected_decl ?extra_rules ?actuality_fallback
     ?subject_override axes =
@@ -3651,7 +2965,7 @@ let mode_stories request ?expected_decl ?extra_rules ?actuality_fallback
 let diagnose_env_lookup request ~loc lookup_error =
   let { source; _ } = request in
   let open Nlg in
-  let story beats = [prose { Nlg.statement = None; children = claims beats }] in
+  let story beats = [prose (Nlg.Plan.group (claims beats))] in
   let local_word =
     mode_const_word (Comonadic Areality) Mode.Locality.Const.Local
   in
@@ -3700,20 +3014,10 @@ let diagnose_env_lookup request ~loc lookup_error =
             local_word ] )
     in
     story
-      [ { Nlg.statement =
-            Some (sentence ?subject:(sentence_subject subject) (phrase claim));
-          children = []
-        };
-        { Nlg.statement =
-            Some
-              (sentence
-                 (phrase
-                    [ txt "but ";
-                      Nlg.pronoun ~case:Subject subject;
-                      copula;
-                      txt " used inside ";
-                      code "exclave_" ]));
-          children =
+      [ Nlg.Plan.statement
+          (sentence ?subject:(sentence_subject subject) (phrase claim));
+        Nlg.Plan.statement
+          ~children:
             [ elaboration
                 (sentence ~kind:Diagnostic.Kind.Background
                    (phrase
@@ -3721,30 +3025,24 @@ let diagnose_env_lookup request ~loc lookup_error =
                         txt " ends the current region early, so the region's ";
                         local_word;
                         txt " values cannot be used inside it" ])) ]
-        } ]
+          (sentence
+             (phrase
+                [ txt "but ";
+                  Nlg.pronoun ~case:Subject subject;
+                  copula;
+                  txt " used inside ";
+                  code "exclave_" ])) ]
   | Env.Mutable_value_used_in_closure (boundary_loc, boundary_desc) ->
     let subject = subject_of_loc ~source ~fallback:"this variable" loc in
     story
-      [ { Nlg.statement =
-            Some
-              (sentence ?subject:(sentence_subject subject)
-                 (phrase
-                    [ Nlg.mention ~case:Subject subject;
-                      copula;
-                      txt " a mutable variable" ]));
-          children = []
-        };
-        { Nlg.statement =
-            Some
-              (sentence
-                 (phrase
-                    [ txt "but ";
-                      Nlg.pronoun ~case:Subject subject;
-                      copula;
-                      txt " used inside ";
-                      ref_source boundary_loc [txt (human_desc boundary_desc)]
-                    ]));
-          children =
+      [ Nlg.Plan.statement
+          (sentence ?subject:(sentence_subject subject)
+             (phrase
+                [ Nlg.mention ~case:Subject subject;
+                  copula;
+                  txt " a mutable variable" ]));
+        Nlg.Plan.statement
+          ~children:
             [ elaboration
                 (sentence ~kind:Diagnostic.Kind.Background
                    (phrase
@@ -3757,7 +3055,14 @@ let diagnose_env_lookup request ~loc lookup_error =
                       [ txt "use a ";
                         code "ref";
                         txt " for mutable state shared across functions" ])) ]
-        } ]
+          (sentence
+             (phrase
+                [ txt "but ";
+                  Nlg.pronoun ~case:Subject subject;
+                  copula;
+                  txt " used inside ";
+                  ref_source boundary_loc [txt (human_desc boundary_desc)] ]))
+      ]
   | Env.Unbound_value _ | Env.Unbound_type _ | Env.Unbound_constructor _
   | Env.Unbound_label _ | Env.Unbound_module _ | Env.Unbound_class _
   | Env.Unbound_modtype _ | Env.Unbound_cltype _ | Env.Unbound_jkind _
@@ -3995,18 +3300,8 @@ let diagnose_unexplained request exn =
   | None -> []
   | Some axes -> mode_stories request axes
 
-let diagnose_typetexp request ~loc ~env err =
-  match err with
-  | Typetexp.Bad_jkind_annot (_ty, v) ->
-    Option.value
-      (jkind_crossing_story ~loc ~what:"this type" (Ikind.Jkind_error v))
-      ~default:[]
-  | err ->
-    let (_ : Scope.t) = typetexp_scope err in
-    diagnose_unexplained request (Typetexp.Error (loc, env, err))
-
-let diagnose_inclusion_leaf request ~sides ~in_parameter (leaf : Inclusion.leaf)
-    : story list =
+let diagnose_inclusion_leaf request ~sides (leaf : Inclusion.leaf) : story list
+    =
   let { context = { declared_modalities_at; _ }; _ } = request in
   match leaf with
   | Inclusion.Mode_leaf { pinpoint; error; expected_decl } ->
@@ -4023,170 +3318,57 @@ let diagnose_inclusion_leaf request ~sides ~in_parameter (leaf : Inclusion.leaf)
       (Mode.Value.fold_error ~init:[] ~step:fold_step pinpoint error)
   | Inclusion.Modality_leaf input ->
     [modality_story ~declared_modalities_at ~sides input]
-  | Inclusion.Missing_leaf missing -> [prose (missing_frame missing)]
-  | Inclusion.Presence_leaf input -> [prose (render_presence_error ~sides input)]
   | Inclusion.Crossing_leaf input -> [prose (render_crossing_error ~sides input)]
-  | Inclusion.Functor_shape_leaf shape ->
-    [prose (render_functor_shape ~in_parameter shape)]
-  | Inclusion.Functor_arity_leaf { position; surplus_on; parameter } ->
-    let open Nlg in
-    let noun =
-      match parameter with
-      | Inclusion.Unit_parameter -> [code "()"]
-      | Inclusion.Module_parameter -> [txt "a parameter"]
-    in
-    let where = [txt (" in the " ^ ordinal position ^ " position")] in
-    let claim, contrast =
-      match (surplus_on : Side.t) with
-      | Actual ->
-        ( (txt "this functor takes " :: noun) @ where,
-          [txt "but the signature declares none there"] )
-      | Expected ->
-        ( (txt "the signature declares " :: noun) @ where,
-          [txt "but this functor takes none there"] )
-    in
-    plain_story ~claim ~contrast ()
-  | Inclusion.Zero_alloc_leaf { expected_loc; actual_loc } ->
-    let open Nlg in
-    let located l words =
-      match l with None -> words | Some l -> [ref_source l words]
-    in
-    plain_story
-      ~claim:
-        (located actual_loc
-           [ txt "the implementation's ";
-             code "zero_alloc";
-             txt " guarantee is weaker" ])
-      ~contrast:
-        ((txt "but " :: sides.expected_name)
-        @ located expected_loc [txt " requires a stronger one"])
-      ~educate:
-        [ [ code "zero_alloc";
-            txt
-              " in a signature is a promise clients may rely on, so the \
-               implementation must guarantee at least as much" ] ]
-      ~suggestion:
-        [ [ txt "strengthen or add the ";
-            code "zero_alloc";
-            txt " attribute on the implementation" ] ]
-      ()
 
 module Explanation = struct
   let realized (children : (Diagnostic.Relation.t * term Nlg.plan) list) =
     let term_entry t : Diagnostic.Glossary.Entry.t =
       { term = term_display t; category = ""; description = ""; url = None }
     in
-    let realized =
-      Nlg.realize ~loc:Location.none ~term_entry ~term_words
-        [{ Nlg.statement = None; children }]
-    in
-    realized.body
-
-  let equal_annotation (left : Diagnostic.Annotation.t)
-      (right : Diagnostic.Annotation.t) =
-    match left, right with
-    | Code, Code -> true
-    | Source left, Source right -> same_chars left right
-    | Mention left, Mention right -> (
-      Diagnostic.Entities.Id.to_int left.entity
-      = Diagnostic.Entities.Id.to_int right.entity
-      &&
-      match left.form, right.form with
-      | Name, Name | Pronoun, Pronoun -> true
-      | Name, Pronoun | Pronoun, Name -> false)
-    | Term left, Term right ->
-      Diagnostic.Glossary.Id.to_int left = Diagnostic.Glossary.Id.to_int right
-    | (Code | Source _ | Mention _ | Term _), _ -> false
-
-  let rec equal_inline (left : Diagnostic.Inline.t)
-      (right : Diagnostic.Inline.t) =
-    match left, right with
-    | Text left, Text right -> String.equal left right
-    | Annotated left, Annotated right ->
-      equal_annotation left.annotation right.annotation
-      && equal_inlines left.content right.content
-    | (Text _ | Annotated _), _ -> false
-
-  and equal_inlines left right =
-    List.length left = List.length right
-    && List.for_all2 equal_inline left right
-
-  let rec equal_block (left : Diagnostic.Block.t) (right : Diagnostic.Block.t) =
-    (match left.kind, right.kind with
-      | Explanation, Explanation
-      | Background, Background
-      | Suggestion, Suggestion ->
-        true
-      | (Explanation | Background | Suggestion), _ -> false)
-    && equal_inlines left.content right.content
-    && equal_children left.children right.children
-
-  and equal_children left right =
-    List.length left = List.length right
-    && List.for_all2
-         (fun ((left_relation : Diagnostic.Relation.t), left_block)
-              ((right_relation : Diagnostic.Relation.t), right_block) ->
-           (match left_relation, right_relation with
-             | Claim, Claim | Elaboration, Elaboration -> true
-             | (Claim | Elaboration), _ -> false)
-           && equal_block left_block right_block)
-         left right
+    Nlg.realize ~term_entry ~term_words [Nlg.Plan.group children]
 
   let same_children (left : term Nlg.plan) (right : term Nlg.plan) =
-    let left = realized left.children and right = realized right.children in
-    List.length left = List.length right && List.for_all2 equal_block left right
+    let left = realized (Nlg.Plan.children left) in
+    let right = realized (Nlg.Plan.children right) in
+    List.length left = List.length right
+    && List.for_all2 Diagnostic_plan.equal left right
 end
 
-let rec diagnose_inclusion_tree request ~sides ~in_parameter
-    (tree : Inclusion.tree) : story list =
+let rec diagnose_inclusion_tree request ~sides (tree : Inclusion.tree) :
+    story list =
   match tree with
-  | Inclusion.Leaf leaf ->
-    diagnose_inclusion_leaf request ~sides ~in_parameter leaf
+  | Inclusion.Leaf leaf -> diagnose_inclusion_leaf request ~sides leaf
   | Inclusion.Item { item; got_loc; expected_loc; children } -> begin
-    let in_parameter =
-      match item with
-      | Inclusion.Item_functor_parameter _ -> true
-      | Inclusion.Direction _ -> in_parameter
-      | Inclusion.Item_module _ | Inclusion.Item_module_type _
-      | Inclusion.Item_type _ | Inclusion.Item_extension_constructor _ ->
-        false
-    in
     let children =
       let rendered =
-        List.map (diagnose_inclusion_tree request ~sides ~in_parameter) children
+        List.map (diagnose_inclusion_tree request ~sides) children
       in
       match children, rendered with
       | ( [ Inclusion.Item { item = Inclusion.Direction _; _ };
             Inclusion.Item { item = Inclusion.Direction _; _ } ],
           [[first]; [second]] )
-        when Explanation.same_children first.frame second.frame ->
-        [{ first with frame = { first.frame with Nlg.statement = None } }]
+        when Explanation.same_children first second ->
+        [Nlg.Plan.without_statement first]
       | _ -> List.concat rendered
     in
     match children with
     | [] -> []
     | children ->
-      [ { frame =
-            item_frame ~sides item ~got_loc ~expected_loc
-              ~children:(frames children);
-          axes = blamed_axes children
-        } ]
+      [ Module_diagnostics.item_frame ~sides item ~got_loc ~expected_loc
+          ~children ]
     end
 
 let diagnose_inclusion request ~sides tree =
-  diagnose_inclusion_tree request ~sides ~in_parameter:false tree
+  diagnose_inclusion_tree request ~sides tree
 
 let diagnose_inclusion_frame request frame children =
   let { reported_loc = loc; _ } = request in
   match children with
   | [] -> []
   | children ->
-    [ { frame =
-          { (inclusion_frame ~loc frame) with
-            Nlg.children = claims (frames children)
-          };
-        axes = blamed_axes children
-      } ]
+    [ Nlg.Plan.with_children
+        (Module_diagnostics.inclusion_frame ~loc frame)
+        (claims children) ]
 
 let diagnose_typemod request ~loc ~env err =
   let { context = { inclusion_site_at; _ }; _ } = request in
@@ -4195,13 +3377,14 @@ let diagnose_typemod request ~loc ~env err =
   | Typemod.Not_included_functor (incl_env, all) ->
     let site =
       match (all : Includemod.Error.all) with
-      | In_Compilation_unit (_, { got; _ }) -> `Unit got
+      | In_Compilation_unit (_, { got; _ }) ->
+        Module_diagnostics.Compilation_unit got
       | In_Signature _ | In_Include_functor_signature _ | In_Module_type _
       | In_Module_type_substitution _ | In_Type_declaration _
       | In_Jkind_declaration _ | In_Expansion _ -> (
         match inclusion_site_at loc with
-        | Some site -> `Site site
-        | None -> `Unknown)
+        | Some site -> Module_diagnostics.Inclusion_site site
+        | None -> Module_diagnostics.Unknown)
     in
     diagnose_inclusion_frame request site
       (List.concat_map
@@ -4214,12 +3397,12 @@ let diagnose_typemod request ~loc ~env err =
             ~fallback:loc all))
   | Typemod.Strengthening_mismatch (lid, (incl_env, all)) ->
     let sides =
-      { expected_name = [Nlg.txt "the module type"];
+      { Module_diagnostics.expected_name = [Nlg.txt "the module type"];
         actual_name = [Nlg.txt "the module"]
       }
     in
     diagnose_inclusion_frame request
-      (`Strengthening (longident_name lid))
+      (Module_diagnostics.Strengthening (longident_name lid))
       (List.concat_map
          (diagnose_inclusion request ~sides)
          (Inclusion.of_all
@@ -4231,12 +3414,13 @@ let diagnose_typemod request ~loc ~env err =
   | Typemod.With_makes_applicative_functor_ill_typed (lid, path, (incl_env, all))
     ->
     let sides =
-      { expected_name = [Nlg.txt "the functor's parameter"];
+      { Module_diagnostics.expected_name = [Nlg.txt "the functor's parameter"];
         actual_name = [Nlg.txt "the module after substitution"]
       }
     in
     diagnose_inclusion_frame request
-      (`Applicative_functor (Path.name path, longident_name lid))
+      (Module_diagnostics.Applicative_functor
+         (Path.name path, longident_name lid))
       (List.concat_map
          (diagnose_inclusion request ~sides)
          (Inclusion.of_all
@@ -4247,12 +3431,12 @@ let diagnose_typemod request ~loc ~env err =
             ~fallback:loc all))
   | Typemod.With_mismatch (lid, (incl_env, all)) ->
     let sides =
-      { expected_name = [Nlg.txt "the new definition"];
+      { Module_diagnostics.expected_name = [Nlg.txt "the new definition"];
         actual_name = [Nlg.txt "the original definition"]
       }
     in
     diagnose_inclusion_frame request
-      (`Substitution (longident_name lid))
+      (Module_diagnostics.Substitution (longident_name lid))
       (List.concat_map
          (diagnose_inclusion request ~sides)
          (Inclusion.of_all
@@ -4261,20 +3445,10 @@ let diagnose_typemod request ~loc ~env err =
                 i_subst = Subst.identity
               }
             ~fallback:loc all))
-  | err ->
-    let (_ : Scope.t) = typemod_scope err in
-    diagnose_unexplained request (Typemod.Error (loc, env, err))
+  | err -> diagnose_unexplained request (Typemod.Error (loc, env, err))
 
 let diagnose_includemod_apply request ~env ~app_name ~mty_f ~args =
   let { reported_loc = loc; _ } = request in
-  let patch =
-    let rec drop_trailing_inserts = function
-      | Diffing.Insert _ :: rest -> drop_trailing_inserts rest
-      | rest -> List.rev rest
-    in
-    drop_trailing_inserts
-      (List.rev (Includemod.Functor_app_diff.diff env ~f:mty_f ~args))
-  in
   let failing =
     List.filter_map
       (fun change ->
@@ -4284,109 +3458,39 @@ let diagnose_includemod_apply request ~env ~app_name ~mty_f ~args =
         | Diffing.Change (_, _, Includemod.Error.Incompatible_params _)
         | Diffing.Delete _ | Diffing.Insert _ | Diffing.Keep _ ->
           None)
-      patch
+      (Includemod.Functor_app_diff.diff env ~f:mty_f ~args)
   in
-  let shape_claims =
-    List.concat_map
-      (fun change ->
-        match change with
-        | Diffing.Delete (descr, _, _) ->
-          let named =
-            match (descr : Includemod.Error.functor_arg_descr) with
-            | Named path -> [Nlg.code (Path.name path)]
-            | Anonymous | Unit | Empty_struct -> [Nlg.txt "this argument"]
-          in
-          plain_story
-            ~claim:(named @ [Nlg.txt " is a surplus argument"])
-            ~suggestion:[[Nlg.txt "remove it"]]
-            ()
-        | Diffing.Insert param ->
-          let named =
-            match (param : Types.functor_parameter) with
-            | Named (Some id, _, _) ->
-              [Nlg.txt "the parameter "; Nlg.code (Ident.name id)]
-            | Named (None, _, _) | Unit -> [Nlg.txt "a parameter"]
-          in
-          plain_story
-            ~claim:(Nlg.txt "no argument is given for " :: named)
-            ~suggestion:
-              [[Nlg.txt "supply the missing argument in that position"]]
-            ()
-        | Diffing.Change (_, _, Includemod.Error.Incompatible_params (arg, _))
-          ->
-          let generative_expected =
-            match (arg : Includemod.Error.functor_arg_descr) with
-            | Unit -> false
-            | Anonymous | Named _ | Empty_struct -> true
-          in
-          plain_story
-            ~claim:
-              [ Nlg.txt
-                  (if generative_expected
-                   then "this argument is a module"
-                   else "this argument is ()") ]
-            ~contrast:
-              [ Nlg.txt
-                  (if generative_expected
-                   then "but the functor expects () at this position"
-                   else "but the functor expects a module at this position") ]
-            ()
-        | Diffing.Change (_, _, Includemod.Error.Mismatch _) | Diffing.Keep _ ->
-          [])
-      patch
-  in
-  let functor_name =
-    match (app_name : Includemod.application_name) with
-    | Anonymous_functor -> None
-    | Named_leftmost_functor lid -> longident_name lid
-    | Full_application_path lid -> longident_name (leftmost_functor lid)
-  in
-  let argument =
-    match failing with
-    | [(Includemod.Error.Named path, _)] -> Some (Path.name path)
-    | _ -> None
-  in
-  let all_deleted =
-    (not (List.is_empty patch))
-    && List.for_all
-         (fun change ->
-           match change with
-           | Diffing.Delete _ -> true
-           | Diffing.Change _ | Diffing.Insert _ | Diffing.Keep _ -> false)
-         patch
-  in
-  if all_deleted
-  then
-    plain_story
-      ~claim:
-        [ (match functor_name with
-          | Some name -> Nlg.code name
-          | None -> Nlg.txt "this module");
-          Nlg.txt " is not a functor, so it cannot be applied" ]
-      ()
-  else
-    let frame =
-      if List.is_empty failing
-      then `Ill_typed_application functor_name
-      else `Application (functor_name, argument)
+  match failing with
+  | [] -> []
+  | failing ->
+    let functor_name =
+      match (app_name : Includemod.application_name) with
+      | Anonymous_functor -> None
+      | Named_leftmost_functor lid -> longident_name lid
+      | Full_application_path lid -> longident_name (leftmost_functor lid)
     in
-    diagnose_inclusion_frame request frame
+    let argument =
+      match failing with
+      | [(Includemod.Error.Named path, _)] -> Some (Path.name path)
+      | _ -> None
+    in
+    diagnose_inclusion_frame request
+      (Module_diagnostics.Application (functor_name, argument))
       (let sides =
-         { expected_name = [Nlg.txt "the parameter"];
+         { Module_diagnostics.expected_name = [Nlg.txt "the parameter"];
            actual_name = [Nlg.txt "the argument"]
          }
        in
-       shape_claims
-       @ List.concat_map
-           (fun (_, (d : Includemod.Error.module_type_diff)) ->
-             Inclusion.of_module_type_symptom
-               ~env:
-                 { Includemod.Functor_inclusion_diff.i_env = env;
-                   i_subst = Subst.identity
-                 }
-               ~fallback:loc ~orientation:Orientation.Got_is_actual d.symptom
-             |> List.concat_map (diagnose_inclusion request ~sides))
-           failing)
+       List.concat_map
+         (fun (_, (diff : Includemod.Error.module_type_diff)) ->
+           Inclusion.of_module_type_symptom
+             ~env:
+               { Includemod.Functor_inclusion_diff.i_env = env;
+                 i_subst = Subst.identity
+               }
+             ~fallback:loc ~orientation:Orientation.Got_is_actual diff.symptom
+           |> List.concat_map (diagnose_inclusion request ~sides))
+         failing)
 
 let diagnose_typedecl request ~loc err =
   let { context = { constructor_arguments_at; _ }; _ } = request in
@@ -4419,12 +3523,12 @@ let diagnose_typedecl request ~loc err =
         | exception Not_found -> None
       in
       let sides =
-        { expected_name = [Nlg.txt "this definition"];
+        { Module_diagnostics.expected_name = [Nlg.txt "this definition"];
           actual_name = [Nlg.txt "the definition of "; Nlg.code name]
         }
       in
       diagnose_inclusion_frame request
-        (`Equation (name, equated_loc))
+        (Module_diagnostics.Equation (name, equated_loc))
         (List.concat_map
            (diagnose_inclusion request ~sides)
            (Inclusion.leaves
@@ -4437,55 +3541,6 @@ let diagnose_typedecl request ~loc err =
     | Types.Tpackage _ | Types.Tof_kind _ | Types.Tmod _ | Types.Tbox _ ->
       []
     end
-  | Typedecl.Jkind_mismatch_of_type (_env, _ty, v) ->
-    Option.value (jkind_crossing_story ~loc ~what:"this type" v) ~default:[]
-  | Typedecl.Jkind_mismatch_of_path (_env, path, v) ->
-    Option.value
-      (jkind_crossing_story ~loc ~what:("type " ^ Path.name path) v)
-      ~default:[]
-  | Typedecl.Atomic_field_must_be_mutable name ->
-    let open Nlg in
-    plain_story
-      ~claim:
-        [ ref_source loc [code name];
-          txt " is declared ";
-          code "[@atomic]";
-          txt " but is not mutable" ]
-      ~educate:
-        [ [ txt
-              "atomicity describes how a field is written, so only a mutable \
-               field can be atomic" ] ]
-      ~suggestion:
-        [[txt "add "; code "mutable"; txt ", or drop the "; code "[@atomic]"]]
-      ()
-  | Typedecl.Non_value_atomic_field ->
-    let open Nlg in
-    plain_story
-      ~claim:[ref_source loc [txt "this field is declared "]; code "[@atomic]"]
-      ~contrast:[txt "but its type does not have layout "; code "value"]
-      ~educate:
-        [ [ txt
-              "atomic access is implemented on values, which are word-sized \
-               and visible to the collector; unboxed layouts have no atomic \
-               representation" ] ]
-      ~suggestion:[[txt "use the boxed type, or drop the "; code "[@atomic]"]]
-      ()
-  | Typedecl.Unboxed_mutable_label ->
-    let open Nlg in
-    plain_story
-      ~claim:
-        [ ref_source loc [txt "this label is declared "];
-          code "mutable";
-          txt ", but it belongs to an unboxed record" ]
-      ~educate:
-        [ [ txt
-              "an unboxed record has no heap block and no identity, so there \
-               is no cell to mutate" ] ]
-      ~suggestion:
-        [ [ txt "use a boxed record, or store the unboxed record in a ";
-            code "mutable";
-            txt " field of one" ] ]
-      ()
   | Typedecl.Unsafe_mode_crossing_on_invalid_type_kind ->
     let open Nlg in
     plain_story
@@ -4502,9 +3557,7 @@ let diagnose_typedecl request ~loc err =
                fields or constructors; a type with neither has nothing to \
                override" ] ]
       ()
-  | err ->
-    let (_ : Scope.t) = typedecl_scope err in
-    diagnose_unexplained request (Typedecl.Error (loc, err))
+  | err -> diagnose_unexplained request (Typedecl.Error (loc, err))
 
 let diagnose_typecore request ~loc ~env err =
   let { source; context = { constructor_arguments_at; _ }; _ } = request in
@@ -4790,34 +3843,6 @@ let diagnose_typecore request ~loc ~env err =
             code "let r = ... in r";
             txt ", so the call is no longer in tail position" ] ]
       ()
-  | Typecore.Bad_tail_annotation kind -> (
-    let open Nlg in
-    let claim =
-      [ref_source loc [txt "this call is annotated "]; code "[@tail]"]
-    in
-    match kind with
-    | `Conflict ->
-      plain_story ~claim
-        ~contrast:[txt "but its tail-call annotations contradict each other"]
-        ~educate:
-          [ [ txt "a call cannot be required to be a tail call by ";
-              code "[@tail]";
-              txt " and required not to be by ";
-              code "[@nontail]" ] ]
-        ~suggestion:[[txt "keep only one tail-call annotation"]]
-        ()
-    | `Not_a_tailcall ->
-      plain_story ~claim
-        ~contrast:[txt "but it is not in tail position"]
-        ~educate:
-          [ [ txt
-                "a call is a tail call only when its result is the enclosing \
-                 function's result" ] ]
-        ~suggestion:
-          [ [ txt "use ";
-              code "[@tail hint]";
-              txt " to ask for the optimisation only where it applies" ] ]
-        ())
   | Typecore.Always_heap_allocation kind ->
     let open Nlg in
     let what =
@@ -4880,82 +3905,26 @@ let diagnose_typecore request ~loc ~env err =
                that already exists" ] ]
       ~suggestion:[[txt "remove the "; code "stack_"]]
       ()
-  | Typecore.Atomic_in_pattern lid ->
-    let open Nlg in
-    let name =
-      match longident_name lid with Some n -> n | None -> "this field"
-    in
-    plain_story
-      ~claim:
-        [ ref_source loc [txt "this pattern matches on "];
-          code name;
-          txt ", which is an atomic field" ]
-      ~educate:
-        [ [ txt
-              "atomic fields are forbidden in patterns: the field may be read \
-               zero, one or several times depending on the patterns around it, \
-               so it is hard to reason about when the atomic read happens" ] ]
-      ~suggestion:
-        [ [ txt "match the field with ";
-            code "_";
-            txt
-              " and read it in the body -- a wildcard is allowed, so every \
-               field can still be listed" ] ]
-      ()
-  | Typecore.Label_not_atomic lid ->
-    let open Nlg in
-    let name =
-      match longident_name lid with Some n -> n | None -> "this field"
-    in
-    plain_story
-      ~claim:
-        [ref_source loc [code "[%atomic.loc]"]; txt " needs an atomic field"]
-      ~contrast:[txt "but "; code name; txt " is not declared atomic"]
-      ~suggestion:[[txt "declare the field as "; code "mutable ... [@atomic]"]]
-      ()
-  | Typecore.Modalities_on_atomic_field lid ->
-    let open Nlg in
-    let name =
-      match longident_name lid with Some n -> n | None -> "this field"
-    in
-    plain_story
-      ~claim:[ref_source loc [code name]; txt " carries a modality of its own"]
-      ~contrast:
-        [ txt "but a field given to ";
-          code "[%atomic.loc]";
-          txt " may carry only the modalities implied by ";
-          code "mutable" ]
-      ~suggestion:[[txt "remove the modality from the field's declaration"]]
-      ()
-  | Typecore.Invalid_atomic_loc_payload ->
-    let open Nlg in
-    plain_story
-      ~claim:
-        [ ref_source loc [code "[%atomic.loc]"];
-          txt " takes a record field access, like ";
-          code "r.x";
-          txt ", but this payload is not one" ]
-      ()
-  | err ->
-    let (_ : Scope.t) = typecore_scope err in
-    diagnose_unexplained request (Typecore.Error (loc, env, err))
+  | err -> diagnose_unexplained request (Typecore.Error (loc, env, err))
 
-let error ~source ~context ~pronouns ~loc exn : Diagnostic.t option =
-  let request = { source; context; pronouns; reported_loc = loc } in
+let diagnose ~source ~context ~pronouns ~loc input : Diagnostic.t option =
+  let request =
+    Diagnostic_request.create ~source ~context ~pronouns ~reported_loc:loc
+  in
   let body =
-    match exn with
-    | Typecore.Error (loc, env, err) -> diagnose_typecore request ~loc ~env err
-    | Typemod.Error (loc, env, err) -> diagnose_typemod request ~loc ~env err
-    | Includemod.Apply_error { env; app_name; mty_f; args; _ } ->
+    match input with
+    | Typecore_error { loc; env; error } ->
+      diagnose_typecore request ~loc ~env error
+    | Typemod_error { loc; env; error } ->
+      diagnose_typemod request ~loc ~env error
+    | Includemod_apply_error { env; app_name; mty_f; args } ->
       diagnose_includemod_apply request ~env ~app_name ~mty_f ~args
-    | Typedecl.Error (loc, err) -> diagnose_typedecl request ~loc err
-    | Typetexp.Error (loc, env, err) -> diagnose_typetexp request ~loc ~env err
-    | Env.Error (Env.Lookup_error (loc, _env, lookup_error)) ->
-      diagnose_env_lookup request ~loc lookup_error
-    | Uniqueness_analysis.Usage.Unique_use_during_borrowing error ->
+    | Typedecl_error { loc; error } -> diagnose_typedecl request ~loc error
+    | Env_lookup_error { loc; error } -> diagnose_env_lookup request ~loc error
+    | Unique_use_during_borrowing error ->
       diagnose_unique_use_during_borrowing request error
-    | Uniqueness_analysis.Error err -> diagnose_uniqueness request err
-    | exn -> diagnose_unexplained request exn
+    | Uniqueness_error error -> diagnose_uniqueness request error
+    | Embedded_mode_error exn -> diagnose_unexplained request exn
   in
   realize ~documentation:context.documentation
     ~reported_loc:request.reported_loc body
@@ -4970,58 +3939,16 @@ let context_unavailable : context =
     documentation = documentation_unavailable
   }
 
-let diagnostic_of_report report : Diagnostic.t =
-  let printer = Location.batch_mode_printer in
-  let text =
-    Format.asprintf "%a"
-      (fun ppf report -> printer.pp printer ppf report)
-      report
-    |> String.trim
-  in
-  { loc = report.Location.main.loc;
-    entities = Diagnostic.Entities.empty;
-    glossary = Diagnostic.Glossary.empty;
-    body =
-      [ { kind = Diagnostic.Kind.Explanation;
-          content = [Diagnostic.Inline.Text text];
-          children = []
-        } ]
-  }
-
-let source_of_report report =
-  let file = report.Location.main.loc.loc_start.pos_fname in
-  match In_channel.with_open_bin file In_channel.input_all with
-  | text -> Some (Source.create ~file ~text)
-  | exception Sys_error _ -> None
-
-let diagnostic_of_exception report exn =
-  match source_of_report report with
-  | None -> None
-  | Some source ->
-    let snapshot = Btype.snapshot () in
-    Fun.protect
-      ~finally:(fun () -> Btype.backtrack snapshot)
-      (fun () ->
-        match
-          error ~source ~context:context_unavailable ~pronouns:Use_pronouns
-            ~loc:report.Location.main.loc exn
-        with
-        | diagnostic -> diagnostic
-        | exception ((Out_of_memory | Stack_overflow) as unrecoverable) ->
-          raise unrecoverable
-        | exception _ -> None)
-
-let json_emitter ppf exn report =
-  let diagnostic =
-    match exn with
-    | Some exn -> (
-      match diagnostic_of_exception report exn with
-      | Some diagnostic -> diagnostic
-      | None -> diagnostic_of_report report)
-    | None -> diagnostic_of_report report
-  in
-  Format.fprintf ppf "%s@." (Diagnostic.to_json diagnostic)
-
-let enable_structured_diagnostics () =
-  Clflags.structured_diagnostics := true;
-  Location.set_emitter json_emitter
+let diagnose_without_context ~source ~loc input =
+  let snapshot = Btype.snapshot () in
+  Fun.protect
+    ~finally:(fun () -> Btype.backtrack snapshot)
+    (fun () ->
+      match
+        diagnose ~source ~context:context_unavailable ~pronouns:Use_pronouns
+          ~loc input
+      with
+      | diagnostic -> diagnostic
+      | exception ((Out_of_memory | Stack_overflow) as unrecoverable) ->
+        raise unrecoverable
+      | exception _ -> None)
