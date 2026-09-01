@@ -1,9 +1,15 @@
 open StdLabels
 
-let compunit_name Cmo_format.{ cu_name = Compunit name ; _ } = name
+let compunit_name Cmo_format.{ cu_name; _ } =
+  Compilation_unit.name_as_string cu_name
+
+let has_cmi ~dir unit_name =
+  let filename = String.uncapitalize_ascii unit_name ^ ".cmi" in
+  Sys.file_exists (Filename.concat dir filename)
 
 let units fn =
   (* The cma format is documented in typing/cmo_format.mli in the compiler sources *)
+  let dir = Filename.dirname fn in
   let ic = open_in_bin fn in
   let len_magic_number = String.length Config.cma_magic_number in
   let magic_number = really_input_string ic len_magic_number in
@@ -14,4 +20,5 @@ let units fn =
   close_in ic;
 
   List.map toc.lib_units ~f:compunit_name
+  |> List.filter ~f:(has_cmi ~dir)
   |> List.sort ~cmp:String.compare
