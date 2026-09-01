@@ -182,6 +182,7 @@ module Language_feature_name = struct
     | Pmod_constraint _ -> "module with constraints"
     | Pmod_unpack _ -> "'val' unpacking of expression as module"
     | Pmod_extension _ -> "extension point as module"
+    | Pmod_hole -> "module hole"
     | Pmod_instance _ -> "module instance"
   ;;
 end
@@ -343,6 +344,7 @@ module Constructor_name = struct
     | Pmod_constraint _ -> "Pmod_constraint"
     | Pmod_unpack _ -> "Pmod_unpack"
     | Pmod_extension _ -> "Pmod_extension"
+    | Pmod_hole -> "Pmod_hole"
     | Pmod_instance _ -> "Pmod_instance"
   ;;
 end
