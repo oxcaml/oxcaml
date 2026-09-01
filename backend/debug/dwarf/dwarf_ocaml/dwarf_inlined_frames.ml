@@ -374,20 +374,10 @@ let dwarf state (fundecl : L.fundecl) inlined_frame_ranges ~function_symbol
     Asm_label.print
     (Proto_die.reference function_proto_die);
   let start_of_code_symbol, dwarf_4_base_address_entry =
-    match !Dwarf_flags.gdwarf_version with
-    | Five ->
-      (* The offsets in DWARF-5 range list entries are relative to the function
-         symbol, which is established as the base address of each list. *)
-      function_symbol, []
-    | Four -> (
-      match DS.code_layout state with
-      | Function_sections ->
-        let base_address_entry =
-          Dwarf_4_range_list_entry.create_base_address_selection_entry
-            ~base_address_symbol:function_symbol
-        in
-        function_symbol, [base_address_entry]
-      | Continuous_code_section { code_begin; _ } -> code_begin, [])
+    Dwarf_base_address_selection.start_of_code_symbol_and_base_entries state
+      ~function_symbol
+      ~create_base_address_selection_entry:
+        Dwarf_4_range_list_entry.create_base_address_selection_entry
   in
   let all_blocks = IF.all_indexes inlined_frame_ranges in
   let scope_proto_dies, _all_summaries =
