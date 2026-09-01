@@ -96,7 +96,9 @@ end = struct
         Incoming { index = byte_offset_to_word_index offset }
       | Reg.Outgoing offset ->
         (* macOS on arm requires unaligned stack locations for C calls. *)
-        if Target_system.is_macos () && Target_system.is_arm ()
+        if
+          Target_system.System.is_macos ()
+          && Target_system.Architecture.is_arm ()
         then Outgoing { index = offset / word_size }
         else Outgoing { index = byte_offset_to_word_index offset }
       | Reg.Domainstate offset ->

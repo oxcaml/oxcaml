@@ -100,7 +100,7 @@ let emit_probe_note_desc ~probe_name ~probe_label ~semaphore_label ~probe_args =
     let lbl = L.create_int Stapsdt_note (Label.to_int probe_label) in
     D.label lbl
   | None -> D.int64 0L);
-  (match Target_system.is_macos () with
+  (match Target_system.Assembler.is_macos () with
   | false -> D.symbol S.Predef.stapsdt_base
   | true -> D.int64 0L);
   D.symbol semaphore_label;
@@ -182,18 +182,19 @@ let emit_dummy_probe_notes () =
       semaphores_without_probes)
 
 let emit_probe_semaphores ~add_def_symbol =
-  (match Target_system.is_macos () with
+  (match Target_system.Assembler.is_macos () with
   | false ->
     Emitaux.emit_stapsdt_base_section ();
     D.switch_to_section Probes
   | true -> D.switch_to_section Probes);
-  D.align ~fill:Zero ~bytes:(if Target_system.is_macos () then 8 else 2);
+  D.align ~fill:Zero
+    ~bytes:(if Target_system.Assembler.is_macos () then 8 else 2);
   String.Map.iter
     (fun _ (label, label_sym, enabled_at_init) ->
       (* Unresolved weak symbols have a zero value regardless of the following
          initialization. *)
       let enabled_at_init = Option.value enabled_at_init ~default:false in
-      if not (Target_system.is_macos ())
+      if not (Target_system.Assembler.is_macos ())
       then (
         D.weak label_sym;
         D.hidden label_sym);
