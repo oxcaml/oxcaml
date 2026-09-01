@@ -887,9 +887,14 @@ and record_pattern ctxt f ~unboxed l closed =
 (** for special treatment of modes in labeled expressions *)
 and pattern2 ctxt f p =
   match p.ppat_desc, p.ppat_attributes with
+  | Ppat_constraint (inner, cty, modes), (_ :: _ as attrs) ->
+    let p_without_modes =
+      { p with ppat_desc = Ppat_constraint (inner, cty, []);
+               ppat_attributes = [] }
+    in
+    pp f "(%a)%a%a" (pattern2 ctxt) p_without_modes
+      (attributes ctxt) attrs optional_at_modes modes
   | _, (_ :: _ as attrs) ->
-    (* Recurse into [pattern2] rather than [pattern]: [Ppat_constraint] with
-       modes but no type can only be printed by [pattern2]. *)
     pp f "(%a)%a" (pattern2 ctxt) {p with ppat_attributes=[]}
       (attributes ctxt) attrs
   | Ppat_constraint(p, ct, m), [] ->
