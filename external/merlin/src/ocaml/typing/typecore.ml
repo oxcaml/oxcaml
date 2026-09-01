@@ -1403,37 +1403,6 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
-<<<<<<< Merlin:ggray.annotation-hint
-(* CR-someday: This function should be migrated to use the new mode
-   error system instead of the ad-hoc [Mode_mismatch] error variant. *)
-let apply_mode_annots ~loc ~env kind (m : Alloc.Const.Option.t) mode =
-  let error axis =
-    raise (error(loc, env, Mode_mismatch (kind, axis)))
-  in
-  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
-  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
-  (match Alloc.submode (Alloc.of_const min) mode with
-  | Ok () -> ()
-  | Error e -> error (Left_le_right, e));
-  (match Alloc.submode mode (Alloc.of_const max) with
-  | Ok () -> ()
-  | Error e -> error (Right_le_left, e))
-||||||| Compiler:last-imported
-(* CR-someday: This function should be migrated to use the new mode
-   error system instead of the ad-hoc [Mode_mismatch] error variant. *)
-let apply_mode_annots ~loc ~env kind (m : Alloc.Const.Option.t) mode =
-  let error axis =
-    raise (Error(loc, env, Mode_mismatch (kind, axis)))
-  in
-  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
-  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
-  (match Alloc.submode (Alloc.of_const min) mode with
-  | Ok () -> ()
-  | Error e -> error (Left_le_right, e));
-  (match Alloc.submode mode (Alloc.of_const max) with
-  | Ok () -> ()
-  | Error e -> error (Right_le_left, e))
-=======
 let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
@@ -1453,7 +1422,6 @@ let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
   let pp : Hint.pinpoint = loc, kind in
   Alloc.submode_err pp min mode;
   Alloc.submode_err pp mode max
->>>>>>> Compiler:HEAD
 
 (** Takes the mutability, the type and the modalities of a field, and expected
     mode of the record (adjusted for allocation), check that the construction
