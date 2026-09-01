@@ -171,7 +171,7 @@ let load_sections (type a r)
 
 let symbol_prefix () =
   match Target_system.System.get () with
-  | MacOS_like -> "_"
+  | MacOS -> "_"
   | Linux
   | Windows (Cygwin | MinGW | Native)
   | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->

@@ -96,7 +96,7 @@ let find t name =
        names *)
     let dlsym_name =
       match Target_system.System.get () with
-      | MacOS_like when String.length name > 0 && String.get name 0 = '_' ->
+      | MacOS when String.length name > 0 && String.get name 0 = '_' ->
         String.sub name 1 (String.length name - 1)
       | _ -> name
     in

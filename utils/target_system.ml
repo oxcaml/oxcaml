@@ -32,7 +32,6 @@ module Architecture = struct
 end
 
 module System = struct
-  (* CR shym Why [MacOS_like] instead of simply [MacOS]? *)
   type windows_system =
     | Cygwin
     | MinGW
@@ -41,7 +40,7 @@ module System = struct
   type t =
     | Linux
     | Windows of windows_system
-    | MacOS_like
+    | MacOS
     | FreeBSD
     | NetBSD
     | OpenBSD
@@ -57,7 +56,7 @@ module System = struct
     | "mingw" | "mingw64" -> Windows MinGW
     | "win32" | "win64" -> Windows Native
     | "cygwin" -> Windows Cygwin
-    | "macosx" -> MacOS_like
+    | "macosx" -> MacOS
     | "freebsd" -> FreeBSD
     | "netbsd" -> NetBSD
     | "openbsd" -> OpenBSD
@@ -74,8 +73,8 @@ module System = struct
 
   let is_windows () =
     match get () with
-    | Linux | MacOS_like | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly
-    | GNU | BeOS | Unknown ->
+    | Linux | MacOS | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU
+    | BeOS | Unknown ->
       false
     | Windows _ -> true
 
@@ -84,7 +83,7 @@ module System = struct
     | Linux | Windows _ | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU
     | BeOS | Unknown ->
       false
-    | MacOS_like -> true
+    | MacOS -> true
 end
 
 module Assembler = struct
@@ -98,7 +97,7 @@ module Assembler = struct
   let get () =
     match System.get () with
     | Windows Native -> MASM
-    | MacOS_like -> MacOS
+    | MacOS -> MacOS
     | Linux
     | Windows (Cygwin | MinGW)
     | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU | BeOS | Unknown ->

@@ -28,7 +28,7 @@ module System : sig
   type t = private
     | Linux
     | Windows of windows_system
-    | MacOS_like
+    | MacOS
     | FreeBSD
     | NetBSD
     | OpenBSD

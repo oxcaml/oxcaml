@@ -35,7 +35,7 @@ let symbol_prefix () =
     | Windows (Cygwin | MinGW | Native)
     | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->
       "" (* checked ok. *)
-    | MacOS_like -> "_" (* checked ok. *))
+    | MacOS -> "_" (* checked ok. *))
   | ARM | POWER | Z | Riscv -> ""
 
 let should_be_escaped = function

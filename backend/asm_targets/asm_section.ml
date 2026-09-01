@@ -175,7 +175,7 @@ let details t first_occurrence =
     | Text, _, _ -> text ()
     | Function_text name, _, _ -> [name], Some "ax", ["@progbits"]
     | Data, _, _ -> data ()
-    | DWARF dwarf, _, MacOS_like ->
+    | DWARF dwarf, _, MacOS ->
       let name =
         match dwarf with
         | Debug_info -> "__debug_info"
@@ -218,7 +218,7 @@ let details t first_occurrence =
       in
       [name], flags, args
     (* Eight Byte Literals; based on corresponding upstream secions *)
-    | Eight_byte_literals, _, MacOS_like ->
+    | Eight_byte_literals, _, MacOS ->
       ["__TEXT"; "__literal8"], None, ["8byte_literals"]
     | Eight_byte_literals, _, Windows (MinGW | Cygwin) ->
       [".rdata"], Some "dr", []
@@ -226,7 +226,7 @@ let details t first_occurrence =
     | Eight_byte_literals, _, _ ->
       [".rodata.cst8"], Some "aM", ["@progbits"; "8"]
     (* Sixteen Byte Literals; based on corresponding upstream secions *)
-    | Sixteen_byte_literals, _, MacOS_like ->
+    | Sixteen_byte_literals, _, MacOS ->
       ["__TEXT"; "__literal16"], None, ["16byte_literals"]
     | Sixteen_byte_literals, _, Windows (MinGW | Cygwin) ->
       [".rdata"], Some "dr", []
@@ -244,28 +244,28 @@ let details t first_occurrence =
     | Sixtyfour_byte_literals, _, _ ->
       [".rodata.cst64"], Some "aM", ["@progbits"; "64"]
     | Jump_tables, _, Windows (MinGW | Cygwin) -> [".rdata"], Some "dr", []
-    | Jump_tables, _, (MacOS_like | Windows Native) ->
+    | Jump_tables, _, (MacOS | Windows Native) ->
       text () (* with LLVM/OS X and MASM, use the text segment *)
     | Jump_tables, _, _ -> [".rodata"], None, []
-    | Read_only_data, _, MacOS_like -> ["__DATA"; "__const"], None, ["regular"]
+    | Read_only_data, _, MacOS -> ["__DATA"; "__const"], None, ["regular"]
     | Read_only_data, _, Windows (MinGW | Cygwin) -> [".rdata"], Some "dr", []
     | Read_only_data, _, _ -> rodata ()
     | Stapsdt_base, _, Linux ->
       [".stapsdt.base"], Some "aG", ["\"progbits\""; ".stapsdt.base"; "comdat"]
     | Stapsdt_base, _, _ ->
       Misc.fatal_error "stapsdt not supported on platforms other than Linux."
-    | Stapsdt_note, _, MacOS_like ->
+    | Stapsdt_note, _, MacOS ->
       ["__DATA"; "__note_stapsdt"], None, ["regular"]
       (* NOTE: This is section is currently not tested. *)
     | Stapsdt_note, _, (GNU | Solaris | Linux | BeOS) ->
       [".note.stapsdt"], Some "?", ["\"note\""]
     | Stapsdt_note, _, _ ->
       Misc.fatal_error "Target systems does not support stapsdt."
-    | Probes, _, MacOS_like -> ["__TEXT"; "__probes"], None, ["regular"]
+    | Probes, _, MacOS -> ["__TEXT"; "__probes"], None, ["regular"]
     | Probes, _, _ -> [".probes"], Some "wa", ["\"progbits\""]
     | Note_ocaml_eh, _, _ -> [".note.ocaml_eh"], Some "?", ["\"note\""]
     | Note_gnu_stack, _, _ -> [".note.GNU-stack"], Some "", ["@progbits"]
-    | Debuginfo_strings, _, MacOS_like ->
+    | Debuginfo_strings, _, MacOS ->
       (* cstring_literals: de-duped by linker *)
       ["__TEXT"; "__cstring"], None, ["cstring_literals"]
     | Debuginfo_strings, arch, _ ->
