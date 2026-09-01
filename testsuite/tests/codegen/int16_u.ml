@@ -140,13 +140,10 @@ bswap:
   ret
 |}]
 
-(* CR-someday jrayman: Could use a [neg] instruction instead *)
 let neg x = Int16_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  neg   %rax
   salq  $48, %rax
   sarq  $48, %rax
   ret
@@ -235,13 +232,13 @@ unsafe_rem:
 let compare x y = Int16_u.compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 |}]
 
@@ -288,13 +285,13 @@ lessthan:
 let unsigned_compare x y = Int16_u.unsigned_compare x y
 [%%expect_asm X86_64{|
 unsigned_compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   seta  %al
-  cmovae %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovae %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 |}]
 
@@ -687,10 +684,9 @@ shr:
 let select x y z = Int16_u.select x y z
 [%%expect_asm X86_64{|
 select:
-  movq  %rax, %rsi
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
   movq  %rdi, %rax
-  cmpq  $1, %rsi
-  cmovne %rbx, %rax
   salq  $48, %rax
   sarq  $48, %rax
   ret

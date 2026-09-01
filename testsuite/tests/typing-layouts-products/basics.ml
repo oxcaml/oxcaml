@@ -2133,15 +2133,6 @@ Error: This type "string t" should be an instance of type "('a : any mod global)
          because of the definition of t at line 2, characters 0-47.
        But the kind of string t must be a subkind of any mod global
          because of the definition of needs_any_mod_global at line 4, characters 0-47.
-|}, Principal{|
-Line 1, characters 19-27:
-1 | type should_fail = string t needs_any_mod_global
-                       ^^^^^^^^
-Error: This type "string t" should be an instance of type "('a : any mod global)"
-       The kind of string t is immutable_data & immutable_data
-         because of the definition of t at line 2, characters 0-47.
-       But the kind of string t must be a subkind of any mod global
-         because of the definition of needs_any_mod_global at line 4, characters 0-47.
 |}]
 
 type ('a : any mod external_) t
@@ -2341,10 +2332,9 @@ Lines 1-6, characters 0-30:
 4 |     c : #(int64# * #(float# * (bool -> bool) * 'b ));
 5 |     d : char }
 6 |   constraint 'b = int * string
-Error: The kind of type "record" is value non_float mod immutable with 'a
-         because it's a boxed record type.
-       But the kind of type "record" must be a subkind of value mod portable
-         because of the annotation on the declaration of the type record.
+Error: This type definition does not satisfy its kind annotation
+         value mod portable,
+       because functions are not mod portable.
 |}]
 
 (****************************************************************************)

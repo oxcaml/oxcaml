@@ -18,6 +18,8 @@ let vec256 v = v |> Vector_types.Vec256.Bit_pattern.to_bits
 
 let vec512 v = v |> Vector_types.Vec512.Bit_pattern.to_bits
 
+let mask v = v |> Vector_types.Mask.Bit_pattern.to_bits
+
 let targetint i = i |> Targetint_32_64.to_int64
 
 let depth_or_infinity (d : int Or_infinity.t) : Fexpr.rec_info =
@@ -64,6 +66,7 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Boxed_vec128 -> Boxed_vec128
   | Boxed_vec256 -> Boxed_vec256
   | Boxed_vec512 -> Boxed_vec512
+  | Boxed_mask -> Boxed_mask
   | Tagged_immediate -> Tagged_immediate
   | Variant { consts; non_consts } -> variant_subkind consts non_consts
   | Float_array -> Float_array
@@ -81,6 +84,7 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Unboxed_vec128_array -> Unboxed_vec128_array
   | Unboxed_vec256_array -> Unboxed_vec256_array
   | Unboxed_vec512_array -> Unboxed_vec512_array
+  | Unboxed_mask_array -> Unboxed_mask_array
   | Unboxed_product_array -> Unboxed_product_array
 
 and variant_subkind consts non_consts : Fexpr.subkind =
@@ -158,6 +162,7 @@ let const c : Fexpr.const =
     Naked_vec256 (Vector_types.Vec256.Bit_pattern.to_bits bits)
   | Naked_vec512 bits ->
     Naked_vec512 (Vector_types.Vec512.Bit_pattern.to_bits bits)
+  | Naked_mask bits -> Naked_mask (Vector_types.Mask.Bit_pattern.to_bits bits)
   | Naked_nativeint i -> Naked_nativeint (i |> targetint)
   | Null -> Null
   | Poison (kind, name) ->
@@ -194,14 +199,14 @@ let alloc_mode_for_allocations env (alloc : Alloc_mode.For_allocations.t) :
 let alloc_mode_for_applications env (alloc : Alloc_mode.For_applications.t) :
     Fexpr.region Fexpr.alloc_mode_for_applications =
   match alloc with
-  | Heap { alloc_region } ->
+  | Not_alloc_stack { alloc_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
-    Heap { alloc_region }
-  | Local { alloc_region; region; ghost_region } ->
+    Not_alloc_stack { alloc_region }
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     let alloc_region = Env.find_region_exn env alloc_region in
     let region = Env.find_region_exn env region in
     let ghost_region = Env.find_region_exn env ghost_region in
-    Local { alloc_region; region; ghost_region }
+    Maybe_alloc_stack { alloc_region; region; ghost_region }
 
 let prim env (p : Flambda_primitive.t) : Fexpr.prim =
   let p, args = Fexpr_prim.OfFlambda.prim env p in
@@ -281,6 +286,7 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
   | Boxed_vec128 i -> Boxed_vec128 (or_variable vec128 env i)
   | Boxed_vec256 i -> Boxed_vec256 (or_variable vec256 env i)
   | Boxed_vec512 i -> Boxed_vec512 (or_variable vec512 env i)
+  | Boxed_mask i -> Boxed_mask (or_variable mask env i)
   | Immutable_float_block elements ->
     Immutable_float_block (List.map (or_variable float env) elements)
   | Immutable_float_array elements ->
@@ -307,8 +313,9 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
     Immutable_vec256_array (List.map (or_variable vec256 env) elements)
   | Immutable_vec512_array elements ->
     Immutable_vec512_array (List.map (or_variable vec512 env) elements)
+  | Immutable_mask_array elements ->
+    Immutable_mask_array (List.map (or_variable mask env) elements)
   | Empty_array array_kind -> Empty_array array_kind
-  | Mutable_string { initial_value } -> Mutable_string { initial_value }
   | Immutable_string s -> Immutable_string s
 
 let inlining_state (is : Inlining_state.t) : Fexpr.inlining_state option =
@@ -472,10 +479,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
             let closure_var, env = Env.bind_var env my_closure in
             let (region_vars : _ Fexpr.alloc_mode_for_applications), env =
               match my_alloc_mode with
-              | Heap { alloc_region } ->
+              | Not_alloc_stack { alloc_region } ->
                 let alloc_region, env = Env.bind_var env alloc_region in
-                Heap { alloc_region }, env
-              | Local
+                Not_alloc_stack { alloc_region }, env
+              | Maybe_alloc_stack
                   { alloc_region = my_alloc_region;
                     region = my_region;
                     ghost_region = my_ghost_region
@@ -483,7 +490,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
                 let alloc_region, env = Env.bind_var env my_alloc_region in
                 let region, env = Env.bind_var env my_region in
                 let ghost_region, env = Env.bind_var env my_ghost_region in
-                Local { alloc_region; region; ghost_region }, env
+                Maybe_alloc_stack { alloc_region; region; ghost_region }, env
             in
             let depth_var, env = Env.bind_var env my_depth in
             let body = expr env body in
@@ -500,10 +507,10 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
       let code_size =
         Code.cost_metrics code |> Cost_metrics.size |> Code_size.to_int
       in
-      let result_mode : Fexpr.alloc_mode_for_assignments =
+      let result_mode : Fexpr.alloc_mode_for_return =
         match Code.result_mode code with
-        | Alloc_heap -> Heap
-        | Alloc_local -> Local
+        | Not_alloc_stack -> Not_alloc_stack
+        | Maybe_alloc_stack -> Maybe_alloc_stack
       in
       Code
         { id = code_id;
@@ -634,7 +641,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   in
   let args = List.map (simple env) (Apply_expr.args app) in
   let alloc_mode =
-    alloc_mode_for_applications env (Apply_expr.alloc_mode app)
+    alloc_mode_for_applications env (Apply_expr.return_mode app)
   in
   let call_kind : Fexpr.call_kind =
     match Apply_expr.call_kind app with

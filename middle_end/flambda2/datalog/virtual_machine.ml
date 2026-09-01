@@ -29,7 +29,7 @@ struct
     | Stack_nil : nil stack
     | Stack_cons :
         'a Iterator.t
-        * 'a option Channel.sender
+        * 'a Channel.or_null_sender
         * ('a -> 's) continuation
         * 's stack
         -> ('a -> 's) stack
@@ -41,7 +41,7 @@ struct
     | Up : ('x, 's) instruction -> ('x, 'a -> 's) instruction
     | Dispatch : ('a, 'b -> 's) instruction
     | Seek :
-        'b option Channel.receiver
+        'b Channel.or_null_receiver
         * 'b Iterator.t
         * ('a, 's) instruction
         * string
@@ -49,7 +49,7 @@ struct
         -> ('a, 's) instruction
     | Open :
         'b Iterator.t
-        * 'b option Channel.sender
+        * 'b Channel.or_null_sender
         * ('a, 'b -> 's) instruction
         * ('a, 'b -> 's) instruction
         * string
@@ -59,7 +59,7 @@ struct
     | Call :
         ('c -> 'b Constant.hlist -> unit)
         * 'c
-        * 'b Option_receiver.hlist
+        * 'b Or_null_receiver.hlist
         * ('a, 's) instruction
         * string
         * string list
@@ -129,11 +129,11 @@ struct
   let[@inline always] dispatch ~advance (stack : (_ -> _) stack) =
     let (Stack_cons (iterator, cell, level, next_stack)) = stack in
     match Iterator.current iterator with
-    | Some current_key ->
+    | This _ as current_key ->
       Iterator.accept iterator;
-      Channel.send cell (Some current_key);
+      Channel.send_or_null cell current_key;
       level stack
-    | None -> advance next_stack
+    | Null -> advance next_stack
 
   let[@loop] rec advance : type s. s continuation =
    fun stack ->
@@ -157,21 +157,23 @@ struct
         Iterator.init iterator;
         execute k (Stack_cons (iterator, cell, execute for_each, stack))
       | Seek (key_ref, iterator, k, _key_ref_name, _iterator_name) -> (
-        let key = Option.get (Channel.recv key_ref) in
-        Iterator.init iterator;
-        Iterator.seek iterator key;
-        match Iterator.current iterator with
-        | Some current_key when Iterator.equal_key iterator current_key key ->
-          Iterator.accept iterator;
-          execute k stack
-        | None | Some _ -> advance stack)
+        match Channel.recv_or_null key_ref with
+        | Null -> Misc.fatal_error "datalog: seek key must be bound"
+        | This key -> (
+          Iterator.init iterator;
+          Iterator.seek iterator key;
+          match Iterator.current iterator with
+          | This current_key when Iterator.equal_key iterator current_key key ->
+            Iterator.accept iterator;
+            execute k stack
+          | Null | This _ -> advance stack))
       | Dispatch -> dispatch ~advance stack
       | Action (op, k) -> (
         match (evaluate [@inlined hint]) op with
         | Accept -> execute k stack
         | Skip -> advance stack)
       | Call (f, ctx, rs, k, _name, _names) ->
-        f ctx (Option_receiver.recv rs);
+        f ctx (Or_null_receiver.recv_hlist rs);
         execute k stack
     in
     execute instruction

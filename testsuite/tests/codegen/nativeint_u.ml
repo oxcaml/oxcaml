@@ -27,13 +27,10 @@ sub:
   ret
 |}]
 
-(* CR ttebbi: This should use the neg instruction. *)
 let neg x = Nativeint_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  movq  %rax, %rbx
-  xorl  %eax, %eax
-  subq  %rbx, %rax
+  neg   %rax
   ret
 |}]
 

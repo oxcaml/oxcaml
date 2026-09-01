@@ -26,6 +26,7 @@
  ******************************************************************************)
 
 open Lambda
+module Fmt = Format_doc
 
 module Or_missing = struct
   type 'a t =
@@ -51,6 +52,47 @@ end
 
 open Or_missing.Syntax
 
+module Template_id = struct
+  (* The owner+stamp combination is globally unique (at least within one linked
+     unit). This fact is used to guarantee that the symbol names are unique. *)
+  type t =
+    { owner : Compilation_unit.t option;
+      stamp : int;
+      name : Slambdaident.t option
+    }
+
+  let stamp = ref 0
+
+  let create ~owner ~name =
+    let t = { owner; stamp = !stamp; name } in
+    incr stamp;
+    t
+
+  let print ppf t =
+    Fmt.fprintf ppf "%a/%a/%i"
+      (Fmt.pp_print_option Compilation_unit.print)
+      t.owner
+      (Fmt.pp_print_option (fun ppf id ->
+           Fmt.pp_print_string ppf (Slambdaident.name id)))
+      t.name t.stamp
+
+  let equal t1 t2 =
+    t1.stamp = t2.stamp && Option.equal Compilation_unit.equal t1.owner t2.owner
+
+  let hash t =
+    match t.owner with
+    | Some owner -> Hashtbl.hash (Compilation_unit.hash owner, t.stamp)
+    | None -> t.stamp
+
+  module Tbl = Hashtbl.Make (struct
+    type nonrec t = t
+
+    let equal = equal
+
+    let hash = hash
+  end)
+end
+
 module rec Types : sig
   type closure =
     { clo_params : Slambdaident.t array;
@@ -67,9 +109,61 @@ module rec Types : sig
     | SLVhalves of halves
     | SLVlayout of layout
     | SLVrecord of value Or_missing.t array
-    | SLVclosure of closure
-end =
-  Types
+    | SLVclosure of Template_id.t
+
+  val print_closure : Fmt.formatter -> closure -> unit
+
+  val print_value_or_missing : Fmt.formatter -> value Or_missing.t -> unit
+end = struct
+  type closure =
+    { clo_params : Slambdaident.t array;
+      clo_body : slambda;
+      clo_env : Env.t
+    }
+
+  type halves =
+    { slv_comptime : value Or_missing.t;
+      slv_runtime : lambda
+    }
+
+  and value =
+    | SLVhalves of halves
+    | SLVlayout of layout
+    | SLVrecord of value Or_missing.t array
+    | SLVclosure of Template_id.t
+
+  let print_closure ppf { clo_params; clo_body; clo_env = _ } =
+    let print_params ppf =
+      Array.iter
+        (fun id ->
+          Fmt.fprintf ppf "%a@ " (Fmt.deprecated Slambdaident.print) id)
+        clo_params
+    in
+    Fmt.fprintf ppf "@[<2>(closure ⟨env⟩@ @[<2>%t->@]@ %a)@]" print_params
+      (Fmt.deprecated Printlambda.slambda)
+      clo_body
+
+  let rec print_value ppf = function
+    | SLVhalves { slv_comptime; slv_runtime } ->
+      Fmt.fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]" print_value_or_missing
+        slv_comptime
+        (Fmt.deprecated Printlambda.lambda)
+        slv_runtime
+    | SLVlayout layout ->
+      Fmt.fprintf ppf "⟪%a⟫" (Fmt.deprecated Printlambda.layout) layout
+    | SLVrecord fields ->
+      let print_fields ppf =
+        Array.iter
+          (fun field -> Fmt.fprintf ppf "@ %a;" print_value_or_missing field)
+          fields
+      in
+      Fmt.fprintf ppf "@[<hv 2>[%t@;<1 -2>]@]" print_fields
+    | SLVclosure id -> Template_id.print ppf id
+
+  and print_value_or_missing ppf = function
+    | Or_missing.Missing -> Fmt.fprintf ppf "(missing)"
+    | Or_missing.Present v -> print_value ppf v
+end
 
 and Env : sig
   type t
@@ -98,7 +192,174 @@ end = struct
   let find t id = Map.find_opt id t |> Or_missing.of_option
 end
 
+module Template_store = struct
+  type t = Types.closure Template_id.Tbl.t
+
+  let empty () = Template_id.Tbl.create 10
+
+  let add t ~cu ~name closure =
+    let id = Template_id.create ~owner:cu ~name in
+    Template_id.Tbl.add t id closure;
+    id
+
+  let find_template t id = Template_id.Tbl.find_opt t id
+
+  let print ppf t =
+    if Template_id.Tbl.length t = 0
+    then ()
+    else begin
+      Template_id.Tbl.iter
+        (fun id closure ->
+          Fmt.fprintf ppf "@ @[<2>(%a@ %a)@]" Template_id.print id
+            Types.print_closure closure)
+        t
+    end
+end
+
+module Mangling : sig
+  val symbol_arg_of_value : Types.value -> string
+end = struct
+  let symbol_arg_of_value_kind_non_null = function
+    | Pintval -> "immediate"
+    | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _ | Parrayval _
+    | Pboxedvectorval _ | Pboxedmaskval ->
+      "value"
+
+  let rec symbol_arg_of_value_kind { raw_kind; nullable } =
+    let kind = symbol_arg_of_value_kind_non_null raw_kind in
+    let nullable =
+      match nullable with Nullable -> "_or_null" | Non_nullable -> ""
+    in
+    kind ^ nullable
+
+  and symbol_arg_of_unboxed_float = function
+    | Unboxed_float64 -> "float64"
+    | Unboxed_float32 -> "float32"
+
+  and symbol_arg_of_unboxed_or_untagged_integer = function
+    | Unboxed_int64 -> "int64"
+    | Unboxed_nativeint -> "nativeint"
+    | Unboxed_int32 -> "int32"
+    | Untagged_int16 -> "int16"
+    | Untagged_int8 -> "int8"
+    | Untagged_int -> "int"
+
+  and symbol_arg_of_unboxed_vector = function
+    | Unboxed_vec128 -> "vec128"
+    | Unboxed_vec256 -> "vec256"
+    | Unboxed_vec512 -> "vec512"
+
+  and symbol_arg_of_unboxed_product layouts =
+    (* CR layout poly: this should be synced up with unarize. *)
+    "(" ^ String.concat "_" (List.map symbol_arg_of_layout layouts) ^ ")"
+
+  and symbol_arg_of_layout = function
+    | Pvalue vk -> symbol_arg_of_value_kind vk
+    | Punboxed_float uf -> symbol_arg_of_unboxed_float uf
+    | Punboxed_or_untagged_integer ui ->
+      symbol_arg_of_unboxed_or_untagged_integer ui
+    | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
+    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
+    | Punboxed_mask -> "mask"
+    | Ptop | Pbottom | Psplicevar _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
+
+  let symbol_arg_of_value (v : Types.value) =
+    match v with
+    | SLVlayout l -> symbol_arg_of_layout l
+    | SLVhalves _ | SLVrecord _ | SLVclosure _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected value"
+end
+
+module CU_data = struct
+  type t =
+    { templates : Template_store.t;
+      cu : Types.value Or_missing.t
+    }
+
+  type raw = File_sections.Idx.t
+
+  let empty () = { templates = Template_store.empty (); cu = Missing }
+
+  let read raw ~sections = Obj.obj (File_sections.get sections raw)
+
+  let write t ~sections = File_sections.Builder.add sections (Obj.repr t)
+
+  let print ppf { templates; cu } =
+    Fmt.fprintf ppf "@[<v 0>%a%a@]" Types.print_value_or_missing cu
+      Template_store.print templates
+end
+
+module Ctx = struct
+  type t =
+    { cu_static_data : Compilation_unit.t -> CU_data.t option;
+      store : Template_store.t;
+      mutable instantiated_template_ids : Ident.Set.t;
+      mutable instantiations : (Ident.t * lambda) list
+    }
+
+  let create ~cu_static_data =
+    let cu_data_cache = Compilation_unit.Tbl.create 0 in
+    { cu_static_data =
+        (fun cu -> Compilation_unit.Tbl.memoize cu_data_cache cu_static_data cu);
+      store = Template_store.empty ();
+      instantiated_template_ids = Ident.Set.empty;
+      instantiations = []
+    }
+
+  let cu_static_data t cu =
+    match t.cu_static_data cu with
+    | Some { cu; _ } -> cu
+    | None -> Or_missing.Missing
+
+  (** Instantiate a template. This is memoized so if this template has already
+      been instantiated with these arguments it just returns the previously
+      computed results, otherwise it uses [eval_apply] to evaluate the closure.
+      The returned runtime half is a reference to the instantiated function. *)
+  let instantiate t ~eval_apply (id : Template_id.t) args :
+      Types.value Or_missing.t =
+    let closure =
+      match Template_store.find_template t.store id with
+      | Some closure -> closure
+      | None -> (
+        let cu_data = Option.bind id.owner t.cu_static_data in
+        let closure =
+          Option.bind cu_data (fun { CU_data.templates; _ } ->
+              Template_store.find_template templates id)
+        in
+        match closure with
+        | Some closure -> closure
+        | None ->
+          Misc.fatal_errorf_doc "Template not found: %a" Template_id.print id)
+    in
+    let arg_names =
+      Array.map Mangling.symbol_arg_of_value args |> Array.to_list
+    in
+    let name =
+      Fmt.asprintf "%a_%a" Template_id.print id
+        (Fmt.pp_print_list
+           ~pp_sep:(fun ppf () -> Fmt.pp_print_string ppf "_")
+           Fmt.pp_print_string)
+        arg_names
+      |> Ident.create_persistent
+    in
+    if not (Ident.Set.mem name t.instantiated_template_ids)
+    then begin
+      (* f might recursively call this function so make sure to mark this name
+         as visited before calling it. *)
+      t.instantiated_template_ids
+        <- Ident.Set.add name t.instantiated_template_ids;
+      let lam = eval_apply closure args in
+      t.instantiations <- (name, lam) :: t.instantiations
+    end;
+    Present (SLVhalves { slv_comptime = Missing; slv_runtime = Lvar name })
+
+  let instantiations t = t.instantiations
+end
+
 include Types
+
+type closure = Template_id.t
 
 let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
@@ -106,7 +367,7 @@ type _ value_type =
   | Thalves : halves value_type
   | Tlayout : layout value_type
   | Trecord : value Or_missing.t array value_type
-  | Tclosure : closure value_type
+  | Tclosure : Template_id.t value_type
 
 let describe_value_type (type a) : a value_type -> string = function
   | Thalves -> "program"
@@ -146,50 +407,58 @@ let expect (type a) ?reason (vty : a value_type) (v : value) : a =
 let expect_not_missing (a : 'a Or_missing.t) : 'a =
   match a with Present a -> a | Missing -> errf "unexpected missing value"
 
-let rec eval_slam env slam : value Or_missing.t =
+let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
   match slam with
   | SLhalves { sval_comptime; sval_runtime } ->
-    let slv_comptime = eval_slam env sval_comptime in
-    let slv_runtime = eval_lam env sval_runtime in
+    let slv_comptime = eval_slam ?name ctx env sval_comptime in
+    let slv_runtime = eval_lam ctx env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
-  | SLlayout layout -> Present (SLVlayout layout)
-  | SLglobal _ -> errf "cross-module eval not implemented"
+  | SLlayout layout -> Present (SLVlayout (eval_layout env layout))
+  | SLglobal cu -> Ctx.cu_static_data ctx cu
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
-    let value = eval_slam env slet_value in
+    let value = eval_slam ~name:slet_name ctx env slet_value in
     let env_body = Env.add env slet_name value in
-    eval_slam env_body slet_body
+    eval_slam ?name ctx env_body slet_body
   | SLmissing -> Missing
   | SLrecord slams ->
-    let values = Array.map (eval_slam env) (Array.of_list slams) in
+    let values = Array.map (eval_slam ctx env) (Array.of_list slams) in
     Present (SLVrecord values)
   | SLfield (slam, i) ->
-    let* fields = eval_slam env slam |>> expect Trecord in
+    let* fields = eval_slam ctx env slam |>> expect Trecord in
     fields.(i)
   | SLproj_comptime slam ->
-    let* halves = eval_slam env slam |>> expect Thalves in
+    let* halves = eval_slam ?name ctx env slam |>> expect Thalves in
     halves.slv_comptime
   | SLtemplate { sfun_params; sfun_body } ->
-    Present
-      (SLVclosure
-         { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
-  | SLinstantiate { sapp_func; sapp_arguments } ->
     let closure =
-      eval_slam env sapp_func |> expect_not_missing |> expect Tclosure
+      { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
     in
-    let eval_arg arg = eval_slam env arg |> expect_not_missing in
-    let args = Array.map eval_arg sapp_arguments in
-    let { clo_params; clo_body; clo_env } = closure in
-    let env_body =
-      Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+    let cu = Current_unit.get_cu () in
+    let closure_id = Template_store.add ctx.store ~cu ~name closure in
+    Present (SLVclosure closure_id)
+  | SLinstantiate { sapp_func; sapp_args } ->
+    let closure =
+      eval_slam ctx env sapp_func |> expect_not_missing |> expect Tclosure
     in
-    eval_slam env_body clo_body
+    let eval_arg arg = eval_slam ctx env arg |> expect_not_missing in
+    let args = Array.map eval_arg sapp_args in
+    Ctx.instantiate ctx closure args
+      ~eval_apply:(fun { clo_params; clo_body; clo_env } args ->
+        let env_body =
+          Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+        in
+        let { slv_comptime = _; slv_runtime } =
+          eval_slam ctx env_body clo_body
+          |> expect_not_missing |> expect Thalves
+        in
+        slv_runtime)
 
 and eval_var env id = Env.find env id
 
-and eval_lam env lam = Lambda.map (eval_lam_shallow env) lam
+and eval_lam ctx env lam = Lambda.map (eval_lam_shallow ctx env) lam
 
-and eval_lam_shallow env lam =
+and eval_lam_shallow ctx env lam =
   match lam with
   | Lconst old_const ->
     let new_const = eval_structured_const env old_const in
@@ -200,6 +469,7 @@ and eval_lam_shallow env lam =
         ap_result_layout = old_result_layout;
         ap_region_close;
         ap_mode;
+        ap_yielding;
         ap_loc;
         ap_tailcall;
         ap_inlined;
@@ -216,6 +486,7 @@ and eval_lam_shallow env lam =
           ap_result_layout = new_result_layout;
           ap_region_close;
           ap_mode;
+          ap_yielding;
           ap_loc;
           ap_tailcall;
           ap_inlined;
@@ -280,17 +551,25 @@ and eval_lam_shallow env lam =
     if new_layout == old_layout
     then lam
     else Lifthenelse (cond, iftrue, iffalse, new_layout)
-  | Lsend (kind, met, obj, args, region_close, mode, loc, old_layout) ->
+  | Lsend (kind, met, obj, args, region_close, mode, loc, old_layout, yielding)
+    ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
     then lam
-    else Lsend (kind, met, obj, args, region_close, mode, loc, new_layout)
+    else
+      Lsend (kind, met, obj, args, region_close, mode, loc, new_layout, yielding)
   | Lregion (body, old_layout) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then lam else Lregion (body, new_layout)
   | Lsplice (_loc, slam) ->
-    let halves = eval_slam env slam |> expect_not_missing |> expect Thalves in
+    let halves =
+      eval_slam ctx env slam |> expect_not_missing |> expect Thalves
+    in
     halves.slv_runtime
+  | Lkindtemplate _ | Lkindinstantiate _ ->
+    (* These constructors only exist in tlambda, fracturing has removed them
+       (and replaced them with SLtemplate and SLinstantiate). *)
+    Lambda.fatal_error_invalid_constructor lam
   | Lvar _ | Lmutvar _
   | Lstaticraise (_, _)
   | Lsequence (_, _)
@@ -346,29 +625,27 @@ and eval_mixed_block_element :
  fun env element ->
   match element with
   | Splice_variable id ->
-    eval_var env (id |> Slambdaident.of_ident)
-    |> expect_not_missing |> expect Tlayout |> mixed_block_element_of_layout
+    eval_var env id |> expect_not_missing |> expect Tlayout
+    |> mixed_block_element_of_layout
   | Product old_elements ->
     let new_elements =
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
     in
     if new_elements == old_elements then element else Product new_elements
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     element
 
 and eval_layout env layout =
   match layout with
-  | Psplicevar id ->
-    eval_var env (id |> Slambdaident.of_ident)
-    |> expect_not_missing |> expect Tlayout
+  | Psplicevar id -> eval_var env id |> expect_not_missing |> expect Tlayout
   | Punboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
     in
     if new_layouts == old_layouts then layout else Punboxed_product new_layouts
   | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Pbottom ->
+  | Punboxed_vector _ | Punboxed_mask | Pbottom ->
     layout
 
 and eval_lfunction_shallow env
@@ -442,12 +719,14 @@ and eval_prim env prim =
   | Pobj_magic old_layout ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pobj_magic new_layout
-  | Pget_idx (old_layout, mut) ->
+  | Pget_idx (old_layout, access) ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout then prim else Pget_idx (new_layout, mut)
-  | Pset_idx (old_layout, mode) ->
+    if new_layout == old_layout then prim else Pget_idx (new_layout, access)
+  | Pset_idx (old_layout, mode, atomicity) ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout then prim else Pset_idx (new_layout, mode)
+    if new_layout == old_layout
+    then prim
+    else Pset_idx (new_layout, mode, atomicity)
   | Pget_ptr (old_layout, mut) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pget_ptr (new_layout, mut)
@@ -475,28 +754,31 @@ and eval_prim env prim =
   | Pbigarraydim _ | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
   | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
   | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _
-  | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
-  | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
-  | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_load_i8 _
+  | Pstring_load_mask _ | Pbytes_load_32 _ | Pbytes_load_f32 _
+  | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_load_mask _ | Pbytes_set_8 _
+  | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _
+  | Pbytes_set_vec _ | Pbigstring_load_i8 _ | Pbytes_set_mask _
   | Pbigstring_load_i16 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
   | Pbigstring_load_f32 _ | Pbigstring_load_64 _ | Pbigstring_load_vec _
-  | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
-  | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-  | Pfloatarray_load_vec _ | Pint_array_load_vec _
-  | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
-  | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
-  | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
-  | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
-  | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
-  | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
-  | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
-  | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
-  | Pctconst _ | Pint_as_pointer _ | Patomic_load_field _ | Patomic_set_field _
-  | Patomic_exchange_field _ | Patomic_compare_exchange_field _
-  | Patomic_compare_set_field _ | Patomic_fetch_add_field | Patomic_add_field
-  | Patomic_sub_field | Patomic_land_field | Patomic_lor_field
-  | Patomic_lxor_field | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit
-  | Punbox_vector _ | Pbox_vector _ | Pjoin_vec256 | Psplit_vec256
+  | Pbigstring_load_mask _ | Pbigstring_set_8 _ | Pbigstring_set_16 _
+  | Pbigstring_set_32 _ | Pbigstring_set_f32 _ | Pbigstring_set_64 _
+  | Pbigstring_set_vec _ | Pbigstring_set_mask _ | Pfloatarray_load_vec _
+  | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
+  | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
+  | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
+  | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
+  | Pfloatarray_set_vec _ | Pint_array_set_vec _
+  | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
+  | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+  | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
+  | Patomic_load_field _ | Patomic_load_mixed_field _ | Patomic_set_field _
+  | Patomic_set_mixed_field _ | Patomic_exchange_field _
+  | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
+  | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
+  | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
+  | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit | Punbox_vector _
+  | Pbox_vector _ | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
@@ -511,7 +793,7 @@ exception Found_a_splice
 let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Psplicevar _ -> raise Found_a_splice
   | Ptop | Pbottom | Pvalue _ | Punboxed_float _
-  | Punboxed_or_untagged_integer _ | Punboxed_vector _ ->
+  | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask ->
     ()
   | Punboxed_product layouts ->
     List.iter assert_layout_contains_no_splices layouts
@@ -520,7 +802,7 @@ let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
   | Splice_variable _ -> raise Found_a_splice
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-  | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     ()
   | Product elements ->
     Array.iter assert_mixed_block_element_contains_no_splices elements
@@ -533,7 +815,7 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Popaque layout | Pobj_magic layout ->
     assert_layout_contains_no_splices layout
   | Pget_idx (layout, _)
-  | Pset_idx (layout, _)
+  | Pset_idx (layout, _, _)
   | Pget_ptr (layout, _)
   | Pset_ptr (layout, _)
   | Pget_ext_ptr (layout, _)
@@ -581,23 +863,36 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Ltrywith (_, _, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lifthenelse (_, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lsequence _ | Lwhile _ | Lfor _ | Lassign _ -> ()
-  | Lsend (_, _, _, _, _, _, _, layout) ->
+  | Lsend (_, _, _, _, _, _, _, layout, _) ->
     assert_layout_contains_no_splices layout
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Found_a_splice);
+  | Lsplice _ -> raise Found_a_splice
+  | Lkindtemplate _ | Lkindinstantiate _ ->
+    Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
-let do_eval slam =
-  eval_slam Env.empty slam |> expect_not_missing
-  |> expect Thalves ~reason:"toplevel module"
+let do_eval (ctx : Ctx.t) slam =
+  let { slv_comptime; slv_runtime } =
+    eval_slam ctx Env.empty slam
+    |> expect_not_missing
+    |> expect Thalves ~reason:"toplevel module"
+  in
+  let lambda =
+    List.fold_left
+      (fun lam (id, def) ->
+        Llet (Strict, layout_function, id, debug_uid_none, def, lam))
+      slv_runtime (Ctx.instantiations ctx)
+  in
+  { slv_comptime; slv_runtime = lambda }
 
-let eval slam =
+let eval ~cu_static_data slam =
   Profile.record_call "static_eval" (fun () ->
-      let halves = do_eval slam in
-      (try assert_no_splices halves.slv_runtime
+      let ctx = Ctx.create ~cu_static_data in
+      let { slv_comptime; slv_runtime } = do_eval ctx slam in
+      (try assert_no_splices slv_runtime
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      halves)
+      { CU_data.templates = ctx.store; cu = slv_comptime }, slv_runtime)

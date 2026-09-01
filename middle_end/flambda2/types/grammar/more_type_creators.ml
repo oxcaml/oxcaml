@@ -32,6 +32,7 @@ let unknown (kind : K.t) =
   | Naked_number Naked_vec128 -> TG.any_naked_vec128
   | Naked_number Naked_vec256 -> TG.any_naked_vec256
   | Naked_number Naked_vec512 -> TG.any_naked_vec512
+  | Naked_number Naked_mask -> TG.any_naked_mask
   | Rec_info -> TG.any_rec_info
   | Region -> TG.any_region
 
@@ -54,6 +55,7 @@ let bottom (kind : K.t) =
   | Naked_number Naked_vec128 -> TG.bottom_naked_vec128
   | Naked_number Naked_vec256 -> TG.bottom_naked_vec256
   | Naked_number Naked_vec512 -> TG.bottom_naked_vec512
+  | Naked_number Naked_mask -> TG.bottom_naked_mask
   | Rec_info -> TG.bottom_rec_info
   | Region -> TG.bottom_region
 
@@ -80,6 +82,8 @@ let these_naked_vec128s vs = TG.these_naked_vec128s vs
 let these_naked_vec256s vs = TG.these_naked_vec256s vs
 
 let these_naked_vec512s vs = TG.these_naked_vec512s vs
+
+let these_naked_masks vs = TG.these_naked_masks vs
 
 let any_tagged_immediate =
   TG.create_variant ~is_unique:false ~immediates:Unknown
@@ -138,6 +142,8 @@ let this_boxed_vec256 i alloc_mode =
 
 let this_boxed_vec512 i alloc_mode =
   TG.box_vec512 (TG.this_naked_vec512 i) alloc_mode
+
+let this_boxed_mask i alloc_mode = TG.box_mask (TG.this_naked_mask i) alloc_mode
 
 let these_boxed_float32s fs alloc_mode =
   TG.box_float32 (these_naked_float32s fs) alloc_mode
@@ -199,6 +205,10 @@ let any_boxed_vec256_non_null =
 
 let any_boxed_vec512_non_null =
   TG.Head_of_kind_value_non_null.create_boxed_vec512 TG.any_naked_vec512
+    (Alloc_mode.For_types.unknown ())
+
+let any_boxed_mask_non_null =
+  TG.Head_of_kind_value_non_null.create_boxed_mask TG.any_naked_mask
     (Alloc_mode.For_types.unknown ())
 
 let any_block =
@@ -443,6 +453,7 @@ let type_for_const const =
   | Naked_vec128 n -> TG.this_naked_vec128 n
   | Naked_vec256 n -> TG.this_naked_vec256 n
   | Naked_vec512 n -> TG.this_naked_vec512 n
+  | Naked_mask n -> TG.this_naked_mask n
   | Null -> TG.null
   | Poison (kind, _) ->
     (* CR ncourant: for now [Poison] has the conservative type "unknown"; but
@@ -490,6 +501,7 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
   | Naked_number Naked_vec128 -> TG.any_naked_vec128
   | Naked_number Naked_vec256 -> TG.any_naked_vec256
   | Naked_number Naked_vec512 -> TG.any_naked_vec512
+  | Naked_number Naked_mask -> TG.any_naked_mask
   | Rec_info -> TG.any_rec_info
   | Region -> TG.any_region
   | Value ->
@@ -504,6 +516,7 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
       | Boxed_vec128 -> Ok any_boxed_vec128_non_null
       | Boxed_vec256 -> Ok any_boxed_vec256_non_null
       | Boxed_vec512 -> Ok any_boxed_vec512_non_null
+      | Boxed_mask -> Ok any_boxed_mask_non_null
       | Tagged_immediate -> Ok any_tagged_immediate_non_null
       | Variant { consts; non_consts } ->
         let const_ctors = these_naked_immediates consts in
@@ -579,6 +592,11 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
         Ok
           (mutable_array_non_null
              ~element_kind:(Ok Flambda_kind.With_subkind.naked_vec512)
+             ~length:any_tagged_immediate alloc_mode)
+      | Unboxed_mask_array ->
+        Ok
+          (mutable_array_non_null
+             ~element_kind:(Ok Flambda_kind.With_subkind.naked_mask)
              ~length:any_tagged_immediate alloc_mode)
       | Unboxed_product_array ->
         Ok

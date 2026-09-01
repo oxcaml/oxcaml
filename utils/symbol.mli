@@ -23,9 +23,6 @@ type t
 (* For predefined exception identifiers. *)
 val for_predef_ident : Ident.t -> t
 
-(** It is assumed that the provided [Ident.t] is in the current unit. *)
-val for_local_ident : Ident.t -> t
-
 (** To be avoided if possible. Linkage names are intended to be generated
     by this module. *)
 val unsafe_create : Compilation_unit.t -> Linkage_name.t -> t
@@ -39,8 +36,6 @@ val for_structured_mangling_path :
     t
 
 val for_compilation_unit : Compilation_unit.t -> t
-val for_current_unit : unit -> t
-val for_new_const_in_current_unit : unit -> t
 
 val compilation_unit : t -> Compilation_unit.t
 

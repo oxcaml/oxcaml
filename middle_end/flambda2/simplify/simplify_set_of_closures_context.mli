@@ -31,7 +31,7 @@ val create :
   value_slot_types_all_sets:T.t Value_slot.Map.t list ->
   t
 
-val create_for_stub :
+val create_for_static_stub :
   DA.t ->
   all_code:Code.t Code_id.Map.t ->
   simplify_function_body:Simplify_common.simplify_function_body ->
@@ -60,3 +60,5 @@ val function_decl_type :
   rec_info:T.t ->
   Code_id.t ->
   Function_type.t Or_unknown.t
+
+val stub_can_be_simplified : DE.t -> bool

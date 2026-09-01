@@ -60,7 +60,7 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
         (use 'ocamlopt -depend -help' for details)"];
     Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
     Compenv.parse_arguments (ref argv) Compenv.anonymous "ocamlopt";
-    Compmisc.read_clflags_from_env ();
+    Location.read_clflags_from_env ();
     (* Set platform-appropriate DWARF fission default when oxcaml-dwarf is
        enabled *)
     if Config.oxcaml_dwarf &&
@@ -103,16 +103,29 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
+<<<<<<< HEAD
                       reaper_rebuild; reaper_solve; Compenv.stop_early;
                       output_c_object]) > 1
+||||||| 0fe1d4a7f5
+                      Compenv.stop_early; output_c_object]) > 1
+=======
+                      functorize;
+                      Compenv.stop_early; output_c_object]) > 1
+>>>>>>> 941c815
     then
     begin
       let module P = Clflags.Compiler_pass in
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
+<<<<<<< HEAD
                          -output-obj, -instantiate, -reaper-rebuild, \
                          -reaper-solve";
+||||||| 0fe1d4a7f5
+                         -output-obj, -instantiate";
+=======
+                         -output-obj, -instantiate, -functorize";
+>>>>>>> 941c815
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -156,6 +169,7 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
       Compiler.instantiate ~src ~args target;
       Warnings.check_fatal ();
     end
+<<<<<<< HEAD
     else if !reaper_rebuild then begin
       Compmisc.init_path ();
       (* CR mvellacott: change validation: should take one .ltosol and many
@@ -203,6 +217,17 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
       in
       let ltosol_file = Compenv.extract_output !output_name in
       reaper_lto_solve ~cmr_files ~ltosol_file;
+||||||| 0fe1d4a7f5
+=======
+    else if !functorize then begin
+      Compmisc.init_path ();
+      let target = Compenv.extract_output !output_name in
+      let input_module_names =
+        Compenv.get_objfiles ~with_ocamlparam:false
+        |> Functorizer.validate_inputs
+      in
+      Compiler.functorize input_module_names target;
+>>>>>>> 941c815
       Warnings.check_fatal ();
     end
     else if !shared then begin

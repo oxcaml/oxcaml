@@ -232,10 +232,10 @@ let classify_expression : Typedtree.expression -> sd =
         Static
 
     | Texp_apply ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
-        _, _, _, _)
+        _, _, _, _, _)
       when is_ref vd ->
         Static
-    | Texp_apply (_, args, _, _, _)
+    | Texp_apply (_, args, _, _, _, _)
       when List.exists is_abstracted_arg args ->
         Static
     | Texp_apply _ ->
@@ -280,9 +280,8 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_try _
     | Texp_override _
     | Texp_letop _
-    (* CR metaprogramming aivaskovic: verify for quotations and splices *)
-    | Texp_quotation _
-    | Texp_antiquotation _ ->
+    | Texp_quote _
+    | Texp_splice _ ->
         Dynamic
     | Texp_typed_hole -> Static
   and classify_value_bindings rec_flag env bindings =
@@ -592,11 +591,6 @@ let option : 'a. ('a -> term_judg) -> 'a option -> term_judg =
 let list : 'a. ('a -> term_judg) -> 'a list -> term_judg =
   fun f li m ->
     List.fold_left (fun env item -> Env.join env (f item m)) Env.empty li
-let listi : 'a. (int -> 'a -> term_judg) -> 'a list -> term_judg =
-  fun f li m ->
-    List.fold_left (fun (idx, env) item -> idx+1, Env.join env (f idx item m))
-      (0, Env.empty) li
-    |> (snd : (int * Env.t) -> Env.t)
 let array : 'a. ('a -> term_judg) -> 'a array -> term_judg =
   fun f ar m ->
     Array.fold_left (fun env item -> Env.join env (f item m)) Env.empty ar
@@ -635,12 +629,12 @@ let array_mode exp =
     (* This is counted as a use, because constructing a generic array
        involves inspecting to decide whether to unbox (PR#6939). *)
     Dereference
-  | Paddrarray | Pgcignorableaddrarray | Pintarray ->
+  | Lambda.Paddrarray | Lambda.Pgcignorableaddrarray | Lambda.Pintarray ->
     (* non-generic, non-float arrays act as constructors *)
     Guard
-  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-  | Punboxedvectorarray _
-  | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+  | Lambda.Punboxedfloatarray _ | Lambda.Punboxedoruntaggedintarray _
+  | Lambda.Punboxedvectorarray _ | Lambda.Punboxedmaskarray
+  | Lambda.Pgcscannableproductarray _ | Lambda.Pgcignorableproductarray _ ->
     Dereference
   | Lambda.Punspecializedarray ->
     Misc.fatal_error "Value_rec_check.array_mode: Punspecializedarray"
@@ -721,7 +715,7 @@ let rec expression : Typedtree.expression -> term_judg =
         single id.txt << Dereference
     | Texp_apply
         ({exp_desc = Texp_ident { desc = vd; kind = Id_prim _; _ }},
-         [_, Arg (arg, _)], _, _, _)
+         [_, Arg (arg, _)], _, _, _, _)
       when is_ref vd ->
       (*
         G |- e: m[Guard]
@@ -729,7 +723,7 @@ let rec expression : Typedtree.expression -> term_judg =
         G |- ref e: m
       *)
       expression arg << Guard
-    | Texp_apply (e, args, _, _, _)  ->
+    | Texp_apply (e, args, _, _, _, _)  ->
         (* [args] may contain omitted arguments, corresponding to labels in
            the function's type that were not passed in the actual application.
            The arguments before the first omitted argument are passed to the
@@ -761,7 +755,7 @@ let rec expression : Typedtree.expression -> term_judg =
       list expression (List.map snd exprs) << Guard
     | Texp_unboxed_tuple exprs ->
       list expression (List.map (fun (_, e, _) -> e) exprs) << Return
-    | Texp_atomic_loc (expr, _, _, _, _) ->
+    | Texp_atomic_loc { record = expr; _ } ->
       expression expr << Guard
     | Texp_array (_, _, exprs, _) ->
       list expression exprs << array_mode exp
@@ -788,27 +782,23 @@ let rec expression : Typedtree.expression -> term_judg =
           path pth << Dereference
         | _ -> empty
       in
-      let arg_mode i = match desc.cstr_repr with
+      let arg_mode = match desc.cstr_repr with
         | Variant_unboxed | Variant_with_null ->
           Return
         | Variant_boxed _ | Variant_extensible ->
            (match shape with
-            | Constructor_uniform_value -> Guard
-            | Constructor_mixed mixed_shape ->
-                (match mixed_shape.(i) with
-                 | Scannable _ | Float_boxed -> Guard
-                 | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-                 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
-                 | Void | Product _ ->
-                   Dereference)
-            | Constructor_variable ->
+            | Constructor_uniform_value
+            | Constructor_mixed _
+            | Constructor_variable _ ->
+              Guard
+            | Constructor_undetermined ->
                 Misc.fatal_error
-                  "value_rec_check: variable constructor representation")
+                  "value_rec_check: unexpected undetermined representation")
       in
-      let arg i (_sort, e) = expression e << arg_mode i in
+      let arg (_sort, e) = expression e << arg_mode in
       join [
         access_constructor;
-        listi arg exprs;
+        list arg exprs;
       ]
     | Texp_variant (_, eo) ->
       (*
@@ -819,33 +809,29 @@ let rec expression : Typedtree.expression -> term_judg =
       option (fun (e, _) -> expression e) eo << Guard
     | Texp_record { fields = es; extended_expression = eo;
                     representation = rep } ->
-        let field_mode i = match rep with
-          | Record_float | Record_ufloat -> Dereference
+        let field_mode =
+          match rep with
+          | Record_float -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
-          | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
+          | Record_boxed | Record_ufloat | Record_mixed _ | Record_variable _
+          | Record_inlined
+              (_, (Constructor_uniform_value | Constructor_mixed _
+                  | Constructor_variable _), _) ->
               Guard
-          | Record_inlined (_, Constructor_mixed mixed_shape, _)
-          | Record_mixed mixed_shape ->
-            (match mixed_shape.(i) with
-             | Scannable _ | Float_boxed -> Guard
-             | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-             | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
-             | Void | Product _ ->
-               Dereference)
           | Record_dummy _ ->
             Misc.fatal_error "value_rec_check: unexpected dummy representation"
-          | Record_inlined (_, Constructor_variable, _)
-          | Record_variable ->
+          | Record_inlined (_, Constructor_undetermined, _)
+          | Record_undetermined ->
             Misc.fatal_error
-              "value_rec_check: unexpected unknown representation"
+              "value_rec_check: unexpected undetermined representation"
         in
-        let field ((label : Data_types.label_description), _sort, field_def) =
+        let field (_, _, field_def) =
           let env =
             match field_def with
             | Kept _ -> empty
             | Overridden (_, e) -> expression e
           in
-          env << field_mode label.lbl_pos
+          env << field_mode
         in
         join [
           array field es;
@@ -854,7 +840,9 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_record_unboxed_product { fields = es; extended_expression = eo;
                                     representation = rep } ->
       begin match rep with
-      | Record_unboxed_product ->
+      | Record_unboxed_product
+      | Record_unboxed_product_undetermined
+      | Record_unboxed_product_variable _ ->
         let field (_, _, field_def) =
           let env =
             match field_def with
@@ -867,9 +855,6 @@ let rec expression : Typedtree.expression -> term_judg =
           array field es;
           option expression (Option.map fst eo) << Dereference
         ]
-      | Record_unboxed_product_variable ->
-        Misc.fatal_error
-          "value_rec_check: unexpected unknown unboxed-product representation"
       end
     | Texp_ifthenelse (cond, ifso, ifnot) ->
       (*
@@ -1115,10 +1100,10 @@ let rec expression : Typedtree.expression -> term_judg =
         expression exp2
       ]
     | Texp_hole _ -> empty
-    | Texp_quotation e ->
+    | Texp_quote e ->
         (* The quoted code may be spliced into a dereferencing context. *)
         expression e << Dereference
-    | Texp_antiquotation e ->
+    | Texp_splice e ->
         expression e << Dereference
 
 (* Function bodies.
@@ -1200,14 +1185,14 @@ and modexp : Typedtree.module_expr -> term_judg =
       path pth
     | Tmod_structure s ->
       structure s
-    | Tmod_functor (_, e) ->
+    | Tmod_functor (_, e, _) ->
       modexp e << Delay
-    | Tmod_apply (f, p, _) ->
+    | Tmod_apply (f, p, _, _, _) ->
       join [
         modexp f << Dereference;
         modexp p << Dereference;
       ]
-    | Tmod_apply_unit f ->
+    | Tmod_apply_unit (f, _) ->
       modexp f << Dereference
     | Tmod_constraint (mexp, _, _, coe) ->
       let rec coercion coe k = match coe with

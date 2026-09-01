@@ -36,6 +36,8 @@ module type S = sig
 
   val name : t -> string
 
+  val canonical_name : t -> string
+
   val kind : t -> Flambda_kind.t
 
   val is_always_immediate : t -> bool
@@ -90,10 +92,18 @@ end) : S = struct
 
     let print ppf t =
       Format.fprintf ppf "@[%t(" P.colour;
+<<<<<<< HEAD
       (* CR mvellacott: We've had to change the implementation here to prevent
          an exception when no CU is set. This change is independent of LTO, so
          could be a separate PR. *)
       if Compilation_unit.is_current t.compilation_unit
+||||||| 0fe1d4a7f5
+      if
+        Compilation_unit.equal t.compilation_unit
+          (Compilation_unit.get_current_exn ())
+=======
+      if Compilation_unit.equal t.compilation_unit (Current_unit.get_cu_exn ())
+>>>>>>> 941c815
       then Format.fprintf ppf "%s/%d" t.name t.name_stamp
       else
         Format.fprintf ppf "%a.%s/%d"
@@ -142,11 +152,13 @@ end) : S = struct
   let in_compilation_unit t compilation_unit =
     Compilation_unit.equal compilation_unit t.compilation_unit
 
-  let is_imported t = not (Compilation_unit.is_current t.compilation_unit)
+  let is_imported t = not (Current_unit.is_current t.compilation_unit)
 
   let to_string t = t.name ^ "_" ^ string_of_int t.name_stamp
 
   let name t = t.name
+
+  let canonical_name t = if !Clflags.canonical_ids then name t else to_string t
 
   let kind t = t.kind
 

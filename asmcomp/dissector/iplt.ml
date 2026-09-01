@@ -91,45 +91,36 @@ let plt_entry_template =
 let build ~prefix ~igot ~symbols =
   (* Remove duplicates while preserving order, and build lookup table *)
   let by_original_symbol = String.Tbl.create 256 in
-  let unique_symbols =
-    List.filter
-      (fun sym ->
-        if String.Tbl.mem by_original_symbol sym
-        then false
-        else (
-          (* Placeholder - will be replaced below *)
-          String.Tbl.add by_original_symbol sym
-            { Entry.index = 0;
-              original_symbol = sym;
-              iplt_symbol = "";
-              igot_symbol = ""
-            };
-          true))
-      symbols
+  let rev_entries, num_entries =
+    List.fold_left
+      (fun (rev_entries, index) symbol ->
+        let original_symbol = Relocatable_symbol_name.to_string symbol in
+        if String.Tbl.mem by_original_symbol original_symbol
+        then rev_entries, index
+        else
+          let iplt_symbol = iplt_symbol_name ~prefix ~symbol:original_symbol in
+          let igot_symbol =
+            Igot.igot_symbol_name ~prefix ~symbol:original_symbol
+          in
+          (* Verify the IGOT entry exists *)
+          (match Igot.find_entry igot ~symbol with
+          | None ->
+            Misc.fatal_errorf "IPLT: no IGOT entry for symbol %s"
+              original_symbol
+          | Some _ -> ());
+          log_verbose "  IPLT entry %d: %s -> %s (via %s)" index original_symbol
+            iplt_symbol igot_symbol;
+          let entry =
+            { Entry.index; original_symbol; iplt_symbol; igot_symbol }
+          in
+          String.Tbl.add by_original_symbol original_symbol entry;
+          entry :: rev_entries, index + 1)
+      ([], 0) symbols
   in
-  let entries =
-    List.mapi
-      (fun index original_symbol ->
-        let iplt_symbol = iplt_symbol_name ~prefix ~symbol:original_symbol in
-        let igot_symbol =
-          Igot.igot_symbol_name ~prefix ~symbol:original_symbol
-        in
-        (* Verify the IGOT entry exists *)
-        (match Igot.find_entry igot ~symbol:original_symbol with
-        | None ->
-          Misc.fatal_errorf "IPLT: no IGOT entry for symbol %s" original_symbol
-        | Some _ -> ());
-        log_verbose "  IPLT entry %d: %s -> %s (via %s)" index original_symbol
-          iplt_symbol igot_symbol;
-        let entry =
-          { Entry.index; original_symbol; iplt_symbol; igot_symbol }
-        in
-        String.Tbl.replace by_original_symbol original_symbol entry;
-        entry)
-      unique_symbols
-  in
+  (* CR sspies: The order of entries does not matter here, so we should remove
+     the list reversal at some point. *)
+  let entries = List.rev rev_entries in
   (* Build section data *)
-  let num_entries = List.length entries in
   let section_data = Bytes.make (num_entries * entry_size) '\x00' in
   for i = 0 to num_entries - 1 do
     Bytes.blit_string plt_entry_template 0 section_data (i * entry_size)
@@ -145,7 +136,9 @@ let section_data t = t.section_data
 
 let section_size t = Bytes.length t.section_data
 
-let find_entry t ~symbol = String.Tbl.find_opt t.by_original_symbol symbol
+let find_entry t ~symbol =
+  String.Tbl.find_opt t.by_original_symbol
+    (Relocatable_symbol_name.to_string symbol)
 
 module Relocation = struct
   type t =

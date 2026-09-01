@@ -705,7 +705,7 @@ let output_then_forget_decisions ~output_prefix =
          (that is not one of the numbered warnings)? *)
       Format.eprintf "WARNING: inlining report output failed@.")
     (fun () ->
-      let compilation_unit = Compilation_unit.get_current_exn () in
+      let compilation_unit = Current_unit.get_cu_exn () in
       let tree =
         lazy
           (List.fold_left

@@ -9,6 +9,12 @@
  }
 *)
 
+(* These tests enumerate modifiers, including redundant ones, so silence the
+   redundant-modifier warning throughout. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
 type t_value : value
 type t_imm : immediate
 type t_imm64 : immediate64
@@ -206,7 +212,7 @@ Error: Unrecognized modifier fizzbuzz.
 let x : int as ('a: value) = 5
 let x : int as ('a : immediate) = 5
 let x : int as ('a : any) = 5;;
-let x : int as ('a: value mod global aliased many contended portable external_) = 5
+let x : int as ('a: value mod global many contended portable external_) = 5
 
 [%%expect{|
 val x : int = 5
@@ -238,19 +244,6 @@ val x : int list = [3; 4; 5]
 let x : int list as ('a : immediate) = [3;4;5]
 ;;
 [%%expect {|
-Line 1, characters 21-23:
-1 | let x : int list as ('a : immediate) = [3;4;5]
-                         ^^
-Error: This alias is bound to type "int list"
-       but is used as an instance of type "('a : immediate)"
-       The layout of int list is value non_float
-         because it's a boxed variant type.
-       But the layout of int list must be a sublayout of value non_pointer
-         because of the annotation on the type variable 'a.
-       Note: The layout of immediate is value non_pointer.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
-|}, Principal{|
 Line 1, characters 21-23:
 1 | let x : int list as ('a : immediate) = [3;4;5]
                          ^^
@@ -1208,6 +1201,73 @@ Error: The kind of type "t" is immutable_data with t_value
          because of the annotation on the declaration of the type t.
 |}]
 
+type t : value mod shareable = { x : t_value }
+[%%expect {|
+Line 1, characters 0-46:
+1 | type t : value mod shareable = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod shareable
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod shared = { x : t_value }
+[%%expect {|
+Line 1, characters 0-43:
+1 | type t : value mod shared = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod shared
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod reading = { x : t_value }
+[%%expect {|
+Line 1, characters 0-44:
+1 | type t : value mod reading = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod reading
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod read = { x : t_value }
+[%%expect {|
+Line 1, characters 0-41:
+1 | type t : value mod read = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod read
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod read corrupted = { x : t_value }
+[%%expect {|
+Line 1, characters 0-51:
+1 | type t : value mod read corrupted = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod read corrupted
+         because of the annotation on the declaration of the type t.
+|}]
+
+type t : value mod immutable corrupted = { x : t_value }
+[%%expect {|
+Line 1, characters 0-56:
+1 | type t : value mod immutable corrupted = { x : t_value }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with t_value
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of
+           value mod immutable corrupted
+         because of the annotation on the declaration of the type t.
+|}]
+
 type t : value mod external_ = { x : t_value }
 [%%expect {|
 Line 1, characters 0-46:
@@ -1387,7 +1447,7 @@ type t : bits64 mod portable aliased
 type u = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1396,7 +1456,7 @@ type t : bits64 mod portable aliased
 type u : bits64 = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]
@@ -1406,7 +1466,7 @@ type t : bits64 mod portable aliased
 type u : bits64 mod portable aliased = private t
 let f (x : t) : _ as (_ : bits64 mod portable aliased) = x
 [%%expect {|
-type t : bits64 mod portable aliased
+type t : bits64 mod aliased portable
 type u = private t
 val f : t -> t = <fun>
 |}]

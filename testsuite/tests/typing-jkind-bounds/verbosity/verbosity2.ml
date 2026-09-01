@@ -55,10 +55,10 @@ type t
           unforkable
           yielding
           once
-          stateful
-          nonportable
           unique
+          stateful
           read_write
+          nonportable
           uncontended
           static
 |}]
@@ -71,10 +71,10 @@ type t
           unforkable
           yielding
           once
-          stateful
-          nonportable
           unique
+          stateful
           read_write
+          nonportable
           uncontended
           static
           internal
@@ -89,8 +89,8 @@ type t
           unforkable
           yielding
           once
-          stateful
           unique
+          stateful
           read_write
           uncontended
           static
@@ -178,8 +178,8 @@ type 'a t
           unforkable
           yielding
           once
-          stateful
           unique
+          stateful
           read_write
           uncontended
           static
@@ -195,10 +195,10 @@ type 'a t
           unforkable
           yielding
           once
-          stateful
-          nonportable
           unique
+          stateful
           read_write
+          nonportable
           uncontended
           static
 |}]

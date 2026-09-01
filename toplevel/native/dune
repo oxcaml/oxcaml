@@ -23,7 +23,7 @@
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (libraries
-  ocamlcommon
+  ocamlfrontend
   ocamlbytecomp
   ocamloptcomp
   oxcaml_common
@@ -32,6 +32,8 @@
   dynlink_internal
   unix)
  (modules genprintval_native opttoploop opttopdirs topmain))
+
+(copy_files ../topmain.mli)
 
 (rule
  (targets genprintval_native.ml)

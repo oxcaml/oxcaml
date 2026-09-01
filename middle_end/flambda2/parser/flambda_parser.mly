@@ -156,8 +156,8 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_INT64 [@symbol "int64"]
 %token KWD_INVALID [@symbol "invalid"]
 %token KWD_LET   [@symbol "let"]
-%token KWD_LOCAL [@symbol "local"]
 %token KWD_LOOPIFY [@symbol "loopify"]
+%token KWD_MASK [@symbol "mask"]
 %token KWD_MUTABLE [@symbol "mutable"]
 %token KWD_NATIVEINT [@symbol "nativeint"]
 %token KWD_NEVER  [@symbol "never"]
@@ -177,6 +177,7 @@ let make_boxed_const_int (i, m) : static_data =
 %token KWD_RERAISE [@symbol "reraise"]
 %token KWD_SET_OF_CLOSURES [@symbol "set_of_closures"]
 %token KWD_SIZE   [@symbol "size"]
+%token KWD_STACK  [@symbol "stack"]
 %token KWD_SUCC   [@symbol "succ"]
 %token KWD_STUB   [@symbol "stub"]
 %token KWD_SWITCH [@symbol "switch"]
@@ -303,7 +304,7 @@ code:
     MINUSGREATER; ret_cont = continuation_id;
     exn_cont = exn_continuation_id;
     ret_arity = return_arity;
-    result_mode = boption(KWD_LOCAL);
+    result_mode = boption(KWD_STACK);
     EQUAL; body = expr;
     { let
         recursive, inline, loopify, id, newer_version_of, code_size, is_tupled,
@@ -311,7 +312,9 @@ code:
         =
         header
       in
-      let result_mode : alloc_mode_for_assignments = if result_mode then Local else Heap in
+      let result_mode : alloc_mode_for_return =
+        if result_mode then Maybe_alloc_stack else Not_alloc_stack
+      in
       { id; newer_version_of; param_arity = None; ret_arity; recursive; inline;
         params_and_body = { params; closure_var; region_vars; depth_var;
                             ret_cont; exn_cont; body };
@@ -377,18 +380,19 @@ alloc_mode_for_allocations:
     { Local { alloc_region; region } }
 
 alloc_mode_for_applications:
-  | AMP; alloc_region = region { Heap { alloc_region } }
+  | AMP; alloc_region = region { Not_alloc_stack { alloc_region } }
   | AMP; alloc_region = region;
     AMP; region = region;
-    AMP; ghost_region = region
-    { Local { alloc_region; region; ghost_region } }
+    AMP;
+    ghost_region = region
+    { Maybe_alloc_stack { alloc_region; region; ghost_region } }
 
 alloc_mode_for_function_params:
-  | AMP; alloc_region = variable { Heap { alloc_region } }
+  | AMP; alloc_region = variable { Not_alloc_stack { alloc_region } }
   | AMP; alloc_region = variable;
     AMP; region = variable;
     AMP; ghost_region = variable
-    { Local { alloc_region; region; ghost_region } }
+    { Maybe_alloc_stack { alloc_region; region; ghost_region } }
 
 prim_param_val:
   | i = IDENT { make_located i ($startpos, $endpos) }
@@ -482,6 +486,7 @@ subkind:
   | KWD_VEC128 KWD_ARRAY { Unboxed_vec128_array }
   | KWD_VEC256 KWD_ARRAY { Unboxed_vec256_array }
   | KWD_VEC512 KWD_ARRAY { Unboxed_vec512_array }
+  | KWD_MASK KWD_ARRAY { Unboxed_mask_array }
   | KWD_PRODUCT KWD_ARRAY { Unboxed_product_array }
 ;
 kinds_with_subkinds_nonempty:
@@ -657,11 +662,13 @@ call_kind:
     { (Function (Direct { code_id; function_slot; }), alloc) }
   | KWD_CCALL; noalloc = boption(KWD_NOALLOC); AMP; alloc_region = region
     { (C_call { alloc = not noalloc },
-      (Heap { alloc_region } : region alloc_mode_for_applications)) }
+      (Not_alloc_stack { alloc_region }
+        : region alloc_mode_for_applications)) }
   | KWD_MCALL LPAREN; kind = method_kind; obj = simple; RPAREN;
       AMP; alloc_region = region
     { (Method { kind; obj },
-        (Heap { alloc_region } : region alloc_mode_for_applications)) }
+        (Not_alloc_stack { alloc_region }
+          : region alloc_mode_for_applications)) }
 ;
 
 inline:
@@ -869,7 +876,6 @@ static_data:
     RBRACKPIPE
     { Immutable_vec512_array is }
   | STATIC_CONST_EMPTY_ARRAY kind=empty_array_kind { Empty_array kind }
-  | KWD_MUTABLE; s = STRING { Mutable_string { initial_value = s } }
   | s = STRING { Immutable_string s }
 ;
 

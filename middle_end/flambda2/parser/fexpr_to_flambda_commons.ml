@@ -155,8 +155,7 @@ let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
   | Some code_id -> code_id
   | None ->
     let c =
-      Code_id.create ~name ~debug:Debuginfo.none
-        (Compilation_unit.get_current_exn ())
+      Code_id.create ~name ~debug:Debuginfo.none (Current_unit.get_cu_exn ())
     in
     DM.add env.code_ids name c;
     c
@@ -164,7 +163,7 @@ let fresh_or_existing_code_id env { Fexpr.txt = name; loc = _ } =
 let fresh_function_slot env { Fexpr.txt = name; loc = _ } =
   let c =
     Function_slot.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       ~name ~is_always_immediate:false Flambda_kind.value
   in
   UT.add env.function_slots name c;
@@ -178,7 +177,7 @@ let fresh_or_existing_function_slot env ({ Fexpr.txt = name; loc = _ } as id) =
 let fresh_value_slot env { Fexpr.txt = name; loc = _ } kind =
   let c =
     Value_slot.create
-      (Compilation_unit.get_current_exn ())
+      (Current_unit.get_cu_exn ())
       ~name ~is_always_immediate:false kind
   in
   WT.add env.vars_within_closures name c;
@@ -211,7 +210,7 @@ let declare_symbol (env : env) ({ Fexpr.txt = cu, name; loc } as symbol) =
     | None ->
       let cunit =
         match cu with
-        | None -> Compilation_unit.get_current_exn ()
+        | None -> Current_unit.get_cu_exn ()
         | Some cu -> compilation_unit cu
       in
       let symbol = Symbol.unsafe_create cunit (Linkage_name.of_string name) in

@@ -34,12 +34,12 @@ val print : Format.formatter -> t -> unit
 val is_identity : t -> bool
 
 val create_import_map :
-  symbols:Symbol.t Symbol.Map.t ->
-  variables:Variable.t Variable.Map.t ->
-  simples:Simple.t Simple.Map.t ->
-  consts:Reg_width_const.t Reg_width_const.Map.t ->
-  code_ids:Code_id.t Code_id.Map.t ->
-  continuations:Continuation.t Continuation.Map.t ->
+  symbols:Symbol.importer ->
+  variables:Variable.importer ->
+  simples:Simple.importer ->
+  consts:Reg_width_const.importer ->
+  code_ids:Code_id.importer ->
+  continuations:Continuation.importer ->
   used_value_slots:Value_slot.Set.t ->
   original_compilation_unit:Compilation_unit.t ->
   t
@@ -60,10 +60,7 @@ val apply_variable : t -> Variable.t -> Variable.t
 
 val apply_variable_set : t -> Variable.Set.t -> Variable.Set.t
 
-val add_symbol : t -> Symbol.t -> Symbol.t -> t
-
-val add_fresh_symbol : t -> Symbol.t -> guaranteed_fresh:Symbol.t -> t
-
+(* This is only used by the importing code. We don't permute symbols. *)
 val apply_symbol : t -> Symbol.t -> Symbol.t
 
 val apply_symbol_set : t -> Symbol.Set.t -> Symbol.Set.t
@@ -77,10 +74,7 @@ val add_fresh_continuation :
 
 val apply_continuation : t -> Continuation.t -> Continuation.t
 
-val add_code_id : t -> Code_id.t -> Code_id.t -> t
-
-val add_fresh_code_id : t -> Code_id.t -> guaranteed_fresh:Code_id.t -> t
-
+(* This is only used by the importing code. We don't permute code ids. *)
 val apply_code_id : t -> Code_id.t -> Code_id.t
 
 val apply_code_id_or_name : t -> Code_id_or_name.t -> Code_id_or_name.t

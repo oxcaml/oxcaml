@@ -18,22 +18,22 @@ open Datalog_imports
 type action
 
 val bind_iterator :
-  'a option Channel.receiver with_name -> 'a Trie.Iterator.t with_name -> action
+  'a Or_null_receiver.t with_name -> 'a Trie.Iterator.t with_name -> action
 
 val unless :
   ('t, 'k, 'v) Table.Id.t ->
   't Channel.receiver ->
-  'k Option_receiver.hlist with_names ->
+  'k Or_null_receiver.hlist with_names ->
   action
 
 val unless_eq :
   'k Value.repr ->
-  'k option Channel.receiver with_name ->
-  'k option Channel.receiver with_name ->
+  'k Or_null_receiver.t with_name ->
+  'k Or_null_receiver.t with_name ->
   action
 
 val filter :
-  ('k Constant.hlist -> bool) -> 'k Option_receiver.hlist with_names -> action
+  ('k Constant.hlist -> bool) -> 'k Or_null_receiver.hlist with_names -> action
 
 type actions
 
@@ -72,7 +72,7 @@ module Level : sig
       the associated actions, if any, and can thus be used in actions for this
       level or levels of later orders. *)
   val use_output :
-    ?cardinality:cardinality -> 'a t -> 'a option Channel.receiver with_name
+    ?cardinality:cardinality -> 'a t -> 'a Or_null_receiver.t with_name
 
   (** Actions to execute immediately after a value is found at this level. *)
   val actions : 'a t -> actions
@@ -112,12 +112,12 @@ val create_call :
   ('c -> 'a Constant.hlist -> unit) ->
   name:string ->
   context:'c ->
-  'a Option_receiver.hlist with_names ->
+  'a Or_null_receiver.hlist with_names ->
   call
 
 val create :
   ?calls:call list ->
-  ?output:'v Option_receiver.hlist with_names ->
+  ?output:'v Or_null_receiver.hlist with_names ->
   context ->
   'v t
 
@@ -169,9 +169,9 @@ module With_parameters : sig
   val without_parameters : (nil, 'v) t -> 'v cursor
 
   val create :
-    parameters:'p Option_sender.hlist ->
+    parameters:'p Or_null_sender.hlist ->
     ?calls:call list ->
-    ?output:'v Option_receiver.hlist with_names ->
+    ?output:'v Or_null_receiver.hlist with_names ->
     context ->
     ('p, 'v) t
 

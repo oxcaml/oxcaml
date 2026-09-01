@@ -162,8 +162,8 @@ end = struct
   let[@inline] fold_iterator ~f ~init iterator =
     let rec loop iterator acc =
       match Name_map_join_iterator.current iterator with
-      | None -> acc
-      | Some name ->
+      | Null -> acc
+      | This name ->
         Name_map_join_iterator.accept iterator;
         let acc = (f [@inlined hint]) name acc in
         Name_map_join_iterator.advance iterator;
@@ -1218,6 +1218,8 @@ module Joined_envs : sig
 
   val keys : t -> Index.Set.t
 
+  val exists_in_all_joined_envs : t -> _ Index.Map.t -> bool
+
   (** Returns the aliases of a variable in all the environments where it exists.
 
       The provided variable {b must} be defined in the current compilation unit.
@@ -1261,6 +1263,9 @@ end = struct
 
   let keys t = Index.Map.keys (envs_and_equations t)
 
+  let exists_in_all_joined_envs t m =
+    Index.Map.subset_domain (envs_and_equations t) m
+
   let get_canonical_simple_ignoring_name_mode typing_env simple =
     Simple_in_one_joined_env.create
       (TE.get_canonical_simple_ignoring_name_mode typing_env
@@ -1282,7 +1287,7 @@ end = struct
     then
       if
         not
-          (Compilation_unit.is_current
+          (Current_unit.is_current
              (Variable.compilation_unit
                 (var : Variable_in_one_joined_env.t :> Variable.t)))
       then
@@ -1611,7 +1616,7 @@ let rec add_inverse_relation_to_env_extension ?(seen = Name.Set.empty)
           env_extension)
     | Value _ | Naked_float32 _ | Naked_float _ | Naked_int8 _ | Naked_int16 _
     | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _ | Naked_vec128 _
-    | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+    | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _ | Region _ ->
       Misc.fatal_error "Kind mismatch for output of relation: expected %a")
 
 let add_to_inverse_relations inverse_relations name relation ~scrutinee =
@@ -1624,7 +1629,26 @@ let add_to_inverse_relations inverse_relations name relation ~scrutinee =
     (Name.Map.singleton name
        (TG.Relation.Map.singleton relation (Name.Set.singleton scrutinee)))
 
-let recover_inverse_relations inverse_relations name ty =
+let recover_inverse_relations ~exists_in_all_joined_envs inverse_relations name
+    ty =
+  (* We can only recover inverse relations if the type we are recovering from is
+     valid in all the joined environments.
+
+     If we have a type [x : Variant (is_int = y)] for [x], but [x] only exists
+     in a subset of the joined environments, then the equation [y = %is_int x]
+     is only valid in those environments -- in particular, if [y] exists in more
+     environments than [x], it is unsound to include that equation in the target
+     environment.
+
+     We avoid this situation by only recovering relations if the type we are
+     recovering from exists in all the joined environments -- this ensures that
+     the variables mentioned in the type cannot exist in more environments than
+     the type itself.
+
+     CR-someday bclement: We could be more precise here by recovering relations
+     if they are valid in all the environments where the involved variables are
+     defined, but it is not clear if that would actually be useful. *)
+  assert exists_in_all_joined_envs;
   match TG.descr ty with
   | Value (Ok (No_alias { is_null = Not_null; non_null = Ok head })) -> (
     match head with
@@ -1688,6 +1712,7 @@ let recover_inverse_relations inverse_relations name ty =
     | Boxed_vec128 (_, _)
     | Boxed_vec256 (_, _)
     | Boxed_vec512 (_, _)
+    | Boxed_mask (_, _)
     | Closures _ | String _ | Array _ ->
       ty, inverse_relations)
   | Value (Ok (No_alias { is_null = Maybe_null { is_null }; non_null = _ })) ->
@@ -1712,7 +1737,8 @@ let recover_inverse_relations inverse_relations name ty =
       | Unknown | Bottom )
   | Naked_immediate _ | Naked_float32 _ | Naked_float _ | Naked_int8 _
   | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_nativeint _
-  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Rec_info _ | Region _ ->
+  | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Rec_info _
+  | Region _ ->
     ty, inverse_relations
 
 let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
@@ -1734,8 +1760,17 @@ let n_way_join_round ~(n_way_join_type : n_way_join_type) t equations_to_join
       with
       | Unknown, t -> types_in_target_env, inverse_relations, t
       | Known ty, t ->
+        let exists_in_all_joined_envs =
+          Joined_envs.exists_in_all_joined_envs t.joined_envs types
+        in
         let ty, inverse_relations =
-          recover_inverse_relations inverse_relations (name :> Name.t) ty
+          if exists_in_all_joined_envs
+          then
+            recover_inverse_relations ~exists_in_all_joined_envs
+              inverse_relations
+              (name :> Name.t)
+              ty
+          else ty, inverse_relations
         in
         let ty = Type_in_target_env.create ty in
         ( Name_in_target_env.Map.add name ty types_in_target_env,
@@ -1816,11 +1851,11 @@ let cut_for_join typing_env ~cut_after =
   incremental_equations, symbol_projections
 
 let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
-    source_env joined_envs equations_to_join symbol_projections_to_join =
+    source_env source_tenv joined_envs equations_to_join
+    symbol_projections_to_join =
   try
     let empty_bindings =
-      Bindings_in_target_env.from_source_env
-        (Source_env.create (ME.typing_env source_env))
+      Bindings_in_target_env.from_source_env (Source_env.create source_tenv)
     in
     let joined_envs = Joined_envs.create equations_to_join in
     let concrete_equations_to_join, bindings =
@@ -1922,6 +1957,22 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
       (Index.Map.print (fun ppf env -> TEL.print ppf (TE.cut ~cut_after env)))
       joined_envs;
     Printexc.raise_with_backtrace Misc.Fatal_error bt
+
+let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+    source_env source_tenv joined_envs equations_to_join
+    symbol_projections_to_join =
+  (* If there is nothing to join, all input environments are bottom and we
+     should not do a join -- in fact, [fold_incremental_join] would raise an
+     exception ("cannot join an empty list").
+
+     Note: we wrap the true [cut_and_n_way_join0] to avoid hurting readability
+     by increasing indentation. *)
+  if Index.Map.is_empty equations_to_join
+  then ME.make_bottom source_env, Name_in_target_env.Map.empty
+  else
+    cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
+      source_env source_tenv joined_envs equations_to_join
+      symbol_projections_to_join
 
 (* Join analysis *)
 
@@ -2085,7 +2136,7 @@ module Analysis = struct
 end
 
 let cut_and_n_way_join ~n_way_join_type ~meet_expanded_head ~cut_after
-    source_env joined_envs =
+    source_env source_tenv joined_envs =
   let joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index typing_env
@@ -2108,12 +2159,13 @@ let cut_and_n_way_join ~n_way_join_type ~meet_expanded_head ~cut_after
   in
   let target_env, _ =
     cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
-      source_env joined_envs equations_to_join symbol_projections_to_join
+      source_env source_tenv joined_envs equations_to_join
+      symbol_projections_to_join
   in
   target_env
 
 let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
-    ~cut_after source_env joined_envs =
+    ~cut_after source_tenv joined_envs =
   let external_ids, joined_envs, equations_to_join, symbol_projections_to_join =
     Index.fold_list
       (fun index (external_id, typing_env)
@@ -2137,12 +2189,13 @@ let cut_and_n_way_join_with_analysis ~n_way_join_type ~meet_expanded_head
       joined_envs
       (Index.Map.empty, Index.Map.empty, Index.Map.empty, Index.Map.empty)
   in
-  let source_env = ME.create source_env in
+  let source_env = ME.create source_tenv in
   let target_env, bindings =
     cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
-      source_env joined_envs equations_to_join symbol_projections_to_join
+      source_env source_tenv joined_envs equations_to_join
+      symbol_projections_to_join
   in
-  let target_env = ME.typing_env target_env in
+  let target_env = ME.final_typing_env ~meet_expanded_head target_env in
   let join_analysis = Analysis.create ~external_ids ~joined_envs bindings in
   target_env, join_analysis
 
@@ -2193,8 +2246,9 @@ let prepare_nested_join ~meet_expanded_head ~joined_envs ~bindings extensions =
         let cut_after = TE.current_scope parent_env in
         let typing_env = TE.increment_scope parent_env in
         match
-          ME.add_env_extension_strict ~meet_expanded_head (ME.create typing_env)
-            extension
+          ME.use_meet_env_strict ~meet_expanded_head typing_env
+            ~f:(fun meet_env ->
+              ME.add_env_extension ~meet_expanded_head meet_env extension)
         with
         | Bottom ->
           (* We can reach bottom here if the extension was created in a more
@@ -2202,10 +2256,8 @@ let prepare_nested_join ~meet_expanded_head ~joined_envs ~bindings extensions =
              reachable. *)
           joined_envs_and_extensions
         | Ok env ->
-          let level = ME.cut env ~cut_after in
-          Index.Map.add index
-            (ME.typing_env env, level)
-            joined_envs_and_extensions)
+          let level = TE.cut env ~cut_after in
+          Index.Map.add index (env, level) joined_envs_and_extensions)
       Index.Map.empty extensions
   in
   Index.Map.mapi

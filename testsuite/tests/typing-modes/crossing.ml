@@ -2,6 +2,11 @@
  expect;
 *)
 
+(* Some tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
 (* mode crossing during inclusion check is according to the written type, not
 the inferred type. *)
 

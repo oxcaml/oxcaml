@@ -80,7 +80,6 @@ type env =
     should_keep_function_param :
       Code_id.t -> Variable.t -> KS.t -> param_decision;
     function_return_decision : param_decision list Code_id.Map.t;
-    kinds : K.t Name.Map.t;
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
@@ -103,7 +102,7 @@ let is_used (env : env) cn = Analysis.has_use env.uses cn
 
 let is_code_id_used (env : env) code_id =
   is_used env (Code_id_or_name.code_id code_id)
-  || not (Compilation_unit.is_current (Code_id.get_compilation_unit code_id))
+  || not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
 
 let is_symbol_used (env : env) symbol =
   is_used env (Code_id_or_name.symbol symbol)
@@ -114,7 +113,7 @@ let raw_is_var_used uses var kind =
   | Value | Naked_number _ -> Analysis.has_use uses (Code_id_or_name.var var)
 
 let is_var_used (env : env) var =
-  raw_is_var_used env.uses var (Name.Map.find (Name.var var) env.kinds)
+  raw_is_var_used env.uses var (Variable.kind var)
 
 let is_name_used (env : env) name =
   Name.pattern_match name ~symbol:(is_symbol_used env) ~var:(is_var_used env)
@@ -184,7 +183,7 @@ let get_parameters params_decisions =
     [] params_decisions
   |> List.rev
 
-let get_parameters_and_modes params_decisions modes =
+let get_parameters_and_modes params_decisions_and_modes =
   List.fold_left
     (fun acc (param_decision, mode) ->
       match param_decision with
@@ -198,8 +197,7 @@ let get_parameters_and_modes params_decisions modes =
               mode )
             :: acc)
           fields acc) (* CR sspies: Missing debug uid. *)
-    []
-    (List.combine params_decisions modes)
+    [] params_decisions_and_modes
   |> List.rev |> List.split
 
 let get_arity params_decisions =
@@ -222,8 +220,7 @@ let get_arity params_decisions =
           (List.map (fun k -> Component_for_creation.Singleton k) arity) ])
 
 let is_dead_var env v =
-  let (kind : K.t) = Name.Map.find (Name.var v) env.kinds in
-  match kind with
+  match Variable.kind v with
   | Region | Rec_info -> false
   | Value | Naked_number _ ->
     not (Analysis.has_source env.uses (Code_id_or_name.var v))
@@ -316,8 +313,8 @@ let function_params_and_body_free_names fpb =
       in
       let regions =
         match (my_alloc_mode : Alloc_mode.For_applications.t) with
-        | Heap { alloc_region } -> [alloc_region]
-        | Local { alloc_region; region; ghost_region } ->
+        | Not_alloc_stack { alloc_region } -> [alloc_region]
+        | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
           [alloc_region; region; ghost_region]
       in
       List.fold_left
@@ -325,21 +322,18 @@ let function_params_and_body_free_names fpb =
         f
         (regions @ (my_closure :: my_depth :: Bound_parameters.vars params)))
 
-let get_simple_kind env simple =
+let get_simple_kind simple =
   Simple.pattern_match'
     ~const:(fun const -> Reg_width_const.kind const)
     ~symbol:(fun _ ~coercion:_ -> K.value)
-    ~var:(fun var ~coercion:_ -> Name.Map.find (Name.var var) env.kinds)
+    ~var:(fun var ~coercion:_ -> Variable.kind var)
     simple
 
-let name_poison ~category env name =
+let name_poison ~category name =
   let kind =
-    match Name.Map.find_opt name env.kinds with
-    | Some k -> k
-    | None ->
-      if Name.is_symbol name
-      then K.value
-      else Misc.fatal_errorf "Unbound name %a" Name.print name
+    Name.pattern_match name
+      ~symbol:(fun _ -> K.value)
+      ~var:(fun var -> Variable.kind var)
   in
   poison category kind
 
@@ -353,10 +347,10 @@ let rewrite_simple (env : env) simple =
       then
         (* This can happen if an unboxed block now only has an application for
            its only use, see [unboxed_or_function.ml] test. *)
-        name_poison ~category:"reaper_rewrite_simple_unboxed" env name
+        name_poison ~category:"reaper_rewrite_simple_unboxed" name
       else if is_name_used env name
       then simple
-      else name_poison ~category:"reaper_unused_name" env name)
+      else name_poison ~category:"reaper_unused_name" name)
     ~const:(fun _ -> simple)
 
 let rewrite_simple_opt (env : env) = function
@@ -631,6 +625,8 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   | Boxed_vec512 n ->
     SC.boxed_vec512
       (rewrite_or_variable Vector_types.Vec512.Bit_pattern.zero env n)
+  | Boxed_mask n ->
+    SC.boxed_mask (rewrite_or_variable Vector_types.Mask.Bit_pattern.zero env n)
   | Immutable_float_block fields ->
     SC.immutable_float_block (rewrite_or_variables Float.zero env fields)
   | Immutable_float_array fields ->
@@ -666,7 +662,10 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   | Immutable_vec512_array fields ->
     SC.immutable_vec512_array
       (rewrite_or_variables Vector_types.Vec512.Bit_pattern.zero env fields)
-  | Empty_array _ | Mutable_string _ | Immutable_string _ -> sc
+  | Immutable_mask_array fields ->
+    SC.immutable_mask_array
+      (rewrite_or_variables Vector_types.Mask.Bit_pattern.zero env fields)
+  | Empty_array _ | Immutable_string _ -> sc
 
 let rebuild_named_default_case env (named : Named.t) =
   let[@local] rewrite_field_access ?(mut : Mutability.t = Immutable) base field
@@ -1079,8 +1078,7 @@ let decide_whether_apply_needs_calling_convention_change env apply =
           | No ->
             if
               not
-                (Compilation_unit.is_current
-                   (Code_id.get_compilation_unit code_id))
+                (Current_unit.is_current (Code_id.get_compilation_unit code_id))
             then call_kind
             else Call_kind.indirect_function_call_known_arity ~code_ids:Unknown
           | Auto ->
@@ -1224,7 +1222,7 @@ let rebuild_apply env apply =
                 Simple.pattern_match arg
                   ~const:(fun _ -> arg)
                   ~name:(fun name ~coercion:_ ->
-                    name_poison ~category:"reaper_unused_argument" env name)
+                    name_poison ~category:"reaper_unused_argument" name)
             in
             let args_and_keep =
               if known_arity
@@ -1252,7 +1250,7 @@ let rebuild_apply env apply =
              the call kind and produce an invalid. *)
             ~callee:(rewrite_simple_opt env (Apply.callee apply))
             exn_continuation ~args ~args_arity ~return_arity ~call_kind
-            ~alloc_mode:(Apply.alloc_mode apply) (Apply.dbg apply)
+            ~return_mode:(Apply.return_mode apply) (Apply.dbg apply)
             ~inlined:(Apply.inlined apply)
             ~inlining_state:(Apply.inlining_state apply)
             ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -1297,12 +1295,10 @@ let rebuild_apply env apply =
             Misc.fatal_errorf
               "Callee is not unboxable in apply %a with unboxed closure"
               Apply.print apply;
-          let callee_fields = get_simple_unboxable env callee in
-          ( Unboxed_fields.fold2_subset_with_kind
-              (fun kind _param callee_field acc ->
-                (Simple.var callee_field, KS.anything kind) :: acc)
-              fields callee_fields [],
-            None )
+          (* The unboxed fields of the closure are passed at the front of the
+             first argument group, in the same order as the parameters
+             introduced in [rebuild_function_params_and_body]. *)
+          get_args_with_kinds env [Unbox fields] [callee], None
       in
       let params_decisions =
         match Code_id.Map.find_opt code_id env.function_params_to_keep with
@@ -1389,7 +1385,7 @@ let rebuild_apply env apply =
       let args = List.map fst (List.flatten args) in
       let make_apply ~continuation =
         Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
-          ~return_arity ~call_kind ~alloc_mode:(Apply.alloc_mode apply)
+          ~return_arity ~call_kind ~return_mode:(Apply.return_mode apply)
           (Apply.dbg apply) ~inlined:(Apply.inlined apply)
           ~inlining_state:(Apply.inlining_state apply)
           ~probe:(Apply.probe apply) ~position:(Apply.position apply)
@@ -1507,7 +1503,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
               if nth < List.length args
               then
                 let arg = List.nth args nth in
-                if K.equal field_kind (get_simple_kind env arg)
+                if K.equal field_kind (get_simple_kind arg)
                 then arg
                 else poison "reaper_dead_unboxed_field" field_kind
               else poison "reaper_dead_unboxed_field" field_kind
@@ -1831,9 +1827,7 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
         (Cost_metrics.set_of_closures
            ~find_code_characteristics:(fun code_id ->
              let code_metadata =
-               if
-                 Compilation_unit.is_current
-                   (Code_id.get_compilation_unit code_id)
+               if Current_unit.is_current (Code_id.get_compilation_unit code_id)
                then
                  match Code_id.Map.find code_id res.all_code with
                  | exception Not_found ->
@@ -2195,8 +2189,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   let rebuild_body () =
     let region_vars =
       match (my_alloc_mode : Alloc_mode.For_applications.t) with
-      | Heap { alloc_region } -> [alloc_region]
-      | Local { alloc_region; region; ghost_region } ->
+      | Not_alloc_stack { alloc_region } -> [alloc_region]
+      | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
         [alloc_region; region; ghost_region]
     in
     let all_vars = region_vars @ (my_closure :: Bound_parameters.vars params) in
@@ -2312,46 +2306,39 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         params_decision
         (Bound_parameters.to_list params)
     in
-    let params_decision =
-      Flambda_arity.group_by_parameter
-        (Code_metadata.params_arity code_metadata)
-        params_decision
-    in
-    let params_and_modes =
-      List.map2
-        (fun p -> get_parameters_and_modes p)
-        params_decision
-        (Flambda_arity.group_by_parameter
-           (Code_metadata.params_arity code_metadata)
-           (Code_metadata.param_modes code_metadata))
-    in
-    let params = List.map fst params_and_modes in
-    let modes = List.concat_map snd params_and_modes in
-    let params_from_closure, code_metadata =
+    let my_closure_decision, code_metadata =
       match
         (* TODO move that in the decisions There should be a single record field
            with all the decisions for return params and closure *)
         Analysis.get_unboxed_fields env.uses (Code_id_or_name.var my_closure)
       with
-      | None -> [], code_metadata
+      (* If we're not unboxing we need to "delete" the extra mode we prepend
+         below, ultimately this is a no-op. *)
+      | None -> Delete, code_metadata
       | Some fields ->
-        ( Unboxed_fields.fold_with_kind
-            (fun kind v acc ->
-              Bound_parameter.create v (KS.anything kind) Flambda_debug_uid.none
-              :: acc)
-            (* CR sspies: Missing debug uid. *)
-            fields [],
-          Code_metadata.with_is_my_closure_used false code_metadata )
+        Unbox fields, Code_metadata.with_is_my_closure_used false code_metadata
     in
-    let params =
-      match params with
+    let params_decision_and_modes =
+      Flambda_arity.group_by_parameter
+        (Code_metadata.params_arity code_metadata)
+        (List.combine params_decision (Code_metadata.param_modes code_metadata))
+    in
+    let params_decision_and_modes =
+      match params_decision_and_modes with
       | [] ->
         Misc.fatal_errorf
           "Empty parameter groups when changing calling convention for code id \
            %a"
           Code_id.print code_id
-      | first :: rest -> (params_from_closure @ first) :: rest
+      | first :: rest ->
+        ((my_closure_decision, Alloc_mode.For_types.unknown ()) :: first)
+        :: rest
     in
+    let params_and_modes =
+      List.map get_parameters_and_modes params_decision_and_modes
+    in
+    let params = List.map fst params_and_modes in
+    let modes = List.concat_map snd params_and_modes in
     let params_arity =
       let components_for params =
         Flambda_arity.Component_for_creation.Unboxed_product
@@ -2366,6 +2353,12 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     let code_metadata =
       Code_metadata.with_params_arity params_arity
         (Code_metadata.with_param_modes modes code_metadata)
+    in
+    (* We only change the calling convention if the analysis has shown there are
+       no partial applications. *)
+    let code_metadata =
+      Code_metadata.with_first_complex_local_param
+        First_complex_local_param.Never_partially_applied code_metadata
     in
     let body, res = rebuild_body () in
     let code_metadata = update_size code_metadata body in
@@ -2402,8 +2395,7 @@ and rebuild_code env res
         (function_params_and_body_free_names params_and_body)
   in
   assert (
-    Compilation_unit.is_current
-      (Code_id.get_compilation_unit (Code.code_id code)));
+    Current_unit.is_current (Code_id.get_compilation_unit (Code.code_id code)));
   let res =
     { res with
       all_code = Code_id.Map.add (Code.code_id code) code res.all_code
@@ -2467,7 +2459,7 @@ type result =
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
-    ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context kinds
+    ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
     (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
   let should_keep_function_param code_id =
     let cannot_change_calling_convention =
@@ -2608,7 +2600,6 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       function_params_to_keep;
       should_keep_function_param;
       function_return_decision;
-      kinds;
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
       inside_code_definition = false;

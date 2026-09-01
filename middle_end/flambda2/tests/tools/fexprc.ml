@@ -43,5 +43,5 @@ let _ =
   Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
   Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
   Compenv.parse_arguments (ref Sys.argv) defer_file "fexprc";
-  Compmisc.read_clflags_from_env ();
+  Location.read_clflags_from_env ();
   !file_action ()

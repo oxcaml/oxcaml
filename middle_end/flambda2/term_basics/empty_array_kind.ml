@@ -26,6 +26,7 @@ type t =
   | Naked_vec128s
   | Naked_vec256s
   | Naked_vec512s
+  | Naked_masks
 
 let print ppf t =
   match t with
@@ -41,6 +42,7 @@ let print ppf t =
   | Naked_vec128s -> Format.pp_print_string ppf "Naked_vec128s"
   | Naked_vec256s -> Format.pp_print_string ppf "Naked_vec256s"
   | Naked_vec512s -> Format.pp_print_string ppf "Naked_vec512s"
+  | Naked_masks -> Format.pp_print_string ppf "Naked_masks"
 
 let compare = Stdlib.compare
 
@@ -59,6 +61,7 @@ let of_element_kind t =
   | Naked_number Naked_vec128 -> Naked_vec128s
   | Naked_number Naked_vec256 -> Naked_vec256s
   | Naked_number Naked_vec512 -> Naked_vec512s
+  | Naked_number Naked_mask -> Naked_masks
   | Region | Rec_info ->
     Misc.fatal_errorf
       "Arrays cannot contain elements of kind region or rec_info"
@@ -78,6 +81,7 @@ let of_lambda array_kind =
   | Punboxedvectorarray Unboxed_vec128 -> Naked_vec128s
   | Punboxedvectorarray Unboxed_vec256 -> Naked_vec256s
   | Punboxedvectorarray Unboxed_vec512 -> Naked_vec512s
+  | Punboxedmaskarray -> Naked_masks
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ -> Unboxed_products
   | Punspecializedarray ->
     Misc.fatal_error "Empty_array_kind.of_lambda: Punspecializedarray"

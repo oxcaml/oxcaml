@@ -1,0 +1,7 @@
+File "_none_", line 1:
+Error: The implementation (obtained by functorizing)
+       does not match the interface bundle_bad/bundle_bad.cmi: 
+       In module Make:
+       This module should not be a functor, a structure was expected.
+       Moreover, the type of the functor body is incompatible with the
+       expected module type.

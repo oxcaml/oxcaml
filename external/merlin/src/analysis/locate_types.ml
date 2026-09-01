@@ -99,6 +99,7 @@ let rec create_type_tree ty : Type_tree.t =
     { data = Type_ref { path = Predef.path_box; ty = ty_without_args };
       children
     }
+  | Tmod (ty, _) -> create_type_tree ty
   | Tnil
   | Tvar _
   | Tsubst _

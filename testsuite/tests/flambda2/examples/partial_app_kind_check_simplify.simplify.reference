@@ -15,24 +15,24 @@ let code inline(never) loopify(never) size(1) newer_version_of(f_1)
         : imm tagged =
   cont k (0)
 in
-let $camlPartial_app_kind_check_simplify__f_4 =
+let $camlPartial_app_kind_check_simplify__f_2 =
   closure f_1_1 @f &toplevel.alloc_region
 in
-let $camlPartial_app_kind_check_simplify__partial_f_5 =
+let $camlPartial_app_kind_check_simplify__partial_f_3 =
   closure partial_f_2 @partial_f &toplevel.alloc_region
-  with { f = $camlPartial_app_kind_check_simplify__f_4 }
+  with { f = $camlPartial_app_kind_check_simplify__f_2 }
 in
 let code loopify(never) size(1) newer_version_of(test_0)
       test_0_1 (u : imm tagged, a, b)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : int64 =
-  cont k ($camlPartial_app_kind_check_simplify__partial_f_5)
+  cont k ($camlPartial_app_kind_check_simplify__partial_f_3)
 in
-let $camlPartial_app_kind_check_simplify__test_3 =
+let $camlPartial_app_kind_check_simplify__test_1 =
   closure test_0_1 @test &toplevel.alloc_region
 in
 let $camlPartial_app_kind_check_simplify =
-  Block 0 ($camlPartial_app_kind_check_simplify__test_3)
+  Block 0 ($camlPartial_app_kind_check_simplify__test_1)
 in
 cont done ($camlPartial_app_kind_check_simplify)

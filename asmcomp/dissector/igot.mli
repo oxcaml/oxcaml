@@ -62,7 +62,7 @@ type t
 
     @param prefix A unique prefix for this partition (e.g., "0", "1")
     @param symbols List of original symbol names needing GOT entries *)
-val build : prefix:string -> symbols:string list -> t
+val build : prefix:string -> symbols:Relocatable_symbol_name.t list -> t
 
 (** Returns the list of entries in the IGOT. *)
 val entries : t -> Entry.t list
@@ -78,7 +78,7 @@ val section_size : t -> int
 
 (** [find_entry t ~symbol] returns the entry for [symbol], or [None] if not
     found. *)
-val find_entry : t -> symbol:string -> Entry.t option
+val find_entry : t -> symbol:Relocatable_symbol_name.t -> Entry.t option
 
 (** [igot_symbol_name ~prefix ~symbol] returns the IGOT symbol name for the
     given original symbol. *)

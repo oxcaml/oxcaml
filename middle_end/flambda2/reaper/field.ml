@@ -199,9 +199,9 @@ let is_local f =
   &&
   match view f with
   | Value_slot vs ->
-    Compilation_unit.is_current (Value_slot.get_compilation_unit vs)
+    Current_unit.is_current (Value_slot.get_compilation_unit vs)
   | Function_slot fs ->
-    Compilation_unit.is_current (Function_slot.get_compilation_unit fs)
+    Current_unit.is_current (Function_slot.get_compilation_unit fs)
   | Block _ | Call_witness _ | Return_of_call _ | Code_id_of_call_witness
   | Is_int | Get_tag | Boxed_number _ ->
     false

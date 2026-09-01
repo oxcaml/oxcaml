@@ -24,17 +24,15 @@ add:
   ret
 |}]
 
-(* CR ttebbi: Unnecessary moves at the beginning. *)
+(* CR ttebbi: This should be branchfree. *)
 let min x y = Int32_u.min x y
 [%%expect_asm X86_64{|
 min:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
+  cmpq  %rbx, %rax
   jg    .L0
-  movq  %rdi, %rax
   ret
 .L0:
+  movq  %rbx, %rax
   ret
 |}]
 
@@ -50,13 +48,13 @@ bswap:
 let compare x y = Int32_u.compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rdi
-  movq  $-1, %rsi
+  movq  %rax, %rsi
+  movq  $-1, %rdi
   xorl  %eax, %eax
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rsi
   setg  %al
-  cmovge %rax, %rsi
-  leaq  1(%rsi,%rsi), %rax
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
   ret
 |}]
 
@@ -73,5 +71,65 @@ let to_int x = Int32_u.to_int x
 [%%expect_asm X86_64{|
 to_int:
   leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let unsigned_div x y = Int32_u.unsigned_div x y
+[%%expect_asm X86_64{|
+unsigned_div:
+  testq %rbx, %rbx
+  je    .L0
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %eax, %rax
+  ret
+.L0:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+|}]
+
+let unsigned_rem x y = Int32_u.unsigned_rem x y
+[%%expect_asm X86_64{|
+unsigned_rem:
+  testq %rbx, %rbx
+  je    .L0
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %edx, %rax
+  ret
+.L0:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+|}]
+
+let unsafe_unsigned_div x y = Int32_u.unsafe_unsigned_div x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_div:
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %eax, %rax
+  ret
+|}]
+
+let unsafe_unsigned_rem x y = Int32_u.unsafe_unsigned_rem x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_rem:
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %edx, %rax
   ret
 |}]

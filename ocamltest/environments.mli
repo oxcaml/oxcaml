@@ -24,6 +24,10 @@ val to_bindings : t -> (Variables.t * string) list
 val to_system_env : t -> string array
 val append_to_system_env : string array -> t -> string array
 
+val expand : t -> string -> string
+(** [expand env s] expands variable references [$var] and [${var}] in [s],
+    using the bindings of [env]. *)
+
 val lookup : Variables.t -> t -> string option
 val lookup_nonempty : Variables.t -> t -> string option
 val safe_lookup : Variables.t -> t -> string

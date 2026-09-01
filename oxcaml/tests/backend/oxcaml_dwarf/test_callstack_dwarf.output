@@ -1,4 +1,4 @@
-    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_start(param=() : unit @ value)
 === Testing simple top-level backtrace ===
     frame #N: <ADDRESS> test_callstack_dwarf.exe`Test_callstack_dwarf.f_simple_backtrace(message="hello world" : string @ value, x=42 : int @ value)
 Backtrace for simple function:

@@ -145,12 +145,16 @@ val sub : t -> t -> t
 (** Multiplication. *)
 val mul : t -> t -> t
 
-val mod_ : t -> t -> t
-
 (** Integer division and modulo. Raise [Division_by_zero] if the second argument
     is zero. This division rounds the real quotient of its arguments towards
     zero, as specified for {!Stdlib.(/)}. *)
 val div : t -> t -> t
+
+val unsigned_div : t -> t -> t
+
+val mod_ : t -> t -> t
+
+val unsigned_mod : t -> t -> t
 
 (** Bitwise logical and. *)
 val and_ : t -> t -> t

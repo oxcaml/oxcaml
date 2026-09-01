@@ -105,6 +105,8 @@ let classify env ty : classification =
   else
     match get_desc ty with
     | Tvar _ | Tunivar _ -> Any
+    | Tmod _ ->
+      Misc.fatal_error "Vicuna_traverse_typed_tree.classify: unexpected Tmod"
     | Tconstr (p, _args, _abbrev) -> (
       if Path.same p Predef.path_float
       then Float
@@ -180,6 +182,8 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
   in
   let scty = scrape_ty env ty in
   match get_desc scty with
+  | Tmod _ ->
+    Misc.fatal_error "Vicuna_traverse_typed_tree.value_kind: unexpected Tmod"
   | Tconstr (p, _, _) when Path.same p Predef.path_int -> Imm
   | Tconstr (p, _, _) when Path.same p Predef.path_char -> Imm
   | Tconstr (p, _, _) when Path.same p Predef.path_unit -> Imm
@@ -367,7 +371,9 @@ and value_kind_record env subst ~visited ~depth
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
   | Record_inlined (Null, _, _) -> raise (Vicuna_unsupported With_null_variants)
-  | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+  | Record_undetermined | Record_variable _
+  | Record_inlined (_, (Constructor_undetermined | Constructor_variable _), _)
+    ->
     raise (Vicuna_unsupported Field_of_kind_any)
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> (
     match labels with
@@ -400,7 +406,8 @@ and value_kind_record env subst ~visited ~depth
       | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
       | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
-      | Record_variable -> Misc.fatal_error "unexpected variable representation"
+      | Record_undetermined | Record_variable _ ->
+        Misc.fatal_error "unexpected variable representation"
     in
     non_consts
 

@@ -41,6 +41,7 @@ let operation : Operation.t -> int =
   | Specific _ -> 30
   | Name_for_debugger _ -> 31
   | Alloc _ -> 32
+  | Const_mask _ -> 33
 
 let basic : Cfg.basic -> int = function
   | Op op -> operation op
@@ -103,7 +104,8 @@ let basic_block : Cfg.basic_block -> int =
           live = _;
           stack_offset = _;
           available_before = _;
-          available_across = _
+          available_across = _;
+          phantom_available_before = _
         };
       predecessors = _;
       stack_offset = _;

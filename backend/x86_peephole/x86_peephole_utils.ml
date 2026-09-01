@@ -12,12 +12,12 @@ type rule_result =
 let is_control_flow = function
   | J _ | JMP _ | CALL _ | RET | HLT | UD2 -> true
   | LEAVE | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _
-  | ADD _ | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _
-  | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _
-  | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _
-  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _
-  | PREFETCH _ | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _
-  | ADC _ | SBB _ ->
+  | ADD _ | SUB _ | IMUL _ | MUL _ | IDIV _ | DIV _ | AND _ | OR _ | XOR _
+  | SAL _ | SAR _ | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO
+  | SET _ | CMOV _ | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _
+  | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _
+  | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | RDTSC | RDPMC | LFENCE | SFENCE
+  | MFENCE | SIMD _ | ADC _ | SBB _ ->
     false
 
 let is_hard_barrier = function
@@ -29,7 +29,7 @@ let is_hard_barrier = function
     | Comment _ | Const _ | Direct_assignment _ | File _ | Global _
     | Indirect_symbol _ | Loc _ | New_line | Private_extern _ | Size _
     | Sleb128 _ | Space _ | Type _ | Uleb128 _ | Protected _ | Hidden _ | Weak _
-    | External _ | Reloc _ ->
+    | External _ | Reloc _ | Delta_uleb128 _ ->
       false)
   | Ins instr -> is_control_flow instr
 
@@ -46,7 +46,7 @@ let get_cells cell n =
 
 let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
-  | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
+  | Regmask _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
 
 let underlying_reg64 = function
   | Reg64 r | Reg32 r | Reg16 r | Reg8L r -> Some r
@@ -56,7 +56,7 @@ let underlying_reg64 = function
     | BH -> Some RBX
     | CH -> Some RCX
     | DH -> Some RDX)
-  | Regf _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> None
+  | Regf _ | Regmask _ | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> None
 
 let is_reg64_subregister reg arg =
   match underlying_reg64 arg with Some r -> equal_reg64 reg r | None -> false
@@ -72,7 +72,7 @@ let arg_contains_reg64 target arg =
        | Vector _ -> false)
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
     equal_reg64 target (underlying_reg64 arg |> Option.get)
-  | Imm _ | Sym _ | Regf _ | Mem64_RIP _ -> false
+  | Imm _ | Sym _ | Regf _ | Regmask _ | Mem64_RIP _ -> false
 
 let reg64_read_when_writing target arg =
   match arg with
@@ -81,7 +81,8 @@ let reg64_read_when_writing target arg =
      update. *)
   | Reg8L _ | Reg8H _ | Reg16 _ ->
     equal_reg64 target (underlying_reg64 arg |> Option.get)
-  | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _ | Mem64_RIP _ -> false
+  | Reg32 _ | Reg64 _ | Regf _ | Regmask _ | Imm _ | Sym _ | Mem64_RIP _ ->
+    false
 
 let writes_to_reg64 target = function
   | MOV (_, dst)
@@ -119,7 +120,7 @@ let writes_to_reg64 target = function
     is_reg64_subregister target src || is_reg64_subregister target dst
   | XCHG (op1, op2) ->
     is_reg64_subregister target op1 || is_reg64_subregister target op2
-  | MUL _ | IMUL (_, None) | IDIV _ ->
+  | MUL _ | IMUL (_, None) | IDIV _ | DIV _ ->
     equal_reg64 target RAX || equal_reg64 target RDX
   | CDQ | CQO -> equal_reg64 target RDX
   | LOCK_CMPXCHG (_, dst) ->
@@ -139,6 +140,13 @@ let writes_to_reg64 target = function
   | SIMD _ ->
     (* Conservative: assume any SIMD instruction may write to target. *)
     true
+
+let arg_unchanged_by arg instr =
+  match arg with
+  | Imm _ | Sym _ -> true
+  | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ ->
+    not (writes_to_reg64 (underlying_reg64 arg |> Option.get) instr)
+  | Regmask _ | Regf _ | Mem _ | Mem64_RIP _ -> false
 
 let reads_from_reg64 target = function
   | MOV (src, dst)
@@ -178,7 +186,7 @@ let reads_from_reg64 target = function
   | LOCK_OR (op1, op2)
   | LOCK_XOR (op1, op2) ->
     arg_contains_reg64 target op1 || arg_contains_reg64 target op2
-  | MUL op | IMUL (op, None) | IDIV op ->
+  | MUL op | IMUL (op, None) | IDIV op | DIV op ->
     (* MUL / IMUL don't usually read RDX, but the 16bit version does and in any
        case, we assume that these instructions write RDX, which is not true for
        the 8bit version. Assuming that we read RDX makes this conservative,
@@ -248,8 +256,8 @@ let flags_never_observed start_cell =
           true
         (* Instructions that write only some flags or leave some undefined: keep
            scanning. *)
-        | INC _ | DEC _ | MUL _ | IMUL _ | IDIV _ | BSF _ | BSR _ | SAL _
-        | SAR _ | SHR _ ->
+        | INC _ | DEC _ | MUL _ | IMUL _ | IDIV _ | DIV _ | BSF _ | BSR _
+        | SAL _ | SAR _ | SHR _ ->
           loop (DLL.next cell)
         (* Instructions that don't touch the flags. *)
         | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ
@@ -261,9 +269,9 @@ let flags_never_observed start_cell =
 
 let maybe_writes_flags = function
   | ADD _ | SUB _ | AND _ | OR _ | XOR _ | CMP _ | TEST _ | INC _ | DEC _
-  | NEG _ | MUL _ | IMUL _ | IDIV _ | BSF _ | BSR _ | SAL _ | SAR _ | SHR _
-  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | LOCK_XADD _
-  | LOCK_CMPXCHG _ | ADC _ | SBB _ ->
+  | NEG _ | MUL _ | IMUL _ | IDIV _ | DIV _ | BSF _ | BSR _ | SAL _ | SAR _
+  | SHR _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _
+  | LOCK_XADD _ | LOCK_CMPXCHG _ | ADC _ | SBB _ ->
     true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
   | SET _ | CMOV _ | BSWAP _ | XCHG _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE

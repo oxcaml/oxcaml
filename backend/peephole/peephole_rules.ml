@@ -31,10 +31,10 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
     match fst_val.desc, snd_val.desc with
     | ( Op
           ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
-          | Const_vec256 _ | Const_vec512 _ ),
+          | Const_vec256 _ | Const_vec512 _ | Const_mask _ ),
         Op
           ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
-          | Const_vec256 _ | Const_vec512 _ ) ) ->
+          | Const_vec256 _ | Const_vec512 _ | Const_mask _ ) ) ->
       (* Removing the first instruction is okay here since it doesn't change the
          set of addresses we touch. *)
       delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
@@ -42,7 +42,13 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
       (* We only consider the removal of spill and reload instructions because a
          move from/to an arbitrary memory location could fail because of memory
          protection. *)
-      delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
+      (* If [snd] reads the location it overwrites (i.e. is an identity move),
+         deleting [fst] would change the value [snd] reads. Such moves are
+         currently removed by [Regalloc_utils.simplify_cfg] before this pass
+         runs, but do not rely on that here. *)
+      if U.are_equal_regs snd_val.arg.(0) snd_val.res.(0)
+      then None
+      else delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
     | _, _ -> None)
   | _ -> None
 
@@ -124,21 +130,11 @@ let are_compatible op1 op2 imm1 imm2 :
     then U.sub_immediates Isub imm1 imm2
     else U.sub_immediates Iadd imm2 imm1
   | Ilsl, Imul ->
-    (* [imm1] is guaranteed to be within bounds for [Ilsl], but [1 lsl imm1] may
-       not be within bounds for [Imul]. *)
-    U.assert_within_range Ilsl imm1;
-    let imm1 = 1 lsl imm1 in
-    if U.is_immediate_for_intop Imul imm1
-    then U.mul_immediates Imul imm1 imm2
-    else None
+    (* [(x lsl imm1) * imm2] is [x * (imm2 lsl imm1)]. *)
+    U.lsl_immediates Imul imm2 imm1
   | Imul, Ilsl ->
-    (* [imm2] is guaranteed to be within bounds for [Ilsl], but [1 lsl imm2] may
-       not be within bounds for [Imul]. *)
-    U.assert_within_range Ilsl imm2;
-    let imm2 = 1 lsl imm2 in
-    if U.is_immediate_for_intop Imul imm2
-    then U.mul_immediates Imul imm1 imm2
-    else None
+    (* [(x * imm1) lsl imm2] is [x * (imm1 lsl imm2)]. *)
+    U.lsl_immediates Imul imm1 imm2
   | Imul, Imul -> U.mul_immediates op1 imm1 imm2
   (* CR-soon gtulba-lecu: check this last case | Imod, Imod -> if imm1 mod imm2
      = 0 then Some (Imod, imm2) else None
@@ -194,6 +190,65 @@ let fold_intop_imm (cell : Cfg.basic Cfg.instruction DLL.cell) =
     else None
   | _ -> None
 
+(** Logical condition for simplifying the following case:
+    {v
+    <add/sub> imm, r
+    <specific> ...r..., r
+    v}
+
+    to:
+    {v <specific'> ...r..., r v}
+
+    where <specific> is an arch-specific operation that reads and overwrites
+    [r], and <specific'> is <specific> with the constant folded into its
+    addressing expression (e.g. the displacement of an amd64 [lea], as in
+    [popcnt r; dec r; lea 1(r,r), r] where the [dec] can be folded into the
+    [lea] as [-1(r,r)]). The arch-specific rewriting is delegated to
+    [Arch.fold_delta_into_specific_operation]. Deleting the first instruction is
+    sound because the second one overwrites [r], and it does not affect liveness
+    because <specific'> still reads [r]. *)
+let fold_intop_imm_into_specific (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  match U.get_cells cell 2 with
+  | [fst; snd] -> (
+    let fst_val = DLL.value fst in
+    let snd_val = DLL.value snd in
+    let delta =
+      match fst_val.desc with
+      | Op (Intop_imm (Iadd, imm)) -> Some imm
+      | Op (Intop_imm (Isub, imm)) when imm <> min_int -> Some (-imm)
+      | _ -> None
+    in
+    match delta, snd_val.desc with
+    | Some delta, Op (Specific specific)
+      when Array.length fst_val.arg = 1
+           && Array.length fst_val.res = 1
+           && Array.length snd_val.res = 1
+           && U.are_equal_regs
+                (Array.unsafe_get fst_val.arg 0)
+                (Array.unsafe_get fst_val.res 0)
+           && U.are_equal_regs
+                (Array.unsafe_get fst_val.res 0)
+                (Array.unsafe_get snd_val.res 0) -> (
+      let reg = Array.unsafe_get fst_val.res 0 in
+      let arg_is_folded_reg =
+        Array.map (fun arg -> U.are_equal_regs reg arg) snd_val.arg
+      in
+      match
+        Arch.fold_delta_into_specific_operation specific ~arg_is_folded_reg
+          ~delta
+      with
+      | None -> None
+      | Some specific ->
+        let new_cell =
+          DLL.insert_and_return_before snd
+            { snd_val with desc = Cfg.Op (Specific specific) }
+        in
+        DLL.delete_curr fst;
+        DLL.delete_curr snd;
+        Some (U.prev_at_most U.go_back_const new_cell))
+    | _, _ -> None)
+  | _ -> None
+
 let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
   (* CR-someday xclerc for xclerc: it is not clear we want these rewrites to
      happen here. Indeed, it is probably better to avoid these useless
@@ -222,7 +277,15 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
       in
       if to_remove
       then (
-        let continue = Some (U.prev_at_most U.go_back_const cell) in
+        (* Compute the continuation from cells that survive the deletion: if
+           [cell] were the first element of the block, [prev_at_most] would
+           return [cell] itself, and the traversal would then operate on a
+           deleted cell. *)
+        let continue =
+          match DLL.prev cell with
+          | Some _ as prev -> prev
+          | None -> DLL.next cell
+        in
         DLL.delete_curr cell;
         continue)
       else None
@@ -237,4 +300,5 @@ let apply cell =
   |> if_none_do remove_overwritten_mov
   |> if_none_do remove_useless_mov
   |> if_none_do fold_intop_imm
+  |> if_none_do fold_intop_imm_into_specific
   |> if_none_do remove_intop_neutral_element

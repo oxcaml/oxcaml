@@ -316,7 +316,7 @@ let build_intervals : Cfg_with_infos.t -> Interval.t Reg.Tbl.t =
     let off = on + 1 in
     if trap_handler
     then
-      Array.iter Proc.destroyed_at_raise ~f:(fun reg ->
+      Array.iter (Proc.destroyed_at_raise ()) ~f:(fun reg ->
           update_range reg ~begin_:on ~end_:on);
     Array.iter instr.arg ~f:(fun reg -> update_range reg ~begin_:on ~end_:on);
     Array.iter instr.res ~f:(fun reg -> update_range reg ~begin_:off ~end_:off);

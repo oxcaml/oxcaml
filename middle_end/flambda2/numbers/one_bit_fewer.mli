@@ -1,8 +1,6 @@
 module type S = sig
   type t
 
-  val machine_width : t -> Target_system.Machine_width.t
-
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
@@ -11,19 +9,19 @@ module type S = sig
 
   val print : Format.formatter -> t -> unit
 
-  val min_value : Target_system.Machine_width.t -> t
+  val min_value : t
 
-  val max_value : Target_system.Machine_width.t -> t
+  val max_value : t
 
-  val minus_one : Target_system.Machine_width.t -> t
+  val minus_one : t
 
-  val zero : Target_system.Machine_width.t -> t
+  val zero : t
 
-  val one : Target_system.Machine_width.t -> t
+  val one : t
 
-  val ten : Target_system.Machine_width.t -> t
+  val ten : t
 
-  val hex_ff : Target_system.Machine_width.t -> t
+  val hex_ff : t
 
   val ( <= ) : t -> t -> bool
 
@@ -35,19 +33,19 @@ module type S = sig
 
   val bottom_byte_to_int : t -> int
 
-  val of_char : Target_system.Machine_width.t -> char -> t
+  val of_char : char -> t
 
-  val of_int : Target_system.Machine_width.t -> int -> t
+  val of_int : int -> t
 
-  val of_int_option : Target_system.Machine_width.t -> int -> t option
+  val of_int_option : int -> t option
 
-  val of_int32 : Target_system.Machine_width.t -> int32 -> t
+  val of_int32 : int32 -> t
 
-  val of_int64 : Target_system.Machine_width.t -> int64 -> t
+  val of_int64 : int64 -> t
 
-  val of_targetint : Target_system.Machine_width.t -> Targetint_32_64.t -> t
+  val of_targetint : Targetint_32_64.t -> t
 
-  val of_float : Target_system.Machine_width.t -> float -> t
+  val of_float : float -> t
 
   val to_float : t -> float
 
@@ -75,7 +73,11 @@ module type S = sig
 
   val mod_ : t -> t -> t
 
+  val unsigned_mod : t -> t -> t
+
   val div : t -> t -> t
+
+  val unsigned_div : t -> t -> t
 
   val and_ : t -> t -> t
 

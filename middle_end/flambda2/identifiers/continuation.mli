@@ -18,7 +18,7 @@
 
 type t = private Table_by_int_id.Id.t
 
-type exported
+type importer
 
 include Container_types.S with type t := t
 
@@ -48,9 +48,9 @@ val name_stamp : t -> int
 
 val sort : t -> Sort.t
 
-val export : t -> exported
+val export : Set.t -> importer
 
-val import : exported -> t
+val import : importer -> t -> t
 
 val export_stamp_counter : unit -> int
 

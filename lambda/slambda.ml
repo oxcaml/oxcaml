@@ -25,16 +25,12 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type value_halves = Slambdaeval.halves =
-  { slv_comptime : Slambdaeval.value Slambdaeval.Or_missing.t;
-    slv_runtime : Lambda.lambda
-  }
-
-let eval inspect_slambda template_lam =
+let eval ~cu_static_data inspect_slambda template_lam =
   Profile.record_call "slambda_eval" (fun () ->
-      let halves =
+      let cu_data, lambda =
         Slambda_fracture.fracture template_lam
-        |> inspect_slambda |> Slambdaeval.eval
+        |> inspect_slambda
+        |> Slambdaeval.eval ~cu_static_data
       in
       (* CR layout poly: We can keep this check in the future if
          [is_enabled Layout_poly] is replaced with whether template_lam contains
@@ -42,8 +38,8 @@ let eval inspect_slambda template_lam =
          fracturing) *)
       if
         (not Language_extension.(is_at_least Layout_poly Alpha))
-        && not (template_lam == halves.slv_runtime)
+        && not (template_lam == lambda)
       then
         Misc.fatal_error
           "Slambda eval did something non-trivial but layout poly is disabled.";
-      halves)
+      cu_data, lambda)

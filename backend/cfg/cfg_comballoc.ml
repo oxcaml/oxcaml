@@ -35,8 +35,8 @@ let rec find_next_allocation : cell option -> allocation option =
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
-        | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+        | Const_mask _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
+        | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
         | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
         | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
         | Domain_index | Poll | Pause )
@@ -45,7 +45,18 @@ let rec find_next_allocation : cell option -> allocation option =
       find_next_allocation (DLL.next cell))
 
 (* [find_compatible_allocations cell ~curr_mode ~curr_size] returns the
-   allocations compatible with mode [curr_mode] and total size [curr_size]. *)
+   allocations compatible with mode [curr_mode] and total size [curr_size].
+
+   GC-safety invariant: combining hoists the allocation of every later block to
+   the first allocation's point, while each block's initializing stores stay in
+   place. The reserved-but-uninitialized blocks are thus exposed to any GC
+   safepoint between the first and last combined allocation, and to any raise
+   (which would leave them live below [young_ptr] on the unwind path). So the
+   pass may only continue across instructions that are neither GC safepoints nor
+   able to raise. That holds here because: the pass runs after [Cfg_polling] so
+   every safepoint is an explicit [Poll] (stopped at below); basic instructions
+   never raise; and no [Specific], [Intop_atomic], or [Store] op allocates or
+   polls. *)
 let find_compatible_allocations :
     cell option ->
     curr_mode:Cmm.Alloc_mode.t ->
@@ -90,18 +101,19 @@ let find_compatible_allocations :
       | Op
           ( Move | Spill | Reload | Floatop _ | Reinterpret_cast _ | Opaque
           | Pause | Const_int _ | Const_float _ | Const_float32 _
-          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_symbol _
-          | Stackoffset _ | Load _
+          | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Const_mask _
+          | Const_symbol _ | Stackoffset _ | Load _
           | Store (_, _, _)
           | Csel _ | Specific _ | Name_for_debugger _ | Probe_is_enabled _
           | Static_cast _ | Dls_get | Tls_get | Domain_index
           | Intop
-              ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
+              ( Iadd | Isub | Imul | Idiv _ | Imod _ | Iand | Ior | Ixor | Ilsl
               | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ )
           | Int128op (Iadd128 | Isub128 | Imul64 _)
           | Intop_imm
-              ( ( Iadd | Isub | Imul | Idiv | Imod | Iand | Ior | Ixor | Ilsl
-                | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _ ),
+              ( ( Iadd | Isub | Imul | Idiv _ | Imod _ | Iand | Ior | Ixor
+                | Ilsl | Ilsr | Iasr | Ipopcnt | Imulh _ | Iclz | Ictz | Icomp _
+                  ),
                 _ )
           | Intop_atomic _ ) ->
         loop allocations (DLL.next cell) ~curr_mode ~curr_size)
@@ -130,7 +142,12 @@ let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
   match first_allocation with
   | None -> ()
   | Some { bytes; dbginfo; mode; cell } ->
-    assert (List.length dbginfo = 1);
+    if List.length dbginfo <> 1
+    then
+      Misc.fatal_errorf
+        "Cfg_comballoc: the first allocation should carry a single block of \
+         debug info but carries %d"
+        (List.length dbginfo);
     let compatible_allocs =
       find_compatible_allocations (DLL.next cell) ~curr_mode:mode
         ~curr_size:bytes

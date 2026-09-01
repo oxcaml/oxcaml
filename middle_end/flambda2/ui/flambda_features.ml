@@ -113,8 +113,15 @@ let reaper_change_calling_conventions () =
   !Oxcaml_flags.Flambda2.reaper_change_calling_conventions
   |> with_default ~f:(fun d -> d.reaper_change_calling_conventions)
 
+<<<<<<< HEAD
 let support_lto () =
   !Oxcaml_flags.Flambda2.support_lto |> with_default ~f:(fun d -> d.support_lto)
+||||||| 0fe1d4a7f5
+=======
+let simplify_stubs () =
+  !Oxcaml_flags.Flambda2.simplify_stubs
+  |> with_default ~f:(fun d -> d.simplify_stubs)
+>>>>>>> 941c815
 
 let flat_float_array () = Config.flat_float_array
 

@@ -747,8 +747,18 @@ let perform_analysis db ~stats =
                   Code_id_or_name.compilation_unit code_id_or_name
                 in
                 let mk kind name =
+<<<<<<< HEAD
                   Value_slot.create compilation_unit ~name
                     ~is_always_immediate:false kind
+||||||| 0fe1d4a7f5
+                  Value_slot.create
+                    (Compilation_unit.get_current_exn ())
+                    ~name ~is_always_immediate:false kind
+=======
+                  Value_slot.create
+                    (Current_unit.get_cu_exn ())
+                    ~name ~is_always_immediate:false kind
+>>>>>>> 941c815
                 in
                 let fields =
                   PTA.get_fields_usage_of_constructors db
@@ -764,7 +774,15 @@ let perform_analysis db ~stats =
                   List.fold_left
                     (fun acc (fs, _) ->
                       Function_slot.Map.add fs
+<<<<<<< HEAD
                         (Function_slot.create compilation_unit
+||||||| 0fe1d4a7f5
+                        (Function_slot.create
+                           (Compilation_unit.get_current_exn ())
+=======
+                        (Function_slot.create
+                           (Current_unit.get_cu_exn ())
+>>>>>>> 941c815
                            ~name:(Function_slot.name fs)
                            ~is_always_immediate:false Flambda_kind.value)
                         acc)
@@ -799,5 +817,5 @@ let cannot_change_calling_convention_query =
 
 let cannot_change_calling_convention uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Compilation_unit.is_current (Code_id.get_compilation_unit v)))
+  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db

@@ -25,10 +25,7 @@ let interface ~source_file ~output_prefix =
       ~compilation_unit:Inferred_from_output_prefix
   in
   with_info ~dump_ext:"cmi" unit_info @@ fun info ->
-  Compile_common.interface
-    ~hook_parse_tree:(fun _ -> ())
-    ~hook_typed_tree:(fun _ -> ())
-    info
+  Compile_common.interface ~hook_parse_tree:Fun.id ~hook_typed_tree:ignore info
 
 (** Js_of_ocaml IR compilation backend for .ml files. *)
 
@@ -47,12 +44,10 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          Builtin_attributes.warn_unused ();
          program.code
          |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
-         |> Slambda.eval
+         |> Slambda.eval ~cu_static_data:Compilenv.get_static_data
               (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-         |> fun { Slambda.slv_comptime = _; slv_runtime } ->
-         (* CR layout poly: Drop the comptime part until top-level modules can
-             be static. *)
-         slv_runtime
+         |> fun (static_data, lambda) ->
+         lambda
          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
          |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
               ~gdwarf_may_alter_codegen:false
@@ -81,7 +76,7 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
                     (fun _ _ -> "")
                     jsir.program)
          in
-         (jsir, program.main_module_block_format, arg_descr))
+         (jsir, program.main_module_block_format, arg_descr, static_data))
 
 let emit_jsir i
     ({ program; imported_compilation_units } :
@@ -116,12 +111,12 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     |> Profile.(record transl)
          (Translmod.transl_implementation ~loc i.module_name)
   in
-  let jsir, main_module_block_format, arg_descr =
+  let jsir, main_module_block_format, arg_descr, static_data =
     tlambda_to_jsir i tlambda ~as_arg_for
   in
   Compilenv.save_unit_info
     (Unit_info.Artifact.filename (Unit_info.cmjx i.target))
-    ~main_module_block_format ~arg_descr;
+    ~main_module_block_format ~arg_descr ~static_data;
   jsir
 
 type starting_point =
@@ -158,10 +153,8 @@ let implementation_aux ~start_from ~source_file ~output_prefix
         let jsir = to_jsir info typed ~as_arg_for in
         emit_jsir info jsir
       in
-      Compile_common.implementation
-        ~hook_parse_tree:(fun _ -> ())
-        ~hook_typed_tree:(fun _ -> ())
-        info ~backend
+      Compile_common.implementation ~hook_parse_tree:Fun.id
+        ~hook_typed_tree:ignore info ~backend
   | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
       (match !Clflags.as_argument_for with
       | Some _ ->
@@ -180,7 +173,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
         Translmod.transl_instance info.module_name ~runtime_args
           ~main_module_block_repr ~arg_block_idx
       in
-      let jsir, main_module_block_format, arg_descr_computed =
+      let jsir, main_module_block_format, arg_descr_computed, static_data =
         tlambda_to_jsir info impl ~as_arg_for
       in
       emit_jsir info jsir;
@@ -191,6 +184,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
           (match arg_descr with
           | None -> arg_descr_computed
           | Some _ -> arg_descr)
+        ~static_data
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
   let start_from = start_from |> starting_point_of_compiler_pass in

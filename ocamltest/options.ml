@@ -120,7 +120,7 @@ let usage = "Usage: ocamltest [options] <files...>"
 
 let () =
   Arg.parse (Arg.align commandline_options) (add_to_list files_to_test) usage;
-  Compmisc.read_clflags_from_env ();
+  Location.read_clflags_from_env ();
   Misc.Style.setup !Clflags.color;
   ()
 

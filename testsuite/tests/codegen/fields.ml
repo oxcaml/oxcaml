@@ -230,3 +230,23 @@ set_mut_unboxed:
   movl  $1, %eax
   ret
 |}]
+
+(* The immediate of a store is never negated, so the full signed 32-bit range
+   applies: -0x8000_0000 is stored directly, while -0x8000_0001 must be
+   materialized in a register first. *)
+let set_mut_unboxed_min_int32 (r : mutable_unboxed) = r.p <- -#0x80000000L
+[%%expect_asm X86_64{|
+set_mut_unboxed_min_int32:
+  movq  $-2147483648, 8(%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+let set_mut_unboxed_below_min_int32 (r : mutable_unboxed) = r.p <- -#0x80000001L
+[%%expect_asm X86_64{|
+set_mut_unboxed_below_min_int32:
+  movabsq $-2147483649, %rbx
+  movq  %rbx, 8(%rax)
+  movl  $1, %eax
+  ret
+|}]

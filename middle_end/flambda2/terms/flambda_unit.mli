@@ -38,7 +38,6 @@ val create :
   toplevel_my_alloc_region:Variable.t ->
   body:Flambda.Expr.t ->
   module_symbol:Symbol.t ->
-  used_value_slots:Value_slot.Set.t Or_unknown.t ->
   t
 
 val create_of_metadata_and_body : Metadata.t -> Flambda.Expr.t -> t
@@ -56,10 +55,6 @@ val toplevel_my_ghost_region : t -> Variable.t
 val toplevel_my_alloc_region : t -> Variable.t
 
 val module_symbol : t -> Symbol.t
-
-val used_value_slots : t -> Value_slot.Set.t Or_unknown.t
-
-val with_used_value_slots : t -> Value_slot.Set.t -> t
 
 val body : t -> Flambda.Expr.t
 

@@ -85,13 +85,13 @@ type t =
 let compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t =
  fun cfg_with_infos phi_moves ->
   let classes = Classes.make () in
-  List.iter
-    (fun { Regalloc_split.src; dst } -> Classes.unite classes src dst)
-    phi_moves;
   let affinity = Reg.Tbl.create 17 in
   match Lazy.force Regalloc_utils.affinity with
   | false -> { classes; affinity }
   | true ->
+    List.iter
+      (fun { Regalloc_split.src; dst } -> Classes.unite classes src dst)
+      phi_moves;
     let priorities : int Phys_reg.Tbl.t Reg.Tbl.t = Reg.Tbl.create 17 in
     Cfg.iter_blocks (Cfg_with_infos.cfg cfg_with_infos) ~f:(fun label block ->
         let loop_infos = Cfg_with_infos.loop_infos cfg_with_infos in
@@ -127,6 +127,26 @@ let compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t =
         Reg.Tbl.replace affinity temp affinities)
       priorities;
     { classes; affinity }
+
+let same_phi_class : t -> Reg.t -> Reg.t -> bool =
+ fun t left right ->
+  let left = Classes.find t.classes left in
+  let right = Classes.find t.classes right in
+  Reg.same left right
+
+let priority : t -> temp:Reg.t -> phys_reg:Phys_reg.t -> int =
+ fun t ~temp ~phys_reg ->
+  let temp = Classes.find t.classes temp in
+  match Reg.Tbl.find_opt t.affinity temp with
+  | None -> 0
+  | Some affinities -> (
+    match
+      Array.find_opt
+        (fun affinity -> Phys_reg.equal affinity.phys_reg phys_reg)
+        affinities
+    with
+    | None -> 0
+    | Some affinity -> affinity.priority)
 
 type affinities =
   { mutable next_index : int;

@@ -152,34 +152,63 @@ module Pattern_matching_wildcard :
   end
 |}]
 
-(* Defining atomic fields in a mixed block is permitted. *)
-module Mixed_blocks_ok = struct
+(* Atomic fields are permitted in mixed blocks. *)
+module Mixed_record_atomics = struct
   type t = {
-    padding : #(int * int * int);
-    mutable field : int [@atomic]
+    mutable a : int [@atomic];
+    mutable b : int64#
   }
-end
 
+  let access t =
+    let _ = t.a in
+    let _ = t.b in
+    t.a <- 42;
+    t.b <- #42L
+end
 [%%expect{|
-module Mixed_blocks_ok :
+module Mixed_record_atomics :
   sig
-    type t = { padding : #(int * int * int); mutable field : int [@atomic]; }
+    type t = { mutable a : int [@atomic]; mutable b : int64#; }
+    val access : t -> unit
   end
 |}]
 
-(* Test access of nonatomic fields in mixed record with atomic fields *)
-type t = { i : int64#; mutable a : int [@atomic]; mutable b : int }
-[%%expect {|
-type t = { i : int64#; mutable a : int [@atomic]; mutable b : int; }
+(* Atomic fields are permitted in mixed inline records. *)
+module Mixed_inline_record_atomics = struct
+  type t = A of {
+    mutable a : int [@atomic];
+    mutable b : int64#
+  }
+
+  let access (A t) =
+    let _ = t.a in
+    let _ = t.b in
+    t.a <- 42;
+    t.b <- #42L
+end
+[%%expect{|
+module Mixed_inline_record_atomics :
+  sig
+    type t = A of { mutable a : int [@atomic]; mutable b : int64#; }
+    val access : t -> unit
+  end
 |}]
 
-let ok_project (t : t) = t.b
-[%%expect {|
-val ok_project : t -> int = <fun>
+(* We forbid taking atomic.loc of fields from mixed records. *)
+let forbidden (t : Mixed_record_atomics.t) = [%atomic.loc t.a]
+[%%expect{|
+Line 1, characters 45-62:
+1 | let forbidden (t : Mixed_record_atomics.t) = [%atomic.loc t.a]
+                                                 ^^^^^^^^^^^^^^^^^
+Error: Use of "[%atomic.loc]" with mixed record fields (here "a") is forbidden.
 |}]
-let ok_set (t : t) = t.b <- 42
-[%%expect {|
-val ok_set : t -> unit = <fun>
+
+let forbidden_inline (A t : Mixed_inline_record_atomics.t) = [%atomic.loc t.a]
+[%%expect{|
+Line 1, characters 61-78:
+1 | let forbidden_inline (A t : Mixed_inline_record_atomics.t) = [%atomic.loc t.a]
+                                                                 ^^^^^^^^^^^^^^^^^
+Error: Use of "[%atomic.loc]" with mixed record fields (here "a") is forbidden.
 |}]
 
 (* Test mixed record atomic fields with non-value layouts *)
@@ -213,6 +242,16 @@ end
 Line 4, characters 4-31:
 4 |     mutable field : u [@atomic]
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Atomic record fields must have layout value.
+|}]
+
+module Mixed_inline_record_non_value_atomic = struct
+  type t = A of { mutable f : float# [@atomic]; g : int64# }
+end
+[%%expect{|
+Line 2, characters 18-47:
+2 |   type t = A of { mutable f : float# [@atomic]; g : int64# }
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Atomic record fields must have layout value.
 |}]
 
@@ -257,11 +296,11 @@ module Functional_update_copy_ok = struct
   let allowed t = { t with y = t.y }
 end
 [%%expect{|
-Line 5, characters 31-32:
-5 |   let allowed t = { t with y = t.y }
-                                   ^
-Error: Accessing atomic fields (here "y") of mixed records is not yet
-       supported.
+module Functional_update_copy_ok :
+  sig
+    type t = { x : int64#; mutable y : int [@atomic]; }
+    val allowed : t -> t
+  end
 |}]
 
 module Functional_update_multi_error = struct
@@ -301,9 +340,13 @@ module Functional_update_multi_copy_ok = struct
   let allowed t = { t with y = t.y; z = t.z } (* no implicit atomic loads *)
 end
 [%%expect{|
-Line 4, characters 31-32:
-4 |   let allowed t = { t with y = t.y; z = t.z } (* no implicit atomic loads *)
-                                   ^
-Error: Accessing atomic fields (here "y") of mixed records is not yet
-       supported.
+module Functional_update_multi_copy_ok :
+  sig
+    type t = {
+      x : int64#;
+      mutable y : int [@atomic];
+      mutable z : int [@atomic];
+    }
+    val allowed : t -> t
+  end
 |}]

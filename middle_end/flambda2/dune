@@ -38,7 +38,7 @@
    Int_replace_polymorphic_compare))
  (modules flambda2)
  (libraries
-  ocamlcommon
+  ocamlfrontend
   ocamlbytecomp
   ocamloptcomp
   flambda2_lattices

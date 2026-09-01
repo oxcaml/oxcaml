@@ -58,7 +58,7 @@ external div : int8# -> int8# -> int8# = "%int8#_div"
 
 (** Same as {!div}, except that arguments and result are interpreted as {e
     unsigned} integers. *)
-val unsigned_div : int8# -> int8# -> int8#
+external unsigned_div : int8# -> int8# -> int8# = "%int8#_unsigned_div"
 
 (** Integer remainder. If [y] is not zero, [rem x y = sub x (mul (div x y)
     y)]. If [y] is zero, [rem x y] raises [Division_by_zero]. *)
@@ -66,7 +66,7 @@ external rem : int8# -> int8# -> int8# = "%int8#_mod"
 
 (** Same as {!rem}, except that arguments and result are interpreted as {e
     unsigned} integers. *)
-val unsigned_rem : int8# -> int8# -> int8#
+external unsigned_rem : int8# -> int8# -> int8# = "%int8#_unsigned_mod"
 
 (** [succ x] is [add x 1]. *)
 external succ : int8# -> int8# = "%int8#_succ"

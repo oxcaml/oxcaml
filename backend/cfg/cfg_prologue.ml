@@ -95,8 +95,8 @@ module Instruction_requirements = struct
       | Op
           ( Move | Spill | Reload | Const_int _ | Const_float32 _
           | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Load _ | Store _ | Intop _ | Int128op _
-          | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+          | Const_vec512 _ | Const_mask _ | Load _ | Store _ | Intop _
+          | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
           | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
           | Begin_region | End_region | Specific _ | Name_for_debugger _
           | Dls_get | Tls_get | Domain_index | Pause )
@@ -484,6 +484,12 @@ let add_prologue (cfg : Cfg.t) prologue_label =
 
 let add_prologue_if_required (cfg_with_infos : Cfg_with_infos.t) ~f =
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  cfg.fun_frame_required
+    <- Proc.frame_required ~fun_contains_calls:cfg.fun_contains_calls
+         ~fun_num_stack_slots:cfg.fun_num_stack_slots;
+  cfg.fun_prologue_required
+    <- Proc.prologue_required ~fun_contains_calls:cfg.fun_contains_calls
+         ~fun_num_stack_slots:cfg.fun_num_stack_slots;
   let prologue_blocks, epilogue_blocks = f cfg_with_infos in
   Label.Set.iter (add_prologue cfg) prologue_blocks;
   Label.Set.iter

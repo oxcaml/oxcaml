@@ -276,8 +276,6 @@ let print_out_value ppf tree =
        fprintf ppf "@[<2>[|%a|]@]"
          (pp_print_seq ~pp_sep:semicolon pp_print_float)
          (Float.Array.to_seq arr)
-    | Oval_code e ->
-        deprecated_printer (fun fmt -> CamlinternalQuote.Code.print fmt e) ppf
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
   and print_fields first ppf =
     function
@@ -494,6 +492,10 @@ and print_simple_out_type ppf =
   | Otyp_attribute (t, attr) ->
       fprintf ppf "@[<1>(%a [@@%s])@]"
         print_out_type_0 t attr.oattr_name
+  | Otyp_mod (t, []) -> print_simple_out_type ppf t
+  | Otyp_mod (t, modalities) ->
+      fprintf ppf "@[<1>(%a%a)@]"
+        print_out_type_0 t print_out_modalities modalities
   | Otyp_jkind_annot (t, jk) ->
     fprintf ppf "@[<1>(%a@ :@ %a)@]"
       print_out_type_0 t
@@ -658,6 +660,8 @@ and print_out_jkind ppf ojkind =
     | Ojkind_product ts ->
       let pp_sep ppf () = fprintf ppf "@ & " in
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+    | Ojkind_addressable t ->
+      fprintf ppf "%a addressable" (pp_element ~nested:true) t
   in
   pp_element ~nested:false ppf ojkind
 
@@ -944,8 +948,9 @@ and print_out_sig_item ppf =
            | Orec_next  -> "and")
           ppf td
   | Osig_value { oval_name; oval_type; oval_modalities;
-                 oval_prims; oval_attributes } ->
+                 oval_prims; oval_attributes; oval_poly } ->
       let kwd = if oval_prims = [] then "val" else "external" in
+      let poly = if oval_poly then "poly_ " else "" in
       let pr_prims ppf =
         function
           [] -> ()
@@ -953,7 +958,7 @@ and print_out_sig_item ppf =
             fprintf ppf "@ = \"%s\"" s;
             List.iter (fun s -> fprintf ppf "@ \"%s\"" s) sl
       in
-      fprintf ppf "@[<2>%s %a :@ %a%a%a%a@]" kwd value_ident oval_name
+      fprintf ppf "@[<2>%s %s%a :@ %a%a%a%a@]" kwd poly value_ident oval_name
         !out_type oval_type
         print_out_modalities oval_modalities
         pr_prims oval_prims

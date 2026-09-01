@@ -673,10 +673,10 @@ and function_constraint =
 and block_access =
   | Baccess_field of Longident.t loc
       (** [.foo] *)
-  | Baccess_block of mutable_flag * expression
-      (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
-          (usually followed by unboxed accesses, to deepen the index).
-      *)
+  | Baccess_block of access_flag * expression
+      (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)],
+          [.idx_atomic(E)] (usually followed by unboxed accesses,
+          to deepen the index). *)
 
 and unboxed_access =
   | Uaccess_unboxed_field of Longident.t loc

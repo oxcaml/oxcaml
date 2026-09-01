@@ -1,10 +1,10 @@
-let $camlTests15__immstring15 = "tests15.ml" in
-let $camlTests15__const_block17 = Block 0 ($camlTests15__immstring15, 18, 52)
+let $camlTests15__immstring_0 = "tests15.ml" in
+let $camlTests15__const_block_1 = Block 0 ($camlTests15__immstring_0, 18, 52)
 in
-let $camlTests15__Pmakeblock20 =
-  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests15__const_block17)
+let $camlTests15__Pmakeblock_2 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests15__const_block_1)
 in
-let $camlTests15__empty_array22 = Empty_array in
+let $camlTests15__empty_array_3 = Empty_array in
 let code list_to_array_0 deleted in
 let code is_c_1 deleted in
 let code set_to_x_2 deleted in
@@ -12,7 +12,7 @@ let code classical_id_3 deleted in
 let code swapped_4 deleted in
 let code negate_5 deleted in
 let code foo_6 deleted in
-let $camlTests15__immstring68 = " \\ \n " in
+let $camlTests15__immstring_4 = " \\ \n " in
 let code loopify(never) size(11) newer_version_of(list_to_array_0)
       list_to_array_0_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
         my_closure &my_alloc_region my_depth
@@ -20,10 +20,10 @@ let code loopify(never) size(11) newer_version_of(list_to_array_0)
         : val array =
   let prim = %is_int (param) in
   switch prim
-    | 0 -> k1 pop(regular k1) ($camlTests15__Pmakeblock20)
-    | 1 -> k ($camlTests15__empty_array22)
+    | 0 -> k1 pop(regular k1) ($camlTests15__Pmakeblock_2)
+    | 1 -> k ($camlTests15__empty_array_3)
 in
-let $camlTests15__list_to_array_7 =
+let $camlTests15__list_to_array_5 =
   closure list_to_array_0_1 @list_to_array &toplevel.alloc_region
 in
 let code loopify(never) size(7) newer_version_of(is_c_1)
@@ -40,7 +40,7 @@ let code loopify(never) size(7) newer_version_of(is_c_1)
   let tagged_scrutinee = %tag_imm (eq) in
   cont k (tagged_scrutinee)
 in
-let $camlTests15__is_c_8 = closure is_c_1_1 @is_c &toplevel.alloc_region in
+let $camlTests15__is_c_6 = closure is_c_1_1 @is_c &toplevel.alloc_region in
 let code loopify(never) size(5) newer_version_of(set_to_x_2)
       set_to_x_2_1 (b : val, i : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -50,7 +50,7 @@ let code loopify(never) size(5) newer_version_of(set_to_x_2)
   let Pbytessetu = %bytes_or_bigstring_set.bytes.[`8`] (b, prim, 120s) in
   cont k (0)
 in
-let $camlTests15__set_to_x_9 =
+let $camlTests15__set_to_x_7 =
   closure set_to_x_2_1 @set_to_x &toplevel.alloc_region
 in
 let code loopify(never) size(3) newer_version_of(classical_id_3)
@@ -62,7 +62,7 @@ let code loopify(never) size(3) newer_version_of(classical_id_3)
   let Pnot_1 = %boolean_not (Pnot) in
   cont k (Pnot_1)
 in
-let $camlTests15__classical_id_10 =
+let $camlTests15__classical_id_8 =
   closure classical_id_3_1 @classical_id &toplevel.alloc_region
 in
 let code loopify(never) size(1) newer_version_of(swapped_4)
@@ -72,7 +72,7 @@ let code loopify(never) size(1) newer_version_of(swapped_4)
         : imm tagged =
   cont k (17459)
 in
-let $camlTests15__swapped_11 =
+let $camlTests15__swapped_9 =
   closure swapped_4_1 @swapped &toplevel.alloc_region
 in
 let code loopify(never) size(3) newer_version_of(negate_5)
@@ -83,7 +83,7 @@ let code loopify(never) size(3) newer_version_of(negate_5)
   let int_neg = %int_barith.sub (0, x) in
   cont k (int_neg)
 in
-let $camlTests15__negate_12 =
+let $camlTests15__negate_10 =
   closure negate_5_1 @negate &toplevel.alloc_region
 in
 let code loopify(never) size(2) newer_version_of(foo_6)
@@ -94,15 +94,15 @@ let code loopify(never) size(2) newer_version_of(foo_6)
   let int_or = %int_barith.or (x, 42) in
   cont k (int_or)
 in
-let $camlTests15__foo_13 = closure foo_6_1 @foo &toplevel.alloc_region in
+let $camlTests15__foo_11 = closure foo_6_1 @foo &toplevel.alloc_region in
 let $camlTests15 =
-  Block 0 ($camlTests15__list_to_array_7,
-           $camlTests15__is_c_8,
-           $camlTests15__set_to_x_9,
-           $camlTests15__classical_id_10,
-           $camlTests15__swapped_11,
-           $camlTests15__negate_12,
-           $camlTests15__immstring68,
-           $camlTests15__foo_13)
+  Block 0 ($camlTests15__list_to_array_5,
+           $camlTests15__is_c_6,
+           $camlTests15__set_to_x_7,
+           $camlTests15__classical_id_8,
+           $camlTests15__swapped_9,
+           $camlTests15__negate_10,
+           $camlTests15__immstring_4,
+           $camlTests15__foo_11)
 in
 cont done ($camlTests15)

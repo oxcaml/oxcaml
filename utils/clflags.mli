@@ -90,7 +90,9 @@ val no_cwd : bool ref
 val print_types : bool ref
 val make_archive : bool ref
 val debug : bool ref
+val debug_ocamldebug_types : bool ref
 val debug_full : bool ref
+val restrict_to_upstream_dwarf : bool ref
 val dwarf_c_toolchain_flag : string ref
 val dwarf_fission : dwarf_fission ref
 val dwarf_pedantic : bool ref
@@ -98,7 +100,6 @@ val gdwarf_config_shape_reduce_depth : int option ref
 val gdwarf_config_shape_eval_depth : int option ref
 val gdwarf_config_max_cms_files_per_unit : int option ref
 val gdwarf_config_max_cms_files_per_variable : int option ref
-val gdwarf_config_max_type_to_shape_depth : int option ref
 val gdwarf_config_max_shape_reduce_steps_per_variable : int option ref
 val gdwarf_config_max_evaluation_steps_per_variable : int option ref
 val gdwarf_config_shape_reduce_fuel : int option ref
@@ -136,6 +137,7 @@ val annotations : bool ref
 val binary_annotations : bool ref
 val binary_annotations_cms : bool ref
 val shape_format : shape_format ref
+val type_to_shape_max_depth : int option ref
 val store_occurrences : bool ref
 val use_threads : bool ref
 val noassert : bool ref
@@ -172,8 +174,13 @@ val parameters : string list ref
 val as_parameter : bool ref
 val as_argument_for : string option ref
 val instantiate : bool ref
+<<<<<<< HEAD
 val reaper_rebuild : bool ref
 val reaper_solve : bool ref
+||||||| 0fe1d4a7f5
+=======
+val functorize : bool ref
+>>>>>>> 941c815
 val dump_source : bool ref
 val dump_parsetree : bool ref
 val dump_typedtree : bool ref
@@ -434,3 +441,6 @@ val ddissector_partitions : bool ref
 val ddissector_inputs : string option ref
 
 val prepend_directory : string -> string
+
+val set_restrict_to_upstream_dwarf : unit -> unit
+val no_restrict_to_upstream_dwarf : unit -> unit

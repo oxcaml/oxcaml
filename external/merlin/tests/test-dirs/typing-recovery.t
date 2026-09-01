@@ -99,6 +99,7 @@
           expression (test.ml[2,15+6]..test.ml[6,69+12]) ghost
             Texp_function
             alloc_mode id(modevar#6[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            yielding_mode unyielding
             id(modevar#a[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,dynamic])
             []
             [
@@ -107,15 +108,16 @@
                 pattern (test.ml[2,15+7]..test.ml[2,15+8])
                   extra (test.ml[2,15+6]..test.ml[2,15+13])
                     Tpat_extra_constraint
-                    core_type (test.ml[2,15+11]..test.ml[2,15+12])
-                      Ttyp_constr \"t\"
-                      []
+                    Some
+                      core_type (test.ml[2,15+11]..test.ml[2,15+12])
+                        Ttyp_constr \"t\"
+                        []
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_var \"x\"
                   sort value
                   value_mode global,many,portable,forkable,unyielding,stateless;meet(unique,uncontended,read_write,static,imply(aliased,contended,immutable,static)(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 []
             ]
             Tfunction_body
@@ -284,6 +286,7 @@
           expression (test2.ml[2,15+6]..test2.ml[2,15+24]) ghost
             Texp_function
             alloc_mode id(modevar#6[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            yielding_mode unyielding
             id(modevar#a[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#b[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
             []
             [
@@ -294,13 +297,14 @@
                     []
                   extra (test2.ml[2,15+6]..test2.ml[2,15+13])
                     Tpat_extra_constraint
-                    core_type (test2.ml[2,15+11]..test2.ml[2,15+12])
-                      Ttyp_constr \"t\"
-                      []
+                    Some
+                      core_type (test2.ml[2,15+11]..test2.ml[2,15+12])
+                        Ttyp_constr \"t\"
+                        []
                     global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
                     []
                   Tpat_any
-                id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                id(modevar#8[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,unyielding,stateful]);id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 []
             ]
             Tfunction_body
@@ -615,9 +619,10 @@ make sure we also handle that correctly in structures:
           pattern (test_ct.ml[1,0+4]..test_ct.ml[1,0+8])
             extra (test_ct.ml[1,0+4]..test_ct.ml[1,0+8]) ghost
               Tpat_extra_constraint
-              core_type (test_ct.ml[1,0+11]..test_ct.ml[1,0+14])
-                Ttyp_constr \"int!\"
-                []
+              Some
+                core_type (test_ct.ml[1,0+11]..test_ct.ml[1,0+14])
+                  Ttyp_constr \"int!\"
+                  []
               global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
               []
             Tpat_var \"foo1\"
@@ -638,18 +643,19 @@ make sure we also handle that correctly in structures:
           pattern (test_ct.ml[3,20+4]..test_ct.ml[3,20+8])
             extra (test_ct.ml[3,20+4]..test_ct.ml[3,20+8]) ghost
               Tpat_extra_constraint
-              core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+21])
-                Ttyp_tuple
-                [
-                  Label: None
-                  core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+14])
-                    Ttyp_constr \"int!\"
-                    []
-                  Label: None
-                  core_type (test_ct.ml[3,20+17]..test_ct.ml[3,20+21])
-                    Ttyp_var _
-                    None
-                ]
+              Some
+                core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+21])
+                  Ttyp_tuple
+                  [
+                    Label: None
+                    core_type (test_ct.ml[3,20+11]..test_ct.ml[3,20+14])
+                      Ttyp_constr \"int!\"
+                      []
+                    Label: None
+                    core_type (test_ct.ml[3,20+17]..test_ct.ml[3,20+21])
+                      Ttyp_var _
+                      None
+                  ]
               global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
               []
             Tpat_var \"foo2\"
@@ -688,18 +694,19 @@ make sure we also handle that correctly in structures:
           pattern (test_ct.ml[5,50+4]..test_ct.ml[5,50+8])
             extra (test_ct.ml[5,50+4]..test_ct.ml[5,50+8]) ghost
               Tpat_extra_constraint
-              core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+20])
-                Ttyp_tuple
-                [
-                  Label: None
-                  core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+14])
-                    Ttyp_constr \"int!\"
-                    []
-                  Label: None
-                  core_type (test_ct.ml[5,50+17]..test_ct.ml[5,50+20])
-                    Ttyp_constr \"int!\"
-                    []
-                ]
+              Some
+                core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+20])
+                  Ttyp_tuple
+                  [
+                    Label: None
+                    core_type (test_ct.ml[5,50+11]..test_ct.ml[5,50+14])
+                      Ttyp_constr \"int!\"
+                      []
+                    Label: None
+                    core_type (test_ct.ml[5,50+17]..test_ct.ml[5,50+20])
+                      Ttyp_constr \"int!\"
+                      []
+                  ]
               global,many,nonportable,forkable,unyielding,stateful,aliased,uncontended,read_write,dynamic
               []
             Tpat_var \"foo3\"

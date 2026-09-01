@@ -247,22 +247,51 @@ module Dbg = struct
       | _ :: _, [] -> 1
       | [], _ :: _ -> -1
       | d1 :: ds1, d2 :: ds2 ->
-
-     let c = String.compare d1.dinfo_file d2.dinfo_file in
+       (* The record patterns below list every field explicitly, making it
+          clear which fields participate in the comparison.  The
+          [dinfo_scopes] and [dinfo_function_symbol] fields are deliberately
+          not compared. *)
+       let { dinfo_file = dinfo_file1;
+                            dinfo_line = dinfo_line1;
+                            dinfo_char_start = dinfo_char_start1;
+                            dinfo_char_end = dinfo_char_end1;
+                            dinfo_start_bol = dinfo_start_bol1;
+                            dinfo_end_bol = dinfo_end_bol1;
+                            dinfo_end_line = dinfo_end_line1;
+                            dinfo_scopes = _;
+                            dinfo_uid = dinfo_uid1;
+                            dinfo_function_symbol = _;
+                            dinfo_dir = dinfo_dir1 } = d1
+       in
+       let { dinfo_file = dinfo_file2;
+                            dinfo_line = dinfo_line2;
+                            dinfo_char_start = dinfo_char_start2;
+                            dinfo_char_end = dinfo_char_end2;
+                            dinfo_start_bol = dinfo_start_bol2;
+                            dinfo_end_bol = dinfo_end_bol2;
+                            dinfo_end_line = dinfo_end_line2;
+                            dinfo_scopes = _;
+                            dinfo_uid = dinfo_uid2;
+                            dinfo_function_symbol = _;
+                            dinfo_dir = dinfo_dir2 } = d2
+       in
+       let c = String.compare dinfo_file1 dinfo_file2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_line d2.dinfo_line in
+       let c = Int.compare dinfo_line1 dinfo_line2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_char_end d2.dinfo_char_end in
+       let c = Int.compare dinfo_char_end1 dinfo_char_end2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_char_start d2.dinfo_char_start in
+       let c = Int.compare dinfo_char_start1 dinfo_char_start2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_start_bol d2.dinfo_start_bol in
+       let c = Int.compare dinfo_start_bol1 dinfo_start_bol2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_end_bol d2.dinfo_end_bol in
+       let c = Int.compare dinfo_end_bol1 dinfo_end_bol2 in
        if c <> 0 then c else
-       let c = Int.compare d1.dinfo_end_line d2.dinfo_end_line in
+       let c = Int.compare dinfo_end_line1 dinfo_end_line2 in
        if c <> 0 then c else
-       let c = Option.compare String.compare d1.dinfo_dir d2.dinfo_dir in
+       let c = Option.compare String.compare dinfo_dir1 dinfo_dir2 in
+       if c <> 0 then c else
+       let c = Option.compare String.compare dinfo_uid1 dinfo_uid2 in
        if c <> 0 then c else
        loop ds1 ds2
     in
@@ -354,6 +383,49 @@ let from_location = function
     let assume_zero_alloc = Scoped_location.get_assume_zero_alloc ~scopes in
     { dbg = [item_from_location ~scopes loc]; assume_zero_alloc; }
 
+(* The build root against which a relative [-directory] argument is to be
+   interpreted.  By convention (see the documentation of [-directory] in
+   [Main_args]), a compilation unit built with a relative [-directory d] has
+   its working directory at [<root>/d]; we recover [<root>] by stripping that
+   suffix from the current working directory. *)
+let build_root_for_relative_directory =
+  lazy
+    (match !Clflags.directory with
+    | None -> None
+    | Some dir ->
+      if Filename.is_relative dir
+      then
+        let cwd = Sys.getcwd () in
+        let suffix = Filename.dir_sep ^ dir in
+        if String.ends_with ~suffix cwd
+        then
+          match String.length cwd - String.length suffix with
+          | 0 -> Some Filename.dir_sep
+          | root_length -> Some (String.sub cwd 0 root_length)
+        else None
+      else None)
+
+let item_file_path d =
+  let file = d.dinfo_file in
+  if not (Filename.is_relative file)
+  then Location.rewrite_absolute_path file
+  else
+    match d.dinfo_dir with
+    | None -> file
+    | Some dir ->
+      let composed = Filename.concat dir file in
+      if not (Filename.is_relative dir)
+      then Location.rewrite_absolute_path composed
+      else (
+        match Lazy.force build_root_for_relative_directory with
+        | Some root ->
+          Location.rewrite_absolute_path (Filename.concat root composed)
+        | None ->
+          (* We cannot reliably absolutize the path, e.g. because this unit was
+             compiled without [-directory].  The composed relative path still
+             carries more information than the bare filename. *)
+          composed)
+
 let to_location { dbg; assume_zero_alloc=_ } =
   let rec last = function
     | [] -> None
@@ -376,6 +448,9 @@ let to_location { dbg; assume_zero_alloc=_ } =
         pos_cnum = d.dinfo_start_bol + d.dinfo_char_end;
       } in
     { loc_ghost = false; loc_start; loc_end; }
+
+let to_file_path { dbg; assume_zero_alloc = _ } =
+  Option.map item_file_path (Misc.last dbg)
 
 let inline { dbg = dbg1; assume_zero_alloc = a1; }
       ~from_inlined_body:{ dbg = dbg2; assume_zero_alloc = a2; } =

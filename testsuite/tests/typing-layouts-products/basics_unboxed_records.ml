@@ -763,13 +763,9 @@ type q : any mod portable = #{ x : int -> int; y : int -> q }
 Line 1, characters 0-61:
 1 | type q : any mod portable = #{ x : int -> int; y : int -> q }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "q" is
-           value non_float mod aliased immutable
-           & value non_float mod aliased immutable
-         because it is an unboxed record.
-       But the kind of type "q" must be a subkind of
-           any mod portable & any mod portable
-         because of the annotation on the declaration of the type q.
+Error: This type definition does not satisfy its kind annotation
+         any mod portable & any mod portable,
+       because functions are not mod portable.
 |}]
 (* CR layouts v2.8: That error message is incomprehensible without
    with-bounds. Internal ticket 5096. *)

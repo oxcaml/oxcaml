@@ -4,23 +4,32 @@
 name: Syntax changes reminder
 
 on:
-  pull_request_target:
+  # This trigger is safe here: the workflow never checks out or runs PR code;
+  # it only posts a comment, which needs write permission on fork PRs.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
     types: [opened, synchronize, reopened]
     paths:
       - 'parsing/parser.mly'
 
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   remind:
+    name: parser-change reminder comment
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      pull-requests: write # post the parser-change checklist comment on the PR
     steps:
       - name: Create PR Comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          REPO=${{ github.repository }}
-          PR_NUMBER=${{ github.event.pull_request.number }}
+          REPO=$GITHUB_REPOSITORY
           COMMENT="## Parser Change Checklist
 
           This PR modifies the parser. Please check that:

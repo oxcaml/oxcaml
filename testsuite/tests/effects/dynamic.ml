@@ -4,66 +4,46 @@
    { native; }
 *)
 
-(* Tests the runtime support for dynamic bindings. Dynamic.t isn't yet implemented in the
-   OxCaml stdlib, only the runtime support for it, so testing that requires faking a bit
-   more infrastructure here in the test case. *)
+open Modes
 
 module type Dynamic_S = sig
   type 'a t
 
   val make : unit -> 'a t
-  val get : 'a t -> 'a or_null
+  val get : 'a t -> 'a or_null @ portable contended
 
-  val with_temporarily : 'a t -> 'a -> f: (unit -> 'b) -> 'b
-end
+  val with_temporarily : 'a t -> 'a @ portable -> f:(unit -> 'b) -> 'b
+ end
 
-module Dynamic : Dynamic_S = struct
-  type 'a t
-
-  external make : unit -> 'a t = "caml_dynamic_make"
-  external get : 'a t -> 'a or_null = "caml_dynamic_get"
-  external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
-  external pop : 'a t -> unit = "caml_dynamic_pop"
+ module Dynamic : Dynamic_S = struct
+  include Dynamic
 
   let with_temporarily d v ~f =
-    push d v;
-    Fun.protect f ~finally:(fun () -> pop d)
-end
+    (with_temporarily d v ~f:(fun () ->
+      { Many.many = { Aliased.aliased = { Global.global = f () }}})).many.aliased.global
+ end
 
-module Dynamic_inside_fiber : Dynamic_S = struct
-  type 'a t
-
-  external make : unit -> 'a t = "caml_dynamic_make"
-  external get : 'a t -> 'a or_null = "caml_dynamic_get"
-  external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
-  external pop : 'a t -> unit = "caml_dynamic_pop"
+ module Dynamic_inside_fiber : Dynamic_S = struct
+  include Dynamic
 
   let with_temporarily d v ~f =
     Effect.Deep.match_with
-      (fun () ->
-        push d v;
-        Fun.protect f ~finally:(fun () -> pop d)) ()
+      (fun () -> with_temporarily d v ~f)
+      ()
       { retc = (fun v -> v);
         exnc = (fun e -> raise e);
         effc = (fun (type a) (_ : a Effect.t) -> None) }
-end
+ end
 
-module Dynamic_outside_fiber : Dynamic_S = struct
-  type 'a t
-
-  external make : unit -> 'a t = "caml_dynamic_make"
-  external get : 'a t -> 'a or_null = "caml_dynamic_get"
-  external push : 'a t -> 'a -> unit  = "caml_dynamic_push"
-  external pop : 'a t -> unit = "caml_dynamic_pop"
+ module Dynamic_outside_fiber : Dynamic_S = struct
+  include Dynamic
 
   let with_temporarily d v ~f =
-    push d v;
-    Fun.protect (fun () ->
-      Effect.Deep.match_with f ()
-        { retc = (fun v -> v);
-          exnc = (fun e -> raise e);
-          effc = (fun (type a) (_ : a Effect.t) -> None) })
-      ~finally:(fun () -> pop d)
+    with_temporarily d v ~f:(fun () ->
+        Effect.Deep.match_with f ()
+          { retc = (fun v -> v);
+            exnc = (fun e -> raise e);
+            effc = (fun (type a) (_ : a Effect.t) -> None) })
 end
 
 type _ Effect.t += E : unit -> unit Effect.t

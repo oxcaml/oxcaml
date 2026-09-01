@@ -664,12 +664,12 @@ end
     Twelve is unsigned (0-4095). *)
 module Immediate = struct
   type 'width t =
-    | Six : int -> [`Six] t
-    | Twelve : int -> [`Twelve] t
-    | Sixteen_unsigned : int -> [`Sixteen_unsigned] t
-    | Sym : 'w Symbol.t -> [`Sym of 'w] t
-    | Float : float -> [`Sixty_four] t
-    | Nativeint : nativeint -> [`Sixty_four] t
+    | Six : int -> [> `Six] t
+    | Twelve : int -> [> `Twelve] t
+    | Sixteen_unsigned : int -> [> `Sixteen_unsigned] t
+    | Sym : 'w Symbol.t -> [> `Sym of 'w] t
+    | Float : float -> [> `Sixty_four] t
+    | Nativeint : nativeint -> [> `Sixty_four] t
   [@@warning "-37"]
 
   let print : type w. Format.formatter -> w t -> unit =
@@ -1005,7 +1005,7 @@ module Instruction_name = struct
         t
     | ADDV :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of ([< `B | `H | `S] as 'w)]]]
+          [`Reg of [`Neon of [`Scalar of ([< `B | `H | `S] as 'w)]]]
           * [ `Reg of
               [ `Neon of
                 [`Vector of [< `V8B | `V16B | `V4H | `V8H | `V2S | `V4S] * 'w]
@@ -1015,7 +1015,7 @@ module Instruction_name = struct
         ( quad,
           [`Reg of [`GP of [< `X | `SP | `FP]]]
           * [`Reg of [`GP of [< `X | `SP | `FP]]]
-          * [`Imm of [< `Twelve | `Sym of [`Twelve]]]
+          * [`Imm of [`Twelve | `Sym of [`Twelve]]]
           * [`Optional of [`Fixed_shift of [`Lsl_by_twelve]] option] )
         t
     | ADD_shifted_register :
@@ -1218,8 +1218,8 @@ module Instruction_name = struct
         t
     | FCVT :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
-          * [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]] )
+          [`Reg of [`Neon of [`Scalar of [< `S | `D]]]]
+          * [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] )
         t
     | FCVTL_vector :
         ( pair,
@@ -1229,7 +1229,7 @@ module Instruction_name = struct
     | FCVTNS :
         ( pair,
           [`Reg of [`GP of [< `X]]]
-          * [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]] )
+          * [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] )
         t
     | FCVTNS_vector :
         ( pair,
@@ -1247,7 +1247,7 @@ module Instruction_name = struct
     | FCVTZS :
         ( pair,
           [`Reg of [`GP of [< `X]]]
-          * [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]] )
+          * [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] )
         t
     | FCVTZS_vector :
         ( pair,
@@ -1326,18 +1326,16 @@ module Instruction_name = struct
         t
     | FMOV_fp_to_gp_32 :
         ( pair,
-          [`Reg of [`GP of [`W]]] * [`Reg of [`Neon of [< `Scalar of [< `S]]]]
-        )
+          [`Reg of [`GP of [`W]]] * [`Reg of [`Neon of [`Scalar of [< `S]]]] )
         t
     | FMOV_fp_to_gp_64 :
         ( pair,
-          [`Reg of [`GP of [`X]]] * [`Reg of [`Neon of [< `Scalar of [< `D]]]]
-        )
+          [`Reg of [`GP of [`X]]] * [`Reg of [`Neon of [`Scalar of [< `D]]]] )
         t
     | FMOV_scalar_immediate :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
-          * [`Imm of [`Sixty_four]] )
+          [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] * [`Imm of [`Sixty_four]]
+        )
         t
     | FMSUB :
         ( quad,
@@ -1491,7 +1489,7 @@ module Instruction_name = struct
         (pair, [`Reg of [`GP of [< `X]]] * [`Mem of Addressing_mode.single]) t
     | LDR_simd_and_fp :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `D | `S | `Q]]]]
+          [`Reg of [`Neon of [`Scalar of [< `D | `S | `Q]]]]
           * [`Mem of Addressing_mode.single] )
         t
     | LSLV :
@@ -1608,7 +1606,7 @@ module Instruction_name = struct
         t
     | SCVTF :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
+          [`Reg of [`Neon of [`Scalar of [< `S | `D]]]]
           * [`Reg of [`GP of [< `X]]] )
         t
     | SCVTF_vector :
@@ -1740,7 +1738,7 @@ module Instruction_name = struct
         (pair, [`Reg of [`GP of [< `W]]] * [`Mem of Addressing_mode.single]) t
     | STR_simd_and_fp :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `D | `S | `Q]]]]
+          [`Reg of [`Neon of [`Scalar of [< `D | `S | `Q]]]]
           * [`Mem of Addressing_mode.single] )
         t
     | SUBS_immediate :
@@ -1815,6 +1813,12 @@ module Instruction_name = struct
           * [`Reg of [`GP of [< `X | `W]]]
           * [`Imm of [`Six]]
           * [`Imm of [`Six]] )
+        t
+    | UDIV :
+        ( triple,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of 'w]]
+          * [`Reg of [`GP of 'w]] )
         t
     | UMAX_vector :
         ( triple,
@@ -2079,6 +2083,7 @@ module Instruction_name = struct
         | TST -> "tst"
         | UADDLP_vector -> "uaddlp"
         | UBFM -> "ubfm"
+        | UDIV -> "udiv"
         | UMAX_vector -> "umax"
         | UMIN_vector -> "umin"
         | UMOV _ -> "umov"
@@ -2573,6 +2578,9 @@ module Instruction_name = struct
       | UBFM ->
         let (Quad (rd, rn, immr, imms)) = ops in
         [| o rd; o rn; o immr; o imms |]
+      | UDIV ->
+        let (Triple (rd, rn, rm)) = ops in
+        [| o rd; o rn; o rm |]
       | UMAX_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
@@ -2681,14 +2689,15 @@ module Instruction = struct
     | LDR_simd_and_fp | LSLV | LSRV | MADD | MOVI | MOVK | MOVN | MOVZ | MSUB
     | MUL_vector | MVN_vector | NEG_vector | NOP | ORR_immediate
     | ORR_shifted_register | ORR_vector | RBIT | RET | REV | REV16 | SBFM
-    | SCVTF | SCVTF_vector | SDIV | SHL | SMAX_vector | SMIN_vector | SMOV _
-    | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector | SQSUB_vector
-    | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR | STRB | STRH
-    | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register | SUB_immediate
-    | SUB_shifted_register | SUB_vector | SXTL _ | TST | UADDLP_vector | UBFM
-    | UMAX_vector | UMIN_vector | UMOV _ | UMULH | UMULL2_vector _
-    | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _ | UQXTN2 _
-    | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1 | ZIP2 ->
+    | SCVTF | SCVTF_vector | SDIV | UDIV | SHL | SMAX_vector | SMIN_vector
+    | SMOV _ | SMULH | SMULL2_vector _ | SMULL_vector _ | SQADD_vector
+    | SQSUB_vector | SQXTN _ | SQXTN2 _ | SSHL_vector | SSHR | STP _ | STR
+    | STRB | STRH | STR_simd_and_fp | SUBS_immediate | SUBS_shifted_register
+    | SUB_immediate | SUB_shifted_register | SUB_vector | SXTL _ | TST
+    | UADDLP_vector | UBFM | UMAX_vector | UMIN_vector | UMOV _ | UMULH
+    | UMULL2_vector _ | UMULL_vector _ | UQADD_vector | UQSUB_vector | UQXTN _
+    | UQXTN2 _ | USHL_vector | USHR | UXTL _ | XTN _ | XTN2 _ | YIELD | ZIP1
+    | ZIP2 ->
       None
 end
 

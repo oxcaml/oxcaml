@@ -126,7 +126,7 @@ let mod_field obj (module_repr : Lambda.module_representation) pos =
 module MakeEvalPrinter (E: EVAL_BASE) = struct
 
   let rec eval_address = function
-    | Env.Aunit cu -> E.eval_compilation_unit cu
+    | Env.Aunit (cu, _) -> E.eval_compilation_unit cu
     | Env.Alocal id -> E.eval_ident id
     | Env.Adot(p, module_repr, pos) ->
       let module_repr = Lambda.transl_module_representation module_repr in

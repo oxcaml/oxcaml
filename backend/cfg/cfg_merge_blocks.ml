@@ -20,6 +20,12 @@ end = struct
       bool =
    fun ~equal_desc ~equal_reg left right ->
     (* CR xclerc for xclerc: consider using other fields *)
+    (* CR mshinwell: [available_before], [available_across] and
+       [phantom_available_before] are ignored here, meaning that blocks that
+       disagree on availability may be merged, with only the representative
+       block's availability information being kept.  Consider reconciling the
+       availability sets (presumably by intersection) when merging blocks that
+       disagree. *)
     match left, right with
     | ( { desc = left_desc;
           id = _;
@@ -30,7 +36,8 @@ end = struct
           live = _;
           stack_offset = left_stack_offset;
           available_before = _;
-          available_across = _
+          available_across = _;
+          phantom_available_before = _
         },
         { desc = right_desc;
           id = _;
@@ -41,14 +48,19 @@ end = struct
           live = _;
           stack_offset = right_stack_offset;
           available_before = _;
-          available_across = _
+          available_across = _;
+          phantom_available_before = _
         } ) ->
       Int.equal left_stack_offset right_stack_offset
       && Misc.Stdlib.Array.equal equal_reg left_arg right_arg
       && Misc.Stdlib.Array.equal equal_reg left_res right_res
       && equal_desc left_desc right_desc
       (* CR-someday xclerc for xclerc: consider definin equal in `Debuginfo` *)
-      && Debuginfo.compare left_dbg right_dbg = 0
+      (* Debug info is allowed to differ (the merged-away paths inherit the
+         representative block's locations), unless the user has asked for
+         debugging to take precedence over code generation. *)
+      && ((not !Dwarf_flags.gdwarf_may_alter_codegen)
+         || Debuginfo.compare left_dbg right_dbg = 0)
 
   let basic_block :
       equal_reg:(Reg.t -> Reg.t -> bool) ->

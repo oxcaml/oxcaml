@@ -146,7 +146,7 @@ let unbox_number ~machine_width kind =
   else
     match (kind : Flambda_kind.Boxable_number.t) with
     | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512
-      ->
+    | Naked_mask ->
       1 (* 1 load *)
     | Naked_int64 when Target_system.Machine_width.is_32_bit machine_width ->
       4 (* 2 Cadda + 2 loads *)
@@ -160,7 +160,7 @@ let box_number ~machine_width kind =
   else
     match (kind : Flambda_kind.Boxable_number.t) with
     | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512
-      ->
+    | Naked_mask ->
       alloc_size (* 1 alloc *)
     | Naked_int32 when not (Target_system.Machine_width.is_32_bit machine_width)
       ->
@@ -173,7 +173,7 @@ let block_load (kind : Flambda_primitive.Block_access_kind.t) =
 let array_load (kind : Flambda_primitive.Array_load_kind.t) =
   match kind with
   | Immediates -> 1 (* cadda + load *)
-  | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints
+  | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints | Naked_masks
   | Gc_ignorable_values | Values ->
     1
   | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
@@ -197,7 +197,8 @@ let array_set (kind : Flambda_primitive.Array_set_kind.t) =
   | Values (Assignment Heap) -> does_not_need_caml_c_call_extcall_size
   | Values (Assignment Local | Initialization) -> 1
   | Gc_ignorable_values -> 1
-  | Immediates | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints ->
+  | Immediates | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints
+  | Naked_masks ->
     1
   | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
   | Naked_vec256s | Naked_vec512s ->
@@ -231,6 +232,7 @@ let string_or_bigstring_load ~machine_width kind width =
     | One_twenty_eight _ -> 2 (* add, load (alignment handled explicitly) *)
     | Two_fifty_six _ -> 2 (* add, load (alignment handled explicitly) *)
     | Five_twelve _ -> 2 (* add, load (alignment handled explicitly) *)
+    | Mask -> 2 (* add, load *)
   in
   start_address_load + elt_load
 
@@ -263,7 +265,7 @@ let binary_int_arith_primitive ~machine_width kind op =
   | (Naked_int64, Add | Naked_int64, Sub | Naked_int64, Mul)
     when Target_system.Machine_width.is_32_bit machine_width ->
     does_not_need_caml_c_call_extcall_size + 2
-  | (Naked_int64, Div | Naked_int64, Mod)
+  | (Naked_int64, Div (Signed | Unsigned) | Naked_int64, Mod (Signed | Unsigned))
     when Target_system.Machine_width.is_32_bit machine_width ->
     needs_caml_c_call_extcall_size + 2
   | (Naked_int64, And | Naked_int64, Or | Naked_int64, Xor)
@@ -273,8 +275,8 @@ let binary_int_arith_primitive ~machine_width kind op =
   | Tagged_immediate, Add -> 2
   | Tagged_immediate, Sub -> 2
   | Tagged_immediate, Mul -> 4
-  | Tagged_immediate, Div -> 4
-  | Tagged_immediate, Mod -> 4
+  | Tagged_immediate, Div (Signed | Unsigned) -> 4
+  | Tagged_immediate, Mod (Signed | Unsigned) -> 4
   | Tagged_immediate, And -> 1
   | Tagged_immediate, Or -> 1
   | Tagged_immediate, Xor -> 2
@@ -296,16 +298,19 @@ let binary_int_arith_primitive ~machine_width kind op =
       Or )
   | ( ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
       | Naked_immediate ),
-      Xor ) ->
-    1
-  (* Division and modulo need some extra care *)
+      Xor )
   | ( ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
       | Naked_immediate ),
-      Div ) ->
+      (Div Unsigned | Mod Unsigned) ) ->
+    1
+  (* Signed division and modulo need some extra care *)
+  | ( ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
+      | Naked_immediate ),
+      Div Signed ) ->
     divmod_bi_check ~machine_width 1 kind + 1
   | ( ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
       | Naked_immediate ),
-      Mod ) ->
+      Mod Signed ) ->
     divmod_bi_check ~machine_width 0 kind + 1
 
 let binary_int_shift_primitive ~machine_width kind op =
@@ -407,7 +412,7 @@ let unary_prim_size ~machine_width prim =
     | Array_kind
         ( Immediates | Values | Gc_ignorable_values | Naked_floats
         | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-        | Naked_vec512s | Unboxed_product _ ) ->
+        | Naked_vec512s | Naked_masks | Unboxed_product _ ) ->
       array_length_size
     | Array_kind
         (Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_float32s)
@@ -487,17 +492,20 @@ let ternary_prim_size ~machine_width prim =
   (* ~ 1 block_load + 1 block_set *)
   | Atomic_field_int_arith _ -> 1
   | Atomic_set_field _ -> 1
-  | Atomic_exchange_field Immediate -> 1
-  | Atomic_exchange_field Any_value -> does_not_need_caml_c_call_extcall_size
+  | Atomic_exchange_field (Immediate, (Heap | Local)) -> 1
+  | Atomic_exchange_field (Any_value, (Heap | Local)) ->
+    does_not_need_caml_c_call_extcall_size
   | Write_offset _ -> 1
 
 let quaternary_prim_size prim =
   match (prim : Flambda_primitive.quaternary_primitive) with
-  | Atomic_compare_and_set_field Immediate -> 3
-  | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Immediate } ->
+  | Atomic_compare_and_set_field (Immediate, (Heap | Local)) -> 3
+  | Atomic_compare_exchange_field
+      { atomic_kind = _; args_kind = Immediate; mode = Heap | Local } ->
     1
-  | Atomic_compare_and_set_field Any_value
-  | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Any_value } ->
+  | Atomic_compare_and_set_field (Any_value, (Heap | Local))
+  | Atomic_compare_exchange_field
+      { atomic_kind = _; args_kind = Any_value; mode = Heap | Local } ->
     does_not_need_caml_c_call_extcall_size
 
 let block num_fields = alloc_size + num_fields
