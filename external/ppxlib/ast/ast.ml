@@ -105,6 +105,7 @@ and direction_flag = Asttypes.direction_flag = Upto | Downto
 (* Order matters, used in polymorphic comparison *)
 and private_flag = Asttypes.private_flag = Private | Public
 and mutable_flag = Asttypes.mutable_flag = Immutable | Mutable
+and atomic_flag = Asttypes.atomic_flag = Nonatomic | Atomic
 and access_flag = Asttypes.access_flag = Immutable_access | Mutable_access | Atomic_access
 and virtual_flag = Asttypes.virtual_flag = Virtual | Concrete
 and override_flag = Asttypes.override_flag = Override | Fresh
@@ -1275,6 +1276,7 @@ and module_expr_desc = Parsetree.module_expr_desc =
   | Pmod_constraint of module_expr * module_type option * modes  (** [(ME : MT)] *)
   | Pmod_unpack of expression  (** [(val E)] *)
   | Pmod_extension of extension  (** [\[%id\]] *)
+  | Pmod_hole  (** [_] *)
   | Pmod_instance of module_instance
       (** [Foo(Param1)(Arg1(Param2)(Arg2)) [@jane.non_erasable.instances]] *)
 
@@ -1443,6 +1445,7 @@ class virtual map =
     method direction_flag : direction_flag -> direction_flag= fun x -> x
     method private_flag : private_flag -> private_flag= fun x -> x
     method mutable_flag : mutable_flag -> mutable_flag= fun x -> x
+    method atomic_flag : atomic_flag -> atomic_flag= fun x -> x
     method access_flag : access_flag -> access_flag= fun x -> x
     method virtual_flag : virtual_flag -> virtual_flag= fun x -> x
     method override_flag : override_flag -> override_flag= fun x -> x
@@ -2496,6 +2499,7 @@ class virtual map =
             let c = self#modes c in Pmod_constraint (a, b, c)
         | Pmod_unpack a -> let a = self#expression a in Pmod_unpack a
         | Pmod_extension a -> let a = self#extension a in Pmod_extension a
+        | Pmod_hole -> Pmod_hole
         | Pmod_instance a ->
             let a = self#module_instance a in Pmod_instance a
     method module_instance : module_instance -> module_instance=
@@ -2678,7 +2682,8 @@ class virtual iter =
     method direction_flag : direction_flag -> unit= fun _ -> ()
     method private_flag : private_flag -> unit= fun _ -> ()
     method mutable_flag : mutable_flag -> unit= fun _ -> ()
-    method access_flag : access_flag ->unit= fun _ -> ()
+    method atomic_flag : atomic_flag -> unit= fun _ -> ()
+    method access_flag : access_flag -> unit= fun _ -> ()
     method virtual_flag : virtual_flag -> unit= fun _ -> ()
     method override_flag : override_flag -> unit= fun _ -> ()
     method closed_flag : closed_flag -> unit= fun _ -> ()
@@ -3406,6 +3411,7 @@ class virtual iter =
             (self#module_expr a; self#option self#module_type b; self#modes c)
         | Pmod_unpack a -> self#expression a
         | Pmod_extension a -> self#extension a
+        | Pmod_hole -> ()
         | Pmod_instance a -> self#module_instance a
     method module_instance : module_instance -> unit=
       fun { pmod_instance_head; pmod_instance_args } ->
@@ -3550,6 +3556,7 @@ class virtual ['acc] fold =
     method direction_flag : direction_flag -> 'acc -> 'acc= fun _ acc -> acc
     method private_flag : private_flag -> 'acc -> 'acc= fun _ acc -> acc
     method mutable_flag : mutable_flag -> 'acc -> 'acc= fun _ acc -> acc
+    method atomic_flag : atomic_flag -> 'acc -> 'acc= fun _ acc -> acc
     method access_flag : access_flag -> 'acc -> 'acc= fun _ acc -> acc
     method virtual_flag : virtual_flag -> 'acc -> 'acc= fun _ acc -> acc
     method override_flag : override_flag -> 'acc -> 'acc= fun _ acc -> acc
@@ -4477,6 +4484,7 @@ class virtual ['acc] fold =
             let acc = self#modes c acc in acc
         | Pmod_unpack a -> self#expression a acc
         | Pmod_extension a -> self#extension a acc
+        | Pmod_hole -> acc
         | Pmod_instance a -> self#module_instance a acc
     method module_instance : module_instance -> 'acc -> 'acc=
       fun { pmod_instance_head; pmod_instance_args } acc ->
@@ -4663,6 +4671,8 @@ class virtual ['acc] fold_map =
     method private_flag : private_flag -> 'acc -> (private_flag * 'acc)=
       fun x acc -> (x, acc)
     method mutable_flag : mutable_flag -> 'acc -> (mutable_flag * 'acc)=
+      fun x acc -> (x, acc)
+    method atomic_flag : atomic_flag -> 'acc -> (atomic_flag * 'acc)=
       fun x acc -> (x, acc)
     method access_flag : access_flag -> 'acc -> (access_flag * 'acc)=
       fun x acc -> (x, acc)
@@ -5969,6 +5979,7 @@ class virtual ['acc] fold_map =
             let (a, acc) = self#expression a acc in ((Pmod_unpack a), acc)
         | Pmod_extension a ->
             let (a, acc) = self#extension a acc in ((Pmod_extension a), acc)
+        | Pmod_hole -> (Pmod_hole, acc)
         | Pmod_instance a ->
             let (a, acc) = self#module_instance a acc in
             ((Pmod_instance a), acc)
@@ -6217,8 +6228,8 @@ class virtual ['ctx] map_with_context =
       fun _ctx x -> x
     method mutable_flag : 'ctx -> mutable_flag -> mutable_flag=
       fun _ctx x -> x
-    method access_flag : 'ctx -> access_flag -> access_flag=
-      fun _ctx x -> x
+    method atomic_flag : 'ctx -> atomic_flag -> atomic_flag= fun _ctx x -> x
+    method access_flag : 'ctx -> access_flag -> access_flag= fun _ctx x -> x
     method virtual_flag : 'ctx -> virtual_flag -> virtual_flag=
       fun _ctx x -> x
     method override_flag : 'ctx -> override_flag -> override_flag=
@@ -7329,6 +7340,7 @@ class virtual ['ctx] map_with_context =
         | Pmod_unpack a -> let a = self#expression ctx a in Pmod_unpack a
         | Pmod_extension a ->
             let a = self#extension ctx a in Pmod_extension a
+        | Pmod_hole -> Pmod_hole
         | Pmod_instance a ->
             let a = self#module_instance ctx a in Pmod_instance a
     method module_instance : 'ctx -> module_instance -> module_instance=
@@ -7566,6 +7578,11 @@ class virtual ['res] lift =
         match x with
         | Immutable -> self#constr "Immutable" []
         | Mutable -> self#constr "Mutable" []
+    method atomic_flag : atomic_flag -> 'res=
+      fun x ->
+        match x with
+        | Nonatomic -> self#constr "Nonatomic" []
+        | Atomic -> self#constr "Atomic" []
     method access_flag : access_flag -> 'res=
       fun x ->
         match x with
@@ -8856,6 +8873,7 @@ class virtual ['res] lift =
             let a = self#expression a in self#constr "Pmod_unpack" [a]
         | Pmod_extension a ->
             let a = self#extension a in self#constr "Pmod_extension" [a]
+        | Pmod_hole -> self#constr "Pmod_hole" []
         | Pmod_instance a ->
             let a = self#module_instance a in self#constr "Pmod_instance" [a]
     method module_instance : module_instance -> 'res=
@@ -9136,6 +9154,8 @@ class virtual ['ctx,'res] lift_map_with_context =
     method private_flag : 'ctx -> private_flag -> (private_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
     method mutable_flag : 'ctx -> mutable_flag -> (mutable_flag * 'res)=
+      fun ctx x -> (x, (self#other ctx x))
+    method atomic_flag : 'ctx -> atomic_flag -> (atomic_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
     method access_flag : 'ctx -> access_flag -> (access_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
@@ -11154,6 +11174,7 @@ class virtual ['ctx,'res] lift_map_with_context =
             let a = self#extension ctx a in
             ((Pmod_extension (Stdlib.fst a)),
               (self#constr ctx "Pmod_extension" [Stdlib.snd a]))
+        | Pmod_hole -> (Pmod_hole, (self#constr ctx "Pmod_hole" []))
         | Pmod_instance a ->
             let a = self#module_instance ctx a in
             ((Pmod_instance (Stdlib.fst a)),
