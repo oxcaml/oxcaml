@@ -220,7 +220,19 @@ let emit t ~binary_backend_available =
     Proto_die.add_or_replace_attribute_value
       (DS.compilation_unit_proto_die t.state)
       (DAH.create_addr_base
-         (Address_table.base_addr (DS.address_table t.state))));
+         (Address_table.base_addr (DS.address_table t.state)));
+    if !Dwarf_flags.gdwarf_offsets
+    then (
+      (* [DW_FORM_loclistx] and [DW_FORM_rnglistx] indices are resolved via the
+         offset arrays whose positions these attributes give. *)
+      Proto_die.add_or_replace_attribute_value
+        (DS.compilation_unit_proto_die t.state)
+        (DAH.create_loclists_base
+           (Location_list_table.base_addr (DS.location_list_table t.state)));
+      Proto_die.add_or_replace_attribute_value
+        (DS.compilation_unit_proto_die t.state)
+        (DAH.create_rnglists_base
+           (Range_list_table.base_addr (DS.range_list_table t.state)))));
   Dwarf_world.emit ~asm_directives:t.asm_directives
     ~compilation_unit_proto_die:(DS.compilation_unit_proto_die t.state)
     ~compilation_unit_header_label:(DS.compilation_unit_header_label t.state)
