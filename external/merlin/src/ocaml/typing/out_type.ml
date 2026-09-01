@@ -889,16 +889,22 @@ let best_type_path_resolution p =
 let best_type_path_simple p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_type_simple (Env.short_paths !printing_env) p
   else Shorter_paths.find_type_simple !printing_env p
 
 let best_module_type_path p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_module_type (Env.short_paths !printing_env) p
   else Shorter_paths.find_module_type !printing_env p
 
 let best_module_path p =
   if !Clflags.real_paths || !printing_env == Env.empty
   then p
+  else if !Clflags.legacy_short_path then
+    Short_paths.find_module (Env.short_paths !printing_env) p
   else Shorter_paths.find_module !printing_env p
 
 let best_class_type_path p =

@@ -6,7 +6,8 @@ type visible_include =
   }
 
 (** {0 OCaml compiler compatible command-line parameters} *)
-let cmi_file = ref None
+let legacy_short_path   = ref false
+let cmi_file            = ref None
 let include_dirs        = ref []
 let hidden_include_dirs = ref []
 let include_paths_files = ref ([] : string list) (* -I-paths *)

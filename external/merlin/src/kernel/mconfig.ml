@@ -30,7 +30,8 @@ type ocaml =
     zero_alloc_assert : Zero_alloc_annotations.Assert.t;
     infer_with_bounds : bool;
     kind_verbosity : int;
-    ikinds : bool
+    ikinds : bool;
+    legacy_short_path : bool
   }
 
 let dump_warnings st =
@@ -74,7 +75,8 @@ let dump_ocaml x =
         `String (Zero_alloc_annotations.Assert.to_string x.zero_alloc_assert) );
       ("infer_with_bounds", `Bool x.infer_with_bounds);
       ("kind_verbosity", `Int x.kind_verbosity);
-      ("ikinds", `Bool x.ikinds)
+      ("ikinds", `Bool x.ikinds);
+      ("legacy_short_path", `Bool x.legacy_short_path)
     ]
 
 (** Some paths can be resolved relative to a current working directory *)
@@ -1076,7 +1078,10 @@ let ocaml_flags =
       "Enable ikinds-based kind checker (experimental)" );
     ( "-no-ikinds",
       Marg.unit (fun ocaml -> { ocaml with ikinds = false }),
-      "Disable ikinds-based kind checker (experimental)" )
+      "Disable ikinds-based kind checker (experimental)" );
+    ( "-legacy-short-path",
+      Marg.unit (fun ocaml -> { ocaml with legacy_short_path = true }),
+      "Use legacy short path implementation" )
   ]
 
 (** {1 Main configuration} *)
@@ -1108,7 +1113,8 @@ let initial =
         zero_alloc_assert = Zero_alloc_annotations.Assert.Assert_default;
         infer_with_bounds = false;
         kind_verbosity = 0;
-        ikinds = true
+        ikinds = true;
+        legacy_short_path = false;
       };
     merlin =
       { build_path = [];

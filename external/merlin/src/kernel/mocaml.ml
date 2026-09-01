@@ -71,7 +71,8 @@ let setup_reader_config config =
   zero_alloc_assert := ocaml.zero_alloc_assert;
   infer_with_bounds := ocaml.infer_with_bounds;
   kind_verbosity := ocaml.kind_verbosity;
-  ikinds := ocaml.ikinds
+  ikinds := ocaml.ikinds;
+  legacy_short_path := ocaml.legacy_short_path
 
 let init_params params =
   List.iter params ~f:(fun s ->
