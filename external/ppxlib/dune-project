@@ -40,8 +40,7 @@ allowing to inject a complex structured value into generated code.
   (ocaml (and (and (>= 4.04.1) (< 5.2.0)) (<> 5.1.0~alpha1)))
   (ocaml-compiler-libs (>= v0.11.0))
   (ppx_derivers (>= 1.0))
-  (sexplib0 (>= v0.12))
-  (sexplib0 (and :with-test (>= "v0.15"))) ; Printexc.register_printer in sexplib0 changed
+  (sexplib0 (>= "v0.15")) ; Printexc.register_printer in sexplib0 changed
   stdlib-shims
   ppxlib_ast
   ppxlib_jane
