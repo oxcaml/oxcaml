@@ -708,10 +708,12 @@ let compile_implementation_from_cmm unix ?toplevel ~sourcefile ~prefixname
     ~obj_filename:(prefixname ^ ext_obj)
     ~may_reduce_heap:(Option.is_none toplevel) (fun () ->
       Compilenv.record_external_symbols ();
-<<<<<<< HEAD
       let cmm_phrases = make_cmm ~ppf_dump ~prefixname in
-      end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
-          cmm_phrases))
+      if Clflags.should_stop_after Compiler_pass.Middle_end
+      then ()
+      else
+        end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
+            cmm_phrases))
 
 let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
     ~ppf_dump (program : Lambda.program) =
@@ -721,22 +723,6 @@ let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
   Compilation_unit.Set.iter Compilenv.require_global program.required_globals;
   compile_implementation_from_cmm unix ?toplevel ~sourcefile ~prefixname
     ~ppf_dump make_cmm
-||||||| 0fe1d4a7f5
-      match pipeline with
-      | Direct_to_cmm direct_to_cmm ->
-        let cmm_phrases = direct_to_cmm ~ppf_dump ~prefixname program in
-        end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
-            cmm_phrases))
-=======
-      match pipeline with
-      | Direct_to_cmm direct_to_cmm ->
-        let cmm_phrases = direct_to_cmm ~ppf_dump ~prefixname program in
-        if Clflags.should_stop_after Compiler_pass.Middle_end
-        then ()
-        else
-          end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
-              cmm_phrases))
->>>>>>> 941c815
 
 let linear_gen_implementation ~ppf_dump unix filename =
   let open Linear_format in

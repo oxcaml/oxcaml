@@ -1155,7 +1155,6 @@ end = struct
     create env ~reachable_names:names_to_keep
 
   let to_typing_env (t : t) ~machine_width ~resolver : typing_env =
-    let just_after_level = t.just_after_level in
     (* Add the symbols that have equations to those that don't. *)
     let defined_symbols =
       Name.Map.fold
@@ -1163,9 +1162,14 @@ end = struct
           Name.pattern_match name
             ~var:(fun _ -> defined_symbols)
             ~symbol:(fun symbol -> Symbol.Set.add symbol defined_symbols))
-        (Cached_level.names_to_types just_after_level)
+        t.names_to_types
         (Symbol.Set.of_list t.defined_symbols_without_equations)
     in
+    (* This constructor leaves [aliases] and [symbol_projections] empty. Empty
+       [aliases] is correct, because we canonicalised before serialising. Empty
+       [symbol_projections] is okay, because nothing on the rebuild path reads
+       it. *)
+    let just_after_level = Cached_level.of_names_to_types t.names_to_types in
     { machine_width;
       resolver;
       binding_time_resolver = binding_time_resolver resolver;

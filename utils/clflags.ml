@@ -184,13 +184,9 @@ let parameters = ref ([] : string list) (* -parameter *)
 let as_parameter = ref false            (* -as-parameter *)
 let as_argument_for = ref None          (* -as-argument-for *)
 let instantiate = ref false             (* -instantiate *)
-<<<<<<< HEAD
+let functorize = ref false              (* -functorize *)
 let reaper_rebuild = ref false          (* -reaper-rebuild *)
 let reaper_solve = ref false            (* -reaper-solve *)
-||||||| 0fe1d4a7f5
-=======
-let functorize = ref false              (* -functorize *)
->>>>>>> 941c815
 let dump_source = ref false             (* -dsource *)
 let dump_parsetree = ref false          (* -dparsetree *)
 and dump_typedtree = ref false          (* -dtypedtree *)

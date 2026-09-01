@@ -136,17 +136,11 @@ module Variable : sig
 
   val export : Set.t -> importer
 
-<<<<<<< HEAD
-  val import : exported -> t
+  val import : importer -> t -> t
 
   val export_name_stamp_counter : unit -> int
 
   val restore_name_stamp_counter : int -> unit
-||||||| 0fe1d4a7f5
-  val import : exported -> t
-=======
-  val import : importer -> t -> t
->>>>>>> 941c815
 end
 
 module Symbol : sig
@@ -282,17 +276,11 @@ module Code_id : sig
 
   val export : Set.t -> importer
 
-<<<<<<< HEAD
-  val import : exported -> t
+  val import : importer -> t -> t
 
   val export_name_stamp_counter : unit -> int
 
   val restore_name_stamp_counter : int -> unit
-||||||| 0fe1d4a7f5
-  val import : exported -> t
-=======
-  val import : importer -> t -> t
->>>>>>> 941c815
 end
 
 module Code_id_or_symbol : sig

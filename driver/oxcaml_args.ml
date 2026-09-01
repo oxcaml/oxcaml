@@ -2157,16 +2157,12 @@ module Oxcaml_options_impl = struct
   let no_reaper_change_calling_conventions =
     clear Flambda2.reaper_change_calling_conventions
 
-<<<<<<< HEAD
   let support_lto = set Flambda2.support_lto
   let no_support_lto = clear Flambda2.support_lto
   let reaper_rebuild = set' Clflags.reaper_rebuild
   let reaper_solve = set' Clflags.reaper_solve
-||||||| 0fe1d4a7f5
-=======
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
->>>>>>> 941c815
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -2791,12 +2787,8 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
-<<<<<<< HEAD
     | "support-lto" -> set Flambda2.support_lto
-||||||| 0fe1d4a7f5
-=======
     | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
->>>>>>> 941c815
     | "dissector" -> set' Clflags.dissector
     | "dissector-partition-size" -> (
         match float_of_string_opt v with

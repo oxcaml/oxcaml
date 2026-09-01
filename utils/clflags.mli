@@ -174,13 +174,9 @@ val parameters : string list ref
 val as_parameter : bool ref
 val as_argument_for : string option ref
 val instantiate : bool ref
-<<<<<<< HEAD
+val functorize : bool ref
 val reaper_rebuild : bool ref
 val reaper_solve : bool ref
-||||||| 0fe1d4a7f5
-=======
-val functorize : bool ref
->>>>>>> 941c815
 val dump_source : bool ref
 val dump_parsetree : bool ref
 val dump_typedtree : bool ref

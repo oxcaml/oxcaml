@@ -892,17 +892,9 @@ let run_script ppf name args =
 
 
 module Compiler = (val Optcompile.native
-<<<<<<< HEAD
-                   (module Unix : Compiler_owee.Unix_intf.S)
+                   (module Unix_for_owee : Compiler_owee.Unix_intf.S)
                    ~flambda2:Flambda2.lambda_to_cmm
                    ~reaped_flambda2_to_cmm:Flambda2.reaped_flambda2_to_cmm)
-||||||| 0fe1d4a7f5
-                   (module Unix : Compiler_owee.Unix_intf.S)
-                   ~flambda2:Flambda2.lambda_to_cmm)
-=======
-                   (module Unix_for_owee : Compiler_owee.Unix_intf.S)
-                   ~flambda2:Flambda2.lambda_to_cmm)
->>>>>>> 941c815
 
 (* Load in-core a .cmxs file *)
 

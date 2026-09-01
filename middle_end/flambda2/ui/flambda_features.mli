@@ -65,12 +65,9 @@ val reaper_max_unbox_size : unit -> int
 
 val reaper_change_calling_conventions : unit -> bool
 
-<<<<<<< HEAD
 val support_lto : unit -> bool
-||||||| 0fe1d4a7f5
-=======
+
 val simplify_stubs : unit -> bool
->>>>>>> 941c815
 
 val kind_checks : unit -> bool
 

@@ -124,15 +124,7 @@ let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
     Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
       ~used_value_slots ~exported_offsets ~sections all_code
   in
-<<<<<<< HEAD
-  let unit = Flambda_unit.with_used_value_slots unit used_value_slots in
   { cmx; unit; all_code; exported_offsets; used_value_slots; reachable_names }
-||||||| 0fe1d4a7f5
-  let unit = Flambda_unit.with_used_value_slots unit used_value_slots in
-  { cmx; unit; all_code; exported_offsets; reachable_names }
-=======
-  { cmx; unit; all_code; exported_offsets; reachable_names }
->>>>>>> 941c815
 
 type flambda_result =
   { flambda : Flambda_unit.t;

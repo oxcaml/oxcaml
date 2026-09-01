@@ -646,6 +646,10 @@ let ocaml_ignored_flags =
     "-no-flambda2-reaper";
     "-dsimplify";
     "-dreaper";
+    "-support-lto";
+    "-no-support-lto";
+    "-reaper-rebuild";
+    "-reaper-solve";
     "-instantiate";
     "-dflambda-heavy-invariants";
     "-cfg-eliminate-dead-trap-handlers";

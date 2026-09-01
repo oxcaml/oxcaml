@@ -10,18 +10,8 @@ module Unix_for_owee = struct
 end
 
 let () =
-<<<<<<< HEAD
-  exit (Optmaindriver.main (module Unix : Compiler_owee.Unix_intf.S) Sys.argv
-    Format.err_formatter
+  exit (Optmaindriver.main (module Unix_for_owee : Compiler_owee.Unix_intf.S)
+    Sys.argv Format.err_formatter
     ~flambda2:Flambda2.lambda_to_cmm
     ~reaped_flambda2_to_cmm:Flambda2.reaped_flambda2_to_cmm
     ~reaper_lto_solve:Flambda2.reaper_lto_solve)
-||||||| 0fe1d4a7f5
-  exit (Optmaindriver.main (module Unix : Compiler_owee.Unix_intf.S) Sys.argv
-    Format.err_formatter
-    ~flambda2:Flambda2.lambda_to_cmm)
-=======
-  exit (Optmaindriver.main (module Unix_for_owee : Compiler_owee.Unix_intf.S)
-    Sys.argv Format.err_formatter
-    ~flambda2:Flambda2.lambda_to_cmm)
->>>>>>> 941c815

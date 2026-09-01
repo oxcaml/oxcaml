@@ -61,4 +61,4 @@ val import_renaming :
   table_data:table_data ->
   used_value_slots:Value_slot.Set.t ->
   original_compilation_unit:Compilation_unit.t ->
-  Renaming.t * Code_id.t Code_id.Map.t
+  Renaming.t * Code_id.importer

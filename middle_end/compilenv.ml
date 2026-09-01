@@ -372,6 +372,15 @@ let save_resumed_unit_info filename ~paused =
         Import_info.create_normal (Import_info.cu import) ~crc:None)
       paused.ui_imports_cmx
   in
+  (* [static_data] is only used in the frontend (i.e., only before flambda2 is
+     reached). The `.reaped.cmx` files are only relevant for entry points that
+     start _after_ the frontend (e.g., `-reaper-rebuild` and linking). Hence,
+     to save space, we empty out this field in `.reaped.cmx` files. *)
+  let static_data =
+    Slambdaeval.CU_data.write
+      (Slambdaeval.CU_data.empty ())
+      ~sections:current_unit.uib_file_sections
+  in
   (* CR mvellacott: we only use the resulting cmx for linking, not compiling
      against, so we may be able to be more selective in what we store here. *)
   let info =
@@ -401,6 +410,8 @@ let save_resumed_unit_info filename ~paused =
       ui_force_link = paused.ui_force_link;
       (* Set by [-requires-metaprogramming] on the paused command line. *)
       ui_requires_metaprogramming = paused.ui_requires_metaprogramming;
+      (* See [static_data] above. *)
+      ui_static_data = static_data;
       (* [ui_export_info] contains offsets into these sections. *)
       ui_file_sections =
         File_sections.Builder.build current_unit.uib_file_sections;

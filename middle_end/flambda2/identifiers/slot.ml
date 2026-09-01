@@ -92,18 +92,10 @@ end) : S = struct
 
     let print ppf t =
       Format.fprintf ppf "@[%t(" P.colour;
-<<<<<<< HEAD
       (* CR mvellacott: We've had to change the implementation here to prevent
          an exception when no CU is set. This change is independent of LTO, so
          could be a separate PR. *)
-      if Compilation_unit.is_current t.compilation_unit
-||||||| 0fe1d4a7f5
-      if
-        Compilation_unit.equal t.compilation_unit
-          (Compilation_unit.get_current_exn ())
-=======
-      if Compilation_unit.equal t.compilation_unit (Current_unit.get_cu_exn ())
->>>>>>> 941c815
+      if Current_unit.is_current t.compilation_unit
       then Format.fprintf ppf "%s/%d" t.name t.name_stamp
       else
         Format.fprintf ppf "%a.%s/%d"

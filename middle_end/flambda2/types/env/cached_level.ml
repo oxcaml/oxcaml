@@ -43,6 +43,12 @@ let empty =
     symbol_projections = Variable.Map.empty
   }
 
+let of_names_to_types names_to_types =
+  { names_to_types;
+    aliases = Aliases.empty;
+    symbol_projections = Variable.Map.empty
+  }
+
 let names_to_types t = t.names_to_types
 
 let aliases t = t.aliases

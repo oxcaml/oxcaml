@@ -21,8 +21,7 @@ module Metadata = struct
       toplevel_my_region : Variable.t;
       toplevel_my_ghost_region : Variable.t;
       toplevel_my_alloc_region : Variable.t;
-      module_symbol : Symbol.t;
-      used_value_slots : Value_slot.Set.t Or_unknown.t
+      module_symbol : Symbol.t
     }
 
   let module_symbol t = t.module_symbol
@@ -33,8 +32,7 @@ module Metadata = struct
         toplevel_my_region;
         toplevel_my_ghost_region;
         toplevel_my_alloc_region;
-        module_symbol;
-        used_value_slots = _
+        module_symbol
       } =
     (* CR mvellacott: Minimise what's stored when we merge .cmr and .cmx. *)
     let ids = Ids_for_export.empty in
@@ -51,8 +49,7 @@ module Metadata = struct
         toplevel_my_region;
         toplevel_my_ghost_region;
         toplevel_my_alloc_region;
-        module_symbol;
-        used_value_slots
+        module_symbol
       } renaming =
     { return_continuation =
         Renaming.apply_continuation renaming return_continuation;
@@ -62,39 +59,17 @@ module Metadata = struct
         Renaming.apply_variable renaming toplevel_my_ghost_region;
       toplevel_my_alloc_region =
         Renaming.apply_variable renaming toplevel_my_alloc_region;
-      module_symbol = Renaming.apply_symbol renaming module_symbol;
-      used_value_slots
+      module_symbol = Renaming.apply_symbol renaming module_symbol
     }
 end
 
 type t =
-<<<<<<< HEAD
   { body : Flambda.Expr.t;
     metadata : Metadata.t
-||||||| 0fe1d4a7f5
-  { return_continuation : Continuation.t;
-    exn_continuation : Continuation.t;
-    toplevel_my_region : Variable.t;
-    toplevel_my_ghost_region : Variable.t;
-    toplevel_my_alloc_region : Variable.t;
-    body : Flambda.Expr.t;
-    module_symbol : Symbol.t;
-    used_value_slots : Value_slot.Set.t Or_unknown.t
-=======
-  { return_continuation : Continuation.t;
-    exn_continuation : Continuation.t;
-    toplevel_my_region : Variable.t;
-    toplevel_my_ghost_region : Variable.t;
-    toplevel_my_alloc_region : Variable.t;
-    body : Flambda.Expr.t;
-    module_symbol : Symbol.t
->>>>>>> 941c815
   }
 
 let create ~return_continuation ~exn_continuation ~toplevel_my_region
-<<<<<<< HEAD
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~body ~module_symbol
-    ~used_value_slots =
+    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~body ~module_symbol =
   { body;
     metadata =
       { return_continuation;
@@ -102,30 +77,8 @@ let create ~return_continuation ~exn_continuation ~toplevel_my_region
         toplevel_my_region;
         toplevel_my_ghost_region;
         toplevel_my_alloc_region;
-        module_symbol;
-        used_value_slots
+        module_symbol
       }
-||||||| 0fe1d4a7f5
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~body ~module_symbol
-    ~used_value_slots =
-  { return_continuation;
-    exn_continuation;
-    toplevel_my_region;
-    toplevel_my_ghost_region;
-    toplevel_my_alloc_region;
-    body;
-    module_symbol;
-    used_value_slots
-=======
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~body ~module_symbol =
-  { return_continuation;
-    exn_continuation;
-    toplevel_my_region;
-    toplevel_my_ghost_region;
-    toplevel_my_alloc_region;
-    body;
-    module_symbol
->>>>>>> 941c815
   }
 
 let create_of_metadata_and_body metadata body = { body; metadata }
@@ -146,41 +99,13 @@ let body t = t.body
 
 let module_symbol t = t.metadata.module_symbol
 
-<<<<<<< HEAD
-let used_value_slots t = t.metadata.used_value_slots
-
-let with_used_value_slots t used_value_slots =
-  { t with
-    metadata = { t.metadata with used_value_slots = Known used_value_slots }
-  }
-
-||||||| 0fe1d4a7f5
-let used_value_slots t = t.used_value_slots
-
-let with_used_value_slots t used_value_slots =
-  { t with used_value_slots = Known used_value_slots }
-
-=======
->>>>>>> 941c815
 let with_body t body = { t with body }
 
 let [@ocamlformat "disable"] print ppf
-<<<<<<< HEAD
       { body; metadata = { return_continuation; exn_continuation;
         toplevel_my_region; toplevel_my_ghost_region;
-        toplevel_my_alloc_region; module_symbol; used_value_slots;
+        toplevel_my_alloc_region; module_symbol;
       } } =
-||||||| 0fe1d4a7f5
-      { return_continuation; exn_continuation; toplevel_my_region;
-        toplevel_my_ghost_region; toplevel_my_alloc_region; body;
-        module_symbol; used_value_slots;
-      } =
-=======
-      { return_continuation; exn_continuation; toplevel_my_region;
-        toplevel_my_ghost_region; toplevel_my_alloc_region; body;
-        module_symbol;
-      } =
->>>>>>> 941c815
   Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(module_symbol@ %a)@]@ \
         @[<hov 1>(return_continuation@ %a)@]@ \

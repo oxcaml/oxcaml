@@ -504,13 +504,7 @@ module Variable = struct
       !previous_name_stamp
     in
     let data : Variable_data.t =
-<<<<<<< HEAD
       { compilation_unit;
-||||||| 0fe1d4a7f5
-      { compilation_unit = Compilation_unit.get_current_exn ();
-=======
-      { compilation_unit = Current_unit.get_cu_exn ();
->>>>>>> 941c815
         name;
         name_stamp;
         kind;
@@ -521,7 +515,7 @@ module Variable = struct
 
   let create ?user_visible name kind =
     create_in_compilation_unit
-      ~compilation_unit:(Compilation_unit.get_current_exn ())
+      ~compilation_unit:(Current_unit.get_cu_exn ())
       ?user_visible name kind
 
   module T0 = struct
@@ -533,16 +527,10 @@ module Variable = struct
 
     let print ppf t =
       let cu = compilation_unit t in
-<<<<<<< HEAD
       (* CR mvellacott: We've had to change the implementation here to prevent
          an exception when no CU is set. This change is independent of LTO, so
          could be a separate PR. *)
-      if Compilation_unit.is_current cu
-||||||| 0fe1d4a7f5
-      if Compilation_unit.equal cu (Compilation_unit.get_current_exn ())
-=======
-      if Compilation_unit.equal cu (Current_unit.get_cu_exn ())
->>>>>>> 941c815
+      if Current_unit.is_current cu
       then
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
@@ -571,8 +559,11 @@ module Variable = struct
 
   type importer = Table.serializable
 
-<<<<<<< HEAD
-  let import (data : exported) = Table.add !grand_table_of_variables data
+  let export vars =
+    Table.export !grand_table_of_variables ~iter:(fun f -> Set.iter f vars)
+
+  let import importer t =
+    Table.add !grand_table_of_variables (Table.import importer t)
 
   let export_name_stamp_counter () = !previous_name_stamp
 
@@ -583,15 +574,6 @@ module Variable = struct
       Misc.fatal_errorf
         "Restoring variable stamp counter would overwrite modified value %d"
         !previous_name_stamp
-||||||| 0fe1d4a7f5
-  let import (data : exported) = Table.add !grand_table_of_variables data
-=======
-  let export vars =
-    Table.export !grand_table_of_variables ~iter:(fun f -> Set.iter f vars)
-
-  let import importer t =
-    Table.add !grand_table_of_variables (Table.import importer t)
->>>>>>> 941c815
 end
 
 module Symbol = struct
@@ -989,8 +971,11 @@ module Code_id = struct
 
   type importer = Table.serializable
 
-<<<<<<< HEAD
-  let import (data : exported) = Table.add !grand_table_of_code_ids data
+  let export symbols =
+    Table.export !grand_table_of_code_ids ~iter:(fun f -> Set.iter f symbols)
+
+  let import importer t =
+    Table.add !grand_table_of_code_ids (Table.import importer t)
 
   let export_name_stamp_counter () = !previous_name_stamp
 
@@ -1001,15 +986,6 @@ module Code_id = struct
       Misc.fatal_errorf
         "Restoring code ID stamp counter would overwrite modified value %d"
         !previous_name_stamp
-||||||| 0fe1d4a7f5
-  let import (data : exported) = Table.add !grand_table_of_code_ids data
-=======
-  let export symbols =
-    Table.export !grand_table_of_code_ids ~iter:(fun f -> Set.iter f symbols)
-
-  let import importer t =
-    Table.add !grand_table_of_code_ids (Table.import importer t)
->>>>>>> 941c815
 end
 
 module Code_id_or_symbol = struct

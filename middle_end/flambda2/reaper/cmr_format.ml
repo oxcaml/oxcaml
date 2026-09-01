@@ -176,7 +176,7 @@ end = struct
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
     in
-    { original_compilation_unit = Compilation_unit.get_current_exn ();
+    { original_compilation_unit = Current_unit.get_cu_exn ();
       table_data = Flambda_cmx_format.create_table_data exported_ids;
       used_value_slots;
       unit_metadata;
