@@ -708,6 +708,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         let name =
           Function_slot.to_string callee's_function_slot ^ "_partial"
         in
+        let unstamped_name =
+          Function_slot.name callee's_function_slot ^ "_partial"
+        in
         let absolute_history, relative_history =
           DE.inlining_history_tracker (DA.denv dacc)
           |> Inlining_history.Tracker.fundecl
@@ -715,7 +718,8 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                ~name
         in
         let code_id =
-          Code_id.create ~name ~debug:dbg (Current_unit.get_cu_exn ())
+          Code_id.create ~name ~unstamped_name ~debug:dbg
+            (Current_unit.get_cu_exn ())
         in
         (* We could create better result types by combining the types for the
            first arguments with the result types from the called function.

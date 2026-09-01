@@ -331,13 +331,16 @@ module Code_id_data = struct
   type t =
     { compilation_unit : Compilation_unit.t;
       name : string;
+      unstamped_name : string;
       debug_info : Debuginfo.t;
       linkage_name : Linkage_name.t
     }
 
   let flags = code_id_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; debug_info = _; linkage_name; } =
+  let [@ocamlformat "disable"] print ppf
+      { compilation_unit; name; unstamped_name = _; debug_info = _;
+        linkage_name; } =
     Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(compilation_unit@ %a)@]@ \
         @[<hov 1>(name@ %s)@]@ \
@@ -347,7 +350,13 @@ module Code_id_data = struct
       name
       Linkage_name.print linkage_name
 
-  let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
+  let hash
+      { compilation_unit = _;
+        name = _;
+        unstamped_name = _;
+        debug_info = _;
+        linkage_name
+      } =
     (* Linkage names are unique across a whole project, so there's no need to
        hash the other fields. *)
     Linkage_name.hash linkage_name
@@ -355,11 +364,13 @@ module Code_id_data = struct
   let equal
       { compilation_unit = _;
         name = _;
+        unstamped_name = _;
         debug_info = _;
         linkage_name = linkage_name1
       }
       { compilation_unit = _;
         name = _;
+        unstamped_name = _;
         debug_info = _;
         linkage_name = linkage_name2
       } =
@@ -875,11 +886,13 @@ module Code_id = struct
 
   let name t = (find_data t).name
 
+  let unstamped_name t = (find_data t).unstamped_name
+
   let debug t = (find_data t).debug_info
 
   let previous_name_stamp = ref (-1)
 
-  let create ~name ~(debug : Debuginfo.t) compilation_unit =
+  let create ~name ~unstamped_name ~(debug : Debuginfo.t) compilation_unit =
     let name_stamp =
       if !previous_name_stamp = max_int
       then Misc.fatal_error "Have run out of name stamps";
@@ -896,22 +909,33 @@ module Code_id = struct
         in
         Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
       | Structured ->
+        (* The suffix alone makes the linkage name unique, so the mangling path
+           can end with the unstamped name, which depends only on the source
+           program. *)
         let suffix =
           if Flambda_features.Expert.shorten_symbol_names ()
           then Printf.sprintf "_%d" name_stamp
           else Printf.sprintf "_%d_code" name_stamp
         in
-        let path = Debuginfo.to_structured_mangling_path ~name debug in
+        let path =
+          Debuginfo.to_structured_mangling_path ~name:unstamped_name debug
+        in
         Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix
         |> Symbol0.linkage_name
     in
     let data : Code_id_data.t =
-      { compilation_unit; name; debug_info = debug; linkage_name }
+      { compilation_unit;
+        name;
+        unstamped_name;
+        debug_info = debug;
+        linkage_name
+      }
     in
     Table.add !grand_table_of_code_ids data
 
   let rename t =
-    create ~name:(name t) ~debug:(debug t) (Current_unit.get_cu_exn ())
+    create ~name:(name t) ~unstamped_name:(unstamped_name t) ~debug:(debug t)
+      (Current_unit.get_cu_exn ())
 
   let in_compilation_unit t comp_unit =
     Compilation_unit.equal (get_compilation_unit t) comp_unit

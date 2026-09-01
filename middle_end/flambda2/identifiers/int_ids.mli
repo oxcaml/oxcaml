@@ -245,7 +245,19 @@ module Code_id : sig
 
   val initialise : unit -> unit
 
-  val create : name:string -> debug:Debuginfo.t -> Compilation_unit.t -> t
+  (** [name] is the name shown when printing the code ID and used to form its
+      linkage name under the flat name-mangling scheme; by convention it is the
+      [Function_slot.to_string] of the corresponding function slot, which
+      carries a stamp. [unstamped_name] is the same name without any such stamp
+      (e.g. [Function_slot.name]); it ends the mangling path under the
+      structured name-mangling scheme, so that the linkage name depends only on
+      the source program apart from its uniqueness suffix. *)
+  val create :
+    name:string ->
+    unstamped_name:string ->
+    debug:Debuginfo.t ->
+    Compilation_unit.t ->
+    t
 
   val get_compilation_unit : t -> Compilation_unit.t
 
