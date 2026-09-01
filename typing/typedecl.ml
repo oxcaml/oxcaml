@@ -2254,8 +2254,7 @@ let compute_record_repr
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:true, ~atomic_fields:_, ~first_any:None ->
-    (* CR wsturgeon: support all-void records *)
-    Misc.fatal_error "Typedecl.compute_record_repr: all-void record"
+    Ok Record_all_void
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
       ~voids:false, ~atomic_fields:_, ~first_any:None ->

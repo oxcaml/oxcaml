@@ -332,6 +332,7 @@ and record_kind =
   | Record_floats
       (** Basically the same as [Record_mixed], but we don't reorder the
           fields. *)
+  | Record_all_void
 
 and 'a constructors = 'a constructor list
 
