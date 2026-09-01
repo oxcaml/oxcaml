@@ -899,8 +899,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
       in
       Cost_metrics.
         { cost_metrics = Code_metadata.cost_metrics code_metadata;
-          params_arity =
-            Flambda_arity.num_params (Code_metadata.params_arity code_metadata)
+          function_slot_size = Code_metadata.function_slot_size code_metadata
         }
     in
     let machine_width = DE.machine_width (DA.denv dacc) in
