@@ -57,3 +57,43 @@ let is_keyword = function
   | "lsr" -> true
   | "asr" -> true
   | _ -> false
+
+let apply_keyword_edition ~cli () =
+  let from_ocaml_param =
+    match Sys.getenv "OCAMLPARAM" with
+    | s -> (
+        let items =
+          if String.equal s "" then []
+          else
+            (* cf. Compenv.parse_args *)
+            match s.[0] with
+            | (':' | '|' | ';' | ' ' | ',') as c ->
+                List.tl (String.split_on_char c s)
+            | _ -> String.split_on_char ',' s
+        in
+        let fold_settings (acc, after_cli) item =
+          match (item, acc) with
+          | "_", None -> (acc, true)
+          | _ ->
+              let len = String.length item in
+              if len >= 9 && String.sub item 0 9 = "keywords=" then
+                (Some (String.sub item 9 (len - 9)), after_cli)
+              else (acc, after_cli)
+        in
+        let from_ocaml_param, after_cli =
+          List.fold_left fold_settings (None, false) items
+        in
+        match from_ocaml_param with
+        | None -> None
+        | Some s -> Some (s, after_cli))
+    | exception Not_found -> None
+  in
+  let keyword_edition =
+    match (cli, from_ocaml_param) with
+    | None, None -> None
+    | None, Some (s, _) | Some _, Some (s, true) -> Some s
+    | _ -> cli
+  in
+  (*IF_AT_LEAST 503 let () = if Option.is_some keyword_edition then Clflags.keyword_edition := keyword_edition in*)
+  (*IF_NOT_AT_LEAST 503 let () = ignore keyword_edition in*)
+  ()
