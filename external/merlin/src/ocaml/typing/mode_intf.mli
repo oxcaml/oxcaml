@@ -130,6 +130,8 @@ module type Common = sig
 
   val generic_level : int
 
+  val rigid_level : int
+
   val newvar : int -> ('l * 'r) t
 
   (* How to submode
