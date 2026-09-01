@@ -4,6 +4,7 @@ module T = struct
   type t = longident = Lident of string | Ldot of t * string | Lapply of t * t
 
   let compare : t -> t -> int = Poly.compare
+  let compare__local : t @ local -> t @ local -> int = Poly.compare__local
 
   let is_normal_ident_char = function
     | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '\'' -> true
@@ -67,6 +68,10 @@ let parse s =
         match String.split_on_char before ~sep:'.' with
         | [] -> assert false
         | s :: l -> Ldot (unflatten ~init:(Lident s) l, group))
+
+let unflatten = function
+  | [] -> None
+  | head :: tail -> Some(unflatten ~init:(Lident head) tail)
 
 module Map = Map.Make (T)
 module Set = Set.Make (T)
