@@ -22,7 +22,9 @@ module Uint64 = Numbers.Uint64
 module A = Asm_directives
 
 module Make (Location_or_range_list : sig
-  include Dwarf_emittable.S
+  type t
+
+  val emit : asm_directives:Asm_directives_dwarf.t -> t -> unit
 
   val section : Asm_section.dwarf_section
 end) =
@@ -79,18 +81,8 @@ struct
        itself to the end of the table (DWARF-5 spec page 242 lines 12--20). It
        is computed by the assembler since the sizes of some list entries are not
        known at compile time. *)
-    (match Dwarf_format.get () with
-    | Thirty_two ->
-      Dwarf_value.emit ~asm_directives
-        (Dwarf_value.distance_between_labels_32_bit
-           ~comment:"32-bit initial length" ~upper:unit_end ~lower:unit_start ())
-    | Sixty_four ->
-      Dwarf_value.emit ~asm_directives
-        (Dwarf_value.int32 ~comment:"64-bit indicator"
-           Initial_length.sixty_four_bit_indicator);
-      Dwarf_value.emit ~asm_directives
-        (Dwarf_value.distance_between_labels_64_bit
-           ~comment:"64-bit initial length" ~upper:unit_end ~lower:unit_start ()));
+    Initial_length.emit_as_label_difference ~asm_directives ~upper:unit_end
+      ~lower:unit_start;
     A.define_label unit_start;
     Dwarf_version.emit ~asm_directives Dwarf_version.five;
     A.uint8 ~comment:"Dwarf_arch_sizes.size_addr"
@@ -113,15 +105,9 @@ struct
           (* Offsets are relative to the first byte after the header, i.e. the
              position of [t.base_addr] (DWARF-5 spec page 242 line 28 and page
              243 line 1). *)
-          match Dwarf_format.get () with
-          | Thirty_two ->
-            Dwarf_value.emit ~asm_directives
-              (Dwarf_value.distance_between_labels_32_bit ?comment ~upper:label
-                 ~lower:t.base_addr ())
-          | Sixty_four ->
-            Dwarf_value.emit ~asm_directives
-              (Dwarf_value.distance_between_labels_64_bit ?comment ~upper:label
-                 ~lower:t.base_addr ()))
+          Dwarf_value.emit ~asm_directives
+            (Dwarf_value.distance_between_labels_format_width ?comment
+               ~upper:label ~lower:t.base_addr ()))
         lists);
     A.comment "Range or location list(s):";
     List.iter

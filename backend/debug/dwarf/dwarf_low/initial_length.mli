@@ -22,7 +22,13 @@ val create : Dwarf_int.t -> t
 
 val to_dwarf_int : t -> Dwarf_int.t
 
-(** The escape value emitted before a 64-bit initial length. *)
-val sixty_four_bit_indicator : Int32.t
-
 include Dwarf_emittable.S with type t := t
+
+(** Emit an initial length whose value is computed by the assembler as the
+    distance between the two labels (which must be in the same section),
+    including the 64-bit indicator when the DWARF format is 64-bit. *)
+val emit_as_label_difference :
+  asm_directives:Asm_targets.Asm_directives_dwarf.t ->
+  upper:Asm_targets.Asm_label.t ->
+  lower:Asm_targets.Asm_label.t ->
+  unit

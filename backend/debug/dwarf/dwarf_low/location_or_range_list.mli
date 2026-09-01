@@ -27,5 +27,7 @@ module Make (Entry : Location_or_range_list_entry.S) : sig
 
   val section : Asm_section.dwarf_section
 
-  include Dwarf_emittable.S with type t := t
+  (** Note that there is no [size] function; see [Location_or_range_list_entry].
+  *)
+  val emit : asm_directives:Asm_directives_dwarf.t -> t -> unit
 end

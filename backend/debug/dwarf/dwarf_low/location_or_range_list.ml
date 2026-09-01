@@ -28,13 +28,6 @@ module Make (Entry : Location_or_range_list_entry.S) = struct
 
   let section = Entry.section
 
-  let size t =
-    (* The extra byte is for the terminating end-of-list entry
-       ([DW_LLE_end_of_list] or [DW_RLE_end_of_list], both code 0). *)
-    List.fold_left
-      (fun size entry -> Dwarf_int.add size (Entry.size entry))
-      (Dwarf_int.one ()) t
-
   let emit ~asm_directives t =
     A.comment "Start of list:";
     A.new_line ();

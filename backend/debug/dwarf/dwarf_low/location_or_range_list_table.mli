@@ -20,7 +20,9 @@
 open Asm_targets
 
 module Make (Location_or_range_list : sig
-  include Dwarf_emittable.S
+  type t
+
+  val emit : asm_directives:Asm_directives_dwarf.t -> t -> unit
 
   val section : Asm_section.dwarf_section
 end) : sig

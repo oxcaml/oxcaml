@@ -14,34 +14,28 @@
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
-open! Int_replace_polymorphic_compare
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open Asm_targets
 module Uint8 = Numbers.Uint8
 module A = Asm_directives
 
 module Entry = struct
-  type t =
-    { addr : Asm_label_or_symbol.t;
-      adjustment : int
-    }
+  module T0 = struct
+    type t = Asm_label_or_symbol.t
 
-  include Identifiable.Make (struct
-    type nonrec t = t
+    let compare = Asm_label_or_symbol.compare
 
-    let compare { addr = addr1; adjustment = adjustment1 }
-        { addr = addr2; adjustment = adjustment2 } =
-      let c = Asm_label_or_symbol.compare addr1 addr2 in
-      if c <> 0 then c else Stdlib.compare adjustment1 adjustment2
+    let equal = Asm_label_or_symbol.equal
 
-    let equal t1 t2 = compare t1 t2 = 0
+    let hash = Asm_label_or_symbol.hash
 
-    let hash { addr; adjustment } =
-      Hashtbl.hash (Asm_label_or_symbol.hash addr, adjustment)
-
-    let print _ _ = Misc.fatal_error "Not yet implemented"
+    let print = Asm_label_or_symbol.print
 
     let output _ _ = Misc.fatal_error "Not yet implemented"
-  end)
+  end
+
+  include T0
+  include Identifiable.Make (T0)
 end
 
 type t =
@@ -68,9 +62,7 @@ let add_entry t (entry : Entry.t) =
     index
   | index -> index
 
-let add ?(adjustment = 0) t addr = add_entry t { addr = Label addr; adjustment }
-
-let add_symbol t symbol = add_entry t { addr = Symbol symbol; adjustment = 0 }
+let add_symbol t symbol = add_entry t (Asm_label_or_symbol.Symbol symbol)
 
 let base_addr t = t.base_addr
 
@@ -87,13 +79,11 @@ let size t =
     (Initial_length.size initial_length)
     (Initial_length.to_dwarf_int initial_length)
 
-let entry_to_dwarf_value (entry : Entry.t) =
+let entry_to_dwarf_value entry =
   (* The table must contain relocatable absolute addresses: on ELF the static
      linker relocates them directly, and DWARF linkers such as dsymutil
      translate them using the debug map. *)
-  Dwarf_value.code_address_from_label_or_symbol_plus_offset ~comment:"address"
-    entry.addr
-    ~offset_in_bytes:(Targetint.of_int_exn entry.adjustment)
+  Dwarf_value.code_address_from_label_or_symbol ~comment:"address" entry
 
 let emit ~asm_directives t =
   Initial_length.emit ~asm_directives (initial_length t);

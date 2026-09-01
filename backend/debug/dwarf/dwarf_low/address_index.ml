@@ -41,21 +41,3 @@ include Identifiable.Make (struct
 
   let output _ _ = Misc.fatal_error "Not yet implemented"
 end)
-
-module Pair = struct
-  type nonrec t = t * t
-
-  include Identifiable.Make (struct
-    type nonrec t = t
-
-    let compare = Stdlib.compare
-
-    let hash = Hashtbl.hash
-
-    let equal t1 t2 = compare t1 t2 = 0
-
-    let print ppf (x, y) = Format.fprintf ppf "(%Ld, %Ld)" x y
-
-    let output _ _ = Misc.fatal_error "Not yet implemented"
-  end)
-end
