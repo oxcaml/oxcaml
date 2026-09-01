@@ -265,6 +265,40 @@ let
   # testOcaml argument (it only feeds the merlin package's check phase).
   merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
 
+  unpackSourceArchive =
+    name: archive:
+    pkgs.runCommand name { } ''
+      mkdir "$out"
+      tar --extract --file=${archive} --directory="$out" --strip-components=1
+    '';
+
+  ppxDeriversSrc = unpackSourceArchive "ppx-derivers-1.2.1-source" (pkgs.fetchurl {
+    url = "https://github.com/ocaml-ppx/ppx_derivers/archive/1.2.1.tar.gz";
+    hash = "sha256-tlle4Yfep5KzH8VKDhUkqx5IvGBo0wZsRSFaE4zHO5U=";
+  });
+
+  sexplib0Src = unpackSourceArchive "sexplib0-v0.17.0-source" (pkgs.fetchurl {
+    url = "https://github.com/janestreet/sexplib0/archive/refs/tags/v0.17.0.tar.gz";
+    hash = "sha512-rTh+QHif5woRRz236F/gF7gBWSYkQU6QMHMLLpLqCPmAlftukjZDDzPIAWBevuCipihOD2GKJqfaRZnU/Z05XQ==";
+  });
+
+  stdlibShimsSrc = unpackSourceArchive "stdlib-shims-0.3.0-source" (pkgs.fetchurl {
+    url = "https://github.com/ocaml/stdlib-shims/releases/download/0.3.0/stdlib-shims-0.3.0.tbz";
+    hash = "sha256-ur9y05F7hvcHiF8MVSjjbGP8y2mPS0bPK6tcfM3W2Eo=";
+  });
+
+  ppxlibJaneUpstreamSrc =
+    unpackSourceArchive "ppxlib-jane-oxcaml-source" (pkgs.fetchurl {
+      url = "https://github.com/janestreet/ppxlib_jane/archive/52e90008fbdc22fc0f880aa827faf10257a9b2a6.tar.gz";
+      hash = "sha256-uT4rFFQQxIrvoqop2cUxBoncrxqyVpPs7cTWREJw0+o=";
+    });
+
+  ppxlibJaneSrc = pkgs.applyPatches {
+    name = "ppxlib-jane-source";
+    src = ppxlibJaneUpstreamSrc;
+    patches = [ ./external/patches/ppxlib-jane-oxcaml.patch ];
+  };
+
   gfortran =
     # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
     # directly to `nativeBuildInputs` overrides many `$PATH` entries from
@@ -358,6 +392,10 @@ stdenv.mkDerivation {
 
   OXCAML_LLDB = if oxcamlLldb then "${lldb}/bin/lldb" else null;
   OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
+  PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
+  PPXLIB_SEXPLIB0_SRC = sexplib0Src;
+  PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
+  PPXLIB_JANE_SRC = ppxlibJaneSrc;
 
   enableParallelBuilding = true;
   separateDebugInfo = false;
@@ -461,6 +499,7 @@ stdenv.mkDerivation {
         make install             - Install
         make test                - Run all tests
         make test-one TEST=...   - Run a single test
+        make external-libs-build - Builds vendored external libraries depending on oxcaml
       ${merlinCommands}EOF
     '';
 
