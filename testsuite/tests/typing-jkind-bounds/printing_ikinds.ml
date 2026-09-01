@@ -49,6 +49,38 @@ Error: This type definition does not satisfy its kind annotation
        because 'a is not mod forkable unyielding many stateless immutable.
 |}]
 
+type 'a shared_direct : value mod shared with 'a
+type 'a shareable_direct : value mod shareable with 'a
+type 'a reading_direct : value mod reading with 'a
+type 'a read_direct : value mod read with 'a
+[%%expect{|
+type 'a shared_direct : value mod shared with 'a
+type 'a shareable_direct : value mod shareable with 'a
+type 'a reading_direct : value mod reading with 'a
+type 'a read_direct : value mod read with 'a
+|}]
+
+type middle_payload
+type shared_with : immutable_data with middle_payload @@ shared
+type corrupted_with : immutable_data with middle_payload @@ corrupted
+type shareable_with : immutable_data with middle_payload @@ shareable
+type corruptible_with : immutable_data with middle_payload @@ corruptible
+type read_with : immutable_data with middle_payload @@ read
+type write_with : immutable_data with middle_payload @@ write
+type reading_with : immutable_data with middle_payload @@ reading
+type writing_with : immutable_data with middle_payload @@ writing
+[%%expect {|
+type middle_payload
+type shared_with : immutable_data with middle_payload @@ shared
+type corrupted_with : immutable_data with middle_payload @@ corrupted
+type shareable_with : immutable_data with middle_payload @@ shareable
+type corruptible_with : immutable_data with middle_payload @@ corruptible
+type read_with : immutable_data with middle_payload @@ read
+type write_with : immutable_data with middle_payload @@ write
+type reading_with : immutable_data with middle_payload @@ reading
+type writing_with : immutable_data with middle_payload @@ writing
+|}]
+
 module M : sig
   type t : immutable_data
 end = struct

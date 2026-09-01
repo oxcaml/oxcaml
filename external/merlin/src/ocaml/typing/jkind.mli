@@ -651,6 +651,14 @@ val get_mode_crossing :
 
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
+val equal_unsafe_mode_crossing :
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
+  context:jkind_context ->
+  Env.t ->
+  Types.unsafe_mode_crossing ->
+  Types.unsafe_mode_crossing ->
+  bool
+
 val get_externality_upper_bound :
   context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Externality.t
 
@@ -673,8 +681,8 @@ val apply_modality_l :
   Mode.Modality.Const.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
 
 (** Change a jkind to be appropriate for an expectation of a type under a
-    modality. This means that the jkind's axes affected by the modality will all
-    be top. The with-bounds are left unchanged. *)
+    modality. Relax direct bounds so applying the modality on the left meets the
+    original expectation. With-bounds are unchanged. *)
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 
