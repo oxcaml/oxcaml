@@ -1,4 +1,8 @@
 (tests
- (names global_module_test axis_lattice_roundtrip_test ldd_imply_test
-   modality_annotation_test)
+ (names
+  global_module_test
+  axis_lattice_roundtrip_test
+  ldd_imply_test
+  modality_annotation_test
+  structured_diagnostic_roundtrip_test)
  (libraries ocamlfrontend))

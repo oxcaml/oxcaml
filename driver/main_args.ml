@@ -2703,7 +2703,7 @@ module Default = struct
         | Some pass ->
           set_save_ir_before pass true
 
-    let _structured_diagnostics = Mode_diagnostics.enable_structured_diagnostics
+    let _structured_diagnostics = Diagnostics.enable_structured_diagnostics
     let _thread = set use_threads
     let _verbose = set verbose
     let _version () = Compenv.print_version_string ()
