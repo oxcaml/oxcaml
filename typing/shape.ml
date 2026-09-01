@@ -586,6 +586,7 @@ and record_kind =
   | Record_boxed
   | Record_mixed of mixed_product_shape
   | Record_floats
+  | Record_all_void
 
 and 'a constructors = 'a constructor list
 
@@ -715,8 +716,9 @@ and equal_record_kind k1 k2 =
   | Record_mixed lys1, Record_mixed lys2 ->
     Misc.Stdlib.Array.equal Layout.equal lys1 lys2
   | Record_floats, Record_floats -> true
+  | Record_all_void, Record_all_void -> true
   | (Record_unboxed | Record_unboxed_product | Record_boxed | Record_mixed _ |
-     Record_floats), _
+     Record_floats | Record_all_void), _
     -> false
 
 and equal_field (s1, uid1, sh1, ly1) (s2, uid2, sh2, ly2) =
@@ -946,6 +948,7 @@ and print_record_type = function
   | Record_mixed _ -> "_mixed"
   | Record_unboxed -> " [@@unboxed]"
   | Record_unboxed_product -> "_unboxed_product"
+  | Record_all_void -> "_all_void"
 
 let rec strip_head_aliases = function
   | { desc = Alias t; _ } -> strip_head_aliases t
