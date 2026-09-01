@@ -2,16 +2,16 @@
  (name ppxlib)
  (public_name ppxlib)
  (libraries
-  (re_export ppxlib_ast)
+  (re_export ppxlib_ast.ast)
   compiler-libs.common
   ocaml-compiler-libs.common
   ocaml-compiler-libs.shadow
-  astlib
+  ppxlib_ast.astlib
   ppxlib_print_diff
   ppx_derivers
   ppxlib_jane
-  ppxlib_traverse_builtins
-  stdppx
+  ppxlib_ast.traverse_builtins
+  ppxlib_ast.stdppx
   stdlib-shims
   sexplib0)
  (flags
