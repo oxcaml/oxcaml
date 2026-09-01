@@ -203,6 +203,7 @@ _compare/config.status: ocaml/config.status
 	  $$(pwd)/ocaml/ $$(pwd)/_compare
 	(cd _compare && ./configure $(CONFIGURE_ARGS) --prefix=$$(pwd)/_install)
 
+
 .PHONY: promote
 promote:
 	$(dune) promotion apply $(ws_main)
@@ -218,6 +219,18 @@ merlin-test:
 .PHONY: merlin-promote
 merlin-promote:
 	$(MAKE) -C external/merlin test-promote
+
+# Intermediary library target to build ocaml-compiler-libs-build against install
+
+.PHONY: ocaml-compiler-libs-build
+ocaml-compiler-libs-build: _install
+	env -u OCAMLPATH \
+	  PATH="$(CURDIR)/_install/bin:$(PATH)" \
+	  OCAMLLIB="$(CURDIR)/_install/lib/ocaml" \
+	  $(dune) build \
+	    --root=external/ocaml-compiler-libs \
+	    --build-dir="$(CURDIR)/_build/ocaml-compiler-libs" \
+	    @install
 
 .PHONY: fmt
 fmt: $(dune_config_targets)
