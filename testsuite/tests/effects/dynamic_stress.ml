@@ -8,7 +8,7 @@ module Dynamic = struct
 
   (* Expose the implementation of dynamic for testing. *)
   external push : 'a t -> 'a @ contended portable -> unit = "caml_dynamic_push"
-  external pop : unit -> unit = "caml_dynamic_pop"
+  external pop : 'a t -> unit = "caml_dynamic_pop"
   external hash : 'a t -> int = "%identity"
 end
 
@@ -17,19 +17,20 @@ let int_or_null = function This n -> string_of_int n | Null -> "null"
 let get_str d = str_or_null (Dynamic.get d)
 let get_int d = int_or_null (Dynamic.get d)
 
-(* Run [f] on a brand new fiber, hence with a fresh (empty) binding chain. *)
+(* Run [f] on a brand new fiber, hence with a freshly-initialized (empty)
+   binding table. *)
 let in_fresh_fiber (f : unit -> unit) =
   Effect.Deep.match_with f ()
     { retc = (fun () -> ());
       exnc = (fun e -> raise e);
       effc = (fun (type a) (_ : a Effect.t) -> None) }
 
-(* Deeply nest [with_temporarily] on a single variable, so the fiber's binding
-   chain holds many bindings of the same variable at once. We record the value
-   seen on the way down and on the way back up; the latter exercises repeated
-   pops down to the empty chain. *)
-let test_deep_nesting () =
-  print_endline "# deep nesting on a single variable";
+(* Deeply nest [with_temporarily] on a single variable. Each level pushes onto
+   the *same* binding stack, forcing it to grow (init capacity 4, doubling).
+   We record the value seen on the way down and on the way back up; the latter
+   exercises repeated pop and the eventual free of the emptied stack. *)
+let test_stack_growth () =
+  print_endline "# stack growth: deep nesting on a single variable";
   let d = Dynamic.make () in
   let depth = 20 in
   let down = Buffer.create 64 and up = Buffer.create 64 in
@@ -45,11 +46,11 @@ let test_deep_nesting () =
   Printf.printf "up:   %s\n" (String.trim (Buffer.contents up));
   Printf.printf "after all pops [expect null]: %s\n" (get_int d)
 
-(* Bind many distinct variables simultaneously (nested), building a long
-   binding chain. Then read them all back, exercising lookup at every
-   depth of the chain. *)
-let test_chain_growth () =
-  print_endline "\n# chain growth: many simultaneous distinct variables";
+(* Bind many distinct variables simultaneously (nested), forcing the hash table
+   to grow repeatedly (init capacity 8, doubling at half-full) and to rehash
+   every key on each grow. Then read them all back, exercising find+probing. *)
+let test_table_growth () =
+  print_endline "\n# table growth: many simultaneous distinct variables";
   let n = 25 in
   let ds = Array.init n (fun _ -> Dynamic.make ()) in
   let rec bind i =
@@ -77,45 +78,10 @@ let test_chain_growth () =
   in
   Printf.printf "visible after unwind [expect 0]: %d\n" leftover
 
-(* The per-thread dynamic cache is direct-mapped with 8 entries, so the cache
-   slot of a key is [hash land 7]. Two keys sharing a slot evict each other's
-   cache entry on every read, so the reads below genuinely consult the fiber's
-   binding chain rather than the cache. *)
-let test_collision () =
-  print_endline "\n# hash collision: contended cache slot";
-  in_fresh_fiber (fun () ->
-    let slot d = Dynamic.hash d land 7 in
-    let pool = Array.init 128 (fun _ -> Dynamic.make ()) in
-    let a, b =
-      let found = ref None in
-      Array.iter
-        (fun x ->
-          if Option.is_none !found then
-            Array.iter
-              (fun y ->
-                if Option.is_none !found && (not (x == y)) && slot x = slot y
-                then found := Some (x, y))
-              pool)
-        pool;
-      match !found with
-      | Some p -> p
-      | None -> failwith "no suitable collision found"
-    in
-    Dynamic.push a 111;
-    Dynamic.push b 222;
-    Printf.printf "both bound: a=%s b=%s\n" (get_int a) (get_int b);
-    Dynamic.pop () (* b *);
-    (* Reading the popped key first also evicts the (shared) per-thread cache
-       slot, so the read of a below genuinely consults the binding chain. *)
-    Printf.printf "after pop b: b=%s [expect null]\n" (get_int b);
-    Printf.printf "after pop b: a=%s [expect 111]\n" (get_int a);
-    Dynamic.pop () (* a *))
-
 (* Heap-allocated bindings must be scanned as GC roots. We bust the per-thread
-   cache so the live strings are reachable only through the fiber's binding
-   chain, then move the heap underneath them and read them back. The final
-   fiber exits with bindings still installed; its chain is dropped with the
-   fiber and collected by the GC. *)
+   cache so the live strings are reachable only through the binding stack in the
+   hash table, then move the heap underneath them and read them back. The final
+   fiber leaves bindings live at exit, exercising table teardown. *)
 let test_gc () =
   print_endline "\n# GC root scanning of live bindings";
   let flush_gc () =
@@ -131,10 +97,10 @@ let test_gc () =
   Dynamic.push d (Bytes.unsafe_to_string (Bytes.make 6 'y'));
   flush_gc ();
   Printf.printf "top after GC [expect yyyyyy]: %s\n" (get_str d);
-  Dynamic.pop ();
+  Dynamic.pop d;
   flush_gc ();
   Printf.printf "below after GC [expect xxxx]: %s\n" (get_str d);
-  Dynamic.pop ();
+  Dynamic.pop d;
   in_fresh_fiber (fun () ->
     let e = Dynamic.make () and g = Dynamic.make () in
     Dynamic.push e (Bytes.unsafe_to_string (Bytes.make 3 'p'));
@@ -143,7 +109,6 @@ let test_gc () =
     Printf.printf "live in fiber: e=%s g=%s\n" (get_str e) (get_str g))
 
 let () =
-  test_deep_nesting ();
-  test_chain_growth ();
-  test_collision ();
+  test_stack_growth ();
+  test_table_growth ();
   test_gc ()

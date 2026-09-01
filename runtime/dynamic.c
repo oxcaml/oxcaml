@@ -145,7 +145,7 @@ CAMLprim value caml_dynamic_push(value dyn, value val)
   CAMLreturn(Val_unit);
 }
 
-CAMLprim value caml_dynamic_pop(value unit)
+CAMLprim value caml_dynamic_pop(value dyn)
 {
   CAMLnoalloc;
 
@@ -158,7 +158,7 @@ CAMLprim value caml_dynamic_pop(value unit)
   if(Is_this(head)) {
     stack->dynamic = Dynamic_node_next(head);
 
-    value dyn = Dynamic_node_dyn(head);
+    CAMLassert(Dynamic_node_dyn(head) == dyn);
     dynamic_binding_t entry = dynamic_cache_entry(dyn);
     if(entry->dyn == dyn) {
       entry->dyn = Val_null;

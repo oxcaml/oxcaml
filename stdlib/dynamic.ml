@@ -19,13 +19,13 @@ external get : 'a t -> 'a or_null @ contended portable @@ portable =
   "caml_dynamic_get" [@@noalloc]
 external push : 'a t -> 'a @ contended portable -> unit @@ portable =
   "caml_dynamic_push"
-external pop : unit -> unit @@ portable = "caml_dynamic_pop" [@@noalloc]
+external pop : 'a t -> unit @@ portable = "caml_dynamic_pop" [@@noalloc]
 
 let[@inline] with_temporarily t v ~f = exclave_
   push t v;
   match f () with
-  | res -> pop (); res
+  | res -> pop t; res
   | exception exn ->
     let bt = Printexc.get_raw_backtrace () in
-    pop ();
+    pop t;
     Printexc.raise_with_backtrace exn bt

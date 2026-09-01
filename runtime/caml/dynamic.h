@@ -30,9 +30,9 @@ CAMLprim value caml_dynamic_get(value dyn);
    Must be paired with [caml_dynamic_pop] on the same fiber. */
 CAMLprim value caml_dynamic_push(value dyn, value val);
 
-/* Pop the fiber's most recent local binding.
+/* Pop the fiber's most recent local binding, which must be for [dyn].
    Must be paired with [caml_dynamic_push] on the same fiber. */
-CAMLprim value caml_dynamic_pop(value unit);
+CAMLprim value caml_dynamic_pop(value dyn);
 
 typedef struct dynamic_binding_s {
   value dyn; /* Dynamic id, or Val_null if unbound */
