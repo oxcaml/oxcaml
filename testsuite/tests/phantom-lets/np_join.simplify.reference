@@ -1,0 +1,28 @@
+let code test_0 deleted in
+let code loopify(never) size(24) newer_version_of(test_0)
+      test_0_1 (b : imm tagged, np x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let np int_add = %int_barith.add (x, 1) in
+      cont k2 (int_add)
+    where k3 =
+      let np int_mul = %int_barith.mul (x, 2) in
+      cont k2 (int_mul)
+    where k2 (np a : imm tagged) =
+      let phantom pair = %block.[`0`].my_alloc_region.local[`region`] (a, x)
+      in
+      let int_add = %int_barith.add (a, x) in
+      let `unit` = %end_region (`region`) in
+      cont k (int_add)
+in
+let $camlNp_join__test_1 = closure test_0_1 @test &toplevel.alloc_region in
+let phantom test = $camlNp_join__test_1 in
+let $camlNp_join = Block 0 ($camlNp_join__test_1) in
+cont done ($camlNp_join)
