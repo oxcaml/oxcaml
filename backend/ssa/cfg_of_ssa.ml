@@ -126,12 +126,21 @@ let get_block_params_regs env (block : block) =
     Misc.fatal_errorf "Cfg_of_ssa: no regs for block params of %a"
       Block.print_id block
 
-let emit_moves ?(dbg = Debuginfo.none) body ~src ~dst =
+let emit_moves ?(dbg = Debuginfo.none)
+    ?(op = fun (_ : Reg.t) (_ : Reg.t) : Operation.t -> Move) body ~src ~dst =
   Array.iter2
     (fun s d ->
       if not (Reg.same s d)
-      then DLL.add_end body (make_instr (Cfg.Op Move) [| s |] [| d |] dbg))
+      then DLL.add_end body (make_instr (Cfg.Op (op s d)) [| s |] [| d |] dbg))
     src dst
+
+(* Moves a call's results out of their ABI locations, mirroring
+   [Select_utils.insert_move_result]. *)
+let emit_result_moves body ~src ~dst =
+  emit_moves body ~src ~dst ~op:(fun s d : Operation.t ->
+      if Select_utils.result_needs_mask_of_int64 s d
+      then Reinterpret_cast Mask_of_int64
+      else Move)
 
 (* Like [emit_moves], but safe when [src] and [dst] overlap (e.g. a permutation
    of the target block's parameter registers): in that case the values are
@@ -298,7 +307,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
   then begin
     let loc_res = Block.Tbl.find env.call_result_locs block in
     let virt_res = get_block_params_regs env block in
-    emit_moves body ~src:loc_res ~dst:virt_res;
+    emit_result_moves body ~src:loc_res ~dst:virt_res;
     let stack_ofs =
       Block.Tbl.find_opt env.call_stack_ofs block |> Option.value ~default:0
     in

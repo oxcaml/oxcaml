@@ -208,6 +208,12 @@ val emit_parts_list :
     initialising the fields of a freshly allocated block ([emit_stores]). *)
 val chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk
 
+(** Whether moving a call result out of its ABI location [src] into [dst] needs
+    a [Reinterpret_cast Mask_of_int64] rather than a plain [Move]. [Proc] types
+    a C-ABI mask location as [Int] so that whoever materialises ABI locations
+    inserts the conversion; targets with mask registers type it [Mask]. *)
+val result_needs_mask_of_int64 : Reg.t -> Reg.t -> bool
+
 val float_test_of_float_comparison :
   Cmm.float_width ->
   Scalar.Float_comparison.t ->

@@ -816,12 +816,13 @@ let insert_move_args env sub_cfg arg loc stacksize =
   then insert env sub_cfg (make_stack_offset stacksize) [||] [||];
   insert_moves env sub_cfg arg loc
 
+let result_needs_mask_of_int64 (src : Reg.t) (dst : Reg.t) =
+  (* The C ABI passes masks in GPRs. *)
+  equal_machtype_component dst.typ Mask && equal_machtype_component src.typ Int
+
 let insert_move_result env sub_cfg (src : Reg.t) (dst : Reg.t) =
-  if
-    equal_machtype_component dst.typ Mask
-    && equal_machtype_component src.typ Int
+  if result_needs_mask_of_int64 src dst
   then
-    (* The C ABI passes masks in GPRs. *)
     insert env sub_cfg (Op (Reinterpret_cast Mask_of_int64)) [| src |] [| dst |]
   else insert_move env sub_cfg src dst
 
