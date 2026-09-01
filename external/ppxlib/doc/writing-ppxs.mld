@@ -19,7 +19,7 @@ into another one. A transformation can be:
   [structure -> structure] or [signature -> signature], that can sometimes take
   extra information as additional arguments. Such a transformation is applied in
   the {{!driver."global-transfo-phase"}global transformation phase}, unless it
-  has a good reason to have been registered in another phase. While global transformations are a flexible and powerful tool in the OCaml ecosystem, they come with many {{!global_transformation}drawbacks} and should only be used when really necessary.  
+  has a good reason to have been registered in another phase. While global transformations are a flexible and powerful tool in the OCaml ecosystem, they come with many {{!global_transformation}drawbacks} and should only be used when really necessary.
 
 In order to register a transformation to the [ppxlib] driver, one should use the
 {{!Ppxlib.Driver.V2.register_transformation}[Driver.V2.register_transformation]}. This function is used to register all
@@ -34,19 +34,20 @@ of the context-free pass. A rule contains the information about
 when it should be applied in the traversal, as well as the transformation to
 apply.
 
-Currently, rules can only be defined to apply in four different contexts:
+Currently, rules can only be defined to apply in five different contexts:
 
 - on extensions points, such as [\[%ext_point payload\]]
-- on some structure or signature items with an attribute, such as
+- on some structure or signature items with a deriving attribute, such as
   [type t = Nil \[@@deriving show\]],
+- on AST nodes with attributes, such as [let x = 42 [@@attr]],
 - on
   {{:https://v2.ocaml.org/manual/extensionsyntax.html#ss:extension-literals}
   litterals with modifiers}, such as [41g] or [43.2x],
 - on function application or identifiers, such as [meta_function "99"] and [meta_constant].
 
 In order to define rules on extensions points, we will use the {{!Ppxlib.Extension}[Extension]}
-module. In order to define rules on attributed items, we will use the
-{{!Ppxlib.Deriving}[Deriving]} module. For the two other rules, we will directly use the
+module. In order to define deriving rules, we will use the {{!Ppxlib.Deriving}[Deriving]}
+module. For the three other rules, we will directly use the
 {{!Ppxlib.Context_free.Rule}[Context_free.Rule]} module.
 
 {2 Extenders}
@@ -101,7 +102,7 @@ See below for examples on when the above name and context will trigger rewriting
   let _ = match () with [%add_suffix "payload"] -> () (* wrong context *)
 ]}
 
-{3 The Payload Extraction}
+{3:extender-payload The Payload Extraction}
 
 An extension node contains a {{!Ppxlib.Parsetree.payload}[payload]}, which will be passed to the transformation function. However, while this payload contains all information, it is not always structured the best way for the transformation function. For instance, in [[%add_suffix "payload"]], the string ["payload"] is encoded as a structure item consisting of an expression’s evaluation, a constant that is a string.
 
@@ -124,7 +125,7 @@ produced node will have to match the {{!ext_context}type of extension node we re
 
 The above pattern extracts a string inside an extension node pattern. It will extract ["string"] in the the extension node [[%ext_name "string"]] and will refuse [[%ext_name 1+1]]. For other ready-to-use examples of patterns, refer to the {{!"matching-code".pattern_examples}example} section. For more in-depth explanation on the types and functions used above, see the {{!"matching-code"}Destructing AST nodes} chapter and the {{!Ppxlib.Ast_pattern}[Ast_pattern] API} .
 
-The unit argument in [extractor] is not important. It is added so that {{:https://v2.ocaml.org/manual/polymorphism.html#ss:valuerestriction}value restriction} does not add noise to the type variables. 
+The unit argument in [extractor] is not important. It is added so that {{:https://v2.ocaml.org/manual/polymorphism.html#ss:valuerestriction}value restriction} does not add noise to the type variables.
 
 {3 The Expand Function}
 
@@ -357,6 +358,91 @@ contexts. As the API shows, derivers are restricted to being applied in the foll
 
 in both structures and signatures.
 
+{2 Attribute-guided Rewriting}
+
+There are rules that apply to AST nodes that, like derivers, apply based on their
+attributes but, like extenders, allow rewriting the entire AST node. These provide
+lighter-weight syntax than extenders but that also means it's less obvious that they're
+rewriting the syntax tree.
+
+These are composed of:
+- The name of the rewrite rule
+- The list of attributes they define
+- The expand function
+
+They are defined to apply in a specific context, specifically, they can be registered to
+be processed in the same contexts as extenders can occur.
+
+{3 The List of Attributes}
+
+A given rewrite rule can have multiple attributes that trigger it, if any of the
+attributes are present on a single node then the rule is triggered and provided with the
+AST node along with the payload of all the attributes registered by this rule. To declare
+attributes use the {{!Ppxlib.Attribute.declare}[Attribute.declare]} function (or the other
+similar functions in that module). Note that the [Context.t] must match the type of AST
+nodes that the rule will apply to.
+
+{@ocaml[
+  # let prefix_attr = Attribute.declare "example.prefix" Expression
+      Ast_pattern.(single_expr_payload (estring __)) Fun.id
+    and suffix_attr = Attribute.declare "example.suffix" Expression
+      Ast_pattern.(single_expr_payload (estring __)) Fun.id ;;
+  val prefix_attr : (expression, string) Attribute.t = <abstr>
+  val suffix_attr : (expression, string) Attribute.t = <abstr>
+]}
+
+{3 The Expand Function}
+
+The expand function takes the AST node (with this rule's attributes already stripped) and
+the payloads of all the declared attributes (as a list of [payload option]s to allow for
+attributes that haven't been included).
+
+{@ocaml[
+  # let expander
+          ~ctxt
+          expression
+          ([ prefix; suffix ] : _ Context_free.Rule.Parsed_payload_list.t)
+      =
+      match expression.pexp_desc with
+      | Pexp_ident { txt = Lident name; loc } ->
+          let prefixed = Option.value ~default:"" prefix ^ name in
+          let suffixed = prefixed ^ Option.value ~default:"" suffix in
+          { expression with pexp_desc = Pexp_ident { txt = Lident suffixed; loc } }
+      | _ -> expression ;;
+  val expander :
+    ctxt:'a ->
+    expression ->
+    (string * (string * unit)) Context_free.Rule.Parsed_payload_list.t -> expression =
+    <fun>
+]}
+
+{3 Creating a rewriting rule}
+
+Finally, we can create the rule using the appropriate
+{{!Ppxlib.Extension.Context}[Ppxlib.Extension.Context]} and register it with the driver.
+There's also a {{!Ppxlib.Context_free.attr_replace}[Context_free.attr_replace]} function
+with a slightly simpler API if you only use a single attribute.
+
+{@ocaml[
+  # let rewrite_rule = Context_free.Rule.attr_multiple_replace "example" Expression
+    [ prefix_attr; suffix_attr ] expander ;;
+  val rule : Context_free.Rule.t = <abstr>
+  # Driver.register_transformation ~rules:[rewrite_rule] "example" ;;
+  - : unit = ()
+]}
+
+Now, for example, the following:
+
+{@ocaml[
+  let _ = foo [@prefix "p_"] [@suffix "_s"]
+]}
+
+will be rewritten to:
+
+{@ocaml[
+  let _ = p_foo_s
+]}
+
 {2 Constant Rewriting}
 
 OCaml integrates a
@@ -441,7 +527,7 @@ With such a rewriter registered:
 Global transformations are the most general kind of transformation. As such, they allow doing virtually any modifications, but this comes with several drawbacks. There are very few PPXs that really need this powerful but dangerous feature. In fact, even if, at first sight, it seems like your transformation isn't context-free, it's likely that you can find a more suitable abstraction with which it becomes context-free. Whenever that's the case, go for context-free! The mentioned drawbacks are:
 
 - It is harder for the user to know exactly what parts of the AST will be
-  changed. Your transformation becomes a scary black box. 
+  changed. Your transformation becomes a scary black box.
 - It is harder for [ppxlib] to combine several global transformations, as there is no
   guarantee that the effect of one will work well with the effect of another.
 - The job done by two global transformations (e.g., an AST traverse) cannot be
