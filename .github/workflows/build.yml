@@ -27,7 +27,7 @@ jobs:
           - name: default (x86_64-linux)
             os: warp-ubuntu-latest-x64-8x
             build_debug: true
-            build_ocaml_compiler_libs: true
+            build_external_libs: true
             sysdeps: gdb
 
           - name: dissector-assembler (x86_64-linux)
@@ -405,9 +405,9 @@ jobs:
           OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
           USE_RUNTIME: ${{ matrix.use_runtime }}
 
-      - name: Build ocaml-compiler-libs
-        if: matrix.build_ocaml_compiler_libs == true && steps.build.conclusion == 'success'
-        run: make ocaml-compiler-libs-build
+      - name: Build libs located in external/
+        if: matrix.build_external_libs == true && steps.build.conclusion == 'success'
+        run: make external-libs-build
 
       - name: Run OxCaml testsuite
         if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
