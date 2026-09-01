@@ -1830,3 +1830,26 @@ end
 [%%expect{|
 module type S = sig val poly_ f : 'a -> 'b end
 |}]
+
+(***************************************)
+(* Attributes on constrained function parameters *)
+
+let f ((x : int) [@test.attr]) = x
+[%%expect{|
+val f : int -> int = <fun>
+|}]
+
+let f ~l:((x : int) [@test.attr]) = x
+[%%expect{|
+val f : l:int -> int = <fun>
+|}]
+
+let f ?l:((x : int option) [@test.attr]) () = x
+[%%expect{|
+val f : ?l:int -> unit -> int option = <fun>
+|}]
+
+let f ?l:((x : int) [@test.attr] = 0) () = x
+[%%expect{|
+val f : ?l:int -> unit -> int = <fun>
+|}]
