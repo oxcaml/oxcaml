@@ -20,14 +20,14 @@ end
 
 module System : sig
   type windows_system = private
-    | Cygwin
     | MinGW
-    | Native
+    | MSVC
 
   (* CR sspies: Remove some of the systems below that are a bit dated. *)
   type t = private
     | Linux
     | Windows of windows_system
+    | Cygwin
     | MacOS
     | FreeBSD
     | NetBSD

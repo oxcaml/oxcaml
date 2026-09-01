@@ -33,13 +33,13 @@ end
 
 module System = struct
   type windows_system =
-    | Cygwin
     | MinGW
-    | Native
+    | MSVC
 
   type t =
     | Linux
     | Windows of windows_system
+    | Cygwin
     | MacOS
     | FreeBSD
     | NetBSD
@@ -54,8 +54,8 @@ module System = struct
     match Config.system with
     | "linux" -> Linux
     | "mingw" | "mingw64" -> Windows MinGW
-    | "win32" | "win64" -> Windows Native
-    | "cygwin" -> Windows Cygwin
+    | "win32" | "win64" -> Windows MSVC
+    | "cygwin" -> Cygwin
     | "macosx" -> MacOS
     | "freebsd" -> FreeBSD
     | "netbsd" -> NetBSD
@@ -73,15 +73,15 @@ module System = struct
 
   let is_windows () =
     match get () with
-    | Linux | MacOS | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU
-    | BeOS | Unknown ->
+    | Linux | Cygwin | MacOS | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly
+    | GNU | BeOS | Unknown ->
       false
     | Windows _ -> true
 
   let is_macos () =
     match get () with
-    | Linux | Windows _ | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU
-    | BeOS | Unknown ->
+    | Linux | Windows _ | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris
+    | Dragonfly | GNU | BeOS | Unknown ->
       false
     | MacOS -> true
 end
@@ -96,11 +96,12 @@ module Assembler = struct
      initialisation *)
   let get () =
     match System.get () with
-    | Windows Native -> MASM
+    | Windows MSVC -> MASM
     | MacOS -> MacOS
     | Linux
-    | Windows (Cygwin | MinGW)
-    | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU | BeOS | Unknown ->
+    | Windows MinGW
+    | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU | BeOS
+    | Unknown ->
       GAS_like
 
   let is_macos () = match get () with MASM | GAS_like -> false | MacOS -> true

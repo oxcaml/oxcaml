@@ -173,8 +173,9 @@ let symbol_prefix () =
   match Target_system.System.get () with
   | MacOS -> "_"
   | Linux
-  | Windows (Cygwin | MinGW | Native)
-  | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->
+  | Windows (MinGW | MSVC)
+  | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly
+  | Unknown ->
       ""
 
 let entry_points ~phrase_name symbols =

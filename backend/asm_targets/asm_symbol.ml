@@ -32,8 +32,9 @@ let symbol_prefix () =
   | IA32 | X86_64 | AArch64 -> (
     match Target_system.System.get () with
     | Linux
-    | Windows (Cygwin | MinGW | Native)
-    | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly | Unknown ->
+    | Windows (MinGW | MSVC)
+    | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | BeOS | GNU | Dragonfly
+    | Unknown ->
       "" (* checked ok. *)
     | MacOS -> "_" (* checked ok. *))
   | ARM | POWER | Z | Riscv -> ""
