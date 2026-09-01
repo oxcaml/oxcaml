@@ -2311,7 +2311,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
           }
     | Ltemplate {tmpl_func; tmpl_env; tmpl_static_params} ->
         Ltemplate
-          { tmpl_func = subst_lfun s l tmpl_func;
+          { tmpl_func;
             tmpl_env =
               Ident.Map.map
                 (fun (lam, layout) -> (subst s l lam, layout))

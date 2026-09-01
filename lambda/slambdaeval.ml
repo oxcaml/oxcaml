@@ -307,7 +307,7 @@ module Ctx = struct
   type t =
     { cu_static_data : Compilation_unit.t -> CU_data.t option;
       store : Template_store.t;
-      instantiated_templates : Types.halves Ident.Tbl.t;
+      instantiated_templates : Types.value Or_missing.t option Ident.Tbl.t;
       mutable instantiations : (Ident.t * lambda) list;
       uniqueify : int Misc.Stdlib.String.Tbl.t
     }
@@ -360,16 +360,18 @@ module Ctx = struct
     in
     let slv_comptime =
       match Ident.Tbl.find_opt t.instantiated_templates name with
-      | Some value -> value.slv_comptime
+      | Some (Some value) -> value
+      | Some None ->
+        Misc.fatal_errorf "Recursive template instantiation of %a" Ident.print
+          name
       | None -> begin
-        (* f might recursively call this function so make sure to mark this name
-          as visited before calling it. *)
-        Ident.Tbl.replace t.instantiated_templates name
-          { Types.slv_comptime = Missing; slv_runtime = Lambda.dummy_constant };
-        let value : Types.halves = eval_apply closure args in
-        Ident.Tbl.replace t.instantiated_templates name value;
-        t.instantiations <- (name, value.slv_runtime) :: t.instantiations;
-        value.slv_comptime
+        (* eval_apply might recursively call this function so mark this name as
+           visited before calling it. *)
+        Ident.Tbl.replace t.instantiated_templates name None;
+        let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
+        Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
+        t.instantiations <- (name, slv_runtime) :: t.instantiations;
+        slv_comptime
         end
     in
     Present (SLVhalves { slv_comptime; slv_runtime = Lvar name })
@@ -480,7 +482,12 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
     Ctx.instantiate ctx closure args
       ~eval_apply:(fun { clo_params; clo_body; clo_env } args ->
         let env_body =
-          Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+          try
+            Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+          with Invalid_argument _ ->
+            Misc.fatal_error
+              "Slambda eval doesn't support partial or over application of \
+               functors."
         in
         eval_slam ctx env_body clo_body |> expect_not_missing |> expect Thalves)
 

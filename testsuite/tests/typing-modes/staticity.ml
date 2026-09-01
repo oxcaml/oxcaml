@@ -552,7 +552,8 @@ module M = struct
   module (Y @ static) = F(struct end)(struct end)
 end
 [%%expect{|
-Uncaught exception: Invalid_argument("Misc.Stdlib.Array.fold_left2")
+>> Fatal error: Slambda eval doesn't support partial or over application of functors.
+Uncaught exception: Misc.Fatal_error
 
 |}]
 

@@ -4,19 +4,10 @@
 *)
 
 (* Tests for *applications* of static functors: instantiation of the
-   [Ltemplate]s that static functors compile to. Definitions alone are
-   covered by [apply_layout.ml]; the typing rules by
-   [typing-modes/staticity.ml]. Most cases pass a module containing a
-   layout-polymorphic identity and instantiate it at two layouts inside the
-   functor body, which only compiles if the parameter really is static and
-   the instantiation really happened at compile time.
+   [Ltemplate]s that static functors compile to.
 
    The toplevel translates each structure item as its own phrase, which
-   currently loses the compile-time half of templates across items (see the
-   CR-soon in the toplevel-phrase-boundaries section below). Until that is
-   fixed, each case is wrapped in a single [let] that defines the functor
-   and its argument with [let module] and reads the results back, so
-   everything is compiled -- and instantiated -- in one phrase. *)
+   currently loses the compile-time half of templates across items. *)
 
 external to_float : float# -> float = "%box_float"
 external to_int64 : int64# -> int64 = "%box_int64"
@@ -107,6 +98,34 @@ val r5 : int = 1
 val r5' : int = 2
 |}]
 
+(* The same functor applied twice to the *same* argument: the second
+   instantiation is memoized and must reuse the first one's compile-time
+   half. *)
+let (r5m, r5m') =
+  let module M = struct let poly_ id x = x end in
+  let module F (M : Id @ static) = struct
+    let i = M.id 1
+    let f = to_float (M.id #2.0)
+  end in
+  let module R1 = F (M) in
+  let module R2 = F (M) in
+  (R1.i + R2.i, R1.f +. R2.f)
+[%%expect{|
+val r5m : int = 2
+val r5m' : float = 4.
+|}]
+
+(* Side effects in the argument structure run exactly once, even though the
+   argument's compile-time and runtime halves are consumed separately. *)
+let r5e =
+  let count = ref 0 in
+  let module F (M : Id @ static) = struct let i = M.id 5 end in
+  let module R = F (struct let () = incr count let poly_ id x = x end) in
+  (R.i, !count)
+[%%expect{|
+val r5e : int * int = (5, 1)
+|}]
+
 (* A static parameter the body never uses: the contrast case for the capture
    cases below. *)
 let r6 =
@@ -154,6 +173,16 @@ let r9 =
   R.i
 [%%expect{|
 val r9 : int = 7
+|}]
+
+(* The functor is aliased before being applied. *)
+let r9a =
+  let module F (M : Id @ static) = struct let i = M.id 7 end in
+  let module G = F in
+  let module R = G (struct let poly_ id x = x end) in
+  R.i
+[%%expect{|
+val r9a : int = 7
 |}]
 
 (* The argument is itself a static functor application. [Wrap] needs a
@@ -424,7 +453,8 @@ let g1 =
   let module R = Half (struct let poly_ id x = x end) in
   R.i
 [%%expect{|
-Uncaught exception: Invalid_argument("Misc.Stdlib.Array.fold_left2")
+>> Fatal error: Slambda eval doesn't support partial or over application of functors.
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -443,7 +473,8 @@ let g2 =
   in
   R.i
 [%%expect{|
-Uncaught exception: Invalid_argument("Misc.Stdlib.Array.fold_left2")
+>> Fatal error: Slambda eval doesn't support partial or over application of functors.
+Uncaught exception: Misc.Fatal_error
 
 |}]
 
@@ -615,4 +646,20 @@ Line 4, characters 16-27:
                     ^^^^^^^^^^^
 Error: Modules do not match: sig val poly_ id : 'a -> 'a end @ dynamic
      is not included in Id @ static Got "dynamic" but expected "static".
+|}]
+
+(* 9. Coercing the functor itself. *)
+
+let c1 =
+  let module Inner (N : Id @ static) = struct
+    let i = N.id 4
+    let extra = 5
+  end in
+  let module U : functor (N : Id @ static) -> sig val i : int end = Inner in
+  let module R = U (struct let poly_ id x = x end) in
+  R.i
+[%%expect{|
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
 |}]

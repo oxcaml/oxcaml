@@ -343,9 +343,9 @@ let rec fracture_lam lambda : slambda =
     (* A kind template fractures into a compile-time template over its kind
        parameters, paired with a runtime block capturing its free variables.
 
-       The template's evaluates to a pair representing the body: the
-       compile-time half is the body's compile-time half; the runtime half is a
-       function of that environment to the original body.
+       The template evaluates to a pair representing the body: the compile-time
+       half is the body's compile-time half; the runtime half is a function of
+       that environment to the original body.
 
        {[
          let <free_var_0> = <fracture free_var_0> in
@@ -483,7 +483,7 @@ let rec fracture_lam lambda : slambda =
       } ->
     (* Like [Lkindtemplate] but parameters are static rather than erased so they
        survive into the lambda code. Only the first [tmpl_static_params]
-       parameters are static the rest are dynamic. Note that the arguments
+       parameters are static; the rest are dynamic. Note that the arguments
        passed by instantiation are the compile-time halves so we must bind the
        runtime halves to their new name inside the function.
 
@@ -520,7 +520,9 @@ let rec fracture_lam lambda : slambda =
               debug_uid = debug_uid_none;
               layout = layout_template_env;
               attributes = default_param_attribute;
-              mode
+              (* The env parameter can be local because we immediately
+                 destructure it. *)
+              mode = alloc_local
             }
           in
           let _, body =
