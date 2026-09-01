@@ -105,6 +105,11 @@ and direction_flag = Asttypes.direction_flag = Upto | Downto
 (* Order matters, used in polymorphic comparison *)
 and private_flag = Asttypes.private_flag = Private | Public
 and mutable_flag = Asttypes.mutable_flag = Immutable | Mutable
+and atomic_flag = Asttypes.atomic_flag = Nonatomic | Atomic
+and access_flag = Asttypes.access_flag =
+  | Immutable_access
+  | Mutable_access
+  | Atomic_access
 and virtual_flag = Asttypes.virtual_flag = Virtual | Concrete
 and override_flag = Asttypes.override_flag = Override | Fresh
 and closed_flag = Asttypes.closed_flag = Closed | Open
@@ -707,7 +712,7 @@ and function_constraint = Parsetree.function_constraint =
 and block_access = Parsetree.block_access =
   | Baccess_field of longident_loc
       (** [.foo] *)
-  | Baccess_block of mutable_flag * expression
+  | Baccess_block of access_flag * expression
       (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
           (usually followed by unboxed accesses, to deepen the index).
       *)
@@ -1433,6 +1438,8 @@ class virtual map =
     method direction_flag : direction_flag -> direction_flag= fun x -> x
     method private_flag : private_flag -> private_flag= fun x -> x
     method mutable_flag : mutable_flag -> mutable_flag= fun x -> x
+    method atomic_flag : atomic_flag -> atomic_flag= fun x -> x
+    method access_flag : access_flag -> access_flag= fun x -> x
     method virtual_flag : virtual_flag -> virtual_flag= fun x -> x
     method override_flag : override_flag -> override_flag= fun x -> x
     method closed_flag : closed_flag -> closed_flag= fun x -> x
@@ -1899,7 +1906,7 @@ class virtual map =
         match x with
         | Baccess_field a -> let a = self#longident_loc a in Baccess_field a
         | Baccess_block (a, b) ->
-            let a = self#mutable_flag a in
+            let a = self#access_flag a in
             let b = self#expression b in Baccess_block (a, b)
     method unboxed_access : unboxed_access -> unboxed_access=
       fun x ->
@@ -2647,6 +2654,8 @@ class virtual iter =
     method direction_flag : direction_flag -> unit= fun _ -> ()
     method private_flag : private_flag -> unit= fun _ -> ()
     method mutable_flag : mutable_flag -> unit= fun _ -> ()
+    method atomic_flag : atomic_flag -> unit= fun _ -> ()
+    method access_flag : access_flag -> unit= fun _ -> ()
     method virtual_flag : virtual_flag -> unit= fun _ -> ()
     method override_flag : override_flag -> unit= fun _ -> ()
     method closed_flag : closed_flag -> unit= fun _ -> ()
@@ -2966,7 +2975,7 @@ class virtual iter =
       fun x ->
         match x with
         | Baccess_field a -> self#longident_loc a
-        | Baccess_block (a, b) -> (self#mutable_flag a; self#expression b)
+        | Baccess_block (a, b) -> (self#access_flag a; self#expression b)
     method unboxed_access : unboxed_access -> unit=
       fun x -> match x with | Uaccess_unboxed_field a -> self#longident_loc a
     method comprehension_iterator : comprehension_iterator -> unit=
@@ -3508,6 +3517,8 @@ class virtual ['acc] fold =
     method direction_flag : direction_flag -> 'acc -> 'acc= fun _ acc -> acc
     method private_flag : private_flag -> 'acc -> 'acc= fun _ acc -> acc
     method mutable_flag : mutable_flag -> 'acc -> 'acc= fun _ acc -> acc
+    method atomic_flag : atomic_flag -> 'acc -> 'acc= fun _ acc -> acc
+    method access_flag : access_flag -> 'acc -> 'acc= fun _ acc -> acc
     method virtual_flag : virtual_flag -> 'acc -> 'acc= fun _ acc -> acc
     method override_flag : override_flag -> 'acc -> 'acc= fun _ acc -> acc
     method closed_flag : closed_flag -> 'acc -> 'acc= fun _ acc -> acc
@@ -3947,7 +3958,7 @@ class virtual ['acc] fold =
         match x with
         | Baccess_field a -> self#longident_loc a acc
         | Baccess_block (a, b) ->
-            let acc = self#mutable_flag a acc in
+            let acc = self#access_flag a acc in
             let acc = self#expression b acc in acc
     method unboxed_access : unboxed_access -> 'acc -> 'acc=
       fun x acc ->
@@ -4609,6 +4620,10 @@ class virtual ['acc] fold_map =
       fun x acc -> (x, acc)
     method mutable_flag : mutable_flag -> 'acc -> (mutable_flag * 'acc)=
       fun x acc -> (x, acc)
+    method atomic_flag : atomic_flag -> 'acc -> (atomic_flag * 'acc)=
+      fun x acc -> (x, acc)
+    method access_flag : access_flag -> 'acc -> (access_flag * 'acc)=
+      fun x acc -> (x, acc)
     method virtual_flag : virtual_flag -> 'acc -> (virtual_flag * 'acc)=
       fun x acc -> (x, acc)
     method override_flag : override_flag -> 'acc -> (override_flag * 'acc)=
@@ -5190,7 +5205,7 @@ class virtual ['acc] fold_map =
             let (a, acc) = self#longident_loc a acc in
             ((Baccess_field a), acc)
         | Baccess_block (a, b) ->
-            let (a, acc) = self#mutable_flag a acc in
+            let (a, acc) = self#access_flag a acc in
             let (b, acc) = self#expression b acc in
             ((Baccess_block (a, b)), acc)
     method unboxed_access :
@@ -6135,6 +6150,8 @@ class virtual ['ctx] map_with_context =
       fun _ctx x -> x
     method mutable_flag : 'ctx -> mutable_flag -> mutable_flag=
       fun _ctx x -> x
+    method atomic_flag : 'ctx -> atomic_flag -> atomic_flag= fun _ctx x -> x
+    method access_flag : 'ctx -> access_flag -> access_flag= fun _ctx x -> x
     method virtual_flag : 'ctx -> virtual_flag -> virtual_flag=
       fun _ctx x -> x
     method override_flag : 'ctx -> override_flag -> override_flag=
@@ -6625,7 +6642,7 @@ class virtual ['ctx] map_with_context =
         | Baccess_field a ->
             let a = self#longident_loc ctx a in Baccess_field a
         | Baccess_block (a, b) ->
-            let a = self#mutable_flag ctx a in
+            let a = self#access_flag ctx a in
             let b = self#expression ctx b in Baccess_block (a, b)
     method unboxed_access : 'ctx -> unboxed_access -> unboxed_access=
       fun ctx x ->
@@ -7460,6 +7477,17 @@ class virtual ['res] lift =
         match x with
         | Immutable -> self#constr "Immutable" []
         | Mutable -> self#constr "Mutable" []
+    method atomic_flag : atomic_flag -> 'res=
+      fun x ->
+        match x with
+        | Nonatomic -> self#constr "Nonatomic" []
+        | Atomic -> self#constr "Atomic" []
+    method access_flag : access_flag -> 'res=
+      fun x ->
+        match x with
+        | Immutable_access -> self#constr "Immutable_access" []
+        | Mutable_access -> self#constr "Mutable_access" []
+        | Atomic_access -> self#constr "Atomic_access" []
     method virtual_flag : virtual_flag -> 'res=
       fun x ->
         match x with
@@ -8043,7 +8071,7 @@ class virtual ['res] lift =
         | Baccess_field a ->
             let a = self#longident_loc a in self#constr "Baccess_field" [a]
         | Baccess_block (a, b) ->
-            let a = self#mutable_flag a in
+            let a = self#access_flag a in
             let b = self#expression b in self#constr "Baccess_block" [a; b]
     method unboxed_access : unboxed_access -> 'res=
       fun x ->
@@ -9005,6 +9033,10 @@ class virtual ['ctx,'res] lift_map_with_context =
       fun ctx x -> (x, (self#other ctx x))
     method mutable_flag : 'ctx -> mutable_flag -> (mutable_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
+    method atomic_flag : 'ctx -> atomic_flag -> (atomic_flag * 'res)=
+      fun ctx x -> (x, (self#other ctx x))
+    method access_flag : 'ctx -> access_flag -> (access_flag * 'res)=
+      fun ctx x -> (x, (self#other ctx x))
     method virtual_flag : 'ctx -> virtual_flag -> (virtual_flag * 'res)=
       fun ctx x -> (x, (self#other ctx x))
     method override_flag : 'ctx -> override_flag -> (override_flag * 'res)=
@@ -9901,7 +9933,7 @@ class virtual ['ctx,'res] lift_map_with_context =
             ((Baccess_field (Stdlib.fst a)),
               (self#constr ctx "Baccess_field" [Stdlib.snd a]))
         | Baccess_block (a, b) ->
-            let a = self#mutable_flag ctx a in
+            let a = self#access_flag ctx a in
             let b = self#expression ctx b in
             ((Baccess_block ((Stdlib.fst a), (Stdlib.fst b))),
               (self#constr ctx "Baccess_block" [Stdlib.snd a; Stdlib.snd b]))

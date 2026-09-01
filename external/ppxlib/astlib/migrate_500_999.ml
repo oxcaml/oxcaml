@@ -247,8 +247,8 @@ and copy_block_access :
   = function
     | Baccess_field lid ->
       Baccess_field (copy_loc (copy_Longident_t ~loc:lid.loc) lid)
-    | Baccess_block (mut, e) ->
-      Baccess_block (copy_mutable_flag mut, copy_expression e)
+    | Baccess_block (access, e) ->
+      Baccess_block (copy_access_flag access, copy_expression e)
 
 and copy_unboxed_access :
     Ast_500.Parsetree.unboxed_access -> Ast_999.Parsetree.unboxed_access
@@ -1631,6 +1631,12 @@ and copy_mutable_flag :
     Ast_500.Asttypes.mutable_flag -> Ast_999.Asttypes.mutable_flag = function
   | Ast_500.Asttypes.Immutable -> Ast_999.Asttypes.Immutable
   | Ast_500.Asttypes.Mutable -> Ast_999.Asttypes.Mutable
+
+and copy_access_flag :
+    Ast_500.Asttypes.access_flag -> Ast_999.Asttypes.access_flag = function
+  | Ast_500.Asttypes.Immutable_access -> Ast_999.Asttypes.Immutable_access
+  | Ast_500.Asttypes.Mutable_access -> Ast_999.Asttypes.Mutable_access
+  | Ast_500.Asttypes.Atomic_access -> Ast_999.Asttypes.Atomic_access
 
 and copy_injectivity :
     Ast_500.Asttypes.injectivity -> Ast_999.Asttypes.injectivity = function
