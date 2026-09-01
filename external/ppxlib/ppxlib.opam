@@ -25,6 +25,8 @@ depends: [
   "ocaml-compiler-libs" {>= "v0.11.0"}
   "ppx_derivers" {>= "1.0"}
   "sexp_type"
+  "ppxlib_ast"
+  "ppxlib_jane"
   "ocamlfind" {with-test}
   "re" {with-test & >= "1.9.0"}
   "cinaps" {with-test & >= "v0.12.1"}

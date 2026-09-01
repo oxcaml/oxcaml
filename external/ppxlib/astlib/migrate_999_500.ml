@@ -905,6 +905,7 @@ and copy_module_expr_desc :
       Ast_500.Parsetree.Pmod_unpack (copy_expression x0)
   | Ast_999.Parsetree.Pmod_extension x0 ->
       Ast_500.Parsetree.Pmod_extension (copy_extension x0)
+  | Ast_999.Parsetree.Pmod_hole -> Ast_500.Parsetree.Pmod_hole
   | Ast_999.Parsetree.Pmod_instance x0 ->
       Ast_500.Parsetree.Pmod_instance (copy_module_instance x0)
 
