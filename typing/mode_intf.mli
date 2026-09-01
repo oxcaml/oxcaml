@@ -203,6 +203,9 @@ module type Common = sig
 
   val newvar_below : int -> ('l * allowed) t -> ('l_ * 'r) t * bool
 
+  (** Returns true if the mode is a constant or a mode variable at level 0 *)
+  val check_const_or_level_0 : ('l * 'r) t -> bool
+
   val print : ?verbose:bool -> unit -> Fmt.formatter -> ('l * 'r) t -> unit
 
   (** Returns true if the mode includes a mode variable at generic level *)

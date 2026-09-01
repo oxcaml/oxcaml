@@ -4,7 +4,7 @@
  flags += "-extension mode_polymorphism_alpha";
  module = "lib.ml";
  ocamlc.byte;
- flags += "-no-extension mode_polymorphism_alpha -I ocamlc.byte \
+ flags += " -no-extension mode_polymorphism_alpha -I ocamlc.byte \
    ocamlc.byte/lib.cmo";
  expect;
 *)

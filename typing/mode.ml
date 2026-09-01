@@ -5554,7 +5554,7 @@ module Comonadic_gen (Obj : Obj) = struct
   let instantiate ~copy_scope ~current_level a =
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
-    let copy_to_level = current_level in
+    let copy_to_level = choose_level current_level in
     S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level obj a
 
   let copy_generic ~copy_scope a =
@@ -5588,6 +5588,8 @@ module Comonadic_gen (Obj : Obj) = struct
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
   let print ?verbose () ppf m = S.print ?verbose obj ppf m
+
+  let check_const_or_level_0 m = S.check_const_or_level_0 m
 
   let check_generic a = S.check_generic a
 
@@ -5749,7 +5751,7 @@ module Monadic_gen (Obj : Obj) = struct
   let instantiate ~copy_scope ~current_level a =
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
-    let copy_to_level = current_level in
+    let copy_to_level = choose_level current_level in
     S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level obj a
 
   let copy_generic ~copy_scope a =
@@ -5785,6 +5787,8 @@ module Monadic_gen (Obj : Obj) = struct
   let equate_exn m1 m2 = equate m1 m2 |> Result.get_ok
 
   let print ?verbose () ppf m = S.print ?verbose obj ppf m
+
+  let check_const_or_level_0 m = S.check_const_or_level_0 m
 
   let check_generic a = S.check_generic a
 
@@ -7088,6 +7092,10 @@ module Value_with (Areality : Areality) = struct
       match Monadic.submode_log ?pp monadic1 monadic2 ~log with
       | Error e -> Error (Monadic e)
       | Ok () -> Ok ())
+
+  let check_const_or_level_0 { monadic = monadic0; comonadic = comonadic0 } =
+    Monadic.check_const_or_level_0 monadic0
+    && Comonadic.check_const_or_level_0 comonadic0
 
   let submode ?pp a b = try_with_log (submode_log ?pp a b)
 
