@@ -44,7 +44,10 @@ let apply_cont cont v ~dbg =
   free_names, expr
 
 let let_prim ~dbg v v_duid prim (free_names, body) =
-  let v' = Bound_var.create v v_duid Name_mode.normal in
+  let v' =
+    Bound_var.create v v_duid Name_mode.normal ~dbg:Debuginfo.none
+      ~is_parameter:Bound_var.Is_parameter.local_var
+  in
   let bindable = Bound_pattern.singleton v' in
   let named = Named.create_prim prim dbg in
   let free_names_of_body = Or_unknown.Known free_names in

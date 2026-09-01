@@ -17,14 +17,31 @@
 (** A parameter (to a function, continuation, etc.) together with its kind. *)
 type t
 
-(** Create a kinded parameter. *)
+(** The [Debuginfo.t] is intended to be used for:
+
+    - naming variables in the debugger based on source location, in the case
+      where disambiguation is required between multiple variables with the same
+      name;
+
+    - working out which DWARF DIE to attach the corresponding variable DIE to,
+      in the presence of inlined frames.
+
+    By contrast the [Flambda_debug_uid.t] is used to convey information about
+    the type shape of the variable. *)
 val create :
-  Variable.t -> Flambda_kind.With_subkind.t -> Flambda_debug_uid.t -> t
+  Variable.t ->
+  Flambda_kind.With_subkind.t ->
+  Flambda_debug_uid.t ->
+  dbg:Debuginfo.t ->
+  t
 
 (** The underlying variable. *)
 val var : t -> Variable.t
 
 val var_and_uid : t -> Variable.t * Flambda_debug_uid.t
+
+val var_and_uid_and_debuginfo :
+  t -> Variable.t * Flambda_debug_uid.t * Debuginfo.t
 
 val name : t -> Name.t
 
@@ -33,6 +50,10 @@ val simple : t -> Int_ids.Simple.t
 
 (** The kind of the given parameter. *)
 val kind : t -> Flambda_kind.With_subkind.t
+
+val dbg : t -> Debuginfo.t
+
+val add_inlined_debuginfo : t -> Inlined_debuginfo.t -> t
 
 (** Replace the kind of the given parameter. *)
 val with_kind : t -> Flambda_kind.With_subkind.t -> t

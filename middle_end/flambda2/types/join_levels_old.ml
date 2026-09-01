@@ -51,7 +51,8 @@ let join_types ~env_at_fork envs_with_levels =
                             (* Variables with [Name_mode.in_types] do not exist
                                at runtime, so we do not equip them with a
                                [Flambda_debug_uid.t]. See #3967. *)
-                            Name_mode.in_types))
+                            Name_mode.in_types ~dbg:Debuginfo.none
+                            ~is_parameter:Bound_var.Is_parameter.local_var))
                       kind)
                 vars base_env)
             (TEL.variables_by_binding_time level)

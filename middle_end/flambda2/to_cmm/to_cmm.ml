@@ -83,7 +83,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     C.continuation_bound_parameters env
       (Bound_parameters.create
          [ Bound_parameter.create ret_var Flambda_kind.With_subkind.any_value
-             ret_var_duid ])
+             ret_var_duid ~dbg:Debuginfo.none ])
   in
   let return_cont, env =
     Env.add_jump_cont env

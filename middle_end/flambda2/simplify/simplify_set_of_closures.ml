@@ -51,7 +51,8 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
       (* This happens in the stub case, where we are only simplifying code, not
          a set of closures. *)
       DE.add_variable denv
-        (Bound_var.create my_closure my_closure_duid NM.normal)
+        (Bound_var.create my_closure my_closure_duid NM.normal
+           ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
         (T.unknown K.value)
     | Some function_slot -> (
       match
@@ -67,7 +68,8 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
       | name ->
         let name = Bound_name.name name in
         DE.add_variable denv
-          (Bound_var.create my_closure my_closure_duid NM.normal)
+          (Bound_var.create my_closure my_closure_duid NM.normal
+             ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var)
           (T.alias_type_of K.value (Simple.name name)))
   in
   let denv =
@@ -76,6 +78,7 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
       let my_alloc_region_duid = Flambda_debug_uid.none in
       let my_alloc_region =
         Bound_var.create my_alloc_region my_alloc_region_duid Name_mode.normal
+          ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
       in
       DE.add_variable denv my_alloc_region (T.unknown K.region)
     | Maybe_alloc_stack
@@ -86,22 +89,28 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_alloc_mode
       let my_alloc_region_duid = Flambda_debug_uid.none in
       let my_alloc_region =
         Bound_var.create my_alloc_region my_alloc_region_duid Name_mode.normal
+          ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
       in
       let denv = DE.add_variable denv my_alloc_region (T.unknown K.region) in
       let my_region_duid = Flambda_debug_uid.none in
       let my_region =
         Bound_var.create my_region my_region_duid Name_mode.normal
+          ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
       in
       let denv = DE.add_variable denv my_region (T.unknown K.region) in
       let my_ghost_region_duid = Flambda_debug_uid.none in
       let my_ghost_region =
         Bound_var.create my_ghost_region my_ghost_region_duid Name_mode.normal
+          ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
       in
       DE.add_variable denv my_ghost_region (T.unknown K.region)
   in
   let my_depth_duid = Flambda_debug_uid.none in
   let denv =
-    let my_depth = Bound_var.create my_depth my_depth_duid Name_mode.normal in
+    let my_depth =
+      Bound_var.create my_depth my_depth_duid Name_mode.normal
+        ~dbg:Debuginfo.none ~is_parameter:Bound_var.Is_parameter.local_var
+    in
     DE.add_variable denv my_depth (T.unknown K.rec_info)
   in
   let denv =
@@ -212,14 +221,14 @@ let simplify_function_body context ~outer_dacc function_slot_opt
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
     | Not_alloc_stack { alloc_region } ->
       [ Bound_parameter.create alloc_region Flambda_kind.With_subkind.region
-          my_alloc_region_duid ]
+          my_alloc_region_duid ~dbg:Debuginfo.none ]
     | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
       [ Bound_parameter.create alloc_region Flambda_kind.With_subkind.region
-          my_alloc_region_duid;
+          my_alloc_region_duid ~dbg:Debuginfo.none;
         Bound_parameter.create region Flambda_kind.With_subkind.region
-          my_region_duid;
+          my_region_duid ~dbg:Debuginfo.none;
         Bound_parameter.create ghost_region Flambda_kind.With_subkind.region
-          my_ghost_region_duid ]
+          my_ghost_region_duid ~dbg:Debuginfo.none ]
   in
   let my_closure_duid = Flambda_debug_uid.none in
   let my_depth_duid = Flambda_debug_uid.none in
@@ -229,9 +238,10 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       ~implicit_params:
         (Bound_parameters.create
            ([ Bound_parameter.create my_closure
-                Flambda_kind.With_subkind.any_value my_closure_duid;
+                Flambda_kind.With_subkind.any_value my_closure_duid
+                ~dbg:Debuginfo.none;
               Bound_parameter.create my_depth Flambda_kind.With_subkind.rec_info
-                my_depth_duid ]
+                my_depth_duid ~dbg:Debuginfo.none ]
            @ region_params))
       ~loopify_state ~params
   with
@@ -406,7 +416,8 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
             (KS.kind kind_with_subkind)
         in
         let result_var_duid = Flambda_debug_uid.none in
-        BP.create result_var kind_with_subkind result_var_duid)
+        BP.create result_var kind_with_subkind result_var_duid
+          ~dbg:Debuginfo.none)
       (Flambda_arity.unarized_components result_arity)
     |> Bound_parameters.create
   in
