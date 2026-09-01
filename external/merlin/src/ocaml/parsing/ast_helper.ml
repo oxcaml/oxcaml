@@ -355,6 +355,7 @@ module Mod = struct
     mk ?loc ?attrs (Pmod_constraint (m, ty, mode))
   let unpack ?loc ?attrs e = mk ?loc ?attrs (Pmod_unpack e)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Pmod_extension a)
+  let hole ?loc ?attrs () = mk ?loc ?attrs Pmod_hole
   let instance ?loc ?attrs a = mk ?loc ?attrs (Pmod_instance a)
   let hole ?(loc = !default_loc) ?attrs () =
     let id = Location.mkloc hole_txt loc in

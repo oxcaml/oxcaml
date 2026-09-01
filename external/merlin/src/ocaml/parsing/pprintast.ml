@@ -1785,6 +1785,7 @@ and module_expr ctxt f x =
     | Pmod_extension ({ txt; _ }, _) when txt = Ast_helper.hole_txt ->
         pp f "_"
     | Pmod_extension e -> extension ctxt f e
+    | Pmod_hole -> pp f "_"
     | Pmod_instance i ->
         pp f "(%a [@jane.non_erasable.instances])"(instance ctxt) i
 

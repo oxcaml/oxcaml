@@ -3458,6 +3458,8 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       Shape.dummy_mod
   | Pmod_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
+  | Pmod_hole ->
+      raise (Typecore.Error(smod.pmod_loc, env, Typecore.Unexpected_hole))
   | Pmod_instance glob ->
       Language_extension.assert_enabled ~loc:smod.pmod_loc Instances ();
       let glob = instance_name ~loc:smod.pmod_loc env glob in
