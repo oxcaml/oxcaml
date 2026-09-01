@@ -4,16 +4,16 @@
 
 (library
  (name ppxlib_ast)
- (public_name ppxlib.ast)
- (libraries astlib stdlib-shims)
+ (public_name ppxlib_ast.ast)
+ (libraries astlib compiler-libs.common ocaml-compiler-libs.common ocaml-compiler-libs.shadow stdlib-shims)
  (flags
-  (:standard -safe-string)
+  (:standard -safe-string -open Ocaml_shadow)
   -w
   -9-27-32)
  (preprocess
   (per_module
    ((action
-     (run %{exe:pp/pp.exe} %{ocaml_version} %{input-file}))
+     (run %{exe:pp/pp.exe} 9.99 %{input-file}))
     versions)))
  (lint
   (pps ppxlib_traverse -deriving-keep-w32=impl)))
