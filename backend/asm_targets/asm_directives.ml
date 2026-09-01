@@ -219,7 +219,9 @@ module Directive = struct
     | Code
     | Machine_width_data
 
-  type label_or_symbol =
+  (* CR mshinwell: use [Asm_label_or_symbol.t] directly everywhere and delete
+     this alias. *)
+  type label_or_symbol = Asm_label_or_symbol.t =
     | Label of Asm_label.t
     | Symbol of Asm_symbol.t
 
