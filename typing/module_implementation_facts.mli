@@ -79,6 +79,7 @@ module Node : sig
   (** Identifies the implementation module of a check *)
   type t =
     | Uid of Shape.Uid.t
+    | Whole_unit of Compilation_unit.t
     | Location of Compilation_unit.t * Location.t
 
   val compare : t -> t -> int

@@ -109,13 +109,18 @@ end
 module Node = struct
   type t =
     | Uid of Uid.t
+    | Whole_unit of Compilation_unit.t
     | Location of Compilation_unit.t * Location.t
 
   let compare left right =
     match left, right with
     | Uid left, Uid right -> Uid.compare left right
-    | Uid _, Location _ -> -1
-    | Location _, Uid _ -> 1
+    | Uid _, (Whole_unit _ | Location _) -> -1
+    | Whole_unit _, Uid _ -> 1
+    | Whole_unit left, Whole_unit right ->
+      Compilation_unit.compare left right
+    | Whole_unit _, Location _ -> -1
+    | Location _, (Uid _ | Whole_unit _) -> 1
     | Location (u1, l1), Location (u2, l2) ->
       let c = Compilation_unit.compare u1 u2 in
       if c <> 0 then c else Location.compare l1 l2
@@ -675,15 +680,15 @@ let facts_of_tree compilation_unit artifact iterate =
     | None -> ());
     key
   in
-  let uid_of_module_path env path =
-    match find_normalized_module env path with
-    | Some declaration -> Some declaration.Types.md_uid
-    | None -> None
-  in
   let node_of_module_path env ~loc path =
-    match uid_of_module_path env path with
-    | Some uid -> Node.Uid uid
-    | None -> Node.Location (compilation_unit, loc)
+    let path = normalize_module_path env path in
+    match Env.find_module_address path env with
+    | Env.Aunit (unit_, _) -> Node.Whole_unit unit_
+    | Env.Alocal _ | Env.Adot _ | exception Not_found -> (
+      match find_module env path with
+      | Some declaration -> Node.Uid declaration.Types.md_uid
+      | None -> Node.Location (compilation_unit, loc)
+    )
   in
   let rec context_of_path_inner ~site env (path : Path.t) : Context.t option =
     match persistent_unit_uid path with
@@ -1923,7 +1928,7 @@ let facts_of_tree compilation_unit artifact iterate =
   facts, fun uid -> Uid.Tbl.find_opt modtype_declaration_contexts uid
 
 let interface_check ~impl ~expectation =
-  { Check.implementation = Node.Uid impl;
+  { Check.implementation = impl;
     expectation = Key.Anon expectation;
     kind = Check.Kind.Interface;
     site = Location.none
@@ -1942,15 +1947,23 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
   let unit_uid = Uid.of_compilation_unit_id compilation_unit in
   List.iter
     (fun (~impl, ~intf) ->
-      Builder.add_check facts (interface_check ~impl ~expectation:intf))
+       Builder.add_check facts
+         (interface_check
+            ~impl:(Node.Uid impl)
+            ~expectation:intf))
     module_pairs;
   if unit_interface_check
   then
     Builder.add_check facts
-      (interface_check ~impl:unit_uid ~expectation:unit_uid);
+      (interface_check
+         ~impl:(Node.Whole_unit compilation_unit)
+         ~expectation:unit_uid);
   Option.iter
     (fun expectation ->
-      Builder.add_check facts (interface_check ~impl:unit_uid ~expectation))
+       Builder.add_check facts
+         (interface_check
+            ~impl:(Node.Whole_unit compilation_unit)
+            ~expectation))
     argument_interface;
   let interface_uid_of_impl =
     let table =
@@ -2000,7 +2013,7 @@ let of_interface compilation_unit ~argument_interface signature =
     (fun expectation ->
       Builder.add_check facts
         (interface_check
-           ~impl:(Uid.of_compilation_unit_id compilation_unit)
+           ~impl:(Node.Whole_unit compilation_unit)
            ~expectation))
     argument_interface;
   Builder.freeze facts
