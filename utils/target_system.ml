@@ -70,13 +70,6 @@ module System = struct
          `configure'"
         Config.system
 
-  let is_windows () =
-    match get () with
-    | Linux | Cygwin | MacOS | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly
-    | GNU | BeOS ->
-      false
-    | Windows _ -> true
-
   let is_macos () =
     match get () with
     | Linux | Windows _ | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris
