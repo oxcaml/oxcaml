@@ -92,8 +92,6 @@ module Assembler = struct
     | MacOS
     | MASM
 
-  (* CR shym Note that [Asm_label.label_prefix] will call this function at
-     initialisation *)
   let get () =
     match System.get () with
     | Windows MSVC -> MASM
@@ -107,6 +105,9 @@ module Assembler = struct
   let is_macos () = match get () with MASM | GAS_like -> false | MacOS -> true
 
   let is_gas () = match get () with MASM | MacOS -> false | GAS_like -> true
+
+  let label_prefix () =
+    match get () with MacOS -> "L" | MASM | GAS_like -> ".L"
 end
 
 module Machine_width = struct

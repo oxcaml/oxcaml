@@ -56,6 +56,8 @@ module Assembler : sig
   val is_macos : unit -> bool
 
   val is_gas : unit -> bool
+
+  val label_prefix : unit -> string
 end
 
 module Machine_width : sig

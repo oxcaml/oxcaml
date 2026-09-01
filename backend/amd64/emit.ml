@@ -327,8 +327,10 @@ let mem__imp s =
 
 (* Output a label *)
 
+(* CR shym Change! This was inconsistent on Windows with
+   Asm_label.label_prefix/Target_system.Assembler.label_prefix *)
 let label_name lbl =
-  if is_macosx system || is_win64 system then "L" ^ lbl else ".L" ^ lbl
+  Target_system.Assembler.label_prefix () ^ lbl
 
 let rel_plt (s : Cmm.symbol) =
   match (s.sym_global : Cmm.is_global) with

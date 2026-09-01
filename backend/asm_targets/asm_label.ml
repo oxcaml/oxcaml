@@ -88,15 +88,11 @@ let create_string_unchecked section label = { section; label = String label }
 let create_label_for_local_symbol section symbol =
   create_string_unchecked section (Asm_symbol.encode symbol)
 
-let label_prefix =
-  match Target_system.Assembler.get () with
-  | MacOS -> "L"
-  | MASM | GAS_like -> ".L"
-
 let encode (t : t) =
+  let open Target_system.Assembler in
   match t.label with
-  | Int label -> label_prefix ^ string_of_int label
-  | String label -> label_prefix ^ label
+  | Int label -> label_prefix () ^ string_of_int label
+  | String label -> label_prefix () ^ label
   | Private_symbol label -> "l_caml" ^ string_of_int label
 
 let section t = t.section
