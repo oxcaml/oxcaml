@@ -36,5 +36,6 @@ val class_type_field : Format.formatter -> Parsetree.class_type_field -> unit
 val module_expr : Format.formatter -> Parsetree.module_expr -> unit
 val module_type : Format.formatter -> Parsetree.module_type -> unit
 val signature_item : Format.formatter -> Parsetree.signature_item -> unit
+val signature_items : Format.formatter -> Parsetree.signature_item list -> unit
 val structure_item : Format.formatter -> Parsetree.structure_item -> unit
 val type_declaration : Format.formatter -> Parsetree.type_declaration -> unit
