@@ -38,6 +38,7 @@ module Context = struct
     | Psig_extension : signature_item t
     | Rtag : row_field t
     | Object_type_field : object_field t
+    | Pfunction_cases : function_body t
 
   let label_declaration = Label_declaration
   let constructor_declaration = Constructor_declaration
@@ -67,6 +68,12 @@ module Context = struct
   let psig_extension = Psig_extension
   let rtag = Rtag
   let object_type_field = Object_type_field
+  let pfunction_cases = Pfunction_cases
+
+  let get_pfunction_cases (fb : function_body) =
+    match fb with
+    | Ast.Pfunction_cases (cases, loc, attrs) -> (cases, loc, attrs)
+    | _ -> failwith "Attribute.Context.get_pfunction_cases"
 
   let get_pstr_eval st =
     match st.pstr_desc with
@@ -116,6 +123,9 @@ module Context = struct
     | Psig_extension -> snd (get_psig_extension x)
     | Rtag -> x.prf_attributes
     | Object_type_field -> x.pof_attributes
+    | Pfunction_cases ->
+        let _, _, attrs = get_pfunction_cases x in
+        attrs
 
   let set_attributes : type a. a t -> a -> attributes -> a =
    fun t x attrs ->
@@ -159,6 +169,9 @@ module Context = struct
         }
     | Rtag -> { x with prf_attributes = attrs }
     | Object_type_field -> { x with pof_attributes = attrs }
+    | Pfunction_cases ->
+        let cases, loc, _ = get_pfunction_cases x in
+        Ast.Pfunction_cases (cases, loc, attrs)
 
   let desc : type a. a t -> string = function
     | Label_declaration -> "label declaration"
@@ -191,6 +204,7 @@ module Context = struct
     | Psig_extension -> "toplevel signature extension"
     | Rtag -> "polymorphic variant tag"
     | Object_type_field -> "object type field"
+    | Pfunction_cases -> "function cases"
 
   (*
   let pattern : type a b c d. a t
@@ -442,13 +456,32 @@ module Floating = struct
 
   let name t = Name.Pattern.name t.name
 
-  let declare name context pattern k =
+  let declare_with_all_args name context pattern k =
     Name.Registrar.register ~kind:`Attribute registrar (Floating context) name;
     {
       name = Name.Pattern.make name;
       context;
-      payload = Payload_parser (pattern, fun ~attr_loc:_ ~name_loc:_ -> k);
+      payload = Payload_parser (pattern, k);
     }
+
+  let declare name context pattern k =
+    declare_with_all_args name context pattern (fun ~attr_loc:_ ~name_loc:_ ->
+        k)
+
+  let declare_with_name_loc name context pattern k =
+    declare_with_all_args name context pattern (fun ~attr_loc:_ ~name_loc ->
+        k ~name_loc)
+
+  let declare_with_attr_loc name context pattern k =
+    declare_with_all_args name context pattern (fun ~attr_loc ~name_loc:_ ->
+        k ~attr_loc)
+
+  let convert_attr_res t attr =
+    let open Result in
+    if Name.Pattern.matches t.name attr.attr_name.txt then
+      (convert t.payload attr >>| fun value -> Some value)
+    else
+      Ok None
 
   let convert_res ts x =
     let open Result in
@@ -673,6 +706,13 @@ let collect_unused_attributes_errors =
         | _ -> (item, [])
       in
       super#signature_item item (acc @ errors @ errors2)
+
+    method! function_body x acc =
+      match x with
+      | Pfunction_cases _ ->
+          let res, errors = self#check_node Pfunction_cases x in
+          super#function_body res (acc @ errors)
+      | _ -> super#function_body x acc
   end
 
 let check_attribute registrar context name =
@@ -802,6 +842,10 @@ let check_unused =
     method! signature_item item =
       collect_unused_attributes_errors#signature_item item []
       |> raise_if_non_empty
+
+    method! function_body x =
+      collect_unused_attributes_errors#function_body x []
+      |> raise_if_non_empty
   end
 
 let reset_checks () = Attribute_table.clear not_seen
@@ -814,7 +858,7 @@ let collect =
         =
       let loc = Common.loc_of_attribute attr in
       super#payload payload;
-      Attribute_table.add not_seen name loc
+      Attribute_table.replace not_seen name loc
   end
 
 let collect_unseen_errors () =
