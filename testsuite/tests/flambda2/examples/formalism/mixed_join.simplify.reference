@@ -1,0 +1,24 @@
+let code choose_0 deleted in
+let code loopify(never) size(28) newer_version_of(choose_0)
+      choose_0_1
+        (cond : imm tagged, s1 : val, f1 : float, s2 : val, f2 : float)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float =
+  (let untagged = %untag_imm (cond) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let Pmakeblock = %block.mixed.`0`.`1`.[`float`] (s1, f1) in
+      cont k2 (Pmakeblock, f1)
+    where k3 =
+      let Pmakeblock = %block.mixed.`0`.`1`.[`float`] (s2, f2) in
+      cont k2 (Pmakeblock, f2)
+    where k2 (r : [ 0 of val * float ], unboxed_mixed_field_1 : float) =
+      let Popaque = %opaque (r) in
+      cont k (unboxed_mixed_field_1)
+in
+let $camlMixed_join__choose_1 = closure choose_0_1 @choose in
+let $camlMixed_join = Block 0 ($camlMixed_join__choose_1) in
+cont done ($camlMixed_join)
