@@ -1,6 +1,37 @@
 (library
  (name ppxlib_jane)
  (public_name ppxlib_jane)
- (libraries ppxlib_ast.astlib compiler-libs.common ppxlib_ast.ast
-   ppxlib_ast.traverse_builtins ppxlib_ast.stdppx)
+ (modules
+  (:standard \ shim_oxcaml shim_upstream))
+ (libraries
+  compiler-libs.common
+  (select
+   shim.ml
+   from
+   (ppxlib_ast.astlib
+    ppxlib_ast.ast
+    ppxlib_ast.traverse_builtins
+    ppxlib_ast.stdppx
+    ->
+    shim_oxcaml.ml)
+   (ppxlib.astlib
+    ppxlib.ast
+    ppxlib.traverse_builtins
+    ppxlib.stdppx
+    ->
+    shim_upstream.ml))
+  (select
+   shim.mli
+   from
+   (ppxlib_ast.ast -> shim_oxcaml.mli)
+   (ppxlib.ast -> shim_upstream.mli)))
  (preprocess no_preprocessing))
+
+(rule
+ (targets shim.mli.diff)
+ (deps shim_oxcaml.mli shim_upstream.mli)
+ (mode promote)
+ (action
+  (with-stdout-to
+   %{targets}
+   (system "diff %{deps}; true"))))
