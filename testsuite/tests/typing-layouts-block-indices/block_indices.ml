@@ -404,3 +404,10 @@ let () =
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
   print_newline ()
+
+(* Regression test for a bug in [transl_idx] *)
+type r = #{ q : int }
+type t = { mutable inner : r }
+
+let[@inline never] idx () : (t, r) idx_mut = (.inner)
+let deepen = (.idx_mut(idx ()).#q)

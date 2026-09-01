@@ -1668,7 +1668,7 @@ let layout_initializer = nullable_value Pgenval
 let layout_array_comprehension_element = nullable_value Pgenval
 let layout_list_element = nullable_value Pgenval
 let layout_probe_arg = nullable_value Pgenval
-let layout_block_idx = layout_unboxed_nativeint
+let layout_block_idx = layout_unboxed_int64
 
 let layout_unboxed_product layouts = Punboxed_product layouts
 
