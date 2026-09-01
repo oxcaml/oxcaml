@@ -1,0 +1,4 @@
+(tests
+ (names testmap testset)
+ (libraries)
+ (modes js wasm))

@@ -1,0 +1,79 @@
+(env
+ (with-effects-double-translation)
+ (with-native-effects)
+ (with-effects)
+ (wasi-with-native-effects)
+ (wasi
+  (wasm_of_ocaml
+   (flags
+    (:standard --effects cps))))
+ (_
+  (js_of_ocaml
+   (flags
+    (:standard --effects cps)))))
+
+(library
+ (name jsoo_testsuite_effect)
+ (enabled_if
+  (>= %{ocaml_version} 5))
+ (inline_tests
+  (deps
+   (sandbox preserve_file_kind))
+  (modes js wasm best))
+ (modules
+  (:standard
+   \
+   assume_no_perform
+   assume_no_perform_unhandled
+   assume_no_perform_nested_handler
+   deep_state
+   test_finalise))
+ (preprocess
+  (pps ppx_expect_light)))
+
+(tests
+ (build_if
+  (>= %{ocaml_version} 5))
+ (names
+  assume_no_perform
+  assume_no_perform_unhandled
+  assume_no_perform_nested_handler)
+ (modules
+  assume_no_perform
+  assume_no_perform_unhandled
+  assume_no_perform_nested_handler)
+ (libraries jsoo_runtime)
+ (action
+  (ignore-outputs
+   (with-accepted-exit-codes
+    0
+    (run node %{test}))))
+ (modes js wasm))
+
+(executable
+ (name deep_state)
+ (enabled_if
+  (>= %{ocaml_version} 5))
+ (modules deep_state)
+ (js_of_ocaml
+  (compilation_mode whole_program))
+ (wasm_of_ocaml
+  (compilation_mode whole_program))
+ (modes js wasm))
+
+; Forces a major GC through node's v8/vm modules to observe
+; Gc.finalise_last under the CPS calling convention.
+
+(test
+ (name test_finalise)
+ (build_if
+  (>= %{ocaml_version} 5))
+ (enabled_if
+  (and
+   (<> %{env:JSOO_TEST_ENGINE=node} wasi)
+   (<> %{profile} quickjs)))
+ (modules test_finalise)
+ (libraries js_of_ocaml)
+ (modes js)
+ (preprocess
+  (pps ppx_js_internal)))

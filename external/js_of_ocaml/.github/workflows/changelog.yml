@@ -1,0 +1,24 @@
+name: Check changelog
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - labeled
+      - opened
+      - reopened
+      - synchronize
+      - unlabeled
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check-changelog:
+    name: Check changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changelog
+        uses: tarides/changelog-check-action@v4

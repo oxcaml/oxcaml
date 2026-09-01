@@ -1,0 +1,19 @@
+; One library for all modules; ppx_expect_light runs each file as its own
+; inline-test partition, so test parallelism is preserved. Gating lives in the
+; sources (ppx_optcomp_light [@@@if] / ppx_expect_light [@when]).
+
+(library
+ (name jsoo_compiler_test)
+ (libraries js_of_ocaml_compiler unix str jsoo_compiler_expect_tests_helper)
+ (inline_tests
+  ;; Depend on the profile-selected [node] wrapper (defined in the root dune's
+  ;; env) so dune materialises the right one on PATH before the runner execs it
+  ;; and re-runs the tests when it changes.
+  (deps
+   %{bin:node}
+   (file %{project_root}/compiler/bin-js_of_ocaml/js_of_ocaml.exe)
+   (file %{project_root}/compiler/bin-jsoo_minify/jsoo_minify.exe)))
+ (flags
+  (:standard -open Jsoo_compiler_expect_tests_helper))
+ (preprocess
+  (pps ppx_optcomp_light ppx_expect_light)))
