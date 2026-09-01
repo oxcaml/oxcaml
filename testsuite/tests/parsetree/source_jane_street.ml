@@ -1853,3 +1853,13 @@ let f ?l:((x : int) [@test.attr] = 0) () = x
 [%%expect{|
 val f : ?l:int -> unit -> int = <fun>
 |}]
+
+let f ((x : int) [@test.attr] @ local) = x
+[%%expect{|
+val f : int @ local -> int = <fun>
+|}]
+
+let f ~l:((x : int) [@test.attr] @ local) = x
+[%%expect{|
+val f : l:int @ local -> int = <fun>
+|}]

@@ -1,0 +1,2917 @@
+source_jane_street.ml: FAIL, CANNOT REPARSE (test.ml 124:2)
+File "<str>", line 1446, characters 23-24:
+Error: Syntax error
+let f (type a : immediate) (x : a) = x
+let f (type a : immediate) (x : a) = x
+let f (type a : immediate) (type b : immediate) (x : a) = x
+let f (type a : immediate) (type b : immediate) (type c) (x : a) = x
+[%%expect
+  {|
+val f : ('a : immediate). 'a -> 'a = <fun>
+val f : ('a : immediate). 'a -> 'a = <fun>
+val f : ('a : immediate). 'a -> 'a = <fun>
+val f : ('a : immediate). 'a -> 'a = <fun>
+|}]
+let f y (type a : immediate) (x : a) = x
+let f y (type a : immediate) (x : a) = x
+let f y (type a : immediate) (type b : immediate) (x : a) = x
+[%%expect
+  {|
+val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
+val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
+val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
+|}]
+let f y (type a : immediate) = y
+let f y (type a : immediate) = y
+let f y (type a : immediate) (type b : immediate) = y
+let f y (type a : immediate) (type b : immediate) (type c) = y
+[%%expect
+  {|
+val f : 'a -> 'a = <fun>
+val f : 'a -> 'a = <fun>
+val f : 'a -> 'a = <fun>
+val f : 'a -> 'a = <fun>
+|}]
+let f (type (a : immediate)) (type (b : immediate)) (type (c : immediate))
+  (type (d : immediate)) = ()
+[%%expect {|
+val f : unit = ()
+|}]
+module type S_for_layouts  =
+  sig
+    type t : float64
+    type variant =
+      | A: ('a : immediate) . 'a -> variant 
+    val f1 : ('a : float64) ('b : immediate) 'c . 'a -> 'b -> 'c
+    val f2 : ('a : float64) 'b ('c : bits64) . 'a -> 'b -> 'c
+    val f3 : 'a 'b ('c : word) . 'a -> 'b -> 'c
+  end
+[%%expect
+  {|
+module type S_for_layouts =
+  sig
+    type t : float64
+    type variant = A : ('a : immediate). 'a -> variant
+    val f1 : ('a : float64) ('b : immediate) 'c. 'a -> 'b -> 'c
+    val f2 : ('a : float64) 'b ('c : bits64). 'a -> 'b -> 'c
+    val f3 : 'a 'b ('c : word). 'a -> 'b -> 'c
+  end
+|}]
+type ('a : immediate) for_layouts = 'a
+let f : ('a : float64) -> (_ : bits64) -> 'a = fun x _ -> x
+let f : ('a : float64) . 'a -> 'a = fun x -> x
+let f : (('a : float64) . 'a -> 'a) -> int = fun _ -> 5
+let f : (unit as (_ : immediate)) -> unit = fun () -> ()
+[%%expect
+  {|
+type ('a : immediate) for_layouts = 'a
+val f : ('a : float64) ('b : bits64). 'a -> 'b -> 'a = <fun>
+val f : ('a : float64). 'a -> 'a = <fun>
+val f : (('a : float64). 'a -> 'a) -> int = <fun>
+val f : unit -> unit = <fun>
+|}]
+type (_ : any) ignore =
+  | K1 
+type t = ..
+type t +=  
+  | K: ('a : float64) . 'a ignore -> t 
+[%%expect
+  {|
+type (_ : any) ignore = K1
+type t = ..
+type t += K : ('a : float64). 'a ignore -> t
+|}]
+type t1 : any
+type t2 : any mod separable
+type t3 : value_or_null
+type t4 : value
+type t5 : void
+type t6 : immediate64
+type t7 : immediate
+type t8 : float64
+type t9 : float32
+type t10 : word
+type t11 : bits32
+type t12 : bits64
+[%%expect
+  {|
+type t1 : any
+type t2 : any separable
+type t3 : value_or_null
+type t4
+type t5 : void
+type t6 : immediate64
+type t7 : immediate
+type t8 : float64
+type t9 : float32
+type t10 : word
+type t11 : bits32
+type t12 : bits64
+|}]
+type ('a, 'b : float64, 'c : any) t13
+[%%expect {|
+type ('a, 'b : float64, 'c : any) t13
+|}]
+type ('a, 'b : float64, 'c : any, 'd, 'e, 'f, 'g, 'h, 'i, 'j : bits64, 'k,
+  'l, 'm) t14
+[%%expect
+  {|
+type ('a, 'b : float64, 'c : any, 'd, 'e, 'f, 'g, 'h, 'i, 'j : bits64, 'k,
+      'l, 'm)
+     t14
+|}]
+type t15 : any non_pointer
+type t16 : value non_pointer
+type t17 : value & value non_pointer
+type t17b : (value & value) non_pointer
+[%%expect
+  {|
+type t15 : any non_pointer
+type t16 : value non_pointer
+type t17 : value & value non_pointer
+Line 4, characters 12-39:
+4 | type t17b : (value & value) non_pointer
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+
+type t17b : value & value
+|}]
+type ('a : value mod external_ stateless many unyielding non_float) t18 =
+  ('a : value mod immutable global)
+[%%expect {|
+type ('a : value mod everything non_float) t18 = 'a
+|}]
+type t = #(int * float#)
+let f xs = match xs with | #(x1, (y1 : float#)) -> #(x1, y1)
+[%%expect
+  {|
+type t = #(int * float#)
+val f : #('a * float#) -> #('a * float#) = <fun>
+|}]
+module M = struct type 'a t = 'a or_null[@@or_null_reexport ] end
+let x () = #(M.Null, (M.This "hi"))
+[%%expect
+  {|
+module M :
+  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
+  stateless
+val x : unit -> #('a M.t * string M.t) = <fun>
+|}]
+module Or_null_names = struct type 'a t =
+                                | Nope 
+                                | Yep of 'a [@@or_null ] end
+let y () = #(Or_null_names.Nope, (Or_null_names.Yep "hi"))
+[%%expect
+  {|
+module Or_null_names : sig type 'a t = Nope | Yep of 'a [@@or_null] end @@
+  stateless
+val y : unit -> #('a Or_null_names.t * string Or_null_names.t) = <fun>
+|}]
+external id : ('a : any) . 'a -> 'a = "%identity"[@@layout_poly ]
+[%%expect
+  {|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+|}]
+type packed1 =
+  | T1: ('a : float64) . 'a -> packed1 
+let f1 p = match p with | T1 (type (a : float64)) (_ : a) -> ()
+let f1_no_parens p = match p with | T1 (type (a : float64)) (_ : a) -> ()
+type packed2 =
+  | T2: 'a 'b . 'a * 'b -> packed2 
+let f2 p = match p with | T2 (type (a : value) b) (_ : (a * b)) -> ()
+let f3 p = match p with | T2 (type a (b : value)) (_ : (a * b)) -> ()
+let f4 p =
+  match p with | T2 (type (a : value) (b : value)) (_ : (a * b)) -> ()
+[%%expect
+  {|
+type packed1 = T1 : ('a : float64). 'a -> packed1
+val f1 : packed1 -> unit = <fun>
+val f1_no_parens : packed1 -> unit = <fun>
+type packed2 = T2 : 'a * 'b -> packed2
+val f2 : packed2 -> unit = <fun>
+val f3 : packed2 -> unit = <fun>
+val f4 : packed2 -> unit = <fun>
+|}]
+let f () = fun ()  : float# -> #0.
+[%%expect {|
+val f : unit -> unit -> float# = <fun>
+|}]
+let nums = [:x for x = 0 to 100:]
+let nums = [|x for x = 0 to 100|]
+let nums = [x for x = 0 to 100]
+[%%expect
+  {|
+val nums : int iarray =
+  [:0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
+    21; 22; 23; 24; 25; 26; 27; 28; 29; 30; 31; 32; 33; 34; 35; 36; 37; 38;
+    39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 52; 53; 54; 55; 56;
+    57; 58; 59; 60; 61; 62; 63; 64; 65; 66; 67; 68; 69; 70; 71; 72; 73; 74;
+    75; 76; 77; 78; 79; 80; 81; 82; 83; 84; 85; 86; 87; 88; 89; 90; 91; 92;
+    93; 94; 95; 96; 97; 98; 99; 100:]
+val nums : int array =
+  [|0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
+    21; 22; 23; 24; 25; 26; 27; 28; 29; 30; 31; 32; 33; 34; 35; 36; 37; 38;
+    39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 52; 53; 54; 55; 56;
+    57; 58; 59; 60; 61; 62; 63; 64; 65; 66; 67; 68; 69; 70; 71; 72; 73; 74;
+    75; 76; 77; 78; 79; 80; 81; 82; 83; 84; 85; 86; 87; 88; 89; 90; 91; 92;
+    93; 94; 95; 96; 97; 98; 99; 100|]
+val nums : int list =
+  [0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
+   21; 22; 23; 24; 25; 26; 27; 28; 29; 30; 31; 32; 33; 34; 35; 36; 37; 38;
+   39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 52; 53; 54; 55; 56;
+   57; 58; 59; 60; 61; 62; 63; 64; 65; 66; 67; 68; 69; 70; 71; 72; 73; 74;
+   75; 76; 77; 78; 79; 80; 81; 82; 83; 84; 85; 86; 87; 88; 89; 90; 91; 92;
+   93; 94; 95; 96; 97; 98; 99; 100]
+|}]
+let nums = [:x for x in [:1;2;3:]:]
+let nums = [|x for x in [|1;2;3|]|]
+let nums = [x for x in [1; 2; 3]]
+[%%expect
+  {|
+val nums : int iarray = [:1; 2; 3:]
+val nums : int array = [|1; 2; 3|]
+val nums : int list = [1; 2; 3]
+|}]
+let nums = [:x + y for x in [:1;2;3:] for y in [:4;5;6:] when (x + y) > 6:]
+let nums = [|x + y for x in [|1;2;3|] for y in [|4;5;6|] when (x + y) > 6|]
+let nums = [x + y for x in [1; 2; 3] for y in [4; 5; 6] when (x + y) > 6]
+let nums =
+  [|(n, m, x)
+    for n = 1 to 10
+      and m = 5 downto 0
+      when ((n + m) mod 3) = 0
+      for x in [|(1 + m);2;3|]
+      when (((n + m) + x) mod 2) = 0|]
+[%%expect
+  {|
+val nums : int iarray = [:7; 7; 8; 7; 8; 9:]
+val nums : int array = [|7; 7; 8; 7; 8; 9|]
+val nums : int list = [7; 7; 8; 7; 8; 9]
+val nums : (int * int * int) array =
+  [|(1, 5, 6); (1, 5, 2); (1, 2, 3); (1, 2, 3); (2, 4, 2); (2, 1, 3);
+    (3, 3, 4); (3, 3, 2); (3, 0, 1); (3, 0, 3); (4, 5, 3); (4, 2, 2);
+    (5, 4, 5); (5, 4, 3); (5, 1, 2); (5, 1, 2); (6, 3, 3); (6, 0, 2);
+    (7, 5, 6); (7, 5, 2); (7, 2, 3); (7, 2, 3); (8, 4, 2); (8, 1, 3);
+    (9, 3, 4); (9, 3, 2); (9, 0, 1); (9, 0, 3); (10, 5, 3); (10, 2, 2)|]
+|}]
+let nums =
+  (([((x)[@test.attr1 ]) for ((x)[@test.attr2 ]) in (([])[@test.attr3 ])])
+  [@test.attr4 ])
+[%%expect {|
+val nums : 'a list = []
+|}]
+let f ?x:(x @ local= 42)  ?x:(x @ local once portable= 42) 
+  ?x:(x : int @ local once portable= 42) 
+  ?x:(x : ('a -> 'a) @ local once portable= fun x -> x) 
+  ?x:(x : ('a : any) 'b . 'a @ local once portable= assert false) 
+  ?x:(x : ('a : any) 'b . ('a -> 'b @ once portable) @ local= assert false) 
+  ?x:(x : ('a : any) 'b . ('a -> 'b) @ local once portable= assert false) 
+  ?x:((y, z) @ local= 42)  ?x:((y, z) @ local once portable= 42) 
+  ?x:((y, z) : int @ local once portable= 42) 
+  ?x:((y, z) : ('a -> 'a) @ local once portable= 42) 
+  ?x:((y, z) : ('a : any) 'b . 'a @ local once portable= 42) 
+  ?x:((y, z) : ('a : any) 'b . ('a -> 'b @ once portable) @ local= 42) 
+  ?x:((y, z) : ('a : any) 'b . ('a -> 'b) @ local once portable= 42) 
+  ~x:(x @ local) ~x:(x @ local once portable)
+  ~x:(x : int @ local once portable)
+  ~x:(x : ('a -> 'a) @ local once portable)
+  ~x:(x : ('a : any) 'b . 'a @ local once portable)
+  ~x:(x : ('a : any) 'b . ('a -> 'b @ once portable) @ local)
+  ~x:(x : ('a : any) 'b . ('a -> 'b) @ local once portable)
+  ~x:((y, z) @ local) ~x:((y, z) @ local once portable)
+  ~x:((y, z) : int @ local once portable)
+  ~x:((y, z) : ('a -> 'a) @ local once portable)
+  ~x:((y, z) : ('a : any) 'b . 'a @ local once portable)
+  ~x:((y, z) : ('a : any) 'b . ('a -> 'b) @ local once portable)
+  ~x:((y, z) : ('a : any) 'b . ('a -> 'b @ once portable) @ local)
+  ((y, z) @ local) ((y, z) @ local once portable)
+  ((y, z) : int @ local once portable)
+  ((y, z) : ('a -> 'a) @ local once portable)
+  ((y, z) : ('a : any) 'b . 'a @ local once portable)
+  ((y, z) : ('a : any) 'b . ('a -> 'b) @ local once portable)
+  ((y, z) : ('a : any) 'b . ('a -> 'b @ once portable) @ local) = ()
+[%%expect
+  {|
+Line 5, characters 8-53:
+5 |       ?(local_ x : ('a : any) 'b . 'a @ once portable = assert false)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Optional parameters cannot be polymorphic
+|}]
+let g () =
+  let (f @ local) = 42 in
+  let (f @ local) a b  @ once portable= 42 in
+  let (f @ local) a b  : int @ once portable = 42 in
+  let (f @ local) a b  : (int -> int) @ once portable = 42 in
+  let (f @ local unique) = 42 in
+  let (f @ local unique) a b  @ once portable= 42 in
+  let (f @ local unique) a b  : int @ once portable = 42 in
+  let (f @ local unique) a b  : (int -> int) @ once portable = 42 in
+  let (a @ local once portable) = 42 in
+  let a : int @ local once portable = 42 in
+  let a : (int -> int) @ local once portable = 42 in
+  let a : ('a : any) 'b . 'a @ local once portable = 42 in
+  let a : ('a : any) 'b . ('a -> 'a @ once portable) @ local = 42 in
+  let a : ('a : any) 'b . ('a -> 'a) @ local once portable = 42 in
+  let a : type (a : any) b. int @ once portable = 42 in
+  let a : type (a : any) b. a -> b @ once portable = 42 in
+  let a : type (a : any) b. (a -> b) @ once portable = 42 in
+  let (a, b) @ once portable = 42 in
+  let (a, b) : int @ once portable = 42 in
+  let (a, b) : (int -> int) @ once portable = 42 in ()
+[%%expect
+  {|
+Line 5, characters 52-54:
+5 |   let local_ f a b : (int -> int) @ once portable = 42 in
+                                                        ^^
+Error: The constant "42" has type "int" but an expression was expected of type
+         "int -> int"
+|}]
+let g () =
+  exclave_ (let _f = (() : _ @ unique once) in
+            let _f = (() : @ unique once) in
+            let _f x y  @ local unique=
+              exclave_ (x + y : _ @ local once unique) in
+            let _f x y  @ local unique=
+              exclave_ (x + y : @ local once unique) in
+            ((() : _ @ unique once); (() : @ local unique once) : @ local) : @ local)
+[%%expect {|
+val g : unit -> unit @ local once = <fun>
+|}]
+type record =
+  {
+  field0: int @@ global ;
+  field1: int @@ global portable contended ;
+  field2: int @@ global portable contended ;
+  normal_field: int }
+[%%expect
+  {|
+type record = {
+  field0 : int @@ global;
+  field1 : int @@ global portable contended;
+  field2 : int @@ global portable contended;
+  normal_field : int;
+}
+|}]
+type 'a parameterized_record =
+  {
+  field0: 'a @@ global ;
+  field1: 'a @@ global portable contended ;
+  field2: 'a @@ global portable contended ;
+  normal_field: 'a }
+type t =
+  | Foo of int @@ global * int 
+  | Foo1 of int @@ global portable contended * int 
+  | Foo2 of int @@ global * int @@ global portable contended 
+  | Foo3 of int @@ global * int @@ portable contended 
+  | Foo4 of (int * int) @@ global portable contended 
+[%%expect
+  {|
+type 'a parameterized_record = {
+  field0 : 'a @@ global;
+  field1 : 'a @@ global portable contended;
+  field2 : 'a @@ global portable contended;
+  normal_field : 'a;
+}
+type t =
+    Foo of int @@ global * int
+  | Foo1 of int @@ global portable contended * int
+  | Foo2 of int @@ global * int @@ global portable contended
+  | Foo3 of int @@ global * int @@ portable contended
+  | Foo4 of (int * int) @@ global portable contended
+|}]
+type fn = int @ local portable contended -> int @ local portable contended
+type nested_fn =
+  (int @ local portable once -> int @ local portable once) @ portable once ->
+    int @ local portable once
+type ('a, 'b) labeled_fn =
+  a:'a @ local unique portable contended ->
+    ?b:'b @ local once portable contended ->
+      'a @ local contended portable ->
+        (int -> 'b @ local unique once) @ portable
+type typvar_fn = a:('a 'b . 'a) @ local unique portable contended -> unit
+[%%expect
+  {|
+type fn = int @ local portable contended -> int @ local portable contended
+type nested_fn =
+    (int @ local once portable -> int @ local once portable) @ once
+    portable -> int @ local once portable
+type ('a, 'b) labeled_fn =
+    a:'a @ local unique portable contended ->
+    ?b:'b @ local once portable contended ->
+    'a @ local portable contended ->
+    (int -> 'b @ local once unique) @ portable
+type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
+|}]
+let f ~x1:(x1 @ many) ~x2:(x2 : string @ local)
+  ~x3:(x3 : (string -> string) @ local) ~x4:(x4 : 'a . ('a -> 'a) @ local)
+  ~x9:(x9 : 'a . 'a @ local) ~x5:(x5 @ local)
+  ~x6:((true | false) @ local many) ~x7:((true | false) : bool @ local many)
+  ~x8:(() @ local) (_ : string @ global) (_ @ local) =
+  exclave_ (let (x9 @ local) = "hi" in
+            let x10 : string @ global = "hi" in
+            let x11 : int array @ local contended = [||] in
+            let (x13 @ global) = "hi" in
+            let (x14 @ local) y z = y + z in
+            let (x15 @ local) y z  : int = y + z in
+            let _ = ("hi" : string @ global) in
+            stack_ (x1, x2, x3, x4, x5, x9, x10, x11, x13, x14, x15) : @ local)
+[%%expect
+  {|
+val f :
+  x1:'b ->
+  x2:string @ local ->
+  x3:(string -> string) @ local ->
+  x4:('a. 'a -> 'a) @ local ->
+  x9:('a. 'a) @ local ->
+  x5:'c @ local ->
+  x6:bool @ local ->
+  x7:bool @ local ->
+  x8:unit @ local ->
+  string ->
+  'd @ local ->
+  'b * string * (string -> string) * ('e -> 'e) * 'c * string * string *
+  int array * string * (int -> (int -> int) @ local) *
+  (int -> (int -> int) @ local) @ local contended = <fun>
+|}]
+let f1 (_ @ local) = ()
+let f2 () = let (x @ local) = [1; 2; 3] in ((f1 x)[@nontail ])
+[%%expect
+  {|
+val f1 : 'a @ local -> unit = <fun>
+val f2 : unit -> unit = <fun>
+|}]
+module type S  =
+  sig
+    @@
+    portable contended
+    module type S0  =
+      sig
+        @@
+        portable contended
+        val x1 : string -> string @@ local
+        val x2 : string -> string @@ portable
+        val x3 : string -> string @@ nonportable
+      end
+    include S0
+    @@
+    portable many local
+  end
+[%%expect
+  {|
+module type S =
+  sig
+    module type S0 =
+      sig
+        val x1 : string -> string @@ portable contended
+        val x2 : string -> string @@ portable contended
+        val x3 : string -> string @@ contended
+      end
+    val x1 : string -> string @@ many portable contended
+    val x2 : string -> string @@ many portable contended
+    val x3 : string -> string @@ many portable contended
+  end
+|}]
+external x4 : string -> string @@ portable many = "%identity"
+[%%expect {|
+external x4 : string -> string @@ portable = "%identity"
+|}]
+type t =
+  | K1 of string @@ global * (float -> float) @@ many * string 
+  | K2: string @@ global * (float -> float) @@ many * string -> t 
+type t =
+  {
+  x: string @@ global ;
+  mutable y: float -> float @@ many ;
+  z: string @@ global many }
+type t1 = {
+  mutable x: float ;
+  mutable f: float -> float }
+type t2 =
+  {
+  mutable x: float @@ local once ;
+  mutable f: float -> float @@ local once }
+[%%expect
+  {|
+type t =
+    K1 of string @@ global * (float -> float) @@ many * string
+  | K2 : string @@ global * (float -> float) @@ many * string -> t
+type t = {
+  x : string @@ global;
+  mutable y : float -> float;
+  z : string @@ global many;
+}
+type t1 = { mutable x : float; mutable f : float -> float; }
+type t2 = {
+  mutable x : float @@ local once;
+  mutable f : float -> float @@ local once;
+}
+|}]
+let f1 (x @ local) (f @ once)  : t1 = exclave_ { x; f }
+[%%expect
+  {|
+Line 1, characters 48-49:
+1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
+                                                    ^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is the field "x" (with some modality) of the record at line 1, characters 46-54.
+|}]
+let f2 (x @ local) (f @ once)  : t2 = exclave_ { x; f }
+[%%expect
+  {|
+val f2 : float @ local -> (float -> float) @ once -> t2 @ local once = <fun>
+|}]
+module type S  =
+  sig val bar : 'a -> 'a module M : sig val foo : 'a -> 'a end end
+module type S'  = sig include S @@ portable end
+[%%expect
+  {|
+module type S =
+  sig val bar : 'a -> 'a module M : sig val foo : 'a -> 'a end end
+module type S' =
+  sig
+    val bar : 'a -> 'a @@ portable
+    module M : sig val foo : 'a -> 'a @@ portable end
+  end
+|}]
+module type S  = sig  end
+module M = struct  end
+[%%expect {|
+module type S = sig end
+module M : sig end @@ stateless
+|}]
+module F(X:S @ portable) = struct  end
+[%%expect
+  {|
+module F : functor (X : S @ portable) -> sig end @@ stateless
+|}]
+module F(_:S @ portable) = struct  end
+[%%expect {|
+module F : S @ portable -> sig end @@ stateless
+|}]
+module M' : S @ portable = M 
+[%%expect {|
+module M' : S @@ stateless
+|}]
+module F(M:S @ portable) : S @ portable = struct  end 
+[%%expect {|
+module F : functor (M : S @ portable) -> S @@ stateless
+|}]
+module F(M:S @ portable) = (struct  end @ portable)
+[%%expect
+  {|
+module F : functor (M : S @ portable) -> sig end @@ stateless
+|}]
+module M' = (M @ portable)
+[%%expect {|
+module M' = M @@ stateless
+|}]
+module M' : S @ portable = M 
+[%%expect {|
+module M' : S @@ stateless
+|}]
+module M = (struct  end @ portable)
+[%%expect {|
+module M : sig end @@ stateless
+|}]
+module M : S @ portable = struct  end 
+[%%expect {|
+module M : S @@ stateless
+|}]
+module type S'  = () -> (M : S @ portable) -> S @ portable -> S @ portable
+[%%expect
+  {|
+module type S' =
+  functor () (M : S @ portable) -> S @ portable -> S @ portable
+|}]
+module type S'  = () -> S @ portable -> S @ portable -> S @ portable
+[%%expect
+  {|
+module type S' = functor () -> S @ portable -> S @ portable -> S @ portable
+|}]
+module type S'  = S @ local -> S -> S
+module type S''  = S @ local -> S -> S
+[%%expect
+  {|
+module type S' = S @ local -> S -> S
+module type S'' = S @ local -> S -> S
+|}]
+module F = (functor () -> struct  end @ portable)
+[%%expect {|
+module F : functor () -> sig end @@ stateless
+|}]
+module G = (functor () -> F @ portable)
+[%%expect
+  {|
+module G : functor () -> (functor () -> sig end) @ contended @@ portable
+|}]
+module G =
+  (functor (F : (S @ unique -> S @ once) @ local) ->
+    (struct  end @ contended) @ portable)
+[%%expect
+  {|
+module G :
+  functor (F : (S @ unique -> S @ once) @ local) -> sig end @ contended @@
+  stateless
+|}]
+module G' = (F @ portable)
+[%%expect {|
+module G' = F @@ stateless
+|}]
+module rec F @ portable = functor () -> struct  end
+ and G @ portable = functor () -> struct  end
+[%%expect
+  {|
+File "_none_", line 1:
+Error: Recursive modules require an explicit module type.
+|}]
+module type T  =
+  sig
+    module M : S @@ portable
+    module M = N @@ portable
+    module M = N @@ portable
+    module M0 : S @ portable -> (X : S @ portable) -> S @ portable
+    module M0 : S @ portable -> (X : S @ portable) -> S @ portable @@
+    portable
+    module M0 : S @ portable -> (X : S @ portable) -> S @ portable @@
+    portable
+    module M0 : S @ portable -> S @ portable -> S @ portable @@ portable
+    module rec F: sig  end @@ portable
+    and G: sig  end @@ portable
+  end
+[%%expect
+  {|
+Line 3, characters 13-14:
+3 |   module M = N @@ portable
+                 ^
+Error: Unbound module "N"
+|}]
+let foo () = let module F = (functor () -> struct  end @ portable) in ()
+[%%expect {|
+val foo : unit -> unit = <fun>
+|}]
+let f x = stack_ (ref x)
+[%%expect
+  {|
+Line 1, characters 10-24:
+1 | let f x = stack_ (ref x)
+              ^^^^^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+type t = {
+  a: int }
+let f a = let y = stack_ { a } in y.a
+[%%expect {|
+type t = { a : int; }
+val f : int -> int = <fun>
+|}]
+let apply ~f:(f @ local) x = ((f x)[@nontail ])
+let double1 y = ((apply ~f:(stack_ (fun x -> x + y)) y)[@nontail ])
+let double2 y = ((apply ~f:(stack_ (function | x -> x + y)) y)[@nontail ])
+[%%expect
+  {|
+val apply : f:('a -> 'b) @ local -> 'a -> 'b = <fun>
+val double1 : int -> int = <fun>
+val double2 : int -> int = <fun>
+|}]
+let make_tuple x y z = ((stack_ (x, y)), z)
+[%%expect
+  {|
+Line 1, characters 23-36:
+1 | let make_tuple x y z = stack_ (x, y), z
+                           ^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global"
+         because it is an element of the tuple at line 1, characters 23-39
+         which is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+type u =
+  | A of unit 
+  | C of int 
+  | B of int * int 
+  | D 
+let create_us () =
+  let a = stack_ (A ()) in
+  let b = stack_ (B (1, 2)) in
+  let c = stack_ (C 3) in let d = stack_ D in let e = stack_ a#b in ()
+[%%expect
+  {|
+type u = A of unit | C of int | B of int * int | D
+Line 7, characters 17-18:
+7 |   let d = stack_ D in
+                     ^
+Error: This expression is not an allocation site.
+|}]
+let unary_minus_plus () =
+  let x = 42 in
+  let a = stack_ (- x) in
+  let b = stack_ (-42) in
+  let c = stack_ 42 in let d = stack_ (+ x) in let e = stack_ 42 in ()
+[%%expect
+  {|
+Line 4, characters 17-22:
+4 |   let b = stack_ (-42) in
+                     ^^^^^
+Error: Stack allocating literals is not supported;
+       they are not allocated at runtime.
+|}]
+module F_struct(_:sig  end) = struct  end
+module type F_sig  = sig  end -> sig  end
+module T = struct include functor F_struct end
+module type S  = sig include functor F_sig end
+[%%expect
+  {|
+module F_struct : sig end -> sig end @@ stateless
+module type F_sig = sig end -> sig end
+module T : sig end @@ stateless
+module type S = sig end
+|}]
+let f x =
+  match x with
+  | [::] -> [::]
+  | (([:x:])[@test.attr1 ]) -> (([:x:])[@test.attr1 ])
+  | (([:x;y:])[@test.attr2 ][@test.attr3 ]) -> (([:x;y:])
+      [@test.attr2 ][@test.attr3 ])
+  | _ -> assert false
+[%%expect
+  {|
+val f : ('a : value_maybe_null). 'a iarray -> 'a iarray = <fun>
+|}]
+let (z, punned) = (4, 5)
+let x_must_be_even _ = assert false
+exception Odd 
+let x = (~x:1, ~y:2)
+let x = (((~x:1, ~y:2))[@test.attr ])
+let _ = (~x:5, 2, ~z, ~punned:(punned : int))
+let (x : (x:int * y:int)) = (~x:1, ~y:2)
+let (x : (((x:int * y:int))[@test.attr ])) = (~x:1, ~y:2)
+[%%expect
+  {|
+val z : int = 4
+val punned : int = 5
+val x_must_be_even : 'a -> 'b = <fun>
+exception Odd
+val x : x:int * y:int = (~x:1, ~y:2)
+val x : x:int * y:int = (~x:1, ~y:2)
+- : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+|}]
+let (~x:x0, ~s, ~y:(y : int), ..) : (x:int * s:string * y:int * string) =
+  (~x:1, ~s:"a", ~y:2, "ignore me")
+[%%expect
+  {|
+val x0 : int @@ stateless = 1
+val s : string @@ stateless = "a"
+val y : int @@ stateless = 2
+|}]
+module M :
+  sig
+    val f : (x:int * string) -> (x:int * string)
+    val mk : unit -> (x:bool * y:string)
+  end = struct let f x = x
+               let mk () = (~x:false, ~y:"hi") end 
+module X_int_int = struct type t = (x:int * int) end
+[%%expect
+  {|
+module M :
+  sig
+    val f : (x:int * string) -> x:int * string
+    val mk : unit -> x:bool * y:string
+  end @@ stateless
+module X_int_int : sig type t = x:int * int end @@ stateless
+|}]
+let foo xy k_good k_bad =
+  match x_must_be_even xy with
+  | (~x, y) -> k_good ()
+  | exception Odd -> k_bad ()
+let (~x:(x : int), ~y, _) = (~x:1, ~y:2, "ignore me")
+let (((~x:(x : int), ~y, _))[@test.attr ]) = (~x:1, ~y:2, "ignore me")
+let f (~foo, ~bar) = (foo * 10) + bar
+let f ((~x:(x : int), y) : (x:int * int))  : int = x + y
+[%%expect
+  {|
+val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
+val x : int @@ stateless = 1
+val y : int = 2
+val x : int @@ stateless = 1
+val y : int = 2
+val f : (foo:int * bar:int) -> int = <fun>
+val f : (x:int * int) -> int = <fun>
+|}]
+type xy = (x:int * y:int)
+let lt = (~x:1, ~y:2, ~x2:3, 4)
+let matches = let (~x, ..) = lt in x
+let matches = let (~y, ~x, ..) = lt in (x, y)
+[%%expect
+  {|
+type xy = x:int * y:int
+val lt : x:int * y:int * x2:int * int = (~x:1, ~y:2, ~x2:3, 4)
+val matches : int = 1
+val matches : int * int = (1, 2)
+|}]
+module Float_u = Stdlib_upstream_compatible.Float_u
+module Int8_u = Stdlib_stable.Int8_u
+module Int16_u = Stdlib_stable.Int16_u
+module Int32_u = Stdlib_upstream_compatible.Int32_u
+module Int64_u = Stdlib_upstream_compatible.Int64_u
+module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
+[%%expect
+  {|
+module Float_u = Stdlib_upstream_compatible.Float_u
+module Int8_u = Stdlib_stable.Int8_u
+module Int16_u = Stdlib_stable.Int16_u
+module Int32_u = Stdlib_upstream_compatible.Int32_u
+module Int64_u = Stdlib_upstream_compatible.Int64_u
+module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
+|}]
+let test_float s f =
+  Format.printf "%s: %f\n" s (Float_u.to_float f); Format.print_flush ()
+let test_int8 s f =
+  Format.printf "%s: %d\n" s (Int8_u.to_int f); Format.print_flush ()
+let test_int16 s f =
+  Format.printf "%s: %d\n" s (Int16_u.to_int f); Format.print_flush ()
+let test_int32 s f =
+  Format.printf "%s: %ld\n" s (Int32_u.to_int32 f); Format.print_flush ()
+let test_int64 s f =
+  Format.printf "%s: %Ld\n" s (Int64_u.to_int64 f); Format.print_flush ()
+let test_int s f =
+  Format.printf "%s: %d\n" s (Int_u.to_int f); Format.print_flush ()
+let test_nativeint s f =
+  Format.printf "%s: %s\n" s (Nativeint_u.to_string f); Format.print_flush ()
+let test_char s f =
+  Format.printf "%s: %C\n" s (Char_u.to_char f); Format.print_flush ()
+[%%expect
+  {|
+val test_float : string -> Float_u.t -> unit = <fun>
+val test_int8 : string -> int8# -> unit = <fun>
+val test_int16 : string -> int16# -> unit = <fun>
+val test_int32 : string -> Int32_u.t -> unit = <fun>
+val test_int64 : string -> Int64_u.t -> unit = <fun>
+val test_int : string -> int# -> unit = <fun>
+val test_nativeint : string -> Nativeint_u.t -> unit = <fun>
+val test_char : string -> char# -> unit = <fun>
+|}]
+let x = test_float "e" #2.718281828459045
+let x = test_float "negative_one_half" (-#0.5)
+let x = test_float "negative_one_half" (-#0.5)
+let x = test_float "negative_one_half" (-#0.5)
+let x = test_float "negative_one_half" (-#0.5)
+let x = test_float "positive_one_dot" #1.
+let x = test_float "positive_one_dot" #1.
+let x = test_float "positive_one_dot" #1.
+let x = test_float "positive_one_dot" #1.
+let x = test_float "one_billion" #1e9
+let x = test_float "one_twenty_seven_point_two_five_in_floating_hex" #0x7f.4
+let x =
+  test_float "five_point_three_seven_five_in_floating_hexponent" #0xa.cp-1
+let x = test_nativeint "zero" #0n
+let x = test_int "zero" #0m
+let x = test_int8 "positive_one" #1s
+let x = test_int8 "positive_one" #1s
+let x = test_int16 "positive_one" #1S
+let x = test_int16 "positive_one" #1S
+let x = test_int32 "positive_one" #1l
+let x = test_int32 "positive_one" #1l
+let x = test_int64 "negative_one" (-#1L)
+let x = test_int64 "negative_one" (-#1L)
+let x = test_nativeint "two_fifty_five_in_hex" #0xFFn
+let x = test_int "ten_in_binary" #0b1010m
+let x = test_int8 "one_hundred_in_octal" #0o144s
+let x = test_int16 "two_hundred_in_hex" #0xC8S
+let x = test_int32 "twenty_five_in_octal" #0o31l
+let x = test_int64 "forty_two_in_binary" #0b101010L
+let x = test_char "untagged char" #'c'
+[%%expect
+  {|
+e: 2.718282
+val x : unit = ()
+negative_one_half: -0.500000
+val x : unit = ()
+negative_one_half: -0.500000
+val x : unit = ()
+negative_one_half: -0.500000
+val x : unit = ()
+negative_one_half: -0.500000
+val x : unit = ()
+positive_one_dot: 1.000000
+val x : unit = ()
+positive_one_dot: 1.000000
+val x : unit = ()
+positive_one_dot: 1.000000
+val x : unit = ()
+positive_one_dot: 1.000000
+val x : unit = ()
+one_billion: 1000000000.000000
+val x : unit = ()
+one_twenty_seven_point_two_five_in_floating_hex: 127.250000
+val x : unit = ()
+five_point_three_seven_five_in_floating_hexponent: 5.375000
+val x : unit = ()
+zero: 0
+val x : unit = ()
+zero: 0
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+negative_one: -1
+val x : unit = ()
+negative_one: -1
+val x : unit = ()
+two_fifty_five_in_hex: 255
+val x : unit = ()
+ten_in_binary: 10
+val x : unit = ()
+one_hundred_in_octal: 100
+val x : unit = ()
+two_hundred_in_hex: 200
+val x : unit = ()
+twenty_five_in_octal: 25
+val x : unit = ()
+forty_two_in_binary: 42
+val x : unit = ()
+untagged char: 'c'
+val x : unit = ()
+|}]
+let f x = match x with | #4. -> `Four | #5. -> `Five | _ -> `Other
+let x = match f #5. with | `Five -> () | _ -> assert false
+let f x = match x with | #4. -> #0. | #5. -> #1. | x -> x
+[%%expect
+  {|
+val f : float# -> [> `Five | `Four | `Other ] = <fun>
+val x : unit = ()
+val f : float# -> float# = <fun>
+|}]
+;;test_float "result" (f #7.)
+let f x =
+  match x with
+  | #4. -> #0.
+  | #5. -> #1.
+  | #6. -> #2.
+  | #7. -> #3.
+  | #8. -> #4.
+  | #9. -> #5.
+  | #10. -> #6.
+  | #11. -> #7.
+  | x -> x
+;;test_float "larger match result" (f #7.)
+let f x = match x with | #4L -> `Four | #5L -> `Five | _ -> `Other
+[%%expect
+  {|
+result: 7.000000
+- : unit = ()
+val f : float# -> float# = <fun>
+larger match result: 3.000000
+- : unit = ()
+val f : int64# -> [> `Five | `Four | `Other ] = <fun>
+|}]
+let x = match f #4L with | `Four -> () | _ -> assert false
+let f x = match x with | #4L -> #0L | #5L -> #1L | x -> x
+;;test_int64 "result" (f #7L)
+[%%expect
+  {|
+val x : unit = ()
+val f : int64# -> int64# = <fun>
+result: 7
+- : unit = ()
+|}]
+let x = match #'c' with | #'a'..#'z' -> 10 | _ -> 20
+[%%expect {|
+val x : int = 10
+|}]
+type 'a boxed_with_idx = {
+  data: 'a ;
+  i: int }
+type 'a with_idx : value & immediate = 'a boxed_with_idx# =
+  #{
+  data: 'a ;
+  i: int }
+let idx #{ data = _; i } = i
+let #{ data = payload;_} = #{ data = "payload"; i = 0 }
+let inc r = #{ r with i = (r.#i + 1) }
+[%%expect
+  {|
+type 'a boxed_with_idx = { data : 'a; i : int; }
+type 'a with_idx = 'a boxed_with_idx# = #{ data : 'a; i : int; }
+val idx : 'a with_idx -> int = <fun>
+val payload : string = "payload"
+val inc : 'a with_idx -> 'a with_idx = <fun>
+|}]
+type 'a r = {
+  foo: 'a }
+let idx_r () = (.foo)
+let idx_r_r () = (.foo.#foo)
+[%%expect
+  {|
+type 'a r = { foo : 'a; }
+val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
+val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
+|}]
+type 'a s = {
+  a: 'a ;
+  mutable b: 'a ;
+  mutable c: 'a [@atomic ]}
+let idx_a = (.a)
+let idx_b = (.b)
+let idx_c = (.c)
+[%%expect
+  {|
+type 'a s = { a : 'a; mutable b : 'a; mutable c : 'a [@atomic]; }
+val idx_a : ('a s, 'a) idx_imm = <abstr>
+val idx_b : ('a s, 'a) idx_mut = <abstr>
+val idx_c : ('a s, 'a) idx_atomic = <abstr>
+|}]
+let idx_a' = (.idx_imm(idx_a).#foo)
+let idx_b' = (.idx_mut(idx_b).#foo)
+let idx_c' = (.idx_atomic(idx_c).#foo)
+[%%expect
+  {|
+val idx_a' : ('a r# s, 'a) idx_imm = <abstr>
+val idx_b' : ('a r# s, 'a) idx_mut = <abstr>
+val idx_c' : ('a r# s, 'a) idx_atomic = <abstr>
+|}]
+module Borrow =
+  struct
+    let f () = let x = "hello" in let y = borrow_ x in ()
+    let g x y = String.concat (borrow_ x) (borrow_ y)
+    let h x = match borrow_ x with | true -> () | false -> ()
+  end
+[%%expect
+  {|
+Line 8, characters 18-29:
+8 |     String.concat (borrow_ x) (borrow_ y)
+                      ^^^^^^^^^^^
+Error: This value is "local" because it is borrowed.
+       However, the highlighted expression is expected to be "global".
+|}]
+type 'a list : immutable_data with 'a
+type ('a, 'b) either : immutable_data with ('a * 'b)
+type 'a contended : immutable_data with 'a @@ contended
+type 'a contended_with_int : (immutable_data with 'a @@ contended) with int
+[%%expect
+  {|
+type 'a list : immutable_data with 'a
+type ('a, 'b) either : immutable_data with 'a with 'b
+type 'a contended : immutable_data with 'a @@ contended
+type 'a contended_with_int : immutable_data with 'a @@ contended
+|}]
+type 'a abstract
+type existential_abstract : immutable_data with ((type : value mod portable))
+                                                  abstract =
+  | Mk: ('a : value mod portable) abstract -> existential_abstract 
+[%%expect
+  {|
+type 'a abstract
+type existential_abstract =
+    Mk : ('a : value mod portable). 'a abstract -> existential_abstract
+|}]
+module M :
+  sig
+    kind_ immediate = value mod global many
+    kind_ immutable_data = value mod many
+    kind_ immutable = value
+    kind_ data = value mod many
+    kind_ abstract
+  end =
+  struct
+    kind_ immediate = value mod global many
+    kind_ immutable_data = value mod many
+    kind_ immutable = value
+    kind_ data = value mod many
+    kind_ abstract
+  end 
+[%%expect
+  {|
+module M :
+  sig
+    kind_ immediate = value mod global many
+    kind_ immutable_data = value mod many
+    kind_ immutable = value
+    kind_ data = value mod many
+    kind_ abstract
+  end @@ stateless
+|}]
+module type S  = sig kind_ k end
+module type S1  = S with kind_ k =  value mod portable
+module type S2  = S with kind_ k :=  value mod global
+[%%expect
+  {|
+module type S = sig kind_ k end
+module type S1 = sig kind_ k = value mod portable end
+module type S2 = sig end
+|}]
+module _ : sig type 'a gel : (kind_of_ 'a) mod global type 'a t : _ end =
+  struct type 'a gel : (kind_of_ 'a) mod global
+         type 'a t : _ end 
+[%%expect
+  {|
+Line 5, characters 16-27:
+5 |   type 'a gel : kind_of_ 'a mod global
+                    ^^^^^^^^^^^
+Error: Unimplemented kind syntax
+|}]
+type t = ('a . 'a -> 'a) -> int
+let f (_ : 'a . 'a -> 'a) = ()
+[%%expect
+  {|
+type t = ('a. 'a -> 'a) -> int
+val f : ('a. 'a -> 'a) -> unit = <fun>
+|}]
+module type S  = sig type t1 type t2 type t3 end
+module M = struct type t1 = int
+                  type t2 =
+                    | K of string 
+                  type t3 end
+module type S2  = S with M
+[%%expect
+  {|
+module type S = sig type t1 type t2 type t3 end
+module M : sig type t1 = int type t2 = K of string type t3 end @@ stateless
+module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
+|}]
+type t1 = float32
+type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
+let x = 3.14s
+let x () = #3.14s
+let y = 42s
+let y () = #42s
+let z = 42S
+let z () = #42S
+[%%expect
+  {|
+type t1 = float32
+type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
+val x : float32 = 3.1400001s
+val x : unit -> float32# = <fun>
+val y : int8 = 42s
+val y : unit -> int8# = <fun>
+val z : int16 = 42S
+val z : unit -> int16# = <fun>
+|}]
+type t1 = int8x16
+type t2 = int16x8
+type t3 = int32x4
+type t4 = int64x2
+type t5 = float32x4
+type t6 = float64x2
+[%%expect
+  {|
+type t1 = int8x16
+type t2 = int16x8
+type t3 = int32x4
+type t4 = int64x2
+type t5 = float32x4
+type t6 = float64x2
+|}]
+let f (x : bool) = (((x : int))[@error_message "custom message"])
+[%%expect
+  {|
+Line 1, characters 20-21:
+1 | let f (x : bool) = (x : int)[@error_message "custom message"]
+                        ^
+Error: The value "x" has type "bool" but an expression was expected of type
+         "int"
+       custom message
+|}]
+let f (v : float#)  : (((_ : value))[@error_message "need a value"]) = v
+[%%expect
+  {|
+Line 1, characters 68-69:
+1 | let f (v : float#) : ((_ : value)[@error_message "need a value"]) = v
+                                                                        ^
+Error: The value "v" has type "float#" but an expression was expected of type
+         "('a : value)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because of the annotation on the wildcard _ at line 1, characters 22-33.
+         need a value
+|}]
+module Base(_:sig  end)(_:sig  end)(_:sig  end)(_:sig  end) = struct  end
+module Name1 = struct  end
+module Name2 = struct  end
+module Value1 = struct  end
+module Value2(_:sig  end)(_:sig  end) = struct  end
+module Name2_1 = struct  end
+module Name2_1 = struct  end
+module _ =
+  (Base (Name1) (Value1) (Name2) (Value2 (Name2_1) (Value2_1)) [@jane.non_erasable.instances])
+[%%expect
+  {|
+module Base : sig end -> sig end -> sig end -> sig end -> sig end @@
+  stateless
+module Name1 : sig end @@ stateless
+module Name2 : sig end @@ stateless
+module Value1 : sig end @@ stateless
+module Value2 : sig end -> sig end -> sig end @@ stateless
+module Name2_1 : sig end @@ stateless
+module Name2_1 : sig end @@ stateless
+Line 9, characters 11-95:
+9 | module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_erasable.instances]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Unbound module "Base[Name1:Value1][Name2:Value2[Name2_1:Value2_1]]"
+|}]
+let overwrite_tuple = function | (a, b) as t -> overwrite_ t with (b, (_))
+type record = {
+  a: int ;
+  b: int }
+let overwrite_record =
+  function | { a; b } as t -> overwrite_ t with { b = a; a = (_) }
+let overwrite_record =
+  function | { a; b } as t -> overwrite_ t with { b = a }
+let ret_record () = { a = 1; b = 2 }
+let overwrite_record () = overwrite_ (ret_record ()) with { b = a }
+type constructor =
+  | C of {
+  a: int ;
+  b: int } 
+let overwrite_constructor =
+  function | C { a; b } as t -> overwrite_ t with (C { b = a; a = (_) })
+let overwrite_constructor =
+  function | C { a; b } as t -> overwrite_ t with (C { b = a })
+[%%expect
+  {|
+Line 2, characters 19-43:
+2 |     (a, b) as t -> overwrite_ t with (b, _)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^
+Alert Translcore: Overwrite not implemented.
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
+
+|}]
+let f ~x:(x : [%call_pos ]) () = x
+[%%expect {|
+val f : x:[%call_pos] -> unit -> lexing_position = <fun>
+|}]
+type t = x:[%call_pos ] -> int
+[%%expect {|
+type t = x:[%call_pos] -> int
+|}]
+let f g here = g ~here:(here : [%call_pos ])
+[%%expect
+  {|
+val f : (here:[%call_pos] -> 'a) -> lexing_position -> 'a = <fun>
+|}]
+let triangle_10 =
+  let mutable x = 0 in for i = 1 to 10 do x <- x + i done; (x : int)
+[%%expect {|
+val triangle_10 : int = 55
+|}]
+type 'a[@foo ] t
+[%%expect {|
+type 'a t
+|}]
+type ('a[@foo ] : any) t
+[%%expect {|
+type ('a : any) t
+|}]
+type _[@foo ] t
+[%%expect {|
+type _ t
+|}]
+type (_[@foo ] : any) t
+[%%expect {|
+type (_ : any) t
+|}]
+type ('a, 'b[@foo ]) t
+[%%expect {|
+type ('a, 'b) t
+|}]
+type ('a, 'b[@foo ] : any) t
+[%%expect {|
+type ('a, 'b : any) t
+|}]
+type ('a, _[@foo ]) t
+[%%expect {|
+type ('a, _) t
+|}]
+type ('a, _[@foo ] : any) t
+[%%expect {|
+type ('a, _ : any) t
+|}]
+module Foo = struct  end
+module type S  = sig module Foo = Foo[@foo ] @@ nonportable end
+[%%expect
+  {|
+module Foo : sig end @@ stateless
+module type S = sig module Foo = Foo end
+|}]
+module type S  = sig module Bar = Bar[@foo ] @@ nonportable end
+[%%expect
+  {|
+Line 2, characters 15-18:
+2 |   module Bar = Bar [@foo] @@ nonportable
+                   ^^^
+Error: Unbound module "Bar"
+|}]
+let f #() = #()
+[%%expect {|
+val f : unit# -> unit# = <fun>
+|}]
+let f = function | #false -> #true | #true -> #false
+[%%expect {|
+val f : bool# -> bool# = <fun>
+|}]
+let f (_ : (repr_ 'a) (repr_ 'b) . 'a -> 'b -> unit) = ()
+[%%expect
+  {|
+val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
+|}]
+let poly_ id : 'a . 'a -> 'a = fun x -> x
+[%%expect
+  {|
+Line 1, characters 10-12:
+1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
+              ^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+let poly_ id x = x
+[%%expect {|
+val poly_ id : 'a -> 'a = <lpoly>
+|}]
+let poly_ const : 'a 'b . 'a -> 'b -> 'a = fun x _ -> x
+[%%expect
+  {|
+Line 1, characters 10-15:
+1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^^^^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+module type S_poly  =
+  sig
+    val poly_ f : 'a . 'a -> 'a
+    val poly_ g : 'a 'b . 'a -> 'b -> 'c -> 'a
+    val poly_ h : 'a -> 'b -> 'a
+  end
+[%%expect
+  {|
+Line 2, characters 16-28:
+2 |   val poly_ f : 'a. 'a -> 'a
+                    ^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables,
+  so "poly_" has no effect. Consider using a regular "val" instead.
+
+module type S_poly =
+  sig
+    val f : 'a -> 'a
+    val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+    val poly_ h : 'a -> 'b -> 'a
+  end
+|}]
+let poly_ f : 'a . 'a -> 'a = fun x -> x
+and poly_ g : 'a 'b . 'a -> 'b -> 'a = fun x _ -> x
+[%%expect
+  {|
+Line 2, characters 10-11:
+2 | and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+let poly_ f : 'a . 'a -> 'a = fun x -> x
+and g x = x
+[%%expect
+  {|
+Line 2, characters 0-18:
+2 | and g = fun x -> x
+    ^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+let h x = x
+and poly_ k : 'a . 'a -> 'a = fun x -> x
+[%%expect
+  {|
+Line 2, characters 0-39:
+2 | and poly_ k : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+let m x = x
+and poly_ n : 'a . 'a -> 'a = fun x -> x
+and p x = x
+[%%expect
+  {|
+Line 2, characters 0-39:
+2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+module type S  = sig val f : layout_ x y. ('a : x) ('b : y) . 'a -> 'b end
+[%%expect {|
+module type S = sig val poly_ f : 'a -> 'b end
+|}]
+let f ((x : int)[@test.attr ]) = x
+[%%expect {|
+val f : int -> int = <fun>
+|}]
+let f ~l:((x : int)[@test.attr ]) = x
+[%%expect {|
+val f : l:int -> int = <fun>
+|}]
+let f ?l:((x : int option)[@test.attr ])  () = x
+[%%expect {|
+val f : ?l:int -> unit -> int option = <fun>
+|}]
+let f ?l:((x : int)[@test.attr ]= 0)  () = x
+[%%expect {|
+val f : ?l:int -> unit -> int = <fun>
+|}]
+let f ((x : int @ local)[@test.attr ]) = x
+[%%expect {|
+val f : int @ local -> int = <fun>
+|}]
+let f ~l:((x : int @ local)[@test.attr ]) = x
+[%%expect {|
+val f : l:int @ local -> int = <fun>
+|}]
+
+=====================================================
+source_jane_street.ml: FAIL, CANNOT REPARSE (test.ml 132:2)
+
+File "<str>", line 1446, characters 23-24:
+Error: Syntax error
+let f (type a : immediate) (x : a) = x
+let f (type a : immediate) (x : a) = x
+let f (type a : immediate) (type b : immediate) (x : a) = x
+let f (type a : immediate) (type b : immediate) (type c) (x : a) = x
+[%%expect
+  {|
+val f : ('a : immediate). 'a -> 'a = <fun>
+val f : ('a : immediate). 'a -> 'a = <fun>
+val f : ('a : immediate). 'a -> 'a = <fun>
+val f : ('a : immediate). 'a -> 'a = <fun>
+|}]
+let f y (type a : immediate) (x : a) = x
+let f y (type a : immediate) (x : a) = x
+let f y (type a : immediate) (type b : immediate) (x : a) = x
+[%%expect
+  {|
+val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
+val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
+val f : 'b ('a : immediate). 'b -> 'a -> 'a = <fun>
+|}]
+let f y (type a : immediate) = y
+let f y (type a : immediate) = y
+let f y (type a : immediate) (type b : immediate) = y
+let f y (type a : immediate) (type b : immediate) (type c) = y
+[%%expect
+  {|
+val f : 'a -> 'a = <fun>
+val f : 'a -> 'a = <fun>
+val f : 'a -> 'a = <fun>
+val f : 'a -> 'a = <fun>
+|}]
+let f (type (a : immediate)) (type (b : immediate)) (type (c : immediate))
+  (type (d : immediate)) = ()
+[%%expect {|
+val f : unit = ()
+|}]
+module type S_for_layouts  =
+  sig
+    type t : float64
+    type variant =
+      | A: ('a : immediate) . 'a -> variant 
+    val f1 : ('a : float64) ('b : immediate) 'c . 'a -> 'b -> 'c
+    val f2 : ('a : float64) 'b ('c : bits64) . 'a -> 'b -> 'c
+    val f3 : 'a 'b ('c : word) . 'a -> 'b -> 'c
+  end
+[%%expect
+  {|
+module type S_for_layouts =
+  sig
+    type t : float64
+    type variant = A : ('a : immediate). 'a -> variant
+    val f1 : ('a : float64) ('b : immediate) 'c. 'a -> 'b -> 'c
+    val f2 : ('a : float64) 'b ('c : bits64). 'a -> 'b -> 'c
+    val f3 : 'a 'b ('c : word). 'a -> 'b -> 'c
+  end
+|}]
+type ('a : immediate) for_layouts = 'a
+let f : ('a : float64) -> (_ : bits64) -> 'a = fun x _ -> x
+let f : ('a : float64) . 'a -> 'a = fun x -> x
+let f : (('a : float64) . 'a -> 'a) -> int = fun _ -> 5
+let f : (unit as (_ : immediate)) -> unit = fun () -> ()
+[%%expect
+  {|
+type ('a : immediate) for_layouts = 'a
+val f : ('a : float64) ('b : bits64). 'a -> 'b -> 'a = <fun>
+val f : ('a : float64). 'a -> 'a = <fun>
+val f : (('a : float64). 'a -> 'a) -> int = <fun>
+val f : unit -> unit = <fun>
+|}]
+type (_ : any) ignore =
+  | K1 
+type t = ..
+type t +=  
+  | K: ('a : float64) . 'a ignore -> t 
+[%%expect
+  {|
+type (_ : any) ignore = K1
+type t = ..
+type t += K : ('a : float64). 'a ignore -> t
+|}]
+type t1 : any
+type t2 : any mod separable
+type t3 : value_or_null
+type t4 : value
+type t5 : void
+type t6 : immediate64
+type t7 : immediate
+type t8 : float64
+type t9 : float32
+type t10 : word
+type t11 : bits32
+type t12 : bits64
+[%%expect
+  {|
+type t1 : any
+type t2 : any separable
+type t3 : value_or_null
+type t4
+type t5 : void
+type t6 : immediate64
+type t7 : immediate
+type t8 : float64
+type t9 : float32
+type t10 : word
+type t11 : bits32
+type t12 : bits64
+|}]
+type ('a, 'b : float64, 'c : any) t13
+[%%expect {|
+type ('a, 'b : float64, 'c : any) t13
+|}]
+type ('a, 'b : float64, 'c : any, 'd, 'e, 'f, 'g, 'h, 'i, 'j : bits64, 'k,
+  'l, 'm) t14
+[%%expect
+  {|
+type ('a, 'b : float64, 'c : any, 'd, 'e, 'f, 'g, 'h, 'i, 'j : bits64, 'k,
+      'l, 'm)
+     t14
+|}]
+type t15 : any non_pointer
+type t16 : value non_pointer
+type t17 : value & value non_pointer
+type t17b : (value & value) non_pointer
+[%%expect
+  {|
+type t15 : any non_pointer
+type t16 : value non_pointer
+type t17 : value & value non_pointer
+Line 4, characters 12-39:
+4 | type t17b : (value & value) non_pointer
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "value & value".
+
+type t17b : value & value
+|}]
+type ('a : value mod external_ stateless many unyielding non_float) t18 =
+  ('a : value mod immutable global)
+[%%expect {|
+type ('a : value mod everything non_float) t18 = 'a
+|}]
+type t = #(int * float#)
+let f xs = match xs with | #(x1, (y1 : float#)) -> #(x1, y1)
+[%%expect
+  {|
+type t = #(int * float#)
+val f : #('a * float#) -> #('a * float#) = <fun>
+|}]
+module M = struct type 'a t = 'a or_null[@@or_null_reexport ] end
+let x () = #(M.Null, (M.This "hi"))
+[%%expect
+  {|
+module M :
+  sig type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport] end @@
+  stateless
+val x : unit -> #('a M.t * string M.t) = <fun>
+|}]
+module Or_null_names = struct type 'a t =
+                                | Nope 
+                                | Yep of 'a [@@or_null ] end
+let y () = #(Or_null_names.Nope, (Or_null_names.Yep "hi"))
+[%%expect
+  {|
+module Or_null_names : sig type 'a t = Nope | Yep of 'a [@@or_null] end @@
+  stateless
+val y : unit -> #('a Or_null_names.t * string Or_null_names.t) = <fun>
+|}]
+external id : ('a : any) . 'a -> 'a = "%identity"[@@layout_poly ]
+[%%expect
+  {|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+|}]
+type packed1 =
+  | T1: ('a : float64) . 'a -> packed1 
+let f1 p = match p with | T1 (type (a : float64)) (_ : a) -> ()
+let f1_no_parens p = match p with | T1 (type (a : float64)) (_ : a) -> ()
+type packed2 =
+  | T2: 'a 'b . 'a * 'b -> packed2 
+let f2 p = match p with | T2 (type (a : value) b) (_ : (a * b)) -> ()
+let f3 p = match p with | T2 (type a (b : value)) (_ : (a * b)) -> ()
+let f4 p =
+  match p with | T2 (type (a : value) (b : value)) (_ : (a * b)) -> ()
+[%%expect
+  {|
+type packed1 = T1 : ('a : float64). 'a -> packed1
+val f1 : packed1 -> unit = <fun>
+val f1_no_parens : packed1 -> unit = <fun>
+type packed2 = T2 : 'a * 'b -> packed2
+val f2 : packed2 -> unit = <fun>
+val f3 : packed2 -> unit = <fun>
+val f4 : packed2 -> unit = <fun>
+|}]
+let f () = fun ()  : float# -> #0.
+[%%expect {|
+val f : unit -> unit -> float# = <fun>
+|}]
+let nums = [:x for x = 0 to 100:]
+let nums = [|x for x = 0 to 100|]
+let nums = [x for x = 0 to 100]
+[%%expect
+  {|
+val nums : int iarray =
+  [:0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
+    21; 22; 23; 24; 25; 26; 27; 28; 29; 30; 31; 32; 33; 34; 35; 36; 37; 38;
+    39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 52; 53; 54; 55; 56;
+    57; 58; 59; 60; 61; 62; 63; 64; 65; 66; 67; 68; 69; 70; 71; 72; 73; 74;
+    75; 76; 77; 78; 79; 80; 81; 82; 83; 84; 85; 86; 87; 88; 89; 90; 91; 92;
+    93; 94; 95; 96; 97; 98; 99; 100:]
+val nums : int array =
+  [|0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
+    21; 22; 23; 24; 25; 26; 27; 28; 29; 30; 31; 32; 33; 34; 35; 36; 37; 38;
+    39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 52; 53; 54; 55; 56;
+    57; 58; 59; 60; 61; 62; 63; 64; 65; 66; 67; 68; 69; 70; 71; 72; 73; 74;
+    75; 76; 77; 78; 79; 80; 81; 82; 83; 84; 85; 86; 87; 88; 89; 90; 91; 92;
+    93; 94; 95; 96; 97; 98; 99; 100|]
+val nums : int list =
+  [0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20;
+   21; 22; 23; 24; 25; 26; 27; 28; 29; 30; 31; 32; 33; 34; 35; 36; 37; 38;
+   39; 40; 41; 42; 43; 44; 45; 46; 47; 48; 49; 50; 51; 52; 53; 54; 55; 56;
+   57; 58; 59; 60; 61; 62; 63; 64; 65; 66; 67; 68; 69; 70; 71; 72; 73; 74;
+   75; 76; 77; 78; 79; 80; 81; 82; 83; 84; 85; 86; 87; 88; 89; 90; 91; 92;
+   93; 94; 95; 96; 97; 98; 99; 100]
+|}]
+let nums = [:x for x in [:1;2;3:]:]
+let nums = [|x for x in [|1;2;3|]|]
+let nums = [x for x in [1; 2; 3]]
+[%%expect
+  {|
+val nums : int iarray = [:1; 2; 3:]
+val nums : int array = [|1; 2; 3|]
+val nums : int list = [1; 2; 3]
+|}]
+let nums = [:x + y for x in [:1;2;3:] for y in [:4;5;6:] when (x + y) > 6:]
+let nums = [|x + y for x in [|1;2;3|] for y in [|4;5;6|] when (x + y) > 6|]
+let nums = [x + y for x in [1; 2; 3] for y in [4; 5; 6] when (x + y) > 6]
+let nums =
+  [|(n, m, x)
+    for n = 1 to 10
+      and m = 5 downto 0
+      when ((n + m) mod 3) = 0
+      for x in [|(1 + m);2;3|]
+      when (((n + m) + x) mod 2) = 0|]
+[%%expect
+  {|
+val nums : int iarray = [:7; 7; 8; 7; 8; 9:]
+val nums : int array = [|7; 7; 8; 7; 8; 9|]
+val nums : int list = [7; 7; 8; 7; 8; 9]
+val nums : (int * int * int) array =
+  [|(1, 5, 6); (1, 5, 2); (1, 2, 3); (1, 2, 3); (2, 4, 2); (2, 1, 3);
+    (3, 3, 4); (3, 3, 2); (3, 0, 1); (3, 0, 3); (4, 5, 3); (4, 2, 2);
+    (5, 4, 5); (5, 4, 3); (5, 1, 2); (5, 1, 2); (6, 3, 3); (6, 0, 2);
+    (7, 5, 6); (7, 5, 2); (7, 2, 3); (7, 2, 3); (8, 4, 2); (8, 1, 3);
+    (9, 3, 4); (9, 3, 2); (9, 0, 1); (9, 0, 3); (10, 5, 3); (10, 2, 2)|]
+|}]
+let nums =
+  (([((x)[@test.attr1 ]) for ((x)[@test.attr2 ]) in (([])[@test.attr3 ])])
+  [@test.attr4 ])
+[%%expect {|
+val nums : 'a list = []
+|}]
+let f ?x:(x @ local= 42)  ?x:(x @ local once portable= 42) 
+  ?x:(x : int @ local once portable= 42) 
+  ?x:(x : ('a -> 'a) @ local once portable= fun x -> x) 
+  ?x:(x : ('a : any) 'b . 'a @ local once portable= assert false) 
+  ?x:(x : ('a : any) 'b . ('a -> 'b @ once portable) @ local= assert false) 
+  ?x:(x : ('a : any) 'b . ('a -> 'b) @ local once portable= assert false) 
+  ?x:((y, z) @ local= 42)  ?x:((y, z) @ local once portable= 42) 
+  ?x:((y, z) : int @ local once portable= 42) 
+  ?x:((y, z) : ('a -> 'a) @ local once portable= 42) 
+  ?x:((y, z) : ('a : any) 'b . 'a @ local once portable= 42) 
+  ?x:((y, z) : ('a : any) 'b . ('a -> 'b @ once portable) @ local= 42) 
+  ?x:((y, z) : ('a : any) 'b . ('a -> 'b) @ local once portable= 42) 
+  ~x:(x @ local) ~x:(x @ local once portable)
+  ~x:(x : int @ local once portable)
+  ~x:(x : ('a -> 'a) @ local once portable)
+  ~x:(x : ('a : any) 'b . 'a @ local once portable)
+  ~x:(x : ('a : any) 'b . ('a -> 'b @ once portable) @ local)
+  ~x:(x : ('a : any) 'b . ('a -> 'b) @ local once portable)
+  ~x:((y, z) @ local) ~x:((y, z) @ local once portable)
+  ~x:((y, z) : int @ local once portable)
+  ~x:((y, z) : ('a -> 'a) @ local once portable)
+  ~x:((y, z) : ('a : any) 'b . 'a @ local once portable)
+  ~x:((y, z) : ('a : any) 'b . ('a -> 'b) @ local once portable)
+  ~x:((y, z) : ('a : any) 'b . ('a -> 'b @ once portable) @ local)
+  ((y, z) @ local) ((y, z) @ local once portable)
+  ((y, z) : int @ local once portable)
+  ((y, z) : ('a -> 'a) @ local once portable)
+  ((y, z) : ('a : any) 'b . 'a @ local once portable)
+  ((y, z) : ('a : any) 'b . ('a -> 'b) @ local once portable)
+  ((y, z) : ('a : any) 'b . ('a -> 'b @ once portable) @ local) = ()
+[%%expect
+  {|
+Line 5, characters 8-53:
+5 |       ?(local_ x : ('a : any) 'b . 'a @ once portable = assert false)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Optional parameters cannot be polymorphic
+|}]
+let g () =
+  let (f @ local) = 42 in
+  let (f @ local) a b  @ once portable= 42 in
+  let (f @ local) a b  : int @ once portable = 42 in
+  let (f @ local) a b  : (int -> int) @ once portable = 42 in
+  let (f @ local unique) = 42 in
+  let (f @ local unique) a b  @ once portable= 42 in
+  let (f @ local unique) a b  : int @ once portable = 42 in
+  let (f @ local unique) a b  : (int -> int) @ once portable = 42 in
+  let (a @ local once portable) = 42 in
+  let a : int @ local once portable = 42 in
+  let a : (int -> int) @ local once portable = 42 in
+  let a : ('a : any) 'b . 'a @ local once portable = 42 in
+  let a : ('a : any) 'b . ('a -> 'a @ once portable) @ local = 42 in
+  let a : ('a : any) 'b . ('a -> 'a) @ local once portable = 42 in
+  let a : type (a : any) b. int @ once portable = 42 in
+  let a : type (a : any) b. a -> b @ once portable = 42 in
+  let a : type (a : any) b. (a -> b) @ once portable = 42 in
+  let (a, b) @ once portable = 42 in
+  let (a, b) : int @ once portable = 42 in
+  let (a, b) : (int -> int) @ once portable = 42 in ()
+[%%expect
+  {|
+Line 5, characters 52-54:
+5 |   let local_ f a b : (int -> int) @ once portable = 42 in
+                                                        ^^
+Error: The constant "42" has type "int" but an expression was expected of type
+         "int -> int"
+|}]
+let g () =
+  exclave_ (let _f = (() : _ @ unique once) in
+            let _f = (() : @ unique once) in
+            let _f x y  @ local unique=
+              exclave_ (x + y : _ @ local once unique) in
+            let _f x y  @ local unique=
+              exclave_ (x + y : @ local once unique) in
+            ((() : _ @ unique once); (() : @ local unique once) : @ local) : @ local)
+[%%expect {|
+val g : unit -> unit @ local once = <fun>
+|}]
+type record =
+  {
+  field0: int @@ global ;
+  field1: int @@ global portable contended ;
+  field2: int @@ global portable contended ;
+  normal_field: int }
+[%%expect
+  {|
+type record = {
+  field0 : int @@ global;
+  field1 : int @@ global portable contended;
+  field2 : int @@ global portable contended;
+  normal_field : int;
+}
+|}]
+type 'a parameterized_record =
+  {
+  field0: 'a @@ global ;
+  field1: 'a @@ global portable contended ;
+  field2: 'a @@ global portable contended ;
+  normal_field: 'a }
+type t =
+  | Foo of int @@ global * int 
+  | Foo1 of int @@ global portable contended * int 
+  | Foo2 of int @@ global * int @@ global portable contended 
+  | Foo3 of int @@ global * int @@ portable contended 
+  | Foo4 of (int * int) @@ global portable contended 
+[%%expect
+  {|
+type 'a parameterized_record = {
+  field0 : 'a @@ global;
+  field1 : 'a @@ global portable contended;
+  field2 : 'a @@ global portable contended;
+  normal_field : 'a;
+}
+type t =
+    Foo of int @@ global * int
+  | Foo1 of int @@ global portable contended * int
+  | Foo2 of int @@ global * int @@ global portable contended
+  | Foo3 of int @@ global * int @@ portable contended
+  | Foo4 of (int * int) @@ global portable contended
+|}]
+type fn = int @ local portable contended -> int @ local portable contended
+type nested_fn =
+  (int @ local portable once -> int @ local portable once) @ portable once ->
+    int @ local portable once
+type ('a, 'b) labeled_fn =
+  a:'a @ local unique portable contended ->
+    ?b:'b @ local once portable contended ->
+      'a @ local contended portable ->
+        (int -> 'b @ local unique once) @ portable
+type typvar_fn = a:('a 'b . 'a) @ local unique portable contended -> unit
+[%%expect
+  {|
+type fn = int @ local portable contended -> int @ local portable contended
+type nested_fn =
+    (int @ local once portable -> int @ local once portable) @ once
+    portable -> int @ local once portable
+type ('a, 'b) labeled_fn =
+    a:'a @ local unique portable contended ->
+    ?b:'b @ local once portable contended ->
+    'a @ local portable contended ->
+    (int -> 'b @ local once unique) @ portable
+type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
+|}]
+let f ~x1:(x1 @ many) ~x2:(x2 : string @ local)
+  ~x3:(x3 : (string -> string) @ local) ~x4:(x4 : 'a . ('a -> 'a) @ local)
+  ~x9:(x9 : 'a . 'a @ local) ~x5:(x5 @ local)
+  ~x6:((true | false) @ local many) ~x7:((true | false) : bool @ local many)
+  ~x8:(() @ local) (_ : string @ global) (_ @ local) =
+  exclave_ (let (x9 @ local) = "hi" in
+            let x10 : string @ global = "hi" in
+            let x11 : int array @ local contended = [||] in
+            let (x13 @ global) = "hi" in
+            let (x14 @ local) y z = y + z in
+            let (x15 @ local) y z  : int = y + z in
+            let _ = ("hi" : string @ global) in
+            stack_ (x1, x2, x3, x4, x5, x9, x10, x11, x13, x14, x15) : @ local)
+[%%expect
+  {|
+val f :
+  x1:'b ->
+  x2:string @ local ->
+  x3:(string -> string) @ local ->
+  x4:('a. 'a -> 'a) @ local ->
+  x9:('a. 'a) @ local ->
+  x5:'c @ local ->
+  x6:bool @ local ->
+  x7:bool @ local ->
+  x8:unit @ local ->
+  string ->
+  'd @ local ->
+  'b * string * (string -> string) * ('e -> 'e) * 'c * string * string *
+  int array * string * (int -> (int -> int) @ local) *
+  (int -> (int -> int) @ local) @ local contended = <fun>
+|}]
+let f1 (_ @ local) = ()
+let f2 () = let (x @ local) = [1; 2; 3] in ((f1 x)[@nontail ])
+[%%expect
+  {|
+val f1 : 'a @ local -> unit = <fun>
+val f2 : unit -> unit = <fun>
+|}]
+module type S  =
+  sig
+    @@
+    portable contended
+    module type S0  =
+      sig
+        @@
+        portable contended
+        val x1 : string -> string @@ local
+        val x2 : string -> string @@ portable
+        val x3 : string -> string @@ nonportable
+      end
+    include S0
+    @@
+    portable many local
+  end
+[%%expect
+  {|
+module type S =
+  sig
+    module type S0 =
+      sig
+        val x1 : string -> string @@ portable contended
+        val x2 : string -> string @@ portable contended
+        val x3 : string -> string @@ contended
+      end
+    val x1 : string -> string @@ many portable contended
+    val x2 : string -> string @@ many portable contended
+    val x3 : string -> string @@ many portable contended
+  end
+|}]
+external x4 : string -> string @@ portable many = "%identity"
+[%%expect {|
+external x4 : string -> string @@ portable = "%identity"
+|}]
+type t =
+  | K1 of string @@ global * (float -> float) @@ many * string 
+  | K2: string @@ global * (float -> float) @@ many * string -> t 
+type t =
+  {
+  x: string @@ global ;
+  mutable y: float -> float @@ many ;
+  z: string @@ global many }
+type t1 = {
+  mutable x: float ;
+  mutable f: float -> float }
+type t2 =
+  {
+  mutable x: float @@ local once ;
+  mutable f: float -> float @@ local once }
+[%%expect
+  {|
+type t =
+    K1 of string @@ global * (float -> float) @@ many * string
+  | K2 : string @@ global * (float -> float) @@ many * string -> t
+type t = {
+  x : string @@ global;
+  mutable y : float -> float;
+  z : string @@ global many;
+}
+type t1 = { mutable x : float; mutable f : float -> float; }
+type t2 = {
+  mutable x : float @@ local once;
+  mutable f : float -> float @@ local once;
+}
+|}]
+let f1 (x @ local) (f @ once)  : t1 = exclave_ { x; f }
+[%%expect
+  {|
+Line 1, characters 48-49:
+1 | let f1 (x @ local) (f @ once) : t1 = exclave_ { x; f }
+                                                    ^
+Error: This value is "local"
+       but is expected to be "global"
+         because it is the field "x" (with some modality) of the record at line 1, characters 46-54.
+|}]
+let f2 (x @ local) (f @ once)  : t2 = exclave_ { x; f }
+[%%expect
+  {|
+val f2 : float @ local -> (float -> float) @ once -> t2 @ local once = <fun>
+|}]
+module type S  =
+  sig val bar : 'a -> 'a module M : sig val foo : 'a -> 'a end end
+module type S'  = sig include S @@ portable end
+[%%expect
+  {|
+module type S =
+  sig val bar : 'a -> 'a module M : sig val foo : 'a -> 'a end end
+module type S' =
+  sig
+    val bar : 'a -> 'a @@ portable
+    module M : sig val foo : 'a -> 'a @@ portable end
+  end
+|}]
+module type S  = sig  end
+module M = struct  end
+[%%expect {|
+module type S = sig end
+module M : sig end @@ stateless
+|}]
+module F(X:S @ portable) = struct  end
+[%%expect
+  {|
+module F : functor (X : S @ portable) -> sig end @@ stateless
+|}]
+module F(_:S @ portable) = struct  end
+[%%expect {|
+module F : S @ portable -> sig end @@ stateless
+|}]
+module M' : S @ portable = M 
+[%%expect {|
+module M' : S @@ stateless
+|}]
+module F(M:S @ portable) : S @ portable = struct  end 
+[%%expect {|
+module F : functor (M : S @ portable) -> S @@ stateless
+|}]
+module F(M:S @ portable) = (struct  end @ portable)
+[%%expect
+  {|
+module F : functor (M : S @ portable) -> sig end @@ stateless
+|}]
+module M' = (M @ portable)
+[%%expect {|
+module M' = M @@ stateless
+|}]
+module M' : S @ portable = M 
+[%%expect {|
+module M' : S @@ stateless
+|}]
+module M = (struct  end @ portable)
+[%%expect {|
+module M : sig end @@ stateless
+|}]
+module M : S @ portable = struct  end 
+[%%expect {|
+module M : S @@ stateless
+|}]
+module type S'  = () -> (M : S @ portable) -> S @ portable -> S @ portable
+[%%expect
+  {|
+module type S' =
+  functor () (M : S @ portable) -> S @ portable -> S @ portable
+|}]
+module type S'  = () -> S @ portable -> S @ portable -> S @ portable
+[%%expect
+  {|
+module type S' = functor () -> S @ portable -> S @ portable -> S @ portable
+|}]
+module type S'  = S @ local -> S -> S
+module type S''  = S @ local -> S -> S
+[%%expect
+  {|
+module type S' = S @ local -> S -> S
+module type S'' = S @ local -> S -> S
+|}]
+module F = (functor () -> struct  end @ portable)
+[%%expect {|
+module F : functor () -> sig end @@ stateless
+|}]
+module G = (functor () -> F @ portable)
+[%%expect
+  {|
+module G : functor () -> (functor () -> sig end) @ contended @@ portable
+|}]
+module G =
+  (functor (F : (S @ unique -> S @ once) @ local) ->
+    (struct  end @ contended) @ portable)
+[%%expect
+  {|
+module G :
+  functor (F : (S @ unique -> S @ once) @ local) -> sig end @ contended @@
+  stateless
+|}]
+module G' = (F @ portable)
+[%%expect {|
+module G' = F @@ stateless
+|}]
+module rec F @ portable = functor () -> struct  end
+ and G @ portable = functor () -> struct  end
+[%%expect
+  {|
+File "_none_", line 1:
+Error: Recursive modules require an explicit module type.
+|}]
+module type T  =
+  sig
+    module M : S @@ portable
+    module M = N @@ portable
+    module M = N @@ portable
+    module M0 : S @ portable -> (X : S @ portable) -> S @ portable
+    module M0 : S @ portable -> (X : S @ portable) -> S @ portable @@
+    portable
+    module M0 : S @ portable -> (X : S @ portable) -> S @ portable @@
+    portable
+    module M0 : S @ portable -> S @ portable -> S @ portable @@ portable
+    module rec F: sig  end @@ portable
+    and G: sig  end @@ portable
+  end
+[%%expect
+  {|
+Line 3, characters 13-14:
+3 |   module M = N @@ portable
+                 ^
+Error: Unbound module "N"
+|}]
+let foo () = let module F = (functor () -> struct  end @ portable) in ()
+[%%expect {|
+val foo : unit -> unit = <fun>
+|}]
+let f x = stack_ (ref x)
+[%%expect
+  {|
+Line 1, characters 10-24:
+1 | let f x = stack_ (ref x)
+              ^^^^^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+type t = {
+  a: int }
+let f a = let y = stack_ { a } in y.a
+[%%expect {|
+type t = { a : int; }
+val f : int -> int = <fun>
+|}]
+let apply ~f:(f @ local) x = ((f x)[@nontail ])
+let double1 y = ((apply ~f:(stack_ (fun x -> x + y)) y)[@nontail ])
+let double2 y = ((apply ~f:(stack_ (function | x -> x + y)) y)[@nontail ])
+[%%expect
+  {|
+val apply : f:('a -> 'b) @ local -> 'a -> 'b = <fun>
+val double1 : int -> int = <fun>
+val double2 : int -> int = <fun>
+|}]
+let make_tuple x y z = ((stack_ (x, y)), z)
+[%%expect
+  {|
+Line 1, characters 23-36:
+1 | let make_tuple x y z = stack_ (x, y), z
+                           ^^^^^^^^^^^^^
+Error: This value is "local" because it is "stack_"-allocated.
+       However, the highlighted expression is expected to be "global"
+         because it is an element of the tuple at line 1, characters 23-39
+         which is expected to be "global" because it is an allocation
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+type u =
+  | A of unit 
+  | C of int 
+  | B of int * int 
+  | D 
+let create_us () =
+  let a = stack_ (A ()) in
+  let b = stack_ (B (1, 2)) in
+  let c = stack_ (C 3) in let d = stack_ D in let e = stack_ a#b in ()
+[%%expect
+  {|
+type u = A of unit | C of int | B of int * int | D
+Line 7, characters 17-18:
+7 |   let d = stack_ D in
+                     ^
+Error: This expression is not an allocation site.
+|}]
+let unary_minus_plus () =
+  let x = 42 in
+  let a = stack_ (- x) in
+  let b = stack_ (-42) in
+  let c = stack_ 42 in let d = stack_ (+ x) in let e = stack_ 42 in ()
+[%%expect
+  {|
+Line 4, characters 17-22:
+4 |   let b = stack_ (-42) in
+                     ^^^^^
+Error: Stack allocating literals is not supported;
+       they are not allocated at runtime.
+|}]
+module F_struct(_:sig  end) = struct  end
+module type F_sig  = sig  end -> sig  end
+module T = struct include functor F_struct end
+module type S  = sig include functor F_sig end
+[%%expect
+  {|
+module F_struct : sig end -> sig end @@ stateless
+module type F_sig = sig end -> sig end
+module T : sig end @@ stateless
+module type S = sig end
+|}]
+let f x =
+  match x with
+  | [::] -> [::]
+  | (([:x:])[@test.attr1 ]) -> (([:x:])[@test.attr1 ])
+  | (([:x;y:])[@test.attr2 ][@test.attr3 ]) -> (([:x;y:])
+      [@test.attr2 ][@test.attr3 ])
+  | _ -> assert false
+[%%expect
+  {|
+val f : ('a : value_maybe_null). 'a iarray -> 'a iarray = <fun>
+|}]
+let (z, punned) = (4, 5)
+let x_must_be_even _ = assert false
+exception Odd 
+let x = (~x:1, ~y:2)
+let x = (((~x:1, ~y:2))[@test.attr ])
+let _ = (~x:5, 2, ~z, ~punned:(punned : int))
+let (x : (x:int * y:int)) = (~x:1, ~y:2)
+let (x : (((x:int * y:int))[@test.attr ])) = (~x:1, ~y:2)
+[%%expect
+  {|
+val z : int = 4
+val punned : int = 5
+val x_must_be_even : 'a -> 'b = <fun>
+exception Odd
+val x : x:int * y:int = (~x:1, ~y:2)
+val x : x:int * y:int = (~x:1, ~y:2)
+- : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+|}]
+let (~x:x0, ~s, ~y:(y : int), ..) : (x:int * s:string * y:int * string) =
+  (~x:1, ~s:"a", ~y:2, "ignore me")
+[%%expect
+  {|
+val x0 : int @@ stateless = 1
+val s : string @@ stateless = "a"
+val y : int @@ stateless = 2
+|}]
+module M :
+  sig
+    val f : (x:int * string) -> (x:int * string)
+    val mk : unit -> (x:bool * y:string)
+  end = struct let f x = x
+               let mk () = (~x:false, ~y:"hi") end 
+module X_int_int = struct type t = (x:int * int) end
+[%%expect
+  {|
+module M :
+  sig
+    val f : (x:int * string) -> x:int * string
+    val mk : unit -> x:bool * y:string
+  end @@ stateless
+module X_int_int : sig type t = x:int * int end @@ stateless
+|}]
+let foo xy k_good k_bad =
+  match x_must_be_even xy with
+  | (~x, y) -> k_good ()
+  | exception Odd -> k_bad ()
+let (~x:(x : int), ~y, _) = (~x:1, ~y:2, "ignore me")
+let (((~x:(x : int), ~y, _))[@test.attr ]) = (~x:1, ~y:2, "ignore me")
+let f (~foo, ~bar) = (foo * 10) + bar
+let f ((~x:(x : int), y) : (x:int * int))  : int = x + y
+[%%expect
+  {|
+val foo : 'a -> (unit -> 'b) -> (unit -> 'b) -> 'b = <fun>
+val x : int @@ stateless = 1
+val y : int = 2
+val x : int @@ stateless = 1
+val y : int = 2
+val f : (foo:int * bar:int) -> int = <fun>
+val f : (x:int * int) -> int = <fun>
+|}]
+type xy = (x:int * y:int)
+let lt = (~x:1, ~y:2, ~x2:3, 4)
+let matches = let (~x, ..) = lt in x
+let matches = let (~y, ~x, ..) = lt in (x, y)
+[%%expect
+  {|
+type xy = x:int * y:int
+val lt : x:int * y:int * x2:int * int = (~x:1, ~y:2, ~x2:3, 4)
+val matches : int = 1
+val matches : int * int = (1, 2)
+|}]
+module Float_u = Stdlib_upstream_compatible.Float_u
+module Int8_u = Stdlib_stable.Int8_u
+module Int16_u = Stdlib_stable.Int16_u
+module Int32_u = Stdlib_upstream_compatible.Int32_u
+module Int64_u = Stdlib_upstream_compatible.Int64_u
+module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
+[%%expect
+  {|
+module Float_u = Stdlib_upstream_compatible.Float_u
+module Int8_u = Stdlib_stable.Int8_u
+module Int16_u = Stdlib_stable.Int16_u
+module Int32_u = Stdlib_upstream_compatible.Int32_u
+module Int64_u = Stdlib_upstream_compatible.Int64_u
+module Nativeint_u = Stdlib_upstream_compatible.Nativeint_u
+module Int_u = Stdlib_stable.Int_u
+module Char_u = Stdlib_stable.Char_u
+|}]
+let test_float s f =
+  Format.printf "%s: %f\n" s (Float_u.to_float f); Format.print_flush ()
+let test_int8 s f =
+  Format.printf "%s: %d\n" s (Int8_u.to_int f); Format.print_flush ()
+let test_int16 s f =
+  Format.printf "%s: %d\n" s (Int16_u.to_int f); Format.print_flush ()
+let test_int32 s f =
+  Format.printf "%s: %ld\n" s (Int32_u.to_int32 f); Format.print_flush ()
+let test_int64 s f =
+  Format.printf "%s: %Ld\n" s (Int64_u.to_int64 f); Format.print_flush ()
+let test_int s f =
+  Format.printf "%s: %d\n" s (Int_u.to_int f); Format.print_flush ()
+let test_nativeint s f =
+  Format.printf "%s: %s\n" s (Nativeint_u.to_string f); Format.print_flush ()
+let test_char s f =
+  Format.printf "%s: %C\n" s (Char_u.to_char f); Format.print_flush ()
+[%%expect
+  {|
+val test_float : string -> Float_u.t -> unit = <fun>
+val test_int8 : string -> int8# -> unit = <fun>
+val test_int16 : string -> int16# -> unit = <fun>
+val test_int32 : string -> Int32_u.t -> unit = <fun>
+val test_int64 : string -> Int64_u.t -> unit = <fun>
+val test_int : string -> int# -> unit = <fun>
+val test_nativeint : string -> Nativeint_u.t -> unit = <fun>
+val test_char : string -> char# -> unit = <fun>
+|}]
+let x = test_float "e" #2.718281828459045
+let x = test_float "negative_one_half" (-#0.5)
+let x = test_float "negative_one_half" (-#0.5)
+let x = test_float "negative_one_half" (-#0.5)
+let x = test_float "negative_one_half" (-#0.5)
+let x = test_float "positive_one_dot" #1.
+let x = test_float "positive_one_dot" #1.
+let x = test_float "positive_one_dot" #1.
+let x = test_float "positive_one_dot" #1.
+let x = test_float "one_billion" #1e9
+let x = test_float "one_twenty_seven_point_two_five_in_floating_hex" #0x7f.4
+let x =
+  test_float "five_point_three_seven_five_in_floating_hexponent" #0xa.cp-1
+let x = test_nativeint "zero" #0n
+let x = test_int "zero" #0m
+let x = test_int8 "positive_one" #1s
+let x = test_int8 "positive_one" #1s
+let x = test_int16 "positive_one" #1S
+let x = test_int16 "positive_one" #1S
+let x = test_int32 "positive_one" #1l
+let x = test_int32 "positive_one" #1l
+let x = test_int64 "negative_one" (-#1L)
+let x = test_int64 "negative_one" (-#1L)
+let x = test_nativeint "two_fifty_five_in_hex" #0xFFn
+let x = test_int "ten_in_binary" #0b1010m
+let x = test_int8 "one_hundred_in_octal" #0o144s
+let x = test_int16 "two_hundred_in_hex" #0xC8S
+let x = test_int32 "twenty_five_in_octal" #0o31l
+let x = test_int64 "forty_two_in_binary" #0b101010L
+let x = test_char "untagged char" #'c'
+[%%expect
+  {|
+e: 2.718282
+val x : unit = ()
+negative_one_half: -0.500000
+val x : unit = ()
+negative_one_half: -0.500000
+val x : unit = ()
+negative_one_half: -0.500000
+val x : unit = ()
+negative_one_half: -0.500000
+val x : unit = ()
+positive_one_dot: 1.000000
+val x : unit = ()
+positive_one_dot: 1.000000
+val x : unit = ()
+positive_one_dot: 1.000000
+val x : unit = ()
+positive_one_dot: 1.000000
+val x : unit = ()
+one_billion: 1000000000.000000
+val x : unit = ()
+one_twenty_seven_point_two_five_in_floating_hex: 127.250000
+val x : unit = ()
+five_point_three_seven_five_in_floating_hexponent: 5.375000
+val x : unit = ()
+zero: 0
+val x : unit = ()
+zero: 0
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+positive_one: 1
+val x : unit = ()
+negative_one: -1
+val x : unit = ()
+negative_one: -1
+val x : unit = ()
+two_fifty_five_in_hex: 255
+val x : unit = ()
+ten_in_binary: 10
+val x : unit = ()
+one_hundred_in_octal: 100
+val x : unit = ()
+two_hundred_in_hex: 200
+val x : unit = ()
+twenty_five_in_octal: 25
+val x : unit = ()
+forty_two_in_binary: 42
+val x : unit = ()
+untagged char: 'c'
+val x : unit = ()
+|}]
+let f x = match x with | #4. -> `Four | #5. -> `Five | _ -> `Other
+let x = match f #5. with | `Five -> () | _ -> assert false
+let f x = match x with | #4. -> #0. | #5. -> #1. | x -> x
+[%%expect
+  {|
+val f : float# -> [> `Five | `Four | `Other ] = <fun>
+val x : unit = ()
+val f : float# -> float# = <fun>
+|}]
+;;test_float "result" (f #7.)
+let f x =
+  match x with
+  | #4. -> #0.
+  | #5. -> #1.
+  | #6. -> #2.
+  | #7. -> #3.
+  | #8. -> #4.
+  | #9. -> #5.
+  | #10. -> #6.
+  | #11. -> #7.
+  | x -> x
+;;test_float "larger match result" (f #7.)
+let f x = match x with | #4L -> `Four | #5L -> `Five | _ -> `Other
+[%%expect
+  {|
+result: 7.000000
+- : unit = ()
+val f : float# -> float# = <fun>
+larger match result: 3.000000
+- : unit = ()
+val f : int64# -> [> `Five | `Four | `Other ] = <fun>
+|}]
+let x = match f #4L with | `Four -> () | _ -> assert false
+let f x = match x with | #4L -> #0L | #5L -> #1L | x -> x
+;;test_int64 "result" (f #7L)
+[%%expect
+  {|
+val x : unit = ()
+val f : int64# -> int64# = <fun>
+result: 7
+- : unit = ()
+|}]
+let x = match #'c' with | #'a'..#'z' -> 10 | _ -> 20
+[%%expect {|
+val x : int = 10
+|}]
+type 'a boxed_with_idx = {
+  data: 'a ;
+  i: int }
+type 'a with_idx : value & immediate = 'a boxed_with_idx# =
+  #{
+  data: 'a ;
+  i: int }
+let idx #{ data = _; i } = i
+let #{ data = payload;_} = #{ data = "payload"; i = 0 }
+let inc r = #{ r with i = (r.#i + 1) }
+[%%expect
+  {|
+type 'a boxed_with_idx = { data : 'a; i : int; }
+type 'a with_idx = 'a boxed_with_idx# = #{ data : 'a; i : int; }
+val idx : 'a with_idx -> int = <fun>
+val payload : string = "payload"
+val inc : 'a with_idx -> 'a with_idx = <fun>
+|}]
+type 'a r = {
+  foo: 'a }
+let idx_r () = (.foo)
+let idx_r_r () = (.foo.#foo)
+[%%expect
+  {|
+type 'a r = { foo : 'a; }
+val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
+val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
+|}]
+type 'a s = {
+  a: 'a ;
+  mutable b: 'a ;
+  mutable c: 'a [@atomic ]}
+let idx_a = (.a)
+let idx_b = (.b)
+let idx_c = (.c)
+[%%expect
+  {|
+type 'a s = { a : 'a; mutable b : 'a; mutable c : 'a [@atomic]; }
+val idx_a : ('a s, 'a) idx_imm = <abstr>
+val idx_b : ('a s, 'a) idx_mut = <abstr>
+val idx_c : ('a s, 'a) idx_atomic = <abstr>
+|}]
+let idx_a' = (.idx_imm(idx_a).#foo)
+let idx_b' = (.idx_mut(idx_b).#foo)
+let idx_c' = (.idx_atomic(idx_c).#foo)
+[%%expect
+  {|
+val idx_a' : ('a r# s, 'a) idx_imm = <abstr>
+val idx_b' : ('a r# s, 'a) idx_mut = <abstr>
+val idx_c' : ('a r# s, 'a) idx_atomic = <abstr>
+|}]
+module Borrow =
+  struct
+    let f () = let x = "hello" in let y = borrow_ x in ()
+    let g x y = String.concat (borrow_ x) (borrow_ y)
+    let h x = match borrow_ x with | true -> () | false -> ()
+  end
+[%%expect
+  {|
+Line 8, characters 18-29:
+8 |     String.concat (borrow_ x) (borrow_ y)
+                      ^^^^^^^^^^^
+Error: This value is "local" because it is borrowed.
+       However, the highlighted expression is expected to be "global".
+|}]
+type 'a list : immutable_data with 'a
+type ('a, 'b) either : immutable_data with ('a * 'b)
+type 'a contended : immutable_data with 'a @@ contended
+type 'a contended_with_int : (immutable_data with 'a @@ contended) with int
+[%%expect
+  {|
+type 'a list : immutable_data with 'a
+type ('a, 'b) either : immutable_data with 'a with 'b
+type 'a contended : immutable_data with 'a @@ contended
+type 'a contended_with_int : immutable_data with 'a @@ contended
+|}]
+type 'a abstract
+type existential_abstract : immutable_data with ((type : value mod portable))
+                                                  abstract =
+  | Mk: ('a : value mod portable) abstract -> existential_abstract 
+[%%expect
+  {|
+type 'a abstract
+type existential_abstract =
+    Mk : ('a : value mod portable). 'a abstract -> existential_abstract
+|}]
+module M :
+  sig
+    kind_ immediate = value mod global many
+    kind_ immutable_data = value mod many
+    kind_ immutable = value
+    kind_ data = value mod many
+    kind_ abstract
+  end =
+  struct
+    kind_ immediate = value mod global many
+    kind_ immutable_data = value mod many
+    kind_ immutable = value
+    kind_ data = value mod many
+    kind_ abstract
+  end 
+[%%expect
+  {|
+module M :
+  sig
+    kind_ immediate = value mod global many
+    kind_ immutable_data = value mod many
+    kind_ immutable = value
+    kind_ data = value mod many
+    kind_ abstract
+  end @@ stateless
+|}]
+module type S  = sig kind_ k end
+module type S1  = S with kind_ k =  value mod portable
+module type S2  = S with kind_ k :=  value mod global
+[%%expect
+  {|
+module type S = sig kind_ k end
+module type S1 = sig kind_ k = value mod portable end
+module type S2 = sig end
+|}]
+module _ : sig type 'a gel : (kind_of_ 'a) mod global type 'a t : _ end =
+  struct type 'a gel : (kind_of_ 'a) mod global
+         type 'a t : _ end 
+[%%expect
+  {|
+Line 5, characters 16-27:
+5 |   type 'a gel : kind_of_ 'a mod global
+                    ^^^^^^^^^^^
+Error: Unimplemented kind syntax
+|}]
+type t = ('a . 'a -> 'a) -> int
+let f (_ : 'a . 'a -> 'a) = ()
+[%%expect
+  {|
+type t = ('a. 'a -> 'a) -> int
+val f : ('a. 'a -> 'a) -> unit = <fun>
+|}]
+module type S  = sig type t1 type t2 type t3 end
+module M = struct type t1 = int
+                  type t2 =
+                    | K of string 
+                  type t3 end
+module type S2  = S with M
+[%%expect
+  {|
+module type S = sig type t1 type t2 type t3 end
+module M : sig type t1 = int type t2 = K of string type t3 end @@ stateless
+module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
+|}]
+type t1 = float32
+type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
+let x = 3.14s
+let x () = #3.14s
+let y = 42s
+let y () = #42s
+let z = 42S
+let z () = #42S
+[%%expect
+  {|
+type t1 = float32
+type t2 = float32#
+type t3 = int8
+type t4 = int8#
+type t5 = int16
+type t6 = int16#
+val x : float32 = 3.1400001s
+val x : unit -> float32# = <fun>
+val y : int8 = 42s
+val y : unit -> int8# = <fun>
+val z : int16 = 42S
+val z : unit -> int16# = <fun>
+|}]
+type t1 = int8x16
+type t2 = int16x8
+type t3 = int32x4
+type t4 = int64x2
+type t5 = float32x4
+type t6 = float64x2
+[%%expect
+  {|
+type t1 = int8x16
+type t2 = int16x8
+type t3 = int32x4
+type t4 = int64x2
+type t5 = float32x4
+type t6 = float64x2
+|}]
+let f (x : bool) = (((x : int))[@error_message "custom message"])
+[%%expect
+  {|
+Line 1, characters 20-21:
+1 | let f (x : bool) = (x : int)[@error_message "custom message"]
+                        ^
+Error: The value "x" has type "bool" but an expression was expected of type
+         "int"
+       custom message
+|}]
+let f (v : float#)  : (((_ : value))[@error_message "need a value"]) = v
+[%%expect
+  {|
+Line 1, characters 68-69:
+1 | let f (v : float#) : ((_ : value)[@error_message "need a value"]) = v
+                                                                        ^
+Error: The value "v" has type "float#" but an expression was expected of type
+         "('a : value)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because of the annotation on the wildcard _ at line 1, characters 22-33.
+         need a value
+|}]
+module Base(_:sig  end)(_:sig  end)(_:sig  end)(_:sig  end) = struct  end
+module Name1 = struct  end
+module Name2 = struct  end
+module Value1 = struct  end
+module Value2(_:sig  end)(_:sig  end) = struct  end
+module Name2_1 = struct  end
+module Name2_1 = struct  end
+module _ =
+  (Base (Name1) (Value1) (Name2) (Value2 (Name2_1) (Value2_1)) [@jane.non_erasable.instances])
+[%%expect
+  {|
+module Base : sig end -> sig end -> sig end -> sig end -> sig end @@
+  stateless
+module Name1 : sig end @@ stateless
+module Name2 : sig end @@ stateless
+module Value1 : sig end @@ stateless
+module Value2 : sig end -> sig end -> sig end @@ stateless
+module Name2_1 : sig end @@ stateless
+module Name2_1 : sig end @@ stateless
+Line 9, characters 11-95:
+9 | module _ = Base(Name1)(Value1)(Name2)(Value2(Name2_1)(Value2_1)) [@jane.non_erasable.instances]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Unbound module "Base[Name1:Value1][Name2:Value2[Name2_1:Value2_1]]"
+|}]
+let overwrite_tuple = function | (a, b) as t -> overwrite_ t with (b, (_))
+type record = {
+  a: int ;
+  b: int }
+let overwrite_record =
+  function | { a; b } as t -> overwrite_ t with { b = a; a = (_) }
+let overwrite_record =
+  function | { a; b } as t -> overwrite_ t with { b = a }
+let ret_record () = { a = 1; b = 2 }
+let overwrite_record () = overwrite_ (ret_record ()) with { b = a }
+type constructor =
+  | C of {
+  a: int ;
+  b: int } 
+let overwrite_constructor =
+  function | C { a; b } as t -> overwrite_ t with (C { b = a; a = (_) })
+let overwrite_constructor =
+  function | C { a; b } as t -> overwrite_ t with (C { b = a })
+[%%expect
+  {|
+Line 2, characters 19-43:
+2 |     (a, b) as t -> overwrite_ t with (b, _)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^
+Alert Translcore: Overwrite not implemented.
+>> Fatal error: Location.todo_overwrite_not_implemented
+Uncaught exception: Misc.Fatal_error
+
+|}]
+let f ~x:(x : [%call_pos ]) () = x
+[%%expect {|
+val f : x:[%call_pos] -> unit -> lexing_position = <fun>
+|}]
+type t = x:[%call_pos ] -> int
+[%%expect {|
+type t = x:[%call_pos] -> int
+|}]
+let f g here = g ~here:(here : [%call_pos ])
+[%%expect
+  {|
+val f : (here:[%call_pos] -> 'a) -> lexing_position -> 'a = <fun>
+|}]
+let triangle_10 =
+  let mutable x = 0 in for i = 1 to 10 do x <- x + i done; (x : int)
+[%%expect {|
+val triangle_10 : int = 55
+|}]
+type 'a[@foo ] t
+[%%expect {|
+type 'a t
+|}]
+type ('a[@foo ] : any) t
+[%%expect {|
+type ('a : any) t
+|}]
+type _[@foo ] t
+[%%expect {|
+type _ t
+|}]
+type (_[@foo ] : any) t
+[%%expect {|
+type (_ : any) t
+|}]
+type ('a, 'b[@foo ]) t
+[%%expect {|
+type ('a, 'b) t
+|}]
+type ('a, 'b[@foo ] : any) t
+[%%expect {|
+type ('a, 'b : any) t
+|}]
+type ('a, _[@foo ]) t
+[%%expect {|
+type ('a, _) t
+|}]
+type ('a, _[@foo ] : any) t
+[%%expect {|
+type ('a, _ : any) t
+|}]
+module Foo = struct  end
+module type S  = sig module Foo = Foo[@foo ] @@ nonportable end
+[%%expect
+  {|
+module Foo : sig end @@ stateless
+module type S = sig module Foo = Foo end
+|}]
+module type S  = sig module Bar = Bar[@foo ] @@ nonportable end
+[%%expect
+  {|
+Line 2, characters 15-18:
+2 |   module Bar = Bar [@foo] @@ nonportable
+                   ^^^
+Error: Unbound module "Bar"
+|}]
+let f #() = #()
+[%%expect {|
+val f : unit# -> unit# = <fun>
+|}]
+let f = function | #false -> #true | #true -> #false
+[%%expect {|
+val f : bool# -> bool# = <fun>
+|}]
+let f (_ : (repr_ 'a) (repr_ 'b) . 'a -> 'b -> unit) = ()
+[%%expect
+  {|
+val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
+|}]
+let poly_ id : 'a . 'a -> 'a = fun x -> x
+[%%expect
+  {|
+Line 1, characters 10-12:
+1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
+              ^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+let poly_ id x = x
+[%%expect {|
+val poly_ id : 'a -> 'a = <lpoly>
+|}]
+let poly_ const : 'a 'b . 'a -> 'b -> 'a = fun x _ -> x
+[%%expect
+  {|
+Line 1, characters 10-15:
+1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^^^^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+module type S_poly  =
+  sig
+    val poly_ f : 'a . 'a -> 'a
+    val poly_ g : 'a 'b . 'a -> 'b -> 'c -> 'a
+    val poly_ h : 'a -> 'b -> 'a
+  end
+[%%expect
+  {|
+Line 2, characters 16-28:
+2 |   val poly_ f : 'a. 'a -> 'a
+                    ^^^^^^^^^^^^
+Warning 219: This value description has no layout-polymorphic type variables,
+  so "poly_" has no effect. Consider using a regular "val" instead.
+
+module type S_poly =
+  sig
+    val f : 'a -> 'a
+    val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+    val poly_ h : 'a -> 'b -> 'a
+  end
+|}]
+let poly_ f : 'a . 'a -> 'a = fun x -> x
+and poly_ g : 'a 'b . 'a -> 'b -> 'a = fun x _ -> x
+[%%expect
+  {|
+Line 2, characters 10-11:
+2 | and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+let poly_ f : 'a . 'a -> 'a = fun x -> x
+and g x = x
+[%%expect
+  {|
+Line 2, characters 0-18:
+2 | and g = fun x -> x
+    ^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+let h x = x
+and poly_ k : 'a . 'a -> 'a = fun x -> x
+[%%expect
+  {|
+Line 2, characters 0-39:
+2 | and poly_ k : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+let m x = x
+and poly_ n : 'a . 'a -> 'a = fun x -> x
+and p x = x
+[%%expect
+  {|
+Line 2, characters 0-39:
+2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
+|}]
+module type S  = sig val f : layout_ x y. ('a : x) ('b : y) . 'a -> 'b end
+[%%expect {|
+module type S = sig val poly_ f : 'a -> 'b end
+|}]
+let f ((x : int)[@test.attr ]) = x
+[%%expect {|
+val f : int -> int = <fun>
+|}]
+let f ~l:((x : int)[@test.attr ]) = x
+[%%expect {|
+val f : l:int -> int = <fun>
+|}]
+let f ?l:((x : int option)[@test.attr ])  () = x
+[%%expect {|
+val f : ?l:int -> unit -> int option = <fun>
+|}]
+let f ?l:((x : int)[@test.attr ]= 0)  () = x
+[%%expect {|
+val f : ?l:int -> unit -> int = <fun>
+|}]
+let f ((x : int @ local)[@test.attr ]) = x
+[%%expect {|
+val f : int @ local -> int = <fun>
+|}]
+let f ~l:((x : int @ local)[@test.attr ]) = x
+[%%expect {|
+val f : l:int @ local -> int = <fun>
+|}]
+
+=====================================================
