@@ -113,7 +113,7 @@ Line 1, characters 0-49:
 1 | type t : value mod dynamic = A of int [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "t" is immediate
-         because it's an unboxed variant type.
+         because it's an @@unboxed variant type.
        But the kind of type "t" must be a subkind of value mod dynamic
          because of the annotation on the declaration of the type t.
 |}]

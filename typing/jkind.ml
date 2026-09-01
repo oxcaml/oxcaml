@@ -3343,7 +3343,7 @@ module Format_history = struct
     | Class_field -> fprintf ppf "it's the type of a class field"
     | Boxed_record -> fprintf ppf "it's a boxed record type"
     | Boxed_variant -> fprintf ppf "it's a boxed variant type"
-    | Unboxed_variant -> fprintf ppf "it's an unboxed variant type"
+    | Unboxed_variant -> fprintf ppf "it's an @@@@unboxed variant type"
     | At_at_unboxed_record -> fprintf ppf "it's an @@@@unboxed record type"
     | Boxed -> fprintf ppf "it's a boxed type"
     | Extensible_variant -> fprintf ppf "it's an extensible variant type"

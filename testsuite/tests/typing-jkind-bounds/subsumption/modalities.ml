@@ -773,7 +773,7 @@ Line 1, characters 0-91:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "packed_not_portable" is
            value mod everything mod dynamic with (type : value) t
-         because it's an unboxed variant type.
+         because it's an @@unboxed variant type.
        But the kind of type "packed_not_portable" must be a subkind of
            value mod portable
          because of the annotation on the declaration of the type packed_not_portable.
