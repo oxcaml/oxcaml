@@ -978,12 +978,12 @@ let rec uid_of_result ~traverse_aliases = function
       ( alias_uid,
         (( Resolved_alias (Compilation_unit comp_unit', _)
          | Resolved (Compilation_unit comp_unit') ) as rest) )
-    when (match module_name_of_uid alias_uid with
+    when match module_name_of_uid alias_uid with
          | None -> false
          | Some comp_unit ->
            let by = comp_unit ^ "__" in
            String.is_prefixed ~by
-             (Compilation_unit.full_path_as_string comp_unit')) ->
+             (Compilation_unit.full_path_as_string comp_unit') ->
     (* Always traverse dune-wrapper aliases *)
     log ~title:"uid_of_result" "Traversing wrapping alias: %s"
       (Compilation_unit.full_path_as_string comp_unit');

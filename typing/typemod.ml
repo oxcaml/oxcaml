@@ -4846,7 +4846,8 @@ let functorize_signature ~params ~modules : Types.signature =
       (fun (p_name, param_id) body ->
         let impl, param_params, (swg : Signature_with_global_bindings.t) =
           Env.find_import ~chain:[]
-            (p_name : Global_module.Parameter_name.t :> CUI.t)
+            (CUI.Found.without_cmi_path
+               (p_name : Global_module.Parameter_name.t :> CUI.t))
         in
         assert (Option.is_none impl);
         assert (List.is_empty param_params);

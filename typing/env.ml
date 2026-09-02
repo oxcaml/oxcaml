@@ -1871,7 +1871,7 @@ let add_required_global_for_quote path env =
   begin match Ident.to_global (Path.head path) with
   | None -> ()
   | Some global ->
-    let name = global.Global_module.Name.head in
+    let name = CUI.Found.intf global.Global_module.Name.head in
     if Current_unit.is_intf name
     then begin
       (* The current compilation unit appears in quotes.
@@ -2178,7 +2178,8 @@ let same_types env1 env2 =
 
 let used_persistent () =
   Persistent_env.fold !persistent_env
-    (fun (s : Global_module.Name.t) _m r -> CUI.Set.add s.head r)
+    (fun (s : Global_module.Name.t) _m r ->
+       CUI.Set.add (CUI.Found.intf s.head) r)
     CUI.Set.empty
 
 let find_all_comps wrap proj s (p, mda) =
@@ -3306,7 +3307,8 @@ let read_signature modname cmi =
 
 let find_import ~chain modname =
   try Persistent_env.find_import !persistent_env modname
-  with Not_found -> error (Cmi_not_found { modname; chain })
+  with Not_found ->
+    error (Cmi_not_found { modname = CUI.Found.intf modname; chain })
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
