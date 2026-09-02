@@ -530,7 +530,7 @@ let unsigned_compare x y = Int64_u.unsigned_compare x y
 unsigned_compare:
   movabsq $-9223372036854775808, %rdi
   subq  %rdi, %rbx
-  movabsq $-9223372036854775808, %rsi
+  movq  %rdi, %rsi
   movq  %rax, %rdi
   subq  %rsi, %rdi
   movq  $-1, %rsi

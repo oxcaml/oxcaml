@@ -89,6 +89,23 @@ type known_value =
   | Const_float32 of int32
   | Const_float of int64
 
+module Nativeint_tbl = Hashtbl.Make (struct
+  type t = nativeint
+
+  let equal = Nativeint.equal
+
+  let hash = Hashtbl.hash
+end)
+
+(* Tells whether the materialization of a constant is expensive enough that
+   replacing it with a register-to-register move is worthwhile. Constants that
+   fit in 32 bits (signed) are materialized by a single cheap instruction on all
+   supported targets (and rewriting the materialization of zero would defeat
+   idioms such as `xor` on amd64); wider constants require more expensive
+   sequences (e.g. `movabsq` on amd64, `movz`/`movk` chains on arm64). *)
+let is_expensive_constant (c : nativeint) : bool =
+  not (Nativeint.equal c (Nativeint.of_int32 (Nativeint.to_int32 c)))
+
 let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
   let is_valid_shift =
     Nativeint.compare right 0n >= 0
@@ -151,17 +168,63 @@ let find_unique_index : 'a array -> f:('a -> bool) -> int option =
    been executed. Currently only tracks constant values, moves between
    registers, basic integer arithmetic, and basic float64 arithmetic over known
    values. Deletes moves deemed to be useless given the information in
-   `known_values`. *)
+   `known_values`, and rewrites the materialization of a constant into a
+   register-to-register move when the constant is statically known to be already
+   available in another register. *)
 let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
     known_value Reg.UsingLocEquality.Tbl.t =
   let known_values = Reg.UsingLocEquality.Tbl.create 17 in
-  let replace reg value =
-    if not (Reg.is_unknown reg)
-    then Reg.UsingLocEquality.Tbl.replace known_values reg value
-    else Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.reg reg
+  (* Reverse map of the `Const_int` entries of `known_values`: from a constant
+     to the registers currently known to hold it. The two tables are kept in
+     sync; `regs_holding_int` is used to rewrite the materialization of a
+     constant into a register-to-register move when the constant is already
+     available in another register. *)
+  let regs_holding_int : Reg.t list Nativeint_tbl.t = Nativeint_tbl.create 17 in
+  let forget_value (reg : Reg.t) (value : known_value) =
+    match value with
+    | Const_int c ->
+      begin match Nativeint_tbl.find_opt regs_holding_int c with
+      | None -> ()
+      | Some regs ->
+        begin match
+          List.filter (fun (r : Reg.t) -> not (Reg.same_loc r reg)) regs
+        with
+        | [] -> Nativeint_tbl.remove regs_holding_int c
+        | regs -> Nativeint_tbl.replace regs_holding_int c regs
+        end
+      end
+    | Const_float32 _ | Const_float _ -> ()
+  in
+  let record_value (reg : Reg.t) (value : known_value) =
+    match value with
+    | Const_int c ->
+      let regs =
+        match Nativeint_tbl.find_opt regs_holding_int c with
+        | None -> []
+        | Some regs -> regs
+      in
+      Nativeint_tbl.replace regs_holding_int c (reg :: regs)
+    | Const_float32 _ | Const_float _ -> ()
   in
   let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
-  let remove reg = Reg.UsingLocEquality.Tbl.remove known_values reg in
+  let replace reg value =
+    if not (Reg.is_unknown reg)
+    then begin
+      (match find_opt reg with
+      | Some old_value -> forget_value reg old_value
+      | None -> ());
+      record_value reg value;
+      Reg.UsingLocEquality.Tbl.replace known_values reg value
+    end
+    else Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.reg reg
+  in
+  let remove reg =
+    match find_opt reg with
+    | None -> ()
+    | Some old_value ->
+      forget_value reg old_value;
+      Reg.UsingLocEquality.Tbl.remove known_values reg
+  in
   (* Deletes the instruction in [cell] if all it does is write [value] to [dst]
      while [dst] is already known to contain [value]; returns whether the
      instruction was deleted. Only integer constants are considered. Deleting
@@ -193,8 +256,27 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         let is_destroyed =
           Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
         in
-        if is_destroyed then None else Some known_value)
+        if is_destroyed
+        then begin
+          forget_value reg known_value;
+          None
+        end
+        else Some known_value)
       known_values
+  in
+  let find_move_source (c : nativeint) ~(dst : Reg.t) : Reg.t option =
+    if is_expensive_constant c && Reg.is_reg dst
+    then
+      match Nativeint_tbl.find_opt regs_holding_int c with
+      | None -> None
+      | Some regs ->
+        List.find_opt
+          (fun (reg : Reg.t) ->
+            Reg.is_reg reg
+            && (not (Reg.same_loc reg dst))
+            && Cmm.equal_machtype_component reg.typ dst.typ)
+          regs
+    else None
   in
   let infer_known_values_from_predecessor () =
     (* When there is only one predecessor, we can sometimes infer the value of a
@@ -291,7 +373,22 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
       match instr.desc with
       | Op (Const_int c) ->
         if not (delete_if_redundant cell instr.res.(0) (Const_int c))
-        then replace instr.res.(0) (Const_int c)
+        then
+          begin match find_move_source c ~dst:instr.res.(0) with
+          | Some src ->
+            (* The constant is expensive to materialize but is already available
+               in `src`: rewrite the materialization into a register-to-register
+               move. As for the deletion performed by `delete_if_redundant`, the
+               (unchanged) `live` fields become an under-approximation of actual
+               liveness (`src` now carries its value to this new use across
+               instructions whose `live` sets may not mention it), which is safe
+               for the same reasons, `src` being an integer register holding a
+               compile-time integer constant. *)
+            Dll.set_value cell
+              { instr with desc = Cfg.Op Move; arg = [| src |] };
+            replace instr.res.(0) (Const_int c)
+          | None -> replace instr.res.(0) (Const_int c)
+          end
       | Op (Const_float32 c) ->
         if !Oxcaml_flags.cfg_value_propagation_float
         then replace instr.res.(0) (Const_float32 c)
@@ -347,9 +444,7 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
           | Domain_index )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
-        Array.iter
-          (fun reg -> Reg.UsingLocEquality.Tbl.remove known_values reg)
-          instr.res;
+        Array.iter remove instr.res;
         remove_destroyed instr);
   known_values
 
