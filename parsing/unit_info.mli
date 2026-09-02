@@ -92,6 +92,10 @@ val prefix: t -> file_prefix
     or compilation artifact.*)
 val modname: t -> Compilation_unit.t
 
+(** [intf u] is the name of the interface (.cmi) of the unit, derived from the
+    output prefix. *)
+val intf: t -> Compilation_unit_intf.t
+
 (** [kind u] is the kind (interface or implementation) of the unit. *)
 val kind: t -> intf_or_impl
 
@@ -157,6 +161,10 @@ module Artifact: sig
 
    (** [modname a] is the module name of the compilation artifact.*)
    val modname: t -> Compilation_unit.t
+
+   (** [intf a] is the name of the interface (.cmi) associated with the
+       artifact, derived from its file name. *)
+   val intf: t -> Compilation_unit_intf.t
 
    (** [from_filename ~for_pack_prefix filename] reconstructs the module name
        [lax_modname_from_source filename] associated to the artifact [filename],

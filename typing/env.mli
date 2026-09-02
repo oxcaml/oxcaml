@@ -637,7 +637,8 @@ val save_signature:
 val save_signature_with_imports:
   alerts:alerts -> signature * Mode.Staticity.Const.t
   -> Compilation_unit_intf.t -> Cmi_format.kind
-  -> Unit_info.Artifact.t -> Import_info.t array -> Cmi_format.cmi_infos_lazy
+  -> Unit_info.Artifact.t -> Import_info.Intf.t array
+  -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind,
            file name, imported units with their CRCs. *)
 
@@ -656,10 +657,10 @@ val register_parameter: Global_module.Parameter_name.t -> unit
 val crc_of_unit: Compilation_unit_intf.t -> Digest.t
 
 (* Return the set of compilation units imported, with their CRC *)
-val imports: unit -> Import_info.t list
+val imports: unit -> Import_info.Intf.t list
 
 (* may raise Persistent_env.Consistbl.Inconsistency *)
-val import_crcs: source:string -> Import_info.t array -> unit
+val import_crcs: source:string -> Import_info.Intf.t array -> unit
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
