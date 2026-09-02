@@ -54,7 +54,7 @@ module Serialized = Types.Make_wrapped(struct type 'a t = int end)
 type crcs = Import_info.t array  (* smaller on disk than using a list *)
 type flags = pers_flags list
 type header = {
-    header_name : Compilation_unit.Name.t;
+    header_name : Compilation_unit_intf.t;
     header_kind : kind;
     header_globals : Global_module.With_precision.t array;
     header_sign : Serialized.signature * Mode.Staticity.Const.t;
@@ -62,7 +62,7 @@ type header = {
 }
 
 type 'sg cmi_infos_generic = {
-    cmi_name : Compilation_unit.Name.t;
+    cmi_name : Compilation_unit_intf.t;
     cmi_kind : kind;
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg * Mode.Staticity.Const.t;
@@ -244,8 +244,8 @@ let output_cmi filename oc cmi =
   let crc = Digest.file filename in
   let my_info =
     match cmi.cmi_kind with
-    | Normal { cmi_impl } ->
-      Import_info.Intf.create_normal cmi.cmi_name cmi_impl ~crc
+    | Normal _ ->
+      Import_info.Intf.create_normal cmi.cmi_name ~crc
     | Parameter ->
       Import_info.Intf.create_parameter cmi.cmi_name ~crc
   in
