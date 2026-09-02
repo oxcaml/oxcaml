@@ -4814,7 +4814,7 @@ type transl_value_decl_modal =
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
-  let mode, val_modalities, val_modal_info =
+  let mode, val_modalities, val_modal_info, curry_mode =
     match modal with
     | Str_primitive ->
         assert (not valdecl.pval_poly);
@@ -4829,7 +4829,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in
-        mode, Mode.Modality.undefined, Valmi_str_primitive modes
+        mode, Mode.Modality.undefined, Valmi_str_primitive modes,
+        Mode.Alloc.Const.legacy
     | Sig_value (md_mode, sig_modalities) ->
         if valdecl.pval_poly then begin
           Language_extension.assert_enabled ~loc Layout_poly
@@ -4842,13 +4843,18 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let modalities =
           Mode.Modality.of_const raw_modalities.moda_modalities
         in
-        md_mode, modalities, Valmi_sig_value raw_modalities
+        let curry_mode =
+          Mode.Modality.Const.apply_const raw_modalities.moda_modalities
+            Mode.Value.Const.legacy
+          |> Mode.Const.value_to_alloc_r2l
+        in
+        md_mode, modalities, Valmi_sig_value raw_modalities, curry_mode
   in
   let lpoly_flag =
     if valdecl.pval_poly then Typetexp.Lpoly else Typetexp.Lmono
   in
   let lpoly, cty =
-    Typetexp.transl_type_scheme env valdecl.pval_type lpoly_flag
+    Typetexp.transl_type_scheme env curry_mode valdecl.pval_type lpoly_flag
   in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with

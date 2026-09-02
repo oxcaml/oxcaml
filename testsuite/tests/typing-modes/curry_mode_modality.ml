@@ -37,16 +37,14 @@ module Modality : Modality = struct
 end
 [%%expect{|
 module type Modality =
-  sig val f : 'a @ portable contended -> unit -> unit @@ portable end
+  sig
+    val f : 'a @ portable contended -> (unit -> unit) @ portable @@ portable
+  end
 module Modality : Modality
 |}]
 
 let () = use_portable (Modality.f 42)
 [%%expect{|
-Line 1, characters 22-37:
-1 | let () = use_portable (Modality.f 42)
-                          ^^^^^^^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 module type Modality_uncontended_arg = sig
@@ -82,7 +80,7 @@ end
 [%%expect{|
 module type Default =
   sig
-    val f : 'a @ portable contended -> unit -> unit @@ portable
+    val f : 'a @ portable contended -> (unit -> unit) @ portable @@ portable
     val g : 'a @ portable contended -> unit -> unit
   end
 module Default : Default
@@ -90,10 +88,6 @@ module Default : Default
 
 let () = use_portable (Default.f 42)
 [%%expect{|
-Line 1, characters 22-36:
-1 | let () = use_portable (Default.f 42)
-                          ^^^^^^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 let () = use_portable (Default.g 42)
