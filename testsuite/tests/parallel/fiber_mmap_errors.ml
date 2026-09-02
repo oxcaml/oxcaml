@@ -1,6 +1,8 @@
 (* TEST
  no-stack-checks;
  no-address-sanitizer;
+ linux; (* The mapping-count limit this test exhausts is Linux-specific:
+           macOS has no equivalent, so the leak just succeeds there. *)
  exit_status = "2";
  native;
 *)
