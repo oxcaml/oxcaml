@@ -707,3 +707,40 @@ never an empty answer.
   >   -filename ./one.ml < ./one.ml \
   >   | jq -r '"\(.class): \(.value)"'
   failure: No module-type declaration at this position
+
+The [_intf.ml] pattern: a signature lives in its own unit and an [.mli]
+includes it.  Selecting [S] by position in [foo_intf.ml] is how the module
+type [Foo_intf.S] is specified, and the implementers of the signature it
+denotes are the module annotated with it directly and the unit whose
+interface includes it.
+
+  $ cat > foo_intf.ml <<'EOF'
+  > module type S = sig
+  >   type t
+  > end
+  > EOF
+  $ cat > foo.mli <<'EOF'
+  > include Foo_intf.S
+  > EOF
+  $ cat > foo.ml <<'EOF'
+  > type t = int
+  > EOF
+  $ cat > bar.ml <<'EOF'
+  > module Another : Foo_intf.S = struct
+  >   type t = { mutable field : string }
+  > end
+  > EOF
+  $ $OCAMLC -bin-annot -c foo_intf.ml
+  $ $OCAMLC -bin-annot -c foo.mli
+  $ $OCAMLC -bin-annot -c foo.ml
+  $ $OCAMLC -bin-annot -c bar.ml
+  $ ocaml-index aggregate foo_intf.cmt foo.cmti foo.cmt bar.cmt \
+  >   -o intf.ocaml-index
+  $ $MERLIN single module-type-impls \
+  >   -position 1:13 \
+  >   -index-file ./intf.ocaml-index \
+  >   -filename ./foo_intf.ml < ./foo_intf.ml \
+  >   | print_results S
+  complete
+  Foo 0:-1 0:-1 interface
+  Another 1:7 1:14 annotation
