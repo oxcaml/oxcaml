@@ -70,6 +70,15 @@ val redirect_symbol_to_atom : t -> Symbol.t -> tag:int -> t
 (** Whether the given symbol may be referenced from outside the unit. *)
 val symbol_is_exported : t -> Symbol.t -> bool
 
+(** Record that [Symbol.t] names a piece of static data invented during Cmm
+    translation of the body of the function with the given code ID (e.g. a set
+    of closures lifted by To_cmm itself). Such symbols postdate simplification
+    and so appear in no [Code.free_names_of_params_and_body]. *)
+val add_code_dep_symbol : t -> Code_id.t -> Symbol.t -> t
+
+(** The symbols recorded by [add_code_dep_symbol] for the given code ID. *)
+val code_dep_symbols : t -> Code_id.t -> Symbol.Set.t
+
 (** Caching of symbols associated with [Invalid] messages. *)
 val add_invalid_message_symbol : t -> Symbol.t -> message:string -> t
 

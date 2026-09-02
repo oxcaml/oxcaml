@@ -27,12 +27,20 @@ type t =
     module_symbol : Symbol.t;
     module_symbol_defined : bool;
     invalid_message_symbols : Symbol.t String.Map.t;
-    atom_redirected_symbols : int String.Map.t
+    atom_redirected_symbols : int String.Map.t;
         (* Linkage names of zero-sized statics of the current unit: every
            reference to them is redirected to the runtime's permanent atom of
            the given tag, via [Cmm_helpers.atom_symbol]. Exported ones
            additionally keep a definition, referenced only from other units, so
            cross-unit references still link (see [static_const0]). *)
+    code_dep_symbols : Symbol.Set.t Code_id.Map.t
+        (* Symbols of static data invented during Cmm translation of a
+           function's body (e.g. sets of closures lifted by To_cmm itself),
+           keyed by that function's code ID. Such symbols postdate
+           simplification, so they appear in no
+           [Code.free_names_of_params_and_body]; consumers needing the full
+           dependencies of a function's generated code must take them into
+           account. *)
   }
 
 let create ~module_symbol ~reachable_names =
@@ -45,7 +53,8 @@ let create ~module_symbol ~reachable_names =
     module_symbol;
     module_symbol_defined = false;
     invalid_message_symbols = String.Map.empty;
-    atom_redirected_symbols = String.Map.empty
+    atom_redirected_symbols = String.Map.empty;
+    code_dep_symbols = Code_id.Map.empty
   }
 
 let redirect_symbol_to_atom t symbol ~tag =
@@ -59,6 +68,21 @@ let redirect_symbol_to_atom t symbol ~tag =
 
 let symbol_is_exported t symbol =
   Name_occurrences.mem_symbol t.reachable_names symbol
+
+let add_code_dep_symbol t code_id symbol =
+  { t with
+    code_dep_symbols =
+      Code_id.Map.update code_id
+        (function
+          | None -> Some (Symbol.Set.singleton symbol)
+          | Some symbols -> Some (Symbol.Set.add symbol symbols))
+        t.code_dep_symbols
+  }
+
+let code_dep_symbols t code_id =
+  match Code_id.Map.find_opt code_id t.code_dep_symbols with
+  | None -> Symbol.Set.empty
+  | Some symbols -> symbols
 
 (* Symbol handling
 
