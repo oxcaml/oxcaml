@@ -215,6 +215,7 @@ let oper_result_type = function
     match memory_chunk with
     | Word_val -> typ_val
     | Word_mask -> typ_mask
+    | Word_code_pointer -> typ_code_pointer
     | Single { reg = Float64 } | Double -> typ_float
     | Single { reg = Float32 } -> typ_float32
     | Onetwentyeight_aligned | Onetwentyeight_unaligned -> typ_vec128
@@ -307,6 +308,9 @@ let oper_result_type = function
 let size_component : machtype_component -> int = function
   | Val | Addr -> Arch.size_addr
   | Int ->
+    assert (Int.equal Arch.size_int Arch.size_addr);
+    Arch.size_int
+  | Code_pointer ->
     assert (Int.equal Arch.size_int Arch.size_addr);
     Arch.size_int
   | Float -> Arch.size_float

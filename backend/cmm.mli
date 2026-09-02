@@ -28,6 +28,7 @@ type machtype_component = Cmx_format.machtype_component =
   | Mask
   | Float32
   | Valx2
+  | Code_pointer
 
 (*=- [Val] denotes a valid OCaml value: either a pointer to the beginning
      of a heap block, an infix pointer if it is preceded by the correct
@@ -78,6 +79,8 @@ val typ_vec256 : machtype
 val typ_vec512 : machtype
 
 val typ_mask : machtype
+
+val typ_code_pointer : machtype
 
 val typ_int128 : machtype
 
@@ -321,6 +324,10 @@ type memory_chunk =
   | Word_int (* integer or pointer outside heap *)
   | Word_mask (* integer-sized AVX512 mask *)
   | Word_val (* pointer inside heap or encoded int *)
+  | Word_code_pointer
+      (** Like [Word_int] but the loaded value carries the [Code_pointer]
+          machtype, so the GC tracks it via the parallel [code_ptr_live_ofs]
+          frame-descriptor array. *)
   | Single of { reg : float_width }
     (* F32 on the heap, may be F32 or F64 in registers. *)
   | Double (* word-aligned 64-bit float see PR#10433 *)
@@ -717,6 +724,8 @@ val is_val : machtype_component -> bool
 val is_int : machtype_component -> bool
 
 val is_addr : machtype_component -> bool
+
+val is_code_pointer : machtype_component -> bool
 
 val is_exn_handler : ccatch_flag -> bool
 
