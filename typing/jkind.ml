@@ -3162,8 +3162,9 @@ module Format_history = struct
     | Statement -> fprintf ppf "it's the type of a statement"
     | Optional_arg_default ->
       fprintf ppf "it's the type of an optional argument default"
+    | Tuple_element -> fprintf ppf "it's the type of a tuple element"
     | Unboxed_tuple_element ->
-      fprintf ppf "it's the type of unboxed tuple element"
+      fprintf ppf "it's the type of an unboxed tuple element"
     | Layout_poly_in_external ->
       fprintf ppf
         "it's the layout polymorphic type in an external declaration@ \
@@ -3284,7 +3285,6 @@ module Format_history = struct
       History.value_or_null_creation_reason -> _ = function
     | Primitive id ->
       fprintf ppf "it is the primitive value_or_null type %s" (Ident.name id)
-    | Tuple_element -> fprintf ppf "it's the type of a tuple element"
     | Separability_check ->
       fprintf ppf "the check that a type is definitely not `float`"
     | Polymorphic_variant_field ->
@@ -4259,6 +4259,7 @@ module Debug_printers = struct
     | Statement -> fprintf ppf "Statement"
     | Optional_arg_default -> fprintf ppf "Optional_arg_default"
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
+    | Tuple_element -> fprintf ppf "Tuple_element"
     | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Array_element -> fprintf ppf "Array_element"
@@ -4339,7 +4340,6 @@ module Debug_printers = struct
   let value_or_null_creation_reason ppf :
       History.value_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
-    | Tuple_element -> fprintf ppf "Tuple_element"
     | Separability_check -> fprintf ppf "Separability_check"
     | Polymorphic_variant_field -> fprintf ppf "Polymorphic_variant_field"
     | V1_safety_check -> fprintf ppf "V1_safety_check"

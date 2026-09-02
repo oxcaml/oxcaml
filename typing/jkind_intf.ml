@@ -389,6 +389,7 @@ module History = struct
     | Statement
     | Optional_arg_default
     | Layout_poly_in_external
+    | Tuple_element
     | Unboxed_tuple_element
     | Peek_or_poke
     | Array_element
@@ -437,7 +438,6 @@ module History = struct
      related to objects here. *)
   type value_or_null_creation_reason =
     | Primitive of Ident.t
-    | Tuple_element
     | Separability_check
     | Polymorphic_variant_field
     | V1_safety_check

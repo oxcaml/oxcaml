@@ -319,7 +319,9 @@ end = struct
       | `Unboxed_unit -> `Unboxed_unit
       | `Unboxed_bool b -> `Unboxed_bool b
       | `Tuple ps ->
-          `Tuple (List.map (fun (label, p) -> label, alpha_pat env p) ps)
+          (* CR zeisbach: one of many places to consider refactoring *)
+          `Tuple
+            (List.map (fun (label, p, sort) -> label, alpha_pat env p, sort) ps)
       | `Unboxed_tuple ps ->
           `Unboxed_tuple
             (List.map (fun (label, p, sort) -> label, alpha_pat env p, sort) ps)
@@ -677,7 +679,7 @@ end
 let rec flatten_pat_line size p k =
   match p.pat_desc with
   | Tpat_any | Tpat_var _ -> Patterns.omegas size :: k
-  | Tpat_tuple args -> (List.map snd args) :: k
+  | Tpat_tuple args -> (List.map (fun (_, p, _) -> p) args) :: k
   | Tpat_or (p1, p2, _) ->
       flatten_pat_line size p1 (flatten_pat_line size p2 k)
   | Tpat_alias { pattern = p; _ } ->
@@ -2480,7 +2482,7 @@ let divide_lazy ~scopes head ctx pm =
 let get_pat_args_tuple arity p rem =
   match p with
   | { pat_desc = Tpat_any } -> Patterns.omegas arity @ rem
-  | { pat_desc = Tpat_tuple args } -> (List.map snd args) @ rem
+  | { pat_desc = Tpat_tuple args } -> (List.map (fun (_, p, _) -> p) args) @ rem
   | _ -> assert false
 
 let get_pat_args_unboxed_tuple arity p rem =
@@ -4918,13 +4920,13 @@ let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial 
 
 let flatten_pattern size p =
   match p.pat_desc with
-  | Tpat_tuple args -> List.map snd args
+  | Tpat_tuple args -> List.map (fun (_, p, _) -> p) args
   | Tpat_any -> Patterns.omegas size
   | _ -> raise Cannot_flatten
 
 let flatten_simple_pattern size (p : Simple.pattern) =
   match p.pat_desc with
-  | `Tuple args -> (List.map snd args)
+  | `Tuple args -> (List.map (fun (_, p, _) -> p) args)
   | `Any -> Patterns.omegas size
   | `Array _
   | `Variant _
