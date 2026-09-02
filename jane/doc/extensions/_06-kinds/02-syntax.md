@@ -117,7 +117,7 @@ The abbreviations defined in the language are as follows:
     * ... point anywhere: this allows mode-crossing to `aliased` (which would
       confuse update-in-place of the pointed-to memory, if there was any)
     Using `mod everything` is appropriate for data represented directly,
-    like `int` or `float32#`.
+    like `int` or `float32_u`.
 
 * `value = value_or_null non_null separable`
 

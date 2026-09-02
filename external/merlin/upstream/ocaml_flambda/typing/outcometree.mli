@@ -62,7 +62,6 @@ type out_value =
   | Oval_unboxed_tuple of (string option * out_value) list
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
-  | Oval_quote of CamlinternalQuote.Code.t
   | Oval_floatarray of floatarray
 
 type out_modality = string
@@ -110,6 +109,7 @@ and out_jkind =
   | Ojkind_var of string * string list
   (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
+  | Ojkind_addressable of out_jkind
 
 (* should be empty if all the jkind annotations are missing *)
 and out_vars_jkinds = (string * out_jkind option) list

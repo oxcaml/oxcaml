@@ -103,6 +103,7 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t  (** See Note [Addressable kinds] *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -119,6 +120,8 @@ module Layout : sig
   end
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
+
+  val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
@@ -648,6 +651,14 @@ val get_mode_crossing :
 
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
+val equal_unsafe_mode_crossing :
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
+  context:jkind_context ->
+  Env.t ->
+  Types.unsafe_mode_crossing ->
+  Types.unsafe_mode_crossing ->
+  bool
+
 val get_externality_upper_bound :
   context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Externality.t
 
@@ -670,8 +681,8 @@ val apply_modality_l :
   Mode.Modality.Const.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
 
 (** Change a jkind to be appropriate for an expectation of a type under a
-    modality. This means that the jkind's axes affected by the modality will all
-    be top. The with-bounds are left unchanged. *)
+    modality. Relax direct bounds so applying the modality on the left meets the
+    original expectation. With-bounds are unchanged. *)
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 
@@ -687,11 +698,15 @@ val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
     jkind is already [Non_null], fails. *)
 val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
-(** Extract out component jkinds from the product. Because there are no product
-    jkinds, this is a bit of a lie: instead, this decomposes the layout but just
-    reuses the non-layout parts of the original jkind. Never does any mutation.
-    Because it just reuses the mode information, the resulting jkinds are higher
-    in the jkind lattice than they might need to be. *)
+(** Given a jkind [k], produce a list of jkinds [ks] such that [k] is equivalent
+    to [Product ks]. In practice, [k] is the kind of, or required kind of, a
+    tuple/record being inspected in [Ctype.constrain_type_jkind].
+
+    Because there are no product jkinds, the resulting jkinds are higher in the
+    jkind lattice than they might need to be. (This decomposes the layout but
+    just reuses the non-layout parts of the original jkind.)
+
+    Never does any mutation. *)
 val decompose_product : Env.t -> 'd Types.jkind -> 'd Types.jkind list option
 
 (** Get an annotation (that a user might write) for this [t]. *)

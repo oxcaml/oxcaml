@@ -925,6 +925,31 @@ let primitive ppf = function
   | Patomic_land_field -> fprintf ppf "atomic_land_field"
   | Patomic_lor_field -> fprintf ppf "atomic_lor_field"
   | Patomic_lxor_field -> fprintf ppf "atomic_lxor_field"
+  | Patomic_load_idx {layout = l} ->
+      fprintf ppf "atomic_load_idx %a"
+        layout l
+  | Patomic_set_idx {layout = l; mode} ->
+      fprintf ppf "atomic_set_idx%s %a"
+        (modify_mode mode)
+        layout l
+  | Patomic_exchange_idx {layout = l; mode} ->
+      fprintf ppf "atomic_exchange_idx%s %a"
+        (modify_mode mode)
+        layout l
+  | Patomic_compare_exchange_idx {layout = l; mode} ->
+      fprintf ppf "atomic_compare_exchange_idx%s %a"
+        (modify_mode mode)
+        layout l
+  | Patomic_compare_set_idx {layout = l; mode} ->
+      fprintf ppf "atomic_compare_set_idx%s %a"
+        (modify_mode mode)
+        layout l
+  | Patomic_fetch_add_idx -> fprintf ppf "atomic_fetch_add_idx"
+  | Patomic_add_idx -> fprintf ppf "atomic_add_idx"
+  | Patomic_sub_idx -> fprintf ppf "atomic_sub_idx"
+  | Patomic_land_idx -> fprintf ppf "atomic_land_idx"
+  | Patomic_lor_idx -> fprintf ppf "atomic_lor_idx"
+  | Patomic_lxor_idx -> fprintf ppf "atomic_lxor_idx"
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ppoll -> fprintf ppf "poll"
@@ -959,20 +984,13 @@ let primitive ppf = function
   | Ppoke layout ->
       fprintf ppf "(poke@ %a)"
         peek_or_poke layout
-  | Pget_idx (l, Atomic_access) ->
-      fprintf ppf "(get_idx_atomic@ %a)"
-        layout l
-  | Pget_idx (l, Mutable_access) ->
+  | Pget_idx (l, Mutable) ->
       fprintf ppf "(get_idx@ %a)"
         layout l
-  | Pget_idx (l, Immutable_access) ->
+  | Pget_idx (l, Immutable) ->
       fprintf ppf "(get_idx_imm@ %a)"
         layout l
-  | Pset_idx (l, mode, Atomic) ->
-      fprintf ppf "(set_idx_atomic%s@ %a)"
-        (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
-        layout l
-  | Pset_idx (l, mode, Nonatomic) ->
+  | Pset_idx (l, mode) ->
       fprintf ppf "(set_idx%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l
@@ -1145,6 +1163,17 @@ let name_of_primitive = function
   | Patomic_land_field -> "Patomic_land_field"
   | Patomic_lor_field -> "Patomic_lor_field"
   | Patomic_lxor_field -> "Patomic_lxor_field"
+  | Patomic_load_idx _ -> "Patomic_load_idx"
+  | Patomic_set_idx _ -> "Patomic_set_idx"
+  | Patomic_exchange_idx _ -> "Patomic_exchange_idx"
+  | Patomic_compare_exchange_idx _ -> "Patomic_compare_exchange_idx"
+  | Patomic_compare_set_idx _ -> "Patomic_compare_set_idx"
+  | Patomic_fetch_add_idx -> "Patomic_fetch_add_idx"
+  | Patomic_add_idx -> "Patomic_add_idx"
+  | Patomic_sub_idx -> "Patomic_sub_idx"
+  | Patomic_land_idx -> "Patomic_land_idx"
+  | Patomic_lor_idx -> "Patomic_lor_idx"
+  | Patomic_lxor_idx -> "Patomic_lxor_idx"
   | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
   | Pwith_stack -> "Pwith_stack"

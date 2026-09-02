@@ -107,6 +107,9 @@ void caml_init_gc_stats (uintnat max_domains);
 
 void caml_free_gc_stats(void);
 
+/* Called at runtime exit; reports using the STATS facility of caml_verb_gc */
+void caml_report_gc_stats(void);
+
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_GC_STATS_H */
