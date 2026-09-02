@@ -1,5 +1,6 @@
 (* TEST
  flambda2;
+ include stdlib_stable;
  {
    expect;
  }{
@@ -131,6 +132,17 @@ let mutation =
 val mutation : string list = ["set"]
 |}]
 
+(* Block indices, both reading and writing. *)
+
+let idx_round_trip =
+  let r = { z = #() } in
+  Stdlib_stable.Idx_mut.set r (.z) #();
+  let #() = Stdlib_stable.Idx_mut.get r (.z) in
+  "indexed"
+[%%expect{|
+val idx_round_trip : string = "indexed"
+|}]
+
 (* Functional update ([Pduprecord]) must not try to copy zero words. *)
 
 let functional_update =
@@ -193,6 +205,41 @@ let letrec_match =
   "matched"
 [%%expect{|
 val letrec_match : string = "matched"
+|}]
+
+(* Optimisation: an empty record flowing through join points, unboxable
+   parameters, and inlined returns must not be re-allocated. *)
+
+(* Join point: the same variable bound on two branches. *)
+let[@inline never] join b =
+  let r = if b then { x = #() } else { x = #() } in
+  describe r
+let join_result = [join true; join false]
+[%%expect{|
+val join : bool -> string = <fun>
+val join_result : string list = ["block tag 0 size 0"; "block tag 0 size 0"]
+|}]
+
+(* Loop parameter: a candidate for continuation-parameter unboxing. If the
+   loop rebuilt the record, the result would not be the original. *)
+let loop_result =
+  let rec go n (r : t) = if n = 0 then r else go (n - 1) r in
+  let r = { x = #() } in
+  let r' = go 1000 r in
+  describe r', r' == r
+[%%expect{|
+val loop_result : string * bool = ("block tag 0 size 0", true)
+|}]
+
+(* Inlined return: the record is constructed in the callee and used in
+   the caller after inlining. *)
+let[@inline always] mk () = { x = #() }
+let inlined_result = describe (mk ())
+let inlined_phys_equal = mk () == mk ()
+[%%expect{|
+val mk : unit -> t = <fun>
+val inlined_result : string = "block tag 0 size 0"
+val inlined_phys_equal : bool = true
 |}]
 
 (* Kinds: an all-void record is a pointer (to the atom), not an immediate. *)

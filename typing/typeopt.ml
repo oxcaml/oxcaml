@@ -1111,6 +1111,14 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
+  | Record_empty ->
+    (* A tag-0 block with no fields. Unlike other records, mutability is
+       irrelevant: there are no field contents to change. *)
+    let variant = Pvariant {
+      consts = [];
+      non_consts = [0, Constructor_uniform []];
+    } in
+    num_nodes_visited, non_nullable variant
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
       let is_mutable =
@@ -1123,7 +1131,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
         let num_nodes_visited, fields =
           match rep with
           | Record_unboxed | Record_dummy _ | Record_undetermined
-          | Record_variable _
+          | Record_variable _ | Record_empty
           | Record_inlined (_, (Constructor_undetermined
                                | Constructor_variable _
                                | Constructor_immediate_all_void), _) ->
@@ -1148,7 +1156,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
                       | Record_mixed _ | Record_unboxed | Record_dummy _
-                      | Record_undetermined | Record_variable _ ->
+                      | Record_undetermined | Record_variable _ | Record_empty ->
                           (* The outer match guards against this *)
                           assert false
                     in
@@ -1174,10 +1182,9 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
             [0, fields]
           | Record_mixed _ ->
             [0, fields]
-          | Record_unboxed -> assert false
-          | Record_inlined (Null, _, _) -> assert false
-          | Record_dummy _ -> assert false
-          | Record_undetermined | Record_variable _ -> assert false
+          | Record_unboxed | Record_inlined (Null, _, _) | Record_dummy _
+          | Record_undetermined | Record_variable _ | Record_empty
+            -> assert false
         in
         (num_nodes_visited,
          non_nullable (Pvariant { consts = []; non_consts }))
