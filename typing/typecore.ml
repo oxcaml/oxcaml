@@ -8665,18 +8665,19 @@ and type_expect_
       }
   | Pexp_letop{ let_ = slet; ands = sands; body = sbody } ->
       submode ~loc ~env Value.legacy expected_mode;
-      let rec loop spat_acc ty_acc ty_acc_sort sands =
+      let rec loop spat_acc ty_acc sands =
         match sands with
-        | [] -> spat_acc, ty_acc, ty_acc_sort
+        | [] -> spat_acc, ty_acc
         | { pbop_pat = spat; _} :: rest ->
-            (* CR layouts v5: eliminate value requirement *)
-            let ty = newvar (Jkind.Builtin.value_or_null ~why:Tuple_element) in
+            let ty = newvar (Jkind.of_new_sort ~why:Tuple_element
+                               ~level:(Ctype.get_current_level ()))
+            in
             let loc = Location.ghostify slet.pbop_op.loc in
             let spat_acc =
               Ast_helper.Pat.tuple ~loc [None, spat_acc; None, spat] Closed
             in
             let ty_acc = newty (Ttuple [None, ty_acc; None, ty]) in
-            loop spat_acc ty_acc Jkind.Sort.scannable rest
+            loop spat_acc ty_acc rest
       in
       let (op_path, op_desc, op_type, spat_params, ty_params, param_sort,
           ty_func_result, body_sort, ty_result, op_result_sort,
@@ -8689,15 +8690,20 @@ and type_expect_
           let op_path, op_desc = type_binding_op_ident env slet.pbop_op in
           let op_type = op_desc.val_type in
           let spat_params, ty_params, param_sort =
-            let initial_jkind, initial_sort = match sands with
+            let initial_jkind, param_sort = match sands with
               | [] ->
                 Jkind.of_new_sort_var ~why:Function_argument
                   ~level:(Ctype.get_current_level ())
-              (* CR layouts v5: eliminate value requirement for tuple elements *)
-              | _ -> Jkind.Builtin.value_or_null ~why:Tuple_element,
-                     Jkind.Sort.scannable
+              | _ :: _ ->
+                (Jkind.of_new_sort ~why:Tuple_element
+                   ~level:(Ctype.get_current_level ()),
+                 (* non-empty => desugaring into tuple, which is scannable *)
+                 Jkind.Sort.scannable)
             in
-            loop slet.pbop_pat (newvar initial_jkind) initial_sort sands
+            let spat_params, ty_params =
+              loop slet.pbop_pat (newvar initial_jkind) sands
+            in
+            spat_params, ty_params, param_sort
           in
           let ty_func_result, body_sort = new_rep_var ~why:Function_result () in
           let arrow_desc = Nolabel, Alloc.legacy, Alloc.legacy in
@@ -10886,27 +10892,35 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   Option.iter
     (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
     (Misc.repeated_label sexpl);
-  let alloc_mode =
+  let alloc_mode, value_mode =
     register_allocation_value_mode ~loc expected_mode.mode
   in
   let argument_mode =
-    expected_mode.mode
+    value_mode
     |> apply_right_is_contained_by
       {containing = Tuple; container = (loc, Expression)}
   in
   (* CR layouts v5: non-values in tuples *)
   let unify_as_tuple ty_expected =
-    let labeled_subtypes =
-      List.map (fun (label, _) -> label,
-                                  newgenvar (Jkind.Builtin.value_or_null ~why:Tuple_element))
+    let labels_types_and_sorts =
+      List.map (fun (label, _) ->
+        let jkind, sort =
+          (* CR zeisbach: give this the actually correct `why` *)
+          Jkind.of_new_sort_var ~why:Unboxed_tuple_element
+            ~level:(Ctype.get_current_level ())
+        in
+        label, newgenvar jkind, sort)
       sexpl
     in
-    let to_unify = newgenty (Ttuple labeled_subtypes) in
+    let to_unify =
+      newgenty
+        (Ttuple (List.map (fun (l, t, _) -> (l, t)) labels_types_and_sorts))
+    in
     with_explanation explanation (fun () ->
       unify_exp_types loc env to_unify (generic_instance ty_expected));
-    labeled_subtypes
+    labels_types_and_sorts
   in
-  let labeled_subtypes = unify_as_tuple ty_expected in
+  let labels_types_and_sorts = unify_as_tuple ty_expected in
   let argument_modes =
     match expected_mode.tuple_modes with
     (* CR zqian: improve the modes of opened labeled tuple pattern. *)
@@ -10925,29 +10939,36 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     | None ->
         List.init arity (fun _ -> argument_mode)
   in
-  let types_and_modes = List.combine labeled_subtypes argument_modes in
+  let types_sorts_and_modes =
+    List.combine labels_types_and_sorts argument_modes
+  in
   let overwrites =
     assign_children arity (fun _loc typ mode ->
-      let labeled_subtypes = unify_as_tuple typ in
+      let labels_types_and_sorts = unify_as_tuple typ in
       List.map
-        (fun (_, typ) -> Assigning(typ, mode))
-        labeled_subtypes)
+        (* CR zeisbach: confirmation on whether to take sorts into account *)
+        (fun (_, typ, _) -> Assigning(typ, mode))
+        labels_types_and_sorts)
     overwrite
   in
   let expl =
     Misc.Stdlib.List.map3
-      (fun (label, body) ((_, ty), argument_mode) overwrite ->
+      (fun (label, body) ((_, ty, sort), argument_mode) overwrite ->
         let argument_mode = mode_default argument_mode in
         let argument_mode = expect_mode_cross env ty argument_mode in
-          (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
-      sexpl types_and_modes overwrites
+        let exp =
+          type_expect ~overwrite env argument_mode body (mk_expected ty)
+        in
+        (label, exp, sort))
+      sexpl types_sorts_and_modes overwrites
   in
   re {
     exp_desc =
       Texp_tuple (expl, Typedtree.create_alloc_mode_r alloc_mode);
     exp_loc = loc; exp_extra = [];
     (* Keep sharing *)
-    exp_type = newty (Ttuple (List.map (fun (label, e) -> label, e.exp_type) expl));
+    exp_type =
+      newty (Ttuple (List.map (fun (label, e, _) -> label, e.exp_type) expl));
     exp_attributes = attributes;
     exp_env = env }
 

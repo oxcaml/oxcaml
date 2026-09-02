@@ -1531,6 +1531,7 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
   Ttyp_alias (cty, name_opt, jkind_annot),
   cty.ctyp_type
 
+(* CR zeisbach: get rid of this because it is duplicated code now *)
 and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
   assert (List.length stl >= 2);
   Option.iter (fun l -> raise (Error (loc, env, Repeated_tuple_label l)))
@@ -1541,7 +1542,7 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
          l, transl_type env ~policy ~row_context Alloc.Const.legacy t)
       stl
   in
-  List.iter (fun (_, {ctyp_type; ctyp_loc}) ->
+  (*= List.iter (fun (_, {ctyp_type; ctyp_loc}) ->
     (* CR layouts v5: remove value requirement *)
     match
       constrain_type_jkind env ctyp_type (Jkind.Builtin.value_or_null ~why:Tuple_element)
@@ -1550,7 +1551,7 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
     | Error e ->
       raise (Error(ctyp_loc, env,
                    Non_value {vloc = Tuple; err = e; typ = ctyp_type})))
-    ctys;
+    ctys; *)
   let ctyp_type =
     newty (Ttuple (List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) ctys))
   in
