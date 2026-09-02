@@ -751,6 +751,11 @@ val format_type_expr : Types.type_expr Format_doc.printer
     module. *)
 val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 
+(** Provides [Ctype.estimate_type_jkind] back up the dependency chain to this
+    module. *)
+val set_estimate_type_jkind :
+  (Env.t -> Types.type_expr -> Types.jkind_l) -> unit
+
 val format : Env.t -> Format_doc.formatter -> 'd Types.jkind -> unit
 
 module Format_verbosity : sig

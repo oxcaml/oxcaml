@@ -3574,6 +3574,8 @@ let constrain_type_jkind ~fixed env ty jkind =
 
 let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
 
+let () = Jkind.set_estimate_type_jkind estimate_type_jkind
+
 let type_jkind_and_sort ~why ~fixed env ty =
   let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
   match constrain_type_jkind ~fixed env ty jkind with

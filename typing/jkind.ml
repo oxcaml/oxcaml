@@ -678,7 +678,7 @@ module With_bounds = struct
       let open Format in
       fprintf ppf "@[{ relevant_axes = %a }@]" Axis_set.print relevant_axes
 
-    let axes_ignored_by_modalities ~mod_bounds
+    let axes_ignored_by_modalities ~mod_bounds ~axes_crossed_by_layout
         ~type_info:{ relevant_axes = explicit_relevant_axes } =
       (* Axes that are max are implicitly relevant. ie, including or excluding an
          axis from the set of relevant axes is semantically equivalent if the mod-
@@ -688,7 +688,11 @@ module With_bounds = struct
          on types when the axis is max, for performance reasons - but we don't want to
          print constant modalities for those axes!
       *)
-      let implicit_relevant_axes = Mod_bounds.get_max_axes mod_bounds in
+      let implicit_relevant_axes =
+        Axis_set.union
+          (Mod_bounds.get_max_axes mod_bounds)
+          axes_crossed_by_layout
+      in
       let relevant_axes =
         Axis_set.union explicit_relevant_axes implicit_relevant_axes
       in
@@ -1834,6 +1838,18 @@ module Context_with_transl = struct
     | Left_jkind (_, ctx) -> ctx
 end
 
+let estimate_type_jkind : (Env.t -> type_expr -> jkind_l) ref =
+  ref (fun _ _ -> assert false)
+
+let set_estimate_type_jkind f = estimate_type_jkind := f
+
+let axes_crossed_by_layout env ty =
+  let jkind = !estimate_type_jkind env ty in
+  match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
+  | Layout l when Layout.crosses_externality l ->
+    Axis_set.singleton (Nonmodal Externality)
+  | Layout _ | Kconstr _ -> Axis_set.empty
+
 (* CR layouts v2.8: This should sometimes be for type schemes, not types
    (which print weak variables like ['_a] correctly), but this works better
    for the common case. When we re-do printing, fix. Internal ticket 4435. *)
@@ -2049,10 +2065,12 @@ module Const = struct
         | with_bounds ->
           let otys = !outcometrees_of_types (List.map fst with_bounds) in
           List.map2
-            (fun (_, type_info) out_type ->
+            (fun (ty, type_info) out_type ->
               let axes_ignored_by_modalities =
                 With_bounds.Type_info.axes_ignored_by_modalities
-                  ~mod_bounds:actual.mod_bounds ~type_info
+                  ~mod_bounds:actual.mod_bounds
+                  ~axes_crossed_by_layout:(axes_crossed_by_layout env ty)
+                  ~type_info
               in
               let modal_modality, nonmodal_axes =
                 modalities_of_ignored_axes axes_ignored_by_modalities
@@ -3581,7 +3599,7 @@ module Violation = struct
     | Layout
     | Kind
 
-  let report_reason ppf violation =
+  let report_reason env ppf violation =
     (* Print out per-axis information about why the error occurred. This only
        happens when modalities are printed because the errors are simple enough
        when there are no modalities that it makes the error unnecessarily noisy.
@@ -3607,10 +3625,12 @@ module Violation = struct
       let has_modalities =
         let jkind_has_modalities jkind =
           List.exists
-            (fun (_, type_info) ->
+            (fun (ty, type_info) ->
               let axes_ignored_by_modalities =
                 With_bounds.Type_info.axes_ignored_by_modalities
-                  ~mod_bounds:jkind.jkind.mod_bounds ~type_info
+                  ~mod_bounds:jkind.jkind.mod_bounds
+                  ~axes_crossed_by_layout:(axes_crossed_by_layout env ty)
+                  ~type_info
               in
               not (Axis_set.is_empty axes_ignored_by_modalities))
             (With_bounds.to_list jkind.jkind.with_bounds)
@@ -3942,7 +3962,7 @@ module Violation = struct
       fprintf ppf "@[<hov 2>%s%a has %t,@ which %t.@]" preamble pp_former former
         fmt_k1 fmt_k2;
     report_missing_cmis ppf missing_cmis;
-    report_reason ppf t.violation;
+    report_reason env ppf t.violation;
     (* otherwise, we get notes for layout abbreviations that get omitted. *)
     report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
     if not !Clflags.ikinds then report_fuel ppf t.violation
