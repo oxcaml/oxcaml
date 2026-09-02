@@ -16,16 +16,15 @@ open Intrinsics
 (* Codegen tests for conversions between tagged ints and untagged
    [nativeint#] values that only manipulate individual bits. *)
 
-(* [Nativeint_u.to_int] truncates to 63 bits, like [Isize.to_int_trunc]. *)
+(* The following three functions are equivalent and compile to the same
+   code. *)
 
-(* CR ttebbi: Could be [shl 2; shr 1; inc], avoiding the [max_int]
-   constant, like [lsl_lsr_after_tag] below. *)
 let land_max_int_after_tag n = Nativeint_u.to_int n land max_int
 [%%expect_asm X86_64{|
 land_max_int_after_tag:
-  movabsq $9223372036854775807, %rbx
-  leaq  1(%rax,%rax), %rax
-  andq  %rbx, %rax
+  salq  $2, %rax
+  shrq  $1, %rax
+  incq  %rax
   ret
 |}]
 
@@ -34,29 +33,26 @@ let lsl_lsr_after_tag n = (Nativeint_u.to_int n lsl 1) lsr 1
 lsl_lsr_after_tag:
   salq  $2, %rax
   shrq  $1, %rax
-  orq   $1, %rax
+  incq  %rax
   ret
 |}]
 
-(* CR ttebbi: This is the same function as the two above and could
-   compile to the same code. *)
 let clear_top_bits_before_tag n =
   Nativeint_u.(to_int (shift_right_logical (shift_left n 2) 2))
 [%%expect_asm X86_64{|
 clear_top_bits_before_tag:
   salq  $2, %rax
-  shrq  $2, %rax
-  leaq  1(%rax,%rax), %rax
+  shrq  $1, %rax
+  incq  %rax
   ret
 |}]
 
-(* CR ttebbi: This reconstructs the tagged representation of [i], so it
-   is a no-op (the low bit of a tagged int is known to be set). *)
+(* This reconstructs the tagged representation of [i], so it is a no-op:
+   untagging asserts that the low bit of [i] is one. *)
 let untag_then_retag i =
   Nativeint_u.(logor (shift_left (of_int i) 1) (of_nativeint 1n))
 [%%expect_asm X86_64{|
 untag_then_retag:
-  orq   $1, %rax
   ret
 |}]
 
@@ -64,8 +60,7 @@ untag_then_retag:
 let untag_then_lsl_1 i = Nativeint_u.(shift_left (of_int i) 1)
 [%%expect_asm X86_64{|
 untag_then_lsl_1:
-  sarq  $1, %rax
-  salq  $1, %rax
+  decq  %rax
   ret
 |}]
 
@@ -73,13 +68,12 @@ untag_then_lsl_1:
 let untag_then_lsl_3 i = Nativeint_u.(shift_left (of_int i) 3)
 [%%expect_asm X86_64{|
 untag_then_lsl_3:
-  sarq  $1, %rax
-  salq  $3, %rax
+  leaq  -4(,%rax,4), %rax
   ret
 |}]
 
-(* CR ttebbi: Could be [ror rax, 1] since the low bit of a tagged int is
-   known to be set. *)
+(* CR ttebbi: Could be [ror rax, 1]: the low bit of [n] is known to be one,
+   but the backend has no rotate instruction selection yet. *)
 let untag_then_set_top_bit n =
   Nativeint_u.(logor (of_nativeint 0x8000000000000000n) (of_int n))
 [%%expect_asm X86_64{|
@@ -90,35 +84,26 @@ untag_then_set_top_bit:
   ret
 |}]
 
-(* CR ttebbi: The boolean could be computed as [(n land 1) xor 1]
-   instead of tagging the intermediate result and going through
-   [sete]. *)
 let low_bit_is_zero n =
   Nativeint_u.(to_int (logand n (of_nativeint 1n))) = 0
 [%%expect_asm X86_64{|
 low_bit_is_zero:
-  movl  $1, %ebx
-  andq  %rbx, %rax
-  leaq  1(%rax,%rax), %rax
-  cmpq  $1, %rax
-  sete  %al
-  movzbq %al, %rax
+  andl  $1, %eax
+  xorq  $1, %rax
   leaq  1(%rax,%rax), %rax
   ret
 |}]
 
-(* CR ttebbi: The whole comparison sequence could be a single
-   [testb $1, %al] followed by [jne]. *)
+(* CR ttebbi: The [and] and [test] could be combined into
+   [testb $1, %al]. *)
 let branch_on_low_bit n ~then_ ~else_ =
   if Nativeint_u.(to_int (logand n (of_nativeint 1n))) = 0
   then then_ ()
   else else_ ()
 [%%expect_asm X86_64{|
 branch_on_low_bit:
-  movl  $1, %esi
-  andq  %rsi, %rax
-  leaq  1(%rax,%rax), %rax
-  cmpq  $1, %rax
+  andl  $1, %eax
+  testq %rax, %rax
   jne   .L0
   movl  $1, %eax
   movq  (%rbx), %rdi

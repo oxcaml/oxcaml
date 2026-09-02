@@ -116,7 +116,7 @@ let select_addressing' chunk (expr : Cmm.expression) :
     validated_offset chunk n, arg
   | Cop
       ( ((Caddv | Cadda) as op),
-        [arg1; Cop (Caddi, [arg2; Cconst_int (n, _)], _)],
+        [arg1; Cop (Caddi _, [arg2; Cconst_int (n, _)], _)],
         dbg )
     when is_offset chunk n ->
     validated_offset chunk n, Cop (op, [arg1; arg2], dbg)
@@ -148,16 +148,16 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   in
   match op with
   (* Integer addition *)
-  | Caddi | Caddv | Cadda -> (
+  | Caddi _ | Caddv | Cadda -> (
     match args with
     (* Shift-add *)
-    | [arg1; Cop (Clsl, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
+    | [arg1; Cop (Clsl _, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
       Rewritten (specific (Ishiftarith (Ishiftadd, n)), [arg1; arg2])
-    | [arg1; Cop (Casr, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
+    | [arg1; Cop (Casr _, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
       Rewritten (specific (Ishiftarith (Ishiftadd, -n)), [arg1; arg2])
-    | [Cop (Clsl, [arg1; Cconst_int (n, _)], _); arg2] when n > 0 && n < 64 ->
+    | [Cop (Clsl _, [arg1; Cconst_int (n, _)], _); arg2] when n > 0 && n < 64 ->
       Rewritten (specific (Ishiftarith (Ishiftadd, n)), [arg2; arg1])
-    | [Cop (Casr, [arg1; Cconst_int (n, _)], _); arg2] when n > 0 && n < 64 ->
+    | [Cop (Casr _, [arg1; Cconst_int (n, _)], _); arg2] when n > 0 && n < 64 ->
       Rewritten (specific (Ishiftarith (Ishiftadd, -n)), [arg2; arg1])
     (* Multiply-add *)
     | [arg1; Cop (Cmuli, args2, dbg)] | [Cop (Cmuli, args2, dbg); arg1] ->
@@ -167,18 +167,18 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Csubi -> (
     match args with
     (* Shift-sub *)
-    | [arg1; Cop (Clsl, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
+    | [arg1; Cop (Clsl _, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
       Rewritten (specific (Ishiftarith (Ishiftsub, n)), [arg1; arg2])
-    | [arg1; Cop (Casr, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
+    | [arg1; Cop (Casr _, [arg2; Cconst_int (n, _)], _)] when n > 0 && n < 64 ->
       Rewritten (specific (Ishiftarith (Ishiftsub, -n)), [arg1; arg2])
     (* Multiply-sub *)
     | [arg1; Cop (Cmuli, args2, dbg)] ->
       rewrite_multiply_add_or_sub Ishiftsub Imulsub ~arg1 ~args2 dbg
     | _ -> Use_default)
   (* Recognize sign extension *)
-  | Casr -> (
+  | Casr _ -> (
     match args with
-    | [Cop (Clsl, [k; Cconst_int (n, _)], _); Cconst_int (n', _)]
+    | [Cop (Clsl _, [k; Cconst_int (n, _)], _); Cconst_int (n', _)]
       when n' = n && 0 < n && n < 64 ->
       Rewritten (specific (Isignext (64 - n)), [k])
     | _ -> Use_default)

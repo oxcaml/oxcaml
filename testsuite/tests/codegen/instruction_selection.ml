@@ -197,8 +197,7 @@ branch_and_return:
   xorl  %eax, %eax
   cmpq  $1, %rbx
   setne %al
-  leaq  1(%rax,%rax), %rax
-  cmpq  $3, %rax
+  cmpq  $1, %rax
   jne   .L0
   movq  %rbx, %rax
   ret
@@ -439,9 +438,8 @@ let shift_of_logand (a : int64_u) =
 ;;
 [%%expect_asm X86_64{|
 shift_of_logand:
-  movl  $1, %ebx
   movq  %rax, %rcx
-  andq  %rbx, %rcx
+  andl  $1, %ecx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax

@@ -585,8 +585,8 @@ let to_int8 x = Int16_u.to_int8 x
 [%%expect_asm X86_64{|
 to_int8:
   salq  $56, %rax
-  sarq  $56, %rax
-  leaq  1(%rax,%rax), %rax
+  sarq  $55, %rax
+  incq  %rax
   ret
 |}]
 

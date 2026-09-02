@@ -271,6 +271,23 @@ type bswap_bitwidth =
   | Thirtytwo
   | Sixtyfour
 
+(** Bits of a value that are statically known: the bits set in [zeros] are known
+    to be zero and the bits set in [ones] are known to be one. *)
+type known_bits =
+  { zeros : nativeint;
+    ones : nativeint
+  }
+
+val no_known_bits : known_bits
+
+(** Assumptions about the arguments of an operation: [lhs] describes the first
+    argument. These assumptions help the optimizer, violating them is undefined
+    behavior. For example, untagging an OCaml int is an arithmetic right shift
+    by one of a value whose low bit is known to be one. *)
+type input_assumptions = { lhs : known_bits }
+
+val no_input_assumptions : input_assumptions
+
 type initialization_or_assignment =
   | Initialization
   | Assignment
@@ -453,7 +470,7 @@ type operation =
       }
   | Calloc of Alloc_mode.t * alloc_block_kind
   | Cstore of memory_chunk * initialization_or_assignment
-  | Caddi
+  | Caddi of input_assumptions
   | Csubi
   | Cmuli
   | Cmulhi of { signed : bool }
@@ -465,9 +482,9 @@ type operation =
   | Cand
   | Cor
   | Cxor
-  | Clsl
-  | Clsr
-  | Casr
+  | Clsl of input_assumptions
+  | Clsr of input_assumptions
+  | Casr of input_assumptions
   | Cbswap of { bitwidth : bswap_bitwidth }
   | Ccsel of machtype
   | Cclz

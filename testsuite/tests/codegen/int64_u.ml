@@ -351,12 +351,9 @@ to_int:
   ret
 |}]
 
-(* CR ttebbi: This is the identity. *)
 let int_roundtrip x = Int64_u.of_int x |> Int64_u.to_int
 [%%expect_asm X86_64{|
 int_roundtrip:
-  sarq  $1, %rax
-  leaq  1(%rax,%rax), %rax
   ret
 |}]
 

@@ -257,6 +257,11 @@ let static_cast : Cmm.static_cast -> string = function
   | Scalar_of_v512 ty -> Printf.sprintf "%s->scalar" (vec512_name ty)
   | V512_of_scalar ty -> Printf.sprintf "scalar->%s" (vec512_name ty)
 
+let input_assumptions { lhs = { zeros; ones } } =
+  if Nativeint.equal zeros 0n && Nativeint.equal ones 0n
+  then ""
+  else Printf.sprintf "{lhs_zeros=0x%nx lhs_ones=0x%nx}" zeros ones
+
 let operation d = function
   | Capply { result_type = _ty; region = _; callees = _ } -> "app" ^ location d
   | Cextcall { func = lbl; _ } ->
@@ -275,7 +280,7 @@ let operation d = function
       match init with Initialization -> "(init)" | Assignment -> ""
     in
     Printf.sprintf "store %s%s" (chunk c) init
-  | Caddi -> "+"
+  | Caddi a -> "+" ^ input_assumptions a
   | Csubi -> "-"
   | Cmuli -> "*"
   | Cmulhi { signed } -> "*h" ^ if signed then "" else "u"
@@ -287,9 +292,9 @@ let operation d = function
   | Cand -> "and"
   | Cor -> "or"
   | Cxor -> "xor"
-  | Clsl -> "<<"
-  | Clsr -> ">>u"
-  | Casr -> ">>s"
+  | Clsl a -> "<<" ^ input_assumptions a
+  | Clsr a -> ">>u" ^ input_assumptions a
+  | Casr a -> ">>s" ^ input_assumptions a
   | Cbswap { bitwidth = Sixteen } -> "bswap_16"
   | Cbswap { bitwidth = Thirtytwo } -> "bswap_32"
   | Cbswap { bitwidth = Sixtyfour } -> "bswap_64"
