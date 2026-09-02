@@ -1777,7 +1777,8 @@ module Basis = struct
       (fun { name; depends; alias_depends; _ } ->
          let index =
            String_map.find
-             (Compilation_unit_intf.to_string name.Global_module.Name.head)
+             (Compilation_unit_intf.to_string
+                (Compilation_unit_intf.Found.intf name.Global_module.Name.head))
              t.assignment
          in
          List.iter
@@ -1798,7 +1799,8 @@ module Basis = struct
         (fun { name; desc; visibility=load_visibility; deprecated; _ } ->
            let index =
            String_map.find
-             (Compilation_unit_intf.to_string name.Global_module.Name.head)
+             (Compilation_unit_intf.to_string
+                (Compilation_unit_intf.Found.intf name.Global_module.Name.head))
              t.assignment
          in
            let origin = Origin.Dependency index in

@@ -47,18 +47,10 @@ val type_implementation:
   Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
-<<<<<<< Merlin:attach-cmi-path
-  sourcefile:string -> Compilation_unit.t -> Env.t ->
-  Parsetree.signature -> Typedtree.signature
-val transl_signature:
-  ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
-||||||| Compiler:last-imported
-  sourcefile:string -> Compilation_unit.t -> Env.t ->
-  Parsetree.signature -> Typedtree.signature
-=======
   sourcefile:string -> intf:Compilation_unit_intf.t -> Compilation_unit.t ->
   Env.t -> Parsetree.signature -> Typedtree.signature
->>>>>>> Compiler:HEAD
+val transl_signature:
+  ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
 
 (* If the [.mli] file has any file-level staticity modality (whether
    [@@ static] or [@@ dynamic]), the module is [Static]; otherwise [Dynamic].
