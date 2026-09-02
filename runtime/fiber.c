@@ -66,7 +66,7 @@
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
 #ifdef TARGET_amd64
 /* amd64.S's caml_reperform reads [idled_from] at Stack_idled_from. */
-static_assert(offsetof(struct stack_info, idled_from) == 112, "");
+static_assert(offsetof(struct stack_info, idled_from) == 104, "");
 #endif
 
 static _Atomic int64_t fiber_id_global = 0;
@@ -1416,9 +1416,6 @@ static void stack_release_memory(struct stack_info* stack)
 
   CAMLassert(stack->magic == 42);
   CAMLassert(caches != NULL);
-
-  // Don't need to update local_sp since this is no longer the current stack.
-  caml_free_local_arenas(stack->local_arenas);
 
   if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
