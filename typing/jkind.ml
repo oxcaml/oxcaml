@@ -725,14 +725,17 @@ module With_bounds = struct
       let open Format in
       fprintf ppf "@[{ bounds_mask = %a }@]" Bounds_mask.print bounds_mask
 
-    let printable_bounds_mask ~mod_bounds
+    let printable_bounds_mask ~mod_bounds ~bounds_crossed_by_layout
         ~type_info:{ bounds_mask = explicit_bounds_mask } =
       (* Contributions covered by direct bounds can be restored for printing. *)
       Mod_bounds.to_axis_lattice mod_bounds
       |> Bounds_mask.join explicit_bounds_mask
+      |> Bounds_mask.join bounds_crossed_by_layout
 
-    let has_non_id_modalities ~mod_bounds ~type_info =
-      let bounds_mask = printable_bounds_mask ~mod_bounds ~type_info in
+    let has_non_id_modalities ~mod_bounds ~bounds_crossed_by_layout ~type_info =
+      let bounds_mask =
+        printable_bounds_mask ~mod_bounds ~bounds_crossed_by_layout ~type_info
+      in
       not (Bounds_mask.equal bounds_mask Axis_lattice.top)
   end
 
@@ -1862,6 +1865,18 @@ module Context_with_transl = struct
     | Left_jkind (_, ctx) -> ctx
 end
 
+let estimate_type_jkind : (Env.t -> type_expr -> jkind_l) ref =
+  ref (fun _ _ -> assert false)
+
+let set_estimate_type_jkind f = estimate_type_jkind := f
+
+let bounds_crossed_by_layout env ty =
+  let jkind = !estimate_type_jkind env ty in
+  match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
+  | Layout l when Layout.crosses_externality l ->
+    Bounds_mask.of_axis_set (Axis_set.singleton (Nonmodal Externality))
+  | Layout _ | Kconstr _ -> Bounds_mask.bot
+
 (* CR layouts v2.8: This should sometimes be for type schemes, not types
    (which print weak variables like ['_a] correctly), but this works better
    for the common case. When we re-do printing, fix. Internal ticket 4435. *)
@@ -2062,10 +2077,12 @@ module Const = struct
         | with_bounds ->
           let otys = !outcometrees_of_types (List.map fst with_bounds) in
           List.map2
-            (fun (_, type_info) out_type ->
+            (fun (ty, type_info) out_type ->
               let bounds_mask =
                 With_bounds.Type_info.printable_bounds_mask
-                  ~mod_bounds:actual.mod_bounds ~type_info
+                  ~mod_bounds:actual.mod_bounds
+                  ~bounds_crossed_by_layout:(bounds_crossed_by_layout env ty)
+                  ~type_info
               in
               let modal_modality, nonmodal_axes =
                 With_bounds.modalities_of_bounds_mask bounds_mask
@@ -3582,7 +3599,7 @@ module Violation = struct
     | Layout
     | Kind
 
-  let report_reason ppf violation =
+  let report_reason env ppf violation =
     (* Print out per-axis information about why the error occurred. This only
        happens when modalities are printed because the errors are simple enough
        when there are no modalities that it makes the error unnecessarily noisy.
@@ -3608,9 +3625,11 @@ module Violation = struct
       let has_modalities =
         let jkind_has_modalities jkind =
           List.exists
-            (fun (_, type_info) ->
+            (fun (ty, type_info) ->
               With_bounds.Type_info.has_non_id_modalities
-                ~mod_bounds:jkind.jkind.mod_bounds ~type_info)
+                ~mod_bounds:jkind.jkind.mod_bounds
+                ~bounds_crossed_by_layout:(bounds_crossed_by_layout env ty)
+                ~type_info)
             (With_bounds.to_list jkind.jkind.with_bounds)
         in
         jkind_has_modalities sub || jkind_has_modalities super
@@ -3961,7 +3980,7 @@ module Violation = struct
       fprintf ppf "@[<hov 2>%s%a has %t,@ which %t.@]" preamble pp_former former
         fmt_k1 fmt_k2;
     report_missing_cmis ppf missing_cmis;
-    report_reason ppf t.violation;
+    report_reason env ppf t.violation;
     (* otherwise, we get notes for layout abbreviations that get omitted. *)
     report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
     if not !Clflags.ikinds then report_fuel ppf t.violation
