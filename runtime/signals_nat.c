@@ -177,7 +177,41 @@ typedef void (*sigaction_t)(int sig, siginfo_t *info, void *context);
 
 CAMLextern void caml_raise_stack_overflow_nat(void);
 
+/* Keep knowledge of each platform's mcontext layout in context_*
+   accessors, so the handler logic itself is more
+   platform-independent. */
+
+#if defined(TARGET_amd64)
+
+Caml_inline void context_set_pc(ucontext_t* context, void (*pc)(void))
+{
+#ifdef SYS_macosx
+  context->uc_mcontext->__ss.__rip = (unsigned long long) pc;
+#else
+  context->uc_mcontext.gregs[REG_RIP] = (greg_t) pc;
+#endif
+}
+
+#elif defined(TARGET_arm64)
+
+/* On Darwin OCaml targets arm64, not arm64e, so the thread-state
+   fields are plain integers, not pointer-authenticated. */
+
+Caml_inline void context_set_pc(ucontext_t* context, void (*pc)(void))
+{
+#ifdef SYS_macosx
+  context->uc_mcontext->__ss.__pc = (unsigned long long) pc;
+#else
+  context->uc_mcontext.pc = (uintnat) pc;
+#endif
+}
+
+#endif /* TARGET_* */
+
 static sigaction_t prior_segv_handler = NULL;
+#ifdef SYS_macosx
+static sigaction_t prior_sigbus_handler = NULL;
+#endif
 
 DECLARE_SIGNAL_HANDLER(segv_handler)
 {
@@ -188,31 +222,34 @@ DECLARE_SIGNAL_HANDLER(segv_handler)
     char* protected_low = Protected_stack_page(block);
     char* protected_high = protected_low + caml_plat_pagesize;
     if ((fault_addr >= protected_low) && (fault_addr < protected_high)) {
-      /* Faulting in the current guard page; presume stack overflow. Raise the
-         exception. */
-#ifdef SYS_macosx
-      context->uc_mcontext->__ss.__rip = (unsigned long long) &caml_raise_stack_overflow_nat;
-#else
-      context->uc_mcontext.gregs[REG_RIP]= (greg_t) &caml_raise_stack_overflow_nat;
-#endif
+      /* Faulting in the current guard page; presume stack overflow.
+         Redirect the faulting thread to the stub raising the exception. */
+      context_set_pc(context, &caml_raise_stack_overflow_nat);
       return; /* to caml_raise_stack_overflow_nat */
     }
   }
 
   /* Not a stack-overflow on our current Caml stack */
-  if (prior_segv_handler) {
-    /* Somebody else installed a SEGV handler before us. We make
-     * "reasonable best efforts" to invoke it, as maybe it's a SEGV
-     * they know about and can fix. We can't apply whatever sa_flags
-     * they had, but we can call their handler. */
-    prior_segv_handler(sig, info, context);
-  } else { /* default SEGV behaviour */
-    act.sa_handler = SIG_DFL;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGSEGV, &act, NULL);
+  {
+    sigaction_t prior =
+#ifdef SYS_macosx
+      sig == SIGBUS ? prior_sigbus_handler :
+#endif
+      prior_segv_handler;
+    if (prior) {
+      /* Somebody else installed a handler before us. We make
+       * "reasonable best efforts" to invoke it, as maybe it's a fault
+       * they know about and can fix. We can't apply whatever sa_flags
+       * they had, but we can call their handler. */
+      prior(sig, info, context);
+    } else { /* default behaviour for the signal */
+      act.sa_handler = SIG_DFL;
+      act.sa_flags = 0;
+      sigemptyset(&act.sa_mask);
+      sigaction(sig, &act, NULL);
+    }
   }
-  /* returning from SEGV handler restarts the failing instruction */
+  /* returning from the handler restarts the failing instruction */
 }
 
 void caml_init_nat_signals(void)
@@ -228,6 +265,17 @@ void caml_init_nat_signals(void)
   if (oldact.sa_sigaction != (sigaction_t)SIG_DFL) {
     prior_segv_handler = oldact.sa_sigaction;
   }
+#ifdef SYS_macosx
+  /* macOS reports accesses to PROT_NONE pages, such as the stack guard
+     pages, as SIGBUS (KERN_PROTECTION_FAILURE), not SIGSEGV. */
+  SET_SIGACT(act, segv_handler);
+  act.sa_flags |= SA_ONSTACK;
+  sigemptyset(&act.sa_mask);
+  sigaction(SIGBUS, &act, &oldact);
+  if (oldact.sa_sigaction != (sigaction_t)SIG_DFL) {
+    prior_sigbus_handler = oldact.sa_sigaction;
+  }
+#endif
 }
 
 #else
