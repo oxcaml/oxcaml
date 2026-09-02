@@ -137,8 +137,7 @@ let emit_signature info alerts tsg =
       Typemod.staticity_of_modalities tsg.Typedtree.sig_modalities
     in
     Env.save_signature ~alerts (tsg.Typedtree.sig_type, staticity)
-      (Compilation_unit.name info.module_name) kind
-      (Unit_info.cmi info.target)
+      (Unit_info.intf info.target) kind (Unit_info.cmi info.target)
   in
   Typemod.save_signature info.target info.module_name tsg info.env sg
 
