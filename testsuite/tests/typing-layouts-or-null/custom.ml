@@ -1333,6 +1333,45 @@ type 'a t3 = 'a t2 = Nope | Yep of 'a [@@or_null]
 
 (* GADT tests. *)
 
+type mixed =
+  | Mixed_null
+  | Mixed_this : 'a -> mixed
+[@@or_null]
+
+let mixed_is_null = function
+  | Mixed_null -> true
+  | Mixed_this _ -> false
+
+let mixed_int = Mixed_this 42
+let mixed_string = Mixed_this "hello"
+
+[%%expect{|
+type mixed = Mixed_null | Mixed_this : 'a -> mixed [@@or_null]
+val mixed_is_null : mixed -> bool = <fun>
+val mixed_int : mixed = Mixed_this <poly>
+val mixed_string : mixed = Mixed_this <poly>
+|}]
+
+type 'a mixed_null_gadt =
+  | Mixed_gadt_null : int mixed_null_gadt
+  | Mixed_plain_this of 'a
+[@@or_null]
+
+let mixed_to_option : type a. a mixed_null_gadt -> a option = function
+  | Mixed_gadt_null -> None
+  | Mixed_plain_this x -> Some x
+
+let mixed_string_payload (x : string mixed_null_gadt) =
+  match x with Mixed_plain_this s -> s
+
+[%%expect{|
+type 'a mixed_null_gadt =
+    Mixed_gadt_null : int mixed_null_gadt
+  | Mixed_plain_this of 'a [@@or_null]
+val mixed_to_option : 'a mixed_null_gadt -> 'a option = <fun>
+val mixed_string_payload : string mixed_null_gadt -> string = <fun>
+|}]
+
 type _ indexed =
   | Indexed_null : int indexed
   | Indexed_this : string -> string indexed

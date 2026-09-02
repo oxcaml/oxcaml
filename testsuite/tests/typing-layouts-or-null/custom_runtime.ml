@@ -390,6 +390,38 @@ let () =
   assert (compare (P 0) (N : int gadt) > 0)
 ;;
 
+type mixed =
+  | Mixed_null
+  | Mixed_this : 'a -> mixed
+[@@or_null]
+
+let[@inline never] mixed_is_null = function
+  | Mixed_null -> true
+  | Mixed_this _ -> false
+
+type 'a mixed_null_gadt =
+  | Mixed_gadt_null : int mixed_null_gadt
+  | Mixed_plain_this of 'a
+[@@or_null]
+
+let[@inline never] mixed_to_option : type a. a mixed_null_gadt -> a option =
+  function
+  | Mixed_gadt_null -> None
+  | Mixed_plain_this x -> Some x
+
+let[@inline never] mixed_string_payload (x : string mixed_null_gadt) =
+  match x with Mixed_plain_this s -> s
+
+let () =
+  assert (mixed_is_null Mixed_null);
+  assert (not (mixed_is_null (Mixed_this 42)));
+  assert (not (mixed_is_null (Mixed_this "hello")));
+  assert (mixed_to_option Mixed_gadt_null = None);
+  assert (mixed_to_option (Mixed_plain_this 42) = Some 42);
+  assert (mixed_to_option (Mixed_plain_this "hello") = Some "hello");
+  assert (mixed_string_payload (Mixed_plain_this "hello") = "hello")
+;;
+
 type _ indexed_gadt =
   | IN : int indexed_gadt
   | IP : float -> float indexed_gadt
