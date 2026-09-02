@@ -643,11 +643,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             List.map arg applied_unarized_args
             @ Bound_parameters.simples remaining_params
           in
-          let inlined : Inlined_attribute.t =
-            if !Clflags.stubs_forward_inlining
-            then Forward_inlined
-            else Default_inlined
-          in
+          let inlined = Inlined_attribute.forward_inlined () in
           let full_application =
             Apply.create ~callee ~continuation:(Return return_continuation)
               exn_continuation ~args ~args_arity:param_arity
