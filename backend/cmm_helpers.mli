@@ -788,6 +788,15 @@ val cdefine_symbol : symbol -> data_item list
     contain additional data items afterwards). *)
 val emit_block : symbol -> nativeint -> data_item list -> data_item list
 
+(** [atom_symbol ~tag] is the runtime-exported symbol [caml_atom_<tag>], which
+    names the *value* of the runtime's permanent zero-sized block (atom) of the
+    given tag: the address one word past its header (see
+    runtime/caml/mlvalues.h). *)
+val atom_symbol : tag:int -> Cmm.symbol
+
+(** A data item holding the value of the runtime's atom of the given tag. *)
+val atom_value_data_item : tag:int -> Cmm.data_item
+
 (** Emit specific kinds of constant blocks as data items *)
 val emit_float32_constant : symbol -> float -> data_item list -> data_item list
 
