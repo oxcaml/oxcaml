@@ -11275,6 +11275,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
        let exp =
          with_local_level_generalize_structure_if_principal
            (fun () -> type_exp env (mode_max_with_position position) sexp)
+           ~before_generalize:generalize_structure_exp
        in
        exp, sort)
   ~before_generalize: begin fun (exp, _sort) ->
