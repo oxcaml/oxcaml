@@ -1080,6 +1080,8 @@ module type S = sig
   module Const : sig
     val alloc_as_value : Alloc.Const.t -> Value.Const.t
 
+    val value_to_alloc_r2l : Value.Const.t -> Alloc.Const.t
+
     module Axis : sig
       val alloc_as_value : Alloc.Axis.packed -> Value.Axis.packed
 
@@ -1206,6 +1208,9 @@ module type S = sig
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t
+
+      (** Apply a modality on a constant *)
+      val apply_const : t -> Value.Const.t -> Value.Const.t
 
       (** [set a t] overwrites an axis of [t] to be [a]. *)
       val set : 'a Axis.t -> 'a -> t -> t
