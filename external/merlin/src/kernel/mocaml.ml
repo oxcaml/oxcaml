@@ -48,7 +48,9 @@ let setup_reader_config config =
     | Some "mli" -> Intf
     | _ -> Impl
   in
-  let compilation_unit = Compilation_unit.of_string (Mconfig.unitname config) in
+  let compilation_unit =
+    Compilation_unit.of_string_unsafe (Mconfig.unitname config)
+  in
   let unit_info =
     Unit_info.make_with_known_compilation_unit
       ~source_file:config.query.filename guessed_file_type "" compilation_unit

@@ -316,7 +316,7 @@ end = struct
         | None -> `No_documentation))
     | Cmt cmt_infos ->
       begin match uid with
-      | Shape.Uid.Compilation_unit _ ->
+      | Shape.Uid.Compilation_unit _ | Shape.Uid.Compilation_unit_intf _ ->
         (* For module doc we need to look at the first items in the typedtree *)
         find_compunit_doc_in_typedtree cmt_infos
       | _ -> begin
@@ -834,7 +834,8 @@ let lookup_uid_loc_of_decl ~config:mconfig uid =
     let rec item_of_uid uid =
       match uid with
       | Shape.Uid.Unboxed_version uid -> item_of_uid uid
-      | Internal | Predef _ | Compilation_unit _ -> None
+      | Internal | Predef _ | Compilation_unit _ | Compilation_unit_intf _ ->
+        None
       | Item { from = Intf; comp_unit; _ } -> Some (`MLI, comp_unit)
       | Item { from = _; comp_unit; _ } -> Some (`ML, comp_unit)
     in
@@ -904,7 +905,11 @@ let find_loc_of_uid ~config ~local_defs ?ident ?fallback (uid : Shape.Uid.t) =
     | Predef s -> `Builtin (uid, s)
     | Internal -> `Builtin (uid, "<internal>")
     | Item { comp_unit; _ } -> `Opt (find_loc_of_item ~comp_unit)
-    | Compilation_unit comp_unit -> find_loc_of_comp_unit ~config uid comp_unit
+    | Compilation_unit comp_unit ->
+      find_loc_of_comp_unit ~config uid
+        (Compilation_unit.full_path_as_string comp_unit)
+    | Compilation_unit_intf intf ->
+      find_loc_of_comp_unit ~config uid (Compilation_unit_intf.to_string intf)
   in
   extract_from_uid uid
 
@@ -960,17 +965,28 @@ let find_definition_uid ~config ~env ~(decl : Env_lookup.item) path =
       Shape_reduce.print_result fmt reduced);
   reduced
 
+let module_name_of_uid : Shape.Uid.t -> string option = function
+  | Item { comp_unit; _ } -> Some comp_unit
+  | Compilation_unit comp_unit ->
+    Some (Compilation_unit.full_path_as_string comp_unit)
+  | Compilation_unit_intf intf -> Some (Compilation_unit_intf.to_string intf)
+  | Internal | Predef _ | Unboxed_version _ -> None
+
 let rec uid_of_result ~traverse_aliases = function
   | Shape_reduce.Resolved uid -> (Some uid, false)
   | Resolved_alias
-      ( (Item { comp_unit; _ } | Compilation_unit comp_unit),
+      ( alias_uid,
         (( Resolved_alias (Compilation_unit comp_unit', _)
          | Resolved (Compilation_unit comp_unit') ) as rest) )
-    when let by = comp_unit ^ "__" in
-         String.is_prefixed ~by comp_unit' ->
+    when (match module_name_of_uid alias_uid with
+         | None -> false
+         | Some comp_unit ->
+           let by = comp_unit ^ "__" in
+           String.is_prefixed ~by
+             (Compilation_unit.full_path_as_string comp_unit')) ->
     (* Always traverse dune-wrapper aliases *)
-    log ~title:"uid_of_result" "Traversing wrapping alias: %s__ %s" comp_unit
-      comp_unit';
+    log ~title:"uid_of_result" "Traversing wrapping alias: %s"
+      (Compilation_unit.full_path_as_string comp_unit');
     uid_of_result ~traverse_aliases rest
   | Resolved_alias (_alias, rest) when traverse_aliases ->
     uid_of_result ~traverse_aliases rest
@@ -1156,7 +1172,8 @@ let from_string ~config ~env ~local_defs ~pos ?let_pun_behavior
 let doc_from_uid ~config ~loc (uid : Shape.Uid.t) =
   let rec get_comp_unit uid =
     match (uid : Shape.Uid.t) with
-    | Item { comp_unit; _ } | Compilation_unit comp_unit -> Some comp_unit
+    | Item _ | Compilation_unit _ | Compilation_unit_intf _ ->
+      module_name_of_uid uid
     | Unboxed_version uid -> get_comp_unit uid
     | Internal | Predef _ -> None
   in

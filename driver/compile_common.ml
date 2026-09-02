@@ -97,6 +97,7 @@ let typecheck_intf info ast =
     ast
     |> Typemod.type_interface
          ~sourcefile:(Unit_info.original_source_file info.target)
+         ~intf:(Unit_info.intf info.target)
          info.module_name info.env
     |> print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
   in
