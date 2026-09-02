@@ -6,29 +6,28 @@ the fact collector (see the module-type-index branch) or in the query itself.
 A failing diff here is the specification of the fix; once a gap is closed, its
 case should pass unchanged and can move into [module-type-impls.t].
 
-The helpers are the same as in [module-type-impls.t], except that a query
-failure is printed as a [failure:] line instead of confusing [jq]:
+The query takes no module-type selector: it reports every module-type
+declaration of the buffer, each identified by its declaration uid.  The
+selection below happens on the display side, so the tests stay deterministic.
+The helpers are the same as in [module-type-impls.t], except that rows equal
+up to their witness instance are printed once, in line order:
 
   $ print_results () {
-  >   jq -r '
+  >   local module_type="${1-}"
+  >   jq -r --arg module_type "$module_type" '
   >     def position: "\(.line):\(.col)";
-  >     if .class != "return" then "\(.class): \(.value)"
-  >     else
-  >       (.value.status,
-  >        ([.value.implementations[]]
-  >         | sort_by([.start.line,
-  >                    .start.col,
-  >                    .end.line,
-  >                    .end.col,
-  >                    (.name // ""),
-  >                    (.check // .kind // "")])
-  >         | .[]
-  >         | [(.name // "<anon>"),
-  >            (.start | position),
-  >            (.end | position),
-  >            (.check // .kind // "<none>")]
-  >         | join(" ")))
-  >     end'
+  >     (.value.targets[]
+  >      | select(.target == $module_type)
+  >      | .status),
+  >     ([.value.implementations[]
+  >       | select(($module_type == "") or (.target == $module_type))]
+  >      | map([(.name // "<anon>"),
+  >             (.start | position),
+  >             (.end | position),
+  >             (.check // .kind // "<none>")]
+  >            | join(" "))
+  >      | unique
+  >      | .[])'
   > }
 
   $ impls_of () {
@@ -37,10 +36,9 @@ failure is printed as a [failure:] line instead of confusing [jq]:
   >   $OCAMLC -bin-annot -c main.ml || return
   >   ocaml-index aggregate main.cmt -o module-types.ocaml-index || return
   >   $MERLIN single module-type-impls \
-  >     -module-type "$module_type" \
   >     -index-file ./module-types.ocaml-index \
   >     -filename ./main.ml < ./main.ml \
-  >     | print_results
+  >     | print_results "$module_type"
   > }
 
 A module bound in an expression implements a module type like a structure
@@ -102,8 +100,8 @@ a module packed by an expression, so both sites implement [S].
   > let unpack (module X : S) = ()
   > EOF
   complete
-  <anon> 9:21 9:22 package
   <anon> 11:19 11:20 package
+  <anon> 9:21 9:22 package
 
 A packed unit is checked against its [.mli] like any other unit, and members
 compiled with [-for-pack] root their facts at the packed name, so references
@@ -136,24 +134,21 @@ between members join.
   $ ocaml-index aggregate pck.cmti pck.cmt pmember.cmt puser.cmt \
   >   -o pack.ocaml-index
 
-The pack was checked against [pck.mli], so the interface query reports the
-pack as that interface's implementation.
+The pack was checked against [pck.mli], so querying the interface buffer
+reports the pack as the [(interface)] implementation.
 
   $ $MERLIN single module-type-impls \
-  >   -interface \
   >   -index-file ./pack.ocaml-index \
   >   -filename ./pck.mli < ./pck.mli \
-  >   | print_results
-  complete
+  >   | print_results "(interface)"
   Pck 0:-1 0:-1 interface
 
 A member annotated against a sibling member's module type implements it.
 
   $ $MERLIN single module-type-impls \
-  >   -module-type S \
   >   -index-file ./pack.ocaml-index \
   >   -filename ./pmember.ml < ./pmember.ml \
-  >   | print_results
+  >   | print_results S
   complete
   M 1:7 1:8 annotation
 
@@ -191,18 +186,19 @@ applications instantiate: a client checked against [F(A).T] implements the
   $ ocaml-index aggregate ifun.cmti ifun.cmt fclient.cmt \
   >   -o ifun.ocaml-index
   $ $MERLIN single module-type-impls \
-  >   -module-type S \
   >   -index-file ./ifun.ocaml-index \
   >   -filename ./ifun.mli < ./ifun.mli \
-  >   | print_results
+  >   | print_results S
   complete
   A 1:7 1:8 argument
+  F 4:7 4:8 interface
+  Ifun 0:-1 0:-1 interface
   Z 5:7 5:8 annotation
 
 A declaration nested inside a module-type body is paired with the [.mli]'s
 declaration during the interface check, exactly like its toplevel siblings,
 so implementations checked in the [.ml] surface when the query resolves the
-module type from the [.mli], here through the declared module [C].
+buffer's [Container.Local] declaration.
 
   $ cat > cont.mli <<'EOF'
   > module type S = sig
@@ -235,19 +231,21 @@ module type from the [.mli], here through the declared module [C].
   $ $OCAMLC -bin-annot -c cont.mli cont.ml
   $ ocaml-index aggregate cont.cmti cont.cmt -o cont.ocaml-index
   $ $MERLIN single module-type-impls \
-  >   -module-type C.Local \
   >   -index-file ./cont.ocaml-index \
   >   -filename ./cont.mli < ./cont.mli \
-  >   | print_results
+  >   | print_results Container.Local
   complete
+  C 8:7 8:8 annotation
+  C 8:7 8:8 interface
+  Cont 0:-1 0:-1 interface
   Impl 14:7 14:11 annotation
 
-A module type that does not resolve is an explicit failure, never a confident
-empty answer.
+A name that is not a module-type declaration of the buffer selects nothing:
+the query only ever answers for the buffer's own declarations, identified by
+their uids.
 
   $ impls_of Nonexistent <<'EOF'
   > module type S = sig
   >   type t
   > end
   > EOF
-  failure: No module type named "Nonexistent" in the current buffer
