@@ -34,6 +34,30 @@ CAMLprim value caml_dynamic_push(value dyn, value val);
    Must be paired with [caml_dynamic_push] on the same fiber. */
 CAMLprim value caml_dynamic_pop(value dyn);
 
+<<<<<<< HEAD
+/* Return a handle to the dynamic binding state currently visible to this fiber.
+
+   These functions are intended to be used by structured concurrency
+   primitives in the following order:
+
+   let scope = caml_dynamic_freeze_scope () in
+   let l, r =
+      spawn (fun () -> caml_dynamic_use_scope scope),
+      spawn (fun () -> caml_dynamic_use_scope scope)
+   in
+   await l, await r
+
+   Using the scope in child fibers causes them to inherit dynamic bindings
+   on the path from the fork point to the root task, even if they're migrated
+   to other worker threads. */
+CAMLprim value caml_dynamic_freeze_scope(value unit);
+
+/* Install [scope] as the current fiber's dynamic binding state and mark it as
+   a concurrent task. See [caml_dynamic_freeze_scope] for usage. */
+CAMLprim value caml_dynamic_use_scope(value scope);
+
+=======
+>>>>>>> main
 typedef struct dynamic_binding_s {
   value dyn; /* Dynamic id, or Val_null if unbound */
   value val;
