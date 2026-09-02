@@ -83,16 +83,20 @@ let mkTexp_apply
   in
   Texp_apply (exp, args, pos, mode, yielding, za)
 
-type texp_tuple_identifier = string option list * alloc_mode_r
+type texp_tuple_identifier = (string option * Jkind.Sort.t) list * alloc_mode_r
 
 let mkTexp_tuple ?id exps =
-  let labels, alloc =
+  let labels_and_sorts, alloc =
     match id with
-    | None -> List.map (fun _ -> None) exps, dummy_alloc_mode_r
+    | None ->
+      (* CR zeisbach: i'm assuming this is a sane sort to throw in here? *)
+      List.map (fun _ -> None, dummy_scannable_sort) exps, dummy_alloc_mode_r
     | Some id -> id
   in
-  let exps = List.combine labels exps in
-  Texp_tuple (exps, alloc)
+  let elements =
+    List.map2 (fun (label, sort) exp -> label, exp, sort) labels_and_sorts exps
+  in
+  Texp_tuple (elements, alloc)
 
 type texp_construct_identifier =
   alloc_mode_r option * constructor_representation
@@ -304,8 +308,10 @@ let view_texp (e : expression_desc) =
   | Texp_record { fields; representation; extended_expression; alloc_mode } ->
     Texp_record { fields; extended_expression; id = representation, alloc_mode }
   | Texp_tuple (args, mode) ->
-    let labels, args = List.split args in
-    Texp_tuple (args, (labels, mode))
+    let labels_and_sorts, args =
+      List.split (List.map (fun (label, arg, sort) -> (label, sort), arg) args)
+    in
+    Texp_tuple (args, (labels_and_sorts, mode))
   | Texp_function { params; body; alloc_mode; ret_sort; ret_mode; zero_alloc }
     ->
     let params =
@@ -396,15 +402,18 @@ let mkTpat_array
           Jkind.Sort.scannable )) l =
   Tpat_array (mut, arg_sort, l)
 
-type tpat_tuple_identifier = string option list
+type tpat_tuple_identifier = (string option * Jkind.Sort.t) list
 
 let mkTpat_tuple ?id pats =
-  let labels =
+  let labels_and_sorts =
     match id with
-    | None -> List.map (fun _ -> None) pats
-    | Some labels -> labels
+    | None -> List.map (fun _ -> None, dummy_scannable_sort) pats
+    | Some id -> id
   in
-  Tpat_tuple (List.combine labels pats)
+  let elements =
+    List.map2 (fun (label, sort) pat -> label, pat, sort) labels_and_sorts pats
+  in
+  Tpat_tuple elements
 
 type tpat_construct_identifier = constructor_representation
 
@@ -487,8 +496,10 @@ let view_tpat (type a) (p : a pattern_desc) : a matched_pattern_desc =
     Tpat_alias (p, ident, name, (sort, mode, ty))
   | Tpat_array (mut, arg_sort, l) -> Tpat_array (l, (mut, arg_sort))
   | Tpat_tuple pats ->
-    let labels, pats = List.split pats in
-    Tpat_tuple (pats, labels)
+    let labels_and_sorts, pats =
+      List.split (List.map (fun (label, pat, sort) -> (label, sort), pat) pats)
+    in
+    Tpat_tuple (pats, labels_and_sorts)
   | Tpat_construct (id, ctor, repres, args, ty) ->
     Tpat_construct (id, ctor, args, ty, repres)
   | Tpat_record (args, repres, closed) -> Tpat_record (args, closed, repres)

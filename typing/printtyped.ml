@@ -514,7 +514,7 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_unboxed_bool b -> line i ppf "Tpat_unboxed_bool %a\n" fmt_bool b;
   | Tpat_tuple (l) ->
       line i ppf "Tpat_tuple\n";
-      list i labeled_pattern ppf l;
+      list i labeled_pattern_with_sorts ppf l;
   | Tpat_unboxed_tuple (l) ->
       line i ppf "Tpat_unboxed_tuple\n";
       list i labeled_pattern_with_sorts ppf l;
@@ -560,11 +560,6 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_fun_layout \"%a\"\n" fmt_ident s;
       line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m
-
-and labeled_pattern : type k . _ -> _ -> string option * k general_pattern -> unit =
-  fun i ppf (label, x) ->
-    tuple_component_label i ppf label;
-    pattern i ppf x
 
 and labeled_pattern_with_sorts :
   type k . _ -> _ -> string option * k general_pattern * Jkind.sort -> unit =
@@ -739,7 +734,7 @@ and expression i ppf x =
   | Texp_tuple (l, am) ->
       line i ppf "Texp_tuple\n";
       alloc_mode i ppf am;
-      list i labeled_expression ppf l;
+      list i labeled_sorted_expression ppf l;
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
       list i labeled_sorted_expression ppf l;
@@ -1515,10 +1510,6 @@ and label_x_apply_arg i ppf (l, e) =
   line i ppf "<arg>\n";
   arg_label (i+1) ppf l;
   (match e with Omitted _ -> () | Arg (e, _) -> expression (i+1) ppf e)
-
-and labeled_expression i ppf (l, e) =
-  tuple_component_label i ppf l;
-  expression (i+1) ppf e;
 
 and labeled_sorted_expression i ppf (l, e, s) =
   tuple_component_label i ppf l;

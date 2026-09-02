@@ -310,10 +310,10 @@ and 'k pattern_desc =
   | Tpat_unboxed_bool : bool -> value pattern_desc
         (** #false, #true *)
   | Tpat_tuple :
-      (string option * value general_pattern) list -> value pattern_desc
-        (** (P1, ..., Pn)                  [(None,P1); ...; (None,Pn)])
-            (L1:P1, ... Ln:Pn)             [(Some L1,P1); ...; (Some Ln,Pn)])
-            Any mix, e.g. (L1:P1, P2)      [(Some L1,P1); ...; (None,P2)])
+      (string option * value general_pattern * Jkind.sort) list -> value pattern_desc
+        (** (P1, ..., Pn)                  [(None,P1,s1); ...; (None,Pn,sn)])
+            (L1:P1, ... Ln:Pn)             [(Some L1,P1,s1); ...; (Some Ln,Pn,sn)])
+            Any mix, e.g. (L1:P1, P2)      [(Some L1,P1,s1); ...; (None,P2,s2)])
 
             Invariant: n >= 2
          *)
@@ -579,14 +579,14 @@ and expression_desc =
         (** #() *)
   | Texp_unboxed_bool of bool
         (** #false, #true *)
-  | Texp_tuple of (string option * expression) list * alloc_mode_r
+  | Texp_tuple of (string option * expression * Jkind.sort) list * alloc_mode_r
         (** [Texp_tuple(el)] represents
             - [(E1, ..., En)]
-                when [el] is [(None, E1);...;(None, En)],
+                when [el] is [(None, E1, s1);...;(None, En, sn)],
             - [(L1:E1, ..., Ln:En)]
-                when [el] is [(Some L1, E1);...;(Some Ln, En)],
+                when [el] is [(Some L1, E1, sn);...;(Some Ln, En, sn)],
             - Any mix, e.g. [(L1: E1, E2)]
-                when [el] is [(Some L1, E1); (None, E2)]
+                when [el] is [(Some L1, E1, s1); (None, E2, s2)]
           *)
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
         (** [Texp_unboxed_tuple(el)] represents

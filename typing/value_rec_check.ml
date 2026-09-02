@@ -750,7 +750,7 @@ let rec expression : Typedtree.expression -> term_judg =
               list expression applied << Dereference;
               list expression delayed << Guard]
     | Texp_tuple (exprs, _) ->
-      list expression (List.map snd exprs) << Guard
+      list expression (List.map (fun (_, e, _) -> e) exprs) << Guard
     | Texp_unboxed_tuple exprs ->
       list expression (List.map (fun (_, e, _) -> e) exprs) << Return
     | Texp_atomic_loc { record = expr; _ } ->
