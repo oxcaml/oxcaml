@@ -176,6 +176,8 @@ module Dependency = struct
       | Instance
       | Argument_member
       | Interface
+      | Interface_member
+      | Interface_pair
 
     let int_of_t = function
       | Definition -> 0
@@ -189,6 +191,8 @@ module Dependency = struct
       | Instance -> 8
       | Argument_member -> 9
       | Interface -> 10
+      | Interface_member -> 11
+      | Interface_pair -> 12
 
     let compare left right = Int.compare (int_of_t left) (int_of_t right)
   end
@@ -426,6 +430,13 @@ let declared_module_type_path env path =
       | None -> None
   in
   follow [] path
+
+let declared_member_type_path (member_type : Types.module_type) =
+  let supported path = if path_contains_apply path then None else Some path in
+  match member_type with
+  | Mty_ident path -> supported path
+  | Mty_strengthen (Mty_ident path, _, _) -> supported path
+  | Mty_signature _ | Mty_functor _ | Mty_alias _ | Mty_strengthen _ -> None
 
 module String_map = Misc.Stdlib.String.Map
 module Path_map = Path.Map
@@ -1032,28 +1043,33 @@ let facts_of_tree compilation_unit artifact iterate =
   in
   let register_application_members ~root (module_expr : module_expr) =
     let module_expr = unwrap_implicit_constraint module_expr in
-    let functor_path =
+    let applied_functor =
       match module_expr.mod_desc with
       | Tmod_apply (functor_, _, _, _, _) | Tmod_apply_unit (functor_, _) ->
-        path_of_module_expr (unwrap_implicit_constraint functor_)
+        Some (unwrap_implicit_constraint functor_)
       | Tmod_ident _ | Tmod_structure _ | Tmod_functor _ | Tmod_constraint _
       | Tmod_unpack _ ->
         None
     in
-    match functor_path with
+    let family =
+      match applied_functor with
+      | None -> None
+      | Some functor_ -> (
+        match path_of_module_expr functor_ with
+        | Some functor_path ->
+          Option.map
+            (functor_result_family module_expr.mod_env)
+            (find_normalized_module module_expr.mod_env functor_path)
+        | None -> functor_result_owner functor_.mod_env functor_.mod_type)
+    in
+    match family with
     | None -> ()
-    | Some functor_path -> (
-      match find_normalized_module module_expr.mod_env functor_path with
-      | None -> ()
-      | Some functor_declaration -> (
-        let family =
-          functor_result_family module_expr.mod_env functor_declaration
-        in
-        match scraped_signature module_expr.mod_env module_expr.mod_type with
-        | Some signature ->
-          instance_members module_expr.mod_env ~instance:root ~family signature;
-          record_member_contexts root signature
-        | None -> ()))
+    | Some family -> (
+      match scraped_signature module_expr.mod_env module_expr.mod_type with
+      | Some signature ->
+        instance_members module_expr.mod_env ~instance:root ~family signature;
+        record_member_contexts root signature
+      | None -> ())
   in
   let rec signature_component env ~prefix_indexes index (path : Path.t) =
     match path with
@@ -1104,7 +1120,7 @@ let facts_of_tree compilation_unit artifact iterate =
                        { context = interface_context;
                          family_uid = interface_declaration.Types.mtd_uid
                        })
-                  Dependency.Reason.Interface
+                  Dependency.Reason.Interface_pair
               | None ->
                 add_omission ~affected:(Some derived)
                   ~source:(Some declaration.mtd_uid)
@@ -1234,7 +1250,7 @@ let facts_of_tree compilation_unit artifact iterate =
                     ~source:
                       (named_key ~family:None body_context
                          body_declaration.Types.mtd_uid)
-                    Dependency.Reason.Interface
+                    Dependency.Reason.Interface_pair
                 | Some _ | None -> ()))
             | Module_member (name, declaration) -> (
               match String_map.find_opt name body_index.module_members with
@@ -1249,6 +1265,14 @@ let facts_of_tree compilation_unit artifact iterate =
                      then Node.Uid body_declaration.Types.md_uid
                      else Node.Location (compilation_unit, site))
                     (Key.Anon declaration.md_uid) Check.Kind.Annotation site;
+                (match declared_member_type_path declaration.Types.md_type with
+                | None -> ()
+                | Some path -> (
+                  match key_of_modtype_path ~site env path with
+                  | Some source ->
+                    add_dependency ~derived:(Key.Anon declaration.md_uid)
+                      ~source Dependency.Reason.Interface
+                  | None -> ()));
                 match resolve_member visited env declaration.Types.md_type with
                 | `Signature (visited, annotation_owner, annotation_members)
                   -> (
@@ -1544,13 +1568,13 @@ let facts_of_tree compilation_unit artifact iterate =
                   (fun (declaration : Typedtree.module_declaration) ->
                     add_dependency ~derived:(Key.Anon unit_uid)
                       ~source:(Key.Anon declaration.md_uid)
-                      Dependency.Reason.Interface)
+                      Dependency.Reason.Interface_member)
                   declarations)
           | Tsig_module declaration ->
             when_interface_root (fun unit_uid ->
                 add_dependency ~derived:(Key.Anon unit_uid)
                   ~source:(Key.Anon declaration.md_uid)
-                  Dependency.Reason.Interface)
+                  Dependency.Reason.Interface_member)
           | Tsig_modtype declaration | Tsig_modtypesubst declaration ->
             when_interface_root (fun unit_uid ->
                 add_dependency ~derived:(Key.Anon unit_uid)
@@ -1559,7 +1583,7 @@ let facts_of_tree compilation_unit artifact iterate =
                        { context = enclosing_context ();
                          family_uid = declaration.mtd_uid
                        })
-                  Dependency.Reason.Interface)
+                  Dependency.Reason.Interface_member)
           | Tsig_open open_ ->
             let path, _ = open_.open_expr in
             report_path_applications ~site:open_.open_loc open_.open_env path
@@ -1841,13 +1865,13 @@ let facts_of_tree compilation_unit artifact iterate =
                   | Tsig_module declaration ->
                     add_dependency ~derived:key
                       ~source:(Key.Anon declaration.md_uid)
-                      Dependency.Reason.Interface
+                      Dependency.Reason.Interface_member
                   | Tsig_recmodule declarations ->
                     List.iter
                       (fun (declaration : module_declaration) ->
                         add_dependency ~derived:key
                           ~source:(Key.Anon declaration.md_uid)
-                          Dependency.Reason.Interface)
+                          Dependency.Reason.Interface_member)
                       declarations
                   | Tsig_modtype declaration | Tsig_modtypesubst declaration ->
                     add_dependency ~derived:key
@@ -1856,7 +1880,7 @@ let facts_of_tree compilation_unit artifact iterate =
                            { context = enclosing_context ();
                              family_uid = declaration.mtd_uid
                            })
-                      Dependency.Reason.Interface
+                      Dependency.Reason.Interface_member
                   | Tsig_value _ | Tsig_type _ | Tsig_typesubst _
                   | Tsig_typext _ | Tsig_exception _ | Tsig_modsubst _
                   | Tsig_open _ | Tsig_class _ | Tsig_class_type _
@@ -1877,7 +1901,7 @@ let facts_of_tree compilation_unit artifact iterate =
                   | Twith_modtype constraint_type ->
                     add_dependency ~derived:key
                       ~source:(key_of_module_type constraint_type)
-                      Dependency.Reason.With_constraint
+                      Dependency.Reason.Interface_member
                   | Twith_modtypesubst constraint_type ->
                     add_dependency ~derived:key
                       ~source:(key_of_module_type constraint_type)
@@ -2060,7 +2084,7 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
             { Dependency.derived = Key.Named { context; family_uid = impl };
               source =
                 Key.Named { context = interface_context; family_uid = intf };
-              reason = Dependency.Reason.Interface
+              reason = Dependency.Reason.Interface_pair
             }
         | None -> unrepresentable Omission.Reason.Unresolved_module))
     modtype_pairs;
