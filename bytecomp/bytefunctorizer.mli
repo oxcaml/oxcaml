@@ -24,4 +24,4 @@
  *                                                                                *
  **********************************************************************************)
 
-val functorize : Compilation_unit.Name.Set.t -> string -> unit
+val functorize : Compilation_unit_intf.Set.t -> string -> unit

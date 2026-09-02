@@ -191,7 +191,7 @@ module Scoped_location = struct
          to fix it easily, and we're not using packs anyway these days. *)
       match scopes with
       | Cons { item = Sc_module_definition; str; _ } ->
-        Some (Compilation_unit.of_string str)
+        Some (Compilation_unit.of_string_unsafe str)
       | _ -> None
 
   type t =
