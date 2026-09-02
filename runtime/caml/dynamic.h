@@ -34,7 +34,6 @@ CAMLprim value caml_dynamic_push(value dyn, value val);
    Must be paired with [caml_dynamic_push] on the same fiber. */
 CAMLprim value caml_dynamic_pop(value dyn);
 
-<<<<<<< HEAD
 /* Return a handle to the dynamic binding state currently visible to this fiber.
 
    These functions are intended to be used by structured concurrency
@@ -56,8 +55,6 @@ CAMLprim value caml_dynamic_freeze_scope(value unit);
    a concurrent task. See [caml_dynamic_freeze_scope] for usage. */
 CAMLprim value caml_dynamic_use_scope(value scope);
 
-=======
->>>>>>> main
 typedef struct dynamic_binding_s {
   value dyn; /* Dynamic id, or Val_null if unbound */
   value val;
