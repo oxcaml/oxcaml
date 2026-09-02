@@ -842,14 +842,25 @@ let lookup_uid_loc_of_decl ~config:mconfig uid =
   in
   Option.bind item ~f:(fun (ml_or_mli, comp_unit) ->
       let config = { mconfig; ml_or_mli; traverse_aliases = false } in
-      match load_cmt ~config comp_unit with
-      | Ok (_pos_fname, artifact) ->
-        log ~title "Cmt successfully loaded, looking for %a" Logger.fmt
-          (fun fmt -> Shape.Uid.print fmt uid);
-        Artifact.uid_to_loc uid artifact
-      | _ ->
-        log ~title "Failed to load the cmt file";
-        None)
+      let load_and_find comp_unit =
+        match load_cmt ~config comp_unit with
+        | Ok (_pos_fname, artifact) ->
+          log ~title "Cmt successfully loaded, looking for %a" Logger.fmt
+            (fun fmt -> Shape.Uid.print fmt uid);
+          Artifact.uid_to_loc uid artifact
+        | Error () | (exception Not_found) ->
+          log ~title "Failed to load the cmt file";
+          None
+      in
+      match load_and_find comp_unit with
+      | Some _ as located -> located
+      | None -> (
+        match Stdlib.String.rindex_opt comp_unit '.' with
+        | Some dot when dot + 1 < String.length comp_unit ->
+          load_and_find
+            (Stdlib.String.sub comp_unit (dot + 1)
+               (String.length comp_unit - dot - 1))
+        | Some _ | None -> None))
 
 (** uid's location are given by tables stored int he cmt files for external
     compilation units or computed by Merlin for the current buffer.
