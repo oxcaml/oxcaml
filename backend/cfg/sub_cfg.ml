@@ -158,12 +158,13 @@ let join_tail ~from ~to_ =
   List.iter (fun from -> transfer ~from ~to_) from;
   add_never_block to_ ~label:(Cmm.new_label ())
 
-let update_exit_terminator ?arg sub_cfg desc ~phantom_available_before =
+let update_exit_terminator ?arg ?dbg sub_cfg desc ~phantom_available_before =
   sub_cfg.exit.terminator
     <- { sub_cfg.exit.terminator with
          desc;
          id = next_instr_id ();
          arg = Option.value arg ~default:sub_cfg.exit.terminator.arg;
+         dbg = Option.value dbg ~default:sub_cfg.exit.terminator.dbg;
          phantom_available_before
        }
 
