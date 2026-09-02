@@ -694,8 +694,23 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
                   free_names ))
             ( Expr.create_apply full_application,
               cost_metrics,
-              Apply.free_names full_application
-              |> NO.without_names_or_continuations )
+              (* [without_names_or_continuations] removes variables (all of
+                 which are bound by the stub's parameters, the value-slot
+                 projections added by the fold below, or [my_closure]) and
+                 continuations (bound above) — but it also removes symbols,
+                 which remain genuinely free in the stub's body: a symbol callee
+                 and any symbol-valued applied arguments are baked directly into
+                 the full application (they are deliberately not stored in value
+                 slots). Re-add the symbols: recorded free names of code must
+                 never understate the actual free names. Note that the value
+                 recorded here is provisional: [simplify_expr] below
+                 re-simplifies the manufactured code, which recomputes its free
+                 names from the simplified body (symbols included). *)
+              let fn = Apply.free_names full_application in
+              Symbol.Set.fold
+                (fun sym acc -> NO.add_symbol acc sym NM.normal)
+                (NO.symbols fn)
+                (NO.without_names_or_continuations fn) )
             (List.rev applied_values)
         in
         let params_and_body =
