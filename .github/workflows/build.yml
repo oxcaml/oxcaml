@@ -296,23 +296,32 @@ jobs:
       # "git fetch -q exited with code 128" or "Branch HEAD not found" (the
       # latter is opam's fallback message after a failed fetch, not a real
       # missing branch). opam captures git's stderr into its own logs, so the
-      # underlying message never reaches the Actions log. These three steps
-      # surface it (the working hypothesis is GitHub's per-IP rate limit on
-      # unauthenticated git, hit via the shared Warp x64 NAT: every failure so
-      # far has been x64, with zero on the arm64 pool).
+      # underlying message never reaches the Actions log.
+      #
+      # The first run of these steps established what is happening: the
+      # anonymous `GET /info/refs` is served 200, and the follow-up
+      # `POST /git-upload-pack` comes back 401 with
+      # `www-authenticate: Basic realm="GitHub"`, so git tries to prompt for a
+      # username, finds no tty, and exits 128. It is intermittent per request
+      # rather than per IP -- 36 of 44 probes got the 401, and individual
+      # runners flipped in both directions between two probes 24s apart -- and
+      # it does not correlate with the anonymous rate-limit budget (the one
+      # runner with an exhausted bucket is the one whose probe succeeded).
+      #
+      # Still unknown: what GitHub says in the 401 body. The probes previously
+      # set GIT_TRACE_CURL_NO_DATA, which suppressed it; it is dropped below so
+      # the (short, text/plain) body is logged.
       - name: DEBUG probe github.com before opam
         continue-on-error: true
         run: |
           echo "runner=${RUNNER_NAME:-?} os=${RUNNER_OS:-?} arch=${RUNNER_ARCH:-?}"
           date -u +'probe-before %Y-%m-%dT%H:%M:%SZ'
-          # Anonymous API limits are per-IP, like the git ones, so these headers
-          # show how much budget the IP has left -- and double as a fingerprint
-          # for the shared NAT: a job on its own IP sees x-ratelimit-used near
-          # 1, whereas jobs sharing an egress see an elevated common count.
+          # Kept as a control now that the rate-limit theory is ruled out: it
+          # confirms the budget stays healthy while the git 401s continue.
           curl -sS --max-time 20 -D - -o /dev/null https://api.github.com/rate_limit \
             | grep -i -E '^(HTTP/|x-ratelimit-|retry-after)' || true
           rc=0
-          GIT_TRACE=1 GIT_TRACE_CURL=1 GIT_TRACE_CURL_NO_DATA=1 \
+          GIT_TRACE=1 GIT_TRACE_CURL=1 \
             git ls-remote https://github.com/ocaml/opam-repository.git HEAD || rc=$?
           echo "ls-remote exit=$rc"
 
@@ -357,7 +366,7 @@ jobs:
           curl -sS --max-time 20 -D - -o /dev/null https://api.github.com/rate_limit \
             | grep -i -E '^(HTTP/|x-ratelimit-|retry-after)' || true
           rc=0
-          GIT_TRACE=1 GIT_TRACE_CURL=1 GIT_TRACE_CURL_NO_DATA=1 \
+          GIT_TRACE=1 GIT_TRACE_CURL=1 \
             git ls-remote https://github.com/ocaml/opam-repository.git HEAD || rc=$?
           echo "ls-remote exit=$rc"
 
