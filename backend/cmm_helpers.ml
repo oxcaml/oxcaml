@@ -1816,6 +1816,7 @@ let memory_chunk_width_in_bytes : memory_chunk -> int = function
   | Word_int -> size_int
   | Word_mask -> size_int
   | Word_val -> size_addr
+  | Word_code_pointer -> size_addr
   | Double -> size_float
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> size_vec128
   | Twofiftysix_unaligned | Twofiftysix_aligned -> size_vec256
@@ -2424,6 +2425,7 @@ module Extended_machtype_component = struct
     | Val -> Val
     | Addr -> Addr
     | Int -> Any_int
+    | Code_pointer -> Any_int
     | Float -> Float
     | Vec128 -> Vec128
     | Vec256 -> Vec256
@@ -2531,6 +2533,9 @@ let machtype_identifier t =
     | Addr ->
       Misc.fatal_error "[Addr] is forbidden inside arity for generic functions"
     | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
+    | Code_pointer ->
+      Misc.fatal_error
+        "[Code_pointer] is forbidden inside arity for generic functions"
   in
   String.of_seq (Seq.map char_of_component (Array.to_seq t))
 
@@ -2588,7 +2593,7 @@ let memory_chunk_size_in_words_for_mixed_block = function
         "Unable to compile mixed blocks on a platform where a float is not the \
          same width as a value.";
     1
-  | Word_int | Word_mask | Word_val -> 1
+  | Word_int | Word_mask | Word_val | Word_code_pointer -> 1
   | Onetwentyeight_unaligned | Onetwentyeight_aligned -> 2
   | Twofiftysix_unaligned | Twofiftysix_aligned -> 4
   | Fivetwelve_unaligned | Fivetwelve_aligned -> 8
@@ -2602,7 +2607,7 @@ let alloc_generic_set_fn block ofs newval memory_chunk dbg =
   | Word_val ->
     (* Values must go through "caml_initialize" *)
     addr_array_initialize block ofs newval dbg
-  | Word_int | Word_mask -> generic_case ()
+  | Word_int | Word_mask | Word_code_pointer -> generic_case ()
   (* Generic cases that may differ under big endian archs *)
   | Single _ | Double | Thirtytwo_unsigned | Thirtytwo_signed
   | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
@@ -2717,7 +2722,7 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
         then
           (* regular scanned part of a block *)
           match memory_chunk with
-          | Word_int | Word_val -> ok ()
+          | Word_int | Word_val | Word_code_pointer -> ok ()
           | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
           | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
           | Onetwentyeight_unaligned | Onetwentyeight_aligned
@@ -2733,7 +2738,8 @@ let make_mixed_alloc ~mode dbg ~tag ~value_prefix_size args args_memory_chunks =
           | Fivetwelve_aligned | Single _ | Byte_unsigned | Byte_signed
           | Sixteen_unsigned | Sixteen_signed ->
             ok ()
-          | Word_val -> error "the flat suffix of a mixed block")
+          | Word_val -> error "the flat suffix of a mixed block"
+          | Word_code_pointer -> error "the flat suffix of a mixed block")
       0 args_memory_chunks
   in
   make_alloc_generic
@@ -4102,6 +4108,7 @@ let machtype_stored_size t =
       match (c : machtype_component) with
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
+      | Code_pointer -> Misc.fatal_error "[Code_pointer] cannot be stored"
       | Val | Int -> cur + 1
       | Float -> cur + ints_per_float
       | Float32 ->
@@ -4119,6 +4126,7 @@ let machtype_non_scanned_size t =
       match (c : machtype_component) with
       | Addr -> Misc.fatal_error "[Addr] cannot be stored"
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
+      | Code_pointer -> Misc.fatal_error "[Code_pointer] cannot be stored"
       | Val -> cur
       | Int -> cur + 1
       | Float -> cur + ints_per_float
@@ -4144,6 +4152,8 @@ let value_slot_given_machtype vs =
         | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> true
         | Val -> false
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
+        | Code_pointer ->
+          Misc.fatal_error "[Code_pointer] cannot be a value slot"
         | Addr -> assert false)
       vs
   in
@@ -4184,6 +4194,8 @@ let read_from_closure_given_machtype t clos base_offset dbg =
           (non_scanned_pos + 1, scanned_pos), load Word_mask non_scanned_pos
         | Val -> (non_scanned_pos, scanned_pos + 1), load Word_val scanned_pos
         | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
+        | Code_pointer ->
+          Misc.fatal_error "[Code_pointer] cannot be read from a closure slot"
         | Addr -> Misc.fatal_error "[Addr] cannot be read")
       (base_offset, base_offset + machtype_non_scanned_size t)
       (Array.to_list t)
@@ -5234,7 +5246,11 @@ let indirect_full_call ~dbg ty pos f ~callees args_type args =
       | [] -> Misc.fatal_error "indirect_full_call: args_type was empty"
       | _ :: _ :: _ -> 2
     in
-    load ~dbg Word_int Asttypes.Mutable
+    (* Load the closure's code pointer with [Word_code_pointer] so the resulting
+       value carries the [Code_pointer] machtype. This lets the GC track the
+       pointer via the parallel [code_ptr_live_ofs] frame descriptor array if
+       the value is held live across a safepoint. *)
+    load ~dbg Word_code_pointer Asttypes.Mutable
       ~addr:(field_address (Cvar v) offset dbg)
   in
   letin v' ~defining_expr:f

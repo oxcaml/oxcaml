@@ -143,6 +143,25 @@ void caml_decode_frame_descr(frame_descr *d, struct frame_descr_decoded *out)
   if (out->has_debug) {
     p += sizeof(uint32_t) * out->num_debuginfo;
   }
+  /* Skip the parallel code_ptr_live_ofs array if present: a count followed
+     by that many entries, using the same width as live_ofs[] (uint16 for
+     medium, uint32 for long), unaligned like the rest of the descriptor.
+     Short descriptors never carry FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS
+     (their size+flags byte has no room for it), so this only occurs
+     here. */
+  if (frame_has_code_ptr_slots(d)) {
+    if (out->is_long) {
+      uint32_t n = caml_read_unaligned_uint32(p);
+      out->num_code_ptr_slots = n;
+      out->code_ptr_slots = p + sizeof(uint32_t);
+      p += sizeof(uint32_t) * (1 + (uintnat)n);
+    } else {
+      uint16_t n = caml_read_unaligned_uint16(p);
+      out->num_code_ptr_slots = n;
+      out->code_ptr_slots = p + sizeof(uint16_t);
+      p += sizeof(uint16_t) * (1 + (uintnat)n);
+    }
+  }
   out->end = p;
 }
 

@@ -716,6 +716,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Vec512 -> Fivetwelve_unaligned
               | Mask -> Word_mask
               | Val | Addr | Int -> Word_val
+              | Code_pointer ->
+                (* [Code_pointer]-typed values are transient register/stack
+                   holdings between a closure Field-0 load and an indirect call;
+                   they are not [value]s and must not be stored into heap blocks
+                   via this path. [Word_val] would silently push the raw PC
+                   through [caml_initialize] (treating it as a GC root);
+                   [Word_int] would skip GC tracking but leave a non-value word
+                   in a scannable field. Fail loudly instead: any to_cmm change
+                   that allows a [Code_pointer] to flow into a heap allocation
+                   needs a dedicated chunk ([Word_code_pointer]) and
+                   corresponding GC handling. *)
+                Misc.fatal_error
+                  "Code_pointer machtype is not storable to a heap block"
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
             insert_debug env sub_cfg
@@ -1273,7 +1286,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
                 "Cfg_selectgen.emit_expr_exit: unexpected machtype_component \
                  Addr in Ccatch register"
             | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
-            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32 ->
+            | Val | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
+            | Code_pointer ->
               ())
           src;
         SU.insert_moves env sub_cfg src tmp_regs;
