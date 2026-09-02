@@ -42,6 +42,17 @@ struct code_fragment {
   /* [mutex] protects the fields [digest_status] and [digest],
      which may be written to when computing a digest
      on-demand (DIGEST_LATER) and thus require synchronization. */
+  void *owner_unloadable_unit;
+  /* If this fragment belongs to an unloadable compilation unit, this is a
+     [struct caml_unloadable_unit *] for that unit; otherwise NULL.
+     Stored as [void *] to avoid an include cycle with [unloadable.h].
+     Initialised to NULL by [caml_register_code_fragment]; set by
+     [caml_register_unloadable_unit] immediately after registration of each
+     per-function code fragment. Read on the major-GC stack-scan hot path
+     ([caml_visit_frame_code_ptr_slots] in [unloadable.h]) so that a single
+     O(log n) skiplist lookup ([caml_find_code_fragment_by_pc]) covers both
+     "is this PC in registered code?" and "is the owning CU unloadable?"
+     without a second linear-scan lookup. */
 };
 
 /* Initialise codefrag. This must be done before any of the other

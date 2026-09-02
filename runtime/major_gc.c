@@ -41,6 +41,9 @@
 #include "caml/weak.h"
 #include "caml/custom.h"
 #include "caml/minor_gc.h"
+#ifdef NATIVE_CODE
+#include "caml/unloadable.h"
+#endif
 
 /* This variable is only written with the world stopped, so it need not be
    atomic */
@@ -1350,10 +1353,23 @@ static intnat mark_stack_push_block(struct mark_stack* stk, value block)
   if (Tag_val(block) == Closure_tag) {
     /* Skip the code pointers and integers at beginning of closure;
        start scanning at the first word of the environment part. */
-    offset = Start_env_closinfo(Closinfo_val(block));
+    value closinfo = Closinfo_val(block);
+    offset = Start_env_closinfo(closinfo);
 
     CAMLassert(offset <= Wosize_val(block)
-      && offset >= Start_env_closinfo(Closinfo_val(block)));
+      && offset >= Start_env_closinfo(closinfo));
+
+    /* F.1: for each function slot in the closure prefix whose closinfo
+       has the unloadable bit set, darken the corresponding [Code_block]
+       via the back-pointer at [entry - 1]. Standard mark scan then
+       recursively darkens the Code_block's dep code- and data-blocks.
+       Native-code only: closures with unloadable code only exist in the
+       native runtime. */
+#ifdef NATIVE_CODE
+    /* The walker fast-exits when no unloadable units are registered (a
+       relaxed atomic load on [caml_unloadable_units_live_count]). */
+    caml_darken_unloadable_code_blocks_in_closure(Caml_state, block);
+#endif
   }
 
   CAMLassert(Has_status_val(block, caml_global_heap_state.MARKED));
@@ -1542,9 +1558,15 @@ Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
       }
 
       if (Tag_hd(hd) == Closure_tag) {
-        uintnat env_offset = Start_env_closinfo(Closinfo_val(block));
+        value closinfo = Closinfo_val(block);
+        uintnat env_offset = Start_env_closinfo(closinfo);
         budget -= env_offset;
         me.start += env_offset;
+        /* F.1: see [mark_stack_push_block] for the same injection. */
+#ifdef NATIVE_CODE
+        /* See [mark_stack_push_block]: walker fast-exits on no-units. */
+        caml_darken_unloadable_code_blocks_in_closure(Caml_state, block);
+#endif
       }
     }
     else if (budget <= 0 || stk->count == 0) {
@@ -1914,6 +1936,14 @@ static void cycle_major_heap_from_stw_single(
   caml_domain_state* domain,
   uintnat num_domains_in_stw)
 {
+#ifdef NATIVE_CODE
+  /* Unload any unloadable units whose heap extents the GC reclaimed during
+     the finished cycle: remove their code fragments, unregister their frame
+     tables (which mutates the global descriptor hashtable, hence STW), and
+     free their buffers. */
+  caml_unloadable_process_pending_unloads();
+#endif
+
   /* Cycle major heap colours */
   /* FIXME: delete caml_cycle_heap_from_stw_single
      and have per-domain copies of the data? */
