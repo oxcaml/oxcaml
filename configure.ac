@@ -858,10 +858,10 @@ AC_ARG_ENABLE([poll-insertion],
     [enable insertion of poll points])])
 
 AC_ARG_ENABLE([oxcaml-dwarf-on-compiler],
-  [AS_HELP_STRING([--enable-oxcaml-dwarf-on-compiler],
-    [Compile the compiler and standard library with OxCaml DWARF])],
+  [AS_HELP_STRING([--disable-oxcaml-dwarf-on-compiler],
+    [Compile the compiler and standard library without OxCaml DWARF])],
   [],
-  [enable_oxcaml_dwarf_on_compiler=no])
+  [enable_oxcaml_dwarf_on_compiler=yes])
 
 AC_ARG_ENABLE([keep-compiler-asm],
   [AS_HELP_STRING([--enable-keep-compiler-asm],
