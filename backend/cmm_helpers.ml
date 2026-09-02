@@ -379,9 +379,11 @@ let caml_int64_ops = "caml_int64_ops"
 let pos_arity_in_closinfo = (8 * size_addr) - 8
 (* arity = the top 8 bits of the closinfo word *)
 
-let pack_closure_info ~arity ~startenv ~is_last =
+let pack_closure_info ~arity ~startenv ~is_last ~is_unloadable =
   assert (-128 <= arity && arity <= 127);
-  assert (0 <= startenv && startenv < 1 lsl (pos_arity_in_closinfo - 2));
+  (* The "delta" / startenv field now occupies one less bit than before (we
+     stole the top bit for [is_unloadable]). *)
+  assert (0 <= startenv && startenv < 1 lsl (pos_arity_in_closinfo - 3));
   Nativeint.(
     add
       (shift_left (of_int arity) pos_arity_in_closinfo)
@@ -389,20 +391,24 @@ let pack_closure_info ~arity ~startenv ~is_last =
          (shift_left
             (Bool.to_int is_last |> Nativeint.of_int)
             (pos_arity_in_closinfo - 1))
-         (add (shift_left (of_int startenv) 1) 1n)))
+         (add
+            (shift_left
+               (Bool.to_int is_unloadable |> Nativeint.of_int)
+               (pos_arity_in_closinfo - 2))
+            (add (shift_left (of_int startenv) 1) 1n))))
 
-let closure_info' ~arity ~startenv ~is_last =
+let closure_info' ~arity ~startenv ~is_last ~is_unloadable =
   let arity =
     match arity with
     | Lambda.Tupled, l -> -List.length l
     | Lambda.Curried _, l -> List.length l
   in
-  pack_closure_info ~arity ~startenv ~is_last
+  pack_closure_info ~arity ~startenv ~is_last ~is_unloadable
 
-let closure_info ~(arity : arity) ~startenv ~is_last =
+let closure_info ~(arity : arity) ~startenv ~is_last ~is_unloadable =
   closure_info'
     ~arity:(arity.function_kind, arity.params_layout)
-    ~startenv ~is_last
+    ~startenv ~is_last ~is_unloadable
 
 let alloc_boxedfloat32_header (mode : Cmm.Alloc_mode.t) dbg =
   match mode with
@@ -4298,7 +4304,11 @@ let intermediate_curry_functions ~nlocal ~arity result =
                         ~startenv:
                           (function_slot_size
                           + machtype_non_scanned_size arg_type)
-                        ~is_last:true,
+                        ~is_last:true ~is_unloadable:false
+                      (* The curry trampoline itself is in shared,
+                         non-unloadable code; an unloadable closure underneath
+                         is captured in the env and tracked via its own closinfo
+                         bit. *),
                       dbg () ) ]
                 @ (if has_nary
                    then

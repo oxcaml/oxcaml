@@ -257,6 +257,7 @@ end = struct
         let closure_info =
           C.closure_info' ~arity:(kind, params_ty)
             ~startenv:(startenv - slot_offset) ~is_last:last_function_slot
+            ~is_unloadable:false
         in
         (* We build here the **reverse** list of fields for the function slot *)
         match closure_code_pointers with
@@ -321,6 +322,7 @@ end = struct
           C.pack_closure_info
             ~arity:(if size = 2 then 1 else 2)
             ~startenv:(startenv - slot_offset) ~is_last:last_function_slot
+            ~is_unloadable:false
         in
         let acc, chunk_acc =
           match size with
