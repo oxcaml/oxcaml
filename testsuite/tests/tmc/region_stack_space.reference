@@ -1,0 +1,3 @@
+no region:                       constant stack: true
+call to local-returning fn:      constant stack: false
+local_ allocation:               constant stack: false
