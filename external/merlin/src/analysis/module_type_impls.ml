@@ -12,6 +12,8 @@ module Dependency_analysis : sig
   val create : Facts.t -> t
 
   val query_family : t -> Shape.Uid.t -> result
+
+  val query_anon : t -> Shape.Uid.t -> result
 end = struct
   module Context = Facts.Context
   module Key = Facts.Key
@@ -71,6 +73,7 @@ end = struct
       key_checks : Facts.Check.t list Dynarray.t;
       key_out : int list Dynarray.t;
       mutable families : Int_set.t Uid.Map.t;
+      mutable paired_families : Uid.Set.t Uid.Map.t;
       mutable global_omissions : Facts.Omission.t list;
       mutable family_omissions : Facts.Omission.t list Uid.Map.t;
       mutable comp_of : int array;
@@ -308,6 +311,7 @@ end = struct
       key_checks = Dynarray.create ();
       key_out = Dynarray.create ();
       families = Uid.Map.empty;
+      paired_families = Uid.Map.empty;
       global_omissions = [];
       family_omissions = Uid.Map.empty;
       comp_of = [||];
@@ -353,8 +357,23 @@ end = struct
         | Module_type_of
         | Strengthening
         | Functor_type
-        | Argument_member
-        | Interface -> observe_family t source_id)
+        | Argument_member -> observe_family t source_id
+        | Interface -> (
+          observe_family t source_id;
+          match (Facts.Key.family derived, Facts.Key.family source) with
+          | Some left, Some right when not (Uid.equal left right) ->
+            let pair a b =
+              let existing =
+                match Uid.Map.find_opt a t.paired_families with
+                | None -> Uid.Set.empty
+                | Some set -> set
+              in
+              t.paired_families <-
+                Uid.Map.add a (Uid.Set.add b existing) t.paired_families
+            in
+            pair left right;
+            pair right left
+          | (Some _ | None), _ -> ()))
       dependencies
 
   let index_omissions t omissions =
@@ -440,16 +459,42 @@ end = struct
     }
 
   let query_family t family =
-    let queried_families = Uid.Set.singleton family in
-    match Uid.Map.find_opt family t.families with
-    | None -> { impacts = []; omissions = scoped_omissions t queried_families }
-    | Some ids ->
-      let seeds =
-        List.map (Int_set.elements ids) ~f:(fun id ->
-            (Dynarray.get t.key_witness id, id))
-      in
-      query_seeds t ~queried_families seeds
+    let rec close pending families =
+      match pending with
+      | [] -> families
+      | family :: pending ->
+        if Uid.Set.mem family families then close pending families
+        else
+          let paired =
+            match Uid.Map.find_opt family t.paired_families with
+            | None -> []
+            | Some set -> Uid.Set.elements set
+          in
+          close (List.rev_append paired pending) (Uid.Set.add family families)
+    in
+    let queried_families = close [ family ] Uid.Set.empty in
+    let seeds =
+      Uid.Set.fold
+        (fun family seeds ->
+          match Uid.Map.find_opt family t.families with
+          | None -> seeds
+          | Some ids ->
+            List.rev_append
+              (List.map (Int_set.elements ids) ~f:(fun id ->
+                   (Dynarray.get t.key_witness id, id)))
+              seeds)
+        queried_families []
+    in
+    match seeds with
+    | [] -> { impacts = []; omissions = scoped_omissions t queried_families }
+    | _ :: _ -> query_seeds t ~queried_families seeds
 
+  let query_anon t uid =
+    let queried_families = Uid.Set.singleton uid in
+    match Key_map.find_opt (Key_repr.Anon uid) t.key_ids with
+    | None -> { impacts = []; omissions = scoped_omissions t queried_families }
+    | Some id ->
+      query_seeds t ~queried_families [ (Dynarray.get t.key_witness id, id) ]
 end
 
 let { Logger.log } = Logger.for_section "module-type-impls"
@@ -474,6 +519,16 @@ module Helpers = struct
     let unit = unitname (Filename.basename intf_file) in
     find_in_path_opt (Mconfig.source_path config) (unit ^ ".ml")
     |> Option.map ~f:Misc.canonicalize_filename
+
+  let source_of_compilation_unit (mconfig : Mconfig.t) compilation_unit =
+    let base = Compilation_unit.base_filename compilation_unit in
+    let find extension =
+      find_in_path_opt (Mconfig.source_path mconfig) (base ^ extension)
+      |> Option.map ~f:Misc.canonicalize_filename
+    in
+    match find ".ml" with
+    | Some file -> Some file
+    | None -> find ".mli"
 
   let module_facts (mconfig : Mconfig.t) =
     let index_files = mconfig.merlin.index_files in
@@ -596,7 +651,12 @@ let source_of_site mconfig compilation_unit loc =
 let uid_site (mconfig : Mconfig.t) (evidence_uid : Shape.Uid.t) =
   match evidence_uid with
   | Item { from; _ } ->
-    Option.bind (Locate.lookup_uid_loc_of_decl ~config:mconfig evidence_uid)
+    let declaration =
+      match Locate.lookup_uid_loc_of_decl ~config:mconfig evidence_uid with
+      | declaration -> declaration
+      | exception Not_found -> None
+    in
+    Option.bind declaration
       ~f:(fun { Location.txt = name; loc } ->
         let description = Format.asprintf "%a" Shape.Uid.print evidence_uid in
         Option.bind (Helpers.find_source_of_loc mconfig ~description loc)
@@ -666,6 +726,17 @@ let resolve_implementation mconfig (node : Facts.Node.t) =
           implementation_name = None;
           site = { impl_loc; impl_kind }
         })
+  | Whole_unit compilation_unit ->
+    Option.map (Helpers.source_of_compilation_unit mconfig compilation_unit)
+      ~f:(fun file ->
+        { implementation_uid =
+            Some
+              (Format.asprintf "%a" Shape.Uid.print
+                 (Shape.Uid.of_compilation_unit_id compilation_unit));
+          implementation_name =
+            Some (Compilation_unit.full_path_as_string compilation_unit);
+          site = { impl_loc = Location.in_file file; impl_kind = Whole_unit }
+        })
   | Uid uid ->
     Option.bind (uid_site mconfig uid)
       ~f:(fun { uid; name; spans_file; row_file; loc } ->
@@ -689,7 +760,7 @@ let resolve_check_site mconfig (check : Facts.Check.t) =
   if Location.is_none check.site then None
   else
     match check.implementation with
-    | Location (compilation_unit, _) ->
+    | Location (compilation_unit, _) | Whole_unit compilation_unit ->
       Option.map (source_of_site mconfig compilation_unit check.site)
         ~f:(fun (_, loc) -> loc)
     | Uid uid ->
@@ -852,7 +923,7 @@ let compare_reason left right =
 let pp_node fmt (node : Facts.Node.t) =
   match node with
   | Uid uid -> Shape.Uid.print fmt uid
-  | Location (compilation_unit, _) ->
+  | Whole_unit compilation_unit | Location (compilation_unit, _) ->
     Format.fprintf fmt "%s"
       (Compilation_unit.full_path_as_string compilation_unit)
 
@@ -990,12 +1061,39 @@ let query ~pipeline (typedtree : Mtyper.typedtree) =
   let implementations =
     List.concat implementations |> List.sort_uniq ~cmp:compare_implementation
   in
-  let implementations =
+  let own_interface_rows =
     match own_interface_implementation mconfig ~own_file typedtree with
-    | None -> implementations
-    | Some own_interface ->
-      List.sort_uniq ~cmp:compare_implementation
-        (own_interface :: implementations)
+    | Some own_interface -> [ own_interface ]
+    | None -> (
+      match (typedtree, engine) with
+      | `Implementation _, _ | _, None -> []
+      | `Interface _, Some engine ->
+        let unit_uid =
+          Shape.Uid.of_compilation_unit_id
+            (Compilation_unit.of_string (Mconfig.unitname mconfig))
+        in
+        let result = Dependency_analysis.query_anon engine unit_uid in
+        List.filter_map result.impacts
+          ~f:(fun ({ witness; check } : Dependency_analysis.impact) ->
+            Option.map (resolve_implementation mconfig check.implementation)
+              ~f:(fun ({ implementation_uid; implementation_name; site } :
+                        resolved_implementation) ->
+                { target = Own_interface;
+                  target_loc = None;
+                  instance = Some (render_witness witness);
+                  implementation_uid;
+                  implementation_name;
+                  site;
+                  check = Some (protocol_check_kind check.kind);
+                  check_site =
+                    (match check_site_resolution mconfig check with
+                    | Resolved_site loc -> Some loc
+                    | No_recorded_site | Unresolved_site -> None)
+                })))
+  in
+  let implementations =
+    List.sort_uniq ~cmp:compare_implementation
+      (own_interface_rows @ implementations)
   in
   log ~title:"query" "%d targets, %d rows" (List.length targets)
     (List.length implementations);
