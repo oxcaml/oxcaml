@@ -177,6 +177,7 @@ let eval (expr : 'a expr) =
    then
      Persistent_env.Persistent_signature.load
        := fun ~allow_hidden:_ ~unit_name ->
+            let unit_name = CUI.Found.intf unit_name in
             Option.map
               (fun cmi ->
                 { Persistent_env.Persistent_signature.filename =
