@@ -91,9 +91,13 @@ val find_normalized : string -> string
     {!Misc.normalized_unit_filename}), i.e. if name is [Foo.ml], allow
     [/path/Foo.ml] and [/path/foo.ml] to match. *)
 
-val find_normalized_with_visibility : string -> string * visibility
+val find_normalized_with_visibility :
+  ?allow_hidden:bool -> string -> string * visibility
 (** Same as [find_normalized], but also reports whether the cmi was found in a
-    -I directory (Visible) or a -H directory (Hidden) *)
+    -I directory (Visible) or a -H directory (Hidden). If [allow_hidden] is
+    [false] (default [true]), pending hidden manifests are not loaded, since
+    they can only contribute [Hidden] results; entries already known from
+    directories may still be reported as [Hidden]. *)
 
 val[@deprecated] add : Dir.t -> unit
 (** Old name for {!append_dir} *)
