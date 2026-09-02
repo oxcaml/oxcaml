@@ -1361,7 +1361,7 @@ let shape_has_float_boxed shape =
 let record_has_float_boxed = function
   | Record_mixed shape -> shape_has_float_boxed shape
   | Record_unboxed | Record_inlined _ | Record_boxed
-  | Record_float | Record_ufloat -> false
+  | Record_float | Record_ufloat | Record_empty -> false
   | Record_dummy _ ->
     fatal_error "record_has_float_boxed: unexpected dummy representation"
   | Record_undetermined | Record_variable _ ->
@@ -1377,7 +1377,7 @@ let record_gets_unboxed_version lbls repr =
   match repr with
   | Record_unboxed | Record_inlined _
   | Record_float | Record_ufloat -> false
-  | Record_boxed | Record_undetermined -> true
+  | Record_boxed | Record_undetermined | Record_empty -> true
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     not represent_as_float_array && not flatten_floats
   | Record_mixed shape -> not (shape_has_float_boxed shape)
@@ -2157,6 +2157,13 @@ let update_constructor_representation env loc args
 type unrepresentable_record =
   | Unrepresentable_field of string
 
+let record_representation_of_mixed_product_shape
+    (shape : Types.mixed_product_shape) :
+    Types.record_representation =
+  if Mixed_product_bytes.types_shape_is_empty shape
+  then Record_empty
+  else Record_mixed shape
+
 let compute_record_repr
     loc lbl_reprs ~warn
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
@@ -2176,7 +2183,7 @@ let compute_record_repr
       | Ok (`Mixed x) -> x
       | Ok `Not_mixed | Error _ -> Misc.fatal_error "expected mixed block"
     in
-    Ok (Record_mixed shape)
+    Ok (record_representation_of_mixed_product_shape shape)
   in
   match
     ( ~values, ~floats, ~atomic_floats,
@@ -2253,12 +2260,8 @@ let compute_record_repr
     Ok Record_boxed
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:true, ~atomic_fields:_, ~first_any:None ->
-    Ok Record_all_void
-  | ~values:false, ~floats:false, ~atomic_floats:false,
-      ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:false, ~atomic_fields:_, ~first_any:None ->
-    Misc.fatal_error "Typedecl.compute_record_repr: empty record"
+      ~voids:_, ~atomic_fields:_, ~first_any:None ->
+    Ok Record_empty
 
 (* For tracking what types appear in record blocks. All product layouts
    count only as a [non_float64_unboxed_field], even if it's a
@@ -2423,7 +2426,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   | Legacy, _,
     (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
           | Record_ufloat | Record_unboxed | Record_undetermined
-          | Record_variable _)
+          | Record_variable _ | Record_empty)
     ->
     (* These are never created by [transl_declaration], so they will only
        appear here when updating later for dealing with [any]. Since none of
@@ -2478,7 +2481,7 @@ let instance_record_representation
     | Legacy,
       (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
       | Record_ufloat | Record_mixed _ | Record_dummy _
-      | Record_variable _)
+      | Record_variable _ | Record_empty)
     | Unboxed_product,
       (Record_unboxed_product | Record_unboxed_product_variable _) ->
         Misc.fatal_error
@@ -2560,7 +2563,7 @@ let finalize_record_representation_and_sorts env loc
       let repres =
        match shape with
        | `Not_mixed -> Record_boxed
-       | `Mixed shape -> Record_mixed shape
+       | `Mixed shape -> record_representation_of_mixed_product_shape shape
       in
       repres, ~variable_sorts:(Some consts)
   | Record_inlined (tag, Constructor_variable sorts_and_types,
@@ -2579,7 +2582,7 @@ let finalize_record_representation_and_sorts env loc
         "Typedecl.finalize_record_representation: representation was not \
          instantiated"
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _) ->
+    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_empty) ->
       repres, ~variable_sorts:None
 
 let finalize_record_representation env loc repres =

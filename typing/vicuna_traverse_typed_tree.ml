@@ -377,6 +377,7 @@ and value_kind_record env subst ~visited ~depth
       raise
         (Vicuna_unsupported
            (Other "Unboxed record should have exactly one field")))
+  | Record_empty -> Block (Some (0, []))
   | Record_inlined _ | Record_boxed | Record_float | Record_ufloat
   | Record_dummy _ ->
     let fields =
@@ -398,6 +399,10 @@ and value_kind_record env subst ~visited ~depth
         raise
           (Vicuna_unsupported
              (Other "Record_unboxed should have been handled above"))
+      | Record_empty ->
+        raise
+          (Vicuna_unsupported
+             (Other "Record_empty should have been handled above"))
       | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
       | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"

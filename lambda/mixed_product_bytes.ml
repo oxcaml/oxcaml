@@ -100,6 +100,11 @@ let size_in_words t =
 
 let types_shape_is_all_value shape = all_value (count_types_shape shape)
 
+let types_shape_is_empty shape =
+  let { value; flat } = count_types_shape shape in
+  Byte_count.is_zero value &&
+  Byte_count.is_zero flat
+
 module Wrt_path = struct
   type nonrec t =
     { here : t;

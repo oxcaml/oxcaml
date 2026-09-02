@@ -146,3 +146,11 @@ let set_any (t : all_void_mutable_any) = t.field <- unbox_unit ()
 [%%expect{|
 TODO
 |}]
+
+(* Implicit unboxed versions of all-void records: *)
+
+type all_void_value_u : void = all_void_value#
+[%%expect{|
+0
+type all_void_value_u = all_void_value#
+|}]

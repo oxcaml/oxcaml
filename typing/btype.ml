@@ -2240,9 +2240,8 @@ module Jkind0 = struct
     let for_boxed_record lbls =
       (* CR wsturgeon: This gives all-void records the kind [immediate], which
          is wrong now that they are permitted and represented as
-         [Record_all_void] (an atom, i.e. a pointer to a statically allocated
-         empty block). Delete this special case so they take the ordinary
-         [Boxed_record] path (and retire [Empty_record]), and add a test that
+         [Record_empty] (a pointer to a statically allocated empty block).
+         Delete this special case so they take the ordinary [Boxed_record] path (and retire [Empty_record]), and add a test that
          [type t : immediate = { x : unit# }] is rejected. This site was
          unreachable while all-void records were a typing error. *)
       if all_void_labels lbls
