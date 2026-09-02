@@ -37,13 +37,14 @@ let apply_cont_deps denv acc apply_cont =
     params args
 
 let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
+  let result_arity = Code.result_arity code in
   let return =
     List.mapi
       (fun i kind ->
         Variable.create
           (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
           (KS.kind kind))
-      (Flambda_arity.unarized_components (Code.result_arity code))
+      (Flambda_arity.unarized_components result_arity)
   in
   let exn = Variable.create "function_exn" K.value in
   let my_closure = Variable.create "my_closure" K.value in
@@ -73,6 +74,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   in
   let code_dep =
     { Traverse_acc.arity;
+      result_arity;
       return;
       my_closure;
       exn;

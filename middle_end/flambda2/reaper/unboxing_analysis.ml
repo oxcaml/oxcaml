@@ -852,21 +852,18 @@ let perform_analysis db ~code_deps ~stats =
         let cannot_change_calling_convention =
           cannot_change_calling_convention_of_db db code_id
         in
+        let result_kinds =
+          Flambda_arity.unarized_components code_dep.result_arity
+        in
         if cannot_change_calling_convention
         then
-          List.map
-            (fun v ->
-              Keep (v, Flambda_kind.With_subkind.anything (Variable.kind v)))
-            code_dep.return
+          List.map2 (fun v kind -> Keep (v, kind)) code_dep.return result_kinds
         else
           (* Format.eprintf "DIRECT: %a@." Code_id.print code_id; *)
-          List.map
-            (fun v ->
+          List.map2
+            (fun v kind ->
               match get_unboxed_fields (Code_id_or_name.var v) with
               | None ->
-                let kind =
-                  Flambda_kind.With_subkind.anything (Variable.kind v)
-                in
                 let is_var_used =
                   raw_is_var_used v (Flambda_kind.With_subkind.kind kind)
                 in
@@ -874,7 +871,7 @@ let perform_analysis db ~code_deps ~stats =
                    functions and their return continuations *)
                 if true || is_var_used then Keep (v, kind) else Delete
               | Some fields -> Unbox fields)
-            code_dep.return)
+            code_dep.return result_kinds)
       code_deps
   in
   let result =

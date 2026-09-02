@@ -214,6 +214,23 @@ let get_arity params_decisions =
       [ Unboxed_product
           (List.map (fun k -> Component_for_creation.Singleton k) arity) ])
 
+let function_return_decision env code_id =
+  let return_decisions =
+    Code_id.Map.find code_id env.uses.function_return_decision
+  in
+  if Analysis.cannot_change_calling_convention env.uses code_id
+  then return_decisions
+  else
+    List.map
+      (function
+        | Keep (v, kind) ->
+          Keep
+            ( v,
+              Types_rewriter.rewrite_kind_with_subkind env.types_rewrite_context
+                (Name.var v) kind )
+        | (Delete | Unbox _) as decision -> decision)
+      return_decisions
+
 let is_dead_var env v =
   match Variable.kind v with
   | Region | Rec_info -> false
@@ -1373,9 +1390,7 @@ let rebuild_apply env apply =
         in
         Flambda_arity.create (List.map components_for args)
       in
-      let return_decisions =
-        Code_id.Map.find code_id env.uses.function_return_decision
-      in
+      let return_decisions = function_return_decision env code_id in
       let return_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
       let args = List.map fst (List.flatten args) in
       let make_apply ~continuation =
@@ -2228,9 +2243,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                 ( List.map (fun p -> p, Points_to_analysis.Keep) params_vars,
                   List.map (fun p -> p, Points_to_analysis.Keep) results_vars )
               | Changing_calling_convention code_id ->
-                let return_decisions =
-                  Code_id.Map.find code_id env.uses.function_return_decision
-                in
+                let return_decisions = function_return_decision env code_id in
                 let params_decision =
                   Code_id.Map.find code_id env.uses.function_params_to_keep
                 in
@@ -2276,9 +2289,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       code_metadata,
       res )
   | Changing_calling_convention code_id ->
-    let return_decisions =
-      Code_id.Map.find code_id env.uses.function_return_decision
-    in
+    let return_decisions = function_return_decision env code_id in
     let params_decision =
       Code_id.Map.find code_id env.uses.function_params_to_keep
     in
