@@ -166,6 +166,21 @@ let[@inline never] [@local never] f_singleton_float_record
 let _ = f_singleton_float_record #{ lone_f = #3.5 }
 let _ = f_singleton_float_record #{ lone_f = #0.0 }
 
+(* Unboxed records with void fields; unarization drops the void components. *)
+type abstract_void : void
+external mk_void : unit -> abstract_void = "%unbox_unit"
+
+type void_record = #{ vr_v: abstract_void; vr_i: int }
+type void_record_two = #{ v2_v: abstract_void; v2_i: int; v2_s: string }
+
+let[@inline never] [@local never] f_void_record (r: void_record) =
+  let #{ vr_v; vr_i } = r in #{ vr_v; vr_i }
+let _ = f_void_record #{ vr_v = mk_void (); vr_i = 7 }
+
+let[@inline never] [@local never] f_void_record_two (r: void_record_two) =
+  let #{ v2_v; v2_i; v2_s } = r in #{ v2_v; v2_i; v2_s }
+let _ = f_void_record_two #{ v2_v = mk_void (); v2_i = 21; v2_s = "two" }
+
 (* Arrays of int64_u *)
 let[@inline never] [@local never] f_int64_array (arr: int64_u array) = arr
 let _ = f_int64_array [|#0L; #100L; #200L; #300L; #400L|]

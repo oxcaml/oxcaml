@@ -72,6 +72,8 @@
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_singleton_record(r=-1 : singleton_record @ value)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_singleton_float_record(r=#3.5 : singleton_float_record @ float64)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_singleton_float_record(r=#0.0 : singleton_float_record @ float64)
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_void_record(r=7 : void_record @ value)
+    frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_void_record_two(r_XXX_unboxed0=21 : void_record_two_unboxed0 @ value, r_XXX_unboxed1="two" : void_record_two_unboxed1 @ value)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_int64_array(arr=[| #0L; #100L; #200L; #300L; #400L |] : int64_u array @ value)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_int64_array(arr=[| #0L; #1L; #42L; #9999L |] : int64_u array @ value)
     frame #N: <ADDRESS> test_unboxed_dwarf.exe`Test_unboxed_dwarf.f_int64_array(arr=[| #81985529216486895L; #1L; #0L |] : int64_u array @ value)

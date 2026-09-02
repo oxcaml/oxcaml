@@ -100,6 +100,10 @@
 (lldb) b Test_unboxed_dwarf.f_singleton_float_record
 (lldb) c
 (lldb) c
+(lldb) b Test_unboxed_dwarf.f_void_record
+(lldb) c
+(lldb) b Test_unboxed_dwarf.f_void_record_two
+(lldb) c
 (lldb) b Test_unboxed_dwarf.f_int64_array
 (lldb) c
 (lldb) c
