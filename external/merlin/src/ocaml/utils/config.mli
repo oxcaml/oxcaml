@@ -25,7 +25,24 @@ val interface_suffix: string ref
         (* Suffix for interface file names *)
 
 val cmi_magic_number: string
-        (* Magic number for compiled interface files *)
+(** Magic number for compiled interface files *)
+
+val cmo_magic_number: string
+(** Magic number for object bytecode files *)
+
+val cma_magic_number: string
+(** Magic number for archive files *)
+
+(* CR mvellacott: replace this with a ltosol magic number. *)
+val cmr_magic_number: string
+(** Magic number for reaper intermediate data *)
+
+val cmx_magic_number: string
+(** Magic number for compilation unit descriptions *)
+
+val cmxa_magic_number: string
+(** Magic number for libraries of compilation unit descriptions *)
+
 val ast_intf_magic_number: string
         (* Magic number for file holding an interface syntax tree *)
 val ast_impl_magic_number: string
@@ -36,6 +53,9 @@ val cms_magic_number: string
         (* Magic number for compiled shapes files *)
 val index_magic_number: string
         (* Magic number for index files *)
+
+val ltosol_magic_number: string
+(** Magic number for reaper whole-program solution files *)
 
 val max_tag: int
         (* Biggest tag that can be stored in the header of a regular block. *)

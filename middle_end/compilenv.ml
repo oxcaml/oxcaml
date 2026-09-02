@@ -30,6 +30,7 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of CU.t * CU.t * string
+  | Missing_reaped_cmx of CU.t * string
 
 exception Error of error
 
@@ -56,6 +57,10 @@ let reset_info_tables () =
 
 module String = Misc.Stdlib.String
 
+let lto_participants = ref CU.Set.empty
+
+let set_lto_participants units = lto_participants := CU.Set.of_list units
+
 let cached_zero_alloc_info = Zero_alloc_info.create ()
 
 let cache_zero_alloc_info c = Zero_alloc_info.merge c ~into:cached_zero_alloc_info
@@ -79,10 +84,13 @@ let current_generic_fns () = current_unit.uib_generic_fns
 
 let current_sections () = current_unit.uib_file_sections
 
-let reset unit_info =
+let reset ?(keep_cmx_caches = false) unit_info =
   let compilation_unit = Unit_info.modname unit_info in
-  Infos_table.clear global_infos_table;
-  Zero_alloc_info.reset cached_zero_alloc_info;
+  if not keep_cmx_caches
+  then begin
+    Infos_table.clear global_infos_table;
+    Zero_alloc_info.reset cached_zero_alloc_info
+  end;
   Env.set_current_unit unit_info;
   current_unit.uib_unit <- compilation_unit;
   current_unit.uib_defines <- [compilation_unit];
@@ -193,21 +201,26 @@ let get_unit comp_unit =
     let (infos, crc) =
       if Env.is_imported_opaque (CU.name comp_unit) then (None, None)
       else begin
+        let need_reaped_cmx = CU.Set.mem comp_unit !lto_participants in
         let missing_extension =
-          match !Clflags.jsir with
-          | false -> "cmx"
-          | true -> "cmjx"
+          if need_reaped_cmx then "reaped.cmx"
+          else if !Clflags.jsir then "cmjx"
+          else "cmx"
         in
+        let filename = CU.base_filename comp_unit ^ "." ^ missing_extension in
         try
-          let filename =
-            Load_path.find_normalized
-              (CU.base_filename comp_unit ^ "." ^ missing_extension) in
+          let filename = Load_path.find_normalized filename in
           let (ui, crc) = read_unit_info filename in
           if not (CU.equal ui.ui_unit comp_unit) then
             raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
           cache_zero_alloc_info ui.ui_zero_alloc_info;
           (Some ui, Some crc)
         with Not_found ->
+          (* A missing [.reaped.cmx] for an LTO participant is fatal because
+             we already decided at compile time to do inlining, direct calls,
+             etc. *)
+          if need_reaped_cmx then
+            raise(Error(Missing_reaped_cmx(comp_unit, filename)));
           let warn =
             Warnings.No_cmx_file
               { missing_extension
@@ -230,6 +243,13 @@ let get_static_data comp_unit =
     (fun ui ->
       Slambdaeval.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
     (get_unit comp_unit)
+
+let get_unit_imports comp_unit =
+  let name = CU.to_global_name_without_prefix comp_unit in
+  match Infos_table.find global_infos_table name with
+  | Some ui -> ui.ui_imports_cmx
+  | None -> []
+  | exception Not_found -> []
 
 let which_cmx_file comp_unit =
   CU.which_cmx_file comp_unit ~accessed_by:(Current_unit.get_cu_exn ())
@@ -361,6 +381,61 @@ let save_unit_info filename ~main_module_block_format ~arg_descr ~static_data =
   in
   write_unit_info current_unit filename
 
+let save_resumed_unit_info filename ~paused =
+  (* On resume we skip the frontend and typechecker, so we need to take the
+     fields they normally produce from [paused], the unit infos saved by the
+     paused compilation. Fields describing generated code are taken from
+     [current_unit] so they describe the reaped code. *)
+  (* [static_data] is computed by the frontend, so we want the paused version.
+     It includes pointers to file sections, which we must copy to the new unit.
+     *)
+  let static_data =
+    Slambdaeval.CU_data.write
+      (Slambdaeval.CU_data.read paused.ui_static_data
+         ~sections:paused.ui_file_sections)
+      ~sections:current_unit.uib_file_sections
+  in
+  let info =
+    { (* Set by [reset], should equal [paused.ui_unit]. *)
+      ui_unit = current_unit.uib_unit;
+      (* Set by [reset], a resumed compilation defines a single unit. *)
+      ui_defines = current_unit.uib_defines;
+      (* Computed by the typechecker. *)
+      ui_arg_descr = paused.ui_arg_descr;
+      ui_imports_cmi = paused.ui_imports_cmi;
+      (* The imports recorded while loading dependency cmx files during the
+         rebuild: .reaped.cmx files for participants of the whole-program
+         solution and ordinary .cmx files otherwise. Those are the files that
+         will be linked, so their CRCs make link-time consistency checking
+         meaningful; the CRCs recorded at pause time describe the unreaped
+         files and would be wrong here. *)
+      ui_imports_cmx = current_unit.uib_imports_cmx;
+      (* Computed by the typechecker. *)
+      ui_quoted_cmi = paused.ui_quoted_cmi;
+      ui_quoted_cmx = paused.ui_quoted_cmx;
+      (* Computed by [Translmod]. *)
+      ui_format = paused.ui_format;
+      (* Registered during Cmm conversion of the reaped code. *)
+      ui_generic_fns = current_unit.uib_generic_fns;
+      (* The reaped flambda2 export info. *)
+      ui_export_info = current_unit.uib_export_info;
+      (* Recomputed by the backend from the reaped code. *)
+      ui_zero_alloc_info = current_unit.uib_zero_alloc_info;
+      (* Set by [-linkall] on the paused command line. *)
+      ui_force_link = paused.ui_force_link;
+      (* Set by [-requires-metaprogramming] on the paused command line. *)
+      ui_requires_metaprogramming = paused.ui_requires_metaprogramming;
+      (* See [static_data] above. *)
+      ui_static_data = static_data;
+      (* [ui_export_info] contains offsets into these sections. *)
+      ui_file_sections =
+        File_sections.Builder.build current_unit.uib_file_sections;
+      (* From the [external] declarations in the source. *)
+      ui_external_symbols = paused.ui_external_symbols;
+    }
+  in
+  write_unit_info info filename
+
 let new_const_symbol () =
   Current_unit.symbol_for_new_const ()
   |> Symbol.linkage_name
@@ -391,6 +466,12 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
+  | Missing_reaped_cmx(name, filename) ->
+      fprintf ppf
+        "Dependency %a@ was included in -reaper-solve@ but its reaped cmx \
+         file@ %a@ was not found."
+        CU.print_as_inline_code name
+        Location.Doc.quoted_filename filename
 
 let () =
   Location.register_error_of_exn

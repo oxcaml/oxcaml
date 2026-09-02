@@ -145,6 +145,10 @@ val add_any_usage : t -> Code_id_or_name.t -> unit
 *)
 val add_any_source : t -> Code_id_or_name.t -> unit
 
+(** Mark a node as needing to exist at runtime without making its fields escape.
+    See {!Global_flow_graph.Relations.keep_alive}. *)
+val add_keep_alive : t -> Code_id_or_name.t -> unit
+
 (** Mark a node as a "magic" source for zero-alloc checking purposes. This is a
     hack to mostly preserve zero_alloc correctness before we have zero_alloc
     regions. *)
@@ -161,6 +165,9 @@ val simple_to_node : t -> denv:Traverse_env.t -> Simple.t -> Code_id_or_name.t
 (** Mark a [Simple.t] as used, conditional on the current function (if any)
     being used. At the top level, marks it unconditionally. *)
 val add_cond_any_usage : t -> denv:Traverse_env.t -> Simple.t -> unit
+
+val add_cond_any_usage_node :
+  t -> denv:Traverse_env.t -> Code_id_or_name.t -> unit
 
 (** Mark a node as [any_source], conditional on the current function (if any)
     being used. At the top level, marks it unconditionally. *)
@@ -240,3 +247,12 @@ val add_set_of_closures :
 
 val get_all_sets_of_closures :
   t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+
+val ids_for_export_continuation_info : continuation_info -> Ids_for_export.t
+
+val ids_for_export_code_dep : code_dep -> Ids_for_export.t
+
+val apply_renaming_continuation_info :
+  continuation_info -> Renaming.t -> continuation_info
+
+val apply_renaming_code_dep : code_dep -> Renaming.t -> code_dep

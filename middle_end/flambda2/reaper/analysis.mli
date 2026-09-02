@@ -25,6 +25,26 @@ val get_changed_representation :
 
 val has_use : result -> Code_id_or_name.t -> bool
 
+(** The code ids and symbols defined in [compilation_unit] that the solution
+    considers used at runtime. Under a whole-program solution, a rebuilt unit's
+    statics can lose all references from within their own unit (e.g. when a
+    module block field is poisoned) while still being referenced by other units,
+    so they must be treated as roots when computing which names are reachable
+    for emission. *)
+val used_code_ids_and_symbols_in_unit :
+  result -> compilation_unit:Compilation_unit.t -> Name_occurrences.t
+
+(** The value and function slots owned by [compilation_unit] whose contents the
+    solution considers read somewhere in the program. Under a whole-program
+    solution, a unit's rebuilt code can lose all of its own projections from a
+    slot (e.g. when the only reads live in copies inlined into other units)
+    while the slot is still read elsewhere; slot offset finalisation must not
+    mark such slots as dead. *)
+val slots_used_in_unit :
+  result ->
+  compilation_unit:Compilation_unit.t ->
+  Value_slot.Set.t * Function_slot.Set.t
+
 val any_usage : result -> Code_id_or_name.t -> bool
 
 val has_source : result -> Code_id_or_name.t -> bool

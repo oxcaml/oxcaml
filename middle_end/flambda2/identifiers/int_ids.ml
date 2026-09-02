@@ -497,14 +497,14 @@ module Variable = struct
 
   let previous_name_stamp = ref (-1)
 
-  let create ?user_visible name kind =
+  let create_in_compilation_unit ~compilation_unit ?user_visible name kind =
     let name_stamp =
       (* CR mshinwell: check for overflow on 32 bit *)
       incr previous_name_stamp;
       !previous_name_stamp
     in
     let data : Variable_data.t =
-      { compilation_unit = Current_unit.get_cu_exn ();
+      { compilation_unit;
         name;
         name_stamp;
         kind;
@@ -512,6 +512,11 @@ module Variable = struct
       }
     in
     Table.add !grand_table_of_variables data
+
+  let create ?user_visible name kind =
+    create_in_compilation_unit
+      ~compilation_unit:(Current_unit.get_cu_exn ())
+      ?user_visible name kind
 
   module T0 = struct
     let compare = Id.compare
@@ -522,7 +527,7 @@ module Variable = struct
 
     let print ppf t =
       let cu = compilation_unit t in
-      if Compilation_unit.equal cu (Current_unit.get_cu_exn ())
+      if Current_unit.is_current cu
       then
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
@@ -556,6 +561,16 @@ module Variable = struct
 
   let import importer t =
     Table.add !grand_table_of_variables (Table.import importer t)
+
+  let export_name_stamp_counter () = !previous_name_stamp
+
+  let restore_name_stamp_counter counter =
+    if !previous_name_stamp = -1
+    then previous_name_stamp := counter
+    else
+      Misc.fatal_errorf
+        "Restoring variable stamp counter would overwrite modified value %d"
+        !previous_name_stamp
 end
 
 module Symbol = struct
@@ -958,6 +973,16 @@ module Code_id = struct
 
   let import importer t =
     Table.add !grand_table_of_code_ids (Table.import importer t)
+
+  let export_name_stamp_counter () = !previous_name_stamp
+
+  let restore_name_stamp_counter counter =
+    if !previous_name_stamp = -1
+    then previous_name_stamp := counter
+    else
+      Misc.fatal_errorf
+        "Restoring code ID stamp counter would overwrite modified value %d"
+        !previous_name_stamp
 end
 
 module Code_id_or_symbol = struct

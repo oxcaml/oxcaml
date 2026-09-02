@@ -58,7 +58,8 @@ let flush_cmm_helpers_state res =
    it will already be included in the list of GC roots; otherwise it does not
    *have* to be a root. *)
 
-let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
+let unit0 ~offsets ~all_code ~reachable_names ~localise_unreachable_symbols
+    flambda_unit =
   (* If someone wants to add 32-bit support in the future there will be a
      (merged) PR on oxcaml/oxcaml which can be used as a guide:
      https://github.com/oxcaml/oxcaml/pull/685 *)
@@ -96,7 +97,7 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
       (Flambda_unit.toplevel_my_region flambda_unit, Flambda_debug_uid.none)
   in
   let r =
-    R.create ~reachable_names
+    R.create ~reachable_names ~localise_unreachable_symbols
       ~module_symbol:(Flambda_unit.module_symbol flambda_unit)
   in
   let body, body_free_vars, body_symbol_inits, res =
@@ -147,6 +148,8 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
   let gc_root_data = C.gc_root_table gc_roots in
   (gc_root_data :: data_items) @ cmm_helpers_data @ functions @ [entry]
 
-let unit ~offsets ~all_code ~reachable_names flambda_unit =
+let unit ~offsets ~all_code ~reachable_names ~localise_unreachable_symbols
+    flambda_unit =
   Profile.record_call "flambda_to_cmm" (fun () ->
-      unit0 ~offsets ~all_code ~reachable_names flambda_unit)
+      unit0 ~offsets ~all_code ~reachable_names ~localise_unreachable_symbols
+        flambda_unit)

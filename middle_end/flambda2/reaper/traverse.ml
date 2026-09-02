@@ -382,7 +382,23 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       in
       if is_external
       then (
+        (* CR mvellacott: in whole-program (LTO) mode, these facts keep direct
+           calls across unit boundaries conservative even when the callee's unit
+           participates in the whole-program solve: the callee escapes and the
+           call's results could be anything. Instead, record such calls as
+           pending boundary records and resolve them at solve time against the
+           callee unit's call witnesses, falling back to this treatment for code
+           ids defined outside the participating set. (Joining through the code
+           id's own graph node does not work: code ids are deliberately
+           [any_source].) *)
         Acc.add_cond_any_source acc ~denv call_widget;
+        (* The rebuilt apply is emitted as a direct reference to the foreign
+           code id (whether or not the callee closure survives, see
+           [Rebuild.rewrite_call_kind]), so the code id must be marked used
+           whenever the code containing this apply is. Whole-program rebuilds
+           rely on this to keep the code id's own unit from deleting code that
+           this unit's rebuilt code still calls directly. *)
+        Acc.add_cond_any_usage_node acc ~denv (Code_id_or_name.code_id code_id);
         match callee with
         | None -> ()
         | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
@@ -840,11 +856,28 @@ let create_symbol_and_add_any_source acc name =
 
 let run0 unit acc ~all_constants () =
   let le_monde_exterieur =
-    create_symbol_and_add_any_source acc "le_monde_extérieur"
+    create_symbol_and_add_any_source acc
+      Global_flow_graph.le_monde_exterieur_name
   in
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
-  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
+  if Flambda_features.support_lto ()
+  then
+    (* In whole-program (LTO) mode, uses of this unit's exports appear in the
+       dependency graphs of the units that import them, and the whole-program
+       solve combines those graphs with this one, so the toplevel return value
+       (the module block) does not escape through the boundary. However, the
+       module block is registered as a GC root via [caml_globals], so it must
+       exist at runtime even if no participating unit reads from it. Its unused
+       fields get poisoned during rebuild. *)
+    Acc.add_keep_alive acc
+      (Code_id_or_name.symbol (Flambda_unit.module_symbol unit))
+  else
+    (* The module block returned at toplevel escapes: compilation units outside
+       this compilation can use it in ways this analysis cannot see. *)
+    Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
+  (* The value of an uncaught exception escapes to the runtime, which can print
+     it. *)
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
   let return_continuation = Flambda_unit.return_continuation unit in
   let exn_continuation = Flambda_unit.exn_continuation unit in
@@ -874,7 +907,9 @@ let run0 unit acc ~all_constants () =
 
 let run (unit : Flambda_unit.t) =
   let acc = Acc.create () in
-  let all_constants = create_symbol_and_add_any_source acc "all_constants" in
+  let all_constants =
+    create_symbol_and_add_any_source acc Global_flow_graph.all_constants_name
+  in
   let holed =
     Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
   in

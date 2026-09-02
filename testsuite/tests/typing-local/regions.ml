@@ -1,5 +1,5 @@
 (* TEST
- modules = "cstubs.c int_as_pointer_regions.ml int_as_pointer_regions_classic_mode.ml";
+ modules = "cstubs.c int_as_pointer_regions.ml";
  include ocamlcommon;
  stack-allocation;
  native;
@@ -60,15 +60,14 @@ let () =
     Flambda 2 output unless the optimizer deletes it because it is unused.
     Such deletion happens in Simplify mode but not in classic mode.
     We cannot specify optimization levels on a per-function basis at the
-    moment, so we use separate files. *)
+    moment, so we use separate files.
+
+    CR mvellacott: Re-enable int_as_pointer_regions_classic_mode.ml when we
+    bring back classic mode. *)
 
 let () =
   Int_as_pointer_regions.int_as_pointer_local 42;
   check_not_empty "int_as_pointer (local -O3)"
-
-let () =
-  Int_as_pointer_regions_classic_mode.int_as_pointer_local 42;
-  check_empty "int_as_pointer (local -Oclassic)"
 
 let[@inline never] uses_local x =
   let local_ r = ref x in

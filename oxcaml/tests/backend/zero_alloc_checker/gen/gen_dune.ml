@@ -330,6 +330,8 @@ let () =
     "test_custom_error_msg_sig";
   print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
     ~extra_sources:[] ~exit_code:2 "test_arch_specific_witness";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_deps:[]
-    ~extra_sources:[] ~exit_code:2 "test_sort_witnesses";
+  (* CR mvellacott: Re-enable test_sort_witnesses when we bring back classic
+     mode. It uses [@@@ocaml.flambda_oclassic] and relies on the zero_alloc
+     check failing under classic-mode inlining, which no longer happens now that
+     classic mode is disabled. *)
   ()

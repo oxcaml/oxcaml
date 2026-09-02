@@ -14,48 +14,98 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Metadata = struct
+  type t =
+    { return_continuation : Continuation.t;
+      exn_continuation : Continuation.t;
+      toplevel_my_region : Variable.t;
+      toplevel_my_ghost_region : Variable.t;
+      toplevel_my_alloc_region : Variable.t;
+      module_symbol : Symbol.t
+    }
+
+  let module_symbol t = t.module_symbol
+
+  let ids_for_export
+      { return_continuation;
+        exn_continuation;
+        toplevel_my_region;
+        toplevel_my_ghost_region;
+        toplevel_my_alloc_region;
+        module_symbol
+      } =
+    (* CR mvellacott: Minimise what's stored when we merge .cmr and .cmx. *)
+    let ids = Ids_for_export.empty in
+    let ids = Ids_for_export.add_continuation ids return_continuation in
+    let ids = Ids_for_export.add_continuation ids exn_continuation in
+    let ids = Ids_for_export.add_variable ids toplevel_my_region in
+    let ids = Ids_for_export.add_variable ids toplevel_my_ghost_region in
+    let ids = Ids_for_export.add_variable ids toplevel_my_alloc_region in
+    Ids_for_export.add_symbol ids module_symbol
+
+  let apply_renaming
+      { return_continuation;
+        exn_continuation;
+        toplevel_my_region;
+        toplevel_my_ghost_region;
+        toplevel_my_alloc_region;
+        module_symbol
+      } renaming =
+    { return_continuation =
+        Renaming.apply_continuation renaming return_continuation;
+      exn_continuation = Renaming.apply_continuation renaming exn_continuation;
+      toplevel_my_region = Renaming.apply_variable renaming toplevel_my_region;
+      toplevel_my_ghost_region =
+        Renaming.apply_variable renaming toplevel_my_ghost_region;
+      toplevel_my_alloc_region =
+        Renaming.apply_variable renaming toplevel_my_alloc_region;
+      module_symbol = Renaming.apply_symbol renaming module_symbol
+    }
+end
+
 type t =
-  { return_continuation : Continuation.t;
-    exn_continuation : Continuation.t;
-    toplevel_my_region : Variable.t;
-    toplevel_my_ghost_region : Variable.t;
-    toplevel_my_alloc_region : Variable.t;
-    body : Flambda.Expr.t;
-    module_symbol : Symbol.t
+  { body : Flambda.Expr.t;
+    metadata : Metadata.t
   }
 
 let create ~return_continuation ~exn_continuation ~toplevel_my_region
     ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~body ~module_symbol =
-  { return_continuation;
-    exn_continuation;
-    toplevel_my_region;
-    toplevel_my_ghost_region;
-    toplevel_my_alloc_region;
-    body;
-    module_symbol
+  { body;
+    metadata =
+      { return_continuation;
+        exn_continuation;
+        toplevel_my_region;
+        toplevel_my_ghost_region;
+        toplevel_my_alloc_region;
+        module_symbol
+      }
   }
 
-let return_continuation t = t.return_continuation
+let create_of_metadata_and_body metadata body = { body; metadata }
 
-let exn_continuation t = t.exn_continuation
+let metadata t = t.metadata
 
-let toplevel_my_region t = t.toplevel_my_region
+let return_continuation t = t.metadata.return_continuation
 
-let toplevel_my_ghost_region t = t.toplevel_my_ghost_region
+let exn_continuation t = t.metadata.exn_continuation
 
-let toplevel_my_alloc_region t = t.toplevel_my_alloc_region
+let toplevel_my_region t = t.metadata.toplevel_my_region
+
+let toplevel_my_ghost_region t = t.metadata.toplevel_my_ghost_region
+
+let toplevel_my_alloc_region t = t.metadata.toplevel_my_alloc_region
 
 let body t = t.body
 
-let module_symbol t = t.module_symbol
+let module_symbol t = t.metadata.module_symbol
 
 let with_body t body = { t with body }
 
 let [@ocamlformat "disable"] print ppf
-      { return_continuation; exn_continuation; toplevel_my_region;
-        toplevel_my_ghost_region; toplevel_my_alloc_region; body;
-        module_symbol;
-      } =
+      { body; metadata = { return_continuation; exn_continuation;
+        toplevel_my_region; toplevel_my_ghost_region;
+        toplevel_my_alloc_region; module_symbol;
+      } } =
   Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(module_symbol@ %a)@]@ \
         @[<hov 1>(return_continuation@ %a)@]@ \

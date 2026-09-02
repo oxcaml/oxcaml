@@ -1,0 +1,2 @@
+>> Fatal error: rebuild_stale_cmr.cmr was written after rebuild_stale_cmr.ltosol (its identifier stamp counters are greater), so the whole-program solution is stale: re-run -reaper-solve
+Fatal error: exception Misc.Fatal_error

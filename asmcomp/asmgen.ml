@@ -705,28 +705,40 @@ type direct_to_cmm =
 
 type pipeline = Direct_to_cmm of direct_to_cmm
 
+type cmm_generator =
+  ppf_dump:Format.formatter -> prefixname:string -> Cmm.phrase list
+
 let asm_filename output_prefix =
   if !keep_asm_file || !Emitaux.binary_backend_available
   then output_prefix ^ ext_asm
   else Filename.temp_file "camlasm" ext_asm
 
-let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
-    ~ppf_dump (program : Lambda.program) =
+let compile_implementation_from_cmm unix ?toplevel ?may_reduce_heap ~sourcefile
+    ~prefixname ~ppf_dump (make_cmm : cmm_generator) =
+  let may_reduce_heap =
+    match may_reduce_heap with
+    | Some may_reduce_heap -> may_reduce_heap
+    | None -> Option.is_none toplevel
+  in
   compile_unit unix ~ppf_dump ~output_prefix:prefixname
     ~asm_filename:(asm_filename prefixname) ~keep_asm:!keep_asm_file
-    ~obj_filename:(prefixname ^ ext_obj)
-    ~may_reduce_heap:(Option.is_none toplevel) (fun () ->
-      Compilation_unit.Set.iter Compilenv.require_global
-        program.required_globals;
+    ~obj_filename:(prefixname ^ ext_obj) ~may_reduce_heap (fun () ->
       Compilenv.record_external_symbols ();
-      match pipeline with
-      | Direct_to_cmm direct_to_cmm ->
-        let cmm_phrases = direct_to_cmm ~ppf_dump ~prefixname program in
-        if Clflags.should_stop_after Compiler_pass.Middle_end
-        then ()
-        else
-          end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
-              cmm_phrases))
+      let cmm_phrases = make_cmm ~ppf_dump ~prefixname in
+      if Clflags.should_stop_after Compiler_pass.Middle_end
+      then ()
+      else
+        end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile (fun () ->
+            cmm_phrases))
+
+let compile_implementation unix ?toplevel ~pipeline ~sourcefile ~prefixname
+    ~ppf_dump (program : Lambda.program) =
+  let make_cmm =
+    match pipeline with Direct_to_cmm direct_to_cmm -> direct_to_cmm program
+  in
+  Compilation_unit.Set.iter Compilenv.require_global program.required_globals;
+  compile_implementation_from_cmm unix ?toplevel ~sourcefile ~prefixname
+    ~ppf_dump make_cmm
 
 let linear_gen_implementation ~ppf_dump unix filename =
   let open Linear_format in

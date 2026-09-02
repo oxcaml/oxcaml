@@ -91,6 +91,16 @@ module Unboxed_fields = struct
         | Unboxed fields -> fold_with_kind f fields acc)
       fields acc
 
+  let rec add_fields fields acc =
+    Field.Map.fold
+      (fun field uf acc -> add_fields_u uf (Field.Set.add field acc))
+      fields acc
+
+  and add_fields_u uf acc =
+    match uf with
+    | Not_unboxed _ -> acc
+    | Unboxed fields -> add_fields fields acc
+
   let rec mapi_u (not_unboxed : 'a -> 'b -> 'c) (unboxed : Field.t -> 'a -> 'a)
       (acc : 'a) (uf : 'b u) : 'c u =
     match uf with
@@ -108,6 +118,14 @@ module Unboxed_fields = struct
     match uf with
     | Not_unboxed x -> Not_unboxed (f x)
     | Unboxed fields -> Unboxed (map f fields)
+
+  let rec equal_u eq u1 u2 =
+    match u1, u2 with
+    | Not_unboxed x1, Not_unboxed x2 -> eq x1 x2
+    | Unboxed fields1, Unboxed fields2 -> equal eq fields1 fields2
+    | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ -> false
+
+  and equal eq fields1 fields2 = Field.Map.equal (equal_u eq) fields1 fields2
 
   (* This is not symmetrical!! [fields1] must define a subset of [fields2], but
      does not have to define all of them. *)
@@ -182,11 +200,102 @@ let pp_changed_representation ff = function
       (Function_slot.Map.print Function_slot.print)
       function_slots Function_slot.print fs
 
+let rename_unboxed_fields_tree tree ~rename_leaf ~rename_field =
+  let rec rename_tree tree =
+    Field.Map.fold
+      (fun fld u new_tree ->
+        Field.Map.add (rename_field fld) (rename_u u) new_tree)
+      tree Field.Map.empty
+  and rename_u (u : _ Unboxed_fields.u) : _ Unboxed_fields.u =
+    match u with
+    | Not_unboxed x -> Not_unboxed (rename_leaf x)
+    | Unboxed tree -> Unboxed (rename_tree tree)
+  in
+  rename_tree tree
+
+let unboxed_fields_ids_for_export unboxed_fields ids =
+  let rec add_tree tree ids =
+    Field.Map.fold (fun (_ : Field.t) u ids -> add_u u ids) tree ids
+  and add_u (u : _ Unboxed_fields.u) ids =
+    match u with
+    | Not_unboxed var -> Ids_for_export.add_variable ids var
+    | Unboxed tree -> add_tree tree ids
+  in
+  Code_id_or_name.Map.fold
+    (fun id tree ids ->
+      add_tree tree (Ids_for_export.add_code_id_or_name ids id))
+    unboxed_fields ids
+
+let unboxed_fields_fields_for_export unboxed_fields fields =
+  Code_id_or_name.Map.fold
+    (fun (_ : Code_id_or_name.t) tree fields ->
+      Unboxed_fields.add_fields tree fields)
+    unboxed_fields fields
+
+let unboxed_fields_apply_renaming unboxed_fields renaming ~rename_field =
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  Code_id_or_name.Map.fold
+    (fun id tree new_unboxed_fields ->
+      Code_id_or_name.Map.add (rename_id id)
+        (rename_unboxed_fields_tree tree
+           ~rename_leaf:(Renaming.apply_variable renaming)
+           ~rename_field)
+        new_unboxed_fields)
+    unboxed_fields Code_id_or_name.Map.empty
+
+let changed_representation_ids_for_export changed_representation ids =
+  let add_id = Ids_for_export.add_code_id_or_name in
+  Code_id_or_name.Map.fold
+    (fun id ((_ : changed_representation), allocation_point) ids ->
+      add_id (add_id ids id) allocation_point)
+    changed_representation ids
+
+let changed_representation_fields_for_export changed_representation fields =
+  Code_id_or_name.Map.fold
+    (fun (_ : Code_id_or_name.t) (repr, (_ : Code_id_or_name.t)) fields ->
+      match (repr : changed_representation) with
+      | Block_representation (tree, (_ : int)) ->
+        Unboxed_fields.add_fields tree fields
+      | Closure_representation
+          ( tree,
+            (_ : Function_slot.t Function_slot.Map.t),
+            (_ : Function_slot.t) ) ->
+        Unboxed_fields.add_fields tree fields)
+    changed_representation fields
+
+let changed_representation_apply_renaming changed_representation renaming
+    ~rename_field =
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  let rename_repr (repr : changed_representation) : changed_representation =
+    (* Ints, block access kinds and slots are structural data, not hashconsed
+       identifiers, so they are not renamed. Note that rebuilding the trees here
+       destroys their physical sharing across the entries of a single set of
+       closures, so consumers must not rely on it. *)
+    match repr with
+    | Block_representation (tree, size) ->
+      Block_representation
+        (rename_unboxed_fields_tree tree ~rename_leaf:Fun.id ~rename_field, size)
+    | Closure_representation (tree, function_slots, current_function_slot) ->
+      Closure_representation
+        ( rename_unboxed_fields_tree tree ~rename_leaf:Fun.id ~rename_field,
+          function_slots,
+          current_function_slot )
+  in
+  Code_id_or_name.Map.fold
+    (fun id (repr, allocation_point) new_changed_representation ->
+      Code_id_or_name.Map.add (rename_id id)
+        (rename_repr repr, rename_id allocation_point)
+        new_changed_representation)
+    changed_representation Code_id_or_name.Map.empty
+
 let cannot_change_witness_calling_convention =
   rel1 "cannot_change_witness_calling_convention" Cols.[n]
 
-let cannot_change_calling_convention =
-  rel1 "cannot_change_calling_convention" Cols.[n]
+let cannot_change_calling_convention_table =
+  Datalog.create_relation ~name:"cannot_change_calling_convention" Cols.[n]
+
+let cannot_change_calling_convention x =
+  cannot_change_calling_convention_table % [x]
 
 let cannot_change_representation0 = rel1 "cannot_change_representation0" Cols.[n]
 
@@ -672,9 +781,16 @@ let perform_analysis0 db ~stats =
                 PTA.get_direct_usages db
                   (Code_id_or_name.Map.singleton to_patch ())
               in
+              (* The new variables are binders in the rebuilt code where
+                 [to_patch] occurs, so they belong to its unit. *)
+              let compilation_unit =
+                Code_id_or_name.compilation_unit to_patch
+              in
               let fields =
                 mk_unboxed_fields ~has_to_be_unboxed
-                  ~mk:(fun kind name -> Variable.create name kind)
+                  ~mk:(fun kind name ->
+                    Variable.create_in_compilation_unit ~compilation_unit name
+                      kind)
                   db code_or_name
                   (PTA.get_fields db
                      (PTA.add_usages_through_function_slots
@@ -733,10 +849,15 @@ let perform_analysis0 db ~stats =
                 in
                 add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
               | Set_of_closures l ->
+                (* The new slots describe the changed layout of the set of
+                   closures containing [code_id_or_name], so they belong to its
+                   unit. *)
+                let compilation_unit =
+                  Code_id_or_name.compilation_unit code_id_or_name
+                in
                 let mk kind name =
-                  Value_slot.create
-                    (Current_unit.get_cu_exn ())
-                    ~name ~is_always_immediate:false kind
+                  Value_slot.create compilation_unit ~name
+                    ~is_always_immediate:false kind
                 in
                 let fields =
                   PTA.get_fields_usage_of_constructors db
@@ -752,8 +873,7 @@ let perform_analysis0 db ~stats =
                   List.fold_left
                     (fun acc (fs, _) ->
                       Function_slot.Map.add fs
-                        (Function_slot.create
-                           (Current_unit.get_cu_exn ())
+                        (Function_slot.create compilation_unit
                            ~name:(Function_slot.name fs)
                            ~is_always_immediate:false Flambda_kind.value)
                         acc)
@@ -789,6 +909,18 @@ let cannot_change_calling_convention_query =
   let^? [x], [] = ["x"], [] in
   [cannot_change_calling_convention x]
 
+(* CR mvellacott: in whole-program (LTO) rebuilds, every rebuild must answer
+   this question identically for a given code ID, whichever unit is current: the
+   defining unit rewrites the function's calling convention according to its
+   answer, and calling units rewrite their call sites according to theirs. The
+   [is_current] test makes the answer depend on the current unit, so consistency
+   relies on [Reaper.Staged.solve_whole_program] forcing
+   [cannot_change_calling_convention] for every code id: all rebuilds agree that
+   no convention changes. To allow cross-unit calling-convention changes, make
+   this decision db-only under LTO (injecting facts into the solution for code
+   ids outside the participating set) and derive the parameter/my-closure
+   decisions for imported code IDs from the solution tables rather than from the
+   unit-local [code_deps]. *)
 let cannot_change_calling_convention uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
   || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))

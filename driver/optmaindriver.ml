@@ -20,7 +20,7 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 =
+let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
   native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -83,7 +83,7 @@ let main unix argv ppf ~flambda2 =
         Compenv.fatal "The -uses-metaprogramming flag is only supported \
                        with the runtime metaprogramming extension";
     let (module Compiler : Optcompile.S) =
-      Optcompile.native unix ~flambda2
+      Optcompile.native unix ~flambda2 ~reaped_flambda2_to_cmm
     in
     begin try
       Compenv.process_deferred_actions
@@ -103,7 +103,7 @@ let main unix argv ppf ~flambda2 =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
-                      functorize;
+                      functorize; reaper_rebuild; reaper_solve;
                       Compenv.stop_early; output_c_object]) > 1
     then
     begin
@@ -111,7 +111,8 @@ let main unix argv ppf ~flambda2 =
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate, -functorize";
+                         -output-obj, -instantiate, -functorize, \
+                         -reaper-rebuild, -reaper-solve";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -163,6 +164,57 @@ let main unix argv ppf ~flambda2 =
         |> Functorizer.validate_inputs
       in
       Compiler.functorize input_module_names target;
+      Warnings.check_fatal ();
+    end
+    else if !reaper_rebuild then begin
+      Compmisc.init_path ();
+      let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
+      let ltosol_file, (other_inputs : string list) = match
+        List.partition (fun f -> Filename.check_suffix f ".ltosol") inputs
+      with
+        | [ltosol_file], other_inputs -> ltosol_file, other_inputs
+        | ltosol_files, _ ->
+          Printf.ksprintf Compenv.fatal
+            "Must specify exactly one .ltosol file with -reaper-rebuild \
+             (found %d: [%s])"
+            (List.length ltosol_files) (String.concat ", " ltosol_files)
+      in
+      let cmr_files, (_other_inputs : string list) =
+        List.partition (fun f -> Filename.check_suffix f ".cmr") other_inputs
+      in
+      (match cmr_files with
+       | [] ->
+         Compenv.fatal
+           "Must specify at least one .cmr file with -reaper-rebuild"
+       | _ :: _ -> ());
+      (* [cmr_files] is in command-line order, which is required to be
+         dependency order (dependencies first). *)
+      let units =
+        List.map
+          (fun cmr_file ->
+            cmr_file, Compenv.output_prefix cmr_file ^ ".reaped")
+          cmr_files
+      in
+      Compiler.reaper_rebuild ~ltosol_file ~units ~keep_symbol_tables:false;
+      Warnings.check_fatal ();
+    end
+    else if !reaper_solve then begin
+      Compmisc.init_path ();
+      (* CR mvellacott: change validation: should take .cmx files. *)
+      let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
+      let cmr_files = match
+        List.partition (fun f -> Filename.check_suffix f ".cmr") inputs
+      with
+        | [], _ ->
+          Compenv.fatal "Must specify at least one .cmr file with -reaper-solve"
+        | cmr_files, [] -> cmr_files
+        | _, other_files ->
+          Printf.ksprintf Compenv.fatal
+            "Got unexpected files: [%s] (-reaper-solve expects .cmr files only)"
+            (String.concat ", " other_files)
+      in
+      let ltosol_file = Compenv.extract_output !output_name in
+      reaper_lto_solve ~cmr_files ~ltosol_file;
       Warnings.check_fatal ();
     end
     else if !shared then begin

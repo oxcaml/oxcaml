@@ -271,7 +271,7 @@ module Greedy : sig
 
   val print : Format.formatter -> state -> unit
 
-  val create_initial_state : unit -> state
+  val create_initial_state : previous_offsets:EO.t -> state
 
   val create_slots_for_set :
     state ->
@@ -434,6 +434,12 @@ end = struct
       computing the actual offsets of these elements within a block. *)
   type state =
     { mutable used_offsets : EO.t;
+      previous_offsets : EO.t;
+          (* Offsets assigned to this unit's own slots by a previous compilation
+             of this unit (the paused process of the reaper's staged pipeline).
+             Other units may hold copies of sets of closures laid out by that
+             compilation, so slots that already have an offset there must keep
+             it. *)
       mutable function_slots : function_slot slot Function_slot.Map.t;
       mutable unboxed_slots : unboxed_slot slot Value_slot.Map.t;
       mutable value_slots : value_slot slot Value_slot.Map.t;
@@ -469,8 +475,9 @@ end = struct
         allocated_slots = Numeric_types.Int.Map.empty
       }
 
-  let create_initial_state () =
+  let create_initial_state ~previous_offsets =
     { used_offsets = EO.empty;
+      previous_offsets;
       function_slots = Function_slot.Map.empty;
       unboxed_slots = Value_slot.Map.empty;
       value_slots = Value_slot.Map.empty;
@@ -535,7 +542,8 @@ end = struct
     List.iter (function s -> Format.fprintf fmt "%a@ " print_set s) l
 
   let [@ocamlformat "disable"] print fmt {
-      used_offsets = _; function_slots = _; unboxed_slots = _; value_slots = _;
+      used_offsets = _; previous_offsets = _; function_slots = _;
+      unboxed_slots = _; value_slots = _;
       sets_of_closures; function_slots_to_assign; unboxed_slots_to_assign; value_slots_to_assign; } =
     Format.fprintf fmt
       "@[<hov 1>(@,\
@@ -733,10 +741,24 @@ end = struct
           let code_metadata = get_code_metadata code_id in
           Code_metadata.function_slot_size code_metadata
       in
-      let s = create_slot ~size (Function_slot function_slot) Unassigned in
-      add_function_slot state function_slot s;
-      add_unallocated_slot_to_set state s set;
-      s)
+      match EO.function_slot_offset state.previous_offsets function_slot with
+      | Some (Live_function_slot { offset; size = previous_size } as info)
+        when previous_size = size ->
+        (* Keep the offset the previous compilation of this unit assigned; see
+           [state.previous_offsets]. *)
+        let offset = Exported_offset.from_exported_offset offset in
+        let s =
+          create_slot ~size (Function_slot function_slot) (Assigned offset)
+        in
+        use_function_slot_info state function_slot info;
+        add_function_slot state function_slot s;
+        add_allocated_slot_to_set s set;
+        s
+      | Some (Live_function_slot _ | Dead_function_slot) | None ->
+        let s = create_slot ~size (Function_slot function_slot) Unassigned in
+        add_function_slot state function_slot s;
+        add_unallocated_slot_to_set state s set;
+        s)
     else
       (* We should be guaranteed that the corresponding compilation unit's cmx
          file has been read during the downward traversal. *)
@@ -770,10 +792,24 @@ end = struct
   let create_unboxed_slot set state value_slot size =
     if Current_unit.is_current (Value_slot.get_compilation_unit value_slot)
     then (
-      let s = create_slot ~size (Unboxed_slot value_slot) Unassigned in
-      add_unboxed_slot state value_slot s;
-      add_unallocated_slot_to_set state s set;
-      s)
+      match EO.value_slot_offset state.previous_offsets value_slot with
+      | Some
+          (Live_value_slot { offset; is_scanned = false; size = previous_size }
+           as info)
+        when previous_size = size ->
+        (* Keep the offset the previous compilation of this unit assigned; see
+           [state.previous_offsets]. *)
+        let offset = Exported_offset.from_exported_offset offset in
+        let s = create_slot ~size (Unboxed_slot value_slot) (Assigned offset) in
+        use_unboxed_slot_info state value_slot info;
+        add_unboxed_slot state value_slot s;
+        add_allocated_slot_to_set s set;
+        s
+      | Some (Live_value_slot _ | Dead_value_slot) | None ->
+        let s = create_slot ~size (Unboxed_slot value_slot) Unassigned in
+        add_unboxed_slot state value_slot s;
+        add_unallocated_slot_to_set state s set;
+        s)
     else
       (* Same as the comments for the function_slots *)
       let imported_offsets = EO.imported_offsets () in
@@ -807,12 +843,27 @@ end = struct
   let create_value_slot set state value_slot =
     if Current_unit.is_current (Value_slot.get_compilation_unit value_slot)
     then (
-      let s =
-        create_slot ~size:1 (Scannable_value_slot value_slot) Unassigned
-      in
-      add_value_slot state value_slot s;
-      add_unallocated_slot_to_set state s set;
-      s)
+      match EO.value_slot_offset state.previous_offsets value_slot with
+      | Some (Live_value_slot { offset; is_scanned = true; size = 1 } as info)
+        ->
+        (* Keep the offset the previous compilation of this unit assigned; see
+           [state.previous_offsets]. *)
+        let offset = Exported_offset.from_exported_offset offset in
+        let s =
+          create_slot ~size:1 (Scannable_value_slot value_slot)
+            (Assigned offset)
+        in
+        use_value_slot_info state value_slot info;
+        add_value_slot state value_slot s;
+        add_allocated_slot_to_set s set;
+        s
+      | Some (Live_value_slot _ | Dead_value_slot) | None ->
+        let s =
+          create_slot ~size:1 (Scannable_value_slot value_slot) Unassigned
+        in
+        add_value_slot state value_slot s;
+        add_unallocated_slot_to_set state s set;
+        s)
     else
       (* Same as the comments for the function_slots *)
       let imported_offsets = EO.imported_offsets () in
@@ -1161,8 +1212,12 @@ let add_offsets_from_function l1 ~from_function:l2 =
   (* Order is irrelevant *)
   List.rev_append l2 l1
 
-let finalize_offsets ~get_code_metadata ~used_slots l =
-  let state = Greedy.create_initial_state () in
+let finalize_offsets ~get_code_metadata ~used_slots
+    ~offsets_from_previous_assignment l =
+  let state =
+    Greedy.create_initial_state
+      ~previous_offsets:offsets_from_previous_assignment
+  in
   Misc.try_finally
     (fun () ->
       List.iter (Greedy.create_slots_for_set state ~get_code_metadata) l;

@@ -73,6 +73,10 @@ let add_simple t simple =
 let add_code_id t code_id =
   { t with code_ids = Code_id.Set.add code_id t.code_ids }
 
+let add_code_id_or_name t code_id_or_name =
+  Code_id_or_name.pattern_match' code_id_or_name ~code_id:(add_code_id t)
+    ~name:(add_name t)
+
 let add_continuation t continuation =
   { t with continuations = Continuation.Set.add continuation t.continuations }
 

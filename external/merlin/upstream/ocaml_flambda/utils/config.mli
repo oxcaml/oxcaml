@@ -132,6 +132,10 @@ val cmo_magic_number: string
 val cma_magic_number: string
 (** Magic number for archive files *)
 
+(* CR mvellacott: replace this with a ltosol magic number. *)
+val cmr_magic_number: string
+(** Magic number for reaper intermediate data *)
+
 val cmx_magic_number: string
 (** Magic number for compilation unit descriptions *)
 
@@ -164,6 +168,9 @@ val linear_magic_number: string
 
 val cfg_magic_number: string
 (** Magic number for Cfg internal representation files *)
+
+val ltosol_magic_number: string
+(** Magic number for reaper whole-program solution files *)
 
 val max_tag: int
 (** Biggest tag that can be stored in the header of a regular block. *)

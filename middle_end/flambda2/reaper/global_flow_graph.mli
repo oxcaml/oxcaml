@@ -17,6 +17,16 @@ type graph
 
 val to_datalog : graph -> Datalog.database
 
+val constructor : Datalog_helpers.Maps.Nfn.handle
+
+val parameter : Datalog_helpers.Maps.Ncn.handle
+
+val code_id_my_closure : Datalog_helpers.Maps.Nn.handle
+
+val any_usage : Datalog_helpers.Maps.N.handle
+
+val any_source : Datalog_helpers.Maps.N.handle
+
 module Relations : sig
   type 'a atom = [> `Atom of Datalog.atom] as 'a
 
@@ -91,6 +101,14 @@ module Relations : sig
 
   val any_source : Code_id_or_name.t term -> _ atom
 
+  (** [keep_alive x] means that [x] must continue to exist at runtime even if
+      the graph records no use of it. It marks [x] as used shallowly: unlike
+      [any_usage], the fields of [x] stay live only if they have uses of their
+      own. This is used in whole-program (LTO) mode for module blocks, which are
+      registered as GC roots via [caml_globals] and so must be kept even when no
+      participating compilation unit reads from them. *)
+  val keep_alive : Code_id_or_name.t term -> _ atom
+
   (* [zero_alloc_source x] means that [x] has any source, but furthermore, that
      all fields read from [x] are themselves [zero_alloc_source] (and hence
      [any_source]), even if they are local fields. This is not fully tracked,
@@ -143,11 +161,16 @@ val add_any_usage : graph -> Code_id_or_name.t -> unit
 
 val add_any_source : graph -> Code_id_or_name.t -> unit
 
+(** See {!Relations.keep_alive}. *)
+val add_keep_alive : graph -> Code_id_or_name.t -> unit
+
 val add_zero_alloc_source : graph -> Code_id_or_name.t -> unit
 
 val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
 
 val create : unit -> graph
+
+val union : graph -> graph -> graph
 
 val add_opaque_let_dependency :
   graph -> to_:Bound_pattern.t -> from:Name_occurrences.t -> unit
@@ -156,3 +179,27 @@ val print_iter_edges :
   print_edge:(Code_id_or_name.t * Code_id_or_name.t * string -> unit) ->
   graph ->
   unit
+
+val ids_for_export : graph -> Ids_for_export.t
+
+(** Fields are hashconsed, so for serialisation the [Field.view] of each one
+    needs serialising separately. *)
+val fields_for_export : graph -> Field.Set.t
+
+(** Rebuild the graph, applying [renaming] to all identifiers and [rename_field]
+    to all fields. The implementation assumes that the renaming is injective,
+    data will be lost otherwise. *)
+val apply_renaming :
+  graph -> Renaming.t -> rename_field:(Field.t -> Field.t) -> graph
+
+(** The linkage names of the synthetic boundary symbols that [Traverse.run]
+    creates for a unit's dependency graph. *)
+val le_monde_exterieur_name : string
+
+val all_constants_name : string
+
+(** Whether [symbol] is one of the synthetic boundary symbols
+    ([le_monde_extérieur] or [all_constants]). They belong to their unit and
+    carry [any_source] facts, but they are not definitions: nothing must treat
+    them as symbols the unit defines. *)
+val is_synthetic_boundary_symbol : Symbol.t -> bool

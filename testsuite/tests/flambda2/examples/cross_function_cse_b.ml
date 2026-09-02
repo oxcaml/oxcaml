@@ -1,4 +1,6 @@
+(* CR mvellacott: Re-enable when we bring back classic mode. *)
 (* TEST
+ skip;
  compile_only = "true";
  readonly_files = "cross_function_cse_a.ml";
  setup-ocamlopt.byte-build-env;

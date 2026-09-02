@@ -1,4 +1,6 @@
+(* CR mvellacott: Re-enable when we bring back classic mode. *)
 (* TEST
+ skip;
  compile_only = "true";
  flambda2;
  setup-ocamlopt.byte-build-env;

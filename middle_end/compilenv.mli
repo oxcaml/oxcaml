@@ -21,9 +21,15 @@
 
 open Cmx_format
 
-val reset : Unit_info.t -> unit
+val reset : ?keep_cmx_caches:bool -> Unit_info.t -> unit
         (* Reset the environment and record the name of the unit being
-           compiled (including any associated -for-pack prefix). *)
+           compiled (including any associated -for-pack prefix).
+           [keep_cmx_caches] (default [false]) preserves the caches of unit
+           infos and zero_alloc info read from .cmx files, which mirror on-disk
+           data that does not change within a process. It is used when
+           compiling several units in one process (batched -reaper-rebuild)
+           together with caches above this level that would otherwise prevent
+           re-reads from repopulating the caches here. *)
 
 val reset_info_tables: unit -> unit
 
@@ -49,6 +55,17 @@ val get_unit_export_info
 val get_static_data :
   Compilation_unit.t -> Slambdaeval.CU_data.t option
         (* Returns [None] if the .cmx file cannot be located. *)
+
+val set_lto_participants : Compilation_unit.t list -> unit
+        (* In a [-reaped-rebuild] invocation, set the units that were involved
+           in the [-reaper-solve]. Other invocations should leave this empty.
+           We use this to determine whether to read [.reaped.cmx] files or
+           plain [.cmx] files for our dependencies. *)
+
+val get_unit_imports : Compilation_unit.t -> Import_info.t list
+        (* The cmx imports recorded in the given unit's cmx file, if its
+           unit infos have already been loaded via [get_unit_export_info];
+           empty otherwise. *)
 
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
         (* Set the export information for the current unit. *)
@@ -87,6 +104,12 @@ val save_unit_info:
   static_data:Slambdaeval.CU_data.t ->
   unit
         (* Save the infos for the current unit in the given file *)
+
+val save_resumed_unit_info: string -> paused:unit_infos -> unit
+        (* Like [save_unit_info] but for a resumed compilation: the fields
+           that normally come from the frontend and typechecker are taken from
+           [paused] instead. *)
+
 val cache_unit_info: unit_infos -> unit
         (* Enter the given infos in the cache.  The infos will be
            honored by [symbol_for_global] and [global_approx]
@@ -111,6 +134,7 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of Compilation_unit.t * Compilation_unit.t * string
+  | Missing_reaped_cmx of Compilation_unit.t * string
 
 exception Error of error
 

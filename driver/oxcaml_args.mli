@@ -147,6 +147,10 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val support_lto : unit -> unit
+  val no_support_lto : unit -> unit
+  val reaper_rebuild : unit -> unit
+  val reaper_solve : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit

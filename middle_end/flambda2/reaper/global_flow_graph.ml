@@ -33,6 +33,7 @@ type graph =
     mutable alias_if_any_source : NNN.t;
     mutable any_usage : N.t;
     mutable any_source : N.t;
+    mutable keep_alive : N.t;
     mutable zero_alloc_source : N.t;
     mutable code_id_my_closure : NN.t
   }
@@ -88,6 +89,8 @@ let any_usage = N.create ~name:"any_usage"
 
 let any_source = N.create ~name:"any_source"
 
+let keep_alive = N.create ~name:"keep_alive"
+
 let zero_alloc_source = N.create ~name:"zero_alloc_source"
 
 let code_id_my_closure = NN.create ~name:"code_id_my_closure"
@@ -103,6 +106,7 @@ let to_datalog graph =
   @@ Datalog.set_table alias_if_any_source graph.alias_if_any_source
   @@ Datalog.set_table any_usage graph.any_usage
   @@ Datalog.set_table any_source graph.any_source
+  @@ Datalog.set_table keep_alive graph.keep_alive
   @@ Datalog.set_table zero_alloc_source graph.zero_alloc_source
   @@ Datalog.set_table code_id_my_closure graph.code_id_my_closure
   @@ Datalog.empty
@@ -143,6 +147,8 @@ module Relations = struct
 
   let any_source var = Datalog.atom any_source [var]
 
+  let keep_alive var = Datalog.atom keep_alive [var]
+
   let zero_alloc_source var = Datalog.atom zero_alloc_source [var]
 
   let code_id_my_closure ~code_id ~my_closure =
@@ -160,8 +166,34 @@ let create () =
     alias_if_any_source = NNN.empty;
     any_usage = N.empty;
     any_source = N.empty;
+    keep_alive = N.empty;
     zero_alloc_source = N.empty;
     code_id_my_closure = NN.empty
+  }
+
+(* This is a plain union: nodes with the same identity (such as a symbol defined
+   in one unit and used from another) are combined, and all facts from both
+   graphs are kept. Whole-program combining, including restoring conservatism at
+   the boundary of the participating set, lives in [Lto_combine]. *)
+let union g1 g2 =
+  (* Relations can carry data on each edge, but for these types it is always
+     unit. *)
+  let keep () () = Some () in
+  { alias = NN.union keep g1.alias g2.alias;
+    use = NN.union keep g1.use g2.use;
+    accessor = NFN.union keep g1.accessor g2.accessor;
+    constructor = NFN.union keep g1.constructor g2.constructor;
+    argument = NCN.union keep g1.argument g2.argument;
+    parameter = NCN.union keep g1.parameter g2.parameter;
+    propagate = NNN.union keep g1.propagate g2.propagate;
+    alias_if_any_source =
+      NNN.union keep g1.alias_if_any_source g2.alias_if_any_source;
+    any_usage = N.union keep g1.any_usage g2.any_usage;
+    any_source = N.union keep g1.any_source g2.any_source;
+    keep_alive = N.union keep g1.keep_alive g2.keep_alive;
+    zero_alloc_source = N.union keep g1.zero_alloc_source g2.zero_alloc_source;
+    code_id_my_closure =
+      NN.union keep g1.code_id_my_closure g2.code_id_my_closure
   }
 
 let add_alias t ~to_ ~from = t.alias <- NN.add_or_replace [to_; from] () t.alias
@@ -205,6 +237,9 @@ let add_any_usage t (var : Code_id_or_name.t) =
 let add_any_source t (var : Code_id_or_name.t) =
   t.any_source <- N.add_or_replace [var] () t.any_source
 
+let add_keep_alive t (var : Code_id_or_name.t) =
+  t.keep_alive <- N.add_or_replace [var] () t.keep_alive
+
 let add_zero_alloc_source t var =
   t.zero_alloc_source <- N.add_or_replace [var] () t.zero_alloc_source
 
@@ -213,3 +248,63 @@ let add_code_id_my_closure t code_id my_closure =
     <- NN.add_or_replace
          [Code_id_or_name.code_id code_id; Code_id_or_name.var my_closure]
          () t.code_id_my_closure
+
+let ids_for_export graph =
+  let open Datalog_helpers in
+  let ids = Ids_for_export.empty in
+  let ids = Maps.Nn.add_ids graph.alias ids in
+  let ids = Maps.Nn.add_ids graph.use ids in
+  let ids = Maps.Nfn.add_ids graph.accessor ids in
+  let ids = Maps.Nfn.add_ids graph.constructor ids in
+  let ids = Maps.Ncn.add_ids graph.argument ids in
+  let ids = Maps.Ncn.add_ids graph.parameter ids in
+  let ids = Maps.Nnn.add_ids graph.propagate ids in
+  let ids = Maps.Nnn.add_ids graph.alias_if_any_source ids in
+  let ids = Maps.N.add_ids graph.any_usage ids in
+  let ids = Maps.N.add_ids graph.any_source ids in
+  let ids = Maps.N.add_ids graph.keep_alive ids in
+  let ids = Maps.N.add_ids graph.zero_alloc_source ids in
+  let ids = Maps.Nn.add_ids graph.code_id_my_closure ids in
+  ids
+
+let fields_for_export graph =
+  let open Datalog_helpers in
+  let fields = Field.Set.empty in
+  let fields = Maps.Nfn.add_fields graph.accessor fields in
+  let fields = Maps.Nfn.add_fields graph.constructor fields in
+  fields
+
+let apply_renaming graph renaming ~rename_field =
+  let open Datalog_helpers in
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  { alias = Maps.Nn.rename graph.alias ~rename_id;
+    use = Maps.Nn.rename graph.use ~rename_id;
+    accessor = Maps.Nfn.rename graph.accessor ~rename_id ~rename_field;
+    constructor = Maps.Nfn.rename graph.constructor ~rename_id ~rename_field;
+    argument = Maps.Ncn.rename graph.argument ~rename_id;
+    parameter = Maps.Ncn.rename graph.parameter ~rename_id;
+    propagate = Maps.Nnn.rename graph.propagate ~rename_id;
+    alias_if_any_source = Maps.Nnn.rename graph.alias_if_any_source ~rename_id;
+    any_usage = Maps.N.rename graph.any_usage ~rename_id;
+    any_source = Maps.N.rename graph.any_source ~rename_id;
+    keep_alive = Maps.N.rename graph.keep_alive ~rename_id;
+    zero_alloc_source = Maps.N.rename graph.zero_alloc_source ~rename_id;
+    code_id_my_closure = Maps.Nn.rename graph.code_id_my_closure ~rename_id
+  }
+
+(* The synthetic boundary symbols created (per unit) by [Traverse.run]. They
+   belong to the unit and carry [any_source] facts, but they are not
+   definitions: nothing must treat them as symbols the unit defines. Real
+   symbols cannot collide with these linkage names: [le_monde_extérieur] is not
+   a valid OCaml identifier, and compiler-generated symbols for toplevel
+   bindings carry stamp suffixes. *)
+let le_monde_exterieur_name = "le_monde_extérieur"
+
+let all_constants_name = "all_constants"
+
+let is_synthetic_boundary_symbol symbol =
+  let cu = Symbol.compilation_unit symbol in
+  let is_symbol_named name =
+    Symbol.equal symbol (Symbol.create cu (Linkage_name.of_string name))
+  in
+  is_symbol_named le_monde_exterieur_name || is_symbol_named all_constants_name

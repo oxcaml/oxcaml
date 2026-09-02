@@ -141,6 +141,42 @@ let merge env1 env2 =
   in
   { function_slot_offsets; value_slot_offsets }
 
+let union_prefer_live env1 env2 =
+  let function_slot_offsets =
+    Function_slot.Map.union
+      (fun _function_slot (info1 : function_slot_info)
+           (info2 : function_slot_info) ->
+        match info1, info2 with
+        | Dead_function_slot, Live_function_slot _ -> Some info2
+        | (Live_function_slot _ | Dead_function_slot), _ -> Some info1)
+      env1.function_slot_offsets env2.function_slot_offsets
+  in
+  let value_slot_offsets =
+    Value_slot.Map.union
+      (fun _value_slot (info1 : value_slot_info) (info2 : value_slot_info) ->
+        match info1, info2 with
+        | Dead_value_slot, Live_value_slot _ -> Some info2
+        | (Live_value_slot _ | Dead_value_slot), _ -> Some info1)
+      env1.value_slot_offsets env2.value_slot_offsets
+  in
+  { function_slot_offsets; value_slot_offsets }
+
+let restrict_to_current_compilation_unit env =
+  let function_slot_offsets =
+    Function_slot.Map.filter
+      (fun function_slot _info ->
+        Current_unit.is_current
+          (Function_slot.get_compilation_unit function_slot))
+      env.function_slot_offsets
+  in
+  let value_slot_offsets =
+    Value_slot.Map.filter
+      (fun value_slot _info ->
+        Current_unit.is_current (Value_slot.get_compilation_unit value_slot))
+      env.value_slot_offsets
+  in
+  { function_slot_offsets; value_slot_offsets }
+
 let import_offsets env = current_offsets := merge env !current_offsets
 
 (* CR gbury: considering that the goal is to have `offsets` significantly

@@ -194,14 +194,23 @@ let must_be_function_slot t =
     | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ) as view ->
     Misc.fatal_errorf "[must_be_function_slot] got %a instead" print_view view
 
+let locality_scope : Compilation_unit.Set.t option ref = ref None
+
+let set_locality_scope units = locality_scope := Some units
+
+let unit_is_in_locality_scope compilation_unit =
+  match !locality_scope with
+  | None -> Current_unit.is_current compilation_unit
+  | Some units -> Compilation_unit.Set.mem compilation_unit units
+
 let is_local f =
   Flambda_features.reaper_local_fields ()
   &&
   match view f with
   | Value_slot vs ->
-    Current_unit.is_current (Value_slot.get_compilation_unit vs)
+    unit_is_in_locality_scope (Value_slot.get_compilation_unit vs)
   | Function_slot fs ->
-    Current_unit.is_current (Function_slot.get_compilation_unit fs)
+    unit_is_in_locality_scope (Function_slot.get_compilation_unit fs)
   | Block _ | Call_witness _ | Return_of_call _ | Code_id_of_call_witness
   | Is_int | Get_tag | Boxed_number _ ->
     false
@@ -227,3 +236,19 @@ let print_for_variable_name ppf x =
         "[Field.print_for_variable_name] got field %a but this field was not \
          expected to be possible to occur in unboxed blocks"
         print_view view
+
+let export_views set =
+  Set.fold (fun field views -> (field, view field) :: views) set []
+
+let import_views views =
+  let map =
+    List.fold_left
+      (fun map (field, view) -> Map.add field (create view) map)
+      Map.empty views
+  in
+  fun field ->
+    match Map.find_opt field map with
+    | Some field -> field
+    | None ->
+      Misc.fatal_errorf "Field %a has no view stored in the serialised data"
+        print field

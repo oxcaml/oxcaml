@@ -58,6 +58,8 @@ val add_simple : t -> Simple.t -> t
 
 val add_code_id : t -> Code_id.t -> t
 
+val add_code_id_or_name : t -> Code_id_or_name.t -> t
+
 val add_continuation : t -> Continuation.t -> t
 
 val union : t -> t -> t

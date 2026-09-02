@@ -26,8 +26,19 @@ type t
 (** Create a result structure.
 
     [reachable_names] specifies which names are reachable from outside the
-    compilation unit (same terminology as used in [Flambda_cmx]). *)
-val create : module_symbol:Symbol.t -> reachable_names:Name_occurrences.t -> t
+    compilation unit (same terminology as used in [Flambda_cmx]).
+
+    When [localise_unreachable_symbols] is set, symbols of the current unit that
+    are not in [reachable_names] are emitted as assembler-local symbols. This is
+    only sound if no other object file can reference them by name; the Reaper's
+    staged rebuilds (see [Flambda2.reaped_flambda2_to_cmm]) must not set it,
+    because other units' rebuilds contain code frozen before this unit's
+    reachable names shrank. *)
+val create :
+  module_symbol:Symbol.t ->
+  reachable_names:Name_occurrences.t ->
+  localise_unreachable_symbols:bool ->
+  t
 
 (** Translate an existing [Symbol.t] to a Cmm symbol. *)
 val symbol : t -> Symbol.t -> Cmm.symbol

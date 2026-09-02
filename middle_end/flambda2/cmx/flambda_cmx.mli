@@ -32,9 +32,16 @@ val load_cmx_file_contents :
 val load_symbol_approx :
   loader -> Symbol.t -> Code_or_metadata.t Value_approximation.t
 
+(** [extra_static_roots] are code ids and symbols that must be treated as
+    reachable in addition to everything reachable from [module_symbol]. Under a
+    whole-program Reaper solution, a rebuilt unit can lose all internal
+    references to a definition (e.g. when a module block field is poisoned) that
+    other compilation units still reference directly. This should be
+    [Name_occurrences.empty] for ordinary compilation. *)
 val prepare_cmx_file_contents :
   final_typing_env:Flambda2_types.Typing_env.t option ->
   module_symbol:Symbol.t ->
+  extra_static_roots:Name_occurrences.t ->
   used_value_slots:Value_slot.Set.t ->
   exported_offsets:Exported_offsets.t ->
   sections:File_sections.Builder.t ->

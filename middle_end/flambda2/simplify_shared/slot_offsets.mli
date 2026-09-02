@@ -63,10 +63,17 @@ val add_offsets_from_function : t -> from_function:t -> t
 (** Compute offsets for all function and value slots that occur in the current
     compilation unit, taking into account the constraints introduced by the
     potential sharing of slots across multiple sets of closures (see .ml file
-    for more details). *)
+    for more details).
+
+    [offsets_from_previous_assignment] contains the offsets assigned to the
+    current unit's own slots by a previous compilation of this unit (the paused
+    process of the reaper's staged pipeline), or is empty. Other units may hold
+    copies of sets of closures laid out by that compilation, so slots that
+    already have an offset there keep it rather than being assigned afresh. *)
 val finalize_offsets :
   get_code_metadata:(Code_id.t -> Code_metadata.t) ->
   used_slots:used_slots ->
+  offsets_from_previous_assignment:Exported_offsets.t ->
   t ->
   result
 
