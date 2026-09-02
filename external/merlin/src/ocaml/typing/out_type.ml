@@ -464,7 +464,8 @@ let instance_name global =
        always global (which is bad - but the syntax is currently bad anyway) *)
     let ({ head; args } : Global_module.Name.t) = global in
     String.concat ""
-      (Compilation_unit_intf.to_string head :: List.map string_of_arg args)
+      (Compilation_unit_intf.to_string (Compilation_unit_intf.Found.intf head)
+       :: List.map string_of_arg args)
   and string_of_arg arg =
     let ({ param; value } : Global_module.Name.argument) = arg in
     Printf.sprintf "(%s)(%s)"

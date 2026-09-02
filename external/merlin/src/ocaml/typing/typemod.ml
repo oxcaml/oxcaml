@@ -4900,7 +4900,7 @@ let cms_register_toplevel_signature_attributes ~sourcefile ~uid ast =
         | { psig_desc = Psig_attribute attr; _ } -> Some attr
         | _ -> None)
 
-let type_interface ~sourcefile modulename env ast =
+let type_interface ~sourcefile ~intf modulename env ast =
   let error e =
     raise (Error (Location.none, Env.empty, e))
   in
@@ -4911,8 +4911,12 @@ let type_interface ~sourcefile modulename env ast =
     error Compiling_as_parameterised_parameter
   end;
   if !Clflags.binary_annotations_cms then begin
-    let uid = Shape.Uid.of_compilation_unit_id modulename in
-    cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
+    (* The unit's documentation may be looked up by its interface uid (e.g. for
+       parameters) or by its implementation uid, so register it under both. *)
+    cms_register_toplevel_signature_attributes ~sourcefile ast
+      ~uid:(Shape.Uid.of_compilation_unit_intf intf);
+    cms_register_toplevel_signature_attributes ~sourcefile ast
+      ~uid:(Shape.Uid.of_compilation_unit_id modulename)
   end;
   let sg = transl_signature ~interface_toplevel:true env ast in
   let arg_type =
@@ -4958,7 +4962,8 @@ let functorize_signature ~params ~modules : Types.signature =
       (fun (p_name, param_id) body ->
         let impl, param_params, (swg : Signature_with_global_bindings.t) =
           Env.find_import ~chain:[]
-            (p_name : Global_module.Parameter_name.t :> CUI.t)
+            (CUI.Found.without_cmi_path
+               (p_name : Global_module.Parameter_name.t :> CUI.t))
         in
         assert (Option.is_none impl);
         assert (List.is_empty param_params);
