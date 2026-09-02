@@ -1169,8 +1169,9 @@ let imm_or_ptr : P.Block_access_field_kind.t -> Lambda.immediate_or_pointer =
 
 let atomic_offset (offset_units : P.atomic_offset_units) offset =
   match offset_units with
-  | Field_index -> C.Field_index (offset, tagged_immediate)
-  | Byte_offset -> C.Byte_offset (offset, naked_int64)
+  | Field_index ->
+    C.Field_index { index = offset; index_type = tagged_immediate }
+  | Byte_offset -> C.Byte_offset { offset; offset_type = naked_int64 }
 
 let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     (arg : Cmm.expression) =

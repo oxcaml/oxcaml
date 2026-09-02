@@ -1737,8 +1737,14 @@ end
 (* Atomics *)
 
 type atomic_offset =
-  | Field_index of expression * Scalar_type.Integral.t
-  | Byte_offset of expression * Scalar_type.Integral.t
+  | Field_index of
+      { index : expression;
+        index_type : Scalar_type.Integral.t
+      }
+  | Byte_offset of
+      { offset : expression;
+        offset_type : Scalar_type.Integral.t
+      }
 
 val atomic_load :
   dbg:Debuginfo.t ->

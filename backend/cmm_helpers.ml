@@ -5970,8 +5970,14 @@ end
 (* Atomics *)
 
 type atomic_offset =
-  | Field_index of expression * Scalar_type.Integral.t
-  | Byte_offset of expression * Scalar_type.Integral.t
+  | Field_index of
+      { index : expression;
+        index_type : Scalar_type.Integral.t
+      }
+  | Byte_offset of
+      { offset : expression;
+        offset_type : Scalar_type.Integral.t
+      }
 
 let tagged_immediate =
   Scalar_type.Integral.Tagged Scalar_type.Tagged_integer.immediate
@@ -5980,25 +5986,33 @@ let untagged_nativeint = Scalar_type.Integral.nativeint
 
 let atomic_field_index_for_extcall offset dbg =
   match offset with
-  | Field_index (field, src) ->
-    Scalar_type.Integral.static_cast field ~dbg ~src ~dst:tagged_immediate
-  | Byte_offset (offset, src) ->
+  | Field_index { index; index_type } ->
+    Scalar_type.Integral.static_cast index ~dbg ~src:index_type
+      ~dst:tagged_immediate
+  | Byte_offset { offset; offset_type } ->
     let offset =
-      Scalar_type.Integral.static_cast offset ~dbg ~src ~dst:untagged_nativeint
+      Scalar_type.Integral.static_cast offset ~dbg ~src:offset_type
+        ~dst:untagged_nativeint
     in
-    (* can use lsr because byte offset is nonnegative *)
+    (* can use lsr here because byte offset is nonnegative *)
+    (* The following is only correct if [offset] is a multiple of the word size. Today,
+       this always holds for value fields, but it might not for offsets derived from
+       external pointers. We'll need to document this restriction in any library where we
+       allow creation of pointers to external data. *)
     tag_int (lsr_int offset (Cconst_int (log2_size_addr, dbg)) dbg) dbg
 
 let atomic_address block offset dbg =
   match offset with
-  | Field_index (field, src) ->
+  | Field_index { index; index_type } ->
     let index =
-      Scalar_type.Integral.static_cast field ~dbg ~src ~dst:tagged_immediate
+      Scalar_type.Integral.static_cast index ~dbg ~src:index_type
+        ~dst:tagged_immediate
     in
     field_address_computed block index dbg
-  | Byte_offset (offset, src) ->
+  | Byte_offset { offset; offset_type } ->
     let offset =
-      Scalar_type.Integral.static_cast offset ~dbg ~src ~dst:untagged_nativeint
+      Scalar_type.Integral.static_cast offset ~dbg ~src:offset_type
+        ~dst:untagged_nativeint
     in
     add_int_addr block offset dbg
 
