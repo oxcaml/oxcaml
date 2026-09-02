@@ -1926,13 +1926,12 @@ AS_CASE([$arch],
     [arch_specific_SOURCES='$(intel_SOURCES)'],
   [arch_specific_SOURCES=''])
 
-# Disabling of stack checks is only supported on amd64.
 AS_IF([test x"$enable_stack_checks" = xyes],
   [AC_DEFINE([STACK_CHECKS_ENABLED])],
-  [AS_IF([test x"$arch" != xamd64],
+  [AS_CASE([$arch],
+    [amd64|arm64], [],
     [enable_stack_checks=yes
-     AC_DEFINE([STACK_CHECKS_ENABLED])],
-    [])])
+     AC_DEFINE([STACK_CHECKS_ENABLED])])])
 
 native_cflags=''
 oc_native_cflags=''
