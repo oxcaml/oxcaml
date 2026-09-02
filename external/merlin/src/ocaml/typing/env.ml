@@ -1658,6 +1658,7 @@ and find_type_unboxed_version path env seen =
       type_unboxed_default = false;
       type_uid = Uid.unboxed_version decl.type_uid;
       type_unboxed_version = None;
+      type_discourse = Discourse_types.empty;
     }
   | Aliases (path, args) ->
     (* CR box rtjoa: Here, we are approximate. Say we have [type 'a id = 'a],

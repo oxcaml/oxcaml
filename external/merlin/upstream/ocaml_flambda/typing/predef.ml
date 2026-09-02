@@ -621,6 +621,7 @@ let cstr id args =
     cd_loc = Location.none;
     cd_attributes = [];
     cd_uid = Uid.of_predef_id id;
+    cd_discourse = Discourse_types.empty;
   }
 
 let list_jkind param =
@@ -632,6 +633,8 @@ let list_sort = Jkind_types.Sort.Const.scannable
 let list_argument_sort = Jkind_types.Sort.Const.scannable
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
+
+let discourse = ref Discourse_types.empty
 
 let ikind_of_jkind_ref :
     (params:type_expr list -> jkind_l -> type_ikind) ref =
@@ -672,6 +675,10 @@ let or_null_kind tvar =
 
 let decl_of_type_constr type_constr =
   let type_ident = ident_of_type_constr type_constr in
+  let () =
+    let path = Pident type_ident in
+    discourse := Discourse_types.add (Type, path) !discourse
+  in
   let type_uid = Uid.of_predef_id type_ident in
   (* The unboxed versions explicitly added to the predef are abstract, as they
      are special-cased; other unboxed versions are automatically derived. *)
@@ -697,6 +704,7 @@ let decl_of_type_constr type_constr =
       type_unboxed_default = false;
       type_uid = Uid.unboxed_version type_uid;
       type_unboxed_version = None;
+      type_discourse = Discourse_types.empty;
     }
   in
   let decl0
@@ -729,6 +737,7 @@ let decl_of_type_constr type_constr =
      type_unboxed_default = false;
      type_uid;
      type_unboxed_version;
+     type_discourse = Discourse_types.empty;
     }
   in
   let decl1
@@ -1301,3 +1310,5 @@ let builtin_type_constrs =
   List.map
     (fun t -> let id = ident_of_type_constr t in (Ident.name id, id))
     all_type_constrs
+
+let discourse () = !discourse

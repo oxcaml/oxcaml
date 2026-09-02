@@ -973,6 +973,7 @@ let transl_declaration env sdecl (id, uid) =
     make_params env path sdecl.ptype_params
   in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
+<<<<<<< Merlin:sp-import-preview
   let discourse, cstrs = List.fold_left_map
       (fun acc_d (sty, sty', loc) ->
           let ct, d =
@@ -987,6 +988,28 @@ let transl_declaration env sdecl (id, uid) =
           (ct, ct', loc))
       Discourse_types.empty
       sdecl.ptype_cstrs
+||||||| Compiler:last-imported
+  let cstrs = List.map
+    (fun (sty, sty', loc) ->
+      transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.Alloc.Const.legacy sty,
+      transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.Alloc.Const.legacy sty', loc)
+    sdecl.ptype_cstrs
+=======
+  let discourse, cstrs = List.fold_left_map
+      (fun acc_d (sty, sty', loc) ->
+          let ct, d =
+            transl_simple_type_with_discourse ~new_var_jkind:Any env
+              ~closed:false Mode.Alloc.Const.legacy sty
+          in
+          let ct', d' =
+            transl_simple_type_with_discourse ~new_var_jkind:Sort env
+              ~closed:false Mode.Alloc.Const.legacy sty'
+          in
+          Discourse_types.(union (union acc_d d) d'),
+          (ct, ct', loc))
+      Discourse_types.empty
+    sdecl.ptype_cstrs
+>>>>>>> Compiler:HEAD
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
   let represent_as_float_array =
@@ -1086,8 +1109,15 @@ let transl_declaration env sdecl (id, uid) =
         raise (Error (sdecl.ptype_loc, Non_abstract_reexport path))
       | Ptype_abstract ->
         Ttype_abstract, Type_abstract Definition,
+<<<<<<< Merlin:sp-import-preview
           Jkind.Builtin.value ~why:Default_type_jkind,
           discourse
+||||||| Compiler:last-imported
+        Jkind.Builtin.value ~why:Default_type_jkind
+=======
+        Jkind.Builtin.value ~why:Default_type_jkind,
+        discourse
+>>>>>>> Compiler:HEAD
       | Ptype_variant scstrs ->
         if or_null then check_or_null_variant_shape sdecl scstrs;
         if List.exists (fun cstr -> cstr.pcd_res <> None) scstrs then begin
@@ -1139,12 +1169,27 @@ let transl_declaration env sdecl (id, uid) =
         in
         let make_cstr acc scstr =
           Builtin_attributes.warning_scope scstr.pcd_attributes
+<<<<<<< Merlin:sp-import-preview
+            (fun () -> make_cstr acc scstr)
+||||||| Compiler:last-imported
+            (fun () -> make_cstr scstr)
+=======
             (fun () -> make_cstr acc scstr)
         in
         let discourse, cstrs =
           List.fold_left_map make_cstr discourse scstrs
+>>>>>>> Compiler:HEAD
+        in
+<<<<<<< Merlin:sp-import-preview
+        let discourse, cstrs =
+          List.fold_left_map make_cstr discourse scstrs
         in
         let tcstrs, cstrs = List.split cstrs in
+||||||| Compiler:last-imported
+        let tcstrs, cstrs = List.split (List.map make_cstr scstrs) in
+=======
+        let tcstrs, cstrs = List.split cstrs in
+>>>>>>> Compiler:HEAD
         let rep, jkind =
           if or_null then begin
             (* Which constructor is the null constructor and which is the
