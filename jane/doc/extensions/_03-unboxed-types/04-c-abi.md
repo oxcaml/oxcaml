@@ -139,7 +139,7 @@ stub returns a two-field struct by value, and as usual, the bytecode stub
 returns the product as a single boxed block.
 
 The components of the returned pair are subject to the following restrictions:
-- Each must be of layout `bits64`, `word`, `float64`, or `value`.
+- Each must be of layout `bits64`, `word`, `float64`, `value`, or `void`.
 - `float32` and 128-bit vectors are accepted only on arm64.
 - On arm64, both components must also have the same layout, so mixed pairs such
   as `#(int64_u * float#)` are supported only on x86-64.
