@@ -186,7 +186,7 @@ end) : S = struct
       (* [arg_descr] is None because we don't allow packs to be arguments.
          [static_data] is empty as we don't support packs with layout poly. *)
       Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
-        ~static_data:Slambdaeval.CU_data.empty
+        ~static_data:(Slambdaeval.CU_data.empty ())
     in
     let file_sections =
       let length =

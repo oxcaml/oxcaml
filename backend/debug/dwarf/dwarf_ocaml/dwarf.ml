@@ -66,14 +66,24 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_layout =
                DAH.create_byte_size_exn ~byte_size:Arch.size_addr ]
            ())
   in
+  let imm_or_ptr_enums =
+    (* As for [value_type_proto_die]: created eagerly, and only when generating
+       full DWARF. *)
+    if !Clflags.restrict_to_upstream_dwarf
+    then None
+    else
+      Some
+        (Dwarf_type.create_imm_or_ptr_enum_dies
+           ~parent_proto_die:compilation_unit_proto_die)
+  in
   let debug_loc_table = Debug_loc_table.create () in
   let debug_ranges_table = Debug_ranges_table.create () in
   let address_table = Address_table.create () in
   let location_list_table = Location_list_table.create () in
   let state =
     DS.create ~compilation_unit_header_label ~compilation_unit_proto_die
-      ~code_layout debug_loc_table debug_ranges_table address_table
-      location_list_table ~get_file_num:get_file_id ~sourcefile
+      ~code_layout ~imm_or_ptr_enums debug_loc_table debug_ranges_table
+      address_table location_list_table ~get_file_num:get_file_id ~sourcefile
     (* CR mshinwell: does get_file_id successfully emit .file directives for
        files we haven't seen before? *)
   in

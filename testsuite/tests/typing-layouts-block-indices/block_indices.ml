@@ -73,10 +73,10 @@ let () =
   Printf.printf "%f\n" (Float_u.to_float r.u);
   print_newline ()
 
-type mixed_float32_record = { s : string; mutable f : float32# }
+type mixed_float32_record = { s : string; mutable f : float32_u }
 
 let () =
-  print_endline "Mixed block record (float32# field)";
+  print_endline "Mixed block record (float32_u field)";
   let r = { s = "foo"; f = #1.0s } in
   let x = Idx_mut.get r (.f) in
   Printf.printf "%f\n" (Float_u.to_float (Float32_u.to_float x));
@@ -110,10 +110,10 @@ let () =
   Printf.printf "%f\n" (Float_u.to_float rr.r2.#f2);
   print_newline ()
 
-type mixed_int32_record = { j : int32#; mutable i : int32# }
+type mixed_int32_record = { j : int32_u; mutable i : int32_u }
 
 let () =
-  print_endline "Mixed block record (int32# field)";
+  print_endline "Mixed block record (int32_u field)";
   let r = { j = -#100l; i = #1l } in
   let x = Idx_mut.get r (.i) in
   Printf.printf "%d\n" (Int32_u.to_int x);
@@ -121,10 +121,10 @@ let () =
   Printf.printf "%d\n" (Int32_u.to_int r.i);
   print_newline ()
 
-type mixed_int64_record = { j : int64#; mutable i : int64# }
+type mixed_int64_record = { j : int64_u; mutable i : int64_u }
 
 let () =
-  print_endline "Mixed block record (int64# field)";
+  print_endline "Mixed block record (int64_u field)";
   let r = { j = -#100L; i = #1L } in
   let x = Idx_mut.get r (.i) in
   Printf.printf "%d\n" (Int64_u.to_int x);
@@ -132,10 +132,10 @@ let () =
   Printf.printf "%d\n" (Int64_u.to_int r.i);
   print_newline ()
 
-type mixed_nativeint_record = { j : nativeint#; mutable i : nativeint# }
+type mixed_nativeint_record = { j : nativeint_u; mutable i : nativeint_u }
 
 let () =
-  print_endline "Mixed block record (nativeint# field)";
+  print_endline "Mixed block record (nativeint_u field)";
   let r = { j = -#100n; i = #1n } in
   let x = Idx_mut.get r (.i) in
   Printf.printf "%d\n" (Nativeint_u.to_int x);
@@ -173,8 +173,8 @@ let () =
 (***************************************)
 (* Nested product update and deepening *)
 
-type a = { s : string; i : int64# }
-type b = { i : int64#; a : a#; s : string }
+type a = { s : string; i : int64_u }
+type b = { i : int64_u; a : a#; s : string }
 type c = { mutable b : b#; s : string }
 
 let print_t_b t =
@@ -242,19 +242,19 @@ let () =
   print_newline ()
 
 let () =
-  print_endline "Reading from a float32# array";
+  print_endline "Reading from a float32_u array";
   let a = makearray_dynamic 10 #0.s in
   for i = 0 to 9 do
     set a i (Float32_u.of_float (Float_u.of_int i))
   done;
   for i = 0 to 9 do
-    let idx : (_, float32#) idx_mut = (Idx_mut.unsafe_create_into_array i) in
+    let idx : (_, float32_u) idx_mut = (Idx_mut.unsafe_create_into_array i) in
     let x = Idx_mut.get a idx in
     Printf.printf "%f\n" (Float_u.to_float (Float32_u.to_float x))
   done;
-  print_endline "\nWriting to a float32# array";
+  print_endline "\nWriting to a float32_u array";
   for i = 0 to 9 do
-    let idx : (_, float32#) idx_mut = (Idx_mut.unsafe_create_into_array i) in
+    let idx : (_, float32_u) idx_mut = (Idx_mut.unsafe_create_into_array i) in
     Idx_mut.set a idx (Float32_u.of_float (Float_u.of_int (i + 10)))
   done;
   for i = 0 to 9 do

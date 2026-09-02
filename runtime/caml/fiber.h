@@ -72,8 +72,9 @@ struct stack_info {
   void* local_top;
   intnat local_limit;
 
-  /* Temporary dynamic bindings, applying only in this fiber */
-  struct dynamic_table_s dyn;
+  /* The current dynamic binding node. Either [Val_null], or a block with three
+     fields: dynamic key, bound value, and nullable parent node. */
+  value dynamic;
 };
 
 #ifdef STACK_GUARD_PAGES

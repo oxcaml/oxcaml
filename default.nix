@@ -372,6 +372,7 @@ stdenv.mkDerivation {
     pkgs.autoconf
     menhir
     ocaml_5_4_0
+    pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
     dune
     pkgs.pkg-config
     pkgs.rsync
@@ -389,6 +390,10 @@ stdenv.mkDerivation {
     pkgs.llvm # llvm-objcopy is used for debuginfo
   ]
   ++ lib.optionals withMerlin merlinDev.devBuildInputs;
+
+  # Nothing here runs libtool, so stop stdenv's configurePhase from rewriting
+  # sys_lib_search_path in the checked-in build-aux/ltmain.sh.
+  dontFixLibtool = true;
 
   preConfigure = ''
     rm -rf _build _install _runtest

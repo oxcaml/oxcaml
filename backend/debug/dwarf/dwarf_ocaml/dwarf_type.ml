@@ -69,24 +69,40 @@ module Debugging_the_compiler = struct
         (Asm_targets.Asm_label.encode reference)
         desc
 
+  (* DIEs shared between functions (currently the immediate-or-pointer
+     enumerations) are parented under the compilation unit DIE, outside every
+     function's subtree, so per-function dumps would omit them; they are
+     recorded here so that every dump can include them. *)
+  let shared_dies = ref []
+
+  let add_shared ~die = if enabled () then shared_dies := die :: !shared_dies
+
+  let print_die ~die =
+    let indent = ref 0 in
+    Proto_die.depth_first_fold die ~init:() ~f:(fun () d ->
+        match d with
+        | DIE { label; tag; has_children; attribute_values = _; _ } ->
+          let indentation = String.make !indent ' ' in
+          let info =
+            (String.Tbl.find_opt die_description_table)
+              (Asm_targets.Asm_label.encode label)
+          in
+          Format.eprintf "%s+ %a(%s) %a\n" indentation
+            Asm_targets.Asm_label.print label (Dwarf_tag.tag_name tag)
+            (Format.pp_print_option Format.pp_print_string)
+            info;
+          if has_children = Child_determination.Yes then indent := !indent + 2
+        | End_of_siblings -> indent := !indent - 2)
+
   let print ~die =
     if enabled ()
-    then
-      let indent = ref 0 in
-      Proto_die.depth_first_fold die ~init:() ~f:(fun () d ->
-          match d with
-          | DIE { label; tag; has_children; attribute_values = _; _ } ->
-            let indentation = String.make !indent ' ' in
-            let info =
-              (String.Tbl.find_opt die_description_table)
-                (Asm_targets.Asm_label.encode label)
-            in
-            Format.eprintf "%s+ %a(%s) %a\n" indentation
-              Asm_targets.Asm_label.print label (Dwarf_tag.tag_name tag)
-              (Format.pp_print_option Format.pp_print_string)
-              info;
-            if has_children = Child_determination.Yes then indent := !indent + 2
-          | End_of_siblings -> indent := !indent - 2)
+    then (
+      (match !shared_dies with
+      | [] -> ()
+      | _ :: _ ->
+        Format.eprintf "shared between functions:\n";
+        List.iter (fun die -> print_die ~die) (List.rev !shared_dies));
+      print_die ~die)
 end
 
 module Shape_reduction_diagnostics : sig
@@ -260,8 +276,8 @@ let create_typedef_die ~reference ~parent_proto_die ?name child_die =
     | [value] kind                     | [size_addr]   | regular OCaml value   |
     | [int8#]                          | 1 byte        | densely packed 8/word |
     | [int16#]                         | 2 bytes       | densely packed 4/word |
-    | [int32#], [float32#]             | 4 bytes       | densely packed 2/word |
-    | [int64#], [float#], [nativeint#] | 8 bytes       | exactly one word      |
+    | [int32_u], [float32_u]           | 4 bytes       | densely packed 2/word |
+    | [int64_u],[float#],[nativeint_u] | 8 bytes       | exactly one word      |
     | unboxed product                  | sum of word-  | e.g. #{int8#; int8#}  |
     |                                  | extended      | takes 16 bytes per    |
     |                                  | fields        | element               |
@@ -487,7 +503,60 @@ let create_attribute_unboxed_variant_die ~reference ~parent_proto_die ?name
       ()
   done
 
-let create_complex_variant_die ~reference ~parent_proto_die ?name
+type immediate_or_pointer =
+  | Immediate
+  | Pointer
+
+let tag_bit = function Immediate -> 1 | Pointer -> 0
+
+let imm_or_ptr_name = function Immediate -> "Immediate" | Pointer -> "Pointer"
+
+(* Which variant of the enumeration distinguishing immediates from pointers: one
+   has named enumerators, the other unnamed ones. *)
+type imm_or_ptr_enumerators =
+  | Named
+  | Unnamed
+
+(* The enumerations distinguishing immediates from pointers do not depend on the
+   type being described, so a single DIE per variant is created for each
+   compilation unit (see [create_imm_or_ptr_enum_dies] below, called from
+   [Dwarf.create]) instead of one per variant type. *)
+let make_imm_or_ptr_enum ~(enumerators : imm_or_ptr_enumerators)
+    ~parent_proto_die () =
+  let enum_die =
+    Proto_die.create ~parent:(Some parent_proto_die)
+      ~tag:Dwarf_tag.Enumeration_type
+      ~attribute_values:[DAH.create_byte_size_exn ~byte_size:Arch.size_addr]
+      ()
+  in
+  Debugging_the_compiler.add_enum
+    ~reference:(Proto_die.reference enum_die)
+    ["Immediate"; "Pointer"];
+  List.iter
+    (fun elem ->
+      let name_attributes =
+        match enumerators with
+        | Named -> [DAH.create_name (imm_or_ptr_name elem)]
+        | Unnamed -> []
+      in
+      Proto_die.create_ignore ~parent:(Some enum_die) ~tag:Dwarf_tag.Enumerator
+        ~attribute_values:
+          (DAH.create_const_value ~value:(Int64.of_int (tag_bit elem))
+          :: name_attributes)
+        ())
+    [Pointer; Immediate];
+  enum_die
+
+let create_imm_or_ptr_enum_dies ~parent_proto_die :
+    DS.Die_gen_ctx.imm_or_ptr_enums =
+  let make enumerators =
+    let die = make_imm_or_ptr_enum ~enumerators ~parent_proto_die () in
+    Debugging_the_compiler.add_shared ~die;
+    die
+  in
+  { named = make Named; unnamed = make Unnamed }
+
+let create_complex_variant_die ~ctx ~reference ~parent_proto_die ?name
     ~simple_constructors
     ~(complex_constructors :
        (string * (string option * Proto_die.reference * RL.t) list) list) () =
@@ -508,27 +577,7 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
     Proto_die.create ~parent:(Some int_or_ptr_structure) ~attribute_values:[]
       ~tag:Dwarf_tag.Variant_part ()
   in
-  let enum_immediate_or_pointer =
-    let enum_die =
-      Proto_die.create ~parent:(Some parent_proto_die)
-        ~tag:Dwarf_tag.Enumeration_type
-        ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
-        ()
-    in
-    Debugging_the_compiler.add_enum
-      ~reference:(Proto_die.reference enum_die)
-      ["Immediate"; "Pointer"];
-    List.iteri
-      (fun i name ->
-        Proto_die.create_ignore ~parent:(Some enum_die)
-          ~tag:Dwarf_tag.Enumerator
-          ~attribute_values:
-            [ DAH.create_name name;
-              DAH.create_const_value ~value:(Int64.of_int i) ]
-          ())
-      ["Pointer"; "Immediate"];
-    enum_die
-  in
+  let enum_immediate_or_pointer = DS.Die_gen_ctx.imm_or_ptr_enum_named ctx in
   let _discriminant_immediate_or_pointer =
     let member_die =
       Proto_die.create ~parent:(Some variant_part_immediate_or_pointer)
@@ -703,14 +752,8 @@ let create_complex_variant_die ~reference ~parent_proto_die ?name
   in
   ()
 
-type immediate_or_pointer =
-  | Immediate
-  | Pointer
-
-let tag_bit = function Immediate -> 1 | Pointer -> 0
-
-let create_immediate_or_block ~reference ~parent_proto_die ?name ~immediate_type
-    ~pointer_type () =
+let create_immediate_or_block ~ctx ~reference ~parent_proto_die ?name
+    ~immediate_type ~pointer_type () =
   let value_size = Arch.size_addr in
   let int_or_ptr_structure =
     Proto_die.create ~reference ~parent:(Some parent_proto_die)
@@ -728,22 +771,7 @@ let create_immediate_or_block ~reference ~parent_proto_die ?name ~immediate_type
         [DAH.create_discr ~proto_die_reference:discriminant_reference]
       ~tag:Dwarf_tag.Variant_part ()
   in
-  let enum_die =
-    Proto_die.create ~parent:(Some parent_proto_die)
-      ~tag:Dwarf_tag.Enumeration_type
-      ~attribute_values:[DAH.create_byte_size_exn ~byte_size:value_size]
-      ()
-  in
-  Debugging_the_compiler.add_enum
-    ~reference:(Proto_die.reference enum_die)
-    ["Immediate"; "Pointer"];
-  List.iter
-    (fun elem ->
-      Proto_die.create_ignore ~parent:(Some enum_die) ~tag:Dwarf_tag.Enumerator
-        ~attribute_values:
-          [DAH.create_const_value ~value:(Int64.of_int (tag_bit elem))]
-        ())
-    [Immediate; Pointer];
+  let enum_die = DS.Die_gen_ctx.imm_or_ptr_enum_unnamed ctx in
   let _discriminant_die =
     Proto_die.create ~reference:discriminant_reference
       ~parent:(Some variant_part_immediate_or_pointer)
@@ -807,7 +835,7 @@ let create_immediate_or_block ~reference ~parent_proto_die ?name ~immediate_type
     store the arguments of the constructor.
 *)
 
-let create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
+let create_poly_variant_dwarf_die ~ctx ~reference ~parent_proto_die ?name
     ~simple_constructors ~complex_constructors () =
   let enum_constructor_for_poly_variant ~parent name =
     let hash = Btype.hash_variant name in
@@ -901,7 +929,7 @@ let create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
           DAH.create_type ~proto_die:complex_constructors_struct ]
       ()
   in
-  create_immediate_or_block ~reference ?name ~parent_proto_die
+  create_immediate_or_block ~ctx ~reference ?name ~parent_proto_die
     ~immediate_type:simple_constructor_enum_die
     ~pointer_type:ptr_case_pointer_to_structure ()
 
@@ -952,10 +980,14 @@ let create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
         DAH.create_type ~proto_die:structure_type ]
     ();
   let tag_type =
+    (* The tag byte must be read as unsigned so that the comparison against the
+       [DW_AT_discr_value] of 248 ([Object_tag]) below can ever succeed: with a
+       signed 1-byte type, a conforming consumer would read the byte 0xF8 as
+       -8. *)
     Proto_die.create ~parent:(Some parent_proto_die)
       ~attribute_values:
         [ DAH.create_byte_size_exn ~byte_size:1;
-          DAH.create_encoding ~encoding:Encoding_attribute.signed ]
+          DAH.create_encoding ~encoding:Encoding_attribute.unsigned ]
       ~tag:Dwarf_tag.Base_type ()
   in
   let exception_tag_discriminant_ref = Proto_die.create_reference () in
@@ -1209,7 +1241,6 @@ let create_boxed_simd_type ?name ~reference ~parent_proto_die split =
 
 module Die_gen_ctx = DS.Die_gen_ctx
 module Rec_var_env = Die_gen_ctx.Rec_var_env
-module Cache = Die_gen_ctx.Cache
 module Name_cache = Die_gen_ctx.Name_cache
 
 let partition_constructors constructors ~f =
@@ -1234,11 +1265,15 @@ let partition_constructors constructors ~f =
    below. *)
 let rec runtime_shape_to_dwarf_die ~ctx (t : RS.t) ~parent_proto_die
     ~fallback_value_die ~rec_env =
-  match Cache.find (Die_gen_ctx.cache ctx) ~inp:t ~rec_env with
+  (* The cache key only includes the binders that [t] can reference (see
+     [Die_gen_ctx.find_cached_die]); in particular closed shapes are keyed with
+     the empty environment, so that e.g. a shape appearing both at top level and
+     inside (unrelated) recursive types is only expanded once. *)
+  match Die_gen_ctx.find_cached_die ctx ~inp:t ~rec_env with
   | Some reference -> reference
   | None ->
     let reference = Proto_die.create_reference () in
-    Cache.add (Die_gen_ctx.cache ctx) ~inp:t ~rec_env ~outp:reference;
+    Die_gen_ctx.add_cached_die ctx ~inp:t ~rec_env ~outp:reference;
     let name = None in
     (* Instead of omitting the name argument below, we fix it to be [None] here
        such that it is easier to change this code if in the future we want to
@@ -1316,7 +1351,7 @@ and runtime_shape_to_dwarf_die_memo ~ctx ~reference ?name (t : RS.t)
       partition_constructors constructors ~f:(fun _label field_type ->
           die field_type)
     in
-    create_poly_variant_dwarf_die ~reference ~parent_proto_die ?name
+    create_poly_variant_dwarf_die ~ctx ~reference ~parent_proto_die ?name
       ~simple_constructors ~complex_constructors ()
   | Variant { constructors; kind = Variant_boxed } -> (
     let simple_constructors, complex_constructors =
@@ -1328,7 +1363,7 @@ and runtime_shape_to_dwarf_die_memo ~ctx ~reference ?name (t : RS.t)
       create_simple_variant_die ~reference ~parent_proto_die ?name
         simple_constructors
     | _ :: _ ->
-      create_complex_variant_die ~reference ~parent_proto_die ?name
+      create_complex_variant_die ~ctx ~reference ~parent_proto_die ?name
         ~simple_constructors ~complex_constructors ())
   | Variant { constructors = [constr]; kind = Variant_attribute_unboxed layout }
     -> (
@@ -1629,7 +1664,7 @@ let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
         (* CR sspies: In case of unboxed projections, we do not have the type
            names of the individual fields available. And obtaining them in
            general is not straightforward, since they could be hidden behind a
-           type alias (e.g., [type prod = #{ a: int64#; b: float# }]). What we
+           type alias (e.g., [type prod = #{ a: int64_u; b: float# }]). What we
            currently do is match the style of unarization variables by appending
            "_unboxed" for the projections to indicate that the type is not the
            same. *)

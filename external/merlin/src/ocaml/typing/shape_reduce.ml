@@ -500,7 +500,7 @@ end) = struct
                      above), we can choose any layout here. Merlin does not
                      consume the layout. *)
                   let layout =
-                    Option.value layout ~default:(Layout.Base Scannable)
+                    Option.value layout ~default:Layout.scannable
                   in
                   (name, field_uid, sh, layout)
                 ) args in

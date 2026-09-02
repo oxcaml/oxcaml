@@ -477,7 +477,7 @@ module Solver = struct
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
+            | Types.Kconstr (path, _, _) -> Some path
           in
           jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
@@ -493,7 +493,7 @@ module Solver = struct
             let unresolved_base =
               match jkind_desc.base with
               | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
+              | Types.Kconstr (path, _, _) -> Some path
             in
             jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
@@ -510,13 +510,10 @@ module Solver = struct
         let atom = rigid_name ctx (Ldd.Name.katom path) in
         Ldd.meet base_mod_bounds atom
     in
-    (* For each with-bound (ty, axes), contribute
-       modality(axes_mask, kind ty). *)
     Jkind.With_bounds.to_seq with_bounds
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
-           let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set axes in
+           let mask = bound_info.Types.With_bounds_type_info.bounds_mask in
            let ty_kind = kind ~use_tables:true ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
          base
@@ -536,7 +533,7 @@ module Solver = struct
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
+            | Types.Kconstr (path, _, _) -> Some path
           in
           jkind_desc.mod_bounds, unresolved_base
         | Some env -> (
@@ -546,7 +543,7 @@ module Solver = struct
             let unresolved_base =
               match jkind_desc.base with
               | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
+              | Types.Kconstr (path, _, _) -> Some path
             in
             jkind_desc.mod_bounds, unresolved_base)
       in

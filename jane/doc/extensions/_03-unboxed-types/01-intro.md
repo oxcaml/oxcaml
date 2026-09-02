@@ -23,14 +23,14 @@ by a *type*. The type system knows about a collection of fixed *base* layouts:
 * `value_or_null` is a superlayout of `value` including normal OCaml values
   and null pointers.
 * `float64` is the layout of the `float#` unboxed float type.
-* `float32` is the layout of the `float32#` unboxed 32-bit float type.
+* `float32` is the layout of the `float32_u` unboxed 32-bit float type.
 * `void` is the layout of the `unit#` unbox unit type. It has no runtime representation.
 * `bits8` is the layout of the `int8#` unboxed int8 type.
 * `bits16` is the layout of the `int16#` unboxed int16 type.
-* `bits32` is the layout of the `int32#` unboxed int32 type.
-* `bits64` is the layout of the `int64#` unboxed int64 type.
+* `bits32` is the layout of the `int32_u` unboxed int32 type.
+* `bits64` is the layout of the `int64_u` unboxed int64 type.
 * `vec128` is the layout of 128-bit unboxed SIMD vector types.
-* `word` is the layout of the `nativeint#` unboxed nativeint type.
+* `word` is the layout of the `nativeint_u` unboxed nativeint type.
 * `any` is a layout that is the superlayout of all other layouts.  It doesn't correspond
   to a specific runtime representation. More information [below](#the-any-layout).
 
@@ -122,7 +122,7 @@ You can also mark types as non-`value`s using the following syntax:
 ```ocaml
 type t4 : float64
 type t5 : value  (* redundant, but you can do it if you like *)
-type t6 : bits64 = int64# (* redundant since the layout can be deduced from the rhs *)
+type t6 : bits64 = int64_u (* redundant since the layout can be deduced from the rhs *)
 ```
 
 A type declared with no `=` signs (often in a signature) and
@@ -169,12 +169,12 @@ of module inclusion. See the [kinds documentation](../../kinds/intro#inclusion-a
 
 # Unboxed numbers
 
-We now have `float#`, `int32#`, `int64#`, `nativeint#`, and unboxed 128-bit vector types.
+We now have `float#`, `int32_u`, `int64_u`, `nativeint_u`, and unboxed 128-bit vector types.
 They are the types for unboxed numbers. These all are stored
 without pointers; working with them does not cause any allocation.
 
-Most unboxed numeric types have their own layout: `float# : float64`, `int32# : bits32`,
-`int64# : bits64`, `nativeint# : word`.
+Most unboxed numeric types have their own layout: `float# : float64`, `int32_u : bits32`,
+`int64_u : bits64`, `nativeint_u : word`.
 
 All of the 128-bit vectors have the same layout: `float32x4# : vec128`,
 `float64x2# : vec128`, `int8x16# : vec128`, `int16x8# : vec128`, `int32x4# : vec128`,
@@ -195,20 +195,20 @@ Each numeric type has its own library for working with it: `float_u`,
     * `#3.14  (* : float# *)`
     * `-#0.5  (* : float# *)`
     * `#1e9   (* : float# *)`
-    * `#123l  (* : int32# *)`
-    * `-#456L (* : int64# *)`
-    * `#789n  (* : nativeint# *)`
+    * `#123l  (* : int32_u *)`
+    * `-#456L (* : int64_u *)`
+    * `#789n  (* : nativeint_u *)`
 
 * Unboxed numbers can be stored in local variables, passed to functions, returned from
   functions, and have limited support in records (details below).
 
 * Unboxed numbers may *not* appear...
-   * ... in a tuple (e.g. you cannot have `int32# * int32#`)
-   * ... as a field of a constructor (e.g. you cannot have `| K of int64#` or `| K of {
-     x : nativeint# }`)
+   * ... in a tuple (e.g. you cannot have `int32_u * int32_u`)
+   * ... as a field of a constructor (e.g. you cannot have `| K of int64_u` or `| K of {
+     x : nativeint_u }`)
    * ... as a field of a polymorphic variant constructor (e.g. you cannot have ``[ `K of
      float# ]``)
-   * ... anywhere near the class system (no `int64#` methods or class variables or even
+   * ... anywhere near the class system (no `int64_u` methods or class variables or even
      parameters in constructors)
 
 * Unboxed numbers may be stored in structures, with
@@ -219,7 +219,7 @@ Each numeric type has its own library for working with it: `float_u`,
 
 * With a few specific exceptions (documented below), existing types all expect
   `value` arguments. Thus for basically any `t`, you cannot write `float# t` or
-  `int64# t`.  This includes natural candidates like `float#
+  `int64_u t`.  This includes natural candidates like `float#
   option`.
 
 * Existing ppxs expect to work with `value` types. Accordingly, using `deriving` with
@@ -430,9 +430,9 @@ the same layout:
 ```ocaml
 external[@layout_poly] magic : ('a : any) ('b : any). 'a -> 'b = "%obj_magic"
 
-let f1 : int32# -> int32# = magic;; (* ok *)
+let f1 : int32_u -> int32_u = magic;; (* ok *)
 let f2 : float# -> float# = magic;; (* ok *)
-let f3 : float# -> int32# = magic;; (* error *)
+let f3 : float# -> int32_u = magic;; (* error *)
 ```
 
 This feature is conceptually similar to `[@local_opt]` for modes and is useful for
@@ -555,7 +555,7 @@ For example, consider this record type:
 type t =
   { w : float#;
     x : string;
-    y : int64#;
+    y : int64_u;
     z : int
   }
 ```
@@ -584,7 +584,7 @@ block representation.  For example, consider this record type:
 ```ocaml
 type t =
   { a : float#;
-    b : #(w:float# * #(x:string * y:int64#) * z:(int * int));
+    b : #(w:float# * #(x:string * y:int64_u) * z:(int * int));
     c : bool }
 ```
 This is represented as a block with six fields, and the fields appear the order
@@ -650,8 +650,8 @@ Here's a full example. Say you're writing C bindings against this OCaml type:
 ```ocaml
 (** foo.ml *)
 type t =
-  { x : int32#;
-    y : int32#;
+  { x : int32_u;
+    y : int32_u;
   }
 ```
 

@@ -159,6 +159,71 @@ void caml_init_gc_stats (uintnat max_domains)
     caml_fatal_error("Failed to allocate sampled_gc_stats");
 }
 
+void caml_report_gc_stats(void)
+{
+  caml_domain_state* domain_state = Caml_state;
+  struct gc_stats s;
+
+  caml_compute_gc_stats(&s);
+  /* cf caml_gc_counters */
+  double minwords = s.alloc_stats.minor_words
+    + (double) (domain_state->young_end - domain_state->young_ptr);
+  double majwords = s.alloc_stats.major_words
+    + (double) domain_state->allocated_words;
+  double allocated_words = minwords + majwords
+    - s.alloc_stats.promoted_words;
+  intnat heap_words = (s.heap_stats.pool_words
+                       + s.heap_stats.large_words
+                       + s.heap_stats.extent_words);
+  intnat top_heap_words = (s.heap_stats.pool_max_words
+                           + s.heap_stats.large_max_words
+                           + s.heap_stats.extent_max_words);
+
+  if (heap_words == 0) {
+    heap_words = Wsize_bsize(caml_heap_size(Caml_state->shared_heap));
+  }
+
+  if (top_heap_words == 0) {
+    top_heap_words = caml_top_heap_words(Caml_state->shared_heap);
+  }
+
+  CAML_GC_MESSAGE(STATS,
+      "allocated_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+      (intnat)allocated_words);
+  CAML_GC_MESSAGE(STATS,
+      "minor_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+      (intnat) minwords);
+  CAML_GC_MESSAGE(STATS,
+      "promoted_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+      (intnat) s.alloc_stats.promoted_words);
+  CAML_GC_MESSAGE(STATS,
+      "major_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+      (intnat) majwords);
+  CAML_GC_MESSAGE(STATS,
+      "minor_collections: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+      (intnat) atomic_load(&caml_minor_collections_count));
+  CAML_GC_MESSAGE(STATS,
+      "major_collections: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+      caml_major_cycles_completed);
+  CAML_GC_MESSAGE(STATS,
+      "forced_major_collections: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+      (intnat)s.alloc_stats.forced_major_collections);
+  CAML_GC_MESSAGE(STATS,
+      "compactions: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
+      atomic_load(&caml_compactions_count));
+  CAML_GC_MESSAGE(STATS,
+      "major_work_done: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+      (intnat)s.alloc_stats.major_work_done);
+  CAML_GC_MESSAGE(STATS, "heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                heap_words);
+  CAML_GC_MESSAGE(STATS, "top_heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                  top_heap_words);
+  CAML_GC_MESSAGE(STATS, "chunk_words: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
+                  s.global_stats.chunk_words);
+  CAML_GC_MESSAGE(STATS, "max chunk_words: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
+                  s.global_stats.max_chunk_words);
+}
+
 void caml_free_gc_stats(void)
 {
   if (sampled_gc_stats != NULL)

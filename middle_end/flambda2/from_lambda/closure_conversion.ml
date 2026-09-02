@@ -632,6 +632,9 @@ let rec unarize_const_sort_for_extern_repr (sort : Jkind.Sort.Const.t) =
   | Univar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Univar"
   | Genvar _ -> Misc.fatal_error "unarize_const_sort_for_extern_repr: Genvar"
   | Product sorts -> List.concat_map unarize_const_sort_for_extern_repr sorts
+  | Addressable sort ->
+    (* Addressability does not affect the non-boxed representation *)
+    unarize_const_sort_for_extern_repr sort
 
 let unarize_extern_repr ~machine_width alloc_mode
     (extern_repr : Lambda.extern_repr) =
@@ -651,6 +654,9 @@ let unarize_extern_repr ~machine_width alloc_mode
     Misc.fatal_error "unarize_extern_repr: unexpected genvar"
   | Same_as_ocaml_repr (Product sorts) ->
     List.concat_map unarize_const_sort_for_extern_repr sorts
+  | Same_as_ocaml_repr (Addressable sort) ->
+    (* Addressability does not affect the non-boxed representation *)
+    unarize_const_sort_for_extern_repr sort
   | Unboxed_float Boxed_float64 ->
     [ { kind = K.naked_float;
         arg_transformer = Some (P.Unbox_number Naked_float);
@@ -1311,7 +1317,11 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pget_ext_ptr _ | Pset_ext_ptr _ | Patomic_exchange_field _
       | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
       | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
-      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
+      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
+      | Patomic_load_idx _ | Patomic_set_idx _ | Patomic_exchange_idx _
+      | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _
+      | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx
+      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx | Pdls_get
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
@@ -1817,7 +1827,7 @@ let close_exact_or_unknown_apply acc env
       ~current_region ~current_ghost_region
   in
   let dbg = Debuginfo.from_location loc in
-  let acc, call_kind, can_erase_callee =
+  let acc, call_kind, can_erase_callee, replace_by_invalid =
     match kind with
     | Function -> (
       match (callee_approx : Env.value_approximation option) with
@@ -1828,29 +1838,41 @@ let close_exact_or_unknown_apply acc env
           (* CR keryan : We could do better here since we know the arity, but we
              would have to untuple the arguments and we lack information for
              now *)
-          acc, Call_kind.indirect_function_call_unknown_arity, false
+          acc, Call_kind.indirect_function_call_unknown_arity, false, false
         else
           let result_arity_from_code = Code_metadata.result_arity meta in
           if
             (* See comment about when this check can be done, in
                simplify_apply_expr.ml *)
-            Flambda_features.kind_checks ()
-            && not
-                 (Flambda_arity.equal_ignoring_subkinds return_arity
-                    result_arity_from_code)
+            not
+              (Flambda_arity.equal_ignoring_subkinds return_arity
+                 result_arity_from_code
+              && Misc.Stdlib.List.equal
+                   (Misc.Stdlib.List.equal K.With_subkind.equal_ignoring_subkind)
+                   (Flambda_arity.unarize_per_parameter args_arity)
+                   (Flambda_arity.unarize_per_parameter
+                      (Code_metadata.params_arity meta)))
           then
-            Misc.fatal_errorf
-              "Wrong return arity for direct OCaml function call to %a@ \
-               (expected %a, found %a):@ %a@ code metadata:@ %a"
-              Ident.print func Flambda_arity.print result_arity_from_code
-              Flambda_arity.print return_arity Debuginfo.print_compact dbg
-              Code_metadata.print meta;
-          let can_erase_callee =
-            Flambda_features.classic_mode ()
-            && not (Code_metadata.is_my_closure_used meta)
-          in
-          acc, Call_kind.direct_function_call code_id, can_erase_callee
-      | None -> acc, Call_kind.indirect_function_call_unknown_arity, false
+            if Flambda_features.kind_checks ()
+            then
+              Misc.fatal_errorf
+                "Wrong arity for direct OCaml function call to %a@ (expected \
+                 parameters (%a) and result (%a),@ found arguments (%a) and \
+                 return (%a)):@ %a@ code metadata:@ %a"
+                Ident.print func Flambda_arity.print
+                (Code_metadata.params_arity meta)
+                Flambda_arity.print result_arity_from_code Flambda_arity.print
+                args_arity Flambda_arity.print return_arity
+                Debuginfo.print_compact dbg Code_metadata.print meta
+            else acc, Call_kind.direct_function_call code_id, false, true
+          else
+            let can_erase_callee =
+              Flambda_features.classic_mode ()
+              && not (Code_metadata.is_my_closure_used meta)
+            in
+            acc, Call_kind.direct_function_call code_id, can_erase_callee, false
+      | None ->
+        acc, Call_kind.indirect_function_call_unknown_arity, false, false
       | Some (Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _)
         ->
         assert false (* See [close_apply] *))
@@ -1858,58 +1880,66 @@ let close_exact_or_unknown_apply acc env
       let acc, obj = find_simple acc env obj in
       ( acc,
         Call_kind.method_call (Call_kind.Method_kind.from_lambda kind) ~obj,
+        false,
         false )
   in
-  let acc, apply_exn_continuation =
-    close_exn_continuation acc env exn_continuation
-  in
-  let acc, args = find_simples acc env args in
-  let inlined_call = Inlined_attribute.from_lambda inlined in
-  let probe = Probe.from_lambda probe in
-  let position =
-    match region_close with
-    | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
-    | Rc_nontail -> Apply.Position.Nontail
-  in
-  let apply =
-    Apply.create
-      ~callee:(if can_erase_callee then None else Some callee)
-      ~continuation:(Return continuation) apply_exn_continuation ~args
-      ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
-      ~inlined:inlined_call
-      ~inlining_state:(Inlining_state.default ~round:0)
-      ~probe ~position
-      ~relative_history:(Env.relative_history_from_scoped ~loc env)
-  in
-  if Flambda_features.classic_mode ()
+  if replace_by_invalid
   then
-    if !Clflags.jsir
+    ( acc,
+      Expr.create_invalid
+        (Application_result_kind_mismatch_in_lambda
+           (Debuginfo.from_location loc)) )
+  else
+    let acc, apply_exn_continuation =
+      close_exn_continuation acc env exn_continuation
+    in
+    let acc, args = find_simples acc env args in
+    let inlined_call = Inlined_attribute.from_lambda inlined in
+    let probe = Probe.from_lambda probe in
+    let position =
+      match region_close with
+      | Rc_normal | Rc_close_at_apply -> Apply.Position.Normal
+      | Rc_nontail -> Apply.Position.Nontail
+    in
+    let apply =
+      Apply.create
+        ~callee:(if can_erase_callee then None else Some callee)
+        ~continuation:(Return continuation) apply_exn_continuation ~args
+        ~args_arity ~return_arity ~call_kind ~return_mode:mode dbg
+        ~inlined:inlined_call
+        ~inlining_state:(Inlining_state.default ~round:0)
+        ~probe ~position
+        ~relative_history:(Env.relative_history_from_scoped ~loc env)
+    in
+    if Flambda_features.classic_mode ()
     then
-      let apply =
-        Apply.with_inlined_attribute apply
-          (Inlined_attribute.with_use_info (Apply.inlined apply)
-             Jsir_inlining_disabled)
-      in
-      Expr_with_acc.create_apply acc apply
-    else
-      match Inlining.inlinable env apply callee_approx with
-      | Not_inlinable ->
+      if !Clflags.jsir
+      then
         let apply =
           Apply.with_inlined_attribute apply
             (Inlined_attribute.with_use_info (Apply.inlined apply)
-               Unused_because_function_unknown)
+               Jsir_inlining_disabled)
         in
         Expr_with_acc.create_apply acc apply
-      | Inlinable func_desc ->
-        let acc = Acc.mark_continuation_as_untrackable continuation acc in
-        let acc =
-          Acc.mark_continuation_as_untrackable
-            (Exn_continuation.exn_handler apply_exn_continuation)
-            acc
-        in
-        Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
-          ~func_desc
-  else Expr_with_acc.create_apply acc apply
+      else
+        match Inlining.inlinable env apply callee_approx with
+        | Not_inlinable ->
+          let apply =
+            Apply.with_inlined_attribute apply
+              (Inlined_attribute.with_use_info (Apply.inlined apply)
+                 Unused_because_function_unknown)
+          in
+          Expr_with_acc.create_apply acc apply
+        | Inlinable func_desc ->
+          let acc = Acc.mark_continuation_as_untrackable continuation acc in
+          let acc =
+            Acc.mark_continuation_as_untrackable
+              (Exn_continuation.exn_handler apply_exn_continuation)
+              acc
+          in
+          Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
+            ~func_desc
+    else Expr_with_acc.create_apply acc apply
 
 let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
   let acc, args = find_simples acc env args in
@@ -3489,9 +3519,15 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     then Lambda.alloc_heap, first_complex_local_param - num_provided
     else Lambda.alloc_local, 0
   in
-  if not (Lambda.locality_return_compat closure_alloc_mode apply.IR.mode)
+  (* This can happen in a dead GADT match case. *)
+  if not (Flambda_arity.is_one_param_of_kind_value apply.IR.return_arity)
   then
-    (* This can happen in a dead GADT match case. *)
+    ( acc,
+      Expr.create_invalid
+        (Application_result_kind_mismatch_in_lambda
+           (Debuginfo.from_location apply.loc)) )
+  else if not (Lambda.locality_return_compat closure_alloc_mode apply.IR.mode)
+  then
     ( acc,
       Expr.create_invalid
         (Partial_application_mode_mismatch_in_lambda
@@ -3810,27 +3846,35 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
         ~arity:params_arity ~first_complex_local_param ~result_mode
     | Over_app { full; provided_arity; remaining; remaining_arity; result_mode }
       ->
-      let full_args_call apply_continuation ~region ~ghost_region acc =
-        let replace_region =
-          match region, ghost_region with
-          | None, None -> None
-          | Some region, Some ghost_region -> Some (region, ghost_region)
-          | Some _, None | None, Some _ -> Misc.fatal_error "Mismatched regions"
+      if not (Flambda_arity.is_one_param_of_kind_value result_arity)
+      then
+        ( acc,
+          Expr.create_invalid
+            (Application_result_kind_mismatch_in_lambda
+               (Debuginfo.from_location apply.loc)) )
+      else
+        let full_args_call apply_continuation ~region ~ghost_region acc =
+          let replace_region =
+            match region, ghost_region with
+            | None, None -> None
+            | Some region, Some ghost_region -> Some (region, ghost_region)
+            | Some _, None | None, Some _ ->
+              Misc.fatal_error "Mismatched regions"
+          in
+          close_exact_or_unknown_apply acc env
+            { apply with
+              args = full;
+              args_arity = provided_arity;
+              continuation = apply_continuation;
+              mode = result_mode;
+              return_arity =
+                Flambda_arity.create_singletons
+                  [Flambda_kind.With_subkind.any_value]
+            }
+            (Some approx) ~replace_region
         in
-        close_exact_or_unknown_apply acc env
-          { apply with
-            args = full;
-            args_arity = provided_arity;
-            continuation = apply_continuation;
-            mode = result_mode;
-            return_arity =
-              Flambda_arity.create_singletons
-                [Flambda_kind.With_subkind.any_value]
-          }
-          (Some approx) ~replace_region
-      in
-      wrap_over_application acc env full_args_call apply ~remaining
-        ~remaining_arity ~result_mode)
+        wrap_over_application acc env full_args_call apply ~remaining
+          ~remaining_arity ~result_mode)
 
 module CIS = Code_id_or_symbol
 module GroupMap = Numbers.Int.Map
