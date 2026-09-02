@@ -66,7 +66,7 @@
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
 #ifdef TARGET_amd64
 /* amd64.S's caml_reperform reads [idled_from] at Stack_idled_from. */
-static_assert(offsetof(struct stack_info, idled_from) == 112, "");
+static_assert(offsetof(struct stack_info, idled_from) == 96, "");
 #endif
 
 static _Atomic int64_t fiber_id_global = 0;
@@ -1414,9 +1414,6 @@ static void stack_release_memory(struct stack_info* stack)
   CAMLassert(stack->magic == 42);
   CAMLassert(caches != NULL);
 
-  // Don't need to update local_sp since this is no longer the current stack.
-  caml_free_local_arenas(stack->local_arenas);
-
   if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
     memset(Stack_base(stack), 0x42,
@@ -1460,8 +1457,6 @@ void caml_free_stack (struct stack_info* stack)
 
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
-
-  caml_dynamic_table_free(&stack->dyn);
 
   stack_release_memory(stack);
 }
@@ -1557,7 +1552,7 @@ static struct stack_info* stack_wake(struct stack_info* idle,
   stack->local_sp = idle->local_sp;
   stack->local_top = idle->local_top;
   stack->local_limit = idle->local_limit;
-  stack->dyn = idle->dyn;
+  stack->dynamic = idle->dynamic;
 
   /* Relocate the exception chain and (under WITH_FRAME_POINTERS) the
      frame-pointer chain by the distance the stack data has moved since

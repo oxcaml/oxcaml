@@ -132,7 +132,7 @@ G(name):
 #define Stack_local_sp           64
 #define Stack_local_top          72
 #define Stack_local_limit        80
-#define Stack_idled_from        112
+#define Stack_idled_from         96
 
 /* struct stack_handler */
 #define Handler_value(REG)       0(REG)
