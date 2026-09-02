@@ -24,6 +24,7 @@ let standard_library_default = {@QS@|@ocaml_libdir@|@QS@}
 
 let ccomp_type = {@QS@|@ccomp_type@|@QS@}
 let c_compiler = {@QS@|@CC@|@QS@}
+let c_compiler_vendor = {@QS@|@ocaml_cc_vendor@|@QS@}
 let c_output_obj = {@QS@|@outputobj@|@QS@}
 let c_has_debug_prefix_map = @cc_has_debug_prefix_map@
 let as_debug_prefix_map_flag = {@QS@|@as_debug_prefix_map_flag@|@QS@}
@@ -84,6 +85,7 @@ let target_os_type = {@QS@|@target_os_type@|@QS@}
 let asm = {@QS@|@AS@|@QS@}
 let asm_cfi_supported = @asm_cfi_supported@
 let asm_size_type_directives = @asm_size_type_directives@
+let asm_dwarf_version = @asm_dwarf_version@
 let with_frame_pointers = @frame_pointers@
 let with_address_sanitizer = @address_sanitizer@
 let with_cpp_mangling = @cpp_mangling@
@@ -116,6 +118,8 @@ let no_stack_checks = "@enable_stack_checks@" <> "yes"
 let multidomain = "@enable_multidomain@" = "yes"
 
 let tsan = @tsan@
+
+let shebangscripts = @shebangscripts@
 
 let has_popcnt = "@has_popcnt@" = "yes"
 

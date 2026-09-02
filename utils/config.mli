@@ -37,6 +37,29 @@ val ccomp_type: string
 val c_compiler: string
 (** The compiler to use for compiling C files *)
 
+val c_compiler_vendor: string
+(** The vendor and version of the C compiler. Consists of hyphenated values
+    where the first part indicates the C compiler's vendor and remaining parts
+    indicate the version of the C compiler, as reported by that C compiler's
+    preprocessor.
+
+    Possible values are:
+    - {v msvc v} - Windows, using Microsoft Visual Studio. {v _MSC_VER v}
+                   follows and optionally {v clang- v} if {v clang-cl v},
+                   rather than Visual Studio itself, is in use.
+    - {v icc v} - Intel C Compiler.
+    - {v mingw v} - Windows, using the mingw-w64 project. The major and minor
+                    version of mingw-w64 itself follow and then either
+                    {v gcc- v} or {v clang- v} indicating which C compiler is in
+                    use.
+    - {v clang v} - Clang LLVM C Compiler.
+    - {v gcc v} - GNU Compiler Collection C Compiler.
+    - {v xlc v} - IBM XL C Compiler.
+    - {v sunc v} - Oracle Solaris Studio.
+    - {v unknown v} - unknown compiler vendor. No additional version info.
+
+    @since 5.5 *)
+
 val c_output_obj: string
 (** Name of the option of the C compiler for specifying the output
     file *)
@@ -218,6 +241,13 @@ val asm_size_type_directives: bool
 
     @since 5.4 *)
 
+val asm_dwarf_version : int option
+(** The DWARF Version emitted by the {!asm} command. At present this is only
+    implemented for the clang internal assembler, all other assemblers have
+    [None].
+
+    @since 5.5 *)
+
 val with_frame_pointers : bool
 (** Whether assembler should maintain frame pointers *)
 
@@ -358,6 +388,11 @@ val multidomain : bool
 
 val tsan : bool
 (** Whether ThreadSanitizer instrumentation is enabled *)
+
+val shebangscripts : bool
+(** Whether the target supports shebang scripts
+
+    @since 5.5 *)
 
 val parameterised_modules : bool
 (** Whether parameterised modules are supported *)

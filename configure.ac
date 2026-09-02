@@ -306,6 +306,7 @@ AC_SUBST([CMJA_MAGIC_NUMBER], [CMJA__MAGIC_NUMBER])
 AC_SUBST([CFG_MAGIC_NUMBER], [CFG__MAGIC_NUMBER])
 AC_SUBST([LINEAR_MAGIC_NUMBER], [LINEAR__MAGIC_NUMBER])
 AC_SUBST([CC])
+AC_SUBST([ocaml_cc_vendor])
 AC_SUBST([SAK_BUILD])
 AC_SUBST([SAK])
 AC_SUBST([encode_C_literal])
@@ -421,6 +422,7 @@ AC_SUBST([as_compress_debug_sections_flag])
 AC_SUBST([cc_compress_debug_sections_flag])
 AC_SUBST([objcopy_compress_debug_sections_flag])
 AC_SUBST([asm_size_type_directives])
+AC_SUBST([asm_dwarf_version])
 AC_SUBST([sharedlib_cflags])
 AC_SUBST([rpath])
 AC_SUBST([mkdll])
@@ -1105,7 +1107,7 @@ AS_CASE([$target],
   ocamltest_libunix="Some true"
   ocamlyacc_wstr_module=""])
 
-otherlibraries="dynlink runtime_events"
+otherlibraries="dynlink runtime_events eval stdlib_alpha stdlib_beta stdlib_stable stdlib_upstream_compatible"
 otherlibs="runtime_events"
 optional_libraries="$optional_libraries otherlibs/dynlink/dynlink"
 
@@ -2110,6 +2112,16 @@ AS_IF([test x"$enable_assembler_suitable_for_dissector" != "x" && \
 AS_IF([test -z "$AS"], [AS="$default_as"])
 
 AS_IF([test -z "$ASPP"], [ASPP="$default_aspp"])
+
+AS_CASE([$ocaml_cc_vendor],
+  [clang-*],
+    [AC_MSG_CHECKING([DWARF version of $AS])
+    m4_normalize([asm_dwarf_version="$(\
+      $AS -### -g -c -x c /dev/null -o /dev/null 2>&1
+        | sed -ne "s/.*dwarf-version=\([0-9]*\).*/Some \1/p")"])
+    AC_MSG_RESULT([$asm_dwarf_version])
+    test -n "$asm_dwarf_version" || asm_dwarf_version='None'],
+  [asm_dwarf_version='None'])
 
 # Utilities
 AC_CHECK_PROG([rlwrap],[rlwrap],[rlwrap])
@@ -3152,6 +3164,11 @@ AS_CASE([$enable_ocamltest,OCAML__DEVELOPMENT_VERSION],
     ocamltest_target=ocamltest
     ocamltest_opt_target=ocamltest.opt
     ocamltest='ocamltest'
+    AS_IF([$native_compiler],
+      [optional_native_tools="$optional_native_tools \
+testsuite/tools/test_in_prefix.opt"],
+      [optional_bytecode_tools="$optional_bytecode_tools \
+testsuite/tools/test_in_prefix"])
     testsuite_tools='testsuite/tools/codegen testsuite/tools/expect'
     optional_bytecode_tools="$optional_bytecode_tools $testsuite_tools"],
   [build_ocamltest=false
