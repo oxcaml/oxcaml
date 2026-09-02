@@ -341,24 +341,32 @@ end = struct
       (fun ({ derived; source; reason } : Facts.Dependency.t) ->
         let derived_id = key_id t derived in
         let source_id = key_id t source in
-        Dynarray.set t.key_out source_id
-          (derived_id :: Dynarray.get t.key_out source_id);
+        let forward () =
+          Dynarray.set t.key_out source_id
+            (derived_id :: Dynarray.get t.key_out source_id)
+        in
         observe_family t derived_id;
         match reason with
         | Definition ->
+          forward ();
           Dynarray.set t.key_out derived_id
             (source_id :: Dynarray.get t.key_out derived_id);
           observe_family t source_id
-        | Instance -> ()
+        | Instance -> forward ()
         | Alias
         | Include
         | With_constraint
-        | Destructive_substitution
         | Module_type_of
         | Strengthening
+        | Interface ->
+          forward ();
+          observe_family t source_id
+        | Destructive_substitution
         | Functor_type
-        | Argument_member -> observe_family t source_id
-        | Interface -> (
+        | Argument_member
+        | Interface_member -> observe_family t source_id
+        | Interface_pair -> (
+          forward ();
           observe_family t source_id;
           match (Facts.Key.family derived, Facts.Key.family source) with
           | Some left, Some right when not (Uid.equal left right) ->
@@ -458,6 +466,45 @@ end = struct
       omissions = scoped_omissions t !families
     }
 
+  let comp_unit_pack_related left right =
+    let extends ~packed ~unit_name =
+      let packed_length = String.length packed in
+      let unit_length = String.length unit_name in
+      packed_length > unit_length + 1
+      && Char.equal packed.[packed_length - unit_length - 1] '.'
+      && String.equal
+           (Stdlib.String.sub packed (packed_length - unit_length) unit_length)
+           unit_name
+    in
+    extends ~packed:left ~unit_name:right
+    || extends ~packed:right ~unit_name:left
+
+  let pack_qualified_families t (family : Uid.t) =
+    match family with
+    | Item { comp_unit; id; from } ->
+      let matching (candidate : Uid.t) =
+        match candidate with
+        | Item
+            { comp_unit = candidate_unit;
+              id = candidate_id;
+              from = candidate_from
+            } ->
+          Int.equal candidate_id id
+          && (match (candidate_from, from) with
+            | Unit_info.Impl, Unit_info.Impl | Unit_info.Intf, Unit_info.Intf ->
+              true
+            | (Unit_info.Impl | Unit_info.Intf), _ -> false)
+          && comp_unit_pack_related candidate_unit comp_unit
+        | Compilation_unit _ | Internal | Predef _ | Unboxed_version _ -> false
+      in
+      let add candidate _ accumulator =
+        if matching candidate then candidate :: accumulator else accumulator
+      in
+      Uid.Map.fold add t.families
+        (Uid.Map.fold add t.paired_families
+           (Uid.Map.fold add t.family_omissions []))
+    | Compilation_unit _ | Internal | Predef _ | Unboxed_version _ -> []
+
   let query_family t family =
     let rec close pending families =
       match pending with
@@ -472,7 +519,9 @@ end = struct
           in
           close (List.rev_append paired pending) (Uid.Set.add family families)
     in
-    let queried_families = close [ family ] Uid.Set.empty in
+    let queried_families =
+      close (family :: pack_qualified_families t family) Uid.Set.empty
+    in
     let seeds =
       Uid.Set.fold
         (fun family seeds ->
@@ -532,9 +581,8 @@ module Helpers = struct
 
   let module_facts (mconfig : Mconfig.t) =
     let index_files = mconfig.merlin.index_files in
-    List.fold_left index_files ~init:(Some None)
-      ~f:(fun accumulator path ->
-        match accumulator, (Index_cache.read path).module_facts with
+    List.fold_left index_files ~init:(Some None) ~f:(fun accumulator path ->
+        match (accumulator, (Index_cache.read path).module_facts) with
         | None, _ | _, None -> None
         | Some facts, Some source ->
           let source = Index_format.fetch_module_facts source in
@@ -656,8 +704,7 @@ let uid_site (mconfig : Mconfig.t) (evidence_uid : Shape.Uid.t) =
       | declaration -> declaration
       | exception Not_found -> None
     in
-    Option.bind declaration
-      ~f:(fun { Location.txt = name; loc } ->
+    Option.bind declaration ~f:(fun { Location.txt = name; loc } ->
         let description = Format.asprintf "%a" Shape.Uid.print evidence_uid in
         Option.bind (Helpers.find_source_of_loc mconfig ~description loc)
           ~f:(fun (spans_file, loc) ->
@@ -854,38 +901,25 @@ let compare_implementation
     if c <> 0 then c
     else
       let c =
-        Stdlib.Option.compare String.compare left.instance right.instance
+        Stdlib.Option.compare String.compare left.implementation_uid
+          right.implementation_uid
       in
       if c <> 0 then c
       else
         let c =
-          Stdlib.Option.compare String.compare left.implementation_uid
-            right.implementation_uid
+          Stdlib.Option.compare String.compare left.implementation_name
+            right.implementation_name
         in
         if c <> 0 then c
         else
-          let c =
-            Stdlib.Option.compare String.compare left.implementation_name
-              right.implementation_name
-          in
+          let c = Location.compare left.site.impl_loc right.site.impl_loc in
           if c <> 0 then c
           else
-            let c = Location.compare left.site.impl_loc right.site.impl_loc in
+            let c =
+              compare_impl_kind left.site.impl_kind right.site.impl_kind
+            in
             if c <> 0 then c
-            else
-              let c =
-                compare_impl_kind left.site.impl_kind right.site.impl_kind
-              in
-              if c <> 0 then c
-              else
-                let c =
-                  Stdlib.Option.compare compare_check_kind left.check
-                    right.check
-                in
-                if c <> 0 then c
-                else
-                  Stdlib.Option.compare Location.compare left.check_site
-                    right.check_site
+            else Stdlib.Option.compare compare_check_kind left.check right.check
 
 let reason_rank : Query_protocol.Module_type_impls.reason -> int = function
   | No_index_files -> 0
@@ -1053,15 +1087,14 @@ let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
   let results = query_results engine targets in
   let targets, implementations =
     List.split
-      (List.map results
-         ~f:(fun ((target, result) as target_result) ->
+      (List.map results ~f:(fun ((target, result) as target_result) ->
            let implementations, resolution_reasons =
-             resolve_impacts ~mconfig ~own_file [target_result]
+             resolve_impacts ~mconfig ~own_file [ target_result ]
            in
            let status, reasons =
              status_and_reasons ~index_files
-               ~facts_present:(Option.is_some facts)
-               ~omissions:result.omissions ~resolution_reasons
+               ~facts_present:(Option.is_some facts) ~omissions:result.omissions
+               ~resolution_reasons
            in
            ( { target = target.target_name;
                target_loc = Helpers.location_in_file own_file target.target_loc;
@@ -1088,8 +1121,10 @@ let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
         List.filter_map result.impacts
           ~f:(fun ({ witness; check } : Dependency_analysis.impact) ->
             Option.map (resolve_implementation mconfig check.implementation)
-              ~f:(fun ({ implementation_uid; implementation_name; site } :
-                        resolved_implementation) ->
+              ~f:(fun
+                  ({ implementation_uid; implementation_name; site } :
+                    resolved_implementation)
+                ->
                 { target = Own_interface;
                   target_loc = None;
                   instance = Some (render_witness witness);

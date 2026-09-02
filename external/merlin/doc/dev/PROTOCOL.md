@@ -592,12 +592,26 @@ The type is described in another file, and the result will be the following obje
 }
 ```
 
-### `module-type-impls`
+### `module-type-impls -position <position>`
 
-Declaration-level change impact for the module-type declarations of the buffer:
-for each declaration, the modules that were checked against a module type that
-depends on it (and the buffer's own implementation unit, for an interface
-buffer), computed from the compiler facts recorded in the configured indexes.
+	-position <position>  Answer only for the innermost module-type declaration
+	                      enclosing this position (optional; without it, every
+	                      module-type declaration of the buffer is a target)
+
+The modules that must *implement* each targeted module-type declaration,
+computed from the compiler facts recorded in the configured indexes.  A module
+implements the target when the type it was checked against reaches the target
+purely through requirement-carrying relations: direct ascription, functor
+arguments, first-class module packing and unpacking, alias chains, `include`,
+`with` constraints, destructive substitution, strengthening, `module type of`,
+and functor-application instances.  A unit whose interface *includes* the
+target implements it too, and is reported as the `(interface)` row.
+
+Modules related to the target only definitionally are not implementers and are
+not returned: the unit or module that declares the target, an `.ml` definition
+paired with the target's own `.mli` declaration, a module ascribed to a
+signature that merely provides the target (or members of the target's type) as
+members, and a functor ascribed to a functor type whose result is the target.
 
 ```javascript
 {
