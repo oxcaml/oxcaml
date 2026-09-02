@@ -850,13 +850,6 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
         pp f "@[<2>(%a@;:@;%a)@]" (pattern1 ctxt) p (core_type ctxt) (Option.get ct)
     | Ppat_lazy p ->
         pp f "@[<2>(lazy@;%a)@]" (simple_pattern ctxt) p
-    (* CR-someday zqian: [Ppat_exception] and [Ppat_effect] are not simple
-       patterns, so printing them here without parentheses yields unparseable
-       output in delimited positions such as function parameters and [lazy]
-       arguments; see tests/parsetree/source_known_broken.ml. They cannot
-       simply be removed from [simple_pattern]: the parenthesizing fallback
-       below recurses through [pattern], which only reaches them via
-       [simple_pattern]. Move them to [pattern] instead. *)
     | Ppat_exception p ->
         pp f "@[<2>exception@;%a@]" (pattern1 ctxt) p
     | Ppat_effect(p1, p2) ->
