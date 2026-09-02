@@ -203,7 +203,8 @@ val disable_partial_application_stub_generation : t -> bool
     the value that should be used for [@inlined forward] calls within.
 
     It is [None] if we are not currently inside an inlined body. *)
-val inlined_attribute_to_forward : t -> Inlined_attribute.t option
+val inlined_attribute_to_forward :
+  t -> (Inlined_attribute.t * forwarded_from:Inlined_debuginfo.t) option
 
 val enter_set_of_closures : t -> t
 

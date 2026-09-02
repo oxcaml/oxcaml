@@ -31,6 +31,7 @@ module Context : sig
       depth : int option;
       unrolling_depth : int option option;
       are_rebuilding_terms : Are_rebuilding_terms.t;
+      inlined_forwarded_from : Debuginfo.t option;
       pass : Pass.t
     }
 
@@ -110,6 +111,7 @@ val record_decision_at_call_site_for_known_function :
   pass:Pass.t ->
   callee:Inlining_history.Absolute.t ->
   are_rebuilding_terms:Are_rebuilding_terms.t ->
+  inlined_forwarded_from:Inlined_debuginfo.t option ->
   Call_site_inlining_decision_type.t ->
   unit
 

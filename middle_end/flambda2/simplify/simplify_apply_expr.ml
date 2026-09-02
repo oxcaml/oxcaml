@@ -219,7 +219,8 @@ type inlining_decision =
    [callee's_code_metadata] to prevent using the wrong one by mistake *)
 let simplify_direct_full_application ~simplify_expr dacc apply function_type
     ~params_arity ~result_arity ~(result_types : _ Or_unknown_or_bottom.t)
-    ~down_to_up ~coming_from_indirect ~callee's_code_metadata =
+    ~down_to_up ~coming_from_indirect ~callee's_code_metadata
+    ~inlined_forwarded_from =
   let inlined =
     match function_type with
     | None ->
@@ -243,7 +244,7 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
           ~callee:(Code_metadata.absolute_history callee's_code_metadata)
           ~tracker:(DE.inlining_history_tracker (DA.denv dacc))
           ~are_rebuilding_terms:(DA.are_rebuilding_terms dacc)
-          ~apply decision;
+          ~apply ~inlined_forwarded_from decision;
       match Call_site_inlining_decision_type.can_inline decision with
       | Do_not_inline { erase_attribute_if_ignored } ->
         Do_not_inline { erase_attribute = erase_attribute_if_ignored }
@@ -950,7 +951,7 @@ let simplify_direct_function_call ~simplify_expr dacc apply
     ~callee's_code_ids_from_call_kind ~callee's_function_slot
     ~coming_from_indirect ~result_arity ~result_types ~recursive
     ~must_be_detupled ~closure_alloc_mode_from_type function_decl ~down_to_up
-    ~call =
+    ~call ~inlined_forwarded_from =
   (match Apply.probe apply, Apply.inlined apply with
   | None, _ | Some _, Never_inlined -> ()
   | ( Some _,
@@ -1058,6 +1059,7 @@ let simplify_direct_function_call ~simplify_expr dacc apply
           simplify_direct_full_application ~simplify_expr dacc apply
             (Some function_decl) ~params_arity ~result_arity ~result_types
             ~down_to_up ~coming_from_indirect ~callee's_code_metadata
+            ~inlined_forwarded_from
       else if provided_num_args > num_params
       then
         if
@@ -1117,7 +1119,7 @@ let simplify_direct_function_call ~simplify_expr dacc apply
           num_params provided_num_args Apply.print apply
 
 let simplify_function_call ~simplify_expr dacc apply ~callee_ty
-    (call : Call_kind.Function_call.t) ~down_to_up =
+    (call : Call_kind.Function_call.t) ~down_to_up ~inlined_forwarded_from =
   (* Function declarations and params and body might not have the same calling
      convention. Currently the only case when it happens is for tupled
      functions. For such functions, the function_declaration declares a
@@ -1161,7 +1163,8 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
           ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
           ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
           ~result_types:(Code_metadata.result_types callee's_code_metadata)
-          ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata)
+          ~down_to_up ~coming_from_indirect:false ~callee's_code_metadata
+          ~inlined_forwarded_from)
     | Indirect_known_arity _ | Indirect_unknown_arity ->
       Misc.fatal_errorf
         "No callee provided for non-direct OCaml function call:@ %a" Apply.print
@@ -1202,7 +1205,7 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
             (Code_metadata.result_types callee's_code_metadata_from_type)
           ~recursive:(Code_metadata.recursive callee's_code_metadata_from_type)
           ~must_be_detupled ~closure_alloc_mode_from_type func_decl_type
-          ~down_to_up ~call)
+          ~down_to_up ~call ~inlined_forwarded_from)
     | Need_meet -> type_unavailable ()
     | Invalid ->
       let rebuild uacc ~after_rebuild =
@@ -1254,15 +1257,16 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
         ~from_env:(DE.get_inlining_state (DA.denv dacc))
         ~from_metadata:(Apply.inlining_state apply)
     in
-    let inlined : Inlined_attribute.t =
+    let inlined, inlined_forwarded_from =
       match Apply.inlined apply with
       | ( Never_inlined | Default_inlined | Unroll _ | Always_inlined _
         | Hint_inlined ) as inlined ->
-        inlined
-      | Forward_inlined -> (
+        inlined, None
+      | Forward_inlined as inlined -> (
         match DE.inlined_attribute_to_forward (DA.denv dacc) with
-        | None -> Forward_inlined
-        | Some inlined_from_env -> inlined_from_env)
+        | None -> inlined, None
+        | Some (inlined_from_env, ~forwarded_from) ->
+          inlined_from_env, Some forwarded_from)
     in
     let apply =
       Apply.create ~callee:simplified_callee
@@ -1280,7 +1284,7 @@ let simplify_apply_shared dacc apply : _ simplify_apply_shared_result =
              ~earlier:(DE.relative_history (DA.denv dacc))
              ~later:(Apply.relative_history apply))
     in
-    Ok (dacc, callee_ty, apply, arg_types)
+    Ok (dacc, callee_ty, apply, arg_types, inlined_forwarded_from)
 
 let rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id uacc
     ~after_rebuild =
@@ -1473,11 +1477,11 @@ let simplify_apply ~simplify_expr dacc apply ~down_to_up =
   | Invalid args_arity ->
     replace_apply_by_invalid dacc ~down_to_up
       (Application_argument_kind_mismatch (args_arity, apply))
-  | Ok (dacc, callee_ty, apply, arg_types) -> (
+  | Ok (dacc, callee_ty, apply, arg_types, inlined_forwarded_from) -> (
     match Apply.call_kind apply with
     | Function { function_call } ->
       simplify_function_call ~simplify_expr dacc apply ~callee_ty function_call
-        ~down_to_up
+        ~down_to_up ~inlined_forwarded_from
     | Method { kind; obj } ->
       let callee_ty =
         match callee_ty with

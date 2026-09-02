@@ -380,7 +380,8 @@ module Inlining = struct
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
           ~callee:(Inlining_history.Absolute.empty compilation_unit)
-          ~are_rebuilding_terms Definition_says_not_to_inline;
+          ~are_rebuilding_terms ~inlined_forwarded_from:None
+          Definition_says_not_to_inline;
         Not_inlinable)
       else
         (* These calculations are all in terms of non-unarized parameters. *)
@@ -417,7 +418,7 @@ module Inlining = struct
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
           ~callee:(Code.absolute_history code)
-          ~are_rebuilding_terms decision;
+          ~are_rebuilding_terms ~inlined_forwarded_from:None decision;
         res
 
   let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into
