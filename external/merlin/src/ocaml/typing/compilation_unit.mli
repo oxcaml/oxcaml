@@ -17,10 +17,12 @@
 (* Handling of the names of compilation units, including associated "-for-pack"
    prefixes and instance arguments.
 
-   By "compilation unit" we mean the code and data associated with the
-   compilation of a single .ml source file: that is to say, file-level entities
-   having OCaml semantics. The notion neither includes the special "startup"
-   files nor external libraries. If the source file was compiled with
+   By "compilation unit" we mean the machine code and data produced by compiling
+   a single .ml source file, as stored in a .cmo or .cmx file: that is to say,
+   file-level entities having OCaml semantics. In particular, a [t] never stands
+   for an interface: interfaces (.cmi files) are identified by
+   [Compilation_unit_intf.t] instead. The notion neither includes the special
+   "startup" files nor external libraries. If the source file was compiled with
    "-parameter", then in addition to the compilation unit for the .ml file
    itself (the _base_), instantiation will produce further compilation units
    (the _instances_; see [create_instance]). *)
@@ -44,8 +46,6 @@ module Name : sig
   val of_string : string -> t
 
   val to_string : t -> string
-
-  val of_head_of_global_name : Global_module.Name.t -> t
 
   val of_parameter_name : Global_module.Parameter_name.t -> t
 
@@ -138,10 +138,6 @@ val to_global_name : t -> Global_module.Name.t option
     prefix. *)
 val to_global_name_exn : t -> Global_module.Name.t
 
-(** Like [to_global_name] but succeed even when there is a pack prefix,
-    discarding the prefix in that case. *)
-val to_global_name_without_prefix : t -> Global_module.Name.t
-
 (** Create the compilation unit named by the given [Global_module.t]. Throws a
     fatal error if the global is not a complete instantiation, which is to say,
     if it has any hidden arguments at any depth. *)
@@ -150,8 +146,13 @@ val of_complete_global_exn : Global_module.t -> t
 (** Create a compilation unit from the given [name]. No prefix is allowed;
     throws a fatal error if there is a "." in the name. (As a special case, a
     "." is allowed as the first character, to handle compilation units which
-    take their names from hidden files.) *)
-val of_string : string -> t
+    take their names from hidden files.) Unsafe: this fabricates a compilation
+    unit from a bare string, with no guarantee that any such unit exists. *)
+val of_string_unsafe : string -> t
+
+(** Create a compilation unit implementing the given interface, assuming it was
+    compiled with neither a "-for-pack" prefix nor instance arguments. *)
+val of_intf_assume_no_prefix_no_args : Compilation_unit_intf.t -> t
 
 (** Create a global [Ident.t] representing this compilation unit. Only intended
     for use in bytecode; most uses of [Ident.t]s that are known to be global

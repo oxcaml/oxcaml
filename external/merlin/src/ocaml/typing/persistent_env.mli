@@ -16,18 +16,18 @@
 
 open Misc
 
+module CUI := Compilation_unit_intf
+
 module Consistbl_data = Import_info.Intf.Nonalias.Kind
 
 module Consistbl : module type of struct
-  include Consistbl.Make (Compilation_unit.Name) (Consistbl_data)
+  include Consistbl.Make (Compilation_unit_intf) (Consistbl_data)
 end
 
 type error =
-  | Illegal_renaming of Compilation_unit.Name.t * Compilation_unit.Name.t * filepath
-  | Inconsistent_import of Compilation_unit.Name.t * filepath * filepath
-  | Need_recursive_types of Compilation_unit.Name.t
-  | Inconsistent_package_declaration_between_imports of
-      filepath * Compilation_unit.t * Compilation_unit.t
+  | Illegal_renaming of CUI.t * CUI.t * filepath
+  | Inconsistent_import of CUI.t * filepath * filepath
+  | Need_recursive_types of CUI.t
   | Direct_reference_from_wrong_package of
       Compilation_unit.t * filepath * Compilation_unit.Prefix.t
   | Illegal_import_of_parameter of Global_module.Name.t * filepath
@@ -37,7 +37,7 @@ type error =
         parameter : Global_module.Parameter_name.t;
       }
   | Imported_module_has_no_such_parameter of
-      { imported : Compilation_unit.Name.t;
+      { imported : CUI.t;
         valid_parameters : Global_module.Parameter_name.t list;
         parameter : Global_module.Parameter_name.t;
         value : Global_module.Name.t;
@@ -73,7 +73,7 @@ module Persistent_signature : sig
       the .cmi file in the load path. This function can be overridden to load
       it from memory, for instance to build a self-contained toplevel. *)
   val load :
-    (allow_hidden:bool -> unit_name:Compilation_unit.Name.t -> t option) ref
+    (allow_hidden:bool -> unit_name:CUI.t -> t option) ref
 end
 
 type can_load_cmis =
@@ -129,7 +129,7 @@ val read_cmi_file :
     would impose typing constraints between it and the current
     persistent module, such as the "parameter subset rule". *)
 val find_import :
-  'a t -> Compilation_unit.Name.t ->
+  'a t -> CUI.t ->
   Compilation_unit.t option
   * Global_module.Parameter_name.t list
   * Signature_with_global_bindings.t
@@ -157,13 +157,14 @@ val is_parameter_import : 'a t -> Global_module.Name.t -> bool
    [penv] (it may have failed) *)
 val looked_up : 'a t -> Global_module.Name.t -> bool
 
-(* [is_imported_opaque penv md] checks if [md] has been imported
-   in [penv] as an opaque module *)
-val is_imported_opaque : 'a t -> Compilation_unit.Name.t -> bool
+(* [is_opaque_impl penv cu] checks if the interface implemented by
+   [cu] (as recorded in its cmi) has been imported in [penv] as an opaque
+   module *)
+val is_opaque_impl : 'a t -> Compilation_unit.t -> bool
 
-(* [register_import_as_opaque penv md] registers [md] in [penv] as an
-   opaque module *)
-val register_import_as_opaque : 'a t -> Compilation_unit.Name.t -> unit
+(* [register_impl_as_opaque penv cu] registers the interface implemented by
+   [cu] in [penv] as an opaque module *)
+val register_impl_as_opaque : 'a t -> Compilation_unit.t -> unit
 
 (* [implemented_parameter penv md] returns the argument to [-as-argument-for]
    that [md] was compiled with. *)
@@ -181,7 +182,7 @@ val global_of_global_name : 'a t
 val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 
 val make_cmi : 'a t
-  -> Compilation_unit.Name.t
+  -> CUI.t
   -> Cmi_format.kind
   -> Subst.Lazy.signature * Mode.Staticity.Const.t
   -> alerts
@@ -204,16 +205,16 @@ val imports : 'a t -> Import_info.Intf.t list
 
 (* Require that the provided interface will be available at quotation
    compile time. *)
-val require_intf_for_quote: 'a t -> Compilation_unit.Name.t -> unit
+val require_intf_for_quote: 'a t -> CUI.t -> unit
 
 (* Return the set of interfaces referenced by quotes *)
-val quoted_intfs: 'a t -> Compilation_unit.Name.Set.t
+val quoted_intfs: 'a t -> CUI.Set.t
 
 (* Compute the transitive closure of the dependencies of these interfaces that
    have been loaded by typing. Always includes the input interfaces. *)
 val loaded_transitive_dependencies : 'a t
-  -> Compilation_unit.Name.Set.t
-  -> Compilation_unit.Name.Set.t
+  -> CUI.Set.t
+  -> CUI.Set.t
 
 (* Require that the provided implementation will be available at quotation
    compile time. *)
@@ -248,9 +249,17 @@ val is_imported_parameter : 'a t -> Global_module.Name.t -> bool
    parameters of the module but will not appear in [imports]. *)
 val parameters : 'a t -> Global_module.Parameter_name.t list
 
+<<<<<<< Merlin:attach-cmi-path
 (* Return the CRC of the interface of the given compilation unit *)
 val crc_of_unit: 'a t
   -> Compilation_unit.Name.t -> Digest.t
+||||||| Compiler:last-imported
+(* Return the CRC of the interface of the given compilation unit *)
+val crc_of_unit: 'a t -> Compilation_unit.Name.t -> Digest.t
+=======
+(* Return the CRC of the given interface *)
+val crc_of_unit: 'a t -> CUI.t -> Digest.t
+>>>>>>> Compiler:HEAD
 
 (* Forward declaration to break mutual recursion with Typecore. *)
 val add_delayed_check_forward: ((unit -> unit) -> unit) ref

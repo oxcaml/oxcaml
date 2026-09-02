@@ -20,6 +20,10 @@ val get_cu : unit -> Compilation_unit.t option
 val get_cu_or_dummy : unit -> Compilation_unit.t
 val get_cu_exn : unit -> Compilation_unit.t
 val is_current : Compilation_unit.t -> bool
+
+(** Whether the given interface is the one implemented by the unit currently
+    being compiled. *)
+val is_intf : Compilation_unit_intf.t -> bool
 val set : Unit_info.t -> unit
 val unset : unit -> unit
 
