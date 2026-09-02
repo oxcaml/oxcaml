@@ -52,20 +52,24 @@
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
     [_CamlU3FooM3BarF3baz]. *)
 
+(** A source location. *)
+type location =
+  | Unknown  (** A dummy position without a filename ([Location.none]) *)
+  | File of string  (** Only the filename *)
+  | Offset of string * int  (** File and character offset ([pos_cnum]) *)
+  | Location of string * int * int  (** File, line and column *)
+
 (** A path item represents a single lexical scope in the mangling path. *)
 type 'cu path_item =
   | Compilation_unit of 'cu  (** A compilation unit (file) *)
   | Inline_marker
       (** A separator (between destination and source) to track inlining *)
   | Module of string  (** A named module *)
-  | Anonymous_module of int * int * string option
-      (** [struct ... end] at (line, col, file) *)
+  | Anonymous_module of location  (** [struct ... end] at a location *)
   | Class of string  (** A class definition *)
   | Function of string  (** A named function *)
-  | Anonymous_function of int * int * string option
-      (** [fun ... -> ...] at (line, col, file) *)
-  | Partial_function of int * int * string option
-      (** A partial application at (line, col, file) *)
+  | Anonymous_function of location  (** [fun ... -> ...] at a location *)
+  | Partial_function of location  (** A partial application at a location *)
 
 (* CR sspies: Support for lazy expressions (they do not appear in the mangling
    path at all) and object methods (they appear as regular functions) is still
