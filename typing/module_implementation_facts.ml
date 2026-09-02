@@ -117,8 +117,7 @@ module Node = struct
     | Uid left, Uid right -> Uid.compare left right
     | Uid _, (Whole_unit _ | Location _) -> -1
     | Whole_unit _, Uid _ -> 1
-    | Whole_unit left, Whole_unit right ->
-      Compilation_unit.compare left right
+    | Whole_unit left, Whole_unit right -> Compilation_unit.compare left right
     | Whole_unit _, Location _ -> -1
     | Location _, (Uid _ | Whole_unit _) -> 1
     | Location (u1, l1), Location (u2, l2) ->
@@ -684,11 +683,10 @@ let facts_of_tree compilation_unit artifact iterate =
     let path = normalize_module_path env path in
     match Env.find_module_address path env with
     | Env.Aunit (unit_, _) -> Node.Whole_unit unit_
-    | Env.Alocal _ | Env.Adot _ | exception Not_found -> (
+    | Env.Alocal _ | Env.Adot _ | (exception Not_found) -> (
       match find_module env path with
       | Some declaration -> Node.Uid declaration.Types.md_uid
-      | None -> Node.Location (compilation_unit, loc)
-    )
+      | None -> Node.Location (compilation_unit, loc))
   in
   let rec context_of_path_inner ~site env (path : Path.t) : Context.t option =
     match persistent_unit_uid path with
@@ -909,11 +907,16 @@ let facts_of_tree compilation_unit artifact iterate =
         match expectation with
         | Some parameter_uid -> Some (instance_scoped parameter_uid)
         | None ->
-          List.iter
-            (fun source ->
-              add_omission ~affected:None ~source:(Some source)
-                Omission.Reason.Missing_parameter_expectation)
-            (named_modtype_uids env parameter_type);
+          (match named_modtype_uids env parameter_type with
+          | [] ->
+            add_omission ~affected:None ~source:None
+              Omission.Reason.Missing_parameter_expectation
+          | sources ->
+            List.iter
+              (fun source ->
+                add_omission ~affected:None ~source:(Some source)
+                  Omission.Reason.Missing_parameter_expectation)
+              sources);
           None)
     in
     match derived with
@@ -922,7 +925,8 @@ let facts_of_tree compilation_unit artifact iterate =
     | None -> ()
   and record_path_application ~site env functor_path argument_path =
     match find_normalized_module env functor_path with
-    | None -> ()
+    | None ->
+      add_omission ~affected:None ~source:None Omission.Reason.Unresolved_module
     | Some functor_declaration -> (
       match Mtype.scrape_alias env functor_declaration.Types.md_type with
       | Mty_functor (Named (_, parameter_type, expectation, _), _, _) ->
@@ -1582,6 +1586,41 @@ let facts_of_tree compilation_unit artifact iterate =
             report_projected_longident_applications ~site:lid.loc
               pattern.pat_env lid.txt
           | _ -> ());
+          (let unpacked =
+             List.exists
+               (fun (extra, _, _) ->
+                 match (extra : pat_extra) with
+                 | Tpat_unpack -> true
+                 | Tpat_constraint _ | Tpat_type _ | Tpat_open _
+                 | Tpat_inspected_type _ ->
+                   false)
+               pattern.pat_extra
+           in
+           if unpacked
+           then
+             List.iter
+               (fun (extra, _, _) ->
+                 match (extra : pat_extra) with
+                 | Tpat_constraint (Some core_type, _) -> (
+                   match core_type.ctyp_desc with
+                   | Ttyp_package { tpt_path = path; _ } -> (
+                     match
+                       key_of_modtype_path ~site:core_type.ctyp_loc
+                         core_type.ctyp_env path
+                     with
+                     | Some expectation ->
+                       add_check
+                         (Node.Location (compilation_unit, pattern.pat_loc))
+                         expectation Check.Kind.Package pattern.pat_loc
+                     | None ->
+                       add_omission ~affected:None ~source:None
+                         Omission.Reason.Unresolved_module_type)
+                   | _ -> ())
+                 | Tpat_constraint (None, _)
+                 | Tpat_unpack | Tpat_type _ | Tpat_open _
+                 | Tpat_inspected_type _ ->
+                   ())
+               pattern.pat_extra);
           Tast_iterator.default_iterator.pat iterator pattern);
       class_expr =
         (fun iterator class_expr ->
@@ -1613,11 +1652,12 @@ let facts_of_tree compilation_unit artifact iterate =
               expression.exp_env lid.txt
           | _ -> ());
           match expression.exp_desc with
-          | Texp_letmodule { id = Some _; uid; module_expr; _ } ->
+          | Texp_letmodule { id; uid; module_expr; body; _ } ->
             record_module_context uid (Context.Proj (enclosing_context (), uid));
-            add_binding uid module_expr;
+            (match id with None -> () | Some _ -> add_binding uid module_expr);
             with_enclosing (functor_body_context uid module_expr) (fun () ->
-                Tast_iterator.default_iterator.expr iterator expression)
+                iterator.module_expr iterator module_expr);
+            iterator.expr iterator body
           | _ -> Tast_iterator.default_iterator.expr iterator expression);
       module_expr =
         (fun iterator module_expr ->
@@ -1734,9 +1774,20 @@ let facts_of_tree compilation_unit artifact iterate =
           add_dependency ~derived:(Key.Anon declaration.md_uid)
             ~source:(key_of_module_type declaration.md_type)
             Dependency.Reason.Interface;
-          with_enclosing
-            (Context.Proj (enclosing_context (), declaration.md_uid))
-            (fun () ->
+          let rec declares_functor (module_type : module_type) =
+            match module_type.mty_desc with
+            | Tmty_functor _ -> true
+            | Tmty_with (inner, _) | Tmty_strengthen (inner, _, _) ->
+              declares_functor inner
+            | Tmty_ident _ | Tmty_signature _ | Tmty_typeof _ | Tmty_alias _ ->
+              false
+          in
+          let members_context =
+            if declares_functor declaration.md_type
+            then Context.Body declaration.md_uid
+            else Context.Proj (enclosing_context (), declaration.md_uid)
+          in
+          with_enclosing members_context (fun () ->
               Tast_iterator.default_iterator.module_declaration iterator
                 declaration));
       module_type_declaration =
@@ -1947,29 +1998,32 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
   let unit_uid = Uid.of_compilation_unit_id compilation_unit in
   List.iter
     (fun (~impl, ~intf) ->
-       Builder.add_check facts
-         (interface_check
-            ~impl:(Node.Uid impl)
-            ~expectation:intf))
+      Builder.add_check facts
+        (interface_check ~impl:(Node.Uid impl) ~expectation:intf))
     module_pairs;
   if unit_interface_check
   then
     Builder.add_check facts
-      (interface_check
-         ~impl:(Node.Whole_unit compilation_unit)
+      (interface_check ~impl:(Node.Whole_unit compilation_unit)
          ~expectation:unit_uid);
   Option.iter
     (fun expectation ->
-       Builder.add_check facts
-         (interface_check
-            ~impl:(Node.Whole_unit compilation_unit)
-            ~expectation))
+      Builder.add_check facts
+        (interface_check ~impl:(Node.Whole_unit compilation_unit) ~expectation))
     argument_interface;
   let interface_uid_of_impl =
     let table =
       List.fold_left
         (fun table (~impl, ~intf) -> Uid.Map.add impl intf table)
         Uid.Map.empty module_pairs
+    in
+    fun uid -> Uid.Map.find_opt uid table
+  in
+  let interface_uid_of_modtype_impl =
+    let table =
+      List.fold_left
+        (fun table (~impl, ~intf) -> Uid.Map.add impl intf table)
+        Uid.Map.empty modtype_pairs
     in
     fun uid -> Uid.Map.find_opt uid table
   in
@@ -1980,7 +2034,15 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
       match interface_uid_of_impl uid, translate_context inner with
       | Some interface, Some inner -> Some (Context.Proj (inner, interface))
       | (Some _ | None), _ -> None)
-    | Context.App _ | Context.Body _ | Context.Site _ -> None
+    | Context.Body uid -> (
+      match
+        match interface_uid_of_modtype_impl uid with
+        | Some _ as interface -> interface
+        | None -> interface_uid_of_impl uid
+      with
+      | Some interface -> Some (Context.Body interface)
+      | None -> None)
+    | Context.App _ | Context.Site _ -> None
   in
   List.iter
     (fun (~impl, ~intf) ->
@@ -2012,8 +2074,22 @@ let of_interface compilation_unit ~argument_interface signature =
   Option.iter
     (fun expectation ->
       Builder.add_check facts
-        (interface_check
-           ~impl:(Node.Whole_unit compilation_unit)
-           ~expectation))
+        (interface_check ~impl:(Node.Whole_unit compilation_unit) ~expectation))
     argument_interface;
+  Builder.freeze facts
+
+let of_pack compilation_unit ~module_pairs ~unit_interface_check =
+  let facts, (_ : Uid.t -> Context.t option) =
+    facts_of_tree compilation_unit Artifact.Implementation (fun _ -> ())
+  in
+  List.iter
+    (fun (~impl, ~intf) ->
+      Builder.add_check facts
+        (interface_check ~impl:(Node.Uid impl) ~expectation:intf))
+    module_pairs;
+  if unit_interface_check
+  then
+    Builder.add_check facts
+      (interface_check ~impl:(Node.Whole_unit compilation_unit)
+         ~expectation:(Uid.of_compilation_unit_id compilation_unit));
   Builder.freeze facts

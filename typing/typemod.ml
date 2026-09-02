@@ -4568,10 +4568,34 @@ let check_argument_type_if_given env sourcefile ~actual_staticity actual_sig
 let module_implementation_facts ~unit_interface ~argument_interface
     compilation_unit (annots : Cmt_format.binary_annots)
     declaration_dependencies =
+  let current_comp_unit =
+    Compilation_unit.full_path_as_string compilation_unit
+  in
+  (* Only this unit's own [.mli] items: an annotation can mention a module
+     type from another unit's interface. *)
+  let is_interface_item (uid : Uid.t) =
+    match uid with
+    | Item { comp_unit; from = Unit_info.Intf; _ } ->
+      String.equal comp_unit current_comp_unit
+    | Compilation_unit _ | Item _ | Internal | Predef _
+    | Unboxed_version _ -> false
+  in
   match annots with
-  | Cmt_format.Packed _ | Partial_implementation _ | Partial_interface _
-  | Functorize ->
+  | Cmt_format.Partial_implementation _ | Partial_interface _ | Functorize ->
     None
+  | Packed _ ->
+    let module_pairs =
+      List.filter_map
+        (fun (kind, impl, intf) ->
+          match (kind : Cmt_format.dependency_kind) with
+          | Definition_to_declaration when is_interface_item intf ->
+            Some (~impl, ~intf)
+          | Definition_to_declaration | Declaration_to_declaration -> None)
+        declaration_dependencies
+    in
+    Some
+      (Module_implementation_facts.of_pack compilation_unit ~module_pairs
+         ~unit_interface_check:unit_interface)
   | Interface signature ->
     let argument_interface =
       Option.map
@@ -4595,23 +4619,11 @@ let module_implementation_facts ~unit_interface ~argument_interface
         | Extension_constructor _ | Label _ | Module_substitution _ | Class _
         | Class_type _ | Jkind _ ->
           ());
-    let current_comp_unit =
-      Compilation_unit.full_path_as_string compilation_unit
-    in
-    (* Only this unit's own [.mli] items: an annotation can mention a module
-       type from another unit's interface. *)
-    let is_interface_item (uid : Uid.t) =
-      match uid with
-      | Item { comp_unit; from = Unit_info.Intf; _ } ->
-        String.equal comp_unit current_comp_unit
-      | Compilation_unit _ | Item _ | Internal | Predef _
-      | Unboxed_version _ -> false
-    in
     let interface_pairs uids =
       List.filter_map
         (fun (kind, impl, intf) ->
           match (kind : Cmt_format.dependency_kind) with
-          | Definition_to_declaration
+          | Definition_to_declaration | Declaration_to_declaration
             when Uid.Set.mem impl uids
                  && is_interface_item intf ->
             Some (~impl, ~intf)
