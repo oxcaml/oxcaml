@@ -55,7 +55,7 @@ struct
   let try_load ~unit_name () =
     match
       Hashtbl.find_opt Loaded_shapes.shapes
-        (Compilation_unit.of_string unit_name)
+        (Compilation_unit.of_string_unsafe unit_name)
     with
     | Some shape ->
       Log.debug "Used loaded shape for %s" unit_name;

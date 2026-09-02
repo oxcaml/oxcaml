@@ -5739,13 +5739,14 @@ let () =
 
 let check_state_consistency () =
   let missing modname =
-    let modname_as_string = Compilation_unit.Name.to_string modname in
+    let modname_as_string = Compilation_unit_intf.to_string modname in
     match Load_path.find_normalized (modname_as_string ^ ".cmi") with
     | _ -> false
     | exception Not_found -> true
   and found _modname filename ps_name =
     match Cmi_cache.get_cached_entry filename with
-    | cmi_infos -> Compilation_unit.Name.equal ps_name cmi_infos.Cmi_format.cmi_name
+    | cmi_infos ->
+      Compilation_unit_intf.equal ps_name cmi_infos.Cmi_format.cmi_name
     | exception Not_found -> false
   in
   Persistent_env.forall ~found ~missing !persistent_env

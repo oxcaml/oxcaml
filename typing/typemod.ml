@@ -4784,7 +4784,7 @@ let cms_register_toplevel_signature_attributes ~sourcefile ~uid ast =
         | { psig_desc = Psig_attribute attr; _ } -> Some attr
         | _ -> None)
 
-let type_interface ~sourcefile modulename env ast =
+let type_interface ~sourcefile ~intf modulename env ast =
   let error e =
     raise (Error (Location.none, Env.empty, e))
   in
@@ -4795,7 +4795,7 @@ let type_interface ~sourcefile modulename env ast =
     error Compiling_as_parameterised_parameter
   end;
   if !Clflags.binary_annotations_cms then begin
-    let uid = Shape.Uid.of_compilation_unit_id modulename in
+    let uid = Shape.Uid.of_compilation_unit_intf intf in
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
   let sg = transl_signature ~interface_toplevel:true env ast in
