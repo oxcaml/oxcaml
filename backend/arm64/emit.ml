@@ -2212,7 +2212,7 @@ let fundecl fundecl =
       ~num_stack_slots:fundecl.fun_num_stack_slots
       ~prologue_required:fundecl.fun_prologue_required
       ~contains_calls:fundecl.fun_contains_calls ~function_name:fundecl.fun_name
-      ~is_unloadable:false
+      ~is_unloadable:fundecl.fun_unloadable
       ~tailrec_entry_point:
         (Option.map
            (label_to_asm_label ~section:Text)
@@ -2221,6 +2221,14 @@ let fundecl fundecl =
   emit_named_text_section (Env.function_name env);
   let fun_sym = S.create_global fundecl.fun_name in
   D.align ~fill:Nop ~bytes:8;
+  if fundecl.fun_unloadable
+  then
+    (* Back-pointer at [entry - 1]: a machine-width word holding the address of
+       this function's Code_block. Read-only at runtime (lives in .text); used
+       by the GC mark phase F.1/F.2 to darken the Code_block when an unloadable
+       closure or return-address is reached. *)
+    D.symbol
+      (S.create_global (Cmm_helpers.code_block_symbol_name fundecl.fun_name));
   global_maybe_protected fun_sym;
   D.type_symbol ~ty:Function fun_sym;
   (* Define both a symbol and a label so the function can be referenced either

@@ -605,6 +605,9 @@ type codegen_option =
   | Use_regalloc of Clflags.Register_allocator.t
   | Use_regalloc_param of string list
   | Cold
+  | Unloadable
+      (** This function lives in an unloadable compilation unit; frames need
+          their UNLOADABLE bit set, etc. *)
   | Assume_zero_alloc of
       { strict : bool;
         never_returns_normally : bool;

@@ -33,7 +33,7 @@ type t =
            the given tag, via [Cmm_helpers.atom_symbol]. Exported ones
            additionally keep a definition, referenced only from other units, so
            cross-unit references still link (see [static_const0]). *)
-    code_dep_symbols : Symbol.Set.t Code_id.Map.t
+    code_dep_symbols : Symbol.Set.t Code_id.Map.t;
         (* Symbols of static data invented during Cmm translation of a
            function's body (e.g. sets of closures lifted by To_cmm itself),
            keyed by that function's code ID. Such symbols postdate
@@ -41,6 +41,10 @@ type t =
            [Code.free_names_of_params_and_body]; consumers needing the full
            dependencies of a function's generated code must take them into
            account. *)
+    atom_loader_aliased_symbols : String.Set.t
+        (* For unloadable compilation units: exported symbols that the JIT
+           loader binds to runtime atoms instead of the unit defining them; see
+           [Cmm_helpers.register_atom_aliased_symbol]. *)
   }
 
 let create ~module_symbol ~reachable_names =
@@ -54,7 +58,8 @@ let create ~module_symbol ~reachable_names =
     module_symbol_defined = false;
     invalid_message_symbols = String.Map.empty;
     atom_redirected_symbols = String.Map.empty;
-    code_dep_symbols = Code_id.Map.empty
+    code_dep_symbols = Code_id.Map.empty;
+    atom_loader_aliased_symbols = String.Set.empty
   }
 
 let redirect_symbol_to_atom t symbol ~tag =
@@ -73,6 +78,20 @@ let symbol_is_redirected_to_atom t symbol =
   String.Map.mem
     (Linkage_name.to_string (Symbol.linkage_name symbol))
     t.atom_redirected_symbols
+
+let alias_symbol_to_atom t symbol ~tag =
+  let sym_name = Linkage_name.to_string (Symbol.linkage_name symbol) in
+  C.register_atom_aliased_symbol sym_name ~tag;
+  { t with
+    atom_loader_aliased_symbols =
+      String.Set.add sym_name t.atom_loader_aliased_symbols
+  }
+
+let symbol_is_aliased_to_atom t symbol =
+  symbol_is_redirected_to_atom t symbol
+  || String.Set.mem
+       (Linkage_name.to_string (Symbol.linkage_name symbol))
+       t.atom_loader_aliased_symbols
 
 let add_code_dep_symbol t code_id symbol =
   { t with
@@ -208,12 +227,17 @@ type result =
 let define_module_symbol_if_missing r =
   if r.module_symbol_defined
   then r
+  else if !Clflags.unit_is_unloadable
+  then
+    (* A zero-sized module block cannot live in the unit's donated heap-extent
+       region; the JIT loader binds the module symbol to the tag-0 atom. *)
+    alias_symbol_to_atom r r.module_symbol ~tag:0
   else
     let linkage_name =
       Linkage_name.to_string (Symbol.linkage_name r.module_symbol)
     in
     let sym : Cmm.symbol = { sym_name = linkage_name; sym_global = Global } in
-    let l = C.emit_block sym (C.black_block_header 0 0) [] in
+    let l = C.emit_unit_block sym (C.unit_block_header 0 0) [] in
     set_data r l
 
 let add_invalid_message_symbol t symbol ~message =
