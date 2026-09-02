@@ -1775,7 +1775,11 @@ module Basis = struct
     Rev_deps.extend_up_to t.rev_deps t.next_dep;
     List.iter
       (fun { name; depends; alias_depends; _ } ->
-         let index = String_map.find name.Global_module.Name.head t.assignment in
+         let index =
+           String_map.find
+             (Compilation_unit_intf.to_string name.Global_module.Name.head)
+             t.assignment
+         in
          List.iter
            (fun dep_name ->
               let dep_index = String_map.find dep_name t.assignment in
@@ -1792,7 +1796,11 @@ module Basis = struct
     let components =
       List.map
         (fun { name; desc; visibility=load_visibility; deprecated; _ } ->
-           let index = String_map.find name.Global_module.Name.head t.assignment in
+           let index =
+           String_map.find
+             (Compilation_unit_intf.to_string name.Global_module.Name.head)
+             t.assignment
+         in
            let origin = Origin.Dependency index in
            let id = Ident.global name in
            let component_visibility : Desc.visibility =
@@ -1808,7 +1816,10 @@ module Basis = struct
         (fun name acc ->
            let index = String_map.find name t.assignment in
            let origin = Origin.Dependency index in
-           let name = Global_module.Name.create_no_args name in
+           let name =
+             Global_module.Name.create_no_args
+               (Compilation_unit_intf.of_string name)
+           in
            let id = Ident.global name in
            Component.Declare_module(origin, id) :: acc)
         additions

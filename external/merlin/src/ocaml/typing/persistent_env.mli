@@ -249,17 +249,8 @@ val is_imported_parameter : 'a t -> Global_module.Name.t -> bool
    parameters of the module but will not appear in [imports]. *)
 val parameters : 'a t -> Global_module.Parameter_name.t list
 
-<<<<<<< Merlin:attach-cmi-path
-(* Return the CRC of the interface of the given compilation unit *)
-val crc_of_unit: 'a t
-  -> Compilation_unit.Name.t -> Digest.t
-||||||| Compiler:last-imported
-(* Return the CRC of the interface of the given compilation unit *)
-val crc_of_unit: 'a t -> Compilation_unit.Name.t -> Digest.t
-=======
 (* Return the CRC of the given interface *)
 val crc_of_unit: 'a t -> CUI.t -> Digest.t
->>>>>>> Compiler:HEAD
 
 (* Forward declaration to break mutual recursion with Typecore. *)
 val add_delayed_check_forward: ((unit -> unit) -> unit) ref
@@ -268,6 +259,6 @@ val add_delayed_check_forward: ((unit -> unit) -> unit) ref
 val with_cmis : 'a t -> ('b -> 'c) -> 'b -> 'c
 
 val forall :
-  found:(Compilation_unit.Name.t -> filepath -> Compilation_unit.Name.t -> bool) ->
-  missing:(Compilation_unit.Name.t -> bool) ->
+  found:(CUI.t -> filepath -> CUI.t -> bool) ->
+  missing:(CUI.t -> bool) ->
   'a t -> bool

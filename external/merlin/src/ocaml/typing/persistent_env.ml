@@ -331,8 +331,7 @@ let register_pers_for_short_paths penv modname ps components =
   in
   let depends, alias_depends =
     List.fold_left
-      (fun (deps, alias_deps) (name, digest) ->
-         let name_as_string = Compilation_unit.Name.to_string name in
+      (fun (deps, alias_deps) (name_as_string, digest) ->
          Short_paths.Basis.add (short_paths_basis penv) name_as_string;
          match digest with
          | None -> deps, name_as_string :: alias_deps
@@ -962,16 +961,9 @@ let describe_prefix ppf prefix =
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
 (* Emits a warning if there is no valid cmi for name *)
-<<<<<<< Merlin:attach-cmi-path
-let check_pers_struct ~allow_hidden penv f1 f2 ~loc name =
-  let name_as_string = CU.Name.to_string (CU.Name.of_head_of_global_name name) in
-||||||| Compiler:last-imported
-let check_pers_struct ~allow_hidden penv f ~loc name =
-  let name_as_string = CU.Name.to_string (CU.Name.of_head_of_global_name name) in
-=======
-let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
+let check_pers_struct ~allow_hidden penv f1 f2 ~loc
+    (name : Global_module.Name.t) =
   let name_as_string = CUI.to_string name.head in
->>>>>>> Compiler:HEAD
   try
     ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
               ~allow_excess_args:true)
