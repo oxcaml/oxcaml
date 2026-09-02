@@ -44,7 +44,7 @@ jobs:
           ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
           opam-repositories: |
             local: file://${{ github.workspace }}/tools/ci/local-opam
-            default: https://github.com/ocaml/opam-repository.git
+            default: https://opam.ocaml.org
           opam-disable-sandboxing: true
           opam-pin: false
 
