@@ -91,6 +91,17 @@ Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
 type t : bits8 addressable & bits16 addressable
 |}]
 
+type t : (any mod portable) addressable addressable
+[%%expect{|
+Line 1, characters 40-51:
+1 | type t : (any mod portable) addressable addressable
+                                            ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "any mod portable addressable".
+
+type t : any mod portable addressable
+|}]
+
 (**** Equalities: [k addressable = k] for addressable [k] ****)
 
 module M : sig
