@@ -114,6 +114,8 @@ module Sort : sig
       possibly under [Addressable] wrappers *)
   val is_scannable_or_var : t -> bool
 
+  val crosses_externality : t -> bool
+
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
   *)
@@ -220,6 +222,8 @@ module Layout : sig
     val max : t
 
     val get_sort : t -> Sort.Const.t option
+
+    val crosses_externality : t -> bool
 
     val is_surely_addressable : t -> bool
 

@@ -128,6 +128,12 @@ module Sort = struct
     | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
       false
 
+  let base_crosses_externality = function
+    | Scannable -> false
+    | Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask ->
+      true
+
   (* Global association list mapping poly vars to names for printing *)
   let sort_poly_var_names : (var * string) list ref = ref []
 
@@ -919,6 +925,15 @@ module Sort = struct
     in
     go (get s)
 
+  let crosses_externality s =
+    let rec go = function
+      | Base b -> base_crosses_externality b
+      | Var _ | Univar _ -> false
+      | Product ts -> List.for_all go ts
+      | Addressable s -> go s
+    in
+    go (get s)
+
   (***********************)
   (* equality *)
 
@@ -1266,6 +1281,12 @@ module Layout = struct
       | Genvar v -> Some (Sort.Const.Genvar v)
       | Addressable t -> Option.map Sort.Const.addressable (get_sort t)
       | Box _ -> Sort.Const.some (Base Scannable)
+
+    let rec crosses_externality = function
+      | Any _ | Univar _ | Genvar _ | Box _ -> false
+      | Base (b, _) -> Sort.base_crosses_externality b
+      | Product ts -> List.for_all crosses_externality ts
+      | Addressable t -> crosses_externality t
 
     let rec is_surely_addressable = function
       | Base (b, _) -> Sort.base_is_addressable b
