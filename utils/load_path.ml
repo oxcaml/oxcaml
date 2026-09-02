@@ -540,10 +540,14 @@ let find_loading_manifests fn =
   | result -> result
   | exception Not_found -> find_in_pending_manifests ~uncap:false fn
 
-let find_uncap_loading_manifests fn_uncap =
+let find_uncap_loading_manifests ~allow_hidden fn_uncap =
   match Path_cache.find_uncap ~fn_already_uncapped:fn_uncap with
   | result -> result
-  | exception Not_found -> find_in_pending_manifests ~uncap:true fn_uncap
+  | exception Not_found ->
+    (* Pending manifests can only contribute [Hidden] entries, so don't load
+       them for a lookup that cannot use hidden results anyway. *)
+    if allow_hidden then find_in_pending_manifests ~uncap:true fn_uncap
+    else raise Not_found
 
 (* CR-soon zqian: the whole load path (directories and manifests) is re-read
    from disk and the cache rebuilt on every [init], even though the flags they
@@ -645,14 +649,14 @@ let search_dirs dirs fn =
         (Dir.find_normalized dir fn))
     dirs
 
-let find_normalized_with_visibility fn =
+let find_normalized_with_visibility ?(allow_hidden = true) fn =
   assert (not Config.merlin || Local_store.is_bound ());
   match Misc.normalized_unit_filename fn with
   | Error _ -> raise Not_found
   | Ok fn_uncap ->
   try
     if is_basename fn && not !Sys.interactive then
-      find_uncap_loading_manifests fn_uncap
+      find_uncap_loading_manifests ~allow_hidden fn_uncap
     else
       match search_dirs (List.rev !visible_dirs) fn with
       | Some result -> result
