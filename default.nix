@@ -299,6 +299,43 @@ let
     patches = [ ./external/patches/ppxlib-jane-oxcaml.patch ];
   };
 
+  mkExternalLibraries =
+    oxcaml:
+    stdenv.mkDerivation {
+      pname = "oxcaml-external-libs";
+      inherit (oxcaml) version meta;
+      inherit src;
+
+      PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
+      PPXLIB_SEXPLIB0_SRC = sexplib0Src;
+      PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
+      PPXLIB_JANE_SRC = ppxlibJaneSrc;
+
+      nativeBuildInputs = [
+        dune
+        oxcaml
+      ];
+
+      dontConfigure = true;
+
+      buildPhase = ''
+        runHook preBuild
+        make \
+          SHELL="$SHELL" \
+          REQUIRES_CONFIGURATION= \
+          DUNE=${dune}/bin/dune \
+          OXCAML_INSTALL=${oxcaml} \
+          external-libs-build
+        runHook postBuild
+      '';
+
+      installPhase = ''
+        runHook preInstall
+        mkdir "$out"
+        runHook postInstall
+      '';
+    };
+
   gfortran =
     # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
     # directly to `nativeBuildInputs` overrides many `$PATH` entries from
@@ -512,6 +549,7 @@ stdenv.mkDerivation {
       ocaml_5_4_0
       ocamlformat
       lldb
+      mkExternalLibraries
       mkMerlinPackages
       ;
   };
