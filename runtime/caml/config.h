@@ -193,14 +193,33 @@ typedef uint64_t uintnat;
 /* Number of words used in the control structure at the start of a stack
    (must match sizeof(struct stack_info) from fiber.h) */
 #ifdef ARCH_SIXTYFOUR
-#define Stack_ctx_words (11 + 1)
+#define Stack_ctx_words (12 + 1)
 #else
-#define Stack_ctx_words (11 + 2)
+#define Stack_ctx_words (12 + 2)
+#endif
+
+/* Byte offset of the [stack_base] field of struct stack_info (the
+   field is last), for the stack checks emitted by the compiler. */
+#ifdef ARCH_SIXTYFOUR
+#define Stack_base_field_offset (Stack_ctx_words * 8 - 8)
+#else
+#define Stack_base_field_offset (Stack_ctx_words * 4 - 4)
 #endif
 
 /* Whether to use guard pages for fiber stacks */
 #if !defined(USE_MMAP_MAP_STACK) && defined(NATIVE_CODE) && !defined(STACK_CHECKS_ENABLED)
 #define STACK_GUARD_PAGES
+#endif
+
+/* A lower bound on the size of the stack guard page: the smallest page
+   size of any supported target. Frames at least this large could step
+   over the guard page, so the compiler keeps a stack check on them even
+   when stack checks are disabled. (The guard page's actual size and
+   position depend on the run-time page size). */
+#if !defined(STACK_CHECKS_ENABLED) && !defined(USE_MMAP_MAP_STACK)
+#define Stack_guard_size 4096
+#else
+#define Stack_guard_size 0
 #endif
 
 /* Whether to offset Stack_high to preserve alignment. */

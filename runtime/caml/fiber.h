@@ -75,16 +75,20 @@ struct stack_info {
   /* The current dynamic binding node. Either [Val_null], or a block with three
      fields: dynamic key, bound value, and nullable parent node. */
   value dynamic;
+
+  /* The lowest usable stack address, set when the stack memory is
+     created (alloc_for_stack): under guard pages it depends on the
+     run-time page size. Everything else, including the stack checks
+     emitted by the compiler, reads it from here. */
+  value* stack_base;
 };
 
 #ifdef STACK_GUARD_PAGES
-// The OCaml stack starts after the stack_info and guard pages
-#define Stack_base(stk) ((value*)(((char*) (stk)) + 2 * caml_plat_pagesize))
 // We can assume that mmap returns page-aligned addresses.
 #define Protected_stack_page(block) (((char*) (block)) + caml_plat_pagesize)
-#else
-#define Stack_base(stk) ((value*)(stk + 1))
 #endif
+
+#define Stack_base(stk) ((stk)->stack_base)
 
 #define Stack_threshold_ptr(stk) \
   (Stack_base(stk) + Stack_threshold / sizeof(value))

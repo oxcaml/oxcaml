@@ -1224,11 +1224,12 @@ let assembly_code_for_poll env i ~far ~return_label =
 let assembly_code_for_stack_check0 ~far ~max_frame_size_bytes =
   (* This must not use [env], as it is called from [emit_relaxed_instruction] *)
   let sc_label = L.create Text and sc_return = L.create Text in
-  let threshold_offset =
-    (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
-  in
-  let f = max_frame_size_bytes + threshold_offset in
+  let f = max_frame_size_bytes + Stack_check.stack_threshold_size in
+  (* The stack base depends on the run-time page size, so
+     has to be read from the stack_info. *)
   A.ins2 LDR reg_x_tmp1 (H.domainstate_field Domain_current_stack);
+  emit_addimm reg_x_tmp1 reg_x_tmp1 Domainstate.stack_base_field_offset;
+  A.ins2 LDR reg_x_tmp1 (H.mem reg_tmp1_base);
   emit_addimm reg_x_tmp1 reg_x_tmp1 f;
   A.ins_cmp_reg O.sp reg_x_tmp1 O.optional_none;
   if not far

@@ -1320,7 +1320,11 @@ let emit_basic t (i : Cfg.basic Cfg.instruction) =
   match i.desc with
   | Op op -> basic_op t i op
   | Prologue | Epilogue | Reloadretaddr -> () (* LLVM handles these for us *)
-  | Stack_check _ -> fail_msg "unexpected instruction: stack check"
+  | Stack_check _ ->
+    (* Functions which could step over a guard page keep stack checks
+       even when stack checks are disabled *)
+    fail_msg "stack check (frame of %d+ bytes) not supported"
+      Domainstate.stack_guard_size
   | Poptrap { lbl_handler } -> (
     match Label.Tbl.find_opt (get_fun_info t).trap_blocks lbl_handler with
     | None -> fail_msg "unbalanced trap pop"
