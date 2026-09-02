@@ -398,7 +398,7 @@ let prelude :
     List.concat_map cfg.fun_codegen_options ~f:(function
       | Cfg.Use_regalloc_param params -> params
       | Cfg.Reduce_code_size | Cfg.No_CSE | Cfg.Use_linscan_regalloc
-      | Cfg.Use_regalloc _ | Cfg.Cold | Cfg.Assume_zero_alloc _
+      | Cfg.Use_regalloc _ | Cfg.Cold | Cfg.Unloadable | Cfg.Assume_zero_alloc _
       | Cfg.Check_zero_alloc _ ->
         [])
   in

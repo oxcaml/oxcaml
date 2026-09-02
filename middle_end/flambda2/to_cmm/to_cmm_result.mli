@@ -70,6 +70,15 @@ val redirect_symbol_to_atom : t -> Symbol.t -> tag:int -> t
 (** Whether the given symbol may be referenced from outside the unit. *)
 val symbol_is_exported : t -> Symbol.t -> bool
 
+(** For unloadable compilation units: record that the given exported symbol is
+    not defined in the unit's emitted data but instead bound by the JIT loader
+    to the runtime's permanent atom of the given tag. Also registers the symbol
+    with [Cmm_helpers.register_atom_aliased_symbol]. *)
+val alias_symbol_to_atom : t -> Symbol.t -> tag:int -> t
+
+(** Whether the given symbol was redirected or aliased to a runtime atom. *)
+val symbol_is_aliased_to_atom : t -> Symbol.t -> bool
+
 (** Record that [Symbol.t] names a piece of static data invented during Cmm
     translation of the body of the function with the given code ID (e.g. a set
     of closures lifted by To_cmm itself). Such symbols postdate simplification

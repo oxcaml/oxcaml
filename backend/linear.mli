@@ -156,6 +156,7 @@ type fundecl =
     fun_num_stack_slots : int Stack_class.Tbl.t;
     fun_frame_required : bool;
     fun_prologue_required : bool;
+    fun_unloadable : bool;
     fun_section_name : string option;
     fun_phantom_lets :
       (Backend_var.Provenance.t option * phantom_defining_expr)

@@ -299,6 +299,20 @@ let white_closure_header sz = block_header Obj.closure_tag sz
 
 let black_closure_header sz = black_block_header Obj.closure_tag sz
 
+(* CU-appropriate variants. Static data always gets black (NOT_MARKABLE)
+   headers, including for unloadable compilation units: an unloadable unit's
+   static blocks remain invisible to the GC (exactly like AOT static data) while
+   the unit's initialiser runs, and are only donated to the major heap
+   afterwards, by [caml_activate_unloadable_unit] — which forces every block
+   header to the current allocation colour at that point. These aliases mark the
+   emission sites whose blocks end up inside the donated region. *)
+let unit_block_header tag sz = black_block_header tag sz
+
+let unit_mixed_block_header tag sz ~scannable_prefix_len =
+  black_mixed_block_header tag sz ~scannable_prefix_len
+
+let unit_closure_header sz = black_closure_header sz
+
 let local_closure_header sz = local_block_header Obj.closure_tag sz
 
 let infix_header ofs = block_header Obj.infix_tag ofs
@@ -367,6 +381,8 @@ let boxedint64_local_header =
 let boxedintnat_local_header = local_block_header Obj.custom_tag 2
 
 let black_custom_header ~size = black_block_header Obj.custom_tag size
+
+let unit_custom_header ~size = unit_block_header Obj.custom_tag size
 
 let caml_float32_ops = "caml_float32_ops"
 
@@ -4566,11 +4582,90 @@ let emit_block symb white_header cont =
   let black_header = Nativeint.logor white_header caml_black in
   (Cint black_header :: cdefine_symbol symb) @ cont
 
+(* Tracking of (function-entry linkage name) for each unloadable function in the
+   CU. The corresponding [Code_block] linkage name is reconstructed via
+   [code_block_symbol_name].
+
+   File-global state is OK here because compilation is serial (one CU per
+   process); concurrent CU compilation would need this threaded through the
+   to_cmm context. *)
+let unloadable_code_block_entries : string list ref = ref []
+
+let register_unloadable_code_block_entry entry_linkage_name =
+  if !Clflags.unit_is_unloadable
+  then
+    unloadable_code_block_entries
+      := entry_linkage_name :: !unloadable_code_block_entries
+
+let flush_unloadable_code_block_entries () =
+  let r = !unloadable_code_block_entries in
+  unloadable_code_block_entries := [];
+  r
+
+(* The known name of the sentinel array that lists every unloadable function in
+   the CU as (entry_address, code_block_address) pairs. Layout: [count; entry_1;
+   code_block_1; ...; entry_count; code_block_count]. *)
+let unloadable_code_blocks_symbol_basename = "unloadable_code_blocks"
+
+(* The known names (relative to the current compilation unit) of the symbols
+   bracketing the contiguous run of static data blocks in an unloadable CU. The
+   JIT loader passes the delimited region to the runtime, which donates it to
+   the major heap as a heap extent once the unit's initialiser has run
+   ([caml_activate_unloadable_unit]). Every emitted item between the two symbols
+   must be a well-formed block (header word followed by its fields), with no
+   padding in between: the extent machinery walks the region
+   header-by-header. *)
+let unloadable_blocks_start_symbol_basename = "unloadable_blocks_start"
+
+let unloadable_blocks_end_symbol_basename = "unloadable_blocks_end"
+
+(* CU-appropriate emit: currently identical to [emit_block]; the separate name
+   marks the emission sites for static data belonging to the CU under
+   compilation, i.e. blocks that (in unloadable mode) end up inside the
+   [unloadable_blocks_start]/[unloadable_blocks_end] bracket. Zero-wosize blocks
+   must never be emitted into the bracket: the heap-extent free-block encoding
+   stores the freed block's size in its first field, which a zero-wosize block
+   does not have. [To_cmm] instead binds the symbols of would-be zero-sized
+   blocks (empty arrays, the entry function's dependency-free [Code_block], an
+   empty module block) to the runtime's permanent atoms (see
+   [register_atom_aliased_symbol]), and pads any other dependency-free
+   [Code_block] to one field. *)
+let emit_unit_block symb white_header cont = emit_block symb white_header cont
+
 (* The runtime exports one symbol per possible tag, [caml_atom_<tag>], naming
    the *value* of the corresponding permanent zero-sized block (atom): the
    address one word past its header (see runtime/caml/mlvalues.h). *)
 let atom_symbol ~tag : Cmm.symbol =
   { sym_name = Printf.sprintf "caml_atom_%d" tag; sym_global = Global }
+
+let atom_value_data_item ~tag = Cmm.Csymbol_address (atom_symbol ~tag)
+
+(* Symbols of the current (unloadable) compilation unit that are not defined in
+   the unit's emitted data: the JIT loader flushes this list after compiling the
+   unit and binds each symbol to the runtime atom of the given tag in its symbol
+   table, so that references from other units resolve to the permanent atom.
+   Used for exported zero-sized statics and for the entry function's
+   [Code_block], none of which may be emitted into the unit's donated
+   heap-extent region.
+
+   File-global state is OK here because compilation is serial (one CU per
+   process); concurrent CU compilation would need this threaded through the
+   to_cmm context. *)
+let atom_aliased_symbols : (string * int) list ref = ref []
+
+let register_atom_aliased_symbol sym_name ~tag =
+  assert !Clflags.unit_is_unloadable;
+  if
+    not
+      (List.exists
+         (fun (name, _) -> String.equal name sym_name)
+         !atom_aliased_symbols)
+  then atom_aliased_symbols := (sym_name, tag) :: !atom_aliased_symbols
+
+let flush_atom_aliased_symbols () =
+  let r = !atom_aliased_symbols in
+  atom_aliased_symbols := [];
+  r
 
 let emit_string_constant_fields s cont =
   let n = size_int - 1 - (String.length s mod size_int) in
@@ -4594,41 +4689,43 @@ let emit_float32_constant symb f cont =
   (* Here we are relying on the fact that the data section is zero initialized
      by just using [Csingle] and not worrying about the high 64 bits of the
      relevant field. *)
-  emit_block symb boxedfloat32_header
+  emit_unit_block symb boxedfloat32_header
     (Csymbol_address (global_symbol caml_float32_ops) :: Csingle f :: cont)
 
 let emit_float_constant symb f cont =
-  emit_block symb float_header (Cdouble f :: cont)
+  emit_unit_block symb float_header (Cdouble f :: cont)
 
 let emit_string_constant symb s cont =
-  emit_block symb
+  emit_unit_block symb
     (string_header (String.length s))
     (emit_string_constant_fields s cont)
 
 let emit_int32_constant symb n cont =
-  emit_block symb boxedint32_header (emit_boxed_int32_constant_fields n cont)
+  emit_unit_block symb boxedint32_header
+    (emit_boxed_int32_constant_fields n cont)
 
 let emit_int64_constant symb n cont =
-  emit_block symb boxedint64_header (emit_boxed_int64_constant_fields n cont)
+  emit_unit_block symb boxedint64_header
+    (emit_boxed_int64_constant_fields n cont)
 
 let emit_nativeint_constant symb n cont =
-  emit_block symb boxedintnat_header
+  emit_unit_block symb boxedintnat_header
     (emit_boxed_nativeint_constant_fields n cont)
 
 let emit_vec128_constant symb bits cont =
-  emit_block symb boxedvec128_header (Cvec128 bits :: cont)
+  emit_unit_block symb boxedvec128_header (Cvec128 bits :: cont)
 
 let emit_vec256_constant symb bits cont =
-  emit_block symb boxedvec256_header (Cvec256 bits :: cont)
+  emit_unit_block symb boxedvec256_header (Cvec256 bits :: cont)
 
 let emit_vec512_constant symb bits cont =
-  emit_block symb boxedvec512_header (Cvec512 bits :: cont)
+  emit_unit_block symb boxedvec512_header (Cvec512 bits :: cont)
 
 let emit_mask_constant symb bits cont =
   emit_block symb boxedmask_header (Cint (Int64.to_nativeint bits) :: cont)
 
 let emit_float_array_constant symb fields cont =
-  emit_block symb
+  emit_unit_block symb
     (floatarray_header (List.length fields))
     (Misc.map_end (fun f -> Cdouble f) fields cont)
 
@@ -4656,6 +4753,9 @@ let make_symbol ?compilation_unit name =
    dissector's -u linker flags must all agree on this name. *)
 let entry_symbol_name ?compilation_unit () =
   make_symbol ?compilation_unit "entry"
+
+let code_block_symbol_name entry_linkage_name =
+  entry_linkage_name ^ "_code_block"
 
 (* Failure function for closures that should never be called indirectly *)
 

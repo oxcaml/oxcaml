@@ -132,10 +132,19 @@ let add_function env res ~params_and_body code_id p ~result_arity ~fun_dbg
   R.add_function res fundecl
 
 let add_functions env ~params_and_body res (code : Code.t) =
-  add_function env res ~params_and_body (Code.code_id code)
-    (Code.params_and_body code)
-    ~result_arity:(Code.result_arity code) ~fun_dbg:(Code.dbg code)
-    ~zero_alloc_attribute:(Code.zero_alloc_attribute code)
+  let res =
+    add_function env res ~params_and_body (Code.code_id code)
+      (Code.params_and_body code)
+      ~result_arity:(Code.result_arity code) ~fun_dbg:(Code.dbg code)
+      ~zero_alloc_attribute:(Code.zero_alloc_attribute code)
+  in
+  (* Emit a [Code_block] for this function alongside the fundecl. The Code_block
+     must be emitted from this path (rather than later via
+     [Exported_code.iter_code]) because simplification can store the metadata of
+     a rebuilt function as [Metadata_only] in [all_code] while the function body
+     still flows through here via [Static_const_or_code. Code]. *)
+  To_cmm_code_blocks.emit_code_block_for ~all_code:(To_cmm_env.all_code env)
+    code res
 
 let preallocate_set_of_closures (res, updates, env) ~closure_symbols
     set_of_closures =
@@ -239,12 +248,12 @@ let immutable_unboxed_int_array env res updates int_type ~symbol ~elts ~to_int64
     | Nativeint_u -> num_elts, UK.naked_int64s, Tags.unboxed_nativeint_array_tag
   in
   let header =
-    C.black_mixed_block_header tag num_fields ~scannable_prefix_len:0
+    C.unit_mixed_block_header tag num_fields ~scannable_prefix_len:0
   in
   let static_fields =
     immutable_unboxed_int_array_payload int_type num_fields ~elts ~to_int64
   in
-  let block = C.emit_block sym header static_fields in
+  let block = C.emit_unit_block sym header static_fields in
   let env, res, updates =
     static_unboxed_array_updates sym env res updates update_kind 0 elts
   in
@@ -260,7 +269,7 @@ let immutable_unboxed_float32_array env res updates ~symbol ~elts =
     else Tags.unboxed_float32_array_one_tag
   in
   let header =
-    C.black_mixed_block_header tag num_fields ~scannable_prefix_len:0
+    C.unit_mixed_block_header tag num_fields ~scannable_prefix_len:0
   in
   let static_fields =
     (* If the array has odd length, the last 32 bits are implicitly initialized
@@ -273,7 +282,7 @@ let immutable_unboxed_float32_array env res updates ~symbol ~elts =
            Cmm.Csingle (Numeric_types.Float32_by_bit_pattern.to_float f)))
       elts
   in
-  let block = C.emit_block sym header static_fields in
+  let block = C.emit_unit_block sym header static_fields in
   let env, res, updates =
     static_unboxed_array_updates sym env res updates UK.naked_float32s 0 elts
   in
@@ -285,12 +294,12 @@ let immutable_unboxed_vector_array ~default ~to_cmm ~update_kind ~tag
   let num_elts = List.length elts in
   let num_fields = num_elts * words_per_element in
   let header =
-    C.black_mixed_block_header tag num_fields ~scannable_prefix_len:0
+    C.unit_mixed_block_header tag num_fields ~scannable_prefix_len:0
   in
   let static_fields =
     List.map (Or_variable.value_map ~default ~f:to_cmm) elts
   in
-  let block = C.emit_block sym header static_fields in
+  let block = C.emit_unit_block sym header static_fields in
   let env, res, updates =
     static_unboxed_array_updates sym env res updates update_kind 0 elts
   in
@@ -403,13 +412,19 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
       then res
       else
         let tag = Option.get (zero_sized_static_tag static_const) in
-        (* Bypass [R.symbol], which would return the atom symbol. *)
-        let sym : Cmm.symbol =
-          { sym_name = Linkage_name.to_string (Symbol.linkage_name s);
-            sym_global = Global
-          }
-        in
-        R.set_data res (C.emit_block sym (C.black_block_header tag 0) [])
+        if !Clflags.unit_is_unloadable
+        then
+          (* Zero-sized blocks cannot live in the unit's donated heap-extent
+             region; the JIT loader binds the symbol to the atom instead. *)
+          R.alias_symbol_to_atom res s ~tag
+        else
+          (* Bypass [R.symbol], which would return the atom symbol. *)
+          let sym : Cmm.symbol =
+            { sym_name = Linkage_name.to_string (Symbol.linkage_name s);
+              sym_global = Global
+            }
+          in
+          R.set_data res (C.emit_block sym (C.black_block_header tag 0) [])
     in
     env, res, updates
   | Block_like s, Block (tag, mut, shape, fields) ->
@@ -430,16 +445,16 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
       match shape with
       | Value_only ->
         ( List.init num_fields (fun _ -> Flambda_kind.value),
-          C.black_block_header tag num_fields )
+          C.unit_block_header tag num_fields )
       | Mixed_record shape ->
         ( MBS.field_kinds shape |> Array.to_list,
-          C.black_mixed_block_header tag (MBS.size_in_words shape)
+          C.unit_mixed_block_header tag (MBS.size_in_words shape)
             ~scannable_prefix_len:(MBS.value_prefix_size shape) )
     in
     let static_fields =
       Misc.Stdlib.List.concat_map2 (static_field res) fields field_kinds
     in
-    let block = C.emit_block sym header static_fields in
+    let block = C.emit_unit_block sym header static_fields in
     let update_kinds =
       match shape with
       | Value_only -> List.map (fun _ -> UK.pointers) fields
@@ -644,14 +659,14 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     immutable_unboxed_mask_array env res updates ~symbol ~elts
   | Block_like s, Immutable_value_array fields ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 (List.length fields) in
+    let header = C.unit_block_header 0 (List.length fields) in
     let field_kinds =
       List.init (List.length fields) (fun _ -> Flambda_kind.value)
     in
     let static_fields =
       Misc.Stdlib.List.concat_map2 (static_field res) fields field_kinds
     in
-    let block = C.emit_block sym header static_fields in
+    let block = C.emit_unit_block sym header static_fields in
     let update_kinds = List.map (fun _ -> UK.pointers) fields in
     let env, res, updates =
       static_block_updates sym env res updates 0
@@ -663,63 +678,63 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     (* Recall: empty arrays have tag zero, even if their kind is naked float.
        Likewise arrays of unboxed products have tag zero. *)
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_float32s ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_ints ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int8s ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int16s ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int32s ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_int64s ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_nativeints ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec128s ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec256s ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_vec512s ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Empty_array Naked_masks ->
     let sym = R.symbol res s in
-    let header = C.black_block_header 0 0 in
-    let block = C.emit_block sym header [] in
+    let header = C.unit_block_header 0 0 in
+    let block = C.emit_unit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Immutable_string str ->
     let data = C.emit_string_constant (R.symbol res s) str in
