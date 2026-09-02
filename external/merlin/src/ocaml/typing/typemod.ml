@@ -3411,21 +3411,14 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         type_module_maybe_hold_locks ~alias ~hold_locks ~strengthen:true
           ~funct_body anchor env sarg
       in
-<<<<<<< Merlin:sp-import-preview
       begin try
       let (md, final_shape), discourse =
-||||||| Compiler:last-imported
-      let md, final_shape =
-=======
-      let (md, final_shape), discourse =
->>>>>>> Compiler:HEAD
         match smty with
         | None ->
             let arg_mode = Typedtree.mode_without_locks_exn arg.mod_mode in
             Value.submode_err (sarg.pmod_loc, Module) arg_mode mode.mode_modes;
             ({ arg with
               mod_mode = (Mode.Value.disallow_right mode.mode_modes, None)},
-<<<<<<< Merlin:sp-import-preview
             arg_shape), empty_discourse
           | Some smty ->
               let mty, discourse = transl_modtype env smty in
@@ -3456,33 +3449,6 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             Shape.dummy_mod, Discourse_types.empty, None
         | _ -> raise exn
       end
-||||||| Compiler:last-imported
-            arg_shape
-        | Some smty ->
-            let mty = transl_modtype env smty in
-            wrap_constraint_with_shape env true arg mty.mty_type mode.mode_modes
-              arg_shape (Tmodtype_explicit (mty, mode))
-      in
-      { md with
-        mod_loc = smod.pmod_loc;
-        mod_attributes = smod.pmod_attributes;
-      },
-      final_shape
-=======
-            arg_shape), empty_discourse
-        | Some smty ->
-            let mty, discourse = transl_modtype env smty in
-            wrap_constraint_with_shape env true arg mty.mty_type mode.mode_modes
-              arg_shape (Tmodtype_explicit (mty, mode)),
-            discourse
-      in
-      { md with
-        mod_loc = smod.pmod_loc;
-        mod_attributes = smod.pmod_attributes;
-      },
-      final_shape,
-      Discourse_types.union arg_discourse discourse, None
->>>>>>> Compiler:HEAD
   | Pmod_unpack sexp ->
       let mode = Value.newvar () in
       let exp =
@@ -3515,7 +3481,6 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
-<<<<<<< Merlin:sp-import-preview
       Shape.leaf_for_unpack,
       empty_discourse, None
   | Pmod_extension ({ txt; _ }, _) when txt = Ast_helper.hole_txt ->
@@ -3526,12 +3491,6 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
       Shape.dummy_mod, empty_discourse, None
-||||||| Compiler:last-imported
-      Shape.leaf_for_unpack
-=======
-      Shape.leaf_for_unpack,
-      empty_discourse, None
->>>>>>> Compiler:HEAD
   | Pmod_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
   | Pmod_instance glob ->
@@ -3954,7 +3913,6 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
         modl_shape sg ~mode env
     in
     let sg =
-<<<<<<< Merlin:sp-import-preview
       let update_alias =
         match discourse_alias with
         | None -> fun id ->
@@ -3982,35 +3940,6 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
     let () = Discourse.define_signature sg in
     let new_env = Env.update_short_paths new_env in
     let sg =
-||||||| Compiler:last-imported
-=======
-      let update_alias =
-        match discourse_alias with
-        | None -> fun id ->
-              let name = Ident.name id in
-              let lid = { txt = Longident.Lident name;
-                          loc = Location.ghostify modl.mod_loc } in
-              let path = Pident id in
-              Some (lid, (Sig_component_kind.Module, path))
-        | Some (lid, (m, path)) -> fun id ->
-                let name = Ident.name id in
-                let lid = { txt = Longident.Ldot (lid, Location.mknoloc name);
-                            loc = Location.ghostify lid.Location.loc } in
-                let path = Path.Pdot (path, name) in
-                Some (lid, (m, path))
-      in
-      List.map (function
-        | Sig_module (id, pres, decl, rec_status, visibility)
-          when Option.is_none decl.md_discourse_alias ->
-          let md_discourse_alias = update_alias id in
-          let decl = { decl with md_discourse_alias } in
-          Sig_module (id, pres, decl, rec_status, visibility)
-        | sig_item -> sig_item)
-        sg
-    in
-    let () = Discourse.define_signature sg in
-    let sg =
->>>>>>> Compiler:HEAD
       rebase_modalities_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~mode sg
     in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
@@ -4210,13 +4139,8 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
             let id, e = Env.enter_module_declaration
               ~scope ~shape:md_shape name pres md ~mode env
             in
-<<<<<<< Merlin:sp-import-preview
             Discourse.define_module md id;
             let e = Env.update_short_paths e in
-||||||| Compiler:last-imported
-=======
-            Discourse.define_module md id;
->>>>>>> Compiler:HEAD
             Signature_names.check_module names pmb_loc id;
             let pp : Mode.Hint.pinpoint = (modl.mod_loc, Module) in
             let md_modalities =
