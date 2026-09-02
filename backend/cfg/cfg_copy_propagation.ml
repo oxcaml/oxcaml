@@ -1,0 +1,205 @@
+[@@@ocaml.warning "+a-40-41-42"]
+
+open! Int_replace_polymorphic_compare
+module Array = ArrayLabels
+module DLL = Doubly_linked_list
+module Subst = Regalloc_substitution
+
+(* Maximum allowed distance between the indices of the write and of the read
+   (the bound is strict, i.e. with a value of [5] the actual distance can be at
+   most [4]). It is a parameter only to make testing / benchmarking easy. *)
+let max_distance : int Lazy.t =
+  Regalloc_utils.int_of_param ~default:5 "COPY_PROPAGATION_MAX_DISTANCE"
+
+type instr =
+  | Basic of Cfg.basic Cfg.instruction
+  | Terminator of Cfg.terminator Cfg.instruction
+
+(* The uses of a `Reg.t` value; note: does not matter if uses are inside a loop
+   because we only want to apply a substitution to remove `Reg.t` values which
+   are used as short-lived intermediaries between two other `Reg.t` value. *)
+type uses =
+  | One_block of
+      { label : Label.t;
+        reads : int;
+        writes : (instr * int) list;
+        min_index : int;
+        max_index : int
+      }
+  | Multiple_blocks
+
+(* CR-someday xclerc for xclerc: we could save a pass over the CFG by computing
+   a more general notion of uses, to be uses both here and in
+   `Regalloc_utils.collect_cfg_infos`. *)
+let compute_uses : Cfg.t -> uses Reg.Tbl.t * int Reg.Tbl.t Label.Tbl.t =
+ fun cfg ->
+  let uses = Reg.Tbl.create 32 in
+  let last_writes : int Reg.Tbl.t Label.Tbl.t = Label.Tbl.create 32 in
+  let record_uses ~label ~block_last_writes ~instr ~read ~regs ~idx =
+    Array.iter regs ~f:(fun reg ->
+        (* Indices increase over the traversal of the block, so replacing
+           unconditionally keeps the index of the last write. *)
+        if not read then Reg.Tbl.replace block_last_writes reg idx;
+        match Reg.Tbl.find_opt uses reg with
+        | None ->
+          let reads, writes = if read then 1, [] else 0, [instr, idx] in
+          Reg.Tbl.replace uses reg
+            (One_block
+               { label; reads; writes; min_index = idx; max_index = idx })
+        | Some
+            (One_block { label = existing; reads; writes; min_index; max_index })
+          ->
+          if not (Label.equal label existing)
+          then Reg.Tbl.replace uses reg Multiple_blocks
+          else begin
+            let reads, writes =
+              if read then succ reads, writes else reads, (instr, idx) :: writes
+            in
+            let min_index = Int.min min_index idx in
+            let max_index = Int.max max_index idx in
+            Reg.Tbl.replace uses reg
+              (One_block { label; reads; writes; min_index; max_index })
+          end
+        | Some Multiple_blocks -> ())
+  in
+  Cfg.iter_blocks cfg ~f:(fun label block ->
+      let block_last_writes = Reg.Tbl.create 8 in
+      Label.Tbl.replace last_writes label block_last_writes;
+      let record_uses = record_uses ~label ~block_last_writes in
+      let idx =
+        DLL.fold_left block.body ~init:0
+          ~f:(fun idx (instr : Cfg.basic Cfg.instruction) ->
+            let basic = Basic instr in
+            record_uses ~read:true ~instr:basic ~regs:instr.arg ~idx;
+            record_uses ~read:false ~instr:basic ~regs:instr.res ~idx;
+            succ idx)
+      in
+      let term = Terminator block.terminator in
+      record_uses ~read:true ~instr:term ~regs:block.terminator.arg ~idx;
+      record_uses ~read:false ~instr:term ~regs:block.terminator.res ~idx);
+  uses, last_writes
+
+(* Returns whether `reg` is written in the block `label` at an index strictly
+   greater than `index`; conservatively returns `true` if the information is not
+   available. *)
+let written_after :
+    int Reg.Tbl.t Label.Tbl.t -> label:Label.t -> Reg.t -> index:int -> bool =
+ fun last_writes ~label reg ~index ->
+  match Label.Tbl.find_opt last_writes label with
+  | None -> true
+  | Some block_last_writes -> (
+    match Reg.Tbl.find_opt block_last_writes reg with
+    | None -> false
+    | Some last_write -> last_write > index)
+
+let compute_subst :
+    uses Reg.Tbl.t ->
+    int Reg.Tbl.t Label.Tbl.t ->
+    Subst.t * InstructionId.Set.t Label.Tbl.t =
+ fun uses last_writes ->
+  let subst = Reg.Tbl.create 8 in
+  let to_delete = Label.Tbl.create 8 in
+  Reg.Tbl.iter
+    (fun reg use ->
+      match reg.loc, use with
+      | (Reg _ | Stack _), _ -> ()
+      | Unknown, Multiple_blocks -> ()
+      | Unknown, One_block { label; reads; writes; min_index; max_index } ->
+        begin match writes with
+        | [(write, write_index)] ->
+          begin match[@ocaml.warning "-fragile-match"] write with
+          | Basic { id; desc = Op Move; arg; res; _ } ->
+            (* On the compiler distribution (as measured with regalloc.exe),
+               the heuristics below (conditions over the number of reads, the
+               max distance, and the stability of the source) delete about 19%
+               of the move instructions remaining after allocation, for both
+               linscan and greedy, while spills and reloads change by less
+               than 1%. *)
+            (* CR-someday xclerc for xclerc: re-run benchmarks with different
+               heuristics, e.g. by setting the COPY_PROPAGATION_MAX_DISTANCE
+               parameter (the current default is OK for both linscan and
+               greedy, but it looks like we could be a bit more aggressive in
+               terms of distance for greedy - maybe even more once the split
+               part of greedy is implemented). *)
+            (* With a single read and a single write, the two uses are
+               at `min_index` and `max_index`; requiring the write to be
+               strictly below `max_index` hence means that the write precedes
+               the read. This rules out loop-carried moves (in self-looping
+               blocks), whose reads see the value from a previous iteration
+               and can thus not be rewritten to read the source directly. *)
+            if
+              reads = 1 && write_index < max_index
+              && max_index - min_index < Lazy.force max_distance
+              && Reg.is_unknown arg.(0)
+              && Reg.is_unknown res.(0)
+              && (not (Reg.same arg.(0) res.(0)))
+              && Cmm.equal_machtype_component arg.(0).typ res.(0).typ
+              (* The source of the move must not be redefined between the move
+                 and the read, otherwise the rewritten read would see the new
+                 value. We conservatively require that the source has no write
+                 after the move in the whole block: this stronger condition
+                 remains valid when substitutions are composed by
+                 `close_subst`. *)
+              && not
+                   (written_after last_writes ~label arg.(0) ~index:write_index)
+            then begin
+              let instrs_to_delete =
+                match Label.Tbl.find_opt to_delete label with
+                | None -> InstructionId.Set.singleton id
+                | Some existing -> InstructionId.Set.add id existing
+              in
+              Label.Tbl.replace to_delete label instrs_to_delete;
+              Reg.Tbl.replace subst res.(0) arg.(0)
+            end
+          | Basic _ | Terminator _ -> ()
+          end
+        | _ -> ()
+        end)
+    uses;
+  subst, to_delete
+
+(* CR-someday xclerc for xclerc: could be moved to `Regalloc_substitution`. *)
+let close_subst : Subst.t -> Subst.t =
+ fun subst ->
+  let max_chain_length = Reg.Tbl.length subst in
+  let closed = Reg.Tbl.create max_chain_length in
+  Reg.Tbl.iter
+    (fun from to_ ->
+      let rec follow to_ ~chain_length =
+        match Reg.Tbl.find_opt subst to_ with
+        | None -> to_
+        | Some next ->
+          (* An acyclic chain cannot be longer than the substitution itself; a
+             longer one would mean the substitution is cyclic, which
+             `compute_subst` cannot produce since each move's write precedes its
+             read. *)
+          if chain_length >= max_chain_length
+          then
+            Misc.fatal_error
+              "Cfg_copy_propagation.close_subst: cyclic substitution"
+          else follow next ~chain_length:(succ chain_length)
+      in
+      Reg.Tbl.replace closed from (follow to_ ~chain_length:0))
+    subst;
+  closed
+
+let run : Cfg_with_infos.t -> Cfg_with_infos.t =
+ fun cfg_with_infos ->
+  let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  let uses, last_writes = compute_uses cfg in
+  let subst, to_delete = compute_subst uses last_writes in
+  match Reg.Tbl.length subst with
+  | 0 -> cfg_with_infos
+  | _ ->
+    let subst = close_subst subst in
+    Cfg.iter_blocks cfg ~f:(fun label block ->
+        Subst.apply_block_in_place subst block;
+        match Label.Tbl.find_opt to_delete label with
+        | None -> ()
+        | Some ids ->
+          DLL.iter_cell block.body ~f:(fun cell ->
+              let instr = DLL.value cell in
+              if InstructionId.Set.mem instr.Cfg.id ids
+              then DLL.delete_curr cell));
+    Cfg_with_infos.invalidate_liveness cfg_with_infos;
+    cfg_with_infos
