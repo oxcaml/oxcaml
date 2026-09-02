@@ -14,11 +14,13 @@
 (**************************************************************************)
 
 module Layout = Jkind_types.Sort.Const
+module CUI = Compilation_unit_intf
 type base_layout = Jkind_types.Sort.base
 
 module Uid = struct
   type t =
-    | Compilation_unit of string
+    | Compilation_unit of Compilation_unit.t
+    | Compilation_unit_intf of CUI.t
     | Item of { comp_unit: string; id: int; from: Unit_info.intf_or_impl }
     | Internal
     | Predef of string
@@ -29,7 +31,10 @@ module Uid = struct
 
     let rec compare (x : t) y =
       match x, y with
-      | Compilation_unit s1, Compilation_unit s2 -> String.compare s1 s2
+      | Compilation_unit c1, Compilation_unit c2 ->
+        Compilation_unit.compare c1 c2
+      | Compilation_unit_intf i1, Compilation_unit_intf i2 ->
+        CUI.compare i1 i2
       | Item c1, Item c2 ->
         let c = Int.compare c1.id c2.id in
         let c =
@@ -40,13 +45,21 @@ module Uid = struct
       | Predef s1, Predef s2 -> String.compare s1 s2
       | Unboxed_version t1, Unboxed_version t2 -> compare t1 t2
       | Compilation_unit _,
+        (Compilation_unit_intf _ | Item _ | Internal | Predef _
+        | Unboxed_version _) ->
+        -1
+      | Compilation_unit_intf _,
         (Item _ | Internal | Predef _ | Unboxed_version _) ->
         -1
       | Item _, (Internal | Predef _| Unboxed_version _) -> -1
       | Internal, (Predef _ | Unboxed_version _) -> -1
       | Predef _, Unboxed_version _ -> -1
-      | (Item _ | Internal | Predef _ | Unboxed_version _),
+      | (Compilation_unit_intf _ | Item _ | Internal | Predef _
+        | Unboxed_version _),
         Compilation_unit _ ->
+        1
+      | (Item _ | Internal | Predef _ | Unboxed_version _),
+        Compilation_unit_intf _ ->
         1
       | (Internal | Predef _ | Unboxed_version _), Item _ -> 1
       | (Predef _ | Unboxed_version _), Internal -> 1
@@ -63,7 +76,10 @@ module Uid = struct
     let rec print fmt = function
       | Internal -> Format.pp_print_string fmt "<internal>"
       | Predef name -> Format.fprintf fmt "<predef:%s>" name
-      | Compilation_unit s -> Format.pp_print_string fmt s
+      | Compilation_unit cu ->
+          Format.pp_print_string fmt (Compilation_unit.full_path_as_string cu)
+      | Compilation_unit_intf intf ->
+          Format.pp_print_string fmt (CUI.to_string intf)
       | Item { comp_unit; id; from } ->
           Format.fprintf fmt "%a%s.%d" pp_intf_or_impl from comp_unit id
       | Unboxed_version t -> Format.fprintf fmt "%a#" print t
@@ -95,11 +111,9 @@ module Uid = struct
       incr id;
       Item { comp_unit; id = !id; from }
 
-  let of_compilation_unit_id id =
-    Compilation_unit (id |> Compilation_unit.full_path_as_string)
+  let of_compilation_unit_id id = Compilation_unit id
 
-  let of_compilation_unit_name name =
-    Compilation_unit (name |> Compilation_unit.Name.to_string)
+  let of_compilation_unit_intf name = Compilation_unit_intf name
 
   let of_predef_id id =
     if not (Ident.is_predef id) then
@@ -1187,7 +1201,7 @@ let of_path ~find_shape ~namespace path =
   aux namespace path
 
 let for_persistent_unit s =
-  comp_unit ~uid:(Compilation_unit s) s
+  comp_unit ~uid:(Compilation_unit_intf (CUI.of_string s)) s
 
 let leaf_for_unpack = leaf' None
 

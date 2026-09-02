@@ -228,19 +228,19 @@ let value_descriptions_zero_alloc
   | Ok () -> prim_coercion_zero_alloc_check
   | Error e -> raise (Dont_match (Zero_alloc e))
 
-let rec compilation_unit_of_uid = function
-  | Uid.Compilation_unit comp_unit
-  | Uid.Item { comp_unit; _ } ->
-    Some comp_unit
-  | Uid.Unboxed_version uid -> compilation_unit_of_uid uid
-  | Uid.Internal | Uid.Predef _ -> None
-
-let uid_is_from_current_unit uid =
-  match compilation_unit_of_uid uid, Env.get_current_unit () with
-  | Some declared_in, Some current_unit ->
-    String.equal declared_in
-      (Compilation_unit.full_path_as_string (Unit_info.modname current_unit))
-  | None, _ | _, None -> false
+let rec uid_is_from_current_unit = function
+  | Uid.Compilation_unit cu -> Current_unit.is_current cu
+  | Uid.Compilation_unit_intf intf -> Current_unit.is_intf intf
+  | Uid.Item { comp_unit; _ } -> begin
+      match Env.get_current_unit () with
+      | Some current_unit ->
+        String.equal comp_unit
+          (Compilation_unit.full_path_as_string
+             (Unit_info.modname current_unit))
+      | None -> false
+    end
+  | Uid.Unboxed_version uid -> uid_is_from_current_unit uid
+  | Uid.Internal | Uid.Predef _ -> false
 
 let value_descriptions ~loc env name
     ~mmodes

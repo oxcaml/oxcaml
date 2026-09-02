@@ -1,5 +1,8 @@
+module CUI := Compilation_unit_intf
+
 module Parameter_name : sig
-  type t
+  (** A parameter is identified by the name of its interface (.cmi). *)
+  type t = private CUI.t
 
   val of_string : string -> t
 
@@ -26,7 +29,7 @@ end
 
 module Name : sig
   type t = private
-    { head : string;
+    { head : CUI.t;
       args : argument list
     }
 
@@ -36,11 +39,11 @@ module Name : sig
 
   val print : Format_doc.formatter -> t -> unit
 
-  val create : string -> argument list -> (t, t duplicate) Result.t
+  val create : CUI.t -> argument list -> (t, t duplicate) Result.t
 
-  val create_exn : string -> argument list -> t
+  val create_exn : CUI.t -> argument list -> t
 
-  val create_no_args : string -> t
+  val create_no_args : CUI.t -> t
 
   val of_parameter_name : Parameter_name.t -> t
 
@@ -85,7 +88,7 @@ end
     the record [{ head = Y; visible_args = [ X, Foo ]; hidden_args = [] }] of
     type [t].) *)
 type t = private
-  { head : string;
+  { head : CUI.t;
     visible_args : argument list;
     hidden_args : argument list
   }
@@ -95,13 +98,13 @@ and argument = t Argument.t
 include Identifiable.S with type t := t
 
 val create :
-  string ->
+  CUI.t ->
   argument list ->
   hidden_args:Parameter_name.t list ->
   (t, t duplicate) Result.t
 
 val create_exn :
-  string -> argument list -> hidden_args:Parameter_name.t list -> t
+  CUI.t -> argument list -> hidden_args:Parameter_name.t list -> t
 
 val to_string : t -> string
 
