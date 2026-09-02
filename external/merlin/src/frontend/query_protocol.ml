@@ -261,9 +261,7 @@ module Module_type_impls = struct
     }
 
   type response =
-    { targets : target_result list;
-      implementations : implementation list
-    }
+    { targets : target_result list; implementations : implementation list }
 end
 
 type _ t =
@@ -356,7 +354,8 @@ type _ t =
       -> (Location.t * string) t
   | Holes (* *) : (Location.t * string) list t
   | Module_type_impls (* *) :
-      Msource.position option -> Module_type_impls.response t
+      Msource.position option
+      -> Module_type_impls.response t
   | Construct :
       Msource.position * [ `None | `Local ] option * int option
       -> (Location.t * string list) t

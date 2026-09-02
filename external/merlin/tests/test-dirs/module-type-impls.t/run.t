@@ -16,12 +16,12 @@ produced.  Never promote a failure into the expectations.
   >      | .status),
   >     ([.value.implementations[]
   >       | select(($module_type == "") or (.target == $module_type))]
-  >      | unique_by([.start.line,
-  >                   .start.col,
-  >                   .end.line,
-  >                   .end.col,
-  >                   (.name // ""),
-  >                   (.check // .kind // "")])
+  >      | sort_by([.start.line,
+  >                 .start.col,
+  >                 .end.line,
+  >                 .end.col,
+  >                 (.name // ""),
+  >                 (.check // .kind // "")])
   >      | .[]
   >      | [(.name // "<anon>"),
   >         (.start | position),
@@ -94,8 +94,9 @@ shown as [<anon>].
   M 5:7 5:8 annotation
   N 9:7 9:8 annotation
 
-Nested module-type aliases retain their dependency on the top-level [S].  Both
-the module that defines the alias and a module ascribed to it are affected.
+Nested module-type aliases retain their dependency on the top-level [S]: a
+module ascribed to the nested alias implements [S].  The module that merely
+provides the alias as a member does not.
 
   $ impls_of S <<EOF
   > module type S = sig
@@ -115,7 +116,6 @@ the module that defines the alias and a module ascribed to it are affected.
   > end
   > EOF
   complete
-  O 9:7 9:8 annotation
   P 13:7 13:8 annotation
 
 Module-type aliases can form a chain before reaching an implementation.
@@ -233,7 +233,6 @@ member to the replacement module type.
   > end
   > EOF
   complete
-  M 13:7 13:8 annotation
   Value 14:9 14:14 annotation
 
   $ impls_of S <<EOF
@@ -256,7 +255,7 @@ member to the replacement module type.
   > end
   > EOF
   complete
-  M 13:7 13:8 annotation
+  Value 14:9 14:14 annotation
 
 Repeated applications of an applicative functor exercise congruence and
 deduplication of application contexts.
@@ -399,7 +398,6 @@ body, and exposes the result through a second application context.
   > module Result = Apply (Base) (A)
   > EOF
   complete
-  Base 12:7 12:11 argument
   <anon> 12:27 14:3 annotation
   <anon> 16:43 17:7 annotation
 
@@ -466,7 +464,6 @@ against that member; the result reexports the member under a new projection.
   > module Alias = Built.Copy
   > EOF
   complete
-  A 15:7 15:8 argument
   Value 17:9 17:14 annotation
 
 [module type of] follows a projection from an applicative functor result, then
@@ -532,8 +529,6 @@ the same implementation before the constrained signature is implemented.
   > EOF
   complete
   Concrete 5:7 5:15 annotation
-  M 21:7 21:8 annotation
-  Nested 23:9 23:15 annotation
 
 Two signature includes form a diamond whose leaves independently refer to the
 same module type; the implementation relies on member pairing rather than
@@ -567,12 +562,12 @@ direct annotations.
   > end
   > EOF
   complete
-  M 18:7 18:8 annotation
   L 19:9 19:10 annotation
   R 22:9 22:10 annotation
 
-Including a doubly applied functor with anonymous arguments anchors the result
-at an unnamed site while exporting an alias of [S] used afterward.
+Including a doubly applied functor exports an alias of [S]; a module ascribed
+to the exported alias implements [S].  The functor body that merely provides
+the alias as a member does not.
 
   $ impls_of S <<EOF
   > module type S = sig
@@ -598,7 +593,7 @@ at an unnamed site while exporting an alias of [S] used afterward.
   > end
   > EOF
   complete
-  <anon> 11:25 13:3 annotation
+  M 19:7 19:8 annotation
 
 Generative applications of the same partially applied functor must remain
 distinct while their projected result modules retain the same family.
@@ -696,8 +691,6 @@ result members, aliases, and the eventual application instance.
   > module Alias = Result.Value
   > EOF
   complete
-  Transform 16:7 16:16 annotation
-  A 21:7 21:8 argument
   Value 23:9 23:14 annotation
 
 With [-position], the query answers for exactly one module type: the
@@ -913,9 +906,7 @@ applications instantiate: a client checked against [F(A).T] implements the
   $ setup_index ifun.mli ifun.ml fclient.ml
   $ impls_of_module_type S ifun.mli
   complete
-  Ifun 0:-1 0:-1 interface
   A 1:7 1:8 argument
-  F 4:7 4:8 interface
   Z 5:7 5:8 annotation
 
 A declaration nested inside a module-type body is paired with the [.mli]'s
@@ -954,9 +945,6 @@ buffer's [Container.Local] declaration.
   $ setup_index cont.mli cont.ml
   $ impls_of_module_type Local cont.mli Container.Local
   complete
-  Cont 0:-1 0:-1 interface
-  C 8:7 8:8 annotation
-  C 8:7 8:8 interface
   Impl 14:7 14:11 annotation
 
 A name that is not a module-type declaration of the buffer selects nothing:

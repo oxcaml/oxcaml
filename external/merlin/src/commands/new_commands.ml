@@ -135,15 +135,21 @@ let all_commands =
             (marg_position (fun pos _ -> Some pos))
         ]
       ~doc:
-        "Declaration-level change impact for the module-type declarations of \
-         the buffer: for each declaration, the modules that were checked \
-         against a module type that depends on it (and the buffer's own \
-         implementation unit, for an interface buffer), computed from the \
-         compiler facts in the configured indexes. With '-position \
-         <position>', the response is restricted to the single module-type \
-         declaration enclosing that position, and it is an error when no \
-         module-type declaration of the buffer encloses it. The response \
-         is:\n\n\
+        "The modules that must implement each module-type declaration of the \
+         buffer, computed from the compiler facts in the configured indexes. A \
+         module implements the target when the type it was checked against \
+         reaches the target purely through requirement-carrying relations \
+         (ascription, functor arguments, packing, aliases, includes, with \
+         constraints, substitutions, strengthening, module type of, and \
+         application instances); a unit whose interface includes the target \
+         implements it and is reported as the '(interface)' row. Modules \
+         related to the target only definitionally are not implementers: \
+         declaring the target, being paired with its own interface \
+         declaration, providing it as an equal member, or producing it as a \
+         functor result do not qualify. With '-position <position>', the \
+         response is restricted to the single module-type declaration \
+         enclosing that position, and it is an error when no module-type \
+         declaration of the buffer encloses it. The response is:\n\n\
          ```javascript\n\
          {\n\
          'targets' : [\n\
@@ -187,9 +193,8 @@ let all_commands =
          impacted module and recorded check site resolved; 'partial' carries \
          the reasons; 'unavailable' means no usable facts channel was \
          configured or loaded, which is distinct from a complete empty result."
-      ~default:None
-      begin fun buffer position ->
-        run buffer (Query_protocol.Module_type_impls position)
+      ~default:None begin fun buffer position ->
+      run buffer (Query_protocol.Module_type_impls position)
       end;
     command "construct"
       ~spec:

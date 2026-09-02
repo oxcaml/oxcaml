@@ -702,8 +702,7 @@ let json_of_response (type a) (query : a t) (response : a) : json =
         ]
     in
     `Assoc
-      [ ( "targets",
-          `List (List.map response.targets ~f:json_of_target_result) );
+      [ ("targets", `List (List.map response.targets ~f:json_of_target_result));
         ( "implementations",
           `List (List.map response.implementations ~f:json_of_implementation) )
       ]
