@@ -733,14 +733,14 @@ val f : foo -> foo = <fun>
 (* Test 29: GADTs *)
 
 let require_boxed (_ : _ box) = ()
-type 'a st = T : string st
+type ('a : value_or_null) st = T : string st
 type 'a ft = T : float ft
-type 'a bt = T : _ box bt
+type ('a : value_or_null) bt = T : _ box bt
 [%%expect{|
 val require_boxed : ('a : any). 'a box -> unit = <fun>
-type 'a st = T : string st
+type ('a : value_or_null) st = T : string st
 type 'a ft = T : float ft
-type 'a bt = T : 'b box bt
+type ('a : value_or_null) bt = T : 'b box bt
 |}]
 
 (* We can match on a GADT to learn that something is boxed *)
@@ -1359,9 +1359,11 @@ Error: The type "t1" has no unboxed version.
    are introduced: learning [a = au box] and [a = float] (hence [au = float#])
    typechecks regardless of which equation comes first. *)
 
-type (_, _ : any) boxes = Boxes : ('a : any). ('a box, 'a) boxes
+type (_ : value_or_null, _ : any) boxes =
+  | Boxes : ('a : any). ('a box, 'a) boxes
 [%%expect{|
-type (_, _ : any) boxes = Boxes : ('a : any). ('a box, 'a) boxes
+type (_ : value_or_null, _ : any) boxes =
+    Boxes : ('a : any). ('a box, 'a) boxes
 |}]
 
 (* Matching [Boxes] before [Equal] *)
@@ -1494,14 +1496,14 @@ module M : sig val f : 'a box -> 'c end
 
 (* [box] is not surjective *)
 module M : sig
-  val f : 'b -> 'c
+  val f : ('b : value_or_null) 'c. 'b -> 'c
 end = struct
-  let f (x : 'a box) : 'c = Obj.magic x
+  let rec f (x : 'a box) : 'c = f x
 end
 [%%expect{|
 Lines 3-5, characters 6-3:
 3 | ......struct
-4 |   let f (x : 'a box) : 'c = Obj.magic x
+4 |   let rec f (x : 'a box) : 'c = f x
 5 | end
 Error: Signature mismatch:
        Modules do not match:

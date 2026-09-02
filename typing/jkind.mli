@@ -120,6 +120,9 @@ module Layout : sig
     val has_genvar : t -> bool
   end
 
+  (** The layout of a pointer to a non-float block: tuples, rows, ... *)
+  val non_float_block : Sort.t t
+
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
@@ -129,6 +132,10 @@ module Layout : sig
     Sort.Flat.t t -> Scannable_axes.t -> string list
 
   val crosses_externality : Sort.t t -> bool
+
+  (** A box layout as the layout of a pointer to it: the scannable sort with the
+      axes the box's contents imply. Other layouts are unchanged. *)
+  val scannable_bound : Sort.t t -> Sort.t t
 
   module Debug_printers : sig
     val t :
@@ -561,6 +568,10 @@ val for_boxed_row : Types.row_desc -> Types.jkind_l
 
 (** The jkind of an arrow type. *)
 val for_arrow : Types.jkind_l
+
+(** The jkind of [contents box]. *)
+val for_box :
+  contents:Types.type_expr -> contents_layout:Sort.t Layout.t -> Types.jkind_l
 
 (** The jkind of an object type. *)
 val for_object : Types.jkind_l

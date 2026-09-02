@@ -329,6 +329,9 @@ module Layout = struct
     | Not_known_addressable -> false
     | Addressable_no_mutation | Addressable_mutated -> true
 
+  let non_float_block : Sort.t t =
+    Sort (Sort.of_base Sort.Scannable, Scannable_axes.non_float_block_axes)
+
   let rec strip_head_addressable : Sort.t t -> Sort.t t = function
     | Addressable t -> strip_head_addressable t
     | Sort (s, sa) as t ->
@@ -395,6 +398,10 @@ module Layout = struct
 
   let non_redundant_axes_of_box_flat t sa =
     non_redundant_axes_of_box_const_opt (get_flat_const t) sa
+
+  let scannable_bound : Sort.t t -> Sort.t t = function
+    | Box (contents, sa) -> Sort (Sort.scannable, box_scannable_axes contents sa)
+    | (Any _ | Sort _ | Product _ | Addressable _) as l -> l
 
   let rec crosses_externality : Sort.t t -> bool = function
     | Any _ -> false
@@ -1368,7 +1375,7 @@ module Base_and_axes = struct
           match Types.get_desc ty with
           | Tmod (ty, _) -> check ~bounds_mask t ty
           | Tpoly (ty, _) | Trepr (ty, _) -> check ~bounds_mask t ty
-          | Ttuple _ ->
+          | Ttuple _ | Tbox _ ->
             if tuple_fuel > 0
             then
               Continue
@@ -1460,7 +1467,7 @@ module Base_and_axes = struct
              belong in the next case. What is the right behaviour here? *)
           | Tquote _ | Tsplice _ | Tquote_eval _ -> Skip
           | Tvar _ | Tarrow _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
-          | Tunivar _ | Tpackage _ | Tof_kind _ | Tbox _ ->
+          | Tunivar _ | Tpackage _ | Tof_kind _ ->
             (* these cases either cannot be infinitely recursive or their jkinds
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
@@ -2907,6 +2914,16 @@ let for_arrow =
     ~annotation:None ~why:(Value_creation Arrow)
   |> mark_best
 
+(* CR rtjoa: revisit *)
+let for_box ~contents ~(contents_layout : Sort.t Layout.t) : jkind_l =
+  fresh_jkind
+    { base = Layout (Box (contents_layout, Scannable_axes.max));
+      mod_bounds = Const.box_mod_bounds Mod_bounds.min;
+      with_bounds = No_with_bounds
+    }
+    ~annotation:None ~why:(Value_creation Boxed)
+  |> add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:contents
+
 let for_object =
   (* The crossing of objects are based on the fact that they are
      produced/defined/allocated at legacy, which applies to only the
@@ -3858,13 +3875,9 @@ module Violation = struct
     | Expected_as_a_value_layout
 
   let offending_layout display (l : Sort.t Layout.t) =
-    match display, l with
-    | Offending_box_as_scannable_bound, Layout.Box (contents, sa) ->
-      Layout.Sort (Sort.scannable, Layout.box_scannable_axes contents sa)
-    | ( Offending_box_as_scannable_bound,
-        (Any _ | Sort _ | Product _ | Addressable _) )
-    | Offending_exactly, _ ->
-      l
+    match display with
+    | Offending_box_as_scannable_bound -> Layout.scannable_bound l
+    | Offending_exactly -> l
 
   let offending_const display (c : Layout.Const.t) =
     match display, c with

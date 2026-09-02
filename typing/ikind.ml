@@ -623,6 +623,8 @@ module Solver = struct
       ->
       (* Keep a rigid param, but cap it by its annotated jkind. *)
       self_provenance (Ldd.meet (rigid ctx ty) (ckind_of_jkind child_ctx jkind))
+    | Types.Tconstr (path, [t], _) when Path.same path Predef.path_box ->
+      box_kind ~self_provenance ~arg_ctx:child_ctx ctx t
     | Types.Tconstr (path, args, _abbrev_memo) ->
       constr ~self_provenance ~arg_ctx:child_ctx ctx path args
     | Types.Tmod (ty, mod_bounds) ->
@@ -656,9 +658,8 @@ module Solver = struct
       kind ~check_principality:false ~use_tables:true ctx ty
     | Types.Tof_kind jkind -> self_provenance (ckind_of_jkind child_ctx jkind)
     | Types.Tobject _ -> self_provenance (Ldd.const Axis_lattice.object_legacy)
-    | Types.Tbox t ->
-      let base = self_provenance (Ldd.const Axis_lattice.mutable_data) in
-      Ldd.join base (kind ~use_tables:true child_ctx t)
+    | Types.Tbox contents ->
+      box_kind ~self_provenance ~arg_ctx:child_ctx ctx contents
     | Types.Tfield _ -> failwith "Tfield shouldn't appear in kind"
     | Types.Tnil -> failwith "Tnil shouldn't appear in kind"
     | Types.Tquote _ | Types.Tsplice _ | Types.Tquote_eval _ ->
@@ -695,6 +696,20 @@ module Solver = struct
          values intersected with an unknown so they behave as not-best. *)
       let unknown = rigid_name ctx (Ldd.Name.unknown (fresh_unknown_uid ())) in
       self_provenance (Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown)
+
+  (* The kind of [contents box]: the boxed type's kind when the box reduces;
+     otherwise [mutable_data] with [contents], which could be the unboxed
+     version of a mutable record. *)
+  and box_kind ~self_provenance ~arg_ctx (ctx : ctx)
+      (contents : Types.type_expr) : Ldd.node =
+    match Btype.reduces_box contents with
+    | Reduces_to_constr (p, args) -> constr ~self_provenance ~arg_ctx ctx p args
+    | Reduces_to_tuple elts ->
+      let base = self_provenance (Ldd.const Axis_lattice.immutable_data) in
+      Ldd.sum elts ~base ~f:(fun (_lbl, t) -> kind ~use_tables:true arg_ctx t)
+    | Doesn't_reduce_box ->
+      let base = self_provenance (Ldd.const Axis_lattice.mutable_data) in
+      Ldd.join base (kind ~use_tables:true arg_ctx contents)
 
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
   let normalize (kind_poly : Ldd.node) : Ldd.node =
@@ -1791,6 +1806,10 @@ let fast_sub_of_any_super : type r.
     ->
     fast_sub_of_sort_sub ~sub ~sub_sort
       ~super_lat:(Jkind.Mod_bounds.to_axis_lattice mod_bounds)
+  | Types.Layout (Jkind_types.Layout.Box _) ->
+    fast_sub_of_sort_sub ~sub
+      ~sub_sort:(Jkind_types.Sort.of_base Jkind_types.Sort.Scannable)
+      ~super_lat:(Jkind.Mod_bounds.to_axis_lattice mod_bounds)
   | Types.Layout _ | Types.Kconstr _ -> false
 
 let fast_sub_of_sort_super : type r.
@@ -1803,6 +1822,13 @@ let fast_sub_of_sort_super : type r.
   | Types.Layout
       (Jkind_types.Layout.Sort (sub_sort, { nullability = _; separability = _ }))
     ->
+    if not (Jkind_types.Sort.equate sub_sort super_sort)
+    then false
+    else
+      fast_sub_of_sort_sub ~sub ~sub_sort
+        ~super_lat:(Jkind.Mod_bounds.to_axis_lattice mod_bounds)
+  | Types.Layout (Jkind_types.Layout.Box _) ->
+    let sub_sort = Jkind_types.Sort.of_base Jkind_types.Sort.Scannable in
     if not (Jkind_types.Sort.equate sub_sort super_sort)
     then false
     else

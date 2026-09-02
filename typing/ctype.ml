@@ -2672,17 +2672,11 @@ and try_reduce_quote_eval env t =
   | Tof_kind _ -> raise Cannot_expand
   | Tlink _ | Tsubst _ -> assert false
 
-and try_reduce_box t =
-  match get_desc t with
-  (* [t# box] ==> [t] *)
-  | Tconstr (p, args, _) ->
-    begin match Path.boxed_version p with
-    | Some boxed_p -> Tconstr (boxed_p, args, ref Mnil)
-    | None -> raise Cannot_expand
-    end
-  (* [#(t1 * t2) box] ==> [t1 * t2] *)
-  | Tunboxed_tuple tys -> Ttuple tys
-  | _ -> raise Cannot_expand
+and try_reduce_box contents =
+  match Btype.reduces_box contents with
+  | Reduces_to_constr (p, args) -> Tconstr (p, args, ref Mnil)
+  | Reduces_to_tuple tys -> Ttuple tys
+  | Doesn't_reduce_box -> raise Cannot_expand
 
 (* Perform head-position reductions exhaustively til the normal form. *)
 let rec try_reduce env ty =
@@ -3238,7 +3232,11 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
     estimate_type_jkind ~expand_components ~ignore_mod_bounds (incr_stage env)
       ty
     |> Jkind.map_type_expr new_quote_ty
-  | Tbox _ -> Jkind.Builtin.value ~why:Boxed
+  | Tbox contents ->
+    Jkind.for_box ~contents
+      ~contents_layout:
+        (estimate_type_layout ~expand_components env ~visited:[get_id ty]
+           contents)
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -3271,6 +3269,40 @@ and estimate_unboxed_product_jkind
     |> List.split
   in
   Jkind.Builtin.product ~why tys_modalities layouts
+(* The layout of a block component. A component that is itself a box is a
+   pointer: a scannable sort with the axes its contents imply, no deeper
+   ([constrain_type_jkind] looks below a box on demand). [visited] guards
+   against cyclic types under [-rectypes]: a type recursively containing
+   itself approximates to [any]. *)
+and estimate_type_layout ~expand_components env ~visited ty
+  : Jkind.Sort.t Jkind.Layout.t =
+  if List.memq (get_id ty) visited
+  then Jkind.Layout.Any Jkind_types.Scannable_axes.max
+  else
+    let visited = get_id ty :: visited in
+    match get_desc ty with
+    | Ttuple _ ->
+      (* A nested tuple is a box of layout [scannable non_null non_float]. Do
+         not recurse into its elements: type abbreviations can share tuple
+         subterms, making structural recursion (and downstream traversals of
+         the resulting layout) exponential. *)
+      Jkind.Layout.non_float_block
+    | Tbox contents ->
+      Jkind.Layout.scannable_bound
+        (Box
+           ( estimate_type_layout ~expand_components env ~visited contents,
+             Jkind_types.Scannable_axes.max ))
+    | Tmod (inner, _) | Trepr (inner, _) ->
+      estimate_type_layout ~expand_components env ~visited inner
+    | _ -> (
+      let jkind =
+        estimate_type_jkind ~expand_components ~ignore_mod_bounds:true env ty
+      in
+      (* [extract_layout] expands kind aliases; only a truly abstract kind
+         falls back to [any] *)
+      match Jkind.extract_layout env jkind with
+      | Ok layout -> Jkind.Layout.scannable_bound layout
+      | Error _ -> Jkind.Layout.Any Jkind_types.Scannable_axes.max)
 
 let rec estimate_type_jkind_unwrapped
       level ~expand_components env ~unwrapped_ty =
@@ -3624,6 +3656,39 @@ let constrain_type_jkind ~fixed env ty jkind =
                  We could still estimate the kind on the left better. *)
               error ()
           in
+          let error () =
+            Error (Jkind.Violation.of_ ~context env
+              (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+          in
+          (* [ty] is [contents box]: its layout is below [jkind]'s box layout
+             iff [contents]'s layout is below the box's contents layout, and
+             the estimate [ty's_jkind] already has [ty]'s axes and bounds. *)
+          let box ~fuel contents =
+            match Jkind.extract_layout env jkind,
+                  Jkind.extract_layout env ty's_jkind with
+            | Ok (Box (contents_layout, _)), Ok (Box (_, ty's_axes)) ->
+              let contents_bound =
+                Jkind.set_layout (Jkind.Builtin.any ~why:Dummy_jkind)
+                  contents_layout
+              in
+              begin match
+                estimate_jkind_and_loop ~fuel ~expanded:false env contents
+                  contents_bound
+              with
+              | Error _ -> error ()
+              | Ok () ->
+                let ty's_jkind =
+                  Jkind.set_layout ty's_jkind (Box (contents_layout, ty's_axes))
+                in
+                match
+                  Ikind.sub_or_intersect ~type_equal ~context env ty's_jkind
+                    jkind
+                with
+                | Sub -> Ok ()
+                | Disjoint _ | May_have_intersection _ -> error ()
+              end
+            | _ -> error ()
+          in
           match get_desc ty with
           | Tconstr _ ->
              if not expanded
@@ -3656,9 +3721,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
-          | _ ->
-            Error (Jkind.Violation.of_ ~context env
-                (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+          | Tbox contents -> box ~fuel contents
+          | _ -> error ()
   and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
