@@ -1208,18 +1208,35 @@ void caml_accum_orphan_heap_stats(struct heap_stats* acc)
 }
 
 
-/* Atoms */
-#define A(i) header_t caml_atom_ ##i = Make_header(0, i, NOT_MARKABLE);
+/* Atoms.
+
+   The atom for tag [t] is a zero-wosize block: a single header word in
+   [caml_atom_table]. The exported symbol [caml_atom_<t>] points at the
+   atom's *value*, i.e. one word past that header, so it can be used
+   directly as an OCaml value but must never be dereferenced; the header
+   lives at minus one word. Entry 256 of the table exists only so that
+   [caml_atom_255] is an address within the table. */
+CAMLexport header_t caml_atom_table[257] = {
+#define A(i) Make_header(0, i, NOT_MARKABLE),
 DO_0_255(A)
 #undef A
-static const header_t *atom_p[256] = {
-#define A(i) &caml_atom_ ##i,
-DO_0_255(A)
-#undef A
+  0
 };
 
+#ifdef SYS_macosx
+#define ATOM_SYM_PREFIX "_"
+#else
+#define ATOM_SYM_PREFIX ""
+#endif
+#define A(i) \
+  __asm__(".globl " ATOM_SYM_PREFIX "caml_atom_" #i "\n" \
+          ".set " ATOM_SYM_PREFIX "caml_atom_" #i ", " \
+          ATOM_SYM_PREFIX "caml_atom_table + 8 * (" #i " + 1)\n");
+DO_0_255(A)
+#undef A
+
 CAMLexport value caml_atom(tag_t tag) {
-  return Val_hp(atom_p[tag]);
+  return (value) &caml_atom_table[tag + 1];
 }
 
 void caml_init_major_heap (asize_t size) {

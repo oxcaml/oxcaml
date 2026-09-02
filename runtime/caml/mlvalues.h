@@ -700,6 +700,10 @@ X(230) X(231) X(232) X(233) X(234) X(235) X(236) X(237) X(238) X(239)  \
 X(240) X(241) X(242) X(243) X(244) X(245) X(246) X(247) X(248) X(249)  \
 X(250) X(251) X(252) X(253) X(254) X(255)
 
+/* The symbols [caml_atom_<n>] point at the *values* of the runtime's
+   permanent atoms (zero-wosize blocks), i.e. one word past the
+   corresponding header. Use their addresses only; never dereference (the
+   header is at minus one word). */
 #define A(n) extern header_t caml_atom_ ## n;
 DO_0_255(A)
 #undef A
