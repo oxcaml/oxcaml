@@ -2507,7 +2507,7 @@ module Desc = struct
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
         Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
           (List.map (fun layout -> { desc with base = Layout layout }) lays)
-      | Layout (Addressable lay) ->
+      | Layout (Addressable lay) when Option.is_none (get_const desc) ->
         if Layout.is_surely_addressable_flat lay
         then format_desc ~nested ppf { desc with base = Layout lay }
         else
