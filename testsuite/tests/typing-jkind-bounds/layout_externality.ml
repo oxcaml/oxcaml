@@ -22,127 +22,33 @@ type 'a t : bits8 with 'a
 type ok = string t require_external
 [%%expect{|
 type 'a t : bits8 with 'a
-Line 2, characters 10-18:
-2 | type ok = string t require_external
-              ^^^^^^^^
-Error: This type "string t" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string t is bits8
-         because of the definition of t at line 1, characters 0-25.
-       But the kind of string t must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
-|}, Principal{|
-type 'a t : bits8 with 'a
-Line 2, characters 10-18:
-2 | type ok = string t require_external
-              ^^^^^^^^
-Error: This type "string t" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string t is bits8 with string
-         because of the definition of t at line 1, characters 0-25.
-       But the kind of string t must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+type ok = string t require_external
 |}]
 
 type ok64 = string t require_external64
 [%%expect{|
-Line 1, characters 12-20:
-1 | type ok64 = string t require_external64
-                ^^^^^^^^
-Error: This type "string t" should be an instance of type
-         "('a : any mod external64)"
-       The kind of string t is bits8
-         because of the definition of t at line 1, characters 0-25.
-       But the kind of string t must be a subkind of any mod external64
-         because of the definition of require_external64 at line 2, characters 0-49.
-|}, Principal{|
-Line 1, characters 12-20:
-1 | type ok64 = string t require_external64
-                ^^^^^^^^
-Error: This type "string t" should be an instance of type
-         "('a : any mod external64)"
-       The kind of string t is bits8 with string
-         because of the definition of t at line 1, characters 0-25.
-       But the kind of string t must be a subkind of any mod external64
-         because of the definition of require_external64 at line 2, characters 0-49.
+type ok64 = string t require_external64
 |}]
 
 type 'a f64 : float64 with 'a
 type ok_f64 = string f64 require_external
 [%%expect{|
 type 'a f64 : float64 with 'a
-Line 2, characters 14-24:
-2 | type ok_f64 = string f64 require_external
-                  ^^^^^^^^^^
-Error: This type "string f64" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string f64 is float64
-         because of the definition of f64 at line 1, characters 0-29.
-       But the kind of string f64 must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
-|}, Principal{|
-type 'a f64 : float64 with 'a
-Line 2, characters 14-24:
-2 | type ok_f64 = string f64 require_external
-                  ^^^^^^^^^^
-Error: This type "string f64" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string f64 is float64 with string
-         because of the definition of f64 at line 1, characters 0-29.
-       But the kind of string f64 must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+type ok_f64 = string f64 require_external
 |}]
 
 type 'a v : void with 'a
 type ok_v = string v require_external
 [%%expect{|
 type 'a v : void with 'a
-Line 2, characters 12-20:
-2 | type ok_v = string v require_external
-                ^^^^^^^^
-Error: This type "string v" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string v is void
-         because of the definition of v at line 1, characters 0-24.
-       But the kind of string v must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
-|}, Principal{|
-type 'a v : void with 'a
-Line 2, characters 12-20:
-2 | type ok_v = string v require_external
-                ^^^^^^^^
-Error: This type "string v" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string v is void with string
-         because of the definition of v at line 1, characters 0-24.
-       But the kind of string v must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+type ok_v = string v require_external
 |}]
 
 type 'a w : word with 'a
 type ok_w = string w require_external
 [%%expect{|
 type 'a w : word with 'a
-Line 2, characters 12-20:
-2 | type ok_w = string w require_external
-                ^^^^^^^^
-Error: This type "string w" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string w is word
-         because of the definition of w at line 1, characters 0-24.
-       But the kind of string w must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
-|}, Principal{|
-type 'a w : word with 'a
-Line 2, characters 12-20:
-2 | type ok_w = string w require_external
-                ^^^^^^^^
-Error: This type "string w" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string w is word with string
-         because of the definition of w at line 1, characters 0-24.
-       But the kind of string w must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+type ok_w = string w require_external
 |}]
 
 (* Products *)
@@ -174,52 +80,14 @@ type ok_alias = string u require_external
 [%%expect{|
 kind_ kb = bits8
 type 'a u : bits8 with 'a
-Line 3, characters 16-24:
-3 | type ok_alias = string u require_external
-                    ^^^^^^^^
-Error: This type "string u" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string u is bits8
-         because of the definition of u at line 2, characters 0-22.
-       But the kind of string u must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
-|}, Principal{|
-kind_ kb = bits8
-type 'a u : bits8 with 'a
-Line 3, characters 16-24:
-3 | type ok_alias = string u require_external
-                    ^^^^^^^^
-Error: This type "string u" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string u is bits8 with string
-         because of the definition of u at line 2, characters 0-22.
-       But the kind of string u must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+type ok_alias = string u require_external
 |}]
 
 (* Learn externality through filling a sort variable *)
 
 let g (y : string t) = (fun (_ : ('a : any mod external_)) -> ()) y
 [%%expect{|
-Line 1, characters 66-67:
-1 | let g (y : string t) = (fun (_ : ('a : any mod external_)) -> ()) y
-                                                                      ^
-Error: The value "y" has type "string t" but an expression was expected of type
-         "('a : bits8)"
-       The kind of string t is bits8
-         because of the definition of t at line 1, characters 0-25.
-       But the kind of string t must be a subkind of bits8
-         because of the annotation on the type variable 'a.
-|}, Principal{|
-Line 1, characters 66-67:
-1 | let g (y : string t) = (fun (_ : ('a : any mod external_)) -> ()) y
-                                                                      ^
-Error: The value "y" has type "string t" but an expression was expected of type
-         "('a : bits8)"
-       The kind of string t is bits8 with string
-         because of the definition of t at line 1, characters 0-25.
-       But the kind of string t must be a subkind of bits8
-         because of the annotation on the type variable 'a.
+val g : string t -> unit = <fun>
 |}]
 
 (* ...also in the reverse order: the crossing constraint is recorded on the
@@ -229,40 +97,14 @@ let g_rev y =
   (fun (_ : ('a : any mod external_)) -> ()) y;
   (y : string t)
 [%%expect{|
-Line 3, characters 3-4:
-3 |   (y : string t)
-       ^
-Error: The value "y" has type "('a : bits8)"
-       but an expression was expected of type "string t"
-       The kind of string t is bits8
-         because of the definition of t at line 1, characters 0-25.
-       But the kind of string t must be a subkind of bits8
-         because of the annotation on the type variable 'a.
-|}, Principal{|
-Line 3, characters 3-4:
-3 |   (y : string t)
-       ^
-Error: The value "y" has type "('a : bits8)"
-       but an expression was expected of type "string t"
-       The kind of string t is bits8 with string
-         because of the definition of t at line 1, characters 0-25.
-       But the kind of string t must be a subkind of bits8
-         because of the annotation on the type variable 'a.
+val g_rev : string t -> string t = <fun>
 |}]
 
 (* With-bounds on a rigid type variable cannot raise externality *)
 
 type 'a ok_rigid = 'a f64 require_external
 [%%expect{|
-Line 1, characters 19-25:
-1 | type 'a ok_rigid = 'a f64 require_external
-                       ^^^^^^
-Error: This type "'a f64" should be an instance of type
-         "('b : any mod external_)"
-       The kind of 'a f64 is float64 with 'a
-         because of the definition of f64 at line 1, characters 0-29.
-       But the kind of 'a f64 must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+type 'a ok_rigid = 'a f64 require_external
 |}]
 
 (* Signature inclusion *)
@@ -273,23 +115,7 @@ end = struct
   type 'a t : bits8 with 'a
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type 'a t : bits8 with 'a
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t : bits8 with 'a end
-       is not included in
-         sig type 'a t : bits8 end
-       Type declarations do not match:
-         type 'a t : bits8 with 'a
-       is not included in
-         type 'a t : bits8
-       The kind of the first is bits8 with 'a
-         because of the definition of t at line 4, characters 2-27.
-       But the kind of the first must be a subkind of bits8
-         because of the definition of t at line 2, characters 2-19.
+module M : sig type 'a t : bits8 end
 |}]
 
 (* Abstract kinds are not assumed external *)
@@ -330,25 +156,10 @@ module A = G (struct
   type 'a t : k with 'a
 end)
 [%%expect{|
-Line 7, characters 14-24:
-7 |   type ok_g = string X.t require_external
-                  ^^^^^^^^^^
-Error: This type "string X.t" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string X.t is bits8
-         because of the definition of t at line 4, characters 4-25.
-       But the kind of string X.t must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
-|}, Principal{|
-Line 7, characters 14-24:
-7 |   type ok_g = string X.t require_external
-                  ^^^^^^^^^^
-Error: This type "string X.t" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string X.t is bits8 with string
-         because of the definition of t at line 4, characters 4-25.
-       But the kind of string X.t must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+module G :
+  functor (X : sig kind_ k = bits8 type 'a t : bits8 with 'a end) ->
+    sig type ok_g = string X.t require_external end
+module A : sig type ok_g end
 |}]
 
 (* [any] must not cross *)
@@ -379,4 +190,19 @@ Error: This type "pa" should be an instance of type "('a : any mod external_)"
          because of the definition of pa at line 1, characters 0-21.
        But the kind of pa must be a subkind of any mod external_
          because of the definition of require_external at line 1, characters 0-46.
+|}]
+
+(* For a kind that crosses externality due to its layout despite its with-bound,
+   we don't print a redundant [@@ external_] *)
+
+type ('a : bits8) c : immediate with 'a
+type ok_nested = string t c require_external
+[%%expect{|
+type ('a : bits8) c : immediate with 'a
+type ok_nested = string t c require_external
+|}]
+
+type ('a : bits8) c2 : value mod portable with 'a
+[%%expect{|
+type ('a : bits8) c2 : value mod portable with 'a
 |}]
