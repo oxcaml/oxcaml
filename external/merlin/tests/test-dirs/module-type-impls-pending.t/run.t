@@ -2,29 +2,33 @@ Pending behavior of the [module-type-impls] query.
 
 Each case in this file documents intended behavior: the expected output below
 is the contract, and some of it is not produced yet because of known gaps in
-the fact collector (see the module-type-index branch).  A failing diff here is
-the specification of the fix; once a gap is closed, its case should pass
-unchanged and can move into [module-type-impls.t].
+the fact collector (see the module-type-index branch) or in the query itself.
+A failing diff here is the specification of the fix; once a gap is closed, its
+case should pass unchanged and can move into [module-type-impls.t].
 
-The helpers are the same as in [module-type-impls.t]:
+The helpers are the same as in [module-type-impls.t], except that a query
+failure is printed as a [failure:] line instead of confusing [jq]:
 
   $ print_results () {
   >   jq -r '
   >     def position: "\(.line):\(.col)";
-  >     .value.status,
-  >     ([.value.implementations[]]
-  >      | sort_by([.start.line,
-  >                 .start.col,
-  >                 .end.line,
-  >                 .end.col,
-  >                 (.name // ""),
-  >                 (.check // .kind // "")])
-  >      | .[]
-  >      | [(.name // "<anon>"),
-  >         (.start | position),
-  >         (.end | position),
-  >         (.check // .kind // "<none>")]
-  >      | join(" "))'
+  >     if .class != "return" then "\(.class): \(.value)"
+  >     else
+  >       (.value.status,
+  >        ([.value.implementations[]]
+  >         | sort_by([.start.line,
+  >                    .start.col,
+  >                    .end.line,
+  >                    .end.col,
+  >                    (.name // ""),
+  >                    (.check // .kind // "")])
+  >         | .[]
+  >         | [(.name // "<anon>"),
+  >            (.start | position),
+  >            (.end | position),
+  >            (.check // .kind // "<none>")]
+  >         | join(" ")))
+  >     end'
   > }
 
   $ impls_of () {
@@ -197,8 +201,8 @@ applications instantiate: a client checked against [F(A).T] implements the
 
 A declaration nested inside a module-type body is paired with the [.mli]'s
 declaration during the interface check, exactly like its toplevel siblings,
-so implementations recorded in the [.ml] surface when the query resolves the
-module type from the [.mli].
+so implementations checked in the [.ml] surface when the query resolves the
+module type from the [.mli], here through the declared module [C].
 
   $ cat > cont.mli <<'EOF'
   > module type S = sig
@@ -208,6 +212,7 @@ module type from the [.mli].
   >   module type Local = S
   >   module Member : S
   > end
+  > module C : Container
   > EOF
   $ cat > cont.ml <<'EOF'
   > module type S = sig
@@ -217,16 +222,32 @@ module type from the [.mli].
   >   module type Local = S
   >   module Member : S
   > end
-  > module Impl : Container.Local = struct
+  > module C : Container = struct
+  >   module type Local = S
+  >   module Member = struct
+  >     type t = int
+  >   end
+  > end
+  > module Impl : C.Local = struct
   >   type t = int
   > end
   > EOF
   $ $OCAMLC -bin-annot -c cont.mli cont.ml
   $ ocaml-index aggregate cont.cmti cont.cmt -o cont.ocaml-index
   $ $MERLIN single module-type-impls \
-  >   -module-type Container.Local \
+  >   -module-type C.Local \
   >   -index-file ./cont.ocaml-index \
   >   -filename ./cont.mli < ./cont.mli \
   >   | print_results
   complete
-  Impl 8:7 8:11 annotation
+  Impl 14:7 14:11 annotation
+
+A module type that does not resolve is an explicit failure, never a confident
+empty answer.
+
+  $ impls_of Nonexistent <<'EOF'
+  > module type S = sig
+  >   type t
+  > end
+  > EOF
+  failure: No module type named "Nonexistent" in the current buffer
