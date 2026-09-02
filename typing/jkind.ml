@@ -2138,11 +2138,20 @@ module Const = struct
       | Addressable
   end
 
-  let warn_redundant_kind_modifier ~loc (base, rev_axes) =
+  let warn_redundant_kind_modifier ~loc
+      ((base : Parsetree.jkind_annotation), (rev_ops : string Location.loc list))
+      =
+    let annotation : Parsetree.jkind_annotation =
+      match rev_ops with
+      | [] -> base
+      | _ :: _ ->
+        { pjka_desc = Pjk_operator (base, List.rev rev_ops);
+          pjka_loc = base.pjka_loc
+        }
+    in
     Location.prerr_warning loc
       (Warnings.Redundant_kind_modifier
-         (Format.asprintf "%a%s" Pprintast.jkind_annotation base
-            (String.concat "" (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
+         (Format.asprintf "%a" Pprintast.jkind_annotation annotation))
 
   let apply_scannable_axis ?prior_annot ~warn env
       (axis : Scannable_axis.t Location.loc option) t =
@@ -2298,18 +2307,18 @@ module Const = struct
          warn_ignored_kind_modifier ~loc env base base_jkind sa_annot);
       let jkind, _ =
         List.fold_left
-          (fun (jkind, rev_axes) ((name : string Location.loc), op) ->
+          (fun (jkind, rev_ops) ((name : string Location.loc), op) ->
             let jkind =
               match (op : Kind_operator.t Location.loc) with
               | { txt = Scannable_axis axis; loc } ->
-                apply_scannable_axis ~prior_annot:(base, rev_axes) ~warn env
+                apply_scannable_axis ~prior_annot:(base, rev_ops) ~warn env
                   (Some (Location.mkloc axis loc))
                   jkind
               | { txt = Addressable; loc } ->
-                apply_addressable ~prior_annot:(base, rev_axes) ~warn ~loc env
+                apply_addressable ~prior_annot:(base, rev_ops) ~warn ~loc env
                   jkind
             in
-            jkind, name.txt :: rev_axes)
+            jkind, name :: rev_ops)
           (base_jkind, []) ops
       in
       jkind
