@@ -999,7 +999,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
        an unboxed product would result in unintended aliasing. Atomic fields are
        restricted to layout [value_or_null], so this check is purely defensive.
     *)
-    | Patomic_load_idx { layout = Punboxed_product _ }
+    | Patomic_load_idx { layout = Punboxed_product _; _ }
     | Patomic_set_idx { layout = Punboxed_product _; _ }
     | Patomic_exchange_idx { layout = Punboxed_product _; _ }
     | Patomic_compare_exchange_idx { layout = Punboxed_product _; _ }

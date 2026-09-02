@@ -1460,7 +1460,22 @@ let emit_instr env i =
   | Lepilogue_close ->
     let n = Env.frame_size env in
     if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
-  | Lop (Intop_atomic _) ->
+  | Lop (Intop_atomic { op = Release_store; size; addr }) -> (
+    assert (
+      match addr with
+      | Iindexed v -> Validated_mem_offset.offset v = 0
+      | Ibased _ -> false);
+    let mem = H.mem (H.gp_reg_of_reg i.arg.(1)) in
+    match size with
+    | Word | Sixtyfour -> A.ins2 STLR (H.reg_x i.arg.(0)) mem
+    | Thirtytwo -> A.ins2 STLR (H.reg_w i.arg.(0)) mem)
+  | Lop
+      (Intop_atomic
+         { op =
+             ( Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange
+             | Compare_set | Compare_exchange );
+           _
+         }) ->
     Misc.fatal_errorf
       "emit_instr: builtins are not yet translated to atomics: %a"
       Printlinear.instr i
@@ -1564,11 +1579,11 @@ let emit_instr env i =
     assert (n mod 16 = 0);
     emit_stack_adjustment (-n);
     Env.set_stack_offset env (Env.stack_offset env + n)
-  | Lop (Load { memory_chunk; addressing_mode; is_atomic; _ }) -> (
+  | Lop (Load { memory_chunk; addressing_mode; atomic; _ }) -> (
     assert (
       Cmm.equal_memory_chunk memory_chunk Word_int
       || Cmm.equal_memory_chunk memory_chunk Word_val
-      || not is_atomic);
+      || Option.is_none atomic);
     let dst = i.res.(0) in
     let base =
       match addressing_mode with
@@ -1591,16 +1606,21 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 LDR_simd_and_fp reg_s7 addressing;
       A.ins2 FCVT (H.reg_d dst) reg_s7
-    | Word_int | Word_val ->
-      if is_atomic
-      then (
+    | Word_int | Word_val -> (
+      match atomic with
+      | None -> A.ins2 LDR (H.reg_x dst) addressing
+      | Some memory_order ->
         assert (
           match addressing_mode with
           | Iindexed v -> Validated_mem_offset.offset v = 0
           | Ibased _ -> false);
-        A.ins0 (DMB ISHLD);
+        (match memory_order with
+        | Seq_cst ->
+          (* memory model barrier: order preceding non-atomic loads before this
+             atomic load *)
+          A.ins0 (DMB ISHLD)
+        | Acquire -> ());
         A.ins2 LDAR (H.reg_x dst) (H.mem (H.gp_reg_of_reg i.arg.(0))))
-      else A.ins2 LDR (H.reg_x dst) addressing
     | Double -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addressing
     | Single { reg = Float32 } ->
       A.ins2 LDR_simd_and_fp (H.reg_s dst) addressing

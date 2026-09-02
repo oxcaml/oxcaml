@@ -329,12 +329,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       if returns
       then Terminator (Prim { op = External external_call; label_after }), args
       else Terminator (Call_no_return external_call), args
-    | Cload { memory_chunk; mutability; is_atomic } ->
+    | Cload { memory_chunk; mutability; atomic } ->
       let arg = single_arg () in
       let addressing_mode, eloc = Target.select_addressing memory_chunk arg in
       let mutability = SU.select_mutable_flag mutability in
-      ( SU.basic_op
-          (Load { memory_chunk; addressing_mode; mutability; is_atomic }),
+      ( SU.basic_op (Load { memory_chunk; addressing_mode; mutability; atomic }),
         [eloc] )
     | Cstore (chunk, init) -> (
       let arg1, arg2 = two_args () in
@@ -409,7 +408,8 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cstatic_cast cast -> SU.basic_op (Static_cast cast), args
     | Catomic { op; size } -> (
       match op with
-      | Exchange | Fetch_and_add | Add | Sub | Land | Lor | Lxor ->
+      | Exchange | Fetch_and_add | Add | Sub | Land | Lor | Lxor | Release_store
+        ->
         let src, dst = two_args () in
         let dst_size : Cmm.memory_chunk =
           match size with
@@ -519,10 +519,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
        let segfault : Cmm.expression =
          Cop
            ( Cload
-               { memory_chunk = Word_int;
-                 mutability = Mutable;
-                 is_atomic = false
-               },
+               { memory_chunk = Word_int; mutability = Mutable; atomic = None },
              [Cconst_int (0, Debuginfo.none)],
              Debuginfo.none )
        in

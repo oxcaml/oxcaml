@@ -258,6 +258,7 @@ type atomic_op =
   | Exchange
   | Compare_set
   | Compare_exchange
+  | Release_store
 
 let equal_atomic_op left right =
   match left, right with
@@ -269,10 +270,11 @@ let equal_atomic_op left right =
   | Lxor, Lxor
   | Exchange, Exchange
   | Compare_set, Compare_set
-  | Compare_exchange, Compare_exchange ->
+  | Compare_exchange, Compare_exchange
+  | Release_store, Release_store ->
     true
   | ( ( Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange | Compare_set
-      | Compare_exchange ),
+      | Compare_exchange | Release_store ),
       _ ) ->
     false
 
@@ -351,6 +353,10 @@ type bswap_bitwidth =
   | Sixteen
   | Thirtytwo
   | Sixtyfour
+
+type atomic_load_memory_order =
+  | Seq_cst
+  | Acquire
 
 type initialization_or_assignment =
   | Initialization
@@ -571,7 +577,7 @@ type operation =
   | Cload of
       { memory_chunk : memory_chunk;
         mutability : Asttypes.mutable_flag;
-        is_atomic : bool
+        atomic : atomic_load_memory_order option
       }
   | Calloc of Alloc_mode.t * alloc_block_kind
   | Cstore of memory_chunk * initialization_or_assignment
@@ -1064,6 +1070,11 @@ let equal_float_comparison left right =
   | CFge, (CFeq | CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFnge)
   | CFnge, (CFeq | CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFge) ->
     false
+
+let equal_atomic_load_memory_order left right =
+  match left, right with
+  | Seq_cst, Seq_cst | Acquire, Acquire -> true
+  | (Seq_cst | Acquire), _ -> false
 
 let equal_memory_chunk left right =
   match left, right with

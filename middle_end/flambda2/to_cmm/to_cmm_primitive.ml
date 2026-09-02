@@ -1173,6 +1173,11 @@ let atomic_offset (offset_units : P.atomic_offset_units) offset =
     C.Field_index { index = offset; index_type = tagged_immediate }
   | Byte_offset -> C.Byte_offset { offset; offset_type = naked_int64 }
 
+let load_memory_order : P.Memory_order.t -> Cmm.atomic_load_memory_order =
+  function
+  | Seq_cst -> Seq_cst
+  | Acq_rel -> Acquire
+
 let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     (arg : Cmm.expression) =
   match (f : P.unary_primitive) with
@@ -1338,9 +1343,10 @@ let binary_primitive env dbg f (_x_simple : Simple.t option)
   | Float_comp (width, Yielding_int_like_compare_functions ()) ->
     binary_float_comp_primitive_yielding_int env dbg width x y
   | Bigarray_get_alignment align -> C.bigstring_get_alignment x y align dbg
-  | Atomic_load (offset_units, block_access_kind) ->
+  | Atomic_load (offset_units, block_access_kind, memory_order) ->
     C.atomic_load ~dbg
       (imm_or_ptr block_access_kind)
+      ~memory_order:(load_memory_order memory_order)
       x
       (atomic_offset offset_units y)
   | Poke kind ->
@@ -1374,7 +1380,8 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
     | And -> C.atomic_land ~dbg x offset z |> C.return_unit dbg
     | Or -> C.atomic_lor ~dbg x offset z |> C.return_unit dbg
     | Xor -> C.atomic_lxor ~dbg x offset z |> C.return_unit dbg)
-  | Atomic_set (offset_units, block_access_kind, mode) ->
+  | Atomic_set (offset_units, block_access_kind, Seq_cst, mode) ->
+    (* Sequentially consistent stores are implemented as exchanges. *)
     C.atomic_exchange ~dbg
       (imm_or_ptr block_access_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
@@ -1382,6 +1389,13 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
       (atomic_offset offset_units y)
       ~new_value:z
     |> C.return_unit dbg
+  | Atomic_set (offset_units, block_access_kind, Acq_rel, mode) ->
+    C.atomic_release_store ~dbg
+      (imm_or_ptr block_access_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
+      x
+      (atomic_offset offset_units y)
+      ~new_value:z
   | Atomic_exchange (offset_units, block_access_kind, mode) ->
     C.atomic_exchange ~dbg
       (imm_or_ptr block_access_kind)

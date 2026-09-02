@@ -342,12 +342,17 @@ let encode_load_store_halfword : type a.
   encode_load_store_gp_sized ~all_sections state ~instr_name ~size:0b01 ~opc ~rd
     addressing
 
-(* Load-Acquire (LDAR) encoding. Format: size[31:30] | 001000 | o2[23] | L[22] |
-   o1[21] | Rs[20:16] | o0[15] | Rt2[14:10] | Rn[9:5] | Rt[4:0] For LDAR: o2=1,
-   L=1, o1=0, Rs=11111, o0=1, Rt2=11111 size: 10 for 32-bit, 11 for 64-bit *)
-let encode_load_acquire : type a.
-    rd:[`GP of a] Reg.t -> rn:[`GP of _] Reg.t -> int32 =
- fun ~rd ~rn ->
+(* Load-Acquire (LDAR) and Store-Release (STLR) encoding. Format: size[31:30] |
+   001000 | o2[23] | L[22] | o1[21] | Rs[20:16] | o0[15] | Rt2[14:10] | Rn[9:5]
+   | Rt[4:0] For LDAR and STLR: o2=1, o1=0, Rs=11111, o0=1, Rt2=11111 size: 10
+   for 32-bit, 11 for 64-bit. L=1 for LDAR, L=0 for STLR. *)
+type load_or_store =
+  | Load
+  | Store
+
+let encode_load_acquire_or_store_release : type a.
+    load_or_store -> rd:[`GP of a] Reg.t -> rn:[`GP of _] Reg.t -> int32 =
+ fun load_or_store ~rd ~rn ->
   let size =
     match rd.reg_name with
     | GP W | GP WZR | GP WSP -> 0b10
@@ -356,7 +361,7 @@ let encode_load_acquire : type a.
   let rt = Reg.gp_encoding rd in
   let rn_enc = Reg.gp_encoding rn in
   let o2 = 1 in
-  let l = 1 in
+  let l = match load_or_store with Load -> 1 | Store -> 0 in
   let o1 = 0 in
   let o0 = 1 in
   let rs = 0b11111 in
@@ -373,6 +378,12 @@ let encode_load_acquire : type a.
   let result = logor result (shift_left (of_int rn_enc) 5) in
   let result = logor result (of_int rt) in
   result
+
+let encode_load_acquire ~rd ~rn =
+  encode_load_acquire_or_store_release Load ~rd ~rn
+
+let encode_store_release ~rd ~rn =
+  encode_load_acquire_or_store_release Store ~rd ~rn
 
 (* Memory barrier encoding. Format: 1101 0101 0000 0011 0011 | CRm[11:8] |
    op2[7:5] | 11111

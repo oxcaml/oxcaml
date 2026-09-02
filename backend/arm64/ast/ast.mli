@@ -1345,6 +1345,7 @@ module Instruction_name : sig
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
           * [`Shift_by_element_width of 'w] )
         t
+    | STLR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
     | STP :
         ('w1, 'w2) LDP_STP_width.t
         -> ( triple,
