@@ -69,11 +69,7 @@ let is_linux = function[@warning "-4"] S_linux -> true | _ -> false
 
 let is_macosx = function[@warning "-4"] S_macosx -> true | _ -> false
 
-let is_win32 = function[@warning "-4"] S_win32 -> true | _ -> false
-
 let is_win64 = function[@warning "-4"] S_win64 -> true | _ -> false
-
-let is_solaris = function[@warning "-4"] S_solaris -> true | _ -> false
 
 let string_of_substring_literal k n s =
   let between x low high =
