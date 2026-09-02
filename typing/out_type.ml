@@ -2528,7 +2528,7 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
          (fun layout ->
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
-  | Layout (Addressable lay) ->
+  | Layout (Addressable lay) when Option.is_none (Jkind.Desc.get_const desc) ->
     if Jkind.Layout.is_surely_addressable_flat lay then
       out_jkind_of_desc env { desc with base = Layout lay }
     else
