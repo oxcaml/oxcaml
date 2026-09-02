@@ -28,7 +28,7 @@ let test ~(call_pos : [%call_pos]) ~expect_caml_modifies f =
 
 type t =
   { mutable a : int or_null
-  ; mutable b : int64#
+  ; mutable b : int64_u
   }
 
 let set t ~a =
