@@ -119,6 +119,8 @@ module Dependency : sig
       | Instance
       | Argument_member
       | Interface
+      | Interface_member
+      | Interface_pair
   end
 
   type t =
