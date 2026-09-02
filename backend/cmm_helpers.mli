@@ -739,6 +739,7 @@ val send :
   Extended_machtype.t list ->
   Extended_machtype.t ->
   Lambda.region_close * Cmx_format.return_mode ->
+  returns:bool ->
   Debuginfo.t ->
   expression
 
@@ -1079,6 +1080,7 @@ val caml_modify_local :
     If a closure needs to be passed, it must be included in [args]. *)
 val direct_call :
   dbg:Debuginfo.t ->
+  returns:bool ->
   machtype ->
   Lambda.region_close ->
   symbol ->
@@ -1088,6 +1090,7 @@ val direct_call :
 (** Same as {!direct_call} but for an indirect call. *)
 val indirect_call :
   dbg:Debuginfo.t ->
+  returns:bool ->
   Extended_machtype.t ->
   Lambda.region_close ->
   Cmx_format.return_mode ->
@@ -1100,6 +1103,7 @@ val indirect_call :
     application (since this enables a few optimisations). *)
 val indirect_full_call :
   dbg:Debuginfo.t ->
+  returns:bool ->
   Extended_machtype.t ->
   Lambda.region_close ->
   expression ->
@@ -1286,7 +1290,7 @@ val atomic_compare_exchange_field :
 
 val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
 
-val perform : dbg:Debuginfo.t -> expression -> expression
+val perform : dbg:Debuginfo.t -> returns:bool -> expression -> expression
 
 val with_stack :
   dbg:Debuginfo.t ->
@@ -1295,6 +1299,7 @@ val with_stack :
   effc:expression ->
   f:expression ->
   arg:expression ->
+  returns:bool ->
   expression
 
 val with_stack_preemptible :
@@ -1305,18 +1310,28 @@ val with_stack_preemptible :
   handle_tick:expression ->
   f:expression ->
   arg:expression ->
+  returns:bool ->
   expression
 
 val continue :
-  dbg:Debuginfo.t -> cont:expression -> value:expression -> expression
+  dbg:Debuginfo.t ->
+  cont:expression ->
+  value:expression ->
+  returns:bool ->
+  expression
 
 val discontinue :
-  dbg:Debuginfo.t -> cont:expression -> exn:expression -> expression
+  dbg:Debuginfo.t ->
+  cont:expression ->
+  exn:expression ->
+  returns:bool ->
+  expression
 
 val discontinue_with_backtrace :
   dbg:Debuginfo.t ->
   cont:expression ->
   exn:expression ->
+  returns:bool ->
   bt:expression ->
   expression
 
@@ -1325,6 +1340,7 @@ val reperform :
   eff:expression ->
   cont:expression ->
   last_fiber:expression ->
+  returns:bool ->
   expression
 
 (* CR mshinwell: change unboxed scalar arrays to use mixed block (or similar)
