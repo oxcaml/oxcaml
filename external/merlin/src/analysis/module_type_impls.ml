@@ -1026,11 +1026,23 @@ let query_results engine targets =
       in
       (target, result))
 
-let query ~pipeline (typedtree : Mtyper.typedtree) =
-  let open Query_protocol.Module_type_impls in
+let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
   let mconfig = Mpipeline.final_config pipeline in
   let own_file = Helpers.own_file mconfig in
   let targets = module_type_decls typedtree in
+  let targets, buffer_wide =
+    match position with
+    | None -> (targets, true)
+    | Some position -> (
+      let enclosing =
+        List.filter targets ~f:(fun (target : target) ->
+            Location_aux.compare_pos position target.target_loc = 0)
+      in
+      match List.rev enclosing with
+      | [] -> failwith "No module-type declaration at this position"
+      | target :: _ -> ([ target ], false))
+  in
+  let open Query_protocol.Module_type_impls in
   let index_files = mconfig.merlin.index_files in
   let facts = Helpers.module_facts mconfig in
   let engine =
@@ -1091,6 +1103,7 @@ let query ~pipeline (typedtree : Mtyper.typedtree) =
                     | No_recorded_site | Unresolved_site -> None)
                 })))
   in
+  let own_interface_rows = if buffer_wide then own_interface_rows else [] in
   let implementations =
     List.sort_uniq ~cmp:compare_implementation
       (own_interface_rows @ implementations)

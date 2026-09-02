@@ -663,3 +663,47 @@ result members, aliases, and the eventual application instance.
   Transform 16:7 16:16 annotation
   A 21:7 21:8 argument
   Value 23:9 23:14 annotation
+
+With [-position], the query answers for exactly one module type: the
+innermost module-type declaration enclosing the position.  The buffer is
+still what identifies the declaration, so the selection is deterministic.
+
+  $ cat > one.ml <<'EOF'
+  > module type S = sig
+  >   type t
+  > end
+  > module type Outer = sig
+  >   module type Inner = S
+  > end
+  > module M : S = struct
+  >   type t = int
+  > end
+  > EOF
+  $ $OCAMLC -bin-annot -c one.ml
+  $ ocaml-index aggregate one.cmt -o one.ocaml-index
+  $ $MERLIN single module-type-impls \
+  >   -position 1:13 \
+  >   -index-file ./one.ocaml-index \
+  >   -filename ./one.ml < ./one.ml \
+  >   | jq -r '.value.targets[].target'
+  S
+
+Inside [Outer]'s body the innermost enclosing declaration is [Outer.Inner],
+not [Outer].
+
+  $ $MERLIN single module-type-impls \
+  >   -position 5:14 \
+  >   -index-file ./one.ocaml-index \
+  >   -filename ./one.ml < ./one.ml \
+  >   | jq -r '.value.targets[].target'
+  Outer.Inner
+
+A position enclosed by no module-type declaration is an explicit failure,
+never an empty answer.
+
+  $ $MERLIN single module-type-impls \
+  >   -position 8:2 \
+  >   -index-file ./one.ocaml-index \
+  >   -filename ./one.ml < ./one.ml \
+  >   | jq -r '"\(.class): \(.value)"'
+  failure: No module-type declaration at this position

@@ -355,7 +355,8 @@ type _ t =
       Msource.position * Msource.position
       -> (Location.t * string) t
   | Holes (* *) : (Location.t * string) list t
-  | Module_type_impls (* *) : Module_type_impls.response t
+  | Module_type_impls (* *) :
+      Msource.position option -> Module_type_impls.response t
   | Construct :
       Msource.position * [ `None | `Local ] option * int option
       -> (Location.t * string list) t
