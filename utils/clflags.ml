@@ -269,9 +269,9 @@ let std_include_dir () =
 let shared = ref false (* -shared *)
 let dlcode = ref true (* not -nodynlink *)
 
-let pic_code = ref (match Config.architecture with (* -fPIC *)
-                     | "amd64" | "s390x" -> true
-                     | _                 -> false)
+let pic_code = ref (match Target_system.Architecture.get () with (* -fPIC *)
+                     | X86_64 | Z                           -> true
+                     | IA32 | ARM | AArch64 | POWER | Riscv -> false)
 
 let runtime_variant = ref ""
 let ocamlrunparam = ref ""

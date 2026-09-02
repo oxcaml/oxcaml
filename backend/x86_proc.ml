@@ -20,57 +20,6 @@ open X86_ast
 module DLL = Doubly_linked_list
 module Section_name = X86_section.Section_name
 
-type system =
-  (* 32 bits and 64 bits *)
-  | S_macosx
-  | S_gnu
-  | S_cygwin
-  (* 32 bits only *)
-  | S_solaris
-  | S_win32
-  | S_linux_elf
-  | S_bsd_elf
-  | S_beos
-  | S_mingw
-  (* 64 bits only *)
-  | S_win64
-  | S_linux
-  | S_mingw64
-  | S_freebsd
-  | S_netbsd
-  | S_openbsd
-  | S_unknown
-
-let system =
-  match Config.system with
-  | "macosx" -> S_macosx
-  | "solaris" -> S_solaris
-  | "win32" -> S_win32
-  | "linux_elf" -> S_linux_elf
-  | "bsd_elf" -> S_bsd_elf
-  | "beos" -> S_beos
-  | "gnu" -> S_gnu
-  | "cygwin" -> S_cygwin
-  | "mingw" -> S_mingw
-  | "mingw64" -> S_mingw64
-  | "win64" -> S_win64
-  | "linux" -> S_linux
-  | "freebsd" -> S_freebsd
-  | "netbsd" -> S_netbsd
-  | "openbsd" -> S_openbsd
-  | _ -> S_unknown
-
-let windows =
-  match[@warning "-4"] system with
-  | S_mingw64 | S_cygwin | S_win64 -> true
-  | _ -> false
-
-let is_linux = function[@warning "-4"] S_linux -> true | _ -> false
-
-let is_macosx = function[@warning "-4"] S_macosx -> true | _ -> false
-
-let is_win64 = function[@warning "-4"] S_win64 -> true | _ -> false
-
 let string_of_substring_literal k n s =
   let between x low high =
     Char.compare x low >= 0 && Char.compare x high <= 0
@@ -310,14 +259,12 @@ let internal_assembler = ref None
 let register_internal_assembler f = internal_assembler := Some f
 
 (* Which asm conventions to use *)
-let masm =
-  match[@warning "-4"] system with S_win32 | S_win64 -> true | _ -> false
-
+(* CR shym Should this be a test whether the target format is ELF? *)
 let use_plt =
-  match system with
-  | S_macosx | S_mingw64 | S_cygwin | S_win64 -> false
-  | S_linux | S_gnu | S_solaris | S_win32 | S_linux_elf | S_bsd_elf | S_beos
-  | S_mingw | S_freebsd | S_netbsd | S_openbsd | S_unknown ->
+  (* CR shym is that just testing for ELF? *)
+  match Target_system.System.get () with
+  | MacOS | Windows (MinGW | MSVC) | Cygwin -> false
+  | Linux | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU | BeOS ->
     !Clflags.dlcode
 
 (* Shall we use an external assembler command ? If [binary_content] contains
@@ -326,7 +273,7 @@ let use_plt =
 let binary_content = ref None
 
 let compile infile outfile =
-  if masm
+  if Target_system.Assembler.is_masm ()
   then
     Ccomp.command
       (Config.asm ^ Filename.quote outfile ^ " " ^ Filename.quote infile

@@ -558,9 +558,11 @@ let specific_operation_name : specific_operation -> string = fun op ->
 
 (* Are we using the Windows 64-bit ABI? *)
 let win64 =
-  match Config.system with
-  | "win64" | "mingw64" | "cygwin" -> true
-  | _                   -> false
+  match Target_system.System.get () with
+  | Windows (MinGW | MSVC) | Cygwin -> true
+  | Linux | MacOS | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU
+  | BeOS ->
+    false
 
 
 (* Specific operations that are pure *)

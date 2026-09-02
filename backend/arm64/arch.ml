@@ -21,8 +21,6 @@ open! Int_replace_polymorphic_compare
 
 open Format
 
-let macosx = String.equal Config.system "macosx"
-
 let is_asan_enabled = ref false
 
 (* CR gyorsh: refactor to use [Arch.Extension] like amd64 *)

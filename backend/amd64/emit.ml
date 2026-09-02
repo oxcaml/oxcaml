@@ -336,7 +336,7 @@ let rel_plt (s : Cmm.symbol) =
   match (s.sym_global : Cmm.is_global) with
   | Local -> sym (label_name (emit_symbol s.sym_name))
   | Global ->
-    if windows && !Clflags.dlcode
+    if Target_system.Assembler.is_windows_or_cygwin () && !Clflags.dlcode
     then mem__imp s.sym_name
     else
       let s = emit_symbol s.sym_name in
@@ -372,7 +372,7 @@ let load_symbol_addr (s : Cmm.symbol) arg =
   | Global ->
     if !Clflags.dlcode
     then
-      if windows
+      if Target_system.Assembler.is_windows_or_cygwin ()
       then
         (* I.mov (mem__imp s) arg (\* mov __caml_imp_foo(%rip), ... *\) *)
         I.mov (sym (emit_symbol s.sym_name)) arg (* movabsq $foo, ... *)
@@ -385,6 +385,16 @@ let load_symbol_addr (s : Cmm.symbol) arg =
    supported on the target system. *)
 
 let emit_named_text_section ?(suffix = "") func_name =
+  let check_supported () =
+    if
+      Target_system.Assembler.is_macos ()
+      (* Names of section segments in macosx are restricted to 16 characters,
+         but function names are often longer, especially anonymous functions. *)
+      || Target_system.Assembler.is_windows_or_cygwin ()
+      (* Win systems provide named text sections, but configure on these systems
+         does not support function sections. *)
+    then assert false
+  in
   (* CR-someday ksvetlitski: In the future we should consider extending this to
      also place other known-cold functions in a separate section (specifically
      [.text.unlikely.caml]). This would necessitate adding a new constructor to
@@ -395,49 +405,31 @@ let emit_named_text_section ?(suffix = "") func_name =
     !Oxcaml_flags.module_entry_functions_section
     && String.ends_with func_name ~suffix:"__entry"
   then (
-    match[@ocaml.warning "-4"] system with
-    | S_macosx
-    (* Names of section segments in macosx are restricted to 16 characters, but
-       function names are often longer, especially anonymous functions. *)
-    | S_win64 | S_mingw64
-    | S_cygwin
-      (* Win systems provide named text sections, but configure on these systems
-         does not support function sections. *) ->
-      assert false
-    | _ ->
-      D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
-        ~args:["@progbits"] ~is_delayed:false;
-      Emitaux.enter_code_section ".text.startup.caml";
-      (* Warning: We set the internal section ref to Text here, because it
-         currently does not supported named text sections. In the rest of this
-         file, we pretend the section is called Text rather than the function
-         specific text section. *)
-      (* CR sspies: Add proper support for named text sections. *)
-      D.unsafe_set_internal_section_ref Text)
+    check_supported ();
+    D.switch_to_section_raw ~names:[".text.startup.caml"] ~flags:(Some "ax")
+      ~args:["@progbits"] ~is_delayed:false;
+    Emitaux.enter_code_section ".text.startup.caml";
+    (* Warning: We set the internal section ref to Text here, because it
+       currently does not supported named text sections. In the rest of this
+       file, we pretend the section is called Text rather than the function
+       specific text section. *)
+    (* CR sspies: Add proper support for named text sections. *)
+    D.unsafe_set_internal_section_ref Text)
   else if !Clflags.function_sections || !Oxcaml_flags.basic_block_sections
   then (
-    match[@ocaml.warning "-4"] system with
-    | S_macosx
-    (* Names of section segments in macosx are restricted to 16 characters, but
-       function names are often longer, especially anonymous functions. *)
-    | S_win64 | S_mingw64
-    | S_cygwin
-      (* Win systems provide named text sections, but configure on these systems
-         does not support function sections. *) ->
-      assert false
-    | _ ->
-      let name =
-        Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
-      in
-      D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
-        ~args:["@progbits"] ~is_delayed:false;
-      Emitaux.enter_code_section name;
-      (* Warning: We set the internal section ref to Text here, because it
-         currently does not supported named text sections. In the rest of this
-         file, we pretend the section is called Text rather than the function
-         specific text section. *)
-      (* CR sspies: Add proper support for named text sections. *)
-      D.unsafe_set_internal_section_ref Text)
+    check_supported ();
+    let name =
+      Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
+    in
+    D.switch_to_section_raw ~names:[name] ~flags:(Some "ax") ~args:["@progbits"]
+      ~is_delayed:false;
+    Emitaux.enter_code_section name;
+    (* Warning: We set the internal section ref to Text here, because it
+       currently does not supported named text sections. In the rest of this
+       file, we pretend the section is called Text rather than the function
+       specific text section. *)
+    (* CR sspies: Add proper support for named text sections. *)
+    D.unsafe_set_internal_section_ref Text)
   else (
     D.text ();
     (* On Mach-O, [Delta_uleb128] evaluates cross-atom deltas via .set, so
@@ -1103,12 +1095,8 @@ let global_maybe_protected (sym : S.t) =
   then
     (* CR sspies: This match should probably moved into asm directives. Check
        what Arm does. *)
-    match system with
-    | S_macosx | S_win32 | S_win64 | S_mingw64 | S_cygwin | S_mingw | S_unknown
-      ->
-      ()
-    | S_gnu | S_solaris | S_linux_elf | S_bsd_elf | S_beos | S_linux | S_freebsd
-    | S_netbsd | S_openbsd ->
+    if not Target_system.Assembler.(is_macos () || is_windows_or_cygwin ())
+    then
       (* Global symbols can be marked as being protected. Unlike in C we don't
          want them to be preempted as we're doing a lot of cross module
          inlining. *)
@@ -2839,7 +2827,7 @@ let fundecl fundecl =
   add_def_symbol fundecl.fun_name;
   let fundecl_sym = S.create_global fundecl.fun_name in
   if
-    is_macosx system
+    Target_system.Assembler.is_macos ()
     && (not !Clflags.output_c_object)
     && is_generic_function fundecl.fun_name
   then (* PR#4690 *)
@@ -2938,7 +2926,7 @@ let begin_assembly unix =
   let code_begin = Cmm_helpers.make_symbol "code_begin" in
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter;
-  if is_win64 system
+  if Target_system.Assembler.is_masm ()
   then (
     D.extrn S.Predef.caml_call_gc;
     D.extrn S.Predef.caml_call_gc_sse;
@@ -2989,7 +2977,7 @@ let begin_assembly unix =
   emit_global_label ~section:Data "data_begin";
   emit_named_text_section code_begin;
   emit_global_label_for_symbol ~section:Text code_begin;
-  if is_macosx system then I.nop ();
+  if Target_system.Assembler.is_macos () then I.nop ();
   (* PR#4690 *)
   Regs.Save_simd_regs.all
   |> List.iter (fun simd ->
@@ -3203,11 +3191,11 @@ let emit_probe_handler_wrapper (p : Probe_emission.probe) =
 let emit_trap_notes () =
   (* Don't emit trap notes on windows and macos systems *)
   let is_system_supported =
-    match system with
-    | S_macosx -> false (* can be supported with a symbol *)
-    | S_gnu | S_solaris | S_linux_elf | S_bsd_elf | S_beos | S_linux -> true
-    | S_cygwin | S_mingw | S_mingw64 | S_win64 | S_win32 | S_unknown -> false
-    | S_freebsd | S_netbsd | S_openbsd ->
+    match Target_system.System.get () with
+    | MacOS -> false (* can be supported with a symbol *)
+    | Linux | Solaris | GNU | BeOS -> true
+    | Windows (MinGW | MSVC) | Cygwin -> false
+    | FreeBSD | NetBSD | OpenBSD | Dragonfly ->
       (* Probably works, as these are ELF-based, but untested. *)
       false
   in
@@ -3260,7 +3248,7 @@ let end_assembly () =
   emit_jump_tables ();
   let code_end = Cmm_helpers.make_symbol "code_end" in
   emit_named_text_section code_end;
-  if is_macosx system then I.nop ();
+  if Target_system.Assembler.is_macos () then I.nop ();
   (* suppress "ld warning: atom sorting error" *)
   emit_global_label_for_symbol ~section:Text code_end;
   emit_imp_table ~section:Text ();
@@ -3275,7 +3263,7 @@ let end_assembly () =
   emit_global_label ~section:Read_only_data "frametable";
   (* MASM can't assemble computed ULEB128 constants, so can't do short frame
      descriptors *)
-  Emitaux.disable_short_descriptors := X86_proc.masm;
+  Emitaux.disable_short_descriptors := Target_system.Assembler.is_masm ();
   (* The binary emitter keeps the strings inline in the frametable section:
      same-section label differences need no relocations. *)
   let debug_strings_section : Asm_targets.Asm_section.t =
@@ -3325,7 +3313,7 @@ let end_assembly () =
   emit_trap_notes ();
   D.mark_stack_non_executable ();
   (* Note that [mark_stack_non_executable] switches the section on Linux. *)
-  if is_win64 system
+  if Target_system.Assembler.is_masm ()
   then (
     D.comment "External functions";
     String.Set.iter
@@ -3339,7 +3327,9 @@ let end_assembly () =
     if !X86_proc.create_asm_file
     then
       Some
-        ((if X86_proc.masm then X86_masm.generate_asm else X86_gas.generate_asm)
+        ((if Target_system.Assembler.is_masm ()
+          then X86_masm.generate_asm
+          else X86_gas.generate_asm)
            !Emitaux.output_channel)
     else None
   in

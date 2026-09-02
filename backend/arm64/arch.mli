@@ -17,7 +17,6 @@
 [@@@ocaml.warning "+a-40-41-42"]
 (* Specific operations for the ARM processor, 64-bit mode *)
 
-val macosx : bool
 val is_asan_enabled : bool ref
 val feat_cssc : bool ref
 val trap_notes : bool ref

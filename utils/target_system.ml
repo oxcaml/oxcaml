@@ -29,6 +29,15 @@ module Architecture = struct
     | IA32 | ARM -> false
 
   let is_32_bit () = not (is_64_bit ())
+
+  let to_string = function
+    | IA32 -> "IA32"
+    | X86_64 -> "X86_64"
+    | ARM -> "ARM"
+    | AArch64 -> "AArch64"
+    | POWER -> "POWER"
+    | Z -> "Z"
+    | Riscv -> "Riscv"
 end
 
 module System = struct
@@ -96,6 +105,15 @@ module Assembler = struct
   let is_macos () = match get () with MASM | GAS_like -> false | MacOS -> true
 
   let is_gas () = match get () with MASM | MacOS -> false | GAS_like -> true
+
+  let is_masm () = match get () with MacOS | GAS_like -> false | MASM -> true
+
+  let is_windows_or_cygwin () =
+    match System.get () with
+    | Windows (MinGW | MSVC) | Cygwin -> true
+    | Linux | MacOS | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU
+    | BeOS ->
+      false
 
   let label_prefix () =
     match get () with MacOS -> "L" | MASM | GAS_like -> ".L"

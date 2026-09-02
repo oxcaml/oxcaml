@@ -3047,11 +3047,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Arch_amd64 ->
         [ Simple
             (Simple.const_bool machine_width
-               (String.equal Config.architecture "amd64")) ]
+               (match[@warning "-4"] Target_system.Architecture.get () with
+               | X86_64 -> true
+               | _ -> false)) ]
       | Arch_arm64 ->
         [ Simple
             (Simple.const_bool machine_width
-               (String.equal Config.architecture "arm64")) ]
+               (match[@warning "-4"] Target_system.Architecture.get () with
+               | AArch64 -> true
+               | _ -> false)) ]
       | Backend_type ->
         [Simple (Simple.const_zero machine_width)]
         (* constructor 0 is the same as Native here *)

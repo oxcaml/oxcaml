@@ -88,9 +88,9 @@ let postcondition_layout : Cfg_with_layout.t -> unit =
   in
   let arch_constraints (id : InstructionId.t) (desc : Cfg.basic)
       (arg : Reg.t array) (res : Reg.t array) : unit =
-    match Config.architecture with
+    match Target_system.Architecture.get () with
     (* CR xclerc for xclerc: what about cross-compilation? *)
-    | "amd64" | "arm64" -> (
+    | X86_64 | AArch64 -> (
       let num_locals = num_stack_locals arg + num_stack_locals res in
       match desc with
       | Op (Spill | Reload) ->
@@ -115,7 +115,9 @@ let postcondition_layout : Cfg_with_layout.t -> unit =
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Specific _ | Name_for_debugger _ | Alloc _ ) ->
         ())
-    | arch -> fatal "unsupported architecture %S" arch
+    | (IA32 | ARM | POWER | Z | Riscv) as arch ->
+      fatal "unsupported architecture %S"
+        (Target_system.Architecture.to_string arch)
   in
   let register_classes_must_be_consistent (id : InstructionId.t) (reg : Reg.t) :
       unit =

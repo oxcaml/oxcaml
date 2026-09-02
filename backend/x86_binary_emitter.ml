@@ -408,7 +408,9 @@ let declare_label b s =
 let buf_opcodes b opcodes =
   ListLabels.iter ~f:(fun opcode -> buf_int8 b opcode) opcodes
 
-let arch64 = String.equal Config.architecture "amd64"
+(* CR shym Should this be turned into a function (ie directly call is_64_bit in
+   emit_rex)? Or a lazy value? *)
+let arch64 = Target_system.Architecture.is_64_bit ()
 
 let emit_rex b rexcode =
   if arch64 && rexcode <> 0 then buf_int8 b (rexcode lor rex)
@@ -689,7 +691,10 @@ let emit_MOV b dst src =
       emit_rex b (rexw lor rexb_opcode reg);
       buf_int8 b (0xB8 lor reg7 reg);
       buf_int64L b n
-  | Reg64 r64, Sym symbol when windows ->
+  | Reg64 r64, Sym symbol when
+      (* CR shym Check that those are really the cases that need to be
+         handled differently *)
+      Target_system.Assembler.is_windows_or_cygwin () ->
       let reg = rd_of_reg64 r64 in
       emit_rex b (rexw lor rexb_opcode reg);
       buf_int8 b (0xB8 lor reg7 reg);

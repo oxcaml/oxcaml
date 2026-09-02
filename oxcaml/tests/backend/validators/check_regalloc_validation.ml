@@ -377,13 +377,13 @@ let () =
       cfg, cfg)
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
-      (if String.equal Config.architecture "amd64"
-       then
-         ">> Fatal error: instruction 20 has a register (anon:V/44) with an \
-          unknown location"
-       else
-         ">> Fatal error: instruction 20 has a register (anon:V/68) with an \
-          unknown location")
+      (match[@warning "-4"] Target_system.Architecture.get () with
+      | X86_64 ->
+          ">> Fatal error: instruction 20 has a register (anon:V/44) with an \
+           unknown location"
+      | _ ->
+          ">> Fatal error: instruction 20 has a register (anon:V/68) with an \
+           unknown location")
 
 let () =
   check "Precoloring can't change"

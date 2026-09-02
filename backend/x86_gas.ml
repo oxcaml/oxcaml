@@ -212,7 +212,10 @@ let print_instr b = function
            (Int64.compare n 0x7FFF_FFFFL <= 0
            && Int64.compare n (-0x8000_0000L) >= 0) ->
     i2 b "movabsq" arg1 arg2
-  | MOV ((Sym _ as arg1), (Reg64 _ as arg2)) when windows ->
+  | MOV ((Sym _ as arg1), (Reg64 _ as arg2))
+    when (* CR shym Check that those are really the cases that need to be
+            handled differently *)
+         Target_system.Assembler.is_windows_or_cygwin () ->
     i2 b "movabsq" arg1 arg2
   | MOV
       ( (( Reg8L _ | Imm _ | Sym _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _

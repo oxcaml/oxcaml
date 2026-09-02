@@ -16,6 +16,8 @@ module Architecture : sig
 
   (* CR mshinwell: what happens about these functions for JSIR? *)
   val is_32_bit : unit -> bool
+
+  val to_string : t -> string
 end
 
 module System : sig
@@ -53,6 +55,10 @@ module Assembler : sig
   val is_macos : unit -> bool
 
   val is_gas : unit -> bool
+
+  val is_masm : unit -> bool
+
+  val is_windows_or_cygwin : unit -> bool
 
   val label_prefix : unit -> string
 end

@@ -109,7 +109,9 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
     match SS.find_target_offset_in_bytes state target with
     | Some _ -> None (* Same section, use normal eval *)
     | None -> (
-      let macosx = String.equal Config.system "macosx" in
+      (* CR shym instead of not macos, switch to is_gas? Or define an is_elf in
+         Target_system? *)
+      let macos = Target_system.Assembler.is_macos () in
       let for_jit = All_section_states.for_jit all_sections in
       let current_section_supports_cross_section_reference =
         Asm_section.equal current_section Asm_section.Data
@@ -120,7 +122,7 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
          addend. For JIT mode, we aggregate sections so can't use section
          symbols. *)
       if
-        (not macosx) && (not for_jit)
+        (not macos) && (not for_jit)
         &&
         match
           All_section_states.find_in_any_individual_section_with_state
@@ -162,7 +164,7 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
                to %s not supported"
               (Asm_section.to_string current_section)
               (Asm_section.to_string label_section)
-          else if (not macosx) && not for_jit
+          else if (not macos) && not for_jit
           then (
             (* ELF without function sections: use R_AARCH64_PREL32 with standard
                section symbol. The assembler uses section symbols for
@@ -216,13 +218,13 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
 (* Returns true if we're on a RELA platform (Linux ELF) where addends are stored
    in the relocation entry rather than in the instruction/data. On REL platforms
    (macOS Mach-O), addends are encoded in the instruction. *)
+(* CR shym is that available on all ELF platforms? *)
 let is_rela_platform () =
-  match Config.system with
-  | "linux" | "linux_eabi" | "linux_eabihf" | "freebsd" | "netbsd" | "openbsd"
-    ->
-    true
-  | "macosx" | "darwin" -> false
-  | _ -> false (* Default to REL behavior for unknown systems *)
+  match Target_system.System.get () with
+  | Linux | FreeBSD | NetBSD | OpenBSD -> true
+  | MacOS -> false
+  | Windows (MinGW | MSVC) | Cygwin | Solaris | Dragonfly | GNU | BeOS ->
+    false (* Default to REL behavior for other systems *)
 
 (* Encode a Symbol.target to its string representation *)
 let encode_target (target : Symbol.target) : string =

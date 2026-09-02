@@ -54,7 +54,8 @@ let int_is_immediate n =
    [effects_of], below. *)
 let inline_ops = ["sqrt"]
 
-let use_direct_addressing _symb = (not !Clflags.dlcode) && not Arch.macosx
+let use_direct_addressing _symb =
+  (not !Clflags.dlcode) && not (Target_system.Assembler.is_macos ())
 
 let is_stack_slot rv =
   Reg.(match rv with [| { loc = Stack _; _ } |] -> true | _ -> false)
@@ -259,7 +260,9 @@ let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
     | XInt | XInt64 | XFloat32 | XFloat | XVec128 -> false
     | XVec256 | XVec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
   in
-  if macosx && ty_arg_is_small_int && is_stack_slot dst
+  if
+    Target_system.Assembler.is_macos ()
+    && ty_arg_is_small_int && is_stack_slot dst
   then Rewritten (Op (Specific Imove32), src, dst)
   else Use_default
 

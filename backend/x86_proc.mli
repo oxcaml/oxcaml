@@ -93,40 +93,6 @@ val assemble_file : (*infile*) string -> (*outfile*) string -> (*retcode*) int
 
 (** System detection *)
 
-(* CR-soon xclerc: remove the systems we do not (and will not) support. *)
-type system =
-  (* 32 bits and 64 bits *)
-  | S_macosx
-  | S_gnu
-  | S_cygwin
-  (* 32 bits only *)
-  | S_solaris
-  | S_win32
-  | S_linux_elf
-  | S_bsd_elf
-  | S_beos
-  | S_mingw
-  (* 64 bits only *)
-  | S_win64
-  | S_linux
-  | S_mingw64
-  | S_freebsd
-  | S_netbsd
-  | S_openbsd
-  | S_unknown
-
-val system : system
-
-val masm : bool
-
-val windows : bool
-
-val is_linux : system -> bool
-
-val is_macosx : system -> bool
-
-val is_win64 : system -> bool
-
 (** Whether calls need to go via the PLT. *)
 val use_plt : bool
 
