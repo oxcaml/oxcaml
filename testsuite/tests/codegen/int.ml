@@ -82,13 +82,6 @@ div_by_constant:
   ret
 |}]
 
-(* CR ttebbi:
-    The last two instructions:
-      sarq  $1, %rax
-      leaq  1(%rax,%rax), %rax
-    are the same as
-      orq $1, %rax
-*)
 let div_2 x = x / 2
 [%%expect_asm X86_64{|
 div_2:
@@ -96,8 +89,7 @@ div_2:
   movq  %rax, %rbx
   shrq  $63, %rbx
   addq  %rbx, %rax
-  sarq  $1, %rax
-  leaq  1(%rax,%rax), %rax
+  orq   $1, %rax
   ret
 |}]
 
@@ -367,8 +359,8 @@ collatz:
   leaq  1(%rdi,%rdi), %rdi
   cmpq  $1, %rdi
   jne   .L2
-  sarq  $1, %rdx
-  leaq  1(%rdx,%rdx), %rbx
+  movq  %rdx, %rbx
+  orq   $1, %rbx
   cmpq  $3, %rbx
   jg    .L1
   jmp   .L0

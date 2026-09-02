@@ -512,6 +512,12 @@ let known_bits_union (k1 : known_bits) (k2 : known_bits) =
     ones = Nativeint.logor k1.ones k2.ones
   }
 
+let known_zero (k : known_bits) mask =
+  Nativeint.equal (Nativeint.logand k.zeros mask) mask
+
+let known_one (k : known_bits) mask =
+  Nativeint.equal (Nativeint.logand k.ones mask) mask
+
 (** The known bits of [a + b]: the low bits up to the first bit that is unknown
     in either operand. *)
 let add_known_bits (a : known_bits) (b : known_bits) =
@@ -527,6 +533,35 @@ let add_known_bits (a : known_bits) (b : known_bits) =
   let sum = Nativeint.logand (Nativeint.add a.ones b.ones) mask in
   { zeros = Nativeint.logand (Nativeint.lognot sum) mask; ones = sum }
 
+let known_bits_inter (k1 : known_bits) (k2 : known_bits) =
+  { zeros = Nativeint.logand k1.zeros k2.zeros;
+    ones = Nativeint.logand k1.ones k2.ones
+  }
+
+(** The known bits of a value with known bits [k] shifted by [n], for
+    [0 <= n < arch_bits]. *)
+let shift_known_bits (op : operation) (k : known_bits) n =
+  match op with
+  | Clsl _ ->
+    { zeros =
+        Nativeint.logand word_mask
+          (Nativeint.logor (Nativeint.shift_left k.zeros n) (low_bits_mask n));
+      ones = Nativeint.logand word_mask (Nativeint.shift_left k.ones n)
+    }
+  | Clsr _ ->
+    { zeros =
+        Nativeint.logor
+          (Nativeint.shift_right_logical k.zeros n)
+          (high_bits_mask n);
+      ones = Nativeint.shift_right_logical k.ones n
+    }
+  | Casr _ ->
+    (* the sign extension is conservatively ignored *)
+    { zeros = Nativeint.shift_right_logical k.zeros n;
+      ones = Nativeint.shift_right_logical k.ones n
+    }
+  | _ -> no_known_bits
+
 (** Conservatively computes the bits of the value of [e] that are statically
     known. *)
 let rec known_bits e : known_bits =
@@ -538,27 +573,29 @@ let rec known_bits e : known_bits =
   match e with
   | Cconst_int (n, _) -> of_const (Nativeint.of_int n)
   | Cconst_natint (n, _) -> of_const n
-  | Cop (Clsl a, [c; Cconst_int (n, _)], _) when is_defined_shift n ->
-    let k = known_bits_union (known_bits c) a.lhs in
-    { zeros =
-        Nativeint.logand word_mask
-          (Nativeint.logor (Nativeint.shift_left k.zeros n) (low_bits_mask n));
-      ones = Nativeint.logand word_mask (Nativeint.shift_left k.ones n)
-    }
-  | Cop (Clsr a, [c; Cconst_int (n, _)], _) when is_defined_shift n ->
-    let k = known_bits_union (known_bits c) a.lhs in
-    { zeros =
-        Nativeint.logor
-          (Nativeint.shift_right_logical k.zeros n)
-          (high_bits_mask n);
-      ones = Nativeint.shift_right_logical k.ones n
-    }
-  | Cop (Casr a, [c; Cconst_int (n, _)], _) when is_defined_shift n ->
-    (* the sign extension is conservatively ignored *)
-    let k = known_bits_union (known_bits c) a.lhs in
-    { zeros = Nativeint.shift_right_logical k.zeros n;
-      ones = Nativeint.shift_right_logical k.ones n
-    }
+  | Cop (((Clsl a | Clsr a | Casr a) as op), [c; Cconst_int (n, _)], _)
+    when is_defined_shift n ->
+    shift_known_bits op (known_bits_union (known_bits c) a.lhs) n
+  | Cop (((Clsl a | Clsr a | Casr a) as op), [c; amount], _) ->
+    (* If the shift amount is known to be less than [arch_bits], the result has
+       the bits that are known for every possible amount. *)
+    let amount_bits = low_bits_mask (Misc.log2 arch_bits) in
+    let known_bits_amount = known_bits amount in
+    if known_zero known_bits_amount (Nativeint.logand word_mask (Nativeint.lognot amount_bits))
+    then
+      let k = known_bits_union (known_bits c) a.lhs in
+      let max_amount =
+        Nativeint.to_int
+          (Nativeint.logand (Nativeint.lognot known_bits_amount.zeros) amount_bits)
+      in
+      let rec for_amounts n acc =
+        if n > max_amount
+        then acc
+        else
+          for_amounts (n + 1) (known_bits_inter acc (shift_known_bits op k n))
+      in
+      for_amounts 1 (shift_known_bits op k 0)
+    else no_known_bits
   | Cop (Cand, [c1; c2], _) ->
     let k1 = known_bits c1 and k2 = known_bits c2 in
     { zeros = Nativeint.logor k1.zeros k2.zeros;
@@ -575,12 +612,6 @@ let rec known_bits e : known_bits =
     (* comparisons return either 0 or 1 *)
     { zeros = Nativeint.logand word_mask (Nativeint.lognot 1n); ones = 0n }
   | _ -> no_known_bits
-
-let known_zero (k : known_bits) mask =
-  Nativeint.equal (Nativeint.logand k.zeros mask) mask
-
-let known_one (k : known_bits) mask =
-  Nativeint.equal (Nativeint.logand k.ones mask) mask
 
 (** returns true only if [e + n] is definitely the same as [e | n], i.e. if the
     set bits of [n] are known to be zero in [e] *)
@@ -888,8 +919,11 @@ let rec or_const e n dbg =
           let e =
             if Nativeint.logand n 1n = 1n then ignore_low_bit_int e else e
           in
-          if
-            can_interchange_add_with_or e n
+          let known = known_bits e in
+          if known_one known n
+          then e
+          else if
+            known_zero known n
             &&
             (* [add_const] takes an [int], so [n] must be exactly representable
                as one *)
@@ -1054,7 +1088,9 @@ and lsl_int c1 c2 dbg =
               lsl_const
                 (Cop
                    ( Caddi assumptions,
-                     [inner; Cconst_int (-((1 lsl n') - 1), dbg)],
+                     [ inner;
+                       natint_const_untagged dbg
+                         (Nativeint.neg (low_bits_mask n')) ],
                      dbg ))
                 (n - n') dbg
             else Cop (Clsl no_input_assumptions, [c1; c2], dbg)
@@ -1133,24 +1169,30 @@ let rec and_const e n dbg =
                 ~bits:(arch_bits - Misc.count_leading_zeroes_nativeint n)
                 ~dbg e
             in
-            (* Masking with a low-bits mask [(1 << k) - 1] that does not fit in
-               a sign-extended 32-bit immediate (and so would have to be
-               materialized in a register first) instead clears the high bits
-               with a pair of shifts. *)
-            let is_wide_low_bits_mask =
-              Nativeint.compare n (Nativeint.of_int32 Int32.max_int) > 0
-              && Nativeint.equal (Nativeint.logand n (Nativeint.succ n)) 0n
-            in
-            if is_wide_low_bits_mask
-            then
-              let shift =
-                arch_bits
-                - Misc.count_trailing_zeroes_nativeint (Nativeint.lognot n)
-              in
-              lsr_const (lsl_const e shift dbg) shift dbg
+            if
+              (* the bits cleared by the mask are already zero *)
+              known_zero (known_bits e)
+                (Nativeint.logand word_mask (Nativeint.lognot n))
+            then e
             else
-              (* prefer putting constants on the right *)
-              Cop (Cand, [e; natint_const_untagged dbg n], dbg)
+              (* Masking with a low-bits mask [(1 << k) - 1] that does not fit
+                 in a sign-extended 32-bit immediate (and so would have to be
+                 materialized in a register first) instead clears the high bits
+                 with a pair of shifts. *)
+              let is_wide_low_bits_mask =
+                Nativeint.compare n (Nativeint.of_int32 Int32.max_int) > 0
+                && Nativeint.equal (Nativeint.logand n (Nativeint.succ n)) 0n
+              in
+              if is_wide_low_bits_mask
+              then
+                let shift =
+                  arch_bits
+                  - Misc.count_trailing_zeroes_nativeint (Nativeint.lognot n)
+                in
+                lsr_const (lsl_const e shift dbg) shift dbg
+              else
+                (* prefer putting constants on the right *)
+                Cop (Cand, [e; natint_const_untagged dbg n], dbg)
           in
           match e with
           | Cop (Cand, [x; y], dbg) -> (
@@ -1229,7 +1271,9 @@ let is_zero_or_one e =
   known_zero (known_bits e) (Nativeint.logand word_mask (Nativeint.lognot 1n))
 
 let tag_int i dbg =
-  let[@local] default c = incr_int (lsl_const c 1 dbg) dbg in
+  (* [or_const] turns into an addition when the low bit is known to be zero, and
+     also handles cases like tagging [x asr 1], which is just [x lor 1]. *)
+  let[@local] default c = or_const (lsl_const c 1 dbg) 1n dbg in
   match low_bits i ~bits:(arch_bits - 1) ~dbg with
   | Cconst_int (n, _) -> int_const dbg n
   | Cop (Ccmpi Cne, [b; Cconst_int (0, _)], _) when is_zero_or_one b ->

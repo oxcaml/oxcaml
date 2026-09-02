@@ -430,7 +430,6 @@ branch_or_tailcall:
 |}]
 
 
-(* CR ttebbi: The final bitwise or is unnecessary. *)
 let shift_of_logand (a : int64_u) =
   let b = Int64_u.logand a #1L in
   let c = Int64_u.shift_right_logical #3L (Int64_u.to_int b) in
@@ -442,7 +441,6 @@ shift_of_logand:
   andl  $1, %ecx
   movl  $3, %eax
   shrq  %cl, %rax
-  orq   $1, %rax
   ret
 |}]
 
