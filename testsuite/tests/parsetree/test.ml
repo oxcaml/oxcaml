@@ -1,6 +1,6 @@
 (* TEST
  include ocamlcommon;
- readonly_files = "source.ml source_jane_street.ml";
+ readonly_files = "source.ml source_jane_street.ml source_known_broken.ml";
 *)
 
 (* (c) Alain Frisch / Lexifi *)
@@ -130,3 +130,7 @@ let () =
      compiler.
    *)
   process "source_jane_street.ml" ~universe_for_parsing:No_extensions;
+  (* Contains examples that Pprintast is known to print incorrectly; their
+     failures are recorded in test.reference. *)
+  process "source_known_broken.ml"
+    ~universe_for_parsing:Language_extension.Universe.maximal;
