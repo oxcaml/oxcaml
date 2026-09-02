@@ -97,7 +97,7 @@ val iter_types:
     t -> iter_cont
 val run_iter_cont: iter_cont list -> (Path.t * iter_cont) list
 val same_types: t -> t -> bool
-val used_persistent: unit -> Compilation_unit.Name.Set.t
+val used_persistent: unit -> Compilation_unit_intf.Set.t
 val find_shadowed_types: Path.t -> t -> Path.t list
 val without_cmis: ('a -> 'b) -> 'a -> 'b
 (* [without_cmis f arg] applies [f] to [arg], but does not
@@ -180,12 +180,12 @@ val add_required_global: Path.t -> t -> unit
 val add_required_global_for_quote: Path.t -> t -> unit
 
 (* Return the set of interfaces referenced by quotes *)
-val quoted_intfs: unit -> Compilation_unit.Name.Set.t
+val quoted_intfs: unit -> Compilation_unit_intf.Set.t
 
 (* Compute the transitive closure of the dependencies of these interfaces that
    have been loaded by typing. Always includes the input interfaces. *)
 val loaded_transitive_dependencies:
-  Compilation_unit.Name.Set.t -> Compilation_unit.Name.Set.t
+  Compilation_unit_intf.Set.t -> Compilation_unit_intf.Set.t
 
 (* Return the set of implementations referenced by quotes *)
 val quoted_impls: unit -> Compilation_unit.Set.t
@@ -631,20 +631,20 @@ val read_signature:
            the module in the environment. *)
 val save_signature:
   alerts:alerts -> signature * Mode.Staticity.Const.t
-  -> Compilation_unit.Name.t -> Cmi_format.kind
+  -> Compilation_unit_intf.t -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind, file name. *)
 val save_signature_with_imports:
   alerts:alerts -> signature * Mode.Staticity.Const.t
-  -> Compilation_unit.Name.t -> Cmi_format.kind
+  -> Compilation_unit_intf.t -> Cmi_format.kind
   -> Unit_info.Artifact.t -> Import_info.t array -> Cmi_format.cmi_infos_lazy
         (* Arguments: signature, module name, module kind,
            file name, imported units with their CRCs. *)
 
 (** See [Persistent_env.find_import]. *)
 val find_import:
-  chain:Compilation_unit.Name.t list ->
-  Compilation_unit.Name.t ->
+  chain:Compilation_unit_intf.t list ->
+  Compilation_unit_intf.t ->
   Compilation_unit.t option
   * Global_module.Parameter_name.t list
   * Signature_with_global_bindings.t
@@ -653,7 +653,7 @@ val find_import:
 val register_parameter: Global_module.Parameter_name.t -> unit
 
 (* Return the CRC of the interface of the given compilation unit *)
-val crc_of_unit: Compilation_unit.Name.t -> Digest.t
+val crc_of_unit: Compilation_unit_intf.t -> Digest.t
 
 (* Return the set of compilation units imported, with their CRC *)
 val imports: unit -> Import_info.t list
@@ -672,11 +672,13 @@ val is_bound_to_runtime_parameter: Ident.t -> bool
    alphabetical order *)
 val parameters: unit -> Global_module.Parameter_name.t list
 
-(* [is_imported_opaque md] returns true if [md] is an opaque imported module *)
-val is_imported_opaque: Compilation_unit.Name.t -> bool
+(* [is_opaque_impl cu] returns true if the interface implemented by
+   [cu] (as recorded in its cmi) was imported as an opaque module *)
+val is_opaque_impl: Compilation_unit.t -> bool
 
-(* [register_import_as_opaque md] registers [md] as an opaque imported module *)
-val register_import_as_opaque: Compilation_unit.Name.t -> unit
+(* [register_impl_as_opaque cu] registers the interface implemented by [cu] as
+   an opaque imported module *)
+val register_impl_as_opaque: Compilation_unit.t -> unit
 
 (* [is_parameter_unit md] returns true if [md] was compiled with
    -as-parameter *)
@@ -713,8 +715,8 @@ type error =
   | Initial_stage_splice of Location.t
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
   | Cmi_not_found of
-      { modname : Compilation_unit.Name.t;
-        chain : Compilation_unit.Name.t list;
+      { modname : Compilation_unit_intf.t;
+        chain : Compilation_unit_intf.t list;
             (** Dependency chain leading to [modname], in reversed order
                 (most-recent loader first). *)
       }

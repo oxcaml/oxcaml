@@ -197,7 +197,7 @@ let compilation_unit { Fexpr.ident; linkage_name } =
   (* CR lmaurer: This ignores the ident when the linkage name is given; is that
      what we want? Why did we have the ability to specify both? *)
   let linkage_name = linkage_name |> Option.value ~default:ident in
-  Compilation_unit.of_string linkage_name
+  Compilation_unit.of_string_unsafe linkage_name
 
 let declare_symbol (env : env) ({ Fexpr.txt = cu, name; loc } as symbol) =
   if Option.is_some cu

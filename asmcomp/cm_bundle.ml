@@ -28,9 +28,10 @@
 (* CR mshinwell: This file has not been code reviewed *)
 
 module CU = Compilation_unit
+module CUI = Compilation_unit_intf
 
 type error =
-  | Missing_intf_for_quote of CU.Name.t
+  | Missing_intf_for_quote of CUI.t
   | Missing_impl_for_quote of CU.t
 (* This is currently unused as we can't ensure the cmx files are always
    available, specifically compiler-libs doesn't ship its cmx files. We should
@@ -39,10 +40,10 @@ type error =
 exception Error of error
 
 let cmi_bundle ~quoted_cmi =
-  CU.Name.Map.of_set
+  CUI.Map.of_set
     (fun name ->
       let path =
-        try Load_path.find_normalized (CU.Name.to_string name ^ ".cmi")
+        try Load_path.find_normalized (CUI.to_string name ^ ".cmi")
         with Not_found -> raise (Error (Missing_intf_for_quote name))
       in
       Cmi_format.read_cmi path)

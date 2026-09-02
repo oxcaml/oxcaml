@@ -13,6 +13,7 @@
  **************************************************************************)
 
 module String_set = Set.Make (String)
+module CUI = Compilation_unit_intf
 
 let merge_cma ~target ~archives =
   (* This is rather tightly tied to the internals of [Bytelibrarian]. *)
@@ -106,7 +107,7 @@ let merge_cmxa0 ~archives =
   Hashtbl.iter (fun _name (import, i) -> cmis.(i) <- import) cmi_table;
   let cmxs = Array.make !ncmxs Import_info.dummy in
   Hashtbl.iter (fun _name (import, i) -> cmxs.(i) <- import) cmx_table;
-  let quoted_cmis = Array.make !nquoted_cmi Compilation_unit.Name.dummy in
+  let quoted_cmis = Array.make !nquoted_cmi CUI.dummy in
   Hashtbl.iter
     (fun quoted_cmi (_, i) -> quoted_cmis.(i) <- quoted_cmi)
     quoted_cmi_table;

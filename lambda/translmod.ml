@@ -1202,7 +1202,7 @@ let transl_implementation compilation_unit impl ~loc =
 
 (* Compile a toplevel phrase *)
 
-let toploop_unit = Compilation_unit.of_string "Toploop"
+let toploop_unit = Compilation_unit.of_string_unsafe "Toploop"
 let toploop_getvalue_pos = 0 (* position of getvalue in module Toploop *)
 let toploop_setvalue_pos = 1 (* position of setvalue in module Toploop *)
 
@@ -1521,8 +1521,7 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
 
 let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
   let impl, _params, _sig =
-    Env.find_import ~chain:[]
-      (Compilation_unit.Name.of_head_of_global_name (Global_module.to_name gm))
+    Env.find_import ~chain:[] (Global_module.to_name gm).Global_module.Name.head
   in
   match impl with
   | Some cu -> cu
