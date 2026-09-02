@@ -116,15 +116,20 @@ val infix_header : int -> nativeint
 
 val black_custom_header : size:int -> nativeint
 
-val pack_closure_info : arity:int -> startenv:int -> is_last:bool -> nativeint
+val pack_closure_info :
+  arity:int -> startenv:int -> is_last:bool -> is_unloadable:bool -> nativeint
 
-(** Closure info for a closure of given arity and distance to environment *)
-val closure_info : arity:arity -> startenv:int -> is_last:bool -> nativeint
+(** Closure info for a closure of given arity and distance to environment.
+    [is_unloadable] indicates that this closure's code lives in an unloadable
+    compilation unit, so the GC must treat the code pointer specially. *)
+val closure_info :
+  arity:arity -> startenv:int -> is_last:bool -> is_unloadable:bool -> nativeint
 
 val closure_info' :
   arity:Lambda.function_kind * 'a list ->
   startenv:int ->
   is_last:bool ->
+  is_unloadable:bool ->
   nativeint
 
 (** Wrappers *)
