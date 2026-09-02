@@ -45,6 +45,14 @@ type frame_descr =
   { fd_lbl : Label.t; (* Return address *)
     fd_frame_size : int; (* Size of stack frame *)
     fd_live_offset : int list; (* Offsets/regs of live addresses *)
+    fd_code_ptr_live_offset : int list;
+        (* Offsets/regs of live Code_pointer-typed slots, encoded in the same
+           scheme as [fd_live_offset]. Sets bit 3
+           (FRAME_DESCRIPTOR_HAS_CODE_PTR_SLOTS = 0x8) of the frame_data word
+           when non-empty. *)
+    fd_unloadable : bool;
+        (* Return address is in code from an unloadable CU; sets bit 2
+           (FRAME_DESCRIPTOR_UNLOADABLE = 0x4) of the frame_data word. *)
     fd_debuginfo : frame_debuginfo; (* Location, if any *)
     fd_long : bool; (* Use 32 instead of 16 bit format. *)
     fd_section : int
@@ -97,14 +105,32 @@ let is_long n =
 
 let is_long_stack_index n = is_long n
 
-let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
-  assert (frame_size land 3 = 0);
+let record_frame_descr ~label ~frame_size ~live_offset ~code_ptr_live_offset
+    ~unloadable debuginfo =
+  (* The runtime packs flag bits into the low 4 bits of [frame_data] (see
+     [FRAME_DESCRIPTOR_FLAGS = 0xF] in [frame_descriptors.h]), so the emitted
+     [frame_size] must be 16-byte aligned. *)
+  assert (frame_size land 0xF = 0);
+  (* The full flag word, matching what [emit_frames] will OR into the frame
+     word: bits 0-1 from the debuginfo, bit 2 for UNLOADABLE, bit 3 for
+     HAS_CODE_PTR_SLOTS. The long/short format decision below must be made on
+     the full value: deciding on a smaller value and then emitting a larger one
+     could produce a short frame word equal to
+     [Oxcaml_flags.max_long_frames_threshold] (= FRAME_LONG_MARKER in the
+     runtime), which the runtime would misparse as a long descriptor. *)
+  let flags =
+    get_flags debuginfo
+    lor (if unloadable then 4 else 0)
+    lor match code_ptr_live_offset with [] -> 0 | _ :: _ -> 8
+  in
   let fd_long =
-    is_long (frame_size + get_flags debuginfo)
+    is_long (frame_size + flags)
     (* The checks below are redundant (if they fail, then frame size check above
        should have failed), but they make the safety of [emit_frame] clear. *)
     || is_long (List.length live_offset)
     || List.exists is_long_stack_index live_offset
+    || is_long (List.length code_ptr_live_offset)
+    || List.exists is_long_stack_index code_ptr_live_offset
   in
   if fd_long && not !Oxcaml_flags.allow_long_frames
   then raise (Error (Stack_frame_too_large frame_size));
@@ -112,6 +138,8 @@ let record_frame_descr ~label ~frame_size ~live_offset debuginfo =
     := { fd_lbl = label;
          fd_frame_size = frame_size;
          fd_live_offset = List.sort_uniq ( - ) live_offset;
+         fd_code_ptr_live_offset = List.sort_uniq ( - ) code_ptr_live_offset;
+         fd_unloadable = unloadable;
          fd_debuginfo = debuginfo;
          fd_long;
          fd_section = !frame_section_epoch
@@ -264,6 +292,11 @@ let emit_frames ~debug_strings_section a =
      delta byte. Used as the body following a 0 (escape) delta byte. *)
   let emit_escaped_frame fd =
     let flags = get_flags fd.fd_debuginfo in
+    let flags = if fd.fd_unloadable then flags lor 4 else flags in
+    let has_code_ptr_slots =
+      match fd.fd_code_ptr_live_offset with [] -> false | _ -> true
+    in
+    let flags = if has_code_ptr_slots then flags lor 8 else flags in
     a.efa_label_rel fd.fd_lbl 0l;
     (* For short format, the size is guaranteed to be less than the constant
        below. *)
@@ -275,7 +308,17 @@ let emit_frames ~debug_strings_section a =
     let emit_unsigned_16_or_32 = if fd.fd_long then emit_u32 else emit_u16 in
     (* The live offsets are always unsigned. *)
     let emit_live_offset n = emit_unsigned_16_or_32 n in
-    emit_unsigned_16_or_32 (fd.fd_frame_size + flags);
+    let frame_word = fd.fd_frame_size + flags in
+    (* A short frame word must not collide with FRAME_LONG_MARKER (=
+       [max_long_frames_threshold]) or FRAME_RETURN_TO_C (0xFFFF); the [is_long]
+       decision in [record_frame_descr] uses the full flag word precisely to
+       guarantee this. *)
+    if not fd.fd_long
+    then
+      assert (
+        frame_word <> Oxcaml_flags.max_long_frames_threshold
+        && frame_word <> 0xFFFF);
+    emit_unsigned_16_or_32 frame_word;
     emit_unsigned_16_or_32 (List.length fd.fd_live_offset);
     List.iter emit_live_offset fd.fd_live_offset;
     begin match fd.fd_debuginfo with
@@ -293,7 +336,15 @@ let emit_frames ~debug_strings_section a =
         dbg
     | Dbg_other _ | Dbg_raise _ -> () (* no alloc lengths *)
     end;
-    emit_debug_words fd
+    emit_debug_words fd;
+    (* Parallel code_ptr_live_ofs array: a count followed by the entries, in the
+       same width as live_ofs[] (uint16 for medium, uint32 for long), unaligned
+       like the rest of the descriptor. Short descriptors never carry code-ptr
+       slots (see [short_encoding]). *)
+    if has_code_ptr_slots
+    then (
+      emit_unsigned_16_or_32 (List.length fd.fd_code_ptr_live_offset);
+      List.iter emit_live_offset fd.fd_code_ptr_live_offset)
   in
   let emit_merged_string str lbl =
     D.define_label (string_label ~section:debug_strings_section lbl);
@@ -322,7 +373,15 @@ let emit_frames ~debug_strings_section a =
     let flags = get_flags fd.fd_debuginfo in
     let has_alloc = flags land 2 <> 0 in
     let size = fd.fd_frame_size in
-    if fd.fd_long || size <= 0 || size > 63 * 16 || size land 15 <> 0
+    if
+      fd.fd_long || size <= 0
+      || size > 63 * 16
+      || size land 15 <> 0
+      (* A short descriptor's size+flags byte only has room for the DEBUG and
+         ALLOC flags, so frames carrying UNLOADABLE or HAS_CODE_PTR_SLOTS must
+         escape. *)
+      || fd.fd_unloadable
+      || not (Misc.Stdlib.List.is_empty fd.fd_code_ptr_live_offset)
     then None
     else
       let frame_words = size / Arch.size_addr in

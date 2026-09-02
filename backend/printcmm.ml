@@ -43,6 +43,7 @@ let machtype_component ppf (ty : machtype_component) =
   | Mask -> fprintf ppf "mask"
   | Float32 -> fprintf ppf "float32"
   | Valx2 -> fprintf ppf "valx2"
+  | Code_pointer -> fprintf ppf "code_ptr"
 
 let machtype ppf mty =
   match Array.length mty with
@@ -153,6 +154,7 @@ let chunk = function
   | Word_int -> "int"
   | Word_mask -> "mask"
   | Word_val -> "val"
+  | Word_code_pointer -> "code_pointer"
   | Single { reg = Float64 } -> "float32_as_float64"
   | Single { reg = Float32 } -> "float32"
   | Double -> "float64"

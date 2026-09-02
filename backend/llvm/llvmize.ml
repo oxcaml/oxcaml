@@ -1094,6 +1094,7 @@ let load t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   match memory_chunk with
   | Word_int -> basic T.i64
   | Word_val -> basic T.val_ptr
+  | Word_code_pointer -> basic T.i64
   | Byte_unsigned -> extend Zext ~from:T.i8 ~to_:T.i64
   | Byte_signed -> extend Sext ~from:T.i8 ~to_:T.i64
   | Sixteen_unsigned -> extend Zext ~from:T.i16 ~to_:T.i64
@@ -1123,6 +1124,7 @@ let store t (i : Cfg.basic Cfg.instruction) (memory_chunk : Cmm.memory_chunk)
   match memory_chunk with
   | Word_int -> basic T.i64
   | Word_val -> basic T.val_ptr
+  | Word_code_pointer -> basic T.i64
   | Byte_unsigned | Byte_signed -> trunc Trunc T.i8
   | Sixteen_unsigned | Sixteen_signed -> trunc Trunc T.i16
   | Thirtytwo_signed | Thirtytwo_unsigned -> trunc Trunc T.i32

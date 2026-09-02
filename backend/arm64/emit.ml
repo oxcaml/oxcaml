@@ -57,6 +57,8 @@ type gc_call =
     gc_frame_lbl : label; (* Linear label of the frame descriptor *)
     gc_frame_size : int;
     gc_live_offset : int list;
+    gc_code_ptr_live_offset : int list;
+    gc_unloadable : bool;
     gc_frame_dbg : frame_debuginfo
   }
 
@@ -83,12 +85,15 @@ module Env : sig
     prologue_required:bool ->
     contains_calls:bool ->
     function_name:string ->
+    is_unloadable:bool ->
     tailrec_entry_point:L.t option ->
     t
 
   val copy : t -> t
 
   val fastcode_flag : t -> bool
+
+  val is_unloadable : t -> bool
 
   val stack_offset : t -> int
 
@@ -147,6 +152,7 @@ end = struct
       mutable local_realloc_sites : local_realloc_call list;
       mutable stack_realloc : stack_realloc option;
       function_name : string;
+      is_unloadable : bool;
       tailrec_entry_point : L.t option;
       float32_literals : (int32 * L.t) list ref;
       float_literals : (int64 * L.t) list ref;
@@ -154,7 +160,7 @@ end = struct
     }
 
   let create ~fastcode_flag ~num_stack_slots ~prologue_required ~contains_calls
-      ~function_name ~tailrec_entry_point =
+      ~function_name ~is_unloadable ~tailrec_entry_point =
     { fastcode_flag;
       stack_offset = 0;
       num_stack_slots = Stack_class.Tbl.copy num_stack_slots;
@@ -164,6 +170,7 @@ end = struct
       local_realloc_sites = [];
       stack_realloc = None;
       function_name;
+      is_unloadable;
       tailrec_entry_point;
       float32_literals = ref [];
       float_literals = ref [];
@@ -202,6 +209,8 @@ end = struct
   let set_stack_realloc t v = t.stack_realloc <- Some v
 
   let function_name t = t.function_name
+
+  let is_unloadable t = t.is_unloadable
 
   let tailrec_entry_point t = t.tailrec_entry_point
 
@@ -727,6 +736,7 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
 let compute_live_offset env live =
   let encode_reg_offset n = (n lsl 1) + 1 in
   let live_offset = ref [] in
+  let code_ptr_live_offset = ref [] in
   Reg.Set.iter
     (function
       | { typ = Val; loc = Reg r; _ } ->
@@ -743,18 +753,27 @@ let compute_live_offset env live =
       | { typ = Val; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
       | { typ = Int | Float | Float32 | Vec128; _ } -> ()
+      | { typ = Code_pointer; loc = Reg r; _ } ->
+        code_ptr_live_offset
+          := encode_reg_offset (Regs.index_in_class r) :: !code_ptr_live_offset
+      | { typ = Code_pointer; loc = Stack s; _ } as reg ->
+        code_ptr_live_offset
+          := Env.slot_offset env s (Stack_class.of_machtype reg.typ)
+             :: !code_ptr_live_offset
+      | { typ = Code_pointer; loc = Unknown; _ } as r ->
+        Misc.fatal_errorf "Unknown location %a" Printreg.reg r
       | { typ = Vec256 | Vec512 | Mask; _ } ->
         Misc.fatal_error "arm64: got 256/512 bit vector or mask")
     live;
-  !live_offset
+  !live_offset, !code_ptr_live_offset
 
 let record_frame_label env live dbg =
   let lbl = Cmm.new_label () in
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
-  record_frame_descr ~label:lbl ~frame_size:(Env.frame_size env)
-    ~live_offset:(compute_live_offset env live)
-    dbg;
+  let live_offset, code_ptr_live_offset = compute_live_offset env live in
+  record_frame_descr ~label:lbl ~frame_size:(Env.frame_size env) ~live_offset
+    ~code_ptr_live_offset ~unloadable:(Env.is_unloadable env) dbg;
   label_to_asm_label ~section:Text lbl
 
 let record_frame env live dbg =
@@ -779,7 +798,9 @@ let emit_call_gc gc =
      runs under [Emitaux.with_snapshot], which rolls back
      [frame_descriptors]. *)
   record_frame_descr ~label:gc.gc_frame_lbl ~frame_size:gc.gc_frame_size
-    ~live_offset:gc.gc_live_offset gc.gc_frame_dbg;
+    ~live_offset:gc.gc_live_offset
+    ~code_ptr_live_offset:gc.gc_code_ptr_live_offset
+    ~unloadable:gc.gc_unloadable gc.gc_frame_dbg;
   labelled_ins1
     (label_to_asm_label ~section:Text gc.gc_frame_lbl)
     B
@@ -1140,7 +1161,9 @@ let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
 let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
   let gc_frame_lbl = Cmm.new_label () in
   let gc_frame_size = Env.frame_size env in
-  let gc_live_offset = compute_live_offset env i.live in
+  let gc_live_offset, gc_code_ptr_live_offset =
+    compute_live_offset env i.live
+  in
   let gc_lbl, gc_return_lbl =
     assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
   in
@@ -1150,6 +1173,8 @@ let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
       gc_frame_lbl;
       gc_frame_size;
       gc_live_offset;
+      gc_code_ptr_live_offset;
+      gc_unloadable = Env.is_unloadable env;
       gc_frame_dbg = Dbg_alloc dbginfo
     }
 
@@ -1208,7 +1233,9 @@ let assembly_code_for_poll0 ~far ~return_label =
 let assembly_code_for_poll env i ~far ~return_label =
   let gc_frame_lbl = Cmm.new_label () in
   let gc_frame_size = Env.frame_size env in
-  let gc_live_offset = compute_live_offset env i.live in
+  let gc_live_offset, gc_code_ptr_live_offset =
+    compute_live_offset env i.live
+  in
   let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
   Env.add_call_gc_site env
     { gc_lbl;
@@ -1216,6 +1243,8 @@ let assembly_code_for_poll env i ~far ~return_label =
       gc_frame_lbl;
       gc_frame_size;
       gc_live_offset;
+      gc_code_ptr_live_offset;
+      gc_unloadable = Env.is_unloadable env;
       gc_frame_dbg = Dbg_alloc []
     }
 
@@ -1286,7 +1315,7 @@ let emit_load_literal dst lbl =
   match dst.typ with
   | Float -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addr
   | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
-  | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
+  | Val | Int | Addr | Code_pointer -> A.ins2 LDR (H.reg_x dst) addr
   | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
   | Vec256 | Vec512 | Mask ->
     Misc.fatal_errorf "emit_load_literal: unexpected vector or mask register %a"
@@ -1300,7 +1329,10 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
   | (Vec256 | Vec512 | Mask), _, _, _ | _, _, (Vec256 | Vec512 | Mask), _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector or mask"
-  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
+  | ( (Int | Val | Addr | Code_pointer),
+      Reg _,
+      (Int | Val | Addr | Code_pointer),
+      Reg _ ) ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
   | Float, Reg _, Float, Stack _ ->
     emit_stack_str_simd_and_fp env (H.reg_d src) dst
@@ -1308,7 +1340,10 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     emit_stack_str_simd_and_fp env (H.reg_s src) dst
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Stack _ ->
     emit_stack_str_simd_and_fp env (H.reg_q src) dst
-  | (Int | Val | Addr), Reg _, (Int | Val | Addr), Stack _ ->
+  | ( (Int | Val | Addr | Code_pointer),
+      Reg _,
+      (Int | Val | Addr | Code_pointer),
+      Stack _ ) ->
     emit_stack_str env (H.reg_x src) dst
   | Float, Stack _, Float, Reg _ ->
     emit_stack_ldr_simd_and_fp env (H.reg_d dst) src
@@ -1316,7 +1351,10 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     emit_stack_ldr_simd_and_fp env (H.reg_s dst) src
   | (Vec128 | Valx2), Stack _, (Vec128 | Valx2), Reg _ ->
     emit_stack_ldr_simd_and_fp env (H.reg_q dst) src
-  | (Int | Val | Addr), Stack _, (Int | Val | Addr), Reg _ ->
+  | ( (Int | Val | Addr | Code_pointer),
+      Stack _,
+      (Int | Val | Addr | Code_pointer),
+      Reg _ ) ->
     emit_stack_ldr env (H.reg_x dst) src
   | _, Stack _, _, Stack _ ->
     Misc.fatal_errorf "Illegal move between stack slots (%a to %a)\n"
@@ -1326,7 +1364,7 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
     Misc.fatal_errorf
       "Illegal move with an unknown register location (%a to %a)\n" Printreg.reg
       src Printreg.reg dst
-  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2),
+  | ( (Float | Float32 | Vec128 | Int | Val | Addr | Valx2 | Code_pointer),
       (Reg _ | Stack _),
       _,
       _ ) ->
@@ -1591,7 +1629,7 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 LDR_simd_and_fp reg_s7 addressing;
       A.ins2 FCVT (H.reg_d dst) reg_s7
-    | Word_int | Word_val ->
+    | Word_int | Word_val | Word_code_pointer ->
       if is_atomic
       then (
         assert (
@@ -1644,7 +1682,7 @@ let emit_instr env i =
     | Single { reg = Float64 } ->
       A.ins2 FCVT reg_s7 (H.reg_d src);
       A.ins2 STR_simd_and_fp reg_s7 addressing
-    | Word_int | Word_val ->
+    | Word_int | Word_val | Word_code_pointer ->
       (* memory model barrier for non-initializing store *)
       if assignment then A.ins0 (DMB ISHLD);
       A.ins2 STR (H.reg_x src) addressing
@@ -2174,6 +2212,7 @@ let fundecl fundecl =
       ~num_stack_slots:fundecl.fun_num_stack_slots
       ~prologue_required:fundecl.fun_prologue_required
       ~contains_calls:fundecl.fun_contains_calls ~function_name:fundecl.fun_name
+      ~is_unloadable:false
       ~tailrec_entry_point:
         (Option.map
            (label_to_asm_label ~section:Text)
