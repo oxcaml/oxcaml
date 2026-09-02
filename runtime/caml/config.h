@@ -19,9 +19,6 @@
 /* This runtime provides some OxCaml-specific features */
 #define OXCAML_RUNTIME 1
 
-/* CR ocaml 5 all-runtime5: remove this and all uses of it */
-#define CAML_RUNTIME_5
-
 #include "m.h"
 #include "s.h"
 #include "compatibility.h"
