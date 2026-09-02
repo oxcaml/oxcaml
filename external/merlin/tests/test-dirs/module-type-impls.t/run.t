@@ -36,6 +36,38 @@ resulting artifacts contain the facts channel.
   >     | print_results "$module_type"
   > }
 
+Multi-file scenarios follow one shape: compile the files in dependency order,
+aggregate their artifacts into an index, then query one module type by the
+position of its declaration, computed from the source so the tests never
+hard-code coordinates.
+
+  $ setup_index () {
+  >   local artifacts=()
+  >   for file in "$@"; do
+  >     $OCAMLC -bin-annot -c "$file" || return
+  >     case "$file" in
+  >       *.mli) artifacts+=("${file%.mli}.cmti") ;;
+  >       *) artifacts+=("${file%.ml}.cmt") ;;
+  >     esac
+  >   done
+  >   ocaml-index aggregate "${artifacts[@]}" -o project.ocaml-index
+  > }
+
+  $ position_of_module_type () {
+  >   awk -v name="$1" '
+  >     { column = index($0, "module type " name)
+  >       if (column) { printf "%d:%d", NR, column + 11; exit } }' "$2"
+  > }
+
+  $ impls_of_module_type () {
+  >   local name="$1" file="$2" target="${3-$1}"
+  >   $MERLIN single module-type-impls \
+  >     -position "$(position_of_module_type "$name" "$file")" \
+  >     -index-file ./project.ocaml-index \
+  >     -filename "./$file" < "./$file" \
+  >     | print_results "$target"
+  > }
+
 Every module checked against [S] is returned.  Named modules carry their UID
 and source name in the raw response; expression-based implementation sites are
 shown as [<anon>].
@@ -730,17 +762,8 @@ interface includes it.
   >   type t = { mutable field : string }
   > end
   > EOF
-  $ $OCAMLC -bin-annot -c foo_intf.ml
-  $ $OCAMLC -bin-annot -c foo.mli
-  $ $OCAMLC -bin-annot -c foo.ml
-  $ $OCAMLC -bin-annot -c bar.ml
-  $ ocaml-index aggregate foo_intf.cmt foo.cmti foo.cmt bar.cmt \
-  >   -o intf.ocaml-index
-  $ $MERLIN single module-type-impls \
-  >   -position 1:13 \
-  >   -index-file ./intf.ocaml-index \
-  >   -filename ./foo_intf.ml < ./foo_intf.ml \
-  >   | print_results S
+  $ setup_index foo_intf.ml foo.mli foo.ml bar.ml
+  $ impls_of_module_type S foo_intf.ml
   complete
   Foo 0:-1 0:-1 interface
   Another 1:7 1:14 annotation
