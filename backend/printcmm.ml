@@ -486,6 +486,7 @@ let codegen_option = function
     Printf.sprintf "regalloc_param[%s]"
       (String.concat ";" (List.map (Printf.sprintf "%S") params))
   | Cold -> "cold"
+  | Unloadable -> "unloadable"
   | Assume_zero_alloc { strict; never_returns_normally; never_raises; loc = _ }
     ->
     Printf.sprintf "assume_zero_alloc_%s%s%s"

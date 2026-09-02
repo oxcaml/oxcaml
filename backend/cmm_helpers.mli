@@ -116,6 +116,23 @@ val infix_header : int -> nativeint
 
 val black_custom_header : size:int -> nativeint
 
+(** [unit_*_header] variants are aliases for the corresponding black-header
+    functions. Static data of unloadable compilation units is also emitted black
+    (NOT_MARKABLE): the blocks are invisible to the GC while the unit's
+    initialiser runs and are donated to the major heap afterwards (via
+    [caml_activate_unloadable_unit]), which forces their headers to the current
+    allocation colour. Use these in to_cmm code paths that emit static data for
+    the current CU, i.e. blocks that end up inside the
+    [unloadable_blocks_start]/[unloadable_blocks_end] bracket. *)
+val unit_block_header : int -> int -> nativeint
+
+val unit_mixed_block_header :
+  int -> int -> scannable_prefix_len:int -> nativeint
+
+val unit_closure_header : int -> nativeint
+
+val unit_custom_header : size:int -> nativeint
+
 val pack_closure_info :
   arity:int -> startenv:int -> is_last:bool -> is_unloadable:bool -> nativeint
 
@@ -793,6 +810,41 @@ val cdefine_symbol : symbol -> data_item list
     contain additional data items afterwards). *)
 val emit_block : symbol -> nativeint -> data_item list -> data_item list
 
+(** CU-appropriate emit for static blocks of the current compilation unit (in
+    unloadable mode, blocks inside the
+    [unloadable_blocks_start]/[unloadable_blocks_end] bracket). *)
+val emit_unit_block : symbol -> nativeint -> data_item list -> data_item list
+
+(** Record an unloadable function's entry linkage name for the
+    [unloadable_code_blocks] sentinel. No-op unless [Clflags.unit_is_unloadable]
+    is set. *)
+val register_unloadable_code_block_entry : string -> unit
+
+(** Retrieve and clear the list of registered unloadable function entry linkage
+    names. Called once per compilation unit by [to_cmm.ml]. *)
+val flush_unloadable_code_block_entries : unit -> string list
+
+(** The CU-relative basename of the sentinel array emitted by to_cmm to
+    enumerate the unit's unloadable functions as
+    [(entry_address, code_block_address)] pairs. The full linkage name is
+    obtained via [make_symbol]. *)
+val unloadable_code_blocks_symbol_basename : string
+
+(** The CU-relative basenames of the symbols bracketing the unit's static data
+    blocks (see the comment on [unloadable_blocks_start_symbol_basename] in the
+    implementation for the layout contract). *)
+val unloadable_blocks_start_symbol_basename : string
+
+val unloadable_blocks_end_symbol_basename : string
+
+(** [code_block_symbol_name entry_linkage_name] is the linkage name of the
+    [Code_block] static-data symbol associated with the function whose entry has
+    the given linkage name. The to_cmm Code_block emission pass produces these
+    symbols (when the CU is unloadable); the per-function back-pointer emitted
+    just ahead of each function entry refers to them via this naming convention.
+*)
+val code_block_symbol_name : string -> string
+
 (** [atom_symbol ~tag] is the runtime-exported symbol [caml_atom_<tag>], which
     names the *value* of the runtime's permanent zero-sized block (atom) of the
     given tag: the address one word past its header (see
@@ -801,6 +853,19 @@ val atom_symbol : tag:int -> Cmm.symbol
 
 (** A data item holding the value of the runtime's atom of the given tag. *)
 val atom_value_data_item : tag:int -> Cmm.data_item
+
+(** Record that the given symbol of the current (unloadable) compilation unit is
+    not defined in the unit's emitted data but instead denotes the value of the
+    runtime's permanent atom of the given tag. The JIT loader flushes this list
+    after compiling the unit and binds each symbol accordingly before
+    relocation. Idempotent per symbol name. Must only be called when
+    [Clflags.unit_is_unloadable] is set. *)
+val register_atom_aliased_symbol : string -> tag:int -> unit
+
+(** Retrieve and clear the list of atom-aliased symbols, as
+    [(linkage_name, tag)] pairs. Called by the JIT loader once per compilation
+    unit. *)
+val flush_atom_aliased_symbols : unit -> (string * int) list
 
 (** Emit specific kinds of constant blocks as data items *)
 val emit_float32_constant : symbol -> float -> data_item list -> data_item list

@@ -535,6 +535,7 @@ let run cfg_with_layout =
     fun_num_stack_slots = cfg.fun_num_stack_slots;
     fun_frame_required = cfg.fun_frame_required;
     fun_prologue_required = cfg.fun_prologue_required;
+    fun_unloadable = List.mem Cfg.Unloadable cfg.fun_codegen_options;
     fun_section_name;
     fun_phantom_lets =
       Backend_var.Map.map
