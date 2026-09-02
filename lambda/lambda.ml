@@ -465,38 +465,6 @@ type primitive =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr of
-    { layout : layout }
-  | Patomic_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
-  | Patomic_load_ext_ptr of
-    { layout : layout }
-  | Patomic_set_ext_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ext_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ext_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ext_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ext_ptr
-  | Patomic_add_ext_ptr
-  | Patomic_sub_ext_ptr
-  | Patomic_land_ext_ptr
-  | Patomic_lor_ext_ptr
-  | Patomic_lxor_ext_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -2989,28 +2957,6 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr _
-  | Patomic_set_ptr _
-  | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
-  | Patomic_load_ext_ptr _
-  | Patomic_set_ext_ptr _
-  | Patomic_exchange_ext_ptr _
-  | Patomic_compare_exchange_ext_ptr _
-  | Patomic_compare_set_ext_ptr _
-  | Patomic_fetch_add_ext_ptr
-  | Patomic_add_ext_ptr
-  | Patomic_sub_ext_ptr
-  | Patomic_land_ext_ptr
-  | Patomic_lor_ext_ptr
-  | Patomic_lxor_ext_ptr
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -3210,15 +3156,8 @@ let primitive_can_raise prim =
   | Patomic_load_idx _ | Patomic_set_idx _
   | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
   | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
-  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
-  | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
-  | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr
-  | Patomic_lor_ptr | Patomic_lxor_ptr
-  | Patomic_load_ext_ptr _ | Patomic_set_ext_ptr _ | Patomic_exchange_ext_ptr _
-  | Patomic_compare_exchange_ext_ptr _ | Patomic_compare_set_ext_ptr _
-  | Patomic_fetch_add_ext_ptr | Patomic_add_ext_ptr | Patomic_sub_ext_ptr
-  | Patomic_land_ext_ptr | Patomic_lor_ext_ptr | Patomic_lxor_ext_ptr -> false
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx ->
+    false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3729,18 +3668,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_compare_exchange_idx { layout; _ } -> layout
   | Patomic_compare_set_idx _
   | Patomic_fetch_add_idx -> layout_int
-  | Patomic_load_ptr { layout } -> layout
-  | Patomic_set_ptr _ -> layout_unit
-  | Patomic_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_exchange_ptr { layout; _ } -> layout
-  | Patomic_compare_set_ptr _
-  | Patomic_fetch_add_ptr -> layout_int
-  | Patomic_load_ext_ptr { layout } -> layout
-  | Patomic_set_ext_ptr _ -> layout_unit
-  | Patomic_exchange_ext_ptr { layout; _ } -> layout
-  | Patomic_compare_exchange_ext_ptr { layout; _ } -> layout
-  | Patomic_compare_set_ext_ptr _
-  | Patomic_fetch_add_ext_ptr -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
@@ -3753,16 +3680,6 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
-  | Patomic_add_ext_ptr
-  | Patomic_sub_ext_ptr
-  | Patomic_land_ext_ptr
-  | Patomic_lor_ext_ptr
-  | Patomic_lxor_ext_ptr
   | Ppoll -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
