@@ -41,6 +41,33 @@ up to their witness instance are printed once, in line order:
   >     | print_results "$module_type"
   > }
 
+  $ setup_index () {
+  >   local artifacts=()
+  >   for file in "$@"; do
+  >     $OCAMLC -bin-annot -c "$file" || return
+  >     case "$file" in
+  >       *.mli) artifacts+=("${file%.mli}.cmti") ;;
+  >       *) artifacts+=("${file%.ml}.cmt") ;;
+  >     esac
+  >   done
+  >   ocaml-index aggregate "${artifacts[@]}" -o project.ocaml-index
+  > }
+
+  $ position_of_module_type () {
+  >   awk -v name="$1" '
+  >     { column = index($0, "module type " name)
+  >       if (column) { printf "%d:%d", NR, column + 11; exit } }' "$2"
+  > }
+
+  $ impls_of_module_type () {
+  >   local name="$1" file="$2" target="${3-$1}"
+  >   $MERLIN single module-type-impls \
+  >     -position "$(position_of_module_type "$name" "$file")" \
+  >     -index-file ./project.ocaml-index \
+  >     -filename "./$file" < "./$file" \
+  >     | print_results "$target"
+  > }
+
 A module bound in an expression implements a module type like a structure
 binding does: the check is attributed to the binding's own declaration, so it
 is reported under the binding's name and position.
@@ -182,13 +209,8 @@ applications instantiate: a client checked against [F(A).T] implements the
   >   type t = int
   > end
   > EOF
-  $ $OCAMLC -bin-annot -c ifun.mli ifun.ml fclient.ml
-  $ ocaml-index aggregate ifun.cmti ifun.cmt fclient.cmt \
-  >   -o ifun.ocaml-index
-  $ $MERLIN single module-type-impls \
-  >   -index-file ./ifun.ocaml-index \
-  >   -filename ./ifun.mli < ./ifun.mli \
-  >   | print_results S
+  $ setup_index ifun.mli ifun.ml fclient.ml
+  $ impls_of_module_type S ifun.mli
   complete
   A 1:7 1:8 argument
   F 4:7 4:8 interface
@@ -228,12 +250,8 @@ buffer's [Container.Local] declaration.
   >   type t = int
   > end
   > EOF
-  $ $OCAMLC -bin-annot -c cont.mli cont.ml
-  $ ocaml-index aggregate cont.cmti cont.cmt -o cont.ocaml-index
-  $ $MERLIN single module-type-impls \
-  >   -index-file ./cont.ocaml-index \
-  >   -filename ./cont.mli < ./cont.mli \
-  >   | print_results Container.Local
+  $ setup_index cont.mli cont.ml
+  $ impls_of_module_type Local cont.mli Container.Local
   complete
   C 8:7 8:8 annotation
   C 8:7 8:8 interface
