@@ -568,6 +568,19 @@ FUNCTION(caml_call_realloc_stack)
         CFI_ENDPROC
 END_FUNCTION(caml_call_realloc_stack)
 
+/* Raise a Stack_overflow exception after a guard-page fault.
+   SP here may point into a guard page, so we have to check and fix
+   that in caml_raise_stack_overflow. */
+
+FUNCTION(caml_raise_stack_overflow_nat)
+        CFI_STARTPROC
+        CFI_SIGNAL_FRAME
+        str     ALLOC_PTR, Caml_state(young_ptr)
+        SWITCH_OCAML_TO_C
+        b       G(caml_raise_stack_overflow)
+        CFI_ENDPROC
+END_FUNCTION(caml_raise_stack_overflow_nat)
+
 FUNCTION(caml_call_gc)
         CFI_STARTPROC
 L(caml_call_gc):
