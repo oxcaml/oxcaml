@@ -556,21 +556,18 @@ let merge_inline_attributes attr1 attr2 loc =
   | None -> raise (Error (to_location loc, Conflicting_inline_attributes))
 
 let merge_functors ~scopes mexp coercion root_path =
-  let rec merge ~scopes mexp coercion path acc inline_attribute static_params =
-    let finished = acc, mexp, path, coercion, inline_attribute, static_params in
+  let rec merge ~scopes mexp coercion path acc inline_attribute staticity =
+    let finished = acc, mexp, path, coercion, inline_attribute, staticity in
     match mexp.mod_desc with
-    | Tmod_functor (param, body, staticity) ->
-      let staticity = Translmode.transl_staticity_mode_r staticity in
-      (* The static parameters of an [Ltemplate] must form a prefix of its
-         parameters, so we stop merging at a static parameter that follows a
-         dynamic one. *)
-      let static_after_dynamic =
-        match staticity with
-        | Static -> List.compare_length_with acc static_params <> 0
-        | Dynamic -> false
-      in
-      if static_after_dynamic then finished
-      else begin
+    | Tmod_functor (param, body, new_staticity) ->
+      let new_staticity = Translmode.transl_staticity_mode_r new_staticity in
+      begin match acc, staticity, new_staticity with
+      | _ :: _, Dynamic, Static | _ :: _, Static, Dynamic ->
+        (* Only care about the old staticity if length acc > 0, otherwise it's
+          just the inital value we passed in. *)
+        finished
+      | _ -> begin
+        let staticity = new_staticity in
         let inline_attribute' =
           Translattribute.get_inline_attribute mexp.mod_attributes
         in
@@ -593,22 +590,18 @@ let merge_functors ~scopes mexp coercion root_path =
         let inline_attribute =
           merge_inline_attributes inline_attribute inline_attribute' loc
         in
-        let static_params =
-          match staticity with
-          | Static -> static_params + 1
-          | Dynamic -> static_params
-        in
         merge ~scopes body res_coercion path ((param, loc, arg_coercion) :: acc)
-          inline_attribute static_params
+          inline_attribute staticity
+        end
       end
     | _ -> finished
   in
-  merge ~scopes mexp coercion root_path [] Default_inline
+  merge ~scopes mexp coercion root_path [] Default_inline Dynamic
 
 let rec compile_functor ~scopes mexp coercion root_path loc =
   let functor_params_rev, body, body_path, res_coercion, inline_attribute,
-      static_params =
-    merge_functors ~scopes mexp coercion root_path 0
+      staticity =
+    merge_functors ~scopes mexp coercion root_path
   in
   assert (List.length functor_params_rev >= 1);  (* cf. [transl_module] *)
   let params, body =
@@ -660,15 +653,14 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
       ~ret_mode:not_alloc_stack
       ~body
   in
-  if static_params > 0
-  then begin
+  match staticity with
+  | Static ->
     let tmpl_func, tmpl_env =
       Lambda.freshen_free_vars_lfunction lfun
         ~layout_of_ident:(Typeopt.layout_of_ident mexp.mod_env)
     in
-    Ltemplate { tmpl_func; tmpl_env; tmpl_static_params = static_params }
-  end
-  else Lfunction lfun
+    Ltemplate { tmpl_func; tmpl_env }
+  | Dynamic -> Lfunction lfun
 
 (* Compile a module expression *)
 

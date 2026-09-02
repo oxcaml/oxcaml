@@ -478,19 +478,17 @@ let rec fracture_lam lambda : slambda =
           })
   | Ltemplate
       { tmpl_func = { kind; params; return; body; attr; loc; mode; ret_mode };
-        tmpl_env;
-        tmpl_static_params
+        tmpl_env
       } ->
     (* Like [Lkindtemplate] but parameters are static rather than erased so they
-       survive into the lambda code. Only the first [tmpl_static_params]
-       parameters are static; the rest are dynamic. Note that the arguments
-       passed by instantiation are the compile-time halves so we must bind the
-       runtime halves to their new name inside the function.
+       survive into the lambda code. Note that the arguments passed by
+       instantiation are the compile-time halves so we must bind the runtime
+       halves to their new name inside the function.
 
        {[
          let <free_var_0> = <fracture free_var_0> in
          ...
-         { c = template <...params[:tmpl_static_params]> ->
+         { c = template <...params> ->
                  let <param0> = { c = param0; r = << <param0> >> } in
                  ...
                  let body = <fracture body> in
@@ -567,7 +565,6 @@ let rec fracture_lam lambda : slambda =
             })
         templated_function_body params
     in
-    let static_params = List.take tmpl_static_params params in
     let free_var_capture =
       List.map
         (fun (id, _) -> Lsplice (loc, SLvar (Slambdaident.of_ident id)))
@@ -580,7 +577,7 @@ let rec fracture_lam lambda : slambda =
               { sfun_params =
                   Misc.Stdlib.Array.of_list_map
                     (fun { name; _ } -> Slambdaident.of_ident name)
-                    static_params;
+                    params;
                 sfun_body = templated_function_body
               };
           sval_runtime =

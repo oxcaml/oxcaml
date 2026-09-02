@@ -1112,10 +1112,6 @@ and lkindinstantiate =
 and ltemplate =
   { tmpl_func: lfunction;
     tmpl_env: (lambda * layout) Ident.Map.t;
-    tmpl_static_params: int;
-    (** The number of leading parameters of [tmpl_func] that are static, and so
-        are applied at compile time. The static parameters of a template always
-        form a prefix of its parameters; see [Translmod.merge_functors]. *)
   }
 
 and lambda_while =

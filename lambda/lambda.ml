@@ -1265,7 +1265,6 @@ and lkindinstantiate =
 and ltemplate =
   { tmpl_func: lfunction;
     tmpl_env: (lambda * layout) Ident.Map.t;
-    tmpl_static_params: int;
   }
 
 and lambda_while =
@@ -2309,14 +2308,13 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                 (fun (lam, layout) -> (subst s l lam, layout))
                 ktmpl_env;
           }
-    | Ltemplate {tmpl_func; tmpl_env; tmpl_static_params} ->
+    | Ltemplate {tmpl_func; tmpl_env} ->
         Ltemplate
           { tmpl_func;
             tmpl_env =
               Ident.Map.map
                 (fun (lam, layout) -> (subst s l lam, layout))
                 tmpl_env;
-            tmpl_static_params;
           }
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
@@ -2574,8 +2572,7 @@ let shallow_map ~tail ~non_tail:f lam =
           ktmpl_env_mode;
           ktmpl_loc;
         }
-  | Ltemplate { tmpl_func = old_lfun; tmpl_env = old_env;
-                tmpl_static_params } ->
+  | Ltemplate { tmpl_func = old_lfun; tmpl_env = old_env } ->
       let new_lfun = map_lfunction f old_lfun in
       let new_env = map_env f old_env in
       if old_lfun == new_lfun && old_env == new_env
@@ -2584,7 +2581,6 @@ let shallow_map ~tail ~non_tail:f lam =
         Ltemplate {
           tmpl_func = new_lfun;
           tmpl_env = new_env;
-          tmpl_static_params;
         }
   | Llet (str, layout, v, v_duid, old_e1, old_e2) ->
       let new_e1 = f old_e1 in

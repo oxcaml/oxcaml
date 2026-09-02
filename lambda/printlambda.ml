@@ -1552,9 +1552,9 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(kinstantiate@ %a%a)]"
         lam kinst_func lams kinst_args
   | Ltemplate {tmpl_func = {kind; params; return; body; attr; ret_mode; mode};
-               tmpl_env; tmpl_static_params} ->
-      fprintf ppf "@[<2>(template%s[%i static]@ %a%a@ %a%a%a)@]"
-        (locality_kind mode) tmpl_static_params template_env tmpl_env
+               tmpl_env} ->
+      fprintf ppf "@[<2>(template%s@ %a%a@ %a%a%a)@]"
+        (locality_kind mode) template_env tmpl_env
         (function_params kind) params
         function_attribute attr return_kind (ret_mode, return) lam body
   | Linstantiate ap ->
