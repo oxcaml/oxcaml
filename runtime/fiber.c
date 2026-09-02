@@ -1429,9 +1429,6 @@ static void stack_release_memory(struct stack_info* stack)
   CAMLassert(stack->magic == 42);
   CAMLassert(caches != NULL);
 
-  // Don't need to update local_sp since this is no longer the current stack.
-  caml_free_local_arenas(stack->local_arenas);
-
   stack->tls_state = Val_null;
 
   if (cache_bucket != -1) {
@@ -1498,8 +1495,6 @@ void caml_free_stack (struct stack_info* stack)
 
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
-
-  stack->tls_state = Val_null;
 
   stack_release_memory(stack);
 }
