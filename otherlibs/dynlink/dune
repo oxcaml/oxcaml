@@ -110,6 +110,7 @@
   ast_mapper
   attr_helper
   builtin_attributes
+  compilation_unit_intf
   global_module
   ident
   path
@@ -261,6 +262,8 @@
 (copy_files ../../utils/int_replace_polymorphic_compare.ml)
 
 (copy_files ../../utils/compilation_unit.ml)
+
+(copy_files ../../utils/compilation_unit_intf.ml)
 
 (copy_files ../../utils/import_info.ml)
 
@@ -468,6 +471,8 @@
 (copy_files ../../utils/int_replace_polymorphic_compare.mli)
 
 (copy_files ../../utils/compilation_unit.mli)
+
+(copy_files ../../utils/compilation_unit_intf.mli)
 
 (copy_files ../../utils/import_info.mli)
 
@@ -716,6 +721,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Terminfo.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Location.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Language_extension.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Compilation_unit_intf.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Global_module.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ident.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Longident.cmo
@@ -851,6 +857,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Terminfo.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Location.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Language_extension.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Compilation_unit_intf.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Global_module.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ident.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Longident.cmx

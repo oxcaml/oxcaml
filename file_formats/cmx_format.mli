@@ -109,6 +109,7 @@ type unit_infos_raw =
 
 type lib_unit_info =
   { li_name: Compilation_unit.t;
+    li_intf: Compilation_unit_intf.t;
     li_crc: Digest.t;
     li_defines: Compilation_unit.t list;
     li_force_link: bool;
