@@ -280,7 +280,14 @@ let compute_value (r : t) ~target_addr ~place_address ~read_instruction
     let offset = Int64.sub target_addr place_address in
     let insn = read_instruction () in
     Ok (patch_branch26 insn offset)
-  | R_AARCH64_ABS64 _ -> Ok target_addr
+  | R_AARCH64_ABS64 _ ->
+    (* [target_addr] already includes the relocation's addend (applied by the
+       [For_jit.compute_value] wrapper via [get_addend]). The JIT applier
+       overwrites the data slot with the computed value, which is why the
+       encoding side records the addend in the relocation (in JIT mode) and not
+       only in the data bytes as the macOS REL convention would have it; see
+       [Encode_directive]. *)
+    Ok target_addr
   | R_AARCH64_PREL32_PAIR { plus_target = _; minus_target } -> (
     match lookup_target minus_target with
     | None ->

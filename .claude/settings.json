@@ -3,7 +3,10 @@
         "allow": [
             "Bash(make:*)",
             "Bash(rg:*)",
-            "Bash(cat:*)"
+            "Bash(cat:*)",
+            "Bash(grep *)",
+            "Bash(sed -n *)",
+            "Bash(git fetch *)"
         ]
     }
 }
