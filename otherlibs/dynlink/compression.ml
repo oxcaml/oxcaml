@@ -2,7 +2,7 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*        Xavier Leroy, College de France and Inria project Cambium       *)
+(*        Xavier Leroy, Collège de France and Inria project Cambium       *)
 (*                                                                        *)
 (*   Copyright 2023 Institut National de Recherche en Informatique et     *)
 (*     en Automatique.                                                    *)
@@ -13,6 +13,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* This is a copy of [utils/compression.ml] without the reference to the
+   primitive, so that dynlink.cmxa doesn't need to link with -lcomprmarsh.
+   This disappears when dynlink_compilerlibs is removed, which is a prereq
+   for having actual marshalled compression. *)
+
 let compression_supported = false
+
 let output_value = Stdlib.output_value
+
 let input_value = Stdlib.input_value

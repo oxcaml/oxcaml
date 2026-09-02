@@ -16,4 +16,4 @@
   mode_intf
   solver_intf
   value_rec_types)
- (libraries merlin_utils ocaml_parsing ocaml_utils))
+ (libraries compiler-libs.common merlin_utils ocaml_parsing ocaml_utils))
