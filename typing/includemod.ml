@@ -257,14 +257,13 @@ module Core_inclusion = struct
 
   (* Inclusion between value descriptions *)
 
-  let value_descriptions ~self_check ~loc env ~direction subst id ~mmodes vd1
-      vd2 =
+  let value_descriptions ~loc env ~direction subst id ~mmodes vd1 vd2 =
     if Directionality.mark_as_used direction then
       Env.mark_value_used vd1.val_uid;
     let vd2 = Subst.value_description subst vd2 in
     try
       Ok (Includecore.value_descriptions ~loc env (Ident.name id) ~mmodes
-            ~self_check vd1 vd2)
+            vd1 vd2)
     with Includecore.Dont_match err ->
       Error Error.(Core (Value_descriptions (mdiff vd1 vd2 mmodes err)))
 
@@ -1255,18 +1254,27 @@ let can_alias env path =
   in
   no_apply path && not (Env.is_functor_arg path env)
 
-let make_core_inclusion ~self_check = Core_inclusion.{
+let core_inclusion = Core_inclusion.{
   type_declarations;
-  value_descriptions = value_descriptions ~self_check;
+  value_descriptions;
   extension_constructors;
   class_type_declarations;
   class_declarations;
   jkind_declarations;
 }
 
-let core_inclusion = make_core_inclusion ~self_check:false
-
-let core_inclusion_self_check = make_core_inclusion ~self_check:true
+let core_inclusion_self_check =
+  let accept ~loc:_ _env ~direction:_ _subst _id ~mmodes:_ _d1 _d2 =
+    Ok Tcoerce_none
+  in
+  {
+    type_declarations=accept;
+    value_descriptions=accept;
+    extension_constructors=accept;
+    class_type_declarations=accept;
+    class_declarations=accept;
+    jkind_declarations=accept;
+  }
 
 let core_consistency =
   let type_declarations ~loc:_ env ~direction:_ _ _ ~mmodes:_ d1 d2 =
