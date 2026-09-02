@@ -111,11 +111,12 @@ Line 3, characters 11-12:
 3 | type bad = t np_req
                ^
 Error: This type "t" should be an instance of type "('a : value non_pointer)"
-       The layout of t is bits32 box
+       The layout of t is value non_pointer64
          because of the definition of t at line 1, characters 0-19.
        But the layout of t must be a sublayout of value non_pointer
          because of the definition of np_req at line 1, characters 0-36.
        Note: The layout of immediate is value non_pointer.
+       Note: The layout of immediate64 is value non_pointer64.
 |}]
 
 type t : float32 box
@@ -128,11 +129,12 @@ Line 3, characters 11-12:
 3 | type bad = t np_req
                ^
 Error: This type "t" should be an instance of type "('a : value non_pointer)"
-       The layout of t is float32 box
+       The layout of t is value non_pointer64
          because of the definition of t at line 1, characters 0-20.
        But the layout of t must be a sublayout of value non_pointer
          because of the definition of np_req at line 1, characters 0-36.
        Note: The layout of immediate is value non_pointer.
+       Note: The layout of immediate64 is value non_pointer64.
 |}]
 
 (* [float64 box] is [value] *)
@@ -146,7 +148,7 @@ Line 3, characters 11-12:
 3 | type bad = t nf_req
                ^
 Error: This type "t" should be an instance of type "('a : value non_float)"
-       The layout of t is float64 box
+       The layout of t is value
          because of the definition of t at line 1, characters 0-20.
        But the layout of t must be a sublayout of value non_float
          because of the definition of nf_req at line 3, characters 0-34.
@@ -187,11 +189,13 @@ Line 3, characters 11-12:
 3 | type bad = t np_req
                ^
 Error: This type "t" should be an instance of type "('a : value non_pointer)"
-       The layout of t is bits8 addressable box
+       The layout of t is value non_float
          because of the definition of t at line 1, characters 0-30.
        But the layout of t must be a sublayout of value non_pointer
          because of the definition of np_req at line 1, characters 0-36.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 type t : (bits8 & bits8) addressable box
@@ -204,11 +208,13 @@ Line 3, characters 11-12:
 3 | type bad = t np_req
                ^
 Error: This type "t" should be an instance of type "('a : value non_pointer)"
-       The layout of t is (bits8 & bits8) addressable box
+       The layout of t is value non_float
          because of the definition of t at line 1, characters 0-40.
        But the layout of t must be a sublayout of value non_pointer
          because of the definition of np_req at line 1, characters 0-36.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* Unlike [float64 box], [float64 addressable box] is a non-float block *)
@@ -252,11 +258,13 @@ Line 3, characters 11-12:
 3 | type bad = t np_req
                ^
 Error: This type "t" should be an instance of type "('a : value non_pointer)"
-       The layout of t is bits8 box box
+       The layout of t is value non_float
          because of the definition of t at line 1, characters 0-22.
        But the layout of t must be a sublayout of value non_pointer
          because of the definition of np_req at line 1, characters 0-36.
        Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
 |}]
 
 (* No axes are implied for payloads with unknown representations *)
@@ -271,7 +279,7 @@ Line 3, characters 11-12:
 3 | type bad = t v_req
                ^
 Error: This type "t" should be an instance of type "('a : value)"
-       The layout of t is any box
+       The layout of t is value_or_null
          because of the definition of t at line 1, characters 0-16.
        But the layout of t must be a sublayout of value
          because of the definition of v_req at line 4, characters 0-23.
@@ -285,7 +293,7 @@ Line 2, characters 11-12:
 2 | type bad = t v_req
                ^
 Error: This type "t" should be an instance of type "('a : value)"
-       The layout of t is any addressable box
+       The layout of t is value_or_null
          because of the definition of t at line 1, characters 0-28.
        But the layout of t must be a sublayout of value
          because of the definition of v_req at line 4, characters 0-23.
@@ -299,7 +307,7 @@ Line 2, characters 11-12:
 2 | type bad = t v_req
                ^
 Error: This type "t" should be an instance of type "('a : value)"
-       The layout of t is (any & value) box
+       The layout of t is value_or_null
          because of the definition of t at line 1, characters 0-26.
        But the layout of t must be a sublayout of value
          because of the definition of v_req at line 4, characters 0-23.
@@ -733,10 +741,11 @@ Line 1, characters 30-33:
                                   ^^^
 Error: The field access "x.f" has type "'a -> 'a"
        but an expression was expected of type "'b -> 'b"
-       The layout of 'a is bits8 box
+       The layout of 'a is value non_pointer
          because of the definition of pa at line 1, characters 0-44.
        But the layout of 'a must overlap with bits8
          because of the definition of pd at line 1, characters 0-40.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 (* Boxes whose axes differ only by axes the contents imply are equal *)
@@ -1032,8 +1041,9 @@ Line 2, characters 42-44:
                                               ^^
 Error: This type "('a : bits8 & bits8)" should be an instance of type
          "('a0 : bits8 box)"
-       The layout of 'a is bits8 box
+       The layout of 'a is value non_pointer
          because of the definition of b8_box_req at line 1, characters 0-32.
        But the layout of 'a must overlap with bits8 & bits8
          because of the definition of prod_req at line 1, characters 0-34.
+       Note: The layout of immediate is value non_pointer.
 |}]
