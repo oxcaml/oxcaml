@@ -34,7 +34,7 @@ Types
   $ $MERLIN_TEST_OCAML_PATH/bin/ocamlobjinfo -quiet -discourse types/repro2_types__Topic_name.cmi
   Discourse:
   t: Repro2_priv!.Topic_name.t
-  of_topic: option/13!; t/281[1]; Repro2_types__!.Topic.t
+  of_topic: option/13!; t/334[1]; Repro2_types__!.Topic.t
 
 
 Main

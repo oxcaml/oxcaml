@@ -35,7 +35,7 @@ Short-paths should prefer Header.t but prints Lib_b.Header.t.
   Discourse:
   Header: alias: Lib_a.Header [Lib_a!.Header] Lib_a!.Header
   
-  t: Header/280[1].t
+  t: Header/333[1].t
 
   $ cd ..
 

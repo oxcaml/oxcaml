@@ -16,6 +16,7 @@
   >     include Stdlib.Domain
   >   end
   > end
+  > EOF
 
   $ $OCAMLC -c shadow_stdlib.ml import0.ml
 

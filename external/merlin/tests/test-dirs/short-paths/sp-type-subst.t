@@ -9,7 +9,7 @@
   >     val is_valid : t -> bool (* t 303 *) 
   >   end
   > end
-  > EOF 
+  > EOF
 
 Surprisingly, in Printtyp, the ident for the inner t has a different stamp...
 (306). It's not clear how we could have the correct ident in the discourse.
@@ -33,7 +33,7 @@ and not `Uchar.utf_decode`. Removing the `type uch.. := int` fixes the issue.
   >     val is_valid : tlong -> bool (* t 303 *) 
   >   end
   > end
-  > EOF 
+  > EOF
 
 FIXME Here we also expect is_valid: t -> bool
   $ $MERLIN single type-enclosing -position 11:1 -short-paths \

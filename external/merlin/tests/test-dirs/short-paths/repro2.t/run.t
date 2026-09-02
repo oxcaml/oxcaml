@@ -109,26 +109,20 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
   # discourse-recap - U
   U at start of D.of_U:
   { u_paths =
-    [Repro2_main ->
-       [{item = (module, Repro2_main!); env = with env};
-        {item = (module, Repro2_main!); env = with env}];
+    [Repro2_main -> [{item = (module, Repro2_main!); env = with env}];
     Repro2_main.Topic_name ->
-      [{item = (module, Repro2_main!.Topic_name); env = with env};
-       {item = (module, Repro2_main!.Topic_name); env = with env}];
+      [{item = (module, Repro2_main!.Topic_name); env = with env}];
     Repro2_main.Topic_name.of_topic ->
-      [{item = (value, Repro2_main!.Topic_name.of_topic); env = with env};
-       {item = (value, Repro2_main!.Topic_name.of_topic); env = with env}]];
+      [{item = (value, Repro2_main!.Topic_name.of_topic); env = with env}]];
     substs =
     [] }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
     [Topic_name ->
-       [{item = (module, Repro2_types!.Topic_name); env = with env};
-        {item = (module, Repro2_types!.Topic_name); env = with env}];
+       [{item = (module, Repro2_types!.Topic_name); env = with env}];
     Repro2_main.Topic_name ->
-      [{item = (module, Repro2_types__Topic_name!); env = with env};
-       {item = (module, Repro2_types__Topic_name!); env = with env}]];
+      [{item = (module, Repro2_types__Topic_name!); env = with env}]];
     substs =
     [] }
   # discourse-recap - next_U
@@ -136,8 +130,6 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
   { u_paths =
     [Topic_name ->
        [{item = (module, Repro2_types__Topic_name!); env = with env};
-        {item = (module, Repro2_types__!.Topic_name); env = with env};
-        {item = (module, Repro2_types__Topic_name!); env = with env};
         {item = (module, Repro2_types__!.Topic_name); env = with env}]];
     substs =
     [] }
@@ -145,24 +137,29 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
   next_U (non-empty, looping):
   { u_paths =
     [Repro2_types__Topic_name ->
-       [{item = (module, Repro2_types__Topic_name!); env = with env};
-        {item = (module, Repro2_types__Topic_name!); env = with env}];
+       [{item = (module, Repro2_types__Topic_name!); env = with env}];
     Topic_name ->
-      [{item = (module, Repro2_types__Topic_name!); env = with env};
-       {item = (module, Repro2_types__Topic_name!); env = with env}]];
+      [{item = (module, Repro2_types__Topic_name!); env = with env}]];
     substs =
     [] }
   # discourse-recap - D
   Final D:
   Discourse {
-    size = 133;
+    size = 163;
     paths =
     unit [unit!];
+    unativeint_u [unativeint_u!];
+    uint8_u [uint8_u!];
+    uint64_u [uint64_u!];
+    uint32_u [uint32_u!];
+    uint16_u [uint16_u!];
     t [t[1]];
     string [string!];
     or_null [or_null!];
     option [option!];
+    nativeint_u [nativeint_u!];
     nativeint [nativeint!];
+    mask [mask!];
     list [list!];
     lexing_position [lexing_position!];
     lazy_t [lazy_t!];
@@ -173,10 +170,12 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
     int64x8 [int64x8!];
     int64x4 [int64x4!];
     int64x2 [int64x2!];
+    int64_u [int64_u!];
     int64 [int64!];
     int32x8 [int32x8!];
     int32x4 [int32x4!];
     int32x16 [int32x16!];
+    int32_u [int32_u!];
     int32 [int32!];
     int16x8 [int16x8!];
     int16x32 [int16x32!];
@@ -185,6 +184,7 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
     int [int!];
     idx_mut [idx_mut!];
     idx_imm [idx_imm!];
+    idx_atomic [idx_atomic!];
     iarray [iarray!];
     floatarray [floatarray!];
     float64x8 [float64x8!];
@@ -193,6 +193,7 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
     float32x8 [float32x8!];
     float32x4 [float32x4!];
     float32x16 [float32x16!];
+    float32_u [float32_u!];
     float32 [float32!];
     float16x8 [float16x8!];
     float16x32 [float16x32!];
@@ -206,6 +207,7 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
     continuation [continuation!];
     char [char!];
     bytes [bytes!];
+    box [box!];
     bool [bool!];
     atomic_loc [atomic_loc!];
     array [array!];
@@ -214,10 +216,12 @@ Expected `Repro2_main.Topic.t -> Repro2_main.Topic_name.t option`.
        Repro2_types__!.Topic_name];
     Topic_name.t [Repro2_types__Topic_name!.t];
     Topic_name.of_topic [Repro2_types__Topic_name!.of_topic];
-    Topic.t [Repro2_types__!.Topic.t];
     Repro2_types__Topic_name [Repro2_types__Topic_name!];
     Repro2_types__Topic_name.t [Repro2_types__Topic_name!.t];
     Repro2_types__Topic_name.of_topic [Repro2_types__Topic_name!.of_topic];
+    Repro2_types__.Topic_name [Repro2_types__!.Topic_name];
+    Repro2_types__.Topic.t [Repro2_types__!.Topic.t];
+    Repro2_types.Topic_name [Repro2_types!.Topic_name];
     Repro2_main [Repro2_main!];
     Repro2_main.Topic_name [Repro2_types__Topic_name!; Repro2_main!.Topic_name];
     Repro2_main.Topic_name.t [Repro2_types__Topic_name!.t];

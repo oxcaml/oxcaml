@@ -104,15 +104,22 @@
   # discourse-recap - D
   Final D:
   Discourse {
-    size = 115;
+    size = 139;
     paths =
     unit [unit!];
+    unativeint_u [unativeint_u!];
+    uint8_u [uint8_u!];
+    uint64_u [uint64_u!];
+    uint32_u [uint32_u!];
+    uint16_u [uint16_u!];
     t [t[1]; t[4]];
     string [string!];
     prev [prev[3]];
     or_null [or_null!];
     option [option!];
+    nativeint_u [nativeint_u!];
     nativeint [nativeint!];
+    mask [mask!];
     list [list!];
     lexing_position [lexing_position!];
     lazy_t [lazy_t!];
@@ -123,10 +130,12 @@
     int64x8 [int64x8!];
     int64x4 [int64x4!];
     int64x2 [int64x2!];
+    int64_u [int64_u!];
     int64 [int64!];
     int32x8 [int32x8!];
     int32x4 [int32x4!];
     int32x16 [int32x16!];
+    int32_u [int32_u!];
     int32 [int32!];
     int16x8 [int16x8!];
     int16x32 [int16x32!];
@@ -135,6 +144,7 @@
     int [int!];
     idx_mut [idx_mut!];
     idx_imm [idx_imm!];
+    idx_atomic [idx_atomic!];
     iarray [iarray!];
     floatarray [floatarray!];
     float64x8 [float64x8!];
@@ -143,6 +153,7 @@
     float32x8 [float32x8!];
     float32x4 [float32x4!];
     float32x16 [float32x16!];
+    float32_u [float32_u!];
     float32 [float32!];
     float16x8 [float16x8!];
     float16x32 [float16x32!];
@@ -156,6 +167,7 @@
     continuation [continuation!];
     char [char!];
     bytes [bytes!];
+    box [box!];
     bool [bool!];
     atomic_loc [atomic_loc!];
     array [array!];

@@ -85,7 +85,9 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
       [{item = (value, Async!.Let_syntax.return); env = with env}]];
     substs =
     [Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax]] }
+    Async.Let_syntax -> [Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax]] }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
@@ -113,14 +115,21 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
   # discourse-recap - D
   Final D:
   Discourse {
-    size = 132;
+    size = 156;
     paths =
     unit [unit!];
+    unativeint_u [unativeint_u!];
+    uint8_u [uint8_u!];
+    uint64_u [uint64_u!];
+    uint32_u [uint32_u!];
+    uint16_u [uint16_u!];
     t [t[1]];
     string [string!];
     or_null [or_null!];
     option [option!];
+    nativeint_u [nativeint_u!];
     nativeint [nativeint!];
+    mask [mask!];
     list [list!];
     lexing_position [lexing_position!];
     lazy_t [lazy_t!];
@@ -131,10 +140,12 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     int64x8 [int64x8!];
     int64x4 [int64x4!];
     int64x2 [int64x2!];
+    int64_u [int64_u!];
     int64 [int64!];
     int32x8 [int32x8!];
     int32x4 [int32x4!];
     int32x16 [int32x16!];
+    int32_u [int32_u!];
     int32 [int32!];
     int16x8 [int16x8!];
     int16x32 [int16x32!];
@@ -143,6 +154,7 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     int [int!];
     idx_mut [idx_mut!];
     idx_imm [idx_imm!];
+    idx_atomic [idx_atomic!];
     iarray [iarray!];
     floatarray [floatarray!];
     float64x8 [float64x8!];
@@ -151,6 +163,7 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     float32x8 [float32x8!];
     float32x4 [float32x4!];
     float32x16 [float32x16!];
+    float32_u [float32_u!];
     float32 [float32!];
     float16x8 [float16x8!];
     float16x32 [float16x32!];
@@ -164,6 +177,7 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     continuation [continuation!];
     char [char!];
     bytes [bytes!];
+    box [box!];
     bool [bool!];
     atomic_loc [atomic_loc!];
     array [array!];
@@ -188,7 +202,8 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
     Async_kernel__.Deferred -> [Async.Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
@@ -203,7 +218,8 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
     Async_kernel__.Deferred -> [Async.Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
@@ -219,7 +235,8 @@ This mocks the Async --include--> Async_kernel --exports--> Deferred
     [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
     Async_kernel__.Deferred -> [Async.Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
@@ -259,7 +276,9 @@ Dump the discourse so regressions show up as a diff in this test:
       [{item = (value, Async!.Let_syntax.return); env = with env}]];
     substs =
     [Async.Deferred -> [Deferred];
-    Async.Let_syntax -> [Let_syntax]] }
+    Async.Let_syntax -> [Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax]] }
   # discourse-recap - next_U
   next_U (non-empty, looping):
   { u_paths =
@@ -287,14 +306,21 @@ Dump the discourse so regressions show up as a diff in this test:
   # discourse-recap - D
   Final D:
   Discourse {
-    size = 132;
+    size = 156;
     paths =
     unit [unit!];
+    unativeint_u [unativeint_u!];
+    uint8_u [uint8_u!];
+    uint64_u [uint64_u!];
+    uint32_u [uint32_u!];
+    uint16_u [uint16_u!];
     t [t[1]];
     string [string!];
     or_null [or_null!];
     option [option!];
+    nativeint_u [nativeint_u!];
     nativeint [nativeint!];
+    mask [mask!];
     list [list!];
     lexing_position [lexing_position!];
     lazy_t [lazy_t!];
@@ -305,10 +331,12 @@ Dump the discourse so regressions show up as a diff in this test:
     int64x8 [int64x8!];
     int64x4 [int64x4!];
     int64x2 [int64x2!];
+    int64_u [int64_u!];
     int64 [int64!];
     int32x8 [int32x8!];
     int32x4 [int32x4!];
     int32x16 [int32x16!];
+    int32_u [int32_u!];
     int32 [int32!];
     int16x8 [int16x8!];
     int16x32 [int16x32!];
@@ -317,6 +345,7 @@ Dump the discourse so regressions show up as a diff in this test:
     int [int!];
     idx_mut [idx_mut!];
     idx_imm [idx_imm!];
+    idx_atomic [idx_atomic!];
     iarray [iarray!];
     floatarray [floatarray!];
     float64x8 [float64x8!];
@@ -325,6 +354,7 @@ Dump the discourse so regressions show up as a diff in this test:
     float32x8 [float32x8!];
     float32x4 [float32x4!];
     float32x16 [float32x16!];
+    float32_u [float32_u!];
     float32 [float32!];
     float16x8 [float16x8!];
     float16x32 [float16x32!];
@@ -338,6 +368,7 @@ Dump the discourse so regressions show up as a diff in this test:
     continuation [continuation!];
     char [char!];
     bytes [bytes!];
+    box [box!];
     bool [bool!];
     atomic_loc [atomic_loc!];
     array [array!];
@@ -362,7 +393,8 @@ Dump the discourse so regressions show up as a diff in this test:
     [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
     Async_kernel__.Deferred -> [Async.Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
@@ -377,7 +409,8 @@ Dump the discourse so regressions show up as a diff in this test:
     [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
     Async_kernel__.Deferred -> [Async.Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
@@ -393,7 +426,8 @@ Dump the discourse so regressions show up as a diff in this test:
     [Async_kernel__Deferred -> [Async.Deferred; Async_kernel.Deferred];
     Async.Deferred -> [Deferred];
     Async.Let_syntax -> [Let_syntax; Async_kernel.Let_syntax];
-    Async_kernel.Let_syntax -> [Deferred.Let_syntax.Let_syntax];
+    Async_kernel.Deferred -> [Deferred];
+    Async_kernel.Let_syntax -> [Let_syntax; Deferred.Let_syntax.Let_syntax];
     Async_kernel__.Deferred -> [Async.Deferred];
     Async_kernel__Deferred.Let_syntax.Let_syntax ->
       [Let_syntax; Async.Let_syntax; Async_kernel.Let_syntax];
