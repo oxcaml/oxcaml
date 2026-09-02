@@ -11275,6 +11275,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
        let exp =
          with_local_level_generalize_structure_if_principal
            (fun () -> type_exp env (mode_max_with_position position) sexp)
+           ~before_generalize:generalize_structure_exp
        in
        exp, sort)
   ~before_generalize: begin fun (exp, _sort) ->
@@ -11294,7 +11295,10 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
         end else
           instance Predef.type_unit
       in
-      unify_var env expected_ty disambiguated_unit_ty;
+      begin
+        try unify_var env expected_ty disambiguated_unit_ty
+        with Unify _ -> assert false
+      end;
       with_explanation explanation (fun () ->
         unify_exp ~sexp env exp expected_ty)
     end else begin
