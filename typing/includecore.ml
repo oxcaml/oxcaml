@@ -187,9 +187,9 @@ let value_descriptions_consistency _env vd1 vd2 =
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
 
-let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 ty2 =
+let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
   let tc_args =
-    Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 ty2
+    Ctype.moregeneral env true pat_lpoly subj_lpoly ty1 ty2
   in
   (* We can set uninstantiated variables (given by [None]) to anything,
      including the variable at the same position.
@@ -251,7 +251,7 @@ let uid_is_from_current_unit uid =
   | None, _ | _, None -> false
 
 (* [static] is [true] if the [module_coercion] requires a [static] argument *)
-let value_descriptions_without_modes ~loc env name ~self_check
+let value_descriptions_without_modes ~loc env name
     (vd1 : Types.value_description)
     (vd2 : Types.value_description)
     : module_coercion * static:bool =
@@ -284,7 +284,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
              Option.iter (Mode.Locality.equate_exn loc) mode_l2;
              Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
-             match moregeneral_lpoly ~self_check env
+             match moregeneral_lpoly env
                  val_lpoly1 val_lpoly2 ty1 ty2 with
              | None -> ()
              | Some _ ->
@@ -308,7 +308,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
         in
         let tc =
           try
-            moregeneral_lpoly ~self_check env
+            moregeneral_lpoly env
               val_lpoly1 val_lpoly2 ty1 vd2.val_type
             |> Option.value ~default:{ tc_params = []; tc_args = [] }
           with Ctype.Moregen err -> raise (Dont_match (Type err))
@@ -340,7 +340,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
         ~static:(kindtemplate_coercion_instantiates tc)
      end
   | _ ->
-     match moregeneral_lpoly ~self_check env
+     match moregeneral_lpoly env
              val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | tc -> begin
@@ -354,9 +354,9 @@ let value_descriptions_without_modes ~loc env name ~self_check
           | None -> Tcoerce_none, ~static:false
      end
 
-let value_descriptions ~loc env name ~mmodes ~self_check vd1 vd2 =
+let value_descriptions ~loc env name ~mmodes vd1 vd2 =
   let cc, ~static =
-    value_descriptions_without_modes ~loc env name ~self_check vd1 vd2
+    value_descriptions_without_modes ~loc env name vd1 vd2
   in
   let () =
     let crossing = Ctype.crossing_of_ty env vd2.val_type in
