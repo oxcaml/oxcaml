@@ -161,7 +161,11 @@ let dump (type a) : a t -> json =
     mk "case-analysis"
       [ ("start", mk_position pos_start); ("end", mk_position pos_end) ]
   | Holes -> mk "holes" []
-  | Module_type_impls -> mk "module-type-impls" []
+  | Module_type_impls position ->
+    mk "module-type-impls"
+      (match position with
+      | None -> []
+      | Some position -> [ ("position", mk_position position) ])
   | Construct (pos, with_values, depth) ->
     let depth = Option.value ~default:1 depth in
     mk "construct"
@@ -611,7 +615,7 @@ let json_of_response (type a) (query : a t) (response : a) : json =
     `List
       (List.map locations ~f:(fun (loc, typ) ->
            with_location loc [ ("type", `String typ) ]))
-  | Module_type_impls, response ->
+  | Module_type_impls _, response ->
     let json_of_loc loc = `Assoc (with_location_fields ~with_file:true loc) in
     let json_of_implementation
         (i : Query_protocol.Module_type_impls.implementation) =
