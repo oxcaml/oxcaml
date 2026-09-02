@@ -97,7 +97,7 @@ Line 1, characters 40-51:
 1 | type t : (any mod portable) addressable addressable
                                             ^^^^^^^^^^^
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
-  is already implied by the kind "any mod portable addressable".
+  is already implied by the kind "(any mod portable) addressable".
 
 type t : any mod portable addressable
 |}]
