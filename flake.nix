@@ -31,6 +31,7 @@
           inherit (merlinPackages) merlin-lib dot-merlin-reader merlin;
           oxcaml-fp = oxcaml.override { framePointers = true; };
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
+          external-libs = oxcaml.mkExternalLibraries oxcaml;
           default = oxcaml;
         };
 
@@ -39,6 +40,7 @@
             oxcaml
             oxcaml-fp
             oxcaml-asan
+            external-libs
             merlin
             ;
         };
