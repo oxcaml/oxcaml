@@ -19,6 +19,7 @@
 #define CAML_INTERNALS
 
 #include "caml/config.h"
+#include <stddef.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -61,6 +62,10 @@
 #endif
 
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
+/* The stack checks emitted by the compiler read [stack_base] at this
+   offset (exported via domainstate.ml.c). */
+static_assert(offsetof(struct stack_info, stack_base)
+              == Stack_base_field_offset, "");
 
 static _Atomic int64_t fiber_id_global = 0;
 static CAMLthread_local int64_t fiber_id_local = 0;
@@ -176,6 +181,7 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
     (struct stack_handler*)
     round_up_p2((uintnat)si + sizeof(struct stack_info)
       + sizeof(value) * wosize, stack_alignment);
+  si->stack_base = (value*)(si + 1);
 
   return si;
 #elif defined(STACK_GUARD_PAGES)
@@ -234,6 +240,13 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
     return NULL;
   }
 
+  /* The sole computation of the base of a guarded stack; everything
+     else reads the field. */
+  stack->stack_base = (value*)((char*)stack + 2 * page_size);
+  /* [Stack_guard_size] is the compiler's lower bound on the guard page
+     (see config.h). */
+  CAMLassert(page_size >= Stack_guard_size);
+
 #ifdef DEBUG /* Avoid unnecessary syscalls in release builds */
 #ifdef __linux__
   /* On Linux, give names to the various mappings */
@@ -255,11 +268,6 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
   CAMLassert((char*) stack + len - (trailer_size + Bsize_wsize(wosize))
     >= Protected_stack_page(stack) + page_size);
 
-  // The compiler's emitted stack checks assume this layout (the
-  // Stack_base_offset and Stack_guard_size exported via domainstate.ml.c).
-  CAMLassert((char*)Stack_base(stack) - (char*)stack == Stack_base_offset);
-  CAMLassert(page_size == Stack_guard_size);
-
   stack->size = len;
   stack->handler = (struct stack_handler*)((char*)stack + len - trailer_size);
   CAMLassert(((uintnat) stack->handler) % stack_alignment == 0);
@@ -276,6 +284,7 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
     (struct stack_handler*)
     round_up_p2((uintnat)stack + sizeof(struct stack_info) +
       sizeof(value) * wosize, stack_alignment);
+  stack->stack_base = (value*)(stack + 1);
   return stack;
 #endif /* USE_MMAP_MAP_STACK, STACK_GUARD_PAGES */
 }
