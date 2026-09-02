@@ -55,7 +55,8 @@ module List = struct
 end
 
 module String = struct
-  include Misc.Stdlib.String
+  include Stdlib.String
+  module Set = Set.Make (String)
   let string_of_char = String.make 1
 
   let words s =
