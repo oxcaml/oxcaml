@@ -737,16 +737,16 @@ and eval_prim env prim =
   | Pset_ext_ptr (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Pset_ext_ptr (new_layout, mode)
-  | Patomic_load_idx { layout = old_layout } ->
+  | Patomic_load_idx { layout = old_layout; memory_order } ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
     then prim
-    else Patomic_load_idx { layout = new_layout }
-  | Patomic_set_idx { layout = old_layout; mode } ->
+    else Patomic_load_idx { layout = new_layout; memory_order }
+  | Patomic_set_idx { layout = old_layout; memory_order; mode } ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
     then prim
-    else Patomic_set_idx { layout = new_layout; mode }
+    else Patomic_set_idx { layout = new_layout; memory_order; mode }
   | Patomic_exchange_idx { layout = old_layout; mode } ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
@@ -841,7 +841,7 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_layout_contains_no_splices layout
   | Pget_idx (layout, _)
   | Pset_idx (layout, _)
-  | Patomic_load_idx { layout }
+  | Patomic_load_idx { layout; _ }
   | Patomic_set_idx { layout; _ }
   | Pget_ptr (layout, _)
   | Pset_ptr (layout, _)

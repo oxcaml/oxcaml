@@ -183,6 +183,23 @@ let _ = atomic_logand_field a 0 1
 let _ = atomic_logor_field a 0 1
 let _ = atomic_logxor_field a 0 1
 
+external atomic_get_acquire : 'a Atomic.t -> 'a = "%atomic_load_acquire"
+external atomic_set_release : 'a Atomic.t -> 'a -> unit = "%atomic_store_release"
+external atomic_get_acquire_field : 'a atomic -> int -> 'a = "%atomic_load_acquire_field"
+external atomic_set_release_field : ('a atomic [@local_opt]) -> int -> 'a -> unit = "%atomic_store_release_field"
+external atomic_get_acquire_loc : 'a Atomic.Loc.t @ local -> 'a = "%atomic_load_acquire_loc"
+external atomic_set_release_loc : 'a Atomic.Loc.t @ local -> 'a -> unit = "%atomic_store_release_loc"
+
+let a = Atomic.make 0
+let _ = atomic_get_acquire a
+let _ = atomic_set_release a 1
+
+let a = {x = 0}
+let _ = atomic_get_acquire_field a 0
+let _ = atomic_set_release_field a 0 1
+let _ = atomic_get_acquire_loc [%atomic.loc a.x]
+let _ = atomic_set_release_loc [%atomic.loc a.x] 1
+
 let () = assert (atomic_load_calls () = 0)
 let () = assert (atomic_load_field_calls () = 0)
 let () = assert (atomic_exchange_calls () = 0)

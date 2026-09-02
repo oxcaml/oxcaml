@@ -1691,7 +1691,7 @@ let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
     | Compare_set -> 2
     | Fetch_and_add -> 1
     | Add | Sub | Land | Lor | Lxor -> 1
-    | Exchange -> 1
+    | Exchange | Release_store -> 1
     | Compare_exchange -> 2
   in
   let src_index = first_memory_arg_index - 1 in
@@ -1730,6 +1730,9 @@ let emit_atomic instr (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) addr =
     (* no need for a "lock" prefix for XCHG with a memory operand *)
     assert (Reg.is_reg instr.arg.(0));
     I.xchg src dst
+  | Release_store ->
+    (* x86 stores have release semantics *)
+    I.mov src dst
 
 let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
   let open Simd_instrs in

@@ -1169,6 +1169,11 @@ let imm_or_ptr : P.Block_access_field_kind.t -> Lambda.immediate_or_pointer =
  fun block_access_kind ->
   match block_access_kind with Any_value -> Pointer | Immediate -> Immediate
 
+let load_memory_order : P.Memory_order.t -> Cmm.atomic_load_memory_order =
+  function
+  | Seq_cst -> Seq_cst
+  | Acq_rel -> Acquire
+
 let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     (arg : Cmm.expression) =
   match (f : P.unary_primitive) with
@@ -1334,8 +1339,11 @@ let binary_primitive env dbg f (_x_simple : Simple.t option)
   | Float_comp (width, Yielding_int_like_compare_functions ()) ->
     binary_float_comp_primitive_yielding_int env dbg width x y
   | Bigarray_get_alignment align -> C.bigstring_get_alignment x y align dbg
-  | Atomic_load_field block_access_kind ->
-    C.atomic_load_field ~dbg (imm_or_ptr block_access_kind) x ~field:y
+  | Atomic_load_field (block_access_kind, memory_order) ->
+    C.atomic_load_field ~dbg
+      (imm_or_ptr block_access_kind)
+      ~memory_order:(load_memory_order memory_order)
+      x ~field:y
   | Poke kind ->
     let memory_chunk =
       K.Standard_int_or_float.to_kind_with_subkind kind
@@ -1366,12 +1374,18 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
     | And -> C.atomic_land_field ~dbg x ~field:y z |> C.return_unit dbg
     | Or -> C.atomic_lor_field ~dbg x ~field:y z |> C.return_unit dbg
     | Xor -> C.atomic_lxor_field ~dbg x ~field:y z |> C.return_unit dbg)
-  | Atomic_set_field (block_access_kind, mode) ->
+  | Atomic_set_field (block_access_kind, Seq_cst, mode) ->
+    (* Sequentially consistent stores are implemented as exchanges. *)
     C.atomic_exchange_field ~dbg
       (imm_or_ptr block_access_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
       x ~field:y ~new_value:z
     |> C.return_unit dbg
+  | Atomic_set_field (block_access_kind, Acq_rel, mode) ->
+    C.atomic_release_store_field ~dbg
+      (imm_or_ptr block_access_kind)
+      ~mode:(Alloc_mode.For_assignments.to_lambda mode)
+      x ~field:y ~new_value:z
   | Atomic_exchange_field (block_access_kind, mode) ->
     C.atomic_exchange_field ~dbg
       (imm_or_ptr block_access_kind)

@@ -579,6 +579,22 @@ module Block_access_field_kind = struct
       Any_value
 end
 
+module Memory_order = struct
+  type t =
+    | Seq_cst
+    | Acq_rel
+
+  let [@ocamlformat "disable"] print ppf t =
+    match t with
+    | Seq_cst -> Format.pp_print_string ppf "Seq_cst"
+    | Acq_rel -> Format.pp_print_string ppf "Acq_rel"
+
+  let compare = Stdlib.compare
+
+  let from_lambda (memory_order : Lambda.atomic_memory_order) =
+    match memory_order with Seq_cst -> Seq_cst | Acq_rel -> Acq_rel
+end
+
 module Mixed_block_access_field_kind = struct
   type t =
     | Value_prefix of Block_access_field_kind.t
@@ -1924,7 +1940,7 @@ type binary_primitive =
   | Float_arith of float_bitwidth * binary_float_arith_op
   | Float_comp of float_bitwidth * unit comparison_behaviour
   | Bigarray_get_alignment of int
-  | Atomic_load_field of Block_access_field_kind.t
+  | Atomic_load_field of Block_access_field_kind.t * Memory_order.t
   | Poke of Flambda_kind.Standard_int_or_float.t
   | Read_offset of Flambda_kind.With_subkind.t * Asttypes.mutable_flag
 
@@ -1946,7 +1962,8 @@ let binary_primitive_eligible_for_cse p =
        floating-point arithmetic operations. See also the comment in
        effects_and_coeffects of unary primitives. *)
     Flambda_features.float_const_prop ()
-  | Atomic_load_field (Any_value | Immediate) | Poke _ | Read_offset _ -> false
+  | Atomic_load_field ((Any_value | Immediate), _) | Poke _ | Read_offset _ ->
+    false
 
 let compare_binary_primitive p1 p2 =
   let binary_primitive_numbering p =
@@ -2013,10 +2030,13 @@ let compare_binary_primitive p1 p2 =
     if c <> 0 then c else Stdlib.compare comp1 comp2
   | Bigarray_get_alignment align1, Bigarray_get_alignment align2 ->
     Int.compare align1 align2
-  | ( Atomic_load_field block_access_field_kind1,
-      Atomic_load_field block_access_field_kind2 ) ->
-    Block_access_field_kind.compare block_access_field_kind1
-      block_access_field_kind2
+  | ( Atomic_load_field (block_access_field_kind1, memory_order1),
+      Atomic_load_field (block_access_field_kind2, memory_order2) ) ->
+    let c =
+      Block_access_field_kind.compare block_access_field_kind1
+        block_access_field_kind2
+    in
+    if c <> 0 then c else Memory_order.compare memory_order1 memory_order2
   | Poke kind1, Poke kind2 ->
     Flambda_kind.Standard_int_or_float.compare kind1 kind2
   | Read_offset (kind1, mut1), Read_offset (kind2, mut2) ->
@@ -2064,9 +2084,10 @@ let print_binary_primitive ppf p =
     fprintf ppf "."
   | Bigarray_get_alignment align ->
     fprintf ppf "@[(Bigarray_get_alignment[%d])@]" align
-  | Atomic_load_field block_access_field_kind ->
-    Format.fprintf ppf "@[(Atomic_load_field@ %a)@]"
-      Block_access_field_kind.print block_access_field_kind
+  | Atomic_load_field (block_access_field_kind, memory_order) ->
+    Format.fprintf ppf "@[(Atomic_load_field@ %a@ %a)@]"
+      Block_access_field_kind.print block_access_field_kind Memory_order.print
+      memory_order
   | Poke kind ->
     fprintf ppf "@[(Poke@ %a)@]"
       Flambda_kind.Standard_int_or_float.print_lowercase kind
@@ -2097,7 +2118,7 @@ let args_kind_of_binary_primitive p =
   | Float_arith (Float32, _) | Float_comp (Float32, _) ->
     K.naked_float32, K.naked_float32
   | Bigarray_get_alignment _ -> bigstring_kind, K.naked_immediate
-  | Atomic_load_field (Any_value | Immediate) -> K.value, K.value
+  | Atomic_load_field ((Any_value | Immediate), _) -> K.value, K.value
   | Poke kind -> K.naked_nativeint, K.Standard_int_or_float.to_kind kind
   | Read_offset _ -> K.value, K.naked_int64
 
@@ -2126,7 +2147,7 @@ let result_kind_of_binary_primitive p : result_kind =
   | Float_arith (Float32, _) -> Singleton K.naked_float32
   | Phys_equal _ | Int_comp _ | Float_comp _ -> Singleton K.naked_immediate
   | Bigarray_get_alignment _ -> Singleton K.naked_immediate
-  | Atomic_load_field (Any_value | Immediate) -> Singleton K.value
+  | Atomic_load_field ((Any_value | Immediate), _) -> Singleton K.value
   | Poke _ -> Unit
   | Read_offset (kind, _) -> Singleton (K.With_subkind.kind kind)
 
@@ -2164,7 +2185,7 @@ let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
     else No_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Bigarray_get_alignment _ ->
     No_effects, No_coeffects, Strict, Can't_move_before_any_branch
-  | Atomic_load_field (Any_value | Immediate) ->
+  | Atomic_load_field ((Any_value | Immediate), _) ->
     Arbitrary_effects, Has_coeffects, Strict, Can't_move_before_any_branch
   | Poke _ ->
     Arbitrary_effects, No_coeffects, Strict, Can't_move_before_any_branch
@@ -2246,7 +2267,8 @@ type ternary_primitive =
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
   | Bigarray_set of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
   | Atomic_field_int_arith of int_atomic_op
-  | Atomic_set_field of Block_access_field_kind.t * Alloc_mode.For_assignments.t
+  | Atomic_set_field of
+      Block_access_field_kind.t * Memory_order.t * Alloc_mode.For_assignments.t
   | Atomic_exchange_field of
       Block_access_field_kind.t * Alloc_mode.For_assignments.t
   | Write_offset of
@@ -2267,7 +2289,7 @@ let ternary_primitive_eligible_for_cse p =
   match p with
   | Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
   | Atomic_field_int_arith _
-  | Atomic_set_field ((Immediate | Any_value), (Heap | Local))
+  | Atomic_set_field ((Immediate | Any_value), _, (Heap | Local))
   | Atomic_exchange_field ((Immediate | Any_value), (Heap | Local))
   | Write_offset _ ->
     false
@@ -2311,13 +2333,17 @@ let compare_ternary_primitive p1 p2 =
       if c <> 0 then c else Stdlib.compare layout1 layout2
   | Atomic_field_int_arith op1, Atomic_field_int_arith op2 ->
     Stdlib.compare op1 op2
-  | ( Atomic_set_field (block_access_field_kind1, mode1),
-      Atomic_set_field (block_access_field_kind2, mode2) ) ->
+  | ( Atomic_set_field (block_access_field_kind1, memory_order1, mode1),
+      Atomic_set_field (block_access_field_kind2, memory_order2, mode2) ) ->
     let c =
       Block_access_field_kind.compare block_access_field_kind1
         block_access_field_kind2
     in
-    if c <> 0 then c else Alloc_mode.For_assignments.compare mode1 mode2
+    if c <> 0
+    then c
+    else
+      let c = Memory_order.compare memory_order1 memory_order2 in
+      if c <> 0 then c else Alloc_mode.For_assignments.compare mode1 mode2
   | ( Atomic_exchange_field (block_access_field_kind1, mode1),
       Atomic_exchange_field (block_access_field_kind2, mode2) ) ->
     let c =
@@ -2390,10 +2416,10 @@ let print_ternary_primitive ppf p =
       num_dimensions Bigarray_kind.print kind Bigarray_layout.print layout
   | Atomic_field_int_arith op ->
     Format.fprintf ppf "@[(Atomic_field_int_arith %a)@]" print_int_atomic_op op
-  | Atomic_set_field (block_access_field_kind, mode) ->
-    Format.fprintf ppf "@[(Atomic_set_field@ %a@ %a)@]"
-      Block_access_field_kind.print block_access_field_kind
-      Alloc_mode.For_assignments.print mode
+  | Atomic_set_field (block_access_field_kind, memory_order, mode) ->
+    Format.fprintf ppf "@[(Atomic_set_field@ %a@ %a@ %a)@]"
+      Block_access_field_kind.print block_access_field_kind Memory_order.print
+      memory_order Alloc_mode.For_assignments.print mode
   | Atomic_exchange_field (block_access_field_kind, mode) ->
     fprintf ppf "@[(Atomic_exchange_field@ %a@ %a)@]"
       Block_access_field_kind.print block_access_field_kind
@@ -2462,7 +2488,7 @@ let args_kind_of_ternary_primitive p =
   | Bigarray_set (_, kind, _) ->
     bigarray_kind, bigarray_index_kind, Bigarray_kind.element_kind kind
   | Atomic_field_int_arith _
-  | Atomic_set_field ((Immediate | Any_value), (Heap | Local))
+  | Atomic_set_field ((Immediate | Any_value), _, (Heap | Local))
   | Atomic_exchange_field ((Immediate | Any_value), (Heap | Local)) ->
     K.value, K.value, K.value
   | Write_offset (_, kind, _) ->

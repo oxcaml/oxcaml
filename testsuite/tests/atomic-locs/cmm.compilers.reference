@@ -1,66 +1,135 @@
 (data global "camlCmm__gc_roots": int 0)
 (data
- int 6912
+ int 14080
  global "camlCmm":
- addr G:"camlCmm__standard_atomic_get_2"
- addr G:"camlCmm__get_3"
- addr G:"camlCmm__set_4"
- addr G:"camlCmm__get_imm_5"
- addr G:"camlCmm__set_imm_6"
- addr G:"camlCmm__cas_7")
+ addr G:"camlCmm__standard_atomic_get_1_2"
+ addr G:"camlCmm__get_2_3"
+ addr G:"camlCmm__set_3_4"
+ addr G:"camlCmm__get_imm_4_5"
+ addr G:"camlCmm__set_imm_5_6"
+ addr G:"camlCmm__cas_6_7"
+ addr G:"camlCmm__standard_atomic_get_acquire_7_8"
+ addr G:"camlCmm__standard_atomic_set_release_8_9"
+ addr G:"camlCmm__standard_atomic_set_release_imm_9_10"
+ addr G:"camlCmm__get_acquire_10_11"
+ addr G:"camlCmm__set_release_11_12"
+ addr G:"camlCmm__get_acquire_imm_12_13"
+ addr G:"camlCmm__set_release_imm_13_14")
 (data
  int 4087
- global "camlCmm__cas_7":
+ global "camlCmm__set_release_imm_13_14":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlCmm__set_release_imm_13_27_code")
+(data
+ int 3063
+ global "camlCmm__get_acquire_imm_12_13":
+ addr G:"camlCmm__get_acquire_imm_12_26_code"
+ int 108086391056891909)
+(data
+ int 4087
+ global "camlCmm__set_release_11_12":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlCmm__set_release_11_25_code")
+(data
+ int 3063
+ global "camlCmm__get_acquire_10_11":
+ addr G:"camlCmm__get_acquire_10_24_code"
+ int 108086391056891909)
+(data
+ int 4087
+ global "camlCmm__standard_atomic_set_release_imm_9_10":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlCmm__standard_atomic_set_release_imm_9_23_code")
+(data
+ int 4087
+ global "camlCmm__standard_atomic_set_release_8_9":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlCmm__standard_atomic_set_release_8_22_code")
+(data
+ int 3063
+ global "camlCmm__standard_atomic_get_acquire_7_8":
+ addr G:"camlCmm__standard_atomic_get_acquire_7_21_code"
+ int 108086391056891909)
+(data
+ int 4087
+ global "camlCmm__cas_6_7":
  addr G:"caml_curry3"
  int 252201579132747783
- addr G:"camlCmm__cas_6_13_code")
+ addr G:"camlCmm__cas_6_20_code")
 (data
  int 4087
- global "camlCmm__set_imm_6":
+ global "camlCmm__set_imm_5_6":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__set_imm_5_12_code")
+ addr G:"camlCmm__set_imm_5_19_code")
 (data
  int 3063
- global "camlCmm__get_imm_5":
- addr G:"camlCmm__get_imm_4_11_code"
+ global "camlCmm__get_imm_4_5":
+ addr G:"camlCmm__get_imm_4_18_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlCmm__set_4":
+ global "camlCmm__set_3_4":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__set_3_10_code")
+ addr G:"camlCmm__set_3_17_code")
 (data
  int 3063
- global "camlCmm__get_3":
- addr G:"camlCmm__get_2_9_code"
+ global "camlCmm__get_2_3":
+ addr G:"camlCmm__get_2_16_code"
  int 108086391056891909)
 (data
  int 4087
- global "camlCmm__standard_atomic_get_2":
+ global "camlCmm__standard_atomic_get_1_2":
  addr G:"caml_curry2"
  int 180143985094819847
- addr G:"camlCmm__standard_atomic_get_1_8_code")
-(function camlCmm__standard_atomic_get_1_8_code (r: val v: val) : int
+ addr G:"camlCmm__standard_atomic_get_1_15_code")
+(function camlCmm__standard_atomic_get_1_15_code (r: val v: val) : int
  (extcall "caml_atomic_exchange_field" r 1 v ->val) 1 )
 
-(function camlCmm__get_2_9_code (r: val) : val
+(function camlCmm__get_2_16_code (r: val) : val
  (load_mut_atomic val (+a r 8)) )
 
-(function camlCmm__set_3_10_code (r: val v: val) : int
+(function camlCmm__set_3_17_code (r: val v: val) : int
  (extcall "caml_atomic_exchange_field" r 3 v ->val) 1 )
 
-(function camlCmm__get_imm_4_11_code (r: val) : int
+(function camlCmm__get_imm_4_18_code (r: val) : int
  (load_mut_atomic int (+a r 8)) )
 
-(function camlCmm__set_imm_5_12_code (r: val v: int) : int
+(function camlCmm__set_imm_5_19_code (r: val v: int) : int
  (atomic exchange v (+a r 8)) 1 )
 
-(function camlCmm__cas_6_13_code (r: val oldv: val newv: val) : int
+(function camlCmm__cas_6_20_code (r: val oldv: val newv: val) : int
  (extcall "caml_atomic_cas_field_local" r 3 oldv newv ->int) )
 
+(function camlCmm__standard_atomic_get_acquire_7_21_code (r: val) : val
+ (load_mut_atomic_acquire val r) )
+
+(function camlCmm__standard_atomic_set_release_8_22_code
+     (r: val v: val) : int
+ (extcall "caml_modify" r v ->unit) 1 )
+
+(function camlCmm__standard_atomic_set_release_imm_9_23_code
+     (r: val v: int) : int
+ (atomic release_store v r) 1 )
+
+(function camlCmm__get_acquire_10_24_code (r: val) : val
+ (load_mut_atomic_acquire val (+a r 8)) )
+
+(function camlCmm__set_release_11_25_code (r: val v: val) : int
+ (extcall "caml_modify_local" r 1 v ->unit) 1 )
+
+(function camlCmm__get_acquire_imm_12_26_code (r: val) : int
+ (load_mut_atomic_acquire int (+a r 8)) )
+
+(function camlCmm__set_release_imm_13_27_code (r: val v: int) : int
+ (atomic release_store v (+a r 8)) 1 )
+
 (function no_cse reduce_code_size linscan camlCmm__entry () : val
- (catch (exit 13 G:"camlCmm") with(13 *ret*: val) 1) )
+ (catch (exit 24 G:"camlCmm") with(24 *ret*: val) 1) )
 
 (data)

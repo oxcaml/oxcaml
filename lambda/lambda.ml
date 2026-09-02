@@ -45,6 +45,10 @@ type has_initializer =
   | With_initializer
   | Uninitialized
 
+type atomic_memory_order =
+  | Seq_cst
+  | Acq_rel
+
 include (struct
 
   type locality_mode =
@@ -425,13 +429,17 @@ type primitive =
   (* Integer to external pointer *)
   | Pint_as_pointer of locality_mode
   (* Atomic operations *)
-  | Patomic_load_field of {immediate_or_pointer : immediate_or_pointer}
+  | Patomic_load_field of
+    {immediate_or_pointer : immediate_or_pointer;
+     memory_order : atomic_memory_order}
   | Patomic_load_mixed_field of {
     index : int;
     shape : mixed_block_shape;
   }
   | Patomic_set_field of
-    {immediate_or_pointer : immediate_or_pointer; mode : modify_mode}
+    {immediate_or_pointer : immediate_or_pointer;
+     memory_order : atomic_memory_order;
+     mode : modify_mode}
   | Patomic_set_mixed_field of {
     index : int;
     shape : mixed_block_shape;
@@ -450,9 +458,9 @@ type primitive =
   | Patomic_lor_field
   | Patomic_lxor_field
   | Patomic_load_idx of
-    { layout : layout }
+    { layout : layout; memory_order : atomic_memory_order }
   | Patomic_set_idx of
-    { layout : layout; mode : modify_mode }
+    { layout : layout; memory_order : atomic_memory_order; mode : modify_mode }
   | Patomic_exchange_idx of
     { layout : layout; mode : modify_mode }
   | Patomic_compare_exchange_idx of
@@ -3646,9 +3654,9 @@ let primitive_result_layout (p : primitive) =
   | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
   | Pperform | Preperform ->
     layout_any_value
-  | Patomic_load_field { immediate_or_pointer = Immediate } ->
+  | Patomic_load_field { immediate_or_pointer = Immediate; _ } ->
     layout_int_or_null
-  | Patomic_load_field { immediate_or_pointer = Pointer } ->
+  | Patomic_load_field { immediate_or_pointer = Pointer; _ } ->
     layout_any_value
   | Patomic_load_mixed_field { index ; shape } ->
     layout_of_mixed_block_shape shape ~path:[index]
@@ -3663,7 +3671,7 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
-  | Patomic_load_idx { layout } -> layout
+  | Patomic_load_idx { layout; _ } -> layout
   | Patomic_set_idx _ -> layout_unit
   | Patomic_exchange_idx { layout; _ } -> layout
   | Patomic_compare_exchange_idx { layout; _ } -> layout

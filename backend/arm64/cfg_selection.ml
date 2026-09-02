@@ -182,8 +182,9 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
       when n' = n && 0 < n && n < 64 ->
       Rewritten (specific (Isignext (64 - n)), [k])
     | _ -> Use_default)
-  (* Use trivial addressing mode for atomic loads *)
-  | Cload { memory_chunk; mutability; is_atomic = true } ->
+  (* Use trivial addressing mode for atomic loads and stores: LDAR and STLR only
+     take a base register. *)
+  | Cload { memory_chunk; mutability; atomic = Some _ as atomic } ->
     Rewritten
       ( Basic
           (Op
@@ -191,7 +192,22 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
                 { memory_chunk;
                   addressing_mode = validated_offset memory_chunk 0;
                   mutability = Select_utils.select_mutable_flag mutability;
-                  is_atomic = true
+                  atomic
+                })),
+        args )
+  | Catomic { op = Release_store; size } ->
+    let memory_chunk : Cmm.memory_chunk =
+      match size with
+      | Word | Sixtyfour -> Word_int
+      | Thirtytwo -> Thirtytwo_signed
+    in
+    Rewritten
+      ( Basic
+          (Op
+             (Intop_atomic
+                { op = Release_store;
+                  size;
+                  addr = validated_offset memory_chunk 0
                 })),
         args )
   (* Recognize floating-point negate and multiply *)

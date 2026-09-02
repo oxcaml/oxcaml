@@ -31,6 +31,37 @@ let set_imm (r : int atomic) v =
 let cas (r : 'a atomic) oldv newv =
   Atomic.Loc.compare_and_set [%atomic.loc r.x] oldv newv
 
+(* acquire loads and release stores: plain loads and stores on amd64, with
+   [caml_modify] providing the write barrier for pointers *)
+
+external get_acquire : 'a Atomic.t -> 'a = "%atomic_load_acquire"
+external set_release : 'a Atomic.t -> 'a -> unit = "%atomic_store_release"
+external loc_get_acquire : 'a Atomic.Loc.t @ local -> 'a
+  = "%atomic_load_acquire_loc"
+external loc_set_release : 'a Atomic.Loc.t @ local -> 'a -> unit
+  = "%atomic_store_release_loc"
+
+let standard_atomic_get_acquire (r : 'a Atomic.t) =
+  get_acquire r
+
+let standard_atomic_set_release (r : 'a Atomic.t) v =
+  set_release r v
+
+let standard_atomic_set_release_imm (r : int Atomic.t) v =
+  set_release r v
+
+let get_acquire (r : 'a atomic) : 'a =
+  loc_get_acquire [%atomic.loc r.x]
+
+let set_release (r : 'a atomic) v =
+  loc_set_release [%atomic.loc r.x] v
+
+let get_acquire_imm (r : int atomic) : int =
+  loc_get_acquire [%atomic.loc r.x]
+
+let set_release_imm (r : int atomic) v =
+  loc_set_release [%atomic.loc r.x] v
+
 (* TEST
    arch_amd64;
    flambda;

@@ -263,19 +263,19 @@ end = struct
           { memory_chunk = memory_chunk1;
             addressing_mode = addressing_mode1;
             mutability = mutability1;
-            is_atomic = is_atomic1
+            atomic = atomic1
           },
         Load
           { memory_chunk = memory_chunk2;
             addressing_mode = addressing_mode2;
             mutability = mutability2;
-            is_atomic = is_atomic2
+            atomic = atomic2
           } ) ->
       Cmm.equal_memory_chunk memory_chunk1 memory_chunk2
       && Arch.equal_addressing_mode_without_displ addressing_mode1
            addressing_mode2
       && Operation.equal_mutable_flag mutability1 mutability2
-      && Bool.equal is_atomic1 is_atomic2
+      && Option.equal Cmm.equal_atomic_load_memory_order atomic1 atomic2
     | ( Store (memory_chunk1, addressing_mode1, is_assignment1),
         Store (memory_chunk2, addressing_mode2, is_assignment2) ) ->
       Cmm.equal_memory_chunk memory_chunk1 memory_chunk2
@@ -1004,7 +1004,7 @@ end = struct
           create Arbitrary
         | Some op -> (
           match op with
-          | Load { memory_chunk; addressing_mode; mutability; is_atomic } ->
+          | Load { memory_chunk; addressing_mode; mutability; atomic } ->
             let desc =
               Memory_access.Read
                 { width_in_bits = width_in_bits memory_chunk;
@@ -1013,7 +1013,7 @@ end = struct
                     (match mutability with
                     | Mutable -> true
                     | Immutable -> false);
-                  is_atomic
+                  is_atomic = Option.is_some atomic
                 }
             in
             create ~first_memory_arg_index:0 desc
@@ -1043,7 +1043,7 @@ end = struct
               | Compare_set -> 2
               | Fetch_and_add -> 1
               | Add | Sub | Land | Lor | Lxor -> 1
-              | Exchange -> 1
+              | Exchange | Release_store -> 1
               | Compare_exchange -> 2
             in
             create ~first_memory_arg_index desc
