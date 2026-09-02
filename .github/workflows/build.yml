@@ -289,8 +289,41 @@ jobs:
         run: sudo touch /.dockerenv
         # makes setup-ocaml skip apt-get, which is slow on first invocation
 
+      # TEMPORARY DEBUGGING -- revert before merging.
+      #
+      # "Set up Opam" started failing en masse on 2026-09-02 at ~09:24 UTC,
+      # always on `opam update` fetching the `default` repository, with either
+      # "git fetch -q exited with code 128" or "Branch HEAD not found" (the
+      # latter is opam's fallback message after a failed fetch, not a real
+      # missing branch). opam captures git's stderr into its own logs, so the
+      # underlying message never reaches the Actions log. These three steps
+      # surface it (the working hypothesis is GitHub's per-IP rate limit on
+      # unauthenticated git, hit via the shared Warp x64 NAT: every failure so
+      # far has been x64, with zero on the arm64 pool).
+      - name: DEBUG probe github.com before opam
+        continue-on-error: true
+        run: |
+          echo "runner=${RUNNER_NAME:-?} os=${RUNNER_OS:-?} arch=${RUNNER_ARCH:-?}"
+          date -u +'probe-before %Y-%m-%dT%H:%M:%SZ'
+          # Anonymous API limits are per-IP, like the git ones, so these headers
+          # show how much budget the IP has left -- and double as a fingerprint
+          # for the shared NAT: a job on its own IP sees x-ratelimit-used near
+          # 1, whereas jobs sharing an egress see an elevated common count.
+          curl -sS --max-time 20 -D - -o /dev/null https://api.github.com/rate_limit \
+            | grep -i -E '^(HTTP/|x-ratelimit-|retry-after)' || true
+          rc=0
+          GIT_TRACE=1 GIT_TRACE_CURL=1 GIT_TRACE_CURL_NO_DATA=1 \
+            git ls-remote https://github.com/ocaml/opam-repository.git HEAD || rc=$?
+          echo "ls-remote exit=$rc"
+
       - name: Set up Opam
         uses: ocaml/setup-ocaml@15d660006c1d3110d77c34b7faa3bddefe8b82f0 # v3.7.0
+        env:
+          # TEMPORARY DEBUGGING -- revert with the steps above.
+          # Make opam echo the commands it runs and their output, and stop it
+          # deleting the per-subprocess logs that hold git's stderr.
+          OPAMVERBOSE: 2
+          OPAMKEEPLOGS: 1
         with:
           ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
           opam-repositories: |
@@ -298,6 +331,35 @@ jobs:
             default: https://github.com/ocaml/opam-repository.git
           opam-disable-sandboxing: true
           opam-pin: false
+
+      # TEMPORARY DEBUGGING -- revert with the steps above.
+      - name: DEBUG dump opam logs
+        if: always()
+        continue-on-error: true
+        run: |
+          root="${OPAMROOT:-$HOME/.opam}"
+          echo "OPAMROOT=$root"
+          ls -la "$root/log" || echo "no log directory"
+          for f in "$root"/log/*.out "$root"/log/*.err; do
+            [ -f "$f" ] || continue
+            echo "===== $f"
+            tail -n 200 "$f"
+          done
+
+      # TEMPORARY DEBUGGING -- revert with the steps above.
+      # A second probe tells us whether the throttle is momentary or a sustained
+      # window: on 2026-09-02 it lasted at least 45 minutes across two attempts.
+      - name: DEBUG probe github.com after opam
+        if: always()
+        continue-on-error: true
+        run: |
+          date -u +'probe-after %Y-%m-%dT%H:%M:%SZ'
+          curl -sS --max-time 20 -D - -o /dev/null https://api.github.com/rate_limit \
+            | grep -i -E '^(HTTP/|x-ratelimit-|retry-after)' || true
+          rc=0
+          GIT_TRACE=1 GIT_TRACE_CURL=1 GIT_TRACE_CURL_NO_DATA=1 \
+            git ls-remote https://github.com/ocaml/opam-repository.git HEAD || rc=$?
+          echo "ls-remote exit=$rc"
 
       - name: Set up Opam environment
         # this command adds the opam environment to the PATH.
