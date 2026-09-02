@@ -127,13 +127,23 @@ let all_commands =
       ~default:() begin fun buffer () ->
         run buffer Query_protocol.Holes
       end;
-    command "module-type-impls" ~spec:[]
+    command "module-type-impls"
+      ~spec:
+        [ optional "-position"
+            "<position> Answer only for the innermost module-type declaration \
+             enclosing this position"
+            (marg_position (fun pos _ -> Some pos))
+        ]
       ~doc:
         "Declaration-level change impact for the module-type declarations of \
          the buffer: for each declaration, the modules that were checked \
          against a module type that depends on it (and the buffer's own \
          implementation unit, for an interface buffer), computed from the \
-         compiler facts in the configured indexes. The response is:\n\n\
+         compiler facts in the configured indexes. With '-position \
+         <position>', the response is restricted to the single module-type \
+         declaration enclosing that position, and it is an error when no \
+         module-type declaration of the buffer encloses it. The response \
+         is:\n\n\
          ```javascript\n\
          {\n\
          'targets' : [\n\
@@ -177,9 +187,9 @@ let all_commands =
          impacted module and recorded check site resolved; 'partial' carries \
          the reasons; 'unavailable' means no usable facts channel was \
          configured or loaded, which is distinct from a complete empty result."
-      ~default:()
-      begin fun buffer () ->
-        run buffer Query_protocol.Module_type_impls
+      ~default:None
+      begin fun buffer position ->
+        run buffer (Query_protocol.Module_type_impls position)
       end;
     command "construct"
       ~spec:
