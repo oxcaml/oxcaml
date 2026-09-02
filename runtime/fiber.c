@@ -64,8 +64,8 @@
 #endif
 
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
-#ifdef TARGET_amd64
-/* amd64.S's caml_reperform reads [idled_from] at Stack_idled_from. */
+#if defined(TARGET_amd64) || defined(TARGET_arm64)
+/* caml_reperform (in asm) reads [idled_from] at Stack_idled_from. */
 static_assert(offsetof(struct stack_info, idled_from) == 96, "");
 #endif
 
@@ -358,22 +358,22 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
    exception trap frame, and [Caml_state->async_exn_handler] never
    points into it), and nothing re-enters it except resumption. */
 
-/* This code has only ever run on amd64: configure forces stack checks
-   on everywhere else. Ports are possible. ARM64 would require:
+/* This code runs on amd64 and arm64: configure forces stack checks on
+   everywhere else. A port needs, in the architecture's assembly:
    - a reload of [Cont_last_fiber] after the call to
-     [caml_continuation_use_noexc] in arm64.S's DO_RESUME_SWITCH, as in
-     amd64.S (waking moves the stacks, invalidating the earlier load);
-   - the same idled-chain check before the append in arm64.S's
-     caml_reperform, as in amd64.S;
-   - re-deriving the suspended-context layout at [Stack_sp] assumed by
-     the frame-pointer chain walk in [stack_wake] (arm64's
-     SWITCH_OCAML_STACKS saves the x29/x30 pair unconditionally);
-   - checking the handler-relative offset of the oldest saved frame
-     pointer in [continuation_wake_stacks] against arm64.S's
-     UPDATE_BASE_POINTER (the two agree today, but by parallel
-     construction, not by sharing). */
-#if !defined(TARGET_amd64)
-#error "Guarded-stack idling only on AMD64: see comment here."
+     [caml_continuation_use_noexc] in DO_RESUME_SWITCH (waking moves
+     the stacks, invalidating an earlier load);
+   - the idled-chain check in caml_reperform (its raw last-fiber
+     argument goes stale when a minor collection idles the continuation
+     mid-perform: see [caml_cont_wake_stacks]);
+   - a saved frame pointer at [Stack_sp] of a suspended stack, where
+     the frame-pointer chain walk in [stack_wake] starts (both ports'
+     SWITCH_OCAML_STACKS put one there);
+   - agreement of UPDATE_BASE_POINTER's handler-relative offset of the
+     oldest saved frame pointer with [continuation_wake_stacks] (both
+     ports use handler - 48). */
+#if !defined(TARGET_amd64) && !defined(TARGET_arm64)
+#error "Guarded-stack idling is not ported to this architecture."
 #endif
 
 /* The global and extra caches; both protected by [stack_cache_global_lock].
@@ -1574,8 +1574,8 @@ static struct stack_info* stack_wake(struct stack_info* idle,
 #ifdef WITH_FRAME_POINTERS
   /* Relocate chain of frame pointers, starting at [sp] with the frame
      pointer pushed when the stack was suspended (by
-     SWITCH_OCAML_STACKS in amd64.S). The chain's last link is
-     rewritten by UPDATE_BASE_POINTER when the stack is resumed. */
+     SWITCH_OCAML_STACKS). The chain's last link is rewritten by
+     UPDATE_BASE_POINTER when the stack is resumed. */
   p = (char**)stack->sp;
   while (old_low <= *p && *p < old_high) {
     *p = *p + delta;
@@ -1641,7 +1641,7 @@ static value continuation_wake_stacks(value cont, struct stack_info* idle)
          parent, stack: relocate it too. The corresponding link of the
          chain's last fiber is instead overwritten by UPDATE_BASE_POINTER
          when the chain is resumed. The offset is as in
-         UPDATE_BASE_POINTER (amd64.S). */
+         UPDATE_BASE_POINTER (amd64.S and arm64.S agree on it). */
       char** slot = (char**)((char*)prev->handler - 48);
       if (reloc.old_low <= *slot && *slot < reloc.old_high)
         *slot = *slot + reloc.delta;
