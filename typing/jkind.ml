@@ -3770,17 +3770,31 @@ module Violation = struct
               sub.jkind pp_bound super.jkind))
     | No_intersection _ -> ()
 
-  type offending_display = Offending_exactly
+  type offending_display =
+    | Offending_exactly
+    | Offending_box_as_scannable_bound
 
   type expected_display =
     | Expected_exactly
     | Expected_as_a_value_layout
 
   let offending_layout display (l : Sort.t Layout.t) =
-    match display with Offending_exactly -> l
+    match display, l with
+    | Offending_box_as_scannable_bound, Layout.Box (contents, sa) ->
+      Layout.Sort (Sort.scannable, Layout.box_scannable_axes contents sa)
+    | ( Offending_box_as_scannable_bound,
+        (Any _ | Sort _ | Product _ | Addressable _) )
+    | Offending_exactly, _ ->
+      l
 
   let offending_const display (c : Layout.Const.t) =
-    match display with Offending_exactly -> c
+    match display, c with
+    | Offending_box_as_scannable_bound, Box (_, sa) ->
+      Layout.Const.of_sort_const (Sort.Const.base Scannable) sa
+    | ( Offending_box_as_scannable_bound,
+        (Any _ | Base _ | Product _ | Univar _ | Genvar _ | Addressable _) )
+    | Offending_exactly, _ ->
+      c
 
   (* CR layouts-scannable: For now, this is special-cased to print out notes
      iff the layout error message prints containing
@@ -3907,12 +3921,30 @@ module Violation = struct
         let base1, base2, cmis = expand k1 k2 in
         base1, base2, cmis
     in
-    (* When we have a non-value layout but expected a value layout, e.g.
-       [float64 </= value non_pointer], we simplify the error message by eliding
-       the scannable axes of the right layout and instead refer to it as "a
-       value layout". *)
+    (* We simplify error messages by eliding detail of value layouts in the
+       following ways:
+
+       1. When we have a non-value layout but expected a value layout, we elide
+          the scannable axes of the expected layout and instead refer to it as
+          "a value layout".
+
+          E.g.,   [float64 </= value non_pointer]
+          becomes [float64 </= a value layout].
+
+       2. When we have a box layout but expected a non-box, we hide the box on
+          the *left* (but still print its scannable axes).
+
+          E.g.,   [bits8 box </= word]
+          becomes [value non_pointer </= word]. *)
     let layout_mismatch l1 l2 =
-      let display1 = Offending_exactly in
+      let display1 =
+        match l1, l2 with
+        | Layout.Box _, Layout.(Any _ | Sort _ | Product _ | Addressable _) ->
+          Offending_box_as_scannable_bound
+        | Layout.Box _, Layout.Box _
+        | Layout.(Any _ | Sort _ | Product _ | Addressable _), _ ->
+          Offending_exactly
+      in
       let display2 =
         if
           (not (Layout.is_scannable_or_var l1)) && Layout.is_scannable_or_var l2
