@@ -4544,6 +4544,12 @@ let emit_block symb white_header cont =
   let black_header = Nativeint.logor white_header caml_black in
   (Cint black_header :: cdefine_symbol symb) @ cont
 
+(* The runtime exports one symbol per possible tag, [caml_atom_<tag>], naming
+   the *value* of the corresponding permanent zero-sized block (atom): the
+   address one word past its header (see runtime/caml/mlvalues.h). *)
+let atom_symbol ~tag : Cmm.symbol =
+  { sym_name = Printf.sprintf "caml_atom_%d" tag; sym_global = Global }
+
 let emit_string_constant_fields s cont =
   let n = size_int - 1 - (String.length s mod size_int) in
   Cstring s :: Cskip n :: Cint8 n :: cont
