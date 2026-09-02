@@ -13,6 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module CUI = Compilation_unit_intf
+
 type intf_or_impl = Intf | Impl
 type modname = string
 type filename = string
@@ -26,12 +28,14 @@ type t = {
   raw_source_file: filename;
   prefix: file_prefix;
   modname: Compilation_unit.t;
+  intf: CUI.t;
   kind: intf_or_impl;
 }
 
 let original_source_file (x: t) = x.original_source_file
 let raw_source_file (x: t) = x.raw_source_file
 let modname (x: t) = x.modname
+let intf (x: t) = x.intf
 let kind (x: t) = x.kind
 let prefix (x: t) = x.prefix
 
@@ -77,6 +81,13 @@ let compilation_unit_from_source ~strict ~for_pack_prefix source_file =
   in
   Compilation_unit.create for_pack_prefix modname
 
+let intf_from_source ~strict source_file =
+  let modname_from_source =
+    if strict then strict_modname_from_source
+    else lax_modname_from_source
+  in
+  modname_from_source source_file |> CUI.of_string
+
 (* Check validity of module name *)
 let is_unit_name name = Misc.Utf8_lexeme.is_valid_identifier name
 
@@ -93,6 +104,7 @@ let make ?(check_modname=true) ~source_file ~for_pack_prefix kind prefix =
   let p =
     {
       modname;
+      intf = intf_from_source ~strict:true prefix;
       prefix;
       original_source_file = source_file;
       raw_source_file = source_file;
@@ -107,6 +119,7 @@ let make ?(check_modname=true) ~source_file ~for_pack_prefix kind prefix =
 let make_with_known_compilation_unit ~source_file kind prefix modname =
   {
     modname;
+    intf = intf_from_source ~strict:false prefix;
     prefix;
     original_source_file = source_file;
     raw_source_file = source_file;
@@ -127,11 +140,13 @@ module Artifact = struct
      raw_source_file: filename option;
      filename: filename;
      modname: Compilation_unit.t;
+     intf: CUI.t;
    }
   let original_source_file x = x.original_source_file
   let raw_source_file x = x.raw_source_file
   let filename x = x.filename
   let modname x = x.modname
+  let intf x = x.intf
   let prefix x = Filename.remove_extension (filename x)
 
   let from_filename ~for_pack_prefix filename =
@@ -139,6 +154,7 @@ module Artifact = struct
       compilation_unit_from_source ~strict:false ~for_pack_prefix filename
     in
     { modname;
+      intf = intf_from_source ~strict:false filename;
       filename;
       original_source_file = None;
       raw_source_file = None }
@@ -147,6 +163,7 @@ end
 
 let of_artifact ~dummy_source_file kind (a : Artifact.t) =
   let modname = Artifact.modname a in
+  let intf = Artifact.intf a in
   let prefix = Artifact.prefix a in
   let original_source_file =
     Option.value a.original_source_file ~default:dummy_source_file
@@ -154,12 +171,13 @@ let of_artifact ~dummy_source_file kind (a : Artifact.t) =
   let raw_source_file =
     Option.value a.raw_source_file ~default:dummy_source_file
   in
-  { modname; prefix; original_source_file; raw_source_file; kind }
+  { modname; intf; prefix; original_source_file; raw_source_file; kind }
 
 let mk_artifact ext u =
   {
     Artifact.filename = u.prefix ^ ext;
     modname = u.modname;
+    intf = u.intf;
     original_source_file = Some u.original_source_file;
     raw_source_file = Some u.raw_source_file;
   }
@@ -204,6 +222,7 @@ let find_normalized_cmi f =
   {
     Artifact.filename;
     modname = modname f;
+    intf = f.intf;
     original_source_file = Some f.original_source_file;
     raw_source_file = Some f.raw_source_file;
   }
