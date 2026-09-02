@@ -99,7 +99,23 @@ Line 1, characters 40-51:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "(any mod portable) addressable".
 
-type t : any mod portable addressable
+type t : any addressable mod portable
+|}]
+
+(* Mod bounds print after the addressable operator *)
+type t : bits8 addressable mod portable
+[%%expect{|
+type t : bits8 addressable mod portable
+|}]
+
+type t : any addressable mod portable
+[%%expect{|
+type t : any addressable mod portable
+|}]
+
+type t : (bits8 & bits16) addressable mod portable
+[%%expect{|
+type t : (bits8 & bits16) addressable mod portable
 |}]
 
 (**** Equalities: [k addressable = k] for addressable [k] ****)
