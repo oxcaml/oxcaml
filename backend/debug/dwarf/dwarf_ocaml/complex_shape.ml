@@ -571,6 +571,11 @@ let rec layout_to_unknown_shape (ly : Layout.t) : t =
   | Univar _ -> Misc.fatal_error "layout_to_unknown_shape: Univar"
   | Genvar _ -> Misc.fatal_error "layout_to_unknown_shape: Genvar"
 
+let unboxed_record_layout fields =
+  match fields with
+  | [(_, _, _, layout)] -> layout
+  | _ -> Layout.product (List.map (fun (_, _, _, ly) -> ly) fields)
+
 let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
     (type_layout : Layout.t option) : t =
   let unknown_shape_exn =
@@ -780,9 +785,8 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
              type_shape_to_complex_shape ~cache ~rec_env field_value
                field_layout ))
          fields)
-  | Record { fields; kind = Record_unboxed_product }, Some (Product lys)
-    when List.equal Layout.equal (List.map (fun (_, _, _, ly) -> ly) fields) lys
-    ->
+  | Record { fields; kind = Record_unboxed_product }, Some ly
+    when Layout.equal ly (unboxed_record_layout fields) ->
     record_unboxed
       (List.map
          (fun (field_name, _, field_value, field_layout) ->
@@ -792,12 +796,10 @@ let rec type_shape_to_complex_shape_exn ~cache ~rec_env (type_shape : Shape.t)
          fields)
   | ( Record { fields; kind = Record_unboxed_product },
       Some ((Base _ | Product _) as ly) ) ->
-    let layout_from_shapes =
-      Layout.product (List.map (fun (_, _, _, ly) -> ly) fields)
-    in
     err_or_unknown_exn (fun f ->
         f "unboxed record expected to be of layout %a, but got: %a" pp_layout
-          layout_from_shapes pp_layout ly)
+          (unboxed_record_layout fields)
+          pp_layout ly)
   | Record { fields; kind = Record_boxed }, (None | Some (Base Scannable))
   | Record { fields; kind = Record_floats }, (None | Some (Base Scannable))
   | Record { fields; kind = Record_mixed _ }, (None | Some (Base Scannable))
