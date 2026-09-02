@@ -27,3 +27,15 @@
 
 (** Evaluate a quoted OCaml expression at runtime. *)
 val eval : 'a expr @ once -> 'a eval
+
+(** [unloadable_units_registered_total ()] returns the cumulative count of
+    JIT-emitted compilation units registered with the runtime since process
+    start. Test-only observability for the unloadable-CU GC mechanism. *)
+val unloadable_units_registered_total : unit -> int
+
+(** [unloadable_units_unloaded_total ()] returns the cumulative count of
+    JIT-emitted compilation units that have been reclaimed by the GC since
+    process start. The number of currently-live units equals
+    [unloadable_units_registered_total () - unloadable_units_unloaded_total ()].
+    Test-only observability. *)
+val unloadable_units_unloaded_total : unit -> int

@@ -21,6 +21,9 @@ type t
 
 val empty : t
 
+val add : t -> string -> Address.t -> t
+(** Add a single symbol binding. Fails if the symbol is already bound. *)
+
 val from_binary_section :
   (module Binary_emitter_intf.S
      with type Assembled_section.t = 'a
@@ -52,6 +55,7 @@ val target_to_string : Binary_emitter_intf.target -> string
 val find : t -> string -> Address.t option
 (** Lookup a symbol's address in the given symbol map. If it is missing from the map
     look it up using dlsym. *)
+
 
 val dprint : t -> unit
 (** Debug printer for symbol table *)

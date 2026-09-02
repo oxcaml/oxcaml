@@ -24,10 +24,15 @@ val jit_load :
       and type Relocation.t = 'r) ->
   phrase_name:string ->
   outcome_ref:evaluation_outcome option ref ->
+  atom_aliases:(string * int) list ->
   'a String.Map.t ->
   unit
 (** Load and run assembled binary sections. This is the main generic JIT entry
-    point that works with any architecture. *)
+    point that works with any architecture. [atom_aliases] gives the
+    [(linkage_name, tag)] pairs of symbols the compiler bound to the values of
+    the runtime's permanent atoms instead of defining them in the unit's data
+    (zero-sized statics of unloadable units); they are entered into the symbol
+    table before relocation. *)
 
 val jit_load_program :
   phrase_name:string -> Format.formatter -> Lambda.program -> evaluation_outcome
@@ -35,6 +40,13 @@ val jit_load_program :
     architecture (x86 or arm64). *)
 
 val jit_lookup_symbol : string -> Obj.t option
+
+(** Drop the pin that keeps the most recently activated unloadable unit's
+    module block alive (see [Globals.unloadable_pin]). Call once the caller
+    holds its own reference to the unit's result; after this, the unit is
+    kept alive only by ordinary GC-visible references and may be unloaded
+    when they are gone. *)
+val clear_unloadable_pin : unit -> unit
 
 val set_debug : unit -> unit
 (** Enables debugging if the OCAML_JIT_DEBUG env var is set. *)

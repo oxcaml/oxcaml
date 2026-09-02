@@ -1,0 +1,39 @@
+[start] registered=0 unloaded=0 live=0
+
+Test simple eval
+Output: 42
+[after simple_eval + compact] registered=1 unloaded=1 live=0
+
+Test complex return type
+Output: [42; 43]
+[after complex_return_type + compact] registered=2 unloaded=2 live=0
+
+Test side effects
+Compiling...
+Outside
+Running...
+Inside
+Done
+[after side_effects + compact] registered=3 unloaded=3 live=0
+
+Test reference to global
+Output: Hello world!
+[after reference_to_global + compact] registered=4 unloaded=4 live=0
+
+Test heap value returned directly
+Output: 18
+[after heap_value_returned_directly + compact] registered=5 unloaded=5 live=0
+
+Test late compilation error
+File "//eval//", line 3, characters 12-72:
+Error: [@tail_mod_cons]: Functions cannot be both local-returning and [@tail_mod_cons]
+Error during eval (expected)
+[after late_compilation_error + compact] registered=5 unloaded=5 live=0
+
+Test warnings emitted during eval
+Done
+[after warning + compact] registered=6 unloaded=6 live=0
+
+Test simplify
+Done
+[after simplify + compact] registered=7 unloaded=7 live=0

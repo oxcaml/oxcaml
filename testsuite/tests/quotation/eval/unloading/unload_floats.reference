@@ -1,0 +1,8 @@
+start: registered=0 unloaded=0 live=0
+f_unboxed(10) = 28.93
+f_unboxed(20) = 57.87
+f_boxed: a=363 b=463 (b-a=100)
+after populate: registered=2 unloaded=0 live=2
+stable: f_unboxed(10) = 28.93
+after 2x Gc.compact (held): registered=2 unloaded=0 live=2
+after release: registered=2 unloaded=2 live=0

@@ -87,9 +87,9 @@ let alloc_all (type a r)
   match Externals.memalign total_size with
   | Error msg ->
       failwithf "posix_memalign for %d bytes failed: %s" total_size msg
-  | Ok address ->
-      let text = { address; value = jit_text_section } in
-      let address = Address.add_int address text_size in
+  | Ok base_address ->
+      let text = { address = base_address; value = jit_text_section } in
+      let address = Address.add_int base_address text_size in
       let map, _address =
         String.Map.fold binary_section_map ~init:(String.Map.empty, address)
           ~f:(fun ~key ~data:binary_section (map, address) ->
@@ -101,7 +101,7 @@ let alloc_all (type a r)
             let address = Address.add_int address size in
             (map, address))
       in
-      (text, map)
+      (text, map, base_address, total_size)
 
 (** Build symbol map from non-text sections *)
 let local_symbol_map (type a r)
@@ -222,13 +222,13 @@ let jit_run entry_points =
 let jit_load (type a r)
     (module E : Binary_emitter_intf.S
       with type Assembled_section.t = a
-       and type Relocation.t = r) ~phrase_name ~outcome_ref
+       and type Relocation.t = r) ~phrase_name ~outcome_ref ~atom_aliases
     (binary_section_map : a String.Map.t) =
   Debug.print_binary_section_map (module E) binary_section_map;
   let other_sections, text =
     extract_text_section (module E) binary_section_map
   in
-  let addressed_text, addressed_sections =
+  let addressed_text, addressed_sections, buffer_base, buffer_size =
     alloc_all (module E) text other_sections
   in
   let other_sections_symbols = local_symbol_map (module E) addressed_sections in
@@ -237,6 +237,26 @@ let jit_load (type a r)
   in
   let local_symbols =
     Symbols.strict_union other_sections_symbols text_section_symbols
+  in
+  (* Bind the symbols the compiler aliased to runtime atoms (exported
+     zero-sized statics and entry Code_blocks of unloadable units; see
+     [Cmm_helpers.register_atom_aliased_symbol]): [caml_atom_<tag>] names the
+     atom's value directly. The bindings are added to [local_symbols] so that
+     both this unit's relocations and later units' references resolve to the
+     permanent atom. *)
+  let local_symbols =
+    List.fold_left atom_aliases ~init:local_symbols
+      ~f:(fun syms (name, tag) ->
+        (* Relocations refer to symbols by their assembly-level names, which
+           carry a leading underscore on macOS; the compiler recorded the
+           Cmm-level name. *)
+        let name = symbol_prefix () ^ name in
+        let atom_name = Printf.sprintf "caml_atom_%d" tag in
+        match Symbols.find syms atom_name with
+        | Some addr -> Symbols.add syms name addr
+        | None ->
+            failwithf "Cannot resolve %s to bind atom-aliased symbol %s"
+              atom_name name)
   in
   let symbols =
     Symbols.aggregate ~current:!Globals.symbols ~new_symbols:local_symbols
@@ -272,7 +292,107 @@ let jit_load (type a r)
   load_text (module E) relocated_text;
   load_sections (module E) addressed_sections;
   let entry_points = entry_points ~phrase_name symbols in
-  let result = jit_run entry_points in
+  (* If the compilation unit emitted an [unloadable_code_blocks] sentinel
+     symbol, register the unit with the runtime so the GC can detect
+     when the unit becomes unreachable and unload its text/data buffers.
+     The sentinel and the [unloadable_blocks_start]/[unloadable_blocks_end]
+     bracket symbols are looked up by exact linker name (constructed from
+     [phrase_name]) — no symbol-table scan by suffix. *)
+  let entry_points, unloadable_unit_handle =
+    let prefix = symbol_prefix () in
+    let separator = "__" in
+    let sentinel_name basename =
+      Printf.sprintf "%scaml%s%s%s" prefix phrase_name separator basename
+    in
+    let sentinel basename =
+      match Symbols.find local_symbols (sentinel_name basename) with
+      | Some addr -> Address.to_nativeint addr
+      | None -> 0n
+    in
+    let code_blocks_table_addr = sentinel "unloadable_code_blocks" in
+    if Nativeint.equal code_blocks_table_addr 0n
+    then (entry_points, None)
+    else
+      let blocks_start_addr = sentinel "unloadable_blocks_start" in
+      let blocks_end_addr = sentinel "unloadable_blocks_end" in
+      if Nativeint.equal blocks_start_addr 0n
+         || Nativeint.equal blocks_end_addr 0n
+      then failwithf "unloadable_blocks_start/end missing for unloadable unit";
+      let code_end_addr =
+        match entry_points.code_end with
+        | Some addr -> Address.to_nativeint addr
+        | None -> failwithf "code_end missing for unloadable unit"
+      in
+      let frametable_addr =
+        match entry_points.frametable with
+        | Some addr -> Address.to_nativeint addr
+        | None -> 0n
+      in
+      let gc_roots_addr =
+        match entry_points.gc_roots with
+        | Some addr -> Address.to_nativeint addr
+        | None -> 0n
+      in
+      (* Registration window safety: between this call and the activation
+         after [jit_run], the unit's static blocks keep their NOT_MARKABLE
+         emission headers, so the GC treats them exactly like AOT static
+         data (invisible to marking and sweeping); heap values stored into
+         them during initialisation are kept alive by the gc_roots
+         dyn-globals registration performed here. Only the activation call
+         below donates the blocks to the major heap, making the unit
+         eligible for reclamation. *)
+      let handle =
+        Externals.register_unloadable_unit code_blocks_table_addr
+          blocks_start_addr blocks_end_addr code_end_addr frametable_addr
+          gc_roots_addr
+          (Address.to_nativeint buffer_base)
+          buffer_size
+      in
+      (* The unloadable-unit registration owns the frame table, gc_roots
+         and code-fragment registrations — drop them from [entry_points]
+         so [jit_run] (the legacy non-unloadable path) does not also
+         register them. A duplicate gc_roots in particular is fatal
+         (caml_register_dyn_global raises [Register_dyn_global_duplicate])
+         when a freed unit's buffer address gets reused by a later unit.
+         [data_begin]/[data_end] go to [caml_page_table_add] under
+         runtime 4 only, so leaving them is harmless on runtime 5. *)
+      ( { entry_points with
+          frametable = None;
+          gc_roots = None;
+          code_begin = None;
+          code_end = None;
+        },
+        Some handle )
+  in
+  let result =
+    match unloadable_unit_handle with
+    | None -> jit_run entry_points
+    | Some handle ->
+      (* Activate the unit — dropping its gc_roots registration and donating
+         its static blocks to the major heap — once the initialiser has
+         finished, whether it returned or raised. On the exception path the
+         unit is typically unreferenced and the GC will reclaim it in due
+         course.
+
+         Before activating, pin the unit's module block in
+         [unloadable_pin]: from activation onwards the unit is kept alive
+         only by references the GC can see, and the caller has not yet had
+         a chance to obtain one (it looks the module block up by symbol
+         name after we return). The pin is a global of this (AOT) library,
+         so the GC scans it every cycle. [Eval.eval] clears it via
+         [clear_unloadable_pin] once it holds the module block as an
+         ordinary value; otherwise it is overwritten on the next load. *)
+      Fun.protect
+        ~finally:(fun () ->
+          (match
+             Symbols.find local_symbols
+               (Printf.sprintf "%scaml%s" (symbol_prefix ()) phrase_name)
+           with
+          | Some addr -> Globals.unloadable_pin := Some (Address.to_obj addr)
+          | None -> ());
+          Externals.activate_unloadable_unit handle)
+        (fun () -> jit_run entry_points)
+  in
   outcome_ref := Some result
 
 (* JIT callback that handles architecture-agnostic packed sections *)
@@ -284,7 +404,8 @@ let jit_callback ~phrase_name ~outcome_ref packed =
       (fun name section map -> String.Map.add map ~key:name ~data:section)
       sections String.Map.empty
   in
-  jit_load emitter ~phrase_name ~outcome_ref binary_section_map
+  let atom_aliases = Cmm_helpers.flush_atom_aliased_symbols () in
+  jit_load emitter ~phrase_name ~outcome_ref ~atom_aliases binary_section_map
 
 let set_debug () =
   match Sys.getenv_opt "OCAML_JIT_DEBUG" with
@@ -310,10 +431,47 @@ let jit_load_lambda ~phrase_name ppf (program : Lambda.program) =
     Direct_to_cmm
       (Flambda2.lambda_to_cmm ~machine_width ~keep_symbol_tables:true)
   in
-  Asmgen.compile_implementation
-    (module Unix_for_owee : Compiler_owee.Unix_intf.S)
-    ~toplevel:need_symbol ~pipeline ~sourcefile:(Some filename)
-    ~prefixname:filename ~ppf_dump:ppf program;
+  (* Mark this CU as unloadable: the JIT-emitted code/data is transient and
+     the runtime should be free to reclaim it once the GC determines the
+     unit is unreachable. This drives:
+       - white (UNMARKED) headers on static data (B.1)
+       - the [is_unloadable] bit on closinfo words (A.2)
+       - [FRAME_DESCRIPTOR_UNLOADABLE] on frame descriptors (A.3)
+       - emission of [Code_block] static items (C)
+       - per-function back-pointers in [.text] (D)
+     We save and restore so any non-JIT compile after this in the same
+     process is unaffected.
+
+     Disabled when [Externals.supports_unloading] is false (Linux ASan,
+     Linux TCMalloc, musl): the buffer allocator on those builds returns
+     memory that cannot be passed to [free], so the unload path would
+     corrupt the allocator. Instead we compile the CU as non-unloadable —
+     black headers, no Code_blocks, no UNLOADABLE bits — and leak the
+     buffer for the life of the process. The downside is an unbounded
+     leak, but it lets [Eval.eval] keep working in those configurations.
+     [unloadable_metadata] then returns [None], so [register_unloadable_
+     unit] is also skipped. *)
+  let saved_unit_is_unloadable = !Clflags.unit_is_unloadable in
+  Clflags.unit_is_unloadable := Externals.supports_unloading ();
+  let restore () =
+    Clflags.unit_is_unloadable := saved_unit_is_unloadable;
+    (* Normally flushed by [jit_callback] during emission; discard any
+       leftovers here so a compilation that fails before emission cannot
+       leak stale aliases into the next unit's load. *)
+    ignore
+      (Cmm_helpers.flush_atom_aliased_symbols ()
+        : (string * int) list)
+  in
+  (match
+     Asmgen.compile_implementation
+       (module Unix_for_owee : Compiler_owee.Unix_intf.S)
+       ~toplevel:need_symbol ~pipeline ~sourcefile:(Some filename)
+       ~prefixname:filename ~ppf_dump:ppf program
+   with
+  | () -> restore ()
+  | exception exn ->
+      restore ();
+      raise exn);
   match !outcome_global with
   | None -> failwith "No evaluation outcome"
   | Some res ->
@@ -336,6 +494,8 @@ let jit_load_program_top ~phrase_name ppf program :
   match jit_load_program ~phrase_name ppf program with
   | Result obj -> Result obj
   | Exception exn -> Exception exn
+
+let clear_unloadable_pin () = Globals.unloadable_pin := None
 
 let jit_lookup_symbol symbol =
   (* Try with symbol prefix first (e.g., "_" on macOS) *)

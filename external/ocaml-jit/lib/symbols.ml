@@ -23,6 +23,11 @@ type t = Address.t String.Map.t
 
 let empty = String.Map.empty
 
+let add t symbol_name address =
+  if String.Map.mem symbol_name t then
+    failwithf "Symbols.add: symbol %s already defined" symbol_name
+  else String.Map.add ~key:symbol_name ~data:address t
+
 let strict_union t t' =
   String.Map.union t t' ~f:(fun symbol_name _ _ ->
       failwithf "Symbol %s defined in several sections" symbol_name)
@@ -130,6 +135,7 @@ let find t name =
             "Symbols.find %s -> ndl_loadsym(%s) hit at %Lx\n%!"
             name dlsym_name (Address.to_int64 addr);
         Some addr))
+
 
 let dprint t =
   Printf.printf "------ Symbols -----\n%!";
