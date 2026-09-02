@@ -84,7 +84,8 @@ let continue continuation args =
   Terminator.Continue
     { continuation; args = Array.map (fun arg -> Terminator.Arg arg) args }
 
-let new_block env ~params = Block.create env.graph ~params ~cold:env.cold
+let new_block env ~params =
+  Block.create env.graph ~params ~cold:env.cold ~handler_dbg:Debuginfo.none
 
 (* Matches [Cfg_selectgen.mark_sub_cfg_as_cold], including its gating on
    [-cfg-block-layout]: a block is cold iff it is emitted lexically inside the
@@ -98,12 +99,17 @@ let emit_name_for_debugger env c v args =
   | Some _ as provenance ->
     emit_op_nores env c
       (Operation.Name_for_debugger
-         { ident = VP.var v; which_parameter = None; provenance; regs = [||] })
+         { ident = VP.var v;
+           which_parameter =
+             Cfg_selectgen.which_parameter_of_provenance provenance;
+           provenance;
+           regs = [||]
+         })
       Debuginfo.none args
 
 let bind_let env c v args =
   let env = env_add v args env in
-  let name = V.name (VP.var v) in
+  let name = VP.var v in
   Array.iter (fun i -> Value.set_name i name) args;
   emit_name_for_debugger env c v args;
   env
@@ -245,7 +251,9 @@ and emit env c (exp : Cmm.expression) ~tail : result =
        phantom set in the SSA graph (see [Cfg_of_ssa.make_instr]). *)
     | Cphantom_let (_var, _defining_expr, body) -> emit env c body ~tail
     | Cname_for_debugger (var, body) ->
-      let* r = emit env c body ~tail:false in
+      (* In tail position [body] never returns here, so no naming op is emitted,
+         matching [Cfg_selectgen.emit_tail]. *)
+      let* r = emit env c body ~tail in
       emit_name_for_debugger env c var r;
       Ok r
     | Csequence (e1, e2) ->
@@ -511,8 +519,8 @@ and emit_catch env c ~tail handlers body : result =
         let handler_block =
           Block.create env.graph ~params:types
             ~cold:(env.cold || handler_is_cold handler)
+            ~handler_dbg:dbg
         in
-        Block.set_handler_dbg handler_block dbg;
         ( Static_label.Map.add nfail handler_block static_exceptions,
           handler_block ))
       env.static_exceptions handlers
@@ -533,7 +541,7 @@ and emit_catch env c ~tail handlers body : result =
             Array.init n (fun i -> Block.param handler_block (param_idx + i))
           in
           bind_let env c id proj_instrs, param_idx + n)
-        ({ env with cold = env.cold || handler_is_cold handler }, 0)
+        ({ env with cold = Block.cold handler_block }, 0)
         handler.params
     in
     emit handler_env c handler.body ~tail, c
@@ -627,7 +635,8 @@ let emit_function (graph : under_construction Ssa.graph) (cmm : Cmm.fundecl) :
   assert (match r with Never_returns -> true | Ok _ -> false);
   Ssa.finish_graph graph
 
-let convert (cmm : Cmm.fundecl) ~keep_unused_ops : finished Ssa.graph =
+let convert ~ppf_dump (cmm : Cmm.fundecl) ~keep_unused_ops : finished Ssa.graph
+    =
   try
     let function_info : Ssa.Function_info.t =
       { sym_name = cmm.fun_name.sym_name;
@@ -642,6 +651,6 @@ let convert (cmm : Cmm.fundecl) ~keep_unused_ops : finished Ssa.graph =
     emit_function g cmm
   with Misc.Fatal_error as exn ->
     let bt = Printexc.get_raw_backtrace () in
-    Format.eprintf "*** Ssa_of_cmm error for %s: %s@.*** CMM:@.%a@."
+    Format.fprintf ppf_dump "*** Ssa_of_cmm error for %s: %s@.*** CMM:@.%a@."
       cmm.fun_name.sym_name (Printexc.to_string exn) Printcmm.fundecl cmm;
     Printexc.raise_with_backtrace exn bt

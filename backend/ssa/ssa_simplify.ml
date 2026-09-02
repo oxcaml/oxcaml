@@ -100,4 +100,4 @@ end
 
 module Runner = Make_run (Simplify_conditions)
 
-let run ssa = Runner.run ssa
+let run ~ppf_dump ssa = Runner.run ~ppf_dump ssa

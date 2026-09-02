@@ -15,4 +15,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val convert : Cmm.fundecl -> keep_unused_ops:bool -> Ssa.finished Ssa.graph
+(** [ppf_dump] receives the diagnostic context (the [Cmm] function) if the
+    conversion fails. *)
+val convert :
+  ppf_dump:Format.formatter ->
+  Cmm.fundecl ->
+  keep_unused_ops:bool ->
+  Ssa.finished Ssa.graph

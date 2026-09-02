@@ -129,4 +129,5 @@ end
 
 module Runner = Make_run (Tail_call_reducer)
 
-let run ~keep_unused_ops ssa = Runner.run ~keep_unused_ops ssa
+let run ~ppf_dump ~keep_unused_ops ssa =
+  Runner.run ~ppf_dump ~keep_unused_ops ssa

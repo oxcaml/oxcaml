@@ -25,4 +25,5 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-val run : Ssa.finished Ssa.graph -> Ssa.finished Ssa.graph
+val run :
+  ppf_dump:Format.formatter -> Ssa.finished Ssa.graph -> Ssa.finished Ssa.graph

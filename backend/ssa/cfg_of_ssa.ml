@@ -345,7 +345,7 @@ let convert_block (env : env) (block : block) : Cfg.basic_block =
         let regs =
           match name with
           | None -> Reg.createv typ
-          | Some name -> Reg.createv_with_id ~id:(Ident.create_local name) typ
+          | Some name -> Reg.createv_with_id ~id:name typ
         in
         Instruction.Id.Tbl.replace env.op_regs id regs;
         if
@@ -606,7 +606,12 @@ let allocate_block_labels_and_param_regs env =
     (fun (block : block) ->
       Block.Tbl.replace env.block_labels block (Label.new_label ());
       Block.Tbl.replace env.block_params_regs block
-        (Reg.createv (Block.params_machtype block)))
+        (Block.params block
+        |> Array.map (fun param ->
+            let typ = Value.typ param in
+            match Value.name param with
+            | None -> Reg.create typ
+            | Some name -> Reg.create_with_id ~id:name typ)))
     (Ssa.blocks env.ssa_graph)
 
 let param_naming_instrs env ~fun_arg_locs =
@@ -728,7 +733,11 @@ let convert ~future_funcnames (ssa_graph : finished Ssa.graph) :
         (Cfg.of_cmm_codegen_option function_info.codegen_options)
       ~fun_dbg:function_info.dbg ~fun_contains_calls:true
       ~fun_num_stack_slots:(Stack_class.Tbl.make 0) ~fun_poll:function_info.poll
-      ~next_instruction_id:Sub_cfg.instr_id ~fun_ret_type:function_info.ret_type
+      ~next_instruction_id:Sub_cfg.instr_id
+      ~fun_ret_type:function_info.ret_type
+        (* CR ttebbi: [Ssa_of_cmm] drops [Cphantom_let], so there are no phantom
+           lets to attach; DWARF for phantom variables is lost in the SSA
+           pipeline (see the CR on [make_instr] above). *)
       ~fun_phantom_lets:Backend_var.Map.empty ~allowed_to_be_irreducible:false
   in
   let layout = DLL.make_empty () in

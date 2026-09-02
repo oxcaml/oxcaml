@@ -30,4 +30,7 @@
     Replaces [Call]+[Return] sequences with tail calls when possible. *)
 
 val run :
-  keep_unused_ops:bool -> Ssa.finished Ssa.graph -> Ssa.finished Ssa.graph
+  ppf_dump:Format.formatter ->
+  keep_unused_ops:bool ->
+  Ssa.finished Ssa.graph ->
+  Ssa.finished Ssa.graph

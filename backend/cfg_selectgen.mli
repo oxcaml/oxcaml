@@ -29,6 +29,9 @@
 
 [@@@ocaml.warning "+a-40-41-42"]
 
+val which_parameter_of_provenance :
+  Backend_var.Provenance.t option -> int option
+
 module Make (_ : Cfg_selectgen_target_intf.S) : sig
   val emit_fundecl :
     future_funcnames:Misc.Stdlib.String.Set.t ->

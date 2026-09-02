@@ -226,5 +226,9 @@ module Combine (_ : Reducer) (_ : Reducer) : Reducer
     the output must remain faithful to the input shape (e.g. before
     [Cfg_compare]). *)
 module Make_run (_ : Reducer) : sig
-  val run : ?keep_unused_ops:bool -> finished Ssa.graph -> finished Ssa.graph
+  val run :
+    ppf_dump:Format.formatter ->
+    ?keep_unused_ops:bool ->
+    finished Ssa.graph ->
+    finished Ssa.graph
 end

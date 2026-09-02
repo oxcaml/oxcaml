@@ -271,7 +271,7 @@ module Combine (A : Reducer) (B : Reducer) : Reducer = struct
 end
 
 module Make_run (R : Reducer) = struct
-  let run ?(keep_unused_ops = false) (in_graph : finished Ssa.graph) :
+  let run ~ppf_dump ?(keep_unused_ops = false) (in_graph : finished Ssa.graph) :
       finished Ssa.graph =
     let out_graph =
       Ssa.create_graph (Ssa.function_info in_graph) ~keep_unused_ops
@@ -308,8 +308,8 @@ module Make_run (R : Reducer) = struct
           then Ssa.entry out_graph
           else
             Block.create_with_names out_graph ~params ~cold:(Block.cold block)
+              ~handler_dbg:(Block.handler_dbg block)
         in
-        Block.set_handler_dbg out_block (Block.handler_dbg block);
         Block.Tbl.replace block_map block out_block;
         (* Index the output values by the original param index, with
            [Omitted_since_unused] in the dropped slots; the kept output params
@@ -415,12 +415,11 @@ module Make_run (R : Reducer) = struct
           visit_terminator block c
         with exn ->
           let bt = Printexc.get_raw_backtrace () in
-          Format.eprintf
+          Format.fprintf ppf_dump
             "*** Ssa_reducer.run error for %s while processing block %a: \
              %s@.*** Input SSA:@.%a@."
             (Ssa.function_info in_graph).sym_name Block.print_id block
             (Printexc.to_string exn) Ssa_print.print in_graph;
-          Format.pp_print_flush Format.err_formatter ();
           Printexc.raise_with_backtrace exn bt)
       (Ssa.blocks in_graph);
     Ssa.finish_graph out_graph

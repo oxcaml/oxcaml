@@ -27,7 +27,7 @@
 
 open! Int_replace_polymorphic_compare
 
-[@@@ocaml.warning "+a-4-9-40-41-42"]
+[@@@ocaml.warning "+a-4-40-41-42"]
 
 (** Structural and register-equivalence check between two CFGs for the same
     function. Used to validate the SSA pipeline against the baseline
@@ -211,32 +211,32 @@ let compare_instruction_fields ~ppf_m ~kind ~old_label ~new_label
   (* CR ttebbi: [phantom_available_before] is always [None] on the new side,
      since [Ssa_of_cmm] drops [Cphantom_let]. We should compare it once the SSA
      pipeline tracks phantom lets. *)
-  let[@warning "+9"] { Cfg.desc = _;
-                       id = old_id;
-                       arg = _;
-                       res = _;
-                       dbg = old_dbg;
-                       fdo = old_fdo;
-                       live = old_live;
-                       stack_offset = old_stack_offset;
-                       available_before = old_avail_before;
-                       available_across = old_avail_across;
-                       phantom_available_before = _
-                     } =
+  let { Cfg.desc = _;
+        id = old_id;
+        arg = _;
+        res = _;
+        dbg = old_dbg;
+        fdo = old_fdo;
+        live = old_live;
+        stack_offset = old_stack_offset;
+        available_before = old_avail_before;
+        available_across = old_avail_across;
+        phantom_available_before = _
+      } =
     old_instr
   in
-  let[@warning "+9"] { Cfg.desc = _;
-                       id = new_id;
-                       arg = _;
-                       res = _;
-                       dbg = new_dbg;
-                       fdo = new_fdo;
-                       live = new_live;
-                       stack_offset = new_stack_offset;
-                       available_before = new_avail_before;
-                       available_across = new_avail_across;
-                       phantom_available_before = _
-                     } =
+  let { Cfg.desc = _;
+        id = new_id;
+        arg = _;
+        res = _;
+        dbg = new_dbg;
+        fdo = new_fdo;
+        live = new_live;
+        stack_offset = new_stack_offset;
+        available_before = new_avail_before;
+        available_across = new_avail_across;
+        phantom_available_before = _
+      } =
     new_instr
   in
   let report_with field pp_value old_value new_value =
@@ -797,39 +797,78 @@ let compare ~old_cfg ~new_cfg ppf =
     let new_to_old = collect_matching_blocks ~ppf_m ~old_cfg ~new_cfg in
     (* Phase 2: register equivalence *)
     verify_register_equivalence ~ppf_m ~old_cfg ~new_cfg ~new_to_old;
-    (* Check CFG metadata. The stored [fun_contains_calls] flags are computed
-       before the final [Cfg_simplify] in both pipelines, so they can
-       legitimately differ for blocks that were subsequently removed. Instead of
-       exact equality, check that the new flag is correct (set whenever the new
-       CFG does contain calls) and at least as precise as the old one. *)
+    (* Compare the function-level metadata, destructuring exhaustively so that a
+       field added to [Cfg.t] must be explicitly considered here. *)
+    let { Cfg.blocks = _ (* phases 1 and 2 *);
+          fun_name = old_fun_name;
+          fun_args = _ (* feed the entry block's instructions, phase 2 *);
+          fun_codegen_options = old_fun_codegen_options;
+          fun_dbg = old_fun_dbg;
+          entry_label = _;
+          fun_contains_calls = old_fun_contains_calls;
+          fun_num_stack_slots = _ (* not populated at this pipeline stage *);
+          fun_frame_required = _ (* not populated at this pipeline stage *);
+          fun_prologue_required = _ (* not populated at this pipeline stage *);
+          fun_poll = old_fun_poll;
+          next_instruction_id = _ (* stale by construction, see [Asmgen] *);
+          fun_ret_type = old_fun_ret_type;
+          (* CR ttebbi: [fun_phantom_lets] is always empty on the new side,
+             since [Ssa_of_cmm] drops [Cphantom_let]. We should compare it once
+             the SSA pipeline tracks phantom lets. *)
+          fun_phantom_lets = _;
+          allowed_to_be_irreducible = old_allowed_to_be_irreducible;
+          register_locations_are_set = _ (* not set at this pipeline stage *)
+        } =
+      old_cfg
+    in
+    let { Cfg.blocks = new_blocks;
+          fun_name = new_fun_name;
+          fun_codegen_options = new_fun_codegen_options;
+          fun_dbg = new_fun_dbg;
+          fun_contains_calls = new_fun_contains_calls;
+          fun_poll = new_fun_poll;
+          fun_ret_type = new_fun_ret_type;
+          allowed_to_be_irreducible = new_allowed_to_be_irreducible;
+          _
+        } =
+      new_cfg
+    in
+    (* The stored [fun_contains_calls] flags are computed before the final
+       [Cfg_simplify] in both pipelines, so they can legitimately differ for
+       blocks that were subsequently removed. Instead of exact equality, check
+       that the new flag is correct (set whenever the new CFG does contain
+       calls) and at least as precise as the old one. *)
     if
-      (not new_cfg.fun_contains_calls)
-      && Label.Tbl.to_seq_values new_cfg.blocks
+      (not new_fun_contains_calls)
+      && Label.Tbl.to_seq_values new_blocks
          |> Seq.exists Cfg.basic_block_contains_calls
     then
       Format.fprintf ppf_m
         "fun_contains_calls is unset on the new CFG even though it contains \
          calls@.";
-    if new_cfg.fun_contains_calls && not old_cfg.fun_contains_calls
+    if new_fun_contains_calls && not old_fun_contains_calls
     then
       Format.fprintf ppf_m
         "fun_contains_calls mismatch: old=%b new=%b (new is less precise)@."
-        old_cfg.fun_contains_calls new_cfg.fun_contains_calls;
-    if not (String.equal old_cfg.fun_name new_cfg.fun_name)
+        old_fun_contains_calls new_fun_contains_calls;
+    if not (String.equal old_fun_name new_fun_name)
     then
-      Format.fprintf ppf_m "fun_name mismatch: old=%s new=%s@." old_cfg.fun_name
-        new_cfg.fun_name;
-    if Stdlib.( <> ) old_cfg.fun_codegen_options new_cfg.fun_codegen_options
+      Format.fprintf ppf_m "fun_name mismatch: old=%s new=%s@." old_fun_name
+        new_fun_name;
+    if Stdlib.( <> ) old_fun_codegen_options new_fun_codegen_options
     then Format.fprintf ppf_m "fun_codegen_options mismatch@.";
-    if Debuginfo.compare old_cfg.fun_dbg new_cfg.fun_dbg <> 0
+    if Debuginfo.compare old_fun_dbg new_fun_dbg <> 0
     then
       Format.fprintf ppf_m "fun_dbg mismatch: old=%a new=%a@."
-        Debuginfo.print_compact old_cfg.fun_dbg Debuginfo.print_compact
-        new_cfg.fun_dbg;
-    if Stdlib.( <> ) old_cfg.fun_poll new_cfg.fun_poll
+        Debuginfo.print_compact old_fun_dbg Debuginfo.print_compact new_fun_dbg;
+    if Stdlib.( <> ) old_fun_poll new_fun_poll
     then Format.fprintf ppf_m "fun_poll mismatch@.";
-    if not (Cmm.equal_machtype old_cfg.fun_ret_type new_cfg.fun_ret_type)
-    then Format.fprintf ppf_m "fun_ret_type mismatch@."
+    if not (Cmm.equal_machtype old_fun_ret_type new_fun_ret_type)
+    then Format.fprintf ppf_m "fun_ret_type mismatch@.";
+    if
+      not
+        (Bool.equal old_allowed_to_be_irreducible new_allowed_to_be_irreducible)
+    then Format.fprintf ppf_m "allowed_to_be_irreducible mismatch@."
   end;
   (* Report *)
   Format.pp_print_flush ppf_m ();

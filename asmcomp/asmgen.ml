@@ -535,8 +535,8 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   in
   let ssa =
     fd_cmm
-    ++ Ssa_of_cmm.convert ~keep_unused_ops:true
-    ++ Ssa_tail_call.run ~keep_unused_ops:true
+    ++ Ssa_of_cmm.convert ~ppf_dump ~keep_unused_ops:true
+    ++ Ssa_tail_call.run ~ppf_dump ~keep_unused_ops:true
   in
   if !Oxcaml_flags.ssa_validate
   then
@@ -561,7 +561,9 @@ let compile_via_ssa ~ppf_dump ~funcnames (fd_cmm : Cmm.fundecl) :
   then Format.fprintf ppf_dump "*** SSA@.@.%a" Ssa_print.print ssa;
   (* Second conversion: produces the CFG that feeds the real pipeline. This is
      where SSA-level optimizations run. *)
-  let ssa = if !Oxcaml_flags.ssa_simplify then Ssa_simplify.run ssa else ssa in
+  let ssa =
+    if !Oxcaml_flags.ssa_simplify then Ssa_simplify.run ~ppf_dump ssa else ssa
+  in
   if !Oxcaml_flags.dump_ssa && !Oxcaml_flags.ssa_simplify
   then
     Format.fprintf ppf_dump "*** SSA after Ssa_simplify@.@.%a" Ssa_print.print

@@ -50,6 +50,7 @@ let print_block_header ppf (blk : block) =
   Format.fprintf ppf " [dominator=%a depth=%d]" Block.print_id
     (Block.immediate_dominator blk)
     (Block.dominator_depth blk);
+  if Block.cold blk then Format.fprintf ppf " [cold]";
   match Block.predecessors blk with
   | [] -> ()
   | preds ->

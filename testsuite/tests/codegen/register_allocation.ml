@@ -562,6 +562,8 @@ f:
   ret
 |}]
 
+(* CR ttebbi: The SSA pipeline results in worse register allocator behavior
+    under pressure due to non-split live ranges. *)
 let[@inline never] register_pressure (x : int) =
   let a = (x, x+1, x+2) in
   let b = (x+3, x+4, x+5) in

@@ -107,8 +107,7 @@ combine_comparisons:
   ret
 |}]
 
-(* CR ttebbi: We branch twice on the same comparison, materializing a boolean
-   for the second branch. *)
+(* CR ttebbi: We branch twice on the same comparison. *)
 let repeat_comparisons r _f =
   let a = !r > 5 in
   let b = !r > 5 in

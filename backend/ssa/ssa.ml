@@ -52,23 +52,26 @@ open! Int_replace_polymorphic_compare
     records the block. [finish_graph] then fills in metadata and produces the
     final immutable [body] array.
 
-    [finish_graph] performs five passes over the finished blocks, in order:
+    [finish_graph] performs multiple passes over the finished blocks:
     - [compute_reachability_and_trap_stacks]: forward DFS from [entry] following
       structural and exception successors, threading the trap stack so each
       reachable block gets its [block_end_trap_stack] populated; unreachable
       blocks are pruned.
     - [compute_dominators]: iterative meet-over-predecessors fixpoint.
     - [increment_uses_in_block]: refcount over op args and block params, leaving
-      anything dead at the [-1] "scheduled for removal" sentinel (its inputs are
-      not counted, so a transitively-dead chain stays at [-1]). Block-param
-      liveness propagates to predecessors' [Continue] args.
+      anything dead at the [removal_sentinel] (its inputs are not counted, so a
+      transitively-dead chain stays at [removal_sentinel]). Block-param liveness
+      propagates to predecessors' [Continue] args.
     - [finalize_block]: materialise [body] from [pending_body]. Always drops
       Push_trap/Pop_trap pairs whose handler is unreachable. When
-      [keep_unused_ops] is false, also drops dead [Op]s ([-1]) and replaces
+      [keep_unused_ops] is false, also drops dead [Op]s and replaces
       [Continue (Goto _)] args going to params scheduled for removal with
       [Omitted_since_unused].
-    - [check_value_invariants]: every use is dominated by its definition, and
-      [Omitted_since_unused] only feeds block params scheduled for removal. *)
+    - [check_value_invariants]: every use is dominated by its definition,
+      [Omitted_since_unused] only feeds block params scheduled for removal, and
+      raise arguments do not smuggle derived pointers into their handler's
+      parameters ([Goto] arguments are checked at [Cursor.finish_block] time
+      instead, see [check_args_fit_params]). *)
 
 module Block_id = Id_counter.Make ()
 module Instruction_id = Id_counter.Make ()
@@ -120,7 +123,7 @@ end
 
 type block_param =
   { typ : Cmm.machtype_component;
-    mutable name : string option;
+    mutable name : Backend_var.t option;
     mutable usage_count : usage_count
   }
 
@@ -135,7 +138,7 @@ type 'g block =
     (* The [Cmm.Ccatch] handler's [dbg], for blocks that are handlers.
        [Cfg_of_ssa] attaches it to the exception-bucket move it emits at the
        entry of a trap handler, matching [Cfg_selectgen.setup_catch_handler]. *)
-    mutable handler_dbg : Debuginfo.t;
+    handler_dbg : Debuginfo.t;
     cold : bool;
     mutable dominator_info : 'g dominator_info;
     mutable block_end_trap_stack : 'g block list
@@ -153,7 +156,7 @@ and 'g op_data =
     args : 'g value array;
     dbg : Debuginfo.t;
     mutable usage_count : usage_count;
-    mutable name : string option
+    mutable name : Backend_var.t option
   }
 
 and 'g instruction =
@@ -230,8 +233,8 @@ and dummy_block : under_construction block =
     block_end_trap_stack = []
   }
 
-let create_block ~block_id_gen ~(params : block_param array) ~(cold : bool) :
-    under_construction block =
+let create_block ~block_id_gen ~(params : block_param array) ~(cold : bool)
+    ~(handler_dbg : Debuginfo.t) : under_construction block =
   { block_id = Block_id.get_and_incr block_id_gen;
     params;
     predecessors = [];
@@ -239,7 +242,7 @@ let create_block ~block_id_gen ~(params : block_param array) ~(cold : bool) :
     pending_body = [];
     terminator = pending_terminator;
     terminator_dbg = Debuginfo.none;
-    handler_dbg = Debuginfo.none;
+    handler_dbg;
     cold;
     dominator_info = { depth = -1; dominator = dummy_block };
     block_end_trap_stack = []
@@ -249,17 +252,17 @@ module Block = struct
   type nonrec 'g t = 'g block
 
   let create (graph : under_construction graph) ~(params : Cmm.machtype)
-      ~(cold : bool) : under_construction t =
-    create_block ~block_id_gen:graph.block_id_gen ~cold
+      ~(cold : bool) ~(handler_dbg : Debuginfo.t) : under_construction t =
+    create_block ~block_id_gen:graph.block_id_gen ~cold ~handler_dbg
       ~params:
         (params
         |> Array.map (fun typ ->
             { typ; name = None; usage_count = removal_sentinel }))
 
   let create_with_names (graph : under_construction graph)
-      ~(params : (Cmm.machtype_component * string option) array) ~(cold : bool)
-      : under_construction t =
-    create_block ~block_id_gen:graph.block_id_gen ~cold
+      ~(params : (Cmm.machtype_component * Backend_var.t option) array)
+      ~(cold : bool) ~(handler_dbg : Debuginfo.t) : under_construction t =
+    create_block ~block_id_gen:graph.block_id_gen ~cold ~handler_dbg
       ~params:
         (params
         |> Array.map (fun (typ, name) ->
@@ -385,11 +388,7 @@ module Block = struct
 
   let handler_dbg (block : finished t) : Debuginfo.t = block.handler_dbg
 
-  let set_handler_dbg (block : under_construction t) (dbg : Debuginfo.t) : unit
-      =
-    block.handler_dbg <- dbg
-
-  let cold (block : finished t) : bool = block.cold
+  let cold (block : 'g t) : bool = block.cold
 
   let is_finished block =
     match block.terminator with
@@ -402,8 +401,11 @@ end
 (* Print the [name/vN] reference of an [Op]; shared by [Value.print] (which
    prints args as references) and [Instruction.print] (which prefixes a full op
    with its result name). *)
-let print_op_id ppf ~id ~(name : string option) =
-  name |> Option.iter (Format.fprintf ppf "%s/");
+let print_name ppf (name : Backend_var.t) =
+  Format.fprintf ppf "%s/" (Backend_var.name name)
+
+let print_op_id ppf ~id ~(name : Backend_var.t option) =
+  name |> Option.iter (print_name ppf);
   Format.fprintf ppf "v%d" (id : Instruction_id.t :> int)
 
 module Value = struct
@@ -432,20 +434,20 @@ module Value = struct
       print_op_id ppf ~id ~name;
       if Array.length typ > 1 then Format.fprintf ppf ".%d" i
     | Block_param (block, i) ->
-      block.params.(i).name |> Option.iter (Format.fprintf ppf "%s/");
+      block.params.(i).name |> Option.iter (print_name ppf);
       Format.fprintf ppf "%a.%d" Block.print_id block i
 
   (* Keep an existing name: when a value is reused for another binding (e.g.
      [let y = x] or a reducer substituting an existing value), the original name
      describes it best. *)
-  let set_name (value : 'g t) name =
+  let set_name (value : 'g t) (name : Backend_var.t) =
     match value with
     | Res (r, _) -> if Option.is_none r.name then r.name <- Some name
     | Block_param (block, i) ->
       if Option.is_none block.params.(i).name
       then block.params.(i).name <- Some name
 
-  let name (value : 'g t) : string option =
+  let name (value : 'g t) : Backend_var.t option =
     match value with
     | Res ({ name; _ }, _) -> name
     | Block_param (block, i) -> block.params.(i).name
@@ -489,7 +491,7 @@ module Instruction = struct
       args : 'g value array;
       dbg : Debuginfo.t;
       mutable usage_count : usage_count;
-      mutable name : string option
+      mutable name : Backend_var.t option
     }
 
   type nonrec 'g t = 'g instruction =
@@ -755,7 +757,7 @@ let create_graph (function_info : Function_info.t) ~keep_unused_ops :
   let block_id_gen = Block_id.create_generator () in
   let instruction_id_gen = Instruction_id.create_generator () in
   let entry =
-    create_block ~block_id_gen ~cold:false
+    create_block ~block_id_gen ~cold:false ~handler_dbg:Debuginfo.none
       ~params:
         (Function_info.flattened_parameters function_info
         |> Array.map (fun typ : block_param ->
@@ -766,7 +768,7 @@ let create_graph (function_info : Function_info.t) ~keep_unused_ops :
   let (_ : int) =
     List.fold_left
       (fun pos (var, (ty : Cmm.machtype)) ->
-        let name = Backend_var.name (Backend_var.With_provenance.var var) in
+        let name = Backend_var.With_provenance.var var in
         for i = 0 to Array.length ty - 1 do
           entry.params.(pos + i).name <- Some name
         done;
@@ -905,6 +907,9 @@ let compute_dominators (graph : finished graph)
               in
               if block.dominator_info.depth <> new_info.depth
               then begin
+                assert (
+                  (not (has_idom block))
+                  || new_info.depth < block.dominator_info.depth);
                 block.dominator_info <- new_info;
                 changed := true
               end

@@ -116,6 +116,8 @@ let create_gen ~name ~typ ~loc =
 
 let create typ = create_gen ~name:Name.Anon ~typ ~loc:Unknown
 
+let create_with_id ~id typ = create_gen ~name:(Name.Var id) ~typ ~loc:Unknown
+
 let create_alias t ~typ =
   match t.loc with
   | Unknown ->

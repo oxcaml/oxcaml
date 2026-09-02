@@ -149,8 +149,8 @@ module Instruction : sig
       args : 'g value array;
       dbg : Debuginfo.t;
       mutable usage_count : usage_count;
-      mutable name : string option
-          (** Optional human-readable name, irrelevant for the semantics. *)
+      mutable name : Backend_var.t option
+          (** Optional name, irrelevant for the semantics. *)
     }
 
   and 'g t = private
@@ -198,9 +198,9 @@ module Value : sig
   (** Set the [name] hint on the value's defining [Op] (for a [Res]) or block
       parameter (for a [Block_param]); a no-op for values that already have a
       name (the first name wins). Construction only. *)
-  val set_name : under_construction t -> string -> unit
+  val set_name : under_construction t -> Backend_var.t -> unit
 
-  val name : 'g t -> string option
+  val name : 'g t -> Backend_var.t option
 
   (** Usage count of the underlying block parameter or operation, [0] if it has
       no uses (or is scheduled for removal; see {!scheduled_for_removal}). Does
@@ -284,17 +284,21 @@ module Block : sig
       the same state (unfortunately) share a type. *)
   type 'g t = 'g block
 
-  (** Create a new block with parameters of the given types. *)
+  (** Create a new block with parameters of the given types. [handler_dbg] is
+      the [Cmm.Ccatch] handler's [dbg] for blocks that are handlers, and
+      [Debuginfo.none] otherwise (see [handler_dbg]). *)
   val create :
     under_construction graph ->
     params:Cmm.machtype ->
     cold:bool ->
+    handler_dbg:Debuginfo.t ->
     under_construction t
 
   val create_with_names :
     under_construction graph ->
-    params:(Cmm.machtype_component * string option) array ->
+    params:(Cmm.machtype_component * Backend_var.t option) array ->
     cold:bool ->
+    handler_dbg:Debuginfo.t ->
     under_construction t
 
   val equal : 'g t -> 'g t -> bool
@@ -321,6 +325,9 @@ module Block : sig
 
   (** The machine types of the block parameters. *)
   val params_machtype : 'g t -> Cmm.machtype
+
+  (** Whether the block was created cold (see [create]). *)
+  val cold : 'g t -> bool
 
   (* The following queries are only meaningful once [finish_graph] has populated
      the graph metadata. *)
@@ -360,15 +367,11 @@ module Block : sig
 
   val terminator_dbg : finished t -> Debuginfo.t
 
-  (** The [Cmm.Ccatch] handler's [dbg], for blocks that are handlers.
-      [Cfg_of_ssa] attaches it to the exception-bucket move at the entry of a
-      trap handler, matching [Cfg_selectgen.setup_catch_handler]. Defaults to
-      [Debuginfo.none]. *)
+  (** The [Cmm.Ccatch] handler's [dbg], for blocks that are handlers (passed at
+      block creation). [Cfg_of_ssa] attaches it to the exception-bucket move at
+      the entry of a trap handler, matching [Cfg_selectgen.setup_catch_handler].
+  *)
   val handler_dbg : finished t -> Debuginfo.t
-
-  val set_handler_dbg : under_construction t -> Debuginfo.t -> unit
-
-  val cold : finished t -> bool
 end
 
 module Cursor : sig
