@@ -572,6 +572,10 @@ let add_nullability_from_ty env ty raw_kind =
 let fallback_if_missing_cmi ~default f =
   try f () with Missing_cmi_fallback -> default
 
+(* Above this size, enumerating the constant constructors in a [Pvariant]
+   costs more in the middle end than the precision is worth. *)
+let max_constant_constructors_in_kind = 512
+
 let instantiate_decl_fields env type_params args =
   match args with
   | [] -> Fun.id
@@ -1027,9 +1031,17 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
         in
         (is_mutable, num_nodes_visited), fields
     in
+    let num_constant_constructors =
+      Array.fold_left
+        (fun n cstr_layout ->
+           if Types.cstr_layout_is_constant cstr_layout then n + 1 else n)
+        0 cstr_layouts
+    in
     let num_nodes_visited, raw_kind =
-    if Array.for_all Types.cstr_layout_is_constant cstr_layouts then
+    if num_constant_constructors = Array.length cstr_layouts then
       (num_nodes_visited, Pintval)
+    else if num_constant_constructors > max_constant_constructors_in_kind then
+      (num_nodes_visited, Pgenval)
     else
       let _idx, result =
         List.fold_left
