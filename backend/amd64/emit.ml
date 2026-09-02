@@ -804,14 +804,13 @@ let emit_stack_realloc () =
 
 let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
   let overflow = L.create Text and ret = L.create Text in
-  let threshold_offset =
-    (* [stack_base_offset] is the distance from [Domain_current_stack] to the
-       lowest usable stack address, in both stack-checking modes. *)
-    Domainstate.stack_base_offset + Stack_check.stack_threshold_size
-  in
   if save_registers then push r10;
-  I.lea (mem64 NONE (-(size_in_bytes + threshold_offset)) (Scalar RSP)) r10;
-  I.cmp (domain_field Domainstate.Domain_current_stack) r10;
+  (* The stack base depends on the run-time page size, so has to be read
+     from the stack_info. *)
+  I.mov (domain_field Domainstate.Domain_current_stack) r10;
+  I.mov (mem64 NONE Domainstate.stack_base_field_offset (Scalar R10)) r10;
+  I.add (int (size_in_bytes + Stack_check.stack_threshold_size)) r10;
+  I.cmp r10 rsp;
   if save_registers then pop r10;
   I.jb (emit_asm_label_arg overflow);
   D.define_label ret;

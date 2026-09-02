@@ -19,7 +19,7 @@
 #include "config.h"
 let stack_ctx_words = Stack_ctx_words
 let stack_guard_size = Stack_guard_size
-let stack_base_offset = Stack_base_offset
+let stack_base_field_offset = Stack_base_field_offset
 
 type t =
 #define DOMAIN_STATE(type, name) | Domain_##name
