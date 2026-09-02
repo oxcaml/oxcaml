@@ -1,7 +1,6 @@
 (* TEST
  modules = "mtf_facts.ml";
  readonly_files = "mtf_packed.mli mtf_pack_a.ml mtf_pack_b.ml";
- include ocamlcommon;
  setup-ocamlc.byte-build-env;
  flags = "-bin-annot";
  module = "mtf_packed.mli";
@@ -16,6 +15,7 @@
  program = "mtf_packed.cmo";
  all_modules = "mtf_pack_a.cmo mtf_pack_b.cmo";
  ocamlc.byte;
+ include ocamlcommon;
  flags = "";
  program = "${test_build_directory}/mtf_pack.byte";
  all_modules = "mtf_facts.ml mtf_pack.ml";
