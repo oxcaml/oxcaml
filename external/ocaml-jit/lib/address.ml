@@ -38,6 +38,8 @@ let emit_string t =
 
 let to_int64 t = Int64.of_nativeint t
 
+let to_nativeint t = t
+
 let pp fmt t = Format.fprintf fmt "%nx" t
 
 external to_obj : t -> Obj.t = "jit_addr_to_obj"

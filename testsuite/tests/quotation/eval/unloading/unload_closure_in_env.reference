@@ -1,0 +1,7 @@
+start: registered=0 unloaded=0 live=0
+composed 2 = 23
+composed 3 = 88
+after populate: registered=1 unloaded=0 live=1
+after 2x Gc.compact (held): registered=1 unloaded=0 live=1
+stable: composed 4 = 263
+after release: registered=1 unloaded=1 live=0

@@ -1,0 +1,9 @@
+start: registered=0 unloaded=0 live=0
+h0..h4 of 1: 101 201 301 401 501
+after populate: registered=5 unloaded=0 live=5
+after Gc.compact (all 5 held): registered=5 unloaded=0 live=5
+after drop h2: registered=5 unloaded=1 live=4
+h0..h4 of 2: 102 202 2 402 502
+after drop h0 and h4: registered=5 unloaded=3 live=2
+h1..h3 of 3: 203 3 403
+after drop everything: registered=5 unloaded=5 live=0
