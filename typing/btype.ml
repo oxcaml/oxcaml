@@ -2221,16 +2221,6 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
-    let all_void_sort_option sort =
-      match sort with
-      | Some sort -> Jkind_types.Sort.Const.all_void sort
-      | None -> false
-
-    let all_void_labels lbls =
-      List.for_all
-        (fun { ld_sort; _ } -> all_void_sort_option ld_sort)
-        lbls
-
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
         (fun { ld_type; ld_modalities; _ } ->
