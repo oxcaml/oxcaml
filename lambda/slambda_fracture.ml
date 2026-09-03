@@ -380,7 +380,9 @@ let rec fracture_lam lambda : slambda =
           in
           let kind =
             match kind with
-            | Tupled -> Tupled
+            | Tupled ->
+              Misc.fatal_errorf
+                "Slambda does not currently support poly tupled functions"
             | Curried { nlocal } ->
               Curried
                 { nlocal =

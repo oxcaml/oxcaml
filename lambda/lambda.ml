@@ -2376,8 +2376,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
 let subst update_env ?freshen_bound_variables s =
   (build_substs update_env ?freshen_bound_variables s).subst_lambda
 
-
-let rename_inner idmap =
+let build_renaming_subst idmap =
   let update_env oldid (vd, mode) env =
     let newid = Ident.Map.find oldid idmap in
     Env.add_value_lazy ~mode newid vd env
@@ -2385,8 +2384,8 @@ let rename_inner idmap =
   let s = Ident.Map.map (fun new_id -> Lvar new_id) idmap in
   build_substs update_env s
 
-let rename idmap lam = (rename_inner idmap).subst_lambda lam
-let rename_lfun idmap lfun = (rename_inner idmap).subst_lfunction lfun
+let rename idmap lam = (build_renaming_subst idmap).subst_lambda lam
+let rename_lfun idmap lfun = (build_renaming_subst idmap).subst_lfunction lfun
 
 let duplicate_function =
   (build_substs
