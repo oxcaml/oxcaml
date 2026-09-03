@@ -116,7 +116,8 @@ let void_field_sizes =
   let r = { i = 1; v = #() } in
   [describe r; describe { r with i = 2 }]
 [%%expect{|
-val void_field_sizes : string list = ["block tag 0 size 1"; "block tag 0 size 1"]
+val void_field_sizes : string list =
+  ["block tag 0 size 1"; "block tag 0 size 1"]
 |}]
 
 (* Optimization: an empty record flowing through
