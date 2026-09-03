@@ -1,172 +1,117 @@
 (* TEST
  flambda2;
  include stdlib_stable;
- {
-   expect;
- }{
-   expect.opt;
- }{
-   flags = "-Oclassic";
-   expect.opt;
- }{
-   flags = "-O3";
-   expect.opt;
- }
+ flags = "-extension layouts_beta";
+ { expect; expect.opt; }
+ { flags += " -Oclassic"; expect.opt; }
+ { flags += " -O3"; expect.opt; }
 *)
 
-(* This file tests all-void record behavior that must be
-   shared between bytecode and native code.
-   Native-only traits (e.g. memory representation)
-   are tested in [all_void_records_native.ml]. *)
-
-type t = { x : unit# }
-[%%expect{|
-type t = { x : unit#; }
-|}]
-
-(* A field whose layout is an all-void product is still void for
-   representation purposes. *)
-type p = { y : #(unit# * unit#) }
-[%%expect{|
-type p = { y : #(unit# * unit#); }
-|}]
-
+(* Void operands are still evaluated exactly once, including when they
+   raise. Only one operand has effects in each row, so no evaluation order
+   is prescribed. The partial updates also read a retained void field. *)
+type t = { x : unit#; kept : unit# }
 type m = { mutable z : unit# }
 [%%expect{|
+type t = { x : unit#; kept : unit#; }
 type m = { mutable z : unit#; }
 |}]
 
-(* Projection and matching work (vacuously). *)
-
-let proj (r : t) = let #() = r.x in "projected"
-let proj_result = proj { x = #() }
+let () =
+  let check name f =
+    let run should_raise =
+      let calls = ref 0 in
+      let tick () = incr calls; if should_raise then raise Exit in
+      let outcome = try let () = f tick in "returned" with Exit -> "raised" in
+      !calls, outcome
+    in
+    let calls, outcome = run false in
+    let raised_calls, raised_outcome = run true in
+    Format.printf "%s: %d %s; %d %s@."
+      name calls outcome raised_calls raised_outcome
+  in
+  let r = { x = #(); kept = #() } in
+  let m = { z = #() } in
+  check "construct" (fun tick ->
+    let _ : t = { x = (tick (); #()); kept = #() } in ());
+  check "project" (fun tick ->
+    let #() = (tick (); r).x in ());
+  check "set receiver" (fun tick -> (tick (); m).z <- #());
+  check "set value" (fun tick -> m.z <- (tick (); #()));
+  check "update receiver" (fun tick ->
+    let _ : t = { (tick (); r) with x = #() } in ());
+  check "update value" (fun tick ->
+    let _ : t = { r with x = (tick (); #()) } in ());
+  check "index get receiver" (fun tick ->
+    let #() = Stdlib_stable.Idx_mut.get (tick (); m) (.z) in ());
+  check "index get index" (fun tick ->
+    let #() = Stdlib_stable.Idx_mut.get m (tick (); (.z)) in ());
+  check "index set receiver" (fun tick ->
+    Stdlib_stable.Idx_mut.set (tick (); m) (.z) #());
+  check "index set index" (fun tick ->
+    Stdlib_stable.Idx_mut.set m (tick (); (.z)) #());
+  check "index set value" (fun tick ->
+    Stdlib_stable.Idx_mut.set m (.z) (tick (); #()))
 [%%expect{|
-val proj : t -> string = <fun>
-val proj_result : string = "projected"
+construct: 1 returned; 1 raised
+project: 1 returned; 1 raised
+set receiver: 1 returned; 1 raised
+set value: 1 returned; 1 raised
+update receiver: 1 returned; 1 raised
+update value: 1 returned; 1 raised
+index get receiver: 1 returned; 1 raised
+index get index: 1 returned; 1 raised
+index set receiver: 1 returned; 1 raised
+index set index: 1 returned; 1 raised
+index set value: 1 returned; 1 raised
 |}]
 
-let match_result =
-  match { y = #(#(), #()) } with
-  | { y = #(v, _) } -> let #() = v in "matched"
-[%%expect{|
-val match_result : string = "matched"
-|}]
-
-(* Field expressions are still evaluated in order,
-   even though nothing is stored. *)
-
-let field_effects =
+(* Specializing a generic record to a void product preserves construction,
+   mutation, and matching, including evaluation of every product component. *)
+type ('a : any) generic = { mutable field : 'a }
+let generic_round_trip =
   let log = ref [] in
-  let eff s = log := s :: !log; #() in
-  let r = { x = eff "x" } in
-  let _ : t = r in
-  let p = { y = #(eff "y1", eff "y2") } in
-  let _ : p = p in
-  List.rev !log
+  let mark name = log := name :: !log; #() in
+  let r : #(unit# * unit#) generic =
+    { field = #(mark "first", mark "second") }
+  in
+  r.field <- #(mark "third", mark "fourth");
+  let { field = #(a, b) } = r in
+  let #() = a in
+  let #() = b in
+  List.sort String.compare !log
 [%%expect{|
-val field_effects : string list = ["x"; "y2"; "y1"]
+type ('a : any) generic = { mutable field : 'a; }
+val generic_round_trip : String.t list =
+  ["first"; "fourth"; "second"; "third"]
 |}]
 
-(* The record expression of a projection is evaluated for its effects. *)
-
-let proj_effects =
-  let log = ref [] in
-  let r () = log := "r" :: !log; { x = #() } in
-  let #() = (r ()).x in
-  List.rev !log
+(* A functor can box and project a field whose type is abstract but void. *)
+let abstract_void =
+  let module Void : sig type t : void val make : unit -> t end = struct
+    type t = unit#
+    let make () = #()
+  end in
+  let module Box (V : sig type t : void end) = struct
+    type t = { field : V.t }
+    let make f = { field = f () }
+    let project r = let (_ : V.t) = r.field in "projected"
+  end in
+  let module B = Box (Void) in
+  B.project (B.make Void.make)
 [%%expect{|
-val proj_effects : string list = ["r"]
+val abstract_void : string = "projected"
 |}]
 
-(* Mutation: the new value is evaluated. *)
-
-let mutation =
-  let log = ref [] in
-  let eff s = log := s :: !log; #() in
-  let r = { z = #() } in
-  r.z <- eff "set";
-  let #() = r.z in
-  List.rev !log
+(* Marshaling, structural comparison, and hashing depend on contents, not
+   physical identity. *)
+let round_trip =
+  let original = { x = #(); kept = #() } in
+  let restored : t = Marshal.from_string (Marshal.to_string original []) 0 in
+  let #() = restored.x in
+  original = restored,
+  compare original restored,
+  Hashtbl.hash original = Hashtbl.hash restored
 [%%expect{|
-val mutation : string list = ["set"]
-|}]
-
-(* Block indices, both reading and writing. *)
-
-let idx_round_trip =
-  let r = { z = #() } in
-  Stdlib_stable.Idx_mut.set r (.z) #();
-  let #() = Stdlib_stable.Idx_mut.get r (.z) in
-  "indexed"
-[%%expect{|
-val idx_round_trip : string = "indexed"
-|}]
-
-(* Functional update. *)
-
-let[@warning "-23"] functional_update =
-  let r = { x = #() } in
-  let #() = { r with x = #() }.x in
-  "updated"
-[%%expect{|
-val functional_update : string = "updated"
-|}]
-
-(* Polymorphic operations. *)
-
-let structural_equal = ({ x = #() } = { x = #() })
-[%%expect{|
-val structural_equal : bool = true
-|}]
-
-let compare_equal = compare { x = #() } { x = #() }
-[%%expect{|
-val compare_equal : int = 0
-|}]
-
-let hash_equal = Hashtbl.hash { x = #() } = Hashtbl.hash { x = #() }
-[%%expect{|
-val hash_equal : bool = true
-|}]
-
-let marshal_round_trip =
-  let r : t = Marshal.from_string (Marshal.to_string { x = #() } []) 0 in
-  let #() = r.x in
-  "marshaled"
-[%%expect{|
-val marshal_round_trip : string = "marshaled"
-|}]
-
-(* All-void records are ordinary values when stored in other blocks. *)
-
-let nested_length = List.length [{ x = #() }; { x = #() }; { x = #() }]
-[%%expect{|
-val nested_length : int = 3
-|}]
-
-(* Recursive bindings. *)
-
-let letrec_match =
-  let rec r = { x = #() }
-  and f () = r in
-  let #() = (f ()).x in
-  "matched"
-[%%expect{|
-val letrec_match : string = "matched"
-|}]
-
-(* Kinds: an all-void record is a pointer, not an immediate. *)
-
-type bad : immediate = { x : unit# }
-[%%expect{|
-Line 1, characters 0-36:
-1 | type bad : immediate = { x : unit# }
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "bad" is value non_float
-         because it's a boxed record type.
-       But the layout of type "bad" must be a sublayout of value non_pointer
-         because of the annotation on the declaration of the type bad.
-       Note: The layout of immediate is value non_pointer.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+val round_trip : bool * int * bool = (true, 0, true)
 |}]

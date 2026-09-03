@@ -3,20 +3,12 @@
  expect;
 *)
 
-(* Records must have at least one runtime value, even when a field's sort is
-   determined only by inference after the record's use *)
+(* All-void records are supported even when a field's layout is determined
+   only by inference after the record's use. *)
 
 type ('a : any) r = { x : 'a }
-external unbox_unit : unit -> unit# = "%unbox_unit"
 [%%expect{|
 type ('a : any) r = { x : 'a; }
-external unbox_unit : unit -> unit# = "%unbox_unit"
-|}]
-
-(* The field's sort is determined at the use site *)
-let g () = { x = unbox_unit () }
-[%%expect{|
-val g : unit -> unit# r = <fun>
 |}]
 
 (* The field's sort is determined after the use, by inference *)

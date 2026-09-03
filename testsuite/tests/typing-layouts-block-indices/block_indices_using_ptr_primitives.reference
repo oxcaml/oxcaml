@@ -37,6 +37,7 @@ Mixed block record with unboxed record with value, flat, and void
 
 Empty record
 { #() }
+void RHS evaluated 1 time(s)
 { #() }
 
 Nested product update and deepen mixed product to mixed product
