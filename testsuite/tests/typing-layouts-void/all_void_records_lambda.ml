@@ -69,7 +69,7 @@ val proj_v : all_void_value -> unit# = <fun>
 
 (* An all-void product field is void for representation purposes. The shape
    differs from [all_void_value]'s at this level, but flattens to the same
-   empty block after unarization. *)
+   empty-block shape after unarization. Physical sharing is not required. *)
 
 type all_void_product = { field : #(unit# * unit#) }
 [%%expect{|
@@ -119,8 +119,9 @@ let set (t : all_void_mutable) = t.field <- unbox_unit ()
 val set : all_void_mutable -> unit = <fun>
 |}]
 
-(* All-void records obtained by instantiating [any] ought to generate the same
-   code as the corresponding definitions above. *)
+(* All-void records obtained by instantiating [any] must have the same
+   representation as the corresponding definitions above. This does not
+   require identical IR annotations or physical sharing. *)
 
 type ('a : any) generic_any = { field : 'a }
 [%%expect{|
