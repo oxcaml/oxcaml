@@ -18,7 +18,7 @@ Force link: no
 Static data:
   [
     (closure ⟨env⟩ layout_2 ->
-      { c = x/334.c
+      { c = (missing)
       ; r =
         ⟪(function {nlocal = 0} closure/349[L] x/334[$layout_2] : $layout_2
            x/334)⟫ });
@@ -30,7 +30,7 @@ Static data:
            (make_unboxed_product #($layout_11, $layout_12) x/337 y/338))⟫ });
     [ (missing); ];
     (closure ⟨env⟩ layout_16 ->
-      { c = x/342.c
+      { c = (missing)
       ; r =
         ⟪(function {nlocal = 0} closure/351[L] x/342[$layout_16] : $layout_16
            (let (calls/348 =a (mixedfield 0  (*) closure/351))

@@ -349,59 +349,60 @@ let rec fracture_lam lambda : slambda =
       ktmpl_body
     in
     let templated_function_body =
-      slet_local "body" body (fun body_c body_r ->
-          let closure_id = Ident.create_local "closure" in
-          let closure_param =
-            { name = closure_id;
-              debug_uid = debug_uid_none;
-              layout = layout_block;
-              attributes = default_param_attribute;
-              (* The env parameter can be local because we immediately
-                 destructure it. *)
-              mode = alloc_local
+      let closure_id = Ident.create_local "closure" in
+      let closure_param =
+        { name = closure_id;
+          debug_uid = debug_uid_none;
+          layout = layout_block;
+          attributes = default_param_attribute;
+          (* The env parameter can be local because we immediately
+              destructure it. *)
+          mode = alloc_local
+        }
+      in
+      let _, body =
+        List.fold_left
+          (fun (i, lam) (ident, (_, layout)) ->
+            ( i + 1,
+              Llet
+                ( Alias,
+                  layout,
+                  ident,
+                  debug_uid_none,
+                  Lprim
+                    ( Pmixedfield
+                        ([i], free_vars_shape_locality_mode, Reads_agree),
+                      [Lvar closure_id],
+                      ktmpl_loc ),
+                  lam ) ))
+          (0, fracture_dynamic body) env
+      in
+      let kind =
+        match kind with
+        | Tupled ->
+          Misc.fatal_errorf
+            "Slambda does not currently support poly tupled functions"
+        | Curried { nlocal } ->
+          Curried
+            { nlocal =
+                begin match ktmpl_env_mode with
+                | Alloc_heap -> nlocal
+                | Alloc_local -> List.length params + 1
+                end
             }
-          in
-          let _, body =
-            List.fold_left
-              (fun (i, lam) (ident, (_, layout)) ->
-                ( i + 1,
-                  Llet
-                    ( Alias,
-                      layout,
-                      ident,
-                      debug_uid_none,
-                      Lprim
-                        ( Pmixedfield
-                            ([i], free_vars_shape_locality_mode, Reads_agree),
-                          [Lvar closure_id],
-                          ktmpl_loc ),
-                      lam ) ))
-              (0, body_r) env
-          in
-          let kind =
-            match kind with
-            | Tupled ->
-              Misc.fatal_errorf
-                "Slambda does not currently support poly tupled functions"
-            | Curried { nlocal } ->
-              Curried
-                { nlocal =
-                    begin match ktmpl_env_mode with
-                    | Alloc_heap -> nlocal
-                    | Alloc_local -> List.length params + 1
-                    end
-                }
-          in
-          let lf =
-            lfunction' ~kind ~params:(closure_param :: params) ~return ~body
-              ~attr ~loc
-              ~mode:alloc_heap
-                (* This closure has no free variables and will always be
-                   statically allocated. alloc_heap is an safe choice. *)
-              ~ret_mode
-          in
-          let sval_runtime = Lfunction (lfunction_with_yielding yielding lf) in
-          SLhalves { sval_comptime = body_c; sval_runtime })
+      in
+      let lf =
+        lfunction' ~kind ~params:(closure_param :: params) ~return ~body
+          ~attr ~loc
+          ~mode:alloc_heap
+            (* This closure has no free variables and will always be
+                statically allocated. alloc_heap is an safe choice. *)
+          ~ret_mode
+      in
+      let sval_runtime = Lfunction (lfunction_with_yielding yielding lf) in
+      (* The compile-time half of the instantiated function is missing like any
+         normal function. *)
+      SLhalves { sval_comptime = SLmissing; sval_runtime }
     in
     let free_var_capture =
       List.map
