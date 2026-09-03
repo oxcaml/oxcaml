@@ -307,25 +307,22 @@ val curry_mode :
   With_locality.Comonadic.l
 
 (** The curry mode implied by the arguments seen so far in a function type:
-    a constant until a generic mode variable is encountered, then the
-    currying fold evaluated twice, on the argument modes themselves
-    ([curry_mode]) and on their constant upper bounds ([curry_mode_const]). *)
+    a constant until a generic mode variable is encountered, then the join
+    of the modes closed over ([curry_mode]). A hidden curry mode is a
+    variable whose lower bound is the implied curry mode, unconstrained
+    otherwise. *)
 module Curry_mode : sig
   type t =
     | Const of With_locality.Const.t
-    | Variable of With_locality.Comonadic.l * With_locality.Const.t
+    | Variable of With_locality.Comonadic.l
 
   val add_const_arg : t -> With_locality.Const.t -> t
 
-  (** Always yields a variable accumulator. [upper] is the constant upper
-      bound of the argument mode. *)
-  val add_arg : t -> With_locality.lr -> upper:With_locality.Const.t -> t
+  (** Always yields a variable accumulator. *)
+  val add_arg : t -> With_locality.lr -> t
 
   (** The comonadic mode of the accumulated curry. *)
   val comonadic : t -> With_locality.Comonadic.l
-
-  (** The constant upper bound of the accumulated curry. *)
-  val upper : t -> With_locality.Const.t
 end
 
 val apply:
