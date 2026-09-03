@@ -10861,20 +10861,34 @@ and type_application env app_loc expected_mode position_and_mode
              [args = [(Label "a", Omitted bar);
                       (Optional "opt", Arg (Eliminated_optional_arg baz));
                       (Nolabel, Arg (Known_arg n))]] *)
-          let ty_res =
-            List.fold_left
-              (fun ty_ret (lbl, arg) ->
-                 match arg with
-                 | Omitted { ty_arg; mode_arg; level; _ } ->
-                     let arrow_desc =
-                       (lbl, mode_arg, Alloc.newvar (get_current_level ()))
-                     in
-                     newty2 ~level
-                       (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
-                 | Arg _ -> ty_ret)
-              ty_ret (List.rev untyped_args)
-          in
-          unify_exp_types app_loc env ty_res (instance ty_expected);
+          (* Upstream does not yet use result types to inform application
+             typechecking. It's also unprincipal. *)
+          if not (Language_extension.erasable_extensions_only ())
+             && not !Clflags.principal
+          then begin
+            let ty_res =
+              List.fold_left
+                (fun ty_ret (lbl, arg) ->
+                   match arg with
+                   | Omitted { ty_arg; mode_arg; level; _ } ->
+                       let arrow_desc =
+                         (lbl, mode_arg, Alloc.newvar (get_current_level ()))
+                       in
+                       newty2 ~level
+                         (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
+                   | Arg _ -> ty_ret)
+                ty_ret (List.rev untyped_args)
+            in
+            let ty_expected = instance ty_expected in
+            if not (is_Tvar (expand_head env ty_expected)) then
+              (* This extra unification might trigger incompleteness in the
+                 type checker (like due to lack of [Tquote_eval]-constraints).
+                 Backtracking might be expensive, but will only happen in cases
+                 we'll fail anyway or when type inference is incomplete. *)
+              let snap = snapshot () in
+              try Ctype.unify env ty_res ty_expected
+              with Unify _ | Tags _ -> backtrack snap
+          end;
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
             if partial_app then position_and_mode_default else position_and_mode

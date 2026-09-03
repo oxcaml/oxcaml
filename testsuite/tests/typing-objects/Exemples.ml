@@ -34,6 +34,8 @@ p#get_x;;
 let q = Oo.copy p;;
 [%%expect{|
 val q : point = <obj>
+|}, Principal{|
+val q : < get_x : int; move : int -> unit > = <obj>
 |}];;
 
 q#move 7; p#get_x, q#get_x;;
@@ -177,6 +179,9 @@ let (c, c') = (new circle p, new circle p');;
 [%%expect{|
 val c : point circle = <obj>
 val c' : color_point circle = <obj>
+|}, Principal{|
+val c : point circle = <obj>
+val c' : < color : string; get_x : int; move : int -> unit > circle = <obj>
 |}];;
 
 class ['a] color_circle c = object
