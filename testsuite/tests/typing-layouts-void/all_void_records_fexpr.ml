@@ -1,6 +1,6 @@
 (* TEST
  flags = "-extension layouts_beta -drawfexpr -dno-unique-ids";
- expect;
+ expect.opt;
 *)
 
 (* All-void records are erased if unboxed.
