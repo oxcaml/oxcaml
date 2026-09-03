@@ -60,6 +60,14 @@ let mem code_id t = Code_id.Map.mem code_id t
 
 let find_exn t code_id = Code_id.Map.find code_id t
 
+let get_code_metadata t code_id =
+  match Code_id.Map.find code_id t with
+  | exception Not_found ->
+    Misc.fatal_errorf
+      "[Exported_code.get_code_metadata]: code_id %a not found in exported code"
+      Code_id.print code_id
+  | code_or_metadata -> Code_or_metadata.code_metadata code_or_metadata
+
 let find t code_id =
   match Code_id.Map.find code_id t with
   | exception Not_found ->

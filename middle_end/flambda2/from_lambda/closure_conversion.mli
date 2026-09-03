@@ -88,9 +88,9 @@ type 'a close_program_metadata =
   | Normal : [`Normal] close_program_metadata
   | Classic :
       (Exported_code.t
+      * Code_or_metadata.t Value_approximation.t Symbol.Map.t
       * Name_occurrences.t
-      * Flambda_cmx_format.raw option
-      * Exported_offsets.t)
+      * Slot_offsets.t)
       -> [`Classic] close_program_metadata
 
 type 'a close_program_result =
@@ -112,5 +112,4 @@ val close_program :
   toplevel_my_region:Ident.t ->
   toplevel_my_ghost_region:Ident.t ->
   toplevel_my_alloc_region:Ident.t ->
-  sections:File_sections.Builder.t ->
   'mode close_program_result
