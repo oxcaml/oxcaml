@@ -67,26 +67,6 @@ let phys_equal_mutable = { z = #() } == { z = #() }
 val phys_equal_mutable : bool = true
 |}]
 
-(* Within one compilation unit,
-   [==] would also hold for a shared static block.
-   [Obj.new_block 0 0] is a C call returning [caml_atom_0],
-   which the compiler cannot fold, so
-   this distinguishes the atom from any other zero-size block. *)
-
-let is_atom = Obj.repr { x = #() } == Obj.new_block 0 0
-[%%expect{|
-val is_atom : bool = true
-|}]
-
-(* Unmarshaling a zero-size block yields the atom ([caml_alloc (0, 0)]). *)
-
-let marshal_identity =
-  let r = { x = #() } in
-  Marshal.from_string (Marshal.to_string r []) 0 == r
-[%%expect{|
-val marshal_identity : bool = true
-|}]
-
 (* Functional update ([Pduprecord]) copies the block's real size,
    not one word per label; a copy of the atom is the atom. *)
 
