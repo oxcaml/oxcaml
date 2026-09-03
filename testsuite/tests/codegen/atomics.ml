@@ -270,7 +270,7 @@ ptr_logxor:
 (* External pointers *)
 
 module Ext_ptr_atomic = struct
-  type t = int64#
+  type t = int64_u
 
   external get :
     ('a : value_or_null). t @ local -> 'a = "%unsafe_atomic_load_ext_ptr"
