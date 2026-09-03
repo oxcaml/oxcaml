@@ -1101,7 +1101,7 @@ let compile_letrec input_bindings body =
         | Static ->
           let size = compute_static_size def in
           begin match size with
-          | Constant | Unreachable ->
+          | Constant | Unreachable | Block (Regular_block 0) ->
             (* The result never escapes any recursive variables, so as we know
                it doesn't inspect them either we can just bind the recursive
                variables to dummy values and evaluate the definition normally.
