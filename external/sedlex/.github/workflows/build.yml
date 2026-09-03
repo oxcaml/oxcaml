@@ -1,0 +1,69 @@
+name: build
+
+on:
+  merge_group:
+  pull_request:
+  push:
+    branches:
+      - master
+  schedule:
+    # Prime the caches every Monday
+    - cron: 0 1 * * MON
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        ocaml-compiler:
+          - 4.14.x
+          - 5.x
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Set git to use LF
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+          git config --global core.ignorecase false
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          dune-cache: ${{ matrix.os == 'ubuntu-latest' }}
+
+      - run: opam install . --with-test
+
+      - run: opam exec -- make build
+
+      - run: opam exec -- make test
+
+      - run: opam exec -- git diff --exit-code
+
+  lint-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use OCaml 4.14.x
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 4.14.x
+          dune-cache: true
+
+      - name: Lint fmt
+        uses: ocaml/setup-ocaml/lint-fmt@v3
