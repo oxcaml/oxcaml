@@ -2121,18 +2121,33 @@ let curry_mode_const alloc arg : Alloc.Const.t =
 module Curry_mode = struct
   type t =
     | Const of Alloc.Const.t
-    | Variable of Alloc.Comonadic.l
+    | Variable of
+        { comonadic : Alloc.Comonadic.l;
+          areality : Locality.Const.t }
 
   let comonadic = function
     | Const c -> Alloc.Comonadic.of_const (Alloc.Const.partial_apply c)
-    | Variable comonadic -> comonadic
+    | Variable { comonadic; _ } -> comonadic
 
-  let add_arg t marg = Variable (curry_mode (comonadic t) marg)
+  let areality = function
+    | Const c -> c.areality
+    | Variable { areality; _ } -> areality
 
-  let add_const_arg t arg =
+  let add_arg t marg ~upper_areality =
+    let areality = Locality.Const.join (areality t) upper_areality in
+    let pinned =
+      Alloc.Comonadic.of_const { Alloc.Comonadic.Const.min with areality }
+    in
+    Variable
+      { comonadic =
+          Alloc.Comonadic.join [curry_mode (comonadic t) marg; pinned];
+        areality }
+
+  let add_const_arg t (arg : Alloc.Const.t) =
     match t with
     | Const c -> Const (curry_mode_const c arg)
-    | Variable _ -> add_arg t (Alloc.of_const arg)
+    | Variable _ ->
+      add_arg t (Alloc.of_const arg) ~upper_areality:arg.areality
 end
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
