@@ -175,9 +175,9 @@ let value_descriptions_consistency _env vd1 vd2 =
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
 
-let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
+let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 ty2 =
   let pat_refs =
-    Ctype.moregeneral env true pat_lpoly subj_lpoly ty1 ty2
+    Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 ty2
   in
   (* Map from RHS sort poly var to its 1-indexed position *)
   let subj_index = List.mapi (fun i v -> (v, i + 1)) subj_lpoly in
@@ -243,7 +243,7 @@ let uid_is_from_current_unit uid =
   | None, _ | _, None -> false
 
 let value_descriptions ~loc env name
-    ~mmodes
+    ~mmodes ~self_check
     (vd1 : Types.value_description)
     (vd2 : Types.value_description) =
   Builtin_attributes.check_alerts_inclusion
@@ -287,7 +287,8 @@ let value_descriptions ~loc env name
              Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              try
-               moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 ty2
+               moregeneral_lpoly ~self_check env
+                 val_lpoly1 val_lpoly2 ty1 ty2
              with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
@@ -301,7 +302,8 @@ let value_descriptions ~loc env name
         let ty1, mode_l1, _, sort1 =
           Ctype.instance_prim env p1 vd1.val_type
         in
-        (try moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 vd2.val_type
+        (try moregeneral_lpoly ~self_check env
+               val_lpoly1 val_lpoly2 ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc_loc =
           (* Prefer a declaration from the current unit.  A foreign primitive
@@ -327,7 +329,7 @@ let value_descriptions ~loc env name
         Tcoerce_primitive pc
      end
   | _ ->
-     match moregeneral_lpoly env
+     match moregeneral_lpoly ~self_check env
              val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | () -> begin
@@ -808,8 +810,15 @@ let report_kind_mismatch first second ppf (kind1, kind2) =
     (kind_to_string kind2)
 
 let print_unsafe_mode_crossing ppf umc =
-  Fmt.fprintf ppf "mod %a@ %a"
-    Mode.Crossing.print umc.unsafe_mod_bounds
+  Fmt.fprintf ppf "mod %a%a@ %a"
+    Mode.Crossing.print umc.unsafe_mod_bounds.crossing
+    (fun ppf externality ->
+      if
+        not
+          (Jkind_axis.Externality.equal externality
+             Jkind_axis.Externality.max)
+      then Fmt.fprintf ppf "@ %a" Jkind_axis.Externality.print externality)
+    umc.unsafe_mod_bounds.externality
     Jkind.With_bounds.format umc.unsafe_with_bounds
 
 let report_unsafe_mode_crossing_mismatch first second ppf e =
@@ -910,8 +919,10 @@ let compare_unsafe_mode_crossing ~env umc1 umc2 =
   | Some _, None -> Some (Unsafe_mode_crossing (Mode_crossing_only_on First))
   | None, Some _ -> Some (Unsafe_mode_crossing (Mode_crossing_only_on Second))
   | Some umc1, Some umc2 ->
-    if equal_unsafe_mode_crossing
+    if Jkind.equal_unsafe_mode_crossing
          ~type_equal:(Ctype.type_equal env)
+         ~context:(Ctype.mk_jkind_context_always_principal env)
+         env
          umc1 umc2
     then None
     else

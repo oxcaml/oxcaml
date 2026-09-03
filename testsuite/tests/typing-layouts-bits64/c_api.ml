@@ -20,50 +20,50 @@
  }
 *)
 
-(* This file tests using external C functions with int64#. *)
+(* This file tests using external C functions with int64_u. *)
 
-external to_int64 : int64# -> (int64[@local_opt]) = "%box_int64"
+external to_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
 
 let print_int64u s f = Printf.printf "%s: %Ld\n" s (to_int64 f)
 let print_int64 s f = Printf.printf "%s: %Ld\n" s f
 
 (* Various combinations of arguments int64, int64 [@unboxed], and
-   int64# *)
-external lognot_UtoU : int64# -> int64# =
+   int64_u *)
+external lognot_UtoU : int64_u -> int64_u =
   "lognot_bytecode" "lognot_UtoU"
-external lognot_BtoU : int64 -> int64# =
+external lognot_BtoU : int64 -> int64_u =
   "lognot_bytecode" "lognot_BtoU"
-external lognot_UtoB : int64# -> int64 =
+external lognot_UtoB : int64_u -> int64 =
   "lognot_bytecode" "lognot_UtoB"
-external lognot_BUtoU : (int64[@unboxed]) -> int64# =
+external lognot_BUtoU : (int64[@unboxed]) -> int64_u =
   "lognot_bytecode" "lognot_UtoU"
-external lognot_UtoBU : int64# -> (int64[@unboxed]) =
+external lognot_UtoBU : int64_u -> (int64[@unboxed]) =
   "lognot_bytecode" "lognot_UtoU"
 
 let () =
   let i = lognot_UtoU #42L in
-  print_int64u "int64# -> int64#, ~42" i
+  print_int64u "int64_u -> int64_u, ~42" i
 
 let () =
   let i = lognot_BtoU (-100L) in
-  print_int64u "int64 -> int64#, ~(-100)" i
+  print_int64u "int64 -> int64_u, ~(-100)" i
 
 let () =
   let f = lognot_UtoB #255L in
-  print_int64 "int64# -> int64, ~255" f
+  print_int64 "int64_u -> int64, ~255" f
 
 let () =
   let f = lognot_BUtoU 1024L in
-  print_int64u "(int64[@unboxed]) -> int64#, ~1024" f
+  print_int64u "(int64[@unboxed]) -> int64_u, ~1024" f
 
 let () =
   let f = lognot_UtoBU (-#1726L) in
-  print_int64 "int64# -> (int64[@unboxed]), ~(-1726)" f
+  print_int64 "int64_u -> (int64[@unboxed]), ~(-1726)" f
 
 (* If there are more than 5 args, you get an array in bytecode *)
 external sum_7 :
-  int64# -> int64 -> int64# -> int64 ->
-  int64# -> int64 -> int64# -> int64# =
+  int64_u -> int64 -> int64_u -> int64 ->
+  int64_u -> int64 -> int64_u -> int64_u =
   "sum_7_bytecode" "sum_7_UBUBUBUtoU"
 
 let _ =

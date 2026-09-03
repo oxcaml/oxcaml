@@ -157,15 +157,20 @@ val set_static_row_name: type_declaration -> Path.t -> unit
 
 (**** Utilities for type traversal ****)
 
-val iter_type_expr: (type_expr -> unit) -> type_expr -> unit
+val iter_type_expr:
+  (type_expr -> unit) -> (Mode.Alloc.lr -> unit) ->
+  type_expr -> unit
         (* Iteration on types *)
-val fold_type_expr: ('a -> type_expr -> 'a) -> 'a -> type_expr -> 'a
+val fold_type_expr:
+  ('a -> type_expr -> 'a) -> ('a -> Mode.Alloc.lr -> 'a) ->
+  'a -> type_expr -> 'a
 val iter_row: (type_expr -> unit) -> row_desc -> unit
         (* Iteration on types in a row *)
 val fold_row: ('a -> type_expr -> 'a) -> 'a -> row_desc -> 'a
 val iter_abbrev: (type_expr -> unit) -> abbrev_memo -> unit
         (* Iteration on types in an abbreviation list *)
-val iter_type_expr_kind: (type_expr -> unit) -> (type_decl_kind -> unit)
+val iter_type_expr_kind: (type_expr -> unit) ->
+  (type_decl_kind -> unit)
 
 val iter_type_expr_cstr_args: (type_expr -> unit) ->
   (constructor_arguments -> unit)
@@ -200,6 +205,8 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
+    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
 type type_iterators_full = (type_expr -> unit) type_iterators
@@ -216,7 +223,8 @@ val type_iterators_without_type_expr: type_iterators_without_type_expr
 (**** Utilities for copying ****)
 
 val copy_type_desc:
-    ?keep_names:bool -> (type_expr -> type_expr) -> type_desc -> type_desc
+    ?keep_names:bool -> (type_expr -> type_expr) ->
+    (Mode.Alloc.lr -> Mode.Alloc.lr) -> type_desc -> type_desc
         (* Copy on types *)
 val copy_row:
     (type_expr -> type_expr) ->
@@ -235,6 +243,26 @@ module For_copy : sig
 
   val redirect_desc: copy_scope -> type_expr -> type_desc -> unit
         (* Temporarily change a type description *)
+
+  val mode_instantiate :
+    copy_scope -> current_level:int ->
+    Mode.Alloc.lr -> Mode.Alloc.lr
+        (* Instantiates a generic mode variable to level [current_level] *)
+
+  val mode_copy_generic :
+    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+        (* Copies the generic parts of a mode variable
+           without changing its level *)
+
+  val mode_copy_for_saving :
+    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+        (* Deeply copies a mode variable without changing its level, giving
+           the copies negative (persistent) ids, for storing in a cmi file. *)
+
+  val mode_copy_for_restoring :
+    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+        (* Deeply copies a mode variable without changing its level.
+           Asserts that the original has negative ids. *)
 
   val with_scope: (copy_scope -> 'a) -> 'a
         (* [with_scope f] calls [f] and restores saved type descriptions
@@ -371,9 +399,6 @@ module Jkind0 : sig
         within [bounds] *)
     val set_min_in_set : t -> Jkind_axis.Axis_set.t -> t
 
-    (** [is_max_within_set bounds axes] returns whether or not all the axes in
-        [axes] are [max] within [bounds] *)
-    val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
     val is_max : t -> bool
 
     val min : t
@@ -386,8 +411,10 @@ module Jkind0 : sig
     val of_axis_lattice : Axis_lattice.t -> t
     val meet : t -> t -> t
 
-    val relevant_axes_of_modality :
-      modality:Mode.Modality.Const.t -> Jkind_axis.Axis_set.t
+    val mask_of_modality : modality:Mode.Modality.Const.t -> Axis_lattice.t
+
+    (** [apply_mask bounds mask] takes the meet of [bounds] and [mask]. *)
+    val apply_mask : t -> Axis_lattice.t -> t
 
     val debug_print : Format.formatter -> t -> unit
   end

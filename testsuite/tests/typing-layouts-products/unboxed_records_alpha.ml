@@ -115,9 +115,9 @@ Error: The layout of type "t3" is any & any separable non_null
          because of the annotation on the declaration of the type t3.
 |}]
 
-type ur1 = #{ a : int64#; b : float# }
+type ur1 = #{ a : int64_u; b : float# }
 and ur4 = #{ a : ur1 }
 [%%expect{|
-type ur1 = #{ a : int64#; b : float#; }
+type ur1 = #{ a : int64_u; b : float#; }
 and ur4 = #{ a : ur1; }
 |}]

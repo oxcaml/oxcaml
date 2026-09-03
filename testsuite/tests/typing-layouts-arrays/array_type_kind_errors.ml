@@ -48,18 +48,18 @@ val f : string t -> int -> string = <fun>
 |}]
 
 (* But this is not: *)
-let bad a i : int64# = unsafe_get a i
+let bad a i : int64_u = unsafe_get a i
 [%%expect{|
-Line 1, characters 23-37:
-1 | let bad a i : int64# = unsafe_get a i
-                           ^^^^^^^^^^^^^^
-Error: This array operation cannot tell whether int64# t is an array type,
+Line 1, characters 24-38:
+1 | let bad a i : int64_u = unsafe_get a i
+                            ^^^^^^^^^^^^^^
+Error: This array operation cannot tell whether int64_u t is an array type,
        possibly because it is abstract. In this case, the element type
-       int64# must be a value:
+       int64_u must be a value:
 
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -70,18 +70,18 @@ let f a i : string = safe_get a i
 val f : string t -> int -> string = <fun>
 |}]
 
-let bad a i : int64# = safe_get a i
+let bad a i : int64_u = safe_get a i
 [%%expect{|
-Line 1, characters 23-35:
-1 | let bad a i : int64# = safe_get a i
-                           ^^^^^^^^^^^^
-Error: This array operation cannot tell whether int64# t is an array type,
+Line 1, characters 24-36:
+1 | let bad a i : int64_u = safe_get a i
+                            ^^^^^^^^^^^^
+Error: This array operation cannot tell whether int64_u t is an array type,
        possibly because it is abstract. In this case, the element type
-       int64# must be a value:
+       int64_u must be a value:
 
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -93,18 +93,18 @@ let f a i (v : string) = unsafe_set a i v
 val f : string t -> int -> string -> unit = <fun>
 |}]
 
-let bad a i (v : int64#) = unsafe_set a i v
+let bad a i (v : int64_u) = unsafe_set a i v
 [%%expect{|
-Line 1, characters 27-43:
-1 | let bad a i (v : int64#) = unsafe_set a i v
-                               ^^^^^^^^^^^^^^^^
-Error: This array operation cannot tell whether int64# t is an array type,
+Line 1, characters 28-44:
+1 | let bad a i (v : int64_u) = unsafe_set a i v
+                                ^^^^^^^^^^^^^^^^
+Error: This array operation cannot tell whether int64_u t is an array type,
        possibly because it is abstract. In this case, the element type
-       int64# must be a value:
+       int64_u must be a value:
 
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -115,18 +115,18 @@ let f a i (v : string) = safe_set a i v
 val f : string t -> int -> string -> unit = <fun>
 |}]
 
-let bad a i (v : int64#) = safe_set a i v
+let bad a i (v : int64_u) = safe_set a i v
 [%%expect{|
-Line 1, characters 27-41:
-1 | let bad a i (v : int64#) = safe_set a i v
-                               ^^^^^^^^^^^^^^
-Error: This array operation cannot tell whether int64# t is an array type,
+Line 1, characters 28-42:
+1 | let bad a i (v : int64_u) = safe_set a i v
+                                ^^^^^^^^^^^^^^
+Error: This array operation cannot tell whether int64_u t is an array type,
        possibly because it is abstract. In this case, the element type
-       int64# must be a value:
+       int64_u must be a value:
 
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -155,31 +155,31 @@ Error: This array operation expects an array type, but 'a t does not appear
 module M : sig
   type t
   val t : t
-  external unsafe_get : t -> int -> int64# = "%array_unsafe_get"
+  external unsafe_get : t -> int -> int64_u = "%array_unsafe_get"
 end = struct
-  type t = int64# array
+  type t = int64_u array
   let t = [| #0L |]
-  external unsafe_get : t -> int -> int64# = "%array_unsafe_get"
+  external unsafe_get : t -> int -> int64_u = "%array_unsafe_get"
 end
 
-let get () : int -> int64# = M.unsafe_get M.t
+let get () : int -> int64_u = M.unsafe_get M.t
 [%%expect{|
 module M :
   sig
     type t
     val t : t
-    external unsafe_get : t -> int -> int64# = "%array_unsafe_get"
+    external unsafe_get : t -> int -> int64_u = "%array_unsafe_get"
   end
-Line 11, characters 29-41:
-11 | let get () : int -> int64# = M.unsafe_get M.t
-                                  ^^^^^^^^^^^^
+Line 11, characters 30-42:
+11 | let get () : int -> int64_u = M.unsafe_get M.t
+                                   ^^^^^^^^^^^^
 Error: This array operation cannot tell whether M.t is an array type,
        possibly because it is abstract. In this case, the element type
-       int64# must be a value:
+       int64_u must be a value:
 
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a value layout
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]

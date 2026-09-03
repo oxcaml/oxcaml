@@ -328,29 +328,32 @@ let current_arch_filter () =
 (* For [%%expect]:
    - {|...|} alone: used for both principal and non-principal
    - {|...|}, Principal{|...|}: first for non-principal, second for principal
+*)
+let eval_toplevel_expectation expectation ~output =
+  let corrected s = { s with str = output } in
+  let combine if_not_principal if_principal =
+    if if_not_principal.str = if_principal.str
+    then [([], if_not_principal)]
+    else [([], if_not_principal); ([Principal], if_principal)]
+  in
+  let expected_output =
+    match expectation.expected_output, !Clflags.principal with
+    | [([], if_not_principal)], false -> [([], corrected if_not_principal)]
+    | [([], expected)], true -> combine expected (corrected expected)
+    | [([], if_not_principal); ([Principal], if_principal)], false ->
+      combine (corrected if_not_principal) if_principal
+    | [([], if_not_principal); ([Principal], if_principal)], true ->
+      combine if_not_principal (corrected if_principal)
+    | _ -> Misc.fatal_error "impossible: already validated"
+  in
+  if expected_output = expectation.expected_output
+  then None
+  else Some { expectation with expected_output }
 
-   For [%%expect_asm]:
+(* For [%%expect_asm]:
    - All entries must have architecture tags (X86_64)
 *)
-let eval_expectation expectation ~output =
-  let to_update = match expectation.kind with
-  | Expect_toplevel ->
-    (match expectation.expected_output with
-      | [([], expected)] -> [([], expected)]
-      | [([], if_not_principal); ([Principal], if_principal)] ->
-        if !Clflags.principal
-        then [([Principal], if_principal)]
-        else [([], if_not_principal)]
-      | _ -> Misc.fatal_error "impossible: already validated")
-  | Expect_asm _ ->
-    List.filter
-      ~f:(fun (f, _) ->
-          match current_arch_filter () with
-          | None -> false
-          | Some arch -> List.mem ~set:f arch)
-      expectation.expected_output
-  | Expect_fexpr -> expectation.expected_output
-  in
+let eval_filtered_expectation expectation ~output ~to_update =
   match to_update with
   | [(filters, s)] when s.str <> output ->
     let s = { s with str = output } in
@@ -364,6 +367,23 @@ let eval_expectation expectation ~output =
       ~loc:expectation.payload_loc
       "duplicate architectures in [%%%%expect_asm]"
   | _ -> None
+
+let eval_expectation expectation ~output =
+  match expectation.kind with
+  | Expect_toplevel -> eval_toplevel_expectation expectation ~output
+  | Expect_fexpr ->
+    eval_filtered_expectation expectation ~output
+      ~to_update:expectation.expected_output
+  | Expect_asm _ ->
+    let to_update =
+      List.filter
+        ~f:(fun (f, _) ->
+            match current_arch_filter () with
+            | None -> false
+            | Some arch -> List.mem ~set:f arch)
+        expectation.expected_output
+    in
+    eval_filtered_expectation expectation ~output ~to_update
 
 let shift_lines delta phrases =
   let position (pos : Lexing.position) =
@@ -539,6 +559,8 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         ~f:(fun () -> let (_, r, _, _) = exec_phrases phrases in r)
   in
   let needs_principal =
+    Option.is_some trailing_code
+    ||
     List.exists chunks ~f:(fun chunk ->
       List.exists chunk.expectations ~f:(fun expectation ->
         match expectation.kind with

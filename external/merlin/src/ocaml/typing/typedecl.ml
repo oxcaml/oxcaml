@@ -1016,7 +1016,10 @@ let transl_declaration env sdecl (id, uid) =
          traverses inside of any type constructors in the [with]-bound. It's
          also necessary because the variables here are at generic level, and so
          any containers of them should be, too! *)
-      Ctype.with_local_level_generalize_structure begin fun () ->
+      Ctype.with_local_level_generalize_structure
+        ~before_generalize:(fun cty ->
+          Ctype.generalize_structure cty.ctyp_type)
+        begin fun () ->
         Typetexp.transl_simple_type env ~new_var_jkind:Any
           ~closed:true Mode.Alloc.Const.legacy sty
       end
@@ -1567,7 +1570,8 @@ let rec check_constraints_rec env loc visited ty =
       check_constraints_rec env loc visited ty
   | _ ->
       Ctype.iter_type_expr_with_stages
-        (fun env -> check_constraints_rec env loc visited) env ty
+        (fun env -> check_constraints_rec env loc visited) env
+        (Fun.const ()) ty
   end
 
 let check_constraints_labels env visited l pl =
@@ -2198,7 +2202,7 @@ type unrepresentable_record =
   | Unrepresentable_field of string
 
 let compute_record_repr
-    loc reprs lbls ~warn ~refining_block_with_any
+    loc reprs lbls ~warn
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
     ~atomic_fields ~voids ~first_any
     ~represent_as_float_array
@@ -2217,19 +2221,17 @@ let compute_record_repr
     in
     Ok (Record_mixed shape)
   in
-  (* Important: If [refining_block_with_any] is true, we must use a plain
-      value block or mixed block. *)
   match
-    ( ~refining_block_with_any, ~values, ~floats, ~atomic_floats,
+    ( ~values, ~floats, ~atomic_floats,
       ~float64s, ~non_float64_unboxed_fields, ~atomic_fields, ~voids,
       ~first_any )
   with
   (* If all fields are float/float64/void, we flatten the floats only when
      opted in via [@@flatten_floats]. *)
-  | ~refining_block_with_any:false, ~values:false, ~floats:true,
+  | ~values:false, ~floats:true,
       ~atomic_floats:false, ~float64s:true,
       ~non_float64_unboxed_fields:false, ~atomic_fields:false,
-      ~first_any:None, ..  ->
+      ~first_any:None, ~voids:_ ->
     if flatten_floats then
       let rec of_repr (repr : Element_repr.t) : Types.mixed_block_element =
         match repr with
@@ -2261,16 +2263,10 @@ let compute_record_repr
     Result.Error (Unrepresentable_field (Ident.name id))
   | ~values:false, ~floats:false, ~atomic_floats:false,
     ~float64s:true, ~non_float64_unboxed_fields:false,
-    ~voids:false, ~first_any:None, .. ->
-    if represent_as_float_array then begin
-      if refining_block_with_any then
-        (* CR-soon rtjoa: This fatal error is included for an abundance of
-           caution. We should make this function more defensive as a whole *)
-        Misc.fatal_error
-          "Typedecl.compute_record_repr: refining any with \
-           [@@represent_as_float_array]";
+    ~voids:false, ~first_any:None, ~atomic_fields:_ ->
+    if represent_as_float_array then
       Ok Record_ufloat
-    end else
+    else
       mixed_record ()
   (* For other mixed blocks, float fields are stored as flat
       only when they're unboxed.
@@ -2282,19 +2278,16 @@ let compute_record_repr
   | ~values:true, ~float64s:true, ..
   | ~non_float64_unboxed_fields:true, .. ->
     mixed_record ()
-  (* value-only records are stored as boxed records, including records whose
-     declared types have fields of kind [any] *)
+  (* value-only records are stored as boxed records *)
   | ~values:true, ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:false, ..
-  | ~refining_block_with_any:true, ~float64s:false,
-      ~non_float64_unboxed_fields:false, ~voids:false, .. ->
+      ~voids:false, .. ->
     Ok Record_boxed
   (* All-nonatomic-float and all-nonatomic-float64 records are stored as
       flat float records.
   *)
   | ~values:false, ~floats:true, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:false, ~first_any:None, .. ->
+      ~voids:false, ~first_any:None, ~atomic_fields:_ ->
     Ok Record_float
   (* Records with atomic float fields cannot use flat representation *)
   | ~atomic_floats:true, ~first_any:None, .. ->
@@ -2303,8 +2296,7 @@ let compute_record_repr
     Ok Record_boxed
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:_, ~atomic_fields:_, ~first_any:None, ..
-    [@warning "+9"] ->
+      ~voids:_, ~atomic_fields:_, ~first_any:None ->
     Misc.fatal_error "Typedecl.compute_record_repr: empty record"
 
 (* For tracking what types appear in record blocks. All product layouts
@@ -2433,7 +2425,6 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
              non_float64_unboxed_fields; atomic_fields; voids;
              first_any } = repr_summary
       in
-      let refining_block_with_any = false in
       match form with
       | Legacy ->
         let ~represent_as_float_array, ~flatten_floats =
@@ -2444,7 +2435,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
         in
         let rep =
           compute_record_repr loc reprs lbls ~represent_as_float_array
-            ~flatten_floats ~warn ~refining_block_with_any ~values ~floats
+            ~flatten_floats ~warn ~values ~floats
             ~atomic_floats ~float64s ~non_float64_unboxed_fields ~atomic_fields
             ~voids ~first_any
         in
@@ -3220,7 +3211,8 @@ let check_well_founded ~abs_env env loc path to_check visited ty0 =
               List.iter (check_subtype parents trace ty env) tyl
         end
     | _ ->
-        Ctype.iter_type_expr_with_stages (check_subtype parents trace ty) env ty
+        Ctype.iter_type_expr_with_stages
+          (check_subtype parents trace ty) env (Fun.const ()) ty
   and check_subtype parents trace outer_ty env inner_ty =
       check parents (Contains (outer_ty, inner_ty) :: trace) env inner_ty
   in
@@ -3567,7 +3559,7 @@ let check_regularity ~abs_env env loc path decl to_check =
           check_regular cpath args prev_exp trace env ty
       | _ ->
           Ctype.iter_type_expr_with_stages
-            (check_subtype cpath args prev_exp trace ty) env ty
+            (check_subtype cpath args prev_exp trace ty) env (Fun.const ()) ty
     end
     and check_subtype cpath args prev_exp trace outer_ty env inner_ty =
       let trace = Contains (outer_ty, inner_ty) :: trace in
@@ -3995,7 +3987,8 @@ let transl_type_decl env rec_flag sdecl_list =
   List.iter2
     (fun sdecl tdecl ->
       let decl = tdecl.typ_type in
-       match Ctype.closed_type_decl decl with
+       match Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+          Ctype.closed_type_decl ~zap_scope decl) with
          Some ty ->
           if not (Msupport.erroneous_type_check ty) then
             raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
@@ -4283,7 +4276,10 @@ let transl_type_extension extend env loc styext =
   (* Check that all type variables are closed *)
   List.iter
     (fun (ext, _shape) ->
-       match Ctype.closed_extension_constructor ext.ext_type with
+       match Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+               Ctype.closed_extension_constructor ~zap_scope
+               ext.ext_type)
+       with
          Some ty ->
            raise(Error(ext.ext_loc, Unbound_type_var_ext(ty, ext.ext_type)))
        | None -> ())
@@ -4339,7 +4335,10 @@ let transl_exception env sext =
       end
   in
   (* Check that all type variables are closed *)
-  begin match Ctype.closed_extension_constructor ext.ext_type with
+  begin match
+    Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+        Ctype.closed_extension_constructor ~zap_scope ext.ext_type)
+  with
     Some ty ->
       raise (Error(ext.ext_loc, Unbound_type_var_ext(ty, ext.ext_type)))
   | None -> ()
@@ -4392,9 +4391,9 @@ let is_upstream_compatible_non_value_unbox env ty =
       (Path.same path)
       [
         Predef.path_unboxed_float;
-        Predef.path_unboxed_int32;
-        Predef.path_unboxed_int64;
-        Predef.path_unboxed_nativeint;
+        Predef.path_int32_u;
+        Predef.path_int64_u;
+        Predef.path_nativeint_u;
       ]
   | _ ->
     false
@@ -4698,7 +4697,10 @@ let check_unboxable env loc ty =
       | _ -> acc
     with Not_found -> acc
   in
-  let all_unboxable_types = Btype.fold_type_expr check_type Path.Set.empty ty in
+  let all_unboxable_types =
+    Btype.fold_type_expr check_type
+      (fun a _ -> a) Path.Set.empty ty
+  in
   Path.Set.fold
     (fun p () ->
        let p = Out_type.shorten_type_path env p in
@@ -5146,7 +5148,10 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   in
   Option.iter (fun p -> set_private_row env sdecl.ptype_loc p new_sig_decl)
     fixed_row_path;
-  begin match Ctype.closed_type_decl new_sig_decl with None -> ()
+  begin match
+    Mode.Alloc.with_zap_scope
+      (fun ~zap_scope -> Ctype.closed_type_decl ~zap_scope new_sig_decl)
+  with None -> ()
   | Some ty -> raise(Error(loc, Unbound_type_var(ty, new_sig_decl)))
   end;
   let new_sig_decl = name_recursion sdecl id new_sig_decl in
