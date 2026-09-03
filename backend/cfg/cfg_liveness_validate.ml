@@ -41,6 +41,28 @@ module Instruction_instruction_relation =
 module Instruction_register_relation =
   Datalog.Schema.Relation2 (Instruction) (Register)
 
+(* The base relations encode facts extracted from the CFG:
+
+   - [next i j] and [exn_next i j] are control-flow edges.
+
+   - [arg i r] and [res i r] record the registers read and written by an
+   instruction.
+
+   - [exn_bucket r] identifies the register defined when entering an exception
+   handler (see [Proc.loc_exn_bucket]).
+
+   - [tailcall_self i] marks the [Tailcall_self] terminator, across which normal
+   successor liveness is not propagated.
+
+   The derived relations describe liveness:
+
+   - [not_removable i] is initially true for impure instructions and
+   terminators, and becomes true for a pure instruction when one of its results
+   is live.
+
+   - [before i r] means [r] is live before [i].
+
+   - [across i r] means [r] is live across [i]. *)
 let create_relation name columns = Datalog.create_relation ~name columns
 
 let next =

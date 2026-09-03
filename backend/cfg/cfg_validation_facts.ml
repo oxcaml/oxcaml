@@ -81,7 +81,9 @@ module Liveness = struct
         not_removable := terminator.id :: !not_removable;
         match terminator.desc with
         | Tailcall_self _ -> tailcall_self := terminator.id :: !tailcall_self
-        | Never -> assert false
+        | Never ->
+          Misc.fatal_errorf
+            "Cfg_validation_facts.Liveness.create: unexpected Never terminator"
         | Always _ | Parity_test _ | Truth_test _ | Float_test _ | Int_test _
         | Switch _ | Return | Raise _ | Tailcall_func _ | Call_no_return _
         | Call _ | Prim _ | Invalid _ ->
