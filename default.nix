@@ -287,6 +287,11 @@ let
     hash = "sha256-ur9y05F7hvcHiF8MVSjjbGP8y2mPS0bPK6tcfM3W2Eo=";
   });
 
+  genSrc = unpackSourceArchive "gen-1.1-source" (pkgs.fetchurl {
+    url = "https://github.com/c-cube/gen/archive/refs/tags/v1.1.tar.gz";
+    hash = "sha256-aJO/FWu6pCVOxewupf5TkDDyOVvFzYPMuP45MM/4nLA=";
+  });
+
   mkExternalLibraries =
     oxcaml:
     stdenv.mkDerivation {
@@ -297,6 +302,7 @@ let
       PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
       PPXLIB_SEXPLIB0_SRC = sexplib0Src;
       PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
+      SEDLEX_GEN_SRC = genSrc;
 
       nativeBuildInputs = [
         dune
@@ -419,6 +425,7 @@ stdenv.mkDerivation {
   PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
   PPXLIB_SEXPLIB0_SRC = sexplib0Src;
   PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
+  SEDLEX_GEN_SRC = genSrc;
 
   enableParallelBuilding = true;
   separateDebugInfo = false;
