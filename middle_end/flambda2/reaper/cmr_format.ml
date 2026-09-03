@@ -73,17 +73,18 @@ module Deps_with_fields = struct
       them in the style of [table_data]. *)
   type t =
     { deps : Global_flow_graph.graph;
-      fields : (Field.t * Field.view) list
+      fields : Fields_for_export.t
     }
 
   let create deps =
     { deps;
-      fields = Field.export_views (Global_flow_graph.fields_for_export deps)
+      fields =
+        Fields_for_export.export (Global_flow_graph.fields_for_export deps)
     }
 
   let deserialise { deps; fields } renaming =
     Global_flow_graph.apply_renaming deps renaming
-      ~rename_field:(Field.import_views fields)
+      ~rename_field:(Fields_for_export.import fields)
 end
 
 module Serialisable : sig

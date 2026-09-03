@@ -252,7 +252,7 @@ end = struct
      them in the style of [table_data]. *)
   type t =
     { table_data : Flambda_cmx_format.table_data;
-      field_views : (Field.t * Field.view) list;
+      field_views : Fields_for_export.t;
       solution_tables : Solution_tables.t;
       unboxed_fields : Unboxing_analysis.unboxed Code_id_or_name.Map.t;
       changed_representation :
@@ -281,7 +281,7 @@ end = struct
         changed_representation fields
     in
     { table_data = Flambda_cmx_format.create_table_data ids;
-      field_views = Field.export_views fields;
+      field_views = Fields_for_export.export fields;
       solution_tables;
       unboxed_fields;
       changed_representation
@@ -303,7 +303,7 @@ end = struct
         ~used_value_slots:Value_slot.Set.empty
         ~original_compilation_unit:(Symbol.external_symbols_compilation_unit ())
     in
-    let rename_field = Field.import_views field_views in
+    let rename_field = Fields_for_export.import field_views in
     let db =
       Solution_tables.to_database
         (Solution_tables.apply_renaming solution_tables renaming ~rename_field)
