@@ -7,6 +7,12 @@ let result_prefix ?(print_reg = Printreg.reg) ppf res =
   let regs = Printreg.regs' ~print_reg in
   if Array.length res > 0 then fprintf ppf "%a := " regs res
 
+let atomic_load_memory_order (atomic : Cmm.atomic_load_memory_order option) =
+  match atomic with
+  | None -> ""
+  | Some Seq_cst -> " atomic"
+  | Some Acquire -> " atomic_acquire"
+
 let operation_body ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf =
   let reg = print_reg in
   let regs = Printreg.regs' ~print_reg in
@@ -26,16 +32,16 @@ let operation_body ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf =
       word1 word2 word3 word4 word5 word6 word7
   | Const_mask n -> fprintf ppf "%016Lx" n
   | Stackoffset n -> fprintf ppf "offset stack %i" n
-  | Load { memory_chunk; addressing_mode; mutability = Immutable; is_atomic } ->
+  | Load { memory_chunk; addressing_mode; mutability = Immutable; atomic } ->
     fprintf ppf "%s%s[%a]"
       (Printcmm.chunk memory_chunk)
-      (if is_atomic then " atomic" else "")
+      (atomic_load_memory_order atomic)
       (Arch.print_addressing reg addressing_mode)
       arg
-  | Load { memory_chunk; addressing_mode; mutability = Mutable; is_atomic } ->
-    fprintf ppf "%s %smut[%a]"
+  | Load { memory_chunk; addressing_mode; mutability = Mutable; atomic } ->
+    fprintf ppf "%s%s mut[%a]"
       (Printcmm.chunk memory_chunk)
-      (if is_atomic then "atomic " else "")
+      (atomic_load_memory_order atomic)
       (Arch.print_addressing reg addressing_mode)
       arg
   | Store (chunk, addr, is_assign) ->
@@ -94,6 +100,12 @@ let operation_body ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf =
       reg arg.(0) reg arg.(1)
   | Intop_atomic { op = Exchange; size; addr } ->
     fprintf ppf "lock exchange %s[%a] %a"
+      (Printcmm.atomic_bitwidth size)
+      (Arch.print_addressing reg addr)
+      (Array.sub arg 1 (Array.length arg - 1))
+      reg arg.(0)
+  | Intop_atomic { op = Release_store; size; addr } ->
+    fprintf ppf "release_store %s[%a] %a"
       (Printcmm.atomic_bitwidth size)
       (Arch.print_addressing reg addr)
       (Array.sub arg 1 (Array.length arg - 1))

@@ -994,7 +994,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_land_field -> ternary (Ccall "caml_atomic_land_field")
     | Patomic_lor_field -> ternary (Ccall "caml_atomic_lor_field")
     | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
-    | Patomic_load_idx { layout } ->
+    | Patomic_load_idx { layout; _ } ->
       let elt = Lambda.mixed_block_element_of_layout layout in
       copy_mixed_block_element elt
         (binary (Ccall "caml_atomic_load_idx_bytecode"))

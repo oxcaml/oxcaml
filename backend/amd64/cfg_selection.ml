@@ -217,7 +217,7 @@ let pseudoregs_for_operation op arg res =
     arg.(len - 1) <- res.(0);
     arg, res
   (* Other instructions are regular *)
-  | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
+  | Intop_atomic { op = Add | Sub | Land | Lor | Lxor | Release_store; _ }
   | Intop (Ipopcnt | Iclz | Ictz | Icomp _ | Iadd)
   | Intop_imm
       ( ( Iadd | Isub | Imulh _ | Idiv _ | Imod _ | Icomp _ | Ipopcnt | Iclz

@@ -868,7 +868,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           if Types.is_atomic lbl.lbl_mut
           then
             Some
-              (Patomic_load_field { immediate_or_pointer },
+              (Patomic_load_field { immediate_or_pointer;
+                                    memory_order = Seq_cst },
                [targ;
                 Lconst (Const_base (Const_int (
                   field_offset_for_label lbl record_repres)))])
@@ -890,7 +891,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           if Types.is_atomic lbl.lbl_mut
           then
             Some
-              (Patomic_load_field { immediate_or_pointer },
+              (Patomic_load_field { immediate_or_pointer;
+                                    memory_order = Seq_cst },
                [targ;
                 Lconst (Const_base (Const_int (
                   field_offset_for_label lbl record_repres)))])
@@ -1011,7 +1013,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           let immediate_or_pointer, _ = maybe_pointer newval in
           if Types.is_atomic lbl.lbl_mut
           then
-            Patomic_set_field { immediate_or_pointer; mode = modify_mode },
+            Patomic_set_field { immediate_or_pointer; memory_order = Seq_cst;
+                                mode = modify_mode },
             [arg_lambda; field_lambda; newval_lambda]
           else
             Psetfield(lbl.lbl_pos, immediate_or_pointer, mode),
@@ -1030,7 +1033,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           let immediate_or_pointer, _ = maybe_pointer newval in
           if Types.is_atomic lbl.lbl_mut
           then
-            Patomic_set_field { immediate_or_pointer; mode = modify_mode },
+            Patomic_set_field { immediate_or_pointer; memory_order = Seq_cst;
+                                mode = modify_mode },
             [arg_lambda; field_lambda; newval_lambda]
           else
             Psetfield (lbl.lbl_pos + 1, immediate_or_pointer, mode),

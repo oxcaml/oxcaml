@@ -291,7 +291,7 @@ type t =
       { memory_chunk : Cmm.memory_chunk;
         addressing_mode : Arch.addressing_mode;
         mutability : mutable_flag;
-        is_atomic : bool
+        atomic : Cmm.atomic_load_memory_order option
       }
   | Store of Cmm.memory_chunk * Arch.addressing_mode * bool
   | Intop of integer_operation
@@ -552,18 +552,18 @@ let equal left right =
         { memory_chunk = left_chunk;
           addressing_mode = left_addr;
           mutability = left_mut;
-          is_atomic = left_atomic
+          atomic = left_atomic
         },
       Load
         { memory_chunk = right_chunk;
           addressing_mode = right_addr;
           mutability = right_mut;
-          is_atomic = right_atomic
+          atomic = right_atomic
         } ) ->
     Cmm.equal_memory_chunk left_chunk right_chunk
     && Arch.equal_addressing_mode left_addr right_addr
     && equal_mutable_flag left_mut right_mut
-    && Bool.equal left_atomic right_atomic
+    && Option.equal Cmm.equal_atomic_load_memory_order left_atomic right_atomic
   | ( Store (left_chunk, left_addr, left_assign),
       Store (right_chunk, right_addr, right_assign) ) ->
     Cmm.equal_memory_chunk left_chunk right_chunk

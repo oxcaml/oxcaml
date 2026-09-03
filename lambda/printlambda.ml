@@ -131,6 +131,10 @@ let modify_mode = function
   | Modify_heap -> ""
   | Modify_maybe_stack -> "(maybe-stack)"
 
+let atomic_memory_order = function
+  | Seq_cst -> ""
+  | Acq_rel -> "(acq_rel)"
+
 let array_index_kind ppf k =
   match k with
   | Ptagged_int_index -> fprintf ppf "int"
@@ -884,18 +888,26 @@ let primitive ppf = function
       (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Pint_as_pointer m -> fprintf ppf "int_as_pointer%s" (locality_kind m)
-  | Patomic_load_field {immediate_or_pointer} ->
+  | Patomic_load_field {immediate_or_pointer; memory_order} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_load_field_imm"
-        | Pointer -> fprintf ppf "atomic_load_field_ptr")
+        | Immediate ->
+          fprintf ppf "atomic_load_field_imm%s"
+            (atomic_memory_order memory_order)
+        | Pointer ->
+          fprintf ppf "atomic_load_field_ptr%s"
+            (atomic_memory_order memory_order))
   | Patomic_load_mixed_field { index ; shape } ->
       fprintf ppf "atomic_load_mixed_field %a %a"
         pp_print_int index
         (mixed_block_shape (fun _ () -> ())) shape
-  | Patomic_set_field {immediate_or_pointer; mode} ->
+  | Patomic_set_field {immediate_or_pointer; memory_order; mode} ->
       (match immediate_or_pointer with
-        | Immediate -> fprintf ppf "atomic_set_field_imm%s" (modify_mode mode)
-        | Pointer -> fprintf ppf "atomic_set_field_ptr%s" (modify_mode mode))
+        | Immediate ->
+          fprintf ppf "atomic_set_field_imm%s%s"
+            (atomic_memory_order memory_order) (modify_mode mode)
+        | Pointer ->
+          fprintf ppf "atomic_set_field_ptr%s%s"
+            (atomic_memory_order memory_order) (modify_mode mode))
   | Patomic_set_mixed_field { index ; shape ; mode } ->
       fprintf ppf "atomic_set_mixed_field%s %a %a"
         (modify_mode mode)
@@ -925,11 +937,13 @@ let primitive ppf = function
   | Patomic_land_field -> fprintf ppf "atomic_land_field"
   | Patomic_lor_field -> fprintf ppf "atomic_lor_field"
   | Patomic_lxor_field -> fprintf ppf "atomic_lxor_field"
-  | Patomic_load_idx {layout = l} ->
-      fprintf ppf "atomic_load_idx %a"
+  | Patomic_load_idx {layout = l; memory_order} ->
+      fprintf ppf "atomic_load_idx%s %a"
+        (atomic_memory_order memory_order)
         layout l
-  | Patomic_set_idx {layout = l; mode} ->
-      fprintf ppf "atomic_set_idx%s %a"
+  | Patomic_set_idx {layout = l; memory_order; mode} ->
+      fprintf ppf "atomic_set_idx%s%s %a"
+        (atomic_memory_order memory_order)
         (modify_mode mode)
         layout l
   | Patomic_exchange_idx {layout = l; mode} ->
@@ -1135,7 +1149,7 @@ let name_of_primitive = function
   | Punboxed_int64_array_set_vec _ -> "Punboxed_int64_array_set_vec"
   | Punboxed_nativeint_array_set_vec _ -> "Punboxed_nativeint_array_set_vec"
   | Pint_as_pointer _ -> "Pint_as_pointer"
-  | Patomic_load_field {immediate_or_pointer} ->
+  | Patomic_load_field {immediate_or_pointer; _} ->
       (match immediate_or_pointer with
         | Immediate -> "atomic_load_field_imm"
         | Pointer -> "atomic_load_field_ptr")

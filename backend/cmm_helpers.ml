@@ -174,13 +174,13 @@ let caml_local = Nativeint.shift_left (Nativeint.of_int 3) 8
 (* Loads *)
 
 let mk_load_immut memory_chunk =
-  Cload { memory_chunk; mutability = Immutable; is_atomic = false }
+  Cload { memory_chunk; mutability = Immutable; atomic = None }
 
 let mk_load_mut memory_chunk =
-  Cload { memory_chunk; mutability = Mutable; is_atomic = false }
+  Cload { memory_chunk; mutability = Mutable; atomic = None }
 
-let mk_load_atomic memory_chunk =
-  Cload { memory_chunk; mutability = Mutable; is_atomic = true }
+let mk_load_atomic memory_chunk ~memory_order =
+  Cload { memory_chunk; mutability = Mutable; atomic = Some memory_order }
 
 (* Block headers. Meaning of the tag field: see stdlib/obj.ml *)
 
@@ -994,9 +994,9 @@ let rec and_const e n dbg =
             match get_const y with
             | Some y -> and_const x (Nativeint.logand y n) dbg
             | None -> default ())
-          | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) -> (
+          | Cop (Cload { memory_chunk; mutability; atomic }, args, dbg) -> (
             let[@local] load memory_chunk =
-              Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
+              Cop (Cload { memory_chunk; mutability; atomic }, args, dbg)
             in
             match memory_chunk, n with
             | (Byte_signed | Byte_unsigned), 0xffn -> load Byte_unsigned
@@ -1837,7 +1837,7 @@ let field_address ?(memory_chunk = Word_val) ptr n dbg =
 
 let get_field_gen_given_memory_chunk memory_chunk mutability ptr n dbg =
   Cop
-    ( Cload { memory_chunk; mutability; is_atomic = false },
+    ( Cload { memory_chunk; mutability; atomic = None },
       [field_address ptr n dbg],
       dbg )
 
@@ -2118,10 +2118,9 @@ let zero_extend ~bits ~dbg e =
   else
     map_tail
       (function
-        | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) as e
-          -> (
+        | Cop (Cload { memory_chunk; mutability; atomic }, args, dbg) as e -> (
           let load memory_chunk =
-            Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
+            Cop (Cload { memory_chunk; mutability; atomic }, args, dbg)
           in
           match memory_chunk, bits with
           | (Byte_signed | Byte_unsigned), 8 -> load Byte_unsigned
@@ -2166,10 +2165,9 @@ let rec sign_extend ~bits ~dbg e =
           else
             let e = lsl_const0 inner (unused_bits - n) dbg in
             asr_const e unused_bits dbg
-        | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) as e
-          -> (
+        | Cop (Cload { memory_chunk; mutability; atomic }, args, dbg) as e -> (
           let load memory_chunk =
-            Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
+            Cop (Cload { memory_chunk; mutability; atomic }, args, dbg)
           in
           match memory_chunk, bits with
           | (Byte_signed | Byte_unsigned), 8 -> load Byte_signed
@@ -2321,8 +2319,7 @@ let get_field_unboxed ~dbg memory_chunk mutability block ~index_in_words =
     assert (size_float = size_addr);
     array_indexing log2_size_addr block index_in_words dbg
   in
-  Cop
-    (Cload { memory_chunk; mutability; is_atomic = false }, [field_address], dbg)
+  Cop (Cload { memory_chunk; mutability; atomic = None }, [field_address], dbg)
 
 let get_field_computed imm_or_ptr mutability ~block ~index dbg =
   let memory_chunk =
@@ -5204,7 +5201,7 @@ let probe ~dbg ~name ~handler_code_linkage_name ~enabled_at_init ~args =
       dbg )
 
 let load ~dbg memory_chunk mutability ~addr =
-  Cop (Cload { memory_chunk; mutability; is_atomic = false }, [addr], dbg)
+  Cop (Cload { memory_chunk; mutability; atomic = None }, [addr], dbg)
 
 let store ~dbg kind init ~addr ~new_value =
   Cop (Cstore (kind, init), [addr; new_value], dbg)
@@ -5367,13 +5364,15 @@ let cmm_arith_size (e : Cmm.expression) =
 
 (* Atomics *)
 
-let atomic_load_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) block
-    ~field =
+let atomic_load_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
+    ~memory_order block ~field =
   let memory_chunk =
     match imm_or_ptr with Immediate -> Word_int | Pointer -> Word_val
   in
   Cop
-    (mk_load_atomic memory_chunk, [field_address_computed block field dbg], dbg)
+    ( mk_load_atomic memory_chunk ~memory_order,
+      [field_address_computed block field dbg],
+      dbg )
 
 let atomic_extcall_name base_name (mode : Lambda.modify_mode) =
   match mode with
@@ -5404,6 +5403,20 @@ let atomic_exchange_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer) ~mode
     then Cop (op, [new_value; field_address_computed block field dbg], dbg)
     else atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
   | Pointer -> atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
+
+let atomic_release_store_field ~dbg (imm_or_ptr : Lambda.immediate_or_pointer)
+    ~mode block ~field ~new_value =
+  (match imm_or_ptr with
+    | Immediate ->
+      let op = Catomic { op = Release_store; size = Word } in
+      if Proc.operation_supported op
+      then Cop (op, [new_value; field_address_computed block field dbg], dbg)
+      else atomic_exchange_extcall ~dbg ~mode block ~field ~new_value
+    | Pointer ->
+      (* [caml_modify] and [caml_modify_local] store with release semantics
+         after running the write barrier. *)
+      addr_array_set mode block field new_value dbg)
+  |> return_unit dbg
 
 let atomic_arith ~dbg ~op ~untag ~ext_name block ~field i =
   let i = if untag then decr_int i dbg else i in

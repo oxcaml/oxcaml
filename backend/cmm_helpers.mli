@@ -1233,8 +1233,19 @@ val fail_if_called_indirectly_function : unit -> Cmm.phrase list
 val atomic_load_field :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
+  memory_order:atomic_load_memory_order ->
   expression ->
   field:expression ->
+  expression
+
+(** A store with release semantics. Returns unit. *)
+val atomic_release_store_field :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
+  expression ->
+  field:expression ->
+  new_value:expression ->
   expression
 
 val atomic_exchange_field :

@@ -3329,10 +3329,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [Unary (Obj_dup { alloc_region = current_alloc_region }, v)]
   | Pget_header m, [[obj]] ->
     [get_header obj m ~current_alloc_region ~current_region]
-  | Patomic_load_field { immediate_or_pointer }, [[atomic]; [field]] ->
+  | ( Patomic_load_field { immediate_or_pointer; memory_order },
+      [[atomic]; [field]] ) ->
     [ Binary
         ( Atomic_load_field
-            (convert_block_access_field_kind immediate_or_pointer),
+            ( convert_block_access_field_kind immediate_or_pointer,
+              P.Memory_order.from_lambda memory_order ),
           atomic,
           field ) ]
   | Patomic_load_mixed_field { index; shape }, [[atomic]] ->
@@ -3341,13 +3343,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~prim_name:"Patomic_load_mixed_field" index shape
     in
     [ Binary
-        (Atomic_load_field field_kind, atomic, H.Simple (Simple.const_int imm))
-    ]
-  | ( Patomic_set_field { immediate_or_pointer; mode },
+        ( Atomic_load_field (field_kind, Seq_cst),
+          atomic,
+          H.Simple (Simple.const_int imm) ) ]
+  | ( Patomic_set_field { immediate_or_pointer; memory_order; mode },
       [[atomic]; [field]; [new_value]] ) ->
     [ Ternary
         ( Atomic_set_field
             ( convert_block_access_field_kind immediate_or_pointer,
+              P.Memory_order.from_lambda memory_order,
               Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
@@ -3359,7 +3363,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     in
     [ Ternary
         ( Atomic_set_field
-            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+            (field_kind, Seq_cst, Alloc_mode.For_assignments.from_lambda mode),
           atomic,
           H.Simple (Simple.const_int imm),
           new_value ) ]
@@ -3407,18 +3411,24 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [Ternary (Atomic_field_int_arith Or, atomic, field, i)]
   | Patomic_lxor_field, [[atomic]; [field]; [i]] ->
     [Ternary (Atomic_field_int_arith Xor, atomic, field, i)]
-  | Patomic_load_idx { layout }, [[ptr]; [idx]] ->
+  | Patomic_load_idx { layout; memory_order }, [[ptr]; [idx]] ->
     let field, field_kind =
       convert_atomic_idx_field ~machine_width prim dbg layout ~idx
     in
-    [Binary (Atomic_load_field field_kind, ptr, field)]
-  | Patomic_set_idx { layout; mode }, [[ptr]; [idx]; [new_value]] ->
+    [ Binary
+        ( Atomic_load_field (field_kind, P.Memory_order.from_lambda memory_order),
+          ptr,
+          field ) ]
+  | Patomic_set_idx { layout; memory_order; mode }, [[ptr]; [idx]; [new_value]]
+    ->
     let field, field_kind =
       convert_atomic_idx_field ~machine_width prim dbg layout ~idx
     in
     [ Ternary
         ( Atomic_set_field
-            (field_kind, Alloc_mode.For_assignments.from_lambda mode),
+            ( field_kind,
+              P.Memory_order.from_lambda memory_order,
+              Alloc_mode.For_assignments.from_lambda mode ),
           ptr,
           field,
           new_value ) ]

@@ -55,6 +55,15 @@ type modify_mode = private
   | Modify_heap
   | Modify_maybe_stack
 
+(* The memory ordering of an atomic load or store, in the sense of the C11
+   memory model. [Seq_cst] atomics are the atomics of the OCaml memory model
+   (see Note [MM] in runtime/memory.c). The OCaml memory model is not consistent
+   with multiple racing Acq_rel stores, or release stores racing with Seq_cst
+   stores. *)
+type atomic_memory_order =
+  | Seq_cst
+  | Acq_rel
+
 val alloc_heap : locality_mode
 
 val alloc_local : locality_mode
@@ -400,7 +409,9 @@ type primitive =
   | Pint_as_pointer of locality_mode
   (* Atomic operations. Note that these operations must not be used on fields of
      all-float blocks. *)
-  | Patomic_load_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_load_field of
+    { immediate_or_pointer : immediate_or_pointer;
+      memory_order : atomic_memory_order }
   | Patomic_load_mixed_field of {
     index : int;
     (** The field being accessed. Like [Pmixedfield]'s path, this is an index
@@ -408,7 +419,9 @@ type primitive =
     shape : mixed_block_shape;
   }
   | Patomic_set_field of
-    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
+    { immediate_or_pointer : immediate_or_pointer;
+      memory_order : atomic_memory_order;
+      mode : modify_mode }
   | Patomic_set_mixed_field of {
     index : int;
     shape : mixed_block_shape;
@@ -426,8 +439,9 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
-  | Patomic_load_idx of { layout : layout }
-  | Patomic_set_idx of { layout : layout; mode : modify_mode }
+  | Patomic_load_idx of { layout : layout; memory_order : atomic_memory_order }
+  | Patomic_set_idx of
+    { layout : layout; memory_order : atomic_memory_order; mode : modify_mode }
   | Patomic_exchange_idx of
     { layout : layout; mode : modify_mode }
   | Patomic_compare_exchange_idx of
