@@ -1009,7 +1009,7 @@ let curry_acc : Curry_mode.t -> With_locality.lr -> Curry_mode.t =
     | Some arg -> Curry_mode.add_const_arg acc arg
     | None ->
       if mode_polymorphism_printing_enabled ()
-      then Curry_mode.add_arg acc marg ~upper:(With_locality.Guts.get_ceil marg)
+      then Curry_mode.add_arg acc marg
       else
         Curry_mode.add_const_arg acc
           (With_locality.zap_to_legacy_force ~arg:true marg)
@@ -1025,16 +1025,14 @@ let curry_mode_of_occurrence :
     | Some c -> Const c
     | None ->
       if mode_polymorphism_printing_enabled ()
-      then
-        Variable
-          (With_locality.Comonadic.disallow_right m.comonadic,
-           With_locality.Guts.get_ceil m)
+      then Variable (With_locality.Comonadic.disallow_right m.comonadic)
       else Const (With_locality.zap_to_legacy_force ~arg m)
 
-(** Whether the return mode [m] of an arrow agrees with the constant
-    content of [acc_mode]. Mutating when [m] must be zapped: [m] is equated
-    with the constant (a [Variable] contains generic variables and cannot
-    be equated with directly); otherwise a pure bounds check.
+(** Whether the return mode [m] of an arrow is the curry mode implied by
+    [acc_mode]. Mutating when [m] must be zapped: [m] is equated with the
+    constant (a [Variable] contains generic variables and cannot be equated
+    with directly); otherwise the bounds of [m] must be those of a hidden
+    curry mode: the implied floor, and no other constraint.
 
     [equate_with_const] additionally checks [m]'s edges;
     [Variable_names.equate_curry] calls this function alone, so that the
@@ -1043,16 +1041,29 @@ let curry_mode_of_occurrence :
 let equate_with_curry_bounds : With_locality.lr -> Curry_mode.t -> bool =
   fun m acc_mode ->
     if not (mode_polymorphism_printing_enabled ()) then
-      Result.is_ok
-        (With_locality.equate
+      match acc_mode with
+      | Const c -> Result.is_ok (With_locality.equate
            m
-           (With_locality.of_const (Curry_mode.upper acc_mode)))
+           (With_locality.of_const c))
+      | Variable _ -> fatal_error "Out_type.equate_with_curry_bounds"
     else
       match acc_mode, With_locality.check_generic m with
       | Const c, false ->
         Result.is_ok (With_locality.equate m (With_locality.of_const c))
       | Variable _, true ->
-        With_locality.Guts.in_bounds (Curry_mode.upper acc_mode) m
+        let floor = With_locality.Guts.get_floor m in
+        let ceil = With_locality.Guts.get_ceil m in
+        let expected_floor =
+          With_locality.Const.merge
+            { comonadic =
+                With_locality.Comonadic.Guts.get_floor
+                  (Curry_mode.comonadic acc_mode);
+              monadic = With_locality.Monadic.Const.min }
+        in
+        With_locality.Const.equal floor expected_floor
+        && With_locality.Monadic.Const.equal
+             (With_locality.Const.split ceil).monadic
+             With_locality.Monadic.Const.max
       | Const _, true | Variable _, false -> false
 
 let erase_implied_axes (modes : Mode.With_locality.Const.t) :

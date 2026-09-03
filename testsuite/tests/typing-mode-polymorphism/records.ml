@@ -28,14 +28,26 @@ val alloc :
 let store_local (x @ local) y = x.i <- y
 [%%expect{|
 val store_local :
-  'a myref @ [< write > local] ->
-  'a @ [< global many read_write] -> unit @ 'm = <fun>
+  'a myref @ [< past('m) & write > local] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) mod many forkable unyielding | local writing] =
+  <fun>
+|}, Principal{|
+val store_local :
+  'a myref @ [< past('m) & write > local] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | local writing] =
+  <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
 [%%expect{|
 val store_global :
-  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
+  'a myref @ [< past('m) & global write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) mod many forkable unyielding | writing] =
+  <fun>
+|}, Principal{|
+val store_global :
+  'a myref @ [< past('m) & global write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | writing] =
   <fun>
 |}]
 
