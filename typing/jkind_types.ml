@@ -922,88 +922,38 @@ module Sort = struct
   (***********************)
   (* equality *)
 
-  type equate_result =
-    | Unequal
-    | Equal_mutated_first
-    | Equal_mutated_second
-    | Equal_mutated_both
-    | Equal_no_mutation
-
-  let join_equate_result r1 r2 =
-    match r1, r2 with
-    | Unequal, _ | _, Unequal -> Unequal
-    | Equal_no_mutation, r | r, Equal_no_mutation -> r
-    | Equal_mutated_both, _ | _, Equal_mutated_both -> Equal_mutated_both
-    | Equal_mutated_first, Equal_mutated_first -> Equal_mutated_first
-    | Equal_mutated_second, Equal_mutated_second -> Equal_mutated_second
-    | Equal_mutated_first, Equal_mutated_second
-    | Equal_mutated_second, Equal_mutated_first ->
-      Equal_mutated_both
-
-  type constrain_addressable_result =
-    | Addressable_mutated
-    | Addressable_no_mutation
-    | Not_known_addressable
-
-  let join_constrain_addressable_result r1 r2 =
-    match r1, r2 with
-    | Not_known_addressable, _ | _, Not_known_addressable ->
-      Not_known_addressable
-    | Addressable_mutated, _ | _, Addressable_mutated -> Addressable_mutated
-    | Addressable_no_mutation, Addressable_no_mutation ->
-      Addressable_no_mutation
-
-  let rec constrain_addressable ~allow_mutation :
-      t -> constrain_addressable_result = function
-    | Addressable _ -> Addressable_no_mutation
-    | Base b ->
-      if base_is_addressable b
-      then Addressable_no_mutation
-      else Not_known_addressable
-    | Product ts ->
-      List.fold_left
-        (fun acc t ->
-          match acc with
-          | Not_known_addressable -> Not_known_addressable
-          | (Addressable_mutated | Addressable_no_mutation) as acc ->
-            join_constrain_addressable_result acc
-              (constrain_addressable ~allow_mutation t))
-        Addressable_no_mutation ts
-    | Univar _ -> Not_known_addressable
+  let rec constrain_addressable ~allow_mutation : t -> bool = function
+    | Addressable _ -> true
+    | Base b -> if base_is_addressable b then true else false
+    | Product ts -> List.for_all (constrain_addressable ~allow_mutation) ts
+    | Univar _ -> false
     | Var v -> (
       match v.contents with
       | Some s -> constrain_addressable ~allow_mutation s
-      | None when is_rigidvar v -> Not_known_addressable
-      | None when not allow_mutation -> Not_known_addressable
+      | None when is_rigidvar v -> false
+      | None when not allow_mutation -> false
       | None ->
         set v (Some (Addressable (of_var (new_var ~level:level_fresh))));
-        Addressable_mutated)
+        true)
 
-  let constraining_addressable equate_result x f =
-    match constrain_addressable ~allow_mutation:true x with
-    | Not_known_addressable -> Unequal
-    | Addressable_no_mutation -> f ()
-    | Addressable_mutated -> join_equate_result equate_result (f ())
+  let is_surely_addressable = constrain_addressable ~allow_mutation:false
 
-  let is_surely_addressable t =
-    match constrain_addressable ~allow_mutation:false t with
-    | Not_known_addressable -> false
-    | Addressable_no_mutation | Addressable_mutated -> true
-
-  let rec equate s1 s2 =
+  let rec equate ~allow_mutation s1 s2 =
     match s1, s2 with
-    | Var v1, Var v2 when v1.id = v2.id -> Equal_no_mutation
-    | Var { contents = Some s1 }, _ -> equate s1 s2
-    | _, Var { contents = Some s2 } -> equate s1 s2
-    | Var ({ contents = None } as v1), _ when not (is_rigidvar v1) ->
+    | Var v1, Var v2 when v1.id = v2.id -> true
+    | Var { contents = Some s1 }, _ -> equate ~allow_mutation s1 s2
+    | _, Var { contents = Some s2 } -> equate ~allow_mutation s1 s2
+    | Var ({ contents = None } as v1), _
+      when (not (is_rigidvar v1)) && allow_mutation ->
       set v1 (Some s2);
-      Equal_mutated_first
-    | _, Var ({ contents = None } as v2) when not (is_rigidvar v2) ->
+      true
+    | _, Var ({ contents = None } as v2)
+      when (not (is_rigidvar v2)) && allow_mutation ->
       set v2 (Some s1);
-      Equal_mutated_second
+      true
     | Var _, _ | _, Var _ ->
       (* rigid *)
-      Unequal
+      false
     | Addressable _, _ | _, Addressable _ ->
       (* We reduce the problem to [s1 addressable = s2 addressable], since if
          one side is addressable, then the other is too. At this point we
@@ -1012,42 +962,21 @@ module Sort = struct
          Consider [s1 = 'var addressable] and [s2 = bits8 addressable].
          We could unify ['var = bits8] or ['var = bits8 addressable], but
          neither is more general. *)
-      constraining_addressable Equal_mutated_first s1 (fun () ->
-          constraining_addressable Equal_mutated_second s2 (fun () ->
-              equate (strip_head_addressable s1) (strip_head_addressable s2)))
-    | Base b1, Base b2 ->
-      if equal_base b1 b2 then Equal_no_mutation else Unequal
-    | Product sorts1, Product sorts2 -> equate_list sorts1 sorts2
+      constrain_addressable ~allow_mutation:true s1
+      && constrain_addressable ~allow_mutation:true s2
+      && equate ~allow_mutation
+           (strip_head_addressable s1)
+           (strip_head_addressable s2)
+    | Base b1, Base b2 -> if equal_base b1 b2 then true else false
+    | Product sorts1, Product sorts2 ->
+      List.for_all2 (equate ~allow_mutation) sorts1 sorts2
     | Univar uv1, Univar uv2 ->
-      if equal_univar_univar uv1 uv2 then Equal_no_mutation else Unequal
-    | _, (Base _ | Product _ | Univar _) -> Unequal
-
-  and equate_list sorts1 sorts2 =
-    let rec go sorts1 sorts2 acc =
-      match sorts1, sorts2, acc with
-      | _, _, Unequal -> Unequal
-      | _ :: _, [], _ -> Unequal
-      | [], _ :: _, _ -> Unequal
-      | [], [], acc -> acc
-      | sort1 :: sorts1, sort2 :: sorts2, acc ->
-        go sorts1 sorts2 (join_equate_result acc (equate sort1 sort2))
-    in
-    go sorts1 sorts2 Equal_no_mutation
-
-  let equate_tracking_mutation = equate
-
-  (* Don't expose whether or not mutation happened; we just need that for
-     [Jkind] *)
-  let equate s1 s2 =
-    match equate_tracking_mutation s1 s2 with
-    | Unequal -> false
-    | Equal_mutated_first | Equal_mutated_second | Equal_no_mutation
-    | Equal_mutated_both ->
-      true
+      if equal_univar_univar uv1 uv2 then true else false
+    | _, (Base _ | Product _ | Univar _) -> false
 
   let decompose_into_product t n =
     let ts = List.init n (fun _ -> of_var (new_var ~level:level_fresh)) in
-    if equate t (Product ts) then Some ts else None
+    if equate ~allow_mutation:true t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
 
