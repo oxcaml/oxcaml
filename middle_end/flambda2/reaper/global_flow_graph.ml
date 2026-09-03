@@ -243,40 +243,44 @@ let add_code_id_my_closure t code_id my_closure =
 let ids_for_export graph =
   let open Datalog_helpers in
   let ids = Ids_for_export.empty in
-  let ids = Maps.Nn.add_ids graph.alias ids in
-  let ids = Maps.Nn.add_ids graph.use ids in
-  let ids = Maps.Nfn.add_ids graph.accessor ids in
-  let ids = Maps.Nfn.add_ids graph.constructor ids in
-  let ids = Maps.Ncn.add_ids graph.argument ids in
-  let ids = Maps.Ncn.add_ids graph.parameter ids in
-  let ids = Maps.Nnn.add_ids graph.propagate ids in
-  let ids = Maps.Nnn.add_ids graph.alias_if_any_source ids in
-  let ids = Maps.N.add_ids graph.any_usage ids in
-  let ids = Maps.N.add_ids graph.any_source ids in
-  let ids = Maps.N.add_ids graph.zero_alloc_source ids in
-  let ids = Maps.Nn.add_ids graph.code_id_my_closure ids in
+  let ids = Serialisation.Nn.add_ids graph.alias ids in
+  let ids = Serialisation.Nn.add_ids graph.use ids in
+  let ids = Serialisation.Nfn.add_ids graph.accessor ids in
+  let ids = Serialisation.Nfn.add_ids graph.constructor ids in
+  let ids = Serialisation.Ncn.add_ids graph.argument ids in
+  let ids = Serialisation.Ncn.add_ids graph.parameter ids in
+  let ids = Serialisation.Nnn.add_ids graph.propagate ids in
+  let ids = Serialisation.Nnn.add_ids graph.alias_if_any_source ids in
+  let ids = Serialisation.N.add_ids graph.any_usage ids in
+  let ids = Serialisation.N.add_ids graph.any_source ids in
+  let ids = Serialisation.N.add_ids graph.zero_alloc_source ids in
+  let ids = Serialisation.Nn.add_ids graph.code_id_my_closure ids in
   ids
 
 let fields_for_export graph =
   let open Datalog_helpers in
   let fields = Field.Set.empty in
-  let fields = Maps.Nfn.add_fields graph.accessor fields in
-  let fields = Maps.Nfn.add_fields graph.constructor fields in
+  let fields = Serialisation.Nfn.add_fields graph.accessor fields in
+  let fields = Serialisation.Nfn.add_fields graph.constructor fields in
   fields
 
 let apply_renaming graph renaming ~rename_field =
   let open Datalog_helpers in
   let rename_id = Renaming.apply_code_id_or_name renaming in
-  { alias = Maps.Nn.rename graph.alias ~rename_id;
-    use = Maps.Nn.rename graph.use ~rename_id;
-    accessor = Maps.Nfn.rename graph.accessor ~rename_id ~rename_field;
-    constructor = Maps.Nfn.rename graph.constructor ~rename_id ~rename_field;
-    argument = Maps.Ncn.rename graph.argument ~rename_id;
-    parameter = Maps.Ncn.rename graph.parameter ~rename_id;
-    propagate = Maps.Nnn.rename graph.propagate ~rename_id;
-    alias_if_any_source = Maps.Nnn.rename graph.alias_if_any_source ~rename_id;
-    any_usage = Maps.N.rename graph.any_usage ~rename_id;
-    any_source = Maps.N.rename graph.any_source ~rename_id;
-    zero_alloc_source = Maps.N.rename graph.zero_alloc_source ~rename_id;
-    code_id_my_closure = Maps.Nn.rename graph.code_id_my_closure ~rename_id
+  { alias = Serialisation.Nn.rename graph.alias ~rename_id;
+    use = Serialisation.Nn.rename graph.use ~rename_id;
+    accessor = Serialisation.Nfn.rename graph.accessor ~rename_id ~rename_field;
+    constructor =
+      Serialisation.Nfn.rename graph.constructor ~rename_id ~rename_field;
+    argument = Serialisation.Ncn.rename graph.argument ~rename_id;
+    parameter = Serialisation.Ncn.rename graph.parameter ~rename_id;
+    propagate = Serialisation.Nnn.rename graph.propagate ~rename_id;
+    alias_if_any_source =
+      Serialisation.Nnn.rename graph.alias_if_any_source ~rename_id;
+    any_usage = Serialisation.N.rename graph.any_usage ~rename_id;
+    any_source = Serialisation.N.rename graph.any_source ~rename_id;
+    zero_alloc_source =
+      Serialisation.N.rename graph.zero_alloc_source ~rename_id;
+    code_id_my_closure =
+      Serialisation.Nn.rename graph.code_id_my_closure ~rename_id
   }

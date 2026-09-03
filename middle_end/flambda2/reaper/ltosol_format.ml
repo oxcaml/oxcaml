@@ -33,21 +33,21 @@ end = struct
   (* We include only the tables that rebuild needs, not everything from the
      Datalog database. *)
   type t =
-    { constructor : Maps.Nfn.t;
-      parameter : Maps.Ncn.t;
-      code_id_my_closure : Maps.Nn.t;
-      any_usage : Maps.N.t;
-      any_source : Maps.N.t;
-      usages : Maps.Nn.t;
-      sources : Maps.Nn.t;
-      rev_accessor : Maps.Nfn.t;
-      has_usage : Maps.N.t;
-      has_source : Maps.N.t;
-      field_of_constructor_is_used : Maps.Nf.t;
-      field_of_constructor_is_used_top : Maps.Nf.t;
-      field_of_constructor_is_used_as : Maps.Nfn.t;
-      allocation_point_dominator : Maps.Nn.t;
-      cannot_change_calling_convention : Maps.N.t
+    { constructor : Serialisation.Nfn.t;
+      parameter : Serialisation.Ncn.t;
+      code_id_my_closure : Serialisation.Nn.t;
+      any_usage : Serialisation.N.t;
+      any_source : Serialisation.N.t;
+      usages : Serialisation.Nn.t;
+      sources : Serialisation.Nn.t;
+      rev_accessor : Serialisation.Nfn.t;
+      has_usage : Serialisation.N.t;
+      has_source : Serialisation.N.t;
+      field_of_constructor_is_used : Serialisation.Nf.t;
+      field_of_constructor_is_used_top : Serialisation.Nf.t;
+      field_of_constructor_is_used_as : Serialisation.Nfn.t;
+      allocation_point_dominator : Serialisation.Nn.t;
+      cannot_change_calling_convention : Serialisation.N.t
     }
 
   let of_database db : t =
@@ -145,21 +145,21 @@ end = struct
        } :
         t) =
     let ids = Ids_for_export.empty in
-    let ids = Maps.Nfn.add_ids constructor ids in
-    let ids = Maps.Ncn.add_ids parameter ids in
-    let ids = Maps.Nn.add_ids code_id_my_closure ids in
-    let ids = Maps.N.add_ids any_usage ids in
-    let ids = Maps.N.add_ids any_source ids in
-    let ids = Maps.Nn.add_ids usages ids in
-    let ids = Maps.Nn.add_ids sources ids in
-    let ids = Maps.Nfn.add_ids rev_accessor ids in
-    let ids = Maps.N.add_ids has_usage ids in
-    let ids = Maps.N.add_ids has_source ids in
-    let ids = Maps.Nf.add_ids field_of_constructor_is_used ids in
-    let ids = Maps.Nf.add_ids field_of_constructor_is_used_top ids in
-    let ids = Maps.Nfn.add_ids field_of_constructor_is_used_as ids in
-    let ids = Maps.Nn.add_ids allocation_point_dominator ids in
-    let ids = Maps.N.add_ids cannot_change_calling_convention ids in
+    let ids = Serialisation.Nfn.add_ids constructor ids in
+    let ids = Serialisation.Ncn.add_ids parameter ids in
+    let ids = Serialisation.Nn.add_ids code_id_my_closure ids in
+    let ids = Serialisation.N.add_ids any_usage ids in
+    let ids = Serialisation.N.add_ids any_source ids in
+    let ids = Serialisation.Nn.add_ids usages ids in
+    let ids = Serialisation.Nn.add_ids sources ids in
+    let ids = Serialisation.Nfn.add_ids rev_accessor ids in
+    let ids = Serialisation.N.add_ids has_usage ids in
+    let ids = Serialisation.N.add_ids has_source ids in
+    let ids = Serialisation.Nf.add_ids field_of_constructor_is_used ids in
+    let ids = Serialisation.Nf.add_ids field_of_constructor_is_used_top ids in
+    let ids = Serialisation.Nfn.add_ids field_of_constructor_is_used_as ids in
+    let ids = Serialisation.Nn.add_ids allocation_point_dominator ids in
+    let ids = Serialisation.N.add_ids cannot_change_calling_convention ids in
     ids
 
   let fields_for_export
@@ -181,11 +181,17 @@ end = struct
        } :
         t) =
     let fields = Field.Set.empty in
-    let fields = Maps.Nfn.add_fields constructor fields in
-    let fields = Maps.Nfn.add_fields rev_accessor fields in
-    let fields = Maps.Nf.add_fields field_of_constructor_is_used fields in
-    let fields = Maps.Nf.add_fields field_of_constructor_is_used_top fields in
-    let fields = Maps.Nfn.add_fields field_of_constructor_is_used_as fields in
+    let fields = Serialisation.Nfn.add_fields constructor fields in
+    let fields = Serialisation.Nfn.add_fields rev_accessor fields in
+    let fields =
+      Serialisation.Nf.add_fields field_of_constructor_is_used fields
+    in
+    let fields =
+      Serialisation.Nf.add_fields field_of_constructor_is_used_top fields
+    in
+    let fields =
+      Serialisation.Nfn.add_fields field_of_constructor_is_used_as fields
+    in
     fields
 
   let apply_renaming
@@ -207,26 +213,31 @@ end = struct
        } :
         t) renaming ~rename_field : t =
     let rename_id = Renaming.apply_code_id_or_name renaming in
-    { constructor = Maps.Nfn.rename constructor ~rename_id ~rename_field;
-      parameter = Maps.Ncn.rename parameter ~rename_id;
-      code_id_my_closure = Maps.Nn.rename code_id_my_closure ~rename_id;
-      any_usage = Maps.N.rename any_usage ~rename_id;
-      any_source = Maps.N.rename any_source ~rename_id;
-      usages = Maps.Nn.rename usages ~rename_id;
-      sources = Maps.Nn.rename sources ~rename_id;
-      rev_accessor = Maps.Nfn.rename rev_accessor ~rename_id ~rename_field;
-      has_usage = Maps.N.rename has_usage ~rename_id;
-      has_source = Maps.N.rename has_source ~rename_id;
+    { constructor =
+        Serialisation.Nfn.rename constructor ~rename_id ~rename_field;
+      parameter = Serialisation.Ncn.rename parameter ~rename_id;
+      code_id_my_closure = Serialisation.Nn.rename code_id_my_closure ~rename_id;
+      any_usage = Serialisation.N.rename any_usage ~rename_id;
+      any_source = Serialisation.N.rename any_source ~rename_id;
+      usages = Serialisation.Nn.rename usages ~rename_id;
+      sources = Serialisation.Nn.rename sources ~rename_id;
+      rev_accessor =
+        Serialisation.Nfn.rename rev_accessor ~rename_id ~rename_field;
+      has_usage = Serialisation.N.rename has_usage ~rename_id;
+      has_source = Serialisation.N.rename has_source ~rename_id;
       field_of_constructor_is_used =
-        Maps.Nf.rename field_of_constructor_is_used ~rename_id ~rename_field;
+        Serialisation.Nf.rename field_of_constructor_is_used ~rename_id
+          ~rename_field;
       field_of_constructor_is_used_top =
-        Maps.Nf.rename field_of_constructor_is_used_top ~rename_id ~rename_field;
+        Serialisation.Nf.rename field_of_constructor_is_used_top ~rename_id
+          ~rename_field;
       field_of_constructor_is_used_as =
-        Maps.Nfn.rename field_of_constructor_is_used_as ~rename_id ~rename_field;
+        Serialisation.Nfn.rename field_of_constructor_is_used_as ~rename_id
+          ~rename_field;
       allocation_point_dominator =
-        Maps.Nn.rename allocation_point_dominator ~rename_id;
+        Serialisation.Nn.rename allocation_point_dominator ~rename_id;
       cannot_change_calling_convention =
-        Maps.N.rename cannot_change_calling_convention ~rename_id
+        Serialisation.N.rename cannot_change_calling_convention ~rename_id
     }
 end
 

@@ -17,15 +17,15 @@ type graph
 
 val to_datalog : graph -> Datalog.database
 
-val constructor : Datalog_helpers.Maps.Nfn.handle
+val constructor : Datalog_helpers.Serialisation.Nfn.table
 
-val parameter : Datalog_helpers.Maps.Ncn.handle
+val parameter : Datalog_helpers.Serialisation.Ncn.table
 
-val code_id_my_closure : Datalog_helpers.Maps.Nn.handle
+val code_id_my_closure : Datalog_helpers.Serialisation.Nn.table
 
-val any_usage : Datalog_helpers.Maps.N.handle
+val any_usage : Datalog_helpers.Serialisation.N.table
 
-val any_source : Datalog_helpers.Maps.N.handle
+val any_source : Datalog_helpers.Serialisation.N.table
 
 module Relations : sig
   type 'a atom = [> `Atom of Datalog.atom] as 'a
