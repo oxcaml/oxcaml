@@ -54,6 +54,15 @@ let create_table_data (exported_ids : Ids_for_export.t) =
   let continuations = Continuation.export exported_ids.continuations in
   { symbols; variables; simples; consts; code_ids; continuations }
 
+let create_table_data_all () =
+  { symbols = Symbol.export_all ();
+    variables = Variable.export_all ();
+    simples = Simple.export_all ();
+    consts = Reg_width_const.export_all ();
+    code_ids = Code_id.export_all ();
+    continuations = Continuation.export_all ()
+  }
+
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
     ~sections =
   let typing_env_exported_ids =

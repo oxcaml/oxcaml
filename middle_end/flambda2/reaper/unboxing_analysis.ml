@@ -213,19 +213,6 @@ let rename_unboxed_fields_tree tree ~rename_leaf ~rename_field =
   in
   rename_tree tree
 
-let unboxed_fields_ids_for_export unboxed_fields ids =
-  let rec add_tree tree ids =
-    Field.Map.fold (fun (_ : Field.t) u ids -> add_u u ids) tree ids
-  and add_u (u : _ Unboxed_fields.u) ids =
-    match u with
-    | Not_unboxed var -> Ids_for_export.add_variable ids var
-    | Unboxed tree -> add_tree tree ids
-  in
-  Code_id_or_name.Map.fold
-    (fun id tree ids ->
-      add_tree tree (Ids_for_export.add_code_id_or_name ids id))
-    unboxed_fields ids
-
 let unboxed_fields_fields_for_export unboxed_fields fields =
   Code_id_or_name.Map.fold
     (fun (_ : Code_id_or_name.t) tree fields ->
@@ -242,13 +229,6 @@ let unboxed_fields_apply_renaming unboxed_fields renaming ~rename_field =
            ~rename_field)
         new_unboxed_fields)
     unboxed_fields Code_id_or_name.Map.empty
-
-let changed_representation_ids_for_export changed_representation ids =
-  let add_id = Ids_for_export.add_code_id_or_name in
-  Code_id_or_name.Map.fold
-    (fun id ((_ : changed_representation), allocation_point) ids ->
-      add_id (add_id ids id) allocation_point)
-    changed_representation ids
 
 let changed_representation_fields_for_export changed_representation fields =
   Code_id_or_name.Map.fold

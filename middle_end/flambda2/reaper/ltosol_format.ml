@@ -24,8 +24,6 @@ module Solution_tables : sig
 
   val to_database : t -> Datalog.database
 
-  val ids_for_export : t -> Ids_for_export.t
-
   val fields_for_export : t -> Field.Set.t
 
   val apply_renaming : t -> Renaming.t -> rename_field:(Field.t -> Field.t) -> t
@@ -126,42 +124,6 @@ end = struct
          cannot_change_calling_convention
     @@ Datalog.empty
 
-  let ids_for_export
-      ({ constructor;
-         parameter;
-         code_id_my_closure;
-         any_usage;
-         any_source;
-         usages;
-         sources;
-         rev_accessor;
-         has_usage;
-         has_source;
-         field_of_constructor_is_used;
-         field_of_constructor_is_used_top;
-         field_of_constructor_is_used_as;
-         allocation_point_dominator;
-         cannot_change_calling_convention
-       } :
-        t) =
-    let ids = Ids_for_export.empty in
-    let ids = Maps.Nfn.add_ids constructor ids in
-    let ids = Maps.Ncn.add_ids parameter ids in
-    let ids = Maps.Nn.add_ids code_id_my_closure ids in
-    let ids = Maps.N.add_ids any_usage ids in
-    let ids = Maps.N.add_ids any_source ids in
-    let ids = Maps.Nn.add_ids usages ids in
-    let ids = Maps.Nn.add_ids sources ids in
-    let ids = Maps.Nfn.add_ids rev_accessor ids in
-    let ids = Maps.N.add_ids has_usage ids in
-    let ids = Maps.N.add_ids has_source ids in
-    let ids = Maps.Nf.add_ids field_of_constructor_is_used ids in
-    let ids = Maps.Nf.add_ids field_of_constructor_is_used_top ids in
-    let ids = Maps.Nfn.add_ids field_of_constructor_is_used_as ids in
-    let ids = Maps.Nn.add_ids allocation_point_dominator ids in
-    let ids = Maps.N.add_ids cannot_change_calling_convention ids in
-    ids
-
   let fields_for_export
       ({ constructor;
          parameter = _;
@@ -253,14 +215,6 @@ end = struct
       ({ db; unboxed_fields; changed_representation } :
         Unboxing_analysis.result) =
     let solution_tables = Solution_tables.of_database db in
-    let ids = Solution_tables.ids_for_export solution_tables in
-    let ids =
-      Unboxing_analysis.unboxed_fields_ids_for_export unboxed_fields ids
-    in
-    let ids =
-      Unboxing_analysis.changed_representation_ids_for_export
-        changed_representation ids
-    in
     let fields = Solution_tables.fields_for_export solution_tables in
     let fields =
       Unboxing_analysis.unboxed_fields_fields_for_export unboxed_fields fields
@@ -269,7 +223,10 @@ end = struct
       Unboxing_analysis.changed_representation_fields_for_export
         changed_representation fields
     in
-    { table_data = Flambda_cmx_format.create_table_data ids;
+    (* The solution mentions the vast majority of the grand tables' contents, so
+       export them whole rather than spend time collecting the ids actually
+       used. *)
+    { table_data = Flambda_cmx_format.create_table_data_all ();
       field_views = Field.export_views fields;
       solution_tables;
       unboxed_fields;

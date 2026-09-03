@@ -119,6 +119,8 @@ struct
     iter (fun id -> HT.replace exported id (find t id));
     exported
 
+  let export_all t = t
+
   let import t id =
     assert (Id.flags id = E.flags);
     try HT.find t id

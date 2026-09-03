@@ -103,6 +103,8 @@ module Const : sig
 
   val export : Set.t -> importer
 
+  val export_all : unit -> importer
+
   val import : importer -> t -> t
 end
 
@@ -136,6 +138,8 @@ module Variable : sig
 
   val export : Set.t -> importer
 
+  val export_all : unit -> importer
+
   val import : importer -> t -> t
 
   val export_name_stamp_counter : unit -> int
@@ -168,6 +172,8 @@ module Symbol : sig
   val linkage_name_as_string : t -> string
 
   val export : Set.t -> importer
+
+  val export_all : unit -> importer
 
   val import : importer -> t -> t
 
@@ -236,6 +242,8 @@ module Simple : sig
 
   val export : Set.t -> importer
 
+  val export_all : unit -> importer
+
   val import :
     importer ->
     t ->
@@ -275,6 +283,8 @@ module Code_id : sig
   val invert_map : t Map.t -> t Map.t
 
   val export : Set.t -> importer
+
+  val export_all : unit -> importer
 
   val import : importer -> t -> t
 

@@ -470,6 +470,8 @@ module Const = struct
   let export consts =
     Table.export !grand_table_of_constants ~iter:(fun f -> Set.iter f consts)
 
+  let export_all () = Table.export_all !grand_table_of_constants
+
   let import importer t =
     Table.add !grand_table_of_constants (Table.import importer t)
 end
@@ -559,6 +561,8 @@ module Variable = struct
   let export vars =
     Table.export !grand_table_of_variables ~iter:(fun f -> Set.iter f vars)
 
+  let export_all () = Table.export_all !grand_table_of_variables
+
   let import importer t =
     Table.add !grand_table_of_variables (Table.import importer t)
 
@@ -647,6 +651,8 @@ module Symbol = struct
 
   let export symbols =
     Table.export !grand_table_of_symbols ~iter:(fun f -> Set.iter f symbols)
+
+  let export_all () = Table.export_all !grand_table_of_symbols
 
   let import importer t =
     Table.add !grand_table_of_symbols (Table.import importer t)
@@ -850,6 +856,8 @@ module Simple = struct
   let export simples =
     Table.export !grand_table_of_simples ~iter:(fun f -> Set.iter f simples)
 
+  let export_all () = Table.export_all !grand_table_of_simples
+
   let import importer t ~import_const ~import_symbol ~import_var =
     let flags = Id.flags t in
     if flags = var_flags
@@ -970,6 +978,8 @@ module Code_id = struct
 
   let export symbols =
     Table.export !grand_table_of_code_ids ~iter:(fun f -> Set.iter f symbols)
+
+  let export_all () = Table.export_all !grand_table_of_code_ids
 
   let import importer t =
     Table.add !grand_table_of_code_ids (Table.import importer t)

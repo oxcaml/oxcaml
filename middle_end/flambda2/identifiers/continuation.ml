@@ -185,5 +185,7 @@ type importer = Table.serializable
 let export conts =
   Table.export !grand_table_of_continuations ~iter:(fun f -> Set.iter f conts)
 
+let export_all () = Table.export_all !grand_table_of_continuations
+
 let import importer t =
   Table.add !grand_table_of_continuations (Table.import importer t)

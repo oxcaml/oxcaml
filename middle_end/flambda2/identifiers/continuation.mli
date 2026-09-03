@@ -50,6 +50,8 @@ val sort : t -> Sort.t
 
 val export : Set.t -> importer
 
+val export_all : unit -> importer
+
 val import : importer -> t -> t
 
 val export_stamp_counter : unit -> int

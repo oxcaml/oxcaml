@@ -57,6 +57,12 @@ type table_data
 
 val create_table_data : Ids_for_export.t -> table_data
 
+(** As for [create_table_data], but exports the grand tables in their entirety,
+    avoiding the cost of collecting the ids actually used. Intended for
+    whole-program artifacts (e.g. .ltosol files) where most entries are needed.
+*)
+val create_table_data_all : unit -> table_data
+
 val import_renaming :
   table_data:table_data ->
   used_value_slots:Value_slot.Set.t ->

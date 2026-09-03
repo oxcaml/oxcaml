@@ -49,5 +49,8 @@ end) : sig
 
   val export : t -> iter:((Id.t -> unit) -> unit) -> serializable
 
+  (** Export the whole table, avoiding the cost of [export]'s filtering. *)
+  val export_all : t -> serializable
+
   val import : serializable -> Id.t -> E.t
 end
