@@ -4612,13 +4612,10 @@ let module_implementation_facts ~unit_interface ~argument_interface
           ());
     let interface_pairs uids =
       List.filter_map
-        (fun (kind, impl, intf) ->
-          match (kind : Cmt_format.dependency_kind) with
-          | Definition_to_declaration | Declaration_to_declaration
-            when Uid.Set.mem impl uids
-                 && is_interface_item intf ->
-            Some (~impl, ~intf)
-          | Definition_to_declaration | Declaration_to_declaration -> None)
+        (fun (_kind, impl, intf) ->
+           if Uid.Set.mem impl uids && is_interface_item intf then
+             Some (~impl, ~intf)
+           else None)
         declaration_dependencies
     in
     let argument_interface =
