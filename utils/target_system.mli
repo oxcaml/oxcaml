@@ -44,13 +44,13 @@ module System : sig
   val is_macos : unit -> bool
 end
 
-module Assembler : sig
-  type t =
+module Toolchain : sig
+  type assembler =
     | GAS_like
     | MacOS
     | MASM
 
-  val get : unit -> t
+  val assembler : unit -> assembler
 
   val is_macos : unit -> bool
 

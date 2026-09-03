@@ -857,7 +857,7 @@ let emit_stapsdt_base_section () =
        convention. Hence, in this rare case, we create the symbol as a raw
        symbol for which no subsequent encoding will be done.*)
     let stapsdt_sym = S.Predef.stapsdt_base in
-    if not (Target_system.Assembler.is_macos ())
+    if not (Target_system.Toolchain.is_macos ())
     then (
       D.weak stapsdt_sym;
       D.hidden stapsdt_sym);
@@ -869,7 +869,7 @@ let emit_stapsdt_base_section () =
 let emit_elf_note ~section ~owner ~typ ~emit_desc =
   let module D = Asm_targets.Asm_directives in
   let module L = Asm_targets.Asm_label in
-  let bytes = if Target_system.Assembler.is_macos () then 8 else 4 in
+  let bytes = if Target_system.Toolchain.is_macos () then 8 else 4 in
   D.align ~fill:Zero ~bytes;
   let a = L.create section in
   let b = L.create section in

@@ -273,7 +273,7 @@ let use_plt =
 let binary_content = ref None
 
 let compile infile outfile =
-  if Target_system.Assembler.is_masm ()
+  if Target_system.Toolchain.is_masm ()
   then
     Ccomp.command
       (Config.asm ^ Filename.quote outfile ^ " " ^ Filename.quote infile

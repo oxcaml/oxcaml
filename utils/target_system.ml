@@ -87,13 +87,13 @@ module System = struct
     | MacOS -> true
 end
 
-module Assembler = struct
-  type t =
+module Toolchain = struct
+  type assembler =
     | GAS_like
     | MacOS
     | MASM
 
-  let get () =
+  let assembler () =
     match System.get () with
     | Windows MSVC -> MASM
     | MacOS -> MacOS
@@ -102,11 +102,14 @@ module Assembler = struct
     | Cygwin | FreeBSD | NetBSD | OpenBSD | Solaris | Dragonfly | GNU | BeOS ->
       GAS_like
 
-  let is_macos () = match get () with MASM | GAS_like -> false | MacOS -> true
+  let is_macos () =
+    match assembler () with MASM | GAS_like -> false | MacOS -> true
 
-  let is_gas () = match get () with MASM | MacOS -> false | GAS_like -> true
+  let is_gas () =
+    match assembler () with MASM | MacOS -> false | GAS_like -> true
 
-  let is_masm () = match get () with MacOS | GAS_like -> false | MASM -> true
+  let is_masm () =
+    match assembler () with MacOS | GAS_like -> false | MASM -> true
 
   let is_windows_or_cygwin () =
     match System.get () with
@@ -116,7 +119,7 @@ module Assembler = struct
       false
 
   let label_prefix () =
-    match get () with MacOS -> "L" | MASM | GAS_like -> ".L"
+    match assembler () with MacOS -> "L" | MASM | GAS_like -> ".L"
 end
 
 module Machine_width = struct

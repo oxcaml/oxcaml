@@ -318,7 +318,7 @@ let global_maybe_protected sym =
   (* CR shym Should this be made consistent with the test on amd64, which
      also excludes Windows and Cygwin? *)
   if
-    (not (Target_system.Assembler.is_macos ()))
+    (not (Target_system.Toolchain.is_macos ()))
     && !Oxcaml_flags.symbol_visibility_protected
   then D.protected sym
 
@@ -988,7 +988,7 @@ let vec128_literal env f = Env.find_or_add_vec128_literal env f
 let emit_literals_list literals align emit_literal =
   if not (Misc.Stdlib.List.is_empty literals)
   then (
-    if Target_system.Assembler.is_macos ()
+    if Target_system.Toolchain.is_macos ()
     then
       D.switch_to_section_raw
         ~names:["__TEXT"; "__literal" ^ Int.to_string align]
@@ -1047,7 +1047,7 @@ let emit_load_symbol_addr dst s =
     A.ins4 ADD_immediate dst_x dst_x
       (label (Needs_reloc PAGE_OFF) lbl)
       O.optional_none)
-  else if Target_system.Assembler.is_macos () || !Clflags.dlcode
+  else if Target_system.Toolchain.is_macos () || !Clflags.dlcode
   then (
     (* Global symbols need GOT on macOS or when building shared objects *)
     A.ins2 ADRP dst_x (symbol (Needs_reloc GOT_PAGE) s);
@@ -1055,7 +1055,7 @@ let emit_load_symbol_addr dst s =
       (H.mem_symbol_reg (H.gp_reg_of_reg dst)
          ~reloc:
            (Needs_reloc
-              (if Target_system.Assembler.is_macos ()
+              (if Target_system.Toolchain.is_macos ()
                then GOT_PAGE_OFF
                else GOT_LOWER_TWELVE))
          s))
@@ -1282,7 +1282,7 @@ let emit_named_text_section func_name =
 
 let emit_load_literal dst lbl =
   let reloc : [`Twelve] Ast.Symbol.same_unit_or_reloc =
-    if Target_system.Assembler.is_macos ()
+    if Target_system.Toolchain.is_macos ()
     then Needs_reloc PAGE_OFF
     else Needs_reloc LOWER_TWELVE
   in
@@ -2284,7 +2284,7 @@ let begin_assembly _unix =
      code_begin symbol and the first function. (See also #4690) Alignment is
      needed to avoid linker warnings for shared_startup__code_{begin,end} (e.g.
      tests/lib-dynlink-pr4839). *)
-  if Target_system.Assembler.is_macos ()
+  if Target_system.Toolchain.is_macos ()
   then (
     A.ins0 NOP;
     D.align ~fill:Nop ~bytes:8);

@@ -328,15 +328,15 @@ let mem__imp s =
 (* Output a label *)
 
 (* CR shym Change! This was inconsistent on Windows with
-   Asm_label.label_prefix/Target_system.Assembler.label_prefix *)
+   Asm_label.label_prefix/Target_system.Toolchain.label_prefix *)
 let label_name lbl =
-  Target_system.Assembler.label_prefix () ^ lbl
+  Target_system.Toolchain.label_prefix () ^ lbl
 
 let rel_plt (s : Cmm.symbol) =
   match (s.sym_global : Cmm.is_global) with
   | Local -> sym (label_name (emit_symbol s.sym_name))
   | Global ->
-    if Target_system.Assembler.is_windows_or_cygwin () && !Clflags.dlcode
+    if Target_system.Toolchain.is_windows_or_cygwin () && !Clflags.dlcode
     then mem__imp s.sym_name
     else
       let s = emit_symbol s.sym_name in
@@ -372,7 +372,7 @@ let load_symbol_addr (s : Cmm.symbol) arg =
   | Global ->
     if !Clflags.dlcode
     then
-      if Target_system.Assembler.is_windows_or_cygwin ()
+      if Target_system.Toolchain.is_windows_or_cygwin ()
       then
         (* I.mov (mem__imp s) arg (\* mov __caml_imp_foo(%rip), ... *\) *)
         I.mov (sym (emit_symbol s.sym_name)) arg (* movabsq $foo, ... *)
@@ -387,10 +387,10 @@ let load_symbol_addr (s : Cmm.symbol) arg =
 let emit_named_text_section ?(suffix = "") func_name =
   let check_supported () =
     if
-      Target_system.Assembler.is_macos ()
+      Target_system.Toolchain.is_macos ()
       (* Names of section segments in macosx are restricted to 16 characters,
          but function names are often longer, especially anonymous functions. *)
-      || Target_system.Assembler.is_windows_or_cygwin ()
+      || Target_system.Toolchain.is_windows_or_cygwin ()
       (* Win systems provide named text sections, but configure on these systems
          does not support function sections. *)
     then assert false
@@ -1095,7 +1095,7 @@ let global_maybe_protected (sym : S.t) =
   then
     (* CR sspies: This match should probably moved into asm directives. Check
        what Arm does. *)
-    if not Target_system.Assembler.(is_macos () || is_windows_or_cygwin ())
+    if not Target_system.Toolchain.(is_macos () || is_windows_or_cygwin ())
     then
       (* Global symbols can be marked as being protected. Unlike in C we don't
          want them to be preempted as we're doing a lot of cross module
@@ -2827,7 +2827,7 @@ let fundecl fundecl =
   add_def_symbol fundecl.fun_name;
   let fundecl_sym = S.create_global fundecl.fun_name in
   if
-    Target_system.Assembler.is_macos ()
+    Target_system.Toolchain.is_macos ()
     && (not !Clflags.output_c_object)
     && is_generic_function fundecl.fun_name
   then (* PR#4690 *)
@@ -2926,7 +2926,7 @@ let begin_assembly unix =
   let code_begin = Cmm_helpers.make_symbol "code_begin" in
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter;
-  if Target_system.Assembler.is_masm ()
+  if Target_system.Toolchain.is_masm ()
   then (
     D.extrn S.Predef.caml_call_gc;
     D.extrn S.Predef.caml_call_gc_sse;
@@ -2977,7 +2977,7 @@ let begin_assembly unix =
   emit_global_label ~section:Data "data_begin";
   emit_named_text_section code_begin;
   emit_global_label_for_symbol ~section:Text code_begin;
-  if Target_system.Assembler.is_macos () then I.nop ();
+  if Target_system.Toolchain.is_macos () then I.nop ();
   (* PR#4690 *)
   Regs.Save_simd_regs.all
   |> List.iter (fun simd ->
@@ -3248,7 +3248,7 @@ let end_assembly () =
   emit_jump_tables ();
   let code_end = Cmm_helpers.make_symbol "code_end" in
   emit_named_text_section code_end;
-  if Target_system.Assembler.is_macos () then I.nop ();
+  if Target_system.Toolchain.is_macos () then I.nop ();
   (* suppress "ld warning: atom sorting error" *)
   emit_global_label_for_symbol ~section:Text code_end;
   emit_imp_table ~section:Text ();
@@ -3263,7 +3263,7 @@ let end_assembly () =
   emit_global_label ~section:Read_only_data "frametable";
   (* MASM can't assemble computed ULEB128 constants, so can't do short frame
      descriptors *)
-  Emitaux.disable_short_descriptors := Target_system.Assembler.is_masm ();
+  Emitaux.disable_short_descriptors := Target_system.Toolchain.is_masm ();
   (* The binary emitter keeps the strings inline in the frametable section:
      same-section label differences need no relocations. *)
   let debug_strings_section : Asm_targets.Asm_section.t =
@@ -3313,7 +3313,7 @@ let end_assembly () =
   emit_trap_notes ();
   D.mark_stack_non_executable ();
   (* Note that [mark_stack_non_executable] switches the section on Linux. *)
-  if Target_system.Assembler.is_masm ()
+  if Target_system.Toolchain.is_masm ()
   then (
     D.comment "External functions";
     String.Set.iter
@@ -3327,7 +3327,7 @@ let end_assembly () =
     if !X86_proc.create_asm_file
     then
       Some
-        ((if Target_system.Assembler.is_masm ()
+        ((if Target_system.Toolchain.is_masm ()
           then X86_masm.generate_asm
           else X86_gas.generate_asm)
            !Emitaux.output_channel)

@@ -111,7 +111,7 @@ let is_cross_section_relative_reference state ~all_sections ~current_section c =
     | None -> (
       (* CR shym instead of not macos, switch to is_gas? Or define an is_elf in
          Target_system? *)
-      let macos = Target_system.Assembler.is_macos () in
+      let macos = Target_system.Toolchain.is_macos () in
       let for_jit = All_section_states.for_jit all_sections in
       let current_section_supports_cross_section_reference =
         Asm_section.equal current_section Asm_section.Data

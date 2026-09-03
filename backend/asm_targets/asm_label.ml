@@ -89,7 +89,7 @@ let create_label_for_local_symbol section symbol =
   create_string_unchecked section (Asm_symbol.encode symbol)
 
 let encode (t : t) =
-  let open Target_system.Assembler in
+  let open Target_system.Toolchain in
   match t.label with
   | Int label -> label_prefix () ^ string_of_int label
   | String label -> label_prefix () ^ label

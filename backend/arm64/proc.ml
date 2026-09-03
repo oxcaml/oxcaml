@@ -150,7 +150,7 @@ let not_supported _ofs = fatal_error "Proc.loc_results: cannot call"
 let max_arguments_for_tailcalls = 16 (* in regs *) + 64 (* in domain state *)
 
 let int_registers : Regs.Phys_reg.t list =
-  if Target_system.Assembler.is_macos ()
+  if Target_system.Toolchain.is_macos ()
   then [X0; X1; X2; X3; X4; X5; X6; X7]
   else [X0; X1; X2; X3; X4; X5; X6; X7; X8; X9; X10; X11; X12; X13; X14; X15]
 
@@ -209,7 +209,7 @@ let external_calling_conventions
       loc.(i) <- [| phys_reg ty reg |]
     | [] ->
       let size =
-        if Target_system.Assembler.is_macos () then size / divisor else size
+        if Target_system.Toolchain.is_macos () then size / divisor else size
       in
       ofs := Misc.align !ofs size;
       loc.(i) <- [| stack_slot (make_stack !ofs) ty |];
