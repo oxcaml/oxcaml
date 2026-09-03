@@ -6457,6 +6457,7 @@ let split_function_ty
         in
         let level = get_level (instance ty_expected) in
         Error.log_or_raise loc_fun env err;
+        Typing_recovery.erroneous_type_register ty_expected;
         let arg_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         let ret_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         { ty_arg = newty (Tpoly (newvar2 level arg_kind, []))
@@ -9670,12 +9671,13 @@ and type_function
          type for each new parameter. Now that functions are n-ary, we
          could possibly run this once.
       *)
-      (try
-         with_explanation ty_fun.explanation (fun () ->
-             unify_exp_types loc env exp_type (instance ty_expected))
-       with exn when !Clflags.typing_recovery
-                  && Typing_recovery.is_recoverable exn ->
-         Typing_recovery.erroneous_type_register ty_expected);
+      if not (Typing_recovery.erroneous_type_check ty_expected) then
+        (try
+           with_explanation ty_fun.explanation (fun () ->
+               unify_exp_types loc env exp_type (instance ty_expected))
+         with exn when !Clflags.typing_recovery
+                    && Typing_recovery.is_recoverable exn ->
+             Typing_recovery.erroneous_type_register ty_expected);
       (* This is quadratic, as it extracts all of the parameters from an arrow
          type for each parameter that's added. Now that functions are n-ary,
          there might be an opportunity to improve this.
