@@ -90,14 +90,14 @@ val marshal_identity : bool = true
 (* Functional update ([Pduprecord]) copies the block's real size,
    not one word per label; a copy of the atom is the atom. *)
 
-let functional_update_size =
+let[@warning "-23"] functional_update_size =
   let r = { x = #() } in
   describe { r with x = #() }
 [%%expect{|
 val functional_update_size : string = "block tag 0 size 0"
 |}]
 
-let functional_update_identity =
+let[@warning "-23"] functional_update_identity =
   let r = { x = #() } in
   { r with x = #() } == r
 [%%expect{|
