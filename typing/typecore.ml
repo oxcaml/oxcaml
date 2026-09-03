@@ -8362,7 +8362,7 @@ and type_expect_
       end
   | Pexp_letmodule(name, smodl, sbody) ->
       let lv = get_current_level () in
-      let (id, pres, modl, _, body) =
+      let type_letmodule () =
         with_local_level_generalize begin fun () ->
           let modl, pres, id, new_env =
             Typetexp.TyVarEnv.with_local_scope begin fun () ->
@@ -8411,12 +8411,23 @@ and type_expect_
           enforce_current_level new_env body.exp_type
         end
       in
-      re {
-        exp_desc = Texp_letmodule(id, name, pres, modl, body);
-        exp_loc = loc; exp_extra = [];
-        exp_type = body.exp_type;
-        exp_attributes = sexp.pexp_attributes;
-        exp_env = env }
+      begin match type_letmodule () with
+      | (id, pres, modl, _, body) ->
+          re {
+            exp_desc = Texp_letmodule(id, name, pres, modl, body);
+            exp_loc = loc; exp_extra = [];
+            exp_type = body.exp_type;
+            exp_attributes = sexp.pexp_attributes;
+            exp_env = env }
+      | exception exn when !Clflags.typing_recovery
+                        && Typing_recovery.is_recoverable exn ->
+          (* We're dropping the let module node and keeping only its body.
+             We also don't report any error in the body, as there's no way to
+             tell if it is due to the failed module. Like in Pexp_open. *)
+          Typing_recovery.catch_errors (ref [])
+            (fun () ->
+               type_expect env expected_mode sbody ty_expected_explained)
+      end
   | Pexp_letexception(cd, sbody) ->
       let (cd, newenv, _shape) = Typedecl.transl_exception env cd in
       let body =
