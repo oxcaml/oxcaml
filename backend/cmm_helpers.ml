@@ -481,27 +481,151 @@ let cint_const n =
 
 let add_no_overflow n x c dbg =
   let d = n + x in
-  if d = 0 then c else Cop (Caddi, [c; Cconst_int (d, dbg)], dbg)
+  if d = 0
+  then c
+  else Cop (Caddi no_input_assumptions, [c; Cconst_int (d, dbg)], dbg)
 
 let is_defined_shift n = 0 <= n && n < arch_bits
 
 let is_defined_shift' n env = is_defined_shift env#.n
 
-(** returns true only if [e + n] is definitely the same as [e | n] *)
-let[@inline] can_interchange_add_with_or e n =
+(* The [known_bits] computed below only ever have the low [arch_bits] bits
+   set. *)
+
+let word_mask =
+  if arch_bits >= Nativeint.size
+  then -1n
+  else Nativeint.pred (Nativeint.shift_left 1n arch_bits)
+
+(** The mask of the low [n] bits, for [0 <= n <= arch_bits]. *)
+let low_bits_mask n =
+  if n >= arch_bits
+  then word_mask
+  else Nativeint.pred (Nativeint.shift_left 1n n)
+
+(** The mask of the high [n] bits, for [0 <= n < arch_bits]. *)
+let high_bits_mask n =
+  Nativeint.logand word_mask (Nativeint.lognot (low_bits_mask (arch_bits - n)))
+
+let known_bits_union (k1 : known_bits) (k2 : known_bits) =
+  { zeros = Nativeint.logor k1.zeros k2.zeros;
+    ones = Nativeint.logor k1.ones k2.ones
+  }
+
+let known_zero (k : known_bits) mask =
+  Nativeint.equal (Nativeint.logand k.zeros mask) mask
+
+let known_one (k : known_bits) mask =
+  Nativeint.equal (Nativeint.logand k.ones mask) mask
+
+(** The known bits of [a + b]: the low bits up to the first bit that is unknown
+    in either operand. *)
+let add_known_bits (a : known_bits) (b : known_bits) =
+  let known =
+    Nativeint.logand
+      (Nativeint.logor a.zeros a.ones)
+      (Nativeint.logor b.zeros b.ones)
+  in
+  let mask =
+    low_bits_mask
+      (Misc.count_trailing_zeroes_nativeint (Nativeint.lognot known))
+  in
+  let sum = Nativeint.logand (Nativeint.add a.ones b.ones) mask in
+  { zeros = Nativeint.logand (Nativeint.lognot sum) mask; ones = sum }
+
+let known_bits_inter (k1 : known_bits) (k2 : known_bits) =
+  { zeros = Nativeint.logand k1.zeros k2.zeros;
+    ones = Nativeint.logand k1.ones k2.ones
+  }
+
+(** The known bits of a value with known bits [k] shifted by [n], for
+    [0 <= n < arch_bits]. *)
+let shift_known_bits (op : operation) (k : known_bits) n =
+  match op with
+  | Clsl _ ->
+    { zeros =
+        Nativeint.logand word_mask
+          (Nativeint.logor (Nativeint.shift_left k.zeros n) (low_bits_mask n));
+      ones = Nativeint.logand word_mask (Nativeint.shift_left k.ones n)
+    }
+  | Clsr _ ->
+    { zeros =
+        Nativeint.logor
+          (Nativeint.shift_right_logical k.zeros n)
+          (high_bits_mask n);
+      ones = Nativeint.shift_right_logical k.ones n
+    }
+  | Casr _ ->
+    (* the sign extension is conservatively ignored *)
+    { zeros = Nativeint.shift_right_logical k.zeros n;
+      ones = Nativeint.shift_right_logical k.ones n
+    }
+  | _ -> no_known_bits
+
+(** Conservatively computes the bits of the value of [e] that are statically
+    known. *)
+let rec known_bits e : known_bits =
+  let of_const n =
+    { zeros = Nativeint.logand word_mask (Nativeint.lognot n);
+      ones = Nativeint.logand word_mask n
+    }
+  in
   match e with
-  | Cop (Clsl, [_; Cconst_int (x, _)], _) -> is_defined_shift x && n asr x = 0
-  | _ -> false
+  | Cconst_int (n, _) -> of_const (Nativeint.of_int n)
+  | Cconst_natint (n, _) -> of_const n
+  | Cop (((Clsl a | Clsr a | Casr a) as op), [c; Cconst_int (n, _)], _)
+    when is_defined_shift n ->
+    shift_known_bits op (known_bits_union (known_bits c) a.lhs) n
+  | Cop (((Clsl a | Clsr a | Casr a) as op), [c; amount], _) ->
+    (* If the shift amount is known to be less than [arch_bits], the result has
+       the bits that are known for every possible amount. *)
+    let amount_bits = low_bits_mask (Misc.log2 arch_bits) in
+    let known_bits_amount = known_bits amount in
+    if known_zero known_bits_amount (Nativeint.logand word_mask (Nativeint.lognot amount_bits))
+    then
+      let k = known_bits_union (known_bits c) a.lhs in
+      let max_amount =
+        Nativeint.to_int
+          (Nativeint.logand (Nativeint.lognot known_bits_amount.zeros) amount_bits)
+      in
+      let rec for_amounts n acc =
+        if n > max_amount
+        then acc
+        else
+          for_amounts (n + 1) (known_bits_inter acc (shift_known_bits op k n))
+      in
+      for_amounts 1 (shift_known_bits op k 0)
+    else no_known_bits
+  | Cop (Cand, [c1; c2], _) ->
+    let k1 = known_bits c1 and k2 = known_bits c2 in
+    { zeros = Nativeint.logor k1.zeros k2.zeros;
+      ones = Nativeint.logand k1.ones k2.ones
+    }
+  | Cop (Cor, [c1; c2], _) ->
+    let k1 = known_bits c1 and k2 = known_bits c2 in
+    { zeros = Nativeint.logand k1.zeros k2.zeros;
+      ones = Nativeint.logor k1.ones k2.ones
+    }
+  | Cop (Caddi a, [c1; c2], _) ->
+    add_known_bits (known_bits_union (known_bits c1) a.lhs) (known_bits c2)
+  | Cop ((Ccmpi _ | Ccmpf _), _, _) ->
+    (* comparisons return either 0 or 1 *)
+    { zeros = Nativeint.logand word_mask (Nativeint.lognot 1n); ones = 0n }
+  | _ -> no_known_bits
+
+(** returns true only if [e + n] is definitely the same as [e | n], i.e. if the
+    set bits of [n] are known to be zero in [e] *)
+let can_interchange_add_with_or e n = known_zero (known_bits e) n
 
 let[@inline] prefer_add = function
   | Cop (Cor, [e; (Cconst_int (n, _) as n')], dbg)
-    when can_interchange_add_with_or e n ->
-    Cop (Caddi, [e; n'], dbg)
+    when can_interchange_add_with_or e (Nativeint.of_int n) ->
+    Cop (Caddi no_input_assumptions, [e; n'], dbg)
   | e -> e
 
 let[@inline] prefer_or = function
-  | Cop (Caddi, [e; (Cconst_int (n, _) as n')], dbg)
-    when can_interchange_add_with_or e n ->
+  | Cop (Caddi _, [e; (Cconst_int (n, _) as n')], dbg)
+    when can_interchange_add_with_or e (Nativeint.of_int n) ->
     Cop (Cor, [e; n'], dbg)
   | e -> e
 
@@ -531,10 +655,10 @@ let rec add_const c n dbg =
         match prefer_add c with
         | Cconst_int (x, _) when Misc.no_overflow_add x n ->
           Cconst_int (x + n, dbg)
-        | Cop (Caddi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
+        | Cop (Caddi _, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
           ->
           add_no_overflow n x c dbg
-        | Cop (Caddi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_add n x
+        | Cop (Caddi _, [c; Cconst_int (x, _)], _) when Misc.no_overflow_add n x
           ->
           add_no_overflow n x c dbg
         | Cop (Csubi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
@@ -543,12 +667,17 @@ let rec add_const c n dbg =
         | Cop (Csubi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_sub n x
           ->
           add_const c (n - x) dbg
-        | _ -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
+        | _ -> Cop (Caddi no_input_assumptions, [c; Cconst_int (n, dbg)], dbg))
 
 let rec add_const' arg const dbg =
   let open P.Default_variables in
   map_tail1 arg ~f:(fun arg ->
-      let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
+      let res =
+        Cop
+          ( Caddi no_input_assumptions,
+            [prefer_add arg; Cconst_int (const, dbg)],
+            dbg )
+      in
       let x = P.create_var Int "x" in
       P.run res
         [ (Binop (Add, Any c, Const_int_fixed 0) => fun env -> env#.c);
@@ -589,16 +718,18 @@ let rec add_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with
       | Cconst_int (n, _), c | c, Cconst_int (n, _) -> add_const c n dbg
-      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
+      | Cop (Caddi _, [c1; Cconst_int (n1, _)], _), c2 ->
         add_const (add_int c1 c2 dbg) n1 dbg
-      | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
+      | c1, Cop (Caddi _, [c2; Cconst_int (n2, _)], _) ->
         add_const (add_int c1 c2 dbg) n2 dbg
-      | _, _ -> Cop (Caddi, [c1; c2], dbg))
+      | _, _ -> Cop (Caddi no_input_assumptions, [c1; c2], dbg))
 
 let rec add_int' arg1 arg2 dbg =
   let open P.Default_variables in
   map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
-      let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
+      let res =
+        Cop (Caddi no_input_assumptions, [prefer_add arg1; prefer_add arg2], dbg)
+      in
       P.run res
         [ ( Binop (Add, Const_int n, Any c) => fun env ->
             add_const env#.c env#.n dbg );
@@ -615,9 +746,9 @@ let rec sub_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with
       | _, Cconst_int (n2, _) when n2 <> min_int -> add_const c1 (-n2) dbg
-      | _, Cop (Caddi, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
+      | _, Cop (Caddi _, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
         add_const (sub_int c1 c2 dbg) (-n2) dbg
-      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), _ ->
+      | Cop (Caddi _, [c1; Cconst_int (n1, _)], _), _ ->
         add_const (sub_int c1 c2 dbg) n1 dbg
       | _, _ -> Cop (Csubi, [c1; c2], dbg))
 
@@ -669,11 +800,11 @@ let rec max_signed_bit_length e =
     (* integer/float comparisons return either [1] or [0]. *)
     1
   | Cop (Cand, [_; Cconst_int (n, _)], _) when n > 0 -> 1 + Misc.log2 n
-  | Cop (Clsl, [c; Cconst_int (n, _)], _) when is_defined_shift n ->
+  | Cop (Clsl _, [c; Cconst_int (n, _)], _) when is_defined_shift n ->
     Int.min arch_bits (max_signed_bit_length c + n)
-  | Cop (Casr, [c; Cconst_int (n, _)], _) when is_defined_shift n ->
+  | Cop (Casr _, [c; Cconst_int (n, _)], _) when is_defined_shift n ->
     Int.max 0 (max_signed_bit_length c - n)
-  | Cop (Clsr, [c; Cconst_int (n, _)], _) when is_defined_shift n ->
+  | Cop (Clsr _, [c; Cconst_int (n, _)], _) when is_defined_shift n ->
     if n = 0 then max_signed_bit_length c else arch_bits - n
   | Cop ((Cand | Cor | Cxor), [x; y], _) ->
     Int.max (max_signed_bit_length x) (max_signed_bit_length y)
@@ -712,16 +843,15 @@ let max_signed_bit_length =
     ~engine:max_signed_bit_length'
 
 let rec ignore_low_bit_int = function
-  | Cop
-      ( Caddi,
-        [(Cop (Clsl, [_; Cconst_int (n, _)], _) as c); Cconst_int (1, _)],
-        _ )
-    when n > 0 && is_defined_shift n ->
+  | Cop (Caddi _, [c; Cconst_int (1, _)], _) when known_zero (known_bits c) 1n
+    ->
     ignore_low_bit_int c
   | Cop (Cor, [c; Cconst_int (1, _)], _) -> ignore_low_bit_int c
-  | Cop (Clsl, [Cop (Clsr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
+  | Cop (Clsl _, [Cop (Clsr _, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _)
+    ->
     ignore_low_bit_int c
-  | Cop (Clsl, [Cop (Casr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
+  | Cop (Clsl _, [Cop (Casr _, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _)
+    ->
     ignore_low_bit_int c
   | c -> c
 
@@ -729,12 +859,8 @@ let rec ignore_low_bit_int' arg =
   let open P.Default_variables in
   P.run arg
     [ ( Guarded
-          { pat =
-              Binop
-                ( Add,
-                  As (c, Binop (Lsl, Any c1, Const_int n)),
-                  Const_int_fixed 1 );
-            guard = (fun env -> env#.n > 0 && is_defined_shift env#.n)
+          { pat = Binop (Add, Any c, Const_int_fixed 1);
+            guard = (fun env -> known_zero (known_bits env#.c) 1n)
           }
       => fun env -> ignore_low_bit_int' env#.c );
       ( Binop (Or, Any c, Const_int_fixed 1) => fun env ->
@@ -793,8 +919,22 @@ let rec or_const e n dbg =
           let e =
             if Nativeint.logand n 1n = 1n then ignore_low_bit_int e else e
           in
-          (* prefer putting constants on the right *)
-          Cop (Cor, [e; natint_const_untagged dbg n], dbg)
+          let known = known_bits e in
+          if known_one known n
+          then e
+          else if
+            known_zero known n
+            &&
+            (* [add_const] takes an [int], so [n] must be exactly representable
+               as one *)
+            Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n
+          then
+            (* An addition is more likely to combine with the surrounding
+               code. *)
+            add_const e (Nativeint.to_int n) dbg
+          else
+            (* prefer putting constants on the right *)
+            Cop (Cor, [e; natint_const_untagged dbg n], dbg)
         in
         match get_const e with
         | Some e -> natint_const_untagged dbg (Nativeint.logor e n)
@@ -833,24 +973,32 @@ let rec lsr_int c1 c2 dbg =
           natint_const_untagged dbg (Nativeint.shift_right_logical x n)
         | None -> (
           match prefer_or c1 with
-          | Cop (Clsr, [inner; Cconst_int (n', _)], _) when is_defined_shift n'
-            ->
+          | Cop (Clsr _, [inner; Cconst_int (n', _)], _)
+            when is_defined_shift n' ->
             if is_defined_shift (n + n')
             then lsr_const inner (n + n') dbg
             else replace inner ~with_:(Cconst_int (0, dbg))
-          | Cop ((Cor | Cxor), [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
-            when Nativeint.shift_right_logical (const_exn y) n = 0n ->
-            lsr_int x c2 dbg
+          | Cop (Cor, [x; ((Cconst_int _ | Cconst_natint _) as y)], _) ->
+            or_const (lsr_int x c2 dbg)
+              (Nativeint.shift_right_logical (const_exn y) n)
+              dbg
+          | Cop (Cxor, [x; ((Cconst_int _ | Cconst_natint _) as y)], _) ->
+            xor_const (lsr_int x c2 dbg)
+              (Nativeint.shift_right_logical (const_exn y) n)
+              dbg
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_right (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | _ -> Cop (Clsr, [c1; c2], dbg)))
-      | Cop (Clsr, [x; (Cconst_int (n', _) as y)], dbg'), c2
+          | _ -> Cop (Clsr no_input_assumptions, [c1; c2], dbg)))
+      | Cop (Clsr _, [x; (Cconst_int (n', _) as y)], dbg'), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
            further peephole optimizations *)
-        Cop (Clsr, [Cop (Clsr, [x; c2], dbg); y], dbg')
-      | c1, c2 -> Cop (Clsr, [c1; c2], dbg))
+        Cop
+          ( Clsr no_input_assumptions,
+            [Cop (Clsr no_input_assumptions, [x; c2], dbg); y],
+            dbg' )
+      | c1, c2 -> Cop (Clsr no_input_assumptions, [c1; c2], dbg))
 
 and asr_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -862,19 +1010,19 @@ and asr_int c1 c2 dbg =
         | Some x -> natint_const_untagged dbg (Nativeint.shift_right x n)
         | None -> (
           match prefer_or c1 with
-          | Cop (Casr, [inner; Cconst_int (n', _)], _) when is_defined_shift n'
-            ->
+          | Cop (Casr _, [inner; Cconst_int (n', _)], _)
+            when is_defined_shift n' ->
             (* saturating add, since the sign bit extends to the left. This is
                different from the logical shifts because arithmetic shifting
                [arch_bits] times or more is the same as shifting [arch_bits - 1]
                times *)
             asr_const inner (Int.min (n + n') (arch_bits - 1)) dbg
-          | Cop (Clsr, [_; Cconst_int (n', _)], _)
+          | Cop (Clsr _, [_; Cconst_int (n', _)], _)
             when n' > 0 && is_defined_shift n' ->
             (* If the argument is guaranteed non-negative, then we know the sign
                bit is 0 and we can weaken this operation to a logical shift *)
             lsr_const c1 n dbg
-          | Cop (Clsl, [c; Cconst_int (x, _)], _)
+          | Cop (Clsl _, [c; Cconst_int (x, _)], _)
             when is_defined_shift x && max_signed_bit_length c + x < arch_bits
             ->
             (* some operations always return small enough integers that it is
@@ -893,13 +1041,16 @@ and asr_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_right (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | _ -> Cop (Casr, [c1; c2], dbg)))
-      | Cop (Casr, [x; (Cconst_int (n', _) as y)], z), c2
+          | _ -> Cop (Casr no_input_assumptions, [c1; c2], dbg)))
+      | Cop (Casr _, [x; (Cconst_int (n', _) as y)], z), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
            further peephole optimizations *)
-        Cop (Casr, [Cop (Casr, [x; c2], dbg); y], z)
-      | _ -> Cop (Casr, [c1; c2], dbg))
+        Cop
+          ( Casr no_input_assumptions,
+            [Cop (Casr no_input_assumptions, [x; c2], dbg); y],
+            z )
+      | _ -> Cop (Casr no_input_assumptions, [c1; c2], dbg))
 
 and lsl_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -910,12 +1061,40 @@ and lsl_int c1 c2 dbg =
         | Some c1 -> natint_const_untagged dbg (Nativeint.shift_left c1 n)
         | None -> (
           match c1 with
-          | Cop (Clsl, [inner; Cconst_int (n', _)], dbg)
+          | Cop (Clsl _, [inner; Cconst_int (n', _)], dbg)
             when is_defined_shift n' ->
             if is_defined_shift (n + n')
             then lsl_const inner (n + n') dbg
             else replace inner ~with_:(Cconst_int (0, dbg))
-          | Cop (Caddi, [c1; Cconst_int (offset, _)], _)
+          | Cop
+              ( ((Clsr assumptions | Casr assumptions) as shift),
+                [inner; Cconst_int (n', _)],
+                _ )
+            when is_defined_shift n' ->
+            let known = known_bits_union (known_bits inner) assumptions.lhs in
+            let low = low_bits_mask n' in
+            if known_zero known low
+            then
+              (* The low [n'] bits of [inner] are zero, so the right shift can
+                 be (partially) undone by this left shift. *)
+              if n >= n'
+              then lsl_const inner (n - n') dbg
+              else Cop (shift, [inner; Cconst_int (n' - n, dbg)], dbg)
+            else if known_one known low && n >= n'
+            then
+              (* The low [n'] bits of [inner] are one, so subtracting [(1 << n')
+                 - 1] clears them, after which the right shift can be undone by
+                 this left shift. *)
+              lsl_const
+                (Cop
+                   ( Caddi assumptions,
+                     [ inner;
+                       natint_const_untagged dbg
+                         (Nativeint.neg (low_bits_mask n')) ],
+                     dbg ))
+                (n - n') dbg
+            else Cop (Clsl no_input_assumptions, [c1; c2], dbg)
+          | Cop (Caddi _, [c1; Cconst_int (offset, _)], _)
             when Misc.no_overflow_lsl offset n ->
             add_const (lsl_int c1 c2 dbg) (offset lsl n) dbg
           | Cop ((Cor | Cxor), [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
@@ -924,13 +1103,16 @@ and lsl_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_left (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | c1 -> Cop (Clsl, [c1; c2], dbg)))
-      | Cop (Clsl, [x; (Cconst_int (n', _) as y)], dbg'), c2
+          | c1 -> Cop (Clsl no_input_assumptions, [c1; c2], dbg)))
+      | Cop (Clsl _, [x; (Cconst_int (n', _) as y)], dbg'), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
            further peephole optimizations *)
-        Cop (Clsl, [Cop (Clsl, [x; c2], dbg); y], dbg')
-      | _, _ -> Cop (Clsl, [c1; c2], dbg))
+        Cop
+          ( Clsl no_input_assumptions,
+            [Cop (Clsl no_input_assumptions, [x; c2], dbg); y],
+            dbg' )
+      | _, _ -> Cop (Clsl no_input_assumptions, [c1; c2], dbg))
 
 and lsl_const c n dbg = lsl_int c (Cconst_int (n, dbg)) dbg
 
@@ -938,7 +1120,8 @@ and asr_const c n dbg = asr_int c (Cconst_int (n, dbg)) dbg
 
 and lsr_const c n dbg = lsr_int c (Cconst_int (n, dbg)) dbg
 
-let lsl_const0 c n dbg = Cop (Clsl, [c; Cconst_int (n, dbg)], dbg)
+let lsl_const0 c n dbg =
+  Cop (Clsl no_input_assumptions, [c; Cconst_int (n, dbg)], dbg)
 
 let is_power2 n = n = 1 lsl Misc.log2 n
 
@@ -953,8 +1136,8 @@ let rec mul_int c1 c2 dbg =
     sub_int (Cconst_int (0, dbg)) c dbg
   | c, Cconst_int (n, _) when is_power2 n -> mult_power2 c n dbg
   | Cconst_int (n, _), c when is_power2 n -> mult_power2 c n dbg
-  | Cop (Caddi, [c; Cconst_int (n, _)], _), Cconst_int (k, _)
-  | Cconst_int (k, _), Cop (Caddi, [c; Cconst_int (n, _)], _)
+  | Cop (Caddi _, [c; Cconst_int (n, _)], _), Cconst_int (k, _)
+  | Cconst_int (k, _), Cop (Caddi _, [c; Cconst_int (n, _)], _)
     when Misc.no_overflow_mul n k ->
     add_const (mul_int c (Cconst_int (k, dbg)) dbg) (n * k) dbg
   | c1, c2 -> Cop (Cmuli, [c1; c2], dbg)
@@ -986,8 +1169,30 @@ let rec and_const e n dbg =
                 ~bits:(arch_bits - Misc.count_leading_zeroes_nativeint n)
                 ~dbg e
             in
-            (* prefer putting constants on the right *)
-            Cop (Cand, [e; natint_const_untagged dbg n], dbg)
+            if
+              (* the bits cleared by the mask are already zero *)
+              known_zero (known_bits e)
+                (Nativeint.logand word_mask (Nativeint.lognot n))
+            then e
+            else
+              (* Masking with a low-bits mask [(1 << k) - 1] that does not fit
+                 in a sign-extended 32-bit immediate (and so would have to be
+                 materialized in a register first) instead clears the high bits
+                 with a pair of shifts. *)
+              let is_wide_low_bits_mask =
+                Nativeint.compare n (Nativeint.of_int32 Int32.max_int) > 0
+                && Nativeint.equal (Nativeint.logand n (Nativeint.succ n)) 0n
+              in
+              if is_wide_low_bits_mask
+              then
+                let shift =
+                  arch_bits
+                  - Misc.count_trailing_zeroes_nativeint (Nativeint.lognot n)
+                in
+                lsr_const (lsl_const e shift dbg) shift dbg
+              else
+                (* prefer putting constants on the right *)
+                Cop (Cand, [e; natint_const_untagged dbg n], dbg)
           in
           match e with
           | Cop (Cand, [x; y], dbg) -> (
@@ -1033,8 +1238,8 @@ and low_bits ~bits ~dbg x =
     map_tail
       (function
         | Cop
-            ( (Casr | Clsr),
-              [Cop (Clsl, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
+            ( (Casr _ | Clsr _),
+              [Cop (Clsl _, [x; Cconst_int (left, _)], _); Cconst_int (right, _)],
               _ )
           when 0 <= left && 0 <= right && max left right <= unused_bits ->
           (* Replacing a first left then right shift pattern with a single shift
@@ -1042,7 +1247,7 @@ and low_bits ~bits ~dbg x =
              doesn't matter if we use a logical or arithmetic right shift in the
              end because the topmost bits are wrong anyway. *)
           if left >= right
-          then low_bits ~bits (lsl_const0 x (left - right) dbg) ~dbg
+          then low_bits ~bits (lsl_const x (left - right) dbg) ~dbg
           else low_bits ~bits ~dbg (asr_const x (right - left) dbg)
         | x -> (
           match get_const_bitmask x with
@@ -1061,29 +1266,55 @@ and low_bits ~bits ~dbg x =
             | _ -> x)))
       x
 
+(** Whether the value of the expression is known to be either 0 or 1. *)
+let is_zero_or_one e =
+  known_zero (known_bits e) (Nativeint.logand word_mask (Nativeint.lognot 1n))
+
 let tag_int i dbg =
+  (* [or_const] turns into an addition when the low bit is known to be zero, and
+     also handles cases like tagging [x asr 1], which is just [x lor 1]. *)
+  let[@local] default c = or_const (lsl_const c 1 dbg) 1n dbg in
   match low_bits i ~bits:(arch_bits - 1) ~dbg with
   | Cconst_int (n, _) -> int_const dbg n
-  | c -> incr_int (lsl_const c 1 dbg) dbg
+  | Cop (Ccmpi Cne, [b; Cconst_int (0, _)], _) when is_zero_or_one b ->
+    (* the comparison is the identity on the 0/1 value [b] *)
+    default b
+  | Cop (Ccmpi Ceq, [b; Cconst_int (0, _)], _) when is_zero_or_one b ->
+    (* Negating the 0/1 value [b] with [xor] avoids materializing a comparison
+       result (e.g. with [sete]). *)
+    default (xor_const b 1n dbg)
+  | c -> default c
+
+(** The input assumption that the argument is a tagged integer, i.e. that its
+    low bit is one. *)
+let tagged_input = { lhs = { zeros = 0n; ones = 1n } }
 
 let untag_int i dbg =
   match i with
   | Cconst_int (n, _) -> Cconst_int (n asr 1, dbg)
-  | Cop (Cor, [Cop (Casr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
+  | Cop (Cor, [Cop (Casr _, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
     when n > 0 && is_defined_shift (n + 1) ->
     asr_const c (n + 1) dbg
-  | Cop (Cor, [Cop (Clsr, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
+  | Cop (Cor, [Cop (Clsr _, [c; Cconst_int (n, _)], _); Cconst_int (1, _)], _)
     when n > 0 && is_defined_shift (n + 1) ->
     lsr_const c (n + 1) dbg
-  | c -> asr_const c 1 dbg
+  | c -> (
+    match asr_const c 1 dbg with
+    | Cop (Casr _, [c'; Cconst_int (1, _)], _) when c' == c ->
+      Cop (Casr tagged_input, [c; Cconst_int (1, dbg)], dbg)
+    | untagged -> untagged)
 
-let unsigned_untag_int i dbg = lsr_const i 1 dbg
+let unsigned_untag_int i dbg =
+  match lsr_const i 1 dbg with
+  | Cop (Clsr _, [i'; Cconst_int (1, _)], _) when i' == i ->
+    Cop (Clsr tagged_input, [i; Cconst_int (1, dbg)], dbg)
+  | untagged -> untagged
 
 let mk_not dbg cmm =
   match cmm with
   | Cop
-      ( (Caddi | Cor),
-        [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
+      ( (Caddi _ | Cor),
+        [Cop (Clsl _, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
         dbg' ) -> (
     match c with
     | Cop (Ccmpi cmp, [c1; c2], dbg'') ->
@@ -1098,7 +1329,8 @@ let mk_not dbg cmm =
       (* 0 -> 3, 1 -> 1 *)
       Cop
         ( Cxor,
-          [Cconst_int (3, dbg); Cop (Clsl, [c; Cconst_int (1, dbg)], dbg)],
+          [ Cconst_int (3, dbg);
+            Cop (Clsl no_input_assumptions, [c; Cconst_int (1, dbg)], dbg) ],
           dbg ))
   | Cconst_int (3, _) -> Cconst_int (1, dbg)
   | Cconst_int (1, _) -> Cconst_int (3, dbg)
@@ -1635,8 +1867,8 @@ let unsigned_mod_int c1 c2 dbg =
 let test_bool dbg cmm =
   match cmm with
   | Cop
-      ( (Caddi | Cor),
-        [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
+      ( (Caddi _ | Cor),
+        [Cop (Clsl _, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
         _ ) ->
     c
   | Cconst_int (n, dbg) ->
@@ -1904,7 +2136,7 @@ let array_indexing ?typ log2size ptr ofs dbg =
   let add =
     match typ with
     | None | Some Addr -> Cadda
-    | Some Int -> Caddi
+    | Some Int -> Caddi no_input_assumptions
     | _ -> assert false
   in
   match ofs with
@@ -1914,16 +2146,16 @@ let array_indexing ?typ log2size ptr ofs dbg =
     then ptr
     else Cop (add, [ptr; Cconst_int (i lsl log2size, dbg)], dbg)
   | Cop
-      ( (Caddi | Cor),
-        [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
+      ( (Caddi _ | Cor),
+        [Cop (Clsl _, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
         dbg' ) ->
     Cop (add, [ptr; lsl_const c log2size dbg], dbg')
-  | Cop (Caddi, [c; Cconst_int (n, _)], dbg') when log2size = 0 ->
+  | Cop (Caddi _, [c; Cconst_int (n, _)], dbg') when log2size = 0 ->
     Cop
       ( add,
         [Cop (add, [ptr; untag_int c dbg], dbg); Cconst_int (n asr 1, dbg)],
         dbg' )
-  | Cop (Caddi, [c; Cconst_int (n, _)], _) ->
+  | Cop (Caddi _, [c; Cconst_int (n, _)], _) ->
     Cop
       ( add,
         [ Cop (add, [ptr; lsl_const c (log2size - 1) dbg], dbg);
@@ -2150,14 +2382,14 @@ let rec sign_extend ~bits ~dbg e =
           or_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
         | Cop (Cxor, [x; y], _) when is_constant y ->
           xor_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
-        | Cop (((Casr | Clsr) as op), [inner; Cconst_int (n, _)], _) as e
+        | Cop (((Casr _ | Clsr _) as op), [inner; Cconst_int (n, _)], _) as e
           when is_defined_shift n ->
           (* see middle_end/flambda2/z3/sign_extension.py for proof *)
           if n = unused_bits
           then
             match op with
-            | Casr -> e
-            | Clsr -> asr_const inner unused_bits dbg
+            | Casr _ -> e
+            | Clsr _ -> asr_const inner unused_bits dbg
             | _ -> assert false
           else if n > unused_bits
           then
@@ -2365,7 +2597,7 @@ let string_length exp dbg =
           Cop
             ( Csubi,
               [ Cop
-                  ( Clsl,
+                  ( Clsl no_input_assumptions,
                     [get_size str dbg; Cconst_int (log2_size_addr, dbg)],
                     dbg );
                 Cconst_int (1, dbg) ],
@@ -2385,7 +2617,8 @@ let bigstring_get_alignment ba idx align dbg =
     (fun ba_data ->
       Cop
         ( Cand,
-          [Cconst_int (align - 1, dbg); Cop (Caddi, [ba_data; idx], dbg)],
+          [ Cconst_int (align - 1, dbg);
+            Cop (Caddi no_input_assumptions, [ba_data; idx], dbg) ],
           dbg ))
 
 (* Message sending *)
@@ -2893,7 +3126,7 @@ let unbox_int dbg bi =
   map_tail (function
     | Cop
         ( Calloc _,
-          [hdr; ops; Cop (Clsl, [contents; Cconst_int (32, _)], _dbg')],
+          [hdr; ops; Cop (Clsl _, [contents; Cconst_int (32, _)], _dbg')],
           _dbg )
       when bi = Primitive.Boxed_int32 && big_endian
            && alloc_matches_boxed_int bi ~hdr ~ops ->
@@ -2968,7 +3201,11 @@ let unaligned_set_16 ~ptr_out_of_heap ptr idx newval dbg =
   else
     let cconst_int i = Cconst_int (i, dbg) in
     let v1 =
-      Cop (Cand, [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF], dbg)
+      Cop
+        ( Cand,
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int 8], dbg);
+            cconst_int 0xFF ],
+          dbg )
     in
     let v2 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
     let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
@@ -3047,14 +3284,24 @@ let unaligned_set_32 ~ptr_out_of_heap ptr idx newval dbg =
     let cconst_int i = Cconst_int (i, dbg) in
     let v1 =
       Cop
-        (Cand, [Cop (Clsr, [newval; cconst_int 24], dbg); cconst_int 0xFF], dbg)
+        ( Cand,
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int 24], dbg);
+            cconst_int 0xFF ],
+          dbg )
     in
     let v2 =
       Cop
-        (Cand, [Cop (Clsr, [newval; cconst_int 16], dbg); cconst_int 0xFF], dbg)
+        ( Cand,
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int 16], dbg);
+            cconst_int 0xFF ],
+          dbg )
     in
     let v3 =
-      Cop (Cand, [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF], dbg)
+      Cop
+        ( Cand,
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int 8], dbg);
+            cconst_int 0xFF ],
+          dbg )
     in
     let v4 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
     let b1, b2, b3, b4 =
@@ -3200,41 +3447,51 @@ let unaligned_set_64 ~ptr_out_of_heap ptr idx newval dbg =
     let v1 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 7)], dbg); cconst_int 0xFF],
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int (8 * 7)], dbg);
+            cconst_int 0xFF ],
           dbg )
     in
     let v2 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 6)], dbg); cconst_int 0xFF],
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int (8 * 6)], dbg);
+            cconst_int 0xFF ],
           dbg )
     in
     let v3 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 5)], dbg); cconst_int 0xFF],
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int (8 * 5)], dbg);
+            cconst_int 0xFF ],
           dbg )
     in
     let v4 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 4)], dbg); cconst_int 0xFF],
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int (8 * 4)], dbg);
+            cconst_int 0xFF ],
           dbg )
     in
     let v5 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 3)], dbg); cconst_int 0xFF],
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int (8 * 3)], dbg);
+            cconst_int 0xFF ],
           dbg )
     in
     let v6 =
       Cop
         ( Cand,
-          [Cop (Clsr, [newval; cconst_int (8 * 2)], dbg); cconst_int 0xFF],
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int (8 * 2)], dbg);
+            cconst_int 0xFF ],
           dbg )
     in
     let v7 =
-      Cop (Cand, [Cop (Clsr, [newval; cconst_int 8], dbg); cconst_int 0xFF], dbg)
+      Cop
+        ( Cand,
+          [ Cop (Clsr no_input_assumptions, [newval; cconst_int 8], dbg);
+            cconst_int 0xFF ],
+          dbg )
     in
     let v8 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
     let b1, b2, b3, b4, b5, b6, b7, b8 =
@@ -3611,7 +3868,7 @@ let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
               ( Cop
                   ( Ccmpi Ceq,
                     [ Cop
-                        ( Casr,
+                        ( Casr no_input_assumptions,
                           [ get_field_gen mut clos 1 dbg;
                             Cconst_int (pos_arity_in_closinfo, dbg) ],
                           dbg );
@@ -3745,7 +4002,7 @@ let cache_public_method meths tag cache dbg =
     Clet
       ( VP.create result,
         Cop
-          ( Caddi,
+          ( Caddi no_input_assumptions,
             [ lsl_const (Cvar result_label_index) log2_size_addr dbg;
               cconst_int (1 - (3 * size_addr)) ],
             dbg ),
@@ -3777,7 +4034,10 @@ let cache_public_method meths tag cache dbg =
         Cop
           ( Cor,
             [ Cop
-                (Clsr, [Cop (Caddi, [Cvar li; Cvar hi], dbg); cconst_int 1], dbg);
+                ( Clsr no_input_assumptions,
+                  [ Cop (Caddi no_input_assumptions, [Cvar li; Cvar hi], dbg);
+                    cconst_int 1 ],
+                  dbg );
               cconst_int 1 ],
             dbg ),
         Cifthenelse
@@ -3913,7 +4173,7 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
         ( Cop
             ( Ccmpi Ceq,
               [ Cop
-                  ( Casr,
+                  ( Casr no_input_assumptions,
                     [ get_field_gen Asttypes.Immutable (Cvar clos) 1 (dbg ());
                       Cconst_int (pos_arity_in_closinfo, dbg ()) ],
                     dbg () );
@@ -4357,7 +4617,8 @@ let curry_function (kind, arity, return) =
 
 type unary_primitive = expression -> Debuginfo.t -> expression
 
-let int_as_pointer arg dbg = Cop (Caddi, [arg; Cconst_int (-1, dbg)], dbg)
+let int_as_pointer arg dbg =
+  Cop (Caddi no_input_assumptions, [arg; Cconst_int (-1, dbg)], dbg)
 (* always a pointer outside the heap *)
 
 let raise_prim raise_kind ~extra_args arg dbg =
@@ -4681,7 +4942,7 @@ let entry_point namelist =
       ( Cstore (Word_int, Assignment),
         [ cconst_symbol (global_symbol "caml_globals_inited");
           Cop
-            ( Caddi,
+            ( Caddi no_input_assumptions,
               [ Cop
                   ( mk_load_mut Word_int,
                     [cconst_symbol (global_symbol "caml_globals_inited")],
@@ -4718,7 +4979,9 @@ let entry_point namelist =
   let high = cconst_int (List.length namelist) in
   let body =
     let dbg = dbg () in
-    let incr_i id = Cop (Caddi, [Cvar id; Cconst_int (1, dbg)], dbg) in
+    let incr_i id =
+      Cop (Caddi no_input_assumptions, [Cvar id; Cconst_int (1, dbg)], dbg)
+    in
     let exit_if_last_iteration id =
       Cifthenelse
         ( Cop (Ccmpi Ceq, [Cvar id; high], dbg),
@@ -5069,6 +5332,26 @@ let lsr_int_caml_raw ~dbg arg1 arg2 = or_const (lsr_int arg1 arg2 dbg) 1n dbg
 
 let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
 
+(* If both operands of a comparison are statically known to be tagged integers
+   [2 * k + 1] whose untagged values [k] are available for free and provably fit
+   in [arch_bits - 1] bits, the comparison can be performed on the untagged
+   values: untagging is injective and monotone on this range. *)
+let untag_comparison_operands ~dbg x y =
+  let untag e =
+    match e with
+    | Cconst_int (n, _) when n land 1 = 1 -> Some (Cconst_int (n asr 1, dbg))
+    | Cconst_natint (n, _) when Nativeint.equal (Nativeint.logand n 1n) 1n ->
+      Some (natint_const_untagged dbg (Nativeint.shift_right n 1))
+    | Cop
+        ( (Caddi _ | Cor),
+          [Cop (Clsl _, [x; Cconst_int (1, _)], _); Cconst_int (1, _)],
+          _ )
+      when max_signed_bit_length x <= arch_bits - 2 ->
+      Some x
+    | _ -> None
+  in
+  match untag x, untag y with Some x, Some y -> x, y | _, _ -> x, y
+
 let eq ~dbg x y =
   match x, y with
   | Cconst_int (n, _), Cop (Csubi, [Cconst_int (m, _); c], _)
@@ -5124,9 +5407,13 @@ let eq ~dbg x y =
      *   (check-sat)
      *)
     binary (Ccmpi Ceq) ~dbg c (Cconst_int (m - n, dbg))
-  | _, _ -> binary (Ccmpi Ceq) ~dbg x y
+  | _, _ ->
+    let x, y = untag_comparison_operands ~dbg x y in
+    binary (Ccmpi Ceq) ~dbg x y
 
-let neq = binary (Ccmpi Cne)
+let neq ~dbg x y =
+  let x, y = untag_comparison_operands ~dbg x y in
+  binary (Ccmpi Cne) ~dbg x y
 
 let lt = binary (Ccmpi Clt)
 
@@ -5348,8 +5635,8 @@ let cmm_arith_size (e : Cmm.expression) =
   let rec cmm_arith_size0 (e : Cmm.expression) =
     match e with
     | Cop
-        ( ( Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor
-          | Cxor | Clsl | Clsr | Casr ),
+        ( ( Caddi _ | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Cand | Cor
+          | Cxor | Clsl _ | Clsr _ | Casr _ ),
           l,
           _ ) ->
       List.fold_left ( + ) 1 (List.map cmm_arith_size0 l)
@@ -5623,7 +5910,7 @@ let make_unboxed_int32_array_payload dbg unboxed_int32_list =
             [ (* [a] is sign-extended by default. We need to change it to be
                  zero-extended for the `or` operation to be correct. *)
               zero_extend ~bits:32 a ~dbg;
-              Cop (Clsl, [b; Cconst_int (32, dbg)], dbg) ],
+              Cop (Clsl no_input_assumptions, [b; Cconst_int (32, dbg)], dbg) ],
             dbg )
       in
       aux (i :: acc) r

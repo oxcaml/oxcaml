@@ -352,6 +352,17 @@ type bswap_bitwidth =
   | Thirtytwo
   | Sixtyfour
 
+type known_bits =
+  { zeros : nativeint;
+    ones : nativeint
+  }
+
+let no_known_bits = { zeros = 0n; ones = 0n }
+
+type input_assumptions = { lhs : known_bits }
+
+let no_input_assumptions = { lhs = no_known_bits }
+
 type initialization_or_assignment =
   | Initialization
   | Assignment
@@ -575,7 +586,7 @@ type operation =
       }
   | Calloc of Alloc_mode.t * alloc_block_kind
   | Cstore of memory_chunk * initialization_or_assignment
-  | Caddi
+  | Caddi of input_assumptions
   | Csubi
   | Cmuli
   | Cmulhi of { signed : bool }
@@ -587,9 +598,9 @@ type operation =
   | Cand
   | Cor
   | Cxor
-  | Clsl
-  | Clsr
-  | Casr
+  | Clsl of input_assumptions
+  | Clsr of input_assumptions
+  | Casr of input_assumptions
   | Cbswap of { bitwidth : bswap_bitwidth }
   | Ccsel of machtype
   | Cclz
@@ -798,8 +809,8 @@ let iter_shallow_tail f = function
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
   | Cconst_symbol _ | Cvar _ | Ctuple _
   | Cop
-      ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
-        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+      ( ( Calloc _ | Caddi _ | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
+        | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl _ | Clsr _ | Casr _
         | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
         | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
         | Capply _ | Cextcall _ | Cload _
@@ -833,8 +844,8 @@ let map_shallow_tail f = function
     | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
     | Cconst_symbol _ | Cvar _ | Ctuple _
     | Cop
-        ( ( Calloc _ | Caddi | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
-          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
+        ( ( Calloc _ | Caddi _ | Csubi | Cmuli | Cdivi _ | Cmodi _ | Caddi128
+          | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl _ | Clsr _ | Casr _
           | Cpopcnt | Caddv | Cadda | Cpackf32 | Copaque | Cbeginregion
           | Cendregion | Cdls_get | Ctls_get | Cdomain_index | Cpoll | Cpause
           | Capply _ | Cextcall _ | Cload _

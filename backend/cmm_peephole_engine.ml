@@ -149,11 +149,11 @@ type 'a clause = cmm_pattern * (Env.t -> 'a)
 
 let matches_binop (binop : binop) (cop : Cmm.operation) =
   match binop, cop with
-  | Add, Caddi -> true
+  | Add, Caddi _ -> true
   | Sub, Csubi -> true
-  | Lsl, Clsl -> true
-  | Lsr, Clsr -> true
-  | Asr, Casr -> true
+  | Lsl, Clsl _ -> true
+  | Lsr, Clsr _ -> true
+  | Asr, Casr _ -> true
   | Or, Cor -> true
   | And, Cand -> true
   | Comparison, (Ccmpi _ | Ccmpf _) -> true

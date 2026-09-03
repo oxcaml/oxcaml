@@ -88,12 +88,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         false
         (* avoid reordering *)
         (* The remaining operations are simple if their args are *)
-      | Cload _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr
-      | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt | Cbswap _
-      | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
-      | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _ | Ccmpf _
-      | Cdls_get | Ctls_get | Cdomain_index ->
+      | Cload _ | Caddi _ | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
+      | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Clsl _ | Clsr _
+      | Casr _ | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cclz | Cctz | Cpopcnt
+      | Cbswap _ | Ccsel _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
+      | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ctuple_field _
+      | Ccmpf _ | Cdls_get | Ctls_get | Cdomain_index ->
         List.for_all is_simple_expr args)
     | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ -> false
 
@@ -146,11 +146,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           ->
           EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
-        | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
-        | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
-        | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl | Clsr | Casr | Ccmpi _ | Caddv
-        | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _
-        | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ ->
+        | Ctuple_field _ | Caddi _ | Csubi | Cmuli | Cmulhi _ | Cdivi _
+        | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor
+        | Cbswap _ | Ccsel _ | Cclz | Cctz | Cpopcnt | Clsl _ | Clsr _ | Casr _
+        | Ccmpi _ | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
+        | Cmulf _ | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _
+        | Ccmpf _ ->
           EC.none
       in
       EC.join from_op (EC.join_list_map args effects_of)
@@ -373,7 +374,7 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         args )
     | Cpoll -> SU.basic_op Poll, args
     | Cpause -> SU.basic_op Pause, args
-    | Caddi -> select_arith_comm Iadd args
+    | Caddi _ -> select_arith_comm Iadd args
     | Csubi -> select_arith Isub args
     | Cmuli -> select_arith_comm Imul args
     | Cmulhi { signed } -> select_arith_comm (Imulh { signed }) args
@@ -385,9 +386,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cand -> select_arith_comm Iand args
     | Cor -> select_arith_comm Ior args
     | Cxor -> select_arith_comm Ixor args
-    | Clsl -> select_arith Ilsl args
-    | Clsr -> select_arith Ilsr args
-    | Casr -> select_arith Iasr args
+    | Clsl _ -> select_arith Ilsl args
+    | Clsr _ -> select_arith Ilsr args
+    | Casr _ -> select_arith Iasr args
     | Cclz -> SU.basic_op (Intop Iclz), args
     | Cctz -> SU.basic_op (Intop Ictz), args
     | Cpopcnt -> SU.basic_op (Intop Ipopcnt), args

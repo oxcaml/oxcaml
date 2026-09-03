@@ -745,9 +745,9 @@ let operation_supported = function
     Arch.Extension.enabled AVX512BW
   | Cprefetch _ | Catomic _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
-  | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
+  | Caddi _ | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
   | Caddi128 | Csubi128 | Cmuli64 _
-  | Cand | Cor | Cxor | Clsl | Clsr | Casr
+  | Cand | Cor | Cxor | Clsl _ | Clsr _ | Casr _
   | Ccsel _
   | Cbswap _
   | Cclz | Cctz

@@ -1315,6 +1315,13 @@ let rec count_leading_zeroes_nativeint n =
   then Nativeint.size
   else count_leading_zeroes_nativeint (Nativeint.shift_right_logical n 1) - 1
 
+let rec count_trailing_zeroes_nativeint n =
+  if n = 0n
+  then Nativeint.size
+  else if Nativeint.logand n 1n = 1n
+  then 0
+  else 1 + count_trailing_zeroes_nativeint (Nativeint.shift_right_logical n 1)
+
 let power ~base n =
   let res = ref 1 in
   for _ = 1 to n do

@@ -49,7 +49,8 @@ let access_array base numelt size =
   | _ ->
       let dbg = Debuginfo.none in
       Cop(Cadda, [base;
-                  Cop(Clsl, [numelt; Cconst_int(Misc.log2 size, dbg)],
+                  Cop(Clsl no_input_assumptions,
+                      [numelt; Cconst_int(Misc.log2 size, dbg)],
                   dbg)],
           dbg)
 
@@ -386,7 +387,7 @@ unaryop:
 ;
 binaryop:
     STORE chunk                 { Cstore ($2, Assignment) }
-  | ADDI                        { Caddi }
+  | ADDI                        { Caddi no_input_assumptions }
   | SUBI                        { Csubi }
   | STAR                        { Cmuli }
   | DIVI                        { (Cdivi {signed = true}) }
@@ -396,9 +397,9 @@ binaryop:
   | AND                         { Cand }
   | OR                          { Cor }
   | XOR                         { Cxor }
-  | LSL                         { Clsl }
-  | LSR                         { Clsr }
-  | ASR                         { Casr }
+  | LSL                         { Clsl no_input_assumptions }
+  | LSR                         { Clsr no_input_assumptions }
+  | ASR                         { Casr no_input_assumptions }
   | EQI                         { Ccmpi Ceq }
   | NEI                         { Ccmpi Cne }
   | LTI                         { Ccmpi Clt }
