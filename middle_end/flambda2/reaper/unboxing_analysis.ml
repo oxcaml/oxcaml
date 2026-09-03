@@ -797,16 +797,13 @@ let perform_analysis db ~code_deps ~stats =
         unboxed, !changed_representation)
   in
   let get_unboxed_fields cn = Code_id_or_name.Map.find_opt cn unboxed in
-  let raw_is_var_used var kind =
-    match (kind : Flambda_kind.t) with
+  let is_var_used var =
+    match Variable.kind var with
     | Region | Rec_info -> true
     | Value | Naked_number _ -> PTA.has_use db (Code_id_or_name.var var)
   in
   let should_keep_function_param code_id =
-    let cannot_change_calling_convention =
-      cannot_change_calling_convention_of_db db code_id
-    in
-    if cannot_change_calling_convention
+    if cannot_change_calling_convention_of_db db code_id
     then (
       fun var kind ->
         assert (Option.is_none (get_unboxed_fields (Code_id_or_name.var var)));
@@ -814,11 +811,7 @@ let perform_analysis db ~code_deps ~stats =
     else
       fun param kind ->
         match get_unboxed_fields (Code_id_or_name.var param) with
-        | None ->
-          let is_var_used =
-            raw_is_var_used param (Flambda_kind.With_subkind.kind kind)
-          in
-          if is_var_used then Keep (param, kind) else Delete
+        | None -> if is_var_used param then Keep (param, kind) else Delete
         | Some fields -> Unbox fields
   in
   let function_params_to_keep =
@@ -849,13 +842,10 @@ let perform_analysis db ~code_deps ~stats =
   let function_return_decision =
     Code_id.Map.mapi
       (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let cannot_change_calling_convention =
-          cannot_change_calling_convention_of_db db code_id
-        in
         let result_kinds =
           Flambda_arity.unarized_components code_dep.result_arity
         in
-        if cannot_change_calling_convention
+        if cannot_change_calling_convention_of_db db code_id
         then
           List.map2 (fun v kind -> Keep (v, kind)) code_dep.return result_kinds
         else
@@ -864,12 +854,9 @@ let perform_analysis db ~code_deps ~stats =
             (fun v kind ->
               match get_unboxed_fields (Code_id_or_name.var v) with
               | None ->
-                let is_var_used =
-                  raw_is_var_used v (Flambda_kind.With_subkind.kind kind)
-                in
                 (* TODO: fix this, needs the mapping between code ids of
                    functions and their return continuations *)
-                if true || is_var_used then Keep (v, kind) else Delete
+                if true || is_var_used v then Keep (v, kind) else Delete
               | Some fields -> Unbox fields)
             code_dep.return result_kinds)
       code_deps

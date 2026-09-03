@@ -1115,10 +1115,7 @@ let decide_whether_apply_needs_calling_convention_change env apply =
     match Code_id.Map.find_opt code_id env.code_deps with
     | None -> Not_changing_calling_convention, call_kind
     | Some _ ->
-      let cannot_change_calling_convention =
-        Analysis.cannot_change_calling_convention env.uses code_id
-      in
-      if cannot_change_calling_convention
+      if Analysis.cannot_change_calling_convention env.uses code_id
       then Not_changing_calling_convention, call_kind
       else Changing_calling_convention code_id, call_kind)
 
@@ -2186,10 +2183,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
          [rebuild_function_params_and_body]"
         Code_id.print code_id
     | Some code_dep ->
-      let cannot_change_calling_convention =
-        Analysis.cannot_change_calling_convention env.uses code_id
-      in
-      ( (if cannot_change_calling_convention
+      ( (if Analysis.cannot_change_calling_convention env.uses code_id
          then Not_changing_calling_convention
          else Changing_calling_convention code_id),
         code_dep.params,
