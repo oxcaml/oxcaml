@@ -156,8 +156,16 @@ let static_cast ~src ~dst x =
     | Int, Int ->
       (* the identity function *)
       x
-    | Boxed Float32, Boxed (Int64 | Nativeint | Int32)
-    | Boxed (Int64 | Nativeint | Int32), Boxed Float32 ->
+    | Boxed Float32, Boxed Int64 ->
+      Prim (Ccall "caml_float32_to_int64_bytecode", [x])
+    | Boxed Int64, Boxed Float32 ->
+      Prim (Ccall "caml_float32_of_int64_bytecode", [x])
+    | Boxed Nativeint, Boxed Float32 ->
+      (* Convert exactly to int64 to avoid double-rounding. *)
+      x
+      |> builtin ~src ~dst:(Boxed Int64 : builtin)
+      |> builtin ~src:(Boxed Int64 : builtin) ~dst
+    | Boxed Float32, Boxed (Nativeint | Int32) | Boxed Int32, Boxed Float32 ->
       (* there are no builtins to convert directly, so we go indirectly via
          float *)
       x
