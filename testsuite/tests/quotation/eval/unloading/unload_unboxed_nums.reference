@@ -1,0 +1,8 @@
+start: registered=0 unloaded=0 live=0
+f_float 4 = 10.00
+f_i64 5 = 1005
+f_mixed 3 = 21.50
+after populate: registered=3 unloaded=0 live=3
+stable: f_float 8 = 20.00, f_i64 9 = 1009, f_mixed 11 = 29.50
+after 2x Gc.compact (held): registered=3 unloaded=0 live=3
+after release: registered=3 unloaded=3 live=0

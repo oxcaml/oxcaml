@@ -19,3 +19,5 @@ open! Import
 let symbols = ref Symbols.empty
 
 let debug = ref false
+
+let unloadable_pin : Obj.t option ref = ref None

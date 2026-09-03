@@ -1,0 +1,11 @@
+start: registered=0 unloaded=0 live=0
+outer 3 5 = 49
+outer 10 7 = 104
+inner_only 1 = 1065
+inner_only 2 = 1066
+after populate: registered=2 unloaded=0 live=2
+after 2x Gc.compact (both held): registered=2 unloaded=0 live=2
+stable: outer 1 1 = 35, inner_only 0 = 1064
+after release outer (inner_only still held): registered=2 unloaded=1 live=1
+inner_only still: 1064
+after release inner_only too: registered=2 unloaded=2 live=0
