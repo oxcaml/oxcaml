@@ -130,8 +130,9 @@ val g :
   string @ [> 'm mod many portable forkable unyielding stateless] = <fun>
 val which :
   bool @ 'n ->
-  string @ [< 'm mod contended immutable & portable] ->
-  string @ [> 'm mod many portable forkable unyielding stateless] = <fun>
+  (string @ [< 'm mod contended immutable & portable] ->
+   string @ [> 'm mod many portable forkable unyielding stateless]) @ [> aliased stateful dynamic] =
+  <fun>
 |}]
 
 (* The least upper bound between portable and nonportable is nonportable *)
@@ -183,7 +184,8 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let close_over x = fun () -> x
 [%%expect{|
-val close_over : 'a @ [< 'm & global] -> unit @ 'n -> 'a @ [> 'm] = <fun>
+val close_over :
+  'a @ [< 'm & global] -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)] = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -201,7 +203,9 @@ Error: This value is "nonportable" but is expected to be "portable".
 let close_over x = fun () -> fun () -> x
 [%%expect{|
 val close_over :
-  'a @ [< 'm & global] -> unit @ 'o -> unit @ 'n -> 'a @ [> 'm] = <fun>
+  'a @ [< 'm & global] ->
+  (unit @ 'o -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [> close('m)] =
+  <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
