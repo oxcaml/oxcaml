@@ -1,9 +1,6 @@
 (* Final program lowering from the generator IR into OxCaml code. *)
 open Ast_helper
 open Asttypes
-
-(* CR hwasilewski for xclerc: Which of these [module] and [open] statements
-   should stay and which shouldn't? *)
 open Parsetree_helpers
 module Expr = Ir.Expr
 module Function = Ir.Function
@@ -14,16 +11,20 @@ module Ty = Ir.Ty
 
 type t =
   { functions : Function.t list;
-    main_decls : (Name.t * Ty.t * Expr.t) list;
-    main_statement : Statement.t
+    toplevel_decls : (Name.t * Ty.t * Expr.t) list;
+    toplevel_statement : Statement.t
   }
 
-let create ~functions ~main_decls ~main_statement =
-  { functions; main_decls; main_statement }
+let create ~functions ~toplevel_decls ~toplevel_statement =
+  { functions; toplevel_decls; toplevel_statement }
 
-let is_float_to_integral ~from ~to_ =
-  NumberTy.is_float from && not (NumberTy.is_float to_)
+let is_floating_point_to_integral ~from ~to_ =
+  NumberTy.is_floating_point from && not (NumberTy.is_floating_point to_)
 
+(* CR-someday hwasilewski: Optimize the prelude for faster compilation. Some
+   possibilities are precompiling the prelude into a .cmxa file and only linking
+   it during fuzzing, possibly only emitting the subset of functions that are
+   needed. *)
 let unsafe_converter_name ~from ~to_ =
   "unsafe_" ^ NumberTy.converter_name ~from ~to_
 
@@ -33,7 +34,7 @@ let conversions =
     let to_name = NumberTy.to_string to_ in
     let primitive_name = Format.sprintf "%%%s_of_%s" to_name from_name in
     let function_name =
-      if is_float_to_integral ~from ~to_
+      if is_floating_point_to_integral ~from ~to_
       then unsafe_converter_name ~from ~to_
       else NumberTy.converter_name ~from ~to_
     in
@@ -65,7 +66,8 @@ let integral_size (base : NumberTy.Base.t) =
   | Int32 -> int 32
   | Int16 -> int 16
   | Int8 -> int 8
-  | Float | Float32 -> invalid_arg "Program.integral_size"
+  | Float | Float32 ->
+    Misc.fatal_errorf "Program.integral_size: expected an integral type"
 
 (* Float-to-integer primitives are unspecified for NaN and out-of-range inputs.
    These wrappers map NaN to zero and saturate infinities and overflow. *)
@@ -87,7 +89,8 @@ let integral_bounds =
     [value upper_name upper; value lower_name lower]
   in
   List.concat_map
-    (fun base -> if NumberTy.Base.is_float base then [] else bounds base)
+    (fun base ->
+      if NumberTy.Base.is_floating_point base then [] else bounds base)
     NumberTy.Base.all
 
 let integral_value (to_ : NumberTy.t) value =
@@ -145,7 +148,7 @@ let float_to_integral_conversions =
     (fun from ->
       List.filter_map
         (fun to_ ->
-          if is_float_to_integral ~from ~to_
+          if is_floating_point_to_integral ~from ~to_
           then Some (wrapper from to_)
           else None)
         NumberTy.all)
@@ -173,7 +176,7 @@ let canonicalize_nan =
    of type [nty] *)
 let print_number nty e =
   let fmt, arg =
-    if NumberTy.is_float nty
+    if NumberTy.is_floating_point nty
     then
       ( "%h ",
         apply (ident canon_nan_name)
@@ -184,11 +187,14 @@ let print_number nty e =
     (qualified_ident "Printf" "printf")
     [Exp.constant (Const.string fmt); arg]
 
-let to_code { functions; main_decls = decls; main_statement = statement } =
+let to_code
+    { functions; toplevel_decls = decls; toplevel_statement = statement } =
   let print_decl (name, ty, _expr) =
     match ty with
     | Ty.Number nty -> print_number nty (ident (Name.to_string name))
-    | _ -> assert false
+    | _ ->
+      Misc.fatal_errorf
+        "Program.to_code: only numeric types allowed in toplevel declarations"
   in
   let body =
     Exp.sequence
@@ -200,11 +206,7 @@ let to_code { functions; main_decls = decls; main_statement = statement } =
   let body =
     List.fold_right
       (fun (name, _ty, expr) acc ->
-        Statement.let_mutable name
-          (Exp.apply
-             (qualified_ident "Sys" "opaque_identity")
-             [Nolabel, Expr.to_code expr])
-          acc)
+        Statement.let_mutable name (opaque_identity (Expr.to_code expr)) acc)
       decls body
   in
   let main =

@@ -7,6 +7,7 @@ val int : int -> Parsetree.expression
 val unit_ : Parsetree.expression
 val apply :
   Parsetree.expression -> Parsetree.expression list -> Parsetree.expression
+val opaque_identity : Parsetree.expression -> Parsetree.expression
 val op : string -> Parsetree.expression list -> Parsetree.expression
 val value_param : Parsetree.pattern -> Parsetree.function_param
 val function_ :

@@ -58,7 +58,7 @@ module Config = struct
 
   let max_expression_complexity = 10
 
-  let main_var_count = 5
+  let toplevel_var_count = 5
 end
 
 (* CR-someday hwasilewski: We should consider changing this to be a monad, which
@@ -85,7 +85,7 @@ module Gen = struct
       List.filter_map
         (fun (weight, choice) ->
           if weight < 0
-          then invalid_arg "Gen.weighted: negative weight"
+          then Misc.fatal_errorf "Gen.weighted: negative weight"
           else if weight = 0
           then None
           else Option.map (fun generate -> weight, generate) choice)
@@ -111,7 +111,7 @@ module Gen = struct
     weighted random_state (List.map (fun choice -> 1, choice) choices)
 
   let run_exn = function
-    | None -> invalid_arg "Gen.run_exn: no available generator"
+    | None -> Misc.fatal_errorf "Gen.run_exn: no available generator"
     | Some generate -> generate ()
 end
 
@@ -146,7 +146,7 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
                [ 1, small ~min:(-1) ~max:1;
                  1, small ~min:(-10) ~max:10;
                  2, Gen.create (fun () -> Random.State.bits64 st.random_state)
-               ])
+                 (* CR-soon hwasilewski: Add max_int and min_int. *) ])
         in
         record_complexity
           (Expr.Const (Number.of_integral_bits base bits))
@@ -155,20 +155,14 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
   let gen_const_float =
     Gen.create (fun () ->
         (* CR-soon hwasilewski: Add a skewed distribution of floats similar to
-           [gen_const_int]. *)
-        record_complexity
-          (Expr.Const
-             (Number.Float
-                (Int64.float_of_bits (Random.State.bits64 st.random_state))))
-          ~complexity)
+           [gen_const_int], emit NaNs with some probability. *)
+        let bits = Random.State.bits64 st.random_state in
+        record_complexity (Expr.Const (Number.Float bits)) ~complexity)
   in
   let gen_const_float32 =
     Gen.create (fun () ->
-        record_complexity
-          (Expr.Const
-             (Number.Float32
-                (Int32.float_of_bits (Random.State.bits32 st.random_state))))
-          ~complexity)
+        let bits = Random.State.bits32 st.random_state in
+        record_complexity (Expr.Const (Number.Float32 bits)) ~complexity)
   in
   let gen_const (nty : NumberTy.t) =
     let boxed =
@@ -338,7 +332,7 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
               in
               continue env (Statement.Assign (name, expr))
             | Bool ->
-              invalid_arg
+              Misc.fatal_errorf
                 "gen_fun_body.gen_assign: unexpected variable of type bool")
       in
       let gen_if =
@@ -384,11 +378,11 @@ let gen_program (st : State.t) env =
       let env, decls = gen_vars env (count - 1) in
       env, decl :: decls
   in
-  let env, main_decls = gen_vars env Config.main_var_count in
-  let _env, main_statement = gen_fun_body st env 0 in
+  let env, toplevel_decls = gen_vars env Config.toplevel_var_count in
+  let _env, toplevel_statement = gen_fun_body st env 0 in
   Program.create
     ~functions:(List.rev st.top_level_functions)
-    ~main_decls ~main_statement
+    ~toplevel_decls ~toplevel_statement
 
 let generate random =
   let state = State.create random in

@@ -17,6 +17,8 @@ let unit_ = Exp.construct (lid "()") None
 
 let apply id args = Exp.apply id (List.map (fun a -> Nolabel, a) args)
 
+let opaque_identity expr = apply (qualified_ident "Sys" "opaque_identity") [expr]
+
 let op name args = apply (ident name) args
 
 let value_param pattern : Parsetree.function_param =
