@@ -375,7 +375,7 @@ module Layout = struct
       List.equal (equate_or_equal ~allow_mutation) ts1 ts2
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
     | Addressable l1, Addressable l2 ->
-      (* Incomplete; see [Sort.equate_sort_addressable]. *)
+      (* Incomplete; see the [Addressable] cases in [Sort.equate]. *)
       equate_or_equal ~allow_mutation
         (strip_head_addressable l1)
         (strip_head_addressable l2)
@@ -429,7 +429,7 @@ module Layout = struct
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
       | Addressable l1, Addressable l2 ->
-        (* Incomplete; see [Sort.equate_sort_addressable]. *)
+        (* Incomplete; see the [Addressable] cases in [Sort.equate]. *)
         sub (strip_head_addressable l1) (strip_head_addressable l2)
       | Addressable l1, Any _ ->
         (* Instead of [l1 addressable < any], we solve [l1 < any]
@@ -501,7 +501,7 @@ module Layout = struct
     | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
     | Addressable l1, Addressable l2 ->
       (* The meet of two addressable layouts is addressable. Incomplete; see
-         [Sort.equate_sort_addressable]. *)
+         the [Addressable] cases in [Sort.equate]. *)
       Option.map
         (fun l -> Addressable l)
         (intersection (strip_head_addressable l1) (strip_head_addressable l2))
