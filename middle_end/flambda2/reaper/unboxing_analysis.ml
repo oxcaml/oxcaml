@@ -512,8 +512,11 @@ type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
-    my_closure_decisions : my_closure_param_decision Code_id.Map.t;
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+  }
+
+type calling_convention_changes =
+  { my_closure_decisions : my_closure_param_decision Code_id.Map.t;
     function_params_to_keep : param_decision list Code_id.Map.t;
     function_return_decision : param_decision list Code_id.Map.t
   }
@@ -606,15 +609,12 @@ let cannot_change_calling_convention_query =
   let^? [x], [] = ["x"], [] in
   [cannot_change_calling_convention x]
 
-let cannot_change_calling_convention_of_db db v =
+let cannot_change_calling_convention uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
   || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
-  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] db
+  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
-let cannot_change_calling_convention uses v =
-  cannot_change_calling_convention_of_db uses.db v
-
-let perform_analysis db ~code_deps ~stats =
+let perform_analysis db ~stats =
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -796,14 +796,27 @@ let perform_analysis db ~code_deps ~stats =
             !changed_representation;
         unboxed, !changed_representation)
   in
-  let get_unboxed_fields cn = Code_id_or_name.Map.find_opt cn unboxed in
+  if
+    Flambda_features.reaper_unbox ()
+    && Flambda_features.reaper_change_calling_conventions ()
+  then { db; unboxed_fields = unboxed; changed_representation }
+  else
+    { db;
+      unboxed_fields = Code_id_or_name.Map.empty;
+      changed_representation = Code_id_or_name.Map.empty
+    }
+
+let compute_calling_convention_changes uses ~code_deps =
+  let get_unboxed_fields cn =
+    Code_id_or_name.Map.find_opt cn uses.unboxed_fields
+  in
   let is_var_used var =
     match Variable.kind var with
     | Region | Rec_info -> true
-    | Value | Naked_number _ -> PTA.has_use db (Code_id_or_name.var var)
+    | Value | Naked_number _ -> PTA.has_use uses.db (Code_id_or_name.var var)
   in
   let should_keep_function_param code_id =
-    if cannot_change_calling_convention_of_db db code_id
+    if cannot_change_calling_convention uses code_id
     then (
       fun var kind ->
         assert (Option.is_none (get_unboxed_fields (Code_id_or_name.var var)));
@@ -830,7 +843,7 @@ let perform_analysis db ~code_deps ~stats =
         match unboxed_fields with
         | None -> Keep_my_closure
         | Some unboxed_fields ->
-          if cannot_change_calling_convention_of_db db code_id
+          if cannot_change_calling_convention uses code_id
           then
             Misc.fatal_errorf
               "For code_id %a, we cannot change calling convention but closure \
@@ -845,7 +858,7 @@ let perform_analysis db ~code_deps ~stats =
         let result_kinds =
           Flambda_arity.unarized_components code_dep.result_arity
         in
-        if cannot_change_calling_convention_of_db db code_id
+        if cannot_change_calling_convention uses code_id
         then
           List.map2 (fun v kind -> Keep (v, kind)) code_dep.return result_kinds
         else
@@ -861,21 +874,4 @@ let perform_analysis db ~code_deps ~stats =
             code_dep.return result_kinds)
       code_deps
   in
-  let result =
-    { db;
-      unboxed_fields = unboxed;
-      changed_representation;
-      my_closure_decisions;
-      function_params_to_keep;
-      function_return_decision
-    }
-  in
-  if
-    Flambda_features.reaper_unbox ()
-    && Flambda_features.reaper_change_calling_conventions ()
-  then result
-  else
-    { result with
-      unboxed_fields = Code_id_or_name.Map.empty;
-      changed_representation = Code_id_or_name.Map.empty
-    }
+  { my_closure_decisions; function_params_to_keep; function_return_decision }

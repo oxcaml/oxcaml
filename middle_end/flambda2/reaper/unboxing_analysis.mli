@@ -60,8 +60,11 @@ type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
-    my_closure_decisions : my_closure_param_decision Code_id.Map.t;
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+  }
+
+type calling_convention_changes =
+  { my_closure_decisions : my_closure_param_decision Code_id.Map.t;
     function_params_to_keep : param_decision list Code_id.Map.t;
     function_return_decision : param_decision list Code_id.Map.t
   }
@@ -71,7 +74,9 @@ val pp_result : Format.formatter -> result -> unit
 val cannot_change_calling_convention : result -> Code_id.t -> bool
 
 val perform_analysis :
-  Datalog.database ->
+  Datalog.database -> stats:Datalog.Schedule.stats -> result
+
+val compute_calling_convention_changes :
+  result ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
-  stats:Datalog.Schedule.stats ->
-  result
+  calling_convention_changes

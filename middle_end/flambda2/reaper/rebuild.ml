@@ -69,6 +69,7 @@ type should_preserve_direct_calls =
 type env =
   { machine_width : Target_system.Machine_width.t;
     uses : Unboxing_analysis.result;
+    calling_convention_changes : Unboxing_analysis.calling_convention_changes;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
@@ -215,7 +216,8 @@ let get_arity params_decisions =
 
 let function_return_decision env code_id =
   let return_decisions =
-    Code_id.Map.find code_id env.uses.function_return_decision
+    Code_id.Map.find code_id
+      env.calling_convention_changes.function_return_decision
   in
   if Analysis.cannot_change_calling_convention env.uses code_id
   then return_decisions
@@ -1277,7 +1279,10 @@ let rebuild_apply env apply =
          code_id Apply.print apply; *)
       let original_callee = Apply.callee apply in
       let args_from_unboxed_callee, callee =
-        match Code_id.Map.find_opt code_id env.uses.my_closure_decisions with
+        match
+          Code_id.Map.find_opt code_id
+            env.calling_convention_changes.my_closure_decisions
+        with
         | None ->
           Misc.fatal_errorf
             "No my_closure_decisions found for code id %a in direct apply \
@@ -1309,7 +1314,10 @@ let rebuild_apply env apply =
           get_args_with_kinds env [Unbox fields] [callee], None
       in
       let params_decisions =
-        match Code_id.Map.find_opt code_id env.uses.function_params_to_keep with
+        match
+          Code_id.Map.find_opt code_id
+            env.calling_convention_changes.function_params_to_keep
+        with
         | None ->
           Misc.fatal_errorf
             "No parameter decisions found for code id %a in direct apply \
@@ -2238,7 +2246,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
               | Changing_calling_convention code_id ->
                 let return_decisions = function_return_decision env code_id in
                 let params_decision =
-                  Code_id.Map.find code_id env.uses.function_params_to_keep
+                  Code_id.Map.find code_id
+                    env.calling_convention_changes.function_params_to_keep
                 in
                 ( List.map2
                     (fun p -> function
@@ -2284,7 +2293,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   | Changing_calling_convention code_id ->
     let return_decisions = function_return_decision env code_id in
     let params_decision =
-      Code_id.Map.find code_id env.uses.function_params_to_keep
+      Code_id.Map.find code_id
+        env.calling_convention_changes.function_params_to_keep
     in
     let result_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
     let code_metadata =
@@ -2459,7 +2469,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
     ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
-    (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
+    ~calling_convention_changes (solved_dep : Analysis.result) get_code_metadata
+    toplevel_expr code =
   let should_keep_param cont param kind =
     let keep_all_parameters =
       Continuation.Set.mem cont fixed_arity_continuations
@@ -2501,6 +2512,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
   let env =
     { machine_width;
       uses = solved_dep;
+      calling_convention_changes;
       code_deps;
       get_code_metadata;
       cont_params_to_keep;

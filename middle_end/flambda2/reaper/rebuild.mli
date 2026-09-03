@@ -45,6 +45,7 @@ val rebuild :
   fixed_arity_continuations:Continuation.Set.t ->
   final_typing_env:Typing_env.t option ->
   types_rewrite_context:Types_rewriter.rewrite_context ->
+  calling_convention_changes:Unboxing_analysis.calling_convention_changes ->
   Unboxing_analysis.result ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->
