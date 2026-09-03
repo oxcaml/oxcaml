@@ -202,9 +202,10 @@ val foo : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm | dynamic] = <fun>
 let foo f = fun x -> fun y -> f x y
 [%%expect{|
 val foo :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< past('q) & past('p) & global] ->
-  ('a @ [< 'o & global] ->
-   ('b @ [< 'n] -> 'c @ [> 'm | dynamic]) @ [> close('o) | past('q)]) @ [> past('p)] =
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
+  ('a @ [< 'q & global] ->
+   ('b @ [< 'p] -> 'c @ [> 'o | dynamic]) @ [> close('q) | past('mm1)]) @ [> past('mm0)] =
   <fun>
 |}]
 
@@ -539,7 +540,8 @@ let choose b x y = if b then x else y
 [%%expect{|
 val choose :
   bool @ 'p ->
-  ('a @ [< 'o & global] -> 'a @ [< 'n] -> 'a @ [> 'n | 'o | dynamic]) @ 'm =
+  ('a @ [< 'n & global] ->
+   ('a @ [< 'o] -> 'a @ [> 'o | 'n | dynamic]) @ [> close('n)]) @ 'm =
   <fun>
 |}, Principal{|
 val choose :
@@ -625,9 +627,10 @@ val flip :
 let flip f x y = f y x
 [%%expect{|
 val flip :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< past('q) & past('p) & global] ->
-  ('b @ [< 'n & global] ->
-   ('a @ [< 'o] -> 'c @ [> 'm | dynamic]) @ [> close('n) | past('q)]) @ [> past('p)] =
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
+  ('b @ [< 'p & global] ->
+   ('a @ [< 'q] -> 'c @ [> 'o | dynamic]) @ [> close('p) | past('mm1)]) @ [> past('mm0)] =
   <fun>
 |}]
 
@@ -635,8 +638,9 @@ val flip :
 let flip f = fun x -> fun y -> f y x
 [%%expect{|
 val flip :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< past('q) & past('p) & global] ->
-  ('b @ [< 'n & global] ->
-   ('a @ [< 'o] -> 'c @ [> 'm | dynamic]) @ [> close('n) | past('q)]) @ [> past('p)] =
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
+  ('b @ [< 'p & global] ->
+   ('a @ [< 'q] -> 'c @ [> 'o | dynamic]) @ [> close('p) | past('mm1)]) @ [> past('mm0)] =
   <fun>
 |}]

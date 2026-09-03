@@ -307,16 +307,21 @@ val curry_mode :
     a constant until a generic mode variable is encountered, then the join
     of the modes closed over ([curry_mode]). A hidden curry mode is a
     variable whose lower bound is the implied curry mode, unconstrained
-    otherwise. *)
+    otherwise. Its areality is bounded below by the constant upper bounds
+    of the areality of the arguments: a closure is as local as the
+    arguments it may close over. *)
 module Curry_mode : sig
   type t =
     | Const of Alloc.Const.t
-    | Variable of Alloc.Comonadic.l
+    | Variable of
+        { comonadic : Alloc.Comonadic.l;
+          areality : Locality.Const.t }
 
   val add_const_arg : t -> Alloc.Const.t -> t
 
-  (** Always yields a variable accumulator. *)
-  val add_arg : t -> Alloc.lr -> t
+  (** Always yields a variable accumulator. [upper_areality] is the constant
+      upper bound of the areality of the argument. *)
+  val add_arg : t -> Alloc.lr -> upper_areality:Locality.Const.t -> t
 
   (** The comonadic mode of the accumulated curry. *)
   val comonadic : t -> Alloc.Comonadic.l

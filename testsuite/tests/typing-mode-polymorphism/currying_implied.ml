@@ -50,9 +50,10 @@ val compose :
 let flip f x y = f y x
 [%%expect{|
 val flip :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< past('q) & past('p) & global] ->
-  ('b @ [< 'n & global] ->
-   ('a @ [< 'o] -> 'c @ [> 'm | dynamic]) @ [> close('n) | past('q)]) @ [> past('p)] =
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
+  ('b @ [< 'p & global] ->
+   ('a @ [< 'q] -> 'c @ [> 'o | dynamic]) @ [> close('p) | past('mm1)]) @ [> past('mm0)] =
   <fun>
 |}]
 
@@ -140,13 +141,13 @@ let store_and_call c g x = c.v <- g; c.v x
 val store_and_call :
   ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('p) & global read_write] ->
   (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global many read_write] ->
-   'a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o) | past('p) mod many forkable unyielding | stateful] =
+   ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) mod many forkable unyielding | stateful]) @ [> past('o) | past('p) mod many forkable unyielding | stateful] =
   <fun>
 |}, Principal{|
 val store_and_call :
   ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('p) & global read_write] ->
   (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global many read_write] ->
-   'a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o) | past('p) | stateful] =
+   ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) | stateful]) @ [> past('o) | past('p) | stateful] =
   <fun>
 |}]
 

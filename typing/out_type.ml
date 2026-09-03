@@ -1009,7 +1009,9 @@ let curry_acc : Curry_mode.t -> Alloc.lr -> Curry_mode.t =
     | Some arg -> Curry_mode.add_const_arg acc arg
     | None ->
       if mode_polymorphism_printing_enabled ()
-      then Curry_mode.add_arg acc marg
+      then
+        Curry_mode.add_arg acc marg
+          ~upper_areality:(Alloc.Guts.get_ceil marg).areality
       else
         Curry_mode.add_const_arg acc
           (Alloc.zap_to_legacy_force ~arg:true marg)
@@ -1022,7 +1024,10 @@ let curry_mode_of_occurrence : arg:bool -> Alloc.lr -> Curry_mode.t =
     | Some c -> Const c
     | None ->
       if mode_polymorphism_printing_enabled ()
-      then Variable (Alloc.Comonadic.disallow_right m.comonadic)
+      then
+        Variable
+          { comonadic = Alloc.Comonadic.disallow_right m.comonadic;
+            areality = (Alloc.Guts.get_ceil m).areality }
       else Const (Alloc.zap_to_legacy_force ~arg m)
 
 (** Whether the return mode [m] of an arrow is the curry mode implied by
