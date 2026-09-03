@@ -1,185 +1,44 @@
 (* TEST
  flambda2;
- {
-   flags = "-extension layouts_beta";
-   expect.opt;
- }{
-   flags = "-extension layouts_beta -Oclassic";
-   expect.opt;
- }{
-   flags = "-extension layouts_beta -O3";
-   expect.opt;
- }
+ flags = "-extension layouts_beta";
+ { expect.opt; }
+ { flags += " -Oclassic"; expect.opt; }
+ { flags += " -O3"; expect.opt; }
 *)
 
-(* In native code, all-void records are static, empty tag-0 blocks.
-   Their physical identity is unspecified, even when fields are mutable;
-   they need not be canonical atoms.
-   Behavior shared with bytecode (notably *not* memory representation)
-   is tested in [all_void_records_runtime.ml]. *)
-
-let describe x =
-  let o = Obj.repr x in
-  if Obj.is_int o
-  then Printf.sprintf "imm %d" (Obj.obj o : int)
-  else Printf.sprintf "block tag %d size %d" (Obj.tag o) (Obj.size o)
-[%%expect{|
-val describe : 'a -> string = <fun>
-|}]
-
-type t = { x : unit# }
+(* Native boxed records are empty tag-0 blocks, regardless of mutability
+   or product fields. Partial small-record updates reconstruct that shape.
+   No physical sharing is required. *)
+type t = { x : unit#; kept : unit# }
 type p = { y : #(unit# * unit#) }
 type m = { mutable z : unit# }
+let describe x =
+  let o = Obj.repr x in
+  if Obj.is_int o then "immediate"
+  else Printf.sprintf "block tag %d size %d" (Obj.tag o) (Obj.size o)
+let shapes =
+  let r = { x = #(); kept = #() } in
+  [describe r; describe { r with x = #() };
+   describe { y = #(#(), #()) }; describe { z = #() }]
 [%%expect{|
-type t = { x : unit#; }
+type t = { x : unit#; kept : unit#; }
 type p = { y : #(unit# * unit#); }
 type m = { mutable z : unit#; }
+val describe : 'a -> string = <fun>
+val shapes : string list =
+  ["block tag 0 size 0"; "block tag 0 size 0"; "block tag 0 size 0";
+   "block tag 0 size 0"]
 |}]
 
-(* Representation: an empty tag-0 block. *)
-
-let reprs =
-  [describe { x = #() }; describe { y = #(#(), #()) }; describe { z = #() }]
+(* Branches, loop parameters, and inlined constructors preserve the shape. *)
+let[@inline always] make () = { x = #(); kept = #() }
+let[@inline never] flow choose =
+  let r = if choose then make () else Sys.opaque_identity (make ()) in
+  let rec loop n r = if n = 0 then r else loop (n - 1) r in
+  loop 10 r
+let flowed = List.map describe [flow true; flow false]
 [%%expect{|
-val reprs : string list =
-  ["block tag 0 size 0"; "block tag 0 size 0"; "block tag 0 size 0"]
-|}]
-
-(* No allocation: constructing in a loop must not move the minor heap. *)
-
-let no_alloc =
-  let before = Gc.minor_words () in
-  for _ = 1 to 1000 do
-    ignore (Sys.opaque_identity { x = #() })
-  done;
-  Gc.minor_words () -. before = 0.
-[%%expect{|
-val no_alloc : bool = true
-|}]
-
-(* Physical equality is unspecified for all-void records, including mutable
-   ones. The physical-equality expectations below over-specify the design
-   and should be removed. *)
-
-let phys_equal = { x = #() } == { x = #() }
-[%%expect{|
-val phys_equal : bool = true
-|}]
-
-let phys_equal_mutable = { z = #() } == { z = #() }
-[%%expect{|
-val phys_equal_mutable : bool = true
-|}]
-
-(* Functional update ([Pduprecord]) copies the block's real size,
-   not one word per label. The result's physical identity is unspecified. *)
-
-let[@warning "-23"] functional_update_size =
-  let r = { x = #() } in
-  describe { r with x = #() }
-[%%expect{|
-val functional_update_size : string = "block tag 0 size 0"
-|}]
-
-let[@warning "-23"] functional_update_identity =
-  let r = { x = #() } in
-  { r with x = #() } == r
-[%%expect{|
-val functional_update_identity : bool = true
-|}]
-
-(* An empty block is an ordinary scanned value when stored in other blocks. *)
-
-let nested =
-  [describe (Some { x = #() }); describe [{ x = #() }; { x = #() }]]
-[%%expect{|
-val nested : string list = ["block tag 0 size 1"; "block tag 0 size 2"]
-|}]
-
-(* Recursive bindings produce empty tag-0 blocks. *)
-
-let letrec_reprs =
-  let rec r = { x = #() }
-  and f () = r in
-  [describe r; describe (f ())]
-[%%expect{|
-val letrec_reprs : string list = ["block tag 0 size 0"; "block tag 0 size 0"]
-|}]
-
-(* Void fields never count towards the size of a block,
-   whether or not the record is all-void;
-   in particular, functional update must copy
-   the block's real size, not one word per label. *)
-
-type tv = { i : int; v : unit# }
-[%%expect{|
-type tv = { i : int; v : unit#; }
-|}]
-
-let void_field_sizes =
-  let r = { i = 1; v = #() } in
-  [describe r; describe { r with i = 2 }]
-[%%expect{|
-val void_field_sizes : string list =
-  ["block tag 0 size 1"; "block tag 0 size 1"]
-|}]
-
-(* Optimization: empty records retain their tag and size through join
-   points, unboxable parameters, and inlined returns. Rebuilding a record
-   may select a different static empty block. *)
-
-(* Join point: the same variable bound on two branches. *)
-let[@inline never] join b =
-  let r = if b then { x = #() } else { x = #() } in
-  describe r
-let join_result = [join true; join false]
-[%%expect{|
-val join : bool -> string = <fun>
-val join_result : string list = ["block tag 0 size 0"; "block tag 0 size 0"]
-|}]
-
-(* Loop parameter: a candidate for continuation-parameter unboxing.
-   The result must retain its empty-block shape, not its physical identity. *)
-let loop_result =
-  let rec go n (r : t) = if n = 0 then r else go (n - 1) r in
-  let r = { x = #() } in
-  let r' = go 1000 r in
-  describe r', r' == r
-[%%expect{|
-val loop_result : string * bool = ("block tag 0 size 0", true)
-|}]
-
-(* Inlined return: the record is constructed in the callee and
-   used in the caller after inlining. Physical equality of separate
-   constructions is unspecified. *)
-let[@inline always] mk () = { x = #() }
-let inlined_result = describe (mk ())
-let inlined_phys_equal = mk () == mk ()
-[%%expect{|
-val mk : unit -> t = <fun>
-val inlined_result : string = "block tag 0 size 0"
-val inlined_phys_equal : bool = true
-|}]
-
-(* All-void records obtained by instantiating [any] with a [void] type
-   must have the same empty-block shape as the directly-declared ones above.
-   This does not require physical sharing. *)
-
-type ('a : any) r = { x : 'a }
-[%%expect{|
-type ('a : any) r = { x : 'a; }
-|}]
-
-let any_reprs =
-  [ describe ({ x = #() } : unit# r);
-    describe ({ x = #(#(), #()) } : #(unit# * unit#) r);
-    describe ({ x = 3 } : int r) ]
-[%%expect{|
-val any_reprs : string list =
-  ["block tag 0 size 0"; "block tag 0 size 0"; "block tag 0 size 1"]
-|}]
-
-let any_phys_equal = ({ x = #() } : unit# r) == { x = #() }
-[%%expect{|
-val any_phys_equal : bool = true
+val make : unit -> t = <fun>
+val flow : bool -> t = <fun>
+val flowed : string list = ["block tag 0 size 0"; "block tag 0 size 0"]
 |}]

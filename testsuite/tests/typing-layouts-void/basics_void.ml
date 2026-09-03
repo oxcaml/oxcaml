@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension layouts_alpha";
  expect;
 *)
 
@@ -128,52 +129,112 @@ type vme : void
 type t = A of vme [@immediate_all_void_constructor]
 |}]
 
-(* All-void records *)
-type u1 = #{ a: unit_u }
-type u2 = #{ a: unit_u; b: unit_u }
+(* Boxed records and inline payloads may be all void, including through
+   nested products. The implicit unboxed version of a boxed record is void. *)
+type u1 = #{ a : unit_u }
+type u2 = #{ a : unit_u; b : unit_u }
 type u3 = { a : unit_u } [@@unboxed]
-type u4 = #{ a: u2 }
-type u5 = #{ a: u3 }
+type nested = #{ a : unit_u; b : #(unit_u * unit_u) }
+type b1 = { a : unit_u }
+type b1_unboxed : void = b1#
+type inline = A of { a : nested }
 [%%expect{|
 type u1 = #{ a : unit_u; }
 type u2 = #{ a : unit_u; b : unit_u; }
 type u3 = { a : unit_u; } [@@unboxed]
-type u4 = #{ a : u2; }
-type u5 = #{ a : u3; }
-|}]
-
-type b1 = { a : unit_u }
-type b2 = { a : #(unit_u * unit_u) }
-type b3 = { a : u1 }
-type b4 = { a : u2 }
-type b5 = { a : u3 }
-type b6 = { a : u4 }
-type b7 = { a : u5 }
-[%%expect{|
+type nested = #{ a : unit_u; b : #(unit_u * unit_u); }
 type b1 = { a : unit_u; }
-type b2 = { a : #(unit_u * unit_u); }
-type b3 = { a : u1; }
-type b4 = { a : u2; }
-type b5 = { a : u3; }
-type b6 = { a : u4; }
-type b7 = { a : u5; }
+type b1_unboxed = b1#
+type inline = A of { a : nested; }
 |}]
 
-type i1 = A of { a : unit_u }
-type i2 = A of { a : #(unit_u * unit_u) }
-type i3 = A of { a : u1 }
-type i4 = A of { a : u2 }
-type i5 = A of { a : u3 }
-type i6 = A of { a : u4 }
-type i7 = A of { a : u5 }
+(* Erasing fields does not erase source-level mutability. *)
+
+type t = A of { x : unit# }
+let set (A r) = r.x <- #()
 [%%expect{|
-type i1 = A of { a : unit_u; }
-type i2 = A of { a : #(unit_u * unit_u); }
-type i3 = A of { a : u1; }
-type i4 = A of { a : u2; }
-type i5 = A of { a : u3; }
-type i6 = A of { a : u4; }
-type i7 = A of { a : u5; }
+type t = A of { x : unit#; }
+Line 2, characters 16-26:
+2 | let set (A r) = r.x <- #()
+                    ^^^^^^^^^^
+Error: The record field "x" is not mutable
+|}]
+
+type t : immutable_data = { mutable x : unit# }
+[%%expect{|
+Line 1, characters 0-47:
+1 | type t : immutable_data = { mutable x : unit# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because mutable fields are not mod immutable.
+|}]
+
+module Bad : sig type t : immutable_data end = struct
+  type t = A of { mutable x : unit# }
+end
+[%%expect{|
+Lines 1-3, characters 47-3:
+1 | ...............................................struct
+2 |   type t = A of { mutable x : unit# }
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = A of { mutable x : unit#; } end
+       is not included in
+         sig type t : immutable_data end
+       Type declarations do not match:
+         type t = A of { mutable x : unit#; }
+       is not included in
+         type t : immutable_data
+       The kind of the first is mutable_data
+         because of the definition of t at line 2, characters 2-37.
+       But the kind of the first must be a subkind of immutable_data
+         because of the definition of t at line 1, characters 17-40.
+|}]
+
+(* An abstract void field contributes with-bounds despite occupying no space. *)
+
+type record : immutable_data with key = { x : key }
+type inline_record : immutable_data with key = A of { x : key }
+[%%expect{|
+type record = { x : key; }
+type inline_record = A of { x : key; }
+|}]
+
+type bad : immutable_data = { x : key }
+[%%expect{|
+Line 1, characters 0-39:
+1 | type bad : immutable_data = { x : key }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because key is not mod forkable unyielding many stateless immutable.
+|}]
+
+type bad : immutable_data = A of { x : key }
+[%%expect{|
+Line 1, characters 0-44:
+1 | type bad : immutable_data = A of { x : key }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because key is not mod forkable unyielding many stateless immutable.
+|}]
+
+(* Refining a generic field to void preserves the surrounding boxed kind. *)
+
+type ('a : any) generic = A of { mutable x : 'a }
+type bad : immutable_data = unit# generic
+[%%expect{|
+type ('a : any) generic = A of { mutable x : 'a; }
+Line 2, characters 0-41:
+2 | type bad : immutable_data = unit# generic
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "unit# generic" is mutable_data
+         because of the definition of generic at line 1, characters 0-49.
+       But the kind of type "unit# generic" must be a subkind of immutable_data
+         because of the definition of bad at line 2, characters 0-41.
 |}]
 
 (* [void] in arrays is not yet allowed *)

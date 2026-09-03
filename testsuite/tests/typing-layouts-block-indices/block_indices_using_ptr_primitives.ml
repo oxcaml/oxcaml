@@ -184,7 +184,9 @@ let () =
   let r = { v = void () } in
   let v = unsafe_get_ptr #(r, (.v)) in
   Printf.printf "{ %s }\n" (use_void v);
-  Idx_mut.set r (.v) (void ());
+  let rhs_calls = ref 0 in
+  unsafe_set_ptr #(r, (.v)) (incr rhs_calls; void ());
+  Printf.printf "void RHS evaluated %d time(s)\n" !rhs_calls;
   let v = unsafe_get_ptr #(r, (.v)) in
   Printf.printf "{ %s }\n" (use_void v);
   print_newline ()
