@@ -127,6 +127,8 @@ let field_offset_for_label lbl repres =
   | Record_inlined (_, Constructor_mixed _, Variant_with_null)
   | Record_mixed _ ->
       lbl.lbl_pos
+  | Record_empty ->
+      lbl.lbl_pos
   | Record_dummy _ ->
       fatal_error "field_offset_for_label: dummy record representation"
   | Record_inlined (_, Constructor_immediate_all_void, _) ->
@@ -849,7 +851,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | Record_inlined (_, Constructor_immediate_all_void, _)
         | Record_inlined (_, Constructor_mixed _, _) | Record_float
         | Record_ufloat | Record_mixed _ | Record_dummy _
-        | Record_undetermined | Record_variable _ ->
+        | Record_undetermined | Record_variable _ | Record_empty ->
           Misc.fatal_error
             "transl: Texp_atomic_loc got unexpected record representation"
       in
@@ -860,7 +862,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
              [arg; lbl], loc)
   | Texp_field { record = arg; record_sort = arg_sort;
                  record_repres; lid = _; label = lbl; boxing = float;
-                 unique_barrier = ubr } ->
+                 unique_barrier = ubr } -> begin
       let record_repres =
         Typedecl.finalize_record_representation arg.exp_env e.exp_loc
           record_repres
@@ -868,96 +870,101 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let arg_layout = layout_exp arg_sort arg in
       let targ = transl_exp ~scopes arg_layout arg in
-      let sem =
-        if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
-      in
-      let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
-      let prim_and_args =
-        match record_repres with
-          Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
-          let immediate_or_pointer, _ = maybe_pointer e in
-          if Types.is_atomic lbl.lbl_mut
-          then
-            Some
-              (Patomic_load_field { immediate_or_pointer },
-               [targ;
-                Lconst (Const_base (Const_int (
-                  field_offset_for_label lbl record_repres)))])
-          else
-            Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
-        | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
-        | Record_float ->
-          let alloc_mode =
-            match float with
-            | Boxing (alloc_mode, _) -> alloc_mode
-            | Non_boxing _ -> assert false
-          in
-          let mode = transl_alloc_mode_r alloc_mode in
-          Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
-        | Record_ufloat ->
-          Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
-        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-          let immediate_or_pointer, _ = maybe_pointer e in
-          if Types.is_atomic lbl.lbl_mut
-          then
-            Some
-              (Patomic_load_field { immediate_or_pointer },
-               [targ;
-                Lconst (Const_base (Const_int (
-                  field_offset_for_label lbl record_repres)))])
-          else
-            Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
-        | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
-            (* CR layouts v5.9: support this *)
-            fatal_error
-              "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
-          (* CR layouts v5: once all-void records are allowed, handle
-             constructors with all-void inline records, which are stored as
-             immediates *)
-        | Record_mixed shape ->
-          let shape =
-            Lambda.transl_mixed_product_shape_for_read
-              ~get_value_kind:(fun i ->
-                if i <> lbl.lbl_pos then Lambda.generic_value
-                else
-                  let pointerness, nullable = maybe_pointer e in
-                  let raw_kind = value_kind_of_pointerness pointerness in
-                  Lambda.{ raw_kind; nullable })
-              ~get_mode:(fun i ->
-                if i <> lbl.lbl_pos then Lambda.alloc_heap
-                else
-                  match float with
-                    | Boxing (mode, _) -> transl_alloc_mode_r mode
-                    | Non_boxing _ ->
-                        Misc.fatal_error
-                          "expected typechecking to make [float] boxing mode\
-                          \ present for float field read")
-              shape
-          in
-          if Types.is_atomic lbl.lbl_mut then
-            (* Patomic_load_mixed_field doesn't care about locality mode;
-               [@@flatten_floats] doesn't accept records with atomic fields. *)
-            let shape = strip_locality_mode shape in
-            Some
-              (Patomic_load_mixed_field { index = lbl.lbl_pos; shape }, [targ])
-          else
-            Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
-        | Record_inlined (_, _, Variant_with_null) -> assert false
-        | Record_dummy _ ->
-          fatal_error "transl_exp0: dummy record representation"
-        | Record_inlined (_, Constructor_immediate_all_void, _) ->
-          fatal_error "transl_exp0: immediate record representation"
-        | Record_inlined
-            (_, (Constructor_undetermined | Constructor_variable _), _)
-        | (Record_undetermined | Record_variable _) ->
-          fatal_error "transl_exp0: variable record representation"
-      in
-      begin match prim_and_args with
-      | None -> targ
-      | Some (prim, args) -> Lprim (prim, args, of_location ~scopes e.exp_loc)
+      match record_repres with
+      | Record_empty -> Lsequence (targ, empty_record layout)
+      | _ -> begin
+        let sem =
+          if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
+        in
+        let sem = add_barrier_to_read (transl_unique_barrier ubr) sem in
+        let prim_and_args =
+          match record_repres with
+            Record_boxed
+          | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+            let immediate_or_pointer, _ = maybe_pointer e in
+            if Types.is_atomic lbl.lbl_mut
+            then
+              Some
+                (Patomic_load_field { immediate_or_pointer },
+                [targ;
+                  Lconst (Const_base (Const_int (
+                    field_offset_for_label lbl record_repres)))])
+            else
+              Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
+          | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
+          | Record_float ->
+            let alloc_mode =
+              match float with
+              | Boxing (alloc_mode, _) -> alloc_mode
+              | Non_boxing _ -> assert false
+            in
+            let mode = transl_alloc_mode_r alloc_mode in
+            Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
+          | Record_ufloat ->
+            Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
+          | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+            let immediate_or_pointer, _ = maybe_pointer e in
+            if Types.is_atomic lbl.lbl_mut
+            then
+              Some
+                (Patomic_load_field { immediate_or_pointer },
+                [targ;
+                  Lconst (Const_base (Const_int (
+                    field_offset_for_label lbl record_repres)))])
+            else
+              Some (Pfield (lbl.lbl_pos + 1, immediate_or_pointer, sem), [targ])
+          | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
+              (* CR layouts v5.9: support this *)
+              fatal_error
+                "Mixed inlined records not supported for extensible variants"
+          | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+            (* CR layouts v5: once all-void records are allowed, handle
+              constructors with all-void inline records, which are stored as
+              immediates *)
+          | Record_mixed shape ->
+            let shape =
+              Lambda.transl_mixed_product_shape_for_read
+                ~get_value_kind:(fun i ->
+                  if i <> lbl.lbl_pos then Lambda.generic_value
+                  else
+                    let pointerness, nullable = maybe_pointer e in
+                    let raw_kind = value_kind_of_pointerness pointerness in
+                    Lambda.{ raw_kind; nullable })
+                ~get_mode:(fun i ->
+                  if i <> lbl.lbl_pos then Lambda.alloc_heap
+                  else
+                    match float with
+                      | Boxing (mode, _) -> transl_alloc_mode_r mode
+                      | Non_boxing _ ->
+                          Misc.fatal_error
+                            "expected typechecking to make [float] boxing mode\
+                            \ present for float field read")
+                shape
+            in
+            if Types.is_atomic lbl.lbl_mut then
+              (* Patomic_load_mixed_field doesn't care about locality mode;
+                [@@flatten_floats] doesn't accept records with atomic fields. *)
+              let shape = strip_locality_mode shape in
+              Some
+                (Patomic_load_mixed_field { index = lbl.lbl_pos; shape }, [targ])
+            else
+              Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
+          | Record_inlined (_, _, Variant_with_null) -> assert false
+          | Record_dummy _ ->
+            fatal_error "transl_exp0: dummy record representation"
+          | Record_inlined (_, Constructor_immediate_all_void, _) ->
+            fatal_error "transl_exp0: immediate record representation"
+          | Record_inlined
+              (_, (Constructor_undetermined | Constructor_variable _), _)
+          | (Record_undetermined | Record_variable _) ->
+            fatal_error "transl_exp0: variable record representation"
+        in
+        begin match prim_and_args with
+        | None -> targ
+        | Some (prim, args) -> Lprim (prim, args, of_location ~scopes e.exp_loc)
+        end
       end
+    end
   | Texp_unboxed_field{ record = arg; record_sort = arg_sort;
                         label = lbl; record_repres; _ } ->
     begin match record_repres with
