@@ -1786,7 +1786,7 @@ let cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
      Note: we wrap the true [cut_and_n_way_join0] to avoid hurting readability
      by increasing indentation. *)
   if Index.Map.is_empty equations_to_join
-  then ME.make_bottom source_env, Name_in_target_env.Map.empty
+  then ME.make_bottom source_env, Variable_in_target_env.Map.empty
   else
     cut_and_n_way_join0 ~n_way_join_type ~meet_expanded_head ~cut_after
       source_env source_tenv joined_envs equations_to_join
