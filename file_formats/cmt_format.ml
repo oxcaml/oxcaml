@@ -111,6 +111,21 @@ let iter_on_declaration f decl =
 let iter_on_declarations ~(f: Shape.Uid.t -> item_declaration -> unit) = {
   Tast_iterator.default_iterator with
   item_declaration = (fun _sub decl -> iter_on_declaration f decl);
+  expr = (fun sub expr ->
+    (match expr.exp_desc with
+     | Texp_letmodule { id; name; presence; uid; module_expr; _ } ->
+         f uid
+           (Module_binding
+              { mb_id = id;
+                mb_name = name;
+                mb_uid = uid;
+                mb_presence = presence;
+                mb_expr = module_expr;
+                mb_attributes = [];
+                mb_loc = module_expr.mod_loc
+              })
+     | _ -> ());
+    Tast_iterator.default_iterator.expr sub expr);
 }
 
 let need_to_clear_env =
