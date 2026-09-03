@@ -35,9 +35,9 @@ type 'a close_program_metadata =
   | Normal : [`Normal] close_program_metadata
   | Classic :
       (Exported_code.t
-      * Code_or_metadata.t Value_approximation.t Symbol.Map.t
       * Name_occurrences.t
-      * Slot_offsets.t)
+      * Flambda_cmx_format.raw option
+      * Exported_offsets.t)
       -> [`Classic] close_program_metadata
 
 type 'a close_program_result =
@@ -4139,7 +4139,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
     ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
     ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region :
+    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~sections :
     mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
@@ -4210,6 +4210,9 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
   if Option.is_some (Acc.top_closure_info acc)
   then
     Misc.fatal_error "Information on nested closures should be empty at the end";
+  let get_code_metadata code_id =
+    Code_id.Map.find code_id (Acc.code_map acc) |> Code.code_metadata
+  in
   let code_slot_offsets = Acc.code_slot_offsets acc in
   match mode with
   | Normal ->
@@ -4229,6 +4232,28 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         (Exported_code.mark_as_imported
            (Flambda_cmx.get_imported_code cmx_loader ()))
     in
+    let Slot_offsets.{ used_value_slots; exported_offsets } =
+      let used_slots =
+        let free_names = Acc.free_names acc in
+        Slot_offsets.
+          { function_slots_in_normal_projections =
+              Name_occurrences.function_slots_in_normal_projections free_names;
+            all_function_slots =
+              Name_occurrences.all_function_slots_at_normal_mode free_names;
+            value_slots_in_normal_projections =
+              Name_occurrences.value_slots_in_normal_projections free_names;
+            all_value_slots =
+              Name_occurrences.all_value_slots_at_normal_mode free_names
+          }
+      in
+      Slot_offsets.finalize_offsets (Acc.slot_offsets acc) ~get_code_metadata
+        ~used_slots
+    in
+    let reachable_names, cmx =
+      Flambda_cmx.prepare_cmx_from_approx ~machine_width:(Acc.machine_width acc)
+        ~approxs:symbols_approximations ~module_symbol ~exported_offsets
+        ~used_value_slots ~sections all_code
+    in
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
         ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
@@ -4236,10 +4261,5 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     in
     { unit;
       code_slot_offsets;
-      metadata =
-        Classic
-          ( all_code,
-            symbols_approximations,
-            Acc.free_names acc,
-            Acc.slot_offsets acc )
+      metadata = Classic (all_code, reachable_names, cmx, exported_offsets)
     }

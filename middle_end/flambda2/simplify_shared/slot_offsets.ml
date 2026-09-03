@@ -1170,17 +1170,3 @@ let finalize_offsets ~get_code_metadata ~used_slots l =
     ~always:(fun () ->
       if Flambda_features.dump_slot_offsets ()
       then Format.eprintf "%a@." Greedy.print state)
-
-let finalize_offsets_from_free_names l ~get_code_metadata ~free_names =
-  let used_slots =
-    { function_slots_in_normal_projections =
-        Name_occurrences.function_slots_in_normal_projections free_names;
-      all_function_slots =
-        Name_occurrences.all_function_slots_at_normal_mode free_names;
-      value_slots_in_normal_projections =
-        Name_occurrences.value_slots_in_normal_projections free_names;
-      all_value_slots =
-        Name_occurrences.all_value_slots_at_normal_mode free_names
-    }
-  in
-  finalize_offsets ~get_code_metadata ~used_slots l
