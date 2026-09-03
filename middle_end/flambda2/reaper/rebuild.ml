@@ -1118,8 +1118,6 @@ let rebuild_apply env apply =
       in
       Exn_continuation.create ~exn_handler ~extra_args
     in
-    (* TODO rewrite arities *)
-    (* XXX mshinwell: does this "rewrite arities" need to be done now? *)
     match updating_calling_convention with
     | Not_changing_calling_convention -> (
       match Apply.callee apply with
@@ -1157,37 +1155,83 @@ let rebuild_apply env apply =
                 Some (Code_id_or_name.name name, false))
           | C_call _ | Method _ | Effect _ -> None
         in
-        let args =
+        let args_and_keep =
           match callee_and_known_arity with
-          | None -> List.map (rewrite_simple env) (Apply.args apply)
+          | None ->
+            List.map
+              (fun arg -> rewrite_simple env arg, Points_to_analysis.Keep)
+              (Apply.args apply)
           | Some (callee, known_arity) ->
-            let keep_or_poison (arg, to_keep) =
-              match (to_keep : Points_to_analysis.keep_or_delete) with
-              | Keep -> arg
-              | Delete ->
-                Simple.pattern_match arg
-                  ~const:(fun _ -> arg)
-                  ~name:(fun name ~coercion:_ ->
-                    name_poison ~category:"reaper_unused_argument" name)
-            in
-            let args_and_keep =
-              if known_arity
-              then
-                Analysis.arguments_used_by_known_arity_call env.uses callee
+            if known_arity
+            then
+              Analysis.arguments_used_by_known_arity_call env.uses callee
+                (Apply.args apply)
+            else
+              let grouped_args =
+                Flambda_arity.group_by_parameter (Apply.args_arity apply)
                   (Apply.args apply)
-              else
-                let grouped_args =
-                  Flambda_arity.group_by_parameter (Apply.args_arity apply)
-                    (Apply.args apply)
-                in
-                List.flatten
-                  (Analysis.arguments_used_by_unknown_arity_call env.uses callee
-                     grouped_args)
-            in
-            List.map keep_or_poison args_and_keep
+              in
+              List.flatten
+                (Analysis.arguments_used_by_unknown_arity_call env.uses callee
+                   grouped_args)
         in
-        let args_arity = Apply.args_arity apply in
-        let return_arity = Apply.return_arity apply in
+        let args, args_arity =
+          List.split
+            (List.map2
+               (fun (arg, to_keep) kind ->
+                 match (to_keep : Points_to_analysis.keep_or_delete) with
+                 | Keep ->
+                   ( arg,
+                     Simple.pattern_match arg
+                       ~const:(fun _ -> kind)
+                       ~name:(fun name ~coercion:_ ->
+                         Types_rewriter.rewrite_kind_with_subkind
+                           env.types_rewrite_context name kind) )
+                 | Delete ->
+                   ( Simple.pattern_match arg
+                       ~const:(fun _ -> arg)
+                       ~name:(fun name ~coercion:_ ->
+                         name_poison ~category:"reaper_unused_argument" name),
+                     Types_rewriter.erase_subkind kind ))
+               args_and_keep
+               (Flambda_arity.unarize (Apply.args_arity apply)))
+        in
+        (* The calling convention is not changing, but the arguments might have
+           been replaced by poison, so we need to rewrite the arities. *)
+        let args_arity =
+          Flambda_arity.create
+            (List.map
+               (fun kinds ->
+                 Flambda_arity.Component_for_creation.(
+                   Unboxed_product (List.map (fun kind -> Singleton kind) kinds)))
+               (Flambda_arity.group_by_parameter (Apply.args_arity apply)
+                  args_arity))
+        in
+        let return_arity =
+          match Apply.continuation apply with
+          | Never_returns -> Apply.return_arity apply
+          | Return cont ->
+            let cont_decisions =
+              Continuation.Map.find cont env.cont_params_to_keep
+            in
+            Flambda_arity.create_singletons
+              (List.map2
+                 (fun (decision : Unboxing_analysis.param_decision) kind ->
+                   match decision with
+                   | Keep (_, kind) ->
+                     (* The subkind has already been rewritten when computing
+                        [cont_params_to_keep] *)
+                     kind
+                   | Unbox _ ->
+                     Misc.fatal_errorf
+                       "[rebuild_apply]: unexpected [Unbox] decision for \
+                        argument of return continuation of non-changing \
+                        calling convention apply %a"
+                       Apply.print apply
+                   | Delete -> Types_rewriter.erase_subkind kind)
+                 cont_decisions
+                 (Flambda_arity.unarized_components (Apply.return_arity apply)))
+        in
         let make_apply =
           Apply.create
           (* Note here that callee is rewritten with [rewrite_simple_opt], which
@@ -2144,6 +2188,14 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   in
   match updating_calling_convention with
   | Not_changing_calling_convention ->
+    (* The value_kind of the parameters might have been rewritten and stored in
+       the metadata; update the parameters to match *)
+    let params =
+      Bound_parameters.create
+        (List.map2 Bound_parameter.with_kind
+           (Bound_parameters.to_list params)
+           (Flambda_arity.unarize (Code_metadata.params_arity code_metadata)))
+    in
     let body, res = rebuild_body env in
     let code_metadata = update_size code_metadata body in
     (* Format.eprintf "REBUILD %a FREE %a@." Code_id.print code_id
