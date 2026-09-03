@@ -89,7 +89,7 @@ unsigned_div:
 .L0:
   subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
@@ -108,7 +108,7 @@ unsigned_rem:
 .L0:
   subq  $8, %rsp
   movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]

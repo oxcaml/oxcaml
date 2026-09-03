@@ -411,7 +411,7 @@ double_loop_no_definition_at_beginning.f:
 .L0:
   subq  $8, %rsp
   movq  <hidden PC-relative offset>(%rip), %rax
-  movq  $0, 272(%r14)
+  movq  $0, 280(%r14)
   call  caml_raise_exn@PLT
 .L1:
 |}]
