@@ -9,42 +9,42 @@
 
 external atomic_load_ext_ptr :
   ('a : value_or_null).
-  int64# @ local -> 'a = "%unsafe_atomic_load_ext_ptr"
+  int64_u @ local -> 'a = "%unsafe_atomic_load_ext_ptr"
 
 external atomic_set_ext_ptr :
   ('a : value_or_null).
-  (int64#[@local_opt]) -> 'a -> unit = "%unsafe_atomic_set_ext_ptr"
+  (int64_u[@local_opt]) -> 'a -> unit = "%unsafe_atomic_set_ext_ptr"
 
 external atomic_exchange_ext_ptr :
   ('a : value_or_null).
-  (int64#[@local_opt]) -> 'a -> 'a = "%unsafe_atomic_exchange_ext_ptr"
+  (int64_u[@local_opt]) -> 'a -> 'a = "%unsafe_atomic_exchange_ext_ptr"
 
 external atomic_cas_ext_ptr :
   ('a : value_or_null).
-  (int64#[@local_opt]) -> 'a -> 'a -> bool = "%unsafe_atomic_cas_ext_ptr"
+  (int64_u[@local_opt]) -> 'a -> 'a -> bool = "%unsafe_atomic_cas_ext_ptr"
 
 external atomic_compare_exchange_ext_ptr :
   ('a : value_or_null).
-  (int64#[@local_opt]) -> 'a -> 'a -> 'a
+  (int64_u[@local_opt]) -> 'a -> 'a -> 'a
   = "%unsafe_atomic_compare_exchange_ext_ptr"
 
 external atomic_fetch_add_ext_ptr :
-  int64# @ local -> int -> int = "%unsafe_atomic_fetch_add_ext_ptr"
+  int64_u @ local -> int -> int = "%unsafe_atomic_fetch_add_ext_ptr"
 
 external atomic_add_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_add_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_add_ext_ptr"
 
 external atomic_sub_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_sub_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_sub_ext_ptr"
 
 external atomic_land_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_land_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_land_ext_ptr"
 
 external atomic_lor_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_lor_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_lor_ext_ptr"
 
 external atomic_lxor_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_lxor_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_lxor_ext_ptr"
 
 let test name f =
   match f () with

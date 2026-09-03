@@ -10,7 +10,7 @@
    primitives. *)
 
 module Int64_u = struct
-  type t = int64#
+  type t = int64_u
 
   external to_int64 : t -> (int64[@local_opt]) @@ portable = "%box_int64"
   external of_int64 : (int64[@local_opt]) -> t @@ portable = "%unbox_int64"
@@ -20,46 +20,46 @@ end
 
 external atomic_load_ext_ptr :
   ('a : value_or_null).
-  int64# @ local -> 'a = "%unsafe_atomic_load_ext_ptr"
+  int64_u @ local -> 'a = "%unsafe_atomic_load_ext_ptr"
 
 external atomic_set_ext_ptr :
   ('a : value_or_null).
-  (int64#[@local_opt]) -> 'a -> unit = "%unsafe_atomic_set_ext_ptr"
+  (int64_u[@local_opt]) -> 'a -> unit = "%unsafe_atomic_set_ext_ptr"
 
 external atomic_exchange_ext_ptr :
   ('a : value_or_null).
-  (int64#[@local_opt]) -> 'a -> 'a = "%unsafe_atomic_exchange_ext_ptr"
+  (int64_u[@local_opt]) -> 'a -> 'a = "%unsafe_atomic_exchange_ext_ptr"
 
 external atomic_cas_ext_ptr :
   ('a : value_or_null).
-  (int64#[@local_opt]) -> 'a -> 'a -> bool = "%unsafe_atomic_cas_ext_ptr"
+  (int64_u[@local_opt]) -> 'a -> 'a -> bool = "%unsafe_atomic_cas_ext_ptr"
 
 external atomic_compare_exchange_ext_ptr :
   ('a : value_or_null).
-  (int64#[@local_opt]) -> 'a -> 'a -> 'a
+  (int64_u[@local_opt]) -> 'a -> 'a -> 'a
   = "%unsafe_atomic_compare_exchange_ext_ptr"
 
 external atomic_fetch_add_ext_ptr :
-  int64# @ local -> int -> int = "%unsafe_atomic_fetch_add_ext_ptr"
+  int64_u @ local -> int -> int = "%unsafe_atomic_fetch_add_ext_ptr"
 
 external atomic_add_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_add_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_add_ext_ptr"
 
 external atomic_sub_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_sub_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_sub_ext_ptr"
 
 external atomic_land_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_land_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_land_ext_ptr"
 
 external atomic_lor_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_lor_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_lor_ext_ptr"
 
 external atomic_lxor_ext_ptr :
-  int64# @ local -> int -> unit = "%unsafe_atomic_lxor_ext_ptr"
+  int64_u @ local -> int -> unit = "%unsafe_atomic_lxor_ext_ptr"
 
 external addr_of_value :
   ('a : value_or_null).
-  'a @ local -> int64#
+  'a @ local -> int64_u
   = "" "caml_native_pointer_of_value"
 
 (*******************************************************)
@@ -185,11 +185,11 @@ let () =
    rather than hard-coding the field offsets we take them from block indices
    (a block index to a single value field is just a byte offset). *)
 
-type pt_mixed = { f : int64#; x : int; mutable y : int; mutable z : string }
+type pt_mixed = { f : int64_u; x : int; mutable y : int; mutable z : string }
 
 external idx_to_int64 :
   ('a : value_or_null) ('b : value_or_null).
-  ('a, 'b) idx_mut -> int64# = "%obj_magic"
+  ('a, 'b) idx_mut -> int64_u = "%obj_magic"
 
 let[@inline never] field_addr pt idx =
   Int64_u.add (addr_of_value pt) (idx_to_int64 idx)
