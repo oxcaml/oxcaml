@@ -152,6 +152,9 @@ val stack_allocation : bool
 val poll_insertion : bool
 (** Whether poll insertion is enabled *)
 
+val faulting_polls : bool
+(** Whether poll points compile to faulting loads *)
+
 val frame_pointers : bool
 (** Whether frame-pointers have been enabled at configure time *)
 
