@@ -994,6 +994,19 @@ let rec and_const e n dbg =
             match get_const y with
             | Some y -> and_const x (Nativeint.logand y n) dbg
             | None -> default ())
+          | Cop
+              ( (Caddi | Cor),
+                [Cop (Clsl, [x; Cconst_int (1, _)], _); Cconst_int (1, _)],
+                _ )
+            when Nativeint.logand n 1n = 1n ->
+            (* prefer [tag (x & n)] to [tag x & tag n] *)
+            incr_int
+              (Cop
+                 ( Clsl,
+                   [ and_const x (Nativeint.shift_right_logical n 1) dbg;
+                     Cconst_int (1, dbg) ],
+                   dbg ))
+              dbg
           | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) -> (
             let[@local] load memory_chunk =
               Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
