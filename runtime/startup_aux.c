@@ -52,17 +52,23 @@ extern void caml_win32_unregister_overflow_detection (void);
 static struct caml_params params;
 const struct caml_params* const caml_params = &params;
 
+/* Default stack size, used when the actual limit cannot be determined.
+   Retrieved from a recent system (May 2024). */
+#define Default_stack_size_bytes (8 * 1024 * 1024)
+
 static size_t get_pthreads_stack_size_in_bytes(void)
 {
+#ifdef CAML_BARE_METAL
+  return Default_stack_size_bytes;
+#else
   pthread_attr_t attr;
-  size_t res =
-    // default value, retrieved from a recent system (May 2024)
-    8 * 1024 * 1024;
+  size_t res = Default_stack_size_bytes;
   if (pthread_attr_init(&attr) == 0) {
     pthread_attr_getstacksize(&attr, &res);
     pthread_attr_destroy(&attr);
   }
   return res;
+#endif
 }
 
 static void init_startup_params(void)
@@ -73,10 +79,10 @@ static void init_startup_params(void)
 
   // Initial stack sizes only apply in native code with stack checks disabled.
 
+#ifdef HAS_GETRLIMIT
   struct rlimit rlimit;
   if (getrlimit(RLIMIT_STACK, &rlimit)) {
-    // default value, retrieved from a recent system (May 2024)
-    caml_init_main_stack_wsz = Wsize_bsize(8192 * 1024);
+    caml_init_main_stack_wsz = Wsize_bsize(Default_stack_size_bytes);
   } else {
     if (rlimit.rlim_cur == RLIM_INFINITY) {
       caml_init_main_stack_wsz = Max_stack_def;
@@ -84,6 +90,9 @@ static void init_startup_params(void)
       caml_init_main_stack_wsz = Wsize_bsize(rlimit.rlim_cur);
     }
   }
+#else
+  caml_init_main_stack_wsz = Wsize_bsize(Default_stack_size_bytes);
+#endif
   if (caml_init_main_stack_wsz > Max_stack_def) {
     caml_init_main_stack_wsz = Max_stack_def;
   }
@@ -271,6 +280,13 @@ static void call_registered_value(const char* name)
     caml_callback_res(*f, Val_unit);
 }
 
+/* Not safe to use if there are domains left running */
+static void shutdown_last_domain(void)
+{
+  caml_domain_terminate(true);
+  caml_finalise_freelist();
+}
+
 CAMLexport void caml_shutdown(void)
 {
   Caml_check_caml_state();
@@ -286,14 +302,16 @@ CAMLexport void caml_shutdown(void)
 
   call_registered_value("Pervasives.do_at_exit");
   call_registered_value("Thread.at_shutdown");
+#ifdef MULTIDOMAIN
   if (!caml_domain_alone()) {
     caml_gc_log("Some domains have not been joined prior to shutdown");
     caml_stop_all_domains();
   } else {
-    /* These calls are not safe to use if there are domains left running */
-    caml_domain_terminate(true);
-    caml_finalise_freelist();
+    shutdown_last_domain();
   }
+#else
+  shutdown_last_domain();
+#endif
   caml_free_gc_stats();
   caml_free_locale();
 #ifndef NATIVE_CODE
