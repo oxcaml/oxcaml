@@ -231,7 +231,7 @@ let fallback cfg internal_failure z3_code =
     cfg.Cfg.fun_name internal_failure z3_result z3_code
 
 let validate_idom (cfg : Cfg.t) expected =
-  (* CR hwasilewski: Note: we assume that cfg has no dead code here. *)
+  (* All CFG blocks must be reachable from the entry block. *)
   let facts = Cfg_validation_facts.Graph.create cfg in
   let z3_code () = Z3.code facts expected in
   match Internal.validate facts expected with

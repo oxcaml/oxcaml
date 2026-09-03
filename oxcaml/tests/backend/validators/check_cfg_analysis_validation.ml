@@ -80,6 +80,13 @@ let test_irreducible () =
            (Truth_test { ifso = left; ifnot = right })) ]
   |> validate
 
+let test_reachable () =
+  let successor = new_label 12 in
+  make_cfg
+    [ block entry_label (terminator (Always successor));
+      block successor (terminator ~arg:[| int.(0) |] Return) ]
+  |> Cfg_with_infos.cfg |> Cfg_reachability_validate.validate_reachability
+
 let expect_fatal f =
   let fmt = Format.err_formatter in
   Format.pp_print_flush fmt ();
@@ -94,6 +101,20 @@ let expect_fatal f =
         match f () with () -> false | exception Misc.Fatal_error -> true)
   in
   if not raised then failwith "expected a fatal error"
+
+let test_incorrect_dominators () =
+  let successor = new_label 14 in
+  let cfg =
+    make_cfg
+      [ block entry_label (terminator (Always successor));
+        block successor (terminator ~arg:[| int.(0) |] Return) ]
+    |> Cfg_with_infos.cfg
+  in
+  let incorrect_idoms = Label.Tbl.create 2 in
+  Label.Tbl.add incorrect_idoms entry_label entry_label;
+  Label.Tbl.add incorrect_idoms successor successor;
+  expect_fatal (fun () ->
+      Cfg_dominators_validate.validate_idom cfg incorrect_idoms)
 
 let test_unreachable () =
   let dead = new_label 13 in
@@ -110,4 +131,6 @@ let () =
   test_diamond ();
   test_nested_loops ();
   test_irreducible ();
+  test_reachable ();
+  test_incorrect_dominators ();
   test_unreachable ()
