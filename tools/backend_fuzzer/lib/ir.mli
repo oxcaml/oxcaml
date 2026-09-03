@@ -20,7 +20,7 @@ module NumberTy : sig
     val all : t list
     val equal : t -> t -> bool
     val to_module : t -> string
-    val is_float : t -> bool
+    val is_floating_point : t -> bool
   end
 
   type t =
@@ -34,14 +34,14 @@ module NumberTy : sig
   val to_module : t -> string
   val to_string : ?no_hash:bool -> t -> string
   val converter_name : from:t -> to_:t -> string
-  val is_float : t -> bool
+  val is_floating_point : t -> bool
   val all : t list
 end
 
 module Number : sig
   type t =
-    | Float of float
-    | Float32 of float
+    | Float of int64
+    | Float32 of int32
     | Int of int
     | Nativeint of Nativeint.t
     | Int64 of int64

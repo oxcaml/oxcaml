@@ -3,12 +3,14 @@ open Ast_helper
 open Asttypes
 open Parsetree_helpers
 
+(** Names of generated value bindings, including variables and functions. *)
 module Name = struct
   type t = string
 
+  (** Check the string is a valid lowercase value identifier. *)
   let of_string string =
     let invalid () =
-      invalid_arg (Format.sprintf "Name.of_string: invalid name %S" string)
+      Misc.fatal_errorf "Name.of_string: invalid name %S" string
     in
     match Misc.Utf8_lexeme.normalize string with
     | Error _ -> invalid ()
@@ -61,7 +63,7 @@ module NumberTy = struct
       | Int16 -> "Int16"
       | Int8 -> "Int8"
 
-    let is_float = function
+    let is_floating_point = function
       | Float | Float32 -> true
       | Int | Nativeint | Int64 | Int32 | Int16 | Int8 -> false
   end
@@ -89,15 +91,15 @@ module NumberTy = struct
       (to_string ~no_hash:true to_)
       (to_string ~no_hash:true from)
 
-  let is_float t = Base.is_float t.base
+  let is_floating_point t = Base.is_floating_point t.base
 
   let all = List.concat_map (fun base -> [boxed base; unboxed base]) Base.all
 end
 
 module Number = struct
   type t =
-    | Float of float
-    | Float32 of float
+    | Float of int64
+    | Float32 of int32
     | Int of int
     | Nativeint of Nativeint.t
     | Int64 of int64
@@ -123,22 +125,18 @@ module Number = struct
     | Int32 -> Int32 (Int64.to_int32 bits)
     | Int16 -> Int16 (truncate_signed ~width:16 bits)
     | Int8 -> Int8 (truncate_signed ~width:8 bits)
-    | Float | Float32 -> invalid_arg "Number.of_integral_bits"
-
-  (* [nan] and the infinities have no literal form, so they are emitted as
-     identifiers rather than constants. *)
-  let float_code m ?suffix x =
-    if Float.is_nan x
-    then qualified_ident m "nan"
-    else if x = Float.infinity
-    then qualified_ident m "infinity"
-    else if x = Float.neg_infinity
-    then qualified_ident m "neg_infinity"
-    else Exp.constant (Const.float ?suffix (Printf.sprintf "%h" x))
+    | Float | Float32 ->
+      Misc.fatal_errorf "Number.of_integral_bits: expected an integral type"
 
   let to_code = function
-    | Float n -> float_code "Float" n
-    | Float32 n -> float_code "Float32" ~suffix:'s' n
+    | Float bits ->
+      apply
+        (qualified_ident "Int64" "float_of_bits")
+        [Exp.constant (Const.int64 bits)]
+    | Float32 bits ->
+      apply
+        (qualified_ident "Float32" "of_bits")
+        [Exp.constant (Const.int32 bits)]
     | Int n -> Exp.constant (Const.int n)
     | Nativeint n -> Exp.constant (Const.nativeint n)
     | Int64 n -> Exp.constant (Const.int64 n)
@@ -172,7 +170,11 @@ module Bin_op = struct
   let num_binops = [Add; Sub; Mul]
 
   let ops_for_ty (ty : Ty.t) =
-    match ty with Number _ -> num_binops | Bool -> assert false
+    match ty with
+    | Number _ -> num_binops
+    | Bool ->
+      Misc.fatal_errorf
+        "Bin_op.ops_for_ty: only numeric types allowed, but got Bool"
 
   let to_code ty op =
     let name = function
@@ -251,10 +253,7 @@ module Statement = struct
       Exp.setinstvar (Name.to_string name |> loc) (Expr.to_code expr)
     | Bounded_loop (loop_var, times, stmt) ->
       let var = ident (Name.to_string loop_var) in
-      let_mutable loop_var
-        (Exp.apply
-           (qualified_ident "Sys" "opaque_identity")
-           [Nolabel, int times])
+      let_mutable loop_var (opaque_identity (int times))
         (Exp.while_
            (op ">" [var; int 0])
            (Exp.sequence (to_code stmt)
@@ -291,9 +290,7 @@ module Function = struct
     let body =
       List.fold_right
         (fun name body ->
-          Statement.let_mutable name
-            (apply (qualified_ident "Sys" "opaque_identity") [ident name])
-            body)
+          Statement.let_mutable name (opaque_identity (ident name)) body)
         names body
     in
     Str.value Nonrecursive
