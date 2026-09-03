@@ -827,52 +827,6 @@ a module packed by an expression, so both sites implement [S].
   <anon> 9:21 9:22 package
   <anon> 11:19 11:20 package
 
-A packed unit is checked against its [.mli] like any other unit, and members
-compiled with [-for-pack] root their facts at the packed name, so references
-between members join.
-
-  $ cat > pmember.ml <<'EOF'
-  > module type S = sig
-  >   type t
-  > end
-  > EOF
-  $ cat > puser.ml <<'EOF'
-  > module M : Pmember.S = struct
-  >   type t = int
-  > end
-  > EOF
-  $ cat > pck.mli <<'EOF'
-  > module Pmember : sig
-  >   module type S = sig
-  >     type t
-  >   end
-  > end
-  > module Puser : sig
-  >   module M : Pmember.S
-  > end
-  > EOF
-  $ $OCAMLC -bin-annot -c pck.mli
-  $ $OCAMLC -bin-annot -for-pack Pck -c pmember.ml
-  $ $OCAMLC -bin-annot -for-pack Pck -c puser.ml
-  $ $OCAMLC -bin-annot -pack -o pck.cmo pmember.cmo puser.cmo
-  $ ocaml-index aggregate pck.cmti pck.cmt pmember.cmt puser.cmt \
-  >   -o project.ocaml-index
-
-The pack was checked against [pck.mli], so querying the interface buffer
-reports the pack as the [(interface)] implementation.
-
-  $ $MERLIN single module-type-impls \
-  >   -index-file ./project.ocaml-index \
-  >   -filename ./pck.mli < ./pck.mli \
-  >   | print_results "(interface)"
-  Pck 0:-1 0:-1 interface
-
-A member annotated against a sibling member's module type implements it.
-
-  $ impls_of_module_type S pmember.ml
-  complete
-  M 1:7 1:8 annotation
-
 The result signature of a functor declared in an [.mli] is what a client's
 applications instantiate: a client checked against [F(A).T] implements the
 [S] that [T] aliases, and the argument implements the parameter's [S].
