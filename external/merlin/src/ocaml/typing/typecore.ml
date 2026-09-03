@@ -307,7 +307,6 @@ type error =
   | Submode_failed of Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
-  | Mode_mismatch of mode_mismatch_kind * Alloc.equate_error
   | Uncurried_function_escapes_comonadic of Alloc.Comonadic.error
   | Uncurried_function_escapes_locality
   | Function_returns_local
@@ -14358,22 +14357,6 @@ let report_error ~loc env =
         "@[This application is complete, but surplus arguments were provided afterwards.@ \
          When passing or calling %a values, extra arguments are passed in a separate application.@]"
          (Alloc.Const.print_axis ax) left
-  | Mode_mismatch (kind, (s, e)) ->
-      let Mode.Alloc.Error (ax, {left; right}) = Mode.Alloc.to_simple_error e in
-      let actual, expected =
-        match s with
-        | Left_le_right -> left, right
-        | Right_le_left -> right, left
-      in
-      let desc, desc_inf = match kind with
-        | Parameter -> "takes a parameter", "take a parameter"
-        | Return -> "has a return value", "have a return value"
-      in
-      Location.errorf ~loc
-        "@[This function %s which is %a,@ \
-        but was expected to %s which is %a.@]"
-        desc (Style.as_inline_code (Alloc.Const.print_axis ax)) actual
-        desc_inf (Style.as_inline_code (Alloc.Const.print_axis ax)) expected
   | Uncurried_function_escapes_comonadic e -> begin
       let Mode.Alloc.Comonadic.Error (ax, {left; right}) =
         Mode.Alloc.Comonadic.to_simple_error e
