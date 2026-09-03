@@ -70,23 +70,26 @@ Error: Signature mismatch:
          sig
            val linear_search_first_satisfying :
              'a @ [< 'm] ->
-             (get:('a @ [> 'm] -> 'b @ [> 'o | aliased] -> 'c @ [< 'n]) @ [< past('mm2) & past('mm0) & past('p)] ->
-              (lo:'b @ [< 'q & 'o & many read_write] ->
-               (hi:'b @ [< past('mm1) & many read_write] ->
-                (pred:('c @ [> 'n | dynamic] -> bool @ 'mm3) @ 'mm4 ->
-                 'b option @ [> 'q | local aliased dynamic]) @ [> close('q) | close('o) | close('m) | past('mm1) | past('mm2) | local stateful]) @ [> close('q) | close('o) | close('m) | past('mm0) | local stateful]) @ [> close('m) | past('p) | local stateful]) @ [> close('m) | stateful]
+             (get:('a @ [< past('n) > 'm] ->
+                   ('b @ [> 'q | aliased] -> 'c @ [< 'p]) @ [> past('n) | past('o)]) @ [< past('mm4) & past('mm2) & past('o) & past('mm0)] ->
+              (lo:'b @ [< 'mm1 & 'q & many read_write] ->
+               (hi:'b @ [< past('mm3) & many read_write] ->
+                (pred:('c @ [> 'p | dynamic] -> bool @ 'mm5) @ 'mm6 ->
+                 'b option @ [> 'mm1 | local aliased dynamic]) @ [> close('mm1) | close('q) | close('m) | past('mm3) | past('mm4) | local stateful]) @ [> close('mm1) | close('q) | close('m) | past('mm2) | local stateful]) @ [> close('m) | past('mm0) | local stateful]) @ [> close('m) | stateful]
            val find_first_satisfying :
              'a @ [< 'm & 'n & many] ->
-             (get:('a @ [> 'n | aliased] -> int @ [> aliased] -> 'b @ [< 'o]) @ [< past('mm1) & past('p)] ->
-              (length:('a @ [> 'm | aliased] -> int @ 'q) @ [< past('mm0)] ->
-               (pred:('b @ [> 'o | dynamic] -> bool @ 'mm2) @ 'mm3 ->
-                int option @ [> local aliased dynamic]) @ [> close('m) | close('n) | past('mm0) | past('mm1) | local stateful]) @ [> close('m) | close('n) | past('p) | local stateful]) @ [> close('m) | close('n) | stateful]
+             (get:('a @ [> 'n | aliased] ->
+                   (int @ [> aliased] -> 'b @ [< 'p]) @ 'o) @ [< past('mm2) & past('q)] ->
+              (length:('a @ [> 'm | aliased] -> int @ 'mm0) @ [< past('mm1)] ->
+               (pred:('b @ [> 'p | dynamic] -> bool @ 'mm3) @ 'mm4 ->
+                int option @ [> local aliased dynamic]) @ [> close('m) | close('n) | past('mm1) | past('mm2) | local stateful]) @ [> close('m) | close('n) | past('q) | local stateful]) @ [> close('m) | close('n) | stateful]
            val find_last_satisfying :
              'a @ [< 'm & 'n & many] ->
-             (pred:('b @ [> 'p | dynamic] -> bool @ 'o) @ [< past('mm1) & past('q)] ->
-              (get:('a @ [> 'n | aliased] -> int @ [> aliased] -> 'b @ [< 'p]) @ [< past('mm0)] ->
+             (pred:('b @ [> 'p | dynamic] -> bool @ 'o) @ [< past('mm2) & past('q)] ->
+              (get:('a @ [> 'n | aliased] ->
+                    (int @ [> aliased] -> 'b @ [< 'p]) @ 'mm0) @ [< past('mm1)] ->
                (length:('a @ [> 'm | aliased] -> int @ [< many read_write]) @ [< many] ->
-                int option @ [> local dynamic]) @ [> close('m) | close('n) | past('mm0) | past('mm1) | local stateful]) @ [> close('m) | close('n) | past('q) | local stateful]) @ [> close('m) | close('n) | stateful]
+                int option @ [> local dynamic]) @ [> close('m) | close('n) | past('mm1) | past('mm2) | local stateful]) @ [> close('m) | close('n) | past('q) | local stateful]) @ [> close('m) | close('n) | stateful]
            val binary_search :
              'a @ [< past('mm0) & 'm & 'n & many] ->
              (length:('a @ [> 'n | aliased] -> int @ [< many read_write]) @ [< past('mm7) & past('mm3) & past('o) & many > local] ->
