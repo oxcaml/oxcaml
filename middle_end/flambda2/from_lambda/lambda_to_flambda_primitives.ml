@@ -1944,10 +1944,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~current_region
     in
     let tag = Tag.Scannable.create_exn tag in
-    (* Mutable zero-size blocks are meaningless after typechecking,
-       and they are fully unsupported by the garbage collector.
-       If `args` is empty, we need to convert mutable zero-size blocks
-       to immutable zero-size blocks. *)
+    (* Mutable zero-size blocks are meaningless after typechecking, and they are
+       fully unsupported by the garbage collector. If `args` is empty, we need
+       to convert mutable zero-size blocks to immutable zero-size blocks. *)
     let mutability =
       if List.is_empty args
       then Mutability.Immutable
