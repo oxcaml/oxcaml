@@ -59,8 +59,10 @@ let local_arg_ok (type a) (w : a dom) (g : a) (s : string @ local) =
 [%%expect{|
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
 val local_arg_ok :
-  'a dom @ 'n ->
-  ('a @ [< global] -> string @ [> local] -> int @ [> dynamic]) @ 'm = <fun>
+  'a dom @ 'o ->
+  ('a @ [< past('n) & global] ->
+   (string @ [> local] -> int @ [> dynamic]) @ [> past('n)]) @ 'm =
+  <fun>
 |}, Principal{|
 type _ dom = L : (string @ local -> int) dom | G : (string -> int) dom
 Line 5, characters 9-12:
