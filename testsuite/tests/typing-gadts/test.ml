@@ -436,11 +436,11 @@ let test : type a. a t -> _ =
   function Int -> ky (1 : a) 1  (* fails *)
 ;;
 [%%expect{|
-Line 2, characters 29-30:
+Line 2, characters 18-30:
 2 |   function Int -> ky (1 : a) 1  (* fails *)
-                                 ^
-Error: This expression has type "int" but an expression was expected of type
-         "a" = "int"
+                      ^^^^^^^^^^^^
+Error: This expression has type "a" = "int"
+       but an expression was expected of type "'a"
        This instance of "int" is ambiguous:
        it would escape the scope of its equation
 |}];;
@@ -450,11 +450,11 @@ let test : type a. a t -> a = fun x ->
   in r
 ;;
 [%%expect{|
-Line 2, characters 41-42:
+Line 2, characters 30-42:
 2 |   let r = match x with Int -> ky (1 : a) 1  (* fails *)
-                                             ^
-Error: This expression has type "int" but an expression was expected of type
-         "a" = "int"
+                                  ^^^^^^^^^^^^
+Error: This expression has type "a" = "int"
+       but an expression was expected of type "'a"
        This instance of "int" is ambiguous:
        it would escape the scope of its equation
 |}];;
@@ -464,11 +464,10 @@ let test : type a. a t -> a = fun x ->
   in r
 ;;
 [%%expect{|
-Line 2, characters 35-42:
+Line 2, characters 30-42:
 2 |   let r = match x with Int -> ky 1 (1 : a)  (* fails *)
-                                       ^^^^^^^
-Error: This expression has type "a" = "int"
-       but an expression was expected of type "int"
+                                  ^^^^^^^^^^^^
+Error: This expression has type "int" but an expression was expected of type "'a"
        This instance of "int" is ambiguous:
        it would escape the scope of its equation
 |}];;
@@ -543,8 +542,17 @@ let test2 : type a. a t -> a option = fun x ->
 Line 4, characters 47-48:
 4 |   begin match x with Int -> u := Some 1; r := !u end;
                                                    ^
-Error: This expression has type "int option ref"
+Error: The value "u" has type "int option ref"
        but an expression was expected of type "a option ref"
+       Type "int" is not compatible with type "a" = "int"
+       This instance of "int" is ambiguous:
+       it would escape the scope of its equation
+|}, Principal{|
+Line 4, characters 46-48:
+4 |   begin match x with Int -> u := Some 1; r := !u end;
+                                                  ^^
+Error: This expression has type "int option"
+       but an expression was expected of type "a option"
        Type "int" is not compatible with type "a" = "int"
        This instance of "int" is ambiguous:
        it would escape the scope of its equation
