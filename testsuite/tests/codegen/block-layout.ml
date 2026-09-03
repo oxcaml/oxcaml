@@ -42,8 +42,8 @@ sum_loop:
   ret
 .L2:
   leaq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
+  movq  56(%r14), %rsp
+  popq  56(%r14)
   popq  %r11
   jmp   *%r11
 |}]
@@ -66,8 +66,8 @@ get_mid:
   ret
 .L0:
   leaq  <hidden PC-relative offset>(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
+  movq  56(%r14), %rsp
+  popq  56(%r14)
   popq  %r11
   jmp   *%r11
 |}]
