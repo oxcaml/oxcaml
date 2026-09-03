@@ -105,7 +105,7 @@ type t3_cmixed3 = C of { x : t_value; y : t_immediate; }
 
 type t3_void = { x : t_void };;
 [%%expect {|
-type t3_void = { x : t_void; };;
+type t3_void = { x : t_void; }
 |}]
 
 type t3_cvoid = C of { x : t_void }

@@ -150,13 +150,13 @@ type b5 = { a : u3 }
 type b6 = { a : u4 }
 type b7 = { a : u5 }
 [%%expect{|
-type b1 = { a : unit_u }
-type b2 = { a : #(unit_u * unit_u) }
-type b3 = { a : u1 }
-type b4 = { a : u2 }
-type b5 = { a : u3 }
-type b6 = { a : u4 }
-type b7 = { a : u5 }
+type b1 = { a : unit_u; }
+type b2 = { a : #(unit_u * unit_u); }
+type b3 = { a : u1; }
+type b4 = { a : u2; }
+type b5 = { a : u3; }
+type b6 = { a : u4; }
+type b7 = { a : u5; }
 |}]
 
 type i1 = A of { a : unit_u }
@@ -167,13 +167,13 @@ type i5 = A of { a : u3 }
 type i6 = A of { a : u4 }
 type i7 = A of { a : u5 }
 [%%expect{|
-type i1 = A of { a : unit_u }
-type i2 = A of { a : #(unit_u * unit_u) }
-type i3 = A of { a : u1 }
-type i4 = A of { a : u2 }
-type i5 = A of { a : u3 }
-type i6 = A of { a : u4 }
-type i7 = A of { a : u5 }
+type i1 = A of { a : unit_u; }
+type i2 = A of { a : #(unit_u * unit_u); }
+type i3 = A of { a : u1; }
+type i4 = A of { a : u2; }
+type i5 = A of { a : u3; }
+type i6 = A of { a : u4; }
+type i7 = A of { a : u5; }
 |}]
 
 (* [void] in arrays is not yet allowed *)
