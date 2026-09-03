@@ -252,7 +252,7 @@ end
 module M64 : S with kind_ k = bits64 = struct
   kind_ k = bits64
 
-  type t = int64_u
+  type t = int64#
 
   let mk () = #0L
 end

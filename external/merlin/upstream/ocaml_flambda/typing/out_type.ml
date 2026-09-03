@@ -805,15 +805,6 @@ let name_penalty s =
 let ambiguity_penalty path env =
   if is_unambiguous path env then 0 else penalty_size
 
-(* We add one to the cost of [nativeint_u], [int32_u], [int64_u], and
-   [float32_u], as if they were hash-types (they used to be), so that
-   user-defined aliases are preferred. *)
-let unboxed_predef_penalty path =
-  if List.exists (Path.same path)
-       [ Predef.path_nativeint_u; Predef.path_int32_u;
-         Predef.path_int64_u; Predef.path_float32_u ]
-  then 1 else 0
-
 let path_size path env =
   let rec size = function
       Pident id ->
@@ -829,7 +820,7 @@ let path_size path env =
         let (l, b) = size p in (1 + l, b)
   in
   let l, s = size path in
-  l + ambiguity_penalty path env + unboxed_predef_penalty path, s
+  l + ambiguity_penalty path env, s
 
 let rec get_best_path r env =
   match !r with

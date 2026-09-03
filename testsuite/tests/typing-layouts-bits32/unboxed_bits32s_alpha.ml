@@ -61,19 +61,19 @@ let print_int32u_bin prefix x =
 type block =
   { x0_1 : int;
     x0_2 : int;
-    x1 : int32_u;
+    x1 : int32#;
     x2_1 : int;
     x2_2 : int;
-    x3 : int32_u;
+    x3 : int32#;
     x4_1 : int;
     x4_2 : int;
-    x5 : int32_u;
+    x5 : int32#;
     x6_1 : int;
     x6_2 : int;
-    x7 : int32_u;
+    x7 : int32#;
     x8_1 : int;
     x8_2 : int;
-    x9 : int32_u;
+    x9 : int32#;
   }
 
 let[@inline_never] f_mixed_blocks_and_closures
@@ -131,10 +131,10 @@ let _ = test_mixed_blocks_and_closures ()
 type t_mixed_record =
   { a : float;
     mutable b : int;
-    c : int32_u;
-    mutable d : int32_u;
+    c : int32#;
+    mutable d : int32#;
     e : int;
-    mutable f : int32_u }
+    mutable f : int32# }
 
 (* Construction *)
 let t_mixed1 = { a = 317.;
@@ -208,10 +208,10 @@ type t_mixed_variant =
   | T of
       { a : float;
         mutable b : int;
-        c : int32_u;
-        mutable d : int32_u;
+        c : int32#;
+        mutable d : int32#;
         e : int;
-        mutable f : int32_u }
+        mutable f : int32# }
 
 (* Construction *)
 let t_mixed_variant1 = T

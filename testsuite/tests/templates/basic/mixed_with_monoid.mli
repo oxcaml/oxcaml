@@ -1,4 +1,4 @@
-type t = #(float# * Monoid.t * int64_u)
+type t = #(float# * Monoid.t * int64#)
 
 val empty : t
 val append : t -> t -> t

@@ -256,9 +256,9 @@ constant_folding:
 
 
 
-type ptr = nativeint_u
+type ptr = nativeint#
 external memcmp :
-  ptr -> ptr -> len:nativeint_u -> int32_u
+  ptr -> ptr -> len:nativeint# -> int32#
   @@ portable
   = "caml_no_bytecode_impl" "memcmp"
 [@@noalloc]
@@ -432,7 +432,7 @@ branch_or_tailcall:
 
 
 (* CR ttebbi: The final bitwise or is unnecessary. *)
-let shift_of_logand (a : int64_u) =
+let shift_of_logand (a : int64#) =
   let b = Int64_u.logand a #1L in
   let c = Int64_u.shift_right_logical #3L (Int64_u.to_int b) in
   reinterpret_unboxed_int64_as_tagged_int63 c

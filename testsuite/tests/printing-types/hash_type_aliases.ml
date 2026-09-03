@@ -2,8 +2,6 @@
 
 type f64 = float#
 
-type i64 : bits64 = int64_u
-
 module R = struct
   type r = { x : unit }
 end
