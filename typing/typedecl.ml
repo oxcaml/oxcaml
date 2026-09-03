@@ -4810,7 +4810,10 @@ let check_for_hidden_arrow env loc ty =
 
 type transl_value_decl_modal =
   | Str_primitive
-  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+  | Sig_value of
+      { md_mode : Mode.Value.l;
+        sig_modalities : Mode.Modality.Const.t;
+        inherited_modalities : Mode.Modality.Const.t }
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
@@ -4831,7 +4834,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         mode, Mode.Modality.undefined, Valmi_str_primitive modes,
         Mode.Alloc.Const.legacy
-    | Sig_value (md_mode, sig_modalities) ->
+    | Sig_value { md_mode; sig_modalities; inherited_modalities } ->
         if valdecl.pval_poly then begin
           Language_extension.assert_enabled ~loc Layout_poly
             Language_extension.Alpha;
@@ -4844,8 +4847,11 @@ let transl_value_decl env loc ~modal ~why valdecl =
           Mode.Modality.of_const raw_modalities.moda_modalities
         in
         let curry_mode =
-          Mode.Modality.Const.apply_const raw_modalities.moda_modalities
-            Mode.Value.Const.legacy
+          let modalities =
+            Mode.Modality.Const.concat ~then_:raw_modalities.moda_modalities
+              inherited_modalities
+          in
+          Mode.Modality.Const.apply_const modalities Mode.Value.Const.legacy
           |> Mode.Const.value_to_alloc_r2l
         in
         md_mode, modalities, Valmi_sig_value raw_modalities, curry_mode
