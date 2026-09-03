@@ -40,7 +40,8 @@ int16_array_set_add:
   ret
 |}]
 
-let int32_array_set_add (a : int32# array) (i : int) (x : int32#) (y : int32#) =
+let int32_array_set_add (a : int32_u array) (i : int) (x : int32_u) (y : int32_u)
+    =
   Array.unsafe_set a i (Int32_u.add x y)
 [%%expect_asm X86_64{|
 int32_array_set_add:
@@ -71,7 +72,7 @@ int16_array_set_of_int:
   ret
 |}]
 
-let int32_array_set_of_int (a : int32# array) (i : int) (x : int) =
+let int32_array_set_of_int (a : int32_u array) (i : int) (x : int) =
   Array.unsafe_set a i (Int32_u.of_int x)
 [%%expect_asm X86_64{|
 int32_array_set_of_int:
@@ -105,7 +106,7 @@ bytes_set_int16_add:
   ret
 |}]
 
-let bytes_set_int32_add (buf : bytes) (i : int) (x : int32#) (y : int32#) =
+let bytes_set_int32_add (buf : bytes) (i : int) (x : int32_u) (y : int32_u) =
   Bytes.unsafe_set_int32_ne buf i (Int32_u.add x y)
 [%%expect_asm X86_64{|
 bytes_set_int32_add:
@@ -128,7 +129,7 @@ bytes_set_int32_of_int:
 |}]
 
 let bytes_set_int32_indexed_by_int64_add
-    (buf : bytes) (i : Int64_u.t) (x : int32#) (y : int32#) =
+    (buf : bytes) (i : Int64_u.t) (x : int32_u) (y : int32_u) =
   Bytes.unsafe_set_int32_ne_indexed_by_int64 buf i (Int32_u.add x y)
 [%%expect_asm X86_64{|
 bytes_set_int32_indexed_by_int64_add:
@@ -140,7 +141,7 @@ bytes_set_int32_indexed_by_int64_add:
 
 (* Mixed blocks *)
 
-type mixed = { mutable i8 : int8#; mutable i16 : int16#; mutable i32 : int32# }
+type mixed = { mutable i8 : int8#; mutable i16 : int16#; mutable i32 : int32_u }
 
 let mixed_set_int8_add (r : mixed) (x : int8#) (y : int8#) =
   r.i8 <- Int8_u.add x y
@@ -162,7 +163,7 @@ mixed_set_int16_add:
   ret
 |}]
 
-let mixed_set_int32_add (r : mixed) (x : int32#) (y : int32#) =
+let mixed_set_int32_add (r : mixed) (x : int32_u) (y : int32_u) =
   r.i32 <- Int32_u.add x y
 [%%expect_asm X86_64{|
 mixed_set_int32_add:
