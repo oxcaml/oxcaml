@@ -496,17 +496,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       sub.expr sub exp
   | Texp_override (_, list) ->
       List.iter (fun (_, s, e) -> iter_loc sub s; sub.expr sub e) list
-  | Texp_letmodule { id; name; presence; uid; module_expr; body } ->
-      sub.item_declaration sub
-        (Module_binding
-           { mb_id = id;
-             mb_name = name;
-             mb_uid = uid;
-             mb_presence = presence;
-             mb_expr = module_expr;
-             mb_attributes = [];
-             mb_loc = module_expr.mod_loc
-           });
+  | Texp_letmodule { name; module_expr; body; _ } ->
       iter_loc sub name;
       sub.module_expr sub module_expr;
       sub.expr sub body
