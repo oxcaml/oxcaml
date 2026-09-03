@@ -1442,6 +1442,22 @@ let no_poll_insertion = Actions.make
     "Poll insertion disabled"
     "Poll insertion enabled")
 
+let faulting_polls = Actions.make
+  ~name:"faulting-polls"
+  ~description:"Passes if poll points compile to faulting loads"
+  ~does_something:false
+  (Actions_helpers.predicate Ocamltest_config.faulting_polls
+    "Faulting polls enabled"
+    "Faulting polls disabled")
+
+let no_faulting_polls = Actions.make
+  ~name:"no-faulting-polls"
+  ~description:"Passes if poll points compile to compare-and-branch"
+  ~does_something:false
+  (Actions_helpers.predicate (not Ocamltest_config.faulting_polls)
+    "Faulting polls disabled"
+    "Faulting polls enabled")
+
 let stack_checks = Actions.make
   ~name:"stack-checks"
   ~description:"Passes if stack checks are enabled"
@@ -1698,6 +1714,8 @@ let init () =
     no_stack_allocation;
     poll_insertion;
     no_poll_insertion;
+    faulting_polls;
+    no_faulting_polls;
     setup_ocamldoc_build_env;
     run_ocamldoc;
     check_ocamldoc_output;
