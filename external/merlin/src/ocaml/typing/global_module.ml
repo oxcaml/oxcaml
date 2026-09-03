@@ -64,7 +64,7 @@ let check_uniqueness_of_merged (type v) l1 l2 =
 
 module Name : sig
   type t = private
-    { head : CUI.t;
+    { head : CUI.Found.t;
       args : argument list
     }
 
@@ -76,9 +76,13 @@ module Name : sig
 
   val create_no_args : CUI.t -> t
 
+  val create_no_args_found : CUI.Found.t -> t
+
+  val with_head_cmi_path : t -> Misc.filepath -> t
+
   val of_parameter_name : Parameter_name.t -> t
 
-  val unsafe_create_unchecked : CUI.t -> argument list -> t
+  val unsafe_create_unchecked : CUI.Found.t -> argument list -> t
 
   val find_in_parameter_map : t -> 'a Parameter_name.Map.t -> 'a option
 
@@ -91,7 +95,7 @@ module Name : sig
   val print : Fmt.formatter -> t -> unit
 end = struct
   type t =
-    { head : CUI.t;
+    { head : CUI.Found.t;
       args : argument list
     }
 
@@ -101,9 +105,9 @@ end = struct
     match args with
     | [] ->
       (* Preserve simple non-wrapping behaviour in atomic case *)
-      Fmt.fprintf ppf "%a" CUI.print head
+      Fmt.fprintf ppf "%a" CUI.Found.print head
     | _ ->
-      Fmt.fprintf ppf "@[<hov 1>%a%a@]" CUI.print head
+      Fmt.fprintf ppf "@[<hov 1>%a%a@]" CUI.Found.print head
         (pp_concat print_arg_pair) args
 
   and print_arg_pair ppf ({ param = name; value = arg } : argument) =
@@ -117,7 +121,7 @@ end = struct
       if t1 == t2
       then 0
       else
-        match CUI.compare head1 head2 with
+        match CUI.Found.compare head1 head2 with
         | 0 -> List.compare compare_arg args1 args2
         | c -> c
 
@@ -129,12 +133,19 @@ end = struct
 
     let output = Misc.output_of_doc_print doc_print
 
-    let hash = Hashtbl.hash
+    (* Do not use the polymorphic hash: the cmi path attached to the head must
+       not affect hashing *)
+    let rec hash ({ head; args } : t) =
+      Hashtbl.hash (CUI.Found.hash head, List.map hash_arg args)
+
+    and hash_arg ({ param; value } : argument) =
+      Hashtbl.hash (Parameter_name.hash param, hash value)
   end)
 
   let print = doc_print
 
   let create head args =
+    let head = CUI.Found.without_cmi_path head in
     sort_and_check_uniqueness args |> Result.map (fun args -> { head; args })
 
   let create_exn head args =
@@ -142,9 +153,16 @@ end = struct
     | Ok t -> t
     | Error (Duplicate _) ->
       Misc.fatal_errorf "Names of instance arguments must be unique:@ %a"
-        (Fmt.compat print) { head; args }
+        (Fmt.compat print)
+        { head = CUI.Found.without_cmi_path head; args }
 
-  let create_no_args head = { head; args = [] }
+  let create_no_args head =
+    { head = CUI.Found.without_cmi_path head; args = [] }
+
+  let create_no_args_found head = { head; args = [] }
+
+  let with_head_cmi_path { head; args } cmi_path =
+    { head = CUI.Found.with_cmi_path head cmi_path; args }
 
   let of_parameter_name param = create_no_args param
 
@@ -155,12 +173,13 @@ end = struct
 
   let find_in_parameter_map t map =
     match t with
-    | { head; args = [] } -> Parameter_name.Map.find_opt head map
+    | { head; args = [] } ->
+      Parameter_name.Map.find_opt (CUI.Found.intf head) map
     | _ -> None
 
   let mem_parameter_set t set =
     match t with
-    | { head; args = [] } -> Parameter_name.Set.mem head set
+    | { head; args = [] } -> Parameter_name.Set.mem (CUI.Found.intf head) set
     | _ -> false
 
   let to_string = Fmt.asprintf "%a" print
@@ -292,7 +311,9 @@ end = struct
      [t] is the identity. Or just have [Name.t] wrap [t] and ignore [hidden_args]. *)
   let rec to_name { head; visible_args; hidden_args = _ } : Name.t =
     (* Safe because we already checked the names in this exact argument list *)
-    Name.unsafe_create_unchecked head (List.map arg_to_name visible_args)
+    Name.unsafe_create_unchecked
+      (CUI.Found.without_cmi_path head)
+      (List.map arg_to_name visible_args)
 
   and arg_to_name ({ param = name; value } : argument) : Name.argument =
     { param = name; value = to_name value }

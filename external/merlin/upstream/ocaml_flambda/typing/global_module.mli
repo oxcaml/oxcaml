@@ -29,7 +29,7 @@ end
 
 module Name : sig
   type t = private
-    { head : CUI.t;
+    { head : CUI.Found.t;
       args : argument list
     }
 
@@ -44,6 +44,12 @@ module Name : sig
   val create_exn : CUI.t -> argument list -> t
 
   val create_no_args : CUI.t -> t
+
+  (** Like [create_no_args], but keep the cmi path attached to the head. *)
+  val create_no_args_found : CUI.Found.t -> t
+
+  (** Attach the given .cmi path to the head of the name. *)
+  val with_head_cmi_path : t -> Misc.filepath -> t
 
   val of_parameter_name : Parameter_name.t -> t
 

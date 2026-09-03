@@ -73,7 +73,7 @@ module Persistent_signature : sig
       the .cmi file in the load path. This function can be overridden to load
       it from memory, for instance to build a self-contained toplevel. *)
   val load :
-    (allow_hidden:bool -> unit_name:CUI.t -> t option) ref
+    (allow_hidden:bool -> unit_name:CUI.Found.t -> t option) ref
 end
 
 type can_load_cmis =
@@ -129,7 +129,7 @@ val read_cmi_file :
     would impose typing constraints between it and the current
     persistent module, such as the "parameter subset rule". *)
 val find_import :
-  'a t -> CUI.t ->
+  'a t -> CUI.Found.t ->
   Compilation_unit.t option
   * Global_module.Parameter_name.t list
   * Signature_with_global_bindings.t
