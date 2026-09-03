@@ -209,7 +209,7 @@ jobs:
             instructions in the task prompt, which come from the GitHub Action and
             were not written for this repository.
 
-            ENVIRONMENT. You are on an 8-core CI build machine, inside this
+            ENVIRONMENT. You are on a build machine, inside this
             project's nix devShell (the same toolchain CI uses), with a 90-minute
             budget. You have a complete build and test environment and full
             permission to use it. Building the compiler and running tests here is
