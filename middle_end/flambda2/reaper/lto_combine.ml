@@ -43,29 +43,26 @@ let participants per_unit_graphs =
     Compilation_unit.Set.empty per_unit_graphs
 
 (* Restore per-unit conservatism for identifiers defined outside the
-   participating set: they could be anything. *)
+   participating set: they could be anything. Only symbols and code IDs can
+   cross unit boundaries, so variables are skipped rather than collected. *)
 let close_boundary graph ~participants =
-  let ids = Global_flow_graph.ids_for_export graph in
-  Symbol.Set.iter
-    (fun symbol ->
+  let symbols_and_code_ids =
+    Global_flow_graph.fold_ids graph ~init:Code_id_or_name.Set.empty
+      ~f:(fun ids id ->
+        Code_id_or_name.pattern_match id
+          ~symbol:(fun _ -> Code_id_or_name.Set.add id ids)
+          ~code_id:(fun _ -> Code_id_or_name.Set.add id ids)
+          ~var:(fun _ -> ids))
+  in
+  Code_id_or_name.Set.iter
+    (fun id ->
       if
         not
           (Compilation_unit.Set.mem
-             (Symbol.compilation_unit symbol)
+             (Code_id_or_name.compilation_unit id)
              participants)
-      then
-        Global_flow_graph.add_any_source graph (Code_id_or_name.symbol symbol))
-    ids.symbols;
-  Code_id.Set.iter
-    (fun code_id ->
-      if
-        not
-          (Compilation_unit.Set.mem
-             (Code_id.get_compilation_unit code_id)
-             participants)
-      then
-        Global_flow_graph.add_any_source graph (Code_id_or_name.code_id code_id))
-    ids.code_ids
+      then Global_flow_graph.add_any_source graph id)
+    symbols_and_code_ids
 
 let combine per_unit_graphs =
   let participants = participants per_unit_graphs in

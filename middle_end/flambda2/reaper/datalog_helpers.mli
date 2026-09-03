@@ -100,7 +100,7 @@ module Maps : sig
 
     type handle = (t, Code_id_or_name.t -> Datalog.nil, unit) Datalog.table
 
-    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+    val fold_ids : t -> init:'a -> f:('a -> Code_id_or_name.t -> 'a) -> 'a
 
     val rename : t -> rename_id:(Code_id_or_name.t -> Code_id_or_name.t) -> t
   end
@@ -114,7 +114,7 @@ module Maps : sig
         unit )
       Datalog.table
 
-    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+    val fold_ids : t -> init:'a -> f:('a -> Code_id_or_name.t -> 'a) -> 'a
 
     val rename : t -> rename_id:(Code_id_or_name.t -> Code_id_or_name.t) -> t
   end
@@ -122,7 +122,7 @@ module Maps : sig
   module Nnn : sig
     type t = Nn.t Code_id_or_name.Map.t
 
-    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+    val fold_ids : t -> init:'a -> f:('a -> Code_id_or_name.t -> 'a) -> 'a
 
     val rename : t -> rename_id:(Code_id_or_name.t -> Code_id_or_name.t) -> t
   end
@@ -133,7 +133,7 @@ module Maps : sig
     type handle =
       (t, Code_id_or_name.t -> Field.t -> Datalog.nil, unit) Datalog.table
 
-    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+    val fold_ids : t -> init:'a -> f:('a -> Code_id_or_name.t -> 'a) -> 'a
 
     val add_fields : t -> Field.Set.t -> Field.Set.t
 
@@ -153,7 +153,7 @@ module Maps : sig
         unit )
       Datalog.table
 
-    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+    val fold_ids : t -> init:'a -> f:('a -> Code_id_or_name.t -> 'a) -> 'a
 
     val add_fields : t -> Field.Set.t -> Field.Set.t
 
@@ -173,7 +173,7 @@ module Maps : sig
         unit )
       Datalog.table
 
-    val add_ids : t -> Ids_for_export.t -> Ids_for_export.t
+    val fold_ids : t -> init:'a -> f:('a -> Code_id_or_name.t -> 'a) -> 'a
 
     val rename : t -> rename_id:(Code_id_or_name.t -> Code_id_or_name.t) -> t
   end

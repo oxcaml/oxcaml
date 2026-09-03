@@ -332,6 +332,12 @@ end
 module type Map_plus_iterator = sig
   include Map
 
+  (** [fold_left f init t] is [fold] with a left-fold interface. It is
+      tail-recursive and annotated for loopification and inlining, so at each
+      call site the whole fold is inlined and [f] is specialised into direct
+      calls. Prefer it to [fold] for hot iteration. *)
+  val fold_left : ('b -> key -> 'a -> 'b) -> 'b -> 'a t -> 'b
+
   module Mutable_iterator : sig
     (** An ['a iterator] iterates over the values in a ['a t] map in increasing
         order. *)

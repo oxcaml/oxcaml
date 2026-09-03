@@ -180,6 +180,12 @@ val print_iter_edges :
   graph ->
   unit
 
+(** Fold [f] over the identifiers occurring in the graph. [f] is applied once
+    per fact mentioning an identifier, not once per identifier, so it must be
+    insensitive to repeats. Use this rather than [ids_for_export] when only some
+    kinds of identifier are of interest. *)
+val fold_ids : graph -> init:'a -> f:('a -> Code_id_or_name.t -> 'a) -> 'a
+
 val ids_for_export : graph -> Ids_for_export.t
 
 (** Fields are hashconsed, so for serialisation the [Field.view] of each one

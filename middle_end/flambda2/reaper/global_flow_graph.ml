@@ -249,23 +249,25 @@ let add_code_id_my_closure t code_id my_closure =
          [Code_id_or_name.code_id code_id; Code_id_or_name.var my_closure]
          () t.code_id_my_closure
 
-let ids_for_export graph =
+let[@inline] fold_ids graph ~init ~f =
   let open Datalog_helpers in
-  let ids = Ids_for_export.empty in
-  let ids = Maps.Nn.add_ids graph.alias ids in
-  let ids = Maps.Nn.add_ids graph.use ids in
-  let ids = Maps.Nfn.add_ids graph.accessor ids in
-  let ids = Maps.Nfn.add_ids graph.constructor ids in
-  let ids = Maps.Ncn.add_ids graph.argument ids in
-  let ids = Maps.Ncn.add_ids graph.parameter ids in
-  let ids = Maps.Nnn.add_ids graph.propagate ids in
-  let ids = Maps.Nnn.add_ids graph.alias_if_any_source ids in
-  let ids = Maps.N.add_ids graph.any_usage ids in
-  let ids = Maps.N.add_ids graph.any_source ids in
-  let ids = Maps.N.add_ids graph.keep_alive ids in
-  let ids = Maps.N.add_ids graph.zero_alloc_source ids in
-  let ids = Maps.Nn.add_ids graph.code_id_my_closure ids in
-  ids
+  let acc = Maps.Nn.fold_ids graph.alias ~init ~f in
+  let acc = Maps.Nn.fold_ids graph.use ~init:acc ~f in
+  let acc = Maps.Nfn.fold_ids graph.accessor ~init:acc ~f in
+  let acc = Maps.Nfn.fold_ids graph.constructor ~init:acc ~f in
+  let acc = Maps.Ncn.fold_ids graph.argument ~init:acc ~f in
+  let acc = Maps.Ncn.fold_ids graph.parameter ~init:acc ~f in
+  let acc = Maps.Nnn.fold_ids graph.propagate ~init:acc ~f in
+  let acc = Maps.Nnn.fold_ids graph.alias_if_any_source ~init:acc ~f in
+  let acc = Maps.N.fold_ids graph.any_usage ~init:acc ~f in
+  let acc = Maps.N.fold_ids graph.any_source ~init:acc ~f in
+  let acc = Maps.N.fold_ids graph.keep_alive ~init:acc ~f in
+  let acc = Maps.N.fold_ids graph.zero_alloc_source ~init:acc ~f in
+  Maps.Nn.fold_ids graph.code_id_my_closure ~init:acc ~f
+
+let ids_for_export graph =
+  fold_ids graph ~init:Ids_for_export.empty
+    ~f:Ids_for_export.add_code_id_or_name
 
 let fields_for_export graph =
   let open Datalog_helpers in

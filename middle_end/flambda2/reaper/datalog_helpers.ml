@@ -86,15 +86,13 @@ module Cols = struct
 end
 
 module Maps = struct
-  let add_id = Ids_for_export.add_code_id_or_name
-
   module N = struct
     type t = unit Code_id_or_name.Map.t
 
     type handle = (t, Code_id_or_name.t -> Datalog.nil, unit) Datalog.table
 
-    let add_ids t ids =
-      Code_id_or_name.Map.fold (fun id () ids -> add_id ids id) t ids
+    let[@inline] fold_ids t ~init ~f =
+      Code_id_or_name.Map.fold_left (fun[@inline] acc id () -> f acc id) init t
 
     let rename old_t ~rename_id =
       Code_id_or_name.Map.fold
@@ -111,10 +109,10 @@ module Maps = struct
         unit )
       Datalog.table
 
-    let add_ids t ids =
-      Code_id_or_name.Map.fold
-        (fun id n ids -> N.add_ids n (add_id ids id))
-        t ids
+    let[@inline] fold_ids t ~init ~f =
+      Code_id_or_name.Map.fold_left
+        (fun[@inline] acc id n -> N.fold_ids n ~init:(f acc id) ~f)
+        init t
 
     let rename old_t ~rename_id =
       Code_id_or_name.Map.fold
@@ -128,10 +126,10 @@ module Maps = struct
   module Nnn = struct
     type t = Nn.t Code_id_or_name.Map.t
 
-    let add_ids t ids =
-      Code_id_or_name.Map.fold
-        (fun id nn ids -> Nn.add_ids nn (add_id ids id))
-        t ids
+    let[@inline] fold_ids t ~init ~f =
+      Code_id_or_name.Map.fold_left
+        (fun[@inline] acc id nn -> Nn.fold_ids nn ~init:(f acc id) ~f)
+        init t
 
     let rename old_t ~rename_id =
       Code_id_or_name.Map.fold
@@ -148,10 +146,10 @@ module Maps = struct
     type handle =
       (t, Code_id_or_name.t -> Field.t -> Datalog.nil, unit) Datalog.table
 
-    let add_ids t ids =
-      Code_id_or_name.Map.fold
-        (fun id (_ : unit Field.Map.t) ids -> add_id ids id)
-        t ids
+    let[@inline] fold_ids t ~init ~f =
+      Code_id_or_name.Map.fold_left
+        (fun[@inline] acc id (_ : unit Field.Map.t) -> f acc id)
+        init t
 
     let add_fields t fields =
       Code_id_or_name.Map.fold
@@ -183,13 +181,13 @@ module Maps = struct
         unit )
       Datalog.table
 
-    let add_ids t ids =
-      Code_id_or_name.Map.fold
-        (fun id fn ids ->
-          Field.Map.fold
-            (fun (_ : Field.t) n ids -> N.add_ids n ids)
-            fn (add_id ids id))
-        t ids
+    let[@inline] fold_ids t ~init ~f =
+      Code_id_or_name.Map.fold_left
+        (fun[@inline] acc id fn ->
+          Field.Map.fold_left
+            (fun[@inline] acc (_ : Field.t) n -> N.fold_ids n ~init:acc ~f)
+            (f acc id) fn)
+        init t
 
     let add_fields t fields =
       Code_id_or_name.Map.fold
@@ -223,13 +221,13 @@ module Maps = struct
         unit )
       Datalog.table
 
-    let add_ids t ids =
-      Code_id_or_name.Map.fold
-        (fun id cn ids ->
-          Cofield.Map.fold
-            (fun (_ : Cofield.t) n ids -> N.add_ids n ids)
-            cn (add_id ids id))
-        t ids
+    let[@inline] fold_ids t ~init ~f =
+      Code_id_or_name.Map.fold_left
+        (fun[@inline] acc id cn ->
+          Cofield.Map.fold_left
+            (fun[@inline] acc (_ : Cofield.t) n -> N.fold_ids n ~init:acc ~f)
+            (f acc id) cn)
+        init t
 
     let rename old_t ~rename_id =
       (* Cofields are stable across processes, so they are not renamed. *)

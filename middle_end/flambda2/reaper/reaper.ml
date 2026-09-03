@@ -205,13 +205,15 @@ module Staged = struct
        restriction, make those decisions derivable from the shared solution
        alone. *)
     let cannot_change_calling_convention =
-      Code_id.Set.fold
-        (fun code_id acc ->
-          Code_id_or_name.Map.add (Code_id_or_name.code_id code_id) () acc)
-        (Global_flow_graph.ids_for_export deps).code_ids
-        (Datalog.get_table
-           Unboxing_analysis.cannot_change_calling_convention_table
-           solved_dep.db)
+      Global_flow_graph.fold_ids deps
+        ~init:
+          (Datalog.get_table
+             Unboxing_analysis.cannot_change_calling_convention_table
+             solved_dep.db) ~f:(fun acc id ->
+          Code_id_or_name.pattern_match id
+            ~code_id:(fun _ -> Code_id_or_name.Map.add id () acc)
+            ~symbol:(fun _ -> acc)
+            ~var:(fun _ -> acc))
     in
     { Unboxing_analysis.db =
         Datalog.set_table

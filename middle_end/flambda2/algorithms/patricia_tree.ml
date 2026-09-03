@@ -523,6 +523,8 @@ module Tree_operations (Tree : Tree) : sig
 
   val fold : ('a, 'b -> 'b) Callback.t -> 'a t -> 'b -> 'b
 
+  val fold_left : ('a, 'b -> 'b) Callback.t -> 'b -> 'a t -> 'b
+
   val for_all : ('a, bool) Callback.t -> 'a t -> bool
 
   val exists : ('a, bool) Callback.t -> 'a t -> bool
@@ -1445,6 +1447,29 @@ end = struct
         let t0, t1 = order_branches' b in
         unsigned_fold f t1 (unsigned_fold f t0 acc))
 
+  (* Unlike [unsigned_fold], this uses an explicit stack so that the recursion
+     is a self tail call and gets loopified, allowing the whole fold to be
+     inlined at each call site, which specialises the callback into direct
+     calls. *)
+  let[@inline] [@loop] rec unsigned_fold_left f acc t stack =
+    match tree_descr t with
+    | Leaf l -> (
+      let acc = Callback.call f (leaf_key l) (leaf_datum l) acc in
+      match stack with
+      | [] -> acc
+      | t :: stack -> unsigned_fold_left f acc t stack)
+    | Branch b -> unsigned_fold_left f acc (branch0 b) (branch1 b :: stack)
+
+  let[@inline] fold_left f init t =
+    match descr t with
+    | Empty -> init
+    | Non_empty tree -> (
+      match tree_descr tree with
+      | Leaf l -> Callback.call f (leaf_key l) (leaf_datum l) init
+      | Branch b ->
+        let t0, t1 = order_branches' b in
+        unsigned_fold_left f init t0 [t1])
+
   let rec unsigned_for_all p t =
     match tree_descr t with
     | Leaf l -> Callback.call p (leaf_key l) (leaf_datum l)
@@ -2179,6 +2204,10 @@ module Map = struct
      we have function specialisation, see the comment on
      {!module-Merge_callback}. *)
   let split i t = Ops.split ~found:Option ~not_found:None i t
+
+  (* Shadow [Ops.fold_left] to put the accumulator first in the callback. *)
+  let[@inline] fold_left f init t =
+    Ops.fold_left (fun[@inline] key datum acc -> f acc key datum) init t
 
   let bindings s = Ops.to_list s
 
