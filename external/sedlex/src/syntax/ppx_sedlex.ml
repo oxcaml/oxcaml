@@ -4,7 +4,6 @@
 
 open Ppxlib
 open Ast_builder.Default
-open Ast_helper
 
 (* let ocaml_version = Versions.ocaml_408 *)
 
@@ -232,7 +231,8 @@ let gen_state (lexbuf_name, lexbuf) auto i (trans, final) =
     [
       value_binding ~loc
         ~pat:(pvar ~loc (state_fun i))
-        ~expr:(Exp.fun_ ~loc Nolabel None lhs body);
+        ~expr:(
+          Ppxlib_jane.Ast_builder.Default.add_fun_param ~loc Nolabel None lhs body);
     ]
   in
   match best_final final with
@@ -335,7 +335,7 @@ let regexp_of_pattern env =
   let rec char_pair_op func name ~encoding p tuple =
     (* Construct something like Sub(a,b) *)
       match tuple with
-      | Some { ppat_desc = Ppat_tuple [p0; p1] } -> begin
+      | Some { ppat_desc = Ppat_tuple ([None, p0; None, p1], Closed) } -> begin
           match func (aux ~encoding p0) (aux ~encoding p1) with
             | Some r -> r
             | None ->
@@ -351,10 +351,14 @@ let regexp_of_pattern env =
     (* interpret one pattern node *)
       match p.ppat_desc with
       | Ppat_or (p1, p2) -> Sedlex.alt (aux ~encoding p1) (aux ~encoding p2)
-      | Ppat_tuple (p :: pl) ->
-          List.fold_left
-            (fun r p -> Sedlex.seq r (aux ~encoding p))
-            (aux ~encoding p) pl
+      | Ppat_tuple (labeled_pl, Closed) ->
+        (match Ppxlib_jane.as_unlabeled_tuple labeled_pl with
+         | Some (p :: pl) ->
+            List.fold_left
+              (fun r p -> Sedlex.seq r (aux ~encoding p))
+              (aux ~encoding p) pl
+         | Some [] -> err p.ppat_loc "empty tuple unexpected"
+         | None -> err p.ppat_loc "labeled tuples not allowed in regexps")
       | Ppat_construct ({ txt = Lident "Star" }, Some (_, p)) ->
           Sedlex.rep (aux ~encoding p)
       | Ppat_construct ({ txt = Lident "Plus" }, Some (_, p)) ->
@@ -372,13 +376,13 @@ let regexp_of_pattern env =
                 {
                   ppat_desc =
                     Ppat_tuple
-                      [
-                        p0;
-                        {
+                      ([
+                        None, p0;
+                        None, {
                           ppat_desc =
                             Ppat_constant (i1 as i2) | Ppat_interval (i1, i2);
                         };
-                      ];
+                      ], Closed);
                 } ) ) -> begin
           match (i1, i2) with
             | Pconst_integer (i1, _), Pconst_integer (i2, _) ->
@@ -471,6 +475,13 @@ let previous = ref []
 let regexps = ref []
 let should_set_cookies = ref false
 
+let loc_ghoster =
+  object
+    inherit Ast_traverse.map as super
+    method! location location = super#location { location with loc_ghost = true }
+  end
+;;
+
 let mapper =
   object (this)
     inherit Ast_traverse.map as super
@@ -509,13 +520,13 @@ let mapper =
                       err e.pexp_loc "'when' guards are not supported")
                 cases
             in
-            gen_definition lexbuf cases error
+            loc_ghoster#expression @@ gen_definition lexbuf cases error
         | [%expr
             let [%p? { ppat_desc = Ppat_var { txt = name } }] =
               [%sedlex.regexp? [%p? p]]
             in
             [%e? body]] ->
-            (this#define_regexp name p)#expression body
+            loc_ghoster#expression @@ (this#define_regexp name p)#expression body
         | [%expr [%sedlex [%e? _]]] ->
             err e.pexp_loc
               "the %%sedlex extension is only recognized on match expressions"
@@ -549,7 +560,7 @@ let mapper =
         let tables = List.map table (get_tables ()) in
         regexps := regexps';
         should_set_cookies := true;
-        tables @ parts @ l)
+        loc_ghoster#structure (tables @ parts) @ l)
       else fst (this#structure_with_regexps l)
   end
 
@@ -570,7 +581,9 @@ let extensions =
   [
     Extension.declare "sedlex" Extension.Context.expression
       Ast_pattern.(single_expr_payload __)
-      (fun ~loc:_ ~path:_ expr -> mapper#expression expr);
+      (fun ~loc:_ ~path:_ expr ->
+        let output = mapper#expression expr in
+        loc_ghoster#expression output);
   ]
 
 let () =
