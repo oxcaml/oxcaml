@@ -96,6 +96,10 @@ Line 1, characters 22-36:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
+(* The curry mode of [f] is fixed when [No_modality] is translated.
+   A modality applied later can't affect the already translated
+   curry mode. The printer makes this visible with parentheses:
+   [(unit -> unit) @@ portable]. *)
 module type Module_modality = sig
   module M : No_modality @@ portable
 end
@@ -124,6 +128,8 @@ Line 1, characters 22-46:
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
+(* Same as [Module_modality]: the curry mode of [f] is not recomputed and
+   shows up as nonportable. *)
 module type Module_modality_prefix = sig
   module (M @@ portable) : No_modality
 end
@@ -154,6 +160,8 @@ module type Default_module = sig @@ portable
   end
 end
 
+(* No_modality is not more general than Default_module. Default_module has
+  a portable curry mode *)
 module Default_module : Default_module = struct
   module M = No_modality
 end
@@ -161,19 +169,35 @@ end
 module type Default_module =
   sig
     module M :
-      sig val f : 'a @ portable contended -> (unit -> unit) @@ portable end
+      sig val f : 'a @ portable contended -> unit -> unit @@ portable end
   end
-module Default_module : Default_module
+Lines 9-11, characters 41-3:
+ 9 | .........................................struct
+10 |   module M = No_modality
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig module M = No_modality end
+       is not included in
+         Default_module
+       In module "M":
+       Modules do not match:
+         sig val f : 'a @ portable contended -> unit -> unit end
+       is not included in
+         sig val f : 'a @ portable contended -> unit -> unit @@ portable end
+       In module "M":
+       Values do not match:
+         val f : 'a @ portable contended -> unit -> unit
+       is not included in
+         val f : 'a @ portable contended -> unit -> unit @@ portable
+       The type "'a @ portable contended -> unit -> unit"
+       is not compatible with the type
+         "'a @ portable contended -> (unit -> unit) @ portable"
 |}]
 
-let () = use_portable (Default_module.M.f 42)
-[%%expect{|
-Line 1, characters 22-45:
-1 | let () = use_portable (Default_module.M.f 42)
-                          ^^^^^^^^^^^^^^^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
-|}]
 
+(* Same as [Module_modality]: [include] of a named module type reuses its
+   already-translated curry-mode. *)
 module type Include_modality = sig
   include No_modality @@ portable
 end
