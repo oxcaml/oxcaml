@@ -614,18 +614,39 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_unboxed_bool b ->
       Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
   | Texp_tuple (el, alloc_mode) ->
-      let ll, shape =
-        transl_value_list_with_shape ~scopes
-          (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
+      let el =
+        List.map (fun (l, e, s) ->
+          (l, e, Jkind.Sort.default_for_transl_and_get s)) el
       in
-      begin try
-        Lconst(Const_block(0, List.map extract_constant ll))
-      with Not_constant ->
-        Lprim(Pmakeblock(0, Immutable,
-                         Lambda.block_shape_of_value_kinds (Some shape),
-                         transl_alloc_mode_r alloc_mode),
-              ll,
-              (of_location ~scopes e.exp_loc))
+      let layouts = List.map (fun (_, e, s) -> layout_exp s e) el in
+      let ll =
+        List.map2 (fun (_, e, _) layout -> transl_exp ~scopes layout e)
+          el layouts
+      in
+      let shape =
+        Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
+      in
+      let constant =
+        match List.map extract_constant ll with
+        | exception Not_constant -> None
+        | constants ->
+            if Mixed_product_bytes.shape_is_all_value shape then
+              Some (Const_block(0, constants))
+            else if !Clflags.native_code then
+              Some (Const_mixed_block(0, shape, constants))
+            else
+              (* CR layouts v5.9: Structured constants for mixed blocks should
+                 be supported in bytecode. See symtable.ml for the difficulty.
+              *)
+              None
+      in
+      begin match constant with
+      | Some constant -> Lconst constant
+      | None ->
+          Lprim(Pmakeblock(0, Immutable, Shape shape,
+                           transl_alloc_mode_r alloc_mode),
+                ll,
+                (of_location ~scopes e.exp_loc))
       end
   | Texp_unboxed_tuple el ->
       let el =
@@ -1612,15 +1633,6 @@ and transl_list_with_layout ~scopes expr_list =
     let layout = layout_exp sort exp in
     transl_exp ~scopes layout exp, sort, layout)
     expr_list
-
-(* Will raise if a list element has a non-value layout. *)
-and transl_value_list_with_shape ~scopes expr_list =
-  let transl_with_shape (e, sort) =
-    let layout = layout_exp sort e in
-    let shape = Lambda.must_be_value layout in
-    transl_exp ~scopes layout e, shape
-  in
-  List.split (List.map transl_with_shape expr_list)
 
 and transl_guard ~scopes guard rhs_layout rhs =
   let layout = rhs_layout in
@@ -2958,14 +2970,19 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
          there. Consider adding it for unboxed tuples. *)
       assert (static_handlers = []);
       let mode = transl_alloc_mode_r alloc_mode in
+      (* CR zeisbach: is it even OK to have non-values in here? probably yes.
+         but now i'm curious why it isn't done for unboxed tuples. maybe there
+         is now room to merge the code in these cases? *)
       let argl =
-        List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
+        List.map (fun (_, a, s) ->
+          (a, Jkind.Sort.default_for_transl_and_get s)) argl
       in
       Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
         (transl_list_with_layout ~scopes argl) mode val_cases partial
     | {exp_desc = Texp_tuple (argl, alloc_mode)}, _ :: _ ->
         let argl =
-          List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
+          List.map (fun (_, a, s) ->
+            (a, Jkind.Sort.default_for_transl_and_get s)) argl
         in
         let val_ids, lvars =
           List.map
