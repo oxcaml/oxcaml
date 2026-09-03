@@ -9,6 +9,15 @@
 
 (* Tests for the mode crossing of box kinds. *)
 
+let use_uncontended : 'a @ uncontended -> unit = fun _ -> ()
+let use_portable : 'a @ portable -> unit = fun _ -> ()
+let use_global : 'a @ global -> unit = fun _ -> ()
+[%%expect{|
+val use_uncontended : 'a -> unit = <fun>
+val use_portable : 'a @ portable -> unit = <fun>
+val use_global : 'a -> unit = <fun>
+|}]
+
 (**** [immediate box] crosses portability, but not contention (the kind
       does not rule out a mutable payload), externality, or locality ****)
 
@@ -283,4 +292,96 @@ Error: This type "t" should be an instance of type "('a : value mod external_)"
          because of the definition of t at line 1, characters 0-22.
        But the kind of t must be a subkind of value mod external_
          because of the definition of ext_req at line 2, characters 0-39.
+|}]
+
+(**** The box type constructor crosses with its payload, except on the
+      axes [mutable_data] withholds ****)
+
+let f (x : int box @ nonportable) = use_portable x
+[%%expect{|
+val f : int box -> unit = <fun>
+|}]
+
+let f (x : int box @ contended) = use_uncontended x
+[%%expect{|
+Line 1, characters 50-51:
+1 | let f (x : int box @ contended) = use_uncontended x
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+(* The box of a function does not cross portability *)
+let f (x : (int -> int) box @ nonportable) = use_portable x
+[%%expect{|
+Line 1, characters 58-59:
+1 | let f (x : (int -> int) box @ nonportable) = use_portable x
+                                                              ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(* Boxes never cross locality *)
+let f (x : int box @ local) = use_global x
+[%%expect{|
+Line 1, characters 41-42:
+1 | let f (x : int box @ local) = use_global x
+                                             ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+(* The same, at the type level *)
+type ('a : value mod portable) portable_req
+type ok = int box portable_req
+type also_ok = string box portable_req
+type bad = (int -> int) box portable_req
+[%%expect{|
+type ('a : value mod portable) portable_req
+type ok = int box portable_req
+type also_ok = string box portable_req
+Line 4, characters 11-27:
+4 | type bad = (int -> int) box portable_req
+               ^^^^^^^^^^^^^^^^
+Error: This type "(int -> int) box" should be an instance of type
+         "('a : value mod portable)"
+       The kind of (int -> int) box is value non_float
+         because it's a boxed type.
+       But the kind of (int -> int) box must be a subkind of
+           value mod portable
+         because of the definition of portable_req at line 1, characters 0-43.
+|}, Principal{|
+type ('a : value mod portable) portable_req
+Line 2, characters 10-17:
+2 | type ok = int box portable_req
+              ^^^^^^^
+Error: This type "int box" should be an instance of type
+         "('a : value mod portable)"
+       The kind of int box is mutable_data with int
+         because it's a boxed type.
+       But the kind of int box must be a subkind of value mod portable
+         because of the definition of portable_req at line 1, characters 0-43.
+|}]
+(* CR layouts v2.8: fix principal mode. Internal ticket 5111 *)
+
+(**** Reducible box types get their boxed type's kind: [t# box] is equal to
+      [t], so it crosses contention exactly when [t] is not mutable ****)
+
+type t = { contents : int }
+let f (x : t# box @ contended) = use_uncontended x
+[%%expect{|
+type t = { contents : int; }
+val f : t @ contended -> unit = <fun>
+|}]
+
+let f (x : #(int * int) box @ contended) = use_uncontended x
+[%%expect{|
+val f : int * int @ contended -> unit = <fun>
+|}]
+
+type r = { mutable contents : int }
+let f (x : r# box @ contended) = use_uncontended x
+[%%expect{|
+type r = { mutable contents : int; }
+Line 2, characters 49-50:
+2 | let f (x : r# box @ contended) = use_uncontended x
+                                                     ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]

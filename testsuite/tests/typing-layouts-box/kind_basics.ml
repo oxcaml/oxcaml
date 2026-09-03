@@ -413,6 +413,36 @@ Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
 type t : bits8 box
 |}]
 
+(* A sort variable's box implies nothing, even when the variable is known
+   addressable *)
+let apply_v (_ : ('b : value)) = ()
+let bad (x : 'a) (_ : 'a addr_req) (y : 'a box) = apply_v y
+[%%expect{|
+val apply_v : 'b -> unit = <fun>
+Line 2, characters 58-59:
+2 | let bad (x : 'a) (_ : 'a addr_req) (y : 'a box) = apply_v y
+                                                              ^
+Error: The value "y" has type "'a box" but an expression was expected of type
+         "('b : value)"
+       The layout of 'a box is value_or_null
+         because it's a boxed type.
+       But the layout of 'a box must be a sublayout of value
+         because of the definition of apply_v at line 1, characters 12-35.
+|}]
+
+let bad (x : 'a) (y : 'a box) = apply_v y
+[%%expect{|
+Line 1, characters 40-41:
+1 | let bad (x : 'a) (y : 'a box) = apply_v y
+                                            ^
+Error: The value "y" has type "'a box" but an expression was expected of type
+         "('b : value)"
+       The layout of 'a box is value_or_null
+         because it's a boxed type.
+       But the layout of 'a box must be a sublayout of value
+         because of the definition of apply_v at line 1, characters 12-35.
+|}]
+
 (**** Kind aliases expand under [box], but truly-abstract kinds and layout
       variables are rejected ****)
 
