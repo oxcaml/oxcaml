@@ -177,7 +177,7 @@ let rec fracture_lam lambda : slambda =
             sval_runtime =
               (if bindings_r == bindings && body_r == body
                then lambda
-               else Lletrec (bindings, body_r))
+               else Lletrec (bindings_r, body_r))
           })
   | Lprim (prim, args, loc) -> fracture_prim lambda prim args loc
   | Lswitch
