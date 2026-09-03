@@ -109,17 +109,13 @@ end
 module Node = struct
   type t =
     | Uid of Uid.t
-    | Whole_unit of Compilation_unit.t
     | Location of Compilation_unit.t * Location.t
 
   let compare left right =
     match left, right with
     | Uid left, Uid right -> Uid.compare left right
-    | Uid _, (Whole_unit _ | Location _) -> -1
-    | Whole_unit _, Uid _ -> 1
-    | Whole_unit left, Whole_unit right -> Compilation_unit.compare left right
-    | Whole_unit _, Location _ -> -1
-    | Location _, (Uid _ | Whole_unit _) -> 1
+    | Uid _, Location _ -> -1
+    | Location _, Uid _ -> 1
     | Location (u1, l1), Location (u2, l2) ->
       let c = Compilation_unit.compare u1 u2 in
       if c <> 0 then c else Location.compare l1 l2
@@ -693,7 +689,7 @@ let facts_of_tree compilation_unit artifact iterate =
   let node_of_module_path env ~loc path =
     let path = normalize_module_path env path in
     match Env.find_module_address path env with
-    | Env.Aunit (unit_, _) -> Node.Whole_unit unit_
+    | Env.Aunit (unit_, _) -> Node.Uid (Uid.of_compilation_unit_id unit_)
     | Env.Alocal _ | Env.Adot _ | (exception Not_found) -> (
       match find_module env path with
       | Some declaration -> Node.Uid declaration.Types.md_uid
@@ -2028,12 +2024,13 @@ let of_implementation compilation_unit ~module_pairs ~modtype_pairs
   if unit_interface_check
   then
     Builder.add_check facts
-      (interface_check ~impl:(Node.Whole_unit compilation_unit)
-         ~expectation:unit_uid);
+      (interface_check ~impl:(Node.Uid unit_uid) ~expectation:unit_uid);
   Option.iter
     (fun expectation ->
       Builder.add_check facts
-        (interface_check ~impl:(Node.Whole_unit compilation_unit) ~expectation))
+        (interface_check
+           ~impl:(Node.Uid (Uid.of_compilation_unit_id compilation_unit))
+           ~expectation))
     argument_interface;
   let interface_uid_of_impl =
     let table =
@@ -2098,22 +2095,8 @@ let of_interface compilation_unit ~argument_interface signature =
   Option.iter
     (fun expectation ->
       Builder.add_check facts
-        (interface_check ~impl:(Node.Whole_unit compilation_unit) ~expectation))
+        (interface_check
+           ~impl:(Node.Uid (Uid.of_compilation_unit_id compilation_unit))
+           ~expectation))
     argument_interface;
-  Builder.freeze facts
-
-let of_pack compilation_unit ~module_pairs ~unit_interface_check =
-  let facts, (_ : Uid.t -> Context.t option) =
-    facts_of_tree compilation_unit Artifact.Implementation (fun _ -> ())
-  in
-  List.iter
-    (fun (~impl, ~intf) ->
-      Builder.add_check facts
-        (interface_check ~impl:(Node.Uid impl) ~expectation:intf))
-    module_pairs;
-  if unit_interface_check
-  then
-    Builder.add_check facts
-      (interface_check ~impl:(Node.Whole_unit compilation_unit)
-         ~expectation:(Uid.of_compilation_unit_id compilation_unit));
   Builder.freeze facts

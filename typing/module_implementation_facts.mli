@@ -79,7 +79,6 @@ module Node : sig
   (** Identifies the implementation module of a check *)
   type t =
     | Uid of Shape.Uid.t
-    | Whole_unit of Compilation_unit.t
     | Location of Compilation_unit.t * Location.t
 
   val compare : t -> t -> int
@@ -206,15 +205,4 @@ val of_interface :
   Compilation_unit.t ->
   argument_interface:Shape.Uid.t option ->
   Typedtree.signature ->
-  t
-
-(** [of_pack compilation_unit ~module_pairs ~unit_interface_check] builds the
-    facts of a unit assembled with [-pack], which has no typedtree of its own:
-    the interface check of the pack against its [.mli] when
-    [unit_interface_check] holds, and one interface check per packed member
-    paired with the [.mli] declaration it was checked against. *)
-val of_pack :
-  Compilation_unit.t ->
-  module_pairs:(impl:Shape.Uid.t * intf:Shape.Uid.t) list ->
-  unit_interface_check:bool ->
   t

@@ -4584,18 +4584,9 @@ let module_implementation_facts ~unit_interface ~argument_interface
   | Cmt_format.Partial_implementation _ | Partial_interface _ | Functorize ->
     None
   | Packed _ ->
-    let module_pairs =
-      List.filter_map
-        (fun (kind, impl, intf) ->
-          match (kind : Cmt_format.dependency_kind) with
-          | Definition_to_declaration when is_interface_item intf ->
-            Some (~impl, ~intf)
-          | Definition_to_declaration | Declaration_to_declaration -> None)
-        declaration_dependencies
-    in
-    Some
-      (Module_implementation_facts.of_pack compilation_unit ~module_pairs
-         ~unit_interface_check:unit_interface)
+    (* We do not support packed libraries: no module-type facts are recorded
+       for a [-pack] unit. *)
+    None
   | Interface signature ->
     let argument_interface =
       Option.map
