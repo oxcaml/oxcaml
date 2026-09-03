@@ -6,7 +6,9 @@ module Test_data = struct
       List.map (fun (param, value) -> { Argument.param; value }) pairs
 
     let g ?(vis = []) ?(hid = []) head =
-      create_exn head (args_of_pairs vis) ~hidden_args:hid
+      create_exn
+        (Compilation_unit_intf.of_string head)
+        (args_of_pairs vis) ~hidden_args:hid
 
     let p s = Parameter_name.of_string s
   end
