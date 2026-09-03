@@ -202,6 +202,8 @@ module Relations = struct
       [accessor] and [rev_constructor]. [any_usage] and [any_source] are the
       tops. *)
 
+  let usages_table = Datalog.create_relation ~name:"usages" Cols.[n; n]
+
   (** [usages x y] y is an alias of x.
 
       For performance reasons, we don't want to represent [usages x y] when x is
@@ -212,10 +214,12 @@ module Relations = struct
       both [usages x y] and [any_usage x] depending on the resolution order.
 
       [usages x x] is used to represent the actual use of x. *)
-  let usages = rel2 "usages" Cols.[n; n]
+  let usages x y = usages_table % [x; y]
 
   (** [any_usage x] x is used in an uncontrolled way *)
   let any_usage = any_usage
+
+  let sources_table = Datalog.create_relation ~name:"sources" Cols.[n; n]
 
   (** [sources x y] y is a source of x.
 
@@ -227,7 +231,7 @@ module Relations = struct
       both [sources x y] and [any_source x] depending on the resolution order.
 
       [sources x x] is used to represent the actual source of x. *)
-  let sources = rel2 "sources" Cols.[n; n]
+  let sources x y = sources_table % [x; y]
 
   (** [any_source x] the special extern value 'any_source' is a source of x it
       represents the top for the sources. It can be produced for instance by an
@@ -249,9 +253,10 @@ module Relations = struct
     let tbl = nrel "rev_constructor" Cols.[n; f; n] in
     fun ~from relation ~base -> tbl % [from; relation; base]
 
-  let rev_accessor =
-    let tbl = nrel "rev_accessor" Cols.[n; f; n] in
-    fun ~base relation ~to_ -> tbl % [base; relation; to_]
+  let rev_accessor_table = nrel "rev_accessor" Cols.[n; f; n]
+
+  let rev_accessor ~base relation ~to_ =
+    rev_accessor_table % [base; relation; to_]
 
   let rev_parameter =
     let tbl = nrel "rev_parameter" Cols.[n; cf; n] in
@@ -280,15 +285,19 @@ module Relations = struct
 
   let nontop_sources x y = `Only_if ([~~(any_source x)], sources x y)
 
+  let has_usage_table = Datalog.create_relation ~name:"has_usage" Cols.[n]
+
   (* [has_usage x] means that [x] must continue to exist at runtime, that is,
      either it has [any_usage], or some field of [x] is itself [has_usage]. *)
-  let has_usage = rel1 "has_usage" Cols.[n]
+  let has_usage x = has_usage_table % [x]
+
+  let has_source_table = Datalog.create_relation ~name:"has_source" Cols.[n]
 
   (* [has_source x] means that [x] can have been created at runtime.
      Unfortunately due to limitations of the datalog engine, it means that
      either [x] is [any_source], or that at least one field of [x] (instead of
      all fields of [x], which would be the exact answer) is [has_source]. *)
-  let has_source = rel1 "has_source" Cols.[n]
+  let has_source x = has_source_table % [x]
 
   let field_of_constructor_is_used_tbl =
     Datalog.create_relation ~name:"field_of_constructor_is_used" Cols.[n; f]
@@ -296,18 +305,28 @@ module Relations = struct
   let field_of_constructor_is_used constr field =
     field_of_constructor_is_used_tbl % [constr; field]
 
-  let field_of_constructor_is_used_top =
-    rel2 "field_of_constructor_is_used_top" Cols.[n; f]
+  let field_of_constructor_is_used_top_table =
+    Datalog.create_relation ~name:"field_of_constructor_is_used_top" Cols.[n; f]
 
-  let field_of_constructor_is_used_as =
-    rel3 "field_of_constructor_is_used_as" Cols.[n; f; n]
+  let field_of_constructor_is_used_top constr field =
+    field_of_constructor_is_used_top_table % [constr; field]
+
+  let field_of_constructor_is_used_as_table =
+    Datalog.create_relation ~name:"field_of_constructor_is_used_as"
+      Cols.[n; f; n]
+
+  let field_of_constructor_is_used_as constr field value =
+    field_of_constructor_is_used_as_table % [constr; field; value]
 
   let multiple_allocation_points = rel1 "multiple_allocations_points" Cols.[n]
 
   let dominated_by_allocation_point =
     rel2 "dominated_by_allocation_point" Cols.[n; n]
 
-  let allocation_point_dominator = rel2 "allocation_point_dominator" Cols.[n; n]
+  let allocation_point_dominator_table =
+    Datalog.create_relation ~name:"allocation_point_dominator" Cols.[n; n]
+
+  let allocation_point_dominator x y = allocation_point_dominator_table % [x; y]
 end
 
 open! Relations

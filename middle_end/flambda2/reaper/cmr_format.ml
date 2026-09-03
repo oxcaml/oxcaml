@@ -73,33 +73,18 @@ module Deps_with_fields = struct
       them in the style of [table_data]. *)
   type t =
     { deps : Global_flow_graph.graph;
-      fields : (Field.t * Field.view) list
+      fields : Fields_for_export.t
     }
 
   let create deps =
-    let fields =
-      Field.Set.fold
-        (fun field fields -> (field, Field.view field) :: fields)
-        (Global_flow_graph.fields_for_export deps)
-        []
-    in
-    { deps; fields }
+    { deps;
+      fields =
+        Fields_for_export.export (Global_flow_graph.fields_for_export deps)
+    }
 
   let deserialise { deps; fields } renaming =
-    let field_map =
-      List.fold_left
-        (fun map (field, view) -> Field.Map.add field (Field.create view) map)
-        Field.Map.empty fields
-    in
-    let rename_field field =
-      match Field.Map.find_opt field field_map with
-      | Some field -> field
-      | None ->
-        Misc.fatal_errorf
-          "Field %a in the stored dependency graph has no view stored"
-          Field.print field
-    in
-    Global_flow_graph.apply_renaming deps renaming ~rename_field
+    Global_flow_graph.apply_renaming deps renaming
+      ~rename_field:(Fields_for_export.import fields)
 end
 
 module Serialisable : sig

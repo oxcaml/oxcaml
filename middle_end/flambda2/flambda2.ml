@@ -431,17 +431,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   (* CR mvellacott: split the resulting solution into per-compilation-unit
      portions. *)
   let solution = Flambda2_reaper.Reaper.Staged.solve combined_graph in
-  Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~solution;
-  (* CR mvellacott: remove this debug print once we can test useful
-     functionality. *)
-  Format.eprintf "reaper_lto_solve: solved units: [%s]; ltosol output: %s@."
-    (String.concat "; "
-       (List.map
-          (fun cmr ->
-            Compilation_unit.full_path_as_string
-              (Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr))
-          cmrs))
-    ltosol_file
+  Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~solution
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables ~ltosol_filename ~cmr_filename =
@@ -470,7 +460,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
         final_typing_env;
         all_code;
         imported_offsets;
-        deps;
+        deps = _;
         rebuild_data
       } =
     Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
@@ -480,13 +470,11 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   (* Make the paused compilation's imported offsets available to
      [Slot_offsets.finalize_offsets]. *)
   Exported_offsets.import_offsets imported_offsets;
-  (* CR mvellacott: use this solution instead of solving again. *)
-  let (_solved_dep : Flambda2_reaper.Unboxing_analysis.result) =
+  (* CR mvellacott: add profiling and debug printing code. *)
+  let solved_dep =
     Flambda2_reaper.Ltosol_format.Serialisable_solution.deserialise
       ltosol_solution
   in
-  (* CR mvellacott: add profiling and debug printing code. *)
-  let solved_dep = Flambda2_reaper.Reaper.Staged.solve deps in
   let flambda, free_names, all_code, slot_offsets, final_typing_env =
     Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
       ~traverse_rebuild:rebuild_data ~solved_dep ~machine_width ~cmx_loader

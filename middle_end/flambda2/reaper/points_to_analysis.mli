@@ -64,11 +64,7 @@ module Relations : sig
 
   val has_source : Code_id_or_name.t term -> _ atom
 
-  val field_of_constructor_is_used_tbl :
-    ( unit Field.Map.t Code_id_or_name.Map.t,
-      Code_id_or_name.t -> Field.t -> Datalog.nil,
-      unit )
-    Datalog.table
+  val field_of_constructor_is_used_tbl : Datalog_helpers.Serialisation.Nf.table
 
   val field_of_constructor_is_used :
     Code_id_or_name.t term -> Field.t term -> _ atom
@@ -78,6 +74,24 @@ module Relations : sig
 
   val dominated_by_allocation_point :
     Code_id_or_name.t term -> Code_id_or_name.t term -> _ atom
+
+  val usages_table : Datalog_helpers.Serialisation.Nn.table
+
+  val sources_table : Datalog_helpers.Serialisation.Nn.table
+
+  val rev_accessor_table : Datalog_helpers.Serialisation.Nfn.table
+
+  val has_usage_table : Datalog_helpers.Serialisation.N.table
+
+  val has_source_table : Datalog_helpers.Serialisation.N.table
+
+  val field_of_constructor_is_used_top_table :
+    Datalog_helpers.Serialisation.Nf.table
+
+  val field_of_constructor_is_used_as_table :
+    Datalog_helpers.Serialisation.Nfn.table
+
+  val allocation_point_dominator_table : Datalog_helpers.Serialisation.Nn.table
 end
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
