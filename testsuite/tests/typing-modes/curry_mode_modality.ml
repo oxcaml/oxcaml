@@ -37,9 +37,7 @@ module Modality : Modality = struct
 end
 [%%expect{|
 module type Modality =
-  sig
-    val f : 'a @ portable contended -> (unit -> unit) @ portable @@ portable
-  end
+  sig val f : 'a @ portable contended -> unit -> unit @@ portable end
 module Modality : Modality
 |}]
 
@@ -80,7 +78,7 @@ end
 [%%expect{|
 module type Default =
   sig
-    val f : 'a @ portable contended -> (unit -> unit) @ portable @@ portable
+    val f : 'a @ portable contended -> unit -> unit @@ portable
     val g : 'a @ portable contended -> unit -> unit
   end
 module Default : Default
