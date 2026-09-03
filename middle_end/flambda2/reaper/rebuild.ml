@@ -74,7 +74,6 @@ type env =
     (* TODO change names *)
     cont_params_to_keep : param_decision list Continuation.Map.t;
     should_keep_param : Continuation.t -> Variable.t -> KS.t -> param_decision;
-    (* TODO same here *)
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
