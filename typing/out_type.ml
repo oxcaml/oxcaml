@@ -1152,6 +1152,8 @@ module Variable_names : sig
   val check_name_of_type : non_gen:bool -> transient_expr -> unit
 
 
+  val reserve_with_base: With_locality.Const.t -> type_expr -> unit
+
   val reserve: type_expr -> unit
 
   val remove_names : transient_expr list -> unit
@@ -1437,8 +1439,8 @@ end = struct
       | _ ->
         zap_non_generic_modes (const_or_generic_of_mode ~arg:false mret) ty
 
-  let zap_non_generic_modes ty =
-    zap_non_generic_modes (Const With_locality.Const.legacy) ty
+  let zap_non_generic_modes base ty =
+    zap_non_generic_modes (Const base) ty
 
   let eq_pair :
       visible_pair
@@ -2393,17 +2395,19 @@ end = struct
     named_weak_vars := s;
     weak_var_map := m
 
-  let reserve ty =
+  let reserve_with_base base ty =
     normalize_type ty;
     add_named_vars ty;
     if mode_polymorphism_printing_enabled () then begin
       let snap = Btype.snapshot () in
-      zap_non_generic_modes ty;
+      zap_non_generic_modes base ty;
       add_named_modevars ty;
       add_visible_paths ();
       add_visible_edges ();
       Btype.backtrack snap
     end
+
+  let reserve ty = reserve_with_base With_locality.Const.legacy ty
 end
 
 (** Whether the return mode [m] of an arrow can be elided: the arrow is
@@ -2495,9 +2499,11 @@ module Aliases = struct
 
 end
 
-let prepare_type ty =
-  Variable_names.reserve ty;
+let prepare_type_with_base base ty =
+  Variable_names.reserve_with_base base ty;
   Aliases.mark_loops ty
+
+let prepare_type ty = prepare_type_with_base With_locality.Const.legacy ty
 
 
 let reset_except_conflicts () =
@@ -2507,9 +2513,12 @@ let reset () =
   Ident_conflicts.reset ();
   reset_except_conflicts ()
 
-let prepare_for_printing tyl =
+let prepare_for_printing_with_base base tyl =
   reset_except_conflicts ();
-  List.iter prepare_type tyl
+  List.iter (prepare_type_with_base base) tyl
+
+let prepare_for_printing tyl =
+  prepare_for_printing_with_base With_locality.Const.legacy tyl
 
 let add_type_to_preparation = prepare_type
 
@@ -3034,11 +3043,11 @@ and tree_of_package mode {pack_path; pack_cstrs} =
             tree_of_typexp mode With_locality.Const.legacy ty))
         pack_cstrs }
 
-let tree_of_typexp mode ty =
+let tree_of_typexp_with_base mode base ty =
   (* [tree_of_typexp] mutates state, which we need to backtrack. *)
-  wrap_mutation (fun () -> tree_of_typexp mode With_locality.Const.legacy ty)
+  wrap_mutation (fun () -> tree_of_typexp mode base ty)
 
-let tree_of_typexp mode ty =
+let tree_of_typexp_with_base mode base ty =
   (* CR metaprogramming jbachurski: Remove this [Env.enter_future] hack once
      errors track their stage, as we should usually print at stage 0.
      See ticket 6726. *)
@@ -3046,9 +3055,12 @@ let tree_of_typexp mode ty =
   then
     wrap_printing_env_unguarded
       (Env.enter_future !printing_env)
-      (fun () -> tree_of_typexp mode ty)
+      (fun () -> tree_of_typexp_with_base mode base ty)
   else
-    tree_of_typexp mode ty
+    tree_of_typexp_with_base mode base ty
+
+let tree_of_typexp mode ty =
+  tree_of_typexp_with_base mode With_locality.Const.legacy ty
 
 let typexp mode ppf ty =
   !Oprint.out_type ppf (tree_of_typexp mode ty)
@@ -3557,10 +3569,6 @@ let maybe_val_poly_shorthand lpoly_vars qtvs =
 let tree_of_value_description id decl =
   (* Format.eprintf "@[%a@]@." raw_type_expr decl.val_type; *)
   let id = Ident.name id in
-  let () = prepare_for_printing [decl.val_type] in
-  let ty = tree_of_typexp Type_scheme decl.val_type in
-  (* Important: process the fvs *after* the type; tree_of_type_scheme
-     resets the naming context *)
   wrap_mutation (fun () ->
   let moda =
     if Mode.Modality.is_undefined decl.val_modalities then
@@ -3569,6 +3577,14 @@ let tree_of_value_description id decl =
       Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         decl.val_modalities
   in
+  let base =
+    Mode.Modality.Const.apply_const moda Mode.With_regionality.Const.legacy
+    |> Mode.Const.value_to_alloc_r2l
+  in
+  let () = prepare_for_printing_with_base base [decl.val_type] in
+  let ty = tree_of_typexp_with_base Type_scheme base decl.val_type in
+  (* Important: process the fvs *after* the type; tree_of_type_scheme
+     resets the naming context *)
   let oval_poly, qsvs, qtvs =
     let lpoly_vars = Lpoly.get_exn decl.val_lpoly in
     let qtvs = extract_qtvs [decl.val_type] in
