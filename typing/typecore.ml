@@ -11486,7 +11486,12 @@ and type_function_cases_expect
         (newgenty
            (Tarrow ((Nolabel, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok)))
     in
-    unify_exp_types loc env ty_fun (instance ty_expected);
+    begin try
+      unify_exp_types loc env ty_fun (instance ty_expected)
+    with exn when !Clflags.typing_recovery
+               && Typing_recovery.is_recoverable exn ->
+         Typing_recovery.erroneous_type_register ty_expected
+    end;
     let param , param_uid = name_cases "param" cases in
     let cases =
       { fc_cases = cases;
