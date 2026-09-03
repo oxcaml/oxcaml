@@ -256,7 +256,7 @@ let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
   let ty_arg_is_small_int =
     match ty_arg with
     | XInt32 | XInt16 | XInt8 -> true
-    | XInt | XInt64 | XFloat32 | XFloat | XVec128 -> false
+    | XInt | XInt64 | XMask | XFloat32 | XFloat | XVec128 -> false
     | XVec256 | XVec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
   in
   if macosx && ty_arg_is_small_int && is_stack_slot dst

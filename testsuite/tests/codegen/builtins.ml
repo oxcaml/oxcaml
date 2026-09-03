@@ -572,10 +572,9 @@ do_prefetch_write_low:
 
 (* Pause *)
 
-let do_pause () = Builtins.pause_hint ()
+let do_pause () = Builtins.pause_hint #()
 [%%expect_asm X86_64{|
 do_pause:
-  movl  $1, %eax
   pause
   ret
 |}]
