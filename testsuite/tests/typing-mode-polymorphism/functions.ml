@@ -66,8 +66,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 let apply f = fun x -> f x
 [%%expect{|
 val apply :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}]
 
 let foo (x @ unique) (y @ aliased) =
@@ -100,9 +100,10 @@ Error: This value is "nonportable" but is expected to be "portable".
 let compose f g x = f (g x)
 [%%expect{|
 val compose :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-  ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-  'c @ [< 'o] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('mm0) & past('o) & global] ->
+  (('c @ [> 'p] -> 'a @ [< 'n & global]) @ [< past('q) & global] ->
+   ('c @ [< 'p] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0)]) @ [> past('o)] =
+  <fun>
 |}]
 
 (* mode polymorphism propagates through composition *)
