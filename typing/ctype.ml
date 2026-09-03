@@ -2127,6 +2127,30 @@ let curry_mode_const alloc arg : With_locality.Const.t =
     {comonadic = acc;
      monadic = With_locality.Monadic.Const.legacy}
 
+module Curry_mode = struct
+  type t =
+    | Const of With_locality.Const.t
+    | Variable of With_locality.Comonadic.l * With_locality.Const.t
+
+  let comonadic = function
+    | Const c ->
+      With_locality.Comonadic.of_const (With_locality.Const.partial_apply c)
+    | Variable (comonadic, _) -> comonadic
+
+  let upper = function
+    | Const c -> c
+    | Variable (_, upper) -> upper
+
+  let add_arg t marg ~upper:marg_upper =
+    Variable
+      (curry_mode (comonadic t) marg, curry_mode_const (upper t) marg_upper)
+
+  let add_const_arg t (arg : With_locality.Const.t) =
+    match t with
+    | Const c -> Const (curry_mode_const c arg)
+    | Variable _ -> add_arg t (With_locality.of_const arg) ~upper:arg
+end
+
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
   | l :: locals, Tarrow ((lbl,marg,mret),arg,ret,commu) ->
