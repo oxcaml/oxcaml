@@ -179,6 +179,15 @@ type my_closure_param_decision =
   | Keep_my_closure
   | Unbox_my_closure of Variable.t Unboxed_fields.t
 
+let print_param_decision ppf param_decision =
+  match param_decision with
+  | Keep (v, kind) ->
+    Format.fprintf ppf "Keep (%a, %a)" Variable.print v
+      Flambda_kind.With_subkind.print kind
+  | Delete -> Format.fprintf ppf "Delete"
+  | Unbox fields ->
+    Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
+
 let pp_changed_representation ff = function
   | Block_representation (fields, size) ->
     Format.fprintf ff "(fields %a) (size %d)"

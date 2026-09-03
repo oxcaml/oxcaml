@@ -56,6 +56,8 @@ type my_closure_param_decision =
   | Keep_my_closure
   | Unbox_my_closure of Variable.t Unboxed_fields.t
 
+val print_param_decision : Format.formatter -> param_decision -> unit
+
 type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;

@@ -40,26 +40,9 @@ module P = Flambda_primitive
 module RE = Rebuilt_expr
 module SC = Static_const
 
-type param_decision = Unboxing_analysis.param_decision =
-  | Keep of Variable.t * Flambda_kind.With_subkind.t
-  | Delete
-  | Unbox of Variable.t Unboxed_fields.t
-
-type my_closure_param_decision = Unboxing_analysis.my_closure_param_decision =
-  | Keep_my_closure
-  | Unbox_my_closure of Variable.t Unboxed_fields.t
-
 (* CR sspies: Throughout this file, we create bound paramters and variables
    without corresponding debugging uids. Does it make sense to properly
    propagate debugging uids there? If so, where should they come from? *)
-
-let print_param_decision ppf param_decision =
-  match param_decision with
-  | Keep (v, kind) ->
-    Format.fprintf ppf "Keep (%a, %a)" Variable.print v KS.print kind
-  | Delete -> Format.fprintf ppf "Delete"
-  | Unbox fields ->
-    Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
 
 type should_preserve_direct_calls =
   | Yes
@@ -73,8 +56,10 @@ type env =
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
-    cont_params_to_keep : param_decision list Continuation.Map.t;
-    should_keep_param : Continuation.t -> Variable.t -> KS.t -> param_decision;
+    cont_params_to_keep :
+      Unboxing_analysis.param_decision list Continuation.Map.t;
+    should_keep_param :
+      Continuation.t -> Variable.t -> KS.t -> Unboxing_analysis.param_decision;
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
@@ -87,7 +72,9 @@ type rebuild_result =
     code_ids_to_remember : Code_id.Set.t
   }
 
-let freshen_decisions = function
+let freshen_decisions :
+    Unboxing_analysis.param_decision -> Unboxing_analysis.param_decision =
+  function
   | Delete -> Delete
   | Keep (v, kind) -> Keep (Variable.rename v, kind)
   | Unbox fields ->
@@ -165,7 +152,7 @@ let get_simple_changed_repr env simple =
 let get_parameters params_decisions =
   List.fold_left
     (fun acc param_decision ->
-      match param_decision with
+      match (param_decision : Unboxing_analysis.param_decision) with
       | Delete -> acc
       | Keep (var, kind) ->
         Bound_parameter.create var kind Flambda_debug_uid.none :: acc
@@ -181,7 +168,7 @@ let get_parameters params_decisions =
 let get_parameters_and_modes params_decisions_and_modes =
   List.fold_left
     (fun acc (param_decision, mode) ->
-      match param_decision with
+      match (param_decision : Unboxing_analysis.param_decision) with
       | Delete -> acc
       | Keep (var, kind) ->
         (Bound_parameter.create var kind Flambda_debug_uid.none, mode) :: acc
@@ -199,7 +186,7 @@ let get_arity params_decisions =
   let arity =
     List.fold_left
       (fun acc param_decision ->
-        match param_decision with
+        match (param_decision : Unboxing_analysis.param_decision) with
         | Delete -> acc
         | Keep (_, kind) -> kind :: acc
         | Unbox fields ->
@@ -359,7 +346,7 @@ let rewrite_simple_opt (env : env) = function
 let get_args env params_decisions args =
   List.fold_left2
     (fun acc arg param_decision ->
-      match param_decision with
+      match (param_decision : Unboxing_analysis.param_decision) with
       | Delete -> acc
       | Keep _ -> rewrite_simple env arg :: acc
       | Unbox fields ->
@@ -373,7 +360,7 @@ let get_args env params_decisions args =
 let get_args_with_kinds env params_decisions args =
   List.fold_left2
     (fun acc arg param_decision ->
-      match param_decision with
+      match (param_decision : Unboxing_analysis.param_decision) with
       | Delete -> acc
       | Keep (_, kind) -> (rewrite_simple env arg, kind) :: acc
       | Unbox fields ->
@@ -811,7 +798,7 @@ let rewrite_apply_cont_expr env ac =
           (Format.pp_print_list ~pp_sep:Format.pp_print_space Simple.print)
           args
           (Format.pp_print_list ~pp_sep:Format.pp_print_space
-             print_param_decision)
+             Unboxing_analysis.print_param_decision)
           args_to_keep;
         Printexc.raise_with_backtrace Misc.Fatal_error bt
     in
@@ -842,13 +829,17 @@ let make_apply_wrapper env
           match rev_args_or_invalid with
           | Invalid -> Invalid
           | Ok (i, rev_args) -> (
-            match apply_decision, func_decision with
+            match
+              ( (apply_decision : Unboxing_analysis.param_decision),
+                (func_decision : Unboxing_analysis.param_decision) )
+            with
             | Unbox _, (Keep _ | Delete) | (Keep _ | Delete), Unbox _ ->
               let[@inline] error () =
                 Misc.fatal_errorf
                   "Inconsistent apply (%a) and func (%a) decisions:@ %a@."
-                  print_param_decision apply_decision print_param_decision
-                  func_decision Apply.print apply
+                  Unboxing_analysis.print_param_decision apply_decision
+                  Unboxing_analysis.print_param_decision func_decision
+                  Apply.print apply
               in
               (* let direct_or_indirect = match Apply.call_kind apply with |
                  Function { function_call = Direct _; _ } -> error () | Function
@@ -1153,7 +1144,7 @@ let rebuild_apply env apply =
               Flambda_colours.error Flambda_colours.pop Exn_continuation.print
               exn_continuation
               (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                 print_param_decision)
+                 Unboxing_analysis.print_param_decision)
               args_to_keep;
             Printexc.raise_with_backtrace Misc.Fatal_error bt
           (* with Not_found -> (* Not defined in cont_params_to_keep *)
@@ -1251,7 +1242,8 @@ let rebuild_apply env apply =
         let func_decisions =
           List.map
             (fun kind ->
-              Keep (Variable.create "function_return" (KS.kind kind), kind))
+              Unboxing_analysis.Keep
+                (Variable.create "function_return" (KS.kind kind), kind))
             (Flambda_arity.unarized_components return_arity)
         in
         make_apply_wrapper env make_apply (Apply.continuation apply)
@@ -1353,7 +1345,7 @@ let rebuild_apply env apply =
                (fun ppf param_decisions ->
                  Format.fprintf ppf "@[(%a)@]"
                    (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                      print_param_decision)
+                      Unboxing_analysis.print_param_decision)
                    param_decisions))
             params_decisions;
           Printexc.raise_with_backtrace Misc.Fatal_error bt
@@ -2238,12 +2230,14 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                     env.calling_convention_changes.function_params_to_keep
                 in
                 ( List.map2
-                    (fun p -> function
+                    (fun p decision ->
+                      match (decision : Unboxing_analysis.param_decision) with
                       | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
                       | Delete -> p, Points_to_analysis.Delete)
                     params_vars params_decision,
                   List.map2
-                    (fun p -> function
+                    (fun p decision ->
+                      match (decision : Unboxing_analysis.param_decision) with
                       | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
                       | Delete -> p, Points_to_analysis.Delete)
                     results_vars return_decisions )
@@ -2294,8 +2288,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     in
     let params_decision =
       List.map2
-        (fun decision param ->
-          match decision with
+        (fun decision param : Unboxing_analysis.param_decision ->
+          match (decision : Unboxing_analysis.param_decision) with
           | Delete -> Delete
           | Unbox _ ->
             Unbox
@@ -2306,7 +2300,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         params_decision
         (Bound_parameters.to_list params)
     in
-    let my_closure_decision, code_metadata =
+    let (my_closure_decision : Unboxing_analysis.param_decision), code_metadata
+        =
       match
         (* TODO move that in the decisions There should be a single record field
            with all the decisions for return params and closure *)
@@ -2462,7 +2457,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
     ~calling_convention_changes (solved_dep : Analysis.result) get_code_metadata
     toplevel_expr code =
-  let should_keep_param cont param kind =
+  let should_keep_param cont param kind : Unboxing_analysis.param_decision =
     let keep_all_parameters =
       Continuation.Set.mem cont fixed_arity_continuations
     in
