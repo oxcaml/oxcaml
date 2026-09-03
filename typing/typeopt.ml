@@ -808,6 +808,11 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
                tuples.  When they are, we'll need to make sure that elements
                are values before recurring.
             *)
+            (* CR zeisbach: WHEN I GET BACK: this should call one of the layout
+               mutually recursive functions. because value_kind expects the
+               kind to be value (which it may not be, now). *)
+            (* CR zeisbach: this is no longer fine.
+               ALSO: search for layouts v5 to find more of these places... *)
             value_kind env ~loc ~visited ~depth ~num_nodes_visited field)
             num_nodes_visited labeled_fields
         in
