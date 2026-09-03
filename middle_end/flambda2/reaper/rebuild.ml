@@ -1254,8 +1254,8 @@ let rebuild_apply env apply =
       let original_callee = Apply.callee apply in
       let args_from_unboxed_callee, callee =
         match
-          Code_id.Map.find_opt code_id
-            env.calling_convention_changes.my_closure_decisions
+          Unboxing_analysis.my_closure_decision env.calling_convention_changes
+            code_id
         with
         | None ->
           Misc.fatal_errorf
@@ -1289,8 +1289,8 @@ let rebuild_apply env apply =
       in
       let params_decisions =
         match
-          Code_id.Map.find_opt code_id
-            env.calling_convention_changes.function_params_to_keep
+          Unboxing_analysis.function_params_to_keep
+            env.calling_convention_changes code_id
         with
         | None ->
           Misc.fatal_errorf
@@ -1369,8 +1369,16 @@ let rebuild_apply env apply =
         Flambda_arity.create (List.map components_for args)
       in
       let return_decisions =
-        Code_id.Map.find code_id
-          env.calling_convention_changes.function_return_decision
+        match
+          Unboxing_analysis.function_return_decision
+            env.calling_convention_changes code_id
+        with
+        | None ->
+          Misc.fatal_errorf
+            "No return decisions found for code id %a in direct apply rewrite \
+             of@ %a"
+            Code_id.print code_id Apply.print apply
+        | Some p -> p
       in
       let return_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
       let args = List.map fst (List.flatten args) in
@@ -2222,12 +2230,28 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                   List.map (fun p -> p, Points_to_analysis.Keep) results_vars )
               | Changing_calling_convention code_id ->
                 let return_decisions =
-                  Code_id.Map.find code_id
-                    env.calling_convention_changes.function_return_decision
+                  match
+                    Unboxing_analysis.function_return_decision
+                      env.calling_convention_changes code_id
+                  with
+                  | None ->
+                    Misc.fatal_errorf
+                      "No return decisions found for code id %a in \
+                       [rebuild_function_params_and_body]"
+                      Code_id.print code_id
+                  | Some p -> p
                 in
                 let params_decision =
-                  Code_id.Map.find code_id
-                    env.calling_convention_changes.function_params_to_keep
+                  match
+                    Unboxing_analysis.function_params_to_keep
+                      env.calling_convention_changes code_id
+                  with
+                  | None ->
+                    Misc.fatal_errorf
+                      "No parameter decisions found for code id %a in \
+                       [rebuild_function_params_and_body]"
+                      Code_id.print code_id
+                  | Some p -> p
                 in
                 ( List.map2
                     (fun p decision ->
@@ -2274,12 +2298,28 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       res )
   | Changing_calling_convention code_id ->
     let return_decisions =
-      Code_id.Map.find code_id
-        env.calling_convention_changes.function_return_decision
+      match
+        Unboxing_analysis.function_return_decision
+          env.calling_convention_changes code_id
+      with
+      | None ->
+        Misc.fatal_errorf
+          "No return decisions found for code id %a in \
+           [rebuild_function_params_and_body]"
+          Code_id.print code_id
+      | Some p -> p
     in
     let params_decision =
-      Code_id.Map.find code_id
-        env.calling_convention_changes.function_params_to_keep
+      match
+        Unboxing_analysis.function_params_to_keep env.calling_convention_changes
+          code_id
+      with
+      | None ->
+        Misc.fatal_errorf
+          "No parameter decisions found for code id %a in \
+           [rebuild_function_params_and_body]"
+          Code_id.print code_id
+      | Some p -> p
     in
     let result_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
     let code_metadata =

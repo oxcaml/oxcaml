@@ -65,11 +65,16 @@ type result =
       (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
-type calling_convention_changes =
-  { my_closure_decisions : my_closure_param_decision Code_id.Map.t;
-    function_params_to_keep : param_decision list Code_id.Map.t;
-    function_return_decision : param_decision list Code_id.Map.t
-  }
+type calling_convention_changes
+
+val my_closure_decision :
+  calling_convention_changes -> Code_id.t -> my_closure_param_decision option
+
+val function_params_to_keep :
+  calling_convention_changes -> Code_id.t -> param_decision list option
+
+val function_return_decision :
+  calling_convention_changes -> Code_id.t -> param_decision list option
 
 val pp_result : Format.formatter -> result -> unit
 

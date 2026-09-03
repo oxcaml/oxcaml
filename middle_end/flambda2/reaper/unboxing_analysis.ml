@@ -886,3 +886,12 @@ let compute_calling_convention_changes uses ~rewrite_kind_with_subkind
       code_deps
   in
   { my_closure_decisions; function_params_to_keep; function_return_decision }
+
+let my_closure_decision t code_id =
+  Code_id.Map.find_opt code_id t.my_closure_decisions
+
+let function_params_to_keep t code_id =
+  Code_id.Map.find_opt code_id t.function_params_to_keep
+
+let function_return_decision t code_id =
+  Code_id.Map.find_opt code_id t.function_return_decision
