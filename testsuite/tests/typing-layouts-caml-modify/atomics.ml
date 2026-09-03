@@ -712,32 +712,33 @@ end
 
 module Ext_ptr_atomic = struct
   module Int64_u = struct
-    external to_int64 : int64# -> (int64[@local_opt]) = "%box_int64"
-    external of_int64 : (int64[@local_opt]) -> int64# = "%unbox_int64"
+    external to_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
+    external of_int64 : (int64[@local_opt]) -> int64_u = "%unbox_int64"
     let[@inline always] add x y = of_int64 (Int64.add (to_int64 x) (to_int64 y))
   end
 
-  external addr_of_value : ('a : value_or_null). 'a @ local -> int64#
+  external addr_of_value : ('a : value_or_null). 'a @ local -> int64_u
     = "" "caml_native_pointer_of_value"
 
-  external ext_load : ('a : value_or_null). int64# -> 'a
+  external ext_load : ('a : value_or_null). int64_u -> 'a
     = "%unsafe_atomic_load_ext_ptr"
-  external ext_set : ('a : value_or_null). int64# -> 'a -> unit
+  external ext_set : ('a : value_or_null). int64_u -> 'a -> unit
     = "%unsafe_atomic_set_ext_ptr"
-  external ext_exchange : ('a : value_or_null). int64# -> 'a -> 'a
+  external ext_exchange : ('a : value_or_null). int64_u -> 'a -> 'a
     = "%unsafe_atomic_exchange_ext_ptr"
   external ext_compare_and_set :
-    ('a : value_or_null). int64# -> 'a -> 'a -> bool
+    ('a : value_or_null). int64_u -> 'a -> 'a -> bool
     = "%unsafe_atomic_cas_ext_ptr"
-  external ext_compare_exchange : ('a : value_or_null). int64# -> 'a -> 'a -> 'a
+  external ext_compare_exchange :
+    ('a : value_or_null). int64_u -> 'a -> 'a -> 'a
     = "%unsafe_atomic_compare_exchange_ext_ptr"
-  external ext_fetch_and_add : int64# -> int -> int
+  external ext_fetch_and_add : int64_u -> int -> int
     = "%unsafe_atomic_fetch_add_ext_ptr"
-  external ext_add : int64# -> int -> unit = "%unsafe_atomic_add_ext_ptr"
-  external ext_sub : int64# -> int -> unit = "%unsafe_atomic_sub_ext_ptr"
-  external ext_logand : int64# -> int -> unit = "%unsafe_atomic_land_ext_ptr"
-  external ext_logor : int64# -> int -> unit = "%unsafe_atomic_lor_ext_ptr"
-  external ext_logxor : int64# -> int -> unit = "%unsafe_atomic_lxor_ext_ptr"
+  external ext_add : int64_u -> int -> unit = "%unsafe_atomic_add_ext_ptr"
+  external ext_sub : int64_u -> int -> unit = "%unsafe_atomic_sub_ext_ptr"
+  external ext_logand : int64_u -> int -> unit = "%unsafe_atomic_land_ext_ptr"
+  external ext_logor : int64_u -> int -> unit = "%unsafe_atomic_lor_ext_ptr"
+  external ext_logxor : int64_u -> int -> unit = "%unsafe_atomic_lxor_ext_ptr"
 
   type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
 
