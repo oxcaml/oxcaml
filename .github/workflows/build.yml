@@ -313,6 +313,19 @@ jobs:
       # the (short, text/plain) body is logged.
       - name: DEBUG probe github.com before opam
         continue-on-error: true
+        env:
+          # Step-scoped credential, for the authenticated leg below. Injected
+          # through the environment (git >= 2.31, equivalent to `git -c`) rather
+          # than written to ~/.gitconfig or RUNNER_TEMP, so it cannot outlive
+          # this step -- in particular the build and testsuite steps never see
+          # it. No new permissions are requested: this is the job's existing
+          # read-only token. Note that actions/checkout's own credential cannot
+          # be reused here even with persist-credentials, because it is bound by
+          # `includeIf.gitdir:` to the oxcaml checkout and opam fetches into a
+          # different gitdir (~/.opam/repo/default).
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: url.https://x-access-token:${{ github.token }}@github.com/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/
         run: |
           echo "runner=${RUNNER_NAME:-?} os=${RUNNER_OS:-?} arch=${RUNNER_ARCH:-?}"
           date -u +'probe-before %Y-%m-%dT%H:%M:%SZ'
@@ -320,10 +333,21 @@ jobs:
           # confirms the budget stays healthy while the git 401s continue.
           curl -sS --max-time 20 -D - -o /dev/null https://api.github.com/rate_limit \
             | grep -i -E '^(HTTP/|x-ratelimit-|retry-after)' || true
-          rc=0
-          GIT_TRACE=1 GIT_TRACE_CURL=1 \
-            git ls-remote https://github.com/ocaml/opam-repository.git HEAD || rc=$?
-          echo "ls-remote exit=$rc"
+          # The two legs hit the same URL seconds apart on the same runner and
+          # differ only in whether a credential is offered, so a split between
+          # them isolates authentication from every other variable.
+          # GIT_CONFIG_COUNT=0 opts this first command out of the rewrite above.
+          anon=0
+          GIT_CONFIG_COUNT=0 GIT_TRACE=1 GIT_TRACE_CURL=1 \
+            git ls-remote https://github.com/ocaml/opam-repository.git HEAD || anon=$?
+          echo "probe-anonymous exit=$anon"
+          # No curl tracing on this leg: the traced URL would carry the
+          # rewritten credential. The sed is belt-and-braces over the runner's
+          # own masking of github.token, in case git echoes the URL in an error.
+          auth=0
+          git ls-remote https://github.com/ocaml/opam-repository.git HEAD 2>&1 \
+            | sed -E 's#https://[^@/[:space:]]*@#https://REDACTED@#g' || auth=$?
+          echo "probe-authenticated exit=$auth"
 
       - name: Set up Opam
         uses: ocaml/setup-ocaml@15d660006c1d3110d77c34b7faa3bddefe8b82f0 # v3.7.0
