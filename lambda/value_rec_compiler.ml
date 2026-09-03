@@ -374,9 +374,6 @@ let compute_static_size lam =
                              | Constructor_variable _), _) ->
             Misc.fatal_error
               "size_of_primitive: unexpected variable representation"
-        | Record_empty ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected empty representation"
         end
     | Pmakeblock (tag, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the

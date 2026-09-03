@@ -541,7 +541,6 @@ and record_representation =
   | Record_dummy of { represent_as_float_array : bool; flatten_floats : bool }
   | Record_undetermined
   | Record_variable of (Jkind_types.Sort.t * type_expr) array
-  | Record_empty
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
@@ -1025,11 +1024,8 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
       Misc.fatal_error
         "equal_record_representation_up_to_scannable_axes: variable \
          representation"
-  | Record_empty, Record_empty ->
-      true
   | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
-    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_undetermined
-    | Record_empty),
+    | Record_ufloat | Record_mixed _ | Record_dummy _ | Record_undetermined),
     _ ->
       false
 
@@ -1101,7 +1097,7 @@ let find_unboxed_type decl =
   | Type_record (_, ( Record_inlined _ | Record_unboxed
                     | Record_boxed | Record_float | Record_ufloat
                     | Record_mixed _ | Record_dummy _ | Record_undetermined
-                    | Record_variable _ | Record_empty), _)
+                    | Record_variable _), _)
   | Type_record_unboxed_product
       (_, (Record_unboxed_product | Record_unboxed_product_undetermined
           | Record_unboxed_product_variable _), _)

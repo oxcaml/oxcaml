@@ -1435,8 +1435,6 @@ let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
   | Record_unboxed
   (* [@atomic] fields disable float record optimization. *)
   | Record_float | Record_ufloat
-  (* [@atomic] fields require value layout, not [void] *)
-  | Record_empty
   (* Only exists as an intermediate step of typechecking the decl itself *)
   | Record_dummy _ ->
       Misc.fatal_error
@@ -2973,7 +2971,7 @@ module Label = NameChoice (struct
     match lbl.lbl_repres with
     | Record_boxed | Record_float | Record_ufloat | Record_unboxed
     | Record_mixed _ | Record_dummy _ | Record_undetermined
-    | Record_variable _ | Record_empty -> true
+    | Record_variable _ -> true
     | Record_inlined _ -> false
 end)
 
@@ -6953,7 +6951,6 @@ and type_expect_
         | Legacy -> begin match rep with
           | Record_unboxed
           | Record_inlined (_, _, (Variant_unboxed | Variant_with_null))
-          | Record_empty
             -> false
           | Record_boxed | Record_float | Record_ufloat | Record_mixed _
           | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
@@ -9146,11 +9143,7 @@ and type_block_access env expected_base_ty principal
       raise (Error (lid.loc, env, Block_access_bad_record reason))
     in
     (match label.lbl_repres with
-     | Record_boxed
-     | Record_undetermined
-     | Record_variable _
-     | Record_empty
-       -> ()
+     | Record_boxed | Record_undetermined | Record_variable _ -> ()
      | Record_mixed shape ->
        if Array.exists (function Float_boxed -> true | _ -> false) shape then
          bad_record_error "[@@flatten_floats]"

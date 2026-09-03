@@ -413,7 +413,6 @@ type record_mismatch =
   | Ufloat_representation of position
   | Mixed_representation of position
   | Mixed_representation_with_flat_floats of position
-  | Empty_representation of position
   | Representation_shape_mismatch
 
 type constructor_mismatch =
@@ -697,10 +696,6 @@ let report_record_mismatch first second decl env ppf err =
       pr "@[<hv>Their internal representations differ:@ %s %s %s.@]"
         (choose ord first second) decl
         "uses a mixed representation where boxed floats are stored flat"
-  | Empty_representation ord ->
-      pr "@[<hv>Their internal representations differ:@ %s %s %s.@]"
-        (choose ord first second) decl
-        "has no runtime fields (all fields have kind void)"
   | Representation_shape_mismatch ->
     pr "@[<hv>Their internal representations differ:@;\
         This is likely caused by a layout mismatch in a later definition.@]"
@@ -1178,10 +1173,6 @@ module Record_diffing = struct
            Some (Record_mismatch (Mixed_representation First))
         | _, Record_mixed _ ->
            Some (Record_mismatch (Mixed_representation Second))
-
-        | Record_empty, Record_empty -> None
-        | Record_empty, _ -> Some (Record_mismatch (Empty_representation First))
-        | _, Record_empty -> Some (Record_mismatch (Empty_representation Second))
 
         | Record_boxed, Record_boxed -> None
 

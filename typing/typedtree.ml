@@ -1585,7 +1585,7 @@ let label_sort (type rep)
     | Record_inlined (_, Constructor_variable sorts_and_types, _) ->
       fst sorts_and_types.(label.lbl_pos)
     | Record_boxed | Record_float | Record_ufloat | Record_mixed _
-    | Record_empty | Record_inlined
+    | Record_inlined
         (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
       begin match label.lbl_sort with
       | Some sort -> Jkind.Sort.of_const sort
@@ -1608,7 +1608,7 @@ let finalized_label_sort (label : Data_types.label_description)
   match repres with
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _
-  | Record_empty | Record_inlined
+  | Record_inlined
       (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
     begin match variable_sorts with
     | Some sorts -> sorts.(label.lbl_pos)

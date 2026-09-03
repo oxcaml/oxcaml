@@ -997,9 +997,6 @@ and record_representation =
   | Record_variable of (Jkind_types.Sort.t * type_expr) array
   (* What [Record_undetermined] becomes after typechecking a use of the record.
      In translation, this refines to [Record_{boxed,mixed}]. *)
-  | Record_empty
-  (* The block has no runtime fields: every field has layout [void] (or a
-     product of voids). Represented as a statically allocated empty block. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product

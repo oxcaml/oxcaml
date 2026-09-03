@@ -509,8 +509,6 @@ module Type_decl_shape = struct
             in
             record_of_labels ~shape_for_constr ~type_subst Record_floats
               lbl_list
-          | Record_empty ->
-            record_of_labels ~shape_for_constr ~type_subst Record_empty lbl_list
           | Record_inlined _ | Record_dummy _ | Record_undetermined
           | Record_variable _ ->
             (* Inlined records should not occur in type declarations, since they

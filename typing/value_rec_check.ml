@@ -813,7 +813,7 @@ let rec expression : Typedtree.expression -> term_judg =
           | Record_float -> Dereference
           | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> Return
           | Record_boxed | Record_ufloat | Record_mixed _ | Record_variable _
-          | Record_empty | Record_inlined
+          | Record_inlined
               (_, (Constructor_uniform_value | Constructor_mixed _
                   | Constructor_variable _), _) ->
               Guard
