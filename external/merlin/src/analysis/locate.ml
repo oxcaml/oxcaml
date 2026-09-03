@@ -842,25 +842,14 @@ let lookup_uid_loc_of_decl ~config:mconfig uid =
   in
   Option.bind item ~f:(fun (ml_or_mli, comp_unit) ->
       let config = { mconfig; ml_or_mli; traverse_aliases = false } in
-      let load_and_find comp_unit =
-        match load_cmt ~config comp_unit with
-        | Ok (_pos_fname, artifact) ->
-          log ~title "Cmt successfully loaded, looking for %a" Logger.fmt
-            (fun fmt -> Shape.Uid.print fmt uid);
-          Artifact.uid_to_loc uid artifact
-        | Error () | (exception Not_found) ->
-          log ~title "Failed to load the cmt file";
-          None
-      in
-      match load_and_find comp_unit with
-      | Some _ as located -> located
-      | None -> (
-        match Stdlib.String.rindex_opt comp_unit '.' with
-        | Some dot when dot + 1 < String.length comp_unit ->
-          load_and_find
-            (Stdlib.String.sub comp_unit (dot + 1)
-               (String.length comp_unit - dot - 1))
-        | Some _ | None -> None))
+      match load_cmt ~config comp_unit with
+      | Ok (_pos_fname, artifact) ->
+        log ~title "Cmt successfully loaded, looking for %a" Logger.fmt
+          (fun fmt -> Shape.Uid.print fmt uid);
+        Artifact.uid_to_loc uid artifact
+      | _ ->
+        log ~title "Failed to load the cmt file";
+        None)
 
 (** uid's location are given by tables stored int he cmt files for external
     compilation units or computed by Merlin for the current buffer.
@@ -918,6 +907,31 @@ let find_loc_of_uid ~config ~local_defs ?ident ?fallback (uid : Shape.Uid.t) =
     | Compilation_unit comp_unit -> find_loc_of_comp_unit ~config uid comp_unit
   in
   extract_from_uid uid
+
+let lookup_loc_of_uid ~config:mconfig ~local_defs (uid : Shape.Uid.t) =
+  let rec dispatch (uid : Shape.Uid.t) =
+    match uid with
+    | Unboxed_version uid -> dispatch uid
+    | Internal | Predef _ -> None
+    | Item { comp_unit; from; _ } -> (
+      let ml_or_mli =
+        match from with
+        | Unit_info.Intf -> `MLI
+        | Unit_info.Impl -> `ML
+      in
+      let config = { mconfig; ml_or_mli; traverse_aliases = false } in
+      match find_loc_of_item ~config ~local_defs uid comp_unit with
+      | Some declaration -> Some (`Declaration declaration)
+      | None ->
+        lookup_uid_loc_of_decl ~config:mconfig uid
+        |> Option.map ~f:(fun declaration -> `Declaration declaration))
+    | Compilation_unit comp_unit -> (
+      let config = { mconfig; ml_or_mli = `ML; traverse_aliases = false } in
+      match find_loc_of_comp_unit ~config uid comp_unit with
+      | `Some (_, loc) -> Some (`Compilation_unit loc)
+      | `None -> None)
+  in
+  dispatch uid
 
 let get_linked_uids ~config ~comp_unit decl_uid =
   let title = "linked_uids" in

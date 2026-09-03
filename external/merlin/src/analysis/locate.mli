@@ -77,6 +77,16 @@ val uid_of_result :
 val lookup_uid_loc_of_decl :
   config:Mconfig.t -> Shape.Uid.t -> string Location.loc option
 
+(** Lookup the declaration of the given Uid in [local_defs] when it belongs to
+    the current unit and in the appropriate cmt file otherwise. The Uid of a
+    compilation unit resolves to the start of the unit's source file. *)
+val lookup_loc_of_uid :
+  config:Mconfig.t ->
+  local_defs:Mtyper.typedtree ->
+  Shape.Uid.t ->
+  [ `Compilation_unit of Location.t | `Declaration of string Location.loc ]
+  option
+
 (** [get_linked_uids] queries the [cmt_declaration_dependencies] table and
   returns udis related to the one passed as argument. TODO right now this
   function only returns simple links tagged with [Definition_to_declaration] *)

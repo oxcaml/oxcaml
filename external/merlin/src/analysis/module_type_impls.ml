@@ -466,45 +466,6 @@ end = struct
       omissions = scoped_omissions t !families
     }
 
-  let comp_unit_pack_related left right =
-    let extends ~packed ~unit_name =
-      let packed_length = String.length packed in
-      let unit_length = String.length unit_name in
-      packed_length > unit_length + 1
-      && Char.equal packed.[packed_length - unit_length - 1] '.'
-      && String.equal
-           (Stdlib.String.sub packed (packed_length - unit_length) unit_length)
-           unit_name
-    in
-    extends ~packed:left ~unit_name:right
-    || extends ~packed:right ~unit_name:left
-
-  let pack_qualified_families t (family : Uid.t) =
-    match family with
-    | Item { comp_unit; id; from } ->
-      let matching (candidate : Uid.t) =
-        match candidate with
-        | Item
-            { comp_unit = candidate_unit;
-              id = candidate_id;
-              from = candidate_from
-            } ->
-          Int.equal candidate_id id
-          && (match (candidate_from, from) with
-            | Unit_info.Impl, Unit_info.Impl | Unit_info.Intf, Unit_info.Intf ->
-              true
-            | (Unit_info.Impl | Unit_info.Intf), _ -> false)
-          && comp_unit_pack_related candidate_unit comp_unit
-        | Compilation_unit _ | Internal | Predef _ | Unboxed_version _ -> false
-      in
-      let add candidate _ accumulator =
-        if matching candidate then candidate :: accumulator else accumulator
-      in
-      Uid.Map.fold add t.families
-        (Uid.Map.fold add t.paired_families
-           (Uid.Map.fold add t.family_omissions []))
-    | Compilation_unit _ | Internal | Predef _ | Unboxed_version _ -> []
-
   let query_family t family =
     let rec close pending families =
       match pending with
@@ -519,9 +480,7 @@ end = struct
           in
           close (List.rev_append paired pending) (Uid.Set.add family families)
     in
-    let queried_families =
-      close (family :: pack_qualified_families t family) Uid.Set.empty
-    in
+    let queried_families = close [ family ] Uid.Set.empty in
     let seeds =
       Uid.Set.fold
         (fun family seeds ->
@@ -568,16 +527,6 @@ module Helpers = struct
     let unit = unitname (Filename.basename intf_file) in
     find_in_path_opt (Mconfig.source_path config) (unit ^ ".ml")
     |> Option.map ~f:Misc.canonicalize_filename
-
-  let source_of_compilation_unit (mconfig : Mconfig.t) compilation_unit =
-    let base = Compilation_unit.base_filename compilation_unit in
-    let find extension =
-      find_in_path_opt (Mconfig.source_path mconfig) (base ^ extension)
-      |> Option.map ~f:Misc.canonicalize_filename
-    in
-    match find ".ml" with
-    | Some file -> Some file
-    | None -> find ".mli"
 
   let module_facts (mconfig : Mconfig.t) =
     let index_files = mconfig.merlin.index_files in
@@ -696,12 +645,15 @@ let source_of_site mconfig compilation_unit loc =
   source_of_recorded_location mconfig ~unit_name:(Some unit_name)
     ~description:unit_name loc
 
-let uid_site (mconfig : Mconfig.t) (evidence_uid : Shape.Uid.t) =
+let uid_site (mconfig : Mconfig.t) ~local_defs (evidence_uid : Shape.Uid.t) =
   match evidence_uid with
   | Item { from; _ } ->
     let declaration =
-      match Locate.lookup_uid_loc_of_decl ~config:mconfig evidence_uid with
-      | declaration -> declaration
+      match
+        Locate.lookup_loc_of_uid ~config:mconfig ~local_defs evidence_uid
+      with
+      | Some (`Declaration declaration) -> Some declaration
+      | Some (`Compilation_unit _) | None -> None
       | exception Not_found -> None
     in
     Option.bind declaration ~f:(fun { Location.txt = name; loc } ->
@@ -755,7 +707,7 @@ type resolved_implementation =
     site : Query_protocol.Module_type_impls.impl_site
   }
 
-let resolve_implementation mconfig (node : Facts.Node.t) =
+let resolve_implementation mconfig ~local_defs (node : Facts.Node.t) =
   let open Query_protocol.Module_type_impls in
   match node with
   | Location (compilation_unit, loc) ->
@@ -773,19 +725,27 @@ let resolve_implementation mconfig (node : Facts.Node.t) =
           implementation_name = None;
           site = { impl_loc; impl_kind }
         })
-  | Whole_unit compilation_unit ->
-    Option.map (Helpers.source_of_compilation_unit mconfig compilation_unit)
-      ~f:(fun file ->
-        { implementation_uid =
-            Some
-              (Format.asprintf "%a" Shape.Uid.print
-                 (Shape.Uid.of_compilation_unit_id compilation_unit));
-          implementation_name =
-            Some (Compilation_unit.full_path_as_string compilation_unit);
-          site = { impl_loc = Location.in_file file; impl_kind = Whole_unit }
-        })
+  | Uid (Compilation_unit unit_name as unit_uid) ->
+    let unit_loc =
+      match
+        Locate.lookup_loc_of_uid ~config:mconfig ~local_defs unit_uid
+      with
+      | Some (`Compilation_unit loc) -> Some loc
+      | Some (`Declaration _) | None -> None
+      | exception Not_found -> None
+    in
+    Option.bind unit_loc ~f:(fun loc ->
+        Option.map
+          (Helpers.find_source_of_loc mconfig ~description:unit_name loc)
+          ~f:(fun (file, _) ->
+            { implementation_uid =
+                Some (Format.asprintf "%a" Shape.Uid.print unit_uid);
+              implementation_name = Some unit_name;
+              site =
+                { impl_loc = Location.in_file file; impl_kind = Whole_unit }
+            }))
   | Uid uid ->
-    Option.bind (uid_site mconfig uid)
+    Option.bind (uid_site mconfig ~local_defs uid)
       ~f:(fun { uid; name; spans_file; row_file; loc } ->
         if loc.Location.loc_ghost then None
         else
@@ -807,14 +767,15 @@ let resolve_check_site mconfig (check : Facts.Check.t) =
   if Location.is_none check.site then None
   else
     match check.implementation with
-    | Location (compilation_unit, _) | Whole_unit compilation_unit ->
+    | Location (compilation_unit, _) ->
       Option.map (source_of_site mconfig compilation_unit check.site)
         ~f:(fun (_, loc) -> loc)
     | Uid uid ->
       let unit_name =
         match uid with
         | Item { comp_unit; _ } -> Some comp_unit
-        | Compilation_unit _ | Internal | Predef _ | Unboxed_version _ -> None
+        | Compilation_unit unit_name -> Some unit_name
+        | Internal | Predef _ | Unboxed_version _ -> None
       in
       let description = Format.asprintf "%a" Shape.Uid.print uid in
       Option.map
@@ -957,7 +918,7 @@ let compare_reason left right =
 let pp_node fmt (node : Facts.Node.t) =
   match node with
   | Uid uid -> Shape.Uid.print fmt uid
-  | Whole_unit compilation_unit | Location (compilation_unit, _) ->
+  | Location (compilation_unit, _) ->
     Format.fprintf fmt "%s"
       (Compilation_unit.full_path_as_string compilation_unit)
 
@@ -968,7 +929,7 @@ let check_site_resolution mconfig (check : Facts.Check.t) =
     | Some loc -> Resolved_site loc
     | None -> Unresolved_site
 
-let resolve_impact ~mconfig ~own_file target
+let resolve_impact ~mconfig ~local_defs ~own_file target
     ({ witness; check } : Dependency_analysis.impact) =
   let open Query_protocol.Module_type_impls in
   let witness = render_witness witness in
@@ -984,7 +945,7 @@ let resolve_impact ~mconfig ~own_file target
           }
       ]
   in
-  match resolve_implementation mconfig check.implementation with
+  match resolve_implementation mconfig ~local_defs check.implementation with
   | Some { implementation_uid; implementation_name; site } ->
     Resolved_impact
       ( { target = Modtype target.target_name;
@@ -1016,11 +977,12 @@ let resolve_impact ~mconfig ~own_file target
          }
       :: site_reasons)
 
-let resolve_impacts ~mconfig ~own_file results =
+let resolve_impacts ~mconfig ~local_defs ~own_file results =
   let resolutions =
     List.concat_map results
       ~f:(fun ((target, result) : target * Dependency_analysis.result) ->
-        List.map result.impacts ~f:(resolve_impact ~mconfig ~own_file target))
+        List.map result.impacts
+          ~f:(resolve_impact ~mconfig ~local_defs ~own_file target))
   in
   let implementations =
     List.filter_map resolutions ~f:(function
@@ -1089,7 +1051,8 @@ let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
     List.split
       (List.map results ~f:(fun ((target, result) as target_result) ->
            let implementations, resolution_reasons =
-             resolve_impacts ~mconfig ~own_file [ target_result ]
+             resolve_impacts ~mconfig ~local_defs:typedtree ~own_file
+               [ target_result ]
            in
            let status, reasons =
              status_and_reasons ~index_files
@@ -1120,7 +1083,9 @@ let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
         let result = Dependency_analysis.query_anon engine unit_uid in
         List.filter_map result.impacts
           ~f:(fun ({ witness; check } : Dependency_analysis.impact) ->
-            Option.map (resolve_implementation mconfig check.implementation)
+            Option.map
+              (resolve_implementation mconfig ~local_defs:typedtree
+                 check.implementation)
               ~f:(fun
                   ({ implementation_uid; implementation_name; site } :
                     resolved_implementation)
