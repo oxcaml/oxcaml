@@ -12,7 +12,9 @@
  }
 *)
 
-(* In native code, all-[void] records must be represented as atoms.
+(* In native code, all-void records are static, empty tag-0 blocks.
+   Their physical identity is unspecified, even when fields are mutable;
+   they need not be canonical atoms.
    Behavior shared with bytecode (notably *not* memory representation)
    is tested in [all_void_records_runtime.ml]. *)
 
@@ -55,7 +57,9 @@ let no_alloc =
 val no_alloc : bool = true
 |}]
 
-(* All such records are the atom, so they test as equal w.r.t. [==]. *)
+(* Physical equality is unspecified for all-void records, including mutable
+   ones. The physical-equality expectations below over-specify the design
+   and should be removed. *)
 
 let phys_equal = { x = #() } == { x = #() }
 [%%expect{|
@@ -68,7 +72,7 @@ val phys_equal_mutable : bool = true
 |}]
 
 (* Functional update ([Pduprecord]) copies the block's real size,
-   not one word per label; a copy of the atom is the atom. *)
+   not one word per label. The result's physical identity is unspecified. *)
 
 let[@warning "-23"] functional_update_size =
   let r = { x = #() } in
@@ -84,7 +88,7 @@ let[@warning "-23"] functional_update_identity =
 val functional_update_identity : bool = true
 |}]
 
-(* The atom is an ordinary scanned value when stored in other blocks. *)
+(* An empty block is an ordinary scanned value when stored in other blocks. *)
 
 let nested =
   [describe (Some { x = #() }); describe [{ x = #() }; { x = #() }]]
@@ -92,7 +96,7 @@ let nested =
 val nested : string list = ["block tag 0 size 1"; "block tag 0 size 2"]
 |}]
 
-(* Recursive bindings: the pre-allocated dummy, if any, has size 0. *)
+(* Recursive bindings produce empty tag-0 blocks. *)
 
 let letrec_reprs =
   let rec r = { x = #() }
@@ -120,9 +124,9 @@ val void_field_sizes : string list =
   ["block tag 0 size 1"; "block tag 0 size 1"]
 |}]
 
-(* Optimization: an empty record flowing through
-   join points, unboxable parameters, and inlined returns
-   must not be re-allocated. *)
+(* Optimization: empty records retain their tag and size through join
+   points, unboxable parameters, and inlined returns. Rebuilding a record
+   may select a different static empty block. *)
 
 (* Join point: the same variable bound on two branches. *)
 let[@inline never] join b =
@@ -135,7 +139,7 @@ val join_result : string list = ["block tag 0 size 0"; "block tag 0 size 0"]
 |}]
 
 (* Loop parameter: a candidate for continuation-parameter unboxing.
-   If the loop rebuilt the record, the result would not be the original. *)
+   The result must retain its empty-block shape, not its physical identity. *)
 let loop_result =
   let rec go n (r : t) = if n = 0 then r else go (n - 1) r in
   let r = { x = #() } in
@@ -146,7 +150,8 @@ val loop_result : string * bool = ("block tag 0 size 0", true)
 |}]
 
 (* Inlined return: the record is constructed in the callee and
-   used in the caller after inlining. *)
+   used in the caller after inlining. Physical equality of separate
+   constructions is unspecified. *)
 let[@inline always] mk () = { x = #() }
 let inlined_result = describe (mk ())
 let inlined_phys_equal = mk () == mk ()
@@ -157,7 +162,8 @@ val inlined_phys_equal : bool = true
 |}]
 
 (* All-void records obtained by instantiating [any] with a [void] type
-   must be represented exactly like the directly-declared ones above. *)
+   must have the same empty-block shape as the directly-declared ones above.
+   This does not require physical sharing. *)
 
 type ('a : any) r = { x : 'a }
 [%%expect{|
