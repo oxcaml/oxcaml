@@ -78,5 +78,7 @@ val perform_analysis :
 
 val compute_calling_convention_changes :
   result ->
+  rewrite_kind_with_subkind:
+    (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
   calling_convention_changes

@@ -806,7 +806,8 @@ let perform_analysis db ~stats =
       changed_representation = Code_id_or_name.Map.empty
     }
 
-let compute_calling_convention_changes uses ~code_deps =
+let compute_calling_convention_changes uses ~rewrite_kind_with_subkind
+    ~code_deps =
   let get_unboxed_fields cn =
     Code_id_or_name.Map.find_opt cn uses.unboxed_fields
   in
@@ -867,6 +868,7 @@ let compute_calling_convention_changes uses ~code_deps =
             (fun v kind ->
               match get_unboxed_fields (Code_id_or_name.var v) with
               | None ->
+                let kind = rewrite_kind_with_subkind (Name.var v) kind in
                 (* TODO: fix this, needs the mapping between code ids of
                    functions and their return continuations *)
                 if true || is_var_used v then Keep (v, kind) else Delete

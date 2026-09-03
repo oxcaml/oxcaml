@@ -44,11 +44,14 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
       Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result solved_dep;
       Dot_printer.print_solved_dep solved_dep deps)
   in
-  let calling_convention_changes =
-    Unboxing_analysis.compute_calling_convention_changes solved_dep ~code_deps
-  in
   let types_rewrite_context =
     Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
+  in
+  let calling_convention_changes =
+    Unboxing_analysis.compute_calling_convention_changes solved_dep
+      ~rewrite_kind_with_subkind:
+        (Types_rewriter.rewrite_kind_with_subkind types_rewrite_context)
+      ~code_deps
   in
   let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
       =
