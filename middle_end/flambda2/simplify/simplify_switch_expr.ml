@@ -408,11 +408,6 @@ let recognize_affine_immediate_const const =
 
 let recognize_affine_argument ~machine_width affine_argument discr const =
   let[@local] affine kind ~offset ~slope = Affine (kind, offset, slope) in
-  let[@local] maybe_affine kind imm ~offset ~slope =
-    if TI.(equal imm (add (mul discr slope) offset))
-    then affine kind ~offset ~slope
-    else Not_affine
-  in
   match affine_argument, recognize_affine_immediate_const const with
   | Not_affine, _ | _, None -> Not_affine
   | Maybe_affine, Some (kind, imm) -> Constant (kind, discr, imm)
@@ -421,6 +416,16 @@ let recognize_affine_argument ~machine_width affine_argument discr const =
     then Misc.fatal_error "Inconsistent kinds for mergeable switch argument";
     let arg_diff = TI.sub imm arg in
     let arm_diff = TI.sub discr arm in
+    (* CR-someday ncourant and bclement: this might fail to recognize affine
+       relations in modular arithmetic, such as a switch: *)
+    (*
+     * 0 -> 0
+     * 2 -> 0
+     * 3 -> int_min
+     *)
+    (* which could be represented by [int_min * scrutinee], but is currently not
+       recognized as affine because we compute [offset] and [slope] from the
+       first two entries only. *)
     if TI.equal (TI.zero machine_width) (TI.mod_ arg_diff arm_diff)
     then
       let slope = TI.div arg_diff arm_diff in
@@ -430,7 +435,9 @@ let recognize_affine_argument ~machine_width affine_argument discr const =
   | Affine (kind, offset, slope), Some (imm_kind, imm) ->
     if not (equal_affine_immediate_kind imm_kind kind)
     then Misc.fatal_error "Inconsistent kinds for mergeable switch argument";
-    maybe_affine kind imm ~offset ~slope
+    if TI.(equal imm (add (mul discr slope) offset))
+    then affine kind ~offset ~slope
+    else Not_affine
 
 type mergeable_argument =
   | Invariant_argument of Simple.t
