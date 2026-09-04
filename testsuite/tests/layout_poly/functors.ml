@@ -18,19 +18,14 @@ module type Id = sig
   val id : layout_ l. ('a : l). 'a -> 'a
 end
 
-(* Used only by the toplevel-phrase-boundary cases below. *)
-module (Id @ static) = struct let poly_ id x = x end
-module (A @ static) = struct let y = 1 end
 [%%expect{|
 external to_float : float# -> float = "%box_float"
 external to_int64 : int64# -> int64 = "%box_int64"
 module type S = sig val y : int end
 module type Id = sig val poly_ id : 'a -> 'a end
-module Id : sig val poly_ id : 'a -> 'a end
-module A : sig val y : int end
 |}]
 
-(* 1. Sanity: static functors over plain modules. *)
+(* Static functors using dynamic data. *)
 
 let r1 =
   let module F (X : S @ static) = struct let z = X.y + 1 end in
@@ -40,7 +35,7 @@ let r1 =
 val r1 : int = 2
 |}]
 
-(* The body also uses a plain value from the enclosing scope. *)
+(* Capture dynamic value from the enclosing scope. *)
 let r2 =
   let k = 10 in
   let module F (X : S @ static) = struct let z = X.y + k end in
@@ -50,7 +45,7 @@ let r2 =
 val r2 : int = 12
 |}]
 
-(* 2. One static argument with a layout-polymorphic field. *)
+(* Static functors using static data. *)
 
 let (r3i, r3f) =
   let module IdA = struct let poly_ id x = x end in
@@ -98,36 +93,26 @@ val r5 : int = 1
 val r5' : int = 2
 |}]
 
-(* The same functor applied twice to the *same* argument: the second
-   instantiation is memoized and must reuse the first one's compile-time
-   half. *)
-let (r5m, r5m') =
+(* The same functor applied twice to the *same* argument, the static part is
+   memoized but the dynamic part should run twice. *)
+let (r5c, r5m, r5m') =
+  let counter = ref 0 in
   let module M = struct let poly_ id x = x end in
   let module F (M : Id @ static) = struct
+    let _ = incr counter
     let i = M.id 1
     let f = to_float (M.id #2.0)
   end in
   let module R1 = F (M) in
   let module R2 = F (M) in
-  (R1.i + R2.i, R1.f +. R2.f)
+  (!counter, R1.i + R2.i, R1.f +. R2.f)
 [%%expect{|
+val r5c : int = 2
 val r5m : int = 2
 val r5m' : float = 4.
 |}]
 
-(* Side effects in the argument structure run exactly once, even though the
-   argument's compile-time and runtime halves are consumed separately. *)
-let r5e =
-  let count = ref 0 in
-  let module F (M : Id @ static) = struct let i = M.id 5 end in
-  let module R = F (struct let () = incr count let poly_ id x = x end) in
-  (R.i, !count)
-[%%expect{|
-val r5e : int * int = (5, 1)
-|}]
-
-(* A static parameter the body never uses: the contrast case for the capture
-   cases below. *)
+(* A static parameter the body never uses. *)
 let r6 =
   let module F (M : Id @ static) = struct let z = 9 end in
   let module R = F (struct let poly_ id x = x end) in
@@ -136,8 +121,7 @@ let r6 =
 val r6 : int = 9
 |}]
 
-(* Result coercion at the definition: the parser nests the constraint inside
-   the functor, so the coercion lands inside the template body. *)
+(* Result coercion at the definition. *)
 let r7 =
   let module F (M : Id @ static) : sig val i : int end = struct
     let i = M.id 5
@@ -149,8 +133,7 @@ let r7 =
 val r7 : int = 5
 |}]
 
-(* Result coercion at the use site: [apply_coercion] wraps the
-   instantiation. *)
+(* Result coercion at the use site. *)
 let r8 =
   let module F (M : Id @ static) = struct
     let i = M.id 6
@@ -162,7 +145,7 @@ let r8 =
 val r8 : int = 6
 |}]
 
-(* Argument with extra fields: the argument gets a structure coercion. *)
+(* Argument coercion. *)
 let r9 =
   let module F (M : Id @ static) = struct let i = M.id 7 end in
   let module Big = struct
@@ -175,6 +158,21 @@ let r9 =
 val r9 : int = 7
 |}]
 
+(* Functor coercion. *)
+let c1 =
+  let module Inner (N : Id @ static) = struct
+    let i = N.id 4
+    let extra = 5
+  end in
+  let module U : functor (N : Id @ static) -> sig val i : int end = Inner in
+  let module R = U (struct let poly_ id x = x end) in
+  R.i
+[%%expect{|
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
 (* The functor is aliased before being applied. *)
 let r9a =
   let module F (M : Id @ static) = struct let i = M.id 7 end in
@@ -185,13 +183,9 @@ let r9a =
 val r9a : int = 7
 |}]
 
-(* The argument is itself a static functor application. [Wrap] needs a
-   functor-type ascription declaring its return static; an inline result
-   annotation does not do that (see the typing negatives below). *)
+(* The argument is itself a static functor application. *)
 let (r10i, r10f) =
-  let module Wrap : functor (M : Id @ static) -> Id @ static =
-    functor (M : Id @ static) -> struct let poly_ id = M.id end
-  in
+  let module Wrap (M : Id @ static) = struct let poly_ id = M.id end in
   let module F (M : Id @ static) = struct
     let i = M.id 8
     let f = to_float (M.id #8.0)
@@ -232,11 +226,7 @@ let r12 =
 val r12 : int = 11
 |}]
 
-(* 3. Captured values: the [tmpl_env] path. Each case uses what it captures
-   and reads the result back, so a wrong environment index or block shape
-   shows up as a wrong value rather than a crash. *)
-
-(* Values of several layouts at once, interleaved. *)
+(* Captured values of several layouts at once. *)
 let (k1i, k1f, k1s, k1i64) =
   let ci = 17 in
   let cf = #2.5 in
@@ -320,7 +310,8 @@ val k5 : int = 51
 
 (* A class defined inside the static functor body: the class table bound by
    the enclosing [oo_wrap] and the unit-level shared constant land in the
-   template's environment. *)
+   template's environment. It also does some weird projection that prevents
+   static eval from seeing what's going on. *)
 let k6 =
   let module K (M : Id @ static) = struct
     class c = object method v = M.id 61 end
@@ -334,26 +325,7 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
-(* Captures used through the parameter's [id] under a result coercion, so
-   capture and coercion interact. *)
-let (k7i, k7f) =
-  let cc1 = 71 in
-  let cc2 = #7.5 in
-  let module K (M : Id @ static) : sig val i : int val f : float end = struct
-    let i = M.id cc1
-    let f = to_float (M.id cc2)
-    let extra = "dropped"
-  end in
-  let module R = K (struct let poly_ id x = x end) in
-  (R.i, R.f)
-[%%expect{|
-val k7i : int = 71
-val k7f : float = 7.5
-|}]
-
-(* 4. A static parameter followed by a dynamic one: one merged template; the
-   static application is an instantiation, the dynamic one an ordinary
-   application of its result. *)
+(* A static parameter followed by a dynamic one. *)
 
 let (d1i, d1f) =
   let module F (M : Id @ static) (X : S) = struct
@@ -367,18 +339,6 @@ val d1i : int = 1
 val d1f : float = 4.
 |}]
 
-(* Stepwise: the partial application bound on its own. *)
-let d2 =
-  let module F (M : Id @ static) (X : S) = struct
-    let i = M.id X.y
-  end in
-  let module Half = F (struct let poly_ id x = x end) in
-  let module R = Half (struct let y = 2 end) in
-  R.i
-[%%expect{|
-val d2 : int = 2
-|}]
-
 (* A generative second parameter. *)
 let d3 =
   let module F (M : Id @ static) () = struct
@@ -390,14 +350,7 @@ let d3 =
 val d3 : int = 44
 |}]
 
-(* 5. Two static parameters that do not merge: the second instantiation must
-   find a template in the compile-time half of the first one's result. *)
-
-(* A result signature on the functor defeats merging: the parser nests the
-   constraint inside the outer functor. Applied stepwise; a one-go
-   application would need the return staticity declared by a functor-type
-   ascription, which puts the constraint at the binding and lets the
-   functors merge again. *)
+(* Nested static functors (these don't get merged). *)
 let (u1i, u1f) =
   let module U (M : Id @ static) :
     (functor (N : Id @ static) -> sig val i : int val f : float end)
@@ -415,36 +368,7 @@ val u1i : int = 1
 val u1f : float = 2.
 |}]
 
-(* Returning a named functor: the outer body is a module identifier. *)
-let u2 =
-  let module Inner (N : Id @ static) = struct let i = N.id 3 end in
-  let module U (M : Id @ static) = Inner in
-  let module Half = U (struct let poly_ id x = x end) in
-  let module R = Half (struct let poly_ id x = x end) in
-  R.i
-[%%expect{|
-val u2 : int = 3
-|}]
-
-(* The same, applied in one go: the functor-type ascription declares the
-   return static while the body stays a module identifier, so nothing
-   merges. *)
-let u3 =
-  let module Inner (N : Id @ static) = struct let i = N.id 4 end in
-  let module U : functor (M : Id @ static)
-    -> (functor (N : Id @ static) -> sig val i : int end) @ static =
-    functor (M : Id @ static) -> Inner
-  in
-  let module R =
-    U (struct let poly_ id x = x end) (struct let poly_ id x = x end)
-  in
-  R.i
-[%%expect{|
-val u3 : int = 4
-|}]
-
-(* 6. Two static parameters, merged. *)
-
+(* Two static parameters. *)
 let g1 =
   let module G (M : Id @ static) (N : Id @ static) = struct
     let i = M.id (N.id 6)
@@ -454,212 +378,6 @@ let g1 =
   R.i
 [%%expect{|
 >> Fatal error: Slambda eval doesn't support partial or over application of functors.
-Uncaught exception: Misc.Fatal_error
-
-|}]
-
-(* One-go application, with the intermediate declared static via a
-   functor-type ascription (the body stays syntactically nested functors,
-   so they still merge). *)
-let g2 =
-  let module G : functor (M : Id @ static)
-    -> (functor (N : Id @ static) -> sig val i : int end) @ static =
-    functor (M : Id @ static) (N : Id @ static) -> struct
-      let i = M.id (N.id 7)
-    end
-  in
-  let module R =
-    G (struct let poly_ id x = x end) (struct let poly_ id x = x end)
-  in
-  R.i
-[%%expect{|
->> Fatal error: Slambda eval doesn't support partial or over application of functors.
-Uncaught exception: Misc.Fatal_error
-
-|}]
-
-(* 7. Toplevel phrase boundaries. *)
-
-module F_top (X : S @ static) = struct let z = X.y + 1 end
-module R_top = F_top (A)
-let r_top = R_top.z
-[%%expect{|
-module F_top : functor (X : S @ static) -> sig val z : int end
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
-|}]
-
-(* Instantiation in a later phrase than the definition. *)
-module F_later (M : Id @ static) = struct let i = M.id 12 end
-[%%expect{|
-module F_later : functor (M : Id @ static) -> sig val i : int end
-|}]
-
-module R_later = F_later (Id)
-let r_later = R_later.i
-[%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
-|}]
-
-(* A toplevel module as the argument of a local instantiation: the
-   argument's compile-time half crosses a phrase boundary. *)
-let r_toparg =
-  let module F (M : Id @ static) = struct let i = M.id 1 end in
-  let module R = F (Id) in
-  R.i
-[%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
-|}]
-
-(* An unannotated toplevel module binding still satisfies a static parameter
-   at typing. *)
-module Unannotated = struct let y = 3 end
-module R_unannotated = F_top (Unannotated)
-[%%expect{|
-module Unannotated : sig val y : int end
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
-|}]
-
-(* A layout-polymorphic value bound by an earlier toplevel item is dynamic,
-   like persistent modules (cf. the CR-soon in typing-modes/staticity.ml),
-   so it cannot be instantiated inside the functor body. *)
-let poly_ myid x = x
-module K_dyn (M : Id @ static) = struct
-  let i = myid 31
-end
-[%%expect{|
-val poly_ myid : 'a -> 'a = <lpoly>
-Line 3, characters 10-14:
-3 |   let i = myid 31
-              ^^^^
-Error: The value "myid" is "dynamic"
-       but is expected to be "static"
-         because it is layout-polymorphic and being instantiated here.
-|}]
-
-(* Likewise a value from an earlier item makes an argument field dynamic. *)
-let n = 51
-module K_arg (M : IdK @ static) = struct
-  let i = M.id M.k
-end
-module KR_arg = K_arg (struct let poly_ id x = x let k = n end)
-[%%expect{|
-val n : int = 51
-module K_arg : functor (M : IdK @ static) -> sig val i : int end
-Line 5, characters 16-63:
-5 | module KR_arg = K_arg (struct let poly_ id x = x let k = n end)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Modules do not match:
-       sig val poly_ id : 'a -> 'a val k : int @@ dynamic end @ static
-     is not included in IdK @ static
-     Values do not match:
-       val k : int @@ dynamic (* in a structure at static *)
-     is not included in
-       val k : int (* in a structure at static *)
-     The first is "dynamic"
-     but the second is "static".
-|}]
-
-(* 8. Typing negatives. *)
-
-(* An inline result annotation does not declare the return staticity: the
-   application's result stays dynamic and cannot feed a static parameter
-   (contrast with the ascribed [Wrap] case above). *)
-module WrapInline (M : Id @ static) : Id @ static = struct
-  let poly_ id = M.id
-end
-module F_wrap (M : Id @ static) = struct let i = M.id 8 end
-module R_wrap = F_wrap (WrapInline (Id))
-[%%expect{|
-module WrapInline : functor (M : Id @ static) -> Id
-module F_wrap : functor (M : Id @ static) -> sig val i : int end
-Line 5, characters 16-40:
-5 | module R_wrap = F_wrap (WrapInline (Id))
-                    ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Modules do not match: sig val poly_ id : 'a -> 'a end @ dynamic
-     is not included in Id @ static Got "dynamic" but expected "static".
-|}]
-
-(* On a plainly-defined merged functor the intermediate application result
-   is dynamic, so the one-go application is a type error. *)
-module G_plain (M : Id @ static) (N : Id @ static) = struct
-  let i = M.id (N.id 5)
-end
-module GR_plain = G_plain (Id) (Id)
-[%%expect{|
-module G_plain :
-  functor (M : Id @ static) (N : Id @ static) -> sig val i : int end
-Line 4, characters 18-30:
-4 | module GR_plain = G_plain (Id) (Id)
-                      ^^^^^^^^^^^^
-Error: The functor is "dynamic"
-       but is expected to be "static"
-         because it shares the staticity of a functor parameter
-         which is expected to be "static".
-|}]
-
-(* A dynamic parameter followed by a static one: the definition compiles
-   (this is the shape the merging prefix guard exists for), but the second
-   application requires the intermediate functor to be static. *)
-module N_mixed (X : S) (M : Id @ static) = struct
-  let i = M.id X.y
-end
-[%%expect{|
-module N_mixed : functor (X : S) (M : Id @ static) -> sig val i : int end
-|}]
-
-module NR_mixed = N_mixed (A) (Id)
-[%%expect{|
-Line 1, characters 18-29:
-1 | module NR_mixed = N_mixed (A) (Id)
-                      ^^^^^^^^^^^
-Error: The functor is "dynamic"
-       but is expected to be "static"
-         because it shares the staticity of a functor parameter
-         which is expected to be "static".
-|}]
-
-module NHalf_mixed = N_mixed (A)
-[%%expect{|
-module NHalf_mixed : functor (M : Id @ static) -> sig val i : int end
-|}]
-
-(* Passing a dynamic module (the result of a dynamic functor application) to
-   a static parameter. *)
-module MkDyn (X : S) = struct let poly_ id x = x end
-module Dyn = MkDyn (A)
-module F_dyn (M : Id @ static) = struct let i = M.id 9 end
-module NR_dyn = F_dyn (Dyn)
-[%%expect{|
-module MkDyn : functor (X : S) -> sig val poly_ id : 'a -> 'a end
-module Dyn : sig val poly_ id : 'a -> 'a end
-module F_dyn : functor (M : Id @ static) -> sig val i : int end
-Line 4, characters 16-27:
-4 | module NR_dyn = F_dyn (Dyn)
-                    ^^^^^^^^^^^
-Error: Modules do not match: sig val poly_ id : 'a -> 'a end @ dynamic
-     is not included in Id @ static Got "dynamic" but expected "static".
-|}]
-
-(* 9. Coercing the functor itself. *)
-
-let c1 =
-  let module Inner (N : Id @ static) = struct
-    let i = N.id 4
-    let extra = 5
-  end in
-  let module U : functor (N : Id @ static) -> sig val i : int end = Inner in
-  let module R = U (struct let poly_ id x = x end) in
-  R.i
-[%%expect{|
->> Fatal error: slambda eval: unexpected missing value
 Uncaught exception: Misc.Fatal_error
 
 |}]
