@@ -1,0 +1,8 @@
+(tests
+ (names io)
+ (modes js wasm)
+ ;; Sys.command not available
+ (enabled_if
+  (<> %{env:JSOO_TEST_ENGINE=node} wasi))
+ (action
+  (run node %{test} %{dep:test-file-short-lines})))
