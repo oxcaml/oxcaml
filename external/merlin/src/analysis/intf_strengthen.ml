@@ -158,8 +158,8 @@ end = struct
         Mode.Alloc.zap_to_ceil_exn entry.intf_modes
       in
       ());
-    let impl_c = Mode.Alloc.zap_to_legacy impl_var in
-    let intf_c = Mode.Alloc.zap_to_legacy intf_var in
+    let impl_c = Mode.Alloc.zap_to_legacy_exn ~arg:(not is_ret) impl_var in
+    let intf_c = Mode.Alloc.zap_to_legacy_exn ~arg:(not is_ret) intf_var in
     match Mode.Alloc.Const.equal impl_c intf_c with
     | true -> diffs
     | false -> { path = entry.pos; impl = impl_c; intf = intf_c } :: diffs
@@ -586,7 +586,7 @@ end = struct
           ( (intf_param : Types.functor_parameter),
             (impl_param : Types.functor_parameter) )
         with
-        | Named (intf_id, _, _), Named (impl_id, impl_pmty, _) ->
+        | Named (intf_id, _, _, _), Named (impl_id, impl_pmty, _, _) ->
           let env =
             match impl_id with
             | Some impl_id ->
@@ -612,7 +612,7 @@ end = struct
       ( (intf_param : Types.functor_parameter),
         (impl_param : Types.functor_parameter) )
     with
-    | Named (_, intf_pmty, _), Named (_, impl_pmty, _) -> (
+    | Named (_, intf_pmty, _, _), Named (_, impl_pmty, _, _) -> (
       match
         ( head_of_mty context.env subst intf_pmty,
           head_of_mty context.env Subst.identity impl_pmty )
