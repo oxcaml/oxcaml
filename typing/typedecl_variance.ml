@@ -446,6 +446,7 @@ let property : (prop, req) Typedecl_properties.property =
     default;
     compute;
     update_decl;
+    unboxed_version_inherits_prop = true;
     check;
   }
 
