@@ -1,0 +1,64 @@
+let code tupled_0 deleted in
+let code id_1 deleted in
+let $camlUnused_tupled_function_param__immstring_1 =
+  "unused_tupled_function_param.ml"
+in
+let $camlUnused_tupled_function_param__const_block_2 =
+  Block 0 ($camlUnused_tupled_function_param__immstring_1, 14, 2)
+in
+let $camlUnused_tupled_function_param__Pmakeblock_3 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlUnused_tupled_function_param__const_block_2)
+in
+let $camlUnused_tupled_function_param__const_block_0 =
+  Block 0 (poison.val.reaper_field_of_static_const,
+           poison.val.reaper_field_of_static_const)
+in
+let code loopify(never) size(1) newer_version_of(tupled_0) tupled 
+      tupled_0_1 (param, param_1)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (1)
+in
+let $camlUnused_tupled_function_param__tupled_4 =
+  closure tupled_0_1 @`tupled` &toplevel.alloc_region
+in
+(let code inline(never) loopify(never) size(1) newer_version_of(id_1)
+       id_1_1 (f)
+         my_closure &my_alloc_region &my_region &my_ghost_region my_depth
+         -> k1 * k2 stack =
+   cont k1 (f)
+ in
+ let $camlUnused_tupled_function_param__id_5 =
+   closure id_1_1 @`id` &toplevel.alloc_region
+ in
+ let over_app_region = %begin_region () in
+ let over_app_ghost_region = %begin_ghost_region () in
+ apply
+        direct(id_1_1
+        &toplevel.alloc_region &over_app_region &over_app_ghost_region)
+   $camlUnused_tupled_function_param__id_5
+     ($camlUnused_tupled_function_param__tupled_4)
+     -> k1 * error
+   where k1 (func) =
+     (apply &toplevel.alloc_region
+        func ($camlUnused_tupled_function_param__const_block_0) -> k2 * error
+        where k2 (param : [ 0 |1 ]) =
+          let unboxed_field = %untag_imm (param) in
+          cont k1 (unboxed_field)
+        where k1 (unboxed_field : imm) =
+          let naked_immediate = unboxed_field in
+          let `unit` = %end_region (over_app_region) in
+          let unit_1 = %end_ghost_region (over_app_ghost_region) in
+          switch naked_immediate
+            | 0 ->
+              error
+                pop(regular error)
+                ($camlUnused_tupled_function_param__Pmakeblock_3)
+            | 1 -> k))
+  where k =
+    let $camlUnused_tupled_function_param =
+      Block 0 ($camlUnused_tupled_function_param__tupled_4)
+    in
+    cont done ($camlUnused_tupled_function_param)
