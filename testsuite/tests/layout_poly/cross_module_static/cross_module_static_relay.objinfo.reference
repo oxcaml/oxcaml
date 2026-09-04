@@ -18,7 +18,7 @@ Apply functions:
 Send functions:
 Force link: no
 Static data:
-  [ Cross_module_static_relay/relay_id/0; ]
+  Cross_module_static_relay_0[ Cross_module_static_relay/relay_id/0; ]
   (Cross_module_static_relay/relay_id/0
     (closure ⟨env⟩ layout_6 ->
       (let (#body/3 =

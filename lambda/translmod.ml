@@ -556,40 +556,51 @@ let merge_inline_attributes attr1 attr2 loc =
   | None -> raise (Error (to_location loc, Conflicting_inline_attributes))
 
 let merge_functors ~scopes mexp coercion root_path =
-  let rec merge ~scopes mexp coercion path acc inline_attribute =
-    let finished = acc, mexp, path, coercion, inline_attribute in
+  let rec merge ~scopes mexp coercion path acc inline_attribute staticity =
+    let finished = acc, mexp, path, coercion, inline_attribute, staticity in
     match mexp.mod_desc with
-    | Tmod_functor (param, body, _) ->
-      let inline_attribute' =
-        Translattribute.get_inline_attribute mexp.mod_attributes
-      in
-      let arg_coercion, res_coercion =
-        match coercion with
-        | Tcoerce_none -> Tcoerce_none, Tcoerce_none
-        | Tcoerce_functor (arg_coercion, res_coercion, _) ->
-          arg_coercion, res_coercion
-        | _ -> fatal_error "Translmod.merge_functors: bad coercion"
-      in
-      let loc = of_location ~scopes mexp.mod_loc in
-      let path, param =
-        match param with
-        | Unit -> None, Ident.create_local "*"
-        | Named (None, _, _, _) ->
-          let id = Ident.create_local "_" in
-          functor_path path id, id
-        | Named (Some id, _, _, _) -> functor_path path id, id
-      in
-      let inline_attribute =
-        merge_inline_attributes inline_attribute inline_attribute' loc
-      in
-      merge ~scopes body res_coercion path ((param, loc, arg_coercion) :: acc)
-        inline_attribute
+    | Tmod_functor (param, body, new_staticity) ->
+      let new_staticity = Translmode.transl_staticity_mode_r new_staticity in
+      begin match acc, staticity, new_staticity with
+      | _ :: _, Dynamic, Static | _ :: _, Static, Dynamic ->
+        (* Only care about the old staticity if length acc > 0, otherwise it's
+          just the inital value we passed in. *)
+        finished
+      | _ -> begin
+        let staticity = new_staticity in
+        let inline_attribute' =
+          Translattribute.get_inline_attribute mexp.mod_attributes
+        in
+        let arg_coercion, res_coercion =
+          match coercion with
+          | Tcoerce_none -> Tcoerce_none, Tcoerce_none
+          | Tcoerce_functor (arg_coercion, res_coercion, _) ->
+            arg_coercion, res_coercion
+          | _ -> fatal_error "Translmod.merge_functors: bad coercion"
+        in
+        let loc = of_location ~scopes mexp.mod_loc in
+        let path, param =
+          match param with
+          | Unit -> None, Ident.create_local "*"
+          | Named (None, _, _, _) ->
+            let id = Ident.create_local "_" in
+            functor_path path id, id
+          | Named (Some id, _, _, _) -> functor_path path id, id
+        in
+        let inline_attribute =
+          merge_inline_attributes inline_attribute inline_attribute' loc
+        in
+        merge ~scopes body res_coercion path ((param, loc, arg_coercion) :: acc)
+          inline_attribute staticity
+        end
+      end
     | _ -> finished
   in
-  merge ~scopes mexp coercion root_path [] Default_inline
+  merge ~scopes mexp coercion root_path [] Default_inline Dynamic
 
 let rec compile_functor ~scopes mexp coercion root_path loc =
-  let functor_params_rev, body, body_path, res_coercion, inline_attribute =
+  let functor_params_rev, body, body_path, res_coercion, inline_attribute,
+      staticity =
     merge_functors ~scopes mexp coercion root_path
   in
   assert (List.length functor_params_rev >= 1);  (* cf. [transl_module] *)
@@ -615,31 +626,41 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
       ([], transl_module ~scopes res_coercion body_path body)
       functor_params_rev
   in
-  lfunction
-    ~kind:(Curried {nlocal=0})
-    ~params
-    ~return:Lambda.layout_module
-    ~attr:{
-      inline = inline_attribute;
-      specialise = Default_specialise;
-      local = Default_local;
-      poll = Default_poll;
-      loop = Never_loop;
-      regalloc = Default_regalloc;
-      regalloc_param = Default_regalloc_params;
-      cold = false;
-      is_a_functor = true;
-      is_opaque = false;
-      zero_alloc = Default_zero_alloc;
-      stub = false;
-      tmc_candidate = false;
-      may_fuse_arity = true;
-      unbox_return = None;
-    }
-    ~loc
-    ~mode:alloc_heap
-    ~ret_mode:not_alloc_stack
-    ~body
+  let lfun =
+    lfunction'
+      ~kind:(Curried {nlocal=0})
+      ~params
+      ~return:Lambda.layout_module
+      ~attr:{
+        inline = inline_attribute;
+        specialise = Default_specialise;
+        local = Default_local;
+        poll = Default_poll;
+        loop = Never_loop;
+        regalloc = Default_regalloc;
+        regalloc_param = Default_regalloc_params;
+        cold = false;
+        is_a_functor = true;
+        is_opaque = false;
+        zero_alloc = Default_zero_alloc;
+        stub = false;
+        tmc_candidate = false;
+        may_fuse_arity = true;
+        unbox_return = None;
+      }
+      ~loc
+      ~mode:alloc_heap
+      ~ret_mode:not_alloc_stack
+      ~body
+  in
+  match staticity with
+  | Static ->
+    let tmpl_func, tmpl_env =
+      Lambda.freshen_free_vars_lfunction lfun
+        ~layout_of_ident:(Typeopt.layout_of_ident mexp.mod_env)
+    in
+    Ltemplate { tmpl_func; tmpl_env }
+  | Dynamic -> Lfunction lfun
 
 (* Compile a module expression *)
 
@@ -655,36 +676,44 @@ and transl_module ~scopes cc rootpath mexp =
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
         compile_functor ~scopes mexp cc rootpath loc) ()
-  | Tmod_apply(funct, arg, ccarg, yielding, _) ->
+  | Tmod_apply(funct, arg, ccarg, yielding, staticity) ->
       let translated_arg = transl_module ~scopes ccarg None arg in
-      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding translated_arg
+      let staticity = Translmode.transl_staticity_mode_r staticity in
+      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding ~staticity
+        translated_arg
   | Tmod_apply_unit (funct, yielding) ->
-      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding lambda_unit
+      transl_apply ~scopes ~loc ~cc mexp.mod_env funct ~yielding
+        ~staticity:Dynamic lambda_unit
   | Tmod_constraint(arg, _, _, ccarg) ->
       transl_module ~scopes (compose_coercions cc ccarg) rootpath arg
   | Tmod_unpack(arg, _) ->
       apply_coercion loc Strict cc
         (Translcore.transl_exp ~scopes Lambda.layout_module arg)
 
-and transl_apply ~scopes ~loc ~cc mod_env funct ~yielding translated_arg =
+and transl_apply ~scopes ~loc ~cc mod_env funct ~yielding ~staticity
+    translated_arg  =
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module funct
   in
-  let ap_yielding = Translmode.transl_yielding_mode_l yielding in
-  oo_wrap mod_env true
-    (apply_coercion loc Strict cc)
-    (Lapply{
-       ap_loc=loc;
-       ap_func=transl_module ~scopes Tcoerce_none None funct;
-       ap_args=[translated_arg];
-       ap_result_layout = Lambda.layout_module;
-       ap_region_close=Rc_normal;
-       ap_mode=not_alloc_stack;
-       ap_yielding;
-       ap_tailcall=Default_tailcall;
-       ap_inlined=inlined_attribute;
-       ap_specialised=Default_specialise;
-       ap_probe=None;})
+  let ap =
+    { ap_loc=loc;
+      ap_func=transl_module ~scopes Tcoerce_none None funct;
+      ap_args=[translated_arg];
+      ap_result_layout = Lambda.layout_module;
+      ap_region_close=Rc_normal;
+      ap_mode=not_alloc_stack;
+      ap_yielding=Translmode.transl_yielding_mode_l yielding;
+      ap_tailcall=Default_tailcall;
+      ap_inlined=inlined_attribute;
+      ap_specialised=Default_specialise;
+      ap_probe=None; }
+  in
+  let apply =
+    match staticity with
+    | Static -> Linstantiate ap
+    | Dynamic -> Lapply ap
+  in
+  oo_wrap mod_env true (apply_coercion loc Strict cc) apply
 
 and transl_struct ~scopes loc fields cc rootpath
       {str_final_env; str_items; _} =

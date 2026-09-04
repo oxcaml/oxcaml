@@ -1,4 +1,5 @@
 (* TEST
+ flags = "-extension layout_poly_alpha";
  expect;
 *)
 
@@ -551,13 +552,9 @@ module M = struct
   module (Y @ static) = F(struct end)(struct end)
 end
 [%%expect{|
-module M :
-  sig
-    module F :
-      functor (A : sig end @ static) ->
-        (functor (B : sig end @ static) -> sig end @ static) @ static
-    module Y : sig end
-  end
+>> Fatal error: Slambda eval doesn't support partial or over application of functors.
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 
