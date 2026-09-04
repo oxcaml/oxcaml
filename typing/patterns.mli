@@ -97,7 +97,6 @@ module Head : sig
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    (* CR zeisbach: this probably needs to look closer to record unboxed product??? *)
     | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
