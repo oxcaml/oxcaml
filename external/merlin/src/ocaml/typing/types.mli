@@ -85,8 +85,10 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
-  (** The axes that the with-bound applies to *)
-  type t = { relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  (** The with-bound contributes the meet of the type's modal and externality
+      bounds and [bounds_mask]. On each axis, [top] preserves the type's bound,
+      [bot] ignores it, and a middle element caps its contribution there. *)
+  type t = { bounds_mask : Axis_lattice.t } [@@unboxed]
 
   val join : t -> t -> t
 end
@@ -893,7 +895,7 @@ type type_declaration =
 and type_decl_kind = (label_declaration, label_declaration, constructor_declaration) type_kind
 
 and unsafe_mode_crossing =
-  { unsafe_mod_bounds : Mode.Crossing.t
+  { unsafe_mod_bounds : mod_bounds
   ; unsafe_with_bounds : (allowed * disallowed) with_bounds
   }
 
@@ -1043,6 +1045,10 @@ and constructor_representation =
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
+  | Constructor_immediate_all_void
+  (* A constructor with all-void args, represented as a constant rather than a
+     block: one annotated with [@immediate_all_void_constructor], or the null
+     constructor of a [Variant_with_null]. *)
   | Constructor_undetermined
   (* The constructor has an inlined record argument with a field of layout
      [any], so its shape cannot be determined at typedecl time. *)
@@ -1348,6 +1354,13 @@ val equal_record_unboxed_product_representation_up_to_scannable_axes :
 val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool
 
+val equal_constructor_representation_up_to_scannable_axes :
+  constructor_representation -> constructor_representation -> bool
+
+(** Whether the constructor is represented as a constant rather than a block:
+    it is nullary, or its shape is [Constructor_immediate_all_void]. *)
+val cstr_layout_is_constant : cstr_layout -> bool
+
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
@@ -1373,10 +1386,6 @@ val mixed_block_element_to_lowercase_string : mixed_block_element -> string
 
 val equal_mixed_product_shape_up_to_scannable_axes :
   mixed_product_shape -> mixed_product_shape -> bool
-
-val equal_unsafe_mode_crossing :
-  type_equal:(type_expr -> type_expr -> bool) ->
-  unsafe_mode_crossing -> unsafe_mode_crossing -> bool
 
 (**** Utilities for backtracking ****)
 

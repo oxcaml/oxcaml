@@ -84,7 +84,7 @@ module Unique_barrier = struct
 
   let enable barrier = match !barrier with
     | Not_computed ->
-      barrier := Enabled (Uniqueness.newvar ())
+      barrier := Enabled (Uniqueness.newvar 0)
     | _ -> Misc.fatal_error "Unique barrier was enabled twice"
 
   (* Due to or-patterns a barrier may have several upper bounds. *)
@@ -96,7 +96,7 @@ module Unique_barrier = struct
   let resolve barrier =
     match !barrier with
     | Enabled uniq ->
-      let zapped = Uniqueness.zap_to_ceil uniq in
+      let zapped = Uniqueness.zap_to_ceil_exn uniq in
       barrier := Resolved zapped;
       zapped
     | Resolved barrier -> barrier
@@ -137,7 +137,7 @@ type alloc_mode_r = Mode.Locality.r
 let create_alloc_mode_r m =
   assert (Mode.Locality.check_const_or_level_0 m); m
 
-let alloc_mode_r_zap_to_ceil m = Mode.Locality.zap_to_ceil m
+let alloc_mode_r_zap_to_ceil m = Mode.Locality.zap_to_ceil_exn m
 
 let alloc_mode_r_submode_err pp m t = Mode.Locality.submode_err pp m t
 
@@ -151,7 +151,7 @@ type alloc_mode_l = Mode.Locality.l
 let create_alloc_mode_l m =
   assert (Mode.Locality.check_const_or_level_0 m); m
 
-let alloc_mode_l_zap_to_floor m = Mode.Locality.zap_to_floor m
+let alloc_mode_l_zap_to_floor m = Mode.Locality.zap_to_floor_exn m
 
 let alloc_mode_l_map f m = f m
 
@@ -163,7 +163,7 @@ type return_mode = Mode.Locality.l
 let create_return_mode m =
   assert (Mode.Locality.check_const_or_level_0 m); m
 
-let return_mode_zap_to_floor m = Mode.Locality.zap_to_floor m
+let return_mode_zap_to_floor_exn m = Mode.Locality.zap_to_floor_exn m
 
 let print_return_mode ppf m =
   Format_doc.compat (Mode.Locality.print ()) ppf m
@@ -1597,6 +1597,8 @@ let label_sort (type rep)
     | Record_undetermined
     | Record_inlined (_, Constructor_undetermined, _) ->
       Misc.fatal_error "label_sort: unexpected undetermined representation"
+    | Record_inlined (_, Constructor_immediate_all_void, _) ->
+      Misc.fatal_error "label_sort: unexpected immediate representation"
     | Record_dummy _ ->
       Misc.fatal_error "label_sort: unexpected dummy representation"
     end
@@ -1623,6 +1625,9 @@ let finalized_label_sort (label : Data_types.label_description)
   | Record_inlined
       (_, (Constructor_undetermined | Constructor_variable _), _) ->
     Misc.fatal_error "finalized_label_sort: representation was not finalized"
+  | Record_inlined (_, Constructor_immediate_all_void, _) ->
+    Misc.fatal_error
+      "finalized_label_sort: unexpected immediate representation"
   | Record_dummy _ ->
     Misc.fatal_error "finalized_label_sort: unexpected dummy representation"
 

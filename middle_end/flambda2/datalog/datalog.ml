@@ -339,21 +339,28 @@ let compile_condition context condition =
     bind_atom (Cursor.initial_actions context) args iterators
 
 let compile_filter context filter =
+  (* Variables bound in filters are bound with cardinality [Any_value]: if a
+     variable is only bound in filters, we only need one matching value.
+
+     This means that iteration will stop for an innermost variable that is only
+     used in filters (not yielded in the output) once we find any entry for such
+     a variable, without iterating over other possible bindings (see
+     [pop_rev_vars] in [cursor.ml]). *)
   match filter with
   | Unless_atom (id, args) ->
-    let refs = compile_terms args in
+    let refs = compile_terms ~cardinality:Any_value args in
     let post_level = find_last_binding (Cursor.initial_actions context) args in
     let r = Cursor.add_naive_binder context id in
     Cursor.add_action post_level (Cursor.unless id r refs)
   | Unless_eq (repr, arg1, arg2) ->
-    let ref1 = compile_term arg1 in
-    let ref2 = compile_term arg2 in
+    let ref1 = compile_term ~cardinality:Any_value arg1 in
+    let ref2 = compile_term ~cardinality:Any_value arg2 in
     let post_level =
       find_last_binding (Cursor.initial_actions context) [arg1; arg2]
     in
     Cursor.add_action post_level (Cursor.unless_eq repr ref1 ref2)
   | User (fn, args) ->
-    let refs = compile_terms args in
+    let refs = compile_terms ~cardinality:Any_value args in
     let post_level = find_last_binding (Cursor.initial_actions context) args in
     Cursor.add_action post_level (Cursor.filter fn refs)
 

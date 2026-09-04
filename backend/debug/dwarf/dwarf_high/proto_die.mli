@@ -77,7 +77,7 @@ type fold_arg = private
         has_children : Child_determination.t;
         attribute_values :
           Dwarf_attribute_values.Attribute_value.t
-          Dwarf_attributes.Attribute_specification.Sealed.Map.t;
+          Dwarf_attributes.Attribute.Sealed.Map.t;
         label : Asm_label.t;
         name : Asm_symbol.t option;
         location_list_in_debug_loc_table :

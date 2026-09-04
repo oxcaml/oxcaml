@@ -181,9 +181,9 @@ and extension_constructor id { ext_args; ext_ret_type; ext_attributes; _ } =
 
 and modes ~arg mode =
   let snapshot = Btype.snapshot () in
-  let mode = Mode.Alloc.zap_to_legacy ~arg mode in
+  let mode = Mode.Alloc.zap_to_legacy_force ~arg mode in
   Btype.backtrack snapshot;
-  Out_type.tree_of_modes mode
+  Out_type.tree_of_modes_const mode
   |> List.map ~f:(fun mode -> Location.mknoloc (Parsetree.Mode mode))
 
 and const_modalities ~mut modality =

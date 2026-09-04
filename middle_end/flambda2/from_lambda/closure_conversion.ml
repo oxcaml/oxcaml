@@ -1247,21 +1247,16 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     let acc, sym =
       match prim with
       | Pmakeblock (tag, _, shape, _mode) ->
-        if tag <> 0
+        if Lambda.is_uniform_block_shape shape
         then
-          (* There should not be any way to reach this from Ocaml code. *)
-          Misc.fatal_error
-            "Non-zero tag on empty block allocation in [Closure_conversion]"
+          register_const0 acc
+            (Static_const.block
+               (Tag.Scannable.create_exn tag)
+               Immutable Value_only [])
+            "empty_block"
         else
-          begin if Lambda.is_uniform_block_shape shape
-          then
-            register_const0 acc
-              (Static_const.block Tag.Scannable.zero Immutable Value_only [])
-              "empty_block"
-          else
-            Misc.fatal_error
-              "Unexpected empty mixed block in [Closure_conversion]"
-          end
+          Misc.fatal_error
+            "Unexpected empty mixed block in [Closure_conversion]"
       | Pmakefloatblock _ ->
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
@@ -1321,7 +1316,11 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_load_idx _ | Patomic_set_idx _ | Patomic_exchange_idx _
       | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _
       | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx
-      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx | Pdls_get
+      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+      | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
+      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
+      | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr
+      | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr | Pdls_get
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64

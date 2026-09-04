@@ -1750,9 +1750,17 @@ let emit_reinterpret_cast (cast : Cmm.reinterpret_cast) i =
       then I.simd vmovupd_Y_Ym256 [| arg i 0; res i 0 |]
       else I.simd vmovupd_Ym256_Y [| arg i 0; res i 0 |]
   | V256_of_vec Vec512 ->
-    if distinct then I.simd vmovupd_Y_Ym256 [| argY i 0; res i 0 |]
+    if distinct
+    then
+      if Reg.is_stack i.res.(0)
+      then I.simd vmovupd_Ym256_Y [| argY i 0; res i 0 |]
+      else I.simd vmovupd_Y_Ym256 [| argY i 0; res i 0 |]
   | V512_of_vec (Vec128 | Vec256 | Vec512) ->
-    if distinct then I.simd vmovupd_Z_Zm512 [| argZ i 0; res i 0 |]
+    if distinct
+    then
+      if Reg.is_stack i.res.(0)
+      then I.simd vmovupd_Zm512_Z [| argZ i 0; res i 0 |]
+      else I.simd vmovupd_Z_Zm512 [| argZ i 0; res i 0 |]
   | Float_of_int64 | Int64_of_float -> movq (arg i 0) (res i 0)
   | Float32_of_int32 -> movd (arg32 i 0) (res i 0)
   | Int32_of_float32 -> movd (arg i 0) (res32 i 0)

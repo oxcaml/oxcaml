@@ -994,19 +994,26 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_land_field -> ternary (Ccall "caml_atomic_land_field")
     | Patomic_lor_field -> ternary (Ccall "caml_atomic_lor_field")
     | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
-    | Patomic_load_idx { layout } ->
-      let elt = Lambda.mixed_block_element_of_layout layout in
-      copy_mixed_block_element elt
-        (binary (Ccall "caml_atomic_load_idx_bytecode"))
-    | Patomic_set_idx { layout; _ } -> (
-      let elt = Lambda.mixed_block_element_of_layout layout in
-      match args with
-      | [arr; idx; value] ->
-        let copied_value = copy_mixed_block_element elt (comp_expr value) in
-        Prim
-          ( Ccall "caml_atomic_set_idx_bytecode",
-            [comp_expr arr; comp_expr idx; copied_value] )
-      | _ -> wrong_arity ~expected:3)
+    (*
+       The following operations do not call [copy_mixed_block_element], so using them with
+       an unboxed product would result in unintended aliasing. Atomic fields are
+       restricted to layout [value_or_null], so this check is purely defensive.
+    *)
+    | Patomic_load_idx { layout = Punboxed_product _ }
+    | Patomic_set_idx { layout = Punboxed_product _; _ }
+    | Patomic_exchange_idx { layout = Punboxed_product _; _ }
+    | Patomic_compare_exchange_idx { layout = Punboxed_product _; _ }
+    | Patomic_compare_set_idx { layout = Punboxed_product _; _ }
+    | Patomic_load_ptr { layout = Punboxed_product _ }
+    | Patomic_set_ptr { layout = Punboxed_product _; _ }
+    | Patomic_exchange_ptr { layout = Punboxed_product _; _ }
+    | Patomic_compare_exchange_ptr { layout = Punboxed_product _; _ }
+    | Patomic_compare_set_ptr { layout = Punboxed_product _; _ } ->
+      Misc.fatal_errorf
+        "Blambda_of_lambda: primitive %a may not be used with unboxed products"
+        Printlambda.primitive primitive
+    | Patomic_load_idx _ -> binary (Ccall "caml_atomic_load_idx_bytecode")
+    | Patomic_set_idx _ -> ternary (Ccall "caml_atomic_set_idx_bytecode")
     | Patomic_exchange_idx _ ->
       ternary (Ccall "caml_atomic_exchange_idx_bytecode")
     | Patomic_compare_exchange_idx _ ->
@@ -1020,6 +1027,21 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_land_idx -> ternary (Ccall "caml_atomic_land_idx_bytecode")
     | Patomic_lor_idx -> ternary (Ccall "caml_atomic_lor_idx_bytecode")
     | Patomic_lxor_idx -> ternary (Ccall "caml_atomic_lxor_idx_bytecode")
+    | Patomic_load_ptr _ -> unary (Ccall "caml_atomic_load_ptr_bytecode")
+    | Patomic_set_ptr _ -> binary (Ccall "caml_atomic_set_ptr_bytecode")
+    | Patomic_exchange_ptr _ ->
+      binary (Ccall "caml_atomic_exchange_ptr_bytecode")
+    | Patomic_compare_exchange_ptr _ ->
+      ternary (Ccall "caml_atomic_compare_exchange_ptr_bytecode")
+    | Patomic_compare_set_ptr _ ->
+      ternary (Ccall "caml_atomic_cas_ptr_bytecode")
+    | Patomic_fetch_add_ptr ->
+      binary (Ccall "caml_atomic_fetch_add_ptr_bytecode")
+    | Patomic_add_ptr -> binary (Ccall "caml_atomic_add_ptr_bytecode")
+    | Patomic_sub_ptr -> binary (Ccall "caml_atomic_sub_ptr_bytecode")
+    | Patomic_land_ptr -> binary (Ccall "caml_atomic_land_ptr_bytecode")
+    | Patomic_lor_ptr -> binary (Ccall "caml_atomic_lor_ptr_bytecode")
+    | Patomic_lxor_ptr -> binary (Ccall "caml_atomic_lxor_ptr_bytecode")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ptls_get -> unary (Ccall "caml_domain_tls_get")
     | Pdomain_index -> unary (Ccall "caml_ml_domain_index")

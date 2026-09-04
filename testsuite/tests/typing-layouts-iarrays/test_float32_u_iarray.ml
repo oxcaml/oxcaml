@@ -21,13 +21,13 @@ open Stdlib_stable
 open Stdlib_upstream_compatible
 
 module Float32_u_array0 :
-  Gen_u_iarray.S0 with type element_t = float32#
+  Gen_u_iarray.S0 with type element_t = float32_u
                    and type ('a : any mod separable) array_t = 'a iarray 
-                   and type mutable_t = float32# array = struct
-  type element_t = float32#
+                   and type mutable_t = float32_u array = struct
+  type element_t = float32_u
 
   type ('a : any mod separable) array_t = 'a iarray
-  type mutable_t = float32# array
+  type mutable_t = float32_u array
 
   type element_arg = unit -> element_t
   type t = element_t iarray
@@ -63,7 +63,7 @@ module Float32_u_array0 :
 
   external freeze : element_t array -> element_t iarray = "%array_to_iarray"
 
-  let empty () : float32# iarray = 
+  let empty () : float32_u iarray = 
     let m = unsafe_create_mutable 0 in
     freeze m
 
