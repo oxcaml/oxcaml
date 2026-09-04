@@ -3,6 +3,18 @@
 The goal of the document is to list features we rely on for the runtime and the generated code.
 Features are grouped by ECMAScript version.
 
+## Supported engines
+
+The generated code and runtime target **ECMAScript 2020 (ES2020)**. They run on:
+
+- Node.js 18 or later
+- Any evergreen browser released since early 2020 (Chrome 80+, Firefox 74+, Safari 13.4+, Edge 80+)
+- [QuickJS-NG](https://github.com/quickjs-ng/quickjs)
+
+The ES2021 features below (`WeakRef`, `FinalizationRegistry`) are optional: they
+are used when available and degrade gracefully otherwise. To target an older
+engine, transpile the output down to ES5 (see `manual/browser-compat.mld`).
+
 ## ECMAScript 2015
 
 ### Arrow function expressions
@@ -35,6 +47,11 @@ Features are grouped by ECMAScript version.
 
 - [Compatibility](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign#browser_compatibility)
 
+### Promise
+
+- [Compatibility](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise#browser_compatibility)
+- For Wasm_of_ocaml
+
 ### Rest parameters
 
 - [Compatibility](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters#browser_compatibility)
@@ -46,6 +63,10 @@ Features are grouped by ECMAScript version.
 ### Spread syntax (in function call)
 
 - [Compatibility](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax#browser_compatibility)
+
+### Template literals
+
+- [Compatibility](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#browser_compatibility)
 
 ### TypedArray
 
@@ -60,7 +81,7 @@ Features are grouped by ECMAScript version.
 
 - [Compatibility](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/DataView#browser_compatibility)
 
-## ECMAScript 2016
+## ECMAScript 2017
 
 ### async function
 

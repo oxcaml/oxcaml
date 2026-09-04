@@ -27,8 +27,15 @@ type t =
   ; optim : string list on_off
   ; quiet : bool
   ; werror : bool
+  ; warnings : (bool * Js_of_ocaml_compiler.Warning.t) list
   ; custom_header : string option
   }
+
+val build_config : bool Cmdliner.Term.t
+
+val apply_build_config : string option Cmdliner.Term.t
+
+val set_param : (string * string) list list Cmdliner.Term.t
 
 val t : t Cmdliner.Term.t Lazy.t
 

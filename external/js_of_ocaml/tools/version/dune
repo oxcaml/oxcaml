@@ -1,0 +1,7 @@
+(rule
+ (target GIT-VERSION)
+ (deps (universe))
+ (action
+  (with-stdout-to
+   %{target}
+   (bash "git describe --always --dirty 2>/dev/null | sed 's/^/ox+/'"))))

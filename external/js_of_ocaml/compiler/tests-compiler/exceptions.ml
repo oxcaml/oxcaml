@@ -16,7 +16,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
-open Util
+open! Util
+
+(* In OxCaml, raise is always reraise, which changes the generated code. *)
+[@@@if not oxcaml]
 
 (* https://github.com/ocsigen/js_of_ocaml/issues/829 *)
 
@@ -34,27 +37,27 @@ let prevent_inline = some_name
     {|
     function some_name(param){
      try{
-      try{throw caml_maybe_attach_backtrace(Stdlib[8], 0);}
+      try{throw caml_maybe_attach_backtrace(Stdlib[8], 1);}
       catch(x$0){var x = caml_wrap_exception(x$0), i = x;}
      }
-     catch(i$0){var i = caml_wrap_exception(i$0);}
-     throw caml_maybe_attach_backtrace(i, 0);
+     catch(i$0){i = caml_wrap_exception(i$0);}
+     throw caml_maybe_attach_backtrace(i, 1);
     }
     //end
     |}];
   print_fun_decl (program ~debug:false) None;
   [%expect
     {|
-    function _a_(_c_){
+    function _a_(_b_){
      try{
-      try{throw caml_maybe_attach_backtrace(Stdlib[8], 0);}
-      catch(_c_){var _b_ = caml_wrap_exception(_c_);}
+      try{throw caml_maybe_attach_backtrace(Stdlib[8], 1);}
+      catch(_b_){var _a_ = caml_wrap_exception(_b_);}
      }
-     catch(_c_){
-      var _a_ = caml_wrap_exception(_c_);
-      throw caml_maybe_attach_backtrace(_a_, 0);
+     catch(_b_){
+      _a_ = caml_wrap_exception(_b_);
+      throw caml_maybe_attach_backtrace(_a_, 1);
      }
-     throw caml_maybe_attach_backtrace(_b_, 0);
+     throw caml_maybe_attach_backtrace(_a_, 1);
     }
     //end
     |}]

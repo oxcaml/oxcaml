@@ -52,12 +52,12 @@ let read_cmi ~dir cmi =
     with Not_found -> (
       match cmi with
       (* HACK: here a list of known "hidden" cmi from the OCaml distribution. *)
-      | "dynlink_config.cmi"
-      | "dynlink_types.cmi"
-      | "dynlink_platform_intf.cmi"
-      | "dynlink_common.cmi"
-      | "dynlink_symtable.cmi"
-      | "dynlink_compilerlibs.cmi" -> raise Not_found
+      | "Dynlink_config.cmi"
+      | "Dynlink_types.cmi"
+      | "Dynlink_platform_intf.cmi"
+      | "Dynlink_common.cmi"
+      | "Dynlink_symtable.cmi"
+      | "Dynlink_compilerlibs.cmi" -> raise Not_found
       | cmi ->
           Format.eprintf
             "Could not find cmi %s or %s in %s@."
@@ -72,7 +72,7 @@ let cmis_of_cma ~dir cma_path =
   in
   let contains = unit_of_cma cma_path in
   let dir = Filename.dirname cma_path in
-  List.filter_map contains ~f:(fun s ->
+  List.filter_map contains ~f:(fun (Js_of_ocaml_compiler.Global_name.Compunit s) ->
       try Some (read_cmi ~dir (s ^ ".cmi")) with Not_found -> None)
 
 let cmis_of_package pkg : string list =

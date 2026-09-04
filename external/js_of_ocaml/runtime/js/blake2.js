@@ -309,7 +309,7 @@ var blake2b = (function () {
 function caml_blake2_create(hashlen, key) {
   key = caml_uint8_array_of_string(key);
   if (key.length > 64) {
-    key.subarray(0, 64);
+    key = key.subarray(0, 64);
   }
   return blake2b.Init(hashlen, key);
 }
@@ -318,7 +318,8 @@ function caml_blake2_create(hashlen, key) {
 //Requires: caml_string_of_uint8_array
 //Requires: blake2b
 //Version: >= 5.2
-function caml_blake2_final(ctx, hashlen) {
+function caml_blake2_final(ctx, _hashlen) {
+  // ctx.outlen === hashlen
   var r = blake2b.Final(ctx);
   return caml_string_of_uint8_array(r);
 }
@@ -378,39 +379,4 @@ function caml_blake2_bytes(hashlen, key, buf, ofs, len) {
   var ctx = caml_blake2_create(hashlen, key);
   caml_blake2_update(ctx, buf, ofs, len);
   return caml_blake2_final(ctx, hashlen);
-}
-
-//Provides: blake2_js_for_wasm_create
-//Requires: caml_blake2_create, caml_string_of_jsbytes
-//If: wasm
-//Version: >= 5.2
-function blake2_js_for_wasm_create(hashlen, key) {
-  const key_jsoo_string = caml_string_of_jsbytes(key);
-  return caml_blake2_create(hashlen, key_jsoo_string);
-}
-
-//Provides: blake2_js_for_wasm_final
-//Requires: caml_blake2_final, caml_jsbytes_of_string
-//If: wasm
-//Version: >= 5.2
-function blake2_js_for_wasm_final(ctx, hashlen) {
-  return caml_jsbytes_of_string(caml_blake2_final(ctx, hashlen));
-}
-
-//Provides: blake2_js_for_wasm_update
-//Requires: caml_blake2_update, caml_string_of_jsbytes
-//If: wasm
-//Version: >= 5.2, < 5.3
-function blake2_js_for_wasm_update(ctx, buf, ofs, len) {
-  const buf_jsoo_string = caml_string_of_jsbytes(buf);
-  return caml_blake2_update(ctx, buf_jsoo_string, ofs, len);
-}
-
-//Provides: blake2_js_for_wasm_update
-//Requires: caml_blake2_update, caml_bytes_of_jsbytes
-//If: wasm
-//Version: >= 5.3
-function blake2_js_for_wasm_update(ctx, buf, ofs, len) {
-  const buf_jsoo_string = caml_bytes_of_jsbytes(buf);
-  return caml_blake2_update(ctx, buf_jsoo_string, ofs, len);
 }

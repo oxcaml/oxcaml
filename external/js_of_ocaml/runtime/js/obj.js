@@ -32,25 +32,57 @@ function caml_update_dummy(x, y) {
 
 //Provides: caml_alloc_dummy_infix
 //Requires: caml_call_gen
+//Version: < 5.4
 function caml_alloc_dummy_infix() {
   return function f(x) {
     return caml_call_gen(f.fun, [x]);
   };
 }
 
+//Provides: caml_alloc_dummy_lazy
+//Version: >= 5.4
+function caml_alloc_dummy_lazy(_unit) {
+  return [0, 0];
+}
+
+//Provides: caml_update_dummy_lazy
+//Requires: caml_obj_tag
+//Requires: caml_update_dummy
+//Version: >= 5.4
+function caml_update_dummy_lazy(dummy, newval) {
+  switch (caml_obj_tag(newval)) {
+    case 246: // Lazy
+    case 244: // Forcing
+    case 250: // Forward
+      caml_update_dummy(dummy, newval);
+      break;
+    default:
+      dummy[1] = newval;
+      dummy[0] = 250;
+      break;
+  }
+  return 0;
+}
+
 //Provides: caml_obj_is_stack
-function caml_obj_is_stack(x) {
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_obj_is_stack(_x) {
   return 0;
 }
 
 //Provides: caml_succ_scannable_prefix_len
-function caml_succ_scannable_prefix_len(x) {
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_succ_scannable_prefix_len(_x) {
   return 0;
 }
 
 //Provides: caml_obj_uniquely_reachable_words
 //Requires: caml_failwith
-function caml_obj_uniquely_reachable_words(x) {
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_obj_uniquely_reachable_words(_x) {
   caml_failwith("Obj.uniquely_reachable_words is not available in javascript.");
 }
 
@@ -92,6 +124,7 @@ function caml_obj_with_tag(tag, x) {
 
 //Provides: caml_obj_dup mutable (mutable)
 function caml_obj_dup(x) {
+  if (x === null) return null;
   return typeof x === "number" ? x : x.slice();
 }
 
@@ -124,7 +157,7 @@ function caml_obj_compare_and_swap(x, i, old, n) {
 
 //Provides: caml_obj_is_shared
 //Version: >= 5.0
-function caml_obj_is_shared(x) {
+function caml_obj_is_shared(_x) {
   return 1;
 }
 
@@ -133,18 +166,25 @@ function caml_lazy_make_forward(v) {
   return [250, v];
 }
 
-///////////// CamlinternalOO
-//Provides: caml_get_public_method const
+//Provides: caml_method_cache
 var caml_method_cache = [];
-function caml_get_public_method(obj, tag, cacheid) {
+
+//Provides: caml_oo_cache_id const
+//Requires: caml_method_cache
+function caml_oo_cache_id() {
+  var cacheid = caml_method_cache.length;
+  caml_method_cache[cacheid] = 0;
+  return cacheid;
+}
+
+///////////// CamlinternalOO
+//Provides: caml_get_cached_method const
+//Requires: caml_method_cache
+function caml_get_cached_method(obj, tag, cacheid) {
   var meths = obj[1];
   var ofs = caml_method_cache[cacheid];
-  if (ofs === undefined) {
-    // Make sure the array is not sparse
-    for (var i = caml_method_cache.length; i < cacheid; i++)
-      caml_method_cache[i] = 0;
-  } else if (meths[ofs] === tag) {
-    return meths[ofs - 1];
+  if (meths[ofs + 4] === tag) {
+    return meths[ofs + 3];
   }
   var li = 3,
     hi = meths[1] * 2 + 1,
@@ -154,7 +194,21 @@ function caml_get_public_method(obj, tag, cacheid) {
     if (tag < meths[mi + 1]) hi = mi - 2;
     else li = mi;
   }
-  caml_method_cache[cacheid] = li + 1;
+  caml_method_cache[cacheid] = li - 3;
+  return meths[li];
+}
+
+//Provides: caml_get_public_method const
+function caml_get_public_method(obj, tag) {
+  var meths = obj[1];
+  var li = 3,
+    hi = meths[1] * 2 + 1,
+    mi;
+  while (li < hi) {
+    mi = ((li + hi) >> 1) | 1;
+    if (tag < meths[mi + 1]) hi = mi - 2;
+    else li = mi;
+  }
   /* return 0 if tag is not there */
   return tag === meths[li + 1] ? meths[li] : 0;
 }
@@ -186,13 +240,13 @@ function caml_obj_set_raw_field(o, i, v) {
 }
 
 //Provides: caml_obj_reachable_words
-function caml_obj_reachable_words(o) {
+function caml_obj_reachable_words(_o) {
   return 0;
 }
 
 //Provides: caml_obj_add_offset
 //Requires: caml_failwith
-function caml_obj_add_offset(v, offset) {
+function caml_obj_add_offset(_v, _offset) {
   caml_failwith("Obj.add_offset is not supported");
 }
 
@@ -246,7 +300,7 @@ function caml_lazy_read_result(o) {
 
 //Provides: caml_is_continuation_tag
 //Version: < 5
-function caml_is_continuation_tag(t) {
+function caml_is_continuation_tag(_t) {
   return 0;
 }
 
@@ -259,18 +313,30 @@ function caml_is_continuation_tag(t) {
 //Provides: caml_custom_identifier
 //Requires: caml_string_of_jsstring
 function caml_custom_identifier(o) {
-  return caml_string_of_jsstring(o.caml_custom);
+  return caml_string_of_jsstring(o.caml_custom || "");
+}
+
+//Provides: caml_ml_gc_ramp_up
+//Requires: caml_callback
+//Version: >= 5.4
+function caml_ml_gc_ramp_up(f) {
+  var a = caml_callback(f, [0]);
+  var suspended = 0;
+  return [0, a, suspended];
+}
+
+//Provides: caml_ml_gc_ramp_down
+//Version: >= 5.4
+function caml_ml_gc_ramp_down(_suspended_collection_work) {
+  return 0;
 }
 
 //Provides: caml_int_as_pointer
 //Requires: caml_failwith
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_int_as_pointer(i) {
   // Special-case null pointers for [or_null].
-  if (i == 0) return null;
+  if (i === 0) return null;
   caml_failwith("%int_as_pointer is not supported in javascript.");
-}
-
-//Provides: caml_is_null
-function caml_is_null(o) {
-  return o === null;
 }

@@ -172,6 +172,29 @@ let%expect_test "test float" =
     "\132\149\166\190\000\000\000\017\000\000\000\004\000\000\000\012\000\000\000\011\160\160\012\031\133\235Q\184\030\t@\004\001\160\004\003@"
     3.140000 3.140000 3.140000 3.140000 |}]
 
+let%expect_test "md5 digest via channel" =
+  (* The MD5 buffer offset bug only triggers when MD5Update is called with
+     in_buf != 0, i.e. when a previous update left a partial 64-byte block.
+     Digest.string does a single update from in_buf=0, so it can't trigger it.
+     To trigger it: write a file larger than the IO buffer (65536 bytes in wasm),
+     read a non-64-aligned prefix so that the first caml_getblock returns a
+     non-64-aligned amount. Then the second MD5Update call has in_buf != 0. *)
+  let total = 100_000 in
+  let skip = 37 in
+  let data = String.init total (fun i -> Char.chr (i mod 256)) in
+  let expected = Digest.to_hex (Digest.string (String.sub data skip (total - skip))) in
+  let tmp = Filename.temp_file "md5" "test" in
+  let oc = open_out_bin tmp in
+  output_string oc data;
+  close_out oc;
+  let ic = open_in_bin tmp in
+  ignore (really_input_string ic skip);
+  let got = Digest.to_hex (Digest.channel ic (-1)) in
+  close_in ic;
+  Sys.remove tmp;
+  Printf.printf "match: %b\n" (expected = got);
+  [%expect {| match: true |}]
+
 let%expect_test "test input with offset" =
   let s = 3.14 in
   let b = Bytes.create 1000 in
@@ -187,3 +210,58 @@ let%expect_test "test input with offset" =
   in
   Printf.printf "%f" (Marshal.from_bytes b (String.length prefix));
   [%expect {| 3.140000 |}]
+
+let%expect_test "block with 2^21 fields" =
+  (* Blocks with 2^21..2^22-1 fields have bit 31 of their BLOCK32
+     header set; the reader must extract the size with an unsigned
+     shift. *)
+  let n = 1 lsl 21 in
+  let a = Array.make n 0 in
+  a.(0) <- 1;
+  a.(n - 1) <- 2;
+  (try
+     let a' : int array = Marshal.from_string (Marshal.to_string a []) 0 in
+     Printf.printf "%d %d %d\n" (Array.length a') a'.(0) a'.(Array.length a' - 1)
+   with e -> print_endline (Printexc.to_string e));
+  [%expect {| 2097152 1 2 |}]
+
+let%expect_test "shared reference after a big-endian double array" =
+  (* Hand-crafted stream (the jsoo writer only emits little-endian
+     codes; native writers on big-endian platforms emit
+     CODE_DOUBLE_ARRAY32_BIG): the value is (s, [| 1.5 |], s) with the
+     second occurrence of s shared. The double array must be registered
+     in the object table for the back-reference to resolve. *)
+  let buf =
+    "\x84\x95\xa6\xbe" (* magic *)
+    ^ "\x00\x00\x00\x13" (* data length: 19 *)
+    ^ "\x00\x00\x00\x03" (* number of shared objects *)
+    ^ "\x00\x00\x00\x09" (* size_32 *)
+    ^ "\x00\x00\x00\x08" (* size_64 *)
+    ^ "\xb0" (* small block, tag 0, size 3 *)
+    ^ "\x22hi" (* small string "hi" *)
+    ^ "\x0f\x00\x00\x00\x01" (* DOUBLE_ARRAY32_BIG, 1 element *)
+    ^ "\x3f\xf8\x00\x00\x00\x00\x00\x00" (* 1.5, big-endian *)
+    ^ "\x04\x02" (* SHARED8, offset 2 *)
+  in
+  let (a, d, b) : string * float array * string = Marshal.from_string buf 0 in
+  Printf.printf "%s %g %b\n" a d.(0) (a == b);
+  [%expect {| hi 1.5 true |}]
+
+let%expect_test "float array marshalling is interoperable" =
+  let hex s =
+    String.iter (fun c -> Printf.printf "%02x" (Char.code c)) s;
+    print_newline ()
+  in
+  (* the marshalled bytes must match the native format (a
+     CODE_DOUBLE_ARRAY block) so other runtimes can read them *)
+  hex (Marshal.to_string [| 1.5; 2.5; 3.5 |] []);
+  (* round-trip within jsoo still works *)
+  let a : float array =
+    Marshal.from_string (Marshal.to_string [| 1.5; 2.5; 3.5 |] []) 0
+  in
+  Printf.printf "%g %g %g\n" a.(0) a.(1) a.(2);
+  [%expect
+    {|
+    8495a6be0000001a0000000100000007000000040e03000000000000f83f00000000000004400000000000000c40
+    1.5 2.5 3.5
+    |}]

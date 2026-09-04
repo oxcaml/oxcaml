@@ -26,6 +26,7 @@ let%expect_test _ =
     +fs.js
     +fs_fake.js
     +fs_node.js
+    +fs_quickjs.js
     +gc.js
     +graphics.js
     +hash.js
@@ -41,12 +42,11 @@ let%expect_test _ =
     +mlBytes.js
     +nat.js
     +obj.js
-    +ocamlj.js
     +parsing.js
     +prng.js
+    +promise.js
     +runtime_events.js
     +stdlib.js
-    +stdlib_modern.js
     +str.js
     +sync.js
     +sys.js
@@ -87,9 +87,9 @@ let%expect_test _ =
     +mlBytes.js
     +nat.js
     +obj.js
-    +ocamlj.js
     +parsing.js
     +prng.js
+    +promise.js
     +runtime_events.js
     +stdlib.js
     +str.js
@@ -102,6 +102,6 @@ let%expect_test _ =
   printl extra;
   [%expect {|
     +dynlink.js
-    +stdlib_modern.js
+    +fs_quickjs.js
     +toplevel.js
     |}]

@@ -1,7 +1,35 @@
 (tests
- (names gh38 gh46 gh107 gh112 gh1904 gh2034)
+ (names gh38 gh46 gh107 gh112 gh1904 gh2034 int64_of_string)
  (modes js wasm)
  (js_of_ocaml
   (flags :standard --disable optcall --no-inline))
  (wasm_of_ocaml
   (flags :standard --disable optcall --no-inline)))
+
+(tests
+ (names fun_eq open_append)
+ (modes js wasm))
+
+(tests
+ (names marshal_regressions)
+ (modes wasm))
+
+(tests
+ (names marshal_fixes)
+ (modes js wasm))
+
+(tests
+ (names readdir_after_closedir unix_ids)
+ (modes wasm)
+ (libraries unix))
+
+(tests
+ (names gh2093)
+ (modes wasm)
+ (enabled_if
+  (and
+   (>= %{ocaml_version} 5)
+   (<> %{profile} wasi)))
+ (wasm_of_ocaml
+  (compilation_mode whole_program)
+  (flags :standard)))

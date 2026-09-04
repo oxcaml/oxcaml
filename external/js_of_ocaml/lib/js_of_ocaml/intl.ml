@@ -100,7 +100,8 @@ module Collator = struct
     end
 
   class type t = object
-    method compare : (Js.js_string Js.t -> Js.js_string Js.t -> int) Js.readonly_prop
+    method compare :
+      (Js.js_string Js.t -> Js.js_string Js.t -> Js.number_t) Js.readonly_prop
 
     method resolvedOptions : unit -> resolved_options Js.t Js.meth
   end
@@ -413,6 +414,62 @@ module PluralRules = struct
   end
 end
 
+module RelativeTimeFormat = struct
+  include Shared
+
+  class type resolved_options = object
+    method locale : Js.js_string Js.t Js.readonly_prop
+
+    method style : Js.js_string Js.t Js.readonly_prop
+
+    method numberingSystem : Js.js_string Js.t Js.readonly_prop
+
+    method numeric : Js.js_string Js.t Js.readonly_prop
+  end
+
+  class type options = object
+    method localeMatcher : Js.js_string Js.t Js.prop
+
+    method numberingSystem : Js.js_string Js.t Js.optdef Js.prop
+
+    method style : Js.js_string Js.t Js.optdef Js.prop
+
+    method numeric : Js.js_string Js.t Js.optdef Js.prop
+  end
+
+  let options () : options Js.t =
+    object%js
+      val mutable localeMatcher = Js.string "best fit"
+
+      val mutable style = Js.undefined
+
+      val mutable numberingSystem = Js.undefined
+
+      val mutable numeric = Js.undefined
+    end
+
+  class type format_part = object
+    method _type : Js.js_string Js.t Js.readonly_prop
+
+    method unit : Js.js_string Js.t Js.optdef Js.readonly_prop
+
+    method _value : Js.js_string Js.t Js.readonly_prop
+  end
+
+  class type t = object
+    method format : Js.number Js.t -> Js.js_string Js.t -> Js.js_string Js.t Js.meth
+
+    method formatToParts :
+      Js.number Js.t -> Js.js_string Js.t -> format_part Js.t Js.js_array Js.t Js.meth
+
+    method resolvedOptions : unit -> resolved_options Js.t Js.meth
+  end
+end
+
+(* Only a subset of the ECMAScript Internationalization API is bound here.
+   The following constructors are not (yet) exposed: [Intl.DisplayNames],
+   [Intl.DurationFormat], [Intl.ListFormat], [Intl.Locale] and
+   [Intl.Segmenter]. *)
 class type intl = object
   method _Collator : Collator._object Js.t Js.readonly_prop
 
@@ -422,18 +479,34 @@ class type intl = object
 
   method _PluralRules : PluralRules._object Js.t Js.readonly_prop
 
+  method _RelativeTimeFormat : RelativeTimeFormat._object Js.t Js.readonly_prop
+
   method getCanonicalLocales :
     Js.js_string Js.t Js.js_array Js.t -> Js.js_string Js.t Js.js_array Js.t Js.meth
 end
 
 let intl = Js.Unsafe.global##._Intl
 
-let collator_constr = Js.Unsafe.global##._Intl##._Collator
+(* On hosts without the ECMAScript Internationalization API (e.g. a
+   QuickJS build without --enable-intl), [globalThis.Intl] is
+   [undefined]. Reading [Intl.Collator] etc. eagerly would throw at
+   module-load time -- defeating [is_supported]. Look up the
+   constructors via Optdef so they collapse to [undefined] when Intl is
+   missing; callers are expected to gate on [is_supported]. *)
+let intl_get prop =
+  Js.Optdef.case
+    (Js.Unsafe.global##._Intl : intl Js.t Js.optdef)
+    (fun () -> Js.Unsafe.pure_js_expr "undefined")
+    (fun o -> Js.Unsafe.get o (Js.string prop))
 
-let dateTimeFormat_constr = Js.Unsafe.global##._Intl##._DateTimeFormat
+let collator_constr = intl_get "Collator"
 
-let numberFormat_constr = Js.Unsafe.global##._Intl##._NumberFormat
+let dateTimeFormat_constr = intl_get "DateTimeFormat"
 
-let pluralRules_constr = Js.Unsafe.global##._Intl##._PluralRules
+let numberFormat_constr = intl_get "NumberFormat"
+
+let pluralRules_constr = intl_get "PluralRules"
+
+let relativeTimeFormat_constr = intl_get "RelativeTimeFormat"
 
 let is_supported () = Js.Optdef.test intl

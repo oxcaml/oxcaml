@@ -64,6 +64,20 @@ end = struct
         (List.map ~f:(fun x -> Sexp.Atom x) (f t))
         rem
     in
+    let compunit_set nm f rem =
+      let to_strings s =
+        List.map
+          ~f:(fun (Global_name.Compunit name) -> name)
+          (Global_name.Compunit_set.elements s)
+      in
+      let elts = to_strings (f t) in
+      let empty_elts = to_strings (f empty) in
+      add
+        nm
+        (List.equal ~eq:String.equal empty_elts elts)
+        (List.map ~f:(fun x -> Sexp.Atom x) elts)
+        rem
+    in
     let bool nm f rem =
       add
         nm
@@ -75,19 +89,25 @@ end = struct
     |> bool "effects_without_cps" (fun t -> t.effects_without_cps)
     |> set "primitives" (fun t -> t.primitives)
     |> bool "force_link" (fun t -> t.force_link)
-    |> set "requires" (fun t -> StringSet.elements t.requires)
-    |> set "provides" (fun t -> StringSet.elements t.provides)
+    |> compunit_set "requires" (fun t -> t.requires)
+    |> compunit_set "provides" (fun t -> t.provides)
 
   let from_sexp t =
     let open Sexp.Util in
     let opt_list l = l |> Option.map ~f:(List.map ~f:string) in
     let list default l = Option.value ~default (opt_list l) in
-    let set default l =
-      Option.value ~default (Option.map ~f:StringSet.of_list (opt_list l))
+    let compunit_set default l =
+      Option.value
+        ~default
+        (Option.map
+           ~f:(fun l ->
+             Global_name.Compunit_set.of_list
+               (List.map ~f:(fun s -> Global_name.Compunit s) l))
+           (opt_list l))
     in
     let bool default v = Option.value ~default (Option.map ~f:(single bool) v) in
-    { provides = t |> member "provides" |> set empty.provides
-    ; requires = t |> member "requires" |> set empty.requires
+    { provides = t |> member "provides" |> compunit_set empty.provides
+    ; requires = t |> member "requires" |> compunit_set empty.requires
     ; primitives = t |> member "primitives" |> list empty.primitives
     ; aliases = []
     ; force_link = t |> member "force_link" |> bool empty.force_link
@@ -173,7 +193,20 @@ module Wasm_binary = struct
 
   let reftype' i ch =
     match i with
-    | 0x6a | 0x6b | 0x6c | 0x6d | 0x6e | 0x6f | 0x70 | 0x71 | 0x72 | 0x73 -> ()
+    | 0x68
+    | 0x69
+    | 0x6a
+    | 0x6b
+    | 0x6c
+    | 0x6d
+    | 0x6e
+    | 0x6f
+    | 0x70
+    | 0x71
+    | 0x72
+    | 0x73
+    | 0x74
+    | 0x75 -> ()
     | 0x63 | 0x64 -> heaptype ch
     | _ ->
         Format.eprintf "Unknown reftype %x@." i;
@@ -181,11 +214,12 @@ module Wasm_binary = struct
 
   let reftype ch = reftype' (input_byte ch) ch
 
-  let valtype ch =
-    let i = read_uint ch in
+  let valtype' i ch =
     match i with
-    | 0x7b | 0x7c | 0x7d | 0x7e | 0x7f -> ()
+    | 0x7B | 0x7C | 0x7D | 0x7E | 0x7F -> ()
     | _ -> reftype' i ch
+
+  let valtype ch = valtype' (read_uint ch) ch
 
   let limits ch =
     match input_byte ch with
@@ -201,32 +235,99 @@ module Wasm_binary = struct
     reftype ch;
     limits ch
 
+  type comptype =
+    | Func of { arity : int }
+    | Struct
+    | Array
+    | Cont
+
+  let supertype ch =
+    match input_byte ch with
+    | 0 -> ()
+    | 1 -> ignore (read_uint ch)
+    | _ -> assert false
+
+  let storagetype ch =
+    let i = read_uint ch in
+    match i with
+    | 0x78 | 0x77 -> ()
+    | _ -> valtype' i ch
+
+  let fieldtype ch =
+    storagetype ch;
+    ignore (input_byte ch)
+
+  let comptype i ch =
+    match i with
+    | 0x5D ->
+        ignore (read_sint ch);
+        Cont
+    | 0x5E ->
+        fieldtype ch;
+        Array
+    | 0x5F ->
+        ignore (vec fieldtype ch);
+        Struct
+    | 0x60 ->
+        let params = vec valtype ch in
+        let _ = vec valtype ch in
+        Func { arity = List.length params }
+    | c -> failwith (Printf.sprintf "Unknown comptype %d" c)
+
+  let subtype i ch =
+    match i with
+    | 0x50 ->
+        supertype ch;
+        comptype (input_byte ch) ch
+    | 0x4F ->
+        supertype ch;
+        comptype (input_byte ch) ch
+    | _ -> comptype i ch
+
+  let rectype ch =
+    match input_byte ch with
+    | 0x4E -> vec (fun ch -> subtype (input_byte ch) ch) ch
+    | i -> [ subtype i ch ]
+
+  type importdesc =
+    | Func of int
+    | Table
+    | Mem
+    | Global
+    | Tag
+
   type import =
     { module_ : string
     ; name : string
+    ; desc : importdesc
     }
 
   let import ch =
     let module_ = name ch in
     let name = name ch in
     let d = read_uint ch in
-    let _ =
+    let desc =
       match d with
-      | 0 -> ignore (read_uint ch)
-      | 1 -> tabletype ch
-      | 2 -> memtype ch
+      | 0 -> Func (read_uint ch)
+      | 1 ->
+          tabletype ch;
+          Table
+      | 2 ->
+          memtype ch;
+          Mem
       | 3 ->
           let _typ = valtype ch in
           let _mut = input_byte ch in
-          ()
+          Global
       | 4 ->
           assert (read_uint ch = 0);
-          ignore (read_uint ch)
+          ignore (read_uint ch);
+          Tag
       | _ ->
           Format.eprintf "Unknown import %x@." d;
           assert false
     in
-    { module_; name }
+    { module_; name; desc }
 
   let export ch =
     let name = name ch in
@@ -256,6 +357,7 @@ module Wasm_binary = struct
   type interface =
     { imports : import list
     ; exports : string list
+    ; types : comptype array
     }
 
   let read_interface ch =
@@ -263,7 +365,11 @@ module Wasm_binary = struct
       match next_section ch with
       | None -> i
       | Some s ->
-          if s.id = 2
+          if s.id = 1
+          then
+            find_sections
+              { i with types = Array.of_list (List.flatten (vec rectype ch.ch)) }
+          else if s.id = 2
           then find_sections { i with imports = vec import ch.ch }
           else if s.id = 7
           then { i with exports = vec export ch.ch }
@@ -271,7 +377,7 @@ module Wasm_binary = struct
             skip_section ch s;
             find_sections i)
     in
-    find_sections { imports = []; exports = [] }
+    find_sections { imports = []; exports = []; types = [||] }
 
   let append_source_map_section ~file ~url =
     let ch = open_out_gen [ Open_wronly; Open_append; Open_binary ] 0o666 file in
@@ -314,22 +420,17 @@ let trim_semi s =
 type unit_data =
   { unit_name : string
   ; unit_info : Unit_info.t
-  ; strings : string list
   ; fragments : (string * Javascript.expression) list
   }
 
-let info_to_sexp ~predefined_exceptions ~build_info ~unit_data =
+let info_to_sexp ~build_info ~unit_data =
   let add nm skip v rem = if skip then rem else Sexp.List (Atom nm :: v) :: rem in
   let units =
     List.map
-      ~f:(fun { unit_name; unit_info; strings; fragments } ->
+      ~f:(fun { unit_name; unit_info; fragments } ->
         Sexp.List
           (Unit_info.to_sexp unit_info
           |> add "name" false [ Atom unit_name ]
-          |> add
-               "strings"
-               (List.is_empty strings)
-               (List.map ~f:(fun s -> Sexp.Atom s) strings)
           |> add
                "fragments"
                (List.is_empty fragments)
@@ -338,10 +439,6 @@ let info_to_sexp ~predefined_exceptions ~build_info ~unit_data =
   in
   Sexp.List
     ([]
-    |> add
-         "predefined_exceptions"
-         (StringSet.is_empty predefined_exceptions)
-         (List.map ~f:(fun s -> Sexp.Atom s) (StringSet.elements predefined_exceptions))
     |> add "units" (List.is_empty unit_data) units
     |> add "build_info" false [ Build_info.to_sexp build_info ])
 
@@ -350,49 +447,36 @@ let info_from_sexp info =
   let build_info =
     info |> member "build_info" |> mandatory (single Build_info.from_sexp)
   in
-  let predefined_exceptions =
-    info
-    |> member "predefined_exceptions"
-    |> Option.value ~default:[]
-    |> List.map ~f:string
-    |> StringSet.of_list
-  in
   let unit_data =
     info
     |> member "units"
     |> Option.value ~default:[]
     |> List.map ~f:(fun u ->
-           let unit_info = u |> Unit_info.from_sexp in
-           let unit_name =
-             u |> member "name" |> Option.value ~default:[] |> single string
-           in
-           let strings =
-             u |> member "strings" |> Option.value ~default:[] |> List.map ~f:string
-           in
-           let fragments =
-             u
-             |> member "fragments"
-             |> Option.map ~f:(single string)
-             |> Option.map ~f:(fun s -> Marshal.from_string (Base64.decode_exn s) 0)
-             |> Option.value ~default:[]
-             (*
+        let unit_info = u |> Unit_info.from_sexp in
+        let unit_name = u |> member "name" |> Option.value ~default:[] |> single string in
+        let fragments =
+          u
+          |> member "fragments"
+          |> Option.map ~f:(single string)
+          |> Option.map ~f:(fun s -> Marshal.from_string (Base64.decode_exn s) 0)
+          |> Option.value ~default:[]
+          (*
                            |> to_option to_assoc
                            |> Option.value ~default:[]
                            |> List.map ~f:(fun (nm, e) ->
                                   ( nm
                                   , let lex = Parse_js.Lexer.of_string (to_string e) in
                                     Parse_js.parse_expr lex ))*)
-           in
-           { unit_name; unit_info; strings; fragments })
+        in
+        { unit_name; unit_info; fragments })
   in
-  build_info, predefined_exceptions, unit_data
+  build_info, unit_data
 
-let add_info z ?(predefined_exceptions = StringSet.empty) ~build_info ~unit_data () =
+let add_info z ~build_info ~unit_data () =
   Zip.add_entry
     z
     ~name:"info.sexp"
-    ~contents:
-      (Sexp.to_string (info_to_sexp ~predefined_exceptions ~build_info ~unit_data))
+    ~contents:(Sexp.to_string (info_to_sexp ~build_info ~unit_data))
 
 let read_info z = info_from_sexp (Sexp.from_string (Zip.read_entry z ~name:"info.sexp"))
 
@@ -404,6 +488,13 @@ let generate_start_function ~to_link ~out_file =
   Generate.add_init_function ~context ~to_link:("prelude" :: to_link);
   Generate.wasm_output ch ~opt_source_map_file:None ~context;
   if times () then Format.eprintf "    generate start: %a@." Timer.print t1
+
+let generate_missing_primitives ~missing_primitives ~out_file =
+  Filename.gen_file out_file
+  @@ fun ch ->
+  let context = Generate.start () in
+  Generate.add_missing_primitives ~context missing_primitives;
+  Generate.wasm_output ch ~opt_source_map_file:None ~context
 
 let output_js js =
   let js = Driver.simplify_js js in
@@ -417,12 +508,15 @@ let output_js js =
 
 let report_missing_primitives missing =
   if not (List.is_empty missing)
-  then (
-    warn "There are some missing Wasm primitives@.";
-    warn "Dummy implementations (raising an exception) ";
-    warn "will be provided.@.";
-    warn "Missing primitives:@.";
-    List.iter ~f:(fun nm -> warn "  %s@." nm) missing)
+  then
+    Warning.warn
+      `Missing_primitive
+      "There are some missing Wasm primitives\n\
+       Dummy implementations (raising an exception) will be provided.\n\
+       Missing primitives:\n\
+       %a"
+      (Format.pp_print_list Format.pp_print_string)
+      missing
 
 let build_runtime_arguments
     ~link_spec
@@ -430,6 +524,7 @@ let build_runtime_arguments
     ~missing_primitives
     ~wasm_dir
     ~generated_js
+    ~embedded_files
     () =
   let missing_primitives = if Config.Flag.genprim () then missing_primitives else [] in
   if not separate_compilation then report_missing_primitives missing_primitives;
@@ -444,28 +539,13 @@ let build_runtime_arguments
   let generated_js =
     List.concat
     @@ List.map
-         ~f:(fun (unit_name, (strings, fragments)) ->
+         ~f:(fun (unit_name, fragments) ->
            let name s =
              match unit_name with
              | None -> s
              | Some nm -> nm ^ "." ^ s
            in
-           let strings =
-             if List.is_empty strings
-             then []
-             else
-               [ ( name "strings"
-                 , Javascript.EArr
-                     (List.map
-                        ~f:(fun s ->
-                          Javascript.Element (EStr (Utf8_string.of_string_exn s)))
-                        strings) )
-               ]
-           in
-           let fragments =
-             if List.is_empty fragments then [] else [ name "fragments", obj fragments ]
-           in
-           strings @ fragments)
+           if List.is_empty fragments then [] else [ name "fragments", obj fragments ])
          generated_js
   in
   let generated_js =
@@ -533,7 +613,7 @@ let build_runtime_arguments
         [ EVar (Javascript.ident Global_constant.global_object_) ]
         N
   in
-  obj
+  let props : (string * Javascript.expression) list =
     [ ( "link"
       , EArr
           (List.map
@@ -559,6 +639,31 @@ let build_runtime_arguments
     ; "generated", generated_js
     ; "src", EStr (Utf8_string.of_string_exn (Filename.basename wasm_dir))
     ]
+  in
+  let props =
+    match Config.effects () with
+    | `Disabled -> ("disable_effects", Javascript.EBool true) :: props
+    | `Jspi | `Cps | `Native -> props
+    | `Double_translation -> assert false
+  in
+  let props =
+    if List.is_empty embedded_files
+    then props
+    else
+      ( "files"
+      , obj
+          (List.map
+             ~f:(fun (name, content) ->
+               let name =
+                 String.concat ~sep:"\\\\" (String.split_on_char ~sep:'\\' name)
+               in
+               ( name
+               , Javascript.EStr
+                   (Utf8_string.of_string_exn (Base64.encode_string content)) ))
+             embedded_files) )
+      :: props
+  in
+  obj props
 
 let source_name i j file =
   let prefix =
@@ -603,21 +708,21 @@ let link_to_directory ~files_to_link ~files ~enable_source_maps ~dir =
   let lst =
     List.tl files
     |> List.map ~f:(fun (file, _) ->
-           if StringSet.mem file files_to_link
-           then (
-             let z = Zip.open_in file in
-             let name' = file |> Filename.basename |> Filename.remove_extension in
-             let ((name', _) as res) = process_file z ~name:"code" ~name' in
-             if enable_source_maps then extract_source_map ~dir ~name:name' z;
-             Zip.close_in z;
-             Some res)
-           else None)
+        if StringSet.mem file files_to_link
+        then (
+          let z = Zip.open_in file in
+          let name' = file |> Filename.basename |> Filename.remove_extension in
+          let ((name', _) as res) = process_file z ~name:"code" ~name' in
+          if enable_source_maps then extract_source_map ~dir ~name:name' z;
+          Zip.close_in z;
+          Some res)
+        else None)
     |> List.filter_map ~f:(fun x -> x)
   in
   runtime :: prelude :: List.map ~f:fst lst, (runtime_intf, List.map ~f:snd lst)
 
 let compute_dependencies ~files_to_link ~files =
-  let h = String.Hashtbl.create 128 in
+  let h = Global_name.Compunit_hashtbl.create 128 in
   let i = ref 2 in
   List.filter_map
     ~f:(fun (file, (_, units)) ->
@@ -626,15 +731,22 @@ let compute_dependencies ~files_to_link ~files =
         let s =
           List.fold_left
             ~f:(fun s { unit_info; _ } ->
-              StringSet.fold
-                (fun unit_name s ->
-                  try IntSet.add (String.Hashtbl.find h unit_name) s with Not_found -> s)
+              Global_name.Compunit_set.fold
+                (fun cu s ->
+                  match Global_name.Compunit_hashtbl.find_opt h cu with
+                  | Some i -> IntSet.add i s
+                  | None -> s)
                 unit_info.requires
                 s)
             ~init:IntSet.empty
             units
         in
-        List.iter ~f:(fun { unit_name; _ } -> String.Hashtbl.add h unit_name !i) units;
+        List.iter
+          ~f:(fun { unit_info; _ } ->
+            Global_name.Compunit_set.iter
+              (fun cu -> Global_name.Compunit_hashtbl.add h cu !i)
+              unit_info.provides)
+          units;
         incr i;
         Some (Some (IntSet.elements s)))
       else None)
@@ -642,33 +754,31 @@ let compute_dependencies ~files_to_link ~files =
 
 let compute_missing_primitives (runtime_intf, intfs) =
   let provided_primitives = StringSet.of_list runtime_intf.Wasm_binary.exports in
-  StringSet.elements
+  StringMap.bindings
   @@ List.fold_left
-       ~f:(fun s { Wasm_binary.imports; _ } ->
+       ~f:(fun s { Wasm_binary.imports; types; _ } ->
          List.fold_left
-           ~f:(fun s { Wasm_binary.module_; name; _ } ->
-             if String.equal module_ "env" && not (StringSet.mem name provided_primitives)
-             then StringSet.add name s
-             else s)
+           ~f:(fun s { Wasm_binary.module_; name; desc } ->
+             match module_, desc with
+             | "env", Func idx when not (StringSet.mem name provided_primitives) -> (
+                 match types.(idx) with
+                 | Func { arity } -> StringMap.add name arity s
+                 | _ -> s)
+             | _ -> s)
            ~init:s
            imports)
-       ~init:StringSet.empty
+       ~init:StringMap.empty
        intfs
 
 let load_information files =
   match files with
   | [] -> assert false
   | runtime :: other_files ->
-      let build_info, predefined_exceptions, _unit_data =
-        Zip.with_open_in runtime read_info
-      in
-      ( predefined_exceptions
-      , (runtime, (build_info, []))
-        :: List.map other_files ~f:(fun file ->
-               let build_info, _predefined_exceptions, unit_data =
-                 Zip.with_open_in file read_info
-               in
-               file, (build_info, unit_data)) )
+      let build_info, _unit_data = Zip.with_open_in runtime read_info in
+      (runtime, (build_info, []))
+      :: List.map other_files ~f:(fun file ->
+          let build_info, unit_data = Zip.with_open_in file read_info in
+          file, (build_info, unit_data))
 
 let remove_directory path =
   try
@@ -688,10 +798,119 @@ let gen_dir dir f =
     remove_directory d_tmp;
     raise exc
 
-let link ~output_file ~linkall ~enable_source_maps ~files =
+let build_dynlink_init ~to_link ~all_primitives =
+  Generate.init ();
+  (* Build the GlobalMap (symtable).
+     Unlike JS (where predefined exceptions are accessed by name on
+     caml_global_data), Wasm accesses them by hardcoded index in fail.wat.
+     So we must enter predefined exceptions first (indices 0-11) to avoid
+     compilation unit indices overlapping with exception slots. *)
+  let symb = ref Ocaml_compiler.Symtable.GlobalMap.empty in
+  let predef_exns = Runtimedef.builtin_exceptions in
+  Array.iter predef_exns ~f:(fun name ->
+      ignore
+        (Ocaml_compiler.Symtable.GlobalMap.enter
+           symb
+           (Global_name.Glob_predef (Predef name))));
+  let unit_names = to_link in
+  List.iter unit_names ~f:(fun name ->
+      ignore
+        (Ocaml_compiler.Symtable.GlobalMap.enter
+           symb
+           (Global_name.Glob_compunit (Compunit name))));
+  (* Build CRCs: no real digests available at link time *)
+  let crcs =
+    List.map ~f:(fun name -> Ocaml_compiler.Import_info.make name None) unit_names
+  in
+  (* Collect all primitives *)
+  let primitives = StringSet.union (Primitive.get_external ()) all_primitives in
+  let num_globals =
+    Ocaml_compiler.Symtable.GlobalMap.fold (fun _ n m -> max n m) !symb 0 + 1
+  in
+  (* Use Parse_bytecode.link_info to generate wasm_set_symbols and
+     wasm_dynlink_init_sections calls *)
+  let code = Parse_bytecode.link_info ~symbols:!symb ~primitives ~crcs ~num_globals in
+  (* Compile to a wasm module *)
+  let wasm_binary, _fragments = Generate.compile ~unit_name:(Some "_link_info") code in
+  wasm_binary
+
+let read_embedded_files file =
+  Zip.with_open_in file (fun z ->
+      if Zip.has_entry z ~name:"embedded_files"
+      then Marshal.from_string (Zip.read_entry z ~name:"embedded_files") 0
+      else [])
+
+let link_to_module ~to_link ~files_to_link ~files ~enable_source_maps:_ ~dir =
+  let process_file ~name ~module_name file =
+    Zip.with_open_in file
+    @@ fun z ->
+    let intf =
+      let ch, pos, len, _ = Zip.get_entry z ~name in
+      Wasm_binary.read_interface (Wasm_binary.from_channel ~name ch pos len)
+    in
+    ( { Wasm_link.module_name
+      ; file
+      ; code = Some (Zip.read_entry z ~name)
+      ; opt_source_map = None
+      }
+    , intf )
+  in
+  let runtime_file = fst (List.hd files) in
+  let z = Zip.open_in runtime_file in
+  let runtime, runtime_intf =
+    process_file ~name:"runtime.wasm" ~module_name:"env" runtime_file
+  in
+  let prelude =
+    { Wasm_link.module_name = "OCaml"
+    ; file = runtime_file
+    ; code = Some (Zip.read_entry z ~name:"prelude.wasm")
+    ; opt_source_map = None
+    }
+  in
+  Zip.close_in z;
+  let lst =
+    List.tl files
+    |> List.filter_map ~f:(fun (file, _) ->
+        if StringSet.mem file files_to_link
+        then Some (process_file ~name:"code.wasm" ~module_name:"OCaml" file)
+        else None)
+  in
+  let missing_primitives =
+    if Config.Flag.genprim ()
+    then compute_missing_primitives (runtime_intf, List.map ~f:snd lst)
+    else []
+  in
+  Fs.with_intermediate_file (Filename.temp_file "start" ".wasm")
+  @@ fun start_module ->
+  generate_start_function ~to_link ~out_file:start_module;
+  let start =
+    { Wasm_link.module_name = "OCaml"
+    ; file = start_module
+    ; code = None
+    ; opt_source_map = None
+    }
+  in
+  Fs.with_intermediate_file (Filename.temp_file "stubs" ".wasm")
+  @@ fun stubs_module ->
+  generate_missing_primitives ~missing_primitives ~out_file:stubs_module;
+  let missing_primitives =
+    { Wasm_link.module_name = "env"
+    ; file = stubs_module
+    ; code = None
+    ; opt_source_map = None
+    }
+  in
+  ignore
+    (Wasm_link.f
+       (runtime :: prelude :: missing_primitives :: start :: List.map ~f:fst lst)
+       ~filter_export:(fun nm -> String.equal nm "_start" || String.equal nm "memory")
+       ~output_file:(Filename.concat dir "code.wasm"))
+
+let link ~output_file ~linkall ~enable_source_maps ~embedded_files ~files =
   if times () then Format.eprintf "linking@.";
   let t = Timer.make () in
-  let predefined_exceptions, files = load_information files in
+  let embedded_files = embedded_files @ List.concat_map ~f:read_embedded_files files in
+  let files = load_information files in
   (match files with
   | [] -> assert false
   | (file, (bi, _)) :: r ->
@@ -710,33 +929,35 @@ let link ~output_file ~linkall ~enable_source_maps ~files =
              | `Runtime ->
                  failwith "The runtime file should be listed first on the command line."
              | _ -> ());
-             Build_info.merge file bi file' bi')
+             Build_info.merge `Wasm file bi file' bi')
            r));
   if times () then Format.eprintf "    reading information: %a@." Timer.print t;
   let t1 = Timer.make () in
   let missing, files_to_link =
     List.fold_right
       files
-      ~init:(StringSet.empty, StringSet.empty)
+      ~init:(Global_name.Compunit_set.empty, StringSet.empty)
       ~f:(fun (file, (build_info, units)) (requires, files_to_link) ->
-        let cmo_or_cmj_file =
+        let cmo_file =
           match Build_info.kind build_info with
-          | `Cmo | `Cmj | `Cmja -> true
+          | `Cmo -> true
           | `Cma | `Exe | `Runtime | `Unknown -> false
         in
         if
           (not (Config.Flag.auto_link ()))
-          || cmo_or_cmj_file
+          || cmo_file
           || linkall
           || List.exists ~f:(fun { unit_info; _ } -> unit_info.force_link) units
           || List.exists
                ~f:(fun { unit_info; _ } ->
-                 not (StringSet.is_empty (StringSet.inter requires unit_info.provides)))
+                 not
+                   (Global_name.Compunit_set.is_empty
+                      (Global_name.Compunit_set.inter requires unit_info.provides)))
                units
         then
           ( List.fold_right units ~init:requires ~f:(fun { unit_info; _ } requires ->
-                StringSet.diff
-                  (StringSet.union unit_info.requires requires)
+                Global_name.Compunit_set.diff
+                  (Global_name.Compunit_set.union unit_info.requires requires)
                   unit_info.provides)
           , StringSet.add file files_to_link )
         else requires, files_to_link)
@@ -744,11 +965,11 @@ let link ~output_file ~linkall ~enable_source_maps ~files =
   let _, to_link =
     List.fold_right
       files
-      ~init:(StringSet.empty, [])
+      ~init:(Global_name.Compunit_set.empty, [])
       ~f:(fun (_file, (build_info, units)) acc ->
-        let cmo_or_cmj_file =
+        let cmo_file =
           match Build_info.kind build_info with
-          | `Cmo | `Cmj | `Cmja -> true
+          | `Cmo -> true
           | `Cma | `Exe | `Runtime | `Unknown -> false
         in
         List.fold_right
@@ -757,51 +978,73 @@ let link ~output_file ~linkall ~enable_source_maps ~files =
           ~f:(fun { unit_name; unit_info; _ } (requires, to_link) ->
             if
               (not (Config.Flag.auto_link ()))
-              || cmo_or_cmj_file
+              || cmo_file
               || linkall
               || unit_info.force_link
-              || not (StringSet.is_empty (StringSet.inter requires unit_info.provides))
+              || not
+                   (Global_name.Compunit_set.is_empty
+                      (Global_name.Compunit_set.inter requires unit_info.provides))
             then
-              ( StringSet.diff
-                  (StringSet.union unit_info.requires requires)
+              ( Global_name.Compunit_set.diff
+                  (Global_name.Compunit_set.union unit_info.requires requires)
                   unit_info.provides
               , unit_name :: to_link )
             else requires, to_link))
   in
-  let missing = StringSet.diff missing predefined_exceptions in
-  if not (StringSet.is_empty missing)
+  if not (Global_name.Compunit_set.is_empty missing)
   then
     failwith
       (Printf.sprintf
          "Could not find compilation unit for %s"
-         (String.concat ~sep:", " (StringSet.elements missing)));
+         (String.concat
+            ~sep:", "
+            (List.map
+               ~f:(fun (Global_name.Compunit name) -> name)
+               (Global_name.Compunit_set.elements missing))));
   if times () then Format.eprintf "    finding what to link: %a@." Timer.print t1;
   if times () then Format.eprintf "  scan: %a@." Timer.print t;
   let t = Timer.make () in
-  let interfaces, wasm_dir, link_spec =
+  let missing_primitives, wasm_dir, link_spec =
     let dir = Filename.chop_extension output_file ^ ".assets" in
     gen_dir dir
     @@ fun tmp_dir ->
     Sys.mkdir tmp_dir 0o777;
-    let start_module =
-      "start-"
-      ^ String.sub
-          (Digest.to_hex (Digest.string (String.concat ~sep:"/" to_link)))
-          ~pos:0
-          ~len:8
-    in
-    generate_start_function
-      ~to_link
-      ~out_file:(Filename.concat tmp_dir (start_module ^ ".wasm"));
-    let module_names, interfaces =
-      link_to_directory ~files_to_link ~files ~enable_source_maps ~dir:tmp_dir
-    in
-    ( interfaces
-    , dir
-    , let to_link = compute_dependencies ~files_to_link ~files in
-      List.combine module_names (None :: None :: to_link) @ [ start_module, None ] )
+    if not (Config.Flag.wasi ())
+    then (
+      let start_module =
+        "start-"
+        ^ String.sub
+            (Digest.to_hex (Digest.string (String.concat ~sep:"/" to_link)))
+            ~pos:0
+            ~len:8
+      in
+      let all_primitives =
+        List.fold_left files ~init:StringSet.empty ~f:(fun acc (_, (_, units)) ->
+            List.fold_left units ~init:acc ~f:(fun acc { unit_info; _ } ->
+                List.fold_left unit_info.Unit_info.primitives ~init:acc ~f:(fun acc p ->
+                    StringSet.add p acc)))
+      in
+      let link_info_wasm = build_dynlink_init ~to_link ~all_primitives in
+      let link_info_module = "_link_info" in
+      let out = Filename.concat tmp_dir (link_info_module ^ ".wasm") in
+      Fs.write_file ~name:out ~contents:link_info_wasm;
+      let start_to_link = link_info_module :: to_link in
+      let module_names, interfaces =
+        link_to_directory ~files_to_link ~files ~enable_source_maps ~dir:tmp_dir
+      in
+      let missing_primitives = compute_missing_primitives interfaces in
+      generate_start_function
+        ~to_link:start_to_link
+        ~out_file:(Filename.concat tmp_dir (start_module ^ ".wasm"));
+      ( List.map ~f:fst missing_primitives
+      , dir
+      , let to_link = compute_dependencies ~files_to_link ~files in
+        List.combine module_names (None :: None :: to_link)
+        @ [ link_info_module, None; start_module, None ] ))
+    else (
+      link_to_module ~to_link ~files_to_link ~files ~enable_source_maps ~dir:tmp_dir;
+      [], dir, [ "code", None ])
   in
-  let missing_primitives = compute_missing_primitives interfaces in
   if times () then Format.eprintf "    copy wasm files: %a@." Timer.print t;
   let t1 = Timer.make () in
   let js_runtime =
@@ -813,8 +1056,7 @@ let link ~output_file ~linkall ~enable_source_maps ~files =
   let generated_js =
     List.concat
     @@ List.map files ~f:(fun (_, (_, units)) ->
-           List.map units ~f:(fun { unit_name; strings; fragments; _ } ->
-               Some unit_name, (strings, fragments)))
+        List.map units ~f:(fun { unit_name; fragments; _ } -> Some unit_name, fragments))
   in
   let runtime_args =
     let js =
@@ -824,6 +1066,7 @@ let link ~output_file ~linkall ~enable_source_maps ~files =
         ~missing_primitives
         ~wasm_dir
         ~generated_js
+        ~embedded_files
         ()
     in
     output_js [ Javascript.Expression_statement js, Javascript.N ]
@@ -882,14 +1125,12 @@ let add_source_map files z sm =
         then Zip.copy_file z' z ~src_name:name ~dst_name:(source_name i j file));
   finalize ()
 
-let make_library ~output_file ~enable_source_maps ~files =
+let make_library ~linkall ~output_file ~enable_source_maps ~files =
   let info =
     List.map files ~f:(fun file ->
-        let build_info, _predefined_exceptions, unit_data =
-          Zip.with_open_in file read_info
-        in
+        let build_info, unit_data = Zip.with_open_in file read_info in
         (match Build_info.kind build_info with
-        | `Cmo | `Cmj | `Cmja -> ()
+        | `Cmo -> ()
         | `Runtime | `Cma | `Exe | `Unknown ->
             failwith (Printf.sprintf "File '%s' is not a .wasmo file." file));
         file, build_info, unit_data)
@@ -901,12 +1142,20 @@ let make_library ~output_file ~enable_source_maps ~files =
           Build_info.configure bi;
           List.fold_left
             ~init:bi
-            ~f:(fun bi (file', bi', _) -> Build_info.merge file bi file' bi')
+            ~f:(fun bi (file', bi', _) -> Build_info.merge `Wasm file bi file' bi')
             r
       | [] -> Build_info.create `Cma)
       `Cma
   in
   let unit_data = List.concat (List.map ~f:(fun (_, _, unit_data) -> unit_data) info) in
+  let unit_data =
+    if linkall
+    then
+      List.map
+        ~f:(fun u -> { u with unit_info = { u.unit_info with force_link = true } })
+        unit_data
+    else unit_data
+  in
   Fs.gen_file output_file
   @@ fun tmp_output_file ->
   let z = Zip.open_out tmp_output_file in
@@ -938,11 +1187,11 @@ let make_library ~output_file ~enable_source_maps ~files =
   if enable_source_maps then add_source_map files z output_sourcemap;
   Zip.close_out z
 
-let link ~output_file ~linkall ~mklib ~enable_source_maps ~files =
+let link ~output_file ~linkall ~mklib ~enable_source_maps ~embedded_files ~files =
   try
     if mklib
-    then make_library ~output_file ~enable_source_maps ~files
-    else link ~output_file ~linkall ~enable_source_maps ~files
+    then make_library ~linkall ~output_file ~enable_source_maps ~files
+    else link ~output_file ~linkall ~enable_source_maps ~embedded_files ~files
   with Build_info.Incompatible_build_info { key; first = f1, v1; second = f2, v2 } ->
     let string_of_v = function
       | None -> "<empty>"
