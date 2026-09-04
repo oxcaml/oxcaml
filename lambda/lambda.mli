@@ -1311,8 +1311,6 @@ val layout_tupled_vector : boxed_vector -> layout
 val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
-(* A layout that is Pgenval because it is the field of a tuple *)
-val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
 (* A layout that is Pgenval because it is the field of a block being considered

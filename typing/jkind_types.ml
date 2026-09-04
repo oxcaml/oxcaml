@@ -320,8 +320,6 @@ module Sort = struct
 
     let for_lazy_body = scannable
 
-    let for_tuple_element = scannable
-
     let for_variant_arg = scannable
 
     let for_instance_var = scannable

@@ -101,10 +101,12 @@ let simplify_self_tail_call dacc apply self_cont ~down_to_up =
        ~dbg:(Apply.dbg apply))
     ~down_to_up
 
+(* CR zeisbach: this probably needs to be fixed. *)
 let simplify_direct_tuple_application ~simplify_expr dacc apply
     ~callee's_code_id ~callee's_code_metadata ~down_to_up =
   let dbg = Apply.dbg apply in
   let tuple_size =
+    (* CR zeisbach: part of this comment is now stale *)
     (* The code for the function being applied has exactly as many parameters as
        there are components of the tuple (which is the first element of
        [Apply.args apply]). The components must be of kind [Value] (in Lambda,

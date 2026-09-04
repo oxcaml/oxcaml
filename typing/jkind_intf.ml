@@ -169,8 +169,6 @@ module type Sort = sig
 
     val for_lazy_body : t
 
-    val for_tuple_element : t
-
     val for_variant_arg : t
 
     val for_boxed_record : t
