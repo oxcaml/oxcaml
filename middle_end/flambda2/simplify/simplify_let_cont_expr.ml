@@ -530,6 +530,9 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
   rebuild_groups body name_occurrences_body cost_metrics_of_body uacc
     data.handlers_from_the_inside_to_the_outside
 
+let after_rebuild_let_cont D.{ rebuild_let_cont_data; after_rebuild } =
+  rebuild_let_cont rebuild_let_cont_data ~after_rebuild
+
 let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
     ~after_rebuild =
   (* At this point all handlers have been rebuild and added to the upwards
@@ -540,7 +543,7 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
      stage for the reconstruction of the let cont expressions. *)
   let uacc = UA.clear_cost_metrics (UA.clear_name_occurrences uacc) in
   let rebuild_body = data.rebuild_body in
-  let data : rebuild_let_cont_data =
+  let rebuild_let_cont_data : rebuild_let_cont_data =
     { name_occurrences_of_subsequent_exprs =
         data.name_occurrences_of_subsequent_exprs;
       cost_metrics_of_subsequent_exprs = data.cost_metrics_of_subsequent_exprs;
@@ -549,7 +552,10 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
         data.handlers_from_the_inside_to_the_outside
     }
   in
-  D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild_let_cont (rebuild_let_cont data ~after_rebuild))
+  let after_rebuild_let_cont_data : D.after_rebuild_let_cont_data =
+    { rebuild_let_cont_data; after_rebuild }
+  in
+  D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild_let_cont (after_rebuild_let_cont_data, after_rebuild_let_cont))
 
 let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let Flow_types.Alias_result.{ continuation_parameters; _ } =

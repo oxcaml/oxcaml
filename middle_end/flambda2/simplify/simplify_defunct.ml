@@ -17,12 +17,19 @@ type rebuilt_handlers_group =
         handler : rebuilt_handler
       }
 
+type rebuild_let_cont_data =
+  { handlers_from_the_inside_to_the_outside : rebuilt_handlers_group list;
+    name_occurrences_of_subsequent_exprs : Name_occurrences.t;
+    cost_metrics_of_subsequent_exprs : Cost_metrics.t;
+    uenv_of_subsequent_exprs : Upwards_env.t
+  }
+
 type after_rebuild =
   | After_rebuild_id
   | After_rebuild_let : 'simplify_named_result after_rebuild_let_data *
       ('simplify_named_result after_rebuild_let_data -> Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t) -> after_rebuild
-  | After_rebuild_let_cont of
-      (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
+  | After_rebuild_let_cont of after_rebuild_let_cont_data *
+      (after_rebuild_let_cont_data -> Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
   | After_rebuild_single_non_recursive_let_cont of
       (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
   | After_rebuild_single_recursive_let_cont of
@@ -39,11 +46,10 @@ and 'simplify_named_result after_rebuild_let_data = {
   rewrite_id : Named_rewrite_id.t;
 }
 
-and rebuild_let_cont_data =
-  { handlers_from_the_inside_to_the_outside : rebuilt_handlers_group list;
-    name_occurrences_of_subsequent_exprs : Name_occurrences.t;
-    cost_metrics_of_subsequent_exprs : Cost_metrics.t;
-    uenv_of_subsequent_exprs : Upwards_env.t
+and after_rebuild_let_cont_data =
+  (* CR pchambart: this one should be unboxed once rebuild is also defonctionnalized *)
+  { rebuild_let_cont_data : rebuild_let_cont_data;
+    after_rebuild : after_rebuild;
   }
 
 type 'a rebuild = Rebuild of (Upwards_acc.t -> after_rebuild:after_rebuild -> 'a)
@@ -65,8 +71,8 @@ let apply_after_rebuild (after_rebuild : after_rebuild) expr uacc =
       expr, uacc
   | After_rebuild_let (data, after_rebuild) ->
       after_rebuild data expr uacc
-  | After_rebuild_let_cont after_rebuild ->
-      after_rebuild expr uacc
+  | After_rebuild_let_cont (data, after_rebuild) ->
+      after_rebuild data expr uacc
   | After_rebuild_single_non_recursive_let_cont after_rebuild ->
       after_rebuild expr uacc
   | After_rebuild_single_recursive_let_cont after_rebuild ->
