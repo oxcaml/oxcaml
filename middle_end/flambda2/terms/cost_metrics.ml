@@ -26,7 +26,7 @@ type t =
 
 type code_characteristics =
   { cost_metrics : t;
-    params_arity : int
+    function_slot_size : int
   }
 
 let zero = { size = Code_size.zero; removed = Removed_operations.zero }
@@ -76,12 +76,11 @@ let set_of_closures ~find_code_characteristics set_of_closures =
         | Deleted { function_slot_size; _ } ->
           metrics, Stdlib.( + ) num_words function_slot_size
         | Code_id { code_id; only_full_applications = _ } ->
-          let { cost_metrics; params_arity } =
+          let { cost_metrics; function_slot_size } =
             find_code_characteristics code_id
           in
-          ( metrics + cost_metrics,
-            (* CR poechsel: valid until OCaml 4.12, as for named_size *)
-            Stdlib.( + ) num_words (if params_arity <= 1 then 2 else 3) ))
+          (* CR poechsel: valid until OCaml 4.12, as for named_size *)
+          metrics + cost_metrics, Stdlib.( + ) num_words function_slot_size)
       funs (zero, num_clos_vars)
   in
   let alloc_size =

@@ -29,6 +29,8 @@ type pinpoint_desc =
   | Unknown
   | Ident of ident  (** An identifier *)
   | Function  (** A function definition *)
+  | Parameter  (** A function parameter *)
+  | Return  (** A function return *)
   | Module  (** A module definition *)
   | Functor  (** A functor definition *)
   | Functor_parameter  (** A functor parameter *)
@@ -102,6 +104,11 @@ type is_contained_by =
     container : pinpoint
   }
 
+type annotation =
+  { loc : Location.t;
+    written_modes : string Location.loc list
+  }
+
 (* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
 the RHS". They are similiar to the [Skip] morph hint and should raise when being
 printed. *)
@@ -135,6 +142,7 @@ type 'd const =
   | Quoted_computation : ('l * disallowed) pos const
   | Spliced : ('l * 'r, 'd) polarity -> 'd const
   | Contained_by : is_contained_by -> ('l * 'r) const
+  | Annotation : annotation -> ('l * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 

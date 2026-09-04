@@ -353,7 +353,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_sp = 0;
   stack->local_top = NULL;
   stack->local_limit = 0;
-  caml_dynamic_table_init(&stack->dyn);
+  stack->dynamic = Val_null;
+  stack->is_task = false;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -692,7 +693,7 @@ void caml_scan_stack(
     scan_stack_frames(f, fflags, fdata, stack, gc_regs, locals);
 
     /* Scan dynamic bindings */
-    caml_dynamic_table_scan_roots(&stack->dyn, f, fflags, fdata);
+    f(fdata, stack->dynamic, &stack->dynamic);
 
     f(fdata, Stack_handle_value(stack), &Stack_handle_value(stack));
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
@@ -834,7 +835,8 @@ void caml_scan_stack(
     }
 
     /* Scan dynamic bindings */
-    caml_dynamic_table_scan_roots(&stack->dyn, f, fflags, fdata);
+    if (is_scannable(fflags, stack->dynamic))
+      f(fdata, stack->dynamic, &stack->dynamic);
 
     if (is_scannable(fflags, Stack_handle_value(stack)))
       f(fdata, Stack_handle_value(stack), &Stack_handle_value(stack));
@@ -992,14 +994,16 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_sp = old_stack->local_sp;
   new_stack->local_top = old_stack->local_top;
   new_stack->local_limit = old_stack->local_limit;
-  new_stack->dyn = old_stack->dyn;
+  new_stack->dynamic = old_stack->dynamic;
+  new_stack->is_task = old_stack->is_task;
 
-  // Detach locals stack and dynamic bindings from old_stack so they will not be freed
+  // Detach locals stack and dynamic bindings from old_stack
   old_stack->local_arenas = NULL;
   old_stack->local_sp = 0;
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
-  caml_dynamic_table_init(&old_stack->dyn);
+  old_stack->dynamic = Val_null;
+  old_stack->is_task = false;
 
 #ifdef NATIVE_CODE
   /* There's no need to do another pass rewriting from
@@ -1192,8 +1196,6 @@ void caml_free_stack (struct stack_info* stack)
 
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
-
-  caml_dynamic_table_free(&stack->dyn);
 
   if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)

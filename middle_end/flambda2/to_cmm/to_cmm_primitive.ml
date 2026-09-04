@@ -289,7 +289,7 @@ let array_length ~dbg arr (kind : P.Array_kind.t) =
        For unboxed products, note that [Array_length] in [Flambda_primitive] is
        a unarized-array-length operation, that arrays of unboxed products are
        represented by mixed blocks with tag zero (not custom blocks), and that
-       arrays of unboxed products are not packed in any way (e.g. int32#
+       arrays of unboxed products are not packed in any way (e.g. int32_u
        elements occupy 64 bits). *)
     assert (C.wordsize_shift = C.numfloat_shift);
     C.addr_array_length arr dbg
@@ -755,10 +755,8 @@ let bytes_or_bigstring_set_aux ~ptr_out_of_heap ~dbg width ~bytes ~index
   match (width : P.string_accessor_width) with
   | Eight | Eight_signed ->
     let addr = C.add_int_ptr ~ptr_out_of_heap bytes index dbg in
-    let new_value = C.low_bits ~bits:8 new_value ~dbg in
     C.store ~dbg Byte_unsigned Assignment ~addr ~new_value
   | Sixteen | Sixteen_signed ->
-    let new_value = C.low_bits ~bits:16 new_value ~dbg in
     C.unaligned_set_16 ~ptr_out_of_heap bytes index new_value dbg
   | Thirty_two -> C.unaligned_set_32 ~ptr_out_of_heap bytes index new_value dbg
   | Single -> C.unaligned_set_f32 ~ptr_out_of_heap bytes index new_value dbg

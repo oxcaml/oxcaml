@@ -138,10 +138,10 @@ type mod_bounds =
   }
 
 module With_bounds_type_info = struct
-  type t = {relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  type t = { bounds_mask : Axis_lattice.t } [@@unboxed]
 
-  let join { relevant_axes = axes1 } { relevant_axes = axes2 } =
-    { relevant_axes = Jkind_axis.Axis_set.union axes1 axes2 }
+  let join { bounds_mask = bounds1 } { bounds_mask = bounds2 } =
+    { bounds_mask = Axis_lattice.join bounds1 bounds2 }
 end
 
 type transient_expr =
@@ -256,7 +256,8 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
+  | Kconstr of
+      Path.t * Jkind_types.Scannable_axes.t * Jkind_types.Kind_operator.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -481,7 +482,7 @@ and type_decl_kind =
   (label_declaration, label_declaration, constructor_declaration) type_kind
 
 and unsafe_mode_crossing =
-  { unsafe_mod_bounds : Mode.Crossing.t
+  { unsafe_mod_bounds : mod_bounds
   ; unsafe_with_bounds : (allowed * disallowed) with_bounds
   }
 
@@ -524,6 +525,7 @@ and mixed_block_element =
   | Word
   | Product of mixed_product_shape
   | Void
+  | Addressable of mixed_block_element
 
 and mixed_product_shape = mixed_block_element array
 
@@ -561,6 +563,7 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   | Constructor_mixed of mixed_product_shape
+  | Constructor_immediate_all_void
   | Constructor_undetermined
   | Constructor_variable of (Jkind_types.Sort.t * type_expr) array
 
@@ -896,9 +899,11 @@ let rec equal_mixed_block_element_up_to_scannable_axes e1 e2 =
   | Product es1, Product es2
     -> Misc.Stdlib.Array.equal
          equal_mixed_block_element_up_to_scannable_axes es1 es2
+  | Addressable e1, Addressable e2
+    -> equal_mixed_block_element_up_to_scannable_axes e1 e2
   | ( Scannable _ | Float64 | Float32 | Float_boxed | Word | Untagged_immediate
     | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
-    | Product _ | Void ), _
+    | Product _ | Void | Addressable _ ), _
     -> false
 
 let rec compare_mixed_block_element e1 e2 =
@@ -918,6 +923,7 @@ let rec compare_mixed_block_element e1 e2 =
     -> 0
   | Product es1, Product es2
     -> Misc.Stdlib.Array.compare compare_mixed_block_element es1 es2
+  | Addressable e1, Addressable e2 -> compare_mixed_block_element e1 e2
   | Scannable _, _ -> -1
   | _, Scannable _ -> 1
   | Float_boxed, _ -> -1
@@ -948,6 +954,8 @@ let rec compare_mixed_block_element e1 e2 =
   | _, Mask -> 1
   | Void, _ -> -1
   | _, Void -> 1
+  | Product _, Addressable _ -> -1
+  | Addressable _, Product _ -> 1
 
 let equal_mixed_product_shape_up_to_scannable_axes r1 r2 = r1 == r2 ||
   Misc.Stdlib.Array.equal equal_mixed_block_element_up_to_scannable_axes r1 r2
@@ -957,6 +965,7 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
   | Constructor_uniform_value, Constructor_uniform_value -> true
   | Constructor_mixed mx1, Constructor_mixed mx2 ->
       equal_mixed_product_shape_up_to_scannable_axes mx1 mx2
+  | Constructor_immediate_all_void, Constructor_immediate_all_void -> true
   | Constructor_undetermined, Constructor_undetermined -> true
   (* [Constructor_variable] only appears in the typedtree, never in a decl. *)
   | Constructor_variable _, _ | _, Constructor_variable _ ->
@@ -964,7 +973,7 @@ let equal_constructor_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
         "equal_constructor_representation_up_to_scannable_axes: variable \
          representation"
   | (Constructor_mixed _ | Constructor_uniform_value
-    | Constructor_undetermined), _
+    | Constructor_immediate_all_void | Constructor_undetermined), _
     -> false
 
 let equal_variant_representation_up_to_scannable_axes r1 r2 = r1 == r2 ||
@@ -1034,6 +1043,16 @@ let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
          variable representation"
   | (Record_unboxed_product | Record_unboxed_product_undetermined), _ -> false
 
+let cstr_layout_is_constant (layout : cstr_layout) =
+  match layout with
+  | Cstr_layout_known { shape = Constructor_immediate_all_void; _ } -> true
+  | Cstr_layout_known
+      { shape = Constructor_uniform_value | Constructor_mixed _
+              | Constructor_undetermined | Constructor_variable _;
+        sorts } ->
+    Array.length sorts = 0
+  | Cstr_layout_undetermined -> false
+
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
@@ -1057,6 +1076,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
+  | Addressable sort -> Addressable (mixed_block_element_of_const_sort sort)
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
@@ -1146,8 +1166,9 @@ let rec mixed_block_element_to_string = function
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
   | Void -> "Void"
+  | Addressable e -> "Addressable (" ^ mixed_block_element_to_string e ^ ")"
 
-let mixed_block_element_to_lowercase_string = function
+let rec mixed_block_element_to_lowercase_string = function
   | Scannable _ -> "scannable"
   | Float_boxed -> "float"
   | Float32 -> "float32"
@@ -1168,6 +1189,8 @@ let mixed_block_element_to_lowercase_string = function
          (Array.to_list (Array.map mixed_block_element_to_string es)))
     ^ "]"
   | Void -> "void"
+  | Addressable e ->
+    mixed_block_element_to_lowercase_string e ^ " addressable"
 
 (**** Definitions for backtracking ****)
 
@@ -1480,7 +1503,6 @@ module With_bounds_types : sig
   val update : type_expr -> (info option -> info option) -> t -> t
   val find_opt : type_expr -> t -> info option
   val for_all : (type_expr -> info -> bool) -> t -> bool
-  val exists : (type_expr -> info -> bool) -> t -> bool
 end = struct
   module M = Map.Make(struct
       (* CR layouts v2.8: A [Map] with mutable values (of which [type_expr] is
@@ -1515,37 +1537,11 @@ end = struct
   let update te f t = update te f (to_map t) |> of_map
   let find_opt te t = find_opt te (to_map t)
   let for_all f t = for_all f (to_map t)
-  let exists f t = exists f (to_map t)
   let map_with_key f t =
     fold (fun key value acc ->
       let key, value = f key value in
       M.add key value acc) (to_map t) M.empty |> of_map
 end
-
-let equal_unsafe_mode_crossing
-      ~type_equal
-      { unsafe_mod_bounds = mc1; unsafe_with_bounds = wb2 }
-      umc2 =
-  Misc.Le_result.equal ~le:Mode.Crossing.le mc1 umc2.unsafe_mod_bounds
-  && (match wb2, umc2.unsafe_with_bounds with
-    | No_with_bounds, No_with_bounds -> true
-    | No_with_bounds, With_bounds _ | With_bounds _, No_with_bounds -> false
-    | With_bounds wb1, With_bounds wb2 ->
-      (* It's tough (impossible?) to do better than a double subset check here because of
-         the fact that these maps are best-effort. But in practice these will usually not
-         be huge, and the attribute triggering this check is (hopefully) rare. *)
-      With_bounds_types.for_all
-        (fun ty1 _info ->
-           With_bounds_types.exists
-             (fun ty2 _info -> type_equal ty1 ty2)
-             wb2)
-        wb1
-      && With_bounds_types.for_all
-        (fun ty2 _info ->
-           With_bounds_types.exists
-             (fun ty1 _info -> type_equal ty1 ty2)
-             wb1)
-        wb2)
 
 (* Constructor and accessors for [row_desc] *)
 

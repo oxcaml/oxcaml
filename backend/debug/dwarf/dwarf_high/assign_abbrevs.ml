@@ -18,6 +18,8 @@ open Dwarf_low
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
 module ASS = Dwarf_attributes.Attribute_specification.Sealed
+module ATS = Dwarf_attributes.Attribute.Sealed
+module AV = Dwarf_attribute_values.Attribute_value
 module DIE = Debugging_information_entry
 
 type result =
@@ -57,6 +59,17 @@ let run ~proto_die_root =
                 name;
                 location_list_in_debug_loc_table
               } ->
+            (* The proto-DIE map is keyed on attributes alone; re-key on full
+               (attribute, form) specifications for the abbreviations table and
+               DIE emission, which distinguish forms. *)
+            let attribute_values =
+              ATS.Map.fold
+                (fun _attribute attribute_value acc ->
+                  ASS.Map.add
+                    (AV.attribute_spec attribute_value)
+                    attribute_value acc)
+                attribute_values ASS.Map.empty
+            in
             let attribute_specs = ASS.Map.keys attribute_values in
             let abbrev_table, abbreviation_code =
               match

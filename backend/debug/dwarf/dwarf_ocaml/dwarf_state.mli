@@ -66,26 +66,6 @@ module Die_gen_ctx : sig
       Proto_die.reference option
   end
 
-  (** Cache memoizing [runtime_shape_to_dwarf_die] results. *)
-  module Cache : sig
-    type t
-
-    val create : initial_size:int -> t
-
-    val find :
-      t ->
-      inp:Runtime_shape.t ->
-      rec_env:Rec_var_env.t ->
-      Proto_die.reference option
-
-    val add :
-      t ->
-      inp:Runtime_shape.t ->
-      rec_env:Rec_var_env.t ->
-      outp:Proto_die.reference ->
-      unit
-  end
-
   (** DWARF DIE cache for named type shapes. *)
   module Name_cache : sig
     type t
@@ -102,13 +82,27 @@ module Die_gen_ctx : sig
     val add : t -> string -> Runtime_shape.t -> Proto_die.reference -> unit
   end
 
+  (** The per-compilation-unit DIEs for the enumerations distinguishing
+      immediates from pointers: one variant with named enumerators, one with
+      unnamed ones. Created eagerly in [Dwarf.create], and only when generating
+      full DWARF. *)
+  type imm_or_ptr_enums =
+    { named : Proto_die.t;
+      unnamed : Proto_die.t
+    }
+
   type t
 
-  val create : initial_size:int -> t
-
-  val cache : t -> Cache.t
+  val create : initial_size:int -> imm_or_ptr_enums:imm_or_ptr_enums option -> t
 
   val name_cache : t -> Name_cache.t
+
+  (** Fatal error if the context was created without the enumeration DIEs. *)
+  val imm_or_ptr_enum_named : t -> Proto_die.t
+
+  (** As [imm_or_ptr_enum_named], but for the variant with unnamed enumerators.
+  *)
+  val imm_or_ptr_enum_unnamed : t -> Proto_die.t
 
   (** The empty recursive-variable environment, interned in this context's table
       so that it can be used as part of a cache key. *)
@@ -119,6 +113,22 @@ module Die_gen_ctx : sig
       cache key. *)
   val push_rec_binder :
     t -> Rec_var_env.t -> Proto_die.reference -> Rec_var_env.t
+
+  (** Look up the memoized DWARF type description for the shape [inp] in the
+      environment [rec_env]. *)
+  val find_cached_die :
+    t ->
+    inp:Runtime_shape.t ->
+    rec_env:Rec_var_env.t ->
+    Proto_die.reference option
+
+  (** Memoize [outp] as the DWARF type description for [inp] in [rec_env]. *)
+  val add_cached_die :
+    t ->
+    inp:Runtime_shape.t ->
+    rec_env:Rec_var_env.t ->
+    outp:Proto_die.reference ->
+    unit
 end
 
 type t
@@ -127,6 +137,7 @@ val create :
   compilation_unit_header_label:Asm_label.t ->
   compilation_unit_proto_die:Proto_die.t ->
   code_layout:code_layout ->
+  imm_or_ptr_enums:Die_gen_ctx.imm_or_ptr_enums option ->
   Debug_loc_table.t ->
   Debug_ranges_table.t ->
   Address_table.t ->

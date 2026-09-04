@@ -3,15 +3,15 @@
  expect.opt;
 *)
 
-external to_int64 : int64# -> int64 = "%box_int64"
+external to_int64 : int64_u -> int64 = "%box_int64"
 external to_float : float# -> float = "%box_float"
 external to_int8 : int8# -> int8 = "%tag_int8"
-external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
+external to_nativeint : nativeint_u -> nativeint = "%box_nativeint"
 [%%expect{|
-external to_int64 : int64# -> int64 = "%box_int64"
+external to_int64 : int64_u -> int64 = "%box_int64"
 external to_float : float# -> float = "%box_float"
 external to_int8 : int8# -> int8 = "%tag_int8"
-external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
+external to_nativeint : nativeint_u -> nativeint = "%box_nativeint"
 |}]
 
 (* Simple let poly_ with a polymorphic function *)
@@ -529,6 +529,6 @@ let poly_ f x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x1
 let () = Printf.printf "%.1f\n" (to_float (f 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 #7.0))
 
 [%%expect{|
-Uncaught exception: File "lambda/lambda.ml", line 1518, characters 2-8: Assertion failed
+Uncaught exception: File "lambda/lambda.ml", line 1542, characters 2-8: Assertion failed
 
 |}]

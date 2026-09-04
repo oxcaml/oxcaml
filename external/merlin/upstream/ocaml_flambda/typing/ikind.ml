@@ -477,7 +477,7 @@ module Solver = struct
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
+            | Types.Kconstr (path, _, _) -> Some path
           in
           jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
@@ -493,7 +493,7 @@ module Solver = struct
             let unresolved_base =
               match jkind_desc.base with
               | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
+              | Types.Kconstr (path, _, _) -> Some path
             in
             jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
         in
@@ -510,13 +510,10 @@ module Solver = struct
         let atom = rigid_name ctx (Ldd.Name.katom path) in
         Ldd.meet base_mod_bounds atom
     in
-    (* For each with-bound (ty, axes), contribute
-       modality(axes_mask, kind ty). *)
     Jkind.With_bounds.to_seq with_bounds
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
-           let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set axes in
+           let mask = bound_info.Types.With_bounds_type_info.bounds_mask in
            let ty_kind = kind ~use_tables:true ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
          base
@@ -536,7 +533,7 @@ module Solver = struct
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
-            | Types.Kconstr (path, _) -> Some path
+            | Types.Kconstr (path, _, _) -> Some path
           in
           jkind_desc.mod_bounds, unresolved_base
         | Some env -> (
@@ -546,7 +543,7 @@ module Solver = struct
             let unresolved_base =
               match jkind_desc.base with
               | Types.Layout _ -> None
-              | Types.Kconstr (path, _) -> Some path
+              | Types.Kconstr (path, _, _) -> Some path
             in
             jkind_desc.mod_bounds, unresolved_base)
       in
@@ -1299,33 +1296,22 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
          modal axes. *)
       use_decl_jkind ()
     | Types.Type_variant (cstrs, rep, _umc_opt) ->
-      (* Choose base: immediate for void-only variants; otherwise immutable. *)
-      let all_args_void =
-        List.for_all
-          (fun (c : Types.constructor_declaration) ->
-            match c.cd_args with
-            | Types.Cstr_tuple args ->
-              List.for_all
-                (fun (arg : Types.constructor_argument) ->
-                  match arg.ca_sort with
-                  | Some sort -> Jkind_types.Sort.Const.all_void sort
-                  | None -> false)
-                args
-            | Types.Cstr_record lbls ->
-              List.for_all
-                (fun (lbl : Types.label_declaration) ->
-                  match lbl.ld_sort with
-                  | Some sort -> Jkind_types.Sort.Const.all_void sort
-                  | None -> false)
-                lbls)
-          cstrs
+      (* Choose base: immediate for constant-only variants; otherwise
+         immutable. *)
+      let all_immediate =
+        match rep with
+        | Types.Variant_boxed layouts ->
+          Array.for_all Types.cstr_layout_is_constant layouts
+        | Types.Variant_unboxed | Types.Variant_extensible
+        | Types.Variant_with_null ->
+          false
       in
       let base =
         let base_lat, source =
           match rep with
           | Types.Variant_unboxed -> Axis_lattice.immediate, "unboxed variants"
           | _ ->
-            if all_args_void
+            if all_immediate
             then Axis_lattice.immediate, "enumeration variants"
             else Axis_lattice.immutable_data, "boxed variants"
         in

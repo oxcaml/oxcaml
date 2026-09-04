@@ -544,9 +544,6 @@ let foo (t : _ t @ nonportable contended once) =
 [%%expect {|
 type ('a : immutable_data) t = Foo of { x : 'a; } | Bar of 'a
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
-|}, Principal{|
-type ('a : immutable_data) t = Foo of { x : 'a; } | Bar of 'a
-val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
 |}]
 
 let foo (t : _ t @ local) = use_global t [@nontail]
@@ -1038,6 +1035,10 @@ module M : sig type t end = struct type t = int end
 type 'a many = Foo of ('a * 'a) many | Leaf
 let f (x : M.t many) = cross_contended x
 [%%expect {|
+module M : sig type t end
+type 'a many = Foo of ('a * 'a) many | Leaf
+val f : M.t many -> unit = <fun>
+|}, Principal{|
 module M : sig type t end
 type 'a many = Foo of ('a * 'a) many | Leaf
 Line 3, characters 39-40:

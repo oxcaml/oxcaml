@@ -590,7 +590,7 @@ let query_dominated_by =
     (let^$ [x], [y] = ["x"], ["y"] in
      [dominated_by_allocation_point x y] =>? [y])
 
-let perform_analysis db ~stats =
+let perform_analysis0 db ~stats =
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -772,10 +772,13 @@ let perform_analysis db ~stats =
             !changed_representation;
         unboxed, !changed_representation)
   in
+  { db; unboxed_fields = unboxed; changed_representation }
+
+let perform_analysis db ~stats =
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then { db; unboxed_fields = unboxed; changed_representation }
+  then perform_analysis0 db ~stats
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;
