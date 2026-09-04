@@ -31,6 +31,8 @@ type ('prop, 'req) property = {
   compute : Env.t -> decl -> 'req -> 'prop;
   update_decl : decl -> 'prop -> decl;
 
+  unboxed_version_inherits_prop : bool;
+
   check : Env.t -> Ident.t -> decl -> 'req * 'req option -> unit;
 }
 (** ['prop] represents the type of property values
@@ -41,7 +43,15 @@ type ('prop, 'req) property = {
 
     Some properties have no natural notion of user requirement, or
     their requirement is global, or already stored in
-    [type_declaration]; they can just use [unit] as ['req] parameter. *)
+    [type_declaration]; they can just use [unit] as ['req] parameter.
+
+    If [unboxed_version_inherits_prop], a declaration's unboxed version gets
+    the declaration's own property value on each round of the fixpoint,
+    instead of one computed from the unboxed version's definition. Variance
+    needs this: [t# box] reduces to [t] and [box] is covariant, so the
+    variance of [t#] must be that of [t]; computing it from the definition of
+    [t#] would lose the invariance coming from mutable fields of [t], whose
+    unboxed counterparts are immutable. *)
 
 
 (** [compute_property prop env decls req] performs a fixpoint computation
