@@ -101,8 +101,11 @@ Error: Signature mismatch:
          val regular_id : 'a -> 'a
        is not included in
          val poly_ regular_id : 'a -> 'a
-       the second has 1 more layout parameter that is not used,
-       which is not supported yet.
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The kind of 'a is 's1
+         because of the definition of regular_id at line 2, characters 2-48.
+       But the kind of 'a must be representable
+         because of the definition of regular_id at line 4, characters 17-22.
 |}]
 
 (* a [let poly_] binding of a tuple. The middle-end won't support this in the
